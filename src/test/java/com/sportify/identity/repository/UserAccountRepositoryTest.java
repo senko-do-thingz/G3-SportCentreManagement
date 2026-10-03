@@ -8,8 +8,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Optional;
 
+import org.springframework.transaction.annotation.Transactional;
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Transactional
 public class UserAccountRepositoryTest extends AbstractIntegrationTest {
 
     @Autowired

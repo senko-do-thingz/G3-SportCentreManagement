@@ -15,10 +15,15 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 public abstract class AbstractIntegrationTest {
 
-    @Container
     protected static final MSSQLServerContainer<?> MSSQL_SERVER_CONTAINER = new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2022-latest")
             .acceptLicense()
             .withPassword("YourStrong!Passw0rd");
+
+    static {
+        if (org.testcontainers.DockerClientFactory.instance().isDockerAvailable()) {
+            MSSQL_SERVER_CONTAINER.start();
+        }
+    }
 
     @DynamicPropertySource
     static void mssqlProperties(DynamicPropertyRegistry registry) {
