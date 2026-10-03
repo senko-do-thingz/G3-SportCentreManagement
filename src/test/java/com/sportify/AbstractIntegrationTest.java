@@ -22,7 +22,7 @@ public abstract class AbstractIntegrationTest {
 
     @DynamicPropertySource
     static void mssqlProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", MSSQL_SERVER_CONTAINER::getJdbcUrl);
+        registry.add("spring.datasource.url", () -> MSSQL_SERVER_CONTAINER.getJdbcUrl() + ";encrypt=false;trustServerCertificate=true");
         registry.add("spring.datasource.username", MSSQL_SERVER_CONTAINER::getUsername);
         registry.add("spring.datasource.password", MSSQL_SERVER_CONTAINER::getPassword);
     }
