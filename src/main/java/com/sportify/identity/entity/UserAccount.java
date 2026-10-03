@@ -1,6 +1,6 @@
 package com.sportify.identity.entity;
 
-import com.sportify.core.audit.BaseAuditableEntity;
+import com.sportify.core.audit.BaseMasterEntity;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class UserAccount extends BaseAuditableEntity {
+public class UserAccount extends BaseMasterEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -52,11 +52,6 @@ public class UserAccount extends BaseAuditableEntity {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
-    @Column(name = "created_by")
-    private Long createdBy;
-
-    @Column(name = "updated_by")
-    private Long updatedBy;
 
     @Version
     @Column(nullable = false)
