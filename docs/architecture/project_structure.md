@@ -12,6 +12,7 @@ G3-SportCentreManagement/
 ├── README.md
 ├── pom.xml                        <-- Maven dependencies and build config
 ├── docs/                          <-- ERD, database design, and architecture docs
+├── logs/                          <-- AI audit logs and generated reports
 └── src/
     ├── main/
     │   ├── java/com/sportify/     <-- Java source code root

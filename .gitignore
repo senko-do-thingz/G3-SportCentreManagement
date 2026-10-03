@@ -60,6 +60,7 @@ Thumbs.db
 
 # Python (for scripts)
 __pycache__/
+*.py
 *.py[cod]
 *$py.class
 venv/
