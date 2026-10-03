@@ -18,7 +18,7 @@ public abstract class AbstractIntegrationTest {
     @Container
     protected static final MSSQLServerContainer<?> MSSQL_SERVER_CONTAINER = new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2022-latest")
             .acceptLicense()
-            .withPassword("sa123456");
+            .withPassword("YourStrong!Passw0rd");
 
     @DynamicPropertySource
     static void mssqlProperties(DynamicPropertyRegistry registry) {
