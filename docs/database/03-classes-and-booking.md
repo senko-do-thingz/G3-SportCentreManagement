@@ -1,0 +1,179 @@
+# 03 - Classes and Booking
+
+Screens covered: Home (Quick class finder, Upcoming classes), F2-01 Class Management, F2-02 Create or Edit Class,
+F2-03 Schedule and Coach Assignment, F2-04 View Schedule, F2-05 Find or Filter Classes, F2-06 Class Detail,
+F2-07 Booking Review, F2-08 Booking Confirmed, F2-09 My Classes, F2-10 Coach Schedule, F2-11 Class Roster,
+F2-12 Class Full or Waitlist, F2-13 Cancel Booking.
+
+## ERD
+
+```mermaid
+erDiagram
+    sport ||--o{ sport_class : "categorizes"
+    age_group ||--o{ sport_class : "targets"
+    coach_profile ||--o{ sport_class : "default coach"
+    sport_class ||--o{ class_session : "scheduled as"
+    coach_profile ||--o{ class_session : "assigned"
+    facility ||--o{ class_session : "teaching area"
+    class_session ||--o{ booking : "has"
+    member_profile ||--o{ booking : "makes"
+    membership ||--o{ booking : "covers"
+    class_session ||--o{ waitlist_entry : "queues"
+    member_profile ||--o{ waitlist_entry : "waits"
+    booking ||--o| waitlist_entry : "promoted from"
+```
+
+## Design Decisions
+
+- **Class vs session.** `sport_class` is the learning group defined in F2-02 (name, sport, age group, level, goal,
+  maximum members, code `CL-204`). `class_session` is one dated occurrence created in F2-03 (date, start/end time,
+  teaching area, coach). Members book **sessions**.
+- **Draft until published.** "A Draft class becomes bookable only after its schedule and Coach assignment are
+  published" (F2-01). A session can be saved as `DRAFT` without coach or facility; publishing requires both
+  (`ck_class_session_publish_ready`).
+- **Capacity and seat counter on the session.** `capacity` is copied from `sport_class.max_members` when the session
+  is created (and can be adjusted). `booked_count` is a denormalized counter updated atomically to avoid overbooking
+  under concurrent requests (see 09-business-rules).
+- **Conflict checks (F2-03).** "Check that this Coach and teaching area have no other session at the selected time."
+  Enforced in the service with indexed queries on `(coach_id, session_date)` and `(facility_id, session_date)`.
+- **One active booking per member per session** via filtered unique index. A member may re-book after cancelling.
+- **Booking stores the membership used** (`membership_id`) so that coverage at booking time is traceable, and
+  `fee_amount` (always 0 when covered by the plan, F2-07 "Amount due 0 VND").
+- **Waitlist does not reserve a seat** (F2-12). When a seat opens, the first `WAITING` entry gets an `OFFERED` status
+  with an expiry; accepting creates a booking with `source = 'WAITLIST'`.
+- **My Classes tabs** (Upcoming / Past / Cancelled) are derived: `status` plus `session_date` compared to today.
+- **Roster** (F2-11, F4-04) is simply `booking` rows with `status = 'CONFIRMED'` for a session.
+
+## Tables
+
+### `sport_class`
+
+| Column | Type | Null | Key / Default | Description |
+|---|---|---|---|---|
+| id | BIGINT | No | PK, IDENTITY | |
+| code | NVARCHAR(20) | No | UQ | `CL-204` from `seq_class_code` |
+| name | NVARCHAR(100) | No | | "Basketball Fundamentals" |
+| sport_id | BIGINT | No | FK -> sport.id | |
+| age_group_id | BIGINT | No | FK -> age_group.id | "Ages 16+" |
+| level | NVARCHAR(20) | No | | `BEGINNER`, `INTERMEDIATE`, `ADVANCED` |
+| learning_goal | NVARCHAR(30) | No | | `IMPROVE_FITNESS`, `BUILD_SKILLS`, `COMPETITION` |
+| max_members | INT | No | CHECK > 0 | Default capacity of new sessions |
+| short_description | NVARCHAR(500) | Yes | | |
+| image_url | NVARCHAR(500) | Yes | | Card and hero image |
+| default_coach_id | BIGINT | Yes | FK -> coach_profile.user_id | Shown in F2-01 list |
+| default_facility_id | BIGINT | Yes | FK -> facility.id | |
+| status | NVARCHAR(20) | No | `DRAFT` | `DRAFT`, `PUBLISHED`, `ARCHIVED` |
+| created_at, updated_at, created_by, updated_by | | | | Audit |
+| version | INT | No | 0 | |
+
+Indexes: `ix_sport_class_filter (sport_id, age_group_id, level, status)` for F2-05 filters.
+
+### `class_session`
+
+| Column | Type | Null | Key / Default | Description |
+|---|---|---|---|---|
+| id | BIGINT | No | PK, IDENTITY | |
+| class_id | BIGINT | No | FK -> sport_class.id | |
+| coach_id | BIGINT | Yes | FK -> coach_profile.user_id | Required when published |
+| facility_id | BIGINT | Yes | FK -> facility.id | Required when published |
+| session_date | DATE | No | | |
+| start_time | TIME(0) | No | | |
+| end_time | TIME(0) | No | CHECK > start_time | |
+| capacity | INT | No | CHECK > 0 | Copied from class |
+| booked_count | INT | No | 0, CHECK 0..capacity | Confirmed bookings |
+| status | NVARCHAR(20) | No | `DRAFT` | `DRAFT`, `PUBLISHED`, `CANCELLED`, `COMPLETED` |
+| published_at | DATETIME2(0) | Yes | | |
+| published_by | BIGINT | Yes | FK -> user_account.id | Manager |
+| cancelled_at | DATETIME2(0) | Yes | | |
+| cancel_reason | NVARCHAR(255) | Yes | | Shown to members (F4-02 note) |
+| attendance_status | NVARCHAR(20) | No | `NOT_STARTED` | `NOT_STARTED`, `DRAFT`, `SUBMITTED` (Flow 4) |
+| attendance_submitted_at | DATETIME2(0) | Yes | | |
+| attendance_submitted_by | BIGINT | Yes | FK -> user_account.id | Assigned coach |
+| created_at, updated_at, created_by, updated_by | | | | Audit |
+| version | INT | No | 0 | Optimistic lock |
+
+Indexes: `ix_class_session_date_status (session_date, status) INCLUDE (class_id, coach_id, booked_count, capacity)`,
+`ix_class_session_coach_date (coach_id, session_date)`, `ix_class_session_facility_date (facility_id, session_date)`,
+`ix_class_session_class_date (class_id, session_date)`.
+
+### `booking`
+
+| Column | Type | Null | Key / Default | Description |
+|---|---|---|---|---|
+| id | BIGINT | No | PK, IDENTITY | |
+| booking_code | NVARCHAR(20) | No | UQ | `BK-2048` |
+| session_id | BIGINT | No | FK -> class_session.id | |
+| member_id | BIGINT | No | FK -> member_profile.user_id | |
+| membership_id | BIGINT | No | FK -> membership.id | Coverage used at booking time |
+| status | NVARCHAR(20) | No | `CONFIRMED` | `CONFIRMED`, `CANCELLED` |
+| source | NVARCHAR(20) | No | `MEMBER` | `MEMBER`, `RECEPTION`, `WAITLIST` |
+| fee_amount | DECIMAL(14,2) | No | 0, CHECK >= 0 | 0 when covered by membership |
+| booked_at | DATETIME2(0) | No | SYSDATETIME() | |
+| cancelled_at | DATETIME2(0) | Yes | | Required when cancelled |
+| cancelled_by | BIGINT | Yes | FK -> user_account.id | |
+| cancel_type | NVARCHAR(20) | Yes | | `MEMBER`, `STAFF`, `SESSION_CANCELLED` |
+| cancel_reason | NVARCHAR(255) | Yes | | |
+| created_at, updated_at | DATETIME2(0) | | | Audit |
+| version | INT | No | 0 | |
+
+Indexes: `ux_booking_active (session_id, member_id) WHERE status = 'CONFIRMED'`,
+`ix_booking_member_status (member_id, status)`, `ix_booking_session_status (session_id, status)`.
+
+### `waitlist_entry`
+
+| Column | Type | Null | Key / Default | Description |
+|---|---|---|---|---|
+| id | BIGINT | No | PK, IDENTITY | |
+| session_id | BIGINT | No | FK -> class_session.id | |
+| member_id | BIGINT | No | FK -> member_profile.user_id | |
+| status | NVARCHAR(20) | No | `WAITING` | `WAITING`, `OFFERED`, `PROMOTED`, `EXPIRED`, `CANCELLED` |
+| joined_at | DATETIME2(0) | No | SYSDATETIME() | Queue order (position is derived, not stored) |
+| offered_at | DATETIME2(0) | Yes | | |
+| offer_expires_at | DATETIME2(0) | Yes | | `offered_at + WAITLIST_OFFER_HOURS` |
+| promoted_booking_id | BIGINT | Yes | FK -> booking.id | Booking created from the offer |
+| cancelled_at | DATETIME2(0) | Yes | | |
+
+Indexes: `ux_waitlist_active (session_id, member_id) WHERE status IN ('WAITING','OFFERED')`,
+`ix_waitlist_queue (session_id, status, joined_at)`.
+
+## Useful Queries
+
+Find matching published sessions (F2-05, Home quick finder, F6-03):
+
+```sql
+SELECT cs.id, sc.name, s.name AS sport, ag.label AS age_group, sc.level,
+       cs.session_date, cs.start_time, cs.end_time, u.full_name AS coach,
+       cs.capacity - cs.booked_count AS seats_left
+FROM class_session cs
+JOIN sport_class sc ON sc.id = cs.class_id
+JOIN sport s        ON s.id = sc.sport_id
+JOIN age_group ag   ON ag.id = sc.age_group_id
+JOIN user_account u ON u.id = cs.coach_id
+WHERE cs.status = 'PUBLISHED'
+  AND sc.status = 'PUBLISHED'
+  AND cs.session_date >= CAST(SYSDATETIME() AS DATE)
+  AND (@sportId IS NULL OR sc.sport_id = @sportId)
+  AND (@ageGroupId IS NULL OR sc.age_group_id = @ageGroupId)
+  AND (@level IS NULL OR sc.level = @level)
+  AND (@goal IS NULL OR sc.learning_goal = @goal)
+ORDER BY cs.session_date, cs.start_time;
+```
+
+Coach or facility conflict check (F2-03):
+
+```sql
+SELECT COUNT(*)
+FROM class_session
+WHERE status IN ('DRAFT', 'PUBLISHED')
+  AND session_date = @date
+  AND (coach_id = @coachId OR facility_id = @facilityId)
+  AND start_time < @endTime
+  AND end_time > @startTime
+  AND id <> ISNULL(@currentSessionId, 0);
+```
+
+## Future Extension
+
+`class_schedule_pattern (class_id, day_of_week, start_time, end_time, coach_id, facility_id, valid_from, valid_to)`
+to generate recurring sessions ("Tue and Thu - 17:00" on Home). Generated rows are still `class_session`, so no other
+table changes.

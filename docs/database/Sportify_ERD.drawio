@@ -1,0 +1,961 @@
+<mxfile host="app.diagrams.net" pages="9">
+  <diagram id="page_0" name="00 - Global ERD Overview">
+    <mxGraphModel dx="6787" dy="3753" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="4000" pageHeight="4000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="0_table_role" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;role&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;code&lt;br&gt;name&lt;br&gt;description&lt;br&gt;is_system&lt;br&gt;created_at&lt;br&gt;updated_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="218" width="320" x="50" y="1618" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_permission" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;permission&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;code&lt;br&gt;name&lt;br&gt;description&lt;br&gt;module&lt;br&gt;display_order&lt;br&gt;" vertex="1">
+          <mxGeometry height="194" width="320" x="50" y="1274" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_role_permission" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;role_permission&lt;/b&gt;&lt;hr&gt;role_id&lt;br&gt;permission_id&lt;br&gt;" vertex="1">
+          <mxGeometry height="98" width="320" x="650" y="1306" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_user_account" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;user_account&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;email&lt;br&gt;password_hash&lt;br&gt;full_name&lt;br&gt;phone&lt;br&gt;date_of_birth&lt;br&gt;address&lt;br&gt;avatar_url&lt;br&gt;role_id&lt;br&gt;status&lt;br&gt;last_login_at&lt;br&gt;created_at, updated_at&lt;br&gt;created_by, updated_by&lt;br&gt;version&lt;br&gt;" vertex="1">
+          <mxGeometry height="386" width="320" x="650" y="1922" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_member_profile" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;member_profile&lt;/b&gt;&lt;hr&gt;user_id&lt;br&gt;member_code&lt;br&gt;main_goal&lt;br&gt;current_level&lt;br&gt;joined_on&lt;br&gt;staff_note&lt;br&gt;created_at, updated_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="218" width="320" x="1250" y="2058" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_member_sport_interest" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;member_sport_interest&lt;/b&gt;&lt;hr&gt;member_id&lt;br&gt;sport_id&lt;br&gt;" vertex="1">
+          <mxGeometry height="98" width="320" x="1850" y="1322" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_coach_profile" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;coach_profile&lt;/b&gt;&lt;hr&gt;user_id&lt;br&gt;primary_sport_id&lt;br&gt;headline&lt;br&gt;bio&lt;br&gt;years_experience&lt;br&gt;specialties&lt;br&gt;is_public&lt;br&gt;display_order&lt;br&gt;created_at, updated_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="266" width="320" x="1250" y="1642" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_coach_sport" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;coach_sport&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;coach_id&lt;br&gt;sport_id&lt;br&gt;max_level&lt;br&gt;" vertex="1">
+          <mxGeometry height="146" width="320" x="1850" y="1026" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_coach_certification" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;coach_certification&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;coach_id&lt;br&gt;sport_id&lt;br&gt;name&lt;br&gt;issuer&lt;br&gt;issued_on&lt;br&gt;expires_on&lt;br&gt;document_url&lt;br&gt;is_verified&lt;br&gt;created_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="290" width="320" x="1850" y="586" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_password_reset_token" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;password_reset_token&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;user_id&lt;br&gt;token_hash&lt;br&gt;expires_at&lt;br&gt;used_at&lt;br&gt;created_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="194" width="320" x="1250" y="2890" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_activity_log" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;activity_log&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;actor_user_id&lt;br&gt;action&lt;br&gt;entity_type&lt;br&gt;entity_id&lt;br&gt;entity_code&lt;br&gt;summary&lt;br&gt;details&lt;br&gt;ip_address&lt;br&gt;created_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="290" width="320" x="1250" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_sport" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;sport&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;code&lt;br&gt;name&lt;br&gt;venue_type&lt;br&gt;description&lt;br&gt;image_url&lt;br&gt;display_order&lt;br&gt;is_active&lt;br&gt;created_at, updated_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="266" width="320" x="50" y="1986" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_age_group" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;age_group&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;code&lt;br&gt;label&lt;br&gt;min_age&lt;br&gt;max_age&lt;br&gt;display_order&lt;br&gt;is_active&lt;br&gt;" vertex="1">
+          <mxGeometry height="218" width="320" x="50" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_facility" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;facility&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;code&lt;br&gt;name&lt;br&gt;facility_type&lt;br&gt;sport_id&lt;br&gt;capacity&lt;br&gt;is_active&lt;br&gt;created_at, updated_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="242" width="320" x="650" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_membership_plan" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;membership_plan&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;code&lt;br&gt;name&lt;br&gt;tagline&lt;br&gt;description&lt;br&gt;price&lt;br&gt;duration_days&lt;br&gt;max_sports&lt;br&gt;is_featured&lt;br&gt;status&lt;br&gt;display_order&lt;br&gt;created_at, updated_at, created_by, updated_by&lt;br&gt;version&lt;br&gt;" vertex="1">
+          <mxGeometry height="362" width="320" x="50" y="762" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_plan_eligible_sport" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;plan_eligible_sport&lt;/b&gt;&lt;hr&gt;plan_id&lt;br&gt;sport_id&lt;br&gt;" vertex="1">
+          <mxGeometry height="98" width="320" x="650" y="762" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_plan_feature" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;plan_feature&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;plan_id&lt;br&gt;feature_text&lt;br&gt;display_order&lt;br&gt;" vertex="1">
+          <mxGeometry height="146" width="320" x="650" y="1010" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_membership" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;membership&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;registration_code&lt;br&gt;member_id&lt;br&gt;plan_id&lt;br&gt;registration_type&lt;br&gt;previous_membership_id&lt;br&gt;channel&lt;br&gt;status&lt;br&gt;price_amount&lt;br&gt;duration_days&lt;br&gt;start_date&lt;br&gt;end_date&lt;br&gt;activated_at&lt;br&gt;cancelled_at&lt;br&gt;cancel_reason&lt;br&gt;created_by_user_id&lt;br&gt;created_at, updated_at&lt;br&gt;version&lt;br&gt;" vertex="1">
+          <mxGeometry height="482" width="320" x="1850" y="1570" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_membership_sport" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;membership_sport&lt;/b&gt;&lt;hr&gt;membership_id&lt;br&gt;sport_id&lt;br&gt;" vertex="1">
+          <mxGeometry height="98" width="320" x="2450" y="1098" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_check_in" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;check_in&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;member_id&lt;br&gt;membership_id&lt;br&gt;checked_in_at&lt;br&gt;result&lt;br&gt;denial_reason&lt;br&gt;recorded_by&lt;br&gt;note&lt;br&gt;" vertex="1">
+          <mxGeometry height="242" width="320" x="2450" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_sport_class" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;sport_class&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;code&lt;br&gt;name&lt;br&gt;sport_id&lt;br&gt;age_group_id&lt;br&gt;level&lt;br&gt;learning_goal&lt;br&gt;max_members&lt;br&gt;short_description&lt;br&gt;image_url&lt;br&gt;default_coach_id&lt;br&gt;default_facility_id&lt;br&gt;status&lt;br&gt;created_at, updated_at, created_by, updated_by&lt;br&gt;version&lt;br&gt;" vertex="1">
+          <mxGeometry height="410" width="320" x="1850" y="2498" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_class_session" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;class_session&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;class_id&lt;br&gt;coach_id&lt;br&gt;facility_id&lt;br&gt;session_date&lt;br&gt;start_time&lt;br&gt;end_time&lt;br&gt;capacity&lt;br&gt;booked_count&lt;br&gt;status&lt;br&gt;published_at&lt;br&gt;published_by&lt;br&gt;cancelled_at&lt;br&gt;cancel_reason&lt;br&gt;attendance_status&lt;br&gt;attendance_submitted_at&lt;br&gt;attendance_submitted_by&lt;br&gt;created_at, updated_at, created_by, updated_by&lt;br&gt;version&lt;br&gt;" vertex="1">
+          <mxGeometry height="506" width="320" x="2450" y="442" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_booking" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;booking&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;booking_code&lt;br&gt;session_id&lt;br&gt;member_id&lt;br&gt;membership_id&lt;br&gt;status&lt;br&gt;source&lt;br&gt;fee_amount&lt;br&gt;booked_at&lt;br&gt;cancelled_at&lt;br&gt;cancelled_by&lt;br&gt;cancel_type&lt;br&gt;cancel_reason&lt;br&gt;created_at, updated_at&lt;br&gt;version&lt;br&gt;" vertex="1">
+          <mxGeometry height="410" width="320" x="3050" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_waitlist_entry" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;waitlist_entry&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;session_id&lt;br&gt;member_id&lt;br&gt;status&lt;br&gt;joined_at&lt;br&gt;offered_at&lt;br&gt;offer_expires_at&lt;br&gt;promoted_booking_id&lt;br&gt;cancelled_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="266" width="320" x="3650" y="1714" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_payment" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;payment&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;payment_code&lt;br&gt;membership_id&lt;br&gt;member_id&lt;br&gt;purpose&lt;br&gt;amount_due&lt;br&gt;amount_received&lt;br&gt;method&lt;br&gt;transaction_reference&lt;br&gt;received_on&lt;br&gt;status&lt;br&gt;is_verified&lt;br&gt;failure_reason&lt;br&gt;note&lt;br&gt;recorded_by&lt;br&gt;recorded_at&lt;br&gt;confirmed_by&lt;br&gt;confirmed_at&lt;br&gt;created_at, updated_at&lt;br&gt;version&lt;br&gt;" vertex="1">
+          <mxGeometry height="530" width="320" x="2450" y="1346" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_invoice" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;invoice&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;invoice_number&lt;br&gt;payment_id&lt;br&gt;membership_id&lt;br&gt;member_id&lt;br&gt;invoice_date&lt;br&gt;billed_to_name&lt;br&gt;billed_to_member_code&lt;br&gt;payment_method&lt;br&gt;transaction_reference&lt;br&gt;total_amount&lt;br&gt;status&lt;br&gt;issued_by&lt;br&gt;issued_at&lt;br&gt;voided_at&lt;br&gt;void_reason&lt;br&gt;" vertex="1">
+          <mxGeometry height="434" width="320" x="3050" y="1026" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_invoice_line" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;invoice_line&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;invoice_id&lt;br&gt;line_no&lt;br&gt;description&lt;br&gt;period_days&lt;br&gt;period_start&lt;br&gt;period_end&lt;br&gt;selected_sports&lt;br&gt;quantity&lt;br&gt;unit_price&lt;br&gt;amount&lt;br&gt;" vertex="1">
+          <mxGeometry height="314" width="320" x="3650" y="466" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_vw_paid_payment" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;vw_paid_payment&lt;/b&gt;&lt;hr&gt;" vertex="1">
+          <mxGeometry height="80" width="320" x="50" y="2632" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_session_plan" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;session_plan&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;session_id&lt;br&gt;coach_id&lt;br&gt;session_goal&lt;br&gt;training_level&lt;br&gt;warmup_minutes&lt;br&gt;main_drill_minutes&lt;br&gt;drills_notes&lt;br&gt;expected_outcome&lt;br&gt;created_at, updated_at&lt;br&gt;version&lt;br&gt;" vertex="1">
+          <mxGeometry height="314" width="320" x="3050" y="1610" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_session_plan_step" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;session_plan_step&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;session_plan_id&lt;br&gt;step_order&lt;br&gt;start_time&lt;br&gt;activity&lt;br&gt;duration_minutes&lt;br&gt;" vertex="1">
+          <mxGeometry height="194" width="320" x="3650" y="1370" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_attendance_record" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;attendance_record&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;session_id&lt;br&gt;booking_id&lt;br&gt;member_id&lt;br&gt;status&lt;br&gt;note&lt;br&gt;recorded_by&lt;br&gt;recorded_at&lt;br&gt;version&lt;br&gt;" vertex="1">
+          <mxGeometry height="266" width="320" x="3650" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_attendance_correction" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;attendance_correction&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;attendance_id&lt;br&gt;old_status&lt;br&gt;new_status&lt;br&gt;reason&lt;br&gt;corrected_by&lt;br&gt;corrected_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="218" width="320" x="4250" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_skill_metric" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;skill_metric&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;sport_id&lt;br&gt;code&lt;br&gt;name&lt;br&gt;max_score&lt;br&gt;display_order&lt;br&gt;is_active&lt;br&gt;" vertex="1">
+          <mxGeometry height="218" width="320" x="650" y="1554" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_session_result" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;session_result&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;session_id&lt;br&gt;member_id&lt;br&gt;attendance_id&lt;br&gt;observed_result&lt;br&gt;recorded_by&lt;br&gt;recorded_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="218" width="320" x="4250" y="418" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_session_result_score" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;session_result_score&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;session_result_id&lt;br&gt;skill_metric_id&lt;br&gt;score&lt;br&gt;" vertex="1">
+          <mxGeometry height="146" width="320" x="4850" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_coach_feedback" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;coach_feedback&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;session_id&lt;br&gt;member_id&lt;br&gt;coach_id&lt;br&gt;went_well&lt;br&gt;improve_next&lt;br&gt;status&lt;br&gt;published_at&lt;br&gt;created_at, updated_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="266" width="320" x="3050" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_vw_session_attendance_summary" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;vw_session_attendance_summary&lt;/b&gt;&lt;hr&gt;" vertex="1">
+          <mxGeometry height="80" width="320" x="50" y="2862" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_vw_member_skill_latest" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;vw_member_skill_latest&lt;/b&gt;&lt;hr&gt;" vertex="1">
+          <mxGeometry height="80" width="320" x="50" y="2402" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_recommendation_rule_set" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;recommendation_rule_set&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;version_no&lt;br&gt;safety_gate_enabled&lt;br&gt;is_active&lt;br&gt;note&lt;br&gt;created_by&lt;br&gt;activated_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="218" width="320" x="1250" y="3234" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_recommendation_rule_weight" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;recommendation_rule_weight&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;rule_set_id&lt;br&gt;criterion&lt;br&gt;weight_percent&lt;br&gt;" vertex="1">
+          <mxGeometry height="146" width="320" x="1850" y="2202" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_workout_plan" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;workout_plan&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;plan_code&lt;br&gt;member_id&lt;br&gt;rule_set_id&lt;br&gt;membership_id&lt;br&gt;previous_plan_id&lt;br&gt;goal&lt;br&gt;sessions_per_week&lt;br&gt;preferred_time&lt;br&gt;available_day&lt;br&gt;preferred_sport_id&lt;br&gt;age_group_id&lt;br&gt;experience_level&lt;br&gt;focus_sport_id&lt;br&gt;focus_summary&lt;br&gt;headline&lt;br&gt;duration_weeks&lt;br&gt;ai_summary&lt;br&gt;recommended_class_id&lt;br&gt;recommended_session_id&lt;br&gt;reviewer_coach_id&lt;br&gt;match_score&lt;br&gt;status&lt;br&gt;ai_model&lt;br&gt;ai_raw_response&lt;br&gt;generated_at&lt;br&gt;submitted_at&lt;br&gt;approved_at&lt;br&gt;version&lt;br&gt;" vertex="1">
+          <mxGeometry height="746" width="320" x="3050" y="2074" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_workout_plan_candidate" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;workout_plan_candidate&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;plan_id&lt;br&gt;class_id&lt;br&gt;session_id&lt;br&gt;rank_no&lt;br&gt;total_score&lt;br&gt;goal_score&lt;br&gt;schedule_score&lt;br&gt;preference_score&lt;br&gt;coverage_score&lt;br&gt;reason&lt;br&gt;" vertex="1">
+          <mxGeometry height="314" width="320" x="3650" y="2130" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_workout_plan_week" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;workout_plan_week&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;plan_id&lt;br&gt;week_no&lt;br&gt;focus&lt;br&gt;" vertex="1">
+          <mxGeometry height="146" width="320" x="3650" y="3354" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_workout_plan_day" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;workout_plan_day&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;plan_id&lt;br&gt;day_of_week&lt;br&gt;display_order&lt;br&gt;activity_type&lt;br&gt;title&lt;br&gt;description&lt;br&gt;duration_minutes&lt;br&gt;class_session_id&lt;br&gt;" vertex="1">
+          <mxGeometry height="266" width="320" x="3650" y="2594" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_workout_plan_exercise" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;workout_plan_exercise&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;plan_id&lt;br&gt;seq_no&lt;br&gt;description&lt;br&gt;source&lt;br&gt;added_by&lt;br&gt;" vertex="1">
+          <mxGeometry height="194" width="320" x="3650" y="3010" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_plan_review" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;plan_review&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;plan_id&lt;br&gt;coach_id&lt;br&gt;requested_by&lt;br&gt;member_note&lt;br&gt;status&lt;br&gt;decision&lt;br&gt;coach_note&lt;br&gt;requested_at&lt;br&gt;decided_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="290" width="320" x="3650" y="930" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_assistant_setting" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;assistant_setting&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;welcome_message&lt;br&gt;escalation_enabled&lt;br&gt;clarification_enabled&lt;br&gt;fallback_message&lt;br&gt;ai_model&lt;br&gt;updated_by&lt;br&gt;updated_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="242" width="320" x="1250" y="1250" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_assistant_topic" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;assistant_topic&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;code&lt;br&gt;name&lt;br&gt;guidance&lt;br&gt;is_active&lt;br&gt;display_order&lt;br&gt;" vertex="1">
+          <mxGeometry height="194" width="320" x="50" y="418" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_assistant_quick_prompt" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;assistant_quick_prompt&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;topic_id&lt;br&gt;prompt_text&lt;br&gt;display_order&lt;br&gt;is_active&lt;br&gt;" vertex="1">
+          <mxGeometry height="170" width="320" x="650" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_ai_conversation" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;ai_conversation&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;user_id&lt;br&gt;title&lt;br&gt;status&lt;br&gt;started_at&lt;br&gt;last_message_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="194" width="320" x="1250" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_ai_message" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;ai_message&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;conversation_id&lt;br&gt;sender&lt;br&gt;content&lt;br&gt;intent&lt;br&gt;topic_id&lt;br&gt;needs_clarification&lt;br&gt;clarification_data&lt;br&gt;referenced_entities&lt;br&gt;model&lt;br&gt;prompt_tokens&lt;br&gt;completion_tokens&lt;br&gt;latency_ms&lt;br&gt;created_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="386" width="320" x="1850" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_support_request" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;support_request&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;request_code&lt;br&gt;member_id&lt;br&gt;topic&lt;br&gt;subject&lt;br&gt;question&lt;br&gt;source&lt;br&gt;ai_conversation_id&lt;br&gt;status&lt;br&gt;assigned_to&lt;br&gt;created_by&lt;br&gt;created_at&lt;br&gt;resolved_by&lt;br&gt;resolved_at&lt;br&gt;version&lt;br&gt;" vertex="1">
+          <mxGeometry height="410" width="320" x="1850" y="3058" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_support_request_message" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;support_request_message&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;request_id&lt;br&gt;author_id&lt;br&gt;author_type&lt;br&gt;body&lt;br&gt;status_after&lt;br&gt;created_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="218" width="320" x="2450" y="2026" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_notification" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;notification&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;recipient_id&lt;br&gt;type&lt;br&gt;title&lt;br&gt;message&lt;br&gt;link_url&lt;br&gt;related_entity_type&lt;br&gt;related_entity_id&lt;br&gt;is_read&lt;br&gt;read_at&lt;br&gt;created_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="314" width="320" x="1250" y="2426" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_announcement" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;announcement&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;title&lt;br&gt;body&lt;br&gt;audience&lt;br&gt;status&lt;br&gt;published_at&lt;br&gt;expires_at&lt;br&gt;created_by&lt;br&gt;created_at, updated_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="266" width="320" x="1250" y="834" as="geometry" />
+        </mxCell>
+        <mxCell id="0_table_system_setting" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;system_setting&lt;/b&gt;&lt;hr&gt;setting_key&lt;br&gt;setting_value&lt;br&gt;value_type&lt;br&gt;description&lt;br&gt;updated_by&lt;br&gt;updated_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="194" width="320" x="1250" y="3602" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_0" edge="1" parent="1" source="0_table_role_permission" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_role">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_1" edge="1" parent="1" source="0_table_role_permission" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_permission">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_2" edge="1" parent="1" source="0_table_user_account" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_role">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_3" edge="1" parent="1" source="0_table_member_profile" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_4" edge="1" parent="1" source="0_table_member_sport_interest" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_member_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_5" edge="1" parent="1" source="0_table_member_sport_interest" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_sport">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_6" edge="1" parent="1" source="0_table_coach_profile" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_7" edge="1" parent="1" source="0_table_coach_profile" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_sport">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_8" edge="1" parent="1" source="0_table_coach_sport" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_coach_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_9" edge="1" parent="1" source="0_table_coach_sport" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_sport">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_10" edge="1" parent="1" source="0_table_coach_certification" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_coach_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_11" edge="1" parent="1" source="0_table_coach_certification" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_sport">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_12" edge="1" parent="1" source="0_table_password_reset_token" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_13" edge="1" parent="1" source="0_table_activity_log" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_14" edge="1" parent="1" source="0_table_facility" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_sport">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_15" edge="1" parent="1" source="0_table_plan_eligible_sport" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_membership_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_16" edge="1" parent="1" source="0_table_plan_eligible_sport" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_sport">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_17" edge="1" parent="1" source="0_table_plan_feature" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_membership_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_18" edge="1" parent="1" source="0_table_membership" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_member_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_19" edge="1" parent="1" source="0_table_membership" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_membership_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_20" edge="1" parent="1" source="0_table_membership" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;exitY=0.5;entryDx=0;entryDy=0;" target="0_table_membership">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_21" edge="1" parent="1" source="0_table_membership" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_22" edge="1" parent="1" source="0_table_membership_sport" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_membership">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_23" edge="1" parent="1" source="0_table_membership_sport" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_sport">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_24" edge="1" parent="1" source="0_table_check_in" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_member_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_25" edge="1" parent="1" source="0_table_check_in" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_membership">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_26" edge="1" parent="1" source="0_table_check_in" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_27" edge="1" parent="1" source="0_table_sport_class" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_sport">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_28" edge="1" parent="1" source="0_table_sport_class" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_age_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_29" edge="1" parent="1" source="0_table_sport_class" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_coach_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_30" edge="1" parent="1" source="0_table_sport_class" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_facility">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1600" y="2703" />
+              <mxPoint x="1600" y="430" />
+              <mxPoint x="970" y="430" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="0_edge_31" edge="1" parent="1" source="0_table_class_session" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_sport_class">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_32" edge="1" parent="1" source="0_table_class_session" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_coach_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_33" edge="1" parent="1" source="0_table_class_session" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_facility">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_34" edge="1" parent="1" source="0_table_class_session" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_35" edge="1" parent="1" source="0_table_class_session" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_36" edge="1" parent="1" source="0_table_booking" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_class_session">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_37" edge="1" parent="1" source="0_table_booking" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_member_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_38" edge="1" parent="1" source="0_table_booking" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_membership">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_39" edge="1" parent="1" source="0_table_booking" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_40" edge="1" parent="1" source="0_table_waitlist_entry" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_class_session">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3450" y="1847" />
+              <mxPoint x="3450" y="560" />
+              <mxPoint x="2770" y="560" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="0_edge_41" edge="1" parent="1" source="0_table_waitlist_entry" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_member_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_42" edge="1" parent="1" source="0_table_waitlist_entry" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_booking">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_43" edge="1" parent="1" source="0_table_payment" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_membership">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_44" edge="1" parent="1" source="0_table_payment" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_member_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_45" edge="1" parent="1" source="0_table_payment" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_46" edge="1" parent="1" source="0_table_payment" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_47" edge="1" parent="1" source="0_table_invoice" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_payment">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_48" edge="1" parent="1" source="0_table_invoice" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_membership">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_49" edge="1" parent="1" source="0_table_invoice" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_member_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_50" edge="1" parent="1" source="0_table_invoice" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_51" edge="1" parent="1" source="0_table_invoice_line" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_invoice">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_52" edge="1" parent="1" source="0_table_session_plan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_class_session">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_53" edge="1" parent="1" source="0_table_session_plan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_coach_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_54" edge="1" parent="1" source="0_table_session_plan_step" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_session_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_55" edge="1" parent="1" source="0_table_attendance_record" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_class_session">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2950" y="183" />
+              <mxPoint x="2950" y="695" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="0_edge_56" edge="1" parent="1" source="0_table_attendance_record" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_booking">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_57" edge="1" parent="1" source="0_table_attendance_record" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_member_profile">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3650" y="480" />
+              <mxPoint x="2790" y="480" />
+              <mxPoint x="2790" y="2380" />
+              <mxPoint x="1570" y="2380" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="0_edge_58" edge="1" parent="1" source="0_table_attendance_record" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3650" y="10" />
+              <mxPoint x="2310" y="10" />
+              <mxPoint x="2310" y="2115" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="0_edge_59" edge="1" parent="1" source="0_table_attendance_correction" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_attendance_record">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_60" edge="1" parent="1" source="0_table_attendance_correction" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="4130" y="159" />
+              <mxPoint x="4130" y="430" />
+              <mxPoint x="2830" y="430" />
+              <mxPoint x="2830" y="2400" />
+              <mxPoint x="1080" y="2400" />
+              <mxPoint x="1080" y="2170" />
+              <mxPoint x="970" y="2170" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="0_edge_61" edge="1" parent="1" source="0_table_skill_metric" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_sport">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_62" edge="1" parent="1" source="0_table_session_result" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_class_session">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="4250" y="390" />
+              <mxPoint x="3570" y="390" />
+              <mxPoint x="3570" y="560" />
+              <mxPoint x="2770" y="560" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="0_edge_63" edge="1" parent="1" source="0_table_session_result" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_member_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_64" edge="1" parent="1" source="0_table_session_result" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_attendance_record">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_65" edge="1" parent="1" source="0_table_session_result" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="4250" y="450" />
+              <mxPoint x="2830" y="450" />
+              <mxPoint x="2830" y="2390" />
+              <mxPoint x="1040" y="2390" />
+              <mxPoint x="1040" y="2115" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="0_edge_66" edge="1" parent="1" source="0_table_session_result_score" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_session_result">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_67" edge="1" parent="1" source="0_table_session_result_score" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_skill_metric">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_68" edge="1" parent="1" source="0_table_coach_feedback" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_class_session">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_69" edge="1" parent="1" source="0_table_coach_feedback" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_member_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_70" edge="1" parent="1" source="0_table_coach_feedback" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_coach_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_71" edge="1" parent="1" source="0_table_recommendation_rule_set" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_72" edge="1" parent="1" source="0_table_recommendation_rule_weight" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_recommendation_rule_set">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_73" edge="1" parent="1" source="0_table_workout_plan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_member_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_74" edge="1" parent="1" source="0_table_workout_plan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_recommendation_rule_set">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_75" edge="1" parent="1" source="0_table_workout_plan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_membership">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_76" edge="1" parent="1" source="0_table_workout_plan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;exitY=0.5;entryDx=0;entryDy=0;" target="0_table_workout_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_77" edge="1" parent="1" source="0_table_workout_plan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_sport">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_78" edge="1" parent="1" source="0_table_workout_plan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_age_group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_79" edge="1" parent="1" source="0_table_workout_plan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_sport">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3050" y="2360" />
+              <mxPoint x="440" y="2360" />
+              <mxPoint x="440" y="2119" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="0_edge_80" edge="1" parent="1" source="0_table_workout_plan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_sport_class">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_81" edge="1" parent="1" source="0_table_workout_plan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_class_session">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_82" edge="1" parent="1" source="0_table_workout_plan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_coach_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_83" edge="1" parent="1" source="0_table_workout_plan_candidate" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_workout_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_84" edge="1" parent="1" source="0_table_workout_plan_candidate" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_sport_class">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_85" edge="1" parent="1" source="0_table_workout_plan_candidate" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_class_session">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3650" y="2000" />
+              <mxPoint x="2970" y="2000" />
+              <mxPoint x="2970" y="695" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="0_edge_86" edge="1" parent="1" source="0_table_workout_plan_week" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_workout_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_87" edge="1" parent="1" source="0_table_workout_plan_day" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_workout_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_88" edge="1" parent="1" source="0_table_workout_plan_day" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_class_session">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3410" y="2727" />
+              <mxPoint x="3410" y="950" />
+              <mxPoint x="2770" y="950" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="0_edge_89" edge="1" parent="1" source="0_table_workout_plan_exercise" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_workout_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_90" edge="1" parent="1" source="0_table_workout_plan_exercise" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_91" edge="1" parent="1" source="0_table_plan_review" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_workout_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_92" edge="1" parent="1" source="0_table_plan_review" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_coach_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_93" edge="1" parent="1" source="0_table_plan_review" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3650" y="990" />
+              <mxPoint x="2260" y="990" />
+              <mxPoint x="2260" y="2030" />
+              <mxPoint x="970" y="2030" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="0_edge_94" edge="1" parent="1" source="0_table_assistant_setting" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_95" edge="1" parent="1" source="0_table_assistant_quick_prompt" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_assistant_topic">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_96" edge="1" parent="1" source="0_table_ai_conversation" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_97" edge="1" parent="1" source="0_table_ai_message" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_ai_conversation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_98" edge="1" parent="1" source="0_table_ai_message" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_assistant_topic">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_99" edge="1" parent="1" source="0_table_support_request" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_member_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_100" edge="1" parent="1" source="0_table_support_request" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_ai_conversation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_101" edge="1" parent="1" source="0_table_support_request" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_102" edge="1" parent="1" source="0_table_support_request" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_103" edge="1" parent="1" source="0_table_support_request" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_104" edge="1" parent="1" source="0_table_support_request_message" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_support_request">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_105" edge="1" parent="1" source="0_table_support_request_message" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_106" edge="1" parent="1" source="0_table_notification" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_107" edge="1" parent="1" source="0_table_announcement" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="0_edge_108" edge="1" parent="1" source="0_table_system_setting" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="0_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="page_1" name="01 - Identity and Access">
+    <mxGraphModel dx="1000" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="4000" pageHeight="4000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="1_table_role" value="&lt;b&gt;role&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;code&lt;br&gt;name&lt;br&gt;description&lt;br&gt;is_system&lt;br&gt;created_at&lt;br&gt;updated_at&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="50" y="394" width="320" height="218" as="geometry" />
+        </mxCell>
+        <mxCell id="1_table_permission" value="&lt;b&gt;permission&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;code&lt;br&gt;name&lt;br&gt;description&lt;br&gt;module&lt;br&gt;display_order&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="50" y="50" width="320" height="194" as="geometry" />
+        </mxCell>
+        <mxCell id="1_table_role_permission" value="&lt;b&gt;role_permission&lt;/b&gt;&lt;hr&gt;role_id&lt;br&gt;permission_id&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="650" y="50" width="320" height="98" as="geometry" />
+        </mxCell>
+        <mxCell id="1_table_user_account" value="&lt;b&gt;user_account&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;email&lt;br&gt;password_hash&lt;br&gt;full_name&lt;br&gt;phone&lt;br&gt;date_of_birth&lt;br&gt;address&lt;br&gt;avatar_url&lt;br&gt;role_id&lt;br&gt;status&lt;br&gt;last_login_at&lt;br&gt;created_at, updated_at&lt;br&gt;created_by, updated_by&lt;br&gt;version&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="650" y="298" width="320" height="386" as="geometry" />
+        </mxCell>
+        <mxCell id="1_table_member_profile" value="&lt;b&gt;member_profile&lt;/b&gt;&lt;hr&gt;user_id&lt;br&gt;member_code&lt;br&gt;main_goal&lt;br&gt;current_level&lt;br&gt;joined_on&lt;br&gt;staff_note&lt;br&gt;created_at, updated_at&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="906" width="320" height="218" as="geometry" />
+        </mxCell>
+        <mxCell id="1_table_member_sport_interest" value="&lt;b&gt;member_sport_interest&lt;/b&gt;&lt;hr&gt;member_id&lt;br&gt;sport_id&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1850" y="786" width="320" height="98" as="geometry" />
+        </mxCell>
+        <mxCell id="1_table_coach_profile" value="&lt;b&gt;coach_profile&lt;/b&gt;&lt;hr&gt;user_id&lt;br&gt;primary_sport_id&lt;br&gt;headline&lt;br&gt;bio&lt;br&gt;years_experience&lt;br&gt;specialties&lt;br&gt;is_public&lt;br&gt;display_order&lt;br&gt;created_at, updated_at&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="490" width="320" height="266" as="geometry" />
+        </mxCell>
+        <mxCell id="1_table_coach_sport" value="&lt;b&gt;coach_sport&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;coach_id&lt;br&gt;sport_id&lt;br&gt;max_level&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1850" y="490" width="320" height="146" as="geometry" />
+        </mxCell>
+        <mxCell id="1_table_coach_certification" value="&lt;b&gt;coach_certification&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;coach_id&lt;br&gt;sport_id&lt;br&gt;name&lt;br&gt;issuer&lt;br&gt;issued_on&lt;br&gt;expires_on&lt;br&gt;document_url&lt;br&gt;is_verified&lt;br&gt;created_at&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1850" y="50" width="320" height="290" as="geometry" />
+        </mxCell>
+        <mxCell id="1_table_password_reset_token" value="&lt;b&gt;password_reset_token&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;user_id&lt;br&gt;token_hash&lt;br&gt;expires_at&lt;br&gt;used_at&lt;br&gt;created_at&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="1274" width="320" height="194" as="geometry" />
+        </mxCell>
+        <mxCell id="1_table_activity_log" value="&lt;b&gt;activity_log&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;actor_user_id&lt;br&gt;action&lt;br&gt;entity_type&lt;br&gt;entity_id&lt;br&gt;entity_code&lt;br&gt;summary&lt;br&gt;details&lt;br&gt;ip_address&lt;br&gt;created_at&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="50" width="320" height="290" as="geometry" />
+        </mxCell>
+        <mxCell id="1_edge_0" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="1_table_role_permission" target="1_table_role">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="1_edge_1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="1_table_role_permission" target="1_table_permission">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="1_edge_2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="1_table_user_account" target="1_table_role">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="1_edge_3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="1_table_member_profile" target="1_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="1_edge_4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="1_table_member_sport_interest" target="1_table_member_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="1_edge_5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="1_table_coach_profile" target="1_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="1_edge_6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="1_table_coach_sport" target="1_table_coach_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="1_edge_7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="1_table_coach_certification" target="1_table_coach_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="1_edge_8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="1_table_password_reset_token" target="1_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="1_edge_9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="1_table_activity_log" target="1_table_user_account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="page_2" name="02 - Catalog and Membership">
+    <mxGraphModel dx="2545" dy="1408" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="4000" pageHeight="4000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2_table_sport" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;sport&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;code&lt;br&gt;name&lt;br&gt;venue_type&lt;br&gt;description&lt;br&gt;image_url&lt;br&gt;display_order&lt;br&gt;is_active&lt;br&gt;created_at, updated_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="266" width="320" x="50" y="930" as="geometry" />
+        </mxCell>
+        <mxCell id="2_table_age_group" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;age_group&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;code&lt;br&gt;label&lt;br&gt;min_age&lt;br&gt;max_age&lt;br&gt;display_order&lt;br&gt;is_active&lt;br&gt;" vertex="1">
+          <mxGeometry height="218" width="320" x="50" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="2_table_facility" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;facility&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;code&lt;br&gt;name&lt;br&gt;facility_type&lt;br&gt;sport_id&lt;br&gt;capacity&lt;br&gt;is_active&lt;br&gt;created_at, updated_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="242" width="320" x="650" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="2_table_membership_plan" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;membership_plan&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;code&lt;br&gt;name&lt;br&gt;tagline&lt;br&gt;description&lt;br&gt;price&lt;br&gt;duration_days&lt;br&gt;max_sports&lt;br&gt;is_featured&lt;br&gt;status&lt;br&gt;display_order&lt;br&gt;created_at, updated_at, created_by, updated_by&lt;br&gt;version&lt;br&gt;" vertex="1">
+          <mxGeometry height="362" width="320" x="50" y="418" as="geometry" />
+        </mxCell>
+        <mxCell id="2_table_plan_eligible_sport" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;plan_eligible_sport&lt;/b&gt;&lt;hr&gt;plan_id&lt;br&gt;sport_id&lt;br&gt;" vertex="1">
+          <mxGeometry height="98" width="320" x="650" y="1110" as="geometry" />
+        </mxCell>
+        <mxCell id="2_table_plan_feature" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;plan_feature&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;plan_id&lt;br&gt;feature_text&lt;br&gt;display_order&lt;br&gt;" vertex="1">
+          <mxGeometry height="146" width="320" x="650" y="1322" as="geometry" />
+        </mxCell>
+        <mxCell id="2_table_membership" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;membership&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;registration_code&lt;br&gt;member_id&lt;br&gt;plan_id&lt;br&gt;registration_type&lt;br&gt;previous_membership_id&lt;br&gt;channel&lt;br&gt;status&lt;br&gt;price_amount&lt;br&gt;duration_days&lt;br&gt;start_date&lt;br&gt;end_date&lt;br&gt;activated_at&lt;br&gt;cancelled_at&lt;br&gt;cancel_reason&lt;br&gt;created_by_user_id&lt;br&gt;created_at, updated_at&lt;br&gt;version&lt;br&gt;" vertex="1">
+          <mxGeometry height="482" width="320" x="650" y="442" as="geometry" />
+        </mxCell>
+        <mxCell id="2_table_membership_sport" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;membership_sport&lt;/b&gt;&lt;hr&gt;membership_id&lt;br&gt;sport_id&lt;br&gt;" vertex="1">
+          <mxGeometry height="98" width="320" x="1250" y="442" as="geometry" />
+        </mxCell>
+        <mxCell id="2_table_check_in" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;check_in&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;member_id&lt;br&gt;membership_id&lt;br&gt;checked_in_at&lt;br&gt;result&lt;br&gt;denial_reason&lt;br&gt;recorded_by&lt;br&gt;note&lt;br&gt;" vertex="1">
+          <mxGeometry height="242" width="320" x="1250" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="2_edge_0" edge="1" parent="1" source="2_table_facility" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="2_table_sport">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="2_edge_1" edge="1" parent="1" source="2_table_plan_eligible_sport" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="2_table_membership_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="2_edge_2" edge="1" parent="1" source="2_table_plan_eligible_sport" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="2_table_sport">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="2_edge_3" edge="1" parent="1" source="2_table_plan_feature" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="2_table_membership_plan">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="460" y="1395" />
+              <mxPoint x="460" y="599" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="2_edge_4" edge="1" parent="1" source="2_table_membership" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="2_table_membership_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="2_edge_5" edge="1" parent="1" source="2_table_membership" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;exitY=0.5;entryDx=0;entryDy=0;" target="2_table_membership">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="2_edge_6" edge="1" parent="1" source="2_table_membership_sport" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="2_table_membership">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="2_edge_7" edge="1" parent="1" source="2_table_membership_sport" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="2_table_sport">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1200" y="491" />
+              <mxPoint x="1200" y="1063" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="2_edge_8" edge="1" parent="1" source="2_table_check_in" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="2_table_membership">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="page_3" name="03 - Classes and Booking">
+    <mxGraphModel dx="1000" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="4000" pageHeight="4000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="3_table_sport_class" value="&lt;b&gt;sport_class&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;code&lt;br&gt;name&lt;br&gt;sport_id&lt;br&gt;age_group_id&lt;br&gt;level&lt;br&gt;learning_goal&lt;br&gt;max_members&lt;br&gt;short_description&lt;br&gt;image_url&lt;br&gt;default_coach_id&lt;br&gt;default_facility_id&lt;br&gt;status&lt;br&gt;created_at, updated_at, created_by, updated_by&lt;br&gt;version&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="50" y="50" width="320" height="410" as="geometry" />
+        </mxCell>
+        <mxCell id="3_table_class_session" value="&lt;b&gt;class_session&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;class_id&lt;br&gt;coach_id&lt;br&gt;facility_id&lt;br&gt;session_date&lt;br&gt;start_time&lt;br&gt;end_time&lt;br&gt;capacity&lt;br&gt;booked_count&lt;br&gt;status&lt;br&gt;published_at&lt;br&gt;published_by&lt;br&gt;cancelled_at&lt;br&gt;cancel_reason&lt;br&gt;attendance_status&lt;br&gt;attendance_submitted_at&lt;br&gt;attendance_submitted_by&lt;br&gt;created_at, updated_at, created_by, updated_by&lt;br&gt;version&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="650" y="50" width="320" height="506" as="geometry" />
+        </mxCell>
+        <mxCell id="3_table_booking" value="&lt;b&gt;booking&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;booking_code&lt;br&gt;session_id&lt;br&gt;member_id&lt;br&gt;membership_id&lt;br&gt;status&lt;br&gt;source&lt;br&gt;fee_amount&lt;br&gt;booked_at&lt;br&gt;cancelled_at&lt;br&gt;cancelled_by&lt;br&gt;cancel_type&lt;br&gt;cancel_reason&lt;br&gt;created_at, updated_at&lt;br&gt;version&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="50" width="320" height="410" as="geometry" />
+        </mxCell>
+        <mxCell id="3_table_waitlist_entry" value="&lt;b&gt;waitlist_entry&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;session_id&lt;br&gt;member_id&lt;br&gt;status&lt;br&gt;joined_at&lt;br&gt;offered_at&lt;br&gt;offer_expires_at&lt;br&gt;promoted_booking_id&lt;br&gt;cancelled_at&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1850" y="50" width="320" height="266" as="geometry" />
+        </mxCell>
+        <mxCell id="3_edge_0" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="3_table_class_session" target="3_table_sport_class">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="3_edge_1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="3_table_booking" target="3_table_class_session">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="3_edge_2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="3_table_waitlist_entry" target="3_table_class_session">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="3_edge_3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="3_table_waitlist_entry" target="3_table_booking">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="page_4" name="04 - Payments, Invoices and Reports">
+    <mxGraphModel dx="1000" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="4000" pageHeight="4000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="4_table_payment" value="&lt;b&gt;payment&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;payment_code&lt;br&gt;membership_id&lt;br&gt;member_id&lt;br&gt;purpose&lt;br&gt;amount_due&lt;br&gt;amount_received&lt;br&gt;method&lt;br&gt;transaction_reference&lt;br&gt;received_on&lt;br&gt;status&lt;br&gt;is_verified&lt;br&gt;failure_reason&lt;br&gt;note&lt;br&gt;recorded_by&lt;br&gt;recorded_at&lt;br&gt;confirmed_by&lt;br&gt;confirmed_at&lt;br&gt;created_at, updated_at&lt;br&gt;version&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="50" y="50" width="320" height="530" as="geometry" />
+        </mxCell>
+        <mxCell id="4_table_invoice" value="&lt;b&gt;invoice&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;invoice_number&lt;br&gt;payment_id&lt;br&gt;membership_id&lt;br&gt;member_id&lt;br&gt;invoice_date&lt;br&gt;billed_to_name&lt;br&gt;billed_to_member_code&lt;br&gt;payment_method&lt;br&gt;transaction_reference&lt;br&gt;total_amount&lt;br&gt;status&lt;br&gt;issued_by&lt;br&gt;issued_at&lt;br&gt;voided_at&lt;br&gt;void_reason&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="650" y="50" width="320" height="434" as="geometry" />
+        </mxCell>
+        <mxCell id="4_table_invoice_line" value="&lt;b&gt;invoice_line&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;invoice_id&lt;br&gt;line_no&lt;br&gt;description&lt;br&gt;period_days&lt;br&gt;period_start&lt;br&gt;period_end&lt;br&gt;selected_sports&lt;br&gt;quantity&lt;br&gt;unit_price&lt;br&gt;amount&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="50" width="320" height="314" as="geometry" />
+        </mxCell>
+        <mxCell id="4_table_vw_paid_payment" value="&lt;b&gt;vw_paid_payment&lt;/b&gt;&lt;hr&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="50" y="730" width="320" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="4_edge_0" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="4_table_invoice" target="4_table_payment">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4_edge_1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="4_table_invoice_line" target="4_table_invoice">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="page_5" name="05 - Training, Attendance and Progress">
+    <mxGraphModel dx="4072" dy="2252" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="4000" pageHeight="4000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="5_table_session_plan" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;session_plan&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;session_id&lt;br&gt;coach_id&lt;br&gt;session_goal&lt;br&gt;training_level&lt;br&gt;warmup_minutes&lt;br&gt;main_drill_minutes&lt;br&gt;drills_notes&lt;br&gt;expected_outcome&lt;br&gt;created_at, updated_at&lt;br&gt;version&lt;br&gt;" vertex="1">
+          <mxGeometry height="314" width="320" x="50" y="882" as="geometry" />
+        </mxCell>
+        <mxCell id="5_table_session_plan_step" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;session_plan_step&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;session_plan_id&lt;br&gt;step_order&lt;br&gt;start_time&lt;br&gt;activity&lt;br&gt;duration_minutes&lt;br&gt;" vertex="1">
+          <mxGeometry height="194" width="320" x="650" y="418" as="geometry" />
+        </mxCell>
+        <mxCell id="5_table_attendance_record" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;attendance_record&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;session_id&lt;br&gt;booking_id&lt;br&gt;member_id&lt;br&gt;status&lt;br&gt;note&lt;br&gt;recorded_by&lt;br&gt;recorded_at&lt;br&gt;version&lt;br&gt;" vertex="1">
+          <mxGeometry height="266" width="320" x="50" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="5_table_attendance_correction" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;attendance_correction&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;attendance_id&lt;br&gt;old_status&lt;br&gt;new_status&lt;br&gt;reason&lt;br&gt;corrected_by&lt;br&gt;corrected_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="218" width="320" x="650" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="5_table_skill_metric" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;skill_metric&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;sport_id&lt;br&gt;code&lt;br&gt;name&lt;br&gt;max_score&lt;br&gt;display_order&lt;br&gt;is_active&lt;br&gt;" vertex="1">
+          <mxGeometry height="218" width="320" x="50" y="1346" as="geometry" />
+        </mxCell>
+        <mxCell id="5_table_session_result" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;session_result&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;session_id&lt;br&gt;member_id&lt;br&gt;attendance_id&lt;br&gt;observed_result&lt;br&gt;recorded_by&lt;br&gt;recorded_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="218" width="320" x="650" y="762" as="geometry" />
+        </mxCell>
+        <mxCell id="5_table_session_result_score" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;session_result_score&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;session_result_id&lt;br&gt;skill_metric_id&lt;br&gt;score&lt;br&gt;" vertex="1">
+          <mxGeometry height="146" width="320" x="1250" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="5_table_coach_feedback" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;coach_feedback&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;session_id&lt;br&gt;member_id&lt;br&gt;coach_id&lt;br&gt;went_well&lt;br&gt;improve_next&lt;br&gt;status&lt;br&gt;published_at&lt;br&gt;created_at, updated_at&lt;br&gt;" vertex="1">
+          <mxGeometry height="266" width="320" x="50" y="466" as="geometry" />
+        </mxCell>
+        <mxCell id="5_table_vw_session_attendance_summary" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;vw_session_attendance_summary&lt;/b&gt;&lt;hr&gt;" vertex="1">
+          <mxGeometry height="80" width="320" x="50" y="1944" as="geometry" />
+        </mxCell>
+        <mxCell id="5_table_vw_member_skill_latest" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" value="&lt;b&gt;vw_member_skill_latest&lt;/b&gt;&lt;hr&gt;" vertex="1">
+          <mxGeometry height="80" width="320" x="50" y="1714" as="geometry" />
+        </mxCell>
+        <mxCell id="5_edge_0" edge="1" parent="1" source="5_table_session_plan_step" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="5_table_session_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="5_edge_1" edge="1" parent="1" source="5_table_attendance_correction" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="5_table_attendance_record">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="5_edge_2" edge="1" parent="1" source="5_table_session_result" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="5_table_attendance_record">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="5_edge_3" edge="1" parent="1" source="5_table_session_result_score" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="5_table_session_result">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="5_edge_4" edge="1" parent="1" source="5_table_session_result_score" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="5_table_skill_metric">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1180" y="123.2" />
+              <mxPoint x="1180" y="1455.2" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="page_6" name="06 - AI Workout Recommendation">
+    <mxGraphModel dx="1000" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="4000" pageHeight="4000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="6_table_recommendation_rule_set" value="&lt;b&gt;recommendation_rule_set&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;version_no&lt;br&gt;safety_gate_enabled&lt;br&gt;is_active&lt;br&gt;note&lt;br&gt;created_by&lt;br&gt;activated_at&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="50" y="50" width="320" height="218" as="geometry" />
+        </mxCell>
+        <mxCell id="6_table_recommendation_rule_weight" value="&lt;b&gt;recommendation_rule_weight&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;rule_set_id&lt;br&gt;criterion&lt;br&gt;weight_percent&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="650" y="50" width="320" height="146" as="geometry" />
+        </mxCell>
+        <mxCell id="6_table_workout_plan" value="&lt;b&gt;workout_plan&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;plan_code&lt;br&gt;member_id&lt;br&gt;rule_set_id&lt;br&gt;membership_id&lt;br&gt;previous_plan_id&lt;br&gt;goal&lt;br&gt;sessions_per_week&lt;br&gt;preferred_time&lt;br&gt;available_day&lt;br&gt;preferred_sport_id&lt;br&gt;age_group_id&lt;br&gt;experience_level&lt;br&gt;focus_sport_id&lt;br&gt;focus_summary&lt;br&gt;headline&lt;br&gt;duration_weeks&lt;br&gt;ai_summary&lt;br&gt;recommended_class_id&lt;br&gt;recommended_session_id&lt;br&gt;reviewer_coach_id&lt;br&gt;match_score&lt;br&gt;status&lt;br&gt;ai_model&lt;br&gt;ai_raw_response&lt;br&gt;generated_at&lt;br&gt;submitted_at&lt;br&gt;approved_at&lt;br&gt;version&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="650" y="346" width="320" height="746" as="geometry" />
+        </mxCell>
+        <mxCell id="6_table_workout_plan_candidate" value="&lt;b&gt;workout_plan_candidate&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;plan_id&lt;br&gt;class_id&lt;br&gt;session_id&lt;br&gt;rank_no&lt;br&gt;total_score&lt;br&gt;goal_score&lt;br&gt;schedule_score&lt;br&gt;preference_score&lt;br&gt;coverage_score&lt;br&gt;reason&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="490" width="320" height="314" as="geometry" />
+        </mxCell>
+        <mxCell id="6_table_workout_plan_week" value="&lt;b&gt;workout_plan_week&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;plan_id&lt;br&gt;week_no&lt;br&gt;focus&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="1714" width="320" height="146" as="geometry" />
+        </mxCell>
+        <mxCell id="6_table_workout_plan_day" value="&lt;b&gt;workout_plan_day&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;plan_id&lt;br&gt;day_of_week&lt;br&gt;display_order&lt;br&gt;activity_type&lt;br&gt;title&lt;br&gt;description&lt;br&gt;duration_minutes&lt;br&gt;class_session_id&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="954" width="320" height="266" as="geometry" />
+        </mxCell>
+        <mxCell id="6_table_workout_plan_exercise" value="&lt;b&gt;workout_plan_exercise&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;plan_id&lt;br&gt;seq_no&lt;br&gt;description&lt;br&gt;source&lt;br&gt;added_by&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="1370" width="320" height="194" as="geometry" />
+        </mxCell>
+        <mxCell id="6_table_plan_review" value="&lt;b&gt;plan_review&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;plan_id&lt;br&gt;coach_id&lt;br&gt;requested_by&lt;br&gt;member_note&lt;br&gt;status&lt;br&gt;decision&lt;br&gt;coach_note&lt;br&gt;requested_at&lt;br&gt;decided_at&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="50" width="320" height="290" as="geometry" />
+        </mxCell>
+        <mxCell id="6_edge_0" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="6_table_recommendation_rule_weight" target="6_table_recommendation_rule_set">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="6_edge_1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="6_table_workout_plan" target="6_table_recommendation_rule_set">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="6_edge_2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;exitY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="6_table_workout_plan" target="6_table_workout_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="6_edge_3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="6_table_workout_plan_candidate" target="6_table_workout_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="6_edge_4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="6_table_workout_plan_week" target="6_table_workout_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="6_edge_5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="6_table_workout_plan_day" target="6_table_workout_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="6_edge_6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="6_table_workout_plan_exercise" target="6_table_workout_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="6_edge_7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="6_table_plan_review" target="6_table_workout_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="page_7" name="07 - AI Assistant and Support">
+    <mxGraphModel dx="1000" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="4000" pageHeight="4000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="7_table_assistant_setting" value="&lt;b&gt;assistant_setting&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;welcome_message&lt;br&gt;escalation_enabled&lt;br&gt;clarification_enabled&lt;br&gt;fallback_message&lt;br&gt;ai_model&lt;br&gt;updated_by&lt;br&gt;updated_at&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="50" y="394" width="320" height="242" as="geometry" />
+        </mxCell>
+        <mxCell id="7_table_assistant_topic" value="&lt;b&gt;assistant_topic&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;code&lt;br&gt;name&lt;br&gt;guidance&lt;br&gt;is_active&lt;br&gt;display_order&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="50" y="786" width="320" height="194" as="geometry" />
+        </mxCell>
+        <mxCell id="7_table_assistant_quick_prompt" value="&lt;b&gt;assistant_quick_prompt&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;topic_id&lt;br&gt;prompt_text&lt;br&gt;display_order&lt;br&gt;is_active&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="650" y="586" width="320" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="7_table_ai_conversation" value="&lt;b&gt;ai_conversation&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;user_id&lt;br&gt;title&lt;br&gt;status&lt;br&gt;started_at&lt;br&gt;last_message_at&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="50" y="50" width="320" height="194" as="geometry" />
+        </mxCell>
+        <mxCell id="7_table_ai_message" value="&lt;b&gt;ai_message&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;conversation_id&lt;br&gt;sender&lt;br&gt;content&lt;br&gt;intent&lt;br&gt;topic_id&lt;br&gt;needs_clarification&lt;br&gt;clarification_data&lt;br&gt;referenced_entities&lt;br&gt;model&lt;br&gt;prompt_tokens&lt;br&gt;completion_tokens&lt;br&gt;latency_ms&lt;br&gt;created_at&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="650" y="50" width="320" height="386" as="geometry" />
+        </mxCell>
+        <mxCell id="7_table_support_request" value="&lt;b&gt;support_request&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;request_code&lt;br&gt;member_id&lt;br&gt;topic&lt;br&gt;subject&lt;br&gt;question&lt;br&gt;source&lt;br&gt;ai_conversation_id&lt;br&gt;status&lt;br&gt;assigned_to&lt;br&gt;created_by&lt;br&gt;created_at&lt;br&gt;resolved_by&lt;br&gt;resolved_at&lt;br&gt;version&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="650" y="906" width="320" height="410" as="geometry" />
+        </mxCell>
+        <mxCell id="7_table_support_request_message" value="&lt;b&gt;support_request_message&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;request_id&lt;br&gt;author_id&lt;br&gt;author_type&lt;br&gt;body&lt;br&gt;status_after&lt;br&gt;created_at&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="50" width="320" height="218" as="geometry" />
+        </mxCell>
+        <mxCell id="7_edge_0" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="7_table_assistant_quick_prompt" target="7_table_assistant_topic">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="7_edge_1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="7_table_ai_message" target="7_table_ai_conversation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="7_edge_2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="7_table_ai_message" target="7_table_assistant_topic">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="7_edge_3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="7_table_support_request" target="7_table_ai_conversation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="7_edge_4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmandOne;endFill=0;startArrow=ERmany;startFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="7_table_support_request_message" target="7_table_support_request">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="page_8" name="08 - Notifications and System">
+    <mxGraphModel dx="1000" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="4000" pageHeight="4000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="8_table_notification" value="&lt;b&gt;notification&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;recipient_id&lt;br&gt;type&lt;br&gt;title&lt;br&gt;message&lt;br&gt;link_url&lt;br&gt;related_entity_type&lt;br&gt;related_entity_id&lt;br&gt;is_read&lt;br&gt;read_at&lt;br&gt;created_at&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="50" y="466" width="320" height="314" as="geometry" />
+        </mxCell>
+        <mxCell id="8_table_announcement" value="&lt;b&gt;announcement&lt;/b&gt;&lt;hr&gt;id&lt;br&gt;title&lt;br&gt;body&lt;br&gt;audience&lt;br&gt;status&lt;br&gt;published_at&lt;br&gt;expires_at&lt;br&gt;created_by&lt;br&gt;created_at, updated_at&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="50" y="50" width="320" height="266" as="geometry" />
+        </mxCell>
+        <mxCell id="8_table_system_setting" value="&lt;b&gt;system_setting&lt;/b&gt;&lt;hr&gt;setting_key&lt;br&gt;setting_value&lt;br&gt;value_type&lt;br&gt;description&lt;br&gt;updated_by&lt;br&gt;updated_at&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=10;fillColor=#f9f9f9;strokeColor=#444444;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="50" y="930" width="320" height="194" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
