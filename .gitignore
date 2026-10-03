@@ -68,3 +68,11 @@ venv/
 .env.*
 !.env.example
 logs/ai_audit/
+parsed_docs.txt
+read_files.py
+logs/ai_audit/
+
+# Course documents
+TOPIC*.xlsx
+Topic*_Next_Steps.docx
+reviews.md

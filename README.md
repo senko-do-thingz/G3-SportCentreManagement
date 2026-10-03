@@ -22,7 +22,7 @@ Welcome to the **Sportify Center** backend repository. This project aims to buil
 ## 🛠 Technology Stack
 
 Currently active technologies in the project:
-- **Language:** Java 17
+- **Language:** Java 25
 - **Framework:** Spring Boot 3.2.x
 - **Persistence:** Spring Data JPA (Hibernate)
 - **Database:** Microsoft SQL Server 2022
@@ -48,8 +48,8 @@ Detailed documentation regarding the database design and architectural decisions
 ## 🚀 Getting Started
 
 ### Prerequisites
-- JDK 17
-- Maven 3.8+
+- JDK 25
+- Maven 3.9+
 - Docker & Docker Compose (for local database)
 
 ### Setup & Run
@@ -63,7 +63,7 @@ You have two options to run the database:
 3. Create the database: `CREATE DATABASE sportify;`
 4. Enable TCP/IP on port 1433 in SQL Server Configuration Manager.
 5. Restart the SQL Server service.
-6. Copy `.env.example` to a new file named `.env` and fill in your local `DB_PASSWORD`.
+6. Copy `.env.example` to a new file named `.env`, fill in your local `DB_PASSWORD`, and generate a secure `JWT_SECRET` (e.g., using `openssl rand -base64 32`).
 
 **Option B: Docker Compose (Optional)**
 If you prefer Docker, you can start the database using:
@@ -78,6 +78,7 @@ Copy `.env.example` to `.env` and configure the credentials.
    ```bash
    mvn clean verify
    ```
+   *Note: Integration tests use Testcontainers. If Docker is running, tests will spin up an isolated MSSQL database. If Docker is NOT installed or running, those specific tests will automatically be skipped.*
 2. Run the application (default port is `8080`):
    ```bash
    mvn spring-boot:run

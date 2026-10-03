@@ -17,12 +17,18 @@ spring:
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
 
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.SQLServerDialect
 
   flyway:
     enabled: true
     locations: classpath:db/migration/identity
+
+application:
+  security:
+    jwt:
+      secret-key: ${JWT_SECRET}
+      expiration: 900000
+      refresh-token:
+        expiration: 604800000
