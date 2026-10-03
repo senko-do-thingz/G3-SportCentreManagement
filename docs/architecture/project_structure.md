@@ -4,6 +4,12 @@ This document outlines the proposed package structure for the Sportify Center Sp
 
 Given the scale of the system (53 tables across 8 logical modules), the project should adopt a **Module-Driven (or Feature-Driven) Package Structure**. Instead of grouping files by technical layers (e.g., placing all controllers in one massive `controller` folder), we group them by business domain. This makes the codebase much easier to navigate, maintain, and scale.
 
+## Core Architectural Standards
+
+1. **MapStruct for Mappers**: Every module must contain a `mapper/` package. All entity-to-DTO and DTO-to-entity conversions must be done using MapStruct interfaces. Business logic services and controllers must not contain manual mapping code to prevent "Fat Services".
+2. **Interface-Implementation Separation**: The `service/` layer must strictly follow the Interface-Implementation pattern. Service interfaces are placed directly in the `service/` package, while their concrete implementations reside in a nested `impl/` package. This optimizes Dependency Injection and makes unit testing with Mocks straightforward.
+3. **Mirrored Test Structure**: The directory structure inside `src/test/java/com/sportify/` must mirror `src/main/java/com/sportify/` exactly (100% identically) to ensure tests are logically mapped to the classes they verify.
+
 ## Root Directory
 
 ```text
@@ -18,7 +24,7 @@ G3-SportCentreManagement/
     │   ├── java/com/sportify/     <-- Java source code root
     │   └── resources/             <-- Configuration and static assets
     └── test/
-        └── java/com/sportify/     <-- Unit and integration tests
+        └── java/com/sportify/     <-- Unit and integration tests (100% mirrored structure)
 ```
 
 ## Java Source Code (`src/main/java/com/sportify/`)
@@ -37,58 +43,74 @@ com.sportify
 ├── identity/                      <-- Module 1: Identity & Access
 │   ├── entity/                    <-- UserAccount, Role, MemberProfile, ActivityLog
 │   ├── repository/                <-- Spring Data JPA interfaces
-│   ├── service/                   <-- Business logic (AuthService, UserManagementService)
-│   ├── controller/                <-- REST APIs (/api/v1/auth, /api/v1/users)
-│   └── dto/                       <-- Java 17 Records for requests and responses
+│   ├── mapper/                    <-- MapStruct mappers (e.g., UserMapper)
+│   ├── dto/                       <-- Java 17 Records for requests and responses
+│   ├── service/                   <-- Business logic interfaces (e.g., AuthService)
+│   │   └── impl/                  <-- Concrete implementations (e.g., AuthServiceImpl)
+│   └── controller/                <-- REST APIs (/api/v1/auth, /api/v1/users)
 │
 ├── catalog/                       <-- Module 2: Catalog & Membership
-│   ├── entity/                    <-- Sport, Facility, MembershipPlan, Membership
+│   ├── entity/                    
 │   ├── repository/
+│   ├── mapper/
+│   ├── dto/
 │   ├── service/
-│   ├── controller/
-│   └── dto/
+│   │   └── impl/
+│   └── controller/
 │
 ├── booking/                       <-- Module 3: Classes & Booking
 │   ├── entity/                    <-- SportClass, ClassSession, Booking, WaitlistEntry
-│   ├── repository/
-│   ├── service/                   <-- Handles concurrency (reserving seats)
-│   ├── controller/
-│   └── dto/
+│   ├── repository/                <-- BookingRepository
+│   ├── mapper/                    <-- BookingMapper, ClassSessionMapper
+│   ├── dto/                       <-- BookingRequest, BookingResponse
+│   ├── service/                   <-- BookingService, ClassSessionService
+│   │   └── impl/                  <-- BookingServiceImpl, ClassSessionServiceImpl
+│   └── controller/                <-- BookingController, ClassSessionController
 │
 ├── payment/                       <-- Module 4: Payments & Reports
-│   ├── entity/                    <-- Payment, Invoice, vw_paid_payment
+│   ├── entity/                    
 │   ├── repository/
-│   ├── service/                   <-- Handles payment confirmation and revenue calculation
-│   ├── controller/
-│   └── dto/
+│   ├── mapper/
+│   ├── dto/
+│   ├── service/                   
+│   │   └── impl/                  
+│   └── controller/
 │
 ├── training/                      <-- Module 5: Training & Progress
-│   ├── entity/                    <-- SessionPlan, AttendanceRecord, SessionResult
+│   ├── entity/                    
 │   ├── repository/
+│   ├── mapper/
+│   ├── dto/
 │   ├── service/
-│   ├── controller/
-│   └── dto/
+│   │   └── impl/
+│   └── controller/
 │
 ├── ai_recommendation/             <-- Module 6: AI Workout Recommendation
-│   ├── entity/                    <-- WorkoutPlan, RecommendationRuleSet
+│   ├── entity/                    
 │   ├── repository/
-│   ├── service/                   <-- AI integration service and generation logic
-│   ├── controller/
-│   └── dto/
+│   ├── mapper/
+│   ├── dto/
+│   ├── service/                   
+│   │   └── impl/                  
+│   └── controller/
 │
 ├── support/                       <-- Module 7: AI Assistant & Support
-│   ├── entity/                    <-- AiConversation, SupportRequest, AssistantSetting
+│   ├── entity/                    
 │   ├── repository/
-│   ├── service/                   <-- LLM chat completion logic and support ticket routing
-│   ├── controller/
-│   └── dto/
+│   ├── mapper/
+│   ├── dto/
+│   ├── service/                   
+│   │   └── impl/                  
+│   └── controller/
 │
 └── notification/                  <-- Module 8: Notifications & System
-    ├── entity/                    <-- Notification, Announcement, SystemSetting
+    ├── entity/                    
     ├── repository/
-    ├── service/                   <-- Async notification sender, settings cache
-    ├── controller/
-    └── dto/
+    ├── mapper/
+    ├── dto/
+    ├── service/                   
+    │   └── impl/                  
+    └── controller/
 ```
 
 ## Resources (`src/main/resources/`)
@@ -112,3 +134,4 @@ resources/
 1. **High Cohesion:** Everything related to `Booking` (entities, controllers, business rules) lives in one folder. If you need to change how booking works, you only look in one place.
 2. **Encapsulation:** You can make classes package-private inside a module so they cannot be accidentally bypassed by other modules.
 3. **Future Microservices Readiness:** If the system grows massively and the AI or Payment module needs to be extracted into a separate microservice, it is easily detached because its code is already isolated.
+4. **Clean Testing:** The 100% mirrored `src/test/` structure ensures test coverage is easy to verify and mock dependencies correctly map to their target components.
