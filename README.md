@@ -85,6 +85,11 @@ Copy `.env.example` to `.env` and configure the credentials.
    ```
    *Database migrations are automatically applied via Flyway on startup.*
 
+   To enable development endpoints (such as manual membership activation), run the application with the `dev` profile:
+   ```bash
+   mvn spring-boot:run -Dspring-boot.run.profiles=dev
+   ```
+
 ## 📏 Development Guidelines
 
 - **MapStruct**: Use MapStruct for all DTO-Entity mappings.
