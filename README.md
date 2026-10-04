@@ -11,7 +11,7 @@ Welcome to the **Sportify Center** backend repository. This project aims to buil
 | Module | Status |
 |---|---|
 | **Identity & Access** | In Progress - Data layer + schema |
-| **Catalog & Membership** | Designed, not implemented |
+| **Catalog & Membership** | In Progress (registration, renewal, check-in, member search) |
 | **Classes & Booking** | Designed, not implemented |
 | **Payments & Reports** | Designed, not implemented |
 | **Training & Progress** | Designed, not implemented |
@@ -85,10 +85,7 @@ Copy `.env.example` to `.env` and configure the credentials.
    ```
    *Database migrations are automatically applied via Flyway on startup.*
 
-   To enable development endpoints (such as manual membership activation), run the application with the `dev` profile:
-   ```bash
-   mvn spring-boot:run -Dspring-boot.run.profiles=dev
-   ```
+   Note: The `dev` profile is active by default in `application.yml`, which enables development endpoints (like manual membership activation). For production, you must set `SPRING_PROFILES_ACTIVE=prod`.
 
 ## 📏 Development Guidelines
 
