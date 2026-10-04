@@ -10,6 +10,9 @@ import com.sportify.identity.entity.ActivityLog;
 import com.sportify.identity.repository.RoleRepository;
 import com.sportify.identity.repository.UserRepository;
 import com.sportify.identity.repository.ActivityLogRepository;
+import com.sportify.identity.repository.MemberProfileRepository;
+import com.sportify.core.common.CodeFormatter;
+import java.time.Clock;
 import com.sportify.identity.security.CustomUserDetails;
 import com.sportify.identity.security.JwtService;
 import com.sportify.identity.service.AuthenticationService;
@@ -19,6 +22,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import org.springframework.transaction.annotation.Transactional;
+
 @Service
 @RequiredArgsConstructor
 public class AuthenticationServiceImpl implements AuthenticationService {
@@ -26,11 +31,15 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final UserRepository repository;
     private final RoleRepository roleRepository;
     private final ActivityLogRepository activityLogRepository;
+    private final MemberProfileRepository memberProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final CodeFormatter codeFormatter;
+    private final Clock clock;
 
     @Override
+    @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (repository.existsByEmailIgnoreCase(request.getEmail())) {
             throw new IllegalArgumentException("Email already exists");
@@ -49,6 +58,18 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .build();
 
         UserAccount savedUser = repository.save(user);
+
+        if ("MEMBER".equals(memberRole.getCode())) {
+            Long nextSeq = memberProfileRepository.getNextMemberCode();
+            String memberCode = codeFormatter.formatMemberCode(nextSeq);
+            com.sportify.identity.entity.MemberProfile profile = com.sportify.identity.entity.MemberProfile.builder()
+                    .userAccount(savedUser)
+                    .memberCode(memberCode)
+                    .currentLevel("BEGINNER")
+                    .joinedOn(java.time.LocalDate.now(clock))
+                    .build();
+            memberProfileRepository.save(profile);
+        }
 
         logActivity(savedUser, "REGISTER", "USER_ACCOUNT", savedUser.getId(), "User registered");
 

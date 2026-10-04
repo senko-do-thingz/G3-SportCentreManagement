@@ -23,4 +23,14 @@ class GlobalExceptionHandlerTest {
         assertNotNull(response.getBody());
         assertEquals("Invalid or expired token", response.getBody().get("message"));
     }
+
+    @Test
+    void testHandleDataIntegrityViolationException() {
+        org.springframework.dao.DataIntegrityViolationException ex = new org.springframework.dao.DataIntegrityViolationException("duplicate key");
+        ResponseEntity<Map<String, Object>> response = handler.handleDataIntegrityViolation(ex);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("The request conflicts with existing data", response.getBody().get("message"));
+    }
 }
