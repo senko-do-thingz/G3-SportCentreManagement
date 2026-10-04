@@ -6,7 +6,6 @@ import com.sportify.catalog.dto.MembershipResponse;
 import com.sportify.catalog.entity.MembershipPlan;
 import com.sportify.catalog.entity.Sport;
 import com.sportify.catalog.repository.MembershipPlanRepository;
-import com.sportify.catalog.repository.MembershipRepository;
 import com.sportify.catalog.repository.SportRepository;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ConflictException;
@@ -21,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -33,9 +33,6 @@ public class MembershipIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private MembershipService membershipService;
-
-    @Autowired
-    private MembershipRepository membershipRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -55,8 +52,10 @@ public class MembershipIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private java.time.Clock clock;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private UserAccount testMember;
-    private MemberProfile testProfile;
     private MembershipPlan swimStarter;
     private Sport swimming;
 
@@ -73,7 +72,7 @@ public class MembershipIntegrationTest extends AbstractIntegrationTest {
                 .role(memberRole)
                 .build());
 
-        testProfile = memberProfileRepository.saveAndFlush(MemberProfile.builder()
+        memberProfileRepository.saveAndFlush(MemberProfile.builder()
                 .userAccount(testMember)
                 .memberCode("MEM-T" + UUID.randomUUID().toString().substring(0, 4))
                 .build());
@@ -84,9 +83,18 @@ public class MembershipIntegrationTest extends AbstractIntegrationTest {
 
     @AfterEach
     void tearDown() {
-        membershipRepository.deleteAll();
-        memberProfileRepository.deleteAll();
-        userRepository.delete(testMember);
+        cleanUpUser(testMember);
+    }
+
+    private void cleanUpUser(UserAccount user) {
+        if (user == null || user.getId() == null) return;
+        Long uid = user.getId();
+        // activity_log.actor_user_id has a foreign key to user_account without cascade
+        jdbcTemplate.update("DELETE FROM activity_log WHERE actor_user_id = ?", uid);
+        jdbcTemplate.update("DELETE FROM check_in WHERE member_id = ?", uid);
+        jdbcTemplate.update("DELETE FROM membership WHERE member_id = ?", uid);
+        jdbcTemplate.update("DELETE FROM member_profile WHERE user_id = ?", uid);
+        jdbcTemplate.update("DELETE FROM user_account WHERE id = ?", uid);
     }
 
     @Test
@@ -142,10 +150,12 @@ public class MembershipIntegrationTest extends AbstractIntegrationTest {
             assertEquals("BEGINNER", profile.getCurrentLevel());
             assertEquals(LocalDate.now(clock), profile.getJoinedOn());
             assertTrue(profile.getMemberCode().matches("MEM-\\d{4}"), "Code should be MEM-xxxx format");
+            
+            // Assert that the created membership references the new profile using JdbcTemplate
+            Long membershipMemberId = jdbcTemplate.queryForObject("SELECT member_id FROM membership WHERE id = ?", Long.class, res.getId());
+            assertEquals(orphanMember.getId(), membershipMemberId, "Membership should reference the lazily created profile");
         } finally {
-            membershipRepository.deleteAll();
-            memberProfileRepository.deleteById(orphanMember.getId());
-            userRepository.delete(orphanMember);
+            cleanUpUser(orphanMember);
         }
     }
 
@@ -170,7 +180,7 @@ public class MembershipIntegrationTest extends AbstractIntegrationTest {
             BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> membershipService.registerMembership(manager, req));
             assertTrue(ex.getMessage().contains("Only users with MEMBER role can have a member profile"));
         } finally {
-            userRepository.delete(manager);
+            cleanUpUser(manager);
         }
     }
 }
