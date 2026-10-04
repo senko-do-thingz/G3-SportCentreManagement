@@ -17,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -44,6 +45,9 @@ public class MemberSearchIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private RoleRepository roleRepository;
 
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+
     @BeforeEach
     void setUp() {
         Role role = roleRepository.findByCode("MEMBER").orElseGet(() -> {
@@ -53,41 +57,44 @@ public class MemberSearchIntegrationTest extends AbstractIntegrationTest {
             return roleRepository.save(r);
         });
 
-        UserAccount user1 = UserAccount.builder()
-                .email(ALICE_EMAIL)
-                .fullName("Alice Wonderland")
-                .passwordHash("hash")
-                .phone("1111")
-                .role(role)
-                .status("ACTIVE")
-                .build();
-        user1 = userRepository.save(user1);
+        transactionTemplate.execute(status -> {
+            UserAccount user1 = UserAccount.builder()
+                    .email(ALICE_EMAIL)
+                    .fullName("Alice Wonderland")
+                    .passwordHash("hash")
+                    .phone("1111")
+                    .role(role)
+                    .status("ACTIVE")
+                    .build();
+            user1 = userRepository.save(user1);
 
-        MemberProfile p1 = MemberProfile.builder()
-                .userAccount(user1)
-                .memberCode("MEM-0001")
-                .currentLevel("BEGINNER")
-                .joinedOn(java.time.LocalDate.now())
-                .build();
-        memberProfileRepository.save(p1);
+            MemberProfile p1 = MemberProfile.builder()
+                    .userAccount(user1)
+                    .memberCode("MEM-0001")
+                    .currentLevel("BEGINNER")
+                    .joinedOn(java.time.LocalDate.now())
+                    .build();
+            memberProfileRepository.save(p1);
 
-        UserAccount user2 = UserAccount.builder()
-                .email(BOB_EMAIL)
-                .fullName("Bob Builder")
-                .passwordHash("hash")
-                .phone("2222")
-                .role(role)
-                .status("ACTIVE")
-                .build();
-        user2 = userRepository.save(user2);
+            UserAccount user2 = UserAccount.builder()
+                    .email(BOB_EMAIL)
+                    .fullName("Bob Builder")
+                    .passwordHash("hash")
+                    .phone("2222")
+                    .role(role)
+                    .status("ACTIVE")
+                    .build();
+            user2 = userRepository.save(user2);
 
-        MemberProfile p2 = MemberProfile.builder()
-                .userAccount(user2)
-                .memberCode("MEM-0002")
-                .currentLevel("INTERMEDIATE")
-                .joinedOn(java.time.LocalDate.now())
-                .build();
-        memberProfileRepository.save(p2);
+            MemberProfile p2 = MemberProfile.builder()
+                    .userAccount(user2)
+                    .memberCode("MEM-0002")
+                    .currentLevel("INTERMEDIATE")
+                    .joinedOn(java.time.LocalDate.now())
+                    .build();
+            memberProfileRepository.save(p2);
+            return null;
+        });
     }
 
     @AfterEach

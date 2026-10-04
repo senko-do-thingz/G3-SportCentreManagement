@@ -18,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -45,6 +46,9 @@ public class MembershipPendingUniqueIndexIntegrationTest extends AbstractIntegra
     @Autowired
     private MembershipPlanRepository membershipPlanRepository;
 
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+
     private UserAccount testUser;
     private MemberProfile testProfile;
     private MembershipPlan testPlan;
@@ -59,19 +63,22 @@ public class MembershipPendingUniqueIndexIntegrationTest extends AbstractIntegra
                         .name("Member")
                         .build()));
 
-        testUser = userRepository.saveAndFlush(UserAccount.builder()
-                .email("racer_" + UUID.randomUUID() + "@test.com")
-                .fullName("Speed Racer")
-                .passwordHash("hash")
-                .phone("999999" + UUID.randomUUID().toString().substring(0, 4))
-                .status("ACTIVE")
-                .role(memberRole)
-                .build());
+        transactionTemplate.execute(status -> {
+            testUser = userRepository.save(UserAccount.builder()
+                    .email("racer_" + UUID.randomUUID() + "@test.com")
+                    .fullName("Speed Racer")
+                    .passwordHash("hash")
+                    .phone("999999" + UUID.randomUUID().toString().substring(0, 4))
+                    .status("ACTIVE")
+                    .role(memberRole)
+                    .build());
 
-        testProfile = memberProfileRepository.saveAndFlush(MemberProfile.builder()
-                .userAccount(testUser)
-                .memberCode("MEM-T" + UUID.randomUUID().toString().substring(0, 4))
-                .build());
+            testProfile = memberProfileRepository.save(MemberProfile.builder()
+                    .userAccount(testUser)
+                    .memberCode("MEM-T" + UUID.randomUUID().toString().substring(0, 4))
+                    .build());
+            return null;
+        });
 
         testPlan = membershipPlanRepository.saveAndFlush(MembershipPlan.builder()
                 .name("Race Plan")
@@ -161,19 +168,22 @@ public class MembershipPendingUniqueIndexIntegrationTest extends AbstractIntegra
     @Test
     void register_TwoPendingMembershipsForDifferentMembers_DoesNotThrowException() {
         Role memberRole = roleRepository.findByCode("MEMBER").orElseThrow();
-        testUser2 = userRepository.saveAndFlush(UserAccount.builder()
-                .email("racer2_" + UUID.randomUUID() + "@test.com")
-                .fullName("Speed Racer 2")
-                .passwordHash("hash")
-                .phone("999998" + UUID.randomUUID().toString().substring(0, 4))
-                .status("ACTIVE")
-                .role(memberRole)
-                .build());
+        transactionTemplate.execute(status -> {
+            testUser2 = userRepository.save(UserAccount.builder()
+                    .email("racer2_" + UUID.randomUUID() + "@test.com")
+                    .fullName("Speed Racer 2")
+                    .passwordHash("hash")
+                    .phone("999998" + UUID.randomUUID().toString().substring(0, 4))
+                    .status("ACTIVE")
+                    .role(memberRole)
+                    .build());
 
-        testProfile2 = memberProfileRepository.saveAndFlush(MemberProfile.builder()
-                .userAccount(testUser2)
-                .memberCode("MEM-U" + UUID.randomUUID().toString().substring(0, 4))
-                .build());
+            testProfile2 = memberProfileRepository.save(MemberProfile.builder()
+                    .userAccount(testUser2)
+                    .memberCode("MEM-U" + UUID.randomUUID().toString().substring(0, 4))
+                    .build());
+            return null;
+        });
 
         Membership m1 = Membership.builder()
                 .member(testProfile)

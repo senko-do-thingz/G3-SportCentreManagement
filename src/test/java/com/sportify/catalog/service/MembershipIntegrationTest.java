@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -55,6 +56,9 @@ public class MembershipIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+
     private UserAccount testMember;
     private MembershipPlan swimStarter;
     private Sport swimming;
@@ -64,18 +68,21 @@ public class MembershipIntegrationTest extends AbstractIntegrationTest {
         Role memberRole = roleRepository.findByCode("MEMBER")
                 .orElseGet(() -> roleRepository.save(Role.builder().code("MEMBER").name("Member").build()));
 
-        testMember = userRepository.saveAndFlush(UserAccount.builder()
-                .email("test_" + UUID.randomUUID() + "@sportify.com")
-                .fullName("Integration Test Member")
-                .passwordHash("hash")
-                .status("ACTIVE")
-                .role(memberRole)
-                .build());
+        transactionTemplate.execute(status -> {
+            testMember = userRepository.save(UserAccount.builder()
+                    .email("test_" + UUID.randomUUID() + "@sportify.com")
+                    .fullName("Integration Test Member")
+                    .passwordHash("hash")
+                    .status("ACTIVE")
+                    .role(memberRole)
+                    .build());
 
-        memberProfileRepository.saveAndFlush(MemberProfile.builder()
-                .userAccount(testMember)
-                .memberCode("MEM-T" + UUID.randomUUID().toString().substring(0, 4))
-                .build());
+            memberProfileRepository.save(MemberProfile.builder()
+                    .userAccount(testMember)
+                    .memberCode("MEM-T" + UUID.randomUUID().toString().substring(0, 4))
+                    .build());
+            return null;
+        });
 
         swimStarter = planRepository.findAll().stream().filter(p -> "SWIM_STARTER".equals(p.getCode())).findFirst().orElseThrow();
         swimming = sportRepository.findAll().stream().filter(s -> "SWIMMING".equals(s.getCode())).findFirst().orElseThrow();
