@@ -40,6 +40,12 @@ class AuthenticationServiceImplTest {
     private JwtService jwtService;
     @Mock
     private AuthenticationManager authenticationManager;
+    @Mock
+    private com.sportify.identity.repository.MemberProfileRepository memberProfileRepository;
+    @Mock
+    private com.sportify.core.common.CodeFormatter codeFormatter;
+    @org.mockito.Spy
+    private java.time.Clock clock = java.time.Clock.fixed(java.time.Instant.parse("2026-10-05T00:00:00Z"), java.time.ZoneId.of("UTC"));
 
     @InjectMocks
     private AuthenticationServiceImpl authService;
@@ -62,6 +68,7 @@ class AuthenticationServiceImplTest {
         userAccount.setEmail("test@sportify.com");
         userAccount.setRole(role);
         userAccount.setStatus("ACTIVE");
+
     }
 
     @Test
@@ -76,6 +83,8 @@ class AuthenticationServiceImplTest {
         when(roleRepository.findByCode("MEMBER")).thenReturn(Optional.of(role));
         when(passwordEncoder.encode(any())).thenReturn("hashed");
         when(userRepository.save(any())).thenReturn(userAccount);
+        when(memberProfileRepository.getNextMemberCode()).thenReturn(1L);
+        when(codeFormatter.formatMemberCode(1L)).thenReturn("MEM-0001");
         when(jwtService.generateToken(any())).thenReturn("access");
         when(jwtService.generateRefreshToken(any())).thenReturn("refresh");
 
