@@ -264,11 +264,17 @@ Write-Host "`n--- STEP M: Refreshed Context - Sport Package Registration with 5%
 if ($pkg1) {
     $pkgRegBody = @{packageId=$pkg1.id; channel="ONLINE"} | ConvertTo-Json
     $pkgRegRes = Invoke-Api -Method Post -Uri "$base/packages/registrations" -Headers $h1 -Body $pkgRegBody
-    if ($pkgRegRes.status -eq 201 -and $pkgRegRes.data.status -eq "ACTIVE" -and $pkgRegRes.data.discountPercent -eq 5.0) {
-        Report-Pass "Package registration active with 5% card discount applied"
+    if ($pkgRegRes.status -eq 201 -and $pkgRegRes.data.status -eq "PENDING_PAYMENT" -and $pkgRegRes.data.discountPercentage -eq 5) {
+        Report-Pass "Package registration created (PENDING_PAYMENT) with 5% card discount applied"
         $myRegId = $pkgRegRes.data.id
+        $actRes = Invoke-Api -Method Put -Uri "$base/packages/registrations/$myRegId/activate" -Headers $mgr
+        if ($actRes.status -eq 200 -and $actRes.data.status -eq "ACTIVE") {
+            Report-Pass "Package registration activated to ACTIVE status"
+        } else {
+            Report-Fail "Package activation failed. Status: $($actRes.status)"
+        }
     } else {
-        Report-Fail "Package registration failed. Status: $($pkgRegRes.status)"
+        Report-Fail "Package registration failed. Status: $($pkgRegRes.status), StatusValue: $($pkgRegRes.data.status)"
     }
 } else {
     Report-Skip "Skipping package registration due to missing package"
@@ -278,13 +284,18 @@ Write-Host "`n--- STEP N: Refreshed Context - Concurrent Package Registrations -
 if ($pkg2) {
     $pkgReg2Body = @{packageId=$pkg2.id; channel="ONLINE"} | ConvertTo-Json
     $pkgReg2Res = Invoke-Api -Method Post -Uri "$base/packages/registrations" -Headers $h1 -Body $pkgReg2Body
-    if ($pkgReg2Res.status -eq 201 -and $pkgReg2Res.data.status -eq "ACTIVE") {
-        $regList = Invoke-Api -Method Get -Uri "$base/packages/registrations/me" -Headers $h1
-        if ($regList.status -eq 200 -and $regList.data.Count -ge 2) {
-            Report-Pass "Member successfully holds multiple active packages concurrently"
-            $secondRegId = $pkgReg2Res.data.id
+    if ($pkgReg2Res.status -eq 201) {
+        $secondRegId = $pkgReg2Res.data.id
+        $act2Res = Invoke-Api -Method Put -Uri "$base/packages/registrations/$secondRegId/activate" -Headers $mgr
+        if ($act2Res.status -eq 200 -and $act2Res.data.status -eq "ACTIVE") {
+            $regList = Invoke-Api -Method Get -Uri "$base/packages/registrations/my" -Headers $h1
+            if ($regList.status -eq 200 -and $regList.data.Count -ge 2) {
+                Report-Pass "Member successfully holds multiple active packages concurrently"
+            } else {
+                Report-Fail "Concurrent packages check failed. Count: $($regList.data.Count)"
+            }
         } else {
-            Report-Fail "Concurrent packages check failed. Count: $($regList.data.Count)"
+            Report-Fail "Second package activation failed. Status: $($act2Res.status)"
         }
     } else {
         Report-Fail "Second package registration failed. Status: $($pkgReg2Res.status)"
@@ -308,6 +319,14 @@ if ($secondRegId) {
             $reviewRes = Invoke-Api -Method Put -Uri "$base/refunds/$refundId/review" -Headers $mgr -Body $reviewBody
             if ($reviewRes.status -eq 200 -and $reviewRes.data.status -eq "APPROVED") {
                 Report-Pass "Manager reviewed and APPROVED refund request"
+                # Verify package registration status is now REFUNDED
+                $checkReg = Invoke-Api -Method Get -Uri "$base/packages/registrations/member/$profileId" -Headers $mgr
+                $refundedReg = $checkReg.data | Where-Object { $_.id -eq $secondRegId }
+                if ($refundedReg -and $refundedReg.status -eq "REFUNDED") {
+                    Report-Pass "Package registration status verified as REFUNDED"
+                } else {
+                    Report-Fail "Package registration status not REFUNDED. Status: $($refundedReg.status)"
+                }
             } else {
                 Report-Fail "Manager refund review failed. Status: $($reviewRes.status)"
             }
