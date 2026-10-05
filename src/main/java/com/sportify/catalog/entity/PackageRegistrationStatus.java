@@ -4,5 +4,6 @@ public enum PackageRegistrationStatus {
     PENDING_PAYMENT,
     ACTIVE,
     EXPIRED,
-    CANCELLED
+    CANCELLED,
+    REFUNDED
 }
