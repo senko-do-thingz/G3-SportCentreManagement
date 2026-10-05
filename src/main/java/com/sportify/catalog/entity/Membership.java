@@ -18,6 +18,7 @@ import java.util.Set;
  * <p>
  * Step 2A: schema mapping only. Registration / renewal / cancellation logic belongs to Step 2B.
  */
+@Deprecated
 @Entity
 @Table(name = "membership")
 @Getter

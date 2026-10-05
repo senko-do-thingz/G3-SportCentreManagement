@@ -17,6 +17,7 @@ import java.util.Set;
  * Both collections are LAZY {@link Set}s so that they can be fetched together with an
  * {@code @EntityGraph} without {@code MultipleBagFetchException} or duplicated rows.
  */
+@Deprecated
 @Entity
 @Table(name = "membership_plan")
 @Getter

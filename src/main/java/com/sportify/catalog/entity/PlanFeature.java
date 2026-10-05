@@ -6,6 +6,7 @@ import lombok.*;
 /**
  * Bullet list line on a plan card ("Coach-led class booking").
  */
+@Deprecated
 @Entity
 @Table(name = "plan_feature")
 @Getter
