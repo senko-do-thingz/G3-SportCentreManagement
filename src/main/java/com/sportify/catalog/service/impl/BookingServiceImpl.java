@@ -116,7 +116,7 @@ public class BookingServiceImpl implements BookingService {
 
         booking.setStatus(BookingStatus.CANCELLED);
         booking.setCancelledAt(LocalDateTime.now(clock));
-        booking.setCancelReason("Cancelled by user: " + actor.getUsername());
+        booking.setCancelReason("Cancelled by user: " + actor.getEmail());
 
         // Restore session seat
         ClassSession session = booking.getSession();
@@ -177,7 +177,7 @@ public class BookingServiceImpl implements BookingService {
                 .bookingCode(booking.getBookingCode())
                 .memberId(booking.getMember().getId())
                 .memberCode(booking.getMember().getMemberCode())
-                .memberFullName(booking.getMember().getUser().getFullName())
+                .memberFullName(booking.getMember().getUserAccount().getFullName())
                 .sportName(booking.getSession().getSport().getName())
                 .remainingSessions(remaining)
                 .confirmedAt(LocalDateTime.now(clock))
@@ -198,7 +198,7 @@ public class BookingServiceImpl implements BookingService {
                 .trainingType(b.getSession().getTrainingType())
                 .memberId(b.getMember().getId())
                 .memberCode(b.getMember().getMemberCode())
-                .memberFullName(b.getMember().getUser().getFullName())
+                .memberFullName(b.getMember().getUserAccount().getFullName())
                 .packageRegistrationId(b.getPackageRegistration() != null ? b.getPackageRegistration().getId() : null)
                 .status(b.getStatus())
                 .bookedAt(b.getBookedAt())

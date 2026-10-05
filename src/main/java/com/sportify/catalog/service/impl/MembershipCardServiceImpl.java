@@ -138,7 +138,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
                 .cardCode(card.getCardCode())
                 .memberId(card.getMember().getId())
                 .memberCode(card.getMember().getMemberCode())
-                .memberFullName(card.getMember().getUser().getFullName())
+                .memberFullName(card.getMember().getUserAccount().getFullName())
                 .tierId(card.getTier().getId())
                 .tierCode(card.getTier().getCode())
                 .tierName(card.getTier().getName())

@@ -151,7 +151,7 @@ public class RefundServiceImpl implements RefundService {
                 .registrationCode(r.getPackageRegistration().getRegistrationCode())
                 .memberId(r.getMember().getId())
                 .memberCode(r.getMember().getMemberCode())
-                .memberFullName(r.getMember().getUser().getFullName())
+                .memberFullName(r.getMember().getUserAccount().getFullName())
                 .amountRequested(r.getAmountRequested())
                 .amountApproved(r.getAmountApproved())
                 .reason(r.getReason())

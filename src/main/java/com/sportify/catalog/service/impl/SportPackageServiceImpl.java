@@ -186,7 +186,7 @@ public class SportPackageServiceImpl implements SportPackageService {
                 .registrationCode(reg.getRegistrationCode())
                 .memberId(reg.getMember().getId())
                 .memberCode(reg.getMember().getMemberCode())
-                .memberFullName(reg.getMember().getUser().getFullName())
+                .memberFullName(reg.getMember().getUserAccount().getFullName())
                 .packageId(reg.getSportPackage().getId())
                 .packageCode(reg.getSportPackage().getCode())
                 .packageName(reg.getSportPackage().getName())

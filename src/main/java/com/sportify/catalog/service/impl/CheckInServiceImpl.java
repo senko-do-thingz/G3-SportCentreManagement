@@ -31,6 +31,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -147,7 +148,7 @@ public class CheckInServiceImpl implements CheckInService {
         return CheckInResponse.builder()
                 .id(checkIn.getId())
                 .memberId(profile.getId())
-                .memberName(profile.getUser().getFullName())
+                .memberName(profile.getUserAccount().getFullName())
                 .membershipId(activeMembership != null ? activeMembership.getId() : null)
                 .bookingId(targetBooking != null ? targetBooking.getId() : null)
                 .bookingCode(targetBooking != null ? targetBooking.getBookingCode() : null)
@@ -166,7 +167,7 @@ public class CheckInServiceImpl implements CheckInService {
                 .map(ci -> CheckInResponse.builder()
                         .id(ci.getId())
                         .memberId(ci.getMember().getId())
-                        .memberName(ci.getMember().getUser().getFullName())
+                        .memberName(ci.getMember().getUserAccount().getFullName())
                         .membershipId(ci.getMembership() != null ? ci.getMembership().getId() : null)
                         .bookingId(ci.getBooking() != null ? ci.getBooking().getId() : null)
                         .bookingCode(ci.getBooking() != null ? ci.getBooking().getBookingCode() : null)
