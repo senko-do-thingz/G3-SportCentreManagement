@@ -4,7 +4,7 @@ This folder contains the proposed database design for **Sportify Center**, a sin
 (six sports: Football, Badminton, Basketball, Volleyball, Swimming, Tennis) with four user roles:
 Member, Coach, Receptionist and Center Manager.
 
-The design is derived from the UI mockups in `context/` (Home + Flow 1 to Flow 6, 75 screens).
+The design is derived from the UI mockups in `context/` (Home + Flow 1 to Flow 6, 135 screens after the 10/05 product context refresh).
 
 ## Target Stack
 
@@ -72,7 +72,7 @@ The design is derived from the UI mockups in `context/` (Home + Flow 1 to Flow 6
 | Module | Tables | Main flows |
 |---|---|---|
 | Identity and access | `role`, `permission`, `role_permission`, `user_account`, `member_profile`, `member_sport_interest`, `coach_profile`, `coach_sport`, `coach_certification`, `password_reset_token`, `activity_log` | Flow 1 |
-| Catalog and membership | `sport`, `age_group`, `facility`, `membership_plan`, `plan_eligible_sport`, `plan_feature`, `membership`, `membership_sport`, `check_in` | Flow 1, Home |
+| Catalog and membership | `sport`, `age_group`, `facility`, `membership_plan`, `plan_eligible_sport`, `plan_feature`, `membership`, `membership_sport`, `sport_package`, `membership_card_tier`, `member_card`, `sport_package_registration`, `refund_request`, `check_in` | Flow 1, Home, Flow 3 |
 | Classes and booking | `sport_class`, `class_session`, `booking`, `waitlist_entry` | Flow 2 |
 | Payments and reports | `payment`, `invoice`, `invoice_line` + views | Flow 1, Flow 3 |
 | Training and progress | `session_plan`, `session_plan_step`, `attendance_record`, `attendance_correction`, `skill_metric`, `session_result`, `session_result_score`, `coach_feedback` + views | Flow 4 |
@@ -80,7 +80,7 @@ The design is derived from the UI mockups in `context/` (Home + Flow 1 to Flow 6
 | AI assistant and support | `assistant_setting`, `assistant_topic`, `assistant_quick_prompt`, `ai_conversation`, `ai_message`, `support_request`, `support_request_message` | Flow 6, Flow 1 |
 | Notifications and system | `notification`, `announcement`, `system_setting` | All |
 
-Total: **53 tables**, **3 reporting views**, **8 sequences**.
+Total: **58 tables** (including V10 and V11 refreshed catalog tables), **3 reporting views**, **8 sequences**.
 
 ## High Level ERD
 

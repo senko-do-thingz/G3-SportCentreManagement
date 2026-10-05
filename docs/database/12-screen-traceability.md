@@ -1,244 +1,244 @@
-# 12 - Screen to Table Traceability
+﻿# 12 - Screen to Table Traceability
 
-This matrix maps all 135 UI screens and state dialogs from the refreshed `context/` folder to the primary database tables that power them, along with their roles and backend endpoints.
+This matrix maps all 135 UI screens and state dialogs from the refreshed context/ folder to the primary database tables that power them, along with their roles, backend endpoints, and implementation status.
 
-## Home Screens
+Status Legend:
+- **IMPLEMENTED**: Backend entity, repository, service logic, controller endpoints, and tests are complete.
+- **PARTIAL**: Database schema / entities exist or are partially modeled, but specific UI endpoints or workflows are pending full implementation.
+- **NOT STARTED**: Feature planned in future sprints (e.g., AI recommendation engine, AI assistant).
 
-| Screen ID / File | Screen Title | Flow / Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| Home/1.png | Home - Landing Page & Hero | Home / Public | `sport`, `membership_card_tier`, `sport_package` | `GET /api/v1/sports`, `GET /api/v1/packages/active` |
-| Home/2.png | Home - Sports, Packages & Features | Home / Public | `sport`, `sport_package`, `coach_profile` | `GET /api/v1/sports`, `GET /api/v1/coaches` |
+## Flow 1 - User and membership management > Flow 1 - Manager
 
-## Flow 1 - User & Membership Management
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Flow 1 - User and membership management/Flow 1 - Manager/F1-01 - User Management.png | User Management | Manager | `user_account`, `role`, `staff_profile` | `GET /api/v1/users`, `POST /api/v1/users`, `PUT /api/v1/users/{id}` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Manager/F1-01 Overlay - Add Staff Account.png | F1-01 Overlay - Add Staff Account | Manager | `user_account`, `role`, `staff_profile` | `GET /api/v1/users`, `POST /api/v1/users`, `PUT /api/v1/users/{id}` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Manager/F1-02 - Sport Packages & Pricing_1.png | Sport Packages & Pricing_1 | Manager | `sport_package`, `sport`, `sport_package_registration` | `GET /api/v1/packages`, `POST /api/v1/packages`, `POST /api/v1/packages/registrations`, `PUT /api/v1/packages/registrations/{id}/activate` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Manager/F1-02 - Sport Packages & Pricing_2.png | Sport Packages & Pricing_2 | Manager | `sport_package`, `sport`, `sport_package_registration` | `GET /api/v1/packages`, `POST /api/v1/packages`, `POST /api/v1/packages/registrations`, `PUT /api/v1/packages/registrations/{id}/activate` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Manager/F1-02 - Sport Packages & Pricing_3.png | Sport Packages & Pricing_3 | Manager | `sport_package`, `sport`, `sport_package_registration` | `GET /api/v1/packages`, `POST /api/v1/packages`, `POST /api/v1/packages/registrations`, `PUT /api/v1/packages/registrations/{id}/activate` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Manager/F1-02 Overlay - Edit Sport Package.png | F1-02 Overlay - Edit Sport Package | Manager | `sport_package`, `sport`, `sport_package_registration` | `GET /api/v1/packages`, `POST /api/v1/packages`, `POST /api/v1/packages/registrations`, `PUT /api/v1/packages/registrations/{id}/activate` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Manager/F1-03 - Membership Cards & Benefits.png | Membership Cards & Benefits | Manager | `membership_card_tier`, `member_card` | `GET /api/v1/membership-cards/tiers`, `POST /api/v1/membership-cards/purchase`, `GET /api/v1/membership-cards/my` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Manager/F1-03 Overlay - Edit Membership Card.png | F1-03 Overlay - Edit Membership Card | Manager | `membership_card_tier`, `member_card` | `GET /api/v1/membership-cards/tiers`, `POST /api/v1/membership-cards/purchase`, `GET /api/v1/membership-cards/my` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Manager/F1-04 - Activity Log.png | Activity Log | Manager | `activity_log`, `user_account` | Audit log query (Planned: `GET /api/v1/activity-logs`) | PARTIAL |
 
-### Manager
+## Flow 1 - User and membership management > Flow 1 - Member
 
-| Screen ID / File | Screen Title | Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| F1-01 | User & Role Management | Manager | `user_account`, `role` | `GET /api/v1/users` |
-| F1-01-Overlay | User & Role Management (Fixed Roles) | Manager | `role` | Fixed role access note (no custom permission edit) |
-| F1-02 | Add or Edit User | Manager | `user_account`, `role` | `POST /api/v1/users`, `PUT /api/v1/users/{id}` |
-| F1-02-RoleSelect | Add or Edit User - Role Select | Manager | `role` | Fixed role dropdown (`MEMBER`, `COACH`, `RECEPTIONIST`, `MANAGER`) |
-| F1-03 | Sport Packages | Manager | `sport_package`, `sport` | `GET /api/v1/packages` |
-| F1-04 | Create or Edit Sport Package | Manager | `sport_package`, `sport` | `POST /api/v1/packages`, `PUT /api/v1/packages/{id}` |
-| F1-05 | Membership Cards | Manager | `membership_card_tier` | `GET /api/v1/membership-cards/tiers` |
-| F1-06 | Activity Log | Manager | `activity_log`, `user_account` | `GET /api/v1/activity-logs` |
-| S1-UserSaved | User Saved Dialog | Manager | `user_account` | Feedback dialog on user save |
-| S1-PackageSaved | Package Saved Dialog | Manager | `sport_package` | Feedback dialog on package save |
-| S1-PackageToggled | Package Status Toggled Dialog | Manager | `sport_package` | Feedback dialog on package active/inactive toggle |
-| S1-CardSaved | Membership Card Saved Dialog | Manager | `membership_card_tier` | Feedback dialog on card tier update |
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Flow 1 - User and membership management/Flow 1 - Member/F1-05 - Log In.png | Log In | Member | `user_account`, `role` | `POST /api/v1/auth/login` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Member/F1-06 - Sign Up.png | Sign Up | Member | `user_account`, `member_profile`, `role` | `POST /api/v1/auth/register` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Member/F1-07 - Member Dashboard.png | Member Dashboard | Member | `member_profile`, `user_account` | `GET /api/v1/members/me`, `PUT /api/v1/members/me`, `GET /api/v1/members` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Member/F1-07 State - After Purchase.png | F1-07 State - After Purchase | Member | `member_profile`, `user_account` | `GET /api/v1/members/me`, `PUT /api/v1/members/me`, `GET /api/v1/members` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Member/F1-07 State - New Standard Member.png | F1-07 State - New Standard Member | Member | `member_profile`, `user_account` | `GET /api/v1/members/me`, `PUT /api/v1/members/me`, `GET /api/v1/members` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Member/F1-08 - My Profile.png | My Profile | Member | `member_profile`, `user_account` | `GET /api/v1/members/me`, `PUT /api/v1/members/me`, `GET /api/v1/members` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Member/F1-09 - Sport Packages.png | Sport Packages | Member | `sport_package`, `sport`, `sport_package_registration` | `GET /api/v1/packages`, `POST /api/v1/packages`, `POST /api/v1/packages/registrations`, `PUT /api/v1/packages/registrations/{id}/activate` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Member/F1-10 - Package Detail & Registration.png | Package Detail & Registration | Member | `sport_package`, `sport`, `sport_package_registration` | `GET /api/v1/packages`, `POST /api/v1/packages`, `POST /api/v1/packages/registrations`, `PUT /api/v1/packages/registrations/{id}/activate` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Member/F1-10 Overlay - Payment Handoff.png | F1-10 Overlay - Payment Handoff | Member | `sport_package`, `sport`, `sport_package_registration` | `GET /api/v1/packages`, `POST /api/v1/packages`, `POST /api/v1/packages/registrations`, `PUT /api/v1/packages/registrations/{id}/activate` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Member/F1-11 - Membership Cards.png | Membership Cards | Member | `membership_card_tier`, `member_card` | `GET /api/v1/membership-cards/tiers`, `POST /api/v1/membership-cards/purchase`, `GET /api/v1/membership-cards/my` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Member/F1-11 Overlay - Renew Membership Card.png | F1-11 Overlay - Renew Membership Card | Member | `membership_card_tier`, `member_card` | `GET /api/v1/membership-cards/tiers`, `POST /api/v1/membership-cards/purchase`, `GET /api/v1/membership-cards/my` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Member/F1-12 - My Membership & Sport Packages.png | My Membership & Sport Packages | Member | `sport_package`, `sport`, `sport_package_registration` | `GET /api/v1/packages`, `POST /api/v1/packages`, `POST /api/v1/packages/registrations`, `PUT /api/v1/packages/registrations/{id}/activate` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Member/F1-12 State - Active.png | F1-12 State - Active | Member | `sport_package`, `sport`, `sport_package_registration` | `GET /api/v1/packages`, `POST /api/v1/packages`, `POST /api/v1/packages/registrations`, `PUT /api/v1/packages/registrations/{id}/activate` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Member/F1-12 State - Expired.png | F1-12 State - Expired | Member | `sport_package`, `sport`, `sport_package_registration` | `GET /api/v1/packages`, `POST /api/v1/packages`, `POST /api/v1/packages/registrations`, `PUT /api/v1/packages/registrations/{id}/activate` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Member/F1-12 State - Pending Payment.png | F1-12 State - Pending Payment | Member | `sport_package`, `sport`, `sport_package_registration` | `GET /api/v1/packages`, `POST /api/v1/packages`, `POST /api/v1/packages/registrations`, `PUT /api/v1/packages/registrations/{id}/activate` | IMPLEMENTED |
 
-### Member
+## Flow 1 - User and membership management > Flow 1 - Receptionist
 
-| Screen ID / File | Screen Title | Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| F1-07 | Member Profile | Member | `user_account`, `member_profile`, `member_sport_interest` | `GET /api/v1/members/me`, `PUT /api/v1/members/me` |
-| F1-08 | Available Packages & Cards | Member | `sport_package`, `membership_card_tier`, `member_card` | `GET /api/v1/packages/active`, `GET /api/v1/membership-cards/tiers` |
-| F1-09 | Package Detail & Registration | Member | `sport_package`, `sport_package_registration`, `member_card` | `POST /api/v1/package-registrations` (supports discount check) |
-| F1-10 | Membership Card Detail & Purchase | Member | `membership_card_tier`, `member_card` | `POST /api/v1/membership-cards/purchase` |
-| F1-11 | My Packages & Cards | Member | `sport_package_registration`, `member_card`, `sport_package` | `GET /api/v1/package-registrations/my`, `GET /api/v1/membership-cards/my` |
-| S1-ProfileUpdated | Profile Updated Dialog | Member | `member_profile` | Confirmation toast/dialog |
-| S1-Registered | Package Registration Submitted Dialog | Member | `sport_package_registration` | Pending payment instruction dialog |
-| S1-CardPurchased | Membership Card Purchased Dialog | Member | `member_card` | Card purchase confirmation |
-| S1-Conflict | Registration Conflict Dialog | Member | `sport_package_registration` | Conflict warning dialog |
-| S1-Renew | Renew Package Dialog | Member | `sport_package_registration` | Package renewal confirmation |
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Flow 1 - User and membership management/Flow 1 - Receptionist/F1-13 - Member Search & Profile.png | Member Search & Profile | Receptionist | `member_profile`, `user_account` | `GET /api/v1/members/me`, `PUT /api/v1/members/me`, `GET /api/v1/members` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Receptionist/F1-13 Overlay - Create Member.png | F1-13 Overlay - Create Member | Receptionist | `member_profile`, `user_account` | `GET /api/v1/members/me`, `PUT /api/v1/members/me`, `GET /api/v1/members` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Receptionist/F1-13 Overlay - Payment Handoff.png | F1-13 Overlay - Payment Handoff | Receptionist | `member_profile`, `user_account` | `GET /api/v1/members/me`, `PUT /api/v1/members/me`, `GET /api/v1/members` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Receptionist/F1-13 State - After Payment.png | F1-13 State - After Payment | Receptionist | `member_profile`, `user_account` | `GET /api/v1/members/me`, `PUT /api/v1/members/me`, `GET /api/v1/members` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Receptionist/F1-13 State - Member Not Found.png | F1-13 State - Member Not Found | Receptionist | `member_profile`, `user_account` | `GET /api/v1/members/me`, `PUT /api/v1/members/me`, `GET /api/v1/members` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Receptionist/F1-14 - Register & Renew.png | Register & Renew | Receptionist | `member_profile`, `user_account` | `GET /api/v1/members/me`, `PUT /api/v1/members/me`, `GET /api/v1/members` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Receptionist/F1-14 State - Membership Card.png | F1-14 State - Membership Card | Receptionist | `membership_card_tier`, `member_card` | `GET /api/v1/membership-cards/tiers`, `POST /api/v1/membership-cards/purchase`, `GET /api/v1/membership-cards/my` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Receptionist/F1-15 - Check-in.png | Check-in | Receptionist | `check_in`, `booking`, `sport_package_registration` | `POST /api/v1/check-ins`, `GET /api/v1/check-ins/history/{memberId}` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Receptionist/F1-15 State - Check-in Recorded.png | F1-15 State - Check-in Recorded | Receptionist | `check_in`, `booking`, `sport_package_registration` | `POST /api/v1/check-ins`, `GET /api/v1/check-ins/history/{memberId}` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Receptionist/F1-15 State - Check-in Rejected.png | F1-15 State - Check-in Rejected | Receptionist | `check_in`, `booking`, `sport_package_registration` | `POST /api/v1/check-ins`, `GET /api/v1/check-ins/history/{memberId}` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Receptionist/F1-16 - Support Requests.png | Support Requests | Receptionist | `support_request`, `user_account` | Support ticket interaction (Planned: `POST /api/v1/support-requests`) | PARTIAL |
+| Flow 1 - User and membership management/Flow 1 - Receptionist/F1-16 Overlay - Support Request.png | F1-16 Overlay - Support Request | Receptionist | `support_request`, `user_account` | Support ticket interaction (Planned: `POST /api/v1/support-requests`) | PARTIAL |
 
-### Receptionist
+## Flow 2 - Class booking and schedule management > Flow 2 - Coach
 
-| Screen ID / File | Screen Title | Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| F1-12 | Member Search & Profile | Receptionist | `user_account`, `member_profile`, `sport_package_registration` | `GET /api/v1/reception/members?query=...` |
-| F1-13 | Register Package for Member | Receptionist | `sport_package`, `sport_package_registration`, `member_card` | `POST /api/v1/reception/package-registrations` |
-| F1-14 | Issue Membership Card for Member | Receptionist | `membership_card_tier`, `member_card` | `POST /api/v1/reception/membership-cards` |
-| F1-15 | Front Desk Check-in | Receptionist | `check_in`, `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/check-in` (validates today's confirmed booking) |
-| S1-ReceptionRegistered | Package Registered Dialog | Receptionist | `sport_package_registration` | Confirmation dialog |
-| S1-ReceptionCardIssued | Card Issued Dialog | Receptionist | `member_card` | Confirmation dialog |
-| S1-CheckInSuccess | Check-in Recorded Dialog | Receptionist | `check_in` | Success confirmation |
-| S1-CheckInDenied | Check-in Denied Dialog | Receptionist | `check_in`, `booking` | Denied warning (no booking today, package inactive, or duplicate) |
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Flow 2 - Class booking and schedule management/Flow 2 - Coach/F2-13 - My Teaching Schedule.png | My Teaching Schedule | Coach | `class_session`, `sport_class`, `facility` | Schedule session management (Planned: `GET /api/v1/sessions`) | PARTIAL |
+| Flow 2 - Class booking and schedule management/Flow 2 - Coach/F2-14 - Class Roster.png | Class Roster | Coach | `sport_class`, `sport`, `coach_profile` | Class management (Planned: `GET /api/v1/classes`) | PARTIAL |
 
-## Flow 2 - Class Booking & Schedule Management
+## Flow 2 - Class booking and schedule management > Flow 2 - Manager
 
-### Manager
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Flow 2 - Class booking and schedule management/Flow 2 - Manager/F2-01 - Class Management.png | Class Management | Manager | `sport_class`, `sport`, `coach_profile` | Class management (Planned: `GET /api/v1/classes`) | PARTIAL |
+| Flow 2 - Class booking and schedule management/Flow 2 - Manager/F2-02 - Create  Edit or Class.png | Create  Edit or Class | Manager | `sport_class`, `sport`, `coach_profile` | Class management (Planned: `GET /api/v1/classes`) | PARTIAL |
+| Flow 2 - Class booking and schedule management/Flow 2 - Manager/F2-03 - Schedule & Coach Assignment.png | Schedule & Coach Assignment | Manager | `class_session`, `sport_class`, `facility` | Schedule session management (Planned: `GET /api/v1/sessions`) | PARTIAL |
+| Flow 2 - Class booking and schedule management/Flow 2 - Manager/S2-Conflict - Schedule Conflict.png | Schedule Conflict | Manager | `class_session`, `sport_class`, `facility` | Schedule session management (Planned: `GET /api/v1/sessions`) | PARTIAL |
 
-| Screen ID / File | Screen Title | Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| F2-01 | Sport Classes | Manager | `sport_class`, `sport`, `age_group` | `GET /api/v1/classes` |
-| F2-02 | Create or Edit Sport Class | Manager | `sport_class` | `POST /api/v1/classes`, `PUT /api/v1/classes/{id}` |
-| F2-03 | Class Sessions & Coach Assignment | Manager | `class_session`, `coach_profile`, `facility` | `GET /api/v1/classes/{id}/sessions`, `POST /api/v1/sessions` |
-| F2-04 | Schedule & Session Details | Manager | `class_session`, `booking`, `coach_profile` | `GET /api/v1/sessions/{id}` |
-| S2-ClassSaved | Sport Class Saved Dialog | Manager | `sport_class` | Confirmation dialog |
-| S2-SessionSaved | Session Published Dialog | Manager | `class_session` | Confirmation dialog |
-| S2-Conflict | Schedule Conflict Dialog | Manager | `class_session` | Coach/facility double-booking conflict warning |
-| S2-Cancelled | Session Cancelled Dialog | Manager | `class_session` | Cancellation confirmation |
+## Flow 2 - Class booking and schedule management > Flow 2 - Member
 
-### Coach
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/F2-04 - View Schedule.png | View Schedule | Member | `class_session`, `sport_class`, `facility` | Schedule session management (Planned: `GET /api/v1/sessions`) | PARTIAL |
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/F2-05 - Find Classes.png | Find Classes | Member | `sport_class`, `sport`, `coach_profile` | Class management (Planned: `GET /api/v1/classes`) | PARTIAL |
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/F2-06 - Session Detail.png | Session Detail | Member | `class_session`, `sport_class`, `facility` | Schedule session management (Planned: `GET /api/v1/sessions`) | PARTIAL |
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/F2-06-Self - Session Detail - Self-training.png | Session Detail - Self-training | Member | `class_session`, `sport_class`, `facility` | Schedule session management (Planned: `GET /api/v1/sessions`) | PARTIAL |
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/F2-07 - Booking Options.png | Booking Options | Member | `class_session`, `sport_class`, `facility` | Schedule session management (Planned: `GET /api/v1/sessions`) | PARTIAL |
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/F2-07-Self - Booking Options - Self-training.png | Booking Options - Self-training | Member | `class_session`, `sport_class`, `facility` | Schedule session management (Planned: `GET /api/v1/sessions`) | PARTIAL |
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/F2-08 - Booking Review.png | Booking Review | Member | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings`, `DELETE /api/v1/bookings/{id}`, `GET /api/v1/bookings/my`, `GET /api/v1/bookings/today/{memberId}` | IMPLEMENTED |
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/F2-08-Self - Booking Review - Self-training.png | Booking Review - Self-training | Member | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings`, `DELETE /api/v1/bookings/{id}`, `GET /api/v1/bookings/my`, `GET /api/v1/bookings/today/{memberId}` | IMPLEMENTED |
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/F2-09 - Booking Confirmed.png | Booking Confirmed | Member | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings`, `DELETE /api/v1/bookings/{id}`, `GET /api/v1/bookings/my`, `GET /api/v1/bookings/today/{memberId}` | IMPLEMENTED |
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/F2-09-Self - Booking Confirmed - Self-training.png | Booking Confirmed - Self-training | Member | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings`, `DELETE /api/v1/bookings/{id}`, `GET /api/v1/bookings/my`, `GET /api/v1/bookings/today/{memberId}` | IMPLEMENTED |
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/F2-10 - My Bookings.png | My Bookings | Member | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings`, `DELETE /api/v1/bookings/{id}`, `GET /api/v1/bookings/my`, `GET /api/v1/bookings/today/{memberId}` | IMPLEMENTED |
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/F2-10-Self - My Bookings - Self-training.png | My Bookings - Self-training | Member | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings`, `DELETE /api/v1/bookings/{id}`, `GET /api/v1/bookings/my`, `GET /api/v1/bookings/today/{memberId}` | IMPLEMENTED |
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/S2-Cancel - Cancel Booking.png | Cancel Booking | Member | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings`, `DELETE /api/v1/bookings/{id}`, `GET /api/v1/bookings/my`, `GET /api/v1/bookings/today/{memberId}` | IMPLEMENTED |
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/S2-Cancelled - Booking Cancelled.png | Booking Cancelled | Member | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings`, `DELETE /api/v1/bookings/{id}`, `GET /api/v1/bookings/my`, `GET /api/v1/bookings/today/{memberId}` | IMPLEMENTED |
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/S2-Cancelled-Self - Booking Cancelled - Self-training.png | Booking Cancelled - Self-training | Member | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings`, `DELETE /api/v1/bookings/{id}`, `GET /api/v1/bookings/my`, `GET /api/v1/bookings/today/{memberId}` | IMPLEMENTED |
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/S2-Cancel-Self - Cancel Booking - Self-training.png | Cancel Booking - Self-training | Member | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings`, `DELETE /api/v1/bookings/{id}`, `GET /api/v1/bookings/my`, `GET /api/v1/bookings/today/{memberId}` | IMPLEMENTED |
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/S2-CoachProfile - Coach Profile.png | Coach Profile | Member | `coach_profile`, `user_account` | Coach profile view (Planned: `GET /api/v1/coaches/{id}`) | PARTIAL |
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/S2-Full - Session Fully Booked.png | Session Fully Booked | Member | `class_session`, `sport_class`, `facility` | Schedule session management (Planned: `GET /api/v1/sessions`) | PARTIAL |
+| Flow 2 - Class booking and schedule management/Flow 2 - Member/S2-NoPackage - No Eligible Sport Package.png | No Eligible Sport Package | Member | `booking`, `class_session` | Session booking dialog | IMPLEMENTED |
 
-| Screen ID / File | Screen Title | Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| F2-13 | Coach Schedule | Coach | `class_session`, `sport_class` | `GET /api/v1/coach/schedule` |
-| F2-14 | Class Session Detail | Coach | `class_session`, `facility` | `GET /api/v1/coach/sessions/{id}` |
-| F2-15 | Class Roster | Coach | `booking`, `member_profile`, `user_account` | `GET /api/v1/coach/sessions/{id}/roster` |
-| F2-16 | Roster Detail & Attendance Notes | Coach | `booking`, `attendance_record` | `GET /api/v1/coach/sessions/{id}/notes` |
-| S2-SessionNotesSaved | Session Notes Saved Dialog | Coach | `class_session` | Confirmation dialog |
+## Flow 2 - Class booking and schedule management > Flow 2 - Receptionist
 
-### Member
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Flow 2 - Class booking and schedule management/Flow 2 - Receptionist/F2-11 - Member Booking Search.png | Member Booking Search | Receptionist | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings`, `DELETE /api/v1/bookings/{id}`, `GET /api/v1/bookings/my`, `GET /api/v1/bookings/today/{memberId}` | IMPLEMENTED |
+| Flow 2 - Class booking and schedule management/Flow 2 - Receptionist/F2-12 - Book for Member.png | Book for Member | Receptionist | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings`, `DELETE /api/v1/bookings/{id}`, `GET /api/v1/bookings/my`, `GET /api/v1/bookings/today/{memberId}` | IMPLEMENTED |
+| Flow 2 - Class booking and schedule management/Flow 2 - Receptionist/S2-ReceptionConfirmed - Booking Confirmed.png | Booking Confirmed | Receptionist | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings`, `DELETE /api/v1/bookings/{id}`, `GET /api/v1/bookings/my`, `GET /api/v1/bookings/today/{memberId}` | IMPLEMENTED |
 
-| Screen ID / File | Screen Title | Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| F2-05 | View Schedule | Member | `class_session`, `sport_class`, `facility` | `GET /api/v1/schedule` |
-| F2-06 | Find or Filter Sessions | Member | `class_session`, `sport`, `sport_class` | `GET /api/v1/sessions/search` |
-| F2-07 | Session Detail - Coach-led | Member | `class_session`, `coach_profile`, `sport_class` | `GET /api/v1/sessions/{id}` |
-| F2-07-Self | Booking Options - Self-training | Member | `class_session`, `facility` | `GET /api/v1/sessions/{id}/self-training-slots` |
-| F2-08 | Booking Review | Member | `class_session`, `sport_package_registration` | `GET /api/v1/bookings/review?sessionId=...` |
-| F2-08-Self | Booking Review - Self-training | Member | `class_session`, `sport_package_registration` | `GET /api/v1/bookings/review?sessionId=...&type=SELF` |
-| F2-09 | Booking Confirmed | Member | `booking`, `class_session` | `POST /api/v1/bookings` |
-| F2-09-Self | Booking Confirmed - Self-training | Member | `booking`, `class_session` | `POST /api/v1/bookings` (self-training slot) |
-| F2-10 | My Bookings | Member | `booking`, `class_session` | `GET /api/v1/bookings/my` (Upcoming / Past / Cancelled) |
-| F2-10-Self | My Bookings - Self-training | Member | `booking`, `class_session` | `GET /api/v1/bookings/my?format=SELF` |
-| S2-Cancel | Cancel Booking Dialog | Member | `booking` | Prompt to confirm session cancellation |
-| S2-Cancel-Self | Cancel Booking - Self-training Dialog | Member | `booking` | Prompt to confirm self-training cancellation |
-| S2-Cancelled | Booking Cancelled Dialog | Member | `booking` | Confirmation of cancellation |
-| S2-Cancelled-Self | Booking Cancelled - Self-training Dialog | Member | `booking` | Confirmation of self-training cancellation |
-| S2-CoachProfile | Coach Profile Dialog | Member | `coach_profile`, `coach_sport`, `coach_certification` | Coach bio, badges, sports |
-| S2-Full | Session Fully Booked Dialog | Member | `class_session`, `waitlist_entry` | Seat capacity full, waitlist prompt |
-| S2-NoPackage | No Eligible Sport Package Dialog | Member | `sport_package_registration` | Warning: must purchase package for sport |
+## Flow 3 - Payment and report managmen > Flow 3 - Manager
 
-### Receptionist
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Flow 3 - Payment and report managmen/Flow 3 - Manager/F3-08 - Financial Overview.png | Financial Overview | Manager | `payment`, `invoice`, `invoice_line` | Payment & invoicing workflow (Planned: `POST /api/v1/payments`, `GET /api/v1/invoices`) | PARTIAL |
+| Flow 3 - Payment and report managmen/Flow 3 - Manager/F3-09 - Transactions & Refund Approval.png | Transactions & Refund Approval | Manager | `refund_request`, `sport_package_registration`, `user_account` | `POST /api/v1/refunds`, `GET /api/v1/refunds/pending`, `GET /api/v1/refunds/my`, `PUT /api/v1/refunds/{id}/review` | IMPLEMENTED |
+| Flow 3 - Payment and report managmen/Flow 3 - Manager/F3-10 - Revenue Reports.png | Revenue Reports | Manager | `payment`, `invoice`, `invoice_line` | Payment & invoicing workflow (Planned: `POST /api/v1/payments`, `GET /api/v1/invoices`) | PARTIAL |
+| Flow 3 - Payment and report managmen/Flow 3 - Manager/S3-Export - Revenue Export Ready.png | Revenue Export Ready | Manager | `payment`, `invoice`, `invoice_line` | Payment & invoicing workflow (Planned: `POST /api/v1/payments`, `GET /api/v1/invoices`) | PARTIAL |
+| Flow 3 - Payment and report managmen/Flow 3 - Manager/S3-RefundRejected - Refund Request Rejected.png | Refund Request Rejected | Manager | `refund_request`, `sport_package_registration`, `user_account` | `POST /api/v1/refunds`, `GET /api/v1/refunds/pending`, `GET /api/v1/refunds/my`, `PUT /api/v1/refunds/{id}/review` | IMPLEMENTED |
+| Flow 3 - Payment and report managmen/Flow 3 - Manager/S3-RefundReview - Review Refund Request.png | Review Refund Request | Manager | `refund_request`, `sport_package_registration`, `user_account` | `POST /api/v1/refunds`, `GET /api/v1/refunds/pending`, `GET /api/v1/refunds/my`, `PUT /api/v1/refunds/{id}/review` | IMPLEMENTED |
 
-| Screen ID / File | Screen Title | Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| F2-11 | Member Booking Search | Receptionist | `user_account`, `member_profile`, `booking` | `GET /api/v1/reception/bookings/search` |
-| F2-12 | Book for Member | Receptionist | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/reception/bookings` |
-| S2-ReceptionConfirmed | Booking Confirmed Dialog | Receptionist | `booking` | Confirmation of staff-assisted booking |
+## Flow 3 - Payment and report managmen > Flow 3 - Member
 
-## Flow 3 - Payment and Report Management
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Flow 3 - Payment and report managmen/Flow 3 - Member/F3-01 - Payment Summary.png | Payment Summary | Member | `payment`, `invoice`, `invoice_line` | Payment & invoicing workflow (Planned: `POST /api/v1/payments`, `GET /api/v1/invoices`) | PARTIAL |
+| Flow 3 - Payment and report managmen/Flow 3 - Member/F3-02 - Payment Instructions & Status.png | Payment Instructions & Status | Member | `payment`, `invoice`, `invoice_line` | Payment & invoicing workflow (Planned: `POST /api/v1/payments`, `GET /api/v1/invoices`) | PARTIAL |
+| Flow 3 - Payment and report managmen/Flow 3 - Member/F3-03 - My Payments & Receipts.png | My Payments & Receipts | Member | `payment`, `invoice`, `invoice_line` | Payment & invoicing workflow (Planned: `POST /api/v1/payments`, `GET /api/v1/invoices`) | PARTIAL |
+| Flow 3 - Payment and report managmen/Flow 3 - Member/S3-CardReceipt - Receipt INV-0900.png | Receipt INV-0900 | Member | `payment`, `invoice`, `invoice_line` | Payment & invoicing workflow (Planned: `POST /api/v1/payments`, `GET /api/v1/invoices`) | PARTIAL |
+| Flow 3 - Payment and report managmen/Flow 3 - Member/S3-MemberReceipt - Receipt INV-1041.png | Receipt INV-1041 | Member | `payment`, `invoice`, `invoice_line` | Payment & invoicing workflow (Planned: `POST /api/v1/payments`, `GET /api/v1/invoices`) | PARTIAL |
+| Flow 3 - Payment and report managmen/Flow 3 - Member/S3-PaidHistory - My Payments - Updated.png | My Payments - Updated | Member | `payment`, `invoice`, `invoice_line` | Payment & invoicing workflow (Planned: `POST /api/v1/payments`, `GET /api/v1/invoices`) | PARTIAL |
+| Flow 3 - Payment and report managmen/Flow 3 - Member/S3-Single - Single Visit Payment Summary.png | Single Visit Payment Summary | Member | `payment`, `invoice`, `invoice_line` | Payment & invoicing workflow (Planned: `POST /api/v1/payments`, `GET /api/v1/invoices`) | PARTIAL |
+| Flow 3 - Payment and report managmen/Flow 3 - Member/S3-SingleReceipt - Receipt INV-1040.png | Receipt INV-1040 | Member | `payment`, `invoice`, `invoice_line` | Payment & invoicing workflow (Planned: `POST /api/v1/payments`, `GET /api/v1/invoices`) | PARTIAL |
 
-### Manager
+## Flow 3 - Payment and report managmen > Flow 3 - Receptionist
 
-| Screen ID / File | Screen Title | Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| F3-08 | Financial Overview | Manager | `payment`, `invoice`, `vw_paid_payment` | `GET /api/v1/manager/finance/overview` |
-| F3-09 | Transactions & Refund Approval | Manager | `payment`, `refund_request` | `GET /api/v1/manager/finance/transactions`, `GET /api/v1/refunds/pending` |
-| F3-10 | Revenue Reports | Manager | `vw_paid_payment`, `invoice` | `GET /api/v1/manager/finance/reports` |
-| S3-Export | Revenue Export Ready Dialog | Manager | `vw_paid_payment` | CSV/Excel export download trigger |
-| S3-RefundReview | Review Refund Request Dialog | Manager | `refund_request`, `payment`, `sport_package_registration` | `GET /api/v1/refunds/{id}` |
-| S3-RefundRejected | Refund Request Rejected Dialog | Manager | `refund_request` | `POST /api/v1/refunds/{id}/reject` |
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Flow 3 - Payment and report managmen/Flow 3 - Receptionist/F3-04 - Payment Requests.png | Payment Requests | Receptionist | `payment`, `invoice`, `invoice_line` | Payment & invoicing workflow (Planned: `POST /api/v1/payments`, `GET /api/v1/invoices`) | PARTIAL |
+| Flow 3 - Payment and report managmen/Flow 3 - Receptionist/F3-05 - Verify & Record Payment.png | Verify & Record Payment | Receptionist | `payment`, `invoice`, `invoice_line` | Payment & invoicing workflow (Planned: `POST /api/v1/payments`, `GET /api/v1/invoices`) | PARTIAL |
+| Flow 3 - Payment and report managmen/Flow 3 - Receptionist/F3-06 - Payment Confirmed & Receipt.png | Payment Confirmed & Receipt | Receptionist | `payment`, `invoice`, `invoice_line` | Payment & invoicing workflow (Planned: `POST /api/v1/payments`, `GET /api/v1/invoices`) | PARTIAL |
+| Flow 3 - Payment and report managmen/Flow 3 - Receptionist/F3-07 - Refund Requests.png | Refund Requests | Receptionist | `refund_request`, `sport_package_registration`, `user_account` | `POST /api/v1/refunds`, `GET /api/v1/refunds/pending`, `GET /api/v1/refunds/my`, `PUT /api/v1/refunds/{id}/review` | IMPLEMENTED |
+| Flow 3 - Payment and report managmen/Flow 3 - Receptionist/S3-Mismatch - Payment Needs Review.png | Payment Needs Review | Receptionist | `payment`, `invoice`, `invoice_line` | Payment & invoicing workflow (Planned: `POST /api/v1/payments`, `GET /api/v1/invoices`) | PARTIAL |
+| Flow 3 - Payment and report managmen/Flow 3 - Receptionist/S3-Receipt - Receipt INV-1041.png | Receipt INV-1041 | Receptionist | `payment`, `invoice`, `invoice_line` | Payment & invoicing workflow (Planned: `POST /api/v1/payments`, `GET /api/v1/invoices`) | PARTIAL |
+| Flow 3 - Payment and report managmen/Flow 3 - Receptionist/S3-RefundApproved - Refund Approved.png | Refund Approved | Receptionist | `refund_request`, `sport_package_registration`, `user_account` | `POST /api/v1/refunds`, `GET /api/v1/refunds/pending`, `GET /api/v1/refunds/my`, `PUT /api/v1/refunds/{id}/review` | IMPLEMENTED |
+| Flow 3 - Payment and report managmen/Flow 3 - Receptionist/S3-RefundDone - Refund Completed.png | Refund Completed | Receptionist | `refund_request`, `sport_package_registration`, `user_account` | `POST /api/v1/refunds`, `GET /api/v1/refunds/pending`, `GET /api/v1/refunds/my`, `PUT /api/v1/refunds/{id}/review` | IMPLEMENTED |
+| Flow 3 - Payment and report managmen/Flow 3 - Receptionist/S3-RefundSubmitted - Refund Request Submitted.png | Refund Request Submitted | Receptionist | `refund_request`, `sport_package_registration`, `user_account` | `POST /api/v1/refunds`, `GET /api/v1/refunds/pending`, `GET /api/v1/refunds/my`, `PUT /api/v1/refunds/{id}/review` | IMPLEMENTED |
 
-### Member
+## Flow 4 - Training and attendence management > Flow 4 - Coach
 
-| Screen ID / File | Screen Title | Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| F3-01 | Payment Summary | Member | `payment`, `sport_package_registration`, `member_card` | `GET /api/v1/payments/summary` |
-| F3-02 | Payment Instructions & Status | Member | `payment`, `bank_transfer_instruction` | `GET /api/v1/payments/{code}/instructions` |
-| F3-03 | My Payments & Receipts | Member | `payment`, `invoice` | `GET /api/v1/payments/my` |
-| S3-CardReceipt | Receipt INV-0900 (Card) | Member | `invoice`, `invoice_line` | `GET /api/v1/invoices/{code}` |
-| S3-MemberReceipt | Receipt INV-1041 (Package) | Member | `invoice`, `invoice_line` | `GET /api/v1/invoices/{code}` |
-| S3-PaidHistory | My Payments - Updated | Member | `payment`, `invoice` | `GET /api/v1/payments/my` |
-| S3-Single | Single Visit Payment Summary | Member | `payment`, `sport_package` | `GET /api/v1/payments/single-visit` |
-| S3-SingleReceipt | Receipt INV-1040 (Single Visit) | Member | `invoice`, `invoice_line` | `GET /api/v1/invoices/{code}` |
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Flow 4 - Training and attendence management/Flow 4 - Coach/F4-01 - My Training Sessions.png | My Training Sessions | Coach | `attendance_record`, `class_session`, `session_plan`, `coach_feedback` | Attendance & coaching workflow (Planned: `POST /api/v1/attendance`) | PARTIAL |
+| Flow 4 - Training and attendence management/Flow 4 - Coach/F4-02 - Session Attendance.png | Session Attendance | Coach | `attendance_record`, `class_session`, `session_plan`, `coach_feedback` | Attendance & coaching workflow (Planned: `POST /api/v1/attendance`) | PARTIAL |
+| Flow 4 - Training and attendence management/Flow 4 - Coach/F4-03 - Training Plan.png | Training Plan | Coach | `attendance_record`, `class_session`, `session_plan`, `coach_feedback` | Attendance & coaching workflow (Planned: `POST /api/v1/attendance`) | PARTIAL |
+| Flow 4 - Training and attendence management/Flow 4 - Coach/F4-04 - Session Results & Feedback.png | Session Results & Feedback | Coach | `attendance_record`, `class_session`, `session_plan`, `coach_feedback` | Attendance & coaching workflow (Planned: `POST /api/v1/attendance`) | PARTIAL |
+| Flow 4 - Training and attendence management/Flow 4 - Coach/F4-05 - Member Progress.png | Member Progress | Coach | `attendance_record`, `class_session`, `session_plan`, `coach_feedback` | Attendance & coaching workflow (Planned: `POST /api/v1/attendance`) | PARTIAL |
+| Flow 4 - Training and attendence management/Flow 4 - Coach/S4-AttendanceSaved - Attendance Saved.png | Attendance Saved | Coach | `attendance_record`, `class_session`, `session_plan`, `coach_feedback` | Attendance & coaching workflow (Planned: `POST /api/v1/attendance`) | PARTIAL |
+| Flow 4 - Training and attendence management/Flow 4 - Coach/S4-Correction - Correct Attendance.png | Correct Attendance | Coach | `attendance_record`, `class_session`, `session_plan`, `coach_feedback` | Attendance & coaching workflow (Planned: `POST /api/v1/attendance`) | PARTIAL |
+| Flow 4 - Training and attendence management/Flow 4 - Coach/S4-FeedbackSent - Feedback Sent.png | Feedback Sent | Coach | `attendance_record`, `class_session`, `session_plan`, `coach_feedback` | Attendance & coaching workflow (Planned: `POST /api/v1/attendance`) | PARTIAL |
+| Flow 4 - Training and attendence management/Flow 4 - Coach/S4-PlanSaved - Training Plan Shared.png | Training Plan Shared | Coach | `attendance_record`, `class_session`, `session_plan`, `coach_feedback` | Attendance & coaching workflow (Planned: `POST /api/v1/attendance`) | PARTIAL |
+| Flow 4 - Training and attendence management/Flow 4 - Coach/S4-Profile - Member Profile & Goals.png | Member Profile & Goals | Coach | `attendance_record`, `class_session`, `session_plan`, `coach_feedback` | Attendance & coaching workflow (Planned: `POST /api/v1/attendance`) | PARTIAL |
+| Flow 4 - Training and attendence management/Flow 4 - Coach/S4-ProgressSaved - Progress Feedback Updated.png | Progress Feedback Updated | Coach | `attendance_record`, `class_session`, `session_plan`, `coach_feedback` | Attendance & coaching workflow (Planned: `POST /api/v1/attendance`) | PARTIAL |
 
-### Receptionist
+## Flow 4 - Training and attendence management > Flow 4 - Manager
 
-| Screen ID / File | Screen Title | Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| F3-04 | Payment Requests | Receptionist | `payment`, `sport_package_registration`, `member_card` | `GET /api/v1/reception/payments/pending` |
-| F3-05 | Verify & Record Payment | Receptionist | `payment`, `sport_package_registration` | `POST /api/v1/reception/payments/{id}/record` |
-| F3-06 | Payment Confirmed & Receipt | Receptionist | `payment`, `invoice` | `POST /api/v1/reception/payments/{id}/confirm` |
-| F3-07 | Refund Requests | Receptionist | `refund_request`, `payment` | `GET /api/v1/reception/refunds`, `POST /api/v1/reception/refunds` |
-| S3-Mismatch | Payment Needs Review Dialog | Receptionist | `payment` | Warning: amount received does not match package fee |
-| S3-Receipt | Receipt INV-1041 Dialog | Receptionist | `invoice` | Staff invoice preview |
-| S3-RefundSubmitted | Refund Request Submitted Dialog | Receptionist | `refund_request` | Confirmation of refund filing to Manager |
-| S3-RefundApproved | Refund Approved Dialog | Receptionist | `refund_request` | Manager approved refund notice |
-| S3-RefundDone | Refund Completed Dialog | Receptionist | `refund_request`, `payment` | Payout completed and logged |
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Flow 4 - Training and attendence management/Flow 4 - Manager/F4-10 - Attendance Overview.png | Attendance Overview | Manager | `attendance_record`, `class_session`, `session_plan`, `coach_feedback` | Attendance & coaching workflow (Planned: `POST /api/v1/attendance`) | PARTIAL |
+| Flow 4 - Training and attendence management/Flow 4 - Manager/S4-ManagerDetails - Session Attendance Details.png | Session Attendance Details | Manager | `attendance_record`, `class_session`, `session_plan`, `coach_feedback` | Attendance & coaching workflow (Planned: `POST /api/v1/attendance`) | PARTIAL |
 
-## Flow 4 - Training, Attendance & Progress
+## Flow 4 - Training and attendence management > Flow 4 - Member
 
-### Coach
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Flow 4 - Training and attendence management/Flow 4 - Member/F4-06 - My Training Plan.png | My Training Plan | Member | `attendance_record`, `class_session`, `session_plan`, `coach_feedback` | Attendance & coaching workflow (Planned: `POST /api/v1/attendance`) | PARTIAL |
+| Flow 4 - Training and attendence management/Flow 4 - Member/F4-07 - My Attendance.png | My Attendance | Member | `attendance_record`, `class_session`, `session_plan`, `coach_feedback` | Attendance & coaching workflow (Planned: `POST /api/v1/attendance`) | PARTIAL |
+| Flow 4 - Training and attendence management/Flow 4 - Member/F4-08 - My Progress & Feedback.png | My Progress & Feedback | Member | `attendance_record`, `class_session`, `session_plan`, `coach_feedback` | Attendance & coaching workflow (Planned: `POST /api/v1/attendance`) | PARTIAL |
+| Flow 4 - Training and attendence management/Flow 4 - Member/S4-Notification - Coach Feedback Notification.png | Coach Feedback Notification | Member | `attendance_record`, `class_session`, `session_plan`, `coach_feedback` | Attendance & coaching workflow (Planned: `POST /api/v1/attendance`) | PARTIAL |
 
-| Screen ID / File | Screen Title | Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| F4-01 | My Training Sessions | Coach | `class_session`, `sport_class` | `GET /api/v1/coach/sessions` |
-| F4-02 | Session Attendance | Coach | `attendance_record`, `booking` | `GET /api/v1/coach/sessions/{id}/attendance` |
-| F4-03 | Training Plan | Coach | `session_plan`, `session_plan_step` | `GET /api/v1/coach/sessions/{id}/plan` |
-| F4-04 | Session Results & Feedback | Coach | `session_result`, `coach_feedback` | `POST /api/v1/coach/sessions/{id}/results` |
-| F4-05 | Member Progress | Coach | `vw_member_skill_latest`, `session_result` | `GET /api/v1/coach/members/{id}/progress` |
-| S4-AttendanceSaved | Attendance Saved Dialog | Coach | `attendance_record` | Confirmation dialog |
-| S4-Correction | Correct Attendance Dialog | Coach | `attendance_record`, `attendance_correction` | Correction note and update |
-| S4-FeedbackSent | Feedback Sent Dialog | Coach | `coach_feedback` | Confirmation dialog |
-| S4-PlanSaved | Training Plan Shared Dialog | Coach | `session_plan` | Confirmation dialog |
-| S4-Profile | Member Profile & Goals Dialog | Coach | `member_profile`, `user_account` | Quick bio popup |
-| S4-ProgressSaved | Progress Feedback Updated Dialog | Coach | `session_result` | Confirmation dialog |
+## Flow 4 - Training and attendence management > Flow 4 - Receptionist
 
-### Manager
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Flow 4 - Training and attendence management/Flow 4 - Receptionist/F4-09 - Self-training Attendance.png | Self-training Attendance | Receptionist | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings/self-training/attendance` | IMPLEMENTED |
+| Flow 4 - Training and attendence management/Flow 4 - Receptionist/S4-SelfSaved - Self-training Attendance Confirmed.png | Self-training Attendance Confirmed | Receptionist | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings/self-training/attendance` | IMPLEMENTED |
 
-| Screen ID / File | Screen Title | Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| F4-10 | Attendance Overview | Manager | `attendance_record`, `class_session` | `GET /api/v1/manager/attendance/overview` |
-| S4-ManagerDetails | Session Attendance Details Dialog | Manager | `attendance_record`, `booking` | Deep-dive audit dialog |
+## Flow 5 - AI Workout Recommendation > Flow 5 - Coach
 
-### Member
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Flow 5 - AI Workout Recommendation/Flow 5 - Coach/F5-06 - AI Exercise Suggestions.png | AI Exercise Suggestions | Coach | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Coach/F5-07 - Review Suggested Exercises.png | Review Suggested Exercises | Coach | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Coach/F5-08 - Training Plan Draft.png | Training Plan Draft | Coach | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Coach/S5-Error - Suggestions Unavailable.png | Suggestions Unavailable | Coach | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
 
-| Screen ID / File | Screen Title | Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| F4-06 | My Training Plan | Member | `session_plan`, `session_plan_step` | `GET /api/v1/members/training-plan` |
-| F4-07 | My Attendance | Member | `attendance_record`, `booking` | `GET /api/v1/members/attendance/history` |
-| F4-08 | My Progress & Feedback | Member | `session_result`, `coach_feedback` | `GET /api/v1/members/progress` |
-| S4-Notification | Coach Feedback Notification Dialog | Member | `notification`, `coach_feedback` | Alert toast/dialog |
+## Flow 5 - AI Workout Recommendation > Flow 5 - Member
 
-### Receptionist
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/F5-01 - My Training Goals.png | My Training Goals | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/F5-02 - Recommended Sports & Classes.png | Recommended Sports & Classes | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/F5-03 - Recommendation Detail.png | Recommendation Detail | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/F5-04 - Suitable Sessions.png | Suitable Sessions | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/F5-05 - Saved Recommendations.png | Saved Recommendations | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/S5-CoachProfile - Coach Profile.png | Coach Profile | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/S5-Full - Session Fully Booked.png | Session Fully Booked | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/S5-NoMatch - No Matching Classes.png | No Matching Classes | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/S5-NoPackage - Package Access Required.png | Package Access Required | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/S5-SelfDetail - Self-training Recommendation.png | Self-training Recommendation | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
 
-| Screen ID / File | Screen Title | Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| F4-09 | Self-training Attendance | Receptionist | `attendance_record`, `booking`, `sport_package_registration` | `GET /api/v1/reception/self-training/today`, `POST /api/v1/reception/self-training/attendance` |
-| S4-SelfSaved | Self-training Attendance Confirmed Dialog | Receptionist | `attendance_record`, `sport_package_registration` | Confirmation dialog (consumes 1 session) |
+## Flow 6 - AI Assistant > Flow 6 - Member
 
-## Flow 5 - AI Workout Recommendation
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Flow 6 - AI Assistant/Flow 6 - Member/F6-01 - AI Assistant.png | AI Assistant | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
+| Flow 6 - AI Assistant/Flow 6 - Member/F6-02 - Package & Pricing Answers.png | Package & Pricing Answers | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
+| Flow 6 - AI Assistant/Flow 6 - Member/F6-03 - Schedule & Booking Answers.png | Schedule & Booking Answers | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
+| Flow 6 - AI Assistant/Flow 6 - Member/F6-04 - My Package & Training Answers.png | My Package & Training Answers | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
+| Flow 6 - AI Assistant/Flow 6 - Member/F6-05 - Contact Reception.png | Contact Reception | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
+| Flow 6 - AI Assistant/Flow 6 - Member/S6-Error - Assistant Temporarily Unavailable.png | Assistant Temporarily Unavailable | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
+| Flow 6 - AI Assistant/Flow 6 - Member/S6-MemberReply - Support Reply Received.png | Support Reply Received | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
+| Flow 6 - AI Assistant/Flow 6 - Member/S6-Submitted - Support Request Submitted.png | Support Request Submitted | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
+| Flow 6 - AI Assistant/Flow 6 - Member/S6-Unknown - More Information Needed.png | More Information Needed | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
 
-### Coach
+## Flow 6 - AI Assistant > Flow 6 - Receptionist
 
-| Screen ID / File | Screen Title | Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| F5-06 | AI Exercise Suggestions | Coach | `workout_plan`, `workout_plan_exercise` | `GET /api/v1/coach/ai/suggestions` |
-| F5-07 | Review Suggested Exercises | Coach | `workout_plan_exercise` | `PUT /api/v1/coach/ai/exercises` |
-| F5-08 | Training Plan Draft | Coach | `session_plan`, `workout_plan` | `POST /api/v1/coach/plans/draft` |
-| S5-Error | Suggestions Unavailable Dialog | Coach | None | AI provider error or fallback dialog |
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Flow 6 - AI Assistant/Flow 6 - Receptionist/F6-06 - Support Request Inbox.png | Support Request Inbox | Receptionist | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
+| Flow 6 - AI Assistant/Flow 6 - Receptionist/F6-07 - Support Request Detail & Reply.png | Support Request Detail & Reply | Receptionist | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
+| Flow 6 - AI Assistant/Flow 6 - Receptionist/S6-ReplySent - Support Reply Sent.png | Support Reply Sent | Receptionist | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
+| Flow 6 - AI Assistant/Flow 6 - Receptionist/S6-Resolved - Support Request Resolved.png | Support Request Resolved | Receptionist | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
 
-### Member
+## Home > 1.png
 
-| Screen ID / File | Screen Title | Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| F5-01 | My Training Goals | Member | `member_profile`, `workout_plan` | `POST /api/v1/ai/goals` |
-| F5-02 | Recommended Sports & Classes | Member | `sport`, `sport_class`, `workout_plan` | `GET /api/v1/ai/recommendations` |
-| F5-03 | Recommendation Detail | Member | `sport_class`, `coach_profile` | `GET /api/v1/ai/recommendations/{id}` |
-| F5-04 | Suitable Sessions | Member | `class_session`, `facility` | `GET /api/v1/ai/recommendations/{id}/sessions` |
-| F5-05 | Saved Recommendations | Member | `workout_plan` | `GET /api/v1/ai/recommendations/saved` |
-| S5-CoachProfile | Coach Profile Dialog | Member | `coach_profile` | Quick coach popup |
-| S5-Full | Session Fully Booked Dialog | Member | `class_session` | Booking conflict dialog |
-| S5-NoMatch | No Matching Classes Dialog | Member | `sport_class` | Prompt: refine preferences |
-| S5-NoPackage | Package Access Required Dialog | Member | `sport_package_registration` | Prompt: must buy sport package to book |
-| S5-SelfDetail | Self-training Recommendation Dialog | Member | `facility`, `sport_package` | Self-training guide dialog |
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Home/1.png | Landing Page & Hero | Public | `sport`, `sport_package`, `membership_card_tier` | `GET /api/v1/sports`, `GET /api/v1/packages` | IMPLEMENTED |
 
-## Flow 6 - AI Assistant and Support
+## Home > 2.png
 
-### Member
+| Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
+|---|---|---|---|---|---|
+| Home/2.png | Sports, Packages & Features | Public | `sport`, `sport_package`, `membership_card_tier` | `GET /api/v1/sports`, `GET /api/v1/packages` | IMPLEMENTED |
 
-| Screen ID / File | Screen Title | Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| F6-01 | AI Assistant | Member | `ai_conversation`, `assistant_setting` | `GET /api/v1/ai-assistant/welcome` |
-| F6-02 | Package & Pricing Answers | Member | `ai_message`, `sport_package`, `membership_card_tier` | `POST /api/v1/ai-assistant/message` |
-| F6-03 | Schedule & Booking Answers | Member | `ai_message`, `class_session` | `POST /api/v1/ai-assistant/message` |
-| F6-04 | My Package & Training Answers | Member | `ai_message`, `sport_package_registration`, `attendance_record` | `POST /api/v1/ai-assistant/message` |
-| F6-05 | Contact Reception | Member | `support_request`, `ai_conversation` | `POST /api/v1/support-requests` |
-| S6-Error | Assistant Temporarily Unavailable Dialog | Member | None | System fallback dialog |
-| S6-MemberReply | Support Reply Received Dialog | Member | `support_request_message` | Alert popup |
-| S6-Submitted | Support Request Submitted Dialog | Member | `support_request` | Submission confirmation |
-| S6-Unknown | More Information Needed Dialog | Member | `ai_message` | Clarification prompt |
-
-### Receptionist
-
-| Screen ID / File | Screen Title | Role | Primary Tables Accessed | Backend Endpoint / Notes |
-|---|---|---|---|---|
-| F6-06 | Support Request Inbox | Receptionist | `support_request`, `user_account` | `GET /api/v1/reception/support-requests` |
-| F6-07 | Support Request Detail & Reply | Receptionist | `support_request`, `support_request_message` | `GET /api/v1/reception/support-requests/{id}`, `POST /api/v1/reception/support-requests/{id}/reply` |
-| S6-ReplySent | Support Reply Sent Dialog | Receptionist | `support_request_message` | Confirmation dialog |
-| S6-Resolved | Support Request Resolved Dialog | Receptionist | `support_request` | Resolution confirmation |

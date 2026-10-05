@@ -9,17 +9,18 @@ Screens covered: Global logic and flows across all flows.
 ```mermaid
 stateDiagram-v2
     [*] --> PENDING_PAYMENT : Register Package
-    PENDING_PAYMENT --> ACTIVE : Payment Confirmed (start_date <= TODAY)
+    PENDING_PAYMENT --> ACTIVE : Payment Confirmed / Receptionist Activates
     PENDING_PAYMENT --> CANCELLED : Cancel
     ACTIVE --> EXPIRED : Daily Job (end_date < TODAY OR remaining_sessions = 0)
-    ACTIVE --> CANCELLED : Cancel / Refund
+    ACTIVE --> REFUNDED : Manager Approves Refund
+    ACTIVE --> CANCELLED : Cancel
 ```
 
 ### Member Card (`member_card.status`)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> ACTIVE : Purchase Card (Free Standard or Paid Tier)
+    [*] --> ACTIVE : Purchase Card (Free STANDARD 0%, GOLD 5%, VIP 10%)
     ACTIVE --> EXPIRED : Daily Job (end_date < TODAY for Gold/VIP)
     ACTIVE --> CANCELLED : Cancel
 ```
@@ -136,9 +137,9 @@ Front desk check-in validates member arrival at the center:
 ## Membership Card & Discount Rules
 
 1. **Card Validity:**
-   - Standard Card: Free, permanent validity, 0% discount.
-   - Gold Card: 300,000 VND / 12 months, 5% discount on 30-day and 90-day packages.
-   - VIP Card: 600,000 VND / 12 months, 10% discount on 30-day and 90-day packages.
+   - Standard Card (STANDARD): Free, permanent validity, 0% discount.
+   - Gold Card (GOLD): 300,000 VND / 12 months, 5% discount on 30-day and 90-day packages.
+   - VIP Card (VIP): 600,000 VND / 12 months, 10% discount on 30-day and 90-day packages.
 2. **Discount Scope & Exclusions:**
    - Single-visit packages (1 day, 1 session) are strictly EXCLUDED from discounts.
    - Discounts apply only to 30-day and 90-day packages.
@@ -164,7 +165,7 @@ Front desk check-in validates member arrival at the center:
 2. **Amount Calculation:** Pro-rated based on unused remaining sessions:
    - `refund_amount = (remaining_sessions / total_sessions) * paid_amount`
 3. **Manager Approval:** Center Manager must review all pending refund requests (`F3-09`).
-4. **Resolution:** Upon Manager approval, refund status becomes `APPROVED`, and upon disbursement becomes `COMPLETED`. The package registration status transitions to `CANCELLED`. If rejected, status is `REJECTED` with a mandatory reason note.
+4. **Resolution:** Upon Manager approval, refund status becomes `APPROVED`, and upon disbursement becomes `COMPLETED`. The package registration status transitions to `REFUNDED`. If rejected, status is `REJECTED` with a mandatory reason note.
 
 ## Critical Transactions & Concurrency Control
 

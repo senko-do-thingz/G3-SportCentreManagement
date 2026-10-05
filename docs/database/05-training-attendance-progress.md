@@ -26,6 +26,10 @@ erDiagram
 - **Coach-led vs Self-training Attendance.**
   - For coach-led sessions (`F4-02`), the assigned coach records attendance for the roster.
   - For self-training sessions (`F4-09`), the receptionist marks attendance at the front desk (`S4-SelfSaved`), which validates that the member attended their scheduled self-training slot and consumes 1 reserved session.
+- **Session Deduction and Attendance Model:**
+  - **Deduction at Booking Time:** When a member confirms a class session booking (`POST /api/v1/bookings`), 1 session is immediately deducted from `sport_package_registration.remaining_sessions`.
+  - **Restoration upon Cancellation:** If a booking is cancelled (`DELETE /api/v1/bookings/{id}`), 1 session is restored to the package registration and the seat is freed.
+  - **Check-in Attendance Validation:** Reception check-in (`POST /api/v1/check-ins`) strictly validates that the member holds an existing confirmed session booking for the current day (Decision 3 / Screen F1-15). Check-in records physical attendance verification without double-decrementing remaining sessions.
 - **Attendance Record.** `attendance_record` is exactly 1:1 with a confirmed `booking`.
 - **Attendance States on Session.** To track whether attendance was done, `class_session` has `attendance_status` (`NOT_STARTED`, `DRAFT`, `SUBMITTED`). Members only see attendance on their side if it is `SUBMITTED`.
 - **Attendance Correction.** Changes to attendance after submission are logged in `attendance_correction` for audit purposes.
