@@ -10,14 +10,14 @@ Welcome to the **Sportify Center** backend repository. This project aims to buil
 
 | Module | Status |
 |---|---|
-| **Identity & Access** | In Progress - Data layer + schema |
-| **Catalog & Membership** | In Progress (registration, renewal, check-in, member search) |
-| **Classes & Booking** | Designed, not implemented |
-| **Payments & Reports** | Designed, not implemented |
-| **Training & Progress** | Designed, not implemented |
-| **AI Workout Recommendation** | Planned |
-| **AI Assistant & Support** | Planned |
-| **Security & JWT** | Planned |
+| **Identity & Access** | Implemented - Fixed roles (MEMBER, COACH, RECEPTIONIST, MANAGER), profiles, validation |
+| **Catalog & Membership** | In Progress - Refreshed with Sport Packages, Membership Cards, Multi-package, Check-in |
+| **Classes & Booking** | Designed - Updated for coach-led vs self-training sessions and package reservations |
+| **Payments & Reports** | Designed - Updated for package invoices, card discounts, and refund workflow |
+| **Training & Progress** | Designed - Updated for coach sessions and receptionist self-training attendance |
+| **AI Workout Recommendation** | Planned - Goal-driven recommendations and coach exercise drafts |
+| **AI Assistant & Support** | Planned - Conversational support and receptionist inbox |
+| **Security & JWT** | Implemented - Role-based endpoint authorization |
 
 ## 🛠 Technology Stack
 
