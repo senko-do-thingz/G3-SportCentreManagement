@@ -57,7 +57,7 @@ class AuthenticationServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        registerRequest = new RegisterRequest("Test User", "test@sportify.com", "password", "123");
+        registerRequest = new RegisterRequest("Test User", "test@sportify.com", "Password123", "0123456789");
         authRequest = new AuthRequest("test@sportify.com", "password");
         
         role = new Role();
@@ -74,7 +74,16 @@ class AuthenticationServiceImplTest {
     @Test
     void register_shouldThrowIfEmailExists() {
         when(userRepository.existsByEmailIgnoreCase(any())).thenReturn(true);
-        assertThrows(IllegalArgumentException.class, () -> authService.register(registerRequest));
+        assertThrows(com.sportify.core.exception.ConflictException.class, () -> authService.register(registerRequest));
+    }
+
+    @Test
+    void register_shouldThrowConflictOnDataIntegrityViolation() {
+        when(userRepository.existsByEmailIgnoreCase(any())).thenReturn(false);
+        when(roleRepository.findByCode("MEMBER")).thenReturn(Optional.of(role));
+        when(passwordEncoder.encode(any())).thenReturn("hashed");
+        when(userRepository.save(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate"));
+        assertThrows(com.sportify.core.exception.ConflictException.class, () -> authService.register(registerRequest));
     }
 
     @Test
@@ -114,5 +123,60 @@ class AuthenticationServiceImplTest {
     void authenticate_shouldThrowIfBadCredentials() {
         doThrow(new BadCredentialsException("Bad")).when(authenticationManager).authenticate(any());
         assertThrows(BadCredentialsException.class, () -> authService.authenticate(authRequest));
+    }
+
+    @Test
+    void register_shouldNormalizeEmail() {
+        registerRequest.setEmail("  Test@Sportify.COM ");
+        when(userRepository.existsByEmailIgnoreCase("test@sportify.com")).thenReturn(false);
+        when(roleRepository.findByCode("MEMBER")).thenReturn(Optional.of(role));
+        when(passwordEncoder.encode(any())).thenReturn("hashed");
+        when(memberProfileRepository.getNextMemberCode()).thenReturn(1L);
+        when(codeFormatter.formatMemberCode(1L)).thenReturn("MEM-0001");
+        
+        when(userRepository.save(any(UserAccount.class))).thenAnswer(invocation -> {
+            UserAccount saved = invocation.getArgument(0);
+            assertEquals("test@sportify.com", saved.getEmail());
+            saved.setId(1L);
+            return saved;
+        });
+        
+        when(jwtService.generateToken(any())).thenReturn("access");
+        when(jwtService.generateRefreshToken(any())).thenReturn("refresh");
+
+        authService.register(registerRequest);
+        verify(userRepository).existsByEmailIgnoreCase("test@sportify.com");
+    }
+
+    @Test
+    void authenticate_shouldNormalizeEmail() {
+        authRequest.setEmail("  Test@Sportify.COM ");
+        when(userRepository.findByEmailIgnoreCase("test@sportify.com")).thenReturn(Optional.of(userAccount));
+        when(jwtService.generateToken(any())).thenReturn("access");
+        when(jwtService.generateRefreshToken(any())).thenReturn("refresh");
+
+        authService.authenticate(authRequest);
+
+        org.mockito.ArgumentCaptor<org.springframework.security.authentication.UsernamePasswordAuthenticationToken> captor = org.mockito.ArgumentCaptor.forClass(org.springframework.security.authentication.UsernamePasswordAuthenticationToken.class);
+        verify(authenticationManager).authenticate(captor.capture());
+        assertEquals("test@sportify.com", captor.getValue().getPrincipal());
+    }
+
+    @Test
+    void refreshToken_shouldThrowResourceNotFoundIfUserMissing() {
+        com.sportify.identity.dto.RefreshTokenRequest req = new com.sportify.identity.dto.RefreshTokenRequest();
+        req.setRefreshToken("token");
+        when(jwtService.extractUsername("token")).thenReturn("missing@sportify.com");
+        when(userRepository.findByEmailIgnoreCase("missing@sportify.com")).thenReturn(Optional.empty());
+
+        assertThrows(com.sportify.core.exception.ResourceNotFoundException.class, () -> authService.refreshToken(req));
+    }
+
+    @Test
+    void register_shouldThrowIllegalStateExceptionIfRoleMissing() {
+        when(userRepository.existsByEmailIgnoreCase(any())).thenReturn(false);
+        when(roleRepository.findByCode("MEMBER")).thenReturn(Optional.empty());
+
+        assertThrows(IllegalStateException.class, () -> authService.register(registerRequest));
     }
 }

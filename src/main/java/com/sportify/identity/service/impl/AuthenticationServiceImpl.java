@@ -23,7 +23,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import org.springframework.transaction.annotation.Transactional;
-
+import com.sportify.core.exception.ConflictException;
+import com.sportify.core.exception.ResourceNotFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
+import com.sportify.identity.entity.MemberProfile;
+import java.util.Locale;
 @Service
 @RequiredArgsConstructor
 public class AuthenticationServiceImpl implements AuthenticationService {
@@ -41,28 +45,34 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        if (repository.existsByEmailIgnoreCase(request.getEmail())) {
-            throw new IllegalArgumentException("Email already exists");
+        String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
+        if (repository.existsByEmailIgnoreCase(email)) {
+            throw new ConflictException("Email is already registered");
         }
 
         Role memberRole = roleRepository.findByCode("MEMBER")
-                .orElseThrow(() -> new RuntimeException("Default role not found"));
+                .orElseThrow(() -> new IllegalStateException("Default role not found"));
 
         UserAccount user = UserAccount.builder()
                 .fullName(request.getFullName())
-                .email(request.getEmail())
+                .email(email)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .phone(request.getPhone())
                 .role(memberRole)
                 .status("ACTIVE")
                 .build();
 
-        UserAccount savedUser = repository.save(user);
+        UserAccount savedUser;
+        try {
+            savedUser = repository.save(user);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ConflictException("Email is already registered");
+        }
 
         if ("MEMBER".equals(memberRole.getCode())) {
             Long nextSeq = memberProfileRepository.getNextMemberCode();
             String memberCode = codeFormatter.formatMemberCode(nextSeq);
-            com.sportify.identity.entity.MemberProfile profile = com.sportify.identity.entity.MemberProfile.builder()
+            MemberProfile profile = MemberProfile.builder()
                     .userAccount(savedUser)
                     .memberCode(memberCode)
                     .currentLevel("BEGINNER")
@@ -85,14 +95,15 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     @Override
     public AuthResponse authenticate(AuthRequest request) {
+        String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
+                        email,
                         request.getPassword()
                 )
         );
 
-        UserAccount user = repository.findByEmailIgnoreCase(request.getEmail())
+        UserAccount user = repository.findByEmailIgnoreCase(email)
                 .orElseThrow();
 
         logActivity(user, "LOGIN", "USER_ACCOUNT", user.getId(), "User logged in");
@@ -113,7 +124,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         String userEmail = jwtService.extractUsername(token);
         if (userEmail != null) {
             UserAccount user = repository.findByEmailIgnoreCase(userEmail)
-                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
             CustomUserDetails userDetails = new CustomUserDetails(user);
             if ("refresh".equals(jwtService.extractTokenType(token)) && jwtService.isTokenValid(token, userDetails)) {
                 if (!"ACTIVE".equals(user.getStatus())) {
