@@ -10,10 +10,11 @@ import com.sportify.catalog.repository.CheckInRepository;
 import com.sportify.catalog.repository.MembershipRepository;
 import com.sportify.catalog.service.CheckInService;
 import com.sportify.core.exception.ResourceNotFoundException;
-import com.sportify.identity.entity.ActivityLog;
+import com.sportify.core.audit.AuditService;
+import com.sportify.core.audit.AuditEvent;
+import com.sportify.core.audit.AuditAction;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
-import com.sportify.identity.repository.ActivityLogRepository;
 import com.sportify.identity.repository.MemberProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -34,7 +35,7 @@ public class CheckInServiceImpl implements CheckInService {
     private final CheckInRepository checkInRepository;
     private final MembershipRepository membershipRepository;
     private final MemberProfileRepository memberProfileRepository;
-    private final ActivityLogRepository activityLogRepository;
+    private final AuditService auditService;
     private final Clock clock;
 
     @Override
@@ -88,13 +89,14 @@ public class CheckInServiceImpl implements CheckInService {
 
         checkIn = checkInRepository.save(checkIn);
 
-        ActivityLog log = new ActivityLog();
-        log.setActor(receptionist);
-        log.setAction("MEMBER_CHECKED_IN");
-        log.setEntityType("CHECK_IN");
-        log.setEntityId(checkIn.getId());
-        log.setSummary("Check-in " + result.name() + " for member " + profile.getMemberCode());
-        activityLogRepository.save(log);
+        auditService.record(AuditEvent.builder()
+                .actor(receptionist)
+                .action(AuditAction.MEMBER_CHECKED_IN)
+                .entityType("CHECK_IN")
+                .entityId(checkIn.getId())
+                .entityCode(profile.getMemberCode())
+                .summary("Check-in " + result.name() + " for member " + profile.getMemberCode())
+                .build());
 
         return mapToResponse(checkIn);
     }

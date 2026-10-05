@@ -6,10 +6,11 @@ import com.sportify.identity.dto.RegisterRequest;
 import com.sportify.identity.dto.RefreshTokenRequest;
 import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
-import com.sportify.identity.entity.ActivityLog;
+import com.sportify.core.audit.AuditService;
+import com.sportify.core.audit.AuditEvent;
+import com.sportify.core.audit.AuditAction;
 import com.sportify.identity.repository.RoleRepository;
 import com.sportify.identity.repository.UserRepository;
-import com.sportify.identity.repository.ActivityLogRepository;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.core.common.CodeFormatter;
 import java.time.Clock;
@@ -28,13 +29,17 @@ import com.sportify.core.exception.ResourceNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import com.sportify.identity.entity.MemberProfile;
 import java.util.Locale;
+import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthenticationServiceImpl implements AuthenticationService {
 
     private final UserRepository repository;
     private final RoleRepository roleRepository;
-    private final ActivityLogRepository activityLogRepository;
+    private final AuditService auditService;
     private final MemberProfileRepository memberProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
@@ -69,6 +74,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new ConflictException("Email is already registered");
         }
 
+        String entityCode = null;
         if ("MEMBER".equals(memberRole.getCode())) {
             Long nextSeq = memberProfileRepository.getNextMemberCode();
             String memberCode = codeFormatter.formatMemberCode(nextSeq);
@@ -79,9 +85,17 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     .joinedOn(java.time.LocalDate.now(clock))
                     .build();
             memberProfileRepository.save(profile);
+            entityCode = memberCode;
         }
 
-        logActivity(savedUser, "REGISTER", "USER_ACCOUNT", savedUser.getId(), "User registered");
+        auditService.record(AuditEvent.builder()
+                .actor(savedUser)
+                .action(AuditAction.REGISTER)
+                .entityType("USER_ACCOUNT")
+                .entityId(savedUser.getId())
+                .entityCode(entityCode)
+                .summary("User registered")
+                .build());
 
         CustomUserDetails userDetails = new CustomUserDetails(savedUser);
         String jwtToken = jwtService.generateToken(userDetails);
@@ -96,17 +110,33 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     public AuthResponse authenticate(AuthRequest request) {
         String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        email,
-                        request.getPassword()
-                )
-        );
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            email,
+                            request.getPassword()
+                    )
+            );
+        } catch (org.springframework.security.authentication.BadCredentialsException | 
+                 org.springframework.security.authentication.DisabledException | 
+                 org.springframework.security.authentication.LockedException ex) {
+            try {
+                auditService.record(AuditEvent.builder()
+                        .actor(null)
+                        .action(AuditAction.LOGIN_FAILED)
+                        .entityType("USER_ACCOUNT")
+                        .summary("Login failed")
+                        .details(Map.of("email", email))
+                        .requiresNew(true)
+                        .build());
+            } catch (RuntimeException re) {
+                AuthenticationServiceImpl.log.warn("Failed to write LOGIN_FAILED audit log");
+            }
+            throw ex;
+        }
 
         UserAccount user = repository.findByEmailIgnoreCase(email)
                 .orElseThrow();
-
-        logActivity(user, "LOGIN", "USER_ACCOUNT", user.getId(), "User logged in");
 
         CustomUserDetails userDetails = new CustomUserDetails(user);
         String jwtToken = jwtService.generateToken(userDetails);
@@ -133,8 +163,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 String accessToken = jwtService.generateToken(userDetails);
                 String newRefreshToken = jwtService.generateRefreshToken(userDetails);
                 
-                logActivity(user, "REFRESH_TOKEN", "USER_ACCOUNT", user.getId(), "Token refreshed");
-                
                 return AuthResponse.builder()
                         .accessToken(accessToken)
                         .refreshToken(newRefreshToken)
@@ -142,15 +170,5 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             }
         }
         throw new org.springframework.security.authentication.BadCredentialsException("Invalid refresh token");
-    }
-
-    private void logActivity(UserAccount actor, String action, String entityType, Long entityId, String summary) {
-        ActivityLog log = new ActivityLog();
-        log.setActor(actor);
-        log.setAction(action);
-        log.setEntityType(entityType);
-        log.setEntityId(entityId);
-        log.setSummary(summary);
-        activityLogRepository.save(log);
     }
 }

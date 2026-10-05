@@ -14,9 +14,10 @@ import com.sportify.catalog.repository.SportRepository;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ConflictException;
 import com.sportify.core.exception.ResourceNotFoundException;
-import com.sportify.identity.entity.ActivityLog;
+import com.sportify.core.audit.AuditAction;
+import com.sportify.core.audit.AuditEvent;
+import com.sportify.core.audit.AuditService;
 import com.sportify.identity.entity.UserAccount;
-import com.sportify.identity.repository.ActivityLogRepository;
 import com.sportify.identity.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,7 +55,7 @@ class MembershipPlanServiceImplTest {
     @Mock
     private SportRepository sportRepository;
     @Mock
-    private ActivityLogRepository activityLogRepository;
+    private AuditService auditService;
     @Mock
     private UserRepository userRepository;
 
@@ -66,7 +67,7 @@ class MembershipPlanServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new MembershipPlanServiceImpl(planRepository, sportRepository, activityLogRepository,
+        service = new MembershipPlanServiceImpl(planRepository, sportRepository, auditService,
                 userRepository, planMapper);
         sports = new ArrayList<>();
         String[] codes = {"FOOTBALL", "BADMINTON", "BASKETBALL", "VOLLEYBALL", "SWIMMING", "TENNIS"};
@@ -110,7 +111,7 @@ class MembershipPlanServiceImplTest {
 
         assertThat(draft.getStatus()).isEqualTo(PlanStatus.DRAFT);
         verify(planRepository, never()).saveAndFlush(any());
-        verify(activityLogRepository, never()).save(any());
+        verify(auditService, never()).record(any());
     }
 
     @Test
@@ -144,12 +145,14 @@ class MembershipPlanServiceImplTest {
         PlanResponse response = service.changeStatus(10L, new PlanStatusUpdateRequest(PlanStatus.ACTIVE, 3), ACTOR_ID);
 
         assertThat(response.status()).isEqualTo(PlanStatus.ACTIVE);
-        ArgumentCaptor<ActivityLog> logCaptor = ArgumentCaptor.forClass(ActivityLog.class);
-        verify(activityLogRepository).save(logCaptor.capture());
-        assertThat(logCaptor.getValue().getAction()).isEqualTo("PACKAGE_UPDATED");
-        assertThat(logCaptor.getValue().getEntityType()).isEqualTo("MEMBERSHIP_PLAN");
-        assertThat(logCaptor.getValue().getEntityCode()).isEqualTo("MULTI_SPORT");
-        assertThat(logCaptor.getValue().getDetails()).contains("\"DRAFT\"").contains("\"ACTIVE\"");
+        ArgumentCaptor<AuditEvent> eventCaptor = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService).record(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getAction()).isEqualTo(AuditAction.PACKAGE_UPDATED);
+        assertThat(eventCaptor.getValue().getEntityType()).isEqualTo("MEMBERSHIP_PLAN");
+        assertThat(eventCaptor.getValue().getEntityCode()).isEqualTo("MULTI_SPORT");
+        java.util.Map<String, Object> details = eventCaptor.getValue().getDetails();
+        assertThat((java.util.Map<String, String>) details.get("before")).containsEntry("status", "DRAFT");
+        assertThat((java.util.Map<String, String>) details.get("after")).containsEntry("status", "ACTIVE");
     }
 
     @Test
@@ -182,7 +185,7 @@ class MembershipPlanServiceImplTest {
 
         assertThat(response.status()).isEqualTo(PlanStatus.ACTIVE);
         verify(planRepository, never()).saveAndFlush(any());
-        verify(activityLogRepository, never()).save(any());
+        verify(auditService, never()).record(any());
     }
 
     @Test
@@ -228,9 +231,9 @@ class MembershipPlanServiceImplTest {
         assertThat(response.features()).containsExactly("Coach-led class booking", "Personal schedule and progress");
         assertThat(response.eligibleSports()).extracting("code").containsExactly("FOOTBALL", "BADMINTON");
 
-        ArgumentCaptor<ActivityLog> logCaptor = ArgumentCaptor.forClass(ActivityLog.class);
-        verify(activityLogRepository).save(logCaptor.capture());
-        assertThat(logCaptor.getValue().getAction()).isEqualTo("PACKAGE_CREATED");
+        ArgumentCaptor<AuditEvent> eventCaptor = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService).record(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getAction()).isEqualTo(AuditAction.PACKAGE_CREATED);
     }
 
     @Test
@@ -290,9 +293,9 @@ class MembershipPlanServiceImplTest {
         assertThat(response.eligibleSports()).extracting("code").containsExactly("BASKETBALL");
         assertThat(response.status()).isEqualTo(PlanStatus.DRAFT);
 
-        ArgumentCaptor<ActivityLog> logCaptor = ArgumentCaptor.forClass(ActivityLog.class);
-        verify(activityLogRepository).save(logCaptor.capture());
-        assertThat(logCaptor.getValue().getAction()).isEqualTo("PACKAGE_UPDATED");
+        ArgumentCaptor<AuditEvent> eventCaptor = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService).record(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getAction()).isEqualTo(AuditAction.PACKAGE_UPDATED);
     }
 
     // ---------------------------------------------------------------------

@@ -11,7 +11,9 @@ import com.sportify.catalog.service.impl.CheckInServiceImpl;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
-import com.sportify.identity.repository.ActivityLogRepository;
+import com.sportify.core.audit.AuditService;
+import com.sportify.core.audit.AuditEvent;
+import com.sportify.core.audit.AuditAction;
 import com.sportify.identity.repository.MemberProfileRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +40,7 @@ public class CheckInServiceTest {
     @Mock
     private MemberProfileRepository memberProfileRepository;
     @Mock
-    private ActivityLogRepository activityLogRepository;
+    private AuditService auditService;
     @org.mockito.Spy
     private java.time.Clock clock = java.time.Clock.fixed(java.time.Instant.parse("2026-10-05T00:00:00Z"), java.time.ZoneId.of("UTC"));
 
@@ -75,7 +77,7 @@ public class CheckInServiceTest {
 
         assertEquals("DENIED", res.getResult());
         assertEquals("No membership found", res.getDenialReason());
-        verify(activityLogRepository).save(any());
+        verify(auditService).record(any(AuditEvent.class));
     }
 
     @Test
@@ -102,7 +104,7 @@ public class CheckInServiceTest {
 
         assertEquals("ALLOWED", res.getResult());
         assertEquals(5L, res.getMembershipId());
-        verify(activityLogRepository).save(any());
+        verify(auditService).record(any(AuditEvent.class));
     }
 
     @Test

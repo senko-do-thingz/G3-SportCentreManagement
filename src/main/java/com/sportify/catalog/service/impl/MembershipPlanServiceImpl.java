@@ -15,8 +15,9 @@ import com.sportify.catalog.service.MembershipPlanService;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ConflictException;
 import com.sportify.core.exception.ResourceNotFoundException;
-import com.sportify.identity.entity.ActivityLog;
-import com.sportify.identity.repository.ActivityLogRepository;
+import com.sportify.core.audit.AuditAction;
+import com.sportify.core.audit.AuditEvent;
+import com.sportify.core.audit.AuditService;
 import com.sportify.identity.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -45,8 +46,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MembershipPlanServiceImpl implements MembershipPlanService {
 
-    static final String ACTION_PACKAGE_CREATED = "PACKAGE_CREATED";
-    static final String ACTION_PACKAGE_UPDATED = "PACKAGE_UPDATED";
+    static final String ACTION_PACKAGE_CREATED = AuditAction.PACKAGE_CREATED;
+    static final String ACTION_PACKAGE_UPDATED = AuditAction.PACKAGE_UPDATED;
     static final String ENTITY_TYPE = "MEMBERSHIP_PLAN";
 
     private static final int MAX_PAGE_SIZE = 100;
@@ -54,7 +55,7 @@ public class MembershipPlanServiceImpl implements MembershipPlanService {
 
     private final MembershipPlanRepository planRepository;
     private final SportRepository sportRepository;
-    private final ActivityLogRepository activityLogRepository;
+    private final AuditService auditService;
     private final UserRepository userRepository;
     private final MembershipPlanMapper planMapper;
 
@@ -119,8 +120,14 @@ public class MembershipPlanServiceImpl implements MembershipPlanService {
         // saveAndFlush so that a concurrent duplicate code surfaces here as DataIntegrityViolationException (409).
         MembershipPlan saved = planRepository.saveAndFlush(plan);
 
-        logActivity(actorUserId, ACTION_PACKAGE_CREATED, saved,
-                "Membership plan '" + saved.getName() + "' created", null);
+        auditService.record(AuditEvent.builder()
+                .actor(actorUserId != null ? userRepository.getReferenceById(actorUserId) : null)
+                .action(ACTION_PACKAGE_CREATED)
+                .entityType(ENTITY_TYPE)
+                .entityId(saved.getId())
+                .entityCode(saved.getCode())
+                .summary(truncate("Membership plan '" + saved.getName() + "' created", 255))
+                .build());
         return planMapper.toResponse(saved);
     }
 
@@ -141,8 +148,14 @@ public class MembershipPlanServiceImpl implements MembershipPlanService {
 
         MembershipPlan saved = planRepository.saveAndFlush(plan);
 
-        logActivity(actorUserId, ACTION_PACKAGE_UPDATED, saved,
-                "Membership plan '" + saved.getName() + "' updated", null);
+        auditService.record(AuditEvent.builder()
+                .actor(actorUserId != null ? userRepository.getReferenceById(actorUserId) : null)
+                .action(ACTION_PACKAGE_UPDATED)
+                .entityType(ENTITY_TYPE)
+                .entityId(saved.getId())
+                .entityCode(saved.getCode())
+                .summary(truncate("Membership plan '" + saved.getName() + "' updated", 255))
+                .build());
         return planMapper.toResponse(saved);
     }
 
@@ -165,9 +178,18 @@ public class MembershipPlanServiceImpl implements MembershipPlanService {
         plan.setStatus(to);
         MembershipPlan saved = planRepository.saveAndFlush(plan);
 
-        logActivity(actorUserId, ACTION_PACKAGE_UPDATED, saved,
-                "Membership plan '" + saved.getName() + "' status changed from " + from + " to " + to,
-                "{\"before\":{\"status\":\"" + from + "\"},\"after\":{\"status\":\"" + to + "\"}}");
+        auditService.record(AuditEvent.builder()
+                .actor(actorUserId != null ? userRepository.getReferenceById(actorUserId) : null)
+                .action(ACTION_PACKAGE_UPDATED)
+                .entityType(ENTITY_TYPE)
+                .entityId(saved.getId())
+                .entityCode(saved.getCode())
+                .summary(truncate("Membership plan '" + saved.getName() + "' status changed from " + from + " to " + to, 255))
+                .details(Map.of(
+                        "before", Map.of("status", from.name()),
+                        "after", Map.of("status", to.name())
+                ))
+                .build());
         return planMapper.toResponse(saved);
     }
 
@@ -226,19 +248,7 @@ public class MembershipPlanServiceImpl implements MembershipPlanService {
         return Set.copyOf(found);
     }
 
-    private void logActivity(Long actorUserId, String action, MembershipPlan plan, String summary, String details) {
-        ActivityLog log = new ActivityLog();
-        if (actorUserId != null) {
-            log.setActor(userRepository.getReferenceById(actorUserId));
-        }
-        log.setAction(action);
-        log.setEntityType(ENTITY_TYPE);
-        log.setEntityId(plan.getId());
-        log.setEntityCode(plan.getCode());
-        log.setSummary(truncate(summary, 255));
-        log.setDetails(details);
-        activityLogRepository.save(log);
-    }
+
 
     private static String truncate(String value, int maxLength) {
         return value.length() <= maxLength ? value : value.substring(0, maxLength);
