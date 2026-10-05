@@ -32,7 +32,7 @@ public class SecurityConfig {
                         req.requestMatchers("/api/v1/auth/**", "/error")
                                 .permitAll()
                                 // Public catalog (read only)
-                                .requestMatchers(HttpMethod.GET, "/api/v1/sports", "/api/v1/plans", "/api/v1/plans/*", "/api/v1/packages/**", "/api/v1/membership-cards/tiers")
+                                .requestMatchers(HttpMethod.GET, "/api/v1/sports", "/api/v1/sports/*", "/api/v1/plans", "/api/v1/plans/*", "/api/v1/packages", "/api/v1/packages/*", "/api/v1/packages/sport/*", "/api/v1/membership-cards/tiers")
                                 .permitAll()
                                 .anyRequest()
                                 .authenticated()

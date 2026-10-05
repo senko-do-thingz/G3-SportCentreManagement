@@ -40,6 +40,12 @@ public class RefundServiceImpl implements RefundService {
         SportPackageRegistration reg = registrationRepository.findById(request.getPackageRegistrationId())
                 .orElseThrow(() -> new ResourceNotFoundException("Package registration not found for id: " + request.getPackageRegistrationId()));
 
+        if (actor.getRole() != null && "MEMBER".equals(actor.getRole().getCode())) {
+            if (!reg.getMember().getId().equals(actor.getId())) {
+                throw new BusinessRuleException("Cannot request refund for another member's package registration");
+            }
+        }
+
         if (reg.getStatus() != PackageRegistrationStatus.ACTIVE) {
             throw new BusinessRuleException("Only active package registrations can be refunded");
         }
@@ -92,9 +98,9 @@ public class RefundServiceImpl implements RefundService {
             refund.setAmountApproved(approvedAmount);
             refund.setStatus(RefundStatus.APPROVED);
 
-            // Cancel the package registration upon refund approval
+            // Mark the package registration as REFUNDED upon refund approval
             SportPackageRegistration reg = refund.getPackageRegistration();
-            reg.setStatus(PackageRegistrationStatus.CANCELLED);
+            reg.setStatus(PackageRegistrationStatus.REFUNDED);
             reg.setCancelledAt(now);
             reg.setCancelReason("Refund approved: " + refund.getRefundCode());
             registrationRepository.save(reg);

@@ -14,6 +14,7 @@ import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
+import com.sportify.identity.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +31,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     private final MembershipCardTierRepository tierRepository;
     private final MemberCardRepository memberCardRepository;
     private final MemberProfileRepository memberProfileRepository;
+    private final UserRepository userRepository;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
 
@@ -44,9 +46,27 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     @Override
     @Transactional
     public MemberCardResponse purchaseCard(MemberCardPurchaseRequest request, UserAccount actor) {
-        Long targetMemberId = request.getMemberId() != null ? request.getMemberId() : actor.getId();
-        MemberProfile member = memberProfileRepository.findById(targetMemberId)
-                .orElseThrow(() -> new ResourceNotFoundException("Member profile not found for id: " + targetMemberId));
+        Long targetMemberId;
+        if (actor.getRole() != null && "MEMBER".equals(actor.getRole().getCode())) {
+            targetMemberId = actor.getId();
+        } else {
+            targetMemberId = request.getMemberId() != null ? request.getMemberId() : actor.getId();
+        }
+
+        MemberProfile member = memberProfileRepository.findById(targetMemberId).orElse(null);
+        if (member == null) {
+            UserAccount targetUser = userRepository.findById(targetMemberId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found: " + targetMemberId));
+            Long nextSeq = memberProfileRepository.getNextMemberCode();
+            String memberCode = codeFormatter.formatMemberCode(nextSeq);
+            member = MemberProfile.builder()
+                    .userAccount(targetUser)
+                    .memberCode(memberCode)
+                    .currentLevel("BEGINNER")
+                    .joinedOn(LocalDate.now(clock))
+                    .build();
+            member = memberProfileRepository.save(member);
+        }
 
         MembershipCardTier tier = tierRepository.findById(request.getTierId())
                 .orElseThrow(() -> new ResourceNotFoundException("Card tier not found for id: " + request.getTierId()));

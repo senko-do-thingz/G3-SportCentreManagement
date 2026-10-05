@@ -20,6 +20,7 @@ import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
+import com.sportify.identity.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,7 @@ public class SportPackageServiceImpl implements SportPackageService {
     private final SportPackageRegistrationRepository registrationRepository;
     private final SportRepository sportRepository;
     private final MemberProfileRepository memberProfileRepository;
+    private final UserRepository userRepository;
     private final MembershipCardService membershipCardService;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
@@ -85,9 +87,27 @@ public class SportPackageServiceImpl implements SportPackageService {
     @Override
     @Transactional
     public PackageRegistrationResponse registerPackage(PackageRegistrationRequest request, UserAccount actor) {
-        Long targetMemberId = request.getMemberId() != null ? request.getMemberId() : actor.getId();
-        MemberProfile member = memberProfileRepository.findById(targetMemberId)
-                .orElseThrow(() -> new ResourceNotFoundException("Member profile not found for id: " + targetMemberId));
+        Long targetMemberId;
+        if (actor.getRole() != null && "MEMBER".equals(actor.getRole().getCode())) {
+            targetMemberId = actor.getId();
+        } else {
+            targetMemberId = request.getMemberId() != null ? request.getMemberId() : actor.getId();
+        }
+
+        MemberProfile member = memberProfileRepository.findById(targetMemberId).orElse(null);
+        if (member == null) {
+            UserAccount targetUser = userRepository.findById(targetMemberId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found: " + targetMemberId));
+            Long nextSeq = memberProfileRepository.getNextMemberCode();
+            String memberCode = codeFormatter.formatMemberCode(nextSeq);
+            member = MemberProfile.builder()
+                    .userAccount(targetUser)
+                    .memberCode(memberCode)
+                    .currentLevel("BEGINNER")
+                    .joinedOn(LocalDate.now(clock))
+                    .build();
+            member = memberProfileRepository.save(member);
+        }
 
         SportPackage pkg = sportPackageRepository.findById(request.getPackageId())
                 .orElseThrow(() -> new ResourceNotFoundException("Sport package not found for id: " + request.getPackageId()));
@@ -116,6 +136,16 @@ public class SportPackageServiceImpl implements SportPackageService {
 
         RegistrationChannel channel = request.getChannel() != null ? request.getChannel() : RegistrationChannel.ONLINE;
 
+        // Staff registering at reception can activate immediately; online registration defaults to PENDING_PAYMENT
+        boolean isStaffReception = (channel == RegistrationChannel.RECEPTION)
+                || (actor.getRole() != null && ("RECEPTIONIST".equals(actor.getRole().getCode()) || "MANAGER".equals(actor.getRole().getCode())));
+
+        PackageRegistrationStatus initialStatus = isStaffReception
+                ? PackageRegistrationStatus.ACTIVE
+                : PackageRegistrationStatus.PENDING_PAYMENT;
+
+        LocalDateTime activatedAt = isStaffReception ? LocalDateTime.now(clock) : null;
+
         SportPackageRegistration registration = SportPackageRegistration.builder()
                 .registrationCode(regCode)
                 .member(member)
@@ -128,8 +158,8 @@ public class SportPackageServiceImpl implements SportPackageService {
                 .remainingSessions(pkg.getSessionCount())
                 .startDate(startDate)
                 .endDate(endDate)
-                .status(PackageRegistrationStatus.ACTIVE)
-                .activatedAt(LocalDateTime.now(clock))
+                .status(initialStatus)
+                .activatedAt(activatedAt)
                 .createdByUser(actor)
                 .build();
 

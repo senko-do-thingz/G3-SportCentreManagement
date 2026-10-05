@@ -81,7 +81,11 @@ public class CheckInServiceImpl implements CheckInService {
                     denialReason = "Specified booking is not scheduled for today or is not confirmed";
                 }
             } else {
-                targetBooking = todayBookings.get(0);
+                // If member has multiple bookings today, pick the first one that has not yet been checked in
+                targetBooking = todayBookings.stream()
+                        .filter(b -> !checkInRepository.existsByBookingIdAndResult(b.getId(), CheckInResult.ALLOWED))
+                        .findFirst()
+                        .orElse(todayBookings.get(0));
             }
 
             if (targetBooking != null) {

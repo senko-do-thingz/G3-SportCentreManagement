@@ -44,7 +44,12 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional
     public BookingResponse createBooking(BookingCreateRequest request, UserAccount actor) {
-        Long targetMemberId = request.getMemberId() != null ? request.getMemberId() : actor.getId();
+        Long targetMemberId;
+        if (actor.getRole() != null && "MEMBER".equals(actor.getRole().getCode())) {
+            targetMemberId = actor.getId();
+        } else {
+            targetMemberId = request.getMemberId() != null ? request.getMemberId() : actor.getId();
+        }
         MemberProfile member = memberProfileRepository.findById(targetMemberId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member profile not found for id: " + targetMemberId));
 
@@ -109,6 +114,12 @@ public class BookingServiceImpl implements BookingService {
     public BookingResponse cancelBooking(Long bookingId, UserAccount actor) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found for id: " + bookingId));
+
+        if (actor.getRole() != null && "MEMBER".equals(actor.getRole().getCode())) {
+            if (!booking.getMember().getId().equals(actor.getId())) {
+                throw new BusinessRuleException("Cannot cancel another member's booking");
+            }
+        }
 
         if (booking.getStatus() == BookingStatus.CANCELLED) {
             throw new BusinessRuleException("Booking is already cancelled");
