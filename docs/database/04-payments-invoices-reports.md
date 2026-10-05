@@ -1,42 +1,38 @@
 # 04 - Payments, Invoices and Reports
 
-Screens covered: F1-12 Payment and Invoice, F3-01 Payment Overview, F3-02 Find Member, F3-03 Record Payment,
-F3-04 Review Payment, F3-05 Invoice Issued, F3-06 Pending or Failed Payment, F3-07 Payment History,
-F3-08 Invoice Detail, F3-09 Revenue Overview, F3-10 Report Filters, F3-11 Revenue Report, F3-12 Payment Ledger.
+Screens covered: F3-01 Payment Summary, F3-02 Payment Instructions & Status, F3-03 My Payments & Receipts,
+F3-04 Payment Requests, F3-05 Verify & Record Payment, F3-06 Payment Confirmed & Receipt,
+F3-07 Refund Requests, F3-08 Financial Overview, F3-09 Transactions & Refund Approval, F3-10 Revenue Reports.
 
 ## ERD
 
 ```mermaid
 erDiagram
-    membership ||--o{ payment : "attempts"
+    sport_package_registration ||--o{ payment : "pays for"
+    member_card ||--o{ payment : "pays for"
+    membership ||--o{ payment : "legacy pays for"
     member_profile ||--o{ payment : "pays"
     user_account ||--o{ payment : "records / confirms"
     payment ||--o| invoice : "issues"
     invoice ||--|{ invoice_line : "contains"
-    membership ||--o{ invoice : "billed"
+    payment ||--o{ refund_request : "target of"
+    sport_package_registration ||--o{ refund_request : "refunded from"
+    user_account ||--o{ refund_request : "reviews"
 ```
 
 ## Design Decisions
 
-- **Payments are only for memberships.** Class sessions covered by an active plan are booked with 0 VND and never
-  create a payment (F3-01 note). `payment.membership_id` is therefore mandatory.
-- **Payment attempts.** A `PENDING` payment is created together with the membership registration (amount due known).
-  The receptionist then records method, amount and reference (F3-03), reviews (F3-04) and either:
-  - confirms -> `PAID` (activates membership, issues invoice), or
-  - keeps `PENDING` ("Save as pending"), or
-  - marks `FAILED` with a reason (F3-06). Retrying creates a **new** `PENDING` payment row for the same membership.
-- **Exactly one PAID payment per membership** (`ux_payment_one_paid_per_membership`) and at most one open `PENDING`
-  attempt (`ux_payment_one_pending_per_membership`). "Confirm a payment only once."
-- **Transaction reference is globally unique** across all statuses (`ux_payment_reference`), so "a failed reference
-  cannot be reused as a second Paid transaction" (F3-06). Cash payments may omit the reference.
-- **PAID integrity check in the database:** a `PAID` row must have `amount_received = amount_due`, a method, a paid
-  date, `is_verified = 1` and a confirming user (`ck_payment_paid_complete`). "Must match the plan fee."
-- **Invoice = immutable snapshot.** One invoice per PAID payment (`invoice.payment_id` unique). Member name, member
-  code, method, reference and the selected sports text are copied, so later profile or plan edits do not alter it.
-  Corrections are done by voiding (`status = 'VOID'`) and issuing a new invoice.
-- **Revenue is computed, not stored.** Reports read `vw_paid_payment` filtered by `received_on` (paid date), plan and
-  method. Pending and Failed remain visible in the ledger but never in revenue (F3-10 rules 01 to 03).
-- **Multi-sport revenue is not split by sport** (F3-09 note). Revenue groups by plan only.
+- **Payments cover packages and membership cards.** Payments cover either a `sport_package_registration`, a `member_card` tier purchase, or legacy `membership`. `payment.membership_id` is retained as nullable for backward compatibility.
+- **Payment requests & verification (F3-04, F3-05).** A `PENDING` payment is created when a package or card is registered. The receptionist verifies receipt of payment (Cash, Bank Transfer, Card), records the transaction reference, and confirms payment.
+- **Card discount on invoices.** When a member holds an active Gold (5%) or VIP (10%) membership card, the discount is calculated at package registration, recorded in `paid_amount`, and itemized on the issued invoice (`invoice_line`). Single visits are excluded from discounts.
+- **Refund Request Workflow (F3-07, F3-09).**
+  - Receptionist files a refund request at front desk (`F3-07`, `S3-RefundSubmitted`) or member initiates.
+  - Refund requests specify the package registration, reason, and requested refund amount (pro-rated based on unused sessions).
+  - Center Manager reviews pending refund requests (`F3-09`, `S3-RefundReview`).
+  - Manager may approve (`S3-RefundApproved`) or reject (`S3-RefundRejected`) the request with a note.
+  - Approved refunds are marked `COMPLETED` (`S3-RefundDone`) upon payout.
+- **Invoice = immutable snapshot.** One invoice per PAID payment (`invoice.payment_id` unique). Member name, reference, discount applied, and package details are snapshot into the invoice and invoice lines.
+- **Revenue is computed, not stored.** Reports read `vw_paid_payment` filtered by `received_on` (paid date). Pending and Failed transactions remain in the ledger but are excluded from recognized revenue.
 
 ## Tables
 
@@ -138,6 +134,27 @@ JOIN membership_plan pl ON pl.id = m.plan_id
 LEFT JOIN invoice i     ON i.payment_id = p.id AND i.status = 'ISSUED'
 WHERE p.status = 'PAID';
 ```
+
+### `refund_request`
+
+Front desk refund filing and Manager review/approval workflow (F3-07, F3-09).
+
+| Column | Type | Null | Key / Default | Description |
+|---|---|---|---|---|
+| id | BIGINT | No | PK, IDENTITY | |
+| refund_code | NVARCHAR(30) | No | UQ | `REF-1001` |
+| payment_id | BIGINT | No | FK -> payment.id | Original payment |
+| package_registration_id | BIGINT | Yes | FK -> sport_package_registration.id | Package being refunded |
+| member_id | BIGINT | No | FK -> member_profile.user_id | Member receiving refund |
+| amount_requested | DECIMAL(14,2) | No | CHECK > 0 | Amount requested |
+| amount_approved | DECIMAL(14,2) | Yes | CHECK >= 0 | Amount approved by Manager |
+| reason | NVARCHAR(500) | No | | Reason for refund |
+| status | NVARCHAR(20) | No | `PENDING` | `PENDING`, `APPROVED`, `REJECTED`, `COMPLETED` |
+| requested_by | BIGINT | No | FK -> user_account.id | Member or Receptionist |
+| reviewed_by | BIGINT | Yes | FK -> user_account.id | Center Manager |
+| reviewed_at | DATETIME2(0) | Yes | | Review timestamp |
+| manager_note | NVARCHAR(500) | Yes | | Manager decision note |
+| created_at, updated_at | DATETIME2(0) | | | Audit |
 
 ### Report queries
 

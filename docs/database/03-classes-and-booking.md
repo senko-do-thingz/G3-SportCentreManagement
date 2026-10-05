@@ -1,9 +1,11 @@
 # 03 - Classes and Booking
 
-Screens covered: Home (Quick class finder, Upcoming classes), F2-01 Class Management, F2-02 Create or Edit Class,
-F2-03 Schedule and Coach Assignment, F2-04 View Schedule, F2-05 Find or Filter Classes, F2-06 Class Detail,
-F2-07 Booking Review, F2-08 Booking Confirmed, F2-09 My Classes, F2-10 Coach Schedule, F2-11 Class Roster,
-F2-12 Class Full or Waitlist, F2-13 Cancel Booking.
+Screens covered: Home (Quick class finder, Upcoming classes), F2-01 Sport Classes, F2-02 Create or Edit Sport Class,
+F2-03 Class Sessions & Coach Assignment, F2-04 Schedule & Session Details, F2-05 View Schedule, F2-06 Find or Filter Sessions,
+F2-07 Session Detail - Coach-led, F2-07-Self Booking Options - Self-training, F2-08 Booking Review,
+F2-08-Self Booking Review - Self-training, F2-09 Booking Confirmed, F2-09-Self Booking Confirmed - Self-training,
+F2-10 My Bookings, F2-10-Self My Bookings - Self-training, F2-11 Member Booking Search, F2-12 Book for Member,
+F2-13 Coach Schedule, F2-14 Class Session Detail, F2-15 Class Roster, F2-16 Roster Detail & Attendance Notes.
 
 ## ERD
 
@@ -17,7 +19,7 @@ erDiagram
     facility ||--o{ class_session : "teaching area"
     class_session ||--o{ booking : "has"
     member_profile ||--o{ booking : "makes"
-    membership ||--o{ booking : "covers"
+    sport_package_registration ||--o{ booking : "covers"
     class_session ||--o{ waitlist_entry : "queues"
     member_profile ||--o{ waitlist_entry : "waits"
     booking ||--o| waitlist_entry : "promoted from"
@@ -28,21 +30,22 @@ erDiagram
 - **Class vs session.** `sport_class` is the learning group defined in F2-02 (name, sport, age group, level, goal,
   maximum members, code `CL-204`). `class_session` is one dated occurrence created in F2-03 (date, start/end time,
   teaching area, coach). Members book **sessions**.
-- **Draft until published.** "A Draft class becomes bookable only after its schedule and Coach assignment are
-  published" (F2-01). A session can be saved as `DRAFT` without coach or facility; publishing requires both
-  (`ck_class_session_publish_ready`).
+- **Coach-led vs Self-training sessions.** Sessions support two formats: `COACH_LED` and `SELF_TRAINING`.
+  For `SELF_TRAINING`, `coach_id` is nullable (or assigned to facility supervisor). Booking self-training slots reserves
+  a training area slot and consumes 1 session from the member's self-training package.
+- **Draft until published.** A session can be saved as `DRAFT` without coach or facility; publishing requires both
+  (or facility only for self-training).
 - **Capacity and seat counter on the session.** `capacity` is copied from `sport_class.max_members` when the session
-  is created (and can be adjusted). `booked_count` is a denormalized counter updated atomically to avoid overbooking
-  under concurrent requests (see 09-business-rules).
+  is created. `booked_count` is updated atomically to avoid overbooking under concurrent requests.
 - **Conflict checks (F2-03).** "Check that this Coach and teaching area have no other session at the selected time."
   Enforced in the service with indexed queries on `(coach_id, session_date)` and `(facility_id, session_date)`.
 - **One active booking per member per session** via filtered unique index. A member may re-book after cancelling.
-- **Booking stores the membership used** (`membership_id`) so that coverage at booking time is traceable, and
-  `fee_amount` (always 0 when covered by the plan, F2-07 "Amount due 0 VND").
-- **Waitlist does not reserve a seat** (F2-12). When a seat opens, the first `WAITING` entry gets an `OFFERED` status
-  with an expiry; accepting creates a booking with `source = 'WAITLIST'`.
-- **My Classes tabs** (Upcoming / Past / Cancelled) are derived: `status` plus `session_date` compared to today.
-- **Roster** (F2-11, F4-04) is simply `booking` rows with `status = 'CONFIRMED'` for a session.
+- **Booking covers sessions via sport package.** `package_registration_id` links the booking to the active package.
+  Each confirmed booking reserves 1 session from `remaining_sessions`. The legacy `membership_id` is retained as nullable for backward compatibility.
+- **Receptionist assisted booking (F2-11, F2-12).** Receptionists can search members and book confirmed sessions on their behalf (`source = 'RECEPTION'`).
+- **Waitlist does not reserve a seat.** When a seat opens, the first `WAITING` entry gets an `OFFERED` status with an expiry; accepting creates a booking with `source = 'WAITLIST'`.
+- **My Bookings tabs** (Upcoming / Past / Cancelled) are derived: `status` plus `session_date` compared to today.
+- **Roster** (F2-15, F2-16) is `booking` rows with `status = 'CONFIRMED'` for a session.
 
 ## Tables
 

@@ -1,6 +1,8 @@
 # 06 - AI Workout Recommendation
 
-Screens covered: F5-01 Recommend Workout, F5-02 Preferences, F5-03 AI Processing, F5-04 Plan Generated, F5-05 Review Plan, F5-06 Wait for Approval, F5-07 Coach Review, F5-08 Approve / Change, F5-09 Plan Approved, F5-10 Coach Queue, F5-11 View Active Plan, F5-12 Recommendation Rules.
+Screens covered: F5-01 My Training Goals, F5-02 Recommended Sports & Classes, F5-03 Recommendation Detail,
+F5-04 Suitable Sessions, F5-05 Saved Recommendations, F5-06 AI Exercise Suggestions,
+F5-07 Review Suggested Exercises, F5-08 Training Plan Draft.
 
 ## ERD
 
@@ -19,12 +21,11 @@ erDiagram
 
 ## Design Decisions
 
-- **Rule Sets.** The system has rules and weights that guide the AI (F5-12). Weights are stored in `recommendation_rule_weight` and must sum to 100%. `recommendation_rule_set` has versioning.
-- **Plan Generation.** The member inputs their goal, schedule, and preferences. The AI generates a `workout_plan` with weeks and days.
-- **Candidates.** `workout_plan_candidate` stores the sessions or classes the AI evaluated and ranked for the plan.
-- **Coach Review.** The plan is generated in `PENDING_REVIEW` state. A coach picks it up via `plan_review`. The plan becomes active only when `APPROVED`.
-- **Unique Constraints.** A member can have at most one `APPROVED` plan and at most one `PENDING_REVIEW` plan at a time.
-- **History.** When a plan is renewed or a new one is made, the previous one gets a status like `SUPERSEDED`. The link is kept via `previous_plan_id`.
+- **Rule Sets & AI Guidance.** The system provides recommendation weights (`recommendation_rule_weight`) to align member goals with available sports, classes, and schedules.
+- **Member Flow (F5-01 to F5-05).** The member sets training goals, receives ranked recommendations for sports and classes, inspects recommendation details, reviews suitable scheduled sessions, and saves recommendations. Booking recommended sessions requires an eligible sport package (`S5-NoPackage`).
+- **Coach AI Assisted Training Plans (F5-06 to F5-08).** Coaches leverage AI suggestions for exercises and drills based on member skill levels and sport objectives, reviewing and modifying suggested exercises before finalizing a training plan draft.
+- **Candidates & Evaluations.** `workout_plan_candidate` stores the sessions or classes evaluated and ranked.
+- **History & Revisions.** When plans or recommendations are adjusted, earlier drafts transition statuses (`SUPERSEDED` or `ARCHIVED`) with `previous_plan_id` audit links.
 
 ## Tables
 
