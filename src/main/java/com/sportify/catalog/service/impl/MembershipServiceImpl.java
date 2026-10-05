@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Deprecated
 @Service
 @RequiredArgsConstructor
 public class MembershipServiceImpl implements MembershipService {

@@ -42,6 +42,7 @@ import java.util.stream.Collectors;
  * Editing a plan never touches existing memberships: price, duration and selected sports are snapshotted
  * on {@code membership} / {@code membership_sport} at registration time (docs/database/02-catalog-and-membership.md).
  */
+@Deprecated
 @Service
 @RequiredArgsConstructor
 public class MembershipPlanServiceImpl implements MembershipPlanService {

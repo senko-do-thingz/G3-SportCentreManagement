@@ -12,6 +12,9 @@ public class CheckInResponse {
     private Long memberId;
     private String memberName;
     private Long membershipId;
+    private Long bookingId;
+    private String bookingCode;
+    private Long packageRegistrationId;
     private LocalDateTime checkedInAt;
     private String result;
     private String denialReason;
