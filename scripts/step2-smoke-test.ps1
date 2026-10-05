@@ -151,16 +151,16 @@ if ($resE.status -eq 200 -and $resE.data.totalElements -ge 1) {
     Report-Fail "GET /members failed. Status: $($resE.status), totalElements: $($resE.data.totalElements)"
 }
 
-Write-Host "`n--- STEP F: Check-in ALLOWED ---"
+Write-Host "`n--- STEP F: Check-in without today booking -> expect DENIED (No confirmed booking for today) ---"
 $ci = @{identifier=$code1; note="test F"} | ConvertTo-Json
 $resF = Invoke-Api -Method Post -Uri "$base/check-ins" -Headers $mgr -Body $ci
-if ($resF.status -eq 201 -and $resF.data.result -eq "ALLOWED") {
-    Report-Pass "Check-in ALLOWED"
+if ($resF.status -eq 201 -and $resF.data.result -eq "DENIED" -and $resF.data.denialReason -match "No confirmed booking for today") {
+    Report-Pass "Check-in DENIED without confirmed booking for today"
 } else {
-    Report-Fail "Check-in FAILED. Status: $($resF.status), Result: $($resF.data.result)"
+    Report-Fail "Check-in F failed. Status: $($resF.status), Result: $($resF.data.result), Reason: $($resF.data.denialReason)"
 }
 
-Write-Host "`n--- STEP G: Fresh member with no membership -> expect DENIED (No membership found) ---"
+Write-Host "`n--- STEP G: Fresh member with no booking -> expect DENIED (No confirmed booking for today) ---"
 $email2 = "member${s}b@example.com"
 $reg2 = @{fullName="Member $s B";email=$email2;password="password123";phone="08$s$(Get-Random -Minimum 10 -Maximum 99)"} | ConvertTo-Json
 $res = Invoke-Api -Method Post -Uri "$base/auth/register" -Body $reg2
@@ -172,19 +172,19 @@ $code2 = $found2.data.content[0].memberCode
 $ci2 = @{identifier=$code2; note="test G"} | ConvertTo-Json
 
 $resG = Invoke-Api -Method Post -Uri "$base/check-ins" -Headers $mgr -Body $ci2
-if ($resG.status -eq 201 -and $resG.data.result -eq "DENIED" -and $resG.data.denialReason -match "No membership found") {
-    Report-Pass "Check-in DENIED (No membership found)"
+if ($resG.status -eq 201 -and $resG.data.result -eq "DENIED" -and $resG.data.denialReason -match "No confirmed booking for today") {
+    Report-Pass "Check-in DENIED (No confirmed booking for today)"
 } else {
-    Report-Fail "Check-in G failed. Status: $($resG.status)"
+    Report-Fail "Check-in G failed. Status: $($resG.status), Reason: $($resG.data.denialReason)"
 }
 
-Write-Host "`n--- STEP H: Fresh member pending membership -> expect DENIED (PENDING_PAYMENT) ---"
+Write-Host "`n--- STEP H: Fresh member pending membership without booking -> expect DENIED (No confirmed booking for today) ---"
 $resH1 = Invoke-Api -Method Post -Uri "$base/memberships" -Headers $h2 -Body $bodyJson
 $resH = Invoke-Api -Method Post -Uri "$base/check-ins" -Headers $mgr -Body $ci2
-if ($resH.status -eq 201 -and $resH.data.result -eq "DENIED" -and $resH.data.denialReason -match "PENDING_PAYMENT") {
-    Report-Pass "Check-in DENIED (PENDING_PAYMENT)"
+if ($resH.status -eq 201 -and $resH.data.result -eq "DENIED" -and $resH.data.denialReason -match "No confirmed booking for today") {
+    Report-Pass "Check-in DENIED without today booking"
 } else {
-    Report-Fail "Check-in H failed. Status: $($resH.status)"
+    Report-Fail "Check-in H failed. Status: $($resH.status), Reason: $($resH.data.denialReason)"
 }
 
 Write-Host "`n--- STEP I: Empty identifier -> expect exactly HTTP 400 ---"
@@ -222,6 +222,103 @@ if (-not $orphanToken) {
             Report-Fail "Registration failed for orphan account. Status: $($resJ1.status)"
         }
     }
+}
+
+Write-Host "`n--- STEP K: Refreshed Context - Sport Packages Catalog ---"
+$pkgRes = Invoke-Api -Method Get -Uri "$base/packages"
+if ($pkgRes.status -eq 200 -and $pkgRes.data.Count -gt 0) {
+    Report-Pass "GET /packages returned active packages"
+    $pkg1 = $pkgRes.data[0]
+    $pkg2 = if ($pkgRes.data.Count -gt 1) { $pkgRes.data[1] } else { $pkgRes.data[0] }
+} else {
+    Report-Fail "GET /packages failed or returned empty. Status: $($pkgRes.status)"
+}
+
+Write-Host "`n--- STEP L: Refreshed Context - Card Tiers and Gold Purchase (5% discount) ---"
+$tierRes = Invoke-Api -Method Get -Uri "$base/membership-cards/tiers"
+if ($tierRes.status -eq 200 -and $tierRes.data.Count -ge 3) {
+    Report-Pass "GET /membership-cards/tiers returned 3 tiers"
+    $goldTier = $tierRes.data | Where-Object { $_.code -eq "GOLD" }
+    if ($goldTier) {
+        $cardReq = @{tierId=$goldTier.id} | ConvertTo-Json
+        $cardRes = Invoke-Api -Method Post -Uri "$base/membership-cards/purchase" -Headers $h1 -Body $cardReq
+        if ($cardRes.status -eq 201 -and $cardRes.data.status -eq "ACTIVE") {
+            Report-Pass "Purchased GOLD membership card"
+            $myCard = Invoke-Api -Method Get -Uri "$base/membership-cards/my-card" -Headers $h1
+            if ($myCard.status -eq 200 -and $myCard.data.tierCode -eq "GOLD" -and $myCard.data.discountPercentage -eq 5.0) {
+                Report-Pass "My card verified with 5% discount"
+            } else {
+                Report-Fail "My card verification failed. Status: $($myCard.status)"
+            }
+        } else {
+            Report-Fail "Purchase card failed. Status: $($cardRes.status)"
+        }
+    } else {
+        Report-Fail "GOLD tier not found in tiers list"
+    }
+} else {
+    Report-Fail "GET /membership-cards/tiers failed. Status: $($tierRes.status)"
+}
+
+Write-Host "`n--- STEP M: Refreshed Context - Sport Package Registration with 5% Discount ---"
+if ($pkg1) {
+    $pkgRegBody = @{packageId=$pkg1.id; channel="ONLINE"} | ConvertTo-Json
+    $pkgRegRes = Invoke-Api -Method Post -Uri "$base/packages/registrations" -Headers $h1 -Body $pkgRegBody
+    if ($pkgRegRes.status -eq 201 -and $pkgRegRes.data.status -eq "ACTIVE" -and $pkgRegRes.data.discountPercent -eq 5.0) {
+        Report-Pass "Package registration active with 5% card discount applied"
+        $myRegId = $pkgRegRes.data.id
+    } else {
+        Report-Fail "Package registration failed. Status: $($pkgRegRes.status)"
+    }
+} else {
+    Report-Skip "Skipping package registration due to missing package"
+}
+
+Write-Host "`n--- STEP N: Refreshed Context - Concurrent Package Registrations ---"
+if ($pkg2) {
+    $pkgReg2Body = @{packageId=$pkg2.id; channel="ONLINE"} | ConvertTo-Json
+    $pkgReg2Res = Invoke-Api -Method Post -Uri "$base/packages/registrations" -Headers $h1 -Body $pkgReg2Body
+    if ($pkgReg2Res.status -eq 201 -and $pkgReg2Res.data.status -eq "ACTIVE") {
+        $regList = Invoke-Api -Method Get -Uri "$base/packages/registrations/me" -Headers $h1
+        if ($regList.status -eq 200 -and $regList.data.Count -ge 2) {
+            Report-Pass "Member successfully holds multiple active packages concurrently"
+            $secondRegId = $pkgReg2Res.data.id
+        } else {
+            Report-Fail "Concurrent packages check failed. Count: $($regList.data.Count)"
+        }
+    } else {
+        Report-Fail "Second package registration failed. Status: $($pkgReg2Res.status)"
+    }
+} else {
+    Report-Skip "Skipping concurrent package check"
+}
+
+Write-Host "`n--- STEP O: Refreshed Context - Refund Request and Review Workflow ---"
+if ($secondRegId) {
+    $refundBody = @{packageRegistrationId=$secondRegId; reason="Relocating to another city"} | ConvertTo-Json
+    $refundRes = Invoke-Api -Method Post -Uri "$base/refunds" -Headers $h1 -Body $refundBody
+    if ($refundRes.status -eq 201 -and $refundRes.data.status -eq "PENDING") {
+        Report-Pass "Refund request submitted with status PENDING"
+        $refundId = $refundRes.data.id
+
+        $pendingList = Invoke-Api -Method Get -Uri "$base/refunds/pending" -Headers $mgr
+        $foundRefund = $pendingList.data | Where-Object { $_.id -eq $refundId }
+        if ($foundRefund) {
+            $reviewBody = @{approved=$true; managerNote="Approved per policy"} | ConvertTo-Json
+            $reviewRes = Invoke-Api -Method Put -Uri "$base/refunds/$refundId/review" -Headers $mgr -Body $reviewBody
+            if ($reviewRes.status -eq 200 -and $reviewRes.data.status -eq "APPROVED") {
+                Report-Pass "Manager reviewed and APPROVED refund request"
+            } else {
+                Report-Fail "Manager refund review failed. Status: $($reviewRes.status)"
+            }
+        } else {
+            Report-Fail "Refund ID $refundId not found in pending list"
+        }
+    } else {
+        Report-Fail "Refund submission failed. Status: $($refundRes.status)"
+    }
+} else {
+    Report-Skip "Skipping refund workflow due to missing registration"
 }
 
 Write-Host "`n--- SUMMARY ---"
