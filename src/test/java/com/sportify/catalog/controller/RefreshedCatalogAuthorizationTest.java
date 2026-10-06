@@ -21,6 +21,7 @@ import com.sportify.identity.security.JwtAuthenticationFilter;
 import com.sportify.identity.security.JwtService;
 import com.sportify.identity.security.SecurityConfig;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -34,9 +35,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -179,6 +182,17 @@ public class RefreshedCatalogAuthorizationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.channel").value("ONLINE"))
                 .andExpect(jsonPath("$.status").value("PENDING_PAYMENT"));
+
+        // Note: The controller forwards the incoming request body and authenticated user.
+        // The business rule enforcing RegistrationChannel.ONLINE and PackageRegistrationStatus.PENDING_PAYMENT
+        // for MEMBER actors (ignoring request.channel) is enforced in SportPackageServiceImpl and tested in SportPackageServiceImplTest.
+        ArgumentCaptor<PackageRegistrationRequest> reqCaptor = ArgumentCaptor.forClass(PackageRegistrationRequest.class);
+        ArgumentCaptor<UserAccount> userCaptor = ArgumentCaptor.forClass(UserAccount.class);
+        verify(sportPackageService).registerPackage(reqCaptor.capture(), userCaptor.capture());
+
+        assertEquals(10L, reqCaptor.getValue().getPackageId());
+        assertEquals(RegistrationChannel.RECEPTION, reqCaptor.getValue().getChannel());
+        assertEquals("MEMBER", userCaptor.getValue().getRole().getCode());
     }
 
     @Test
@@ -205,6 +219,15 @@ public class RefreshedCatalogAuthorizationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.channel").value("RECEPTION"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
+
+        ArgumentCaptor<PackageRegistrationRequest> reqCaptor = ArgumentCaptor.forClass(PackageRegistrationRequest.class);
+        ArgumentCaptor<UserAccount> userCaptor = ArgumentCaptor.forClass(UserAccount.class);
+        verify(sportPackageService).registerPackage(reqCaptor.capture(), userCaptor.capture());
+
+        assertEquals(10L, reqCaptor.getValue().getPackageId());
+        assertEquals(5L, reqCaptor.getValue().getMemberId());
+        assertEquals(RegistrationChannel.RECEPTION, reqCaptor.getValue().getChannel());
+        assertEquals("RECEPTIONIST", userCaptor.getValue().getRole().getCode());
     }
 
     @Test
@@ -231,6 +254,15 @@ public class RefreshedCatalogAuthorizationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.channel").value("RECEPTION"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
+
+        ArgumentCaptor<PackageRegistrationRequest> reqCaptor = ArgumentCaptor.forClass(PackageRegistrationRequest.class);
+        ArgumentCaptor<UserAccount> userCaptor = ArgumentCaptor.forClass(UserAccount.class);
+        verify(sportPackageService).registerPackage(reqCaptor.capture(), userCaptor.capture());
+
+        assertEquals(10L, reqCaptor.getValue().getPackageId());
+        assertEquals(5L, reqCaptor.getValue().getMemberId());
+        assertEquals(RegistrationChannel.RECEPTION, reqCaptor.getValue().getChannel());
+        assertEquals("MANAGER", userCaptor.getValue().getRole().getCode());
     }
 
     @Test
