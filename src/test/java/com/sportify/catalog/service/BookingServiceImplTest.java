@@ -9,6 +9,7 @@ import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.entity.Sport;
 import com.sportify.catalog.entity.SportPackage;
 import com.sportify.catalog.entity.SportPackageRegistration;
+import com.sportify.catalog.entity.TrainingFormat;
 import com.sportify.catalog.repository.BookingRepository;
 import com.sportify.catalog.repository.ClassSessionRepository;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
@@ -74,6 +75,7 @@ public class BookingServiceImplTest {
         session = ClassSession.builder()
                 .id(20L)
                 .sport(sport)
+                .trainingType(TrainingFormat.COACH_LED)
                 .sessionDate(LocalDate.of(2026, 10, 6))
                 .capacity(10)
                 .bookedCount(2)
@@ -83,7 +85,7 @@ public class BookingServiceImplTest {
         memberUser = UserAccount.builder().id(100L).role(memberRole).fullName("Member User").build();
         memberProfile = MemberProfile.builder().id(100L).userAccount(memberUser).memberCode("MEM-100").build();
 
-        SportPackage pkg = SportPackage.builder().id(5L).sport(sport).sessionCount(8).build();
+        SportPackage pkg = SportPackage.builder().id(5L).sport(sport).trainingFormat(TrainingFormat.COACH_LED).sessionCount(8).build();
         packageReg = SportPackageRegistration.builder()
                 .id(50L)
                 .member(memberProfile)
@@ -358,5 +360,56 @@ public class BookingServiceImplTest {
         assertEquals(BookingStatus.CONFIRMED, res.getStatus());
         assertEquals(50L, res.getPackageRegistrationId());
         verify(registrationRepository).save(packageReg);
+    }
+
+    @Test
+    void createBooking_WithWrongTrainingFormat_ThrowsBusinessRuleException() {
+        SportPackage selfTrainingPkg = SportPackage.builder()
+                .id(7L)
+                .sport(sport)
+                .trainingFormat(TrainingFormat.SELF_TRAINING)
+                .sessionCount(8)
+                .build();
+        packageReg.setSportPackage(selfTrainingPkg);
+
+        BookingCreateRequest req = BookingCreateRequest.builder()
+                .sessionId(20L)
+                .packageRegistrationId(50L)
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
+                .thenReturn(Optional.empty());
+        when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
+
+        assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+    }
+
+    @Test
+    void createBooking_WithAnotherMembersRegistration_AsStaff_ThrowsBusinessRuleException() {
+        Role staffRole = Role.builder().id(2L).code("RECEPTIONIST").build();
+        UserAccount staffUser = UserAccount.builder().id(200L).role(staffRole).fullName("Staff User").build();
+
+        MemberProfile otherMember = MemberProfile.builder().id(999L).build();
+        SportPackageRegistration otherReg = SportPackageRegistration.builder()
+                .id(51L)
+                .member(otherMember)
+                .status(PackageRegistrationStatus.ACTIVE)
+                .build();
+
+        BookingCreateRequest req = BookingCreateRequest.builder()
+                .memberId(100L) // booking for member 100L
+                .sessionId(20L)
+                .packageRegistrationId(51L) // registration belongs to 999L
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
+                .thenReturn(Optional.empty());
+        when(registrationRepository.findById(51L)).thenReturn(Optional.of(otherReg));
+
+        assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, staffUser));
     }
 }

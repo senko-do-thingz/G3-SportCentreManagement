@@ -84,8 +84,8 @@ public class BookingServiceImpl implements BookingService {
                 throw new BusinessRuleException("Package registration is not active: " + packageReg.getStatus());
             }
 
-            if (packageReg.getStartDate() != null && session.getSessionDate().isBefore(packageReg.getStartDate())
-                    || packageReg.getEndDate() != null && session.getSessionDate().isAfter(packageReg.getEndDate())) {
+            if (session.getSessionDate().isBefore(packageReg.getStartDate())
+                    || session.getSessionDate().isAfter(packageReg.getEndDate())) {
                 throw new BusinessRuleException("Session date " + session.getSessionDate() + " is outside package validity period ("
                         + packageReg.getStartDate() + " to " + packageReg.getEndDate() + ")");
             }
@@ -95,10 +95,8 @@ public class BookingServiceImpl implements BookingService {
                 throw new BusinessRuleException("Package sport does not match session sport");
             }
 
-            if (session.getTrainingType() != null && packageReg.getSportPackage() != null && packageReg.getSportPackage().getTrainingFormat() != null) {
-                if (packageReg.getSportPackage().getTrainingFormat() != session.getTrainingType()) {
-                    throw new BusinessRuleException("Package training format does not match session training type");
-                }
+            if (packageReg.getSportPackage().getTrainingFormat() != session.getTrainingType()) {
+                throw new BusinessRuleException("Package training format does not match session training type");
             }
         } else {
             // Find an active package covering this sport
