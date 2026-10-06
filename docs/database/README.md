@@ -84,7 +84,7 @@ The design is derived from the UI mockups in `context/` (Home + Flow 1 to Flow 6
 | AI assistant and support | `assistant_setting`, `assistant_topic`, `assistant_quick_prompt`, `ai_conversation`, `ai_message`, `support_request`, `support_request_message` | Flow 6, Flow 1 |
 | Notifications and system | `notification`, `announcement`, `system_setting` | All |
 
-Total: **58 tables** (26 implemented in migrations V1-V11, 32 planned), **3 reporting views** (planned), **8 sequences** (5 implemented in V9-V10: seq_registration_code, seq_card_code, seq_package_reg_code, seq_refund_code, seq_booking_code, seq_class_code; 3 planned).
+Total: **58 tables** (26 implemented in migrations V1-V11, 32 planned), **3 reporting views** (planned), **11 sequences** (7 implemented in migrations V2, V9-V10: seq_booking_code, seq_card_code, seq_class_code, seq_member_code, seq_package_reg_code, seq_refund_code, seq_registration_code; 4 planned: seq_payment_code, seq_invoice_number, seq_support_request_code, seq_workout_plan_code).
 
 ## High Level ERD
 
