@@ -39,6 +39,7 @@ public class SportPackage {
     @Column(name = "session_count", nullable = false)
     private Integer sessionCount;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.SMALLINT)
     @Column(name = "session_minutes", nullable = false)
     @Builder.Default
     private Integer sessionMinutes = 60;
