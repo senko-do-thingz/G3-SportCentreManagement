@@ -180,8 +180,8 @@ Status Legend:
 
 | Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
 |---|---|---|---|---|---|
-| Flow 4 - Training and attendence management/Flow 4 - Receptionist/F4-09 - Self-training Attendance.png | Self-training Attendance | Receptionist | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings/self-training/attendance` | IMPLEMENTED |
-| Flow 4 - Training and attendence management/Flow 4 - Receptionist/S4-SelfSaved - Self-training Attendance Confirmed.png | Self-training Attendance Confirmed | Receptionist | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings/self-training/attendance` | IMPLEMENTED |
+| Flow 4 - Training and attendence management/Flow 4 - Receptionist/F4-09 - Self-training Attendance.png | Self-training Attendance | Receptionist | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings/self-training/attendance` | PARTIAL |
+| Flow 4 - Training and attendence management/Flow 4 - Receptionist/S4-SelfSaved - Self-training Attendance Confirmed.png | Self-training Attendance Confirmed | Receptionist | `booking`, `class_session`, `sport_package_registration` | `POST /api/v1/bookings/self-training/attendance` | PARTIAL |
 
 ## Flow 5 - AI Workout Recommendation > Flow 5 - Coach
 

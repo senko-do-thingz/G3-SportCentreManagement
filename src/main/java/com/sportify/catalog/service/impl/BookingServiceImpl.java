@@ -243,7 +243,7 @@ public class BookingServiceImpl implements BookingService {
                 .remainingSessions(remaining)
                 .confirmedAt(LocalDateTime.now(clock))
                 .recordedByName(receptionist.getFullName())
-                .message("Self-training attendance recorded and verified successfully")
+                .message("Self-training attendance acknowledged (persistence pending Flow 4 implementation)")
                 .build();
     }
 

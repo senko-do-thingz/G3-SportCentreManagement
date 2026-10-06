@@ -2,6 +2,8 @@ package com.sportify.catalog.service;
 
 import com.sportify.catalog.dto.BookingCreateRequest;
 import com.sportify.catalog.dto.BookingResponse;
+import com.sportify.catalog.dto.SelfTrainingAttendanceRequest;
+import com.sportify.catalog.dto.SelfTrainingAttendanceResponse;
 import com.sportify.catalog.entity.Booking;
 import com.sportify.catalog.entity.BookingStatus;
 import com.sportify.catalog.entity.CheckInResult;
@@ -514,5 +516,39 @@ public class BookingServiceImplTest {
         assertEquals(1, session.getBookedCount()); // Decremented session seat
         assertEquals(5, packageReg.getRemainingSessions()); // Remaining sessions NOT incremented (remains 5)
         verify(registrationRepository, never()).save(packageReg);
+    }
+
+    @Test
+    void recordSelfTrainingAttendance_Success_ReturnsAcknowledgedResponseAndNoSaveCalled() {
+        Booking booking = Booking.builder()
+                .id(1L)
+                .bookingCode("BK-000001")
+                .member(memberProfile)
+                .session(session)
+                .packageRegistration(packageReg)
+                .status(BookingStatus.CONFIRMED)
+                .build();
+
+        SelfTrainingAttendanceRequest req = SelfTrainingAttendanceRequest.builder()
+                .bookingId(1L)
+                .build();
+
+        UserAccount receptionist = UserAccount.builder()
+                .id(200L)
+                .fullName("Receptionist User")
+                .role(Role.builder().id(2L).code("RECEPTIONIST").build())
+                .build();
+
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+
+        SelfTrainingAttendanceResponse response = bookingService.recordSelfTrainingAttendance(req, receptionist);
+
+        assertNotNull(response);
+        assertEquals(1L, response.getBookingId());
+        assertEquals("Self-training attendance acknowledged (persistence pending Flow 4 implementation)", response.getMessage());
+        assertEquals(5, response.getRemainingSessions());
+        verify(bookingRepository, never()).save(any());
+        verify(registrationRepository, never()).save(any());
+        verify(sessionRepository, never()).save(any());
     }
 }

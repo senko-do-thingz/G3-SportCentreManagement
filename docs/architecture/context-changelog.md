@@ -78,7 +78,7 @@ On 2026-10-05, the product owner delivered a comprehensive overhaul of the Figma
           .remainingSessions(remaining)
           .confirmedAt(LocalDateTime.now(clock))
           .recordedByName(receptionist.getFullName())
-          .message("Self-training attendance recorded and verified successfully")
+          .message("Self-training attendance acknowledged (persistence pending Flow 4 implementation)")
           .build();
   ```
 - Coaches record class attendance for coach-led sessions (`F4-02`).
