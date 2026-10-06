@@ -356,12 +356,21 @@ END;
 -- Part 3: Post-condition validation (fail loudly if catalog does not match Figma)
 -- ----------------------------------------------------------------------------
 
--- Check 1: Exactly 36 packages with code LIKE 'PK-%' must exist
+-- Check 1: Exactly 36 packages with codes PK-001 through PK-036 must exist
 DECLARE @pk_package_count INT;
-SELECT @pk_package_count = COUNT(*) FROM [sport_package] WHERE code LIKE 'PK-%';
+SELECT @pk_package_count = COUNT(*)
+FROM [sport_package]
+WHERE code IN (
+    'PK-001', 'PK-002', 'PK-003', 'PK-004', 'PK-005', 'PK-006',
+    'PK-007', 'PK-008', 'PK-009', 'PK-010', 'PK-011', 'PK-012',
+    'PK-013', 'PK-014', 'PK-015', 'PK-016', 'PK-017', 'PK-018',
+    'PK-019', 'PK-020', 'PK-021', 'PK-022', 'PK-023', 'PK-024',
+    'PK-025', 'PK-026', 'PK-027', 'PK-028', 'PK-029', 'PK-030',
+    'PK-031', 'PK-032', 'PK-033', 'PK-034', 'PK-035', 'PK-036'
+);
 IF @pk_package_count <> 36
 BEGIN
-    THROW 50001, 'Migration V12 verification failed: expected exactly 36 sport packages with code LIKE ''PK-%''', 1;
+    THROW 50001, 'Migration V12 verification failed: expected 36 sport packages with codes PK-001 through PK-036', 1;
 END;
 
 -- Check 2: All 36 Figma natural keys must exist and match Figma pricing
