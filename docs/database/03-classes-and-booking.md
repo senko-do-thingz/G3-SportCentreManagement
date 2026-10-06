@@ -42,8 +42,8 @@ erDiagram
 - **One active booking per member per session** via filtered unique index. A member may re-book after cancelling.
 - **Booking covers sessions via sport package.** `package_registration_id` links the booking to the active package.
   Each confirmed booking reserves 1 session from `remaining_sessions`. The legacy `membership_id` is retained as nullable for backward compatibility.
-- **Receptionist assisted booking (F2-11, F2-12).** Receptionists can search members and book confirmed sessions on their behalf (`source = 'RECEPTION'`).
-- **Waitlist does not reserve a seat.** When a seat opens, the first `WAITING` entry gets an `OFFERED` status with an expiry; accepting creates a booking with `source = 'WAITLIST'`.
+- **Receptionist assisted booking (F2-11, F2-12).** Receptionists can search members and book confirmed sessions on their behalf (creates a standard `booking` row with `status = 'CONFIRMED'`; source channel is not stored in V10 schema).
+- **Waitlist does not reserve a seat (Planned).** When a seat opens, the first `WAITING` entry gets an `OFFERED` status with an expiry; accepting creates a booking.
 - **My Bookings tabs** (Upcoming / Past / Cancelled) are derived: `status` plus `session_date` compared to today.
 - **Roster** (F2-15, F2-16) is `booking` rows with `status = 'CONFIRMED'` for a session.
 
@@ -51,78 +51,71 @@ erDiagram
 
 ### `sport_class`
 
+Learning group / class definition (migrated in V10).
+
 | Column | Type | Null | Key / Default | Description |
 |---|---|---|---|---|
 | id | BIGINT | No | PK, IDENTITY | |
-| code | NVARCHAR(20) | No | UQ | `CL-204` from `seq_class_code` |
-| name | NVARCHAR(100) | No | | "Basketball Fundamentals" |
-| sport_id | BIGINT | No | FK -> sport.id | |
-| age_group_id | BIGINT | No | FK -> age_group.id | "Ages 16+" |
-| level | NVARCHAR(20) | No | | `BEGINNER`, `INTERMEDIATE`, `ADVANCED` |
-| learning_goal | NVARCHAR(30) | No | | `IMPROVE_FITNESS`, `BUILD_SKILLS`, `COMPETITION` |
-| max_members | INT | No | CHECK > 0 | Default capacity of new sessions |
-| short_description | NVARCHAR(500) | Yes | | |
-| image_url | NVARCHAR(500) | Yes | | Card and hero image |
-| default_coach_id | BIGINT | Yes | FK -> coach_profile.user_id | Shown in F2-01 list |
-| default_facility_id | BIGINT | Yes | FK -> facility.id | |
-| status | NVARCHAR(20) | No | `DRAFT` | `DRAFT`, `PUBLISHED`, `ARCHIVED` |
-| created_at, updated_at, created_by, updated_by | | | | Audit |
-| version | INT | No | 0 | |
+| code | NVARCHAR(30) | No | UQ | `CL-204` from `seq_class_code` |
+| name | NVARCHAR(100) | No | | Display class name (e.g. "Basketball Fundamentals") |
+| sport_id | BIGINT | No | FK -> sport.id | Sport categorized |
+| age_group_id | BIGINT | Yes | FK -> age_group.id | Target age group (e.g. "Ages 16+") |
+| level | NVARCHAR(20) | No | `BEGINNER` | `BEGINNER`, `INTERMEDIATE`, `ADVANCED` |
+| max_members | INT | No | 20, CHECK > 0 | Default capacity of new sessions |
+| is_active | BIT | No | 1 | Active visibility toggle |
+| created_at, updated_at | DATETIME2(0) | | | Audit timestamps |
 
-Indexes: `ix_sport_class_filter (sport_id, age_group_id, level, status)` for F2-05 filters.
+*(Note: Columns `learning_goal`, `short_description`, `image_url`, `default_coach_id`, `default_facility_id` from early UI designs remain planned UI extensions not yet added in V10 schema).*
 
 ### `class_session`
 
+Dated class occurrence or self-training slot (migrated in V10).
+
 | Column | Type | Null | Key / Default | Description |
 |---|---|---|---|---|
 | id | BIGINT | No | PK, IDENTITY | |
-| class_id | BIGINT | No | FK -> sport_class.id | |
-| coach_id | BIGINT | Yes | FK -> coach_profile.user_id | Required when published |
-| facility_id | BIGINT | Yes | FK -> facility.id | Required when published |
-| session_date | DATE | No | | |
-| start_time | TIME(0) | No | | |
-| end_time | TIME(0) | No | CHECK > start_time | |
-| capacity | INT | No | CHECK > 0 | Copied from class |
+| class_id | BIGINT | Yes | FK -> sport_class.id | Linked class (nullable for self-training slots) |
+| sport_id | BIGINT | No | FK -> sport.id | Sport of the session |
+| session_date | DATE | No | | Date of session |
+| start_time | TIME(0) | No | | Start time |
+| end_time | TIME(0) | No | CHECK > start_time | End time |
+| facility_id | BIGINT | Yes | FK -> facility.id | Facility / court |
+| coach_id | BIGINT | Yes | FK -> coach_profile.user_id | Assigned coach (nullable for self-training) |
+| training_type | NVARCHAR(20) | No | `COACH_LED` | `COACH_LED` or `SELF_TRAINING` |
+| capacity | INT | No | 20, CHECK > 0 | Maximum participants |
 | booked_count | INT | No | 0, CHECK 0..capacity | Confirmed bookings |
-| status | NVARCHAR(20) | No | `DRAFT` | `DRAFT`, `PUBLISHED`, `CANCELLED`, `COMPLETED` |
-| published_at | DATETIME2(0) | Yes | | |
-| published_by | BIGINT | Yes | FK -> user_account.id | Manager |
-| cancelled_at | DATETIME2(0) | Yes | | |
-| cancel_reason | NVARCHAR(255) | Yes | | Shown to members (F4-02 note) |
-| attendance_status | NVARCHAR(20) | No | `NOT_STARTED` | `NOT_STARTED`, `DRAFT`, `SUBMITTED` (Flow 4) |
-| attendance_submitted_at | DATETIME2(0) | Yes | | |
-| attendance_submitted_by | BIGINT | Yes | FK -> user_account.id | Assigned coach |
-| created_at, updated_at, created_by, updated_by | | | | Audit |
-| version | INT | No | 0 | Optimistic lock |
+| status | NVARCHAR(20) | No | `PUBLISHED` | `DRAFT`, `PUBLISHED`, `CANCELLED`, `COMPLETED` |
+| created_at, updated_at | DATETIME2(0) | | | Audit timestamps |
 
-Indexes: `ix_class_session_date_status (session_date, status) INCLUDE (class_id, coach_id, booked_count, capacity)`,
-`ix_class_session_coach_date (coach_id, session_date)`, `ix_class_session_facility_date (facility_id, session_date)`,
-`ix_class_session_class_date (class_id, session_date)`.
+*(Note: Columns `published_at`, `published_by`, `cancelled_at`, `cancel_reason`, `attendance_status`, `attendance_submitted_at`, `attendance_submitted_by`, `version` are planned extensions not in V10).*
+
+Indexes: `ix_class_session_date_status (session_date, status)`.
 
 ### `booking`
 
+Session reservation by a member (migrated in V10).
+
 | Column | Type | Null | Key / Default | Description |
 |---|---|---|---|---|
 | id | BIGINT | No | PK, IDENTITY | |
-| booking_code | NVARCHAR(20) | No | UQ | `BK-2048` |
-| session_id | BIGINT | No | FK -> class_session.id | |
-| member_id | BIGINT | No | FK -> member_profile.user_id | |
-| membership_id | BIGINT | No | FK -> membership.id | Coverage used at booking time |
+| booking_code | NVARCHAR(30) | No | UQ | `BK-2048` from `seq_booking_code` |
+| session_id | BIGINT | No | FK -> class_session.id | Reserved session |
+| member_id | BIGINT | No | FK -> member_profile.user_id | Booking member |
+| package_registration_id | BIGINT | Yes | FK -> sport_package_registration.id | Active package covering the booking |
+| membership_id | BIGINT | Yes | FK -> membership.id | Legacy membership coverage fallback |
 | status | NVARCHAR(20) | No | `CONFIRMED` | `CONFIRMED`, `CANCELLED` |
-| source | NVARCHAR(20) | No | `MEMBER` | `MEMBER`, `RECEPTION`, `WAITLIST` |
-| fee_amount | DECIMAL(14,2) | No | 0, CHECK >= 0 | 0 when covered by membership |
-| booked_at | DATETIME2(0) | No | SYSDATETIME() | |
-| cancelled_at | DATETIME2(0) | Yes | | Required when cancelled |
-| cancelled_by | BIGINT | Yes | FK -> user_account.id | |
-| cancel_type | NVARCHAR(20) | Yes | | `MEMBER`, `STAFF`, `SESSION_CANCELLED` |
-| cancel_reason | NVARCHAR(255) | Yes | | |
-| created_at, updated_at | DATETIME2(0) | | | Audit |
-| version | INT | No | 0 | |
+| booked_at | DATETIME2(0) | No | SYSDATETIME() | Booking creation timestamp |
+| cancelled_at | DATETIME2(0) | Yes | | Cancellation timestamp |
+| cancel_reason | NVARCHAR(255) | Yes | | Cancellation reason |
+| created_at, updated_at | DATETIME2(0) | | | Audit timestamps |
 
-Indexes: `ux_booking_active (session_id, member_id) WHERE status = 'CONFIRMED'`,
-`ix_booking_member_status (member_id, status)`, `ix_booking_session_status (session_id, status)`.
+*(Note: Columns `source`, `fee_amount`, `cancelled_by`, `cancel_type`, `version` from earlier drafts are not present in V10).*
 
-### `waitlist_entry`
+Indexes: `ix_booking_member_session (member_id, session_id, status)`.
+
+### `waitlist_entry` (Planned - not in V10)
+
+Planned waitlist queue when class sessions reach maximum capacity.
 
 | Column | Type | Null | Key / Default | Description |
 |---|---|---|---|---|
