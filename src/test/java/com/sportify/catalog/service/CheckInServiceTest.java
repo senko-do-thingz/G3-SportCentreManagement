@@ -7,15 +7,12 @@ import com.sportify.catalog.entity.BookingStatus;
 import com.sportify.catalog.entity.CheckIn;
 import com.sportify.catalog.entity.CheckInResult;
 import com.sportify.catalog.entity.ClassSession;
-import com.sportify.catalog.entity.Membership;
-import com.sportify.catalog.entity.MembershipStatus;
 import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.entity.Sport;
 import com.sportify.catalog.entity.SportPackage;
 import com.sportify.catalog.entity.SportPackageRegistration;
 import com.sportify.catalog.repository.BookingRepository;
 import com.sportify.catalog.repository.CheckInRepository;
-import com.sportify.catalog.repository.MembershipRepository;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.impl.CheckInServiceImpl;
 import com.sportify.core.audit.AuditEvent;
@@ -57,8 +54,6 @@ public class CheckInServiceTest {
     private BookingRepository bookingRepository;
     @Mock
     private SportPackageRegistrationRepository packageRegistrationRepository;
-    @Mock
-    private MembershipRepository membershipRepository;
     @Mock
     private MemberProfileRepository memberProfileRepository;
     @Mock
@@ -140,6 +135,7 @@ public class CheckInServiceTest {
     void recordCheckIn_AlreadyCheckedIn_ResultDenied() {
         CheckInRequest req = new CheckInRequest();
         req.setIdentifier("MEM-123");
+        req.setBookingId(30L);
 
         when(memberProfileRepository.findByMemberCode("MEM-123")).thenReturn(Optional.of(memberProfile));
         when(bookingRepository.findTodayBookingsForMember(eq(1L), eq(LocalDate.of(2026, 10, 5)), eq(BookingStatus.CONFIRMED)))
@@ -156,6 +152,28 @@ public class CheckInServiceTest {
 
         assertEquals("DENIED", res.getResult());
         assertEquals("Already checked in for this session", res.getDenialReason());
+    }
+
+    @Test
+    void recordCheckIn_WhenAllTodayBookingsAlreadyCheckedIn_ResultDenied() {
+        CheckInRequest req = new CheckInRequest();
+        req.setIdentifier("MEM-123");
+
+        when(memberProfileRepository.findByMemberCode("MEM-123")).thenReturn(Optional.of(memberProfile));
+        when(bookingRepository.findTodayBookingsForMember(eq(1L), eq(LocalDate.of(2026, 10, 5)), eq(BookingStatus.CONFIRMED)))
+                .thenReturn(List.of(todayBooking));
+        when(checkInRepository.existsByBookingIdAndResult(eq(30L), eq(CheckInResult.ALLOWED)))
+                .thenReturn(true);
+        when(checkInRepository.save(any(CheckIn.class))).thenAnswer(i -> {
+            CheckIn c = i.getArgument(0);
+            c.setId(106L);
+            return c;
+        });
+
+        CheckInResponse res = checkInService.recordCheckIn(req, receptionist);
+
+        assertEquals("DENIED", res.getResult());
+        assertEquals("All confirmed bookings for today have already been checked in", res.getDenialReason());
     }
 
     @Test
@@ -196,15 +214,9 @@ public class CheckInServiceTest {
     }
 
     @Test
-    void recordCheckIn_WithTodayBookingAndLegacyMembership_ResultAllowed() {
+    void recordCheckIn_WithTodayBookingAndLegacyMembership_ResultDenied() {
         CheckInRequest req = new CheckInRequest();
         req.setIdentifier("MEM-123");
-
-        Membership active = new Membership();
-        active.setId(5L);
-        active.setStatus(MembershipStatus.ACTIVE);
-        active.setStartDate(LocalDate.of(2026, 10, 1));
-        active.setEndDate(LocalDate.of(2026, 10, 10));
 
         when(memberProfileRepository.findByMemberCode("MEM-123")).thenReturn(Optional.of(memberProfile));
         when(bookingRepository.findTodayBookingsForMember(eq(1L), eq(LocalDate.of(2026, 10, 5)), eq(BookingStatus.CONFIRMED)))
@@ -213,8 +225,6 @@ public class CheckInServiceTest {
                 .thenReturn(false);
         when(packageRegistrationRepository.findActiveRegistrationsForSport(eq(1L), eq(10L), eq(PackageRegistrationStatus.ACTIVE), eq(LocalDate.of(2026, 10, 5))))
                 .thenReturn(Collections.emptyList());
-        when(membershipRepository.findAllByMemberIdOrderByStartDateDesc(eq(1L)))
-                .thenReturn(List.of(active));
         when(checkInRepository.save(any(CheckIn.class))).thenAnswer(i -> {
             CheckIn c = i.getArgument(0);
             c.setId(104L);
@@ -223,9 +233,8 @@ public class CheckInServiceTest {
 
         CheckInResponse res = checkInService.recordCheckIn(req, receptionist);
 
-        assertEquals("ALLOWED", res.getResult());
-        assertEquals(5L, res.getMembershipId());
-        assertEquals(30L, res.getBookingId());
+        assertEquals("DENIED", res.getResult());
+        assertEquals("No active sport package", res.getDenialReason());
     }
 
     @Test
@@ -239,8 +248,6 @@ public class CheckInServiceTest {
         when(checkInRepository.existsByBookingIdAndResult(eq(30L), eq(CheckInResult.ALLOWED)))
                 .thenReturn(false);
         when(packageRegistrationRepository.findActiveRegistrationsForSport(eq(1L), eq(10L), eq(PackageRegistrationStatus.ACTIVE), eq(LocalDate.of(2026, 10, 5))))
-                .thenReturn(Collections.emptyList());
-        when(membershipRepository.findAllByMemberIdOrderByStartDateDesc(eq(1L)))
                 .thenReturn(Collections.emptyList());
         when(checkInRepository.save(any(CheckIn.class))).thenAnswer(i -> {
             CheckIn c = i.getArgument(0);

@@ -7,12 +7,10 @@ import com.sportify.catalog.entity.BookingStatus;
 import com.sportify.catalog.entity.CheckIn;
 import com.sportify.catalog.entity.CheckInResult;
 import com.sportify.catalog.entity.Membership;
-import com.sportify.catalog.entity.MembershipStatus;
 import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.entity.SportPackageRegistration;
 import com.sportify.catalog.repository.BookingRepository;
 import com.sportify.catalog.repository.CheckInRepository;
-import com.sportify.catalog.repository.MembershipRepository;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.CheckInService;
 import com.sportify.core.audit.AuditAction;
@@ -40,7 +38,6 @@ public class CheckInServiceImpl implements CheckInService {
     private final CheckInRepository checkInRepository;
     private final BookingRepository bookingRepository;
     private final SportPackageRegistrationRepository packageRegistrationRepository;
-    private final MembershipRepository membershipRepository;
     private final MemberProfileRepository memberProfileRepository;
     private final AuditService auditService;
     private final Clock clock;
@@ -85,7 +82,10 @@ public class CheckInServiceImpl implements CheckInService {
                 targetBooking = todayBookings.stream()
                         .filter(b -> !checkInRepository.existsByBookingIdAndResult(b.getId(), CheckInResult.ALLOWED))
                         .findFirst()
-                        .orElse(todayBookings.get(0));
+                        .orElse(null);
+                if (targetBooking == null) {
+                    denialReason = "All confirmed bookings for today have already been checked in";
+                }
             }
 
             if (targetBooking != null) {
@@ -94,7 +94,7 @@ public class CheckInServiceImpl implements CheckInService {
                 if (alreadyCheckedIn) {
                     denialReason = "Already checked in for this session";
                 } else {
-                    // Check package or membership coverage
+                    // Check package coverage
                     Long sportId = targetBooking.getSession().getSport().getId();
                     List<SportPackageRegistration> activePackages = packageRegistrationRepository.findActiveRegistrationsForSport(
                             profile.getId(), sportId, PackageRegistrationStatus.ACTIVE, today);
@@ -106,21 +106,7 @@ public class CheckInServiceImpl implements CheckInService {
                         targetPackage = targetBooking.getPackageRegistration();
                         result = CheckInResult.ALLOWED;
                     } else {
-                        // Legacy membership fallback check
-                        List<Membership> allMemberships = membershipRepository.findAllByMemberIdOrderByStartDateDesc(profile.getId());
-                        activeMembership = allMemberships.stream()
-                                .filter(m -> m.getStatus() == MembershipStatus.ACTIVE
-                                        && m.getStartDate() != null && m.getEndDate() != null
-                                        && !today.isBefore(m.getStartDate())
-                                        && !today.isAfter(m.getEndDate()))
-                                .findFirst()
-                                .orElse(null);
-
-                        if (activeMembership != null) {
-                            result = CheckInResult.ALLOWED;
-                        } else {
-                            denialReason = "No active sport package";
-                        }
+                        denialReason = "No active sport package";
                     }
                 }
             }
