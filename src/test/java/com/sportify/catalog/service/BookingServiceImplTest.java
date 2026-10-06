@@ -4,6 +4,7 @@ import com.sportify.catalog.dto.BookingCreateRequest;
 import com.sportify.catalog.dto.BookingResponse;
 import com.sportify.catalog.entity.Booking;
 import com.sportify.catalog.entity.BookingStatus;
+import com.sportify.catalog.entity.CheckInResult;
 import com.sportify.catalog.entity.ClassSession;
 import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.entity.SessionStatus;
@@ -12,6 +13,7 @@ import com.sportify.catalog.entity.SportPackage;
 import com.sportify.catalog.entity.SportPackageRegistration;
 import com.sportify.catalog.entity.TrainingFormat;
 import com.sportify.catalog.repository.BookingRepository;
+import com.sportify.catalog.repository.CheckInRepository;
 import com.sportify.catalog.repository.ClassSessionRepository;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.impl.BookingServiceImpl;
@@ -42,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -56,6 +59,8 @@ public class BookingServiceImplTest {
     private SportPackageRegistrationRepository registrationRepository;
     @Mock
     private MemberProfileRepository memberProfileRepository;
+    @Mock
+    private CheckInRepository checkInRepository;
     @Mock
     private CodeFormatter codeFormatter;
     @Spy
@@ -436,5 +441,67 @@ public class BookingServiceImplTest {
         when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
 
         assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+    }
+
+    @Test
+    void cancelBooking_AlreadyCheckedIn_ThrowsBusinessRuleException() {
+        Booking booking = Booking.builder()
+                .id(1L)
+                .member(memberProfile)
+                .session(session)
+                .status(BookingStatus.CONFIRMED)
+                .build();
+
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(checkInRepository.existsByBookingIdAndResult(eq(1L), eq(CheckInResult.ALLOWED))).thenReturn(true);
+
+        assertThrows(BusinessRuleException.class, () -> bookingService.cancelBooking(1L, memberUser));
+    }
+
+    @Test
+    void cancelBooking_PastSessionDate_ThrowsBusinessRuleException() {
+        ClassSession pastSession = ClassSession.builder()
+                .id(21L)
+                .sport(sport)
+                .sessionDate(LocalDate.of(2026, 10, 5)) // Past date
+                .bookedCount(2)
+                .build();
+
+        Booking booking = Booking.builder()
+                .id(1L)
+                .member(memberProfile)
+                .session(pastSession)
+                .status(BookingStatus.CONFIRMED)
+                .build();
+
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(checkInRepository.existsByBookingIdAndResult(eq(1L), eq(CheckInResult.ALLOWED))).thenReturn(false);
+
+        assertThrows(BusinessRuleException.class, () -> bookingService.cancelBooking(1L, memberUser));
+    }
+
+    @Test
+    void cancelBooking_WithInactivePackageRegistration_DoesNotRestorePackageSessions() {
+        packageReg.setStatus(PackageRegistrationStatus.EXPIRED);
+
+        Booking booking = Booking.builder()
+                .id(1L)
+                .member(memberProfile)
+                .session(session)
+                .packageRegistration(packageReg)
+                .status(BookingStatus.CONFIRMED)
+                .build();
+
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(checkInRepository.existsByBookingIdAndResult(eq(1L), eq(CheckInResult.ALLOWED))).thenReturn(false);
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        BookingResponse res = bookingService.cancelBooking(1L, memberUser);
+
+        assertNotNull(res);
+        assertEquals(BookingStatus.CANCELLED, res.getStatus());
+        assertEquals(1, session.getBookedCount()); // Decremented session seat
+        assertEquals(5, packageReg.getRemainingSessions()); // Remaining sessions NOT incremented (remains 5)
+        verify(registrationRepository, never()).save(packageReg);
     }
 }

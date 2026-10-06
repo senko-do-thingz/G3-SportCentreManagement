@@ -6,11 +6,13 @@ import com.sportify.catalog.dto.SelfTrainingAttendanceRequest;
 import com.sportify.catalog.dto.SelfTrainingAttendanceResponse;
 import com.sportify.catalog.entity.Booking;
 import com.sportify.catalog.entity.BookingStatus;
+import com.sportify.catalog.entity.CheckInResult;
 import com.sportify.catalog.entity.ClassSession;
 import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.entity.SessionStatus;
 import com.sportify.catalog.entity.SportPackageRegistration;
 import com.sportify.catalog.repository.BookingRepository;
+import com.sportify.catalog.repository.CheckInRepository;
 import com.sportify.catalog.repository.ClassSessionRepository;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.BookingService;
@@ -40,6 +42,7 @@ public class BookingServiceImpl implements BookingService {
     private final ClassSessionRepository sessionRepository;
     private final SportPackageRegistrationRepository registrationRepository;
     private final MemberProfileRepository memberProfileRepository;
+    private final CheckInRepository checkInRepository;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
 
@@ -162,6 +165,16 @@ public class BookingServiceImpl implements BookingService {
             throw new BusinessRuleException("Booking is already cancelled");
         }
 
+        LocalDate today = LocalDate.now(clock);
+
+        if (checkInRepository.existsByBookingIdAndResult(booking.getId(), CheckInResult.ALLOWED)) {
+            throw new BusinessRuleException("Cannot cancel booking that has already been checked in");
+        }
+
+        if (booking.getSession().getSessionDate().isBefore(today)) {
+            throw new BusinessRuleException("Cannot cancel a past session booking");
+        }
+
         booking.setStatus(BookingStatus.CANCELLED);
         booking.setCancelledAt(LocalDateTime.now(clock));
         booking.setCancelReason("Cancelled by user: " + actor.getEmail());
@@ -173,8 +186,8 @@ public class BookingServiceImpl implements BookingService {
             sessionRepository.save(session);
         }
 
-        // Restore 1 session to package registration
-        if (booking.getPackageRegistration() != null) {
+        // Restore 1 session to package registration only if registration is ACTIVE
+        if (booking.getPackageRegistration() != null && booking.getPackageRegistration().getStatus() == PackageRegistrationStatus.ACTIVE) {
             SportPackageRegistration pkg = booking.getPackageRegistration();
             pkg.setRemainingSessions(pkg.getRemainingSessions() + 1);
             registrationRepository.save(pkg);
