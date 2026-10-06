@@ -36,13 +36,13 @@ On 2026-10-05, the product owner delivered a comprehensive overhaul of the Figma
   - Booking creation forbids using another member's package registration (throws `AccessDeniedException`).
   - Booking cancellation and refund submission forbid acting on bookings or registrations owned by other members (throws `AccessDeniedException` / 403).
   - Package registration activation is restricted to staff roles (`RECEPTIONIST`, `MANAGER`); members attempting self-activation receive 403.
-  - Member profile auto-provisioning is restricted to self or staff, and strictly requires the target user to have role MEMBER (`SportPackageServiceImpl.java:101-103`: `if (targetUser.getRole() == null || !"MEMBER".equals(targetUser.getRole().getCode())) { throw new BusinessRuleException("Cannot create member profile for non-member user: " + targetMemberId); }`).
+  - Member profile auto-provisioning strictly requires the target user to have role MEMBER (`SportPackageServiceImpl.java:101-103`: `if (targetUser.getRole() == null || !"MEMBER".equals(targetUser.getRole().getCode())) { throw new BusinessRuleException("Cannot create member profile for non-member user: " + targetMemberId); }`).
 
 ### 2.3 Front Desk Check-in Validation (Screen F1-15)
 - **Previous Model:** Checked in against active membership plan.
 - **Refreshed Model:** Check-in strictly requires:
   1. An existing confirmed session booking for the current day (`session_date = CAST(SYSDATETIME() AS DATE)`).
-  2. Member holds an active paid sport package covering the sport.
+  2. The booked package registration must be ACTIVE and valid today (start_date <= today <= end_date).
   3. No duplicate check-in recorded for the same session.
   4. Front desk check-in never double-deducts session attendance.
 
@@ -53,7 +53,7 @@ On 2026-10-05, the product owner delivered a comprehensive overhaul of the Figma
 ### 2.5 Refund Request Workflow (Flow 3)
 - Front desk receptionists file refund requests (`F3-07`, `S3-RefundSubmitted`) or members request online.
 - Center Manager reviews and approves/rejects requests (`F3-09`, `S3-RefundReview`, `S3-RefundApproved`, `S3-RefundRejected`).
-- Payout is recorded as completed (`S3-RefundDone`).
+- Payout recording as completed (`S3-RefundDone`, transitioning status to `COMPLETED`) is Planned.
 
 ### 2.6 Self-training Attendance (Flow 4)
 - Screen `F4-09 - Self-training Attendance`: Front desk receptionists record self-training attendance. However, `BookingServiceImpl.recordSelfTrainingAttendance` (`BookingServiceImpl.java:225-248`) does not persist anything today (no attendance record created, no remaining session deduction, no check-in link):

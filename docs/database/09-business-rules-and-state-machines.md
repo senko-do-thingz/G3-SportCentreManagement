@@ -11,7 +11,7 @@ stateDiagram-v2
     [*] --> PENDING_PAYMENT : Register Package
     PENDING_PAYMENT --> ACTIVE : Payment Confirmed / Receptionist Activates
     PENDING_PAYMENT --> CANCELLED : Cancel
-    ACTIVE --> EXPIRED : Daily Job (end_date < TODAY OR remaining_sessions = 0)
+    ACTIVE --> EXPIRED : Daily Job (end_date < TODAY OR remaining_sessions = 0) (Planned)
     ACTIVE --> REFUNDED : Manager Approves Refund
     ACTIVE --> CANCELLED : Cancel
 ```
@@ -125,7 +125,7 @@ stateDiagram-v2
 Front desk check-in validates member arrival at the center:
 
 1. **Today's Confirmed Booking Required:** The member MUST have at least one confirmed session booking for the current day (`session_date = CAST(SYSDATETIME() AS DATE)`, `status = 'CONFIRMED'`).
-2. **Active Package Coverage:** The member must have an active paid sport package covering the sport of the booked session.
+2. **Active Package Coverage:** The booked package registration must be ACTIVE and valid today (start_date <= today <= end_date).
 3. **No Duplicate Check-in:** The member must not have already checked in for the same session today.
 4. **Attendance Independence:** Front desk check-in does not mark session attendance and does not double-deduct remaining package sessions (attendance is separately recorded by coaches in classes or receptionists in self-training slots).
 5. **Result & Denial Reasons:**
@@ -153,14 +153,14 @@ Front desk check-in validates member arrival at the center:
 ## Sport Package & Booking Eligibility Rules
 
 1. **Multiple Concurrent Packages:** Members can hold multiple active packages simultaneously across different sports and formats.
-2. **Session Reservation & Deduction:** Booking a session immediately reserves and deducts 1 session from `remaining_sessions` (`POST /api/v1/bookings`). Cancelling a confirmed booking restores 1 session to `remaining_sessions` (`DELETE /api/v1/bookings/{id}`).
+2. **Session Reservation & Deduction:** Booking a session immediately reserves and deducts 1 session from `remaining_sessions` (`POST /api/v1/bookings`). Cancelling a confirmed booking (`DELETE /api/v1/bookings/{id}`) restores 1 session to `remaining_sessions` only when the registration is ACTIVE; cancellation is blocked after an ALLOWED check-in or after the session date.
 3. **Registration Activation Rules:**
    - Status transition: Strictly allowed only from `PENDING_PAYMENT` -> `ACTIVE`. Transition from any other status (`ACTIVE`, `CANCELLED`, `REFUNDED`, `EXPIRED`) throws a business rule error.
    - Channel and role enforcement: Registrations created by a `MEMBER` actor always force channel `ONLINE` and status `PENDING_PAYMENT`. Only `RECEPTIONIST` and `MANAGER` staff actors can create immediate `ACTIVE` registrations with channel `RECEPTION`.
    - Date recomputation at activation: If `startDate` is in the past when activation occurs (`startDate < TODAY`), `startDate` is reset to `TODAY` and `endDate` is set to `startDate + durationDays`. If `startDate >= TODAY`, dates are preserved unchanged.
    - Refund terminal status: Approved refunds transition the associated package registration status to `REFUNDED`.
 4. **Booking Eligibility Checklist:**
-   - Session State: `PUBLISHED` and in the future (Implemented).
+   - Session State: `PUBLISHED` and not in the past (today allowed) (Implemented).
    - Capacity: Available seats (`capacity - booked_count > 0`, Implemented; waitlist prompt is Planned).
    - Package Coverage: Active package for the session sport with `remaining_sessions > 0` and `session_date` between `start_date` and `end_date` (Implemented).
    - Format Match: Self-training package for self-training sessions; Coach-led package for coach-led classes (Implemented for explicit package selection; Planned for automatic package lookup).
