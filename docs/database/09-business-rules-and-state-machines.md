@@ -149,8 +149,13 @@ Front desk check-in validates member arrival at the center:
 ## Sport Package & Booking Eligibility Rules
 
 1. **Multiple Concurrent Packages:** Members can hold multiple active packages simultaneously across different sports and formats.
-2. **Session Reservation:** Booking a session reserves 1 session from `remaining_sessions`. Cancelling a booking restores 1 session to `remaining_sessions`.
-3. **Booking Eligibility Checklist:**
+2. **Session Reservation & Deduction:** Booking a session immediately reserves and deducts 1 session from `remaining_sessions` (`POST /api/v1/bookings`). Cancelling a confirmed booking restores 1 session to `remaining_sessions` (`DELETE /api/v1/bookings/{id}`).
+3. **Registration Activation Rules:**
+   - Status transition: Strictly allowed only from `PENDING_PAYMENT` -> `ACTIVE`. Transition from any other status (`ACTIVE`, `CANCELLED`, `REFUNDED`, `EXPIRED`) throws a business rule error.
+   - Channel and role enforcement: Registrations created by a `MEMBER` actor always force channel `ONLINE` and status `PENDING_PAYMENT`. Only `RECEPTIONIST` and `MANAGER` staff actors can create immediate `ACTIVE` registrations with channel `RECEPTION`.
+   - Date recomputation at activation: If `startDate` is in the past when activation occurs (`startDate < TODAY`), `startDate` is reset to `TODAY` and `endDate` is set to `startDate + durationDays`. If `startDate >= TODAY`, dates are preserved unchanged.
+   - Refund terminal status: Approved refunds transition the associated package registration status to `REFUNDED`.
+4. **Booking Eligibility Checklist:**
    - Session State: `PUBLISHED` and in the future.
    - Capacity: Available seats (`capacity - booked_count > 0`), otherwise waitlist.
    - Package Coverage: Active package for the class sport with `remaining_sessions > 0` and `session_date` between `start_date` and `end_date`.

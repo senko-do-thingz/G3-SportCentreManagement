@@ -140,8 +140,8 @@ An instance of a member purchasing a sport package.
 | remaining_sessions | INT | No | CHECK >= 0 | Sessions left to book |
 | start_date | DATE | No | | Explicitly chosen start date |
 | end_date | DATE | No | CHECK >= start_date | `start_date + duration_days` |
-| status | NVARCHAR(20) | No | `PENDING_PAYMENT` | `PENDING_PAYMENT`, `ACTIVE`, `EXPIRED`, `CANCELLED` |
-| activated_at | DATETIME2(0) | Yes | | Date paid and activated |
+| status | NVARCHAR(20) | No | `PENDING_PAYMENT` | `PENDING_PAYMENT`, `ACTIVE`, `EXPIRED`, `CANCELLED`, `REFUNDED` (V11) |
+| activated_at | DATETIME2(0) | Yes | | Date activated. Activation allowed only from PENDING_PAYMENT -> ACTIVE. Recomputes start_date to TODAY and end_date = start_date + duration_days if start_date < TODAY. |
 | payment_id | BIGINT | Yes | FK -> payment.id | Payment record |
 | created_by_user_id | BIGINT | No | FK -> user_account.id | Member or receptionist |
 | created_at, updated_at | DATETIME2(0) | | | Audit |

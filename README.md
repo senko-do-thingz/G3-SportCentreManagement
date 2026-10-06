@@ -11,8 +11,8 @@ Welcome to the **Sportify Center** backend repository. This project aims to buil
 | Module | Status |
 |---|---|
 | **Identity & Access** | Implemented - Fixed roles (MEMBER, COACH, RECEPTIONIST, MANAGER), profiles, validation |
-| **Catalog & Membership** | Implemented (V10 + V11) - Sport Packages, Membership Cards, Multi-package, Check-in, Refund workflow |
-| **Classes & Booking** | Implemented (V10) - Coach-led vs self-training sessions, package reservations, capacity checks |
+| **Catalog & Membership** | Implemented (V10 + V11) - Sport Packages, Membership Cards, Multi-package model, PENDING_PAYMENT to ACTIVE activation with date recomputation, REFUNDED status, Check-in flow |
+| **Classes & Booking** | Implemented (V10) - Coach-led vs self-training sessions, session deduction at booking, capacity checks |
 | **Payments & Reports** | Designed / Partial - Updated for package invoices, card discounts, and refund requests |
 | **Training & Progress** | Designed / Partial - Updated for coach sessions and receptionist self-training attendance |
 | **AI Workout Recommendation** | Planned - Goal-driven recommendations and coach exercise drafts |
