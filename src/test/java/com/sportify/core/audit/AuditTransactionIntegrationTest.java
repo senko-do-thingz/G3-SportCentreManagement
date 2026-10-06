@@ -72,7 +72,7 @@ public class AuditTransactionIntegrationTest extends AbstractIntegrationTest {
                 .status("ACTIVE")
                 .fullName("Test Audit")
                 .build();
-        userRepository.save(user);
+        UserAccount savedUser = userRepository.save(user);
 
         try {
             AuthRequest request = new AuthRequest(testEmail, "wrong_password");
@@ -110,7 +110,9 @@ public class AuditTransactionIntegrationTest extends AbstractIntegrationTest {
                     })
                     .collect(Collectors.toList());
             activityLogRepository.deleteAll(toDelete);
-            userRepository.delete(user);
+            if (savedUser != null && savedUser.getId() != null) {
+                userRepository.deleteById(savedUser.getId());
+            }
         }
     }
 
