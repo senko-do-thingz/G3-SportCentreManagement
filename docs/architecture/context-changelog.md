@@ -83,6 +83,11 @@ On 2026-10-05, the product owner delivered a comprehensive overhaul of the Figma
   ```
 - Coaches record class attendance for coach-led sessions (`F4-02`).
 
+### 2.7 Same-Day Booking and Cancellation Rules (Flow 2)
+- **Session Reservation & Deduction:** Booking a session immediately reserves and deducts 1 session from `remaining_sessions` (`POST /api/v1/bookings`). Cancelling a confirmed booking (`DELETE /api/v1/bookings/{id}`) restores 1 session to `remaining_sessions` only when the registration is ACTIVE; cancellation is blocked after an ALLOWED check-in, after the session date, or once the session start time has been reached on the session day when requested by a MEMBER (staff are exempt).
+- **Booking Eligibility Checklist:**
+  - Session not started: booking is rejected once the session start time is reached (Implemented).
+
 ## 3. Phase 4 Implementation Plan
 
 1. **Migration V10:** Add new tables and constraints.

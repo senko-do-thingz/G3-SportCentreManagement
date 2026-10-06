@@ -153,7 +153,7 @@ Front desk check-in validates member arrival at the center:
 ## Sport Package & Booking Eligibility Rules
 
 1. **Multiple Concurrent Packages:** Members can hold multiple active packages simultaneously across different sports and formats.
-2. **Session Reservation & Deduction:** Booking a session immediately reserves and deducts 1 session from `remaining_sessions` (`POST /api/v1/bookings`). Cancelling a confirmed booking (`DELETE /api/v1/bookings/{id}`) restores 1 session to `remaining_sessions` only when the registration is ACTIVE; cancellation is blocked after an ALLOWED check-in or after the session date.
+2. **Session Reservation & Deduction:** Booking a session immediately reserves and deducts 1 session from `remaining_sessions` (`POST /api/v1/bookings`). Cancelling a confirmed booking (`DELETE /api/v1/bookings/{id}`) restores 1 session to `remaining_sessions` only when the registration is ACTIVE; cancellation is blocked after an ALLOWED check-in, after the session date, or once the session start time has been reached on the session day when requested by a MEMBER (staff are exempt).
 3. **Registration Activation Rules:**
    - Status transition: Strictly allowed only from `PENDING_PAYMENT` -> `ACTIVE`. Transition from any other status (`ACTIVE`, `CANCELLED`, `REFUNDED`, `EXPIRED`) throws a business rule error.
    - Channel and role enforcement: Registrations created by a `MEMBER` actor always force channel `ONLINE` and status `PENDING_PAYMENT`. Only `RECEPTIONIST` and `MANAGER` staff actors can create immediate `ACTIVE` registrations with channel `RECEPTION`.
@@ -161,6 +161,7 @@ Front desk check-in validates member arrival at the center:
    - Refund terminal status: Approved refunds transition the associated package registration status to `REFUNDED`.
 4. **Booking Eligibility Checklist:**
    - Session State: `PUBLISHED` and not in the past (today allowed) (Implemented).
+   - Session not started: booking is rejected once the session start time is reached (Implemented).
    - Capacity: Available seats (`capacity - booked_count > 0`, Implemented; waitlist prompt is Planned).
    - Package Coverage: Active package for the session sport with `remaining_sessions > 0` and `session_date` between `start_date` and `end_date` (Implemented).
    - Format Match: Self-training package for self-training sessions; Coach-led package for coach-led classes (Implemented for explicit package selection; Planned for automatic package lookup).
