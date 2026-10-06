@@ -101,7 +101,7 @@ Member's card holding record.
 | end_date | DATE | Yes | | Null for permanent Standard, date for Gold/VIP |
 | status | NVARCHAR(20) | No | `ACTIVE` | `ACTIVE`, `EXPIRED`, `CANCELLED` |
 | price_paid | DECIMAL(14,2) | No | CHECK >= 0 | Snapshot of fee paid |
-| payment_id | BIGINT | Yes | FK -> payment.id | Associated payment attempt |
+| payment_id | BIGINT | Yes | FK -> payment.id | Associated payment attempt (planned, not in V10) |
 | created_at, updated_at | DATETIME2(0) | | | Audit |
 
 ### `sport_package`
@@ -142,7 +142,7 @@ An instance of a member purchasing a sport package.
 | end_date | DATE | No | CHECK >= start_date | `start_date + duration_days` |
 | status | NVARCHAR(20) | No | `PENDING_PAYMENT` | `PENDING_PAYMENT`, `ACTIVE`, `EXPIRED`, `CANCELLED`, `REFUNDED` (V11) |
 | activated_at | DATETIME2(0) | Yes | | Date activated. Activation allowed only from PENDING_PAYMENT -> ACTIVE. Recomputes start_date to TODAY and end_date = start_date + duration_days if start_date < TODAY. |
-| payment_id | BIGINT | Yes | FK -> payment.id | Payment record |
+| payment_id | BIGINT | Yes | FK -> payment.id | Payment record (planned, not in V10) |
 | created_by_user_id | BIGINT | No | FK -> user_account.id | Member or receptionist |
 | created_at, updated_at | DATETIME2(0) | | | Audit |
 
