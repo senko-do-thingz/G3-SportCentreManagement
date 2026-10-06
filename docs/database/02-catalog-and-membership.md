@@ -154,11 +154,12 @@ Front desk arrival record (F1-15).
 |---|---|---|---|---|
 | id | BIGINT | No | PK, IDENTITY | |
 | member_id | BIGINT | No | FK -> member_profile.user_id | Arriving member |
+| membership_id | BIGINT | Yes | FK -> membership.id | Legacy membership reference (nullable) |
 | booking_id | BIGINT | Yes | FK -> booking.id | Today's confirmed session booking |
 | package_registration_id | BIGINT | Yes | FK -> sport_package_registration.id | Active package backing admission |
 | checked_in_at | DATETIME2(0) | No | SYSDATETIME() | Front desk timestamp |
 | result | NVARCHAR(20) | No | | `ALLOWED`, `DENIED` |
-| denial_reason | NVARCHAR(255) | Yes | | "No booking today", "Inactive package", "Duplicate check-in" |
+| denial_reason | NVARCHAR(255) | Yes | | Reason if DENIED: "No confirmed booking for today", "Specified booking is not scheduled for today or is not confirmed", "All confirmed bookings for today have already been checked in", "Already checked in for this session", "No active sport package" |
 | recorded_by | BIGINT | No | FK -> user_account.id | Receptionist user |
 | note | NVARCHAR(255) | Yes | | Staff note |
 

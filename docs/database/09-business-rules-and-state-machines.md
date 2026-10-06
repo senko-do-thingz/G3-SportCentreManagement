@@ -125,14 +125,16 @@ stateDiagram-v2
 Front desk check-in validates member arrival at the center:
 
 1. **Today's Confirmed Booking Required:** The member MUST have at least one confirmed session booking for the current day (`session_date = CAST(SYSDATETIME() AS DATE)`, `status = 'CONFIRMED'`).
-2. **Active Package Coverage:** The member must have an active paid sport package covering the sport and format of the booked session.
+2. **Active Package Coverage:** The member must have an active paid sport package covering the sport of the booked session.
 3. **No Duplicate Check-in:** The member must not have already checked in for the same session today.
 4. **Attendance Independence:** Front desk check-in does not mark session attendance and does not double-deduct remaining package sessions (attendance is separately recorded by coaches in classes or receptionists in self-training slots).
 5. **Result & Denial Reasons:**
    - If conditions 1 and 2 are satisfied, result is `ALLOWED`.
    - If no confirmed booking exists for today, result is `DENIED` with reason `"No confirmed booking for today"`.
-   - If package is expired or inactive, result is `DENIED` with reason `"No active sport package"`.
-   - If duplicate check-in detected, result is `DENIED` with reason `"Already checked in for this session"`.
+   - If a specific booking ID is provided in request but is not found, not confirmed, or not scheduled for today, result is `DENIED` with reason `"Specified booking is not scheduled for today or is not confirmed"`.
+   - If all confirmed bookings for today have already been checked in, result is `DENIED` with reason `"All confirmed bookings for today have already been checked in"`.
+   - If already checked in for the target session, result is `DENIED` with reason `"Already checked in for this session"`.
+   - If package coverage is missing or inactive, result is `DENIED` with reason `"No active sport package"`.
 
 ## Membership Card & Discount Rules
 
@@ -156,13 +158,13 @@ Front desk check-in validates member arrival at the center:
    - Date recomputation at activation: If `startDate` is in the past when activation occurs (`startDate < TODAY`), `startDate` is reset to `TODAY` and `endDate` is set to `startDate + durationDays`. If `startDate >= TODAY`, dates are preserved unchanged.
    - Refund terminal status: Approved refunds transition the associated package registration status to `REFUNDED`.
 4. **Booking Eligibility Checklist:**
-   - Session State: `PUBLISHED` and in the future.
-   - Capacity: Available seats (`capacity - booked_count > 0`), otherwise waitlist.
-   - Package Coverage: Active package for the class sport with `remaining_sessions > 0` and `session_date` between `start_date` and `end_date`.
-   - Format Match: Self-training package for self-training sessions; Coach-led package for coach-led classes.
-   - Age Restriction: Member's age falls within `age_group` range.
-   - No Overlap: Member does not have an overlapping confirmed booking.
-   - Double Booking: Database enforces at most one confirmed booking per member per session.
+   - Session State: `PUBLISHED` and in the future (Planned).
+   - Capacity: Available seats (`capacity - booked_count > 0`, Implemented; waitlist prompt is Planned).
+   - Package Coverage: Active package for the session sport with `remaining_sessions > 0` and `session_date` between `start_date` and `end_date` (Implemented).
+   - Format Match: Self-training package for self-training sessions; Coach-led package for coach-led classes (Implemented for explicit package selection; Planned for automatic package lookup).
+   - Age Restriction: Member's age falls within `age_group` range (Planned).
+   - No Overlap: Member does not have an overlapping confirmed booking (Planned).
+   - Double Booking: Database enforces at most one confirmed booking per member per session (Implemented).
 
 ## Refund Rules
 
@@ -201,7 +203,8 @@ Front desk check-in validates member arrival at the center:
 
 ## Scheduled Jobs
 
-1. **Package Expiration:** Daily at midnight, set packages to `EXPIRED` if `end_date < TODAY` or `remaining_sessions = 0`.
-2. **Card Expiration:** Daily at midnight, set member cards to `EXPIRED` if `end_date < TODAY`.
-3. **Session Completion:** Hourly, mark sessions as `COMPLETED` when session date and time have passed.
-4. **Waitlist Expiry:** Hourly, expire offered waitlist entries that exceeded the acceptance window.
+1. **Package Expiration:** Daily at midnight, set packages to `EXPIRED` if `end_date < TODAY` or `remaining_sessions = 0` (Planned).
+2. **Card Expiration:** Daily at midnight, set member cards to `EXPIRED` if `end_date < TODAY` (Planned).
+3. **Session Completion:** Hourly, mark sessions as `COMPLETED` when session date and time have passed (Planned).
+4. **Waitlist Expiry:** Hourly, expire offered waitlist entries that exceeded the acceptance window (Planned).
+*(Note: Active scheduled job `MembershipScheduledJobs` currently processes legacy `membership` table transitions only).*

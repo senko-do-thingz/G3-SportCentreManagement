@@ -23,10 +23,22 @@ On 2026-10-05, the product owner delivered a comprehensive overhaul of the Figma
     - Members can hold multiple active sport packages concurrently.
     - Member/staff explicitly chooses the `start_date` at registration time.
 - **Flyway Migration `V10__context_refresh_schema.sql`:**
-  - Adds `membership_card_tier`, `member_card`, `sport_package`, `sport_package_registration`, `refund_request`.
+  - Creates tables: `membership_card_tier`, `member_card`, `sport_package`, `sport_package_registration`, `refund_request`, `sport_class`, `class_session`, `booking`.
+  - Alters table `check_in`: Adds `booking_id` (FK to `booking`) and `package_registration_id` (FK to `sport_package_registration`).
   - Deprecates legacy `membership_plan` and `membership` Java domain entities with `@Deprecated` while preserving schema tables.
+- **Flyway Migration `V11__add_refunded_status.sql`:**
+  - Updates check constraint `ck_spr_status` on `sport_package_registration` to include terminal status `REFUNDED` (`PENDING_PAYMENT`, `ACTIVE`, `EXPIRED`, `CANCELLED`, `REFUNDED`).
 
-### 2.2 Front Desk Check-in Validation (Screen F1-15)
+### 2.2 Activation, Channel, and Ownership Security Rules
+- **Package Registration Activation:** Status transition is strictly allowed only from `PENDING_PAYMENT` -> `ACTIVE`. If `startDate < TODAY` upon activation, `startDate` is reset to `TODAY` and `endDate` is recalculated as `startDate + durationDays`.
+- **Channel & Role Enforcement:** Registrations submitted by a `MEMBER` actor always enforce channel `ONLINE` and status `PENDING_PAYMENT`. Only `RECEPTIONIST` and `MANAGER` staff actors can create immediate `ACTIVE` registrations with channel `RECEPTION`.
+- **Ownership & Authorization:** Members are strictly restricted to their own resources:
+  - Booking creation forbids using another member's package registration (throws `AccessDeniedException`).
+  - Booking cancellation and refund submission forbid acting on bookings or registrations owned by other members (throws `AccessDeniedException` / 403).
+  - Package registration activation is restricted to staff roles (`RECEPTIONIST`, `MANAGER`); members attempting self-activation receive 403.
+  - Member profile auto-provisioning is restricted to self or staff.
+
+### 2.3 Front Desk Check-in Validation (Screen F1-15)
 - **Previous Model:** Checked in against active membership plan.
 - **Refreshed Model:** Check-in strictly requires:
   1. An existing confirmed session booking for the current day (`session_date = CAST(SYSDATETIME() AS DATE)`).
@@ -34,16 +46,16 @@ On 2026-10-05, the product owner delivered a comprehensive overhaul of the Figma
   3. No duplicate check-in recorded for the same session.
   4. Front desk check-in never double-deducts session attendance.
 
-### 2.3 Fixed Roles & Permission Security (Screen F1-01 Overlay)
+### 2.4 Fixed Roles & Permission Security (Screen F1-01 Overlay)
 - **Previous Model:** Configurable `role_permission` matrix editable by Managers in UI.
 - **Refreshed Model:** Fixed role access (`MEMBER`, `COACH`, `RECEPTIONIST`, `MANAGER`). UI custom permission selection is disabled. Authorization is enforced using `@PreAuthorize("hasRole('...')")`.
 
-### 2.4 Refund Request Workflow (Flow 3)
+### 2.5 Refund Request Workflow (Flow 3)
 - Front desk receptionists file refund requests (`F3-07`, `S3-RefundSubmitted`) or members request online.
 - Center Manager reviews and approves/rejects requests (`F3-09`, `S3-RefundReview`, `S3-RefundApproved`, `S3-RefundRejected`).
 - Payout is recorded as completed (`S3-RefundDone`).
 
-### 2.5 Self-training Attendance (Flow 4)
+### 2.6 Self-training Attendance (Flow 4)
 - Screen `F4-09 - Self-training Attendance`: Front desk receptionists record self-training attendance, consuming 1 reserved session.
 - Coaches record class attendance for coach-led sessions (`F4-02`).
 
