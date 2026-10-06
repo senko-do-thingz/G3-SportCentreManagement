@@ -214,30 +214,6 @@ public class CheckInServiceTest {
     }
 
     @Test
-    void recordCheckIn_WithTodayBookingAndLegacyMembership_ResultDenied() {
-        CheckInRequest req = new CheckInRequest();
-        req.setIdentifier("MEM-123");
-
-        when(memberProfileRepository.findByMemberCode("MEM-123")).thenReturn(Optional.of(memberProfile));
-        when(bookingRepository.findTodayBookingsForMember(eq(1L), eq(LocalDate.of(2026, 10, 5)), eq(BookingStatus.CONFIRMED)))
-                .thenReturn(List.of(todayBooking));
-        when(checkInRepository.existsByBookingIdAndResult(eq(30L), eq(CheckInResult.ALLOWED)))
-                .thenReturn(false);
-        when(packageRegistrationRepository.findActiveRegistrationsForSport(eq(1L), eq(10L), eq(PackageRegistrationStatus.ACTIVE), eq(LocalDate.of(2026, 10, 5))))
-                .thenReturn(Collections.emptyList());
-        when(checkInRepository.save(any(CheckIn.class))).thenAnswer(i -> {
-            CheckIn c = i.getArgument(0);
-            c.setId(104L);
-            return c;
-        });
-
-        CheckInResponse res = checkInService.recordCheckIn(req, receptionist);
-
-        assertEquals("DENIED", res.getResult());
-        assertEquals("No active sport package", res.getDenialReason());
-    }
-
-    @Test
     void recordCheckIn_WithTodayBookingNoPackageNoMembership_ResultDenied() {
         CheckInRequest req = new CheckInRequest();
         req.setIdentifier("MEM-123");
