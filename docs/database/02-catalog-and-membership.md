@@ -159,7 +159,7 @@ Front desk arrival record (F1-15).
 | package_registration_id | BIGINT | Yes | FK -> sport_package_registration.id | Active package backing admission |
 | checked_in_at | DATETIME2(0) | No | SYSDATETIME() | Front desk timestamp |
 | result | NVARCHAR(20) | No | | `ALLOWED`, `DENIED` |
-| denial_reason | NVARCHAR(255) | Yes | | Reason if DENIED: "No confirmed booking for today", "Specified booking is not scheduled for today or is not confirmed", "All confirmed bookings for today have already been checked in", "Already checked in for this session", "No active sport package" |
+| denial_reason | NVARCHAR(255) | Yes | | Reason if DENIED: "No confirmed booking for today", "Specified booking is not scheduled for today or is not confirmed", "All confirmed bookings for today have already been checked in", "Already checked in for this session", "Booking is not linked to a sport package registration", "No active sport package", "Sport package registration is expired or not yet valid" |
 | recorded_by | BIGINT | No | FK -> user_account.id | Receptionist user |
 | note | NVARCHAR(255) | Yes | | Staff note |
 

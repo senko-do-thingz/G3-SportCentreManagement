@@ -134,7 +134,9 @@ Front desk check-in validates member arrival at the center:
    - If a specific booking ID is provided in request but is not found, not confirmed, or not scheduled for today, result is `DENIED` with reason `"Specified booking is not scheduled for today or is not confirmed"`.
    - If all confirmed bookings for today have already been checked in, result is `DENIED` with reason `"All confirmed bookings for today have already been checked in"`.
    - If already checked in for the target session, result is `DENIED` with reason `"Already checked in for this session"`.
-   - If package coverage is missing or inactive, result is `DENIED` with reason `"No active sport package"`.
+   - If booking has no linked package registration, result is `DENIED` with reason `"Booking is not linked to a sport package registration"`.
+   - If the linked package registration status is not active, result is `DENIED` with reason `"No active sport package"`.
+   - If today is outside the package validity period (`today < startDate` or `today > endDate`), result is `DENIED` with reason `"Sport package registration is expired or not yet valid"`.
 
 ## Membership Card & Discount Rules
 

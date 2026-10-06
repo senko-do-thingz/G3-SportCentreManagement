@@ -10,7 +10,6 @@ import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.entity.SportPackageRegistration;
 import com.sportify.catalog.repository.BookingRepository;
 import com.sportify.catalog.repository.CheckInRepository;
-import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.CheckInService;
 import com.sportify.core.audit.AuditAction;
 import com.sportify.core.audit.AuditEvent;
@@ -36,7 +35,6 @@ public class CheckInServiceImpl implements CheckInService {
 
     private final CheckInRepository checkInRepository;
     private final BookingRepository bookingRepository;
-    private final SportPackageRegistrationRepository packageRegistrationRepository;
     private final MemberProfileRepository memberProfileRepository;
     private final AuditService auditService;
     private final Clock clock;
@@ -92,19 +90,17 @@ public class CheckInServiceImpl implements CheckInService {
                 if (alreadyCheckedIn) {
                     denialReason = "Already checked in for this session";
                 } else {
-                    // Check package coverage
-                    Long sportId = targetBooking.getSession().getSport().getId();
-                    List<SportPackageRegistration> activePackages = packageRegistrationRepository.findActiveRegistrationsForSport(
-                            profile.getId(), sportId, PackageRegistrationStatus.ACTIVE, today);
-
-                    if (!activePackages.isEmpty()) {
-                        targetPackage = activePackages.get(0);
-                        result = CheckInResult.ALLOWED;
-                    } else if (targetBooking.getPackageRegistration() != null && targetBooking.getPackageRegistration().getStatus() == PackageRegistrationStatus.ACTIVE) {
-                        targetPackage = targetBooking.getPackageRegistration();
-                        result = CheckInResult.ALLOWED;
-                    } else {
+                    // Check package coverage directly from booking
+                    SportPackageRegistration pkg = targetBooking.getPackageRegistration();
+                    if (pkg == null) {
+                        denialReason = "Booking is not linked to a sport package registration";
+                    } else if (pkg.getStatus() != PackageRegistrationStatus.ACTIVE) {
                         denialReason = "No active sport package";
+                    } else if (today.isBefore(pkg.getStartDate()) || today.isAfter(pkg.getEndDate())) {
+                        denialReason = "Sport package registration is expired or not yet valid";
+                    } else {
+                        targetPackage = pkg;
+                        result = CheckInResult.ALLOWED;
                     }
                 }
             }

@@ -13,7 +13,6 @@ import com.sportify.catalog.entity.SportPackage;
 import com.sportify.catalog.entity.SportPackageRegistration;
 import com.sportify.catalog.repository.BookingRepository;
 import com.sportify.catalog.repository.CheckInRepository;
-import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.impl.CheckInServiceImpl;
 import com.sportify.core.audit.AuditEvent;
 import com.sportify.core.audit.AuditService;
@@ -52,8 +51,6 @@ public class CheckInServiceTest {
     private CheckInRepository checkInRepository;
     @Mock
     private BookingRepository bookingRepository;
-    @Mock
-    private SportPackageRegistrationRepository packageRegistrationRepository;
     @Mock
     private MemberProfileRepository memberProfileRepository;
     @Mock
@@ -190,6 +187,7 @@ public class CheckInServiceTest {
                 .startDate(LocalDate.of(2026, 10, 1))
                 .endDate(LocalDate.of(2026, 10, 31))
                 .build();
+        todayBooking.setPackageRegistration(registration);
 
         when(memberProfileRepository.findByMemberCode("1")).thenReturn(Optional.empty());
         when(memberProfileRepository.findById(1L)).thenReturn(Optional.of(memberProfile));
@@ -197,8 +195,6 @@ public class CheckInServiceTest {
                 .thenReturn(List.of(todayBooking));
         when(checkInRepository.existsByBookingIdAndResult(eq(30L), eq(CheckInResult.ALLOWED)))
                 .thenReturn(false);
-        when(packageRegistrationRepository.findActiveRegistrationsForSport(eq(1L), eq(10L), eq(PackageRegistrationStatus.ACTIVE), eq(LocalDate.of(2026, 10, 5))))
-                .thenReturn(List.of(registration));
         when(checkInRepository.save(any(CheckIn.class))).thenAnswer(i -> {
             CheckIn c = i.getArgument(0);
             c.setId(103L);
@@ -214,17 +210,17 @@ public class CheckInServiceTest {
     }
 
     @Test
-    void recordCheckIn_WithTodayBookingNoPackageNoMembership_ResultDenied() {
+    void recordCheckIn_WithTodayBookingNoPackageRegistration_ResultDenied() {
         CheckInRequest req = new CheckInRequest();
         req.setIdentifier("MEM-123");
+
+        todayBooking.setPackageRegistration(null);
 
         when(memberProfileRepository.findByMemberCode("MEM-123")).thenReturn(Optional.of(memberProfile));
         when(bookingRepository.findTodayBookingsForMember(eq(1L), eq(LocalDate.of(2026, 10, 5)), eq(BookingStatus.CONFIRMED)))
                 .thenReturn(List.of(todayBooking));
         when(checkInRepository.existsByBookingIdAndResult(eq(30L), eq(CheckInResult.ALLOWED)))
                 .thenReturn(false);
-        when(packageRegistrationRepository.findActiveRegistrationsForSport(eq(1L), eq(10L), eq(PackageRegistrationStatus.ACTIVE), eq(LocalDate.of(2026, 10, 5))))
-                .thenReturn(Collections.emptyList());
         when(checkInRepository.save(any(CheckIn.class))).thenAnswer(i -> {
             CheckIn c = i.getArgument(0);
             c.setId(105L);
@@ -234,7 +230,106 @@ public class CheckInServiceTest {
         CheckInResponse res = checkInService.recordCheckIn(req, receptionist);
 
         assertEquals("DENIED", res.getResult());
+        assertEquals("Booking is not linked to a sport package registration", res.getDenialReason());
+    }
+
+    @Test
+    void recordCheckIn_WithBookingPackageRegistration_StatusNotActive_ResultDenied() {
+        CheckInRequest req = new CheckInRequest();
+        req.setIdentifier("MEM-123");
+
+        SportPackage pkg = SportPackage.builder().id(50L).name("Badminton Monthly").sport(sport).build();
+        SportPackageRegistration registration = SportPackageRegistration.builder()
+                .id(60L)
+                .member(memberProfile)
+                .sportPackage(pkg)
+                .status(PackageRegistrationStatus.PENDING_PAYMENT)
+                .startDate(LocalDate.of(2026, 10, 1))
+                .endDate(LocalDate.of(2026, 10, 31))
+                .build();
+        todayBooking.setPackageRegistration(registration);
+
+        when(memberProfileRepository.findByMemberCode("MEM-123")).thenReturn(Optional.of(memberProfile));
+        when(bookingRepository.findTodayBookingsForMember(eq(1L), eq(LocalDate.of(2026, 10, 5)), eq(BookingStatus.CONFIRMED)))
+                .thenReturn(List.of(todayBooking));
+        when(checkInRepository.existsByBookingIdAndResult(eq(30L), eq(CheckInResult.ALLOWED)))
+                .thenReturn(false);
+        when(checkInRepository.save(any(CheckIn.class))).thenAnswer(i -> {
+            CheckIn c = i.getArgument(0);
+            c.setId(106L);
+            return c;
+        });
+
+        CheckInResponse res = checkInService.recordCheckIn(req, receptionist);
+
+        assertEquals("DENIED", res.getResult());
         assertEquals("No active sport package", res.getDenialReason());
+    }
+
+    @Test
+    void recordCheckIn_WithBookingPackageRegistration_BeforeStartDate_ResultDenied() {
+        CheckInRequest req = new CheckInRequest();
+        req.setIdentifier("MEM-123");
+
+        SportPackage pkg = SportPackage.builder().id(50L).name("Badminton Monthly").sport(sport).build();
+        SportPackageRegistration registration = SportPackageRegistration.builder()
+                .id(60L)
+                .member(memberProfile)
+                .sportPackage(pkg)
+                .status(PackageRegistrationStatus.ACTIVE)
+                .startDate(LocalDate.of(2026, 10, 10)) // Future start date (today is 2026-10-05)
+                .endDate(LocalDate.of(2026, 10, 31))
+                .build();
+        todayBooking.setPackageRegistration(registration);
+
+        when(memberProfileRepository.findByMemberCode("MEM-123")).thenReturn(Optional.of(memberProfile));
+        when(bookingRepository.findTodayBookingsForMember(eq(1L), eq(LocalDate.of(2026, 10, 5)), eq(BookingStatus.CONFIRMED)))
+                .thenReturn(List.of(todayBooking));
+        when(checkInRepository.existsByBookingIdAndResult(eq(30L), eq(CheckInResult.ALLOWED)))
+                .thenReturn(false);
+        when(checkInRepository.save(any(CheckIn.class))).thenAnswer(i -> {
+            CheckIn c = i.getArgument(0);
+            c.setId(107L);
+            return c;
+        });
+
+        CheckInResponse res = checkInService.recordCheckIn(req, receptionist);
+
+        assertEquals("DENIED", res.getResult());
+        assertEquals("Sport package registration is expired or not yet valid", res.getDenialReason());
+    }
+
+    @Test
+    void recordCheckIn_WithBookingPackageRegistration_AfterEndDate_ResultDenied() {
+        CheckInRequest req = new CheckInRequest();
+        req.setIdentifier("MEM-123");
+
+        SportPackage pkg = SportPackage.builder().id(50L).name("Badminton Monthly").sport(sport).build();
+        SportPackageRegistration registration = SportPackageRegistration.builder()
+                .id(60L)
+                .member(memberProfile)
+                .sportPackage(pkg)
+                .status(PackageRegistrationStatus.ACTIVE)
+                .startDate(LocalDate.of(2026, 9, 1))
+                .endDate(LocalDate.of(2026, 10, 1)) // Past end date (today is 2026-10-05)
+                .build();
+        todayBooking.setPackageRegistration(registration);
+
+        when(memberProfileRepository.findByMemberCode("MEM-123")).thenReturn(Optional.of(memberProfile));
+        when(bookingRepository.findTodayBookingsForMember(eq(1L), eq(LocalDate.of(2026, 10, 5)), eq(BookingStatus.CONFIRMED)))
+                .thenReturn(List.of(todayBooking));
+        when(checkInRepository.existsByBookingIdAndResult(eq(30L), eq(CheckInResult.ALLOWED)))
+                .thenReturn(false);
+        when(checkInRepository.save(any(CheckIn.class))).thenAnswer(i -> {
+            CheckIn c = i.getArgument(0);
+            c.setId(108L);
+            return c;
+        });
+
+        CheckInResponse res = checkInService.recordCheckIn(req, receptionist);
+
+        assertEquals("DENIED", res.getResult());
+        assertEquals("Sport package registration is expired or not yet valid", res.getDenialReason());
     }
 
     @Test
