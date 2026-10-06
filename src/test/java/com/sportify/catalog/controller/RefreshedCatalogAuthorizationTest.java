@@ -182,6 +182,58 @@ public class RefreshedCatalogAuthorizationTest {
     }
 
     @Test
+    void registerPackage_AsReceptionist_ChannelReception_ReturnsActiveAndReception() throws Exception {
+        PackageRegistrationRequest req = PackageRegistrationRequest.builder()
+                .packageId(10L)
+                .memberId(5L)
+                .channel(RegistrationChannel.RECEPTION)
+                .build();
+
+        PackageRegistrationResponse res = PackageRegistrationResponse.builder()
+                .id(2L)
+                .channel(RegistrationChannel.RECEPTION)
+                .status(PackageRegistrationStatus.ACTIVE)
+                .build();
+
+        when(sportPackageService.registerPackage(any(), argThat(u -> u != null && u.getRole() != null && "RECEPTIONIST".equals(u.getRole().getCode()))))
+                .thenReturn(res);
+
+        mockMvc.perform(post("/api/v1/packages/registrations")
+                        .with(user(createUserDetails("RECEPTIONIST")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.channel").value("RECEPTION"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    @Test
+    void registerPackage_AsManager_ChannelReception_ReturnsActiveAndReception() throws Exception {
+        PackageRegistrationRequest req = PackageRegistrationRequest.builder()
+                .packageId(10L)
+                .memberId(5L)
+                .channel(RegistrationChannel.RECEPTION)
+                .build();
+
+        PackageRegistrationResponse res = PackageRegistrationResponse.builder()
+                .id(3L)
+                .channel(RegistrationChannel.RECEPTION)
+                .status(PackageRegistrationStatus.ACTIVE)
+                .build();
+
+        when(sportPackageService.registerPackage(any(), argThat(u -> u != null && u.getRole() != null && "MANAGER".equals(u.getRole().getCode()))))
+                .thenReturn(res);
+
+        mockMvc.perform(post("/api/v1/packages/registrations")
+                        .with(user(createUserDetails("MANAGER")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.channel").value("RECEPTION"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    @Test
     void activateRegistration_AsMember_ShouldReturn403() throws Exception {
         mockMvc.perform(put("/api/v1/packages/registrations/1/activate")
                         .with(user(createUserDetails("MEMBER"))))
