@@ -2,25 +2,27 @@ package com.sportify.catalog.service.impl;
 
 import com.sportify.catalog.dto.CheckInRequest;
 import com.sportify.catalog.dto.CheckInResponse;
+import com.sportify.catalog.entity.Booking;
+import com.sportify.catalog.entity.BookingStatus;
 import com.sportify.catalog.entity.CheckIn;
 import com.sportify.catalog.entity.CheckInResult;
-import com.sportify.catalog.entity.Membership;
-import com.sportify.catalog.entity.MembershipStatus;
+import com.sportify.catalog.entity.PackageRegistrationStatus;
+import com.sportify.catalog.entity.SportPackageRegistration;
+import com.sportify.catalog.repository.BookingRepository;
 import com.sportify.catalog.repository.CheckInRepository;
-import com.sportify.catalog.repository.MembershipRepository;
 import com.sportify.catalog.service.CheckInService;
+import com.sportify.core.audit.AuditAction;
+import com.sportify.core.audit.AuditEvent;
+import com.sportify.core.audit.AuditService;
 import com.sportify.core.exception.ResourceNotFoundException;
-import com.sportify.identity.entity.ActivityLog;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
-import com.sportify.identity.repository.ActivityLogRepository;
 import com.sportify.identity.repository.MemberProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import java.time.Clock;
-import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -32,9 +34,9 @@ import java.util.stream.Collectors;
 public class CheckInServiceImpl implements CheckInService {
 
     private final CheckInRepository checkInRepository;
-    private final MembershipRepository membershipRepository;
+    private final BookingRepository bookingRepository;
     private final MemberProfileRepository memberProfileRepository;
-    private final ActivityLogRepository activityLogRepository;
+    private final AuditService auditService;
     private final Clock clock;
 
     @Override
@@ -51,34 +53,63 @@ public class CheckInServiceImpl implements CheckInService {
 
         MemberProfile profile = profileOpt.orElseThrow(() -> new ResourceNotFoundException("Member not found"));
 
-        List<Membership> allMemberships = membershipRepository.findAllByMemberIdOrderByStartDateDesc(profile.getId());
-
         LocalDate today = LocalDate.now(clock);
-        Membership activeMembership = null;
+        List<Booking> todayBookings = bookingRepository.findTodayBookingsForMember(profile.getId(), today, BookingStatus.CONFIRMED);
+
+        Booking targetBooking = null;
+        SportPackageRegistration targetPackage = null;
+        CheckInResult result = CheckInResult.DENIED;
         String denialReason = null;
 
-        if (allMemberships.isEmpty()) {
-            denialReason = "No membership found";
+        // Front desk check-in strictly requires an existing confirmed session booking for the current day (Decision 3 / Screen F1-15)
+        if (todayBookings.isEmpty()) {
+            denialReason = "No confirmed booking for today";
         } else {
-            // Find an active and valid membership
-            activeMembership = allMemberships.stream()
-                    .filter(m -> m.getStatus() == MembershipStatus.ACTIVE
-                            && m.getStartDate() != null && m.getEndDate() != null
-                            && !today.isBefore(m.getStartDate())
-                            && !today.isAfter(m.getEndDate()))
-                    .findFirst()
-                    .orElse(null);
+            if (request.getBookingId() != null) {
+                targetBooking = todayBookings.stream()
+                        .filter(b -> b.getId().equals(request.getBookingId()))
+                        .findFirst()
+                        .orElse(null);
+                if (targetBooking == null) {
+                    denialReason = "Specified booking is not scheduled for today or is not confirmed";
+                }
+            } else {
+                // If member has multiple bookings today, pick the first one that has not yet been checked in
+                targetBooking = todayBookings.stream()
+                        .filter(b -> !checkInRepository.existsByBookingIdAndResult(b.getId(), CheckInResult.ALLOWED))
+                        .findFirst()
+                        .orElse(null);
+                if (targetBooking == null) {
+                    denialReason = "All confirmed bookings for today have already been checked in";
+                }
+            }
 
-            if (activeMembership == null) {
-                denialReason = resolveDenialReason(allMemberships, today);
+            if (targetBooking != null) {
+                // Check if already checked in for this booking today
+                boolean alreadyCheckedIn = checkInRepository.existsByBookingIdAndResult(targetBooking.getId(), CheckInResult.ALLOWED);
+                if (alreadyCheckedIn) {
+                    denialReason = "Already checked in for this session";
+                } else {
+                    // Check package coverage directly from booking
+                    SportPackageRegistration pkg = targetBooking.getPackageRegistration();
+                    if (pkg == null) {
+                        denialReason = "Booking is not linked to a sport package registration";
+                    } else if (pkg.getStatus() != PackageRegistrationStatus.ACTIVE) {
+                        denialReason = "No active sport package";
+                    } else if (today.isBefore(pkg.getStartDate()) || today.isAfter(pkg.getEndDate())) {
+                        denialReason = "Sport package registration is expired or not yet valid";
+                    } else {
+                        targetPackage = pkg;
+                        result = CheckInResult.ALLOWED;
+                    }
+                }
             }
         }
 
-        CheckInResult result = activeMembership != null ? CheckInResult.ALLOWED : CheckInResult.DENIED;
-
         CheckIn checkIn = CheckIn.builder()
                 .member(profile)
-                .membership(activeMembership)
+                .booking(targetBooking)
+                .packageRegistration(targetPackage)
                 .checkedInAt(LocalDateTime.now(clock))
                 .result(result)
                 .denialReason(denialReason)
@@ -88,32 +119,22 @@ public class CheckInServiceImpl implements CheckInService {
 
         checkIn = checkInRepository.save(checkIn);
 
-        ActivityLog log = new ActivityLog();
-        log.setActor(receptionist);
-        log.setAction("MEMBER_CHECKED_IN");
-        log.setEntityType("CHECK_IN");
-        log.setEntityId(checkIn.getId());
-        log.setSummary("Check-in " + result.name() + " for member " + profile.getMemberCode());
-        activityLogRepository.save(log);
+        auditService.record(AuditEvent.builder()
+                .actor(receptionist)
+                .action(AuditAction.MEMBER_CHECKED_IN)
+                .entityType("CHECK_IN")
+                .entityId(checkIn.getId())
+                .entityCode(profile.getMemberCode())
+                .summary("Check-in " + result.name() + " for member " + profile.getMemberCode())
+                .build());
 
-        return mapToResponse(checkIn);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<CheckInResponse> getCheckInHistory(Long memberId) {
-        return checkInRepository.findByMemberIdOrderByCheckedInAtDesc(memberId)
-                .stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
-
-    private CheckInResponse mapToResponse(CheckIn checkIn) {
         return CheckInResponse.builder()
                 .id(checkIn.getId())
-                .memberId(checkIn.getMember().getId())
-                .memberName(checkIn.getMember().getUserAccount().getFullName())
-                .membershipId(checkIn.getMembership() != null ? checkIn.getMembership().getId() : null)
+                .memberId(profile.getId())
+                .memberName(profile.getUserAccount().getFullName())
+                .bookingId(targetBooking != null ? targetBooking.getId() : null)
+                .bookingCode(targetBooking != null ? targetBooking.getBookingCode() : null)
+                .packageRegistrationId(targetPackage != null ? targetPackage.getId() : null)
                 .checkedInAt(checkIn.getCheckedInAt())
                 .result(checkIn.getResult().name())
                 .denialReason(checkIn.getDenialReason())
@@ -121,20 +142,23 @@ public class CheckInServiceImpl implements CheckInService {
                 .build();
     }
 
-    private String resolveDenialReason(List<Membership> memberships, LocalDate today) {
-        if (memberships.isEmpty()) {
-            return "No membership found";
-        }
-        if (memberships.stream().anyMatch(m -> m.getStatus() == MembershipStatus.PENDING_PAYMENT)) {
-            return "Membership is PENDING_PAYMENT";
-        }
-        if (memberships.stream().anyMatch(m -> m.getStatus() == MembershipStatus.SCHEDULED)) {
-            return "Membership SCHEDULED but not yet started";
-        }
-        if (memberships.stream().anyMatch(m -> m.getStatus() == MembershipStatus.EXPIRED ||
-                (m.getStatus() == MembershipStatus.ACTIVE && m.getEndDate() != null && today.isAfter(m.getEndDate())))) {
-            return "Membership is EXPIRED";
-        }
-        return "Membership is CANCELLED";
+    @Override
+    @Transactional(readOnly = true)
+    public List<CheckInResponse> getCheckInHistory(Long memberId) {
+        return checkInRepository.findByMemberIdOrderByCheckedInAtDesc(memberId).stream()
+                .map(ci -> CheckInResponse.builder()
+                        .id(ci.getId())
+                        .memberId(ci.getMember().getId())
+                        .memberName(ci.getMember().getUserAccount().getFullName())
+                        .membershipId(ci.getMembership() != null ? ci.getMembership().getId() : null)
+                        .bookingId(ci.getBooking() != null ? ci.getBooking().getId() : null)
+                        .bookingCode(ci.getBooking() != null ? ci.getBooking().getBookingCode() : null)
+                        .packageRegistrationId(ci.getPackageRegistration() != null ? ci.getPackageRegistration().getId() : null)
+                        .checkedInAt(ci.getCheckedInAt())
+                        .result(ci.getResult().name())
+                        .denialReason(ci.getDenialReason())
+                        .note(ci.getNote())
+                        .build())
+                .collect(Collectors.toList());
     }
 }

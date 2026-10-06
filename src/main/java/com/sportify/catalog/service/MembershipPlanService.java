@@ -8,6 +8,7 @@ import com.sportify.catalog.dto.PlanUpdateRequest;
 
 import java.util.List;
 
+@Deprecated
 public interface MembershipPlanService {
 
     // ---------- Public ----------

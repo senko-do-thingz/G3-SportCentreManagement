@@ -67,4 +67,151 @@ class AuthenticationControllerTest {
         mockMvc.perform(get("/api/v1/some-protected-endpoint"))
                 .andExpect(status().isUnauthorized());
     }
+    @Test
+    void register_withInvalidEmail_shouldReturn400() throws Exception {
+        com.sportify.identity.dto.RegisterRequest req = new com.sportify.identity.dto.RegisterRequest("Test User", "invalid-email", "Password123", "0123456789");
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.email").exists());
+    }
+
+    @Test
+    void register_withWeakPassword_shouldReturn400() throws Exception {
+        com.sportify.identity.dto.RegisterRequest req = new com.sportify.identity.dto.RegisterRequest("Test User", "test@sportify.com", "weak", "0123456789");
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.password").exists());
+    }
+    
+    @Test
+    void register_withInvalidPhone_shouldReturn400() throws Exception {
+        com.sportify.identity.dto.RegisterRequest req = new com.sportify.identity.dto.RegisterRequest("Test User", "test@sportify.com", "Password123", "abc");
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.phone").exists());
+    }
+
+    @Test
+    void register_withDuplicateEmail_shouldReturn409() throws Exception {
+        com.sportify.identity.dto.RegisterRequest req = new com.sportify.identity.dto.RegisterRequest("Test User", "test@sportify.com", "Password123", "0123456789");
+        when(authenticationService.register(any())).thenThrow(new com.sportify.core.exception.ConflictException("Email is already registered"));
+        
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Email is already registered"));
+    }
+
+    @Test
+    void register_withBlankFullName_shouldReturn400() throws Exception {
+        com.sportify.identity.dto.RegisterRequest req = new com.sportify.identity.dto.RegisterRequest("", "test@sportify.com", "Password123", "0123456789");
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.fullName").exists());
+    }
+
+    @Test
+    void register_withOversizedFullName_shouldReturn400() throws Exception {
+        com.sportify.identity.dto.RegisterRequest req = new com.sportify.identity.dto.RegisterRequest("A".repeat(101), "test@sportify.com", "Password123", "0123456789");
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.fullName").exists());
+    }
+
+    @Test
+    void register_withOversizedEmail_shouldReturn400() throws Exception {
+        com.sportify.identity.dto.RegisterRequest req = new com.sportify.identity.dto.RegisterRequest("Test User", "A".repeat(247) + "@a.com", "Password123", "0123456789");
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.email").exists());
+    }
+
+    @Test
+    void register_withPasswordWithoutDigit_shouldReturn400() throws Exception {
+        com.sportify.identity.dto.RegisterRequest req = new com.sportify.identity.dto.RegisterRequest("Test User", "test@sportify.com", "Password", "0123456789");
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.password").exists());
+    }
+
+    @Test
+    void register_withPasswordWithoutLetter_shouldReturn400() throws Exception {
+        com.sportify.identity.dto.RegisterRequest req = new com.sportify.identity.dto.RegisterRequest("Test User", "test@sportify.com", "12345678", "0123456789");
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.password").exists());
+    }
+
+    @Test
+    void register_withOversizedPassword_shouldReturn400() throws Exception {
+        com.sportify.identity.dto.RegisterRequest req = new com.sportify.identity.dto.RegisterRequest("Test User", "test@sportify.com", "A".repeat(64) + "1", "0123456789");
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.password").exists());
+    }
+
+    @Test
+    void register_withOversizedPhone_shouldReturn400() throws Exception {
+        com.sportify.identity.dto.RegisterRequest req = new com.sportify.identity.dto.RegisterRequest("Test User", "test@sportify.com", "Password123", "0".repeat(21));
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.phone").exists());
+    }
+
+    @Test
+    void register_withShortPhone_shouldReturn400() throws Exception {
+        com.sportify.identity.dto.RegisterRequest req = new com.sportify.identity.dto.RegisterRequest("Test User", "test@sportify.com", "Password123", "+1234567");
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.phone").exists());
+    }
+
+    @Test
+    void register_withValidPhone_shouldReturn200() throws Exception {
+        com.sportify.identity.dto.RegisterRequest req = new com.sportify.identity.dto.RegisterRequest("Test User", "test@sportify.com", "Password123", "+84901234567");
+        when(authenticationService.register(any())).thenReturn(com.sportify.identity.dto.AuthResponse.builder().accessToken("token").build());
+        
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("token"));
+    }
+
+    @Test
+    void register_withGenericException_shouldReturn500WithoutInternalDetails() throws Exception {
+        com.sportify.identity.dto.RegisterRequest req = new com.sportify.identity.dto.RegisterRequest("Test User", "test@sportify.com", "Password123", "0123456789");
+        when(authenticationService.register(any())).thenThrow(new IllegalStateException("Secret internal detail"));
+        
+        mockMvc.perform(post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value("Internal server error"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Secret internal detail"))))
+                .andExpect(jsonPath("$.details").doesNotExist());
+    }
 }

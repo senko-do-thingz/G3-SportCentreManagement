@@ -17,6 +17,7 @@ import java.util.Set;
  * Both collections are LAZY {@link Set}s so that they can be fetched together with an
  * {@code @EntityGraph} without {@code MultipleBagFetchException} or duplicated rows.
  */
+@Deprecated
 @Entity
 @Table(name = "membership_plan")
 @Getter
@@ -68,8 +69,7 @@ public class MembershipPlan extends BaseMasterEntity {
 
     @Version
     @Column(nullable = false)
-    @Builder.Default
-    private Integer version = 0;
+    private Integer version;
 
     /** Pool of sports this plan allows ({@code plan_eligible_sport}). */
     @ManyToMany(fetch = FetchType.LAZY)

@@ -7,6 +7,7 @@ import com.sportify.identity.entity.UserAccount;
 import java.time.LocalDate;
 import java.util.List;
 
+@Deprecated
 public interface MembershipService {
     MembershipResponse registerMembership(UserAccount currentUser, MembershipRegistrationRequest request);
     MembershipResponse registerForMember(Long memberId, UserAccount currentUser, MembershipRegistrationRequest request);

@@ -33,4 +33,15 @@ class GlobalExceptionHandlerTest {
         assertNotNull(response.getBody());
         assertEquals("The request conflicts with existing data", response.getBody().get("message"));
     }
+
+    @Test
+    void testHandleGlobalException() {
+        Exception ex = new IllegalStateException("Internal secret message");
+        ResponseEntity<Map<String, Object>> response = handler.handleGlobalException(ex);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("Internal server error", response.getBody().get("message"));
+        org.junit.jupiter.api.Assertions.assertFalse(response.getBody().containsValue("Internal secret message"));
+    }
 }

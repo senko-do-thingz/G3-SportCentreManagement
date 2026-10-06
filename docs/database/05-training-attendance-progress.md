@@ -1,6 +1,8 @@
 # 05 - Training, Attendance and Progress
 
-Screens covered: F4-01 Training Dashboard, F4-02 Coach Schedule, F4-03 Session Plan, F4-04 Class Roster and Attendance, F4-05 Record Attendance, F4-06 Attendance Summary, F4-07 Record Member Results, F4-08 Provide Feedback, F4-09 Member Progress Tracking, F4-10 Member Class History, F4-11 Member Training Report.
+Screens covered: F4-01 My Training Sessions, F4-02 Session Attendance, F4-03 Training Plan,
+F4-04 Session Results & Feedback, F4-05 Member Progress, F4-06 My Training Plan, F4-07 My Attendance,
+F4-08 My Progress & Feedback, F4-09 Self-training Attendance, F4-10 Attendance Overview.
 
 ## ERD
 
@@ -21,12 +23,19 @@ erDiagram
 ## Design Decisions
 
 - **Session Plan.** `session_plan` is created by the coach before the class (F4-03). It is 1:1 with `class_session`. It includes a sequence of `session_plan_step` rows.
-- **Attendance Record.** `attendance_record` is exactly 1:1 with a confirmed `booking`. The coach submits attendance for the whole class at once.
+- **Coach-led vs Self-training Attendance.**
+  - For coach-led sessions (`F4-02`), the assigned coach records attendance for the roster.
+  - For self-training sessions (`F4-09`), the receptionist marks attendance at the front desk (`S4-SelfSaved`), which validates that the member attended their scheduled self-training slot and consumes 1 reserved session.
+- **Session Deduction and Attendance Model:**
+  - **Deduction at Booking Time:** When a member confirms a class session booking (`POST /api/v1/bookings`), 1 session is immediately deducted from `sport_package_registration.remaining_sessions`.
+  - **Restoration upon Cancellation:** If a booking is cancelled (`DELETE /api/v1/bookings/{id}`), 1 session is restored to the package registration and the seat is freed.
+  - **Check-in Attendance Validation:** Reception check-in (`POST /api/v1/check-ins`) strictly validates that the member holds an existing confirmed session booking for the current day (Decision 3 / Screen F1-15). Check-in records physical attendance verification without double-decrementing remaining sessions.
+- **Attendance Record.** `attendance_record` is exactly 1:1 with a confirmed `booking`.
 - **Attendance States on Session.** To track whether attendance was done, `class_session` has `attendance_status` (`NOT_STARTED`, `DRAFT`, `SUBMITTED`). Members only see attendance on their side if it is `SUBMITTED`.
 - **Attendance Correction.** Changes to attendance after submission are logged in `attendance_correction` for audit purposes.
 - **Skill Metrics.** `skill_metric` defines the criteria per sport (e.g., Basketball: Ball Control, Passing, Teamwork). These are scored 0 to 10 (or 0 to 5) in `session_result_score`.
 - **Session Results.** `session_result` requires the member to be PRESENT or LATE. It aggregates the scores and adds qualitative notes.
-- **Coach Feedback.** `coach_feedback` (F4-08) is a text assessment (Went well, To improve). It has a DRAFT and PUBLISHED status.
+- **Coach Feedback.** `coach_feedback` (F4-04) is a text assessment (Went well, To improve). It has a DRAFT and PUBLISHED status.
 
 ## Tables
 

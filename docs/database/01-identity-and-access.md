@@ -1,7 +1,7 @@
 # 01 - Identity and Access
 
-Screens covered: Home (Log in / Join now), F1-02 User Management, F1-03 Roles and Permissions, F1-04 Activity Log,
-F1-05 Sign Up and Log In, F1-06 My Profile, F1-10 Member Search and Profile, Home "Meet your coaches".
+Screens covered: Home (Log in / Join now), F1-01 User & Role Management, F1-02 Add or Edit User, F1-06 Activity Log,
+F1-07 Member Profile, F1-12 Member Search and Profile.
 
 ## ERD
 
@@ -25,9 +25,11 @@ erDiagram
 
 - **One account, one role.** `user_account.role_id` is a single FK. A person who is both a coach and a member uses
   two accounts. If multi-role is needed later, replace `role_id` with a `user_role` join table.
-- **Configurable permissions (F1-03).** `role_permission` stores the matrix. Spring Security authorities are
-  `ROLE_<role.code>` plus every `permission.code` of that role.
-- **Account status is separate from membership status** (note on F1-02). `user_account.status` only controls login.
+- **Fixed system roles and access (F1-01, F1-01-Overlay).** The system defines 4 fixed roles: `MEMBER`, `COACH`, `RECEPTIONIST`, `MANAGER`.
+  Screen F1-01 Overlay dictates "Fixed role access. No custom permission selection." Dynamic runtime permission editing is disabled.
+  Spring Security authorizes endpoints via fixed role authorities (`ROLE_MEMBER`, `ROLE_COACH`, `ROLE_RECEPTIONIST`, `ROLE_MANAGER`).
+  The schema tables `role_permission` and `permission` are retained for backward compatibility and internal authority mapping.
+- **Account status is separate from membership status** (note on F1-01). `user_account.status` only controls login.
 - **Profiles use a shared primary key.** `member_profile.user_id` and `coach_profile.user_id` are both PK and FK to
   `user_account.id` (JPA `@MapsId`). Receptionist and Manager need no extra profile.
 - **Member age group is computed, not stored.** Age at the session date is derived from `user_account.date_of_birth`

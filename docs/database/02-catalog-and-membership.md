@@ -1,47 +1,46 @@
 # 02 - Catalog and Membership
 
-Screens covered: Home (sports, plans), F1-07 Membership Plans, F1-08 Plan Detail and Registration, F1-09 My Membership,
-F1-10 Member Search and Profile, F1-11 Register and Renew Membership, F1-13 Check-in, Manager "Membership packages".
+Screens covered: Home (sports, packages, cards), F1-03 Sport Packages, F1-04 Create or Edit Sport Package,
+F1-05 Membership Cards, F1-08 Available Packages & Cards, F1-09 Package Detail & Registration,
+F1-10 Membership Card Detail & Purchase, F1-11 My Packages & Cards, F1-12 Member Search & Profile,
+F1-13 Register Package for Member, F1-14 Issue Membership Card for Member, F1-15 Front Desk Check-in.
 
-## ERD
+## ERD (Active Architecture)
 
 ```mermaid
 erDiagram
     sport ||--o{ facility : "primary sport of"
-    membership_plan ||--o{ plan_eligible_sport : "allows"
-    sport ||--o{ plan_eligible_sport : "allowed in"
-    membership_plan ||--o{ plan_feature : "lists"
-    membership_plan ||--o{ membership : "instantiated as"
-    member_profile ||--o{ membership : "holds"
-    membership ||--o| membership : "renews"
-    membership ||--o{ membership_sport : "selected"
-    sport ||--o{ membership_sport : "selected in"
+    sport ||--o{ sport_package : "offers"
+    membership_card_tier ||--o{ member_card : "granted to"
+    member_profile ||--o{ member_card : "holds"
+    sport_package ||--o{ sport_package_registration : "instantiated as"
+    member_profile ||--o{ sport_package_registration : "holds"
     member_profile ||--o{ check_in : "arrives"
-    membership ||--o{ check_in : "validated by"
+    booking ||--o{ check_in : "validated against"
 ```
 
 ## Design Decisions
 
-- **Unified plan model.** Every plan has `max_sports` and a pool of eligible sports (`plan_eligible_sport`):
-  - Starter: pool = 6 sports, `max_sports = 1` (member chooses 1).
-  - Multi-Sport: pool = 6 sports, `max_sports = 3` (member chooses up to 3).
-  - All Access: pool = 6 sports, `max_sports = 6` (all included automatically).
-  - Swim Starter / Basketball Pass: pool = 1 sport, `max_sports = 1` (fixed).
-  When `pool size = max_sports` the UI preselects all sports and hides the checkboxes.
-- **One row per membership period.** `membership` is created as `PENDING_PAYMENT` when a member (F1-08) or a
-  receptionist (F1-11) registers. A renewal creates a **new** row with `registration_type = 'RENEWAL'` and
-  `previous_membership_id`. This keeps history, invoices and revenue per period clean.
-- **Snapshots.** `price_amount` and `duration_days` are copied from the plan at registration time, and the selected
-  sports are copied into `membership_sport`. Later plan edits never change existing memberships or invoices.
-- **Dates are set only on payment confirmation.**
-  - No current active membership: `start_date = confirmation date`, status `ACTIVE`.
-  - Renewal while still active: `start_date = previous.end_date + 1 day`, status `SCHEDULED` (a daily job switches it
-    to `ACTIVE`).
-  - `end_date = start_date + duration_days` (matches "27 Sept 2026 - 27 Oct 2026" in F1-09), inclusive.
-- **At most one pending registration per member** (filtered unique index). This prevents duplicate charges (F3-02).
-- **Facility = teaching area** ("Basketball Court B", "Indoor Pool"). Used for schedule conflict checks in F2-03.
-- **Age groups are a lookup table** because they carry numeric ranges used in eligibility checks.
-- **Check-in** records arrival at the front desk only; it never counts as class attendance.
+- **Sport Packages Model.** Each package is strictly tied to:
+  - Exactly 1 sport (`sport_id`).
+  - Exactly 1 training format (`format`: `SELF_TRAINING` or `COACH_LED`).
+  - Duration in days and fixed session counts:
+    - Single visit: 1 day, 1 session.
+    - 30 days: 30 days, 8 sessions.
+    - 90 days: 90 days, 24 sessions.
+- **Multiple Active Packages.** Members can hold multiple active sport packages simultaneously (e.g., Badminton Self-training 30-day package and Swimming Coach-led 90-day package concurrently).
+- **Membership Cards (Discounts Only).** Membership cards provide fixed percentage discounts on 30-day and 90-day sport package purchases:
+  - Standard: Free, permanent validity, 0% discount.
+  - Gold: 300,000 VND / 12 months, 5% discount on package purchases.
+  - VIP: 600,000 VND / 12 months, 10% discount on package purchases.
+  - Card rules: Single visits are excluded from discounts; discounts do not stack; cards do not grant direct facility admission without an active sport package session booking.
+- **Explicit Start Date Selection.** When registering for a package (online or at reception), the member/staff explicitly chooses the `start_date`. Validity end date is computed as `end_date = start_date + duration_days`.
+- **Front Desk Check-in (F1-15).** Front desk check-in strictly requires:
+  1. An existing confirmed session booking for the member on the current day (the current date in Asia/Ho_Chi_Minh from the application Clock).
+  2. The member holds an active paid sport package covering the session sport.
+  3. No duplicate check-in recorded for the same session.
+  4. Front desk check-in verifies arrival and does not double-deduct from attendance (which is separately logged by coaches or receptionists).
+- **Legacy Compatibility.** Legacy tables (`membership_plan`, `plan_eligible_sport`, `plan_feature`, `membership`, `membership_sport`) are retained in the schema for data continuity, with their corresponding Java domain entities marked `@Deprecated`.
 
 ## Tables
 
@@ -52,24 +51,12 @@ erDiagram
 | id | BIGINT | No | PK, IDENTITY | |
 | code | NVARCHAR(30) | No | UQ | `FOOTBALL`, `BADMINTON`, `BASKETBALL`, `VOLLEYBALL`, `SWIMMING`, `TENNIS` |
 | name | NVARCHAR(50) | No | UQ | Display name |
-| venue_type | NVARCHAR(20) | No | | `INDOOR`, `OUTDOOR`, `POOL` (Home tiles "01 / OUTDOOR") |
+| venue_type | NVARCHAR(20) | No | | `INDOOR`, `OUTDOOR`, `POOL` |
 | description | NVARCHAR(500) | Yes | | |
 | image_url | NVARCHAR(500) | Yes | | |
 | display_order | INT | No | 0 | |
 | is_active | BIT | No | 1 | |
 | created_at, updated_at | DATETIME2(0) | | | Audit |
-
-### `age_group`
-
-| Column | Type | Null | Key / Default | Description |
-|---|---|---|---|---|
-| id | BIGINT | No | PK, IDENTITY | |
-| code | NVARCHAR(30) | No | UQ | `KIDS_6_12`, `AGES_8_11`, `TEENS_13_17`, `AGES_16_PLUS`, `ADULTS_18_PLUS` |
-| label | NVARCHAR(50) | No | | "Kids 6-12", "Ages 16+" |
-| min_age | INT | No | CHECK >= 0 | Inclusive |
-| max_age | INT | Yes | CHECK >= min_age | Inclusive, null = no upper bound |
-| display_order | INT | No | 0 | |
-| is_active | BIT | No | 1 | |
 
 ### `facility`
 
@@ -80,129 +67,106 @@ erDiagram
 | name | NVARCHAR(100) | No | | "Basketball Court B" |
 | facility_type | NVARCHAR(20) | No | | `COURT`, `POOL`, `FIELD`, `HALL`, `STUDIO` |
 | sport_id | BIGINT | Yes | FK -> sport.id | Primary sport; null = multi-purpose |
-| capacity | INT | Yes | CHECK > 0 | Physical capacity (informational) |
+| capacity | INT | Yes | CHECK > 0 | Physical capacity |
 | is_active | BIT | No | 1 | |
 | created_at, updated_at | DATETIME2(0) | | | Audit |
 
-### `membership_plan`
+### `membership_card_tier`
 
-Called "Membership packages" in the Manager workspace.
-
-| Column | Type | Null | Key / Default | Description |
-|---|---|---|---|---|
-| id | BIGINT | No | PK, IDENTITY | |
-| code | NVARCHAR(30) | No | UQ | `STARTER`, `MULTI_SPORT`, `ALL_ACCESS`, ... |
-| name | NVARCHAR(100) | No | | "Multi-Sport" |
-| tagline | NVARCHAR(100) | Yes | | "02 / EXPLORE" label |
-| description | NVARCHAR(500) | Yes | | "Mix classes across up to three sports." |
-| price | DECIMAL(14,2) | No | CHECK >= 0 | VND |
-| duration_days | INT | No | CHECK > 0 | 30 |
-| max_sports | INT | No | CHECK >= 1 | Number of sports the member may select |
-| is_featured | BIT | No | 0 | "MOST POPULAR" badge |
-| status | NVARCHAR(20) | No | `DRAFT` | `DRAFT`, `ACTIVE`, `ARCHIVED` |
-| display_order | INT | No | 0 | |
-| created_at, updated_at, created_by, updated_by | | | | Audit |
-| version | INT | No | 0 | |
-
-### `plan_eligible_sport`
-
-Pool of sports a plan allows. Rule: `COUNT(*) >= max_sports` (service validation on publish).
-
-| Column | Type | Null | Key / Default | Description |
-|---|---|---|---|---|
-| plan_id | BIGINT | No | PK, FK -> membership_plan.id (cascade) | |
-| sport_id | BIGINT | No | PK, FK -> sport.id | |
-
-### `plan_feature`
-
-Bullet list on plan cards ("Coach-led class booking", "Personal schedule and progress").
+Defines the membership card discount tiers (Standard, Gold, VIP).
 
 | Column | Type | Null | Key / Default | Description |
 |---|---|---|---|---|
 | id | BIGINT | No | PK, IDENTITY | |
-| plan_id | BIGINT | No | FK -> membership_plan.id (cascade) | |
-| feature_text | NVARCHAR(150) | No | | |
-| display_order | INT | No | 0 | |
-
-### `membership`
-
-One registration / membership period. Displayed as "Current membership" (F1-09) and "Registration summary" (F1-11).
-
-| Column | Type | Null | Key / Default | Description |
-|---|---|---|---|---|
-| id | BIGINT | No | PK, IDENTITY | |
-| registration_code | NVARCHAR(20) | No | UQ | `REG-1042` |
-| member_id | BIGINT | No | FK -> member_profile.user_id | |
-| plan_id | BIGINT | No | FK -> membership_plan.id | |
-| registration_type | NVARCHAR(20) | No | | `NEW`, `RENEWAL` |
-| previous_membership_id | BIGINT | Yes | FK -> membership.id | Set for renewals |
-| channel | NVARCHAR(20) | No | | `ONLINE` (member) or `RECEPTION` (receptionist) |
-| status | NVARCHAR(20) | No | `PENDING_PAYMENT` | `PENDING_PAYMENT`, `SCHEDULED`, `ACTIVE`, `EXPIRED`, `CANCELLED` |
-| price_amount | DECIMAL(14,2) | No | CHECK >= 0 | Snapshot of plan price |
-| duration_days | INT | No | CHECK > 0 | Snapshot of plan duration |
-| start_date | DATE | Yes | | Set on payment confirmation |
-| end_date | DATE | Yes | CHECK >= start_date | Inclusive validity end |
-| activated_at | DATETIME2(0) | Yes | | When it became `ACTIVE` |
-| cancelled_at | DATETIME2(0) | Yes | | |
-| cancel_reason | NVARCHAR(255) | Yes | | |
-| created_by_user_id | BIGINT | No | FK -> user_account.id | Member or receptionist who created it |
+| code | NVARCHAR(30) | No | UQ | `STANDARD`, `GOLD`, `VIP` |
+| name | NVARCHAR(50) | No | | "Standard", "Gold Member", "VIP Member" |
+| price | DECIMAL(14,2) | No | CHECK >= 0 | 0 for Standard, 300,000 for Gold, 600,000 for VIP |
+| duration_months | INT | No | CHECK >= 0 | 0 (permanent) for Standard, 12 for Gold and VIP |
+| discount_percentage | INT | No | CHECK >= 0 | 0% for Standard, 5% for Gold, 10% for VIP |
+| description | NVARCHAR(500) | Yes | | Tier benefits description |
+| is_active | BIT | No | 1 | |
 | created_at, updated_at | DATETIME2(0) | | | Audit |
-| version | INT | No | 0 | |
 
-Constraints and indexes:
-- `ck_membership_active_dates`: statuses `SCHEDULED`, `ACTIVE`, `EXPIRED` require both dates.
-- `ux_membership_one_pending (member_id) WHERE status = 'PENDING_PAYMENT'`.
-- `ix_membership_member_status (member_id, status, end_date)` for "current membership" lookups.
+### `member_card`
 
-### `membership_sport`
-
-Sports selected for this membership period ("Your sports: Basketball, Swimming, Badminton").
+Member's card holding record.
 
 | Column | Type | Null | Key / Default | Description |
 |---|---|---|---|---|
-| membership_id | BIGINT | No | PK, FK -> membership.id (cascade) | |
-| sport_id | BIGINT | No | PK, FK -> sport.id | Must exist in `plan_eligible_sport` of the plan |
+| id | BIGINT | No | PK, IDENTITY | |
+| card_code | NVARCHAR(30) | No | UQ | `CARD-1001` from sequence |
+| member_id | BIGINT | No | FK -> member_profile.user_id | Member holding card |
+| tier_id | BIGINT | No | FK -> membership_card_tier.id | Current card tier |
+| start_date | DATE | No | | Card activation date |
+| end_date | DATE | Yes | | Null for permanent Standard, date for Gold/VIP |
+| status | NVARCHAR(20) | No | `ACTIVE` | `ACTIVE`, `EXPIRED`, `CANCELLED` |
+| price_paid | DECIMAL(14,2) | No | CHECK >= 0 | Snapshot of fee paid |
+| payment_id | BIGINT | Yes | FK -> payment.id | Associated payment attempt |
+| created_at, updated_at | DATETIME2(0) | | | Audit |
 
-Rule: number of rows `<= membership_plan.max_sports` and `>= 1` (service validation).
+### `sport_package`
+
+Specific packages offered by the center.
+
+| Column | Type | Null | Key / Default | Description |
+|---|---|---|---|---|
+| id | BIGINT | No | PK, IDENTITY | |
+| code | NVARCHAR(30) | No | UQ | `PKG-BADMINTON-30D`, `PKG-SWIM-90D-COACH` |
+| name | NVARCHAR(100) | No | | Display name |
+| sport_id | BIGINT | No | FK -> sport.id | Single sport covered |
+| training_format | NVARCHAR(20) | No | | `SELF_TRAINING`, `COACH_LED` |
+| duration_days | INT | No | CHECK > 0 | 1, 30, or 90 days |
+| session_count | INT | No | CHECK > 0 | 1, 8, or 24 sessions |
+| price_amount | DECIMAL(14,2) | No | CHECK >= 0 | Base package price in VND |
+| description | NVARCHAR(500) | Yes | | Package overview |
+| is_active | BIT | No | 1 | Package visibility toggle |
+| created_at, updated_at | DATETIME2(0) | | | Audit |
+
+### `sport_package_registration`
+
+An instance of a member purchasing a sport package.
+
+| Column | Type | Null | Key / Default | Description |
+|---|---|---|---|---|
+| id | BIGINT | No | PK, IDENTITY | |
+| registration_code | NVARCHAR(30) | No | UQ | `REG-PKG-1001` |
+| member_id | BIGINT | No | FK -> member_profile.user_id | Purchasing member |
+| package_id | BIGINT | No | FK -> sport_package.id | Package purchased |
+| channel | NVARCHAR(20) | No | | `ONLINE` or `RECEPTION` |
+| original_price | DECIMAL(14,2) | No | CHECK >= 0 | Package base price |
+| discount_percentage | INT | No | CHECK >= 0 | 0, 5, or 10 from active card tier |
+| paid_amount | DECIMAL(14,2) | No | CHECK >= 0 | Amount after card discount |
+| total_sessions | INT | No | CHECK > 0 | Snapshot of initial sessions |
+| remaining_sessions | INT | No | CHECK >= 0 | Sessions left to book |
+| start_date | DATE | No | | Explicitly chosen start date |
+| end_date | DATE | No | CHECK >= start_date | `start_date + duration_days` |
+| status | NVARCHAR(20) | No | `PENDING_PAYMENT` | `PENDING_PAYMENT`, `ACTIVE`, `EXPIRED`, `CANCELLED`, `REFUNDED` (V11) |
+| activated_at | DATETIME2(0) | Yes | | Date activated. Activation allowed only from PENDING_PAYMENT -> ACTIVE. Recomputes start_date to TODAY and end_date = start_date + duration_days if start_date < TODAY. |
+| payment_id | BIGINT | Yes | FK -> payment.id | Payment record |
+| created_by_user_id | BIGINT | No | FK -> user_account.id | Member or receptionist |
+| created_at, updated_at | DATETIME2(0) | | | Audit |
 
 ### `check_in`
 
-Front desk arrival record (F1-13).
+Front desk arrival record (F1-15).
 
 | Column | Type | Null | Key / Default | Description |
 |---|---|---|---|---|
 | id | BIGINT | No | PK, IDENTITY | |
-| member_id | BIGINT | No | FK -> member_profile.user_id | |
-| membership_id | BIGINT | Yes | FK -> membership.id | Membership used to validate; null when denied |
-| checked_in_at | DATETIME2(0) | No | SYSDATETIME() | |
+| member_id | BIGINT | No | FK -> member_profile.user_id | Arriving member |
+| membership_id | BIGINT | Yes | FK -> membership.id | Legacy membership reference (nullable) |
+| booking_id | BIGINT | Yes | FK -> booking.id | Today's confirmed session booking |
+| package_registration_id | BIGINT | Yes | FK -> sport_package_registration.id | Active package backing admission |
+| checked_in_at | DATETIME2(0) | No | SYSDATETIME() | Front desk timestamp |
 | result | NVARCHAR(20) | No | | `ALLOWED`, `DENIED` |
-| denial_reason | NVARCHAR(255) | Yes | | "No active membership", "Account inactive" |
-| recorded_by | BIGINT | No | FK -> user_account.id | Receptionist |
-| note | NVARCHAR(255) | Yes | | |
+| denial_reason | NVARCHAR(255) | Yes | | Reason if DENIED: "No confirmed booking for today", "Specified booking is not scheduled for today or is not confirmed", "All confirmed bookings for today have already been checked in", "Already checked in for this session", "Booking is not linked to a sport package registration", "No active sport package", "Sport package registration is expired or not yet valid" |
+| recorded_by | BIGINT | No | FK -> user_account.id | Receptionist user |
+| note | NVARCHAR(255) | Yes | | Staff note |
 
-Indexes: `ix_check_in_member (member_id, checked_in_at)`, `ix_check_in_time (checked_in_at)`.
+### Deprecated Tables (Retained for Backward Compatibility)
 
-## Useful Queries
-
-Current membership of a member (F1-09, F1-10, F2-07, F5-01, F6-04):
-
-```sql
-SELECT TOP (1) m.*
-FROM membership m
-WHERE m.member_id = @memberId
-  AND m.status IN ('ACTIVE', 'SCHEDULED')
-  AND m.end_date >= CAST(SYSDATETIME() AS DATE)
-ORDER BY m.start_date;
-```
-
-Membership covering a session date and sport (booking eligibility):
-
-```sql
-SELECT m.id
-FROM membership m
-JOIN membership_sport ms ON ms.membership_id = m.id
-WHERE m.member_id = @memberId
-  AND m.status IN ('ACTIVE', 'SCHEDULED')
-  AND @sessionDate BETWEEN m.start_date AND m.end_date
-  AND ms.sport_id = @sportId;
-```
+- `membership_plan`: Monolithic membership plan definition.
+- `plan_eligible_sport`: Sports allowed under monolithic plan.
+- `plan_feature`: Monolithic plan feature bullet points.
+- `membership`: Monolithic membership registration periods.
+- `membership_sport`: Sports chosen under monolithic membership.

@@ -18,6 +18,7 @@ import java.util.Set;
  * <p>
  * Step 2A: schema mapping only. Registration / renewal / cancellation logic belongs to Step 2B.
  */
+@Deprecated
 @Entity
 @Table(name = "membership")
 @Getter
@@ -88,8 +89,7 @@ public class Membership extends BaseAuditableEntity {
 
     @Version
     @Column(nullable = false)
-    @Builder.Default
-    private Integer version = 0;
+    private Integer version;
 
     /** Sports selected for this period ({@code membership_sport}). */
     @ManyToMany(fetch = FetchType.LAZY)

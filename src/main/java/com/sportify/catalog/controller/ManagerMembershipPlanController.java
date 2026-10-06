@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Manager workspace "Membership packages".
  */
+@Deprecated
 @RestController
 @RequestMapping("/api/v1/manager/plans")
 @RequiredArgsConstructor

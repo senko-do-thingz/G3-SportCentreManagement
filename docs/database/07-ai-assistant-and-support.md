@@ -1,6 +1,8 @@
 # 07 - AI Assistant and Support
 
-Screens covered: F6-01 AI Assistant Welcome, F6-02 Assistant Conversation, F6-03 Suggest Classes, F6-04 Query Membership, F6-05 Hand-off to Staff, F6-06 Suggest Exercise, F6-07 Handoff Sent, F6-08 Member Support Hub, F6-09 Staff Support Queue, F6-10 Request Details, F6-11 Resolution, F6-12 Assistant Settings.
+Screens covered: F6-01 AI Assistant, F6-02 Package & Pricing Answers, F6-03 Schedule & Booking Answers,
+F6-04 My Package & Training Answers, F6-05 Contact Reception, F6-06 Support Request Inbox,
+F6-07 Support Request Detail & Reply.
 
 ## ERD
 

@@ -10,10 +10,11 @@ import com.sportify.catalog.service.MembershipService;
 import com.sportify.core.exception.ConflictException;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ResourceNotFoundException;
-import com.sportify.identity.entity.ActivityLog;
+import com.sportify.core.audit.AuditService;
+import com.sportify.core.audit.AuditEvent;
+import com.sportify.core.audit.AuditAction;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
-import com.sportify.identity.repository.ActivityLogRepository;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.UserRepository;
 import com.sportify.core.common.CodeFormatter;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Deprecated
 @Service
 @RequiredArgsConstructor
 public class MembershipServiceImpl implements MembershipService {
@@ -36,7 +38,7 @@ public class MembershipServiceImpl implements MembershipService {
     private final MembershipPlanRepository planRepository;
     private final SportRepository sportRepository;
     private final MemberProfileRepository memberProfileRepository;
-    private final ActivityLogRepository activityLogRepository;
+    private final AuditService auditService;
     private final UserRepository userRepository;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
@@ -137,8 +139,15 @@ public class MembershipServiceImpl implements MembershipService {
 
         membership = membershipRepository.save(membership);
 
-        logActivity(creator, "MEMBERSHIP_REGISTERED", "MEMBERSHIP", membership.getId(), "Registered new membership");
-
+        String auditAction = regType == RegistrationType.RENEWAL ? AuditAction.MEMBERSHIP_RENEWED : AuditAction.MEMBERSHIP_REGISTERED;
+        auditService.record(AuditEvent.builder()
+                .actor(creator)
+                .action(auditAction)
+                .entityType("MEMBERSHIP")
+                .entityId(membership.getId())
+                .entityCode(membership.getRegistrationCode())
+                .summary("Registered new membership")
+                .build());
         return mapToResponse(membership);
     }
 
@@ -164,7 +173,14 @@ public class MembershipServiceImpl implements MembershipService {
         membership.setCancelReason("Cancelled by user");
         membershipRepository.save(membership);
 
-        logActivity(currentUser, "MEMBERSHIP_CANCELLED", "MEMBERSHIP", membership.getId(), "Cancelled membership");
+        auditService.record(AuditEvent.builder()
+                .actor(currentUser)
+                .action(AuditAction.MEMBERSHIP_CANCELLED)
+                .entityType("MEMBERSHIP")
+                .entityId(membership.getId())
+                .entityCode(membership.getRegistrationCode())
+                .summary("Cancelled membership")
+                .build());
     }
 
     @Override
@@ -212,7 +228,14 @@ public class MembershipServiceImpl implements MembershipService {
 
         membershipRepository.save(membership);
 
-        logActivity(actor, "MEMBERSHIP_ACTIVATED", "MEMBERSHIP", membership.getId(), "Membership activated");
+        auditService.record(AuditEvent.builder()
+                .actor(actor)
+                .action(AuditAction.MEMBERSHIP_ACTIVATED)
+                .entityType("MEMBERSHIP")
+                .entityId(membership.getId())
+                .entityCode(membership.getRegistrationCode())
+                .summary("Membership activated")
+                .build());
     }
 
     @Override
@@ -222,6 +245,14 @@ public class MembershipServiceImpl implements MembershipService {
         for (Membership m : scheduled) {
             m.setStatus(MembershipStatus.ACTIVE);
             membershipRepository.save(m);
+            auditService.record(AuditEvent.builder()
+                    .actor(null)
+                    .action(AuditAction.MEMBERSHIP_ACTIVATED_BY_JOB)
+                    .entityType("MEMBERSHIP")
+                    .entityId(m.getId())
+                    .entityCode(m.getRegistrationCode())
+                    .summary("Membership activated by scheduled job")
+                    .build());
         }
     }
 
@@ -232,18 +263,18 @@ public class MembershipServiceImpl implements MembershipService {
         for (Membership m : active) {
             m.setStatus(MembershipStatus.EXPIRED);
             membershipRepository.save(m);
+            auditService.record(AuditEvent.builder()
+                    .actor(null)
+                    .action(AuditAction.MEMBERSHIP_EXPIRED_BY_JOB)
+                    .entityType("MEMBERSHIP")
+                    .entityId(m.getId())
+                    .entityCode(m.getRegistrationCode())
+                    .summary("Membership expired by scheduled job")
+                    .build());
         }
     }
 
-    private void logActivity(UserAccount actor, String action, String entityType, Long entityId, String summary) {
-        ActivityLog log = new ActivityLog();
-        log.setActor(actor);
-        log.setAction(action);
-        log.setEntityType(entityType);
-        log.setEntityId(entityId);
-        log.setSummary(summary);
-        activityLogRepository.save(log);
-    }
+
 
     private MembershipResponse mapToResponse(Membership m) {
         return MembershipResponse.builder()

@@ -10,7 +10,9 @@ import com.sportify.catalog.service.impl.MembershipServiceImpl;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
-import com.sportify.identity.repository.ActivityLogRepository;
+import com.sportify.core.audit.AuditService;
+import com.sportify.core.audit.AuditEvent;
+import com.sportify.core.audit.AuditAction;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.UserRepository;
 import com.sportify.core.exception.BusinessRuleException;
@@ -46,7 +48,7 @@ public class MembershipServiceTest {
     @Mock
     private MemberProfileRepository memberProfileRepository;
     @Mock
-    private ActivityLogRepository activityLogRepository;
+    private AuditService auditService;
     @Mock
     private UserRepository userRepository;
     @Mock
@@ -166,6 +168,7 @@ public class MembershipServiceTest {
         assertEquals(LocalDate.of(2026, 10, 5), m.getStartDate());
         assertEquals(LocalDate.of(2026, 10, 5).plusDays(30), m.getEndDate());
         assertNotNull(m.getActivatedAt());
+        verify(auditService).record(any(AuditEvent.class));
     }
 
     @Test
@@ -239,6 +242,11 @@ public class MembershipServiceTest {
 
         assertNotNull(res);
         verify(memberProfileRepository).save(any(MemberProfile.class));
+        
+        org.mockito.ArgumentCaptor<AuditEvent> eventCaptor = org.mockito.ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService).record(eventCaptor.capture());
+        assertEquals(AuditAction.MEMBERSHIP_REGISTERED, eventCaptor.getValue().getAction());
+        assertEquals("REG-0001", eventCaptor.getValue().getEntityCode());
     }
 
     @Test
@@ -264,5 +272,96 @@ public class MembershipServiceTest {
 
         assertNotNull(res);
         assertEquals("PENDING_PAYMENT", res.getStatus());
+        
+        org.mockito.ArgumentCaptor<AuditEvent> eventCaptor = org.mockito.ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService).record(eventCaptor.capture());
+        assertEquals(AuditAction.MEMBERSHIP_REGISTERED, eventCaptor.getValue().getAction());
+        assertEquals("REG-0001", eventCaptor.getValue().getEntityCode());
+    }
+
+    @Test
+    void register_Renewal_LogsRenewal() {
+        MembershipRegistrationRequest req = new MembershipRegistrationRequest();
+        req.setPlanId(100L);
+        req.setSportIds(List.of(10L));
+
+        Membership active = new Membership();
+        active.setId(99L);
+        active.setStatus(MembershipStatus.ACTIVE);
+
+        when(memberProfileRepository.findById(1L)).thenReturn(Optional.of(memberProfile));
+        when(membershipRepository.existsByMemberIdAndStatus(1L, MembershipStatus.PENDING_PAYMENT)).thenReturn(false);
+        when(planRepository.findById(100L)).thenReturn(Optional.of(plan));
+        when(membershipRepository.getNextRegistrationCode()).thenReturn(2L);
+        when(codeFormatter.formatRegistrationCode(2L)).thenReturn("REG-0002");
+        when(membershipRepository.findActiveOrScheduled(anyLong(), any(), any())).thenReturn(List.of(active));
+        when(membershipRepository.save(any(Membership.class))).thenAnswer(i -> {
+            Membership m = i.getArgument(0);
+            m.setId(21L);
+            return m;
+        });
+
+        MembershipResponse res = membershipService.registerMembership(memberUser, req);
+
+        assertNotNull(res);
+        org.mockito.ArgumentCaptor<AuditEvent> eventCaptor = org.mockito.ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService).record(eventCaptor.capture());
+        assertEquals(AuditAction.MEMBERSHIP_RENEWED, eventCaptor.getValue().getAction());
+        assertEquals("REG-0002", eventCaptor.getValue().getEntityCode());
+    }
+
+    @Test
+    void processScheduledMemberships_LogsEvents() {
+        Membership scheduled = new Membership();
+        scheduled.setId(10L);
+        scheduled.setRegistrationCode("REG-0010");
+        scheduled.setStatus(MembershipStatus.SCHEDULED);
+
+        when(membershipRepository.findByStatusAndStartDateLessThanEqual(eq(MembershipStatus.SCHEDULED), any()))
+                .thenReturn(List.of(scheduled));
+
+        membershipService.processScheduledMemberships(LocalDate.now(clock));
+
+        assertEquals(MembershipStatus.ACTIVE, scheduled.getStatus());
+        verify(membershipRepository).save(scheduled);
+
+        org.mockito.ArgumentCaptor<AuditEvent> eventCaptor = org.mockito.ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService).record(eventCaptor.capture());
+        assertEquals(AuditAction.MEMBERSHIP_ACTIVATED_BY_JOB, eventCaptor.getValue().getAction());
+        assertNull(eventCaptor.getValue().getActor());
+        assertEquals("REG-0010", eventCaptor.getValue().getEntityCode());
+    }
+
+    @Test
+    void processExpiredMemberships_LogsEvents() {
+        Membership active = new Membership();
+        active.setId(11L);
+        active.setRegistrationCode("REG-0011");
+        active.setStatus(MembershipStatus.ACTIVE);
+
+        when(membershipRepository.findByStatusAndEndDateLessThan(eq(MembershipStatus.ACTIVE), any()))
+                .thenReturn(List.of(active));
+
+        membershipService.processExpiredMemberships(LocalDate.now(clock));
+
+        assertEquals(MembershipStatus.EXPIRED, active.getStatus());
+        verify(membershipRepository).save(active);
+
+        org.mockito.ArgumentCaptor<AuditEvent> eventCaptor = org.mockito.ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService).record(eventCaptor.capture());
+        assertEquals(AuditAction.MEMBERSHIP_EXPIRED_BY_JOB, eventCaptor.getValue().getAction());
+        assertNull(eventCaptor.getValue().getActor());
+        assertEquals("REG-0011", eventCaptor.getValue().getEntityCode());
+    }
+
+    @Test
+    void processScheduledMemberships_NoChanges_NoLogs() {
+        when(membershipRepository.findByStatusAndStartDateLessThanEqual(eq(MembershipStatus.SCHEDULED), any()))
+                .thenReturn(Collections.emptyList());
+
+        membershipService.processScheduledMemberships(LocalDate.now(clock));
+
+        verify(membershipRepository, never()).save(any());
+        verify(auditService, never()).record(any());
     }
 }

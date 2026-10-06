@@ -6,20 +6,20 @@ Welcome to the **Sportify Center** backend repository. This project aims to buil
 
 *Note: This project is currently in the initial foundation and data modeling phase.*
 
-## 🎯 Module Status
+## Module Status
 
 | Module | Status |
 |---|---|
-| **Identity & Access** | In Progress - Data layer + schema |
-| **Catalog & Membership** | In Progress (registration, renewal, check-in, member search) |
-| **Classes & Booking** | Designed, not implemented |
-| **Payments & Reports** | Designed, not implemented |
-| **Training & Progress** | Designed, not implemented |
-| **AI Workout Recommendation** | Planned |
-| **AI Assistant & Support** | Planned |
-| **Security & JWT** | Planned |
+| **Identity & Access** | Implemented - Fixed roles (MEMBER, COACH, RECEPTIONIST, MANAGER), profiles, validation |
+| **Catalog & Membership** | Implemented (V10 + V11) - Sport Packages, Membership Cards, Multi-package model, PENDING_PAYMENT to ACTIVE activation with date recomputation, REFUNDED status, Check-in flow |
+| **Classes & Booking** | Implemented (V10) - Coach-led vs self-training sessions, session deduction at booking, capacity checks |
+| **Payments & Reports** | Designed / Partial - Updated for package invoices, card discounts, and refund requests |
+| **Training & Progress** | Designed / Partial - Updated for coach sessions and receptionist self-training attendance |
+| **AI Workout Recommendation** | Planned - Goal-driven recommendations and coach exercise drafts |
+| **AI Assistant & Support** | Planned - Conversational support and receptionist inbox |
+| **Security & JWT** | Implemented - Role-based endpoint authorization, IDOR protection |
 
-## 🛠 Technology Stack
+## Technology Stack
 
 Currently active technologies in the project:
 - **Language:** Java 25
@@ -30,7 +30,7 @@ Currently active technologies in the project:
 - **Utilities:** MapStruct, Lombok
 - **Testing:** JUnit 5, Testcontainers (MSSQL), JaCoCo
 
-## 📁 Project Structure
+## Project Structure
 
 The project follows a strict module-driven structure:
 - `src/main/java/com/sportify/`
@@ -38,14 +38,14 @@ The project follows a strict module-driven structure:
   - `core/` - Common utilities, audit logging
 - `src/test/java/com/sportify/` - **100% mirrored** test directory structure
 
-## 📚 Documentation
+## Documentation
 
 Detailed documentation regarding the database design and architectural decisions can be found in the `docs/` directory.
 
 - [Database Design & Schema](docs/database/README.md)
 - [Architecture & Project Structure Guidelines](docs/architecture/project_structure.md)
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 - JDK 25
@@ -87,14 +87,14 @@ Copy `.env.example` to `.env` and configure the credentials.
 
    Note: The `dev` profile is active by default in `application.yml`, which enables development endpoints (like manual membership activation). For production, you must set `SPRING_PROFILES_ACTIVE=prod`.
 
-## 📏 Development Guidelines
+## Development Guidelines
 
 - **MapStruct**: Use MapStruct for all DTO-Entity mappings.
 - **Service Layer**: Strict separation of Interface and Implementation (e.g., `UserService` and `UserServiceImpl`).
 - **Test Mirroring**: Every test class must reflect the package structure of the main class.
 - **Conventional Commits**: Use `feat`, `fix`, `chore`, `build`, `docs`, `test` prefixes. Each task group must have its own commit.
 
-## 👥 Team
+## Team
 
 - **Author:** Senko ([@senko-do-thingz](https://github.com/senko-do-thingz))
 - **Contributors:** [Placeholder for team members]

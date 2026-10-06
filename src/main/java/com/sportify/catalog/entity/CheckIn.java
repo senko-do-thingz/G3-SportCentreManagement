@@ -29,10 +29,20 @@ public class CheckIn {
     @JoinColumn(name = "member_id", nullable = false)
     private MemberProfile member;
 
-    /** Membership used to validate; {@code null} when denied. */
+    /** Membership used to validate (legacy); {@code null} when denied. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "membership_id")
     private Membership membership;
+
+    /** Today's confirmed session booking validating arrival. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "booking_id")
+    private Booking booking;
+
+    /** Sport package registration backing the admission. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "package_registration_id")
+    private SportPackageRegistration packageRegistration;
 
     @Column(name = "checked_in_at", nullable = false)
     private LocalDateTime checkedInAt;
