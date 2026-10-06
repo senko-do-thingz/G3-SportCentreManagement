@@ -36,7 +36,7 @@ erDiagram
   - Card rules: Single visits are excluded from discounts; discounts do not stack; cards do not grant direct facility admission without an active sport package session booking.
 - **Explicit Start Date Selection.** When registering for a package (online or at reception), the member/staff explicitly chooses the `start_date`. Validity end date is computed as `end_date = start_date + duration_days`.
 - **Front Desk Check-in (F1-15).** Front desk check-in strictly requires:
-  1. An existing confirmed session booking for the member on the current day (`session_date = CAST(SYSDATETIME() AS DATE)`).
+  1. An existing confirmed session booking for the member on the current day (the current date in Asia/Ho_Chi_Minh from the application Clock).
   2. The member holds an active paid sport package covering the session sport.
   3. No duplicate check-in recorded for the same session.
   4. Front desk check-in verifies arrival and does not double-deduct from attendance (which is separately logged by coaches or receptionists).

@@ -41,7 +41,7 @@ On 2026-10-05, the product owner delivered a comprehensive overhaul of the Figma
 ### 2.3 Front Desk Check-in Validation (Screen F1-15)
 - **Previous Model:** Checked in against active membership plan.
 - **Refreshed Model:** Check-in strictly requires:
-  1. An existing confirmed session booking for the current day (`session_date = CAST(SYSDATETIME() AS DATE)`).
+  1. An existing confirmed session booking for the current day (the current date in Asia/Ho_Chi_Minh from the application Clock).
   2. The booked package registration must be ACTIVE and valid today (start_date <= today <= end_date).
   3. No duplicate check-in recorded for the same session.
   4. Front desk check-in never double-deducts session attendance.
