@@ -351,3 +351,68 @@ BEGIN
     SELECT 'PK-036', 'Tennis - 90-day package (Coach-led)', s.id, 'COACH_LED', 90, 24, 3780000.00, '90 days package with 24 coach-led sessions for Tennis (90 min each)', 1
     FROM [sport] s WHERE s.code = 'TENNIS';
 END;
+
+-- ----------------------------------------------------------------------------
+-- Part 3: Post-condition validation (fail loudly if catalog does not match Figma)
+-- ----------------------------------------------------------------------------
+
+-- Check 1: Exactly 36 packages with code LIKE 'PK-%' must exist
+DECLARE @pk_package_count INT;
+SELECT @pk_package_count = COUNT(*) FROM [sport_package] WHERE code LIKE 'PK-%';
+IF @pk_package_count <> 36
+BEGIN
+    THROW 50001, 'Migration V12 verification failed: expected exactly 36 sport packages with code LIKE ''PK-%''', 1;
+END;
+
+-- Check 2: All 36 Figma natural keys must exist and match Figma pricing
+IF EXISTS (
+    SELECT 1
+    FROM (VALUES
+        ('FOOTBALL', 'SELF_TRAINING', 1, 1, 80000.00),
+        ('FOOTBALL', 'SELF_TRAINING', 30, 8, 500000.00),
+        ('FOOTBALL', 'SELF_TRAINING', 90, 24, 1350000.00),
+        ('FOOTBALL', 'COACH_LED', 1, 1, 150000.00),
+        ('FOOTBALL', 'COACH_LED', 30, 8, 900000.00),
+        ('FOOTBALL', 'COACH_LED', 90, 24, 2400000.00),
+        ('BASKETBALL', 'SELF_TRAINING', 1, 1, 70000.00),
+        ('BASKETBALL', 'SELF_TRAINING', 30, 8, 450000.00),
+        ('BASKETBALL', 'SELF_TRAINING', 90, 24, 1200000.00),
+        ('BASKETBALL', 'COACH_LED', 1, 1, 130000.00),
+        ('BASKETBALL', 'COACH_LED', 30, 8, 800000.00),
+        ('BASKETBALL', 'COACH_LED', 90, 24, 2100000.00),
+        ('SWIMMING', 'SELF_TRAINING', 1, 1, 90000.00),
+        ('SWIMMING', 'SELF_TRAINING', 30, 8, 600000.00),
+        ('SWIMMING', 'SELF_TRAINING', 90, 24, 1620000.00),
+        ('SWIMMING', 'COACH_LED', 1, 1, 180000.00),
+        ('SWIMMING', 'COACH_LED', 30, 8, 1100000.00),
+        ('SWIMMING', 'COACH_LED', 90, 24, 2970000.00),
+        ('BADMINTON', 'SELF_TRAINING', 1, 1, 70000.00),
+        ('BADMINTON', 'SELF_TRAINING', 30, 8, 450000.00),
+        ('BADMINTON', 'SELF_TRAINING', 90, 24, 1200000.00),
+        ('BADMINTON', 'COACH_LED', 1, 1, 140000.00),
+        ('BADMINTON', 'COACH_LED', 30, 8, 850000.00),
+        ('BADMINTON', 'COACH_LED', 90, 24, 2250000.00),
+        ('VOLLEYBALL', 'SELF_TRAINING', 1, 1, 60000.00),
+        ('VOLLEYBALL', 'SELF_TRAINING', 30, 8, 400000.00),
+        ('VOLLEYBALL', 'SELF_TRAINING', 90, 24, 1080000.00),
+        ('VOLLEYBALL', 'COACH_LED', 1, 1, 120000.00),
+        ('VOLLEYBALL', 'COACH_LED', 30, 8, 750000.00),
+        ('VOLLEYBALL', 'COACH_LED', 90, 24, 1950000.00),
+        ('TENNIS', 'SELF_TRAINING', 1, 1, 120000.00),
+        ('TENNIS', 'SELF_TRAINING', 30, 8, 800000.00),
+        ('TENNIS', 'SELF_TRAINING', 90, 24, 2160000.00),
+        ('TENNIS', 'COACH_LED', 1, 1, 220000.00),
+        ('TENNIS', 'COACH_LED', 30, 8, 1400000.00),
+        ('TENNIS', 'COACH_LED', 90, 24, 3780000.00)
+    ) AS figma(sport_code, training_format, duration_days, session_count, expected_price)
+    JOIN [sport] s ON s.code = figma.sport_code
+    LEFT JOIN [sport_package] p ON p.sport_id = s.id
+        AND p.training_format = figma.training_format
+        AND p.duration_days = figma.duration_days
+        AND p.session_count = figma.session_count
+    WHERE p.id IS NULL OR p.price_amount <> figma.expected_price
+)
+BEGIN
+    THROW 50001, 'Migration V12 verification failed: one or more sport packages are missing or do not match Figma catalog pricing', 1;
+END;
+
