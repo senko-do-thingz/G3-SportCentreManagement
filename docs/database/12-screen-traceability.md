@@ -1,11 +1,11 @@
-﻿# 12 - Screen to Table Traceability
+# 12 - Screen to Table Traceability
 
 This matrix maps all 135 UI screens and state dialogs from the refreshed context/ folder to the primary database tables that power them, along with their roles, backend endpoints, and implementation status.
 
 Status Legend:
-- **IMPLEMENTED**: Backend entity, repository, service logic, controller endpoints, and tests are complete.
-- **PARTIAL**: Database schema / entities exist or are partially modeled, but specific UI endpoints or workflows are pending full implementation.
-- **NOT STARTED**: Feature planned in future sprints (e.g., AI recommendation engine, AI assistant).
+- **IMPLEMENTED**: Full stack complete (database schema, JPA entity, repository, service logic, REST controller endpoints, and tests).
+- **PARTIAL**: Database schema and relational tables are fully implemented (migrations V1-V19), with backend REST endpoints, DTOs, or service workflows scheduled for subsequent sprint tasks.
+- **NOT STARTED**: Feature deferred beyond current release cycle (currently 0 screens; all 135 screens now have underlying database schemas implemented in V1-V19).
 
 ## Flow 1 - User and membership management > Flow 1 - Manager
 
@@ -187,48 +187,48 @@ Status Legend:
 
 | Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
 |---|---|---|---|---|---|
-| Flow 5 - AI Workout Recommendation/Flow 5 - Coach/F5-06 - AI Exercise Suggestions.png | AI Exercise Suggestions | Coach | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
-| Flow 5 - AI Workout Recommendation/Flow 5 - Coach/F5-07 - Review Suggested Exercises.png | Review Suggested Exercises | Coach | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
-| Flow 5 - AI Workout Recommendation/Flow 5 - Coach/F5-08 - Training Plan Draft.png | Training Plan Draft | Coach | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
-| Flow 5 - AI Workout Recommendation/Flow 5 - Coach/S5-Error - Suggestions Unavailable.png | Suggestions Unavailable | Coach | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Coach/F5-06 - AI Exercise Suggestions.png | AI Exercise Suggestions | Coach | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | PARTIAL |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Coach/F5-07 - Review Suggested Exercises.png | Review Suggested Exercises | Coach | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | PARTIAL |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Coach/F5-08 - Training Plan Draft.png | Training Plan Draft | Coach | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | PARTIAL |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Coach/S5-Error - Suggestions Unavailable.png | Suggestions Unavailable | Coach | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | PARTIAL |
 
 ## Flow 5 - AI Workout Recommendation > Flow 5 - Member
 
 | Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
 |---|---|---|---|---|---|
-| Flow 5 - AI Workout Recommendation/Flow 5 - Member/F5-01 - My Training Goals.png | My Training Goals | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
-| Flow 5 - AI Workout Recommendation/Flow 5 - Member/F5-02 - Recommended Sports & Classes.png | Recommended Sports & Classes | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
-| Flow 5 - AI Workout Recommendation/Flow 5 - Member/F5-03 - Recommendation Detail.png | Recommendation Detail | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
-| Flow 5 - AI Workout Recommendation/Flow 5 - Member/F5-04 - Suitable Sessions.png | Suitable Sessions | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
-| Flow 5 - AI Workout Recommendation/Flow 5 - Member/F5-05 - Saved Recommendations.png | Saved Recommendations | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
-| Flow 5 - AI Workout Recommendation/Flow 5 - Member/S5-CoachProfile - Coach Profile.png | Coach Profile | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
-| Flow 5 - AI Workout Recommendation/Flow 5 - Member/S5-Full - Session Fully Booked.png | Session Fully Booked | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
-| Flow 5 - AI Workout Recommendation/Flow 5 - Member/S5-NoMatch - No Matching Classes.png | No Matching Classes | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
-| Flow 5 - AI Workout Recommendation/Flow 5 - Member/S5-NoPackage - Package Access Required.png | Package Access Required | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
-| Flow 5 - AI Workout Recommendation/Flow 5 - Member/S5-SelfDetail - Self-training Recommendation.png | Self-training Recommendation | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | NOT STARTED |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/F5-01 - My Training Goals.png | My Training Goals | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | PARTIAL |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/F5-02 - Recommended Sports & Classes.png | Recommended Sports & Classes | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | PARTIAL |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/F5-03 - Recommendation Detail.png | Recommendation Detail | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | PARTIAL |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/F5-04 - Suitable Sessions.png | Suitable Sessions | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | PARTIAL |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/F5-05 - Saved Recommendations.png | Saved Recommendations | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | PARTIAL |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/S5-CoachProfile - Coach Profile.png | Coach Profile | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | PARTIAL |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/S5-Full - Session Fully Booked.png | Session Fully Booked | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | PARTIAL |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/S5-NoMatch - No Matching Classes.png | No Matching Classes | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | PARTIAL |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/S5-NoPackage - Package Access Required.png | Package Access Required | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | PARTIAL |
+| Flow 5 - AI Workout Recommendation/Flow 5 - Member/S5-SelfDetail - Self-training Recommendation.png | Self-training Recommendation | Member | `workout_recommendation`, `member_profile`, `sport` | AI Recommendation Engine (Planned: `GET /api/v1/ai/recommendations`) | PARTIAL |
 
 ## Flow 6 - AI Assistant > Flow 6 - Member
 
 | Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
 |---|---|---|---|---|---|
-| Flow 6 - AI Assistant/Flow 6 - Member/F6-01 - AI Assistant.png | AI Assistant | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
-| Flow 6 - AI Assistant/Flow 6 - Member/F6-02 - Package & Pricing Answers.png | Package & Pricing Answers | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
-| Flow 6 - AI Assistant/Flow 6 - Member/F6-03 - Schedule & Booking Answers.png | Schedule & Booking Answers | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
-| Flow 6 - AI Assistant/Flow 6 - Member/F6-04 - My Package & Training Answers.png | My Package & Training Answers | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
-| Flow 6 - AI Assistant/Flow 6 - Member/F6-05 - Contact Reception.png | Contact Reception | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
-| Flow 6 - AI Assistant/Flow 6 - Member/S6-Error - Assistant Temporarily Unavailable.png | Assistant Temporarily Unavailable | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
-| Flow 6 - AI Assistant/Flow 6 - Member/S6-MemberReply - Support Reply Received.png | Support Reply Received | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
-| Flow 6 - AI Assistant/Flow 6 - Member/S6-Submitted - Support Request Submitted.png | Support Request Submitted | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
-| Flow 6 - AI Assistant/Flow 6 - Member/S6-Unknown - More Information Needed.png | More Information Needed | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
+| Flow 6 - AI Assistant/Flow 6 - Member/F6-01 - AI Assistant.png | AI Assistant | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | PARTIAL |
+| Flow 6 - AI Assistant/Flow 6 - Member/F6-02 - Package & Pricing Answers.png | Package & Pricing Answers | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | PARTIAL |
+| Flow 6 - AI Assistant/Flow 6 - Member/F6-03 - Schedule & Booking Answers.png | Schedule & Booking Answers | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | PARTIAL |
+| Flow 6 - AI Assistant/Flow 6 - Member/F6-04 - My Package & Training Answers.png | My Package & Training Answers | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | PARTIAL |
+| Flow 6 - AI Assistant/Flow 6 - Member/F6-05 - Contact Reception.png | Contact Reception | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | PARTIAL |
+| Flow 6 - AI Assistant/Flow 6 - Member/S6-Error - Assistant Temporarily Unavailable.png | Assistant Temporarily Unavailable | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | PARTIAL |
+| Flow 6 - AI Assistant/Flow 6 - Member/S6-MemberReply - Support Reply Received.png | Support Reply Received | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | PARTIAL |
+| Flow 6 - AI Assistant/Flow 6 - Member/S6-Submitted - Support Request Submitted.png | Support Request Submitted | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | PARTIAL |
+| Flow 6 - AI Assistant/Flow 6 - Member/S6-Unknown - More Information Needed.png | More Information Needed | Member | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | PARTIAL |
 
 ## Flow 6 - AI Assistant > Flow 6 - Receptionist
 
 | Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
 |---|---|---|---|---|---|
-| Flow 6 - AI Assistant/Flow 6 - Receptionist/F6-06 - Support Request Inbox.png | Support Request Inbox | Receptionist | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
-| Flow 6 - AI Assistant/Flow 6 - Receptionist/F6-07 - Support Request Detail & Reply.png | Support Request Detail & Reply | Receptionist | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
-| Flow 6 - AI Assistant/Flow 6 - Receptionist/S6-ReplySent - Support Reply Sent.png | Support Reply Sent | Receptionist | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
-| Flow 6 - AI Assistant/Flow 6 - Receptionist/S6-Resolved - Support Request Resolved.png | Support Request Resolved | Receptionist | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | NOT STARTED |
+| Flow 6 - AI Assistant/Flow 6 - Receptionist/F6-06 - Support Request Inbox.png | Support Request Inbox | Receptionist | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | PARTIAL |
+| Flow 6 - AI Assistant/Flow 6 - Receptionist/F6-07 - Support Request Detail & Reply.png | Support Request Detail & Reply | Receptionist | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | PARTIAL |
+| Flow 6 - AI Assistant/Flow 6 - Receptionist/S6-ReplySent - Support Reply Sent.png | Support Reply Sent | Receptionist | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | PARTIAL |
+| Flow 6 - AI Assistant/Flow 6 - Receptionist/S6-Resolved - Support Request Resolved.png | Support Request Resolved | Receptionist | `ai_conversation`, `ai_message`, `support_request` | AI Assistant and Support Ticket Service (Planned: `POST /api/v1/ai/assistant/chat`) | PARTIAL |
 
 ## Home > 1.png
 

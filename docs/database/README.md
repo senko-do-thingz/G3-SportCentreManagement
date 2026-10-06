@@ -33,6 +33,7 @@ The design is derived from the UI mockups in `context/` (Home + Flow 1 to Flow 6
 | [10-ddl-sqlserver.md](10-ddl-sqlserver.md) | Complete SQL Server DDL, views and seed data |
 | [11-jpa-mapping-guide.md](11-jpa-mapping-guide.md) | Java 17 / Spring Boot 3 entity mapping conventions and examples |
 | [12-screen-traceability.md](12-screen-traceability.md) | Screen ID -> tables matrix |
+| [13-figma-schema-gap-analysis.md](13-figma-schema-gap-analysis.md) | Full 135 Figma screen to schema gap matrix |
 
 ## Key Assumptions (from the mockups)
 
@@ -84,7 +85,7 @@ The design is derived from the UI mockups in `context/` (Home + Flow 1 to Flow 6
 | AI assistant and support | `assistant_setting`, `assistant_topic`, `assistant_quick_prompt`, `ai_conversation`, `ai_message`, `support_request`, `support_request_message` | Flow 6, Flow 1 |
 | Notifications and system | `notification`, `announcement`, `system_setting` | All |
 
-Total: **58 tables** (26 implemented in migrations V1-V12, 32 planned; V12 is data-only so table count is unchanged), **3 reporting views** (planned), **11 sequences** (7 implemented in migrations V2, V9-V10: seq_booking_code, seq_card_code, seq_class_code, seq_member_code, seq_package_reg_code, seq_refund_code, seq_registration_code; 4 planned: seq_payment_code, seq_invoice_number, seq_support_request_code, seq_workout_plan_code).
+Total: **58 tables** (all 58 implemented in migrations V1-V19: 26 in V1-V12, 32 in V13-V19), **3 reporting views** (planned), **11 sequences** (all 11 implemented in migrations V2, V9-V10, V14, V17-V18: seq_booking_code, seq_card_code, seq_class_code, seq_member_code, seq_package_reg_code, seq_refund_code, seq_registration_code, seq_payment_code, seq_invoice_number, seq_support_request_code, seq_workout_plan_code).
 
 ## High Level ERD
 

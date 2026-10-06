@@ -113,7 +113,7 @@ Session reservation by a member (migrated in V10).
 
 Indexes: `ix_booking_member_session (member_id, session_id, status)`.
 
-### `waitlist_entry` (Planned - not in V10)
+### `waitlist_entry` (Implemented - Migration V15)
 
 Planned waitlist queue when class sessions reach maximum capacity.
 
