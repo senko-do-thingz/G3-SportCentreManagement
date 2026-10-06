@@ -72,6 +72,34 @@ public class BookingServiceImpl implements BookingService {
         if (request.getPackageRegistrationId() != null) {
             packageReg = registrationRepository.findById(request.getPackageRegistrationId())
                     .orElseThrow(() -> new ResourceNotFoundException("Package registration not found for id: " + request.getPackageRegistrationId()));
+
+            if (!packageReg.getMember().getId().equals(member.getId())) {
+                if (actor.getRole() != null && "MEMBER".equals(actor.getRole().getCode())) {
+                    throw new AccessDeniedException("Cannot use another member's package registration");
+                }
+                throw new BusinessRuleException("Selected package registration does not belong to the member");
+            }
+
+            if (packageReg.getStatus() != PackageRegistrationStatus.ACTIVE) {
+                throw new BusinessRuleException("Package registration is not active: " + packageReg.getStatus());
+            }
+
+            if (packageReg.getStartDate() != null && session.getSessionDate().isBefore(packageReg.getStartDate())
+                    || packageReg.getEndDate() != null && session.getSessionDate().isAfter(packageReg.getEndDate())) {
+                throw new BusinessRuleException("Session date " + session.getSessionDate() + " is outside package validity period ("
+                        + packageReg.getStartDate() + " to " + packageReg.getEndDate() + ")");
+            }
+
+            if (packageReg.getSportPackage() == null || packageReg.getSportPackage().getSport() == null
+                    || !packageReg.getSportPackage().getSport().getId().equals(session.getSport().getId())) {
+                throw new BusinessRuleException("Package sport does not match session sport");
+            }
+
+            if (session.getTrainingType() != null && packageReg.getSportPackage() != null && packageReg.getSportPackage().getTrainingFormat() != null) {
+                if (packageReg.getSportPackage().getTrainingFormat() != session.getTrainingType()) {
+                    throw new BusinessRuleException("Package training format does not match session training type");
+                }
+            }
         } else {
             // Find an active package covering this sport
             List<SportPackageRegistration> activePackages = registrationRepository.findActiveRegistrationsForSport(

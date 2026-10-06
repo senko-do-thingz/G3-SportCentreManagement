@@ -215,4 +215,148 @@ public class BookingServiceImplTest {
 
         assertThrows(AccessDeniedException.class, () -> bookingService.cancelBooking(1L, otherMember));
     }
+
+    @Test
+    void createBooking_WithAnotherMembersRegistration_AsMember_ThrowsAccessDeniedException() {
+        MemberProfile otherMember = MemberProfile.builder().id(999L).build();
+        SportPackageRegistration otherReg = SportPackageRegistration.builder()
+                .id(51L)
+                .member(otherMember)
+                .status(PackageRegistrationStatus.ACTIVE)
+                .build();
+
+        BookingCreateRequest req = BookingCreateRequest.builder()
+                .sessionId(20L)
+                .packageRegistrationId(51L)
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
+                .thenReturn(Optional.empty());
+        when(registrationRepository.findById(51L)).thenReturn(Optional.of(otherReg));
+
+        assertThrows(AccessDeniedException.class, () -> bookingService.createBooking(req, memberUser));
+    }
+
+    @Test
+    void createBooking_WithPendingPaymentRegistration_ThrowsBusinessRuleException() {
+        packageReg.setStatus(PackageRegistrationStatus.PENDING_PAYMENT);
+
+        BookingCreateRequest req = BookingCreateRequest.builder()
+                .sessionId(20L)
+                .packageRegistrationId(50L)
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
+                .thenReturn(Optional.empty());
+        when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
+
+        assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+    }
+
+    @Test
+    void createBooking_WithCancelledRegistration_ThrowsBusinessRuleException() {
+        packageReg.setStatus(PackageRegistrationStatus.CANCELLED);
+
+        BookingCreateRequest req = BookingCreateRequest.builder()
+                .sessionId(20L)
+                .packageRegistrationId(50L)
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
+                .thenReturn(Optional.empty());
+        when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
+
+        assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+    }
+
+    @Test
+    void createBooking_WithExpiredRegistration_ThrowsBusinessRuleException() {
+        packageReg.setStatus(PackageRegistrationStatus.EXPIRED);
+
+        BookingCreateRequest req = BookingCreateRequest.builder()
+                .sessionId(20L)
+                .packageRegistrationId(50L)
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
+                .thenReturn(Optional.empty());
+        when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
+
+        assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+    }
+
+    @Test
+    void createBooking_WithExpiredByDateRegistration_ThrowsBusinessRuleException() {
+        packageReg.setStartDate(LocalDate.of(2026, 9, 1));
+        packageReg.setEndDate(LocalDate.of(2026, 9, 30)); // Session is 2026-10-06
+
+        BookingCreateRequest req = BookingCreateRequest.builder()
+                .sessionId(20L)
+                .packageRegistrationId(50L)
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
+                .thenReturn(Optional.empty());
+        when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
+
+        assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+    }
+
+    @Test
+    void createBooking_WithWrongSportRegistration_ThrowsBusinessRuleException() {
+        Sport otherSport = Sport.builder().id(99L).name("Tennis").code("TENNIS").build();
+        SportPackage otherPkg = SportPackage.builder().id(6L).sport(otherSport).sessionCount(8).build();
+        packageReg.setSportPackage(otherPkg);
+
+        BookingCreateRequest req = BookingCreateRequest.builder()
+                .sessionId(20L)
+                .packageRegistrationId(50L)
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
+                .thenReturn(Optional.empty());
+        when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
+
+        assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+    }
+
+    @Test
+    void createBooking_WithValidExplicitRegistration_Success() {
+        BookingCreateRequest req = BookingCreateRequest.builder()
+                .sessionId(20L)
+                .packageRegistrationId(50L)
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
+                .thenReturn(Optional.empty());
+        when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
+        when(bookingRepository.getNextBookingCodeSequence()).thenReturn(10L);
+        when(codeFormatter.formatBookingCode(10L)).thenReturn("BKG-010");
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> {
+            Booking b = i.getArgument(0);
+            b.setId(10L);
+            return b;
+        });
+
+        BookingResponse res = bookingService.createBooking(req, memberUser);
+
+        assertNotNull(res);
+        assertEquals(BookingStatus.CONFIRMED, res.getStatus());
+        assertEquals(50L, res.getPackageRegistrationId());
+        verify(registrationRepository).save(packageReg);
+    }
 }
