@@ -557,10 +557,14 @@ public class BookingServiceImplTest {
 
         assertNotNull(response);
         assertEquals(1L, response.getBookingId());
+        assertEquals("MEM-100", response.getMemberCode());
+        assertEquals("Badminton", response.getSportName());
+        assertEquals("Receptionist User", response.getRecordedByName());
         assertEquals("Self-training attendance acknowledged (persistence pending Flow 4 implementation)", response.getMessage());
         assertEquals(5, response.getRemainingSessions());
         verify(bookingRepository, never()).save(any());
         verify(registrationRepository, never()).save(any());
         verify(sessionRepository, never()).save(any());
+        verifyNoInteractions(checkInRepository);
     }
 }
