@@ -166,7 +166,7 @@ Front desk check-in validates member arrival at the center:
    - Format Match: Self-training package for self-training sessions; Coach-led package for coach-led classes (Implemented for explicit package selection; Planned for automatic package lookup).
    - Age Restriction: Member's age falls within `age_group` range (Planned).
    - No Overlap: Member does not have an overlapping confirmed booking (Planned).
-   - Double Booking: Database enforces at most one confirmed booking per member per session (Implemented).
+   - Double Booking: Application-level check only (not race-safe, no unique index in V10) (Implemented).
 
 ## Refund Rules
 
@@ -174,9 +174,9 @@ Front desk check-in validates member arrival at the center:
 2. **Amount Calculation:** Pro-rated based on unused remaining sessions:
    - `refund_amount = (remaining_sessions / total_sessions) * paid_amount`
 3. **Manager Approval:** Center Manager must review all pending refund requests (`F3-09`).
-4. **Resolution:** Upon Manager approval, refund status becomes `APPROVED`, and upon disbursement becomes `COMPLETED`. The package registration status transitions to `REFUNDED`. If rejected, status is `REJECTED` with a mandatory reason note.
+4. **Resolution:** Upon Manager approval, refund status becomes `APPROVED` (Implemented), and upon disbursement becomes `COMPLETED` (Planned; RefundController endpoints only implement submission, pending list, and review to APPROVED or REJECTED: `RefundController.java:35` `submitRefund`, `RefundController.java:41` `getPendingRefunds`, `RefundController.java:47` `reviewRefund`). The package registration status transitions to `REFUNDED`. If rejected, status is `REJECTED` with a mandatory reason note.
 
-## Critical Transactions & Concurrency Control
+## Critical Transactions & Concurrency Control (Target design - not yet implemented)
 
 ### Booking a Seat
 
@@ -205,7 +205,7 @@ Front desk check-in validates member arrival at the center:
 
 ## Scheduled Jobs
 
-1. **Package Expiration:** Daily at midnight, set packages to `EXPIRED` if `end_date < TODAY` or `remaining_sessions = 0` (Planned).
+1. **Package Expiration:** Daily at midnight, set packages to `EXPIRED` if `end_date < TODAY` or `remaining_sessions = 0` (Planned). Note: The remaining_sessions = 0 condition conflicts with strict check-in and must be decided before the job is built.
 2. **Card Expiration:** Daily at midnight, set member cards to `EXPIRED` if `end_date < TODAY` (Planned).
 3. **Session Completion:** Hourly, mark sessions as `COMPLETED` when session date and time have passed (Planned).
 4. **Waitlist Expiry:** Hourly, expire offered waitlist entries that exceeded the acceptance window (Planned).

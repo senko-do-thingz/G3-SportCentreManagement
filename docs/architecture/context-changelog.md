@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-05  
 **Author:** Engineering Team  
-**Status:** Approved & Implemented in Phase 3 / Phase 4  
+**Status:** In Progress (Phase 4 Implementation Plan)  
 
 ## 1. Overview
 
@@ -36,7 +36,7 @@ On 2026-10-05, the product owner delivered a comprehensive overhaul of the Figma
   - Booking creation forbids using another member's package registration (throws `AccessDeniedException`).
   - Booking cancellation and refund submission forbid acting on bookings or registrations owned by other members (throws `AccessDeniedException` / 403).
   - Package registration activation is restricted to staff roles (`RECEPTIONIST`, `MANAGER`); members attempting self-activation receive 403.
-  - Member profile auto-provisioning is restricted to self or staff.
+  - Member profile auto-provisioning is restricted to self or staff, and strictly requires the target user to have role MEMBER (`SportPackageServiceImpl.java:101-103`: `if (targetUser.getRole() == null || !"MEMBER".equals(targetUser.getRole().getCode())) { throw new BusinessRuleException("Cannot create member profile for non-member user: " + targetMemberId); }`).
 
 ### 2.3 Front Desk Check-in Validation (Screen F1-15)
 - **Previous Model:** Checked in against active membership plan.
@@ -56,7 +56,31 @@ On 2026-10-05, the product owner delivered a comprehensive overhaul of the Figma
 - Payout is recorded as completed (`S3-RefundDone`).
 
 ### 2.6 Self-training Attendance (Flow 4)
-- Screen `F4-09 - Self-training Attendance`: Front desk receptionists record self-training attendance, consuming 1 reserved session.
+- Screen `F4-09 - Self-training Attendance`: Front desk receptionists record self-training attendance. However, `BookingServiceImpl.recordSelfTrainingAttendance` (`BookingServiceImpl.java:225-248`) does not persist anything today (no attendance record created, no remaining session deduction, no check-in link):
+  ```java
+  Booking booking = bookingRepository.findById(request.getBookingId())
+          .orElseThrow(() -> new ResourceNotFoundException("Booking not found for id: " + request.getBookingId()));
+
+  if (booking.getStatus() != BookingStatus.CONFIRMED) {
+      throw new BusinessRuleException("Cannot mark attendance for a non-confirmed booking");
+  }
+
+  SportPackageRegistration pkg = booking.getPackageRegistration();
+  int remaining = pkg != null ? pkg.getRemainingSessions() : 0;
+
+  return SelfTrainingAttendanceResponse.builder()
+          .bookingId(booking.getId())
+          .bookingCode(booking.getBookingCode())
+          .memberId(booking.getMember().getId())
+          .memberCode(booking.getMember().getMemberCode())
+          .memberFullName(booking.getMember().getUserAccount().getFullName())
+          .sportName(booking.getSession().getSport().getName())
+          .remainingSessions(remaining)
+          .confirmedAt(LocalDateTime.now(clock))
+          .recordedByName(receptionist.getFullName())
+          .message("Self-training attendance recorded and verified successfully")
+          .build();
+  ```
 - Coaches record class attendance for coach-led sessions (`F4-02`).
 
 ## 3. Phase 4 Implementation Plan
