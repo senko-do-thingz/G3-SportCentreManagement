@@ -3,6 +3,10 @@ package com.sportify.catalog.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sportify.catalog.dto.RefundReviewRequest;
 import com.sportify.catalog.dto.SportPackageCreateRequest;
+import com.sportify.catalog.dto.PackageRegistrationRequest;
+import com.sportify.catalog.dto.PackageRegistrationResponse;
+import com.sportify.catalog.entity.PackageRegistrationStatus;
+import com.sportify.catalog.entity.RegistrationChannel;
 import com.sportify.catalog.service.BookingService;
 import com.sportify.catalog.service.MembershipCardService;
 import com.sportify.catalog.service.RefundService;
@@ -30,11 +34,13 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest({SportPackageController.class, RefundController.class, MembershipCardController.class, BookingController.class})
@@ -145,5 +151,37 @@ public class RefreshedCatalogAuthorizationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void registerPackage_AsMember_ChannelReception_ReturnsPendingPaymentAndOnline() throws Exception {
+        PackageRegistrationRequest req = PackageRegistrationRequest.builder()
+                .packageId(10L)
+                .channel(RegistrationChannel.RECEPTION)
+                .build();
+
+        PackageRegistrationResponse res = PackageRegistrationResponse.builder()
+                .id(1L)
+                .channel(RegistrationChannel.ONLINE)
+                .status(PackageRegistrationStatus.PENDING_PAYMENT)
+                .build();
+
+        when(sportPackageService.registerPackage(any(), argThat(u -> u != null && u.getRole() != null && "MEMBER".equals(u.getRole().getCode()))))
+                .thenReturn(res);
+
+        mockMvc.perform(post("/api/v1/packages/registrations")
+                        .with(user(createUserDetails("MEMBER")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.channel").value("ONLINE"))
+                .andExpect(jsonPath("$.status").value("PENDING_PAYMENT"));
+    }
+
+    @Test
+    void activateRegistration_AsMember_ShouldReturn403() throws Exception {
+        mockMvc.perform(put("/api/v1/packages/registrations/1/activate")
+                        .with(user(createUserDetails("MEMBER"))))
+                .andExpect(status().isForbidden());
     }
 }

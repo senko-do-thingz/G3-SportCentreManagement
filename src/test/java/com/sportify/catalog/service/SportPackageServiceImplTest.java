@@ -72,6 +72,7 @@ public class SportPackageServiceImplTest {
     private SportPackage sportPackage;
     private UserAccount memberUser;
     private UserAccount receptionistUser;
+    private UserAccount managerUser;
     private MemberProfile memberProfile;
 
     @BeforeEach
@@ -95,6 +96,9 @@ public class SportPackageServiceImplTest {
 
         Role recRole = Role.builder().id(2L).code("RECEPTIONIST").name("Receptionist").build();
         receptionistUser = UserAccount.builder().id(200L).email("rec@sportify.com").role(recRole).build();
+
+        Role mgrRole = Role.builder().id(3L).code("MANAGER").name("Manager").build();
+        managerUser = UserAccount.builder().id(300L).email("mgr@sportify.com").role(mgrRole).build();
     }
 
     @Test
@@ -160,6 +164,32 @@ public class SportPackageServiceImplTest {
     }
 
     @Test
+    void registerPackage_AsMember_WithChannelReception_ForcesOnlineAndPendingPayment() {
+        PackageRegistrationRequest req = PackageRegistrationRequest.builder()
+                .packageId(10L)
+                .channel(RegistrationChannel.RECEPTION) // Member attempts to self-activate via reception channel
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(sportPackage));
+        when(membershipCardService.getApplicableDiscountPercentage(eq(100L), eq(30))).thenReturn(0);
+        when(registrationRepository.getNextRegistrationCodeSequence()).thenReturn(103L);
+        when(codeFormatter.formatPackageRegCode(103L)).thenReturn("REG-PKG-103");
+        when(registrationRepository.save(any(SportPackageRegistration.class))).thenAnswer(i -> {
+            SportPackageRegistration r = i.getArgument(0);
+            r.setId(502L);
+            return r;
+        });
+
+        PackageRegistrationResponse res = sportPackageService.registerPackage(req, memberUser);
+
+        assertNotNull(res);
+        assertEquals(100L, res.getMemberId());
+        assertEquals(RegistrationChannel.ONLINE, res.getChannel()); // Channel forced to ONLINE
+        assertEquals(PackageRegistrationStatus.PENDING_PAYMENT, res.getStatus()); // Status forced to PENDING_PAYMENT
+    }
+
+    @Test
     void registerPackage_AsReceptionist_UsesProvidedMemberId_SetsActive() {
         PackageRegistrationRequest req = PackageRegistrationRequest.builder()
                 .memberId(100L)
@@ -182,7 +212,35 @@ public class SportPackageServiceImplTest {
 
         assertNotNull(res);
         assertEquals(100L, res.getMemberId());
+        assertEquals(RegistrationChannel.RECEPTION, res.getChannel());
         assertEquals(PackageRegistrationStatus.ACTIVE, res.getStatus()); // Front desk registration is activated immediately
+    }
+
+    @Test
+    void registerPackage_AsManager_UsesProvidedMemberId_SetsActive() {
+        PackageRegistrationRequest req = PackageRegistrationRequest.builder()
+                .memberId(100L)
+                .packageId(10L)
+                .channel(RegistrationChannel.RECEPTION)
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(sportPackage));
+        when(membershipCardService.getApplicableDiscountPercentage(eq(100L), eq(30))).thenReturn(0);
+        when(registrationRepository.getNextRegistrationCodeSequence()).thenReturn(104L);
+        when(codeFormatter.formatPackageRegCode(104L)).thenReturn("REG-PKG-104");
+        when(registrationRepository.save(any(SportPackageRegistration.class))).thenAnswer(i -> {
+            SportPackageRegistration r = i.getArgument(0);
+            r.setId(503L);
+            return r;
+        });
+
+        PackageRegistrationResponse res = sportPackageService.registerPackage(req, managerUser);
+
+        assertNotNull(res);
+        assertEquals(100L, res.getMemberId());
+        assertEquals(RegistrationChannel.RECEPTION, res.getChannel());
+        assertEquals(PackageRegistrationStatus.ACTIVE, res.getStatus()); // Front desk registration by manager is activated immediately
     }
 
     @Test

@@ -134,17 +134,31 @@ public class SportPackageServiceImpl implements SportPackageService {
         long seq = registrationRepository.getNextRegistrationCodeSequence();
         String regCode = codeFormatter.formatPackageRegCode(seq);
 
-        RegistrationChannel channel = request.getChannel() != null ? request.getChannel() : RegistrationChannel.ONLINE;
+        String roleCode = actor.getRole() != null ? actor.getRole().getCode() : null;
+        RegistrationChannel channel;
+        PackageRegistrationStatus initialStatus;
+        LocalDateTime activatedAt;
 
-        // Staff registering at reception can activate immediately; online registration defaults to PENDING_PAYMENT
-        boolean isStaffReception = (channel == RegistrationChannel.RECEPTION)
-                || (actor.getRole() != null && ("RECEPTIONIST".equals(actor.getRole().getCode()) || "MANAGER".equals(actor.getRole().getCode())));
-
-        PackageRegistrationStatus initialStatus = isStaffReception
-                ? PackageRegistrationStatus.ACTIVE
-                : PackageRegistrationStatus.PENDING_PAYMENT;
-
-        LocalDateTime activatedAt = isStaffReception ? LocalDateTime.now(clock) : null;
+        if ("MEMBER".equals(roleCode)) {
+            // For a MEMBER actor, ignore request.channel and force RegistrationChannel.ONLINE with initial status PENDING_PAYMENT
+            channel = RegistrationChannel.ONLINE;
+            initialStatus = PackageRegistrationStatus.PENDING_PAYMENT;
+            activatedAt = null;
+        } else if ("RECEPTIONIST".equals(roleCode) || "MANAGER".equals(roleCode)) {
+            // Only RECEPTIONIST and MANAGER may create ACTIVE registrations (channel RECEPTION)
+            channel = request.getChannel() != null ? request.getChannel() : RegistrationChannel.RECEPTION;
+            if (channel == RegistrationChannel.RECEPTION) {
+                initialStatus = PackageRegistrationStatus.ACTIVE;
+                activatedAt = LocalDateTime.now(clock);
+            } else {
+                initialStatus = PackageRegistrationStatus.PENDING_PAYMENT;
+                activatedAt = null;
+            }
+        } else {
+            channel = RegistrationChannel.ONLINE;
+            initialStatus = PackageRegistrationStatus.PENDING_PAYMENT;
+            activatedAt = null;
+        }
 
         SportPackageRegistration registration = SportPackageRegistration.builder()
                 .registrationCode(regCode)
