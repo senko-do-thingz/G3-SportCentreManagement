@@ -55,6 +55,5 @@ public class UserAccount extends BaseMasterEntity {
 
     @Version
     @Column(nullable = false)
-    @Builder.Default
-    private Integer version = 0;
+    private Integer version;
 }

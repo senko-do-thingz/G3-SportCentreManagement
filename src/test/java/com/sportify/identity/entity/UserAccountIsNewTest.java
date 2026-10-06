@@ -47,16 +47,16 @@ class UserAccountIsNewTest {
     }
 
     @Test
-    void builderDefaultVersionZeroCausesIsNewToBeFalse() {
+    void builderDefaultVersionIsNullAndIsNewIsTrue() {
         UserAccount user = UserAccount.builder()
                 .email("test@sportify.com")
                 .fullName("Test User")
                 .build();
 
-        // UserAccount has @Builder.Default private Integer version = 0
-        // Because version is non-null (0), Spring Data JpaMetamodelEntityInformation.isNew returns false
-        assertFalse(entityInformation.isNew(user),
-                "UserAccount built with default version 0 must be treated as not new (isNew == false)");
+        // UserAccount version field defaults to null
+        assertNull(user.getVersion(), "UserAccount built with default builder must have version == null");
+        assertTrue(entityInformation.isNew(user),
+                "UserAccount built with default builder (version == null) must be treated as new (isNew == true)");
     }
 
     @Test
@@ -73,7 +73,7 @@ class UserAccountIsNewTest {
     }
 
     @Test
-    void simpleJpaRepositoryDelegatesToMergeWhenVersionIsZero() {
+    void simpleJpaRepositoryDelegatesToPersistWhenUsingDefaultBuilder() {
         EntityManager em = mock(EntityManager.class);
         EntityManagerFactory emf = mock(EntityManagerFactory.class);
         when(em.getEntityManagerFactory()).thenReturn(emf);
@@ -85,13 +85,12 @@ class UserAccountIsNewTest {
                 .fullName("Test User")
                 .build();
 
-        when(em.merge(user)).thenReturn(user);
+        UserAccount savedUser = repository.save(user);
 
-        repository.save(user);
-
-        // Because isNew is false, SimpleJpaRepository calls merge instead of persist
-        verify(em).merge(user);
-        verify(em, never()).persist(any());
+        // Because version defaults to null, isNew is true: SimpleJpaRepository calls persist with the original instance and never merge
+        assertSame(user, savedUser, "Returned instance from save must be the original instance");
+        verify(em).persist(user);
+        verify(em, never()).merge(any());
     }
 
     @Test
@@ -123,9 +122,12 @@ class UserAccountIsNewTest {
 
         SimpleJpaRepository<UserAccount, Long> repository = new SimpleJpaRepository<>(entityInformation, em);
 
+        // Documents the legacy failure mode: when an entity carries an explicit non-null version (e.g. 0),
+        // Spring Data JPA considers isNew == false and delegates to em.merge rather than em.persist.
         UserAccount originalUser = UserAccount.builder()
                 .email("test@sportify.com")
                 .fullName("Test User")
+                .version(0)
                 .build();
 
         UserAccount managedUser = UserAccount.builder()

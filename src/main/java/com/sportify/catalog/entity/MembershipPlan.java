@@ -69,8 +69,7 @@ public class MembershipPlan extends BaseMasterEntity {
 
     @Version
     @Column(nullable = false)
-    @Builder.Default
-    private Integer version = 0;
+    private Integer version;
 
     /** Pool of sports this plan allows ({@code plan_eligible_sport}). */
     @ManyToMany(fetch = FetchType.LAZY)

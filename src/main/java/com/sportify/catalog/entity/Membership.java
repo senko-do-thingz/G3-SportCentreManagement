@@ -89,8 +89,7 @@ public class Membership extends BaseAuditableEntity {
 
     @Version
     @Column(nullable = false)
-    @Builder.Default
-    private Integer version = 0;
+    private Integer version;
 
     /** Sports selected for this period ({@code membership_sport}). */
     @ManyToMany(fetch = FetchType.LAZY)
