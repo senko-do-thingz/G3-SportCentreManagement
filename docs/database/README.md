@@ -14,7 +14,7 @@ The design is derived from the UI mockups in `context/` (Home + Flow 1 to Flow 6
 | Framework | Spring Boot 3.x |
 | Persistence | Spring Data JPA (Hibernate 6) |
 | Database | Microsoft SQL Server 2019+ (also works on Azure SQL) |
-| Migrations | Flyway (`V1__init_schema.sql`, `V2__seed_reference_data.sql`) |
+| Migrations | Flyway: Identity (`V1` to `V4`), Catalog, Booking, Refunds & Packages (`V5`, `V6`, `V9`, `V10`, `V11`, `V12`). `V7` and `V8` do not exist because booking migration `V7` was renumbered to `V10` (commit f545759); `V12` is data-only (updates 7 seeded packages in place, inserts 29, adds no tables). |
 | Security | Spring Security (role + permission authorities) |
 
 ## Document Index
@@ -39,10 +39,14 @@ The design is derived from the UI mockups in `context/` (Home + Flow 1 to Flow 6
 1. **One center only.** "This project has one center. No branch selector is required." (F3-10). There is no `center`
    or `branch` table; center details live in `system_setting`.
 2. **One role per account.** Every screen shows a single role per user. Permissions per role are configurable (F1-03).
-3. **Membership is sport-based.** A plan defines how many sports a member may choose (`max_sports`) from a pool of
-   eligible sports. The chosen sports are stored per membership period.
-4. **Membership starts only after payment confirmation** (F1-08, F1-11, F3-06). A pending payment never activates access.
-5. **Class booking inside an active plan costs 0 VND** and never creates a payment (F2-07, F3-01).
+3. **Sport package and card tier architecture.** Members purchase individual sport packages (`sport_package`) specified by sport,
+   training format (`SELF_TRAINING`, `COACH_LED`), duration in days, and session count. In addition, members hold a
+   membership card (`member_card`) with a discount tier (`membership_card_tier`: Standard 0%, Gold 5%, VIP 10%)
+   that provides discounts on eligible packages. Legacy `membership_plan` is retained for backwards compatibility.
+4. **Registration activation and payment lifecycle.** Online sport package registrations start in `PENDING_PAYMENT`
+   status with sessions locked until payment confirmation or reception activation, which transitions the registration
+   to `ACTIVE`, computes start/end dates, and unlocks class bookings.
+5. **Class booking inside an active package consumes remaining sessions** and does not create an immediate payment at booking time (F2-07, F3-01).
 6. **Center check-in (Receptionist) is different from class attendance (Coach)** (F1-13, F4-01, F4-10).
 7. **AI never commits business actions.** The AI assistant does not book or register; AI workout plans become
    effective only after Coach approval (F5-07, F5-11, F6-06).
@@ -54,7 +58,7 @@ The design is derived from the UI mockups in `context/` (Home + Flow 1 to Flow 6
 |---|---|
 | Table names | `snake_case`, singular (`booking`, `class_session`). Reserved words avoided (`user_account`, `sport_class`). |
 | Primary key | `id BIGINT IDENTITY(1,1)`. 1:1 profile tables reuse the parent key (`member_profile.user_id`). |
-| Business codes | Human readable codes (`MEM-0128`, `REG-1042`, `PAY-1098`, `INV-2026-1099`, `BK-2048`, `REQ-1082`, `CL-204`, `WP-0001`) stored in a separate `UNIQUE` column, generated from SQL Server `SEQUENCE` objects. |
+| Business codes | Human readable codes (`MEM-0128`, `REG-1042`, `CARD-1000`, `REG-PKG-1000`, `REF-1000`, `BK-2048`, `CL-1204`, `PAY-1098`, `INV-2026-1099`, `REQ-1082`, `WP-0001`) stored in a separate `UNIQUE` column, generated from SQL Server `SEQUENCE` objects. |
 | Text | `NVARCHAR` for every string column (Vietnamese names, plus avoids implicit conversion with the JDBC driver). |
 | Enums | `NVARCHAR(20..40)` + `CHECK` constraint, mapped with `@Enumerated(EnumType.STRING)`. |
 | Money | `DECIMAL(14,2)` in VND, mapped to `java.math.BigDecimal`. |
@@ -80,7 +84,7 @@ The design is derived from the UI mockups in `context/` (Home + Flow 1 to Flow 6
 | AI assistant and support | `assistant_setting`, `assistant_topic`, `assistant_quick_prompt`, `ai_conversation`, `ai_message`, `support_request`, `support_request_message` | Flow 6, Flow 1 |
 | Notifications and system | `notification`, `announcement`, `system_setting` | All |
 
-Total: **58 tables** (including V10 and V11 refreshed catalog tables), **3 reporting views**, **8 sequences**.
+Total: **58 tables** (26 implemented in migrations V1-V12, 32 planned; V12 is data-only so table count is unchanged), **3 reporting views** (planned), **11 sequences** (7 implemented in migrations V2, V9-V10: seq_booking_code, seq_card_code, seq_class_code, seq_member_code, seq_package_reg_code, seq_refund_code, seq_registration_code; 4 planned: seq_payment_code, seq_invoice_number, seq_support_request_code, seq_workout_plan_code).
 
 ## High Level ERD
 
@@ -91,12 +95,13 @@ erDiagram
     permission ||--o{ role_permission : "granted by"
     user_account ||--o| member_profile : "is a"
     user_account ||--o| coach_profile : "is a"
-    membership_plan ||--o{ membership : "defines"
-    member_profile ||--o{ membership : "holds"
-    membership ||--o{ membership_sport : "covers"
-    sport ||--o{ membership_sport : "covered by"
-    membership ||--o{ payment : "paid by"
-    payment ||--o| invoice : "produces"
+    membership_card_tier ||--o{ member_card : "categorizes"
+    member_profile ||--o{ member_card : "holds"
+    sport ||--o{ sport_package : "offered as"
+    sport_package ||--o{ sport_package_registration : "registered in"
+    member_profile ||--o{ sport_package_registration : "purchases"
+    sport_package_registration ||--o{ refund_request : "requested for"
+    sport_package_registration ||--o{ booking : "covers"
     sport ||--o{ sport_class : "categorizes"
     age_group ||--o{ sport_class : "targets"
     sport_class ||--o{ class_session : "scheduled as"
@@ -104,6 +109,7 @@ erDiagram
     facility ||--o{ class_session : "hosts"
     class_session ||--o{ booking : "reserved by"
     member_profile ||--o{ booking : "makes"
+    booking ||--o{ check_in : "checked in at"
     class_session ||--o{ waitlist_entry : "queues"
     booking ||--o| attendance_record : "results in"
     attendance_record ||--o| session_result : "scored in"
@@ -123,10 +129,10 @@ These do not block the schema (the design handles both cases), but the team shou
 
 | # | Observation | Impact on design |
 |---|---|---|
-| 1 | Multi-Sport price is 550,000 VND in F1-07, F1-08, F1-11, F1-12 but 300,000 VND in F3-03 to F3-08 and in the revenue report. | Price is snapshotted on `membership.price_amount` and `payment.amount_due`, so either value works. Confirm the official price for seed data. |
+| 1 | Sport package pricing across Figma screens. | Packages have dedicated pricing per item in `sport_package` (e.g. PK-001 through PK-036). Base prices and session counts are snapshotted on `sport_package_registration`. |
 | 2 | Goal labels differ: "Improve fitness" (Home, F1-06), "Improve health" (F5-02), "Fitness" (F4-09). | One enum `IMPROVE_FITNESS` with display label "Improve health and fitness". |
 | 3 | Age group for members is shown as "Adults 18+" (F1-06) while classes use "Ages 16+". | Member age group is not stored; eligibility is computed from `date_of_birth` against the class `age_group` range. |
 | 4 | F5-10 Coach Review Queue lists a plan with status "Not submitted". | Queue should only list `plan_review.status = 'PENDING'`. Draft plans are not visible to coaches. |
-| 5 | Revenue report shows a plan "Basketball Pass" and "Swim Starter" that are not on the public plan pages. | Supported as single-sport plans with a fixed eligible sport (`plan_eligible_sport`). |
+| 5 | Single sport packages vs multi-sport packages. | Modeled cleanly as individual `sport_package` rows per sport (Football, Badminton, Basketball, Volleyball, Swimming, Tennis). |
 | 6 | Home shows recurring times ("Tue and Thu - 17:00") while F2-03 schedules one session date. | v1 stores individual `class_session` rows. A recurrence pattern table is listed as a future extension. |
-| 7 | "Membership cards" menu (older F1 variant) has no dedicated screen. | Treated as the list of `membership` rows. |
+| 7 | Membership card tiers and benefits (F1-03, F1-04, F1-05). | Handled by `membership_card_tier` (Standard 0 VND / 0%, Gold 300,000 VND / 5%, VIP 600,000 VND / 10%) and member holdings in `member_card`. |
