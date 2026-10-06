@@ -6,7 +6,6 @@ import com.sportify.catalog.entity.Booking;
 import com.sportify.catalog.entity.BookingStatus;
 import com.sportify.catalog.entity.CheckIn;
 import com.sportify.catalog.entity.CheckInResult;
-import com.sportify.catalog.entity.Membership;
 import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.entity.SportPackageRegistration;
 import com.sportify.catalog.repository.BookingRepository;
@@ -61,7 +60,6 @@ public class CheckInServiceImpl implements CheckInService {
 
         Booking targetBooking = null;
         SportPackageRegistration targetPackage = null;
-        Membership activeMembership = null;
         CheckInResult result = CheckInResult.DENIED;
         String denialReason = null;
 
@@ -116,7 +114,6 @@ public class CheckInServiceImpl implements CheckInService {
                 .member(profile)
                 .booking(targetBooking)
                 .packageRegistration(targetPackage)
-                .membership(activeMembership)
                 .checkedInAt(LocalDateTime.now(clock))
                 .result(result)
                 .denialReason(denialReason)
@@ -139,7 +136,6 @@ public class CheckInServiceImpl implements CheckInService {
                 .id(checkIn.getId())
                 .memberId(profile.getId())
                 .memberName(profile.getUserAccount().getFullName())
-                .membershipId(activeMembership != null ? activeMembership.getId() : null)
                 .bookingId(targetBooking != null ? targetBooking.getId() : null)
                 .bookingCode(targetBooking != null ? targetBooking.getBookingCode() : null)
                 .packageRegistrationId(targetPackage != null ? targetPackage.getId() : null)
