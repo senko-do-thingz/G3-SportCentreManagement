@@ -73,15 +73,15 @@ Required Keys:
 
 ## Sequences
 
-The following sequences are defined in the schema design to generate business codes via `NEXT VALUE FOR`:
+The following sequences are defined in the schema design to generate business codes via `NEXT VALUE FOR` and formatted via `CodeFormatter`:
 
-- `seq_member_code`: Format `MEM-0001` (Implemented in V2)
-- `seq_registration_code`: Format `REG-0001` (Implemented in V9)
-- `seq_card_code`: Format `CARD-1001` (Implemented in V10)
-- `seq_package_reg_code`: Format `SPR-1001` (Implemented in V10)
-- `seq_refund_code`: Format `REF-1001` (Implemented in V10)
-- `seq_booking_code`: Format `BK-0001` (Implemented in V10)
-- `seq_class_code`: Format `CL-0001` (Implemented in V10)
+- `seq_member_code`: Format `MEM-%04d`, first generated `MEM-0001` (START WITH 1, Implemented in V2)
+- `seq_registration_code`: Format `REG-%04d`, first generated `REG-1000` (START WITH 1000, Implemented in V9)
+- `seq_card_code`: Format `CARD-%04d`, first generated `CARD-1000` (START WITH 1000, Implemented in V10)
+- `seq_package_reg_code`: Format `REG-PKG-%04d`, first generated `REG-PKG-1000` (START WITH 1000, Implemented in V10)
+- `seq_refund_code`: Format `REF-%04d`, first generated `REF-1000` (START WITH 1000, Implemented in V10)
+- `seq_booking_code`: Format `BK-%04d`, first generated `BK-1000` (START WITH 1000, Implemented in V10)
+- `seq_class_code`: Format `CL-%04d`, first generated `CL-1000` (START WITH 1000, Implemented in V10)
 - `seq_payment_code`: Format `PAY-0001` (Planned)
 - `seq_invoice_number`: Format `INV-YYYY-0001` (YYYY handled in app or trigger, Planned)
 - `seq_support_request_code`: Format `REQ-0001` (Planned)

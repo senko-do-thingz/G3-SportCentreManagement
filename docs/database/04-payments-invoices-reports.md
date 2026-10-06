@@ -142,7 +142,7 @@ Front desk refund filing and Manager review/approval workflow (F3-07, F3-09).
 | Column | Type | Null | Key / Default | Description |
 |---|---|---|---|---|
 | id | BIGINT | No | PK, IDENTITY | |
-| refund_code | NVARCHAR(30) | No | UQ | `REF-1001` |
+| refund_code | NVARCHAR(30) | No | UQ | `REF-1000` |
 | payment_id | BIGINT | No | FK -> payment.id | Original payment |
 | package_registration_id | BIGINT | Yes | FK -> sport_package_registration.id | Package being refunded |
 | member_id | BIGINT | No | FK -> member_profile.user_id | Member receiving refund |

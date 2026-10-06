@@ -94,7 +94,7 @@ Member's card holding record.
 | Column | Type | Null | Key / Default | Description |
 |---|---|---|---|---|
 | id | BIGINT | No | PK, IDENTITY | |
-| card_code | NVARCHAR(30) | No | UQ | `CARD-1001` from sequence |
+| card_code | NVARCHAR(30) | No | UQ | `CARD-1000` from sequence |
 | member_id | BIGINT | No | FK -> member_profile.user_id | Member holding card |
 | tier_id | BIGINT | No | FK -> membership_card_tier.id | Current card tier |
 | start_date | DATE | No | | Card activation date |
@@ -129,7 +129,7 @@ An instance of a member purchasing a sport package.
 | Column | Type | Null | Key / Default | Description |
 |---|---|---|---|---|
 | id | BIGINT | No | PK, IDENTITY | |
-| registration_code | NVARCHAR(30) | No | UQ | `REG-PKG-1001` |
+| registration_code | NVARCHAR(30) | No | UQ | `REG-PKG-1000` |
 | member_id | BIGINT | No | FK -> member_profile.user_id | Purchasing member |
 | package_id | BIGINT | No | FK -> sport_package.id | Package purchased |
 | channel | NVARCHAR(20) | No | | `ONLINE` or `RECEPTION` |

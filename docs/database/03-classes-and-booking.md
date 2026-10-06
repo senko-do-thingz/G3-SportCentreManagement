@@ -28,7 +28,7 @@ erDiagram
 ## Design Decisions
 
 - **Class vs session.** `sport_class` is the learning group defined in F2-02 (name, sport, age group, level, goal,
-  maximum members, code `CL-204`). `class_session` is one dated occurrence created in F2-03 (date, start/end time,
+  maximum members, code `CL-1000`). `class_session` is one dated occurrence created in F2-03 (date, start/end time,
   teaching area, coach). Members book **sessions**.
 - **Coach-led vs Self-training sessions.** Sessions support two formats: `COACH_LED` and `SELF_TRAINING`.
   For `SELF_TRAINING`, `coach_id` is nullable (or assigned to facility supervisor). Booking self-training slots reserves
@@ -56,7 +56,7 @@ Learning group / class definition (migrated in V10).
 | Column | Type | Null | Key / Default | Description |
 |---|---|---|---|---|
 | id | BIGINT | No | PK, IDENTITY | |
-| code | NVARCHAR(30) | No | UQ | `CL-204` from `seq_class_code` |
+| code | NVARCHAR(30) | No | UQ | `CL-1000` from `seq_class_code` |
 | name | NVARCHAR(100) | No | | Display class name (e.g. "Basketball Fundamentals") |
 | sport_id | BIGINT | No | FK -> sport.id | Sport categorized |
 | age_group_id | BIGINT | Yes | FK -> age_group.id | Target age group (e.g. "Ages 16+") |

@@ -58,7 +58,7 @@ The design is derived from the UI mockups in `context/` (Home + Flow 1 to Flow 6
 |---|---|
 | Table names | `snake_case`, singular (`booking`, `class_session`). Reserved words avoided (`user_account`, `sport_class`). |
 | Primary key | `id BIGINT IDENTITY(1,1)`. 1:1 profile tables reuse the parent key (`member_profile.user_id`). |
-| Business codes | Human readable codes (`MEM-0128`, `REG-1042`, `PAY-1098`, `INV-2026-1099`, `BK-2048`, `REQ-1082`, `CL-204`, `WP-0001`) stored in a separate `UNIQUE` column, generated from SQL Server `SEQUENCE` objects. |
+| Business codes | Human readable codes (`MEM-0128`, `REG-1042`, `CARD-1000`, `REG-PKG-1000`, `REF-1000`, `BK-2048`, `CL-1204`, `PAY-1098`, `INV-2026-1099`, `REQ-1082`, `WP-0001`) stored in a separate `UNIQUE` column, generated from SQL Server `SEQUENCE` objects. |
 | Text | `NVARCHAR` for every string column (Vietnamese names, plus avoids implicit conversion with the JDBC driver). |
 | Enums | `NVARCHAR(20..40)` + `CHECK` constraint, mapped with `@Enumerated(EnumType.STRING)`. |
 | Money | `DECIMAL(14,2)` in VND, mapped to `java.math.BigDecimal`. |
