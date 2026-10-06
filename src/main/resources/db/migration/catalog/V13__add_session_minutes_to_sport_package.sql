@@ -17,37 +17,41 @@ BEGIN
         CONSTRAINT [df_sport_package_session_minutes] DEFAULT 60
         CONSTRAINT [ck_sport_package_session_minutes] CHECK ([session_minutes] IN (60, 90));
 END;
+GO
 
 -- Step 2: Backfill session_minutes to match Figma screens F1-02
--- Self-training packages: 60 minutes each
-UPDATE [sport_package]
-SET [session_minutes] = 60
-WHERE [training_format] = 'SELF_TRAINING';
+-- Execute dynamically to prevent compile-time column resolution errors in SQL Server
+EXEC sp_executesql N'
+    UPDATE [sport_package]
+    SET [session_minutes] = 60
+    WHERE [training_format] = ''SELF_TRAINING'';
 
--- Coach-led packages: 90 minutes each
-UPDATE [sport_package]
-SET [session_minutes] = 90
-WHERE [training_format] = 'COACH_LED';
+    UPDATE [sport_package]
+    SET [session_minutes] = 90
+    WHERE [training_format] = ''COACH_LED'';
+';
+GO
 
 -- Step 3: Post-condition validation
--- Assert that exactly 18 self-training packages have 60 minutes
-DECLARE @self_60_count INT;
-SELECT @self_60_count = COUNT(*)
-FROM [sport_package]
-WHERE [training_format] = 'SELF_TRAINING' AND [session_minutes] = 60;
+EXEC sp_executesql N'
+    DECLARE @self_60_count INT;
+    SELECT @self_60_count = COUNT(*)
+    FROM [sport_package]
+    WHERE [training_format] = ''SELF_TRAINING'' AND [session_minutes] = 60;
 
-IF @self_60_count <> 18
-BEGIN
-    THROW 50001, 'Migration V13 verification failed: expected 18 self-training packages with session_minutes = 60', 1;
-END;
+    IF @self_60_count <> 18
+    BEGIN
+        THROW 50001, ''Migration V13 verification failed: expected 18 self-training packages with session_minutes = 60'', 1;
+    END;
 
--- Assert that exactly 18 coach-led packages have 90 minutes
-DECLARE @coach_90_count INT;
-SELECT @coach_90_count = COUNT(*)
-FROM [sport_package]
-WHERE [training_format] = 'COACH_LED' AND [session_minutes] = 90;
+    DECLARE @coach_90_count INT;
+    SELECT @coach_90_count = COUNT(*)
+    FROM [sport_package]
+    WHERE [training_format] = ''COACH_LED'' AND [session_minutes] = 90;
 
-IF @coach_90_count <> 18
-BEGIN
-    THROW 50001, 'Migration V13 verification failed: expected 18 coach-led packages with session_minutes = 90', 1;
-END;
+    IF @coach_90_count <> 18
+    BEGIN
+        THROW 50001, ''Migration V13 verification failed: expected 18 coach-led packages with session_minutes = 90'', 1;
+    END;
+';
+GO
