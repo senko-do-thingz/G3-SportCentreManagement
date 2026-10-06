@@ -6,6 +6,7 @@ import com.sportify.catalog.entity.Booking;
 import com.sportify.catalog.entity.BookingStatus;
 import com.sportify.catalog.entity.ClassSession;
 import com.sportify.catalog.entity.PackageRegistrationStatus;
+import com.sportify.catalog.entity.SessionStatus;
 import com.sportify.catalog.entity.Sport;
 import com.sportify.catalog.entity.SportPackage;
 import com.sportify.catalog.entity.SportPackageRegistration;
@@ -411,5 +412,29 @@ public class BookingServiceImplTest {
         when(registrationRepository.findById(51L)).thenReturn(Optional.of(otherReg));
 
         assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, staffUser));
+    }
+
+    @Test
+    void createBooking_WithUnpublishedSession_ThrowsBusinessRuleException() {
+        session.setStatus(SessionStatus.DRAFT);
+
+        BookingCreateRequest req = BookingCreateRequest.builder().sessionId(20L).build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+
+        assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+    }
+
+    @Test
+    void createBooking_WithPastSessionDate_ThrowsBusinessRuleException() {
+        session.setSessionDate(LocalDate.of(2026, 10, 5)); // Past date (clock is 2026-10-06)
+
+        BookingCreateRequest req = BookingCreateRequest.builder().sessionId(20L).build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+
+        assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
     }
 }

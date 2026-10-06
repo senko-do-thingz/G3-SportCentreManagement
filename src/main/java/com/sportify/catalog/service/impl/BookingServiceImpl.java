@@ -8,6 +8,7 @@ import com.sportify.catalog.entity.Booking;
 import com.sportify.catalog.entity.BookingStatus;
 import com.sportify.catalog.entity.ClassSession;
 import com.sportify.catalog.entity.PackageRegistrationStatus;
+import com.sportify.catalog.entity.SessionStatus;
 import com.sportify.catalog.entity.SportPackageRegistration;
 import com.sportify.catalog.repository.BookingRepository;
 import com.sportify.catalog.repository.ClassSessionRepository;
@@ -57,6 +58,16 @@ public class BookingServiceImpl implements BookingService {
         ClassSession session = sessionRepository.findById(request.getSessionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Class session not found for id: " + request.getSessionId()));
 
+        LocalDate today = LocalDate.now(clock);
+
+        if (session.getStatus() != SessionStatus.PUBLISHED) {
+            throw new BusinessRuleException("Session is not published for booking");
+        }
+
+        if (session.getSessionDate().isBefore(today)) {
+            throw new BusinessRuleException("Cannot book a session in the past");
+        }
+
         if (session.getBookedCount() >= session.getCapacity()) {
             throw new BusinessRuleException("Session is fully booked");
         }
@@ -67,7 +78,6 @@ public class BookingServiceImpl implements BookingService {
             throw new BusinessRuleException("Member already has a confirmed booking for this session");
         }
 
-        LocalDate today = LocalDate.now(clock);
         SportPackageRegistration packageReg;
         if (request.getPackageRegistrationId() != null) {
             packageReg = registrationRepository.findById(request.getPackageRegistrationId())

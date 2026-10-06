@@ -160,7 +160,7 @@ Front desk check-in validates member arrival at the center:
    - Date recomputation at activation: If `startDate` is in the past when activation occurs (`startDate < TODAY`), `startDate` is reset to `TODAY` and `endDate` is set to `startDate + durationDays`. If `startDate >= TODAY`, dates are preserved unchanged.
    - Refund terminal status: Approved refunds transition the associated package registration status to `REFUNDED`.
 4. **Booking Eligibility Checklist:**
-   - Session State: `PUBLISHED` and in the future (Planned).
+   - Session State: `PUBLISHED` and in the future (Implemented).
    - Capacity: Available seats (`capacity - booked_count > 0`, Implemented; waitlist prompt is Planned).
    - Package Coverage: Active package for the session sport with `remaining_sessions > 0` and `session_date` between `start_date` and `end_date` (Implemented).
    - Format Match: Self-training package for self-training sessions; Coach-led package for coach-led classes (Implemented for explicit package selection; Planned for automatic package lookup).
