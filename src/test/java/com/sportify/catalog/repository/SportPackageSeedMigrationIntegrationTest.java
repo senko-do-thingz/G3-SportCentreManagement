@@ -212,4 +212,67 @@ class SportPackageSeedMigrationIntegrationTest extends AbstractIntegrationTest {
         );
         assertThat(pkgRegPaymentIdCount).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName("SSMS verification script queries should execute successfully and match F1-02 and F1-03")
+    void ssmsVerificationScriptQueriesShouldExecuteSuccessfully() {
+        // Query 1: flyway_schema_history
+        List<Map<String, Object>> flywayRows = jdbc.queryForList(
+                "SELECT installed_rank, version, description, type, script, installed_by, installed_on, execution_time, success " +
+                        "FROM flyway_schema_history ORDER BY installed_rank"
+        );
+        assertThat(flywayRows).isNotEmpty();
+        assertThat(flywayRows).allSatisfy(row -> assertThat(row.get("success")).isEqualTo(true));
+
+        // Query 2: sport_package (F1-02)
+        List<Map<String, Object>> packageRows = jdbc.queryForList(
+                "SELECT id, code, name, sport_id, training_format, duration_days, session_count, price_amount, session_minutes, is_active " +
+                        "FROM sport_package ORDER BY code"
+        );
+        assertThat(packageRows).hasSize(36);
+        assertThat(packageRows).allSatisfy(row -> {
+            assertThat(row.get("id")).isNotNull();
+            assertThat(row.get("is_active")).isEqualTo(true);
+            int durationDays = ((Number) row.get("duration_days")).intValue();
+            int sessionCount = ((Number) row.get("session_count")).intValue();
+            int sessionMinutes = ((Number) row.get("session_minutes")).intValue();
+            BigDecimal price = (BigDecimal) row.get("price_amount");
+
+            assertThat(durationDays).isIn(1, 30, 90);
+            assertThat(sessionCount).isIn(1, 8, 24);
+            assertThat(sessionMinutes).isIn(60, 90);
+            assertThat(price).isPositive();
+        });
+
+        // Query 3: membership_card_tier (F1-03)
+        List<Map<String, Object>> tierRows = jdbc.queryForList(
+                "SELECT id, code, name, price, duration_months, discount_percentage, description, is_active " +
+                        "FROM membership_card_tier ORDER BY id"
+        );
+        assertThat(tierRows).hasSize(3);
+
+        Map<String, Object> standard = tierRows.get(0);
+        assertThat(standard.get("code")).isEqualTo("STANDARD");
+        assertThat(standard.get("name")).isEqualTo("Standard");
+        assertThat((BigDecimal) standard.get("price")).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(((Number) standard.get("duration_months")).intValue()).isEqualTo(0);
+        assertThat(((Number) standard.get("discount_percentage")).intValue()).isEqualTo(0);
+        assertThat(standard.get("is_active")).isEqualTo(true);
+
+        Map<String, Object> gold = tierRows.get(1);
+        assertThat(gold.get("code")).isEqualTo("GOLD");
+        assertThat(gold.get("name")).isEqualTo("Gold Member");
+        assertThat((BigDecimal) gold.get("price")).isEqualByComparingTo(new BigDecimal("300000.00"));
+        assertThat(((Number) gold.get("duration_months")).intValue()).isEqualTo(12);
+        assertThat(((Number) gold.get("discount_percentage")).intValue()).isEqualTo(5);
+        assertThat(gold.get("is_active")).isEqualTo(true);
+
+        Map<String, Object> vip = tierRows.get(2);
+        assertThat(vip.get("code")).isEqualTo("VIP");
+        assertThat(vip.get("name")).isEqualTo("VIP Member");
+        assertThat((BigDecimal) vip.get("price")).isEqualByComparingTo(new BigDecimal("600000.00"));
+        assertThat(((Number) vip.get("duration_months")).intValue()).isEqualTo(12);
+        assertThat(((Number) vip.get("discount_percentage")).intValue()).isEqualTo(10);
+        assertThat(vip.get("is_active")).isEqualTo(true);
+    }
 }
