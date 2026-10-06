@@ -268,6 +268,41 @@ public class SportPackageServiceImplTest {
     }
 
     @Test
+    void registerPackage_OrphanCoachUser_ThrowsBusinessRuleException() {
+        PackageRegistrationRequest req = PackageRegistrationRequest.builder()
+                .memberId(400L)
+                .packageId(10L)
+                .channel(RegistrationChannel.RECEPTION)
+                .build();
+
+        Role coachRole = Role.builder().id(4L).code("COACH").name("Coach").build();
+        UserAccount coachUser = UserAccount.builder().id(400L).email("coach@sportify.com").role(coachRole).build();
+
+        when(memberProfileRepository.findById(400L)).thenReturn(Optional.empty());
+        when(userRepository.findById(400L)).thenReturn(Optional.of(coachUser));
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> sportPackageService.registerPackage(req, receptionistUser));
+        assertEquals("Cannot create member profile for non-member user: 400", ex.getMessage());
+    }
+
+    @Test
+    void registerPackage_OrphanManagerUser_ThrowsBusinessRuleException() {
+        PackageRegistrationRequest req = PackageRegistrationRequest.builder()
+                .memberId(300L)
+                .packageId(10L)
+                .channel(RegistrationChannel.RECEPTION)
+                .build();
+
+        when(memberProfileRepository.findById(300L)).thenReturn(Optional.empty());
+        when(userRepository.findById(300L)).thenReturn(Optional.of(managerUser));
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> sportPackageService.registerPackage(req, receptionistUser));
+        assertEquals("Cannot create member profile for non-member user: 300", ex.getMessage());
+    }
+
+    @Test
     void registerPackage_PastStartDate_ThrowsBusinessRuleException() {
         PackageRegistrationRequest req = PackageRegistrationRequest.builder()
                 .packageId(10L)

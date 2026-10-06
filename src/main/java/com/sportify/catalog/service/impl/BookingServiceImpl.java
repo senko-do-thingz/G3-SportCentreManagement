@@ -20,6 +20,7 @@ import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -117,7 +118,7 @@ public class BookingServiceImpl implements BookingService {
 
         if (actor.getRole() != null && "MEMBER".equals(actor.getRole().getCode())) {
             if (!booking.getMember().getId().equals(actor.getId())) {
-                throw new BusinessRuleException("Cannot cancel another member's booking");
+                throw new AccessDeniedException("Cannot cancel another member's booking");
             }
         }
 

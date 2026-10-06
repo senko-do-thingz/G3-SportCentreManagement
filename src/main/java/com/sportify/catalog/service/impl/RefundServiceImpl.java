@@ -15,6 +15,7 @@ import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.UserAccount;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,7 +43,7 @@ public class RefundServiceImpl implements RefundService {
 
         if (actor.getRole() != null && "MEMBER".equals(actor.getRole().getCode())) {
             if (!reg.getMember().getId().equals(actor.getId())) {
-                throw new BusinessRuleException("Cannot request refund for another member's package registration");
+                throw new AccessDeniedException("Cannot request refund for another member's package registration");
             }
         }
 

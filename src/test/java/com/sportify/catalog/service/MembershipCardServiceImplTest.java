@@ -10,6 +10,7 @@ import com.sportify.catalog.repository.MemberCardRepository;
 import com.sportify.catalog.repository.MembershipCardTierRepository;
 import com.sportify.catalog.service.impl.MembershipCardServiceImpl;
 import com.sportify.core.common.CodeFormatter;
+import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
@@ -33,6 +34,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -167,5 +169,41 @@ public class MembershipCardServiceImplTest {
 
         int discount = membershipCardService.getApplicableDiscountPercentage(100L, 30);
         assertEquals(5, discount);
+    }
+
+    @Test
+    void purchaseCard_OrphanCoachUser_ThrowsBusinessRuleException() {
+        MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
+                .memberId(400L)
+                .tierId(2L)
+                .build();
+
+        Role coachRole = Role.builder().id(4L).code("COACH").name("Coach").build();
+        UserAccount coachUser = UserAccount.builder().id(400L).email("coach@sportify.com").role(coachRole).build();
+
+        when(memberProfileRepository.findById(400L)).thenReturn(Optional.empty());
+        when(userRepository.findById(400L)).thenReturn(Optional.of(coachUser));
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> membershipCardService.purchaseCard(req, receptionistUser));
+        assertEquals("Cannot create member profile for non-member user: 400", ex.getMessage());
+    }
+
+    @Test
+    void purchaseCard_OrphanManagerUser_ThrowsBusinessRuleException() {
+        MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
+                .memberId(300L)
+                .tierId(2L)
+                .build();
+
+        Role mgrRole = Role.builder().id(3L).code("MANAGER").name("Manager").build();
+        UserAccount managerUser = UserAccount.builder().id(300L).email("mgr@sportify.com").role(mgrRole).build();
+
+        when(memberProfileRepository.findById(300L)).thenReturn(Optional.empty());
+        when(userRepository.findById(300L)).thenReturn(Optional.of(managerUser));
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> membershipCardService.purchaseCard(req, receptionistUser));
+        assertEquals("Cannot create member profile for non-member user: 300", ex.getMessage());
     }
 }

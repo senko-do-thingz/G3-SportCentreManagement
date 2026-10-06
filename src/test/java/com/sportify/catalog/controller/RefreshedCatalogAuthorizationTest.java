@@ -1,6 +1,7 @@
 package com.sportify.catalog.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sportify.catalog.dto.RefundCreateRequest;
 import com.sportify.catalog.dto.RefundReviewRequest;
 import com.sportify.catalog.dto.SportPackageCreateRequest;
 import com.sportify.catalog.dto.PackageRegistrationRequest;
@@ -35,8 +36,10 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -182,6 +185,33 @@ public class RefreshedCatalogAuthorizationTest {
     void activateRegistration_AsMember_ShouldReturn403() throws Exception {
         mockMvc.perform(put("/api/v1/packages/registrations/1/activate")
                         .with(user(createUserDetails("MEMBER"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void cancelBooking_OwnershipViolation_ShouldReturn403() throws Exception {
+        when(bookingService.cancelBooking(eq(1L), any()))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("Cannot cancel another member's booking"));
+
+        mockMvc.perform(delete("/api/v1/bookings/1")
+                        .with(user(createUserDetails("MEMBER"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void submitRefund_OwnershipViolation_ShouldReturn403() throws Exception {
+        RefundCreateRequest req = RefundCreateRequest.builder()
+                .packageRegistrationId(10L)
+                .reason("Doctor advised against sports")
+                .build();
+
+        when(refundService.submitRefund(any(), any()))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("Cannot request refund for another member's package registration"));
+
+        mockMvc.perform(post("/api/v1/refunds")
+                        .with(user(createUserDetails("MEMBER")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isForbidden());
     }
 }

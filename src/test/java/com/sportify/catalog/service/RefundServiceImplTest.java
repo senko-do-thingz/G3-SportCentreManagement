@@ -12,6 +12,7 @@ import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.impl.RefundServiceImpl;
 import com.sportify.core.common.CodeFormatter;
 import com.sportify.core.exception.BusinessRuleException;
+import org.springframework.security.access.AccessDeniedException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
@@ -100,7 +101,7 @@ public class RefundServiceImplTest {
     }
 
     @Test
-    void submitRefund_AsDifferentMember_ThrowsBusinessRuleException() {
+    void submitRefund_AsDifferentMember_ThrowsAccessDeniedException() {
         Role memberRole = Role.builder().id(1L).code("MEMBER").build();
         UserAccount otherMember = UserAccount.builder().id(999L).role(memberRole).build();
 
@@ -111,7 +112,7 @@ public class RefundServiceImplTest {
 
         when(registrationRepository.findById(50L)).thenReturn(Optional.of(activeRegistration));
 
-        assertThrows(BusinessRuleException.class, () -> refundService.submitRefund(req, otherMember));
+        assertThrows(AccessDeniedException.class, () -> refundService.submitRefund(req, otherMember));
     }
 
     @Test

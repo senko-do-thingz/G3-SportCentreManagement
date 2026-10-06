@@ -98,6 +98,9 @@ public class SportPackageServiceImpl implements SportPackageService {
         if (member == null) {
             UserAccount targetUser = userRepository.findById(targetMemberId)
                     .orElseThrow(() -> new ResourceNotFoundException("User not found: " + targetMemberId));
+            if (targetUser.getRole() == null || !"MEMBER".equals(targetUser.getRole().getCode())) {
+                throw new BusinessRuleException("Cannot create member profile for non-member user: " + targetMemberId);
+            }
             Long nextSeq = memberProfileRepository.getNextMemberCode();
             String memberCode = codeFormatter.formatMemberCode(nextSeq);
             member = MemberProfile.builder()

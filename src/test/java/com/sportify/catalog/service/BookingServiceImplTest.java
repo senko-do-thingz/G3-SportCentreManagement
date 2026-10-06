@@ -15,6 +15,7 @@ import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.impl.BookingServiceImpl;
 import com.sportify.core.common.CodeFormatter;
 import com.sportify.core.exception.BusinessRuleException;
+import org.springframework.security.access.AccessDeniedException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
@@ -199,7 +200,7 @@ public class BookingServiceImplTest {
     }
 
     @Test
-    void cancelBooking_ByDifferentMember_ThrowsBusinessRuleException() {
+    void cancelBooking_ByDifferentMember_ThrowsAccessDeniedException() {
         Role memberRole = Role.builder().id(1L).code("MEMBER").build();
         UserAccount otherMember = UserAccount.builder().id(999L).role(memberRole).build();
 
@@ -212,6 +213,6 @@ public class BookingServiceImplTest {
 
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
 
-        assertThrows(BusinessRuleException.class, () -> bookingService.cancelBooking(1L, otherMember));
+        assertThrows(AccessDeniedException.class, () -> bookingService.cancelBooking(1L, otherMember));
     }
 }

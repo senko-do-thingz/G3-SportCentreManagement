@@ -10,6 +10,7 @@ import com.sportify.catalog.repository.MemberCardRepository;
 import com.sportify.catalog.repository.MembershipCardTierRepository;
 import com.sportify.catalog.service.MembershipCardService;
 import com.sportify.core.common.CodeFormatter;
+import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
@@ -57,6 +58,9 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         if (member == null) {
             UserAccount targetUser = userRepository.findById(targetMemberId)
                     .orElseThrow(() -> new ResourceNotFoundException("User not found: " + targetMemberId));
+            if (targetUser.getRole() == null || !"MEMBER".equals(targetUser.getRole().getCode())) {
+                throw new BusinessRuleException("Cannot create member profile for non-member user: " + targetMemberId);
+            }
             Long nextSeq = memberProfileRepository.getNextMemberCode();
             String memberCode = codeFormatter.formatMemberCode(nextSeq);
             member = MemberProfile.builder()
