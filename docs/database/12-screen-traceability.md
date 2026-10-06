@@ -38,7 +38,7 @@ Status Legend:
 | Flow 1 - User and membership management/Flow 1 - Member/F1-11 Overlay - Renew Membership Card.png | F1-11 Overlay - Renew Membership Card | Member | `membership_card_tier`, `member_card` | `GET /api/v1/membership-cards/tiers`, `POST /api/v1/membership-cards/purchase`, `GET /api/v1/membership-cards/my` | IMPLEMENTED |
 | Flow 1 - User and membership management/Flow 1 - Member/F1-12 - My Membership & Sport Packages.png | My Membership & Sport Packages | Member | `sport_package`, `sport`, `sport_package_registration` | `GET /api/v1/packages/registrations/my`, `GET /api/v1/membership-cards/my` | IMPLEMENTED |
 | Flow 1 - User and membership management/Flow 1 - Member/F1-12 State - Active.png | F1-12 State - Active | Member | `sport_package`, `sport`, `sport_package_registration` | `GET /api/v1/packages/registrations/my` | IMPLEMENTED |
-| Flow 1 - User and membership management/Flow 1 - Member/F1-12 State - Expired.png | F1-12 State - Expired | Member | `sport_package`, `sport`, `sport_package_registration` | `GET /api/v1/packages/registrations/my` | IMPLEMENTED |
+| Flow 1 - User and membership management/Flow 1 - Member/F1-12 State - Expired.png | F1-12 State - Expired | Member | `sport_package`, `sport`, `sport_package_registration` | `GET /api/v1/packages/registrations/my` | PARTIAL |
 | Flow 1 - User and membership management/Flow 1 - Member/F1-12 State - Pending Payment.png | F1-12 State - Pending Payment | Member | `sport_package`, `sport`, `sport_package_registration` | `GET /api/v1/packages/registrations/my` | IMPLEMENTED |
 
 ## Flow 1 - User and membership management > Flow 1 - Receptionist
