@@ -123,15 +123,15 @@ class V14ToV19SchemaConstraintIntegrationTest extends AbstractIntegrationTest {
         // Valid assignment on sport_package_registration
         long pkgId = jdbc.queryForObject("SELECT TOP 1 id FROM sport_package ORDER BY id", Long.class);
         assertThatCode(() -> jdbc.update("""
-                INSERT INTO sport_package_registration (registration_code, member_id, package_id, status, price_paid, total_sessions, remaining_sessions, start_date, end_date, payment_id)
-                VALUES ('REG-FK-01', ?, ?, 'ACTIVE', 500000.00, 8, 8, '2026-10-01', '2026-10-31', ?)
-                """, memberId, pkgId, paymentId)).doesNotThrowAnyException();
+                INSERT INTO sport_package_registration (registration_code, member_id, package_id, channel, original_price, paid_amount, total_sessions, remaining_sessions, start_date, end_date, status, created_by_user_id, payment_id)
+                VALUES ('REG-FK-01', ?, ?, 'ONLINE', 500000.00, 500000.00, 8, 8, '2026-10-01', '2026-10-31', 'ACTIVE', ?, ?)
+                """, memberId, pkgId, memberId, paymentId)).doesNotThrowAnyException();
 
         // Invalid payment_id on sport_package_registration
         assertThatThrownBy(() -> jdbc.update("""
-                INSERT INTO sport_package_registration (registration_code, member_id, package_id, status, price_paid, total_sessions, remaining_sessions, start_date, end_date, payment_id)
-                VALUES ('REG-FK-02', ?, ?, 'ACTIVE', 500000.00, 8, 8, '2026-10-01', '2026-10-31', 999999)
-                """, memberId, pkgId)).isInstanceOf(DataAccessException.class);
+                INSERT INTO sport_package_registration (registration_code, member_id, package_id, channel, original_price, paid_amount, total_sessions, remaining_sessions, start_date, end_date, status, created_by_user_id, payment_id)
+                VALUES ('REG-FK-02', ?, ?, 'ONLINE', 500000.00, 500000.00, 8, 8, '2026-10-01', '2026-10-31', 'ACTIVE', ?, 999999)
+                """, memberId, pkgId, memberId)).isInstanceOf(DataAccessException.class);
     }
 
     @Test
@@ -539,23 +539,24 @@ class V14ToV19SchemaConstraintIntegrationTest extends AbstractIntegrationTest {
             return existing.get(0);
         }
         jdbc.update("""
-                INSERT INTO sport_class (code, name, sport_id, coach_id, training_format, capacity, status)
-                VALUES ('CLS-TEST-01', 'Introductory Class', ?, ?, 'COACH_LED', 20, 'ACTIVE')
-                """, sportId, coachId);
+                INSERT INTO sport_class (code, name, sport_id, level, max_members, is_active)
+                VALUES ('CLS-TEST-01', 'Introductory Class', ?, 'BEGINNER', 20, 1)
+                """, sportId);
         return jdbc.queryForObject("SELECT id FROM sport_class WHERE code = 'CLS-TEST-01'", Long.class);
     }
 
     private long getOrCreateTestClassSession() {
         long coachId = getOrCreateTestCoach("session.coach@sportify.test", "COACH-SESS-01");
         long classId = getOrCreateTestSportClass(coachId);
+        long sportId = jdbc.queryForObject("SELECT TOP 1 id FROM sport ORDER BY id", Long.class);
         List<Long> existing = jdbc.queryForList("SELECT id FROM class_session WHERE class_id = ?", Long.class, classId);
         if (!existing.isEmpty()) {
             return existing.get(0);
         }
         jdbc.update("""
-                INSERT INTO class_session (class_id, session_date, start_time, end_time, capacity, booked_count, status)
-                VALUES (?, '2026-10-15', '09:00', '10:30', 20, 0, 'SCHEDULED')
-                """, classId);
+                INSERT INTO class_session (class_id, sport_id, coach_id, session_date, start_time, end_time, capacity, booked_count, status)
+                VALUES (?, ?, ?, '2026-10-15', '09:00', '10:30', 20, 0, 'PUBLISHED')
+                """, classId, sportId, coachId);
         return jdbc.queryForObject("SELECT TOP 1 id FROM class_session WHERE class_id = ? ORDER BY id DESC", Long.class, classId);
     }
 }
