@@ -173,7 +173,10 @@ public class BookingServiceImplTest {
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
         when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
 
-        assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+        assertEquals("Session is fully booked", ex.getMessage());
+        verifyNoInteractions(registrationRepository);
+        verify(bookingRepository, never()).save(any());
     }
 
     @Test
@@ -186,7 +189,9 @@ public class BookingServiceImplTest {
         when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
                 .thenReturn(Optional.of(existing));
 
-        assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+        assertEquals("Member already has a confirmed booking for this session", ex.getMessage());
+        verify(bookingRepository, never()).save(any());
     }
 
     @Test
@@ -326,7 +331,12 @@ public class BookingServiceImplTest {
     @Test
     void createBooking_WithWrongSportRegistration_ThrowsBusinessRuleException() {
         Sport otherSport = Sport.builder().id(99L).name("Tennis").code("TENNIS").build();
-        SportPackage otherPkg = SportPackage.builder().id(6L).sport(otherSport).sessionCount(8).build();
+        SportPackage otherPkg = SportPackage.builder()
+                .id(6L)
+                .sport(otherSport)
+                .trainingFormat(TrainingFormat.COACH_LED)
+                .sessionCount(8)
+                .build();
         packageReg.setSportPackage(otherPkg);
 
         BookingCreateRequest req = BookingCreateRequest.builder()
@@ -340,7 +350,9 @@ public class BookingServiceImplTest {
                 .thenReturn(Optional.empty());
         when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
 
-        assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+        assertEquals("Package sport does not match session sport", ex.getMessage());
+        verify(bookingRepository, never()).save(any());
     }
 
     @Test
