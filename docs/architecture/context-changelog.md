@@ -30,7 +30,7 @@ On 2026-10-05, the product owner delivered a comprehensive overhaul of the Figma
 - **Previous Model:** Checked in against active membership plan.
 - **Refreshed Model:** Check-in strictly requires:
   1. An existing confirmed session booking for the current day (`session_date = CAST(SYSDATETIME() AS DATE)`).
-  2. Member holds an active paid sport package (or legacy active membership).
+  2. Member holds an active paid sport package covering the sport.
   3. No duplicate check-in recorded for the same session.
   4. Front desk check-in never double-deducts session attendance.
 

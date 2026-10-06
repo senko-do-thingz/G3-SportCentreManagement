@@ -37,7 +37,7 @@ erDiagram
 - **Explicit Start Date Selection.** When registering for a package (online or at reception), the member/staff explicitly chooses the `start_date`. Validity end date is computed as `end_date = start_date + duration_days`.
 - **Front Desk Check-in (F1-15).** Front desk check-in strictly requires:
   1. An existing confirmed session booking for the member on the current day (`session_date = CAST(SYSDATETIME() AS DATE)`).
-  2. The member holds an active paid sport package (or legacy active membership).
+  2. The member holds an active paid sport package covering the session sport.
   3. No duplicate check-in recorded for the same session.
   4. Front desk check-in verifies arrival and does not double-deduct from attendance (which is separately logged by coaches or receptionists).
 - **Legacy Compatibility.** Legacy tables (`membership_plan`, `plan_eligible_sport`, `plan_feature`, `membership`, `membership_sport`) are retained in the schema for data continuity, with their corresponding Java domain entities marked `@Deprecated`.

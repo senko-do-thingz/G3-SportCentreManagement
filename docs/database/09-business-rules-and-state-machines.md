@@ -125,7 +125,7 @@ stateDiagram-v2
 Front desk check-in validates member arrival at the center:
 
 1. **Today's Confirmed Booking Required:** The member MUST have at least one confirmed session booking for the current day (`session_date = CAST(SYSDATETIME() AS DATE)`, `status = 'CONFIRMED'`).
-2. **Active Package Coverage:** The member must have an active paid sport package (or legacy active membership) covering the sport and format of the booked session.
+2. **Active Package Coverage:** The member must have an active paid sport package covering the sport and format of the booked session.
 3. **No Duplicate Check-in:** The member must not have already checked in for the same session today.
 4. **Attendance Independence:** Front desk check-in does not mark session attendance and does not double-deduct remaining package sessions (attendance is separately recorded by coaches in classes or receptionists in self-training slots).
 5. **Result & Denial Reasons:**
