@@ -39,6 +39,10 @@ public class SportPackage {
     @Column(name = "session_count", nullable = false)
     private Integer sessionCount;
 
+    @Column(name = "session_minutes", nullable = false)
+    @Builder.Default
+    private Integer sessionMinutes = 60;
+
     @Column(name = "price_amount", nullable = false, precision = 14, scale = 2)
     private BigDecimal priceAmount;
 
@@ -57,6 +61,9 @@ public class SportPackage {
 
     @PrePersist
     void prePersist() {
+        if (sessionMinutes == null) {
+            sessionMinutes = (trainingFormat == TrainingFormat.COACH_LED) ? 90 : 60;
+        }
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
         }
