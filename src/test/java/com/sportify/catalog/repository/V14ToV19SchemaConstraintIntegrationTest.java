@@ -110,14 +110,14 @@ class V14ToV19SchemaConstraintIntegrationTest extends AbstractIntegrationTest {
         // Valid assignment of payment_id
         long tierId = jdbc.queryForObject("SELECT TOP 1 id FROM membership_card_tier ORDER BY id", Long.class);
         assertThatCode(() -> jdbc.update("""
-                INSERT INTO member_card (card_code, member_id, tier_id, status, price_paid, discount_percentage, start_date, end_date, payment_id)
-                VALUES ('CARD-FK-01', ?, ?, 'ACTIVE', 300000.00, 5, '2026-10-01', '2027-10-01', ?)
+                INSERT INTO member_card (card_code, member_id, tier_id, status, price_paid, start_date, end_date, payment_id)
+                VALUES ('CARD-FK-01', ?, ?, 'ACTIVE', 300000.00, '2026-10-01', '2027-10-01', ?)
                 """, memberId, tierId, paymentId)).doesNotThrowAnyException();
 
         // Invalid payment_id on member_card
         assertThatThrownBy(() -> jdbc.update("""
-                INSERT INTO member_card (card_code, member_id, tier_id, status, price_paid, discount_percentage, start_date, end_date, payment_id)
-                VALUES ('CARD-FK-02', ?, ?, 'ACTIVE', 300000.00, 5, '2026-10-01', '2027-10-01', 999999)
+                INSERT INTO member_card (card_code, member_id, tier_id, status, price_paid, start_date, end_date, payment_id)
+                VALUES ('CARD-FK-02', ?, ?, 'ACTIVE', 300000.00, '2026-10-01', '2027-10-01', 999999)
                 """, memberId, tierId)).isInstanceOf(DataAccessException.class);
 
         // Valid assignment on sport_package_registration
@@ -528,7 +528,7 @@ class V14ToV19SchemaConstraintIntegrationTest extends AbstractIntegrationTest {
                 SELECT ?, 'hash-coach', 'Coach Test', r.id, 'ACTIVE' FROM role r WHERE r.code = 'COACH'
                 """, email);
         long userId = jdbc.queryForObject("SELECT id FROM user_account WHERE email = ?", Long.class, email);
-        jdbc.update("INSERT INTO coach_profile (user_id, coach_code, bio) VALUES (?, ?, 'Specialist')", userId, coachCode);
+        jdbc.update("INSERT INTO coach_profile (user_id, bio) VALUES (?, 'Specialist')", userId);
         return userId;
     }
 
