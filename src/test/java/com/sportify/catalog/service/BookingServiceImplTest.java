@@ -37,6 +37,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
@@ -67,7 +68,7 @@ public class BookingServiceImplTest {
     @Mock
     private CodeFormatter codeFormatter;
     @Spy
-    private Clock clock = Clock.fixed(Instant.parse("2026-10-06T00:00:00Z"), ZoneId.of("UTC"));
+    private Clock clock = Clock.fixed(Instant.parse("2026-10-06T00:00:00Z"), ZoneId.of("Asia/Ho_Chi_Minh"));
 
     @InjectMocks
     private BookingServiceImpl bookingService;
@@ -86,6 +87,8 @@ public class BookingServiceImplTest {
                 .sport(sport)
                 .trainingType(TrainingFormat.COACH_LED)
                 .sessionDate(LocalDate.of(2026, 10, 6))
+                .startTime(LocalTime.of(9, 0))
+                .endTime(LocalTime.of(10, 30))
                 .capacity(10)
                 .bookedCount(2)
                 .build();
@@ -566,5 +569,130 @@ public class BookingServiceImplTest {
         verify(registrationRepository, never()).save(any());
         verify(sessionRepository, never()).save(any());
         verifyNoInteractions(checkInRepository);
+    }
+
+    @Test
+    void createBooking_SameDayAfterStartTime_ThrowsBusinessRuleException() {
+        ClassSession startedSession = ClassSession.builder()
+                .id(23L)
+                .sport(sport)
+                .trainingType(TrainingFormat.COACH_LED)
+                .sessionDate(LocalDate.of(2026, 10, 6))
+                .startTime(LocalTime.of(6, 0))
+                .endTime(LocalTime.of(7, 30))
+                .capacity(10)
+                .bookedCount(2)
+                .build();
+
+        BookingCreateRequest req = BookingCreateRequest.builder()
+                .sessionId(23L)
+                .packageRegistrationId(50L)
+                .build();
+
+        when(sessionRepository.findById(23L)).thenReturn(Optional.of(startedSession));
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+        assertEquals("Cannot book a session that has already started", ex.getMessage());
+        verify(bookingRepository, never()).save(any());
+        verify(registrationRepository, never()).save(any());
+        verify(sessionRepository, never()).save(any());
+    }
+
+    @Test
+    void createBooking_SameDayBeforeStartTime_Success() {
+        BookingCreateRequest req = BookingCreateRequest.builder()
+                .sessionId(20L)
+                .packageRegistrationId(50L)
+                .build();
+
+        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
+        when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED)).thenReturn(Optional.empty());
+        when(bookingRepository.getNextBookingCodeSequence()).thenReturn(10L);
+        when(codeFormatter.formatBookingCode(10L)).thenReturn("BK-000010");
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> {
+            Booking b = i.getArgument(0);
+            b.setId(200L);
+            return b;
+        });
+
+        BookingResponse res = bookingService.createBooking(req, memberUser);
+
+        assertNotNull(res);
+        assertEquals(200L, res.getId());
+        assertEquals(BookingStatus.CONFIRMED, res.getStatus());
+        verify(sessionRepository).save(session);
+        verify(registrationRepository).save(packageReg);
+        verify(bookingRepository).save(any(Booking.class));
+    }
+
+    @Test
+    void cancelBooking_SameDayAfterStartTime_AsMember_ThrowsBusinessRuleException() {
+        ClassSession startedSession = ClassSession.builder()
+                .id(23L)
+                .sport(sport)
+                .trainingType(TrainingFormat.COACH_LED)
+                .sessionDate(LocalDate.of(2026, 10, 6))
+                .startTime(LocalTime.of(6, 0))
+                .endTime(LocalTime.of(7, 30))
+                .bookedCount(2)
+                .build();
+
+        Booking booking = Booking.builder()
+                .id(1L)
+                .member(memberProfile)
+                .session(startedSession)
+                .status(BookingStatus.CONFIRMED)
+                .build();
+
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(checkInRepository.existsByBookingIdAndResult(eq(1L), eq(CheckInResult.ALLOWED))).thenReturn(false);
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.cancelBooking(1L, memberUser));
+        assertEquals("Cannot cancel a session that has already started", ex.getMessage());
+        verify(bookingRepository, never()).save(any());
+        verify(registrationRepository, never()).save(any());
+        verify(sessionRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelBooking_SameDayAfterStartTime_AsStaff_Success() {
+        ClassSession startedSession = ClassSession.builder()
+                .id(23L)
+                .sport(sport)
+                .trainingType(TrainingFormat.COACH_LED)
+                .sessionDate(LocalDate.of(2026, 10, 6))
+                .startTime(LocalTime.of(6, 0))
+                .endTime(LocalTime.of(7, 30))
+                .bookedCount(2)
+                .build();
+
+        Booking booking = Booking.builder()
+                .id(1L)
+                .member(memberProfile)
+                .session(startedSession)
+                .packageRegistration(packageReg)
+                .status(BookingStatus.CONFIRMED)
+                .build();
+
+        UserAccount receptionist = UserAccount.builder()
+                .id(200L)
+                .role(Role.builder().id(2L).code("RECEPTIONIST").build())
+                .email("receptionist@sportify.com")
+                .build();
+
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(checkInRepository.existsByBookingIdAndResult(eq(1L), eq(CheckInResult.ALLOWED))).thenReturn(false);
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        BookingResponse res = bookingService.cancelBooking(1L, receptionist);
+
+        assertNotNull(res);
+        assertEquals(BookingStatus.CANCELLED, res.getStatus());
+        verify(bookingRepository).save(any(Booking.class));
+        verify(sessionRepository).save(startedSession);
+        verify(registrationRepository).save(packageReg);
     }
 }

@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -69,6 +70,10 @@ public class BookingServiceImpl implements BookingService {
 
         if (session.getSessionDate().isBefore(today)) {
             throw new BusinessRuleException("Cannot book a session in the past");
+        }
+
+        if (session.getSessionDate().isEqual(today) && !LocalTime.now(clock).isBefore(session.getStartTime())) {
+            throw new BusinessRuleException("Cannot book a session that has already started");
         }
 
         if (session.getBookedCount() >= session.getCapacity()) {
@@ -173,6 +178,13 @@ public class BookingServiceImpl implements BookingService {
 
         if (booking.getSession().getSessionDate().isBefore(today)) {
             throw new BusinessRuleException("Cannot cancel a past session booking");
+        }
+
+        if (actor.getRole() != null && "MEMBER".equals(actor.getRole().getCode())) {
+            if (booking.getSession().getSessionDate().isEqual(today)
+                    && !LocalTime.now(clock).isBefore(booking.getSession().getStartTime())) {
+                throw new BusinessRuleException("Cannot cancel a session that has already started");
+            }
         }
 
         booking.setStatus(BookingStatus.CANCELLED);
