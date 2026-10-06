@@ -46,6 +46,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -389,7 +390,9 @@ public class BookingServiceImplTest {
                 .thenReturn(Optional.empty());
         when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
 
-        assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+        assertEquals("Package training format does not match session training type", ex.getMessage());
+        verify(bookingRepository, never()).save(any());
     }
 
     @Test
@@ -416,7 +419,9 @@ public class BookingServiceImplTest {
                 .thenReturn(Optional.empty());
         when(registrationRepository.findById(51L)).thenReturn(Optional.of(otherReg));
 
-        assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, staffUser));
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, staffUser));
+        assertEquals("Selected package registration does not belong to the member", ex.getMessage());
+        verify(bookingRepository, never()).save(any());
     }
 
     @Test
@@ -428,7 +433,10 @@ public class BookingServiceImplTest {
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
         when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
 
-        assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+        assertEquals("Session is not published for booking", ex.getMessage());
+        verifyNoInteractions(registrationRepository);
+        verify(bookingRepository, never()).save(any());
     }
 
     @Test
@@ -440,7 +448,10 @@ public class BookingServiceImplTest {
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
         when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
 
-        assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+        assertEquals("Cannot book a session in the past", ex.getMessage());
+        verifyNoInteractions(registrationRepository);
+        verify(bookingRepository, never()).save(any());
     }
 
     @Test
