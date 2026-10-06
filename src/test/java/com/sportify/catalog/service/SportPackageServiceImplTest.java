@@ -16,6 +16,7 @@ import com.sportify.catalog.repository.SportRepository;
 import com.sportify.catalog.service.impl.SportPackageServiceImpl;
 import com.sportify.core.common.CodeFormatter;
 import com.sportify.core.exception.BusinessRuleException;
+import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
@@ -280,11 +281,15 @@ public class SportPackageServiceImplTest {
     }
 
     @Test
-    void activateRegistration_SetsStatusActive() {
+    void activateRegistration_PendingPayment_Success() {
+        LocalDate futureStart = LocalDate.of(2026, 10, 10);
+        LocalDate futureEnd = futureStart.plusDays(30);
         SportPackageRegistration reg = SportPackageRegistration.builder()
                 .id(50L)
                 .member(memberProfile)
                 .sportPackage(sportPackage)
+                .startDate(futureStart)
+                .endDate(futureEnd)
                 .status(PackageRegistrationStatus.PENDING_PAYMENT)
                 .build();
 
@@ -294,5 +299,111 @@ public class SportPackageServiceImplTest {
         PackageRegistrationResponse res = sportPackageService.activateRegistration(50L, receptionistUser);
 
         assertEquals(PackageRegistrationStatus.ACTIVE, res.getStatus());
+        assertNotNull(res.getActivatedAt());
+        assertEquals(futureStart, res.getStartDate());
+        assertEquals(futureEnd, res.getEndDate());
+    }
+
+    @Test
+    void activateRegistration_AlreadyActive_ThrowsBusinessRuleException() {
+        SportPackageRegistration reg = SportPackageRegistration.builder()
+                .id(51L)
+                .member(memberProfile)
+                .sportPackage(sportPackage)
+                .startDate(LocalDate.of(2026, 10, 6))
+                .endDate(LocalDate.of(2026, 11, 5))
+                .status(PackageRegistrationStatus.ACTIVE)
+                .build();
+
+        when(registrationRepository.findById(51L)).thenReturn(Optional.of(reg));
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> sportPackageService.activateRegistration(51L, receptionistUser));
+        assertEquals("Cannot activate package registration with status: ACTIVE. Only PENDING_PAYMENT registrations can be activated.", ex.getMessage());
+    }
+
+    @Test
+    void activateRegistration_Cancelled_ThrowsBusinessRuleException() {
+        SportPackageRegistration reg = SportPackageRegistration.builder()
+                .id(52L)
+                .member(memberProfile)
+                .sportPackage(sportPackage)
+                .startDate(LocalDate.of(2026, 10, 6))
+                .endDate(LocalDate.of(2026, 11, 5))
+                .status(PackageRegistrationStatus.CANCELLED)
+                .build();
+
+        when(registrationRepository.findById(52L)).thenReturn(Optional.of(reg));
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> sportPackageService.activateRegistration(52L, receptionistUser));
+        assertEquals("Cannot activate package registration with status: CANCELLED. Only PENDING_PAYMENT registrations can be activated.", ex.getMessage());
+    }
+
+    @Test
+    void activateRegistration_Refunded_ThrowsBusinessRuleException() {
+        SportPackageRegistration reg = SportPackageRegistration.builder()
+                .id(53L)
+                .member(memberProfile)
+                .sportPackage(sportPackage)
+                .startDate(LocalDate.of(2026, 10, 6))
+                .endDate(LocalDate.of(2026, 11, 5))
+                .status(PackageRegistrationStatus.REFUNDED)
+                .build();
+
+        when(registrationRepository.findById(53L)).thenReturn(Optional.of(reg));
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> sportPackageService.activateRegistration(53L, receptionistUser));
+        assertEquals("Cannot activate package registration with status: REFUNDED. Only PENDING_PAYMENT registrations can be activated.", ex.getMessage());
+    }
+
+    @Test
+    void activateRegistration_Expired_ThrowsBusinessRuleException() {
+        SportPackageRegistration reg = SportPackageRegistration.builder()
+                .id(54L)
+                .member(memberProfile)
+                .sportPackage(sportPackage)
+                .startDate(LocalDate.of(2026, 9, 1))
+                .endDate(LocalDate.of(2026, 10, 1))
+                .status(PackageRegistrationStatus.EXPIRED)
+                .build();
+
+        when(registrationRepository.findById(54L)).thenReturn(Optional.of(reg));
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> sportPackageService.activateRegistration(54L, receptionistUser));
+        assertEquals("Cannot activate package registration with status: EXPIRED. Only PENDING_PAYMENT registrations can be activated.", ex.getMessage());
+    }
+
+    @Test
+    void activateRegistration_PastStartDate_RecomputesDates() {
+        LocalDate pastStart = LocalDate.of(2026, 10, 1); // Clock is 2026-10-06
+        LocalDate pastEnd = pastStart.plusDays(30);
+        SportPackageRegistration reg = SportPackageRegistration.builder()
+                .id(55L)
+                .member(memberProfile)
+                .sportPackage(sportPackage) // durationDays = 30
+                .startDate(pastStart)
+                .endDate(pastEnd)
+                .status(PackageRegistrationStatus.PENDING_PAYMENT)
+                .build();
+
+        when(registrationRepository.findById(55L)).thenReturn(Optional.of(reg));
+        when(registrationRepository.save(any(SportPackageRegistration.class))).thenAnswer(i -> i.getArgument(0));
+
+        PackageRegistrationResponse res = sportPackageService.activateRegistration(55L, receptionistUser);
+
+        assertEquals(PackageRegistrationStatus.ACTIVE, res.getStatus());
+        assertEquals(LocalDate.of(2026, 10, 6), res.getStartDate()); // Recomputed to today
+        assertEquals(LocalDate.of(2026, 10, 6).plusDays(30), res.getEndDate()); // Recomputed to today + durationDays
+    }
+
+    @Test
+    void activateRegistration_NotFound_ThrowsResourceNotFoundException() {
+        when(registrationRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> sportPackageService.activateRegistration(999L, receptionistUser));
     }
 }

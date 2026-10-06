@@ -187,6 +187,16 @@ public class SportPackageServiceImpl implements SportPackageService {
         SportPackageRegistration registration = registrationRepository.findById(registrationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Package registration not found for id: " + registrationId));
 
+        if (registration.getStatus() != PackageRegistrationStatus.PENDING_PAYMENT) {
+            throw new BusinessRuleException("Cannot activate package registration with status: " + registration.getStatus() + ". Only PENDING_PAYMENT registrations can be activated.");
+        }
+
+        LocalDate today = LocalDate.now(clock);
+        if (registration.getStartDate().isBefore(today)) {
+            registration.setStartDate(today);
+            registration.setEndDate(today.plusDays(registration.getSportPackage().getDurationDays()));
+        }
+
         registration.setStatus(PackageRegistrationStatus.ACTIVE);
         registration.setActivatedAt(LocalDateTime.now(clock));
         registration = registrationRepository.save(registration);
