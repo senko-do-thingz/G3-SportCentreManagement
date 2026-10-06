@@ -21,7 +21,9 @@ SET p.code = 'PK-019',
     p.updated_at = SYSDATETIME()
 FROM [sport_package] p
 JOIN [sport] s ON s.id = p.sport_id
-WHERE s.code = 'BADMINTON' AND p.training_format = 'SELF_TRAINING' AND p.duration_days = 1 AND p.session_count = 1;
+WHERE p.code = 'BADMINTON_SELF_SINGLE'
+  AND s.code = 'BADMINTON' AND p.training_format = 'SELF_TRAINING' AND p.duration_days = 1 AND p.session_count = 1
+  AND NOT EXISTS (SELECT 1 FROM [sport_package] x WHERE x.code = 'PK-019');
 
 -- 2. Badminton Self-training 30-day (PK-020)
 UPDATE p
@@ -33,7 +35,9 @@ SET p.code = 'PK-020',
     p.updated_at = SYSDATETIME()
 FROM [sport_package] p
 JOIN [sport] s ON s.id = p.sport_id
-WHERE s.code = 'BADMINTON' AND p.training_format = 'SELF_TRAINING' AND p.duration_days = 30 AND p.session_count = 8;
+WHERE p.code = 'BADMINTON_SELF_30D'
+  AND s.code = 'BADMINTON' AND p.training_format = 'SELF_TRAINING' AND p.duration_days = 30 AND p.session_count = 8
+  AND NOT EXISTS (SELECT 1 FROM [sport_package] x WHERE x.code = 'PK-020');
 
 -- 3. Badminton Coach-led 30-day (PK-023)
 UPDATE p
@@ -45,7 +49,9 @@ SET p.code = 'PK-023',
     p.updated_at = SYSDATETIME()
 FROM [sport_package] p
 JOIN [sport] s ON s.id = p.sport_id
-WHERE s.code = 'BADMINTON' AND p.training_format = 'COACH_LED' AND p.duration_days = 30 AND p.session_count = 8;
+WHERE p.code = 'BADMINTON_COACH_30D'
+  AND s.code = 'BADMINTON' AND p.training_format = 'COACH_LED' AND p.duration_days = 30 AND p.session_count = 8
+  AND NOT EXISTS (SELECT 1 FROM [sport_package] x WHERE x.code = 'PK-023');
 
 -- 4. Badminton Coach-led 90-day (PK-024)
 UPDATE p
@@ -57,7 +63,9 @@ SET p.code = 'PK-024',
     p.updated_at = SYSDATETIME()
 FROM [sport_package] p
 JOIN [sport] s ON s.id = p.sport_id
-WHERE s.code = 'BADMINTON' AND p.training_format = 'COACH_LED' AND p.duration_days = 90 AND p.session_count = 24;
+WHERE p.code = 'BADMINTON_COACH_90D'
+  AND s.code = 'BADMINTON' AND p.training_format = 'COACH_LED' AND p.duration_days = 90 AND p.session_count = 24
+  AND NOT EXISTS (SELECT 1 FROM [sport_package] x WHERE x.code = 'PK-024');
 
 -- 5. Swimming Self-training 30-day (PK-014)
 UPDATE p
@@ -69,7 +77,9 @@ SET p.code = 'PK-014',
     p.updated_at = SYSDATETIME()
 FROM [sport_package] p
 JOIN [sport] s ON s.id = p.sport_id
-WHERE s.code = 'SWIMMING' AND p.training_format = 'SELF_TRAINING' AND p.duration_days = 30 AND p.session_count = 8;
+WHERE p.code = 'SWIMMING_SELF_30D'
+  AND s.code = 'SWIMMING' AND p.training_format = 'SELF_TRAINING' AND p.duration_days = 30 AND p.session_count = 8
+  AND NOT EXISTS (SELECT 1 FROM [sport_package] x WHERE x.code = 'PK-014');
 
 -- 6. Swimming Coach-led 30-day (PK-017)
 UPDATE p
@@ -81,7 +91,9 @@ SET p.code = 'PK-017',
     p.updated_at = SYSDATETIME()
 FROM [sport_package] p
 JOIN [sport] s ON s.id = p.sport_id
-WHERE s.code = 'SWIMMING' AND p.training_format = 'COACH_LED' AND p.duration_days = 30 AND p.session_count = 8;
+WHERE p.code = 'SWIMMING_COACH_30D'
+  AND s.code = 'SWIMMING' AND p.training_format = 'COACH_LED' AND p.duration_days = 30 AND p.session_count = 8
+  AND NOT EXISTS (SELECT 1 FROM [sport_package] x WHERE x.code = 'PK-017');
 
 -- 7. Basketball Coach-led 30-day (PK-011)
 UPDATE p
@@ -93,7 +105,9 @@ SET p.code = 'PK-011',
     p.updated_at = SYSDATETIME()
 FROM [sport_package] p
 JOIN [sport] s ON s.id = p.sport_id
-WHERE s.code = 'BASKETBALL' AND p.training_format = 'COACH_LED' AND p.duration_days = 30 AND p.session_count = 8;
+WHERE p.code = 'BASKETBALL_COACH_30D'
+  AND s.code = 'BASKETBALL' AND p.training_format = 'COACH_LED' AND p.duration_days = 30 AND p.session_count = 8
+  AND NOT EXISTS (SELECT 1 FROM [sport_package] x WHERE x.code = 'PK-011');
 
 
 -- ----------------------------------------------------------------------------
