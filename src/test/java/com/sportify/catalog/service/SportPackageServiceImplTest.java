@@ -165,6 +165,57 @@ public class SportPackageServiceImplTest {
     }
 
     @Test
+    void registerPackage_ThirtyDayPackage_EndsOnTheThirtiethDay() {
+        PackageRegistrationRequest req = PackageRegistrationRequest.builder()
+                .packageId(10L)
+                .startDate(LocalDate.of(2026, 11, 1))
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(sportPackage));
+        when(membershipCardService.getApplicableDiscountPercentage(eq(100L), eq(30))).thenReturn(0);
+        when(registrationRepository.getNextRegistrationCodeSequence()).thenReturn(110L);
+        when(codeFormatter.formatPackageRegCode(110L)).thenReturn("REG-PKG-110");
+        when(registrationRepository.save(any(SportPackageRegistration.class))).thenAnswer(i -> i.getArgument(0));
+
+        PackageRegistrationResponse res = sportPackageService.registerPackage(req, memberUser);
+
+        assertEquals(LocalDate.of(2026, 11, 1), res.getStartDate());
+        assertEquals(LocalDate.of(2026, 11, 30), res.getEndDate()); // 1 to 30 November = 30 days, not 31
+    }
+
+    @Test
+    void registerPackage_SingleVisit_EndsOnTheSameDay() {
+        SportPackage singleVisit = SportPackage.builder()
+                .id(11L)
+                .code("BADMINTON_SELF_SINGLE")
+                .name("Badminton Single Visit")
+                .sport(sport)
+                .trainingFormat(TrainingFormat.SELF_TRAINING)
+                .durationDays(1)
+                .sessionCount(1)
+                .priceAmount(BigDecimal.valueOf(50000.00))
+                .isActive(true)
+                .build();
+        PackageRegistrationRequest req = PackageRegistrationRequest.builder()
+                .packageId(11L)
+                .startDate(LocalDate.of(2026, 10, 20))
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sportPackageRepository.findById(11L)).thenReturn(Optional.of(singleVisit));
+        when(membershipCardService.getApplicableDiscountPercentage(eq(100L), eq(1))).thenReturn(0);
+        when(registrationRepository.getNextRegistrationCodeSequence()).thenReturn(111L);
+        when(codeFormatter.formatPackageRegCode(111L)).thenReturn("REG-PKG-111");
+        when(registrationRepository.save(any(SportPackageRegistration.class))).thenAnswer(i -> i.getArgument(0));
+
+        PackageRegistrationResponse res = sportPackageService.registerPackage(req, memberUser);
+
+        assertEquals(LocalDate.of(2026, 10, 20), res.getStartDate());
+        assertEquals(LocalDate.of(2026, 10, 20), res.getEndDate()); // valid on the visit date only
+    }
+
+    @Test
     void registerPackage_AsMember_WithChannelReception_ForcesOnlineAndPendingPayment() {
         PackageRegistrationRequest req = PackageRegistrationRequest.builder()
                 .packageId(10L)
@@ -431,7 +482,7 @@ public class SportPackageServiceImplTest {
 
         assertEquals(PackageRegistrationStatus.ACTIVE, res.getStatus());
         assertEquals(LocalDate.of(2026, 10, 6), res.getStartDate()); // Recomputed to today
-        assertEquals(LocalDate.of(2026, 10, 6).plusDays(30), res.getEndDate()); // Recomputed to today + durationDays
+        assertEquals(LocalDate.of(2026, 11, 4), res.getEndDate()); // Recomputed: 30 days counting today, 06/10 to 04/11
     }
 
     @Test

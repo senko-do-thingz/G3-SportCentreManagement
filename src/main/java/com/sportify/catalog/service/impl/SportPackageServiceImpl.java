@@ -127,7 +127,8 @@ public class SportPackageServiceImpl implements SportPackageService {
             throw new BusinessRuleException("Start date cannot be in the past");
         }
 
-        LocalDate endDate = startDate.plusDays(pkg.getDurationDays());
+        // A package of N days covers N calendar days including the start date (a single visit: that day only)
+        LocalDate endDate = packageEnd(startDate, pkg.getDurationDays());
 
         // Check active membership cards for discount (single visit packages excluded)
         int discountPercentage = membershipCardService.getApplicableDiscountPercentage(member.getId(), pkg.getDurationDays());
@@ -199,7 +200,7 @@ public class SportPackageServiceImpl implements SportPackageService {
         LocalDate today = LocalDate.now(clock);
         if (registration.getStartDate().isBefore(today)) {
             registration.setStartDate(today);
-            registration.setEndDate(today.plusDays(registration.getSportPackage().getDurationDays()));
+            registration.setEndDate(packageEnd(today, registration.getSportPackage().getDurationDays()));
         }
 
         registration.setStatus(PackageRegistrationStatus.ACTIVE);
@@ -264,5 +265,9 @@ public class SportPackageServiceImpl implements SportPackageService {
                 .activatedAt(reg.getActivatedAt())
                 .createdAt(reg.getCreatedAt())
                 .build();
+    }
+
+    static LocalDate packageEnd(LocalDate startDate, int durationDays) {
+        return startDate.plusDays(durationDays - 1L);
     }
 }

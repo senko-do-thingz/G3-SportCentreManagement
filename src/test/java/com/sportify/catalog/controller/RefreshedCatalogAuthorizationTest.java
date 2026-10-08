@@ -121,6 +121,38 @@ public class RefreshedCatalogAuthorizationTest {
     }
 
     @Test
+    void activateCard_AsMember_ShouldReturn403() throws Exception {
+        mockMvc.perform(put("/api/v1/membership-cards/1/activate")
+                        .with(user(createUserDetails("MEMBER"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void activateCard_AsReceptionist_ShouldReturn200() throws Exception {
+        when(membershipCardService.activateCard(eq(1L), any())).thenReturn(null);
+
+        mockMvc.perform(put("/api/v1/membership-cards/1/activate")
+                        .with(user(createUserDetails("RECEPTIONIST"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void cancelCard_AsCoach_ShouldReturn403() throws Exception {
+        mockMvc.perform(put("/api/v1/membership-cards/1/cancel")
+                        .with(user(createUserDetails("COACH"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void cancelCard_AsMember_ShouldReturn200() throws Exception {
+        when(membershipCardService.cancelCard(eq(1L), any())).thenReturn(null);
+
+        mockMvc.perform(put("/api/v1/membership-cards/1/cancel")
+                        .with(user(createUserDetails("MEMBER"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void getPendingRefunds_AsMember_ShouldReturn403() throws Exception {
         mockMvc.perform(get("/api/v1/refunds/pending")
                         .with(user(createUserDetails("MEMBER"))))

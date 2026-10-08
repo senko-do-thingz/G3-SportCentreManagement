@@ -35,6 +35,24 @@ public class MembershipCardController {
         return membershipCardService.purchaseCard(request, userDetails.getUserAccount());
     }
 
+    /** The front desk confirms the payment of a card request: PENDING_PAYMENT -> ACTIVE. */
+    @PutMapping("/{id}/activate")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'MANAGER')")
+    public MemberCardResponse activateCard(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return membershipCardService.activateCard(id, userDetails.getUserAccount());
+    }
+
+    /** Cancels a card request that has not been paid yet. A member may cancel only their own request. */
+    @PutMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyRole('MEMBER', 'RECEPTIONIST', 'MANAGER')")
+    public MemberCardResponse cancelCard(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return membershipCardService.cancelCard(id, userDetails.getUserAccount());
+    }
+
     @GetMapping("/my")
     @PreAuthorize("hasRole('MEMBER')")
     public List<MemberCardResponse> getMyCards(
