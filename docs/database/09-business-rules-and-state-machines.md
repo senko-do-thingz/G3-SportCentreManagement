@@ -20,9 +20,12 @@ stateDiagram-v2
 
 ```mermaid
 stateDiagram-v2
-    [*] --> ACTIVE : Purchase Card (Free STANDARD 0%, GOLD 5%, VIP 10%)
+    [*] --> ACTIVE : Free STANDARD card / purchase at the desk
+    [*] --> PENDING_PAYMENT : Member requests GOLD or VIP online
+    PENDING_PAYMENT --> ACTIVE : Receptionist confirms payment
+    PENDING_PAYMENT --> CANCELLED : Member or staff cancels
+    ACTIVE --> REPLACED : Upgrade to a dearer tier is paid
     ACTIVE --> EXPIRED : Daily Job (end_date < TODAY for Gold/VIP)
-    ACTIVE --> CANCELLED : Cancel
 ```
 
 ### Refund Request (`refund_request.status`)
@@ -54,8 +57,9 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
     [*] --> PENDING : Initiated
-    PENDING --> PAID : Confirmed
+    PENDING --> SUCCESS : Confirmed
     PENDING --> FAILED : Mark Failed
+    SUCCESS --> REFUNDED : Refund approved
     FAILED --> PENDING : Retry (creates new row)
 ```
 
@@ -148,7 +152,23 @@ Front desk check-in validates member arrival at the center:
    - Single-visit packages (1 day, 1 session) are strictly EXCLUDED from discounts.
    - Discounts apply only to 30-day and 90-day packages.
    - Discounts do not stack. The member's single highest active card discount is applied.
-3. **Consecutive Renewal:** Renewing an active Gold/VIP card extends the `end_date` by 12 months from the existing expiry date.
+3. **One card at a time (implemented):**
+   - Same tier: renewal starts the day after the current card ends.
+   - Dearer tier while a card is valid: upgrade from today, keeps the current end date, the member pays only the price difference. The old card becomes `REPLACED` when the payment is confirmed.
+   - Cheaper tier: starts the day after the current card ends, full price.
+   - Only one `PENDING_PAYMENT` request per member. An upgrade is refused while a renewal is already paid.
+   - End date = start + months - 1 day. A card that has not started yet gives no discount.
+
+### Rules vs. Code
+
+| Rule | Status |
+|---|---|
+| Online card request waits for payment (`PENDING_PAYMENT`) | Done |
+| Upgrade pays the difference, old card `REPLACED` | Done |
+| Card and package end date = start + duration - 1 day | Done |
+| One confirmed booking per member and session (`ux_booking_active`) | Done (database) |
+| Cancel unpaid card requests after 7 days | Not done |
+| Map `sport_class.coach_id`, `booking.cancelled_by_user_id`, `member_card.payment_id` in entities | Not done |
 
 ## Sport Package & Booking Eligibility Rules
 
@@ -199,15 +219,16 @@ Front desk check-in validates member arrival at the center:
 
 1. Pessimistic lock on `payment` to prevent double confirmation.
 2. Verify status is `PENDING`.
-3. Set status to `PAID`, record `received_on` and `amount_received`.
+3. Set `payment_status` to `SUCCESS` and record `payment_time` (V14 has no `amount_received` column).
 4. Activate corresponding package registration or member card.
-5. Issue `invoice` and itemized `invoice_line` snapshot with applied discounts.
+5. Issue `invoice` (status `PAID`) and itemized `invoice_line` snapshot with applied discounts.
 6. Insert `activity_log`.
 
 ## Scheduled Jobs
 
 1. **Package Expiration:** Daily at midnight, set packages to `EXPIRED` if `end_date < TODAY` or `remaining_sessions = 0` (Planned). Note: The remaining_sessions = 0 condition conflicts with strict check-in and must be decided before the job is built.
 2. **Card Expiration:** Daily at midnight, set member cards to `EXPIRED` if `end_date < TODAY` (Planned).
+5. **Unpaid Card Requests:** Daily, cancel `PENDING_PAYMENT` member cards older than 7 days (Planned).
 3. **Session Completion:** Hourly, mark sessions as `COMPLETED` when session date and time have passed (Planned).
 4. **Waitlist Expiry:** Hourly, expire offered waitlist entries that exceeded the acceptance window (Planned).
 *(Note: Active scheduled job `MembershipScheduledJobs` currently processes legacy `membership` table transitions only).*

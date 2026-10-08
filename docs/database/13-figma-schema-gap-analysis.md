@@ -5,7 +5,7 @@ This document provides a comprehensive audit of all 135 Figma screens from the r
 
 ### 1.1. Status Definitions
 - **COVERED**: Full-stack complete. Both the underlying database schema (tables, columns, foreign keys, constraints) AND the needed backend REST API endpoints, DTOs, and services are implemented in the code repository.
-- **PARTIAL**: Database schema is fully created in Flyway migrations (V1-V19), but backend REST controllers, DTOs, or service workflows are not yet fully implemented (scheduled for subsequent sprint tasks).
+- **PARTIAL**: Database schema is fully created in Flyway migrations (V1-V20), but backend REST controllers, DTOs, or service workflows are not yet fully implemented (scheduled for subsequent sprint tasks).
 - **MISSING**: Neither the schema nor the backend exists (0 screens, as all 135 screens have their schema tables implemented in V1-V19).
 - **LEGACY-CONFLICT**: UI assumes legacy schema constructs that conflict with modern design (0 screens).
 

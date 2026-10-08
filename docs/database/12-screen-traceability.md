@@ -4,7 +4,7 @@ This matrix maps all 135 UI screens and state dialogs from the refreshed context
 
 Status Legend:
 - **IMPLEMENTED**: Full stack complete (database schema, JPA entity, repository, service logic, REST controller endpoints, and tests).
-- **PARTIAL**: Database schema and relational tables are fully implemented (migrations V1-V19), with backend REST endpoints, DTOs, or service workflows scheduled for subsequent sprint tasks.
+- **PARTIAL**: Database schema and relational tables are fully implemented (migrations V1-V20), with backend REST endpoints, DTOs, or service workflows scheduled for subsequent sprint tasks.
 - **NOT STARTED**: Feature deferred beyond current release cycle (currently 0 screens; all 135 screens now have underlying database schemas implemented in V1-V19).
 
 ## Flow 1 - User and membership management > Flow 1 - Manager
