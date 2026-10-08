@@ -20,6 +20,7 @@ public class SportPackageResponse {
     private TrainingFormat trainingFormat;
     private Integer durationDays;
     private Integer sessionCount;
+    private Integer sessionMinutes;
     private BigDecimal priceAmount;
     private String description;
     private Boolean isActive;

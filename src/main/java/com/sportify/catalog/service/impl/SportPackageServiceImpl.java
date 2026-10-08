@@ -9,6 +9,7 @@ import com.sportify.catalog.entity.RegistrationChannel;
 import com.sportify.catalog.entity.Sport;
 import com.sportify.catalog.entity.SportPackage;
 import com.sportify.catalog.entity.SportPackageRegistration;
+import com.sportify.catalog.entity.TrainingFormat;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.repository.SportPackageRepository;
 import com.sportify.catalog.repository.SportRepository;
@@ -75,6 +76,7 @@ public class SportPackageServiceImpl implements SportPackageService {
                 .trainingFormat(request.getTrainingFormat())
                 .durationDays(request.getDurationDays())
                 .sessionCount(request.getSessionCount())
+                .sessionMinutes(request.getSessionMinutes() != null ? request.getSessionMinutes() : (request.getTrainingFormat() == TrainingFormat.COACH_LED ? 90 : 60))
                 .priceAmount(request.getPriceAmount())
                 .description(request.getDescription())
                 .isActive(true)
@@ -231,6 +233,7 @@ public class SportPackageServiceImpl implements SportPackageService {
                 .trainingFormat(pkg.getTrainingFormat())
                 .durationDays(pkg.getDurationDays())
                 .sessionCount(pkg.getSessionCount())
+                .sessionMinutes(pkg.getSessionMinutes())
                 .priceAmount(pkg.getPriceAmount())
                 .description(pkg.getDescription())
                 .isActive(pkg.getIsActive())

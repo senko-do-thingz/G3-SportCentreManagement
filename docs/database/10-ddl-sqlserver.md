@@ -1,7 +1,7 @@
 # 10 - DDL Script (SQL Server)
 
 > [!NOTE]
-> **Superseded by V1-V12:** The DDL and seed scripts below represent initial architectural drafts (`V1__init_schema.sql` and `V2__seed_reference_data.sql`).
+> **Superseded by V1-V19:** The DDL and seed scripts below represent initial architectural drafts (`V1__init_schema.sql` and `V2__seed_reference_data.sql`).
 > The active production database schema is managed modularly in `src/main/resources/db/migration/`:
 > - Identity & Core: `identity/V1__init_identity_schema.sql`, `identity/V2__add_identity_tables.sql`, `identity/V3__seed_identity_data.sql`, `identity/V4__seed_manager_account.sql`
 > - Catalog, Membership, Booking, Refunds & Packages: `catalog/V5__create_catalog_membership_tables.sql`, `catalog/V6__seed_catalog_data.sql`, `catalog/V9__add_registration_sequence.sql`, `catalog/V10__context_refresh_schema.sql`, `catalog/V11__add_refunded_status.sql`, `catalog/V12__align_sport_package_seed_with_figma.sql`
@@ -10,7 +10,7 @@
 This document provides the historical SQL Server DDL and seed data drafts.
 It assumes `SET ANSI_NULLS ON` and `SET QUOTED_IDENTIFIER ON`.
 
-## V1__init_schema.sql (Initial Draft - Superseded by V1-V12)
+## V1__init_schema.sql (Initial Draft - Superseded by V1-V19)
 
 ```sql
 SET ANSI_NULLS ON

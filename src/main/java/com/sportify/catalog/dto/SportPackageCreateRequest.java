@@ -33,6 +33,8 @@ public class SportPackageCreateRequest {
     @Min(value = 1, message = "Session count must be at least 1")
     private Integer sessionCount;
 
+    private Integer sessionMinutes;
+
     @NotNull(message = "Price amount is required")
     @DecimalMin(value = "0.0", inclusive = true, message = "Price amount must be non-negative")
     private BigDecimal priceAmount;
