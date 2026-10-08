@@ -97,11 +97,11 @@ Member's card holding record.
 | card_code | NVARCHAR(30) | No | UQ | `CARD-1000` from sequence |
 | member_id | BIGINT | No | FK -> member_profile.user_id | Member holding card |
 | tier_id | BIGINT | No | FK -> membership_card_tier.id | Current card tier |
-| start_date | DATE | No | | Card activation date |
+| start_date | DATE | No | | Card start date. Recomputed from the payment date when a PENDING_PAYMENT card is activated |
 | end_date | DATE | Yes | | Null for permanent Standard, date for Gold/VIP |
-| status | NVARCHAR(20) | No | `ACTIVE` | `ACTIVE`, `EXPIRED`, `CANCELLED` |
+| status | NVARCHAR(20) | No | `ACTIVE` | `PENDING_PAYMENT`, `ACTIVE`, `EXPIRED`, `CANCELLED`, `REPLACED` (V20). `PENDING_PAYMENT` = online request not paid yet, `REPLACED` = old card after an upgrade |
 | price_paid | DECIMAL(14,2) | No | CHECK >= 0 | Snapshot of fee paid |
-| payment_id | BIGINT | Yes | FK -> payment.id | Associated payment attempt (planned, not in V10) |
+| payment_id | BIGINT | Yes | FK -> payment.id | Associated payment (V14). Not mapped by the entity yet |
 | created_at, updated_at | DATETIME2(0) | | | Audit |
 
 ### `sport_package`

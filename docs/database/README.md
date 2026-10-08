@@ -85,7 +85,7 @@ The design is derived from the UI mockups in `context/` (Home + Flow 1 to Flow 6
 | AI assistant and support | `assistant_setting`, `assistant_topic`, `assistant_quick_prompt`, `ai_conversation`, `ai_message`, `support_request`, `support_request_message` | Flow 6, Flow 1 |
 | Notifications and system | `notification`, `announcement`, `system_setting` | All |
 
-Total: **58 tables** (all 58 implemented in migrations V1-V19: 26 in V1-V12, 32 in V13-V19), **3 reporting views** (planned), **11 sequences** (all 11 implemented in migrations V2, V9-V10, V14, V17-V18: seq_booking_code, seq_card_code, seq_class_code, seq_member_code, seq_package_reg_code, seq_refund_code, seq_registration_code, seq_payment_code, seq_invoice_number, seq_support_request_code, seq_workout_plan_code).
+Total: **58 tables** (all 58 implemented in migrations V1-V20: 26 in V1-V12, 32 in V13-V19; V20 only adds columns, checks and indexes), **3 reporting views** (planned), **11 sequences** (all 11 implemented in migrations V2, V9-V10, V14, V17-V18: seq_booking_code, seq_card_code, seq_class_code, seq_member_code, seq_package_reg_code, seq_refund_code, seq_registration_code, seq_payment_code, seq_invoice_number, seq_support_request_code, seq_workout_plan_code).
 
 ## High Level ERD
 
@@ -137,3 +137,10 @@ These do not block the schema (the design handles both cases), but the team shou
 | 5 | Single sport packages vs multi-sport packages. | Modeled cleanly as individual `sport_package` rows per sport (Football, Badminton, Basketball, Volleyball, Swimming, Tennis). |
 | 6 | Home shows recurring times ("Tue and Thu - 17:00") while F2-03 schedules one session date. | v1 stores individual `class_session` rows. A recurrence pattern table is listed as a future extension. |
 | 7 | Membership card tiers and benefits (F1-03, F1-04, F1-05). | Handled by `membership_card_tier` (Standard 0 VND / 0%, Gold 300,000 VND / 5%, VIP 600,000 VND / 10%) and member holdings in `member_card`. |
+
+## Migration V20 (`catalog/V20__align_schema_with_topic.sql`)
+
+- `member_card.status` also allows `PENDING_PAYMENT` and `REPLACED`.
+- `sport_class.coach_id` (FK `coach_profile`): coach in charge of a class.
+- `booking.cancelled_by_user_id` (FK `user_account`): who cancelled a booking.
+- `ux_booking_active (member_id, session_id) WHERE status = 'CONFIRMED'`: no double booking.

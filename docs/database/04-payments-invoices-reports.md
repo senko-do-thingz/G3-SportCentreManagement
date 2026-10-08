@@ -8,131 +8,103 @@ F3-07 Refund Requests, F3-08 Financial Overview, F3-09 Transactions & Refund App
 
 ```mermaid
 erDiagram
-    sport_package_registration ||--o{ payment : "pays for"
-    member_card ||--o{ payment : "pays for"
-    membership ||--o{ payment : "legacy pays for"
     member_profile ||--o{ payment : "pays"
-    user_account ||--o{ payment : "records / confirms"
-    payment ||--o| invoice : "issues"
+    payment ||--o{ member_card : "pays for (member_card.payment_id)"
+    payment ||--o{ sport_package_registration : "pays for (payment_id)"
+    payment ||--o{ invoice : "issues"
     invoice ||--|{ invoice_line : "contains"
     payment ||--o{ refund_request : "target of"
     sport_package_registration ||--o{ refund_request : "refunded from"
-    user_account ||--o{ refund_request : "reviews"
+    user_account ||--o{ refund_request : "requests / reviews"
 ```
+
+Implemented in migration V14 (payment, invoice, invoice_line, payment_id on member_card,
+sport_package_registration and refund_request). `refund_request` is from V10/V11.
+No JPA entity maps `payment`, `invoice` or `invoice_line` yet.
 
 ## Design Decisions
 
-- **Payments cover packages and membership cards.** Payments cover either a `sport_package_registration`, a `member_card` tier purchase, or legacy `membership`. `payment.membership_id` is retained as nullable for backward compatibility.
-- **Payment requests & verification (F3-04, F3-05).** A `PENDING` payment is created when a package or card is registered. The receptionist verifies receipt of payment (Cash, Bank Transfer, Card), records the transaction reference, and confirms payment.
-- **Card discount on invoices.** When a member holds an active Gold (5%) or VIP (10%) membership card, the discount is calculated at package registration, recorded in `paid_amount`, and itemized on the issued invoice (`invoice_line`). Single visits are excluded from discounts.
-- **Refund Request Workflow (F3-07, F3-09).**
-  - Receptionist files a refund request at front desk (`F3-07`, `S3-RefundSubmitted`) or member initiates.
-  - Refund requests specify the package registration, reason, and requested refund amount (pro-rated based on unused sessions).
-  - Center Manager reviews pending refund requests (`F3-09`, `S3-RefundReview`).
-  - Manager may approve (`S3-RefundApproved`) or reject (`S3-RefundRejected`) the request with a note.
-  - Approved refunds are marked `COMPLETED` (`S3-RefundDone`) upon payout.
-- **Invoice = immutable snapshot.** One invoice per PAID payment (`invoice.payment_id` unique). Member name, reference, discount applied, and package details are snapshot into the invoice and invoice lines.
-- **Revenue is computed, not stored.** Reports read `vw_paid_payment` filtered by `received_on` (paid date). Pending and Failed transactions remain in the ledger but are excluded from recognized revenue.
+- **One payment row, linked from what it pays for.** `member_card`, `sport_package_registration` and `refund_request` hold a nullable `payment_id`. A payment does not point back to the item; `invoice_line.item_type` + `item_reference_id` say what was bought.
+- **Payment requests and verification (F3-04, F3-05).** A `PENDING` payment is created when a package or card is requested online. The receptionist checks the money, records `reference_code`, and sets `payment_status = 'SUCCESS'`. The linked card or package is then activated (`PENDING_PAYMENT -> ACTIVE`).
+- **Card discount on invoices.** A Gold (5%) or VIP (10%) discount is computed at package registration and shown in `invoice.discount_amount` and the invoice lines. Single visits get no discount.
+- **Refund Request Workflow (F3-07, F3-09).** Receptionist or member files a request, the Center Manager approves or rejects it with a note, approved refunds become `COMPLETED` on payout, and the payment becomes `REFUNDED`.
+- **Invoice = snapshot.** An invoice is issued for a successful payment. `invoice.payment_id` is indexed but not unique.
+- **Revenue is computed, not stored.** Reports read `vw_paid_payment` (planned view) filtered by `payment_time`. `PENDING` and `FAILED` rows stay in the ledger but are not revenue.
+- **Not in V14 (left out on purpose or later):** who recorded or confirmed a payment, amount received (cash change), failure reason. Add them in a later migration if F3-05 needs them.
 
 ## Tables
 
-### `payment`
+### `payment` (V14)
 
 | Column | Type | Null | Key / Default | Description |
 |---|---|---|---|---|
 | id | BIGINT | No | PK, IDENTITY | |
-| payment_code | NVARCHAR(20) | No | UQ | `PAY-1098` |
-| membership_id | BIGINT | No | FK -> membership.id | Registration being paid (`REG-1042`) |
-| member_id | BIGINT | No | FK -> member_profile.user_id | Denormalized for history and ledger queries |
-| purpose | NVARCHAR(20) | No | | `NEW_MEMBERSHIP`, `RENEWAL` |
-| amount_due | DECIMAL(14,2) | No | CHECK >= 0 | Copied from `membership.price_amount` |
-| amount_received | DECIMAL(14,2) | Yes | CHECK >= 0 | Entered by receptionist |
-| method | NVARCHAR(20) | Yes | | `CASH`, `BANK_TRANSFER`, `CARD` |
-| transaction_reference | NVARCHAR(60) | Yes | UX filtered | `FT-20260927-0128` |
-| received_on | DATE | Yes | | Paid date, drives revenue period |
-| status | NVARCHAR(20) | No | `PENDING` | `PENDING`, `PAID`, `FAILED` |
-| is_verified | BIT | No | 0 | "I have verified that the full amount was received" |
-| failure_reason | NVARCHAR(255) | Yes | | Required when `FAILED` |
-| note | NVARCHAR(500) | Yes | | |
-| recorded_by | BIGINT | Yes | FK -> user_account.id | Receptionist who entered details |
-| recorded_at | DATETIME2(0) | Yes | | |
-| confirmed_by | BIGINT | Yes | FK -> user_account.id | Required when `PAID` |
-| confirmed_at | DATETIME2(0) | Yes | | |
-| created_at, updated_at | DATETIME2(0) | | | Audit |
+| payment_code | VARCHAR(30) | No | UQ `uq_payment_code` | From `seq_payment_code` (starts at 1000) |
+| member_id | BIGINT | No | FK -> member_profile.user_id | Paying member |
+| amount | DECIMAL(12,2) | No | CHECK > 0 | Amount to pay |
+| payment_method | VARCHAR(30) | No | CHECK | `CASH`, `CREDIT_CARD`, `BANK_TRANSFER`, `MOMO`, `VNPAY`, `ZALOPAY` |
+| payment_status | VARCHAR(20) | No | CHECK | `PENDING`, `SUCCESS`, `FAILED`, `REFUNDED` |
+| reference_code | VARCHAR(100) | Yes | | Bank or e-wallet transaction reference |
+| notes | NVARCHAR(500) | Yes | | |
+| payment_time | DATETIME2(0) | No | SYSDATETIME() | Payment time, drives the revenue period |
 | version | INT | No | 0 | Optimistic lock |
+| created_at, updated_at | DATETIME2(0) | No | SYSDATETIME() | Audit |
 
-Constraints and indexes:
-- `ck_payment_paid_complete`, `ck_payment_failed_reason`, `ck_payment_reference_required` (non-cash PAID needs a reference).
-- `ux_payment_reference (transaction_reference) WHERE transaction_reference IS NOT NULL`.
-- `ux_payment_one_paid_per_membership (membership_id) WHERE status = 'PAID'`.
-- `ux_payment_one_pending_per_membership (membership_id) WHERE status = 'PENDING'`.
-- `ix_payment_status_received (status, received_on) INCLUDE (amount_received, method, membership_id, member_id)`.
-- `ix_payment_member (member_id, created_at)`.
+Indexes: `ix_payment_member_id (member_id)`, `ix_payment_payment_time (payment_time)`, `ix_payment_status (payment_status)`.
 
-### `invoice`
+### `invoice` (V14)
 
 | Column | Type | Null | Key / Default | Description |
 |---|---|---|---|---|
 | id | BIGINT | No | PK, IDENTITY | |
-| invoice_number | NVARCHAR(30) | No | UQ | `INV-2026-1099` |
-| payment_id | BIGINT | No | UQ, FK -> payment.id | One invoice per paid payment |
-| membership_id | BIGINT | No | FK -> membership.id | |
+| invoice_number | VARCHAR(30) | No | UQ `uq_invoice_number` | From `seq_invoice_number` |
+| payment_id | BIGINT | No | FK -> payment.id | Payment that produced the invoice |
 | member_id | BIGINT | No | FK -> member_profile.user_id | |
-| invoice_date | DATE | No | | Paid date |
-| billed_to_name | NVARCHAR(100) | No | | Snapshot "Alex Nguyen" |
-| billed_to_member_code | NVARCHAR(20) | No | | Snapshot `MEM-0128` |
-| payment_method | NVARCHAR(20) | No | | Snapshot |
-| transaction_reference | NVARCHAR(60) | Yes | | Snapshot |
-| total_amount | DECIMAL(14,2) | No | CHECK >= 0 | |
-| status | NVARCHAR(20) | No | `ISSUED` | `ISSUED`, `VOID` |
-| issued_by | BIGINT | No | FK -> user_account.id | |
-| issued_at | DATETIME2(0) | No | SYSDATETIME() | |
-| voided_at | DATETIME2(0) | Yes | | |
-| void_reason | NVARCHAR(255) | Yes | | |
+| subtotal_amount | DECIMAL(12,2) | No | CHECK >= 0 | Before discount and tax |
+| discount_amount | DECIMAL(12,2) | No | 0 | Card discount |
+| tax_amount | DECIMAL(12,2) | No | 0 | |
+| total_amount | DECIMAL(12,2) | No | CHECK >= 0 | |
+| status | VARCHAR(20) | No | CHECK | `ISSUED`, `PAID`, `CANCELLED`, `REFUNDED` |
+| issue_date | DATETIME2(0) | No | SYSDATETIME() | |
+| created_at, updated_at | DATETIME2(0) | No | SYSDATETIME() | Audit |
 
-Index: `ix_invoice_member (member_id, invoice_date)`.
+Indexes: `ix_invoice_payment_id`, `ix_invoice_member_id`, `ix_invoice_issue_date`.
 
-### `invoice_line`
+### `invoice_line` (V14)
 
 | Column | Type | Null | Key / Default | Description |
 |---|---|---|---|---|
 | id | BIGINT | No | PK, IDENTITY | |
 | invoice_id | BIGINT | No | FK -> invoice.id (cascade) | |
-| line_no | INT | No | | Unique per invoice |
-| description | NVARCHAR(200) | No | | "Multi-Sport membership" |
-| period_days | INT | Yes | | 30 |
-| period_start | DATE | Yes | | |
-| period_end | DATE | Yes | | |
-| selected_sports | NVARCHAR(255) | Yes | | Snapshot "Basketball, Badminton, Swimming" |
+| item_type | VARCHAR(30) | No | CHECK | `SPORT_PACKAGE`, `MEMBERSHIP_CARD`, `CLASS_DROP_IN`, `PENALTY_FEE` |
+| item_reference_id | BIGINT | No | | Id of the package registration, card, etc. (no FK) |
+| description | NVARCHAR(255) | No | | |
 | quantity | INT | No | 1, CHECK > 0 | |
-| unit_price | DECIMAL(14,2) | No | CHECK >= 0 | |
-| amount | DECIMAL(14,2) | No | CHECK >= 0 | |
+| unit_price | DECIMAL(12,2) | No | | |
+| line_total | DECIMAL(12,2) | No | | |
+| created_at | DATETIME2(0) | No | SYSDATETIME() | |
 
-Unique: `(invoice_id, line_no)`.
+Index: `ix_invoice_line_invoice_id`.
 
 ## Reporting View
 
-### `vw_paid_payment`
+### `vw_paid_payment` (planned, not in any migration)
 
-Single source for F3-09, F3-11 and the revenue part of F3-12.
+Single source for the revenue screens.
 
 ```sql
 CREATE VIEW vw_paid_payment AS
-SELECT p.id              AS payment_id,
+SELECT p.id           AS payment_id,
        p.payment_code,
-       p.received_on,
-       p.amount_received AS amount,
-       p.method,
+       p.payment_time,
+       CAST(p.payment_time AS DATE) AS paid_on,
+       p.amount,
+       p.payment_method,
        p.member_id,
-       m.id              AS membership_id,
-       m.plan_id,
-       pl.name           AS plan_name,
        i.invoice_number
 FROM payment p
-JOIN membership m       ON m.id = p.membership_id
-JOIN membership_plan pl ON pl.id = m.plan_id
-LEFT JOIN invoice i     ON i.payment_id = p.id AND i.status = 'ISSUED'
-WHERE p.status = 'PAID';
+LEFT JOIN invoice i ON i.payment_id = p.id AND i.status IN ('ISSUED', 'PAID')
+WHERE p.payment_status = 'SUCCESS';
 ```
 
 ### `refund_request`
@@ -143,7 +115,7 @@ Front desk refund filing and Manager review/approval workflow (F3-07, F3-09).
 |---|---|---|---|---|
 | id | BIGINT | No | PK, IDENTITY | |
 | refund_code | NVARCHAR(30) | No | UQ | `REF-1000` |
-| payment_id | BIGINT | No | FK -> payment.id | Original payment |
+| payment_id | BIGINT | Yes | FK -> payment.id | Original payment (added in V14) |
 | package_registration_id | BIGINT | Yes | FK -> sport_package_registration.id | Package being refunded |
 | member_id | BIGINT | No | FK -> member_profile.user_id | Member receiving refund |
 | amount_requested | DECIMAL(14,2) | No | CHECK > 0 | Amount requested |
@@ -158,64 +130,61 @@ Front desk refund filing and Manager review/approval workflow (F3-07, F3-09).
 
 ### Report queries
 
-Revenue overview KPIs (F3-09) for a month:
+Revenue overview KPIs (F3-08) for a month:
 
 ```sql
 SELECT SUM(amount) AS paid_revenue,
        COUNT(*)    AS paid_transactions,
        AVG(amount) AS average_payment
 FROM vw_paid_payment
-WHERE received_on >= @monthStart AND received_on < DATEADD(MONTH, 1, @monthStart);
+WHERE paid_on >= @monthStart AND paid_on < DATEADD(MONTH, 1, @monthStart);
 ```
 
-Revenue trend, last six months (F3-09 chart):
+Revenue trend, last six months:
 
 ```sql
-SELECT DATEFROMPARTS(YEAR(received_on), MONTH(received_on), 1) AS month_start,
+SELECT DATEFROMPARTS(YEAR(paid_on), MONTH(paid_on), 1) AS month_start,
        SUM(amount) AS revenue
 FROM vw_paid_payment
-WHERE received_on >= DATEADD(MONTH, -5, @currentMonthStart)
-GROUP BY DATEFROMPARTS(YEAR(received_on), MONTH(received_on), 1)
+WHERE paid_on >= DATEADD(MONTH, -5, @currentMonthStart)
+GROUP BY DATEFROMPARTS(YEAR(paid_on), MONTH(paid_on), 1)
 ORDER BY month_start;
 ```
 
-Revenue by plan with share (F3-11), using the F3-10 filters:
+Revenue by item type (F3-10):
 
 ```sql
-SELECT plan_name,
-       COUNT(*)    AS paid_count,
-       SUM(amount) AS revenue,
-       CAST(100.0 * SUM(amount) / SUM(SUM(amount)) OVER () AS DECIMAL(5,2)) AS share_percent
-FROM vw_paid_payment
-WHERE received_on BETWEEN @fromDate AND @toDate
-  AND (@planId IS NULL OR plan_id = @planId)
-  AND (@method IS NULL OR method = @method)
-GROUP BY plan_name
+SELECT il.item_type,
+       COUNT(DISTINCT v.payment_id) AS paid_count,
+       SUM(il.line_total)           AS revenue
+FROM vw_paid_payment v
+JOIN invoice i       ON i.payment_id = v.payment_id
+JOIN invoice_line il ON il.invoice_id = i.id
+WHERE v.paid_on BETWEEN @fromDate AND @toDate
+  AND (@method IS NULL OR v.payment_method = @method)
+GROUP BY il.item_type
 ORDER BY revenue DESC;
 ```
 
-Paying members (F3-11 "Members with at least one Paid transaction"):
+Paying members:
 
 ```sql
 SELECT COUNT(DISTINCT member_id)
 FROM vw_paid_payment
-WHERE received_on BETWEEN @fromDate AND @toDate;
+WHERE paid_on BETWEEN @fromDate AND @toDate;
 ```
 
-Payment ledger including Pending and Failed (F3-12):
+Payment ledger including PENDING and FAILED (F3-09):
 
 ```sql
-SELECT p.created_at, p.payment_code, i.invoice_number, u.full_name, pl.name AS plan_name,
-       p.method, p.amount_due, p.amount_received, p.status
+SELECT p.payment_time, p.payment_code, i.invoice_number, u.full_name,
+       p.payment_method, p.amount, p.payment_status
 FROM payment p
-JOIN membership m       ON m.id = p.membership_id
-JOIN membership_plan pl ON pl.id = m.plan_id
-JOIN user_account u     ON u.id = p.member_id
-LEFT JOIN invoice i     ON i.payment_id = p.id
+JOIN user_account u ON u.id = p.member_id
+LEFT JOIN invoice i ON i.payment_id = p.id
 WHERE (@search IS NULL OR p.payment_code LIKE @search + '%' OR u.full_name LIKE '%' + @search + '%')
-ORDER BY p.created_at DESC
+ORDER BY p.payment_time DESC
 OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
 ```
 
 CSV export and "Print / Save PDF" are generated by the application from these queries; no table is required.
-Each export is recorded in `activity_log` (`REPORT_EXPORTED`).

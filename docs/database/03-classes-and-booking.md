@@ -62,6 +62,7 @@ Learning group / class definition (migrated in V10).
 | age_group_id | BIGINT | Yes | FK -> age_group.id | Target age group (e.g. "Ages 16+") |
 | level | NVARCHAR(20) | No | `BEGINNER` | `BEGINNER`, `INTERMEDIATE`, `ADVANCED` |
 | max_members | INT | No | 20, CHECK > 0 | Default capacity of new sessions |
+| coach_id | BIGINT | Yes | FK -> coach_profile.user_id | Coach in charge of the class (V20). Not mapped by the entity yet |
 | is_active | BIT | No | 1 | Active visibility toggle |
 | created_at, updated_at | DATETIME2(0) | | | Audit timestamps |
 
@@ -91,6 +92,8 @@ Dated class occurrence or self-training slot (migrated in V10).
 
 Indexes: `ix_class_session_date_status (session_date, status)`.
 
+`sport_class` index (V20): `ix_sport_class_coach (coach_id)`.
+
 ### `booking`
 
 Session reservation by a member (migrated in V10).
@@ -107,11 +110,12 @@ Session reservation by a member (migrated in V10).
 | booked_at | DATETIME2(0) | No | SYSDATETIME() | Booking creation timestamp |
 | cancelled_at | DATETIME2(0) | Yes | | Cancellation timestamp |
 | cancel_reason | NVARCHAR(255) | Yes | | Cancellation reason |
+| cancelled_by_user_id | BIGINT | Yes | FK -> user_account.id | Who cancelled: member, receptionist or manager (V20). Not mapped by the entity yet |
 | created_at, updated_at | DATETIME2(0) | | | Audit timestamps |
 
-*(Note: Columns `source`, `fee_amount`, `cancelled_by`, `cancel_type`, `version` from earlier drafts are not present in V10).*
+*(Note: Columns `source`, `fee_amount`, `cancel_type`, `version` from earlier drafts are not present. `cancelled_by` was added in V20 as `cancelled_by_user_id`).*
 
-Indexes: `ix_booking_member_session (member_id, session_id, status)`.
+Indexes: `ix_booking_member_session (member_id, session_id, status)`, `ux_booking_active (member_id, session_id) WHERE status = 'CONFIRMED'` (V20, unique: one confirmed booking per member and session).
 
 ### `waitlist_entry` (Implemented - Migration V15)
 
