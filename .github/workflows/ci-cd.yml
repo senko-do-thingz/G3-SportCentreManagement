@@ -9,6 +9,9 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
 
     steps:
     - name: Checkout repository
@@ -20,6 +23,7 @@ jobs:
         java-version: '25'
         distribution: 'temurin'
         cache: 'maven'
+        cache-dependency-path: backend/pom.xml
 
     - name: Build and run tests with Maven
       env:
@@ -31,11 +35,11 @@ jobs:
       if: always()
       with:
         name: surefire-reports
-        path: target/surefire-reports/
+        path: backend/target/surefire-reports/
 
     - name: Upload JaCoCo Coverage Report
       uses: actions/upload-artifact@v4
       if: always()
       with:
         name: jacoco-report
-        path: target/site/jacoco/
+        path: backend/target/site/jacoco/
