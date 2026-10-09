@@ -23,7 +23,7 @@ G3-SportCentreManagement/
     .env.example                     copy to backend/.env
   frontend/                Web app. Run every npm command here.
     README.md
-  docs/                    database design, architecture notes, AI Audit Log
+  docs/                    database design, architecture notes
   context/                 exported Figma screens, grouped by flow and role
   .github/                 CI workflow and CODEOWNERS
   CHANGELOG.md             what changed and what is not done yet
@@ -118,7 +118,6 @@ Booking code currently lives inside `catalog/`. `docs/architecture/project_struc
 - [Changelog](CHANGELOG.md) - latest changes and the list of work not done yet
 - [TODO](TODO.md) - tasks per flow, owners and priorities
 - [Frontend guide](frontend/README.md)
-- AI Audit Log: `docs/AI_Audit_Log.docx`
 
 ## Getting Started
 
@@ -255,8 +254,7 @@ CI (`.github/workflows/ci-cd.yml`) runs `mvn clean verify` with JDK 25 inside `b
 - **Frontend files:** commit `package-lock.json`, never commit `node_modules/` or `dist/`.
 - **Language and style:** code, comments, commit messages and documentation are 100% English. Use `-` instead of an em dash, no emoji, and no special symbols (write `->` instead of an arrow symbol).
 - **Branches and commits:** one branch per task (`feat/...`, `fix/...`, `chore/...`). Use Conventional Commits with `feat`, `fix`, `chore`, `build`, `docs` and `test` prefixes. Each task group has its own commit.
-- **Pull requests:** every change to `main` goes through a pull request that is reviewed by the code owner (@senko-do-thingz) before merging. Update `CHANGELOG.md` and the AI Audit Log in the same PR.
-- **AI Audit Log:** update `docs/AI_Audit_Log.docx` after finishing any AI-assisted task.
+- **Pull requests:** every change to `main` goes through a pull request that is reviewed by the code owner (@senko-do-thingz) before merging. Update `CHANGELOG.md` in the same PR.
 
 ## Known Gaps
 
