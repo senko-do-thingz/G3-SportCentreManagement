@@ -1,7 +1,5 @@
 # Sportify Center - Project Structure
 
-> Since the repository was split, every path below is relative to the `backend/` folder (for example `backend/src/main/java/com/sportify/`). The React app lives in `frontend/`.
-
 This document outlines the proposed package structure for the Sportify Center Spring Boot application. 
 
 Given the scale of the system (53 tables across 8 logical modules), the project should adopt a **Module-Driven (or Feature-Driven) Package Structure**. Instead of grouping files by technical layers (e.g., placing all controllers in one massive `controller` folder), we group them by business domain. This makes the codebase much easier to navigate, maintain, and scale.

@@ -1,23 +1,5 @@
 # Changelog
 
-## 2026-10-09 - Repository split into backend/ and frontend/
-
-### Structure
-- Moved the Spring Boot project into `backend/` (`src`, `pom.xml`, `.env.example`, `docker-compose.yml`, `scaffold.ps1`, `scripts`). Git keeps the file history (renames).
-- New `frontend/` folder for the React app (created by task FE-00), with a README.
-- `docs/`, `context/`, `.github/`, `README.md`, `CHANGELOG.md` stay at the root.
-
-### What changes for every member
-- Run every Maven command inside `backend/`: `cd backend`, then `mvn clean verify` or `mvn spring-boot:run`.
-- Move your `.env` from the root to `backend/.env` (the app reads `.env` from the folder it runs in).
-- CI builds and tests `backend/`.
-
-### Also in this change
-- `TODO.md`: next tasks for Flow 1-3.
-- `docs/database/schema/`: reference of all 58 tables generated from migrations V1-V20.
-- `.gitignore`: `node_modules/`, `dist/`, `.vite/` for the frontend.
-- `docs/AI_Audit_Log.docx`: entries for 2026-10-08 and 2026-10-09.
-
 ## 2026-10-08 - Membership cards, end dates, schema V20
 
 Built on top of `feat/figma-schema-sync` (V13-V19). Merge that branch first. Not yet built or tested by the team: run `mvn clean verify` (unit tests, and the Testcontainers tests when Docker is running) before merging.

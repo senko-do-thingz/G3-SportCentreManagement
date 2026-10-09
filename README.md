@@ -32,18 +32,11 @@ Currently active technologies in the project:
 
 ## Project Structure
 
-```
-G3-SportCentreManagement/
-  backend/     Spring Boot API (Java 25, Maven). Run every mvn command inside this folder.
-    src/main/java/com/sportify/   identity/, catalog/, core/ modules
-    src/test/java/com/sportify/   100% mirrored test structure
-    src/main/resources/db/migration/   Flyway migrations V1-V20
-    pom.xml, .env.example, docker-compose.yml
-  frontend/    React web app (Vite + TypeScript), created by task FE-00
-  docs/        Database design, architecture, AI audit log
-  context/     Figma screens of every flow
-  .github/     CI (builds and tests backend/)
-```
+The project follows a strict module-driven structure:
+- `src/main/java/com/sportify/`
+  - `identity/` - User accounts, profiles, roles, permissions
+  - `core/` - Common utilities, audit logging
+- `src/test/java/com/sportify/` - **100% mirrored** test directory structure
 
 ## Documentation
 
@@ -70,21 +63,19 @@ You have two options to run the database:
 3. Create the database: `CREATE DATABASE sportify;`
 4. Enable TCP/IP on port 1433 in SQL Server Configuration Manager.
 5. Restart the SQL Server service.
-6. Copy `backend/.env.example` to a new file named `backend/.env`, fill in your local `DB_PASSWORD`, and generate a secure `JWT_SECRET` (e.g., using `openssl rand -base64 32`).
+6. Copy `.env.example` to a new file named `.env`, fill in your local `DB_PASSWORD`, and generate a secure `JWT_SECRET` (e.g., using `openssl rand -base64 32`).
 
 **Option B: Docker Compose (Optional)**
 If you prefer Docker, you can start the database using:
 ```bash
-cd backend
 docker compose up -d
 ```
 *(This will automatically create the `sportify` database)*
-Copy `backend/.env.example` to `backend/.env` and configure the credentials.
+Copy `.env.example` to `.env` and configure the credentials.
 
 #### 2. Run the Application
-1. Build the project and run tests (inside the `backend` folder):
+1. Build the project and run tests:
    ```bash
-   cd backend
    mvn clean verify
    ```
    *Note: Integration tests use Testcontainers. If Docker is running, tests will spin up an isolated MSSQL database. If Docker is NOT installed or running, those specific tests will automatically be skipped.*

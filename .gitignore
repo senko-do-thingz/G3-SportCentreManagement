@@ -49,12 +49,6 @@ buildNumber.properties
 .settings/
 .metadata/
 
-# Frontend (Node / Vite)
-node_modules/
-dist/
-.vite/
-npm-debug.log*
-
 # OS generated files
 .DS_Store
 .DS_Store?
