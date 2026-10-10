@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Integration test verifying V20 schema mappings and business behaviors against SQL Server:
  * - Cancel booking tracks cancelledBy actor (receptionist, member, manager)
  * - SportClass persists with and without CoachProfile
- * - Duplicate booking attempts throw ConflictException (via application check and index fallback)
+ * - Duplicate booking attempt throws ConflictException via application pre-check (database fallback on ux_booking_active is covered by unit tests in BookingServiceImplTest)
  * - Cancel then book again is allowed by the partial unique index ux_booking_active
  */
 @Transactional
@@ -145,12 +145,10 @@ class BookingV20IntegrationTest extends AbstractIntegrationTest {
         long sportId = getSportId("BADMINTON");
         long sessionId = createSession(sportId, LocalDate.now().plusDays(3), 10, 0);
 
-        long packageId = jdbc.queryForObject(
-                "SELECT id FROM sport_package WHERE sport_id = ? AND training_format = 'SELF_TRAINING' AND is_active = 1",
-                Long.class, sportId);
+        long packageId = getSelfTrainingPackageId();
         long adminId = jdbc.queryForObject("SELECT MIN(id) FROM user_account", Long.class);
         String regCode = "REG-" + UUID.randomUUID().toString().substring(0, 8);
-        long regId = insertPackageRegistration(regCode, memberId, packageId, adminId, 10, 10);
+        long regId = insertPackageRegistration(regCode, memberId, packageId, adminId, 8, 8);
 
         BookingCreateRequest request = BookingCreateRequest.builder()
                 .sessionId(sessionId)
@@ -176,12 +174,10 @@ class BookingV20IntegrationTest extends AbstractIntegrationTest {
         long sportId = getSportId("BADMINTON");
         long sessionId = createSession(sportId, LocalDate.now().plusDays(4), 10, 0);
 
-        long packageId = jdbc.queryForObject(
-                "SELECT id FROM sport_package WHERE sport_id = ? AND training_format = 'SELF_TRAINING' AND is_active = 1",
-                Long.class, sportId);
+        long packageId = getSelfTrainingPackageId();
         long adminId = jdbc.queryForObject("SELECT MIN(id) FROM user_account", Long.class);
         String regCode = "REG-" + UUID.randomUUID().toString().substring(0, 8);
-        long regId = insertPackageRegistration(regCode, memberId, packageId, adminId, 10, 10);
+        long regId = insertPackageRegistration(regCode, memberId, packageId, adminId, 8, 8);
 
         BookingCreateRequest request = BookingCreateRequest.builder()
                 .sessionId(sessionId)
@@ -229,6 +225,10 @@ class BookingV20IntegrationTest extends AbstractIntegrationTest {
 
     private long getSportId(String code) {
         return jdbc.queryForObject("SELECT id FROM sport WHERE code = ?", Long.class, code);
+    }
+
+    private long getSelfTrainingPackageId() {
+        return jdbc.queryForObject("SELECT id FROM sport_package WHERE code = 'PK-020'", Long.class);
     }
 
     private long createSession(long sportId, LocalDate date, int capacity, int bookedCount) {

@@ -271,7 +271,7 @@
   4. Flush and clear persistence context.
   5. Reload booking from bookingRepository.
 - Expected Result: reloaded booking cancelledBy is not null and matches actor id and role; BookingResponse cancelledByName and cancelledByRole match actor.
-- Status: PASSED (Verified compilation and test schema alignment; executed in Docker/CI environment)
+- Status: Not run (Docker unavailable)
 
 ---
 
@@ -288,7 +288,7 @@
   4. Flush and clear persistence context.
   5. Reload both classes from sportClassRepository.
 - Expected Result: SportClass with coach reloads with coach ID matching seeded coach; SportClass without coach reloads with null coach.
-- Status: PASSED (Verified compilation and test schema alignment; executed in Docker/CI environment)
+- Status: Not run (Docker unavailable)
 
 ---
 
@@ -303,7 +303,7 @@
   2. Invoke `bookingService.createBooking(req, memberUser)` -> first call succeeds with CONFIRMED.
   3. Invoke `bookingService.createBooking(req, memberUser)` a second time.
 - Expected Result: Second call throws ConflictException with message "Member already has a confirmed booking for this session".
-- Status: PASSED (Verified compilation and test schema alignment; executed in Docker/CI environment)
+- Status: Not run (Docker unavailable)
 
 ---
 
@@ -319,15 +319,15 @@
   3. Call `bookingService.cancelBooking` -> booking status becomes CANCELLED.
   4. Call `bookingService.createBooking` again for the same session.
 - Expected Result: Second booking succeeds with status CONFIRMED and new booking ID.
-- Status: PASSED (Verified compilation and test schema alignment; executed in Docker/CI environment)
+- Status: Not run (Docker unavailable)
 
 ---
 
 ## 3. Summary of Test Execution
 - Total test cases documented: 20 test cases across unit, WebMvc, and SQL Server integration layers.
 - Test suites executed via `mvn clean verify`:
-  - `V20EntityMappingTest`: 3 tests run, 0 failures, 0 errors, 0 skipped.
-  - `BookingServiceImplTest`: 31 tests run, 0 failures, 0 errors, 0 skipped.
-  - `BookingControllerTest`: 6 tests run, 0 failures, 0 errors, 0 skipped.
-  - `BookingV20IntegrationTest`: 4 tests (including parameterized suite), compiled and verified with Testcontainers disabledWithoutDocker=true.
-- Full project test suite result: 393 tests executed, 0 failures, 0 errors, 69 skipped. Result: 100% PASS (BUILD SUCCESS).
+  - `V20EntityMappingTest`: 3 tests run, 0 failures, 0 errors, 0 skipped. Status: PASSED.
+  - `BookingServiceImplTest`: 31 tests run, 0 failures, 0 errors, 0 skipped. Status: PASSED.
+  - `BookingControllerTest`: 6 tests run, 0 failures, 0 errors, 0 skipped. Status: PASSED.
+  - `BookingV20IntegrationTest`: 4 tests (including parameterized suite), skipped because Docker daemon is unavailable locally (Testcontainers disabledWithoutDocker=true). Status: SKIPPED (will be verified by GitHub Actions CI on PR).
+- Full project test suite result: 393 tests executed, 324 passed, 0 failures, 0 errors, 69 skipped. Result: BUILD SUCCESS.

@@ -20,7 +20,7 @@ Branch `feat/f2-map-v20-columns`.
 - `BookingServiceImplTest`: updated tests to assert `ConflictException` on duplicate booking, added unit test verifying duplicate booking on a full session throws 409 before capacity check, and verified member, receptionist, and manager cancellation actors (31 tests total).
 - `BookingControllerTest`: added WebMvc tests covering cancellation actor response and duplicate booking 409 conflict handling.
 - `V20EntityMappingTest`: added reflection-based unit tests validating JPA mapping annotations (`@ManyToOne(fetch = LAZY)`, `@JoinColumn`).
-- `BookingV20IntegrationTest`: added integration tests against SQL Server validating cancellation actor persistence for RECEPTIONIST, MEMBER, and MANAGER, `SportClass` coach persistence (with and without coach), duplicate booking throwing `ConflictException`, and cancel-then-rebook behavior.
+- `BookingV20IntegrationTest`: added integration tests against SQL Server validating cancellation actor persistence for RECEPTIONIST, MEMBER, and MANAGER, `SportClass` coach persistence (with and without coach), duplicate booking throwing `ConflictException`, and cancel-then-rebook behavior. Not run locally: run `cd backend && mvn clean verify` before merging (the Testcontainers test needs Docker); they will be verified by the GitHub Actions CI run on the pull request.
 
 ## 2026-10-10 - Manager user and staff account management (BE-01, F1-01)
 
