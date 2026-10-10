@@ -52,7 +52,7 @@ Arrows read "parent ||--o{ child : child column". Tables from other files appear
 | 8 | is_active | BIT | No | 1 | - | V10 | - |
 | 9 | created_at | DATETIME2(0) | No | SYSDATETIME() | - | V10 | - |
 | 10 | updated_at | DATETIME2(0) | Yes | - | - | V10 | - |
-| 11 | coach_id | BIGINT | Yes | - | FK -> coach_profile.user_id | V20 | Not mapped in the entity yet; Added in V20 |
+| 11 | coach_id | BIGINT | Yes | - | FK -> coach_profile.user_id | V20 | Mapped in entity SportClass.coach; Added in V20 |
 
 Foreign keys:
 
@@ -127,7 +127,7 @@ Indexes:
 | 10 | cancel_reason | NVARCHAR(255) | Yes | - | - | V10 | - |
 | 11 | created_at | DATETIME2(0) | No | SYSDATETIME() | - | V10 | - |
 | 12 | updated_at | DATETIME2(0) | Yes | - | - | V10 | - |
-| 13 | cancelled_by_user_id | BIGINT | Yes | - | FK -> user_account.id | V20 | Not mapped in the entity yet; Added in V20 |
+| 13 | cancelled_by_user_id | BIGINT | Yes | - | FK -> user_account.id | V20 | Mapped in entity Booking.cancelledBy; Added in V20 |
 
 Foreign keys:
 

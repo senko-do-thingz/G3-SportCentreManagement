@@ -21,6 +21,8 @@ import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.impl.BookingServiceImpl;
 import com.sportify.core.common.CodeFormatter;
 import com.sportify.core.exception.BusinessRuleException;
+import com.sportify.core.exception.ConflictException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.Role;
@@ -183,7 +185,7 @@ public class BookingServiceImplTest {
     }
 
     @Test
-    void createBooking_AlreadyBooked_ThrowsBusinessRuleException() {
+    void createBooking_AlreadyBooked_ThrowsConflictException() {
         BookingCreateRequest req = BookingCreateRequest.builder().sessionId(20L).build();
         Booking existing = Booking.builder().id(10L).status(BookingStatus.CONFIRMED).build();
 
@@ -192,7 +194,23 @@ public class BookingServiceImplTest {
         when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
                 .thenReturn(Optional.of(existing));
 
-        BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
+        ConflictException ex = assertThrows(ConflictException.class, () -> bookingService.createBooking(req, memberUser));
+        assertEquals("Member already has a confirmed booking for this session", ex.getMessage());
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    void createBooking_SessionFullAndAlreadyBooked_ThrowsConflictException() {
+        session.setBookedCount(10); // Full capacity
+        BookingCreateRequest req = BookingCreateRequest.builder().sessionId(20L).build();
+        Booking existing = Booking.builder().id(10L).status(BookingStatus.CONFIRMED).build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
+                .thenReturn(Optional.of(existing));
+
+        ConflictException ex = assertThrows(ConflictException.class, () -> bookingService.createBooking(req, memberUser));
         assertEquals("Member already has a confirmed booking for this session", ex.getMessage());
         verify(bookingRepository, never()).save(any());
     }
@@ -694,5 +712,126 @@ public class BookingServiceImplTest {
         verify(bookingRepository).save(any(Booking.class));
         verify(sessionRepository).save(startedSession);
         verify(registrationRepository).save(packageReg);
+    }
+
+    @Test
+    void cancelBooking_AsMember_SetsCancelledByAndReturnsActorNameAndRole() {
+        Booking booking = Booking.builder()
+                .id(1L)
+                .member(memberProfile)
+                .session(session)
+                .packageRegistration(packageReg)
+                .status(BookingStatus.CONFIRMED)
+                .build();
+
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        BookingResponse res = bookingService.cancelBooking(1L, memberUser);
+
+        assertNotNull(res);
+        assertEquals(BookingStatus.CANCELLED, res.getStatus());
+        assertEquals("Member User", res.getCancelledByName());
+        assertEquals("MEMBER", res.getCancelledByRole());
+        assertEquals(memberUser, booking.getCancelledBy());
+    }
+
+    @Test
+    void cancelBooking_AsReceptionist_SetsCancelledByAndReturnsActorNameAndRole() {
+        Booking booking = Booking.builder()
+                .id(1L)
+                .member(memberProfile)
+                .session(session)
+                .packageRegistration(packageReg)
+                .status(BookingStatus.CONFIRMED)
+                .build();
+
+        UserAccount receptionist = UserAccount.builder()
+                .id(201L)
+                .role(Role.builder().id(2L).code("RECEPTIONIST").build())
+                .fullName("Receptionist Staff")
+                .email("rec@sportify.com")
+                .build();
+
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        BookingResponse res = bookingService.cancelBooking(1L, receptionist);
+
+        assertNotNull(res);
+        assertEquals(BookingStatus.CANCELLED, res.getStatus());
+        assertEquals("Receptionist Staff", res.getCancelledByName());
+        assertEquals("RECEPTIONIST", res.getCancelledByRole());
+        assertEquals(receptionist, booking.getCancelledBy());
+    }
+
+    @Test
+    void cancelBooking_AsManager_SetsCancelledByAndReturnsActorNameAndRole() {
+        Booking booking = Booking.builder()
+                .id(1L)
+                .member(memberProfile)
+                .session(session)
+                .packageRegistration(packageReg)
+                .status(BookingStatus.CONFIRMED)
+                .build();
+
+        UserAccount manager = UserAccount.builder()
+                .id(301L)
+                .role(Role.builder().id(3L).code("MANAGER").build())
+                .fullName("Center Manager")
+                .email("manager@sportify.com")
+                .build();
+
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        BookingResponse res = bookingService.cancelBooking(1L, manager);
+
+        assertNotNull(res);
+        assertEquals(BookingStatus.CANCELLED, res.getStatus());
+        assertEquals("Center Manager", res.getCancelledByName());
+        assertEquals("MANAGER", res.getCancelledByRole());
+        assertEquals(manager, booking.getCancelledBy());
+    }
+
+    @Test
+    void createBooking_WhenDataIntegrityViolationUxBookingActive_ThrowsConflictException() {
+        BookingCreateRequest req = BookingCreateRequest.builder()
+                .sessionId(20L)
+                .packageRegistrationId(50L)
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
+                .thenReturn(Optional.empty());
+        when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
+        when(bookingRepository.getNextBookingCodeSequence()).thenReturn(1L);
+        when(codeFormatter.formatBookingCode(1L)).thenReturn("BKG-001");
+        when(bookingRepository.save(any(Booking.class))).thenThrow(
+                new DataIntegrityViolationException("Cannot insert duplicate key row with unique index 'ux_booking_active'."));
+
+        ConflictException ex = assertThrows(ConflictException.class, () -> bookingService.createBooking(req, memberUser));
+        assertEquals("Member already has a confirmed booking for this session", ex.getMessage());
+    }
+
+    @Test
+    void createBooking_WhenDataIntegrityViolationOther_RethrowsException() {
+        BookingCreateRequest req = BookingCreateRequest.builder()
+                .sessionId(20L)
+                .packageRegistrationId(50L)
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
+                .thenReturn(Optional.empty());
+        when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
+        when(bookingRepository.getNextBookingCodeSequence()).thenReturn(1L);
+        when(codeFormatter.formatBookingCode(1L)).thenReturn("BKG-001");
+        when(bookingRepository.save(any(Booking.class))).thenThrow(
+                new DataIntegrityViolationException("Cannot insert null into column 'status'."));
+
+        assertThrows(DataIntegrityViolationException.class, () -> bookingService.createBooking(req, memberUser));
     }
 }
