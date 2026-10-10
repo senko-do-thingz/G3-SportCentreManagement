@@ -20,6 +20,27 @@ Branch `feat/f3-payment-entities`. Status: Implemented, unit-verified, integrati
 - `PaymentDdlValidateIntegrationTest`: integration test for context startup with Hibernate `ddl-auto: validate` against database (not executed here; requires Docker).
 - `PaymentRepositoryIntegrationTest`: Testcontainers repository integration test verifying persistence of payment and invoice with 2 lines, read-back assertion, sequence generation, check constraint enforcement (`ck_payment_status`, `ck_payment_method`, `ck_payment_amount`, `ck_invoice_status`, `ck_invoice_amounts`, `ck_invoice_line_item_type`, `ck_invoice_line_quantity`), optimistic locking version increments, stale copy optimistic locking failure, and foreign key linking (not executed here; requires Docker).
 
+## 2026-10-10 - Map V20 columns: class coach and booking cancel actor (BE-08, Flow 2)
+
+Branch `feat/f2-map-v20-columns`.
+
+### Backend
+- `SportClass`: mapped `coach` relationship (`ManyToOne CoachProfile`, column `coach_id`, nullable, lazy).
+- `Booking`: mapped `cancelledBy` relationship (`ManyToOne UserAccount`, column `cancelled_by_user_id`, nullable, lazy).
+- `BookingServiceImpl`:
+  - `cancelBooking`: stores the cancellation actor on `booking.cancelledBy` (member, receptionist, or manager).
+  - `mapToBookingResponse`: populates `cancelledByName` and `cancelledByRole` from `booking.cancelledBy`.
+  - `createBooking`: runs duplicate confirmed booking check before session capacity check; catches duplicate confirmed booking on unique index `ux_booking_active` and throws `ConflictException` (HTTP 409) with clear message "Member already has a confirmed booking for this session". Pre-check also throws `ConflictException`.
+  - Extracted `DUPLICATE_BOOKING_MESSAGE` constant and case-insensitive check for `ux_booking_active`.
+- `BookingResponse`: added `cancelledByName` and `cancelledByRole` fields.
+- `ConflictException`: maintains `extends RuntimeException`; mapped to HTTP 409 Conflict via `GlobalExceptionHandler`.
+- `GlobalExceptionHandler`: extracted `DUPLICATE_BOOKING_MESSAGE` constant; maps `ux_booking_active` unique constraint violations case-insensitively to HTTP 409 Conflict with message "Member already has a confirmed booking for this session".
+
+### Tests
+- `BookingServiceImplTest`: updated tests to assert `ConflictException` on duplicate booking, added unit test verifying duplicate booking on a full session throws 409 before capacity check, and verified member, receptionist, and manager cancellation actors (31 tests total).
+- `BookingControllerTest`: added WebMvc tests covering cancellation actor response and duplicate booking 409 conflict handling.
+- `V20EntityMappingTest`: added reflection-based unit tests validating JPA mapping annotations (`@ManyToOne(fetch = LAZY)`, `@JoinColumn`).
+- `BookingV20IntegrationTest`: added integration tests against SQL Server validating cancellation actor persistence for RECEPTIONIST, MEMBER, and MANAGER, `SportClass` coach persistence (with and without coach), duplicate booking throwing `ConflictException`, and cancel-then-rebook behavior. Not run locally: run `cd backend && mvn clean verify` before merging (the Testcontainers test needs Docker); they will be verified by the GitHub Actions CI run on the pull request.
 
 ## 2026-10-10 - Manager user and staff account management (BE-01, F1-01)
 

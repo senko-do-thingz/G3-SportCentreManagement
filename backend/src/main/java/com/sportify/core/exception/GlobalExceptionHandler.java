@@ -18,12 +18,14 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final String DUPLICATE_BOOKING_MESSAGE = "Member already has a confirmed booking for this session";
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidationExceptions(MethodArgumentNotValidException ex) {
@@ -82,7 +84,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         // Log the root cause for operators, but never expose SQL or constraint details to the client.
-        logger.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
+        String rootMsg = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : "";
+        logger.warn("Data integrity violation: {}", rootMsg);
+        if (rootMsg != null && rootMsg.toLowerCase(Locale.ROOT).contains("ux_booking_active")) {
+            return buildErrorResponse(HttpStatus.CONFLICT, DUPLICATE_BOOKING_MESSAGE, null);
+        }
         return buildErrorResponse(HttpStatus.CONFLICT, "The request conflicts with existing data", null);
     }
 

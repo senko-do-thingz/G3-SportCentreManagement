@@ -28,4 +28,6 @@ public class BookingResponse {
     private Long packageRegistrationId;
     private BookingStatus status;
     private LocalDateTime bookedAt;
+    private String cancelledByName;
+    private String cancelledByRole;
 }

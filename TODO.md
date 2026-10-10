@@ -36,7 +36,7 @@ Missing: everything the manager needs to create classes and sessions.
 
 | ID | Task | Owner | Priority | Depends on |
 |---|---|---|---|---|
-| F2-B1 | Map `sport_class.coach_id` in `SportClass` | Dat | P1 | - |
+| F2-B1 | [x] Map `sport_class.coach_id` in `SportClass` (done) | Dat | P1 | - |
 | F2-B2 | Class CRUD for the manager: `POST/PUT/GET /api/v1/manager/classes`, assign a coach | Dat | P1 | F2-B1 |
 | F2-B3 | Session CRUD: create sessions for a class (date, time, facility, capacity), cancel a session | Dat | P1 | F2-B2 |
 | F2-B4 | Public session list for members: `GET /api/v1/sessions?sportId=&date=` with booked count and free seats | Dat | P1 | F2-B3 |

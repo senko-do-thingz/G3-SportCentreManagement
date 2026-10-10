@@ -18,11 +18,13 @@ import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.BookingService;
 import com.sportify.core.common.CodeFormatter;
 import com.sportify.core.exception.BusinessRuleException;
+import com.sportify.core.exception.ConflictException;
 import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,12 +34,15 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class BookingServiceImpl implements BookingService {
+
+    private static final String DUPLICATE_BOOKING_MESSAGE = "Member already has a confirmed booking for this session";
 
     private final BookingRepository bookingRepository;
     private final ClassSessionRepository sessionRepository;
@@ -68,6 +73,12 @@ public class BookingServiceImpl implements BookingService {
             throw new BusinessRuleException("Session is not published for booking");
         }
 
+        // Check if member already booked this session before capacity check
+        Optional<Booking> existing = bookingRepository.findBySessionIdAndMemberIdAndStatus(session.getId(), member.getId(), BookingStatus.CONFIRMED);
+        if (existing.isPresent()) {
+            throw new ConflictException(DUPLICATE_BOOKING_MESSAGE);
+        }
+
         if (session.getSessionDate().isBefore(today)) {
             throw new BusinessRuleException("Cannot book a session in the past");
         }
@@ -78,12 +89,6 @@ public class BookingServiceImpl implements BookingService {
 
         if (session.getBookedCount() >= session.getCapacity()) {
             throw new BusinessRuleException("Session is fully booked");
-        }
-
-        // Check if member already booked this session
-        Optional<Booking> existing = bookingRepository.findBySessionIdAndMemberIdAndStatus(session.getId(), member.getId(), BookingStatus.CONFIRMED);
-        if (existing.isPresent()) {
-            throw new BusinessRuleException("Member already has a confirmed booking for this session");
         }
 
         SportPackageRegistration packageReg;
@@ -150,7 +155,14 @@ public class BookingServiceImpl implements BookingService {
                 .bookedAt(LocalDateTime.now(clock))
                 .build();
 
-        booking = bookingRepository.save(booking);
+        try {
+            booking = bookingRepository.save(booking);
+        } catch (DataIntegrityViolationException ex) {
+            if (isUxBookingActiveViolation(ex)) {
+                throw new ConflictException(DUPLICATE_BOOKING_MESSAGE);
+            }
+            throw ex;
+        }
         return mapToBookingResponse(booking);
     }
 
@@ -190,6 +202,7 @@ public class BookingServiceImpl implements BookingService {
         booking.setStatus(BookingStatus.CANCELLED);
         booking.setCancelledAt(LocalDateTime.now(clock));
         booking.setCancelReason("Cancelled by user: " + actor.getEmail());
+        booking.setCancelledBy(actor);
 
         // Restore session seat
         ClassSession session = booking.getSession();
@@ -260,6 +273,15 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private BookingResponse mapToBookingResponse(Booking b) {
+        String cancelledByName = null;
+        String cancelledByRole = null;
+        if (b.getCancelledBy() != null) {
+            cancelledByName = b.getCancelledBy().getFullName();
+            if (b.getCancelledBy().getRole() != null) {
+                cancelledByRole = b.getCancelledBy().getRole().getCode();
+            }
+        }
+
         return BookingResponse.builder()
                 .id(b.getId())
                 .bookingCode(b.getBookingCode())
@@ -275,6 +297,14 @@ public class BookingServiceImpl implements BookingService {
                 .packageRegistrationId(b.getPackageRegistration() != null ? b.getPackageRegistration().getId() : null)
                 .status(b.getStatus())
                 .bookedAt(b.getBookedAt())
+                .cancelledByName(cancelledByName)
+                .cancelledByRole(cancelledByRole)
                 .build();
+    }
+
+    private boolean isUxBookingActiveViolation(DataIntegrityViolationException ex) {
+        Throwable root = ex.getMostSpecificCause();
+        String message = root != null && root.getMessage() != null ? root.getMessage() : ex.getMessage();
+        return message != null && message.toLowerCase(Locale.ROOT).contains("ux_booking_active");
     }
 }
