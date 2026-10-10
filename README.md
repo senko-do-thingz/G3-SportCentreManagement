@@ -137,6 +137,7 @@ Copy `backend/.env.example` to `backend/.env` and fill in the values. The applic
 | `DB_USERNAME` | Database user (default `sa`) |
 | `DB_PASSWORD` | Database password (required) |
 | `JWT_SECRET` | Base64 signing key for tokens (required). Generate one with `openssl rand -base64 32` |
+| `CORS_ALLOWED_ORIGINS` | Comma separated origins allowed to call the API from a browser. `dev` defaults to `http://localhost:5173,http://localhost:3000`. Required in `prod` (no default), for example `https://app.example.com` |
 
 ### 2. Start the database
 
@@ -178,7 +179,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`. The backend must be running, and it needs CORS enabled for the web app (task BE-00). The API base URL comes from `VITE_API_BASE_URL` in `frontend/.env`, which is not committed.
+Open `http://localhost:5173`. The backend must be running. CORS for `http://localhost:5173` and `http://localhost:3000` is enabled by default in the `dev` profile (see `CORS_ALLOWED_ORIGINS` in `backend/.env.example`). The API base URL comes from `VITE_API_BASE_URL` in `frontend/.env`, which is not committed.
 
 ### Seeded data
 
@@ -265,7 +266,7 @@ Tracked in [CHANGELOG.md](CHANGELOG.md) and [TODO.md](TODO.md):
 - Activating a membership card does not create a `payment` row yet (the V14 tables have no entity).
 - The legacy membership service still computes `end = start + duration` (deprecated flow).
 - No class or session management API, so members cannot browse sessions yet.
-- CORS is not configured for the web app yet, and CI does not build the frontend.
+- CI does not build the frontend yet.
 
 ## Team
 
