@@ -32,4 +32,12 @@ public class CodeFormatter {
     public String formatClassCode(long sequence) {
         return String.format("CL-%04d", sequence);
     }
+
+    public String formatPaymentCode(long sequence) {
+        return String.format("PAY-%04d", sequence);
+    }
+
+    public String formatInvoiceNumber(long sequence) {
+        return String.format("INV-%04d", sequence);
+    }
 }
