@@ -2,6 +2,7 @@ package com.sportify.catalog.entity;
 
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
+import com.sportify.payment.entity.Payment;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -77,6 +78,10 @@ public class SportPackageRegistration {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by_user_id", nullable = false)
     private UserAccount createdByUser;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "payment_id")
+    private Payment payment;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

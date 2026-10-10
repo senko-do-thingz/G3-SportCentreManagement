@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-10-10 - Payment, Invoice and InvoiceLine entities (BE-16)
+
+Branch `feat/f3-payment-entities`. Status: Implemented, unit-verified, integration tests pending Docker. Not built or run here: run `cd backend && mvn clean verify` before merging (Testcontainers tests need Docker).
+
+### Backend
+- Mapped V14 tables (`payment`, `invoice`, `invoice_line`) to JPA entities `Payment`, `Invoice`, and `InvoiceLine` with exact database column types:
+  - `Payment`: `amount` as `BigDecimal` (`precision = 12, scale = 2`), optimistic locking `version` annotated with `@Version` (`Integer`), `paymentCode` (`VARCHAR(30)` unique, not null), `paymentMethod` (`PaymentMethod`), `paymentStatus` (`PaymentStatus`), `referenceCode` (`VARCHAR(100)`), `notes` (`NVARCHAR(500)`), `paymentTime`, `createdAt`, and `updatedAt`.
+  - `Invoice`: `invoiceNumber` (`VARCHAR(30)` unique, not null), `subtotalAmount`, `discountAmount`, `taxAmount`, and `totalAmount` as `BigDecimal` (`precision = 12, scale = 2`), `status` (`InvoiceStatus`), lazy `@ManyToOne` to `Payment` and `MemberProfile`, bidirectional `addLine(InvoiceLine)`, `issueDate`, `createdAt`, and `updatedAt`.
+  - `InvoiceLine`: `itemType` (`InvoiceItemType`), `itemReferenceId` (`BIGINT`), `description` (`NVARCHAR(255)`), `quantity` (`INT`, default 1), `unitPrice` and `lineTotal` as `BigDecimal` (`precision = 12, scale = 2`), `createdAt`, and lazy `@ManyToOne` to `Invoice`.
+- Enums stored as STRING: `PaymentMethod` (CASH, CREDIT_CARD, BANK_TRANSFER, MOMO, VNPAY, ZALOPAY), `PaymentStatus` (PENDING, SUCCESS, FAILED, REFUNDED), `InvoiceStatus` (ISSUED, PAID, CANCELLED, REFUNDED), `InvoiceItemType` (SPORT_PACKAGE, MEMBERSHIP_CARD, CLASS_DROP_IN, PENALTY_FEE).
+- Formatted sequence codes in `CodeFormatter`: `formatPaymentCode(long)` (`PAY-%04d`) and `formatInvoiceNumber(long)` (`INV-%04d`).
+- Repositories: `PaymentRepository` (native query `getNextPaymentCodeSequence()` for `seq_payment_code`), `InvoiceRepository` (native query `getNextInvoiceNumberSequence()` for `seq_invoice_number`), and `InvoiceLineRepository`.
+- Foreign key mappings on dependent entities: mapped `payment_id` on `MemberCard`, `SportPackageRegistration`, and `RefundRequest` as nullable lazy `@ManyToOne Payment`.
+
+### Tests
+- `CodeFormatterTest`: unit tests for `formatPaymentCode` (0, 1, 42, 1000, 99999) and `formatInvoiceNumber` (0, 1, 42, 1000, 99999).
+- `PaymentEntityMappingTest`: reflection tests verifying exact table and column annotations, data types, precision/scale, lengths, `@Version`, enum string storage, foreign key definitions, and lifecycle defaults.
+- `PaymentDdlValidateIntegrationTest`: integration test for context startup with Hibernate `ddl-auto: validate` against database (not executed here; requires Docker).
+- `PaymentRepositoryIntegrationTest`: Testcontainers repository integration test verifying persistence of payment and invoice with 2 lines, read-back assertion, sequence generation, check constraint enforcement (`ck_payment_status`, `ck_payment_method`, `ck_payment_amount`, `ck_invoice_status`, `ck_invoice_amounts`, `ck_invoice_line_item_type`, `ck_invoice_line_quantity`), optimistic locking version increments, stale copy optimistic locking failure, and foreign key linking (not executed here; requires Docker).
+
 ## 2026-10-10 - Map V20 columns: class coach and booking cancel actor (BE-08, Flow 2)
 
 Branch `feat/f2-map-v20-columns`.

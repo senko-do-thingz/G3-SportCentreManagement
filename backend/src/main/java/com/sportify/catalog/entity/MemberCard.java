@@ -1,6 +1,7 @@
 package com.sportify.catalog.entity;
 
 import com.sportify.identity.entity.MemberProfile;
+import com.sportify.payment.entity.Payment;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -46,6 +47,10 @@ public class MemberCard {
     @Column(name = "price_paid", nullable = false, precision = 14, scale = 2)
     @Builder.Default
     private BigDecimal pricePaid = BigDecimal.ZERO;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "payment_id")
+    private Payment payment;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

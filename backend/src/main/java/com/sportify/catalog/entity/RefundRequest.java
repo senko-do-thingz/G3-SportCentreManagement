@@ -2,6 +2,7 @@ package com.sportify.catalog.entity;
 
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
+import com.sportify.payment.entity.Payment;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -23,6 +24,10 @@ public class RefundRequest {
 
     @Column(name = "refund_code", nullable = false, unique = true, length = 30)
     private String refundCode;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "payment_id")
+    private Payment payment;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "package_registration_id", nullable = false)
