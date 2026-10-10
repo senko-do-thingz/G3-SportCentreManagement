@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-10-10 - Manager user and staff account management (BE-01, F1-01)
+
+Branch `feat/f1-manager-user-management`. API behind screen F1-01 "User Management" and the overlay "Add Staff Account". Not built or run here: run `cd backend && mvn clean verify` before merging (the Testcontainers test needs Docker).
+
+### Endpoints (role MANAGER only, other roles get 403)
+- `GET /api/v1/manager/users?role=&status=&search=&page=&size=`: paged list (`PageResponse`) with id, full name, email, phone, role, status and created date, newest first. `search` matches name, email, phone or member code (case-insensitive, `%` and `_` are matched literally). Page size is capped at 100.
+- `POST /api/v1/manager/users`: creates a RECEPTIONIST, COACH or MANAGER account (201). Body: `fullName`, `email`, `phone`, `temporaryPassword` (StrongPassword), `role`, `sportIds`.
+  - A COACH also gets a `coach_profile` row (the first sport id is the primary sport) and one `coach_sport` row per sport id. At least one active sport is required; other roles must not send sports.
+  - MEMBER accounts cannot be created here (400).
+  - Duplicate email or phone returns 409. A weak password returns 400 with the field error under `details.temporaryPassword`.
+- `PATCH /api/v1/manager/users/{id}/status`: body `{"status": "ACTIVE"}` or `{"status": "INACTIVE"}`. A manager cannot deactivate their own account (400). Setting the status an account already has changes nothing and writes no log row.
+
+### Backend
+- New `ManagerUserController`, `ManagerUserService` and `ManagerUserServiceImpl`, `ManagerUserMapper`, DTOs (`StaffAccountCreateRequest`, `UserStatusUpdateRequest`, `ManagerUserResponse`) and `UserStatus` enum.
+- New `CoachSport` entity and `CoachSportRepository` for the existing `coach_sport` table (no migration needed).
+- `UserRepository` now also extends `JpaSpecificationExecutor`; filters live in `UserSpecifications` (role is loaded in the same query, no N+1).
+- `JwtAuthenticationFilter` no longer authenticates a request when the account is disabled, so deactivating a user also stops the access token that is still valid (up to 15 minutes). Login and token refresh were already refused for INACTIVE accounts.
+- Activity log: `USER_CREATED` on create and `USER_STATUS_CHANGED` (from and to) on a status change, written through `AuditService` with the manager as actor. Passwords are never logged.
+
+### Tests
+- `ManagerUserServiceImplTest` (unit), `ManagerUserControllerTest` (WebMvc, includes the 401 and 403 matrix), `InactiveUserLoginTest`, `UserSpecificationsTest`.
+- `ManagerUserIntegrationTest` (Testcontainers): list, filter, search and paging against SQL Server, coach rows, activity log rows, inactive user cannot log in.
+
+### Known gaps
+- The temporary password is not forced to change at first login (there is no column for it yet).
+- The Add Staff overlay also shows "Skills" and "Certificate" fields; they are not part of this task.
+
 ## 2026-10-09 - CORS for the React frontend (BE-00)
 
 Branch `feat/be-cors-config`.
