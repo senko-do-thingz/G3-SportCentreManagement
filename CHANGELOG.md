@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-10-09 - CORS for the React frontend (BE-00)
+
+Branch `feat/be-cors-config`.
+
+### Backend
+- `SecurityConfig`: enabled CORS (`http.cors`) with a `CorsConfigurationSource` bean.
+  - Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS. Headers: Authorization, Content-Type. Credentials off. Max age 3600 seconds.
+  - Preflight `OPTIONS` requests are answered before authorization and are also permitted explicitly, so they need no token.
+  - Any origin that is not in the allow list is rejected with 403 (simple and preflight requests).
+- New property `app.cors.allowed-origins` (comma separated):
+  - `application.yml`: `${CORS_ALLOWED_ORIGINS:}` (empty = no cross-origin request is accepted).
+  - `application-dev.yml`: defaults to `http://localhost:5173,http://localhost:3000`.
+  - `application-prod.yml`: reads `CORS_ALLOWED_ORIGINS` from the environment, no localhost default.
+- `.env.example`: documented `CORS_ALLOWED_ORIGINS`.
+
+### Tests
+- `SecurityConfigCorsTest` (WebMvcTest): allowed origins, unknown origin, preflight on a protected endpoint without a token, allowed methods, headers and max age, rejected method and header.
+- `SecurityConfigCorsEmptyOriginsTest` (WebMvcTest): an empty allow list rejects every origin.
+- `SecurityConfigCorsSourceTest`: property parsing and fixed policy.
+- `CorsPropertiesConfigTest`: where the property is defined (yml files and `.env.example`).
+
+### Deploy note
+- Production must set `CORS_ALLOWED_ORIGINS` (for example `https://app.example.com`). Without it the browser frontend cannot call the API.
+
 ## 2026-10-09 - Repository split into backend/ and frontend/
 
 ### Structure

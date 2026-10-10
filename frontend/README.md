@@ -12,7 +12,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. The backend must be running (`cd backend && mvn spring-boot:run`) with CORS enabled (task BE-00).
+Open http://localhost:5173. The backend must be running (`cd backend && mvn spring-boot:run`). CORS for `http://localhost:5173` is enabled by default in the `dev` profile; other origins go in `CORS_ALLOWED_ORIGINS` in `backend/.env`.
 
 ## Rules
 
