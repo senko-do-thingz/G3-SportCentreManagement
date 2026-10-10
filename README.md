@@ -53,7 +53,7 @@ The Spring Boot project used to live in the repository root. After you pull the 
 
 | Module | Status |
 |---|---|
-| **Identity & Access** | Implemented - register, login, token refresh, current user, member search, fixed roles (MEMBER, COACH, RECEPTIONIST, MANAGER), strong password validation, audit logging |
+| **Identity & Access** | Implemented - register, login, token refresh, current user, member search, manager user and staff account management, fixed roles (MEMBER, COACH, RECEPTIONIST, MANAGER), strong password validation, audit logging |
 | **Catalog & Membership** | Implemented - sports, sport packages and registrations, membership cards (tiers, purchase, renewal, upgrade, activation, cancellation), check-in, refund requests. The plan-based membership flow (`/api/v1/memberships`) is legacy and deprecated |
 | **Classes & Booking** | Partially implemented - booking create, cancel and list, self-training attendance, capacity and session deduction checks. Class and session management endpoints and the waitlist are not built yet |
 | **Payments & Reports** | Schema only (V14: `payment`, `invoice`, `invoice_line`). No entities or endpoints yet |
@@ -223,6 +223,7 @@ All paths start with `/api/v1`. Send the access token as `Authorization: Bearer 
 | | `GET /refunds/pending`, `PUT /refunds/{id}/review` | MANAGER |
 | | `PUT /refunds/{id}/complete` | RECEPTIONIST, MANAGER |
 | Manager plans | `GET`, `POST`, `PUT /{id}`, `PATCH /{id}/status` under `/manager/plans` | MANAGER |
+| Manager users | `GET /manager/users` (filter by role and status, search, page), `POST /manager/users` (staff account), `PATCH /manager/users/{id}/status` | MANAGER |
 | Legacy memberships | `POST /memberships`, `GET /memberships/me` | MEMBER |
 | | `POST /memberships/{id}/cancel` | MEMBER, RECEPTIONIST, MANAGER |
 | | `POST /memberships/register-for-member` | RECEPTIONIST, MANAGER |
