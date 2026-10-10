@@ -1,5 +1,6 @@
 package com.sportify.catalog.entity;
 
+import com.sportify.identity.entity.CoachProfile;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -31,6 +32,10 @@ public class SportClass {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "age_group_id")
     private AgeGroup ageGroup;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "coach_id")
+    private CoachProfile coach;
 
     @Column(nullable = false, length = 20)
     @Builder.Default

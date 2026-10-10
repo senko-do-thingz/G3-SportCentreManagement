@@ -1,6 +1,7 @@
 package com.sportify.catalog.entity;
 
 import com.sportify.identity.entity.MemberProfile;
+import com.sportify.identity.entity.UserAccount;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -48,6 +49,10 @@ public class Booking {
 
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cancelled_by_user_id")
+    private UserAccount cancelledBy;
 
     @Column(name = "cancel_reason", length = 255)
     private String cancelReason;
