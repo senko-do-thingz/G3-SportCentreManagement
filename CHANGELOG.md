@@ -2,7 +2,7 @@
 
 ## 2026-10-09 - CORS for the React frontend (BE-00)
 
-Branch `feat/be-cors-config`. Not built here: run `cd backend && mvn clean verify` before merging.
+Branch `feat/be-cors-config`.
 
 ### Backend
 - `SecurityConfig`: enabled CORS (`http.cors`) with a `CorsConfigurationSource` bean.
