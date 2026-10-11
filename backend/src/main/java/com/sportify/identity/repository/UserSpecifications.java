@@ -1,5 +1,6 @@
 package com.sportify.identity.repository;
 
+import com.sportify.core.common.SearchUtils;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
@@ -19,8 +20,6 @@ import java.util.Locale;
  * Dynamic filters for the manager user list. Every filter is optional.
  */
 public final class UserSpecifications {
-
-    private static final char LIKE_ESCAPE = '\\';
 
     private UserSpecifications() {
     }
@@ -57,13 +56,13 @@ public final class UserSpecifications {
                 memberSubquery.select(member.<Long>get("id"))
                         .where(
                                 cb.equal(member.get("id"), root.get("id")),
-                                cb.like(cb.lower(member.get("memberCode")), pattern, LIKE_ESCAPE)
+                                cb.like(cb.lower(member.get("memberCode")), pattern, SearchUtils.LIKE_ESCAPE)
                         );
 
                 predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("fullName")), pattern, LIKE_ESCAPE),
-                        cb.like(cb.lower(root.get("email")), pattern, LIKE_ESCAPE),
-                        cb.like(cb.lower(root.get("phone")), pattern, LIKE_ESCAPE),
+                        cb.like(cb.lower(root.get("fullName")), pattern, SearchUtils.LIKE_ESCAPE),
+                        cb.like(cb.lower(root.get("email")), pattern, SearchUtils.LIKE_ESCAPE),
+                        cb.like(cb.lower(root.get("phone")), pattern, SearchUtils.LIKE_ESCAPE),
                         cb.exists(memberSubquery)
                 ));
             }
@@ -73,9 +72,6 @@ public final class UserSpecifications {
 
     /** Escapes LIKE wildcards so user input is matched literally. */
     static String escapeLike(String value) {
-        return value
-                .replace("\\", "\\\\")
-                .replace("%", "\\%")
-                .replace("_", "\\_");
+        return SearchUtils.escapeLike(value);
     }
 }

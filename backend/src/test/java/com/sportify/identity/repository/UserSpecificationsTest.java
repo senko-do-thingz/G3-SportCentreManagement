@@ -8,7 +8,7 @@ class UserSpecificationsTest {
 
     @Test
     void escapeLike_shouldEscapeWildcardsAndBackslash() {
-        assertEquals("50\\%\\_off\\\\", UserSpecifications.escapeLike("50%_off\\"));
+        assertEquals("50\\%\\_off\\\\\\[test]", UserSpecifications.escapeLike("50%_off\\[test]"));
     }
 
     @Test
