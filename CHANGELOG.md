@@ -1,5 +1,49 @@
 # Changelog
 
+## 2026-10-11 - Class management for the manager (BE-09, Flow 2)
+
+Branch `feat/f2-class-management`. Status: Implemented, unit-verified, integration tests pending Docker. Not built or run against a real DB here: run mvn clean verify before merging (Testcontainers tests need Docker).
+
+### Endpoints
+- `GET /api/v1/manager/classes?sportId=&level=&coachId=&active=&search=&page=&size=`: paged class list (`PageResponse<ManagerClassResponse>`) with sportId, level, coachId, active, case-insensitive search (name, code, or coach name), and paging. Role `MANAGER`.
+- `GET /api/v1/manager/classes/{id}`: single class detail with `upcomingSessions`. Role `MANAGER`.
+- `POST /api/v1/manager/classes`: creates a sport class (201). Body: `name`, `sportId`, `ageGroupId`, `level`, `maxMembers`, `coachId`. Generates code `CL-%04d` using `seq_class_code`. Validates coach is active and teaches sport. Role `MANAGER`.
+- `PUT /api/v1/manager/classes/{id}`: updates class `name`, `sportId`, `ageGroupId`, `level`, `maxMembers`, `coachId`. Validates coach teaches sport (even if coach unchanged). If sport changes, rejects with 400 if class has upcoming sessions. Recomputes `upcomingSessions` using single clock read. Role `MANAGER`.
+- `PATCH /api/v1/manager/classes/{id}/status`: toggles class active status. Deactivating a class with confirmed future bookings returns 400. Reuses `upcomingSessions` using single clock read. Role `MANAGER`.
+- `GET /api/v1/age-groups`: dropdown options (`List<AgeGroupResponse>`) ordered by displayOrder then id. Roles `MANAGER`, `RECEPTIONIST`.
+- `GET /api/v1/coaches?sportId=`: active coach options (`List<CoachOptionResponse>`) filtered optionally by sportId. Roles `MANAGER`, `RECEPTIONIST`.
+
+### Backend
+- Repositories and audit:
+  - `SportClassRepository`: added `findWithDetailsById(Long)` and overrode `findAll(Specification, Pageable)` with `@EntityGraph(attributePaths = {"sport", "ageGroup", "coach", "coach.userAccount"})` to eliminate N+1 queries without unsafe criteria Fetch-to-Join casting (`getNextClassCodeSequence()` already existed on main).
+  - `AgeGroupRepository`: added `findByIsActiveTrueOrderByDisplayOrderAscIdAsc()`.
+  - `BookingRepository`: added `countUpcomingByClass(...)`.
+  - `ClassSessionRepository`: added `countUpcomingByClassIds(...)`.
+  - `CoachProfileRepository`: added `findWithAccountById(...)`, `findActiveCoaches()`, and `findActiveCoachesBySport(Long)`.
+  - `CoachSportRepository`: added `findByIdCoachIdIn(...)` (`existsById` is inherited from `JpaRepository`).
+  - `AuditAction`: added `CLASS_CREATED`, `CLASS_UPDATED`, `CLASS_STATUS_CHANGED`.
+  - Parameter cast in upcoming queries: cast `:now` parameter to SQL Server `time` (`s.startTime > cast(:now as time)`) in `ClassSessionRepository.countUpcomingByClassIds` and `BookingRepository.countUpcomingByClass` because mssql-jdbc defaults `sendTimeAsDatetime=true` and sends `LocalTime` as `datetime`, which SQL Server rejects when comparing against a `TIME(0)` column.
+- Query specifications and helper:
+  - `SearchUtils`: shared helper escaping `\`, `%`, `_`, and `[` with `LIKE_ESCAPE = '\\'`. Reused across `SportClassSpecifications` and `UserSpecifications`.
+  - `SportClassSpecifications`: criteria specifications for `sportId`, `level`, `coachId`, `active`, and `search` using `root.join(...)` and `SearchUtils.escapeLike`.
+- Services and logic:
+  - `ManagerClassServiceImpl`: implements class listing, detail, creation, update, and deactivation guard. Single `LocalDateTime.now(clock)` read per transaction reused across validation and response mapping.
+  - `AgeGroupServiceImpl` and `CoachDirectoryServiceImpl`: dropdown services.
+  - Role-based security on `/api/v1/manager/classes/**` (MANAGER) and `/api/v1/age-groups`, `/api/v1/coaches` (MANAGER, RECEPTIONIST).
+
+### Tests
+- `SearchUtilsTest`: unit tests verifying literal escaping for `\`, `%`, `_`, `[`, empty string, and null inputs.
+- `UserSpecificationsTest`: unit tests verifying pattern construction including `\[test]`.
+- `ManagerClassServiceImplTest`: unit tests covering create with `CL-xxxx`, coach qualification failure (400), coach unchanged on PUT but no longer qualified (400), sport change blocked with upcoming sessions (400), deactivation blocked with confirmed future booking (400), deactivation allowed without confirmed booking, upcoming sessions count logic, and single clock read. All null assertions use `assertNull`.
+- `AgeGroupServiceImplTest` and `CoachDirectoryServiceImplTest`: unit tests for lookup services.
+- `ManagerClassControllerTest`, `AgeGroupControllerTest`, `CoachControllerTest`: WebMvc controller slice tests for request validation, authorization matrix (401, 403 for non-manager), and status codes.
+- `ManagerClassIntegrationTest`: Testcontainers integration test extending `AbstractIntegrationTest` (following `ManagerUserIntegrationTest` pattern). Covers list with sportId/level/coachId/active/search/paging; create -> CL-xxxx; coach not teaching the sport -> 400; deactivate with a confirmed future booking -> 400; a past session and a today-before-now session are not counted; non-manager -> 403. Clean up only rows it created.
+
+### Follow-ups
+- `sport_class.is_active` is not enforced by session creation or booking yet.
+- Check-then-act races (e.g. concurrent bookings or session scheduling during class deactivation).
+- No `@Version` on `sport_class` (no optimistic locking).
+
 ## 2026-10-10 - Payment, Invoice and InvoiceLine entities (BE-16)
 
 Branch `feat/f3-payment-entities`. Status: Implemented, unit-verified, integration tests pending Docker. Not built or run here: run `cd backend && mvn clean verify` before merging (Testcontainers tests need Docker).

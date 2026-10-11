@@ -2,12 +2,15 @@ package com.sportify.catalog.repository;
 
 import com.sportify.catalog.entity.Booking;
 import com.sportify.catalog.entity.BookingStatus;
+import com.sportify.catalog.entity.SessionStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,4 +27,20 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     @Query(value = "SELECT NEXT VALUE FOR seq_booking_code", nativeQuery = true)
     Long getNextBookingCodeSequence();
+
+    /**
+     * Counts bookings with the given status on sessions of a class that have not started yet
+     * (session date after today, or today with a start time after now) and whose session status
+     * is one of the given statuses.
+     */
+    @Query("SELECT COUNT(b) FROM Booking b JOIN b.session s "
+            + "WHERE s.sportClass.id = :classId "
+            + "AND b.status = :bookingStatus "
+            + "AND s.status IN :sessionStatuses "
+            + "AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime > cast(:now as time)))")
+    long countUpcomingByClass(@Param("classId") Long classId,
+                              @Param("bookingStatus") BookingStatus bookingStatus,
+                              @Param("sessionStatuses") Collection<SessionStatus> sessionStatuses,
+                              @Param("today") LocalDate today,
+                              @Param("now") LocalTime now);
 }
