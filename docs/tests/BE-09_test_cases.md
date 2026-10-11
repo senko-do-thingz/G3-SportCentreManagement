@@ -15,6 +15,7 @@
   - GET /api/v1/age-groups for form dropdown ordered by displayOrder then id (roles MANAGER, RECEPTIONIST).
   - GET /api/v1/coaches?sportId= for coach selection and coach qualification panel (roles MANAGER, RECEPTIONIST).
   - Shared search escaping utility SearchUtils with wildcard and bracket escaping (used by SportClassSpecifications and UserSpecifications).
+  - TIME parameter compatibility: queries in ClassSessionRepository and BookingRepository cast :now to SQL Server time (cast(:now as time)) to resolve mssql-jdbc sendTimeAsDatetime=true driver incompatibility.
   - Role-based authorization: non-manager roles receive 403 on manager endpoints; non-staff roles receive 403 on lookup endpoints.
   - Testcontainers integration test extending AbstractIntegrationTest against real SQL Server (pending Docker).
 

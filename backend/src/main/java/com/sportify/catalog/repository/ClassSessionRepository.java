@@ -25,7 +25,7 @@ public interface ClassSessionRepository extends JpaRepository<ClassSession, Long
     @Query("SELECT s.sportClass.id AS classId, COUNT(s) AS sessionCount FROM ClassSession s "
             + "WHERE s.sportClass.id IN :classIds "
             + "AND s.status IN :statuses "
-            + "AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime > :now)) "
+            + "AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime > cast(:now as time))) "
             + "GROUP BY s.sportClass.id")
     List<ClassSessionCount> countUpcomingByClassIds(@Param("classIds") Collection<Long> classIds,
                                                     @Param("statuses") Collection<SessionStatus> statuses,

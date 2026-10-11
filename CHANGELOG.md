@@ -15,13 +15,14 @@ Branch `feat/f2-class-management`. Status: Implemented, unit-verified, integrati
 
 ### Backend
 - Repositories and audit:
-  - `SportClassRepository`: overrode `findAll(Specification, Pageable)` with `@EntityGraph(attributePaths = {"sport", "ageGroup", "coach", "coach.userAccount"})` to eliminate N+1 queries without unsafe criteria Fetch-to-Join casting; added native query `getNextClassCodeSequence()` for `seq_class_code`.
+  - `SportClassRepository`: added `findWithDetailsById(Long)` and overrode `findAll(Specification, Pageable)` with `@EntityGraph(attributePaths = {"sport", "ageGroup", "coach", "coach.userAccount"})` to eliminate N+1 queries without unsafe criteria Fetch-to-Join casting (`getNextClassCodeSequence()` already existed on main).
   - `AgeGroupRepository`: added `findByIsActiveTrueOrderByDisplayOrderAscIdAsc()`.
   - `BookingRepository`: added `countUpcomingByClass(...)`.
-  - `ClassSessionRepository`: added `countUpcomingByClass(...)`.
-  - `CoachProfileRepository`: added `findWithAccountById(...)`.
-  - `CoachSportRepository`: added `existsById(...)`.
+  - `ClassSessionRepository`: added `countUpcomingByClassIds(...)`.
+  - `CoachProfileRepository`: added `findWithAccountById(...)`, `findActiveCoaches()`, and `findActiveCoachesBySport(Long)`.
+  - `CoachSportRepository`: added `findByIdCoachIdIn(...)` (`existsById` is inherited from `JpaRepository`).
   - `AuditAction`: added `CLASS_CREATED`, `CLASS_UPDATED`, `CLASS_STATUS_CHANGED`.
+  - Parameter cast in upcoming queries: cast `:now` parameter to SQL Server `time` (`s.startTime > cast(:now as time)`) in `ClassSessionRepository.countUpcomingByClassIds` and `BookingRepository.countUpcomingByClass` because mssql-jdbc defaults `sendTimeAsDatetime=true` and sends `LocalTime` as `datetime`, which SQL Server rejects when comparing against a `TIME(0)` column.
 - Query specifications and helper:
   - `SearchUtils`: shared helper escaping `\`, `%`, `_`, and `[` with `LIKE_ESCAPE = '\\'`. Reused across `SportClassSpecifications` and `UserSpecifications`.
   - `SportClassSpecifications`: criteria specifications for `sportId`, `level`, `coachId`, `active`, and `search` using `root.join(...)` and `SearchUtils.escapeLike`.

@@ -37,7 +37,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             + "WHERE s.sportClass.id = :classId "
             + "AND b.status = :bookingStatus "
             + "AND s.status IN :sessionStatuses "
-            + "AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime > :now))")
+            + "AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime > cast(:now as time)))")
     long countUpcomingByClass(@Param("classId") Long classId,
                               @Param("bookingStatus") BookingStatus bookingStatus,
                               @Param("sessionStatuses") Collection<SessionStatus> sessionStatuses,
