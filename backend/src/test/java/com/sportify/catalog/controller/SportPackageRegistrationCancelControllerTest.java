@@ -104,9 +104,9 @@ public class SportPackageRegistrationCancelControllerTest {
     }
 
     @Test
-    @DisplayName("PUT /api/v1/packages/registrations/{id}/cancel as staff (ADMIN) returns 200")
-    void cancelRegistration_AsAdmin_Returns200() throws Exception {
-        CustomUserDetails admin = createUserDetails(300L, "ADMIN", "Center Admin");
+    @DisplayName("PUT /api/v1/packages/registrations/{id}/cancel as staff (MANAGER) returns 200")
+    void cancelRegistration_AsManager_Returns200() throws Exception {
+        CustomUserDetails manager = createUserDetails(300L, "MANAGER", "Center Manager");
         PackageRegistrationResponse response = PackageRegistrationResponse.builder()
                 .id(10L)
                 .status(PackageRegistrationStatus.CANCELLED)
@@ -115,7 +115,7 @@ public class SportPackageRegistrationCancelControllerTest {
         when(sportPackageService.cancelRegistration(eq(10L), any(UserAccount.class))).thenReturn(response);
 
         mockMvc.perform(put("/api/v1/packages/registrations/10/cancel")
-                        .with(user(admin)))
+                        .with(user(manager)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CANCELLED"));
     }

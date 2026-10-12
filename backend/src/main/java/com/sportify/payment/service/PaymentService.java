@@ -26,10 +26,12 @@ public interface PaymentService {
     Payment createPendingPayment(MemberProfile member, BigDecimal amount, PaymentMethod method);
 
     @Transactional(propagation = Propagation.MANDATORY)
-    Payment createPendingPayment(UserAccount memberUser, BigDecimal amount, PaymentMethod method);
-
     Payment markPaymentSuccess(Long paymentId, UserAccount confirmedBy);
 
+    @Transactional(propagation = Propagation.MANDATORY)
+    Payment markPaymentSuccess(Long paymentId, UserAccount confirmedBy, PaymentMethod actualMethod);
+
+    @Transactional(propagation = Propagation.MANDATORY)
     Payment markPaymentFailed(Long paymentId, String reason);
 
     PaymentResponse getPayment(Long id, UserAccount actor);

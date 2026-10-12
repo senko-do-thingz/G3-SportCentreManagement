@@ -1,10 +1,12 @@
 package com.sportify.catalog.controller;
 
+import com.sportify.catalog.dto.ActivatePaymentRequest;
 import com.sportify.catalog.dto.CardTierResponse;
 import com.sportify.catalog.dto.MemberCardPurchaseRequest;
 import com.sportify.catalog.dto.MemberCardResponse;
 import com.sportify.catalog.service.MembershipCardService;
 import com.sportify.identity.security.CustomUserDetails;
+import com.sportify.payment.entity.PaymentMethod;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -40,8 +42,10 @@ public class MembershipCardController {
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'MANAGER')")
     public MemberCardResponse activateCard(
             @PathVariable Long id,
+            @RequestBody(required = false) ActivatePaymentRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return membershipCardService.activateCard(id, userDetails.getUserAccount());
+        PaymentMethod actualMethod = request != null ? request.getPaymentMethod() : null;
+        return membershipCardService.activateCard(id, userDetails.getUserAccount(), actualMethod);
     }
 
     /** Cancels a card request that has not been paid yet. A member may cancel only their own request. */

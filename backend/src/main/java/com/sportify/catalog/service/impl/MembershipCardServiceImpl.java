@@ -18,9 +18,9 @@ import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.UserRepository;
 import com.sportify.payment.entity.Payment;
+import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,7 +56,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     @Transactional
     public MemberCardResponse purchaseCard(MemberCardPurchaseRequest request, UserAccount actor) {
         Long targetMemberId;
-        if (actor.getRole() != null && "MEMBER".equals(actor.getRole().getCode())) {
+        if (SecurityUtils.isMember(actor)) {
             targetMemberId = actor.getId();
         } else {
             targetMemberId = request.getMemberId() != null ? request.getMemberId() : actor.getId();
@@ -66,7 +66,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         if (member == null) {
             UserAccount targetUser = userRepository.findById(targetMemberId)
                     .orElseThrow(() -> new ResourceNotFoundException("User not found: " + targetMemberId));
-            if (targetUser.getRole() == null || !"MEMBER".equals(targetUser.getRole().getCode())) {
+            if (!SecurityUtils.isMember(targetUser)) {
                 throw new BusinessRuleException("Cannot create member profile for non-member user: " + targetMemberId);
             }
             Long nextSeq = memberProfileRepository.getNextMemberCode();
@@ -126,6 +126,12 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     @Override
     @Transactional
     public MemberCardResponse activateCard(Long cardId, UserAccount actor) {
+        return activateCard(cardId, actor, null);
+    }
+
+    @Override
+    @Transactional
+    public MemberCardResponse activateCard(Long cardId, UserAccount actor, PaymentMethod actualMethod) {
         MemberCard card = memberCardRepository.findById(cardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member card not found for id: " + cardId));
         if (card.getStatus() != CardStatus.PENDING_PAYMENT) {
@@ -145,7 +151,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         card.setStatus(CardStatus.ACTIVE);
         card = memberCardRepository.save(card);
         if (card.getPayment() != null) {
-            paymentService.markPaymentSuccess(card.getPayment().getId(), actor);
+            paymentService.markPaymentSuccess(card.getPayment().getId(), actor, actualMethod);
         }
         if (plan.replaces() != null) {
             replace(plan.replaces());
@@ -160,14 +166,14 @@ public class MembershipCardServiceImpl implements MembershipCardService {
                 .orElseThrow(() -> new ResourceNotFoundException("Member card not found for id: " + cardId));
         boolean isStaff = SecurityUtils.isStaff(actor);
         if (!isStaff && !card.getMember().getId().equals(actor.getId())) {
-            throw new AccessDeniedException("Cannot cancel another member's card request");
+            throw new ResourceNotFoundException("Member card not found for id: " + cardId);
         }
         if (card.getStatus() != CardStatus.PENDING_PAYMENT) {
             throw new BusinessRuleException("Only a card request that is waiting for payment can be cancelled.");
         }
         card.setStatus(CardStatus.CANCELLED);
         if (card.getPayment() != null) {
-            String actorDescription = isStaff ? "staff: " + actor.getFullName() : "member: " + actor.getFullName();
+            String actorDescription = isStaff ? "staff user id " + actor.getId() : "member user id " + actor.getId();
             paymentService.markPaymentFailed(card.getPayment().getId(),
                     "Payment cancelled due to card cancellation by " + actorDescription);
         }
@@ -203,7 +209,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             LocalDate from = last.getEndDate().plusDays(1);
             return new CardPlan(from, cardEnd(from, months), tier.getPrice(), null);
         }
-        if (current != null && tier.getPrice().compareTo(current.getTier().getPrice()) >= 0) {
+        if (current != null && tier.getPrice().compareTo(current.getTier().getPrice()) > 0) {
             if (last != current) {
                 throw new BusinessRuleException("The current card is already renewed from " + last.getStartDate()
                         + ". The card can be upgraded once that term has started.");

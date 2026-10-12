@@ -14,7 +14,6 @@ import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
-import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.payment.config.BankTransferProperties;
 import com.sportify.payment.dto.PaymentResponse;
 import com.sportify.payment.dto.UpdatePaymentMethodRequest;
@@ -36,16 +35,14 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceImplTest {
@@ -59,8 +56,6 @@ class PaymentServiceImplTest {
     @Mock
     private InvoiceRepository invoiceRepository;
     @Mock
-    private MemberProfileRepository memberProfileRepository;
-    @Mock
     private BankTransferProperties bankProperties;
     @Mock
     private CodeFormatter codeFormatter;
@@ -72,7 +67,6 @@ class PaymentServiceImplTest {
     private UserAccount otherUser;
     private UserAccount receptionistUser;
     private UserAccount managerUser;
-    private UserAccount adminUser;
     private MemberProfile ownerProfile;
     private Payment pendingPayment;
 
@@ -84,7 +78,6 @@ class PaymentServiceImplTest {
                 memberCardRepository,
                 sportPackageRegistrationRepository,
                 invoiceRepository,
-                memberProfileRepository,
                 bankProperties,
                 codeFormatter,
                 clock
@@ -93,13 +86,11 @@ class PaymentServiceImplTest {
         Role memberRole = Role.builder().id(1L).code("MEMBER").name("Member").build();
         Role recRole = Role.builder().id(2L).code("RECEPTIONIST").name("Receptionist").build();
         Role mgrRole = Role.builder().id(3L).code("MANAGER").name("Manager").build();
-        Role adminRole = Role.builder().id(4L).code("ADMIN").name("Admin").build();
 
         ownerUser = UserAccount.builder().id(100L).email("owner@example.com").fullName("Owner Member").role(memberRole).build();
         otherUser = UserAccount.builder().id(200L).email("other@example.com").fullName("Other Member").role(memberRole).build();
         receptionistUser = UserAccount.builder().id(300L).email("rec@sportify.com").fullName("Desk Staff").role(recRole).build();
         managerUser = UserAccount.builder().id(400L).email("mgr@sportify.com").fullName("Center Mgr").role(mgrRole).build();
-        adminUser = UserAccount.builder().id(500L).email("admin@sportify.com").fullName("Admin User").role(adminRole).build();
 
         ownerProfile = MemberProfile.builder().id(100L).userAccount(ownerUser).memberCode("MEM-0100").build();
 
@@ -111,7 +102,9 @@ class PaymentServiceImplTest {
                 .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .paymentStatus(PaymentStatus.PENDING)
                 .paymentTime(null)
+                .notes("Existing payment notes")
                 .createdAt(LocalDateTime.of(2026, 10, 12, 10, 0, 0))
+                .updatedAt(LocalDateTime.of(2026, 10, 12, 10, 0, 0))
                 .build();
 
         lenient().when(bankProperties.getAccountName()).thenReturn("Sportify Sports Center");
@@ -120,15 +113,11 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    @DisplayName("Create pending payment with valid online method succeeds and keeps paymentTime null")
+    @DisplayName("Create pending payment with valid online method succeeds and sets timestamps from Clock")
     void createPendingPayment_ValidOnlineMethod_Succeeds() {
         when(paymentRepository.getNextPaymentCodeSequence()).thenReturn(1001L);
         when(codeFormatter.formatPaymentCode(1001L)).thenReturn("PAY-1001");
-        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> {
-            Payment p = invocation.getArgument(0);
-            p.setId(11L);
-            return p;
-        });
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Payment payment = paymentService.createPendingPayment(ownerProfile, BigDecimal.valueOf(300000.00), PaymentMethod.MOMO);
 
@@ -137,10 +126,35 @@ class PaymentServiceImplTest {
         assertThat(payment.getPaymentMethod()).isEqualTo(PaymentMethod.MOMO);
         assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(payment.getPaymentTime()).isNull();
+        assertThat(payment.getCreatedAt()).isEqualTo(LocalDateTime.now(clock));
+        assertThat(payment.getUpdatedAt()).isEqualTo(LocalDateTime.now(clock));
     }
 
     @Test
-    @DisplayName("Create pending payment with real CodeFormatter generates code matching PAY-%04d format")
+    @DisplayName("Clock consistency: createdAt and paymentTime use same time zone and paymentTime >= createdAt")
+    void timeSource_CreatedAtAndPaymentTime_UseSameClock() {
+        when(paymentRepository.getNextPaymentCodeSequence()).thenReturn(1002L);
+        when(codeFormatter.formatPaymentCode(1002L)).thenReturn("PAY-1002");
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> {
+            Payment p = invocation.getArgument(0);
+            if (p.getId() == null) {
+                p.setId(1002L);
+            }
+            return p;
+        });
+
+        Payment payment = paymentService.createPendingPayment(ownerProfile, BigDecimal.valueOf(100000.00), PaymentMethod.BANK_TRANSFER);
+        when(paymentRepository.findById(payment.getId())).thenReturn(Optional.of(payment));
+
+        Payment successfulPayment = paymentService.markPaymentSuccess(payment.getId(), receptionistUser);
+
+        assertThat(successfulPayment.getCreatedAt()).isEqualTo(LocalDateTime.now(clock));
+        assertThat(successfulPayment.getPaymentTime()).isEqualTo(LocalDateTime.now(clock));
+        assertThat(successfulPayment.getPaymentTime()).isAfterOrEqualTo(successfulPayment.getCreatedAt());
+    }
+
+    @Test
+    @DisplayName("Create pending payment with real CodeFormatter generates formatted paymentCode")
     void createPendingPayment_WithRealCodeFormatter_GeneratesFormattedCode() {
         CodeFormatter realFormatter = new CodeFormatter();
         PaymentServiceImpl serviceWithRealFormatter = new PaymentServiceImpl(
@@ -148,23 +162,21 @@ class PaymentServiceImplTest {
                 memberCardRepository,
                 sportPackageRegistrationRepository,
                 invoiceRepository,
-                memberProfileRepository,
                 bankProperties,
                 realFormatter,
                 clock
         );
 
-        when(paymentRepository.getNextPaymentCodeSequence()).thenReturn(1042L);
+        when(paymentRepository.getNextPaymentCodeSequence()).thenReturn(1000L);
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Payment payment = serviceWithRealFormatter.createPendingPayment(ownerProfile, BigDecimal.valueOf(100000.00), PaymentMethod.BANK_TRANSFER);
 
-        assertThat(payment.getPaymentCode()).isEqualTo("PAY-1042");
-        assertThat(payment.getPaymentCode()).matches("^PAY-\\d{4,}$");
+        assertThat(payment.getPaymentCode()).isEqualTo("PAY-1000");
     }
 
     @Test
-    @DisplayName("Create pending payment with cash or credit card throws BusinessRuleException")
+    @DisplayName("Create pending payment with disallowed online methods throws BusinessRuleException")
     void createPendingPayment_DisallowedOnlineMethod_ThrowsBusinessRuleException() {
         assertThatThrownBy(() -> paymentService.createPendingPayment(ownerProfile, BigDecimal.valueOf(100000.00), PaymentMethod.CASH))
                 .isInstanceOf(BusinessRuleException.class)
@@ -176,7 +188,7 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    @DisplayName("Create pending payment with amount <= 0 throws BusinessRuleException")
+    @DisplayName("Create pending payment with zero or negative amount throws BusinessRuleException")
     void createPendingPayment_ZeroOrNegativeAmount_ThrowsBusinessRuleException() {
         assertThatThrownBy(() -> paymentService.createPendingPayment(ownerProfile, BigDecimal.ZERO, PaymentMethod.BANK_TRANSFER))
                 .isInstanceOf(BusinessRuleException.class)
@@ -185,17 +197,39 @@ class PaymentServiceImplTest {
         assertThatThrownBy(() -> paymentService.createPendingPayment(ownerProfile, BigDecimal.valueOf(-50000.00), PaymentMethod.BANK_TRANSFER))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Payment amount must be greater than zero");
+    }
 
-        // Discount producing 0.004 rounds to 0.00 with scale 2
+    @Test
+    @DisplayName("Amount rounding down to zero is rejected (TODO-BE17-DISCOUNT)")
+    void createPendingPayment_AmountRoundsToZero_ThrowsBusinessRuleException() {
         BigDecimal roundedZero = BigDecimal.valueOf(0.004).setScale(2, java.math.RoundingMode.HALF_UP);
+        assertThat(roundedZero).isEqualByComparingTo(BigDecimal.ZERO);
+
         assertThatThrownBy(() -> paymentService.createPendingPayment(ownerProfile, roundedZero, PaymentMethod.BANK_TRANSFER))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Payment amount must be greater than zero");
     }
 
     @Test
-    @DisplayName("Mark payment success sets SUCCESS status, paymentTime, confirmedByUser, and staff notes")
-    void markPaymentSuccess_UpdatesStatusTimeAndNotes() {
+    @DisplayName("Mark payment success with null id throws BusinessRuleException")
+    void markPaymentSuccess_NullPaymentId_ThrowsBusinessRuleException() {
+        assertThrows(BusinessRuleException.class, () -> paymentService.markPaymentSuccess(null, receptionistUser));
+    }
+
+    @Test
+    @DisplayName("Mark payment success when status is not PENDING throws BusinessRuleException")
+    void markPaymentSuccess_NotPendingStatus_ThrowsBusinessRuleException() {
+        pendingPayment.setPaymentStatus(PaymentStatus.SUCCESS);
+        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+
+        assertThatThrownBy(() -> paymentService.markPaymentSuccess(10L, receptionistUser))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Cannot mark payment as success: payment is in status SUCCESS, expected PENDING");
+    }
+
+    @Test
+    @DisplayName("Mark payment success updates status, paymentTime, confirmedByUser, and appends user id note")
+    void markPaymentSuccess_UpdatesStatusAndNotes() {
         when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -204,24 +238,81 @@ class PaymentServiceImplTest {
         assertThat(success.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
         assertThat(success.getPaymentTime()).isEqualTo(LocalDateTime.now(clock));
         assertThat(success.getConfirmedByUser()).isEqualTo(receptionistUser);
-        assertThat(success.getNotes()).contains("Confirmed by staff: Desk Staff");
+        assertThat(success.getNotes()).contains("Existing payment notes | Confirmed by user id 300");
     }
 
     @Test
-    @DisplayName("Mark payment failed sets FAILED status and notes")
-    void markPaymentFailed_UpdatesStatusAndNotes() {
+    @DisplayName("Mark payment success with staff specifying CASH updates payment method")
+    void markPaymentSuccess_WithStaffAndCashMethod_UpdatesPaymentMethodToCash() {
         when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Payment failed = paymentService.markPaymentFailed(10L, "Payment cancelled by member: Owner Member");
+        Payment success = paymentService.markPaymentSuccess(10L, receptionistUser, PaymentMethod.CASH);
 
-        assertThat(failed.getPaymentStatus()).isEqualTo(PaymentStatus.FAILED);
-        assertThat(failed.getNotes()).isEqualTo("Payment cancelled by member: Owner Member");
+        assertThat(success.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(success.getPaymentMethod()).isEqualTo(PaymentMethod.CASH);
+        assertThat(success.getConfirmedByUser()).isEqualTo(receptionistUser);
+        assertThat(success.getNotes()).contains("Confirmed by user id 300");
     }
 
     @Test
-    @DisplayName("GET payment by owner returns PaymentResponse")
-    void getPayment_Owner_ReturnsResponse() {
+    @DisplayName("Mark payment failed with null id throws BusinessRuleException")
+    void markPaymentFailed_NullPaymentId_ThrowsBusinessRuleException() {
+        assertThrows(BusinessRuleException.class, () -> paymentService.markPaymentFailed(null, "some reason"));
+    }
+
+    @Test
+    @DisplayName("Mark payment failed when status is not PENDING throws BusinessRuleException")
+    void markPaymentFailed_NotPendingStatus_ThrowsBusinessRuleException() {
+        pendingPayment.setPaymentStatus(PaymentStatus.SUCCESS);
+        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+
+        assertThatThrownBy(() -> paymentService.markPaymentFailed(10L, "some reason"))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Cannot mark payment as failed: payment is in status SUCCESS, expected PENDING");
+    }
+
+    @Test
+    @DisplayName("Mark payment failed sets FAILED status and appends reason to notes")
+    void markPaymentFailed_UpdatesStatusAndAppendsNotes() {
+        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Payment failed = paymentService.markPaymentFailed(10L, "Payment cancelled by member user id 100");
+
+        assertThat(failed.getPaymentStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(failed.getNotes()).isEqualTo("Existing payment notes | Payment cancelled by member user id 100");
+    }
+
+    @Test
+    @DisplayName("truncateNotes does not split surrogate pairs")
+    void truncateNotes_DoesNotSplitSurrogatePairs() {
+        // Build a string of 499 ASCII characters followed by a 2-char surrogate pair (\uD83D\uDE00)
+        String prefix = "A".repeat(499);
+        String surrogatePair = "\uD83D\uDE00";
+        String longNote = prefix + surrogatePair;
+
+        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        pendingPayment.setNotes(null);
+
+        Payment failed = paymentService.markPaymentFailed(10L, longNote);
+
+        // Character at index 499 would be \uD83D (high surrogate). Truncation must back up to 499 chars.
+        assertThat(failed.getNotes().length()).isEqualTo(499);
+        assertThat(failed.getNotes()).isEqualTo(prefix);
+    }
+
+    @Test
+    @DisplayName("getPayment and updatePaymentMethod with null actor throws IllegalArgumentException")
+    void paymentMethods_NullActor_ThrowsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class, () -> paymentService.getPayment(10L, null));
+        assertThrows(IllegalArgumentException.class, () -> paymentService.updatePaymentMethod(10L, mock(UpdatePaymentMethodRequest.class), null));
+    }
+
+    @Test
+    @DisplayName("GET payment by owner returns PaymentResponse with notes concealed")
+    void getPayment_Owner_ReturnsResponseWithNotesConcealed() {
         when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
 
         PaymentResponse response = paymentService.getPayment(10L, ownerUser);
@@ -229,24 +320,25 @@ class PaymentServiceImplTest {
         assertThat(response).isNotNull();
         assertThat(response.getCode()).isEqualTo("PAY-1000");
         assertThat(response.getStatus()).isEqualTo(PaymentStatus.PENDING);
+        assertThat(response.getNotes()).isNull();
     }
 
     @Test
-    @DisplayName("GET payment by staff returns PaymentResponse")
-    void getPayment_Staff_ReturnsResponse() {
+    @DisplayName("GET payment by staff returns PaymentResponse with notes visible")
+    void getPayment_Staff_ReturnsResponseWithNotesVisible() {
         when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
 
         PaymentResponse recResponse = paymentService.getPayment(10L, receptionistUser);
         PaymentResponse mgrResponse = paymentService.getPayment(10L, managerUser);
-        PaymentResponse adminResponse = paymentService.getPayment(10L, adminUser);
 
         assertThat(recResponse).isNotNull();
+        assertThat(recResponse.getNotes()).isEqualTo("Existing payment notes");
         assertThat(mgrResponse).isNotNull();
-        assertThat(adminResponse).isNotNull();
+        assertThat(mgrResponse.getNotes()).isEqualTo("Existing payment notes");
     }
 
     @Test
-    @DisplayName("GET payment by other non-owner member throws 404 ResourceNotFoundException (M5)")
+    @DisplayName("GET payment by other non-owner member throws 404 ResourceNotFoundException")
     void getPayment_OtherMember_ThrowsResourceNotFoundException() {
         when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
 
@@ -288,11 +380,31 @@ class PaymentServiceImplTest {
         PaymentResponse response = paymentService.updatePaymentMethod(10L, request, ownerUser);
 
         assertThat(response.getMethod()).isEqualTo(PaymentMethod.MOMO);
+        assertThat(response.getNotes()).isNull();
         verify(paymentRepository).save(pendingPayment);
     }
 
     @Test
-    @DisplayName("PUT payment method by non-owner member throws 404 ResourceNotFoundException (M5)")
+    @DisplayName("PUT payment method by staff allows setting CASH")
+    void updatePaymentMethod_StaffWithCash_Succeeds() {
+        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+        when(memberCardRepository.findByPaymentId(10L)).thenReturn(Optional.empty());
+        when(sportPackageRegistrationRepository.findByPaymentId(10L)).thenReturn(Optional.empty());
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
+                .paymentMethod(PaymentMethod.CASH)
+                .build();
+
+        PaymentResponse response = paymentService.updatePaymentMethod(10L, request, receptionistUser);
+
+        assertThat(response.getMethod()).isEqualTo(PaymentMethod.CASH);
+        assertThat(response.getNotes()).isEqualTo("Existing payment notes");
+        verify(paymentRepository).save(pendingPayment);
+    }
+
+    @Test
+    @DisplayName("PUT payment method by non-owner member throws 404 ResourceNotFoundException")
     void updatePaymentMethod_OtherMember_ThrowsResourceNotFoundException() {
         when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
 
@@ -354,7 +466,7 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    @DisplayName("PUT payment method with cash or credit card throws BusinessRuleException")
+    @DisplayName("PUT payment method by member with cash or credit card throws BusinessRuleException")
     void updatePaymentMethod_DisallowedMethod_ThrowsBusinessRuleException() {
         when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
 
@@ -365,23 +477,6 @@ class PaymentServiceImplTest {
         assertThatThrownBy(() -> paymentService.updatePaymentMethod(10L, request, ownerUser))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("not allowed for online payment");
-    }
-
-    @Test
-    @DisplayName("Update payment method propagates optimistic locking failure cleanly")
-    void updatePaymentMethod_WhenOptimisticLockConflict_ThrowsOptimisticLockingException() {
-        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
-        when(memberCardRepository.findByPaymentId(10L)).thenReturn(Optional.empty());
-        when(sportPackageRegistrationRepository.findByPaymentId(10L)).thenReturn(Optional.empty());
-        when(paymentRepository.save(any(Payment.class)))
-                .thenThrow(new org.springframework.orm.ObjectOptimisticLockingFailureException(Payment.class, 10L));
-
-        UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
-                .paymentMethod(PaymentMethod.MOMO)
-                .build();
-
-        assertThatThrownBy(() -> paymentService.updatePaymentMethod(10L, request, ownerUser))
-                .isInstanceOf(org.springframework.orm.ObjectOptimisticLockingFailureException.class);
     }
 
     @Test

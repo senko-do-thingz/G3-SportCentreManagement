@@ -18,7 +18,7 @@ public class PaymentController {
     private final PaymentService paymentService;
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('MEMBER', 'RECEPTIONIST', 'MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('MEMBER', 'RECEPTIONIST', 'MANAGER')")
     public PaymentResponse getPayment(
             @PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -26,7 +26,7 @@ public class PaymentController {
     }
 
     @PutMapping("/{id}/method")
-    @PreAuthorize("hasAnyRole('MEMBER', 'RECEPTIONIST', 'MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('MEMBER', 'RECEPTIONIST', 'MANAGER')")
     public PaymentResponse updatePaymentMethod(
             @PathVariable Long id,
             @Valid @RequestBody UpdatePaymentMethodRequest request,

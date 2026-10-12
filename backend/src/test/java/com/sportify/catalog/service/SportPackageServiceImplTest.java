@@ -51,6 +51,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -555,6 +556,7 @@ public class SportPackageServiceImplTest {
         when(sportPackageRepository.findById(15L)).thenReturn(Optional.of(freePkg));
 
         assertThrows(BusinessRuleException.class, () -> sportPackageService.registerPackage(req, memberUser));
+        verify(registrationRepository, never()).getNextRegistrationCodeSequence();
     }
 
     @Test
@@ -568,6 +570,7 @@ public class SportPackageServiceImplTest {
         when(membershipCardService.getApplicableDiscountPercentage(100L, sportPackage.getDurationDays())).thenReturn(100);
 
         assertThrows(BusinessRuleException.class, () -> sportPackageService.registerPackage(req, memberUser));
+        verify(registrationRepository, never()).getNextRegistrationCodeSequence();
     }
 
     @Test
@@ -594,7 +597,34 @@ public class SportPackageServiceImplTest {
         PackageRegistrationResponse res = sportPackageService.activateRegistration(88L, receptionistUser);
 
         assertEquals(PackageRegistrationStatus.ACTIVE, res.getStatus());
-        verify(paymentService).markPaymentSuccess(88L, receptionistUser);
+        verify(paymentService).markPaymentSuccess(88L, receptionistUser, null);
+    }
+
+    @Test
+    void activateRegistration_WithActualPaymentMethodCash_PassesCashToPaymentService() {
+        Payment payment = Payment.builder()
+                .id(88L)
+                .paymentCode("PAY-0088")
+                .paymentStatus(PaymentStatus.PENDING)
+                .build();
+        SportPackageRegistration reg = SportPackageRegistration.builder()
+                .id(88L)
+                .registrationCode("REG-PKG-0088")
+                .member(memberProfile)
+                .sportPackage(sportPackage)
+                .status(PackageRegistrationStatus.PENDING_PAYMENT)
+                .payment(payment)
+                .startDate(LocalDate.now(clock))
+                .endDate(LocalDate.now(clock).plusDays(29))
+                .build();
+
+        when(registrationRepository.findById(88L)).thenReturn(Optional.of(reg));
+        when(registrationRepository.save(any(SportPackageRegistration.class))).thenAnswer(i -> i.getArgument(0));
+
+        PackageRegistrationResponse res = sportPackageService.activateRegistration(88L, receptionistUser, PaymentMethod.CASH);
+
+        assertEquals(PackageRegistrationStatus.ACTIVE, res.getStatus());
+        verify(paymentService).markPaymentSuccess(88L, receptionistUser, PaymentMethod.CASH);
     }
 
     @Test
@@ -621,7 +651,7 @@ public class SportPackageServiceImplTest {
         PackageRegistrationResponse res = sportPackageService.cancelRegistration(88L, memberUser);
 
         assertEquals(PackageRegistrationStatus.CANCELLED, res.getStatus());
-        verify(paymentService).markPaymentFailed(eq(88L), org.mockito.ArgumentMatchers.contains("member: Member One"));
+        verify(paymentService).markPaymentFailed(eq(88L), org.mockito.ArgumentMatchers.contains("member user id 100"));
     }
 
     @Test
@@ -649,7 +679,7 @@ public class SportPackageServiceImplTest {
         PackageRegistrationResponse res = sportPackageService.cancelRegistration(88L, receptionistUser);
 
         assertEquals(PackageRegistrationStatus.CANCELLED, res.getStatus());
-        verify(paymentService).markPaymentFailed(eq(88L), org.mockito.ArgumentMatchers.contains("staff: Front Desk"));
+        verify(paymentService).markPaymentFailed(eq(88L), org.mockito.ArgumentMatchers.contains("staff user id 200"));
     }
 
     @Test

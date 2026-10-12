@@ -11,6 +11,7 @@ import com.sportify.catalog.repository.MembershipCardTierRepository;
 import com.sportify.catalog.service.impl.MembershipCardServiceImpl;
 import com.sportify.core.common.CodeFormatter;
 import com.sportify.core.exception.BusinessRuleException;
+import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
@@ -440,14 +441,14 @@ public class MembershipCardServiceImplTest {
     }
 
     @Test
-    void cancelCard_AnotherMembersRequest_ThrowsAccessDeniedException() {
+    void cancelCard_AnotherMembersRequest_ThrowsResourceNotFoundException() {
         UserAccount otherUser = UserAccount.builder().id(101L).role(memberUser.getRole()).fullName("Other").build();
         MemberProfile otherProfile = MemberProfile.builder().id(101L).userAccount(otherUser).memberCode("MEM-101").build();
         MemberCard pending = MemberCard.builder().id(41L).cardCode("CARD-41").member(otherProfile).tier(goldTier)
                 .status(CardStatus.PENDING_PAYMENT).pricePaid(goldTier.getPrice()).build();
         when(memberCardRepository.findById(41L)).thenReturn(Optional.of(pending));
 
-        assertThrows(AccessDeniedException.class, () -> membershipCardService.cancelCard(41L, memberUser));
+        assertThrows(ResourceNotFoundException.class, () -> membershipCardService.cancelCard(41L, memberUser));
     }
 
     @Test
@@ -508,8 +509,9 @@ public class MembershipCardServiceImplTest {
     }
 
     @Test
-    void purchaseCard_Online_WithZeroUpgradePrice_ThrowsBusinessRuleException() {
-        // Current card is VIP (600k). Member tries to upgrade to another tier with same price (600k) -> upgrade diff = 0
+    void purchaseCard_Online_WithEqualPriceTier_CreatesPendingCardStartingAfterCurrentEnd() {
+        // Current card is VIP (600k) ending 2027-09-30. Buying another tier with same price (600k)
+        // must not be treated as upgrade; it starts the day after last card ends at full tier price.
         MembershipCardTier equalPriceTier = MembershipCardTier.builder()
                 .id(4L)
                 .code("VIP-EQUAL")
@@ -523,12 +525,60 @@ public class MembershipCardServiceImplTest {
 
         MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
                 .tierId(4L)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
         when(tierRepository.findById(4L)).thenReturn(Optional.of(equalPriceTier));
-        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of(currentVip));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class)))
+                .thenReturn(List.of(currentVip));
+        stubNewCard(26L);
+        when(paymentService.createPendingPayment(eq(memberProfile), eq(equalPriceTier.getPrice()), eq(PaymentMethod.BANK_TRANSFER)))
+                .thenReturn(Payment.builder().id(51L).paymentCode("PAY-1006").paymentStatus(PaymentStatus.PENDING).build());
 
-        assertThrows(BusinessRuleException.class, () -> membershipCardService.purchaseCard(req, memberUser));
+        MemberCardResponse res = membershipCardService.purchaseCard(req, memberUser);
+
+        assertEquals(CardStatus.PENDING_PAYMENT, res.getStatus());
+        assertEquals(LocalDate.of(2027, 10, 1), res.getStartDate());
+        assertEquals(LocalDate.of(2028, 9, 30), res.getEndDate());
+        assertEquals(BigDecimal.valueOf(600000.00), res.getPricePaid());
+        assertEquals(51L, res.getPaymentId());
+        assertEquals("PAY-1006", res.getPaymentCode());
+        // Verify current card was NOT replaced
+        assertEquals(CardStatus.ACTIVE, currentVip.getStatus());
+    }
+
+    @Test
+    void purchaseCard_AtDesk_WithEqualPriceTier_DoesNotReplaceCurrentCard() {
+        // Staff at desk buying an equal-price tier for a member with an active card
+        MembershipCardTier equalPriceTier = MembershipCardTier.builder()
+                .id(4L)
+                .code("VIP-EQUAL")
+                .name("VIP Equal")
+                .price(BigDecimal.valueOf(600000.00))
+                .durationMonths(12)
+                .isActive(true)
+                .build();
+
+        MemberCard currentVip = paidCard(vipTier, LocalDate.of(2026, 10, 1), LocalDate.of(2027, 9, 30));
+
+        MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
+                .memberId(100L)
+                .tierId(4L)
+                .build();
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(4L)).thenReturn(Optional.of(equalPriceTier));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class)))
+                .thenReturn(List.of(currentVip));
+        stubNewCard(27L);
+
+        MemberCardResponse res = membershipCardService.purchaseCard(req, receptionistUser);
+
+        assertEquals(CardStatus.ACTIVE, res.getStatus());
+        assertEquals(LocalDate.of(2027, 10, 1), res.getStartDate());
+        assertEquals(LocalDate.of(2028, 9, 30), res.getEndDate());
+        assertEquals(BigDecimal.valueOf(600000.00), res.getPricePaid());
+        // The current card must NOT be REPLACED
+        assertEquals(CardStatus.ACTIVE, currentVip.getStatus());
     }
 
     @Test
@@ -554,7 +604,33 @@ public class MembershipCardServiceImplTest {
         MemberCardResponse res = membershipCardService.activateCard(42L, receptionistUser);
 
         assertEquals(CardStatus.ACTIVE, res.getStatus());
-        verify(paymentService).markPaymentSuccess(99L, receptionistUser);
+        verify(paymentService).markPaymentSuccess(99L, receptionistUser, null);
+    }
+
+    @Test
+    void activateCard_WithActualPaymentMethodCash_PassesCashToPaymentService() {
+        Payment payment = Payment.builder()
+                .id(99L)
+                .paymentCode("PAY-0099")
+                .paymentStatus(PaymentStatus.PENDING)
+                .build();
+        MemberCard pending = MemberCard.builder()
+                .id(42L)
+                .cardCode("CARD-42")
+                .member(memberProfile)
+                .tier(goldTier)
+                .status(CardStatus.PENDING_PAYMENT)
+                .payment(payment)
+                .pricePaid(goldTier.getPrice())
+                .build();
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of());
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
+
+        MemberCardResponse res = membershipCardService.activateCard(42L, receptionistUser, PaymentMethod.CASH);
+
+        assertEquals(CardStatus.ACTIVE, res.getStatus());
+        verify(paymentService).markPaymentSuccess(99L, receptionistUser, PaymentMethod.CASH);
     }
 
     @Test
@@ -579,7 +655,7 @@ public class MembershipCardServiceImplTest {
         MemberCardResponse res = membershipCardService.cancelCard(42L, memberUser);
 
         assertEquals(CardStatus.CANCELLED, res.getStatus());
-        verify(paymentService).markPaymentFailed(eq(99L), org.mockito.ArgumentMatchers.contains("member: Test Member"));
+        verify(paymentService).markPaymentFailed(eq(99L), org.mockito.ArgumentMatchers.contains("member user id 100"));
     }
 
     @Test
@@ -605,7 +681,7 @@ public class MembershipCardServiceImplTest {
         MemberCardResponse res = membershipCardService.cancelCard(42L, receptionistUser);
 
         assertEquals(CardStatus.CANCELLED, res.getStatus());
-        verify(paymentService).markPaymentFailed(eq(99L), org.mockito.ArgumentMatchers.contains("staff: Front Desk"));
+        verify(paymentService).markPaymentFailed(eq(99L), org.mockito.ArgumentMatchers.contains("staff user id 200"));
     }
 }
 

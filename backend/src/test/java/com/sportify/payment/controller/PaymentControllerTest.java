@@ -315,4 +315,92 @@ public class PaymentControllerTest {
                         .content("{}"))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    @DisplayName("GET /api/v1/payments/{id} as member conceals notes (notes is null)")
+    void getPayment_AsMember_ConcealsNotes() throws Exception {
+        CustomUserDetails member = createUserDetails(100L, "MEMBER", "Member User");
+        PaymentResponse response = PaymentResponse.builder()
+                .id(1L)
+                .code("PAY-1000")
+                .status(PaymentStatus.PENDING)
+                .amount(BigDecimal.valueOf(810000.00))
+                .method(PaymentMethod.BANK_TRANSFER)
+                .notes(null)
+                .build();
+
+        when(paymentService.getPayment(eq(1L), any(UserAccount.class))).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/payments/1")
+                        .with(user(member)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.notes").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/payments/{id} as staff includes notes")
+    void getPayment_AsStaff_IncludesNotes() throws Exception {
+        CustomUserDetails staff = createUserDetails(200L, "RECEPTIONIST", "Front Desk");
+        PaymentResponse response = PaymentResponse.builder()
+                .id(1L)
+                .code("PAY-1000")
+                .status(PaymentStatus.SUCCESS)
+                .amount(BigDecimal.valueOf(810000.00))
+                .method(PaymentMethod.BANK_TRANSFER)
+                .notes("Confirmed by user id 200")
+                .build();
+
+        when(paymentService.getPayment(eq(1L), any(UserAccount.class))).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/payments/1")
+                        .with(user(staff)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.notes").value("Confirmed by user id 200"));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/payments/{id}/method as staff allows setting CASH")
+    void updatePaymentMethod_AsStaffWithCash_Returns200() throws Exception {
+        CustomUserDetails staff = createUserDetails(200L, "RECEPTIONIST", "Front Desk");
+        UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
+                .paymentMethod(PaymentMethod.CASH)
+                .build();
+
+        PaymentResponse response = PaymentResponse.builder()
+                .id(1L)
+                .code("PAY-1000")
+                .status(PaymentStatus.PENDING)
+                .amount(BigDecimal.valueOf(810000.00))
+                .method(PaymentMethod.CASH)
+                .build();
+
+        when(paymentService.updatePaymentMethod(eq(1L), any(UpdatePaymentMethodRequest.class), any(UserAccount.class)))
+                .thenReturn(response);
+
+        mockMvc.perform(put("/api/v1/payments/1/method")
+                        .with(user(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.method").value("CASH"));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/payments/{id}/method when optimistic locking conflict occurs returns 409 Conflict")
+    void updatePaymentMethod_WhenOptimisticLockConflict_Returns409Conflict() throws Exception {
+        CustomUserDetails member = createUserDetails(100L, "MEMBER", "Taylor Nguyen");
+        UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
+                .paymentMethod(PaymentMethod.MOMO)
+                .build();
+
+        when(paymentService.updatePaymentMethod(eq(1L), any(UpdatePaymentMethodRequest.class), any(UserAccount.class)))
+                .thenThrow(new org.springframework.orm.ObjectOptimisticLockingFailureException(com.sportify.payment.entity.Payment.class, 1L));
+
+        mockMvc.perform(put("/api/v1/payments/1/method")
+                        .with(user(member))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("The resource was modified by another request. Please reload and try again."));
+    }
 }

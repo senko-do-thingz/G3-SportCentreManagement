@@ -4,12 +4,13 @@ import com.sportify.catalog.repository.MemberCardRepository;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.core.common.CodeFormatter;
 import com.sportify.identity.entity.MemberProfile;
-import com.sportify.identity.repository.MemberProfileRepository;
+import com.sportify.identity.entity.UserAccount;
 import com.sportify.payment.config.BankTransferProperties;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.repository.InvoiceRepository;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.service.PaymentService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.ProxyFactory;
@@ -49,15 +50,15 @@ class PaymentServiceTransactionMandatoryTest {
         protected void doRollback(DefaultTransactionStatus status) {}
     }
 
-    @Test
-    @DisplayName("createPendingPayment with Propagation.MANDATORY throws IllegalTransactionStateException outside a transaction")
-    void createPendingPayment_OutsideTransaction_ThrowsIllegalTransactionStateException() {
+    private PaymentService proxy;
+
+    @BeforeEach
+    void setUpProxy() {
         PaymentServiceImpl target = new PaymentServiceImpl(
                 mock(PaymentRepository.class),
                 mock(MemberCardRepository.class),
                 mock(SportPackageRegistrationRepository.class),
                 mock(InvoiceRepository.class),
-                mock(MemberProfileRepository.class),
                 mock(BankTransferProperties.class),
                 mock(CodeFormatter.class),
                 Clock.systemUTC()
@@ -71,9 +72,29 @@ class PaymentServiceTransactionMandatoryTest {
         proxyFactory.setInterfaces(PaymentService.class);
         proxyFactory.addAdvice(interceptor);
 
-        PaymentService proxy = (PaymentService) proxyFactory.getProxy();
+        proxy = (PaymentService) proxyFactory.getProxy();
+    }
 
+    @Test
+    @DisplayName("createPendingPayment with Propagation.MANDATORY throws IllegalTransactionStateException outside a transaction")
+    void createPendingPayment_OutsideTransaction_ThrowsIllegalTransactionStateException() {
         assertThatThrownBy(() -> proxy.createPendingPayment(mock(MemberProfile.class), BigDecimal.valueOf(100000.00), PaymentMethod.BANK_TRANSFER))
+                .isInstanceOf(IllegalTransactionStateException.class)
+                .hasMessageContaining("No existing transaction found for transaction marked with propagation 'mandatory'");
+    }
+
+    @Test
+    @DisplayName("markPaymentSuccess with Propagation.MANDATORY throws IllegalTransactionStateException outside a transaction")
+    void markPaymentSuccess_OutsideTransaction_ThrowsIllegalTransactionStateException() {
+        assertThatThrownBy(() -> proxy.markPaymentSuccess(10L, mock(UserAccount.class)))
+                .isInstanceOf(IllegalTransactionStateException.class)
+                .hasMessageContaining("No existing transaction found for transaction marked with propagation 'mandatory'");
+    }
+
+    @Test
+    @DisplayName("markPaymentFailed with Propagation.MANDATORY throws IllegalTransactionStateException outside a transaction")
+    void markPaymentFailed_OutsideTransaction_ThrowsIllegalTransactionStateException() {
+        assertThatThrownBy(() -> proxy.markPaymentFailed(10L, "Failed reason"))
                 .isInstanceOf(IllegalTransactionStateException.class)
                 .hasMessageContaining("No existing transaction found for transaction marked with propagation 'mandatory'");
     }

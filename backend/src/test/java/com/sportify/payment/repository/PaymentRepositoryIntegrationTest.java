@@ -87,6 +87,8 @@ class PaymentRepositoryIntegrationTest extends AbstractIntegrationTest {
                 .referenceCode("TXN-PAY-001")
                 .notes("Payment for package and member card")
                 .paymentTime(LocalDateTime.now())
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
                 .build();
 
         Payment savedPayment = paymentRepository.save(payment);
@@ -263,6 +265,8 @@ class PaymentRepositoryIntegrationTest extends AbstractIntegrationTest {
                 .amount(new BigDecimal("100000.00"))
                 .paymentMethod(PaymentMethod.CASH)
                 .paymentStatus(PaymentStatus.PENDING)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
                 .build();
 
         Payment saved = paymentRepository.saveAndFlush(payment);
@@ -286,6 +290,8 @@ class PaymentRepositoryIntegrationTest extends AbstractIntegrationTest {
                 .amount(new BigDecimal("100000.00"))
                 .paymentMethod(PaymentMethod.CASH)
                 .paymentStatus(PaymentStatus.PENDING)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
                 .build());
 
         entityManager.detach(payment);
@@ -326,6 +332,9 @@ class PaymentRepositoryIntegrationTest extends AbstractIntegrationTest {
                 .amount(new BigDecimal("500000.00"))
                 .paymentMethod(PaymentMethod.CASH)
                 .paymentStatus(PaymentStatus.SUCCESS)
+                .paymentTime(LocalDateTime.now())
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
                 .build());
 
         // 2. MemberCard with payment_id

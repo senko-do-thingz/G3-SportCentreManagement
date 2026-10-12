@@ -16,7 +16,17 @@ public final class SecurityUtils {
             code = code.substring(5);
         }
         return "RECEPTIONIST".equals(code)
-                || "MANAGER".equals(code)
-                || "ADMIN".equals(code);
+                || "MANAGER".equals(code);
+    }
+
+    public static boolean isMember(UserAccount actor) {
+        if (actor == null || actor.getRole() == null || actor.getRole().getCode() == null) {
+            return false;
+        }
+        String code = actor.getRole().getCode().trim().toUpperCase();
+        if (code.startsWith("ROLE_")) {
+            code = code.substring(5);
+        }
+        return "MEMBER".equals(code);
     }
 }

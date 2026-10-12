@@ -1,11 +1,9 @@
 package com.sportify.payment.service.impl;
 
-import com.sportify.catalog.entity.MemberCard;
 import com.sportify.catalog.entity.CardStatus;
-import com.sportify.catalog.entity.SportPackage;
-import com.sportify.catalog.entity.SportPackageRegistration;
+import com.sportify.catalog.entity.MemberCard;
 import com.sportify.catalog.entity.PackageRegistrationStatus;
-import com.sportify.catalog.entity.MembershipCardTier;
+import com.sportify.catalog.entity.SportPackageRegistration;
 import com.sportify.catalog.repository.MemberCardRepository;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.core.common.CodeFormatter;
@@ -14,7 +12,6 @@ import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
-import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.payment.config.BankTransferProperties;
 import com.sportify.payment.dto.BankTransferInstructions;
 import com.sportify.payment.dto.PaymentResponse;
@@ -45,7 +42,6 @@ public class PaymentServiceImpl implements PaymentService {
     private final MemberCardRepository memberCardRepository;
     private final SportPackageRegistrationRepository sportPackageRegistrationRepository;
     private final InvoiceRepository invoiceRepository;
-    private final MemberProfileRepository memberProfileRepository;
     private final BankTransferProperties bankProperties;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
@@ -68,6 +64,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         Long seq = paymentRepository.getNextPaymentCodeSequence();
         String code = codeFormatter.formatPaymentCode(seq);
+        LocalDateTime now = LocalDateTime.now(clock);
 
         Payment payment = Payment.builder()
                 .paymentCode(code)
@@ -76,6 +73,8 @@ public class PaymentServiceImpl implements PaymentService {
                 .paymentMethod(chosenMethod)
                 .paymentStatus(PaymentStatus.PENDING)
                 .paymentTime(null)
+                .createdAt(now)
+                .updatedAt(now)
                 .build();
 
         return paymentRepository.save(payment);
@@ -83,57 +82,70 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
-    public Payment createPendingPayment(UserAccount memberUser, BigDecimal amount, PaymentMethod method) {
-        if (memberUser == null) {
-            throw new BusinessRuleException("User account cannot be null when creating a payment");
-        }
-        MemberProfile member = memberProfileRepository.findById(memberUser.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Member profile not found for user id: " + memberUser.getId()));
-        return createPendingPayment(member, amount, method);
+    public Payment markPaymentSuccess(Long paymentId, UserAccount confirmedBy) {
+        return markPaymentSuccess(paymentId, confirmedBy, null);
     }
 
     @Override
-    @Transactional
-    public Payment markPaymentSuccess(Long paymentId, UserAccount confirmedBy) {
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Payment markPaymentSuccess(Long paymentId, UserAccount confirmedBy, PaymentMethod actualMethod) {
         if (paymentId == null) {
-            return null;
+            throw new BusinessRuleException("Payment ID cannot be null");
         }
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found for id: " + paymentId));
 
-        if (payment.getPaymentStatus() == PaymentStatus.PENDING) {
-            payment.setPaymentStatus(PaymentStatus.SUCCESS);
-            payment.setPaymentTime(LocalDateTime.now(clock));
-            if (confirmedBy != null) {
-                payment.setConfirmedByUser(confirmedBy);
-                String staffNote = "Confirmed by staff: " + confirmedBy.getFullName();
-                payment.setNotes(appendNote(payment.getNotes(), staffNote));
-            }
-            return paymentRepository.save(payment);
+        if (payment.getPaymentStatus() != PaymentStatus.PENDING) {
+            throw new BusinessRuleException("Cannot mark payment as success: payment is in status "
+                    + payment.getPaymentStatus() + ", expected PENDING");
         }
-        return payment;
+
+        if (actualMethod != null) {
+            payment.setPaymentMethod(actualMethod);
+        }
+
+        LocalDateTime now = LocalDateTime.now(clock);
+        payment.setPaymentStatus(PaymentStatus.SUCCESS);
+        payment.setPaymentTime(now);
+        payment.setUpdatedAt(now);
+
+        if (confirmedBy != null) {
+            payment.setConfirmedByUser(confirmedBy);
+            String staffNote = "Confirmed by user id " + confirmedBy.getId();
+            payment.setNotes(appendNote(payment.getNotes(), staffNote));
+        }
+
+        return paymentRepository.save(payment);
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.MANDATORY)
     public Payment markPaymentFailed(Long paymentId, String reason) {
         if (paymentId == null) {
-            return null;
+            throw new BusinessRuleException("Payment ID cannot be null");
         }
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found for id: " + paymentId));
 
-        if (payment.getPaymentStatus() == PaymentStatus.PENDING) {
-            payment.setPaymentStatus(PaymentStatus.FAILED);
-            payment.setNotes(truncateNotes(reason));
-            return paymentRepository.save(payment);
+        if (payment.getPaymentStatus() != PaymentStatus.PENDING) {
+            throw new BusinessRuleException("Cannot mark payment as failed: payment is in status "
+                    + payment.getPaymentStatus() + ", expected PENDING");
         }
-        return payment;
+
+        LocalDateTime now = LocalDateTime.now(clock);
+        payment.setPaymentStatus(PaymentStatus.FAILED);
+        payment.setNotes(appendNote(payment.getNotes(), reason));
+        payment.setUpdatedAt(now);
+
+        return paymentRepository.save(payment);
     }
 
     @Override
     @Transactional(readOnly = true)
     public PaymentResponse getPayment(Long id, UserAccount actor) {
+        if (actor == null) {
+            throw new IllegalArgumentException("Actor cannot be null");
+        }
         Payment payment = paymentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found for id: " + id));
 
@@ -144,12 +156,19 @@ public class PaymentServiceImpl implements PaymentService {
             throw new ResourceNotFoundException("Payment not found for id: " + id);
         }
 
-        return mapToPaymentResponse(payment);
+        PaymentResponse response = mapToPaymentResponse(payment);
+        if (!isStaffUser) {
+            response.setNotes(null);
+        }
+        return response;
     }
 
     @Override
     @Transactional
     public PaymentResponse updatePaymentMethod(Long id, UpdatePaymentMethodRequest request, UserAccount actor) {
+        if (actor == null) {
+            throw new IllegalArgumentException("Actor cannot be null");
+        }
         Payment payment = paymentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found for id: " + id));
 
@@ -178,15 +197,24 @@ public class PaymentServiceImpl implements PaymentService {
             }
         });
 
-        PaymentMethod newMethod = request.getPaymentMethod();
-        if (newMethod == null || !ONLINE_ALLOWED_PAYMENT_METHODS.contains(newMethod)) {
+        PaymentMethod newMethod = request != null ? request.getPaymentMethod() : null;
+        if (newMethod == null) {
+            throw new BusinessRuleException("Payment method cannot be null");
+        }
+        if (!isStaffUser && !ONLINE_ALLOWED_PAYMENT_METHODS.contains(newMethod)) {
             throw new BusinessRuleException("Payment method " + newMethod
                     + " is not allowed for online payment. Allowed methods: " + ONLINE_ALLOWED_PAYMENT_METHODS);
         }
 
         payment.setPaymentMethod(newMethod);
+        payment.setUpdatedAt(LocalDateTime.now(clock));
         payment = paymentRepository.save(payment);
-        return mapToPaymentResponse(payment);
+
+        PaymentResponse response = mapToPaymentResponse(payment);
+        if (!isStaffUser) {
+            response.setNotes(null);
+        }
+        return response;
     }
 
     private PaymentResponse mapToPaymentResponse(Payment payment) {
@@ -236,7 +264,14 @@ public class PaymentServiceImpl implements PaymentService {
         if (note == null) {
             return null;
         }
-        return note.length() > 500 ? note.substring(0, 500) : note;
+        if (note.length() <= 500) {
+            return note;
+        }
+        int cutoff = 500;
+        if (Character.isHighSurrogate(note.charAt(cutoff - 1))) {
+            cutoff--;
+        }
+        return note.substring(0, cutoff);
     }
 
     private record PaymentItemSummary(String description, BigDecimal originalPrice, BigDecimal discount) {}
@@ -306,9 +341,6 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     private PaymentItemSummary defaultItemSummary(Payment payment) {
-        String description = payment.getNotes() != null && !payment.getNotes().isBlank()
-                ? payment.getNotes()
-                : "Payment " + payment.getPaymentCode();
-        return new PaymentItemSummary(description, payment.getAmount(), BigDecimal.ZERO);
+        return new PaymentItemSummary("Payment " + payment.getPaymentCode(), payment.getAmount(), BigDecimal.ZERO);
     }
 }

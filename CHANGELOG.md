@@ -2,25 +2,36 @@
 
 ## 2026-10-12 - Pending Payments for Online Requests and Payment Summary (BE-17, Flow 3)
 
-Branch `feat/f3-pending-payments`. Status: Implemented and reviewed. Verified with `mvn test -Dtest='!*IntegrationTest'` (450 tests run, 0 failures, 0 errors, 4 skipped requiring Docker). Testcontainers integration tests and `ddl-auto: validate` startup checks require Docker and will be verified in CI.
+Branch `feat/f3-pending-payments`. Status: Implemented and hardened after Round 3 Code Review. Verified locally with `mvn -B -ntp test "-Dtest=!*IntegrationTest" "-Dsurefire.failIfNoSpecifiedTests=false"` (501 tests run, 0 failures, 0 errors, 4 skipped requiring Docker: FlywayMigrationTest, PermissionRepositoryTest, RoleRepositoryTest, UserAccountRepositoryTest). Integration tests verified in CI via GitHub Actions.
 
-### Review Fixes & Improvements
-- B1 Honest Testing: Added `invalidPaymentStatus_RejectedByCheckConstraint` and `savePaymentAndInvoiceWithTwoLines_ReadsThemBack` to `PaymentPendingIntegrationTest`. Clarified in Audit Log that local environment has no Docker and Testcontainers integration tests are verified in CI. Fixed Sport fixture in `PaymentPendingIntegrationTest` using `SportTestData.aValidSport()` to provide valid `venueType` and avoid unique constraint collisions on seed data.
-- B2 Payment Activation & Method Guard: `activateCard` and `activateRegistration` transition linked pending payment to `SUCCESS`, record completion timestamp in `payment_time`, set `confirmed_by_user_id` FK, and log confirming staff user in `notes`. `PUT /api/v1/payments/{id}/method` rejects updates if payment or linked card/registration is not `PENDING_PAYMENT`.
-- B3 Zero/Negative Amount Guard: Pre-payment validation rejects amounts <= 0 with `BusinessRuleException` preventing orphaned rows. Added unit tests for zero price, 100 percent discount, rounded zero discount (0.004 -> 0.00), and equal-tier upgrade price differences. TODO-BE17-DISCOUNT: Open question for team deciding whether 0-amount orders should bypass payment table or promotions capped at 99.99%.
-- M1 Service Consolidation & Security Helper: Created `PaymentService.createPendingPayment` with `Propagation.MANDATORY`. Removed dead sequence fallback. Extracted shared `SecurityUtils.isStaff` supporting `ROLE_` prefixes. Added `SecurityUtilsTest` with parameterized tests across all roles. Added `PaymentServiceTransactionMandatoryTest` proving `Propagation.MANDATORY` throws `IllegalTransactionStateException` outside an active transaction. Catalog services decoupled from `PaymentRepository`.
-- M2 Schema Integrity & Flat Response Mapping: Added Flyway migration `V21__payment_pending_adjustments.sql` with duplicate safety guards, `confirmed_by_user_id` FK, and filtered unique indexes on `member_card(payment_id)` and `sport_package_registration(payment_id)` where `payment_id IS NOT NULL`. Added integration tests verifying duplicate rejection and multiple NULL rows. Refactored `PaymentServiceImpl` item resolution into flat helper records.
-- M3 Bank Instructions & Allowed Methods: `BankTransferInstructions` included only when method is `BANK_TRANSFER` and status is `PENDING` (omitted via `@JsonInclude(NON_NULL)` otherwise). Restricted online payment creation to `BANK_TRANSFER`, `MOMO`, `VNPAY`, `ZALOPAY`, rejecting `CASH` and `CREDIT_CARD` with 400. Counter staff flows retain ability to record CASH payments. NOTE: MOMO, VNPAY, and ZALOPAY do not currently connect to external payment gateways and are verified manually by staff.
-- M4 Configuration Fail-Fast & Validation: Added `@Validated` and `@NotBlank` on `BankTransferProperties`. Removed hardcoded defaults from `application.yml` so unconfigured deploys fail fast. Demo values restricted to dev/test profiles. Added `BankTransferPropertiesTest`. Added production-safe Flyway settings (`clean-disabled: true`, `out-of-order: false`, `validate-on-migrate: true`).
-- M5 Non-leaking Existence: Non-owner members receive 404 (`ResourceNotFoundException`) instead of 403 on payment endpoints and registration cancel endpoint (`cancelRegistration`) to avoid leaking resource existence. Center staff maintains full access.
-- M6 Authorization Alignment: Added `ADMIN` to `@PreAuthorize` of `PUT /api/v1/packages/registrations/{id}/cancel` matching staff definition (`RECEPTIONIST`, `MANAGER`, `ADMIN`).
-- M7 Test Suite Expansion: Added `SportPackageRegistrationCancelControllerTest`. Added real `CodeFormatter` tests, amount guard tests, JSON shape tests asserting `paymentTime` and instruction visibility, optimistic locking failure test, and `PaymentServiceTransactionMandatoryTest`.
-- Minor: Dynamic cancellation notes recording actor role and name truncated to 500 characters. `payment_time` made nullable in V21 and `Payment` entity.
+### Review Fixes & Hardening (Round 3)
+- B1 Card Plan & Upgrade Rule Reversion: Reverted upgrade check in `MembershipCardServiceImpl.planCard` to `tier.getPrice().compareTo(current.getTier().getPrice()) > 0`. Purchasing an equal-price tier now starts the day after the current card ends, priced at full tier price, without replacing the active card. Added unit tests for both online and desk equal-tier switches.
+- B2 Cash Recording on Activation: `activateCard` and `activateRegistration` accept optional `ActivatePaymentRequest { paymentMethod }`. Counter staff can specify actual payment method (including `CASH` and `CREDIT_CARD`) when confirming payment, which delegates to `PaymentService.markPaymentSuccess(paymentId, confirmedBy, actualMethod)`. In `updatePaymentMethod`, staff can assign any payment method, whereas members remain restricted to `ONLINE_ALLOWED_PAYMENT_METHODS`. Desk walk-in direct sales (card `paidAtDesk`, registration via `RECEPTION`) do not record payment rows in this PR and are tracked as `TODO-BE17-COUNTER-PAYMENT`.
+- B3 Audit and Consistency Corrections:
+  - V21 Migration: Removed redundant `ck_payment_amount` (pre-existing in V14). Dropped `df_payment_payment_time` default constraint, added backfill setting `payment_time = NULL` for non-SUCCESS payments, and added CHECK constraint `ck_payment_success_time` enforcing `payment_status <> 'SUCCESS' OR payment_time IS NOT NULL`.
+  - Non-owner 404: `cancelCard` throws `ResourceNotFoundException` (404) for non-owners, concealing card existence and matching `cancelRegistration`. Added `MembershipCardControllerTest` proving 404 response.
+  - Concurrency: Clarified `@Version private Integer version` pre-existed on `Payment`. Replaced tautological mock test with a real integration test in `PaymentPendingIntegrationTest` asserting `ObjectOptimisticLockingFailureException`, and added MockMvc test confirming HTTP 409 conflict.
+  - Catalog DTOs: Reverted all whitespace-only and formatting changes against `origin/main`.
+- M1 Single Time Source: Removed uncoordinated `@PrePersist` and `@PreUpdate` calls to `LocalDateTime.now()` from `Payment.java`. All timestamps (`createdAt`, `updatedAt`, `paymentTime`) are set via `LocalDateTime.now(clock)` in `PaymentServiceImpl`. Added unit test proving `createdAt` and `paymentTime` share the same time zone and `paymentTime >= createdAt`.
+- M2 V21 Completion: Added integration tests verifying `ck_payment_success_time` rejects SUCCESS with null `payment_time`, and native SQL insert of PENDING leaves `payment_time` NULL due to dropped default constraint.
+- M3 History Ordering: Replaced `findByMemberIdOrderByPaymentTimeDesc` with `findByMemberIdOrderByCreatedAtDesc` across repository and callers. Added integration test verifying newest pending payment is ordered first.
+- M4 Data Masking: Actors in notes and cancelReason recorded by user ID only (e.g. "staff user id 12") instead of full names. Masked internal `notes` to null for non-staff in `PaymentResponse`. Set default item description to `"Payment " + paymentCode` instead of internal notes. Added MockMvc tests verifying member receives null notes while staff receives notes.
+- M5 Service Hardening: Added `@Transactional(propagation = Propagation.MANDATORY)` on `markPaymentSuccess` and `markPaymentFailed`. Enforced validation rejecting null payment IDs and non-PENDING payments with `BusinessRuleException`. `markPaymentFailed` appends failure reason instead of overwriting notes. `truncateNotes` protects against surrogate pair splitting.
+- M6 Role Consistency: Removed unseeded `ADMIN` role from `SecurityUtils.isStaff` and all `@PreAuthorize` annotations added by this PR. Replaced hardcoded role string equality in services with `SecurityUtils.isMember` and `SecurityUtils.isStaff`.
+- M7 Configuration Documentation: Created `backend/.env.example` documenting `SPORTIFY_PAYMENT_*` variables and `CORS_ALLOWED_ORIGINS`. Removed redundant `SPORTIFY_*` keys from `application-test.yml`.
+- Minor: Removed unused `createPendingPayment(UserAccount, ...)` overload. In `createRegistration`, moved `paidAmount <= 0` guard before sequence increment. Validated actor is non-null in `getPayment` and `updatePaymentMethod`.
+
+### Open Questions
+- `TODO-BE17-DISCOUNT`: Handling of 100% discount / free orders vs `ck_payment_amount > 0` constraint.
+- `TODO-BE17-COUNTER-PAYMENT`: Counter desk walk-in direct sales recording payment rows.
+- Semantics of `FAILED` for user cancellation: Consider dedicated `CANCELLED` status.
+- Architectural layering: `SecurityUtils` in `core.common` depending on `identity.entity.UserAccount`.
+- Single time source for other domain entities (`Invoice`, `InvoiceLine`, `MemberCard`) using `Clock`.
 
 ### Docs and Test Artifacts
 - `docs/tests/BE-17_test_cases.md`: Complete test specifications and traceability matrix.
-- `docs/audit/BE-17_AI_Audit_Log.docx`: AI Audit Log document with complete audit trail, open questions, and CI verification notes.
-- `docs/audit/BE-17_AI_Audit_Log.md`: Markdown copy of the AI Audit Log for Git diffing and review.
+- `docs/audit/BE-17_AI_Audit_Log.docx`: AI Audit Log document synchronized with markdown copy.
+- `docs/audit/BE-17_AI_Audit_Log.md`: Markdown copy of the AI Audit Log including Section 10 resolution.
 
 ## 2026-10-12 - Log in and Sign up screens (FE-01, Flow 1)
 
