@@ -25,6 +25,12 @@ export interface AuthContextValue {
   role: Role | null
   /** True right after the refresh token was rejected; cleared on the next successful login. */
   sessionExpired: boolean
+  /**
+   * True when this tab was signed in and lost its session because another tab of the same
+   * browser logged in or out (one account per browser). Never set by a logout in this tab.
+   * Cleared on the next successful login or sign up.
+   */
+  signedOutElsewhere: boolean
   /** The error behind status 'error', otherwise null. */
   loadError: unknown
   login(credentials: LoginRequest, options?: LoginOptions): Promise<UserProfile>

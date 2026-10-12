@@ -24,6 +24,20 @@ Branch `feat/f1-auth-screens`. Status: Implemented and verified with `npm test` 
 - `docs/audit/FE-01_AI_Audit_Log.docx`.
 - `frontend/README.md`: Remember me, `register`, password rules, new components.
 
+### FE-01 review fixes (round 2)
+Same branch, new commits on top of the FE-01 commit. Verified with `npm test` (141 tests, 26 new), `npm run lint -- --max-warnings 0`, `tsc -b`, `npm run build` and 7 browser checks; each fix was broken once on purpose and caught by a test. No backend change.
+- R2: rule "one account per browser". A login or logout still clears both storage areas; a tab that loses its session this way now shows "You were signed out because another account signed in or out in this browser." on its login page (never after a logout in the same tab). A tab with its own session without Remember me also drops it (`tokenStorage.endTabSession`). JSDoc, README and audit log now describe this exactly.
+- R3: the sample account box shows only with `VITE_SHOW_SAMPLE_ACCOUNT=true` and both `VITE_SAMPLE_ACCOUNT_EMAIL` and `VITE_SAMPLE_ACCOUNT_PASSWORD` (read through `config/env.ts`, documented in README and `.env.example`). No credentials in the code.
+- R4: "Passwords do not match" is recomputed when either password field changes.
+- R5: backend validation errors for keys without an input are shown above the form on both pages.
+- R6: only the 409 "Email is already registered" (`EMAIL_TAKEN_MESSAGE`) goes under Email; other 409 messages go above the form.
+- R7: the hero photo covers the full height of the column on both screens.
+- R8: focus after an error through a state counter and an effect (`utils/useFocusFirstInvalid.ts`); `utils/focus.ts` removed.
+- R9: the email and notice passed to /login are read once and removed from history.
+- R10: the top progress label is "Meets requirements" instead of "Strong".
+- R11: the rules list id comes from `useId`, `Checkbox` merges a caller's `aria-describedby`, unused `tokenStorage.isPersistent()` removed.
+- Docs: `docs/tests/FE-01_test_cases.md` (cases TC-FE01-048 to 073, manual section rewritten with PowerShell steps and SQL), `docs/audit/FE-01_AI_Audit_Log.docx` (sections 9 and 10).
+
 ## 2026-10-12 - Frontend foundation: routing, API client, auth, layouts (FE-00, Shared)
 
 Branch `feat/fe-foundation`. Status: Implemented and verified with `npm test` (68 tests after review round 3), `npm run lint` and `npm run build`, plus 25 browser checks against a mock of the auth API. Manual checks against the real backend (docs/tests/FE-00_test_cases.md section 3) must be run before merging. Builds on the Vite + React + TypeScript scaffold from PR #13; no backend change.

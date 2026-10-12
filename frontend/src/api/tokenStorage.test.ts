@@ -6,7 +6,6 @@ describe('tokenStorage and Remember me', () => {
     tokenStorage.startSession({ accessToken: 'a1', refreshToken: 'r1' })
     expect(window.localStorage.getItem('sportify.accessToken')).toBe('a1')
     expect(window.sessionStorage.getItem('sportify.accessToken')).toBeNull()
-    expect(tokenStorage.isPersistent()).toBe(true)
   })
 
   it('keeps a session that is not remembered in sessionStorage only', () => {
@@ -15,7 +14,6 @@ describe('tokenStorage and Remember me', () => {
     expect(window.localStorage.getItem('sportify.refreshToken')).toBeNull()
     expect(tokenStorage.getAccessToken()).toBe('a1')
     expect(tokenStorage.hasSession()).toBe(true)
-    expect(tokenStorage.isPersistent()).toBe(false)
   })
 
   it('rotates the tokens in the area of the current session', () => {
@@ -38,6 +36,32 @@ describe('tokenStorage and Remember me', () => {
     tokenStorage.startSession({ accessToken: 'newer', refreshToken: 'newer-r' })
     expect(window.sessionStorage.getItem('sportify.accessToken')).toBeNull()
     expect(tokenStorage.getAccessToken()).toBe('newer')
+  })
+
+  it('a login without Remember me removes a remembered session written by another tab (R2)', () => {
+    // Tab A logged in with Remember me: its tokens are in the shared localStorage.
+    window.localStorage.setItem('sportify.accessToken', 'tab-a-access')
+    window.localStorage.setItem('sportify.refreshToken', 'tab-a-refresh')
+    window.localStorage.setItem('sportify.sessionId', 'tab-a-session')
+
+    // Tab B (this module) logs in without Remember me: one account per browser.
+    tokenStorage.startSession({ accessToken: 'tab-b', refreshToken: 'tab-b-r' }, { persistent: false })
+
+    expect(window.localStorage.getItem('sportify.accessToken')).toBeNull()
+    expect(window.localStorage.getItem('sportify.refreshToken')).toBeNull()
+    expect(window.localStorage.getItem('sportify.sessionId')).toBeNull()
+    expect(tokenStorage.getAccessToken()).toBe('tab-b')
+  })
+
+  it('endTabSession drops only the session of this tab', () => {
+    window.localStorage.setItem('sportify.accessToken', 'shared')
+    window.sessionStorage.setItem('sportify.accessToken', 'own')
+    expect(tokenStorage.getAccessToken()).toBe('own')
+
+    tokenStorage.endTabSession()
+
+    expect(window.sessionStorage.getItem('sportify.accessToken')).toBeNull()
+    expect(tokenStorage.getAccessToken()).toBe('shared')
   })
 
   it('logout clears both areas and starts a new epoch', () => {

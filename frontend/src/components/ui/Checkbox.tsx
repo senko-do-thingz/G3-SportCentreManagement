@@ -6,10 +6,19 @@ export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement
   error?: string
 }
 
-export function Checkbox({ label, error, id, className, ...rest }: CheckboxProps) {
+export function Checkbox({
+  label,
+  error,
+  id,
+  className,
+  'aria-describedby': extraDescribedBy,
+  ...rest
+}: CheckboxProps) {
   const generatedId = useId()
   const inputId = id ?? generatedId
   const errorId = error ? `${inputId}-error` : undefined
+  // Same rule as Input: the caller's ids and the error id are both kept.
+  const describedBy = [errorId, extraDescribedBy].filter(Boolean).join(' ') || undefined
   return (
     <div className={['checkbox-field', className ?? ''].filter(Boolean).join(' ')}>
       <label className="checkbox" htmlFor={inputId}>
@@ -18,7 +27,7 @@ export function Checkbox({ label, error, id, className, ...rest }: CheckboxProps
           type="checkbox"
           className="checkbox__input"
           aria-invalid={error ? true : undefined}
-          aria-describedby={errorId}
+          aria-describedby={describedBy}
           {...rest}
         />
         <span className="checkbox__label">{label}</span>

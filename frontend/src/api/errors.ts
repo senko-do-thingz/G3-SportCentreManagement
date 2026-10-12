@@ -78,3 +78,26 @@ export function getErrorMessage(error: unknown): string {
   }
   return 'Something went wrong. Please try again.'
 }
+
+/**
+ * Splits backend validation details between the fields a form renders and the rest.
+ * fields: messages whose key matches a rendered input, shown under that input.
+ * formMessage: the messages whose key has no input (for example "role"), joined, to show above
+ * the form; null when every key matched. Without this, such errors would be lost and the form
+ * would simply be enabled again with no message.
+ */
+export function splitFieldErrors(
+  fieldErrors: Record<string, string>,
+  renderedFields: readonly string[],
+): { fields: Record<string, string>; formMessage: string | null } {
+  const fields: Record<string, string> = {}
+  const unmatched: string[] = []
+  for (const [key, message] of Object.entries(fieldErrors)) {
+    if (renderedFields.includes(key)) {
+      fields[key] = message
+    } else {
+      unmatched.push(message)
+    }
+  }
+  return { fields, formMessage: unmatched.length > 0 ? unmatched.join(' ') : null }
+}

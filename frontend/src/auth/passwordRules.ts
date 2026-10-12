@@ -68,14 +68,19 @@ export function isStrongPassword(value: string): boolean {
   return checkPassword(value).every((rule) => rule.met)
 }
 
-/** Strength label shown next to the rules: how many of the four rules are met. */
-export function passwordStrength(value: string): 'empty' | 'weak' | 'fair' | 'strong' {
+/**
+ * Progress label shown above the rules: how many of the four backend rules are met. It is not a
+ * real strength score, so the top level is called "Meets requirements" instead of "Strong".
+ */
+export type PasswordProgress = 'empty' | 'weak' | 'fair' | 'valid'
+
+export function passwordProgress(value: string): PasswordProgress {
   if (!value) {
     return 'empty'
   }
   const met = checkPassword(value).filter((rule) => rule.met).length
   if (met === 4) {
-    return 'strong'
+    return 'valid'
   }
   return met >= 3 ? 'fair' : 'weak'
 }

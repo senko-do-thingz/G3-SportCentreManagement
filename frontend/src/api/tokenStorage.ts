@@ -10,15 +10,26 @@ type Area = 'local' | 'session'
 /**
  * Persists the JWT pair so a page reload keeps the user signed in.
  *
- * Two areas are used:
- * - localStorage for a remembered session ("Remember me" ticked, and every session started by
- *   sign up or by code that does not pass an option). All browser tabs share these keys and the
- *   session survives a browser restart.
- * - sessionStorage for a session that is not remembered. It belongs to one tab and ends when the
- *   tab or the browser is closed. Other tabs are not affected by it.
+ * Rule: one account per browser. Two storage areas are used:
+ * - localStorage for a remembered session ("Remember me" ticked, every sign up, and any call to
+ *   startSession without options). All tabs share these keys and the session survives a browser
+ *   restart.
+ * - sessionStorage for a session that is not remembered. It is written only in the tab that
+ *   logged in and ends when that tab is closed (some browsers restore it when they reopen tabs
+ *   from the last session).
  *
- * When both areas hold tokens, the tab's own sessionStorage wins, so a tab that logged in without
- * "Remember me" keeps its own user even if another tab logs in or out with a remembered session.
+ * What other tabs see:
+ * - A new login in any tab, remembered or not, and a logout in any tab clear both areas of that
+ *   tab, which includes the shared localStorage. A remembered session that another tab was using
+ *   therefore ends: that tab receives a storage event, becomes anonymous and its login page says
+ *   that another account signed in or out in this browser. This keeps an older remembered user
+ *   from coming back on a shared front desk computer.
+ * - A tab whose own session is not remembered drops it too when it sees another tab log in or out
+ *   (endTabSession, called from the AuthProvider storage listener).
+ * - Limitation: a login without "Remember me" writes nothing to localStorage when localStorage is
+ *   already empty, so a tab that holds its own not remembered session gets no event and keeps it.
+ *
+ * Inside one tab, its own sessionStorage is read before localStorage.
  *
  * Trade-off: both areas are readable by any script on the page, so the app must never render
  * untrusted HTML. Moving to httpOnly cookies would need backend changes and is out of scope.
@@ -117,11 +128,6 @@ export const tokenStorage = {
     return read(ACCESS_KEY) !== null || read(REFRESH_KEY) !== null
   },
 
-  /** True when the current session is kept in localStorage (remembered on this device). */
-  isPersistent(): boolean {
-    return activeArea() === 'local' && this.hasSession()
-  },
-
   getEpoch(): number {
     return sessionEpoch
   },
@@ -150,6 +156,15 @@ export const tokenStorage = {
     const area = activeArea()
     writeTo(area, ACCESS_KEY, tokens.accessToken)
     writeTo(area, REFRESH_KEY, tokens.refreshToken)
+  },
+
+  /**
+   * Removes the session this tab keeps for itself (Remember me off). Called when another tab
+   * logged in or out, so the browser never holds two accounts at once. The shared localStorage
+   * is not touched.
+   */
+  endTabSession(): void {
+    clearArea('session')
   },
 
   clear(): void {

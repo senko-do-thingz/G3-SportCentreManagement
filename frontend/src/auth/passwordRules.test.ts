@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { checkPassword, isStrongPassword, passwordStrength, utf8ByteLength } from './passwordRules'
-import { normalizePhone, toRegisterRequest, validateRegister, EMPTY_REGISTER_FORM } from './registerValidation'
+import { checkPassword, isStrongPassword, passwordProgress, utf8ByteLength } from './passwordRules'
+import {
+  EMPTY_REGISTER_FORM,
+  nextConfirmPasswordError,
+  normalizePhone,
+  toRegisterRequest,
+  validateRegister,
+} from './registerValidation'
 
 /** Cases copied from the rules of com.sportify.core.validation.StrongPasswordValidator. */
 describe('password rules (same as backend StrongPassword)', () => {
@@ -40,11 +46,12 @@ describe('password rules (same as backend StrongPassword)', () => {
     expect(isStrongPassword(password)).toBe(false)
   })
 
-  it('reports the strength from the number of rules met', () => {
-    expect(passwordStrength('')).toBe('empty')
-    expect(passwordStrength('abc')).toBe('weak')
-    expect(passwordStrength('abcdefgh')).toBe('fair')
-    expect(passwordStrength('abcdefg1')).toBe('strong')
+  it('reports progress from the number of rules met, and never calls a password strong', () => {
+    expect(passwordProgress('')).toBe('empty')
+    expect(passwordProgress('abc')).toBe('weak')
+    expect(passwordProgress('abcdefgh')).toBe('fair')
+    // A simple password that passes every backend rule only "meets the requirements".
+    expect(passwordProgress('abcdefg1')).toBe('valid')
   })
 })
 
@@ -84,5 +91,27 @@ describe('sign up form checks', () => {
 
   it('keeps the password exactly as typed', () => {
     expect(toRegisterRequest({ ...valid, password: ' Train2026 ' }).password).toBe(' Train2026 ')
+  })
+})
+
+describe('Confirm password error after editing either password field (R4)', () => {
+  it('adds nothing while no error is shown', () => {
+    expect(nextConfirmPasswordError({ password: 'Train2026', confirmPassword: 'Train2' }, undefined)).toBeUndefined()
+  })
+
+  it('clears a shown mismatch as soon as the two values match', () => {
+    expect(nextConfirmPasswordError({ password: 'Train2027', confirmPassword: 'Train2027' }, 'Passwords do not match')).toBeUndefined()
+  })
+
+  it('keeps the mismatch while the values still differ', () => {
+    expect(nextConfirmPasswordError({ password: 'Train2028', confirmPassword: 'Train2027' }, 'Passwords do not match')).toBe(
+      'Passwords do not match',
+    )
+  })
+
+  it('asks for the confirmation again when the field is emptied', () => {
+    expect(nextConfirmPasswordError({ password: 'Train2026', confirmPassword: '' }, 'Passwords do not match')).toBe(
+      'Please confirm your password',
+    )
   })
 })

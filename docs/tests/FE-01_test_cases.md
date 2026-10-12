@@ -12,6 +12,7 @@
   - Sign up: full name, phone, email, password with live rules (same rules as the backend `@StrongPassword`), confirm password, accept terms. Calls `POST /auth/register`, signs the new member in with the returned tokens and opens the member dashboard.
   - Backend field errors shown under each field (400 `details`), duplicate email (409) shown under the email field.
   - Enter submits both forms; every control is disabled while the request is running.
+  - Review round 2 (R2 to R11): one account per browser with a notice in the tab that was signed out, sample account box from env variables (off by default), Confirm password error follows both fields, backend errors without an input shown above the form, only "Email is already registered" under Email, full height hero photo, focus through a state counter, login prefill read once, "Meets requirements" label, accessible ids.
 
 ### Backend contract used (checked in the code on `main`, commit 81b9e51)
 | Call | Result | Shown as |
@@ -24,29 +25,29 @@
 
 Password rules (`StrongPasswordValidator`): 8 to 64 characters, at most 72 bytes in UTF-8, at least one letter and one digit. Phone (`RegisterRequest`): `^\+?\d{8,15}$`.
 
-### How to run
+### How to run (PowerShell)
 ```powershell
 cd frontend
 npm install
-npm test          # automated cases TC-FE01-001 to TC-FE01-047 (plus the 68 FE-00 tests)
-npm run lint
+npm test                         # automated cases TC-FE01-001 to TC-FE01-073 (plus the 68 FE-00 tests)
+npm run lint -- --max-warnings 0
 npm run build
 ```
 
-Manual cases (section 4) need the real backend: `cd backend` then `mvn spring-boot:run`, and in a second terminal `cd frontend` then `npm run dev`, then open http://localhost:5173/login.
+Manual cases (section 4) need the real backend and SQL Server; section 4.1 gives the exact steps without Docker.
 
-### Result summary
+### Result summary (after review round 2, 2026-10-12)
 | Group | Cases | Result |
 |---|---|---|
-| Automated, screens (`src/pages/public/authScreens.test.tsx`) | 24 | 24 PASSED |
-| Automated, password rules and sign up checks (`src/auth/passwordRules.test.ts`) | 17 | 17 PASSED |
-| Automated, token storage and Remember me (`src/api/tokenStorage.test.ts`) | 6 | 6 PASSED |
+| Automated, screens (`src/pages/public/authScreens.test.tsx`) | 44 (24 round 1, 20 round 2) | 44 PASSED |
+| Automated, password rules and sign up checks (`src/auth/passwordRules.test.ts`) | 21 (17 round 1, 4 round 2) | 21 PASSED |
+| Automated, token storage and Remember me (`src/api/tokenStorage.test.ts`) | 8 (6 round 1, 2 round 2) | 8 PASSED |
 | Automated, FE-00 regression (6 existing files) | 68 | 68 PASSED |
-| Build and lint (`npm run build`, `npm run lint`, `tsc -b`) | 3 | 3 PASSED |
-| Browser checks in Chromium against a mock of the auth API | 6 | 6 PASSED |
-| Manual checks against the real backend and SQL Server | 14 | NOT RUN YET (run before merge) |
+| Build, lint and types (`npm run build`, `npm run lint -- --max-warnings 0`, `tsc -b`) | 3 | 3 PASSED, 0 warnings |
+| Browser checks in Chromium against a mock of the auth API | 7 | 7 PASSED |
+| Manual checks against the real backend and SQL Server | 18 | NOT RUN YET (run before merge) |
 
-Total automated: 115 Vitest tests in 9 files (47 new). Four guards were broken on purpose (409 mapping, disabled fieldset, 64 character limit, Remember me option) and each made a test fail before it was restored.
+Total automated: 141 Vitest tests in 9 files (47 from round 1, 26 from round 2). Round 1: four guards broken on purpose, each caught. Round 2: every fix (R2 to R11, 15 guards in total) was broken once on purpose and at least one test failed each time before the fix was restored; one gap found this way (R3 flag ignored while values are set) got its own test.
 
 Note: the real Spring Boot backend could not be started in the AI workspace (no SQL Server, Maven Central blocked), so section 4 must be run on a team machine before the PR is merged.
 
@@ -76,12 +77,12 @@ Note: the real Spring Boot backend could not be started in the AI workspace (no 
 
 #### TC-FE01-004: Remember me off
 - Test: `without Remember me keeps the session for this tab only`
-- Expected Result: tokens in sessionStorage only, nothing in localStorage; `tokenStorage.isPersistent()` is false.
+- Expected Result: tokens in sessionStorage only, nothing in localStorage. (Round 2: the `isPersistent()` check was removed with the method; the storage checks stay.)
 - Status: PASSED
 
 #### TC-FE01-005: Remember me on
 - Test: `with Remember me keeps the session on this device`
-- Expected Result: tokens in localStorage only; `isPersistent()` is true.
+- Expected Result: tokens in localStorage only. (Round 2: `isPersistent()` check removed with the method.)
 - Status: PASSED
 
 #### TC-FE01-006: Wrong credentials
@@ -121,7 +122,7 @@ Note: the real Spring Boot backend could not be started in the AI workspace (no 
 #### TC-FE01-012: Successful sign up logs in and opens the dashboard
 - Test: `creates the account, logs in and opens the member dashboard`
 - Steps: name "  Jamie Tran ", phone "0901 234 599", email " jamie@sportify.demo ", password and confirm "Train2026", accept terms, click Create account.
-- Expected Result: `POST /auth/register` without Authorization, body `{fullName: 'Jamie Tran', email: 'jamie@sportify.demo', password: 'Train2026', phone: '0901234599'}`; then `GET /users/me` with `Bearer access-1`; Member Dashboard shown with the new name; session remembered.
+- Expected Result: `POST /auth/register` without Authorization, body `{fullName: 'Jamie Tran', email: 'jamie@sportify.demo', password: 'Train2026', phone: '0901234599'}`; then `GET /users/me` with `Bearer access-1`; Member Dashboard shown with the new name; tokens in localStorage (remembered).
 - Status: PASSED
 
 #### TC-FE01-013: Enter submits, form disabled while sending
@@ -148,7 +149,7 @@ Note: the real Spring Boot backend could not be started in the AI workspace (no 
 
 #### TC-FE01-017: Live password rules and strength
 - Test: `updates the password rules and the strength label while typing`
-- Expected Result: after "abc": letter rule met, digit and length not met, "Password strength: Weak"; after "abc12345": all rules met, "Password strength: Strong"; screen reader text "- met".
+- Expected Result: after "abc": letter rule met, digit and length not met, "Password strength: Weak"; after "abc12345": all rules met, "Meets requirements" (round 2, R10: was "Password strength: Strong"); screen reader text "- met".
 - Status: PASSED
 
 #### TC-FE01-018: Required, mismatch and terms messages
@@ -203,7 +204,7 @@ Note: the real Spring Boot backend could not be started in the AI workspace (no 
 | TC-FE01-034 | over 72 UTF-8 bytes | 36 x `é` + `1` (37 chars, 73 bytes) | invalid; 35 x `é` + `1` (71 bytes) valid | PASSED |
 | TC-FE01-035 | length in UTF-16 code units like Java | 3 characters outside the BMP + `a1` = 8 units | valid | PASSED |
 | TC-FE01-036 | letter outside the BMP not counted (Java checks each `char`) | 4 x `\u{1D400}` + `1234` | invalid | PASSED |
-| TC-FE01-037 | strength label | empty, `abc`, `abcdefgh`, `abcdefg1` | empty, weak, fair, strong | PASSED |
+| TC-FE01-037 | progress label (round 2, R10: `passwordProgress`) | empty, `abc`, `abcdefgh`, `abcdefg1` | empty, weak, fair, valid ("Meets requirements") | PASSED |
 | TC-FE01-038 | complete form | valid values | no errors | PASSED |
 | TC-FE01-039 | backend messages for limits | name 101 chars, phone 7 digits, phone 16 digits, email without dot | backend texts; `+` and 15 digits accepted | PASSED |
 | TC-FE01-040 | phone separators removed | `(+84) 901-234.567` | `+84901234567`; name and email trimmed | PASSED |
@@ -213,12 +214,45 @@ Note: the real Spring Boot backend could not be started in the AI workspace (no 
 
 | ID | Test | Expected | Status |
 |---|---|---|---|
-| TC-FE01-042 | remembered session (default) | localStorage only, `isPersistent` true, same as FE-00 | PASSED |
+| TC-FE01-042 | remembered session (default) | localStorage only, same as FE-00 | PASSED |
 | TC-FE01-043 | session not remembered | sessionStorage only, readable through `getAccessToken` | PASSED |
 | TC-FE01-044 | refresh rotation | rotated pair written to the area of the current session | PASSED |
 | TC-FE01-045 | tab session wins | sessionStorage token used even if another tab writes localStorage | PASSED |
 | TC-FE01-046 | new login | the other area is cleared, so an old remembered user cannot come back | PASSED |
 | TC-FE01-047 | logout | both areas cleared, epoch increased | PASSED |
+
+### 2.5 Review round 2: `authScreens.test.tsx`, `passwordRules.test.ts`, `tokenStorage.test.ts`
+
+| ID | Finding | Test | Expected Result | Status |
+|---|---|---|---|---|
+| TC-FE01-048 | R2 | `a login without Remember me removes a remembered session written by another tab (R2)` (tokenStorage) | Session only login in this tab clears the access, refresh and session keys another tab wrote to localStorage | PASSED |
+| TC-FE01-049 | R2 | `endTabSession drops only the session of this tab` (tokenStorage) | sessionStorage cleared, localStorage untouched | PASSED |
+| TC-FE01-050 | R2 | `a login without Remember me in another tab signs this tab out with a notice` | Remembered member tab receives the storage event, shows Log in with "You were signed out because another account signed in or out in this browser." | PASSED |
+| TC-FE01-051 | R2 | `a login or logout in another tab also ends the session this tab keeps for itself` | Tab with a session only login drops its sessionStorage tokens and shows the notice | PASSED |
+| TC-FE01-052 | R2 | `a logout in this tab does not show the notice` | Log out in the same tab: Log in screen, no notice | PASSED |
+| TC-FE01-053 | R2 | `the notice disappears after the next successful login` | After logging in again and out again, no notice | PASSED |
+| TC-FE01-054 | R3 | `is hidden by default` | No sample box, no manager email on the page | PASSED |
+| TC-FE01-055 | R3 | `stays hidden when values are set but the flag is not "true"` | Flag `yes` with both values: hidden | PASSED |
+| TC-FE01-056 | R3 | `shows the configured account when VITE_SHOW_SAMPLE_ACCOUNT is "true"` | "Sample account: demo.member@sportify.demo - Demo2026" | PASSED |
+| TC-FE01-057 | R3 | `stays hidden when the flag is on but a value is empty` | Hidden | PASSED |
+| TC-FE01-058 | R4 | `clears the error when the Password field is changed to match` | Exact review steps: Password Train2026, Confirm Train2027, submit, change Password to Train2027: error gone, "Passwords match" shown | PASSED |
+| TC-FE01-059 | R4 | `clears the error when the Confirm password field is fixed instead` | Reverse case: Confirm changed to Train2026: error gone, "Passwords match" shown | PASSED |
+| TC-FE01-060 | R4 | `keeps the error while the two values still differ` | Error stays | PASSED |
+| TC-FE01-061 | R4 | `adds nothing while no error is shown` (unit) | No error while typing for the first time | PASSED |
+| TC-FE01-062 | R4 | `clears a shown mismatch as soon as the two values match` (unit) | undefined | PASSED |
+| TC-FE01-063 | R4 | `keeps the mismatch while the values still differ` (unit) | "Passwords do not match" | PASSED |
+| TC-FE01-064 | R4 | `asks for the confirmation again when the field is emptied` (unit) | "Please confirm your password" | PASSED |
+| TC-FE01-065 | R5 | `Sign up shows them above the form and keeps the matched ones under their field` | 400 with `role` and `phone`: "Role is not allowed" above the form, phone message under Phone, button enabled | PASSED |
+| TC-FE01-066 | R5 | `Log in shows them above the form` | 400 with only `role`: message above the form, button enabled | PASSED |
+| TC-FE01-067 | R6 | `shows another 409 above the form, not under Email` | "The request conflicts with existing data" above the form, Email not invalid | PASSED |
+| TC-FE01-068 | R6 | `keeps "Email is already registered" under Email` | Message is a field error under Email | PASSED |
+| TC-FE01-069 | R8 | `Log in focuses the field named by a backend validation error` | Server error path: focus on Email after a 400 with `details.email` | PASSED |
+| TC-FE01-070 | R9 | `removes the email and notice from history so a reload does not show them again` | History state becomes null; after a simulated reload no notice and empty email | PASSED |
+| TC-FE01-071 | R9 | `keeps the requested page in history when it removes the prefill` | History state becomes `{from: '/member/packages'}` | PASSED |
+| TC-FE01-072 | R11 | `links the password field to the rules list through a generated id` | `aria-describedby` points to the rules list, id is not the old fixed `password-rules` | PASSED |
+| TC-FE01-073 | R11 | `Checkbox keeps the caller describedby together with its error id` | Both ids in `aria-describedby`; description reads the error and the note | PASSED |
+
+Existing focus tests TC-FE01-010, TC-FE01-014 and TC-FE01-018 still pass with the new focus hook (R8). R7 has no automated test; it is covered by browser check B07.
 
 ---
 
@@ -234,6 +268,9 @@ Run with `npm run build`, `npx vite preview --port 4173`, and Playwright routing
 | B04 | Weak password shows the StrongPassword message under Password | PASSED |
 | B05 | Successful sign up opens `/member` (Member Dashboard) | PASSED |
 | B06 | Sign up on a 390 px phone has no horizontal scroll | PASSED |
+| B07 | Round 2, R7: the photo covers the full height of the hero column on both screens and the slogan stays readable (screenshot `FE-01_round2_screens.png`) | PASSED |
+
+B01 to B06 were run again after review round 2 on the new production build: all passed.
 
 Screens were compared with the Figma exports: same 519 / 619 split of the 1140 px card, photo hero with slogan, brand, headings, field order and footer links.
 
@@ -241,21 +278,60 @@ Screens were compared with the Figma exports: same 519 / 619 split of the 1140 p
 
 ## 4. Manual Test Cases (real backend and SQL Server)
 
-Preconditions: backend on http://localhost:8080 with the `dev` profile, frontend on http://localhost:5173, database migrated (V1 to V20).
+### 4.1 Start everything without Docker (PowerShell)
+
+Preconditions: SQL Server running locally with a `sportify` database (see the root README, section on SQL Server without Docker), JDK 25, Maven 3.9+, Node.js 24. `backend/.env` filled from `backend/.env.example`.
+
+Terminal 1, backend:
+```powershell
+cd backend
+mvn spring-boot:run
+```
+Wait for `Started` in the log. The `dev` profile is active by default and Flyway applies the migrations.
+
+Terminal 2, frontend:
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+Open http://localhost:5173/login.
+
+Change the status of a test user for M03 and M04 (in SSMS, or with `sqlcmd` in PowerShell; replace the email with the account you created in M07):
+```powershell
+sqlcmd -S localhost -d sportify -U sa -P "<DB_PASSWORD from backend/.env>" -Q "UPDATE user_account SET status = 'LOCKED' WHERE email = 'jamie@sportify.demo'; SELECT email, status FROM user_account WHERE email = 'jamie@sportify.demo';"
+```
+```sql
+-- M03: lock the account
+UPDATE user_account SET status = 'LOCKED' WHERE email = 'jamie@sportify.demo';
+-- M04: make it inactive
+UPDATE user_account SET status = 'INACTIVE' WHERE email = 'jamie@sportify.demo';
+-- Restore after the test
+UPDATE user_account SET status = 'ACTIVE' WHERE email = 'jamie@sportify.demo';
+```
+The backend accepts any status other than `ACTIVE` as disabled (`CustomUserDetails.isEnabled` and `isAccountNonLocked`), so both return 403.
+
+Sample account box for M17 and M18: edit `frontend/.env`, then stop `npm run dev` (Ctrl+C) and start it again, because Vite reads `.env` only at start up.
+
+### 4.2 Cases
 
 | ID | Steps | Expected Result | Status |
 |---|---|---|---|
-| M01 | Open /login, log in as `manager@sportify.com` / `password` | Manager workspace opens | NOT RUN |
+| M01 | Open /login, log in as the seeded manager (`manager@sportify.com`, password from migration V4) | Manager workspace opens | NOT RUN |
 | M02 | Log in with a wrong password | "Invalid email or password. Please try again." | NOT RUN |
-| M03 | In SQL set `user_account.status = 'LOCKED'` for a test member, log in | Locked or inactive message, no session | NOT RUN |
-| M04 | Same with status `INACTIVE` | Same message | NOT RUN |
-| M05 | Log in without Remember me, close the browser, open /member | Login page | NOT RUN |
-| M06 | Log in with Remember me, close the browser, open /member | Member Dashboard without logging in again | NOT RUN |
-| M07 | Open /register, sign up a new email with valid values | Member Dashboard opens with the new name; row in `user_account` (role MEMBER, status ACTIVE) and `member_profile` (new member code) | NOT RUN |
-| M08 | Sign up again with the same email in upper case | "Email is already registered" under Email address | NOT RUN |
-| M09 | Sign up with password `password` | Weak password message, no request in the Network tab | NOT RUN |
+| M03 | Run the LOCKED SQL from 4.1 for the M07 account, then log in with it | "This account is locked or inactive. Please contact the front desk to reactivate it.", no session | NOT RUN |
+| M04 | Run the INACTIVE SQL from 4.1, log in again; restore ACTIVE afterwards | Same message | NOT RUN |
+| M05 | Log in without Remember me, then close the TAB (not the whole browser), open a new tab on http://localhost:5173/member | Login page. Note: Chrome and Edge with "Continue where you left off" (Settings, On start up) restore sessionStorage when the browser is reopened, so closing the browser is not a valid test of this case | NOT RUN |
+| M06 | Log in with Remember me, close the browser, open http://localhost:5173/member | Member Dashboard without logging in again | NOT RUN |
+| M07 | Open /register, sign up `jamie@sportify.demo` with valid values | Member Dashboard opens with the new name; row in `user_account` (role MEMBER, status ACTIVE) and in `member_profile` (new member code) | NOT RUN |
+| M08 | Sign up again with `JAMIE@sportify.demo` | "Email is already registered" under Email address | NOT RUN |
+| M09 | Sign up with password `password` | Weak password message, no request in the DevTools Network tab | NOT RUN |
 | M10 | Sign up with phone `0901 234 567` | Saved as `0901234567` | NOT RUN |
 | M11 | Press Enter in any field of both forms | Form submits | NOT RUN |
-| M12 | Throttle the network (DevTools, Slow 3G) and submit | Button shows the spinner, all fields disabled, only one request | NOT RUN |
-| M13 | Stop the backend and submit either form | "Cannot reach the server" message | NOT RUN |
-| M14 | Compare both screens side by side with the Figma PNGs at 1880 px wide | Layout, copy and colors match | NOT RUN |
+| M12 | DevTools, Network, throttling Slow 3G, submit either form | Spinner on the button, all fields disabled, one request only | NOT RUN |
+| M13 | Stop the backend (Ctrl+C in terminal 1) and submit either form | "Cannot reach the server" message | NOT RUN |
+| M14 | Compare both screens with the Figma PNGs at 1880 px wide | Layout, copy, colors and full height photo match | NOT RUN |
+| M15 | R2: tab A logs in with Remember me as the M07 member. Tab B (same browser) logs in without Remember me as the manager. Switch back to tab A | Tab A shows the Log in screen with "You were signed out because another account signed in or out in this browser." | NOT RUN |
+| M16 | R2: tabs A and B both on the same remembered session. Click Log out in tab A | Tab A: Log in screen without the notice. Tab B: Log in screen with the notice | NOT RUN |
+| M17 | R3: no `frontend/.env` (or `VITE_SHOW_SAMPLE_ACCOUNT=false`), restart `npm run dev`, open /login | No sample account box | NOT RUN |
+| M18 | R3: in `frontend/.env` set `VITE_SHOW_SAMPLE_ACCOUNT=true`, `VITE_SAMPLE_ACCOUNT_EMAIL` and `VITE_SAMPLE_ACCOUNT_PASSWORD` to a demo member, restart `npm run dev`, open /login | Box shows "Sample account: <email> - <password>". Remove the values afterwards and do not commit `.env` (`git status` must not list it) | NOT RUN |

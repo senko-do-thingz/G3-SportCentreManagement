@@ -1,8 +1,13 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter, useLocation, type Location } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
+import { AuthProvider } from '../../auth/AuthProvider'
 import { STRONG_PASSWORD_MESSAGE } from '../../auth/passwordRules'
+import { Checkbox } from '../../components/ui/Checkbox'
+import { ToastProvider } from '../../components/ui/ToastProvider'
+import { AppRoutes } from '../../routes/AppRoutes'
 import { backendError, installFakeFetch, json, MANAGER, MEMBER, type RecordedCall } from '../../test/fakeBackend'
 import { renderApp } from '../../test/renderApp'
 
@@ -98,6 +103,7 @@ async function fillRegisterForm(
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 describe('F1-05 Log in', () => {
@@ -165,7 +171,6 @@ describe('F1-05 Log in', () => {
 
     expect(window.sessionStorage.getItem('sportify.accessToken')).toBe('access-1')
     expect(window.localStorage.getItem('sportify.accessToken')).toBeNull()
-    expect(tokenStorage.isPersistent()).toBe(false)
   })
 
   it('with Remember me keeps the session on this device', async () => {
@@ -181,7 +186,6 @@ describe('F1-05 Log in', () => {
 
     expect(window.localStorage.getItem('sportify.accessToken')).toBe('access-1')
     expect(window.sessionStorage.getItem('sportify.accessToken')).toBeNull()
-    expect(tokenStorage.isPersistent()).toBe(true)
   })
 
   it('shows a clear message for wrong credentials and keeps the email', async () => {
@@ -276,7 +280,8 @@ describe('F1-06 Sign up', () => {
     })
     expect(calls[1]).toMatchObject({ method: 'GET', path: '/users/me', authorization: 'Bearer access-1' })
     expect(screen.getByText('Jamie Tran')).toBeInTheDocument()
-    expect(tokenStorage.isPersistent()).toBe(true)
+    // A new member is remembered on this device.
+    expect(window.localStorage.getItem('sportify.accessToken')).toBe('access-1')
   })
 
   it('submits with the Enter key and disables the form while sending', async () => {
@@ -369,7 +374,7 @@ describe('F1-06 Sign up', () => {
     await user.type(password, '12345')
     expect(rule('length')).toHaveAttribute('data-met', 'true')
     expect(rule('digit')).toHaveAttribute('data-met', 'true')
-    expect(screen.getByText('Password strength: Strong')).toBeInTheDocument()
+    expect(screen.getByText('Meets requirements')).toBeInTheDocument()
     expect(within(rule('length') as HTMLElement).getByText('- met')).toBeInTheDocument()
   })
 
@@ -460,5 +465,321 @@ describe('F1-06 Sign up', () => {
     await user.click(await screen.findByRole('link', { name: 'Log in' }))
 
     expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+  })
+})
+
+describe('FE-01 review fixes (round 2)', () => {
+  const SIGNED_OUT_ELSEWHERE = 'You were signed out because another account signed in or out in this browser.'
+
+  /** Signs this tab in as a member with Remember me, as if it had logged in earlier. */
+  async function rememberedMemberTab() {
+    tokenStorage.startSession({ accessToken: 'access-0', refreshToken: 'refresh-0' })
+    installFakeFetch((call) => (call.path === '/users/me' ? json(200, MEMBER) : backendError(404, 'Resource not found')))
+    renderApp('/member')
+    await screen.findByRole('heading', { name: 'Member Dashboard' })
+    return tokenStorage.getSessionId()
+  }
+
+  describe('R2 one account per browser', () => {
+    it('a login without Remember me in another tab signs this tab out with a notice', async () => {
+      const oldSession = await rememberedMemberTab()
+
+      // The other tab's startSession({ persistent: false }) clears the shared localStorage.
+      window.localStorage.clear()
+      act(() => {
+        window.dispatchEvent(new StorageEvent('storage', { key: 'sportify.sessionId', oldValue: oldSession, newValue: null }))
+      })
+
+      expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent(SIGNED_OUT_ELSEWHERE)
+      expect(tokenStorage.hasSession()).toBe(false)
+    })
+
+    it('a login or logout in another tab also ends the session this tab keeps for itself', async () => {
+      tokenStorage.startSession({ accessToken: 'access-0', refreshToken: 'refresh-0' }, { persistent: false })
+      installFakeFetch((call) => (call.path === '/users/me' ? json(200, MEMBER) : backendError(404, 'Resource not found')))
+      renderApp('/member')
+      await screen.findByRole('heading', { name: 'Member Dashboard' })
+
+      act(() => {
+        window.dispatchEvent(new StorageEvent('storage', { key: 'sportify.sessionId', oldValue: 'x', newValue: null }))
+      })
+
+      expect(await screen.findByText(SIGNED_OUT_ELSEWHERE)).toBeInTheDocument()
+      expect(window.sessionStorage.getItem('sportify.accessToken')).toBeNull()
+    })
+
+    it('a logout in this tab does not show the notice', async () => {
+      await rememberedMemberTab()
+      const user = userEvent.setup()
+
+      await user.click(screen.getByRole('button', { name: 'Log out' }))
+
+      expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+      expect(screen.queryByText(SIGNED_OUT_ELSEWHERE)).not.toBeInTheDocument()
+    })
+
+    it('the notice disappears after the next successful login', async () => {
+      const oldSession = await rememberedMemberTab()
+      window.localStorage.clear()
+      act(() => {
+        window.dispatchEvent(new StorageEvent('storage', { key: 'sportify.sessionId', oldValue: oldSession, newValue: null }))
+      })
+      await screen.findByText(SIGNED_OUT_ELSEWHERE)
+      installFakeFetch(authBackend())
+      const user = userEvent.setup()
+
+      await user.type(screen.getByLabelText(/email address/i), 'member@sportify.demo')
+      await user.type(screen.getByLabelText(/^password/i), 'Demo123!{Enter}')
+      await screen.findByRole('heading', { name: 'Member Dashboard' })
+      await user.click(screen.getByRole('button', { name: 'Log out' }))
+
+      expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+      expect(screen.queryByText(SIGNED_OUT_ELSEWHERE)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('R3 sample account box', () => {
+    it('is hidden by default', async () => {
+      installFakeFetch(authBackend())
+      renderApp('/login')
+
+      await screen.findByRole('heading', { name: 'Welcome back' })
+      expect(screen.queryByText(/sample account/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/manager@sportify\.com/)).not.toBeInTheDocument()
+    })
+
+    it('stays hidden when values are set but the flag is not "true"', async () => {
+      vi.stubEnv('VITE_SAMPLE_ACCOUNT_EMAIL', 'demo.member@sportify.demo')
+      vi.stubEnv('VITE_SAMPLE_ACCOUNT_PASSWORD', 'Demo2026')
+      vi.stubEnv('VITE_SHOW_SAMPLE_ACCOUNT', 'yes')
+      installFakeFetch(authBackend())
+      renderApp('/login')
+
+      await screen.findByRole('heading', { name: 'Welcome back' })
+      expect(screen.queryByText(/sample account/i)).not.toBeInTheDocument()
+    })
+
+    it('shows the configured account when VITE_SHOW_SAMPLE_ACCOUNT is "true"', async () => {
+      vi.stubEnv('VITE_SHOW_SAMPLE_ACCOUNT', 'true')
+      vi.stubEnv('VITE_SAMPLE_ACCOUNT_EMAIL', 'demo.member@sportify.demo')
+      vi.stubEnv('VITE_SAMPLE_ACCOUNT_PASSWORD', 'Demo2026')
+      installFakeFetch(authBackend())
+      renderApp('/login')
+
+      expect(await screen.findByText('Sample account: demo.member@sportify.demo - Demo2026')).toBeInTheDocument()
+    })
+
+    it('stays hidden when the flag is on but a value is empty', async () => {
+      vi.stubEnv('VITE_SHOW_SAMPLE_ACCOUNT', 'true')
+      vi.stubEnv('VITE_SAMPLE_ACCOUNT_EMAIL', 'demo.member@sportify.demo')
+      vi.stubEnv('VITE_SAMPLE_ACCOUNT_PASSWORD', '')
+      installFakeFetch(authBackend())
+      renderApp('/login')
+
+      await screen.findByRole('heading', { name: 'Welcome back' })
+      expect(screen.queryByText(/sample account/i)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('R4 Passwords do not match follows both fields', () => {
+    async function mismatchShown() {
+      installFakeFetch(authBackend())
+      const user = userEvent.setup()
+      renderApp('/register')
+      await user.type(await screen.findByLabelText(/^password/i), 'Train2026')
+      await user.type(screen.getByLabelText(/confirm password/i), 'Train2027')
+      await user.click(screen.getByRole('button', { name: 'Create account' }))
+      expect(screen.getByText('Passwords do not match')).toBeInTheDocument()
+      return user
+    }
+
+    it('clears the error when the Password field is changed to match', async () => {
+      const user = await mismatchShown()
+      const password = screen.getByLabelText(/^password/i)
+
+      await user.clear(password)
+      await user.type(password, 'Train2027')
+
+      expect(screen.queryByText('Passwords do not match')).not.toBeInTheDocument()
+      expect(screen.getByText('Passwords match')).toBeInTheDocument()
+      expect(screen.getByLabelText(/confirm password/i)).not.toHaveAttribute('aria-invalid')
+    })
+
+    it('clears the error when the Confirm password field is fixed instead', async () => {
+      const user = await mismatchShown()
+      const confirm = screen.getByLabelText(/confirm password/i)
+
+      await user.clear(confirm)
+      await user.type(confirm, 'Train2026')
+
+      expect(screen.queryByText('Passwords do not match')).not.toBeInTheDocument()
+      expect(screen.getByText('Passwords match')).toBeInTheDocument()
+    })
+
+    it('keeps the error while the two values still differ', async () => {
+      const user = await mismatchShown()
+
+      await user.type(screen.getByLabelText(/^password/i), '9')
+
+      expect(screen.getByText('Passwords do not match')).toBeInTheDocument()
+    })
+  })
+
+  describe('R5 backend errors for keys without an input', () => {
+    it('Sign up shows them above the form and keeps the matched ones under their field', async () => {
+      installFakeFetch(() =>
+        backendError(400, 'Validation Error', { role: 'Role is not allowed', phone: 'Phone must be 8-15 digits with optional leading +' }),
+      )
+      const user = userEvent.setup()
+      renderApp('/register')
+
+      await fillRegisterForm(user)
+      await user.click(screen.getByRole('button', { name: 'Create account' }))
+
+      expect(await screen.findByText('Role is not allowed')).toHaveClass('notice--danger')
+      expect(screen.getByLabelText(/phone number/i)).toHaveAccessibleDescription('Phone must be 8-15 digits with optional leading +')
+      expect(screen.getByRole('button', { name: 'Create account' })).toBeEnabled()
+    })
+
+    it('Log in shows them above the form', async () => {
+      installFakeFetch(() => backendError(400, 'Validation Error', { role: 'Role is not allowed' }))
+      const user = userEvent.setup()
+      renderApp('/login')
+
+      await user.type(await screen.findByLabelText(/email address/i), 'member@sportify.demo')
+      await user.type(screen.getByLabelText(/^password/i), 'Demo123!{Enter}')
+
+      expect(await screen.findByText('Role is not allowed')).toHaveClass('notice--danger')
+      expect(screen.getByRole('button', { name: /log in/i })).toBeEnabled()
+    })
+  })
+
+  describe('R6 only "Email is already registered" goes under Email', () => {
+    it('shows another 409 above the form, not under Email', async () => {
+      installFakeFetch((call) =>
+        call.path === '/auth/register' ? backendError(409, 'The request conflicts with existing data') : backendError(404, 'x'),
+      )
+      const user = userEvent.setup()
+      renderApp('/register')
+
+      await fillRegisterForm(user)
+      await user.click(screen.getByRole('button', { name: 'Create account' }))
+
+      expect(await screen.findByText('The request conflicts with existing data')).toHaveClass('notice--danger')
+      expect(screen.getByLabelText(/email address/i)).not.toHaveAttribute('aria-invalid')
+    })
+
+    it('keeps "Email is already registered" under Email', async () => {
+      installFakeFetch(authBackend())
+      const user = userEvent.setup()
+      renderApp('/register')
+
+      await fillRegisterForm(user, { email: 'member@sportify.demo' })
+      await user.click(screen.getByRole('button', { name: 'Create account' }))
+
+      expect(await screen.findByText('Email is already registered')).toHaveClass('field__error')
+      expect(screen.queryByRole('alert', { name: /conflicts/ })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('R8 focus after a server error', () => {
+    it('Log in focuses the field named by a backend validation error', async () => {
+      installFakeFetch(() => backendError(400, 'Validation Error', { email: 'Email is invalid' }))
+      const user = userEvent.setup()
+      renderApp('/login')
+
+      await user.type(await screen.findByLabelText(/email address/i), 'member@sportify.demo')
+      await user.type(screen.getByLabelText(/^password/i), 'Demo123!{Enter}')
+
+      await screen.findByText('Email is invalid')
+      await waitFor(() => expect(screen.getByLabelText(/email address/i)).toHaveFocus())
+    })
+  })
+
+  describe('R9 Log in prefill is read once', () => {
+    it('removes the email and notice from history so a reload does not show them again', async () => {
+      installFakeFetch(authBackend())
+      let current: Location | null = null
+      function LocationProbe() {
+        current = useLocation()
+        return null
+      }
+      const tree = (entry: Partial<Location>) => (
+        <MemoryRouter initialEntries={[entry]}>
+          <ToastProvider>
+            <AuthProvider>
+              <AppRoutes />
+              <LocationProbe />
+            </AuthProvider>
+          </ToastProvider>
+        </MemoryRouter>
+      )
+      const notice = 'Your account was created, but we could not sign you in. Please log in.'
+      const first = render(tree({ pathname: '/login', state: { email: 'jamie@sportify.demo', notice } }))
+
+      expect(await screen.findByText(notice)).toBeInTheDocument()
+      expect(screen.getByLabelText(/email address/i)).toHaveValue('jamie@sportify.demo')
+      await waitFor(() => expect((current as Location | null)?.state).toBeNull())
+
+      // Reload: the browser restores the same history entry, now without the prefill.
+      const reloaded = (current as Location | null) ?? { pathname: '/login', state: null }
+      first.unmount()
+      render(tree({ pathname: reloaded.pathname, state: reloaded.state }))
+
+      await screen.findByRole('heading', { name: 'Welcome back' })
+      expect(screen.queryByText(notice)).not.toBeInTheDocument()
+      expect(screen.getByLabelText(/email address/i)).toHaveValue('')
+    })
+
+    it('keeps the requested page in history when it removes the prefill', async () => {
+      installFakeFetch(authBackend())
+      let current: Location | null = null
+      function LocationProbe() {
+        current = useLocation()
+        return null
+      }
+      render(
+        <MemoryRouter initialEntries={[{ pathname: '/login', state: { from: '/member/packages', notice: 'Hello' } }]}>
+          <ToastProvider>
+            <AuthProvider>
+              <AppRoutes />
+              <LocationProbe />
+            </AuthProvider>
+          </ToastProvider>
+        </MemoryRouter>,
+      )
+
+      await screen.findByText('Hello')
+      await waitFor(() => expect((current as Location | null)?.state).toEqual({ from: '/member/packages' }))
+    })
+  })
+
+  describe('R11 accessible descriptions', () => {
+    it('links the password field to the rules list through a generated id', async () => {
+      installFakeFetch(authBackend())
+      renderApp('/register')
+
+      const password = await screen.findByLabelText(/^password/i)
+      const rulesId = password.getAttribute('aria-describedby') ?? ''
+      expect(rulesId).not.toBe('password-rules')
+      const rules = document.getElementById(rulesId)
+      expect(rules).toHaveClass('password-rules')
+    })
+
+    it('Checkbox keeps the caller describedby together with its error id', () => {
+      render(
+        <>
+          <p id="terms-note">Read the terms first.</p>
+          <Checkbox label="I agree" aria-describedby="terms-note" error="You must accept the terms" />
+        </>,
+      )
+
+      const box = screen.getByRole('checkbox', { name: 'I agree' })
+      const ids = (box.getAttribute('aria-describedby') ?? '').split(' ')
+      expect(ids).toContain('terms-note')
+      expect(ids).toHaveLength(2)
+      expect(box).toHaveAccessibleDescription('You must accept the terms Read the terms first.')
+    })
   })
 })

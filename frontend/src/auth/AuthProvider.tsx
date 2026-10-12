@@ -17,10 +17,17 @@ interface AuthState {
   status: AuthStatus
   user: UserProfile | null
   sessionExpired: boolean
+  signedOutElsewhere: boolean
   loadError: unknown
 }
 
-const ANONYMOUS: AuthState = { status: 'anonymous', user: null, sessionExpired: false, loadError: null }
+const ANONYMOUS: AuthState = {
+  status: 'anonymous',
+  user: null,
+  sessionExpired: false,
+  signedOutElsewhere: false,
+  loadError: null,
+}
 
 /**
  * True when a failed GET /users/me means the session is over. The API client already tried a
@@ -50,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const user = await authApi.me()
       if (isCurrent()) {
-        setState({ status: 'authenticated', user, sessionExpired: false, loadError: null })
+        setState({ status: 'authenticated', user, sessionExpired: false, signedOutElsewhere: false, loadError: null })
       }
       return user
     } catch (error) {
@@ -101,9 +108,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
       tokenStorage.markExternalSessionChange()
+      // One account per browser: a login or logout in another tab also ends the session that
+      // this tab keeps for itself without "Remember me".
+      tokenStorage.endTabSession()
       if (!tokenStorage.hasSession()) {
         loadCounter.current += 1
-        setState(ANONYMOUS)
+        // Tell a signed in user why the session ended; a tab that was already anonymous stays quiet.
+        setState((previous) => ({ ...ANONYMOUS, signedOutElsewhere: previous.status === 'authenticated' }))
         return
       }
       void loadProfile()
@@ -117,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokenStorage.startSession(tokens, { persistent })
     try {
       const user = await authApi.me()
-      setState({ status: 'authenticated', user, sessionExpired: false, loadError: null })
+      setState({ status: 'authenticated', user, sessionExpired: false, signedOutElsewhere: false, loadError: null })
       return user
     } catch (error) {
       tokenStorage.clear()
@@ -172,6 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: state.user,
       role: roleOf(state.user),
       sessionExpired: state.sessionExpired,
+      signedOutElsewhere: state.signedOutElsewhere,
       loadError: state.loadError,
       login,
       register,

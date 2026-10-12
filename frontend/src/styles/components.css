@@ -385,7 +385,7 @@
   color: var(--color-warning);
 }
 
-.password-rules__strength--strong {
+.password-rules__strength--valid {
   color: var(--color-success);
 }
 

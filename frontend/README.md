@@ -31,6 +31,24 @@ Stop-Process -Id <OwningProcess>
 
 If you really need another port, run `npm run dev -- --port 5174` and add `http://localhost:5174` to `CORS_ALLOWED_ORIGINS` in `backend/.env`, then restart the backend.
 
+### Environment variables (`frontend/.env`, git-ignored)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `VITE_API_BASE_URL` | `http://localhost:8080/api/v1` | Base URL of the API, including `/api/v1` |
+| `VITE_SHOW_SAMPLE_ACCOUNT` | off | Shows the sample account box on the Log in screen only when it is exactly `true` |
+| `VITE_SAMPLE_ACCOUNT_EMAIL` | empty | Email shown in that box |
+| `VITE_SAMPLE_ACCOUNT_PASSWORD` | empty | Password shown in that box |
+
+The box stays hidden when the flag is not `true` or either value is empty. Use a throwaway demo member account for the box, never staff credentials, and never commit real values. Vite reads `.env` only when the dev server starts, so restart `npm run dev` after a change. Example in PowerShell:
+
+```powershell
+cd frontend
+Copy-Item .env.example .env
+notepad .env   # set VITE_SHOW_SAMPLE_ACCOUNT=true and the two values, then save
+npm run dev
+```
+
 | Command | What it does |
 |---|---|
 | `npm run dev` | Dev server with hot reload |
@@ -48,7 +66,7 @@ src/
   api/          client.ts (fetch wrapper, token refresh), authApi.ts, errors.ts (ApiError), types.ts, page.ts
   auth/         AuthProvider, useAuth, RequireAuth, RequireRole, roles.ts (role labels and home paths)
   components/   Brand.tsx and ui/ (shared UI kit, import from components/ui)
-  config/       env.ts (VITE_API_BASE_URL)
+  config/       env.ts (VITE_API_BASE_URL, sampleAccount())
   layouts/      PublicLayout, MemberLayout (top nav), StaffLayout (side nav), navigation.ts (menus)
   pages/        public/ (log in, sign up, 403, 404), dev/ComponentDemoPage (/ui-kit), PlaceholderPage
   routes/       AppRoutes.tsx
@@ -85,7 +103,14 @@ await login({ email, password }, { remember: true }) // remember: false keeps th
 await register({ fullName, email, password, phone })  // creates a MEMBER and signs in (remembered)
 ```
 
-"Remember me" (FE-01): a remembered session is stored in localStorage (shared by all tabs, kept after the browser is closed); a session that is not remembered is stored in sessionStorage (this tab only, ends when the tab is closed). `tokenStorage.startSession(tokens)` without options keeps the FE-00 behaviour (remembered).
+"Remember me" (FE-01). Rule: one account per browser.
+
+- Remember me ticked (and every sign up): the tokens go to localStorage. All tabs share them and they survive a browser restart.
+- Remember me not ticked: the tokens go to the sessionStorage of the tab that logged in. They end when that tab is closed. Chrome and Edge with "Continue where you left off" restore sessionStorage when the browser reopens its tabs, so close the tab, not only the browser, to end such a session.
+- A new login (with or without Remember me) and a logout always clear both areas of that tab, including the shared localStorage. Another tab that was signed in with a remembered session therefore loses it: it becomes anonymous and its login page shows "You were signed out because another account signed in or out in this browser." A logout in the same tab never shows that notice.
+- A tab that holds its own session without Remember me also drops it when it sees another tab log in or out (`tokenStorage.endTabSession()`, called from the storage listener in `AuthProvider`).
+- Limitation: a login without Remember me writes nothing to localStorage when it is already empty, so a second tab that also logged in without Remember me gets no event and keeps its own account.
+- `tokenStorage.startSession(tokens)` without options keeps the FE-00 behaviour (remembered). `useAuth().signedOutElsewhere` is true after such a sign out.
 
 `status` is one of:
 

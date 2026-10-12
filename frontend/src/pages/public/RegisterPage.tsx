@@ -1,12 +1,15 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useId, useRef, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { ApiError, getErrorMessage } from '../../api/errors'
+import { ApiError, getErrorMessage, splitFieldErrors } from '../../api/errors'
 import { AccountCreatedError } from '../../auth/authContext'
-import { checkPassword, passwordStrength } from '../../auth/passwordRules'
+import { checkPassword, passwordProgress } from '../../auth/passwordRules'
 import {
   EMAIL_MAX_LENGTH,
+  EMAIL_TAKEN_MESSAGE,
   EMPTY_REGISTER_FORM,
   FULL_NAME_MAX_LENGTH,
+  nextConfirmPasswordError,
+  REGISTER_FIELDS,
   toRegisterRequest,
   validateRegister,
   type RegisterForm,
@@ -17,39 +20,51 @@ import { Button } from '../../components/ui/Button'
 import { Checkbox } from '../../components/ui/Checkbox'
 import { Input } from '../../components/ui/Input'
 import { PasswordInput } from '../../components/ui/PasswordInput'
-import { focusFirstInvalid } from '../../utils/focus'
+import { useFocusFirstInvalid } from '../../utils/useFocusFirstInvalid'
 import { AuthShell } from './AuthShell'
 import type { LoginPrefillState } from './LoginPage'
 
-const STRENGTH_LABELS = { empty: '', weak: 'Weak', fair: 'Fair', strong: 'Strong' } as const
+const PROGRESS_LABELS = {
+  empty: '',
+  weak: 'Password strength: Weak',
+  fair: 'Password strength: Fair',
+  valid: 'Meets requirements',
+} as const
 
 /** Field names of the form. Backend validation keys use the same names. */
 type FieldName = keyof RegisterForm
 
 /**
- * Maps a failed POST /auth/register to messages: 409 (email already registered) goes under the
- * email field, 400 validation details go under their fields, anything else is shown above the form.
+ * Maps a failed POST /auth/register to messages:
+ * - 409 "Email is already registered" goes under the Email field;
+ * - any other 409 (for example a database conflict) goes above the form;
+ * - 400 validation details go under their field, and details for a key that has no input on this
+ *   form go above it, so no message is lost;
+ * - anything else goes above the form.
  */
 function registerErrors(error: unknown): { fields: Record<string, string>; form: string | null } {
   if (error instanceof ApiError) {
     if (error.status === 409) {
-      return { fields: { email: error.message }, form: null }
+      return error.message === EMAIL_TAKEN_MESSAGE
+        ? { fields: { email: error.message }, form: null }
+        : { fields: {}, form: error.message }
     }
     if (error.hasFieldErrors) {
-      return { fields: error.fieldErrors, form: null }
+      const { fields, formMessage } = splitFieldErrors(error.fieldErrors, REGISTER_FIELDS)
+      return { fields, form: formMessage }
     }
   }
   return { fields: {}, form: getErrorMessage(error) }
 }
 
-function PasswordRules({ password }: { password: string }) {
+function PasswordRules({ id, password }: { id: string; password: string }) {
   const rules = checkPassword(password)
-  const strength = passwordStrength(password)
+  const progress = passwordProgress(password)
   return (
-    <div className="password-rules" id="password-rules">
-      {strength !== 'empty' && (
-        <p className={`password-rules__strength password-rules__strength--${strength}`} aria-live="polite">
-          Password strength: {STRENGTH_LABELS[strength]}
+    <div className="password-rules" id={id}>
+      {progress !== 'empty' && (
+        <p className={`password-rules__strength password-rules__strength--${progress}`} aria-live="polite">
+          {PROGRESS_LABELS[progress]}
         </p>
       )}
       <ul className="password-rules__list">
@@ -73,12 +88,14 @@ function PasswordRules({ password }: { password: string }) {
 export function RegisterPage() {
   const { status, user, register } = useAuth()
   const navigate = useNavigate()
+  const rulesId = useId()
 
   const [form, setForm] = useState<RegisterForm>(EMPTY_REGISTER_FORM)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const formRef = useRef<HTMLFormElement>(null)
+  const focusFirstInvalid = useFocusFirstInvalid(formRef)
   const sendingRef = useRef(false)
 
   if (status === 'authenticated' && user && !submitting) {
@@ -86,14 +103,22 @@ export function RegisterPage() {
   }
 
   const update = <K extends FieldName>(field: K, value: RegisterForm[K]) => {
-    setForm((current) => ({ ...current, [field]: value }))
+    const next = { ...form, [field]: value }
+    setForm(next)
     setFieldErrors((current) => {
-      if (!current[field]) {
-        return current
+      const errors = { ...current }
+      delete errors[field]
+      // Password and Confirm password depend on each other: a mismatch message that is already
+      // shown follows both fields, so fixing either one clears it.
+      if (field === 'password' || field === 'confirmPassword') {
+        const confirmError = nextConfirmPasswordError(next, current.confirmPassword)
+        if (confirmError) {
+          errors.confirmPassword = confirmError
+        } else {
+          delete errors.confirmPassword
+        }
       }
-      const next = { ...current }
-      delete next[field]
-      return next
+      return errors
     })
   }
 
@@ -106,7 +131,7 @@ export function RegisterPage() {
     const clientErrors = validateRegister(form)
     setFieldErrors(clientErrors)
     if (Object.keys(clientErrors).length > 0) {
-      focusFirstInvalid(formRef.current)
+      focusFirstInvalid()
       return
     }
     sendingRef.current = true
@@ -124,7 +149,7 @@ export function RegisterPage() {
       setFieldErrors(fields)
       setFormError(message)
       if (Object.keys(fields).length > 0) {
-        focusFirstInvalid(formRef.current)
+        focusFirstInvalid()
       }
       sendingRef.current = false
       setSubmitting(false)
@@ -187,10 +212,10 @@ export function RegisterPage() {
               value={form.password}
               onChange={(event) => update('password', event.target.value)}
               error={fieldErrors.password}
-              aria-describedby="password-rules"
+              aria-describedby={rulesId}
               required
             />
-            <PasswordRules password={form.password} />
+            <PasswordRules id={rulesId} password={form.password} />
           </div>
           <PasswordInput
             label="Confirm password"

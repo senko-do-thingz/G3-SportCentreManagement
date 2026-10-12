@@ -1,6 +1,6 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { ApiError, getErrorMessage } from '../../api/errors'
+import { ApiError, getErrorMessage, splitFieldErrors } from '../../api/errors'
 import type { LoginRedirectState } from '../../auth/RequireAuth'
 import { validateLogin } from '../../auth/loginValidation'
 import { homePathFor, postLoginPath } from '../../auth/roles'
@@ -9,7 +9,8 @@ import { Button } from '../../components/ui/Button'
 import { Checkbox } from '../../components/ui/Checkbox'
 import { Input } from '../../components/ui/Input'
 import { PasswordInput } from '../../components/ui/PasswordInput'
-import { focusFirstInvalid } from '../../utils/focus'
+import { sampleAccount } from '../../config/env'
+import { useFocusFirstInvalid } from '../../utils/useFocusFirstInvalid'
 import { AuthShell } from './AuthShell'
 
 /** Shown for HTTP 403 from POST /auth/login (DisabledException or LockedException on the backend). */
@@ -22,14 +23,20 @@ export const INVALID_CREDENTIALS_MESSAGE = 'Invalid email or password. Please tr
 export const FORGOT_PASSWORD_MESSAGE =
   'Online password reset is not available yet. Please ask the front desk to reset your password.'
 
-/** Seeded by migration V4. Shown only in development builds, like the sample account box in Figma. */
-const DEMO_ACCOUNT_HINT = 'Sample account: manager@sportify.com - password'
+/** Shown when another tab of this browser logged in or out and this tab lost its session. */
+export const SIGNED_OUT_ELSEWHERE_MESSAGE =
+  'You were signed out because another account signed in or out in this browser.'
+
+/** Inputs rendered by this form; backend validation keys outside this list go above the form. */
+const LOGIN_FIELDS = ['email', 'password'] as const
 
 /** State passed by the sign up page when the account exists but the automatic sign in failed. */
 export interface LoginPrefillState {
   email?: string
   notice?: string
 }
+
+type LoginLocationState = (LoginRedirectState & LoginPrefillState) | null
 
 function loginErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -45,22 +52,35 @@ function loginErrorMessage(error: unknown): string {
 
 /** Log in screen (Figma F1-05). */
 export function LoginPage() {
-  const { status, user, login, sessionExpired } = useAuth()
+  const { status, user, login, sessionExpired, signedOutElsewhere } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const locationState = location.state as (LoginRedirectState & LoginPrefillState) | null
-  const requestedPath = locationState?.from ?? null
+  // History state is read once and kept here; the effect below removes the prefill values from
+  // the history entry so a reload does not show the notice again.
+  const [initialState] = useState(() => location.state as LoginLocationState)
+  const requestedPath = initialState?.from ?? null
 
-  const [email, setEmail] = useState(locationState?.email ?? '')
+  const [email, setEmail] = useState(initialState?.email ?? '')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
-  const [infoMessage, setInfoMessage] = useState<string | null>(locationState?.notice ?? null)
+  const [infoMessage, setInfoMessage] = useState<string | null>(initialState?.notice ?? null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const formRef = useRef<HTMLFormElement>(null)
+  const focusFirstInvalid = useFocusFirstInvalid(formRef)
   // Guards against a second submit before React has re-rendered the disabled button.
   const sendingRef = useRef(false)
+  const sample = sampleAccount()
+
+  useEffect(() => {
+    if (initialState?.email !== undefined || initialState?.notice !== undefined) {
+      // Keep only the page that asked for the login, which is still needed after the redirect.
+      const remaining: LoginRedirectState | null = initialState.from ? { from: initialState.from } : null
+      navigate(location.pathname, { replace: true, state: remaining })
+    }
+    // initialState is fixed for the life of the page and the path stays /login, so this runs once.
+  }, [initialState, location.pathname, navigate])
 
   const clearFieldError = (field: string) => {
     setFieldErrors((current) => {
@@ -86,7 +106,7 @@ export function LoginPage() {
     const clientErrors = validateLogin(email, password)
     setFieldErrors(clientErrors)
     if (Object.keys(clientErrors).length > 0) {
-      focusFirstInvalid(formRef.current)
+      focusFirstInvalid()
       return
     }
     sendingRef.current = true
@@ -96,9 +116,12 @@ export function LoginPage() {
       navigate(postLoginPath(signedIn, requestedPath), { replace: true })
     } catch (error) {
       if (error instanceof ApiError && error.hasFieldErrors) {
-        // Backend validation messages take precedence over the client side checks.
-        setFieldErrors(error.fieldErrors)
-        focusFirstInvalid(formRef.current)
+        // Backend validation messages take precedence over the client side checks. Keys without
+        // an input on this form are shown above it instead of being lost.
+        const { fields, formMessage } = splitFieldErrors(error.fieldErrors, LOGIN_FIELDS)
+        setFieldErrors(fields)
+        setFormError(formMessage)
+        focusFirstInvalid()
       } else {
         setFormError(loginErrorMessage(error))
       }
@@ -109,11 +132,20 @@ export function LoginPage() {
 
   return (
     <AuthShell title="Welcome back" subtitle="Log in to manage your training.">
-      {import.meta.env.DEV && <p className="notice notice--info auth-sample">{DEMO_ACCOUNT_HINT}</p>}
+      {sample && (
+        <p className="notice notice--info auth-sample">
+          Sample account: {sample.email} - {sample.password}
+        </p>
+      )}
 
       {sessionExpired && !formError && (
         <p className="notice notice--warning" role="status">
           Your session has expired. Please log in again.
+        </p>
+      )}
+      {signedOutElsewhere && !sessionExpired && !formError && (
+        <p className="notice notice--warning" role="status">
+          {SIGNED_OUT_ELSEWHERE_MESSAGE}
         </p>
       )}
       {infoMessage && !formError && (

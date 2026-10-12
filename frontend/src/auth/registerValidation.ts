@@ -21,6 +21,13 @@ export const EMPTY_REGISTER_FORM: RegisterForm = {
   acceptTerms: false,
 }
 
+/**
+ * Message of the 409 that AuthenticationServiceImpl.register throws for an existing email. Only
+ * this 409 belongs under the Email field; any other 409 (for example "The request conflicts with
+ * existing data" from DataIntegrityViolationException) is shown above the form.
+ */
+export const EMAIL_TAKEN_MESSAGE = 'Email is already registered'
+
 /** Same pattern as RegisterRequest.phone on the backend: 8 to 15 digits with an optional leading +. */
 export const PHONE_PATTERN = /^\+?\d{8,15}$/
 export const FULL_NAME_MAX_LENGTH = 100
@@ -33,6 +40,12 @@ export const EMAIL_MAX_LENGTH = 255
 export function normalizePhone(phone: string): string {
   return phone.replace(/[\s.\-()]/g, '')
 }
+
+/** Inputs rendered by the sign up form; backend validation keys outside this list go above the form. */
+export const REGISTER_FIELDS = ['fullName', 'phone', 'email', 'password', 'confirmPassword', 'acceptTerms'] as const
+
+export const PASSWORDS_DO_NOT_MATCH = 'Passwords do not match'
+export const CONFIRM_PASSWORD_REQUIRED = 'Please confirm your password'
 
 /**
  * Client side checks run before POST /auth/register. Messages match the backend validation
@@ -73,9 +86,9 @@ export function validateRegister(form: RegisterForm): Record<string, string> {
   }
 
   if (!form.confirmPassword) {
-    errors.confirmPassword = 'Please confirm your password'
+    errors.confirmPassword = CONFIRM_PASSWORD_REQUIRED
   } else if (form.confirmPassword !== form.password) {
-    errors.confirmPassword = 'Passwords do not match'
+    errors.confirmPassword = PASSWORDS_DO_NOT_MATCH
   }
 
   if (!form.acceptTerms) {
@@ -93,4 +106,22 @@ export function toRegisterRequest(form: RegisterForm): RegisterRequest {
     password: form.password,
     phone: normalizePhone(form.phone),
   }
+}
+
+/**
+ * New Confirm password error after the user edited Password or Confirm password, given the error
+ * already on screen. Nothing is added while the user is still typing for the first time; an error
+ * that is shown is cleared as soon as the two values match and otherwise kept up to date.
+ */
+export function nextConfirmPasswordError(
+  form: Pick<RegisterForm, 'password' | 'confirmPassword'>,
+  shownError: string | undefined,
+): string | undefined {
+  if (!shownError) {
+    return undefined
+  }
+  if (!form.confirmPassword) {
+    return CONFIRM_PASSWORD_REQUIRED
+  }
+  return form.confirmPassword === form.password ? undefined : PASSWORDS_DO_NOT_MATCH
 }
