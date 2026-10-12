@@ -2,7 +2,14 @@
 
 ## 2026-10-12 - Pending Payments for Online Requests and Payment Summary (BE-17, Flow 3)
 
-Branch `feat/f3-pending-payments`. Status: Implemented and hardened after Round 3 Code Review. Verified locally with `mvn -B -ntp test "-Dtest=!*IntegrationTest" "-Dsurefire.failIfNoSpecifiedTests=false"` (501 tests run, 0 failures, 0 errors, 4 skipped requiring Docker: FlywayMigrationTest, PermissionRepositoryTest, RoleRepositoryTest, UserAccountRepositoryTest). Integration tests verified in CI via GitHub Actions: run 38289687826 (https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/38289687826), head SHA `c1d828f24f5fb934c45f8745c2ccb60000300fec`, conclusion success (593 tests run, 0 failures, 0 errors, 0 skipped).
+Branch `feat/f3-pending-payments`. Status: Implemented and hardened after Round 4 Code Review. Verified locally with `mvn -B -ntp test "-Dtest=!*IntegrationTest" "-Dsurefire.failIfNoSpecifiedTests=false"` (504 tests run, 0 failures, 0 errors, 4 skipped via `@Testcontainers(disabledWithoutDocker = true)`: FlywayMigrationTest, PermissionRepositoryTest, RoleRepositoryTest, UserAccountRepositoryTest). Integration tests verified in CI via GitHub Actions.
+
+### Review Fixes & Hardening (Round 4)
+- Blocker 1 Configuration Restore: Restored the base configuration in `backend/.env.example` from `origin/main` (retaining `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `CORS_ALLOWED_ORIGINS`) and appended unquoted `SPORTIFY_PAYMENT_*` properties with comments explaining they are required for non-dev profiles. Extended `CorsPropertiesConfigTest` with `envExample_shouldContainAllRequiredKeysAndNoDoubleQuotes`.
+- Major 6 Lifecycle Fallbacks: Restored `@PrePersist` and `@PreUpdate` callbacks on `Payment.java` as a safety net fallback populating timestamps when null and refreshing `updatedAt` on update, while services continue setting deterministic timestamps via `Clock`. Reverted manual builder lines in `PaymentRepositoryIntegrationTest` and updated `PaymentEntityMappingTest.testLifecycleDefaults`.
+- Minor 7 Activation Validation: Updated `activateCard` and `activateRegistration` to throw `BusinessRuleException` (400) if `actualMethod` is specified but no payment is linked to the entity. Added unit tests for both cases.
+- Minor 8 Role Lookup Fail-Fast: Updated `optimisticLockConflict_ThrowsObjectOptimisticLockingFailureException` and helper in `PaymentPendingIntegrationTest` to fail fast via `orElseThrow` if the seeded `MEMBER` role is missing, avoiding test fixture role table mutations.
+- Documentation Accuracy: Corrected claims regarding skipped tests to cite `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest`, clarified `docs/ci-cd.md` resides on branch `chore/ci-cd-pipeline`, and marked Section 3 of the audit log as historical.
 
 ### Review Fixes & Hardening (Round 3)
 - B1 Card Plan & Upgrade Rule Reversion: Reverted upgrade check in `MembershipCardServiceImpl.planCard` to `tier.getPrice().compareTo(current.getTier().getPrice()) > 0`. Purchasing an equal-price tier now starts the day after the current card ends, priced at full tier price, without replacing the active card. Added unit tests for both online and desk equal-tier switches.
@@ -18,7 +25,7 @@ Branch `feat/f3-pending-payments`. Status: Implemented and hardened after Round 
 - M4 Data Masking: Actors in notes and cancelReason recorded by user ID only (e.g. "staff user id 12") instead of full names. Masked internal `notes` to null for non-staff in `PaymentResponse`. Set default item description to `"Payment " + paymentCode` instead of internal notes. Added MockMvc tests verifying member receives null notes while staff receives notes.
 - M5 Service Hardening: Added `@Transactional(propagation = Propagation.MANDATORY)` on `markPaymentSuccess` and `markPaymentFailed`. Enforced validation rejecting null payment IDs and non-PENDING payments with `BusinessRuleException`. `markPaymentFailed` appends failure reason instead of overwriting notes. `truncateNotes` protects against surrogate pair splitting.
 - M6 Role Consistency: Removed unseeded `ADMIN` role from `SecurityUtils.isStaff` and all `@PreAuthorize` annotations added by this PR. Replaced hardcoded role string equality in services with `SecurityUtils.isMember` and `SecurityUtils.isStaff`.
-- M7 Configuration Documentation: Created `backend/.env.example` documenting `SPORTIFY_PAYMENT_*` variables and `CORS_ALLOWED_ORIGINS`. Removed redundant `SPORTIFY_*` keys from `application-test.yml`.
+- M7 Configuration Documentation: Extended the existing `backend/.env.example` (restored base configuration from origin/main and appended `SPORTIFY_PAYMENT_*` bank transfer properties without double quotes). Removed redundant `SPORTIFY_*` keys from `application-test.yml`.
 - Minor: Removed unused `createPendingPayment(UserAccount, ...)` overload. In `createRegistration`, moved `paidAmount <= 0` guard before sequence increment. Validated actor is non-null in `getPayment` and `updatePaymentMethod`.
 
 ### Open Questions
@@ -27,11 +34,12 @@ Branch `feat/f3-pending-payments`. Status: Implemented and hardened after Round 
 - Semantics of `FAILED` for user cancellation: Consider dedicated `CANCELLED` status.
 - Architectural layering: `SecurityUtils` in `core.common` depending on `identity.entity.UserAccount`.
 - Single time source for other domain entities (`Invoice`, `InvoiceLine`, `MemberCard`) using `Clock`.
+- Module coupling: `catalog.dto.ActivatePaymentRequest` depending on `payment.entity.PaymentMethod`.
 
 ### Docs and Test Artifacts
 - `docs/tests/BE-17_test_cases.md`: Complete test specifications and traceability matrix.
 - `docs/audit/BE-17_AI_Audit_Log.docx`: AI Audit Log document synchronized with markdown copy.
-- `docs/audit/BE-17_AI_Audit_Log.md`: Markdown copy of the AI Audit Log including Section 10 resolution.
+- `docs/audit/BE-17_AI_Audit_Log.md`: Markdown copy of the AI Audit Log including Section 12 resolution.
 
 ## 2026-10-12 - Log in and Sign up screens (FE-01, Flow 1)
 

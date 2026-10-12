@@ -509,11 +509,7 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
         TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
 
         Role memberRole = txTemplate.execute(status -> roleRepository.findByCode("MEMBER")
-                .orElseGet(() -> roleRepository.saveAndFlush(Role.builder()
-                        .code("MEMBER")
-                        .name("Member")
-                        .isSystem(true)
-                        .build())));
+                .orElseThrow(() -> new IllegalStateException("Required seeded role MEMBER not found")));
 
         Long memberId = txTemplate.execute(status -> {
             UserAccount user = userRepository.saveAndFlush(UserAccount.builder()
@@ -657,11 +653,7 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
         }
 
         Role memberRole = roleRepository.findByCode("MEMBER")
-                .orElseGet(() -> roleRepository.saveAndFlush(Role.builder()
-                        .code("MEMBER")
-                        .name("Member")
-                        .isSystem(true)
-                        .build()));
+                .orElseThrow(() -> new IllegalStateException("Required seeded role MEMBER not found"));
 
         UserAccount user = userRepository.saveAndFlush(UserAccount.builder()
                 .email("it-member-" + System.nanoTime() + "@sportify.com")

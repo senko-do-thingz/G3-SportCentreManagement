@@ -138,6 +138,9 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             throw new BusinessRuleException("Cannot activate membership card with status: " + card.getStatus()
                     + ". Only PENDING_PAYMENT cards can be activated.");
         }
+        if (actualMethod != null && card.getPayment() == null) {
+            throw new BusinessRuleException("Cannot specify payment method for a card with no linked payment");
+        }
 
         LocalDate today = LocalDate.now(clock);
         CardPlan plan = planCard(card.getMember().getId(), card.getTier(), today);

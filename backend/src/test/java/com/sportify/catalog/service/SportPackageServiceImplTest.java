@@ -708,4 +708,22 @@ public class SportPackageServiceImplTest {
 
         assertThrows(BusinessRuleException.class, () -> sportPackageService.cancelRegistration(90L, memberUser));
     }
+
+    @Test
+    void activateRegistration_WithActualMethod_WhenNoPaymentLinked_ThrowsBusinessRuleException() {
+        SportPackageRegistration reg = SportPackageRegistration.builder()
+                .id(91L)
+                .member(memberProfile)
+                .sportPackage(sportPackage)
+                .status(PackageRegistrationStatus.PENDING_PAYMENT)
+                .payment(null)
+                .startDate(LocalDate.now())
+                .endDate(LocalDate.now().plusDays(30))
+                .build();
+
+        when(registrationRepository.findById(91L)).thenReturn(Optional.of(reg));
+
+        assertThrows(BusinessRuleException.class,
+                () -> sportPackageService.activateRegistration(91L, receptionistUser, PaymentMethod.CASH));
+    }
 }

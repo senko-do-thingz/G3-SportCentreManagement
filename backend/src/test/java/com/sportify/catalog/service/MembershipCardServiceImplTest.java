@@ -683,5 +683,22 @@ public class MembershipCardServiceImplTest {
         assertEquals(CardStatus.CANCELLED, res.getStatus());
         verify(paymentService).markPaymentFailed(eq(99L), org.mockito.ArgumentMatchers.contains("staff user id 200"));
     }
+
+    @Test
+    void activateCard_WithActualMethod_WhenNoPaymentLinked_ThrowsBusinessRuleException() {
+        MemberCard pending = MemberCard.builder()
+                .id(42L)
+                .cardCode("CARD-42")
+                .member(memberProfile)
+                .tier(goldTier)
+                .status(CardStatus.PENDING_PAYMENT)
+                .payment(null)
+                .pricePaid(goldTier.getPrice())
+                .build();
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+
+        assertThrows(BusinessRuleException.class,
+                () -> membershipCardService.activateCard(42L, receptionistUser, PaymentMethod.CASH));
+    }
 }
 

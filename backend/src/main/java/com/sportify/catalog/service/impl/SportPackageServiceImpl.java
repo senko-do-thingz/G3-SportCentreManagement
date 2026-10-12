@@ -215,6 +215,9 @@ public class SportPackageServiceImpl implements SportPackageService {
         if (registration.getStatus() != PackageRegistrationStatus.PENDING_PAYMENT) {
             throw new BusinessRuleException("Cannot activate package registration with status: " + registration.getStatus() + ". Only PENDING_PAYMENT registrations can be activated.");
         }
+        if (actualMethod != null && registration.getPayment() == null) {
+            throw new BusinessRuleException("Cannot specify payment method for a registration with no linked payment");
+        }
 
         LocalDate today = LocalDate.now(clock);
         if (registration.getStartDate().isBefore(today)) {

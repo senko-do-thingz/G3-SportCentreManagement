@@ -288,14 +288,25 @@ class PaymentEntityMappingTest {
     @Test
     @DisplayName("Lifecycle methods should initialize defaults properly")
     void testLifecycleDefaults() {
-        Payment payment = Payment.builder()
-                .paymentTime(null)
-                .createdAt(LocalDateTime.of(2026, 10, 12, 10, 0, 0))
-                .updatedAt(LocalDateTime.of(2026, 10, 12, 10, 0, 0))
-                .build();
+        Payment payment = Payment.builder().build();
+        assertThat(payment.getCreatedAt()).isNull();
+        assertThat(payment.getUpdatedAt()).isNull();
         assertThat(payment.getPaymentTime()).isNull();
+
+        payment.prePersist();
         assertThat(payment.getCreatedAt()).isNotNull();
         assertThat(payment.getUpdatedAt()).isNotNull();
+        assertThat(payment.getPaymentTime()).isNull();
+
+        LocalDateTime oldTime = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
+        payment.setUpdatedAt(oldTime);
+        payment.preUpdate();
+        assertThat(payment.getUpdatedAt()).isAfter(oldTime);
+
+        LocalDateTime serviceCreatedAt = LocalDateTime.of(2026, 10, 12, 10, 0, 0);
+        Payment paymentWithClock = Payment.builder().createdAt(serviceCreatedAt).build();
+        paymentWithClock.prePersist();
+        assertThat(paymentWithClock.getCreatedAt()).isEqualTo(serviceCreatedAt);
 
         Invoice invoice = Invoice.builder().build();
         invoice.prePersist();

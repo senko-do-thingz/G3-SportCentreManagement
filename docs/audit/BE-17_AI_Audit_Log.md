@@ -29,7 +29,7 @@ Workstream B (CI/CD pipeline architecture and workflows) is tracked independentl
 
 ---
 
-## 3. Discrepancy Analysis: Local Test Count (450) vs CI Test Count (535)
+## 3. Historical Discrepancy Analysis (Round 2): Local Test Count (450) vs CI Test Count (535)
 - **Observation**: Running `mvn test -Dtest='!*IntegrationTest'` locally yielded 450 tests run, 0 failures, 4 skipped. In contrast, CI executed 535 tests with 0 skipped.
 - **Root Cause**:
   1. `!*IntegrationTest` surefire filter excludes all classes whose name ends with `IntegrationTest`. There are 16 such test classes in the repository comprising 81 integration tests.
@@ -73,7 +73,7 @@ Workstream B (CI/CD pipeline architecture and workflows) is tracked independentl
 ---
 
 ## 6. Workstream B Reference
-All Workstream B deliverables (CI/CD workflows, Docker packaging, scripts, and quality gates) are maintained on branch `chore/ci-cd-pipeline` (see docs/ci-cd.md).
+All Workstream B deliverables (CI/CD workflows, Docker packaging, scripts, and quality gates) and their documentation (`docs/ci-cd.md`) are maintained on branch `chore/ci-cd-pipeline`.
 
 ---
 
@@ -83,6 +83,7 @@ All Workstream B deliverables (CI/CD workflows, Docker packaging, scripts, and q
 3. **Cancellation Status Semantics**: Currently, user cancellation sets payment status to `FAILED`. Using `FAILED` for user cancellation is semantically imprecise. Consider introducing a distinct `CANCELLED` status in `PaymentStatus` and associated database CHECK constraint.
 4. **Architectural Layering**: `SecurityUtils` in `com.sportify.core.common` depends on `UserAccount` in `com.sportify.identity.entity`. This creates an inversion where core utilities depend on an identity feature entity. Consider decoupling by passing role code strings or introducing a core identity interface.
 5. **Single Time Source for Remaining Entities**: While `Payment` now strictly uses the injected `Clock` bean for `createdAt`, `updatedAt`, and `paymentTime`, other entities (`Invoice`, `InvoiceLine`, `MemberCard`) still invoke `LocalDateTime.now()` directly in `@PrePersist`. Consider unifying Spring Data JPA Auditing across all entities via a Clock-backed `DateTimeProvider`.
+6. **DTO / Entity Module Coupling**: `ActivatePaymentRequest` in `com.sportify.catalog.dto` depends on `PaymentMethod` in `com.sportify.payment.entity`. This couples a catalog DTO directly to an entity enum in the payment module. Consider decoupling catalog request DTOs from payment entity enums via a shared API type or string representation.
 
 ---
 
@@ -90,7 +91,7 @@ All Workstream B deliverables (CI/CD workflows, Docker packaging, scripts, and q
 - **Local Unit Test Execution**:
   - Command: `mvn -B -ntp test "-Dtest=!*IntegrationTest" "-Dsurefire.failIfNoSpecifiedTests=false"`
   - Output: Tests run: 501, Failures: 0, Errors: 0, Skipped: 4. BUILD SUCCESS.
-  - Skipped tests explanation: 4 tests (`FlywayMigrationTest`, `PermissionRepositoryTest`, `RoleRepositoryTest`, `UserAccountRepositoryTest`) annotated with `@Disabled` because they require real database containers (Testcontainers) which run in CI.
+  - Skipped tests explanation: 4 tests (`FlywayMigrationTest`, `PermissionRepositoryTest`, `RoleRepositoryTest`, `UserAccountRepositoryTest`) extend `AbstractIntegrationTest` which is annotated with `@Testcontainers(disabledWithoutDocker = true)`. Because Docker is not running in the local environment, Testcontainers automatically skips them. They run and are verified in CI via GitHub Actions.
 
 ---
 
@@ -127,7 +128,7 @@ All Workstream B deliverables (CI/CD workflows, Docker packaging, scripts, and q
 | **M4** | FIXED | `PaymentServiceImpl.java:108-115, 145-155, 230-245` (notes format `"staff user id " + id`, masked notes to null for non-staff in `mapToResponse`, default item summary does not leak notes) | `getPayment_AsMember_HidesInternalNotes`, `getPayment_AsStaff_ShowsInternalNotes` in `PaymentControllerTest.java` |
 | **M5** | FIXED | `PaymentService.java:30-45` (`@Transactional(propagation = Propagation.MANDATORY)`), `PaymentServiceImpl.java:90-105, 130-155` (null ID validation, non-PENDING validation, `appendNote` for failed notes, surrogate pair check in `truncateNotes`) | `markPaymentSuccess_WithNullPaymentId_ThrowsBusinessRuleException`, `markPaymentSuccess_WhenPaymentNotPending_ThrowsBusinessRuleException`, `markPaymentFailed_WithNullPaymentId_ThrowsBusinessRuleException`, `markPaymentFailed_WhenPaymentNotPending_ThrowsBusinessRuleException`, `markPaymentFailed_AppendsNoteInsteadOfOverwriting`, `truncateNotes_DoesNotSplitSurrogatePair`, `PaymentServiceTransactionMandatoryTest` |
 | **M6** | FIXED | `SecurityUtils.java:15-32` (removed `ADMIN` from `isStaff`, added `isMember`), `MembershipCardServiceImpl.java:60-70`, `SportPackageServiceImpl.java:115-130`, `PaymentController.java`, `SportPackageController.java` | `SecurityUtilsTest.java` (proves `isStaff` false for `ADMIN`, true for `RECEPTIONIST`/`MANAGER`; proves `isMember` true for `MEMBER`) |
-| **M7** | FIXED | `backend/.env.example:1-25` (documented `SPORTIFY_PAYMENT_*` and `CORS_ALLOWED_ORIGINS`), `backend/src/test/resources/application-test.yml:15-20` (removed redundant `SPORTIFY_*`) | `CorsPropertiesConfigTest.envExample_shouldDocumentCorsAllowedOrigins`, `BankTransferPropertiesTest` |
+| **M7** | FIXED | Extended the existing `backend/.env.example` (restored base configuration from origin/main and appended `SPORTIFY_PAYMENT_*` bank transfer properties without double quotes), `backend/src/test/resources/application-test.yml:15-20` (removed redundant `SPORTIFY_*`) | `CorsPropertiesConfigTest.envExample_shouldContainAllRequiredKeysAndNoDoubleQuotes`, `BankTransferPropertiesTest` |
 | **M8** | FIXED | `docs/audit/BE-17_AI_Audit_Log.md` (metadata single branch, Workstream B single reference line) | Document structure audit |
 | **Minor** | FIXED | `PaymentService.java` & `PaymentServiceImpl.java` (removed dead `createPendingPayment(UserAccount, ...)`); `SportPackageServiceImpl.java:120` (moved amount guard before sequence sequence); `PaymentServiceImpl.java:35, 175` (null actor validation); `.docx` generated from `.md` | `createPendingPayment_UnusedOverloadRemoved`, `createRegistration_ZeroPaidAmount_DoesNotCallSequence`, `PaymentServiceImplTest.getPayment_NullActor_ThrowsIllegalArgumentException` |
 
@@ -135,10 +136,10 @@ All Workstream B deliverables (CI/CD workflows, Docker packaging, scripts, and q
 - **Command**: `mvn -B -ntp test "-Dtest=!*IntegrationTest" "-Dsurefire.failIfNoSpecifiedTests=false"`
 - **Result**: Tests run: 501, Failures: 0, Errors: 0, Skipped: 4. Build Success.
 - **Skipped Tests Detail**:
-  1. `com.sportify.FlywayMigrationTest`: Skipped (annotated `@Disabled` for local execution without Docker).
-  2. `com.sportify.identity.repository.PermissionRepositoryTest`: Skipped (annotated `@Disabled` for local execution without Docker).
-  3. `com.sportify.identity.repository.RoleRepositoryTest`: Skipped (annotated `@Disabled` for local execution without Docker).
-  4. `com.sportify.identity.repository.UserAccountRepositoryTest`: Skipped (annotated `@Disabled` for local execution without Docker).
+  1. `com.sportify.FlywayMigrationTest`: Skipped via `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` when Docker is unavailable.
+  2. `com.sportify.identity.repository.PermissionRepositoryTest`: Skipped via `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` when Docker is unavailable.
+  3. `com.sportify.identity.repository.RoleRepositoryTest`: Skipped via `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` when Docker is unavailable.
+  4. `com.sportify.identity.repository.UserAccountRepositoryTest`: Skipped via `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` when Docker is unavailable.
 - **All Integration Tests**: Fully compiled and ready for Docker execution in GitHub Actions CI (`PaymentPendingIntegrationTest`, `PaymentRepositoryIntegrationTest`, `PaymentDdlValidateIntegrationTest`).
 
 ### CI Evidence
@@ -147,3 +148,55 @@ All Workstream B deliverables (CI/CD workflows, Docker packaging, scripts, and q
 - **Head SHA**: `c1d828f24f5fb934c45f8745c2ccb60000300fec`
 - **Conclusion**: `success`
 - **Total Test Count**: Tests run: 593, Failures: 0, Errors: 0, Skipped: 0. Build Success.
+
+---
+
+## 11. Independent Code Review Round 4 (2026-10-13)
+- **Reviewer**: AI code reviewer (Antigravity), read-only review, no production code changed.
+- **Scope**: `git diff origin/main` at HEAD `28ed796` (46 files, 4139 insertions, 77 deletions).
+- **Verdict**: Request changes (small). Close to mergeable.
+- **Verified evidence**: GitHub Actions run `38290151720` (event `pull_request`, head `28ed796`) concluded `success`. Round 3 items B1, B2, B3, M1, M2, M3, M4, M5, M6 and M8 were verified in code.
+- **Blocker**: `backend/.env.example` existed on main and was overwritten, not created. The rewrite deleted `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` and `JWT_SECRET`, which have no defaults in `application.yml` and are used by `docker-compose.yml`. New values are wrapped in double quotes, but `.env` is imported as `.properties`, so the quotes become part of the value shown in bank transfer instructions.
+- **Inaccurate claims**: audit sections 8 and 10 state the 4 skipped tests are annotated `@Disabled`; no `@Disabled` exists in the repo, they are skipped by `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` (section 3 already says this). CHANGELOG and audit M7 say "Created backend/.env.example". `docs/ci-cd.md` is referenced but does not exist on this branch.
+- **Major**: `Payment` lifecycle callbacks were removed with no safety net; every future creator must set `createdAt` manually, `updatedAt` is not maintained outside `PaymentServiceImpl`, and `testLifecycleDefaults` is now an empty assertion.
+- **Minor**: catalog DTO depends on `payment.entity.PaymentMethod`; `actualMethod` silently ignored when no payment is linked; optimistic lock test may create a `MEMBER` role without cleanup; section 3 title should be marked historical.
+- **Full report**: `BE-17_code_review_round4.md` (review artifact).
+
+---
+
+## 12. Round 4 Review Resolution
+
+### Review Findings Resolution Matrix
+
+| Finding ID | Area | Status | Changed File & Line | Proving Test |
+|---|---|---|---|---|
+| **Blocker 1** | Configuration | FIXED | `backend/.env.example:1-17` (restored origin/main base and appended unquoted `SPORTIFY_PAYMENT_*`), `CorsPropertiesConfigTest.java:60-84` | `envExample_shouldContainAllRequiredKeysAndNoDoubleQuotes` in `CorsPropertiesConfigTest.java` |
+| **Doc 2** | Documentation | FIXED | `docs/audit/BE-17_AI_Audit_Log.md` (Sections 8, 10, 12) & `CHANGELOG.md` | Fixed claims: skipped tests use `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` (no disabled annotation in codebase) |
+| **Doc 3** | Documentation | FIXED | `docs/audit/BE-17_AI_Audit_Log.md` (Section 10 M7) & `CHANGELOG.md` | Clarified M7 as "Extended the existing backend/.env.example" with restored base |
+| **Doc 4** | Documentation | FIXED | `docs/audit/BE-17_AI_Audit_Log.md` (Section 6) | Clarified `docs/ci-cd.md` resides on branch `chore/ci-cd-pipeline` |
+| **Doc 5** | Documentation | FIXED | `docs/audit/BE-17_AI_Audit_Log.md` (Section 3) | Renamed title to mark Section 3 as historical Round 2 numbers |
+| **Major 6** | Safety Net | FIXED | `Payment.java:65-79` (restored `@PrePersist` and `@PreUpdate` callbacks), `PaymentEntityMappingTest.java:290-311`, reverted manual builder lines in `PaymentRepositoryIntegrationTest.java` | `testLifecycleDefaults` in `PaymentEntityMappingTest.java` (verifies prePersist fills timestamps when null, preserves Clock timestamps when set, and preUpdate refreshes updatedAt) |
+| **Minor 7** | Validation | FIXED | `MembershipCardServiceImpl.java:141-143`, `SportPackageServiceImpl.java:218-220` | `activateCard_WithActualMethod_WhenNoPaymentLinked_ThrowsBusinessRuleException` in `MembershipCardServiceImplTest.java`, `activateRegistration_WithActualMethod_WhenNoPaymentLinked_ThrowsBusinessRuleException` in `SportPackageServiceImplTest.java` |
+| **Minor 8** | Test Fixture | FIXED | `PaymentPendingIntegrationTest.java:511-512, 655-656` | `optimisticLockConflict_ThrowsObjectOptimisticLockingFailureException` (fails fast via `orElseThrow` without mutating roles table) |
+| **Minor 9** | Architecture | FIXED | `docs/audit/BE-17_AI_Audit_Log.md` (Section 7 item 6 & Section 12) & `CHANGELOG.md` | Logged open question on `ActivatePaymentRequest` depending on `PaymentMethod` entity enum |
+
+### Lifecycle Callback Choice Rationale (Major 6)
+Option (b) was chosen over Option (a):
+- Option (b) restores `@PrePersist` and `@PreUpdate` directly on `Payment` as a lightweight fallback that populates `createdAt` and `updatedAt` only when null, while allowing `PaymentServiceImpl` to maintain Clock-controlled deterministic timestamps without being overwritten.
+- Option (a) requires configuring Spring Data JPA Auditing infrastructure (`@EnableJpaAuditing`, `AuditingEntityListener`), which adds global persistence listener overhead and risks unintended interactions across test fixtures not designed for entity listener weaving.
+- Tests prove that `prePersist()` populates empty timestamps on unmanaged saves while preserving pre-set timestamps supplied by Clock beans.
+
+### Local Test Execution Evidence
+- **Command**: `mvn -B -ntp test "-Dtest=!*IntegrationTest" "-Dsurefire.failIfNoSpecifiedTests=false"`
+- **Result**: Tests run: 504, Failures: 0, Errors: 0, Skipped: 4. Build Success.
+- **Skipped Tests Detail**:
+  1. `com.sportify.FlywayMigrationTest`: Skipped via `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` when Docker is unavailable.
+  2. `com.sportify.identity.repository.PermissionRepositoryTest`: Skipped via `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` when Docker is unavailable.
+  3. `com.sportify.identity.repository.RoleRepositoryTest`: Skipped via `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` when Docker is unavailable.
+  4. `com.sportify.identity.repository.UserAccountRepositoryTest`: Skipped via `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` when Docker is unavailable.
+
+### CI Evidence
+- **Run ID**: To be recorded following Git commit and push to `origin feat/f3-pending-payments`.
+- **Head SHA**: To be recorded following Git commit.
+- **Conclusion**: To be verified via GitHub Actions run.
+
