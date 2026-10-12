@@ -125,3 +125,34 @@ export function nextConfirmPasswordError(
   }
   return form.confirmPassword === form.password ? undefined : PASSWORDS_DO_NOT_MATCH
 }
+
+/** Form values and the field errors on screen, kept in one state so they always change together. */
+export interface RegisterFormState {
+  form: RegisterForm
+  fieldErrors: Record<string, string>
+}
+
+/**
+ * Applies one edit to the sign up form. Used inside a functional state update, so it always starts
+ * from the latest values (two edits in the same event batch never overwrite each other). Clears
+ * the error of the edited field; when Password or Confirm password changes, recomputes the Confirm
+ * password error from the same next values (see nextConfirmPasswordError).
+ */
+export function applyFieldChange<K extends keyof RegisterForm>(
+  current: RegisterFormState,
+  field: K,
+  value: RegisterForm[K],
+): RegisterFormState {
+  const form = { ...current.form, [field]: value }
+  const fieldErrors = { ...current.fieldErrors }
+  delete fieldErrors[field]
+  if (field === 'password' || field === 'confirmPassword') {
+    const confirmError = nextConfirmPasswordError(form, current.fieldErrors.confirmPassword)
+    if (confirmError) {
+      fieldErrors.confirmPassword = confirmError
+    } else {
+      delete fieldErrors.confirmPassword
+    }
+  }
+  return { form, fieldErrors }
+}

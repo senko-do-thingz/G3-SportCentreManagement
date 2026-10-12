@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { AccountSwitchNotice } from '../components/AccountSwitchNotice'
 import { Brand } from '../components/Brand'
 import { areaItems, itemHref, MEMBER_AREA } from './navigation'
 import { UserMenu } from './UserMenu'
@@ -28,7 +29,8 @@ export function MemberLayout() {
         </nav>
       </header>
       <main className="member-main container" id="main-content">
-        <Outlet />
+        <AccountSwitchNotice />
+          <Outlet />
       </main>
     </div>
   )

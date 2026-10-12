@@ -18,6 +18,14 @@ export interface LoginOptions {
   remember?: boolean
 }
 
+/** Set when this tab followed another tab of the browser to a different account (one account per browser). */
+export interface AccountSwitch {
+  userId: number
+  fullName: string
+  /** Increases on every switch, so the redirect runs once per switch. */
+  seq: number
+}
+
 export interface AuthContextValue {
   status: AuthStatus
   user: UserProfile | null
@@ -31,6 +39,13 @@ export interface AuthContextValue {
    * Cleared on the next successful login or sign up.
    */
   signedOutElsewhere: boolean
+  /**
+   * Not null right after another tab signed a different account in and this tab followed it.
+   * The app then opens the new user's home page and shows a notice. Cleared by
+   * dismissAccountSwitch, the next login, sign up, logout, or the next switch.
+   */
+  accountSwitched: AccountSwitch | null
+  dismissAccountSwitch(): void
   /** The error behind status 'error', otherwise null. */
   loadError: unknown
   login(credentials: LoginRequest, options?: LoginOptions): Promise<UserProfile>

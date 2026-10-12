@@ -26,6 +26,25 @@ export class ApiError extends Error {
   }
 }
 
+export const SESSION_CHANGED_MESSAGE =
+  'The signed in account changed while this request was running. Please try again.'
+
+/**
+ * Thrown by the API client when the session changed (logout, login, or another tab switched the
+ * account) while a request was running. The answer belonged to the previous account, so it is
+ * never returned to the caller and never retried with the new account's token.
+ */
+export class StaleSessionError extends ApiError {
+  constructor() {
+    super(0, SESSION_CHANGED_MESSAGE)
+    this.name = 'StaleSessionError'
+  }
+
+  override get isNetworkError(): boolean {
+    return false
+  }
+}
+
 export const NETWORK_ERROR_MESSAGE = 'Cannot reach the server. Check your connection and try again.'
 export const SESSION_EXPIRED_MESSAGE = 'Your session has expired. Please log in again.'
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { checkPassword, isStrongPassword, passwordProgress, utf8ByteLength } from './passwordRules'
 import {
+  applyFieldChange,
   EMPTY_REGISTER_FORM,
   nextConfirmPasswordError,
   normalizePhone,
@@ -44,6 +45,11 @@ describe('password rules (same as backend StrongPassword)', () => {
     const password = `${'\u{1D400}'.repeat(4)}1234` // 4 math letters (8 code units) + 4 digits
     expect(checkPassword(password).find((rule) => rule.id === 'letter')?.met).toBe(false)
     expect(isStrongPassword(password)).toBe(false)
+  })
+
+  it('an empty password meets no rule, not even the byte limit (N6)', () => {
+    expect(checkPassword('').every((rule) => !rule.met)).toBe(true)
+    expect(checkPassword('a').find((rule) => rule.id === 'bytes')?.met).toBe(true)
   })
 
   it('reports progress from the number of rules met, and never calls a password strong', () => {
@@ -91,6 +97,23 @@ describe('sign up form checks', () => {
 
   it('keeps the password exactly as typed', () => {
     expect(toRegisterRequest({ ...valid, password: ' Train2026 ' }).password).toBe(' Train2026 ')
+  })
+})
+
+describe('applyFieldChange works from the latest state (N3)', () => {
+  const start = { form: { ...EMPTY_REGISTER_FORM }, fieldErrors: {} as Record<string, string> }
+
+  it('chains two edits without losing the first one', () => {
+    const afterPassword = applyFieldChange(start, 'password', 'Train2026')
+    const afterConfirm = applyFieldChange(afterPassword, 'confirmPassword', 'Train2026')
+    expect(afterConfirm.form.password).toBe('Train2026')
+    expect(afterConfirm.form.confirmPassword).toBe('Train2026')
+  })
+
+  it('computes the Confirm password error from the same next values', () => {
+    const shown = { form: { ...EMPTY_REGISTER_FORM, password: 'Train2026', confirmPassword: 'Train2027' }, fieldErrors: { confirmPassword: 'Passwords do not match', password: 'x' } }
+    const fixed = applyFieldChange(shown, 'password', 'Train2027')
+    expect(fixed.fieldErrors).toEqual({})
   })
 })
 

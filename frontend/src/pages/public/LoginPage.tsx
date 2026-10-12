@@ -77,10 +77,14 @@ export function LoginPage() {
     if (initialState?.email !== undefined || initialState?.notice !== undefined) {
       // Keep only the page that asked for the login, which is still needed after the redirect.
       const remaining: LoginRedirectState | null = initialState.from ? { from: initialState.from } : null
-      navigate(location.pathname, { replace: true, state: remaining })
+      // Same address including the query string and hash; only the history state changes.
+      navigate(
+        { pathname: location.pathname, search: location.search, hash: location.hash },
+        { replace: true, state: remaining },
+      )
     }
-    // initialState is fixed for the life of the page and the path stays /login, so this runs once.
-  }, [initialState, location.pathname, navigate])
+    // initialState is fixed for the life of the page and the address stays the same, so this runs once.
+  }, [initialState, location.pathname, location.search, location.hash, navigate])
 
   const clearFieldError = (field: string) => {
     setFieldErrors((current) => {

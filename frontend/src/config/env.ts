@@ -17,13 +17,19 @@ export interface SampleAccount {
 
 /**
  * Sample account shown in the box on the Log in screen (Figma F1-05). Off by default: the box is
- * shown only when VITE_SHOW_SAMPLE_ACCOUNT is exactly "true" and both VITE_SAMPLE_ACCOUNT_EMAIL
- * and VITE_SAMPLE_ACCOUNT_PASSWORD are set. Put only a throwaway demo member here, never staff
+ * shown only in the development server (import.meta.env.DEV, npm run dev), and only when
+ * VITE_SHOW_SAMPLE_ACCOUNT is exactly "true" and both VITE_SAMPLE_ACCOUNT_EMAIL and
+ * VITE_SAMPLE_ACCOUNT_PASSWORD are set. Vite replaces import.meta.env.DEV with false in a production
+ * build (npm run build), so the code after the first check is removed and the values never reach
+ * the bundle. Put only a throwaway demo member here, never staff
  * credentials, and never commit real values (frontend/.env is git-ignored).
  *
  * Read on every call instead of once at start up, so tests can change the variables.
  */
 export function sampleAccount(): SampleAccount | null {
+  if (!import.meta.env.DEV) {
+    return null
+  }
   if (import.meta.env.VITE_SHOW_SAMPLE_ACCOUNT !== 'true') {
     return null
   }

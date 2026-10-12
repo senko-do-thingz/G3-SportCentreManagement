@@ -26,6 +26,13 @@ type Area = 'local' | 'session'
  *   from coming back on a shared front desk computer.
  * - A tab whose own session is not remembered drops it too when it sees another tab log in or out
  *   (endTabSession, called from the AuthProvider storage listener).
+ * - When another tab logs in and the session left in localStorage belongs to a DIFFERENT user than
+ *   the one this tab showed, this tab follows it, but never silently: AuthProvider sets
+ *   accountSwitched, the app opens the home page of the new user's role and every layout shows
+ *   "You are now signed in as <name> because another account signed in in this browser." The same
+ *   user logging in again changes nothing visible; a tab that was anonymous shows nothing.
+ * - A request that was running when the session changed is dropped by the API client
+ *   (StaleSessionError), so an answer of the previous account never reaches the new one.
  * - Limitation: a login without "Remember me" writes nothing to localStorage when localStorage is
  *   already empty, so a tab that holds its own not remembered session gets no event and keeps it.
  *

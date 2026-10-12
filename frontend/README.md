@@ -36,11 +36,11 @@ If you really need another port, run `npm run dev -- --port 5174` and add `http:
 | Variable | Default | Meaning |
 |---|---|---|
 | `VITE_API_BASE_URL` | `http://localhost:8080/api/v1` | Base URL of the API, including `/api/v1` |
-| `VITE_SHOW_SAMPLE_ACCOUNT` | off | Shows the sample account box on the Log in screen only when it is exactly `true` |
+| `VITE_SHOW_SAMPLE_ACCOUNT` | off | Shows the sample account box on the Log in screen only when it is exactly `true`, and only in `npm run dev` |
 | `VITE_SAMPLE_ACCOUNT_EMAIL` | empty | Email shown in that box |
 | `VITE_SAMPLE_ACCOUNT_PASSWORD` | empty | Password shown in that box |
 
-The box stays hidden when the flag is not `true` or either value is empty. Use a throwaway demo member account for the box, never staff credentials, and never commit real values. Vite reads `.env` only when the dev server starts, so restart `npm run dev` after a change. Example in PowerShell:
+The box exists only in the development server (`npm run dev`): `sampleAccount()` also requires `import.meta.env.DEV`, so a production build (`npm run build`) never shows it and the values are not in the bundle. In development it stays hidden when the flag is not `true` or either value is empty. Use a throwaway demo member account for the box, never staff credentials, and never commit real values. Vite reads `.env` only when the dev server starts, so restart `npm run dev` after a change. Example in PowerShell:
 
 ```powershell
 cd frontend
@@ -109,6 +109,8 @@ await register({ fullName, email, password, phone })  // creates a MEMBER and si
 - Remember me not ticked: the tokens go to the sessionStorage of the tab that logged in. They end when that tab is closed. Chrome and Edge with "Continue where you left off" restore sessionStorage when the browser reopens its tabs, so close the tab, not only the browser, to end such a session.
 - A new login (with or without Remember me) and a logout always clear both areas of that tab, including the shared localStorage. Another tab that was signed in with a remembered session therefore loses it: it becomes anonymous and its login page shows "You were signed out because another account signed in or out in this browser." A logout in the same tab never shows that notice.
 - A tab that holds its own session without Remember me also drops it when it sees another tab log in or out (`tokenStorage.endTabSession()`, called from the storage listener in `AuthProvider`).
+- When another tab logs in as a different user, this tab follows the new account, but never silently: it opens the home page of the new user's role (`/member`, `/reception`, `/manager` or `/coach`, never the 403 page of the old URL) and every layout shows "You are now signed in as <full name> because another account signed in in this browser." The notice can be dismissed and is cleared by the next login, sign up, logout or switch (`useAuth().accountSwitched`, `dismissAccountSwitch()`). The role area is mounted again for the new user, so no page or form of the previous user stays on screen. The same user logging in again in another tab changes nothing visible, and a tab that was anonymous shows nothing.
+- A request that was still running when the session changed fails with `StaleSessionError` (from `api/errors.ts`) instead of returning the previous account's answer, and it is never retried with the new account's token.
 - Limitation: a login without Remember me writes nothing to localStorage when it is already empty, so a second tab that also logged in without Remember me gets no event and keeps its own account.
 - `tokenStorage.startSession(tokens)` without options keeps the FE-00 behaviour (remembered). `useAuth().signedOutElsewhere` is true after such a sign out.
 

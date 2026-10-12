@@ -4,6 +4,7 @@ import { MemoryRouter, useLocation, type Location } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
 import { AuthProvider } from '../../auth/AuthProvider'
+import { useAuth } from '../../auth/useAuth'
 import { STRONG_PASSWORD_MESSAGE } from '../../auth/passwordRules'
 import { Checkbox } from '../../components/ui/Checkbox'
 import { ToastProvider } from '../../components/ui/ToastProvider'
@@ -780,6 +781,266 @@ describe('FE-01 review fixes (round 2)', () => {
       expect(ids).toContain('terms-note')
       expect(ids).toHaveLength(2)
       expect(box).toHaveAccessibleDescription('You must accept the terms Read the terms first.')
+    })
+  })
+})
+
+describe('FE-01 review fixes (round 3)', () => {
+  const MEMBER_Y = { ...MEMBER, id: 7, email: 'jordan@sportify.demo', fullName: 'Jordan Pham' }
+  const switchNotice = (name: string) =>
+    `You are now signed in as ${name} because another account signed in in this browser.`
+
+  /** Waits until the account switch notice for this name is on screen. */
+  async function expectSwitchNotice(name: string) {
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(switchNotice(name)))
+  }
+
+  /** Fake /users/me: each access token belongs to one profile. */
+  function profilesByToken(profiles: Record<string, typeof MEMBER>) {
+    return installFakeFetch((call) => {
+      const profile = profiles[call.authorization?.replace('Bearer ', '') ?? '']
+      return profile ? json(200, profile) : backendError(401, 'Unauthorized')
+    })
+  }
+
+  /** What the other tab does when it logs in with Remember me: new tokens and a new session id. */
+  function otherTabLogsIn(accessToken: string) {
+    const oldSession = window.localStorage.getItem('sportify.sessionId')
+    window.localStorage.setItem('sportify.accessToken', accessToken)
+    window.localStorage.setItem('sportify.refreshToken', `${accessToken}-refresh`)
+    window.localStorage.setItem('sportify.sessionId', `${accessToken}-session`)
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', { key: 'sportify.sessionId', oldValue: oldSession, newValue: `${accessToken}-session` }),
+      )
+    })
+  }
+
+  describe('N1 a switch to another account is never silent', () => {
+    it('session only tab of member X follows a remembered login of member Y to the member home with a notice', async () => {
+      tokenStorage.startSession({ accessToken: 'x-access', refreshToken: 'x-refresh' }, { persistent: false })
+      profilesByToken({ 'x-access': MEMBER, 'y-access': MEMBER_Y })
+      renderApp('/member/packages')
+      await screen.findByRole('heading', { name: 'Sport Packages' })
+      expect(screen.getAllByText('Taylor Nguyen').length).toBeGreaterThan(0)
+
+      otherTabLogsIn('y-access')
+
+      expect(await screen.findByRole('heading', { name: 'Member Dashboard' })).toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent(switchNotice('Jordan Pham'))
+      expect(screen.queryByText('Taylor Nguyen')).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Sport Packages' })).not.toBeInTheDocument()
+    })
+
+    it('remembered tab of member X lands on the manager home when a manager logs in elsewhere', async () => {
+      tokenStorage.startSession({ accessToken: 'x-access', refreshToken: 'x-refresh' })
+      profilesByToken({ 'x-access': MEMBER, 'manager-access': MANAGER })
+      renderApp('/member')
+      await screen.findByRole('heading', { name: 'Member Dashboard' })
+
+      otherTabLogsIn('manager-access')
+
+      expect(await screen.findByRole('heading', { name: 'User Management' })).toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent(switchNotice('Morgan Lee'))
+      expect(screen.queryByRole('heading', { name: 'Access denied' })).not.toBeInTheDocument()
+    })
+
+    it('the same user logging in again in another tab keeps the page and shows nothing', async () => {
+      tokenStorage.startSession({ accessToken: 'x-access', refreshToken: 'x-refresh' })
+      const { calls } = profilesByToken({ 'x-access': MEMBER, 'x-access-2': MEMBER })
+      renderApp('/member/packages')
+      await screen.findByRole('heading', { name: 'Sport Packages' })
+
+      otherTabLogsIn('x-access-2')
+      await waitFor(() => expect(calls.filter((call) => call.path === '/users/me')).toHaveLength(2))
+      await new Promise((resolve) => setTimeout(resolve, 20))
+
+      expect(screen.getByRole('heading', { name: 'Sport Packages' })).toBeInTheDocument()
+      expect(screen.queryByText(/You are now signed in as/)).not.toBeInTheDocument()
+    })
+
+    it('an anonymous tab shows no notice when another tab logs in', async () => {
+      profilesByToken({ 'y-access': MEMBER_Y })
+      renderApp('/login')
+      await screen.findByRole('heading', { name: 'Welcome back' })
+
+      otherTabLogsIn('y-access')
+
+      expect(await screen.findByRole('heading', { name: 'Member Dashboard' })).toBeInTheDocument()
+      expect(screen.queryByText(/You are now signed in as/)).not.toBeInTheDocument()
+    })
+
+    it('a profile request of the old account that answers late does not overwrite the new user', async () => {
+      tokenStorage.startSession({ accessToken: 'x-access', refreshToken: 'x-refresh' })
+      let releaseOld: () => void = () => undefined
+      let holdOld = false
+      installFakeFetch(async (call) => {
+        const token = call.authorization?.replace('Bearer ', '') ?? ''
+        if (token === 'x-access' && holdOld) {
+          await new Promise<void>((resolve) => {
+            releaseOld = resolve
+          })
+        }
+        return json(200, token === 'y-access' ? MEMBER_Y : MEMBER)
+      })
+      let reloadUser: () => Promise<unknown> = async () => null
+      function AuthProbe() {
+        reloadUser = useAuth().reloadUser
+        return null
+      }
+      render(
+        <MemoryRouter initialEntries={['/member']}>
+          <ToastProvider>
+            <AuthProvider>
+              <AppRoutes />
+              <AuthProbe />
+            </AuthProvider>
+          </ToastProvider>
+        </MemoryRouter>,
+      )
+      await screen.findByRole('heading', { name: 'Member Dashboard' })
+
+      // Account X starts a profile reload that hangs...
+      holdOld = true
+      let oldReload: Promise<unknown> = Promise.resolve()
+      act(() => {
+        oldReload = reloadUser()
+      })
+      // ...then another tab switches the browser to account Y.
+      otherTabLogsIn('y-access')
+      await expectSwitchNotice('Jordan Pham')
+      await act(async () => {
+        releaseOld()
+        await oldReload
+      })
+
+      expect(screen.getByRole('status')).toHaveTextContent(switchNotice('Jordan Pham'))
+      expect(screen.getAllByText('Jordan Pham').length).toBeGreaterThan(0)
+      expect(screen.queryByText('Taylor Nguyen')).not.toBeInTheDocument()
+    })
+
+    it('the notice can be dismissed and is cleared by a logout', async () => {
+      tokenStorage.startSession({ accessToken: 'x-access', refreshToken: 'x-refresh' })
+      profilesByToken({ 'x-access': MEMBER, 'y-access': MEMBER_Y })
+      const user = userEvent.setup()
+      renderApp('/member')
+      await screen.findByRole('heading', { name: 'Member Dashboard' })
+      otherTabLogsIn('y-access')
+      await expectSwitchNotice('Jordan Pham')
+
+      await user.click(screen.getByRole('button', { name: 'Dismiss' }))
+      expect(screen.queryByText(/You are now signed in as/)).not.toBeInTheDocument()
+
+      otherTabLogsIn('x-access')
+      await expectSwitchNotice('Taylor Nguyen')
+      await user.click(screen.getByRole('button', { name: 'Log out' }))
+      await screen.findByRole('heading', { name: 'Welcome back' })
+      expect(screen.queryByText(/You are now signed in as/)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('N3 two edits in one batch both survive', () => {
+    it('keeps the Password edit when Confirm password changes in the same event batch', async () => {
+      installFakeFetch(authBackend())
+      renderApp('/register')
+      const password = await screen.findByLabelText(/^password/i)
+      const confirm = screen.getByLabelText(/confirm password/i)
+
+      // React 19 flushes every discrete DOM event on its own, so two typed edits never share a
+      // batch in a DOM test. To check the batching itself, both rendered onChange handlers are
+      // called inside one act: React then applies both updates in one batch, the way it does for
+      // updates outside discrete events. A handler that builds the next form from its render
+      // closure loses the first edit here. The props key is a React internal, used only in this test.
+      const handlerOf = (input: HTMLElement) => {
+        const key = Object.keys(input).find((name) => name.startsWith('__reactProps$'))
+        const props = (input as unknown as Record<string, { onChange: (event: unknown) => void }>)[key ?? '']
+        return props.onChange
+      }
+      const onPasswordChange = handlerOf(password)
+      const onConfirmChange = handlerOf(confirm)
+      act(() => {
+        onPasswordChange({ target: { value: 'Train2026' } })
+        onConfirmChange({ target: { value: 'Train2026' } })
+      })
+
+      expect(password).toHaveValue('Train2026')
+      expect(confirm).toHaveValue('Train2026')
+      expect(screen.getByText('Passwords match')).toBeInTheDocument()
+    })
+  })
+
+  describe('N4 focus after a server error on Sign up', () => {
+    it('moves the focus to Phone number for a 400 with details.phone', async () => {
+      installFakeFetch(() => backendError(400, 'Validation Error', { phone: 'Phone must be 8-15 digits with optional leading +' }))
+      const user = userEvent.setup()
+      renderApp('/register')
+
+      await fillRegisterForm(user)
+      await user.click(screen.getByRole('button', { name: 'Create account' }))
+
+      const phone = screen.getByLabelText(/phone number/i)
+      await waitFor(() => expect(phone).toBeEnabled())
+      await waitFor(() => expect(phone).toHaveFocus())
+    })
+  })
+
+  describe('N5 sample account box only in the development server', () => {
+    it('stays hidden when DEV is false even with the flag and both values set', async () => {
+      vi.stubEnv('DEV', false)
+      vi.stubEnv('VITE_SHOW_SAMPLE_ACCOUNT', 'true')
+      vi.stubEnv('VITE_SAMPLE_ACCOUNT_EMAIL', 'demo.member@sportify.demo')
+      vi.stubEnv('VITE_SAMPLE_ACCOUNT_PASSWORD', 'Demo2026')
+      installFakeFetch(authBackend())
+      renderApp('/login')
+
+      await screen.findByRole('heading', { name: 'Welcome back' })
+      expect(screen.queryByText(/sample account/i)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('N6 empty password', () => {
+    it('shows every rule as not met and no progress label while the field is empty', async () => {
+      installFakeFetch(authBackend())
+      const user = userEvent.setup()
+      renderApp('/register')
+      const password = await screen.findByLabelText(/^password/i)
+
+      for (const rule of ['length', 'letter', 'digit', 'bytes']) {
+        expect(document.querySelector(`[data-rule="${rule}"]`)).toHaveAttribute('data-met', 'false')
+      }
+      expect(screen.queryByText(/Password strength|Meets requirements/)).not.toBeInTheDocument()
+
+      await user.type(password, 'a')
+      await user.clear(password)
+      expect(document.querySelector('[data-rule="bytes"]')).toHaveAttribute('data-met', 'false')
+    })
+  })
+
+  describe('N7 history cleanup keeps the query string and hash', () => {
+    it('removes the prefill but stays on /login?x=1#top', async () => {
+      installFakeFetch(authBackend())
+      let current: Location | null = null
+      function LocationProbe() {
+        current = useLocation()
+        return null
+      }
+      render(
+        <MemoryRouter initialEntries={[{ pathname: '/login', search: '?x=1', hash: '#top', state: { notice: 'Hello' } }]}>
+          <ToastProvider>
+            <AuthProvider>
+              <AppRoutes />
+              <LocationProbe />
+            </AuthProvider>
+          </ToastProvider>
+        </MemoryRouter>,
+      )
+
+      await screen.findByText('Hello')
+      await waitFor(() => expect((current as Location | null)?.state).toBeNull())
+      const location = current as Location | null
+      expect(location?.pathname).toBe('/login')
+      expect(location?.search).toBe('?x=1')
+      expect(location?.hash).toBe('#top')
     })
   })
 })

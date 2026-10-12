@@ -12,6 +12,7 @@
   - Sign up: full name, phone, email, password with live rules (same rules as the backend `@StrongPassword`), confirm password, accept terms. Calls `POST /auth/register`, signs the new member in with the returned tokens and opens the member dashboard.
   - Backend field errors shown under each field (400 `details`), duplicate email (409) shown under the email field.
   - Enter submits both forms; every control is disabled while the request is running.
+  - Review round 3 (N1, N3 to N8): a switch to another account is never silent (redirect to the new role's home page with a notice in every layout, answers of requests from the previous account dropped), sign up form in one functional state update, focus after a server error on Sign up, sample account box only in the development server, empty password meets no rule, history cleanup keeps the query string and hash, `sqlcmd -C`.
   - Review round 2 (R2 to R11): one account per browser with a notice in the tab that was signed out, sample account box from env variables (off by default), Confirm password error follows both fields, backend errors without an input shown above the form, only "Email is already registered" under Email, full height hero photo, focus through a state counter, login prefill read once, "Meets requirements" label, accessible ids.
 
 ### Backend contract used (checked in the code on `main`, commit 81b9e51)
@@ -29,25 +30,26 @@ Password rules (`StrongPasswordValidator`): 8 to 64 characters, at most 72 bytes
 ```powershell
 cd frontend
 npm install
-npm test                         # automated cases TC-FE01-001 to TC-FE01-073 (plus the 68 FE-00 tests)
+npm test                         # automated cases TC-FE01-001 to TC-FE01-089 (plus the FE-00 tests)
 npm run lint -- --max-warnings 0
 npm run build
 ```
 
 Manual cases (section 4) need the real backend and SQL Server; section 4.1 gives the exact steps without Docker.
 
-### Result summary (after review round 2, 2026-10-12)
+### Result summary (after review round 3, 2026-10-12)
 | Group | Cases | Result |
 |---|---|---|
-| Automated, screens (`src/pages/public/authScreens.test.tsx`) | 44 (24 round 1, 20 round 2) | 44 PASSED |
-| Automated, password rules and sign up checks (`src/auth/passwordRules.test.ts`) | 21 (17 round 1, 4 round 2) | 21 PASSED |
+| Automated, screens (`src/pages/public/authScreens.test.tsx`) | 55 (24 round 1, 20 round 2, 11 round 3) | 55 PASSED |
+| Automated, password rules and sign up checks (`src/auth/passwordRules.test.ts`) | 24 (17 round 1, 4 round 2, 3 round 3) | 24 PASSED |
 | Automated, token storage and Remember me (`src/api/tokenStorage.test.ts`) | 8 (6 round 1, 2 round 2) | 8 PASSED |
-| Automated, FE-00 regression (6 existing files) | 68 | 68 PASSED |
+| Automated, API client (`src/api/client.test.ts`) | 17 (15 FE-00, 2 round 3; 1 FE-00 expectation updated) | 17 PASSED |
+| Automated, other FE-00 files (5 files; 1 test in `auth.flow.test.tsx` updated) | 53 | 53 PASSED |
 | Build, lint and types (`npm run build`, `npm run lint -- --max-warnings 0`, `tsc -b`) | 3 | 3 PASSED, 0 warnings |
-| Browser checks in Chromium against a mock of the auth API | 7 | 7 PASSED |
-| Manual checks against the real backend and SQL Server | 18 | NOT RUN YET (run before merge) |
+| Browser checks in Chromium against a mock of the auth API | 8 | 8 PASSED |
+| Manual checks against the real backend and SQL Server | 20 | NOT RUN YET (run before merge) |
 
-Total automated: 141 Vitest tests in 9 files (47 from round 1, 26 from round 2). Round 1: four guards broken on purpose, each caught. Round 2: every fix (R2 to R11, 15 guards in total) was broken once on purpose and at least one test failed each time before the fix was restored; one gap found this way (R3 flag ignored while values are set) got its own test.
+Total automated: 157 Vitest tests in 9 files (47 from round 1, 26 from round 2, 16 from round 3, 68 from FE-00). Deliberate regressions: round 1 broke 4 guards, round 2 broke 15, round 3 broke 13. Each time at least one test failed before the fix was restored. In round 3 this exposed one weak test: the first N3 test could not fail, because React 19 renders after every DOM event. It was rewritten so that both edits fall in one batch.
 
 Note: the real Spring Boot backend could not be started in the AI workspace (no SQL Server, Maven Central blocked), so section 4 must be run on a team machine before the PR is merged.
 
@@ -254,6 +256,32 @@ Note: the real Spring Boot backend could not be started in the AI workspace (no 
 
 Existing focus tests TC-FE01-010, TC-FE01-014 and TC-FE01-018 still pass with the new focus hook (R8). R7 has no automated test; it is covered by browser check B07.
 
+### 2.6 Review round 3
+
+| ID | Finding | Test (file) | Expected Result | Status |
+|---|---|---|---|---|
+| TC-FE01-074 | N1 | `session only tab of member X follows a remembered login of member Y to the member home with a notice` (authScreens) | Tab A on /member/packages with a session only login of Taylor Nguyen; another tab logs in with Remember me as Jordan Pham: tab A opens Member Dashboard, notice "You are now signed in as Jordan Pham because another account signed in in this browser.", Taylor Nguyen no longer on the page | PASSED |
+| TC-FE01-075 | N1 | `remembered tab of member X lands on the manager home when a manager logs in elsewhere` (authScreens) | Tab A opens User Management with the notice for Morgan Lee, not the 403 page | PASSED |
+| TC-FE01-076 | N1 | `the same user logging in again in another tab keeps the page and shows nothing` (authScreens) | Profile reloaded, Sport Packages still shown, no notice | PASSED |
+| TC-FE01-077 | N1 | `an anonymous tab shows no notice when another tab logs in` (authScreens) | Tab on /login follows to the dashboard without a notice | PASSED |
+| TC-FE01-078 | N1 | `a profile request of the old account that answers late does not overwrite the new user` (authScreens) | A reloadUser of account X hangs, the browser switches to Y, X answers: the page keeps Y and the notice for Y | PASSED |
+| TC-FE01-079 | N1 | `the notice can be dismissed and is cleared by a logout` (authScreens) | Dismiss hides it; after a new switch, Log out clears it | PASSED |
+| TC-FE01-080 | N1 | `drops the answer of a request started before another tab switched the account (N1)` (client) | The request fails with StaleSessionError; the old account's body is never returned | PASSED |
+| TC-FE01-081 | N1 | `never retries an old 401 with the token of the new account (N1)` (client) | StaleSessionError, no request sent with the new token | PASSED |
+| TC-FE01-082 | N3 | `keeps the Password edit when Confirm password changes in the same event batch` (authScreens) | Both onChange handlers run in one batch: both fields keep Train2026 and "Passwords match" is shown | PASSED |
+| TC-FE01-083 | N3 | `chains two edits without losing the first one` (passwordRules) | applyFieldChange keeps both edits | PASSED |
+| TC-FE01-084 | N3 | `computes the Confirm password error from the same next values` (passwordRules) | Mismatch error and the edited field error are both cleared | PASSED |
+| TC-FE01-085 | N4 | `moves the focus to Phone number for a 400 with details.phone` (authScreens) | Phone number enabled again and focused | PASSED |
+| TC-FE01-086 | N5 | `stays hidden when DEV is false even with the flag and both values set` (authScreens) | No sample box | PASSED |
+| TC-FE01-087 | N6 | `shows every rule as not met and no progress label while the field is empty` (authScreens) | All four rules `data-met="false"`, no label, also after typing and clearing | PASSED |
+| TC-FE01-088 | N6 | `an empty password meets no rule, not even the byte limit (N6)` (passwordRules) | All rules not met for an empty value; the byte rule is met for "a" | PASSED |
+| TC-FE01-089 | N7 | `removes the prefill but stays on /login?x=1#top` (authScreens) | History state null, pathname /login, search ?x=1, hash #top | PASSED |
+
+Updated in round 3 (behaviour changed on purpose by N1):
+- FE-00 `auth.flow.test.tsx`, `follows a login as another user in another tab`: a manager tab followed by a member login now opens the Member Dashboard with the notice instead of the 403 page.
+- FE-00 `client.test.ts`, `does not clear a newer session when an old request fails late`: the old request must still fail with an ApiError, which is now either a 401 or StaleSessionError depending on timing; the checks that the new session is kept and no logout event fires are unchanged.
+- R3 tests: the box needs `import.meta.env.DEV`, which is true under Vitest, so no stub was needed for the existing cases. TC-FE01-086 sets DEV to false.
+
 ---
 
 ## 3. Browser Checks (Chromium, production build, mocked auth API)
@@ -270,7 +298,11 @@ Run with `npm run build`, `npx vite preview --port 4173`, and Playwright routing
 | B06 | Sign up on a 390 px phone has no horizontal scroll | PASSED |
 | B07 | Round 2, R7: the photo covers the full height of the hero column on both screens and the slogan stays readable (screenshot `FE-01_round2_screens.png`) | PASSED |
 
-B01 to B06 were run again after review round 2 on the new production build: all passed.
+| B08 | Round 3, N1: two pages in one browser context (they share localStorage and receive each other's storage events). Page A logs in without Remember me as member Taylor Nguyen and opens Sport Packages; page B logs in with Remember me as Jordan Pham: page A goes to /member with the notice for Jordan Pham and Taylor Nguyen is gone. A third page then writes a manager session to localStorage: page A goes to /manager (no 403) with the notice for Morgan Lee; Dismiss hides it (screenshot `FE-01_round3_account_switch.png`) | PASSED |
+
+B01 to B06 were run again after review rounds 2 and 3 on each new production build: all passed. B07 was checked again on the round 3 build (`FE-01_round3_screens.png`).
+
+N5 bundle check: `npm run build` with `VITE_SHOW_SAMPLE_ACCOUNT=true` and sample values set in the environment produced a bundle with 0 occurrences of the email and password. Only the static label `Sample account: ` remains, inside markup that cannot render because `sampleAccount()` returns null in production.
 
 Screens were compared with the Figma exports: same 519 / 619 split of the 1140 px card, photo hero with slogan, brand, headings, field order and footer links.
 
@@ -299,8 +331,9 @@ Open http://localhost:5173/login.
 
 Change the status of a test user for M03 and M04 (in SSMS, or with `sqlcmd` in PowerShell; replace the email with the account you created in M07):
 ```powershell
-sqlcmd -S localhost -d sportify -U sa -P "<DB_PASSWORD from backend/.env>" -Q "UPDATE user_account SET status = 'LOCKED' WHERE email = 'jamie@sportify.demo'; SELECT email, status FROM user_account WHERE email = 'jamie@sportify.demo';"
+sqlcmd -S localhost -d sportify -U sa -P "<DB_PASSWORD from backend/.env>" -C -Q "UPDATE user_account SET status = 'LOCKED' WHERE email = 'jamie@sportify.demo'; SELECT email, status FROM user_account WHERE email = 'jamie@sportify.demo';"
 ```
+`-C` trusts the server certificate. sqlcmd 18 (ODBC Driver 18) encrypts the connection by default and otherwise fails with the self signed certificate of a local SQL Server. The same SQL can also be run in SSMS: connect to `localhost`, open a New Query on the `sportify` database, paste the statements below and press F5.
 ```sql
 -- M03: lock the account
 UPDATE user_account SET status = 'LOCKED' WHERE email = 'jamie@sportify.demo';
@@ -334,4 +367,6 @@ Sample account box for M17 and M18: edit `frontend/.env`, then stop `npm run dev
 | M15 | R2: tab A logs in with Remember me as the M07 member. Tab B (same browser) logs in without Remember me as the manager. Switch back to tab A | Tab A shows the Log in screen with "You were signed out because another account signed in or out in this browser." | NOT RUN |
 | M16 | R2: tabs A and B both on the same remembered session. Click Log out in tab A | Tab A: Log in screen without the notice. Tab B: Log in screen with the notice | NOT RUN |
 | M17 | R3: no `frontend/.env` (or `VITE_SHOW_SAMPLE_ACCOUNT=false`), restart `npm run dev`, open /login | No sample account box | NOT RUN |
-| M18 | R3: in `frontend/.env` set `VITE_SHOW_SAMPLE_ACCOUNT=true`, `VITE_SAMPLE_ACCOUNT_EMAIL` and `VITE_SAMPLE_ACCOUNT_PASSWORD` to a demo member, restart `npm run dev`, open /login | Box shows "Sample account: <email> - <password>". Remove the values afterwards and do not commit `.env` (`git status` must not list it) | NOT RUN |
+| M18 | R3: in `frontend/.env` set `VITE_SHOW_SAMPLE_ACCOUNT=true`, `VITE_SAMPLE_ACCOUNT_EMAIL` and `VITE_SAMPLE_ACCOUNT_PASSWORD` to a demo member, restart `npm run dev`, open /login. Then run `npm run build` and `npm run preview` and open the preview's /login | Dev server: box shows "Sample account: <email> - <password>". Preview of the production build: no box (N5). Remove the values afterwards and do not commit `.env` (`git status` must not list it) | NOT RUN |
+| M19 | N1: in Chrome, tab A logs in without Remember me as member A (for example the M07 account) and opens Sport Packages. Tab B (same window) logs in with Remember me as member B. Switch back to tab A and click Dismiss | Tab A shows the Member Dashboard (not Sport Packages) of member B with "You are now signed in as <member B> because another account signed in in this browser."; member A's name is nowhere on the page; Dismiss hides the notice. Note: if tab B logs out first, tab A shows the signed out notice instead (M15, M16), and a later login only redirects tab A without a switch notice, because tab A was anonymous | NOT RUN |
+| M20 | N1: tab A logs in without Remember me as member A and opens Sport Packages. Tab B (same window, still anonymous because A's session lives only in tab A) logs in with Remember me as the seeded manager. Switch back to tab A | Tab A opens the manager home (User Management) with "You are now signed in as <manager name> because another account signed in in this browser.", never the 403 page of /member/packages | NOT RUN |

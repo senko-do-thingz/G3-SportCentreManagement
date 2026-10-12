@@ -1082,3 +1082,18 @@
   justify-content: center;
   pointer-events: none;
 }
+
+/* Notice after this tab followed another tab to a different account (FE-01 round 3, N1) */
+.account-switch-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.account-switch-notice .link-button {
+  flex-shrink: 0;
+  color: inherit;
+  font-weight: var(--weight-semibold);
+}

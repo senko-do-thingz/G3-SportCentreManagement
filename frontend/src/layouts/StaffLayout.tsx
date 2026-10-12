@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { AccountSwitchNotice } from '../components/AccountSwitchNotice'
 import { useAuth } from '../auth/useAuth'
 import { Brand } from '../components/Brand'
 import { findActiveItem, itemHref, STAFF_AREAS } from './navigation'
@@ -65,6 +66,7 @@ export function StaffLayout() {
           <UserMenu />
         </header>
         <main className="staff-content" id="main-content">
+          <AccountSwitchNotice />
           <Outlet />
         </main>
       </div>

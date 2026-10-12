@@ -38,6 +38,17 @@ Same branch, new commits on top of the FE-01 commit. Verified with `npm test` (1
 - R11: the rules list id comes from `useId`, `Checkbox` merges a caller's `aria-describedby`, unused `tokenStorage.isPersistent()` removed.
 - Docs: `docs/tests/FE-01_test_cases.md` (cases TC-FE01-048 to 073, manual section rewritten with PowerShell steps and SQL), `docs/audit/FE-01_AI_Audit_Log.docx` (sections 9 and 10).
 
+### FE-01 review fixes (round 3)
+Same branch, new commits. Verified with `npm test` (157 tests, 16 new), `npm run lint -- --max-warnings 0`, `tsc -b`, `npm run build` and 8 browser checks. The 13 guards of this round were each broken once on purpose and caught by a test. No backend change.
+- N1: a switch to another account is never silent. When another tab signs in as a different user, this tab opens the home page of the new user's role (never the 403 page) and every layout shows "You are now signed in as <name> because another account signed in in this browser." (dismissible). The role area is mounted again for the new user, so no page or form of the previous user survives. The same user logging in again, or an anonymous tab, shows nothing. The API client drops answers of requests that started before a session change (`StaleSessionError`) and never retries them with the new account's token. The round 2 decision to switch without a notice is reverted.
+- N3: the sign up form and its field errors live in one state, updated functionally (`applyFieldChange`).
+- N4: test for the focus after a server error on Sign up.
+- N5: the sample account box needs `import.meta.env.DEV`; a production build never shows it and does not contain the values.
+- N6: with an empty password every rule is shown as not met.
+- N7: the login history cleanup keeps the query string and hash.
+- N8: `sqlcmd -C` in the manual steps, with the SSMS alternative.
+- Docs: test cases TC-FE01-074 to 089, browser check B08, manual cases M19 and M20; README Remember me section.
+
 ## 2026-10-12 - Frontend foundation: routing, API client, auth, layouts (FE-00, Shared)
 
 Branch `feat/fe-foundation`. Status: Implemented and verified with `npm test` (68 tests after review round 3), `npm run lint` and `npm run build`, plus 25 browser checks against a mock of the auth API. Manual checks against the real backend (docs/tests/FE-00_test_cases.md section 3) must be run before merging. Builds on the Vite + React + TypeScript scaffold from PR #13; no backend change.

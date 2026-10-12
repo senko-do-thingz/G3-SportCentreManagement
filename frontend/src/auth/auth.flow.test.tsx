@@ -295,8 +295,11 @@ describe('auth flow', () => {
       window.localStorage.setItem('sportify.sessionId', 'session-from-other-tab')
       fireStorage('sportify.sessionId', oldSession, 'session-from-other-tab')
 
-      // This tab was on a manager page; the member who is now signed in sees the 403 page.
-      expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
+      // FE-01 round 3 (N1): a switch to another account is never silent. The tab opens the
+      // member home page with a notice instead of showing the 403 page of the manager URL.
+      expect(await screen.findByRole('heading', { name: 'Member Dashboard' })).toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent('You are now signed in as Taylor Nguyen')
+      expect(screen.queryByRole('heading', { name: 'Access denied' })).not.toBeInTheDocument()
       expect(meCalls()).toBe(2)
     })
 

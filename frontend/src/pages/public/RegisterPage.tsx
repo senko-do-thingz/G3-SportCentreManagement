@@ -4,15 +4,16 @@ import { ApiError, getErrorMessage, splitFieldErrors } from '../../api/errors'
 import { AccountCreatedError } from '../../auth/authContext'
 import { checkPassword, passwordProgress } from '../../auth/passwordRules'
 import {
+  applyFieldChange,
   EMAIL_MAX_LENGTH,
   EMAIL_TAKEN_MESSAGE,
   EMPTY_REGISTER_FORM,
   FULL_NAME_MAX_LENGTH,
-  nextConfirmPasswordError,
   REGISTER_FIELDS,
   toRegisterRequest,
   validateRegister,
   type RegisterForm,
+  type RegisterFormState,
 } from '../../auth/registerValidation'
 import { homePathFor } from '../../auth/roles'
 import { useAuth } from '../../auth/useAuth'
@@ -90,10 +91,14 @@ export function RegisterPage() {
   const navigate = useNavigate()
   const rulesId = useId()
 
-  const [form, setForm] = useState<RegisterForm>(EMPTY_REGISTER_FORM)
+  const [{ form, fieldErrors }, setFormState] = useState<RegisterFormState>({
+    form: EMPTY_REGISTER_FORM,
+    fieldErrors: {},
+  })
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const setFieldErrors = (errors: Record<string, string>) =>
+    setFormState((current) => ({ ...current, fieldErrors: errors }))
   const formRef = useRef<HTMLFormElement>(null)
   const focusFirstInvalid = useFocusFirstInvalid(formRef)
   const sendingRef = useRef(false)
@@ -102,24 +107,9 @@ export function RegisterPage() {
     return <Navigate to={homePathFor(user)} replace />
   }
 
+  // Functional update: every edit starts from the latest form and errors, never from this render.
   const update = <K extends FieldName>(field: K, value: RegisterForm[K]) => {
-    const next = { ...form, [field]: value }
-    setForm(next)
-    setFieldErrors((current) => {
-      const errors = { ...current }
-      delete errors[field]
-      // Password and Confirm password depend on each other: a mismatch message that is already
-      // shown follows both fields, so fixing either one clears it.
-      if (field === 'password' || field === 'confirmPassword') {
-        const confirmError = nextConfirmPasswordError(next, current.confirmPassword)
-        if (confirmError) {
-          errors.confirmPassword = confirmError
-        } else {
-          delete errors.confirmPassword
-        }
-      }
-      return errors
-    })
+    setFormState((current) => applyFieldChange(current, field, value))
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {

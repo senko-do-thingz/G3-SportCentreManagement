@@ -46,8 +46,12 @@ export function utf8ByteLength(value: string): number {
   return new TextEncoder().encode(value).length
 }
 
-/** Result of every rule, in the order shown under the password field. */
+/**
+ * Result of every rule, in the order shown under the password field. An empty password meets no
+ * rule, so the list starts neutral instead of showing the byte limit as already met.
+ */
 export function checkPassword(value: string): PasswordRuleResult[] {
+  const empty = value.length === 0
   return [
     {
       id: 'length',
@@ -59,7 +63,7 @@ export function checkPassword(value: string): PasswordRuleResult[] {
     {
       id: 'bytes',
       label: `No more than ${PASSWORD_MAX_BYTES} bytes (accented letters count as 2)`,
-      met: utf8ByteLength(value) <= PASSWORD_MAX_BYTES,
+      met: !empty && utf8ByteLength(value) <= PASSWORD_MAX_BYTES,
     },
   ]
 }

@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ReactNode } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { RequireRole } from '../auth/RequireRole'
+import { useAuth } from '../auth/useAuth'
 import { MemberLayout } from '../layouts/MemberLayout'
 import { ALL_AREAS, type RoleArea } from '../layouts/navigation'
 import { PublicLayout } from '../layouts/PublicLayout'
@@ -12,6 +13,7 @@ import { HomeRedirect } from '../pages/public/HomeRedirect'
 import { LoginPage } from '../pages/public/LoginPage'
 import { NotFoundPage } from '../pages/public/NotFoundPage'
 import { RegisterPage } from '../pages/public/RegisterPage'
+import { AccountSwitchRedirect } from './AccountSwitchRedirect'
 
 /**
  * Real screens by full path. Later tasks register their page here, for example
@@ -42,8 +44,14 @@ function areaRoutes(area: RoleArea) {
 }
 
 export function AppRoutes() {
+  const { user } = useAuth()
+  // Keyed by user id: when the signed in account changes, the whole role area (layout, page and
+  // any form in it) is mounted again, so nothing typed or loaded for the previous user survives.
+  const accountKey = user ? `user-${user.id}` : 'anonymous'
   return (
-    <Routes>
+    <>
+      <AccountSwitchRedirect />
+      <Routes>
       <Route path="/" element={<HomeRedirect />} />
 
       <Route element={<PublicLayout />}>
@@ -68,7 +76,7 @@ export function AppRoutes() {
           key={area.basePath}
           path={area.basePath}
           element={
-            <RequireRole roles={[area.role]}>
+            <RequireRole key={accountKey} roles={[area.role]}>
               {area.role === 'MEMBER' ? <MemberLayout /> : <StaffLayout />}
             </RequireRole>
           }
@@ -79,6 +87,7 @@ export function AppRoutes() {
       ))}
 
       <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+      </Routes>
+    </>
   )
 }
