@@ -2,7 +2,7 @@
 
 ## 2026-10-12 - Pending Payments for Online Requests and Payment Summary (BE-17, Flow 3)
 
-Branch `feat/f3-pending-payments`. Status: Implemented and hardened after Round 3 Code Review. Verified locally with `mvn -B -ntp test "-Dtest=!*IntegrationTest" "-Dsurefire.failIfNoSpecifiedTests=false"` (501 tests run, 0 failures, 0 errors, 4 skipped requiring Docker: FlywayMigrationTest, PermissionRepositoryTest, RoleRepositoryTest, UserAccountRepositoryTest). Integration tests verified in CI via GitHub Actions.
+Branch `feat/f3-pending-payments`. Status: Implemented and hardened after Round 3 Code Review. Verified locally with `mvn -B -ntp test "-Dtest=!*IntegrationTest" "-Dsurefire.failIfNoSpecifiedTests=false"` (501 tests run, 0 failures, 0 errors, 4 skipped requiring Docker: FlywayMigrationTest, PermissionRepositoryTest, RoleRepositoryTest, UserAccountRepositoryTest). Integration tests verified in CI via GitHub Actions: run 38289687826 (https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/38289687826), head SHA `c1d828f24f5fb934c45f8745c2ccb60000300fec`, conclusion success (593 tests run, 0 failures, 0 errors, 0 skipped).
 
 ### Review Fixes & Hardening (Round 3)
 - B1 Card Plan & Upgrade Rule Reversion: Reverted upgrade check in `MembershipCardServiceImpl.planCard` to `tier.getPrice().compareTo(current.getTier().getPrice()) > 0`. Purchasing an equal-price tier now starts the day after the current card ends, priced at full tier price, without replacing the active card. Added unit tests for both online and desk equal-tier switches.

@@ -142,6 +142,8 @@ All Workstream B deliverables (CI/CD workflows, Docker packaging, scripts, and q
 - **All Integration Tests**: Fully compiled and ready for Docker execution in GitHub Actions CI (`PaymentPendingIntegrationTest`, `PaymentRepositoryIntegrationTest`, `PaymentDdlValidateIntegrationTest`).
 
 ### CI Evidence
-- **Run ID**: To be recorded following Git commit and push to `origin feat/f3-pending-payments`.
-- **Head SHA**: To be recorded following Git commit.
-- **Conclusion**: To be verified via GitHub Actions run.
+- **Run ID**: `38289687826`
+- **URL**: https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/38289687826
+- **Head SHA**: `c1d828f24f5fb934c45f8745c2ccb60000300fec`
+- **Conclusion**: `success`
+- **Total Test Count**: Tests run: 593, Failures: 0, Errors: 0, Skipped: 0. Build Success.
