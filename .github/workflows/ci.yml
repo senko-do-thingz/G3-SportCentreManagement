@@ -89,7 +89,7 @@ jobs:
 
       - name: Run unit tests
         working-directory: backend
-        run: mvn $MAVEN_ARGS test
+        run: mvn -B -ntp test
 
       - name: Fail on skipped tests
         if: always()
@@ -144,7 +144,7 @@ jobs:
 
       - name: Run integration tests
         working-directory: backend
-        run: mvn $MAVEN_ARGS verify -DskipUnitTests=true
+        run: mvn -B -ntp verify -DskipUnitTests=true
 
       - name: Fail on skipped tests
         if: always()
@@ -184,7 +184,7 @@ jobs:
 
       - name: Build jar without tests
         working-directory: backend
-        run: mvn $MAVEN_ARGS -DskipUnitTests=true -DskipITs=true package
+        run: mvn -B -ntp -DskipUnitTests=true -DskipITs=true package
 
       - name: Upload jar
         uses: actions/upload-artifact@v4
