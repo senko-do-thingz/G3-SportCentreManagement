@@ -1,0 +1,244 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  JAVA_VERSION: "25"
+  MAVEN_ARGS: "-B -ntp"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  conventions:
+    name: Project conventions and workflow lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check forbidden characters in added lines
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: bash scripts/ci/check-conventions.sh "$BASE_SHA"
+
+      - name: Lint GitHub workflows
+        run: |
+          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
+          ./actionlint -color
+
+  migration-guard:
+    name: Flyway migration guard
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check migrations against base branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags origin "$BASE_REF"
+          bash scripts/ci/check-migrations.sh "origin/$BASE_REF"
+
+  unit-tests:
+    name: Unit tests (no Docker)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    env:
+      DOCKER_HOST: unix:///nonexistent.sock
+      JWT_SECRET: "dGhpcy1pcy1hLXZlcnktc2VjdXJlLW1vY2stc2VjcmV0LWtleS1mb3ItdGVzdGluZy1vbmx5LWdoYWN0aW9ucw=="
+      BANK_TRANSFER_ACCOUNT_NAME: "Sportify Demo Center"
+      BANK_TRANSFER_ACCOUNT_NUMBER: "0000 1041 2460"
+      BANK_TRANSFER_BANK_NAME: "Demo Bank"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Run unit tests
+        working-directory: backend
+        run: mvn $MAVEN_ARGS test
+
+      - name: Fail on skipped tests
+        if: always()
+        run: bash scripts/ci/check-no-skipped-tests.sh backend/target/surefire-reports
+
+      - name: Publish test report
+        if: always()
+        uses: mikepenz/action-junit-report@v5
+        with:
+          report_paths: backend/target/surefire-reports/TEST-*.xml
+          check_name: Unit test report
+
+      - name: Upload surefire reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-unit
+          path: backend/target/surefire-reports
+          retention-days: 14
+
+  integration-tests:
+    name: Integration tests (Testcontainers, SQL Server 2022)
+    needs: unit-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    env:
+      JWT_SECRET: "dGhpcy1pcy1hLXZlcnktc2VjdXJlLW1vY2stc2VjcmV0LWtleS1mb3ItdGVzdGluZy1vbmx5LWdoYWN0aW9ucw=="
+      BANK_TRANSFER_ACCOUNT_NAME: "Sportify Demo Center"
+      BANK_TRANSFER_ACCOUNT_NUMBER: "0000 1041 2460"
+      BANK_TRANSFER_BANK_NAME: "Demo Bank"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Show Docker info
+        run: docker info
+
+      - name: Pre-pull SQL Server image
+        run: docker pull mcr.microsoft.com/mssql/server:2022-latest
+
+      - name: Run integration tests
+        working-directory: backend
+        run: mvn $MAVEN_ARGS verify -DskipUnitTests=true
+
+      - name: Fail on skipped tests
+        if: always()
+        run: bash scripts/ci/check-no-skipped-tests.sh backend/target/failsafe-reports
+
+      - name: Publish test report
+        if: always()
+        uses: mikepenz/action-junit-report@v5
+        with:
+          report_paths: backend/target/failsafe-reports/TEST-*.xml
+          check_name: Integration test report
+
+      - name: Upload failsafe reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failsafe-reports-integration
+          path: backend/target/failsafe-reports
+          retention-days: 14
+
+  package:
+    name: Package application
+    needs: [unit-tests, integration-tests]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Build jar without tests
+        working-directory: backend
+        run: mvn $MAVEN_ARGS -DskipUnitTests=true -DskipITs=true package
+
+      - name: Upload jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: backend/target/*.jar
+          if-no-files-found: error
+          retention-days: 7
+
+  frontend:
+    name: Frontend checks and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Test frontend
+        working-directory: frontend
+        run: npm run test
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+  ci-gate:
+    name: CI gate
+    if: always()
+    needs: [conventions, migration-guard, unit-tests, integration-tests, package, frontend]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Evaluate required jobs
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          for r in $RESULTS; do
+            if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
+              echo "At least one required job did not succeed."
+              exit 1
+            fi
+          done

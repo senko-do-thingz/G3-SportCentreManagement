@@ -1,0 +1,84 @@
+name: Deploy Compose
+description: Deploys application container via Docker Compose over SSH with health smoke test and automated rollback
+
+inputs:
+  ssh_key:
+    description: SSH Private Key
+    required: true
+  known_hosts:
+    description: SSH Known Hosts
+    required: true
+  deploy_user:
+    description: SSH Deployment User
+    required: true
+  deploy_host:
+    description: SSH Deployment Host
+    required: true
+  deploy_dir:
+    description: Deployment Directory on Remote Host
+    required: true
+  image_tag:
+    description: Image Tag to Deploy
+    required: true
+  base_url:
+    description: Base URL for Health Check
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Configure SSH
+      shell: bash
+      env:
+        SSH_KEY: ${{ inputs.ssh_key }}
+        KNOWN_HOSTS: ${{ inputs.known_hosts }}
+      run: |
+        install -m 700 -d ~/.ssh
+        printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+        chmod 600 ~/.ssh/id_deploy
+        printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+    - name: Record previous tag
+      shell: bash
+      env:
+        DEPLOY_USER: ${{ inputs.deploy_user }}
+        DEPLOY_HOST: ${{ inputs.deploy_host }}
+        DEPLOY_DIR: ${{ inputs.deploy_dir }}
+      run: |
+        PREVIOUS_TAG="$(ssh -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "cat $DEPLOY_DIR/.current_tag 2>/dev/null || true")"
+        echo "PREVIOUS_TAG=$PREVIOUS_TAG" >> "$GITHUB_ENV"
+
+    - name: Deploy
+      shell: bash
+      env:
+        DEPLOY_USER: ${{ inputs.deploy_user }}
+        DEPLOY_HOST: ${{ inputs.deploy_host }}
+        DEPLOY_DIR: ${{ inputs.deploy_dir }}
+        IMAGE_TAG: ${{ inputs.image_tag }}
+      run: |
+        ssh -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" \
+          "cd $DEPLOY_DIR && IMAGE_TAG=$IMAGE_TAG docker compose pull && IMAGE_TAG=$IMAGE_TAG docker compose up -d && echo $IMAGE_TAG > .current_tag"
+
+    - name: Smoke test
+      shell: bash
+      env:
+        BASE_URL: ${{ inputs.base_url }}
+      run: |
+        for i in $(seq 1 30); do
+          code="$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/actuator/health" || true)"
+          if [ "$code" = "200" ]; then echo "Healthy"; exit 0; fi
+          sleep 5
+        done
+        echo "Smoke test failed"
+        exit 1
+
+    - name: Roll back on failure
+      if: failure() && env.PREVIOUS_TAG != ''
+      shell: bash
+      env:
+        DEPLOY_USER: ${{ inputs.deploy_user }}
+        DEPLOY_HOST: ${{ inputs.deploy_host }}
+        DEPLOY_DIR: ${{ inputs.deploy_dir }}
+      run: |
+        ssh -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" \
+          "cd $DEPLOY_DIR && IMAGE_TAG=$PREVIOUS_TAG docker compose up -d && echo $PREVIOUS_TAG > .current_tag"
