@@ -550,3 +550,13 @@
     padding: var(--space-6) var(--space-4) var(--space-10);
   }
 }
+
+/* Session error page (profile could not be loaded, tokens kept) */
+.status-page__card--wide {
+  max-width: 520px;
+}
+
+.status-page__card .state {
+  width: 100%;
+  margin-top: var(--space-4);
+}

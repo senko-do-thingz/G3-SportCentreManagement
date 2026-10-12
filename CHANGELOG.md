@@ -2,7 +2,7 @@
 
 ## 2026-10-12 - Frontend foundation: routing, API client, auth, layouts (FE-00, Shared)
 
-Branch `feat/fe-foundation`. Status: Implemented and verified with `npm test` (43 tests), `npm run lint` and `npm run build`, plus browser checks against a mock of the auth API. Manual checks against the real backend (docs/tests/FE-00_test_cases.md section 3) must be run before merging. Builds on the Vite + React + TypeScript scaffold from PR #13; no backend change.
+Branch `feat/fe-foundation`. Status: Implemented and verified with `npm test` (65 tests after review round 2), `npm run lint` and `npm run build`, plus 20 browser checks against a mock of the auth API. Manual checks against the real backend (docs/tests/FE-00_test_cases.md section 3) must be run before merging. Builds on the Vite + React + TypeScript scaffold from PR #13; no backend change.
 
 ### API client (`frontend/src/api/`)
 - `client.ts`: fetch wrapper with base URL from `VITE_API_BASE_URL` (default `http://localhost:8080/api/v1`), JSON request and response handling, query string builder, `Authorization: Bearer` header.
@@ -32,12 +32,27 @@ Branch `feat/fe-foundation`. Status: Implemented and verified with `npm test` (4
 - `frontend/README.md`: how to call the API, use the auth context, add a screen and use the UI kit.
 
 ### Docs
-- `docs/tests/FE-00_test_cases.md`: 45 automated cases (43 tests plus build and lint), 12 browser checks, 12 manual cases for the real backend.
+- `docs/tests/FE-00_test_cases.md`: 67 automated cases (65 tests plus build and lint), 20 browser checks, 16 manual cases for the real backend.
 - `docs/audit/FE-00_AI_Audit_Log.docx`.
+
+### Review round 2
+- Step 1 (report only, no backend change): with the current backend a missing, expired or malformed access token on a protected endpoint returns 401, never 403 (JwtAuthenticationFilter.java line 64 catches JwtException, SecurityConfig.java lines 51-58 send anonymous requests to CustomAuthenticationEntryPoint, which sets 401 at line 21). Two latent backend risks are written up in the AI audit log with proposed fixes: an AccessDeniedException for an anonymous user would become 403 in GlobalExceptionHandler.java lines 99-101 if @PreAuthorize is ever added to a permitAll URL, and a token of a deleted user escapes the JWT filter as UsernameNotFoundException.
+- Session restore: new auth status `error`. A network error, 5xx or 429 while loading the profile keeps the tokens and shows a full page Retry screen (`SessionErrorPage`) instead of sending the user to `/login`. Only 401 or 403 after the refresh attempt, or a rejected refresh, end the session. `RequireAuth` and `HomeRedirect` handle the new status.
+- Refresh: 404 from `/auth/refresh` (user no longer exists) now ends the session like 400, 401 and 403.
+- Cross tab refresh: the refresh runs inside a Web Locks API lock (`navigator.locks.request`) with a fallback when it is missing. Inside the lock the stored tokens are read again and reused when another tab already refreshed. A rejected refresh reads storage again and keeps the session when another tab stored a newer refresh token. A rejected refresh ends the session while still holding the lock, so a waiting tab does not resend the same token.
+- Storage events: a new `sportify.sessionId` key marks a login. Other tabs reload the profile only when it changes (login or logout elsewhere), not on token rotation, and a late profile answer from an older change is ignored.
+- `/ui-kit` is registered only when `import.meta.env.DEV` is true and loaded lazily, so a production build contains neither the route nor the page (it shows 404).
+- `package.json` `engines.node` set to `^22.13.0 || ^24.0.0 || >=26.0.0` (the range shared by Vite 8, Vitest 5, ESLint 10 and jsdom), new `frontend/.nvmrc` (24), README documents the Node requirement and the fixed port 5173 (`strictPort`).
+- Table keeps the previous rows visible (dimmed, `aria-busy`) with a spinner overlay while loading another page.
+- Toast messages are announced once: two permanent live regions (assertive for errors, polite for the rest), no role on each toast.
+- Log in form checks email (required, basic format) and password (required) before sending; backend field errors still take precedence.
+- Modal focus trap ignores hidden elements (`hidden`, `aria-hidden="true"`, `inert`, `display: none`, `visibility: hidden`) and pulls focus back into the dialog when it moved outside.
+- 22 new tests (65 in total, 6 files); each new guard was broken on purpose once and its tests failed (15 of 15).
 
 ### Follow-ups
 - Run the manual cases in docs/tests/FE-00_test_cases.md section 3 against the real backend before merging.
 - Tokens are stored in localStorage (no httpOnly cookie support in the backend); never render untrusted HTML.
+- Backend hardening proposals from review round 2 (R1: return 401 instead of 403 for anonymous AccessDeniedException; R2: catch UsernameNotFoundException in JwtAuthenticationFilter) are for the backend team to decide.
 - The backend has no logout endpoint, so logout only drops the tokens on this device; issued refresh tokens stay valid until they expire (7 days).
 - `GET /members` returns a raw Spring page; switching it to `PageResponse` would let screens drop `normalizePage`.
 

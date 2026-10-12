@@ -754,6 +754,12 @@
   pointer-events: none;
 }
 
+.toast-region__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
 .toast {
   position: relative;
   display: flex;
@@ -878,4 +884,23 @@
   .definition-list dd {
     margin-bottom: var(--space-2);
   }
+}
+
+/* Table loading another page: previous rows stay visible under a spinner overlay */
+.table-scroll--loading {
+  position: relative;
+}
+
+.table-scroll--loading .table tbody {
+  opacity: 0.45;
+  transition: opacity 0.15s ease;
+}
+
+.table__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }

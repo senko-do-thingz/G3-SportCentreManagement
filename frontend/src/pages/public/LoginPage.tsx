@@ -7,6 +7,7 @@ import { useAuth } from '../../auth/useAuth'
 import { Brand } from '../../components/Brand'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { validateLogin } from '../../auth/loginValidation'
 
 /**
  * Log in screen (Figma F1-05). FE-00 delivers a working form so every role can reach its layout;
@@ -24,6 +25,17 @@ export function LoginPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
+  const clearFieldError = (field: string) => {
+    setFieldErrors((current) => {
+      if (!current[field]) {
+        return current
+      }
+      const next = { ...current }
+      delete next[field]
+      return next
+    })
+  }
+
   if (status === 'authenticated' && user && !submitting) {
     return <Navigate to={homePathFor(user)} replace />
   }
@@ -31,13 +43,18 @@ export function LoginPage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setFormError(null)
-    setFieldErrors({})
+    const clientErrors = validateLogin(email, password)
+    setFieldErrors(clientErrors)
+    if (Object.keys(clientErrors).length > 0) {
+      return
+    }
     setSubmitting(true)
     try {
       const signedIn = await login({ email, password })
       navigate(postLoginPath(signedIn, requestedPath), { replace: true })
     } catch (error) {
       if (error instanceof ApiError && error.hasFieldErrors) {
+        // Backend validation messages take precedence over the client side checks.
         setFieldErrors(error.fieldErrors)
       } else {
         setFormError(getErrorMessage(error))
@@ -84,7 +101,10 @@ export function LoginPage() {
             autoComplete="email"
             placeholder="you@example.com"
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            onChange={(event) => {
+              setEmail(event.target.value)
+              clearFieldError('email')
+            }}
             error={fieldErrors.email}
             required
           />
@@ -94,7 +114,10 @@ export function LoginPage() {
             name="password"
             autoComplete="current-password"
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={(event) => {
+              setPassword(event.target.value)
+              clearFieldError('password')
+            }}
             error={fieldErrors.password}
             required
           />

@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { act, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../api/tokenStorage'
@@ -181,5 +181,197 @@ describe('auth flow', () => {
   it('redirects / to the login page for anonymous users', async () => {
     renderApp('/')
     expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+  })
+  it('keeps the tokens and shows Retry when the backend is unreachable on reload', async () => {
+    tokenStorage.startSession({ accessToken: 'access-1', refreshToken: 'refresh-1' })
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))))
+
+    renderApp('/manager')
+
+    expect(await screen.findByRole('heading', { name: 'We could not load your account' })).toBeInTheDocument()
+    expect(screen.getByText(/cannot reach the server/i)).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Welcome back' })).not.toBeInTheDocument()
+    expect(tokenStorage.getAccessToken()).toBe('access-1')
+    expect(tokenStorage.getRefreshToken()).toBe('refresh-1')
+  })
+
+  it('Retry restores the session once the backend is back', async () => {
+    tokenStorage.startSession({ accessToken: 'access-1', refreshToken: 'refresh-1' })
+    let online = false
+    installFakeFetch((call) => {
+      if (!online) {
+        return backendError(503, 'Service unavailable')
+      }
+      return call.path === '/users/me' ? json(200, MANAGER) : backendError(404, 'x')
+    })
+    const user = userEvent.setup()
+    renderApp('/manager/finance')
+
+    await screen.findByRole('heading', { name: 'We could not load your account' })
+    expect(screen.getByText('Service unavailable')).toBeInTheDocument()
+    online = true
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(await screen.findByRole('heading', { name: 'Financial Overview' })).toBeInTheDocument()
+  })
+
+  it('a server error during the refresh on reload keeps the session and shows Retry', async () => {
+    tokenStorage.startSession({ accessToken: 'expired', refreshToken: 'refresh-ok' })
+    installFakeFetch((call) =>
+      call.path === '/auth/refresh' ? backendError(500, 'Internal server error') : backendError(401, 'Unauthorized'),
+    )
+
+    renderApp('/')
+
+    expect(await screen.findByRole('heading', { name: 'We could not load your account' })).toBeInTheDocument()
+    expect(tokenStorage.getRefreshToken()).toBe('refresh-ok')
+  })
+
+  it('a rejected refresh on reload still goes to the login page', async () => {
+    tokenStorage.startSession({ accessToken: 'expired', refreshToken: 'revoked' })
+    installFakeFetch((call) =>
+      call.path === '/auth/refresh' ? backendError(404, 'User not found') : backendError(401, 'Unauthorized'),
+    )
+
+    renderApp('/member')
+
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(tokenStorage.hasSession()).toBe(false)
+  })
+
+  it('Log out on the Retry screen ends the session', async () => {
+    tokenStorage.startSession({ accessToken: 'access-1', refreshToken: 'refresh-1' })
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))))
+    const user = userEvent.setup()
+    renderApp('/manager')
+
+    await screen.findByRole('heading', { name: 'We could not load your account' })
+    await user.click(screen.getByRole('button', { name: 'Log out' }))
+
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(tokenStorage.hasSession()).toBe(false)
+  })
+  describe('changes made in another tab (storage events)', () => {
+    function fireStorage(key: string, oldValue: string | null, newValue: string | null) {
+      act(() => {
+        window.dispatchEvent(new StorageEvent('storage', { key, oldValue, newValue }))
+      })
+    }
+
+    async function signedInAsManager() {
+      tokenStorage.startSession({ accessToken: 'manager-access', refreshToken: 'manager-refresh' })
+      const profiles: Record<string, typeof MANAGER> = { 'manager-access': MANAGER, 'member-access': MEMBER }
+      const delays: Record<string, number> = {}
+      const { calls } = installFakeFetch(async (call) => {
+        const token = call.authorization?.replace('Bearer ', '') ?? ''
+        await new Promise((resolve) => setTimeout(resolve, delays[token] ?? 0))
+        return profiles[token] ? json(200, profiles[token]) : backendError(401, 'Unauthorized')
+      })
+      renderApp('/manager')
+      await screen.findByRole('heading', { name: 'User Management' })
+      const meCalls = () => calls.filter((call) => call.path === '/users/me').length
+      return { meCalls, delays }
+    }
+
+    it('ignores token rotation done by a refresh in another tab', async () => {
+      const { meCalls } = await signedInAsManager()
+      expect(meCalls()).toBe(1)
+
+      window.localStorage.setItem('sportify.accessToken', 'manager-access-2')
+      fireStorage('sportify.accessToken', 'manager-access', 'manager-access-2')
+      fireStorage('sportify.refreshToken', 'manager-refresh', 'manager-refresh-2')
+      await new Promise((resolve) => setTimeout(resolve, 20))
+
+      expect(meCalls()).toBe(1)
+      expect(screen.getByRole('heading', { name: 'User Management' })).toBeInTheDocument()
+    })
+
+    it('follows a login as another user in another tab', async () => {
+      const { meCalls } = await signedInAsManager()
+      const oldSession = tokenStorage.getSessionId()
+
+      window.localStorage.setItem('sportify.accessToken', 'member-access')
+      window.localStorage.setItem('sportify.refreshToken', 'member-refresh')
+      window.localStorage.setItem('sportify.sessionId', 'session-from-other-tab')
+      fireStorage('sportify.sessionId', oldSession, 'session-from-other-tab')
+
+      // This tab was on a manager page; the member who is now signed in sees the 403 page.
+      expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
+      expect(meCalls()).toBe(2)
+    })
+
+    it('follows a logout in another tab', async () => {
+      await signedInAsManager()
+      const oldSession = tokenStorage.getSessionId()
+
+      window.localStorage.clear()
+      fireStorage('sportify.sessionId', oldSession, null)
+
+      expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    })
+
+    it('a slow profile answer from an older change cannot overwrite a newer one', async () => {
+      const { delays } = await signedInAsManager()
+      const oldSession = tokenStorage.getSessionId()
+
+      // First change: a member logs in elsewhere, and its profile answer is slow.
+      delays['member-access'] = 60
+      window.localStorage.setItem('sportify.accessToken', 'member-access')
+      window.localStorage.setItem('sportify.sessionId', 'member-session')
+      fireStorage('sportify.sessionId', oldSession, 'member-session')
+      // Second change right after: the manager logs in again, fast answer.
+      window.localStorage.setItem('sportify.accessToken', 'manager-access')
+      window.localStorage.setItem('sportify.sessionId', 'manager-session')
+      fireStorage('sportify.sessionId', 'member-session', 'manager-session')
+
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      expect(screen.getByRole('heading', { name: 'User Management' })).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Access denied' })).not.toBeInTheDocument()
+    })
+  })
+  describe('log in form checks', () => {
+    it('shows required messages and sends no request for an empty form', async () => {
+      const { calls } = installFakeFetch(backendWith(ACCOUNTS))
+      const user = userEvent.setup()
+      renderApp('/login')
+
+      await user.click(await screen.findByRole('button', { name: /log in/i }))
+
+      expect(screen.getByText('Email is required')).toBeInTheDocument()
+      expect(screen.getByText('Password is required')).toBeInTheDocument()
+      expect(calls).toHaveLength(0)
+    })
+
+    it('rejects a malformed email before calling the backend', async () => {
+      const { calls } = installFakeFetch(backendWith(ACCOUNTS))
+      renderApp('/login')
+
+      await logIn('manager.sportify.com', 'password')
+
+      expect(screen.getByText('Email is invalid')).toBeInTheDocument()
+      expect(screen.getByLabelText(/email address/i)).toHaveAttribute('aria-invalid', 'true')
+      expect(calls).toHaveLength(0)
+    })
+
+    it('clears the message of a field when the user types in it', async () => {
+      installFakeFetch(backendWith(ACCOUNTS))
+      const user = userEvent.setup()
+      renderApp('/login')
+      await user.click(await screen.findByRole('button', { name: /log in/i }))
+
+      await user.type(screen.getByLabelText(/email address/i), 'm')
+
+      expect(screen.queryByText('Email is required')).not.toBeInTheDocument()
+      expect(screen.getByText('Password is required')).toBeInTheDocument()
+    })
+
+    it('shows backend field errors over the client checks', async () => {
+      installFakeFetch(() => backendError(400, 'Validation Error', { email: 'Email must be at most 255 characters' }))
+      renderApp('/login')
+
+      await logIn('someone@sportify.com', 'secret')
+
+      expect(await screen.findByText('Email must be at most 255 characters')).toBeInTheDocument()
+    })
   })
 })

@@ -55,10 +55,14 @@ export function Table<T>({
   }
 
   const showEmpty = !loading && rows.length === 0
+  // While loading another page, keep the previous rows visible (dimmed) under a spinner overlay,
+  // so the table does not flash empty. The full row spinner is only for the very first load.
+  const showRowSpinner = loading && rows.length === 0
+  const showOverlay = loading && rows.length > 0
 
   return (
     <div className="table-block">
-      <div className="table-scroll">
+      <div className={`table-scroll${showOverlay ? ' table-scroll--loading' : ''}`}>
         <table className="table">
           {caption && <caption className="visually-hidden">{caption}</caption>}
           <thead>
@@ -75,23 +79,22 @@ export function Table<T>({
             </tr>
           </thead>
           <tbody aria-busy={loading || undefined}>
-            {loading && (
+            {showRowSpinner && (
               <tr>
                 <td colSpan={columns.length} className="table__state-cell">
                   <Spinner label="Loading rows" />
                 </td>
               </tr>
             )}
-            {!loading &&
-              rows.map((row, rowIndex) => (
-                <tr key={rowKey(row, rowIndex)}>
-                  {columns.map((column) => (
-                    <td key={column.key} style={{ textAlign: column.align ?? 'left' }}>
-                      {cellValue(row, column, rowIndex)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+            {rows.map((row, rowIndex) => (
+              <tr key={rowKey(row, rowIndex)}>
+                {columns.map((column) => (
+                  <td key={column.key} style={{ textAlign: column.align ?? 'left' }}>
+                    {cellValue(row, column, rowIndex)}
+                  </td>
+                ))}
+              </tr>
+            ))}
             {showEmpty && (
               <tr>
                 <td colSpan={columns.length} className="table__state-cell">
@@ -101,6 +104,11 @@ export function Table<T>({
             )}
           </tbody>
         </table>
+        {showOverlay && (
+          <div className="table__overlay">
+            <Spinner label="Loading rows" inline />
+          </div>
+        )}
       </div>
       {pagination && pagination.totalItems > 0 && <Pagination {...pagination} disabled={loading || pagination.disabled} />}
     </div>

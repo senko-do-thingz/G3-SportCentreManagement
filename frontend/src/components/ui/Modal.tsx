@@ -20,6 +20,27 @@ const openModals: RefObject<HTMLDivElement | null>[] = []
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
+/** True when the element, or a parent up to the dialog, is hidden from the user. */
+function isHidden(element: HTMLElement, root: HTMLElement): boolean {
+  let node: HTMLElement | null = element
+  while (node && node !== root.parentElement) {
+    if (node.hidden || node.getAttribute('aria-hidden') === 'true' || node.hasAttribute('inert')) {
+      return true
+    }
+    const style = window.getComputedStyle(node)
+    if (style.display === 'none' || style.visibility === 'hidden') {
+      return true
+    }
+    node = node.parentElement
+  }
+  return false
+}
+
+/** Focusable elements of the dialog in tab order, without hidden ones. */
+function focusableIn(dialog: HTMLElement): HTMLElement[] {
+  return Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((element) => !isHidden(element, dialog))
+}
+
 export function Modal({
   open,
   onClose,
@@ -47,7 +68,7 @@ export function Modal({
     }
     const previouslyFocused = document.activeElement as HTMLElement | null
     const dialog = dialogRef.current
-    const firstFocusable = dialog?.querySelector<HTMLElement>(FOCUSABLE)
+    const firstFocusable = dialog ? focusableIn(dialog)[0] : undefined
     ;(firstFocusable ?? dialog)?.focus()
 
     const previousOverflow = document.body.style.overflow
@@ -83,24 +104,46 @@ export function Modal({
       }
       // Keep keyboard focus inside the dialog.
       if (event.key === 'Tab' && dialog) {
-        const items = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE))
+        const items = focusableIn(dialog)
         if (items.length === 0) {
           event.preventDefault()
+          dialog.focus()
           return
         }
         const first = items[0]
         const last = items[items.length - 1]
-        if (event.shiftKey && document.activeElement === first) {
+        const active = document.activeElement
+        const outside = !(active instanceof Node) || !dialog.contains(active)
+        if (outside) {
+          // Focus escaped the dialog (for example a click on the page behind): bring it back.
+          event.preventDefault()
+          ;(event.shiftKey ? last : first).focus()
+        } else if (event.shiftKey && (active === first || active === dialog)) {
           event.preventDefault()
           last.focus()
-        } else if (!event.shiftKey && document.activeElement === last) {
+        } else if (!event.shiftKey && active === last) {
           event.preventDefault()
           first.focus()
         }
       }
     }
+    // Focus moved outside the top dialog by other means (script, assistive technology): pull it back.
+    const handleFocusIn = (event: FocusEvent) => {
+      const dialog = dialogRef.current
+      if (!dialog || openModals[openModals.length - 1] !== dialogRef) {
+        return
+      }
+      const target = event.target
+      if (target instanceof Node && !dialog.contains(target) && !target.contains(dialog)) {
+        ;(focusableIn(dialog)[0] ?? dialog).focus()
+      }
+    }
     document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
+    document.addEventListener('focusin', handleFocusIn)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('focusin', handleFocusIn)
+    }
   }, [open, dismissible])
 
   if (!open) {

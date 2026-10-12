@@ -4,6 +4,9 @@ import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { renderApp } from '../../test/renderApp'
 import { StatusBadge } from './Badge'
+import { Table } from './Table'
+import { ToastProvider } from './ToastProvider'
+import { useToast } from './toastContext'
 import { Modal } from './Modal'
 import { Pagination } from './Pagination'
 import { pageWindow } from './pageWindow'
@@ -54,7 +57,7 @@ describe('shared UI components', () => {
 
     await user.click(screen.getByRole('button', { name: 'Next' }))
 
-    expect(within(table).getByText('Demo User 06')).toBeInTheDocument()
+    expect(await within(table).findByText('Demo User 06')).toBeInTheDocument()
     expect(screen.getByText('Showing 6-10 of 23')).toBeInTheDocument()
   })
 
@@ -153,5 +156,113 @@ describe('shared UI components', () => {
     await user.click(screen.getByRole('button', { name: 'Start saving' }))
     await user.click(screen.getByRole('button', { name: 'Done' }))
     expect(screen.getByRole('button', { name: 'Opener' })).toHaveFocus()
+  })
+  it('serves /ui-kit only in development builds', async () => {
+    vi.stubEnv('DEV', false)
+    renderApp('/ui-kit')
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+    vi.unstubAllEnvs()
+  })
+
+  it('keeps the previous rows visible under an overlay while loading', () => {
+    const columns = [{ key: 'name', header: 'Name' }]
+    const rows = [{ id: 1, name: 'Taylor Nguyen' }]
+    const { container, rerender } = render(
+      <Table caption="People" columns={columns} rows={rows} rowKey={(row) => row.id} />,
+    )
+    rerender(<Table caption="People" columns={columns} rows={rows} rowKey={(row) => row.id} loading />)
+
+    expect(screen.getByText('Taylor Nguyen')).toBeInTheDocument()
+    expect(container.querySelector('tbody')).toHaveAttribute('aria-busy', 'true')
+    expect(container.querySelector('.table__overlay')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Loading rows')
+  })
+
+  it('shows the row spinner only for a first load without rows', () => {
+    const { container } = render(
+      <Table caption="People" columns={[{ key: 'name', header: 'Name' }]} rows={[]} rowKey={() => 1} loading />,
+    )
+    expect(container.querySelector('.table__overlay')).not.toBeInTheDocument()
+    expect(container.querySelector('.table__state-cell .spinner')).toBeInTheDocument()
+  })
+
+  it('announces each toast once, through one live region', async () => {
+    const user = userEvent.setup()
+    function Trigger() {
+      const toast = useToast()
+      return (
+        <>
+          <button type="button" onClick={() => toast.success('Saved')}>
+            ok
+          </button>
+          <button type="button" onClick={() => toast.error('Failed')}>
+            fail
+          </button>
+        </>
+      )
+    }
+    render(
+      <ToastProvider>
+        <Trigger />
+      </ToastProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'ok' }))
+    await user.click(screen.getByRole('button', { name: 'fail' }))
+
+    const saved = screen.getByText('Saved').closest('.toast') as HTMLElement
+    const failed = screen.getByText('Failed').closest('.toast') as HTMLElement
+    for (const toast of [saved, failed]) {
+      expect(toast).not.toHaveAttribute('role')
+      expect(toast).not.toHaveAttribute('aria-live')
+    }
+    expect(saved.closest('[aria-live]')).toHaveAttribute('aria-live', 'polite')
+    expect(failed.closest('[aria-live]')).toHaveAttribute('aria-live', 'assertive')
+    expect(saved.parentElement?.parentElement?.closest('[aria-live]')).toBeNull()
+  })
+
+  describe('modal focus trap', () => {
+    function TrapHarness() {
+      return (
+        <>
+          <button type="button">Outside</button>
+          <Modal open onClose={() => undefined} title="Trap" dismissible={false}>
+            {/* Hidden elements sit at both edges, exactly where the trap wraps focus. */}
+            <button type="button" hidden>
+              Hidden attribute
+            </button>
+            <div aria-hidden="true">
+              <button type="button">Aria hidden</button>
+            </div>
+            <button type="button">First</button>
+            <button type="button">Last</button>
+            <button type="button" style={{ display: 'none' }}>
+              Display none
+            </button>
+          </Modal>
+        </>
+      )
+    }
+
+    it('skips hidden elements when wrapping with Tab and Shift+Tab', async () => {
+      const user = userEvent.setup()
+      render(<TrapHarness />)
+      expect(screen.getByRole('button', { name: 'First' })).toHaveFocus()
+
+      await user.tab({ shift: true })
+      expect(screen.getByRole('button', { name: 'Last' })).toHaveFocus()
+      await user.tab()
+      expect(screen.getByRole('button', { name: 'First' })).toHaveFocus()
+    })
+
+    it('pulls focus back into the dialog when it moved outside', async () => {
+      const user = userEvent.setup()
+      render(<TrapHarness />)
+
+      screen.getByRole('button', { name: 'Outside', hidden: true }).focus()
+      expect(screen.getByRole('button', { name: 'First' })).toHaveFocus()
+
+      await user.tab()
+      expect(document.activeElement && screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
+    })
   })
 })

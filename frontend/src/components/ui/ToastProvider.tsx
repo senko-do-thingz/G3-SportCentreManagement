@@ -60,33 +60,40 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [show, dismiss],
   )
 
+  const renderToast = (toast: ToastItem) => (
+    <div key={toast.id} className={`toast toast--${toast.tone}`}>
+      <span className="toast__bar" aria-hidden="true" />
+      <div className="toast__content">
+        <p className="toast__title">{toast.title}</p>
+        {toast.message && <p className="toast__message">{toast.message}</p>}
+      </div>
+      <button
+        type="button"
+        className="toast__close"
+        onClick={() => dismiss(toast.id)}
+        aria-label="Dismiss notification"
+      >
+        <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+          <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      </button>
+    </div>
+  )
+
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="toast-region" aria-live="polite" aria-relevant="additions">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`toast toast--${toast.tone}`}
-            role={toast.tone === 'error' ? 'alert' : 'status'}
-          >
-            <span className="toast__bar" aria-hidden="true" />
-            <div className="toast__content">
-              <p className="toast__title">{toast.title}</p>
-              {toast.message && <p className="toast__message">{toast.message}</p>}
-            </div>
-            <button
-              type="button"
-              className="toast__close"
-              onClick={() => dismiss(toast.id)}
-              aria-label="Dismiss notification"
-            >
-              <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
-                <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
-        ))}
+      {/*
+        Two live regions that always exist: errors are announced assertively, everything else
+        politely. The toast elements themselves carry no role, so each message is read once.
+      */}
+      <div className="toast-region">
+        <div className="toast-region__list" aria-live="assertive" aria-relevant="additions">
+          {toasts.filter((toast) => toast.tone === 'error').map(renderToast)}
+        </div>
+        <div className="toast-region__list" aria-live="polite" aria-relevant="additions">
+          {toasts.filter((toast) => toast.tone !== 'error').map(renderToast)}
+        </div>
       </div>
     </ToastContext.Provider>
   )

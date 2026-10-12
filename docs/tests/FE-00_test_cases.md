@@ -8,17 +8,18 @@
 - Depends on: BE-00 (CORS for http://localhost:5173, merged)
 - Scope:
   - API client (`frontend/src/api/client.ts`) on top of fetch: base URL from `VITE_API_BASE_URL`, JSON handling, Authorization header, automatic `POST /auth/refresh` on 401 (one shared refresh, one retry, then logout), typed `ApiError` (status, message, fieldErrors).
-  - Auth context (`AuthProvider`, `useAuth`): login, logout, current user from `GET /users/me`, role, token storage, session restore after reload, logout in other tabs.
+  - Auth context (`AuthProvider`, `useAuth`): login, logout, current user from `GET /users/me`, role, token storage, session restore after reload with a Retry screen when the server is unreachable, login and logout followed across tabs.
+  - Cross tab refresh: one refresh at a time through the Web Locks API, with a storage re-check fallback (review round 2).
   - Route guards `RequireAuth` and `RequireRole(roles)`, 403 and 404 pages.
   - Layouts: public, member (top nav), staff (side nav) for RECEPTIONIST, MANAGER, COACH with a menu per role and placeholder pages for screens built later.
   - Shared UI: Button, Input, Select, Modal, Table with Pagination, Badge and StatusBadge, Toast, Spinner, EmptyState, ErrorState, Card, StatCard, PageHeader; money and date formatters.
-  - Design tokens sampled from the Figma screens (blue and white, light) and a demo page at `/ui-kit`.
+  - Design tokens sampled from the Figma screens (blue and white, light) and a demo page at `/ui-kit` (development builds only since review round 2).
 
 ### How to run
 ```powershell
 cd frontend
 npm install
-npm test          # automated cases TC-FE00-001 to TC-FE00-043
+npm test          # automated cases TC-FE00-001 to TC-FE00-043 and TC-FE00-046 to TC-FE00-067
 npm run lint
 npm run build
 ```
@@ -30,14 +31,17 @@ Manual cases (section 3) need the real backend: `cd backend` then `mvn spring-bo
 |---|---|---|
 | Automated, API client (`src/api/client.test.ts`) | 15 | 15 PASSED |
 | Automated, page helper (`src/api/page.test.ts`) | 2 | 2 PASSED |
-| Automated, auth flow (`src/auth/auth.flow.test.tsx`) | 12 | 12 PASSED |
-| Automated, shared UI (`src/components/ui/components.test.tsx`) | 9 | 9 PASSED |
+| Automated, auth flow (`src/auth/auth.flow.test.tsx`) | 25 | 25 PASSED |
+| Automated, shared UI (`src/components/ui/components.test.tsx`) | 15 | 15 PASSED |
+| Automated, two tabs (`src/api/crossTab.test.ts`) | 3 | 3 PASSED |
 | Automated, formatters (`src/utils/format.test.ts`) | 5 | 5 PASSED |
 | Build and lint (`npm run build`, `npm run lint`) | 2 | 2 PASSED |
-| Browser checks in Chromium against a mock of the auth API | 12 | 12 PASSED |
-| Manual checks against the real backend and SQL Server | 12 | NOT RUN YET (run before merge) |
+| Browser checks in Chromium against a mock of the auth API | 20 | 20 PASSED |
+| Manual checks against the real backend and SQL Server | 16 | NOT RUN YET (run before merge) |
 
-Note: the browser checks used a local mock server that copies the backend auth contract (login, refresh with token rotation, `/users/me`, error body `{timestamp, status, message, details}`) with a 4 second access token. The real Spring Boot backend could not be started in the AI workspace (no SQL Server image), so section 3 must be run on a team machine before the PR is merged.
+Total automated: 65 Vitest tests in 6 files (43 from round 1, 22 added in review round 2), plus build and lint.
+
+Note: the browser checks used a local mock server that copies the backend auth contract (login, refresh with token rotation, `/users/me`, error body `{timestamp, status, message, details}`) with a 4 second access token. The real Spring Boot backend could not be started in the AI workspace (no SQL Server image, and Maven Central is blocked there), so section 3 must be run on a team machine before the PR is merged.
 
 ---
 
@@ -277,7 +281,142 @@ Note: the browser checks used a local mock server that copies the backend auth c
 - Expected Result: after the modal switches to non dismissible (saving) and then closes, focus returns to the button that opened it.
 - Status: PASSED
 
-### 2.7 Build and lint
+### 2.7 Review round 2
+
+#### Session restore (`auth.flow.test.tsx`)
+
+#### TC-FE00-046: Backend unreachable on reload keeps the session
+- Test: `keeps the tokens and shows Retry when the backend is unreachable on reload`
+- Steps: stored session; every request fails with a network error; open `/manager`.
+- Expected Result: "We could not load your account" with "Cannot reach the server..."; no login page; both tokens still stored.
+- Status: PASSED
+
+#### TC-FE00-047: Retry restores the session
+- Test: `Retry restores the session once the backend is back`
+- Steps: `/users/me` returns 503 first; the backend comes back; click Retry on `/manager/finance`.
+- Expected Result: the 503 message is shown first, then "Financial Overview" after Retry, without logging in again.
+- Status: PASSED
+
+#### TC-FE00-048: Server error during the refresh keeps the session
+- Test: `a server error during the refresh on reload keeps the session and shows Retry`
+- Expected Result: `/auth/refresh` 500 gives the Retry screen at `/`; the refresh token is kept.
+- Status: PASSED
+
+#### TC-FE00-049: Rejected refresh still logs out
+- Test: `a rejected refresh on reload still goes to the login page`
+- Steps: `/auth/refresh` returns 404 "User not found" (deleted user, backend AuthenticationServiceImpl lines 156-157).
+- Expected Result: login page; storage empty.
+- Status: PASSED
+
+#### TC-FE00-050: Log out from the Retry screen
+- Test: `Log out on the Retry screen ends the session`
+- Expected Result: login page; storage empty.
+- Status: PASSED
+
+#### Changes made in another tab (`auth.flow.test.tsx`, storage events)
+
+#### TC-FE00-051: Token rotation in another tab is ignored
+- Test: `ignores token rotation done by a refresh in another tab`
+- Expected Result: storage events for `sportify.accessToken` and `sportify.refreshToken` do not call `GET /users/me` again (still 1 call); the page stays.
+- Status: PASSED
+
+#### TC-FE00-052: Login as another user in another tab is followed
+- Test: `follows a login as another user in another tab`
+- Steps: signed in as manager on `/manager`; another tab stores a member session and a new `sportify.sessionId`.
+- Expected Result: the profile is reloaded (2 calls) and the member sees "Access denied" on the manager page.
+- Status: PASSED
+
+#### TC-FE00-053: Logout in another tab is followed
+- Test: `follows a logout in another tab`
+- Expected Result: removing `sportify.sessionId` in another tab shows the login page.
+- Status: PASSED
+
+#### TC-FE00-054: Stale profile answer is ignored
+- Test: `a slow profile answer from an older change cannot overwrite a newer one`
+- Steps: a member session change with a slow `/users/me`, then a manager session change with a fast one.
+- Expected Result: the manager page stays; the late member answer is ignored.
+- Status: PASSED
+
+#### Log in form checks (`auth.flow.test.tsx`)
+
+#### TC-FE00-055: Empty form
+- Test: `shows required messages and sends no request for an empty form`
+- Expected Result: "Email is required" and "Password is required"; no request sent.
+- Status: PASSED
+
+#### TC-FE00-056: Malformed email
+- Test: `rejects a malformed email before calling the backend`
+- Expected Result: "Email is invalid", the field has `aria-invalid="true"`; no request sent.
+- Status: PASSED
+
+#### TC-FE00-057: Typing clears the field message
+- Test: `clears the message of a field when the user types in it`
+- Expected Result: the email message disappears after typing; the password message stays.
+- Status: PASSED
+
+#### TC-FE00-058: Backend field errors win
+- Test: `shows backend field errors over the client checks`
+- Expected Result: the backend `details` message "Email must be at most 255 characters" is shown under the field.
+- Status: PASSED
+
+#### Two tabs (`frontend/src/api/crossTab.test.ts`)
+
+Each tab is simulated with its own instance of the client and token storage modules, sharing one `localStorage`. The fake backend rotates refresh tokens like `AuthenticationServiceImpl` (a refresh token works once).
+
+#### TC-FE00-059: Parallel 401 in two tabs with Web Locks
+- Test: `with Web Locks: parallel 401 in two tabs makes exactly one refresh call and nobody is logged out`
+- Expected Result: both requests succeed; exactly one `POST /auth/refresh`; storage holds `access-2`; no session expired event in either tab.
+- Status: PASSED
+
+#### TC-FE00-060: Parallel 401 in two tabs without Web Locks
+- Test: `without Web Locks: the second refresh is rejected but the tab reuses the token stored by the other tab`
+- Expected Result: two refresh calls, the second rejected; that tab reads storage again, finds the newer refresh token and reuses the stored access token; both requests succeed; nobody is logged out.
+- Status: PASSED
+
+#### TC-FE00-061: A really rejected refresh token logs out both tabs
+- Test: `a really rejected refresh token still logs out both tabs`
+- Expected Result: both requests fail; only one refresh call (the session is ended inside the lock, so the waiting tab does not resend the same token); storage empty; each tab notified once.
+- Status: PASSED
+
+#### Shared UI (`components.test.tsx`)
+
+#### TC-FE00-062: /ui-kit only in development
+- Test: `serves /ui-kit only in development builds`
+- Steps: `import.meta.env.DEV` stubbed to false; open `/ui-kit`.
+- Expected Result: "Page not found".
+- Status: PASSED
+
+#### TC-FE00-063: Table keeps rows while loading
+- Test: `keeps the previous rows visible under an overlay while loading`
+- Expected Result: the previous row stays visible, `tbody` has `aria-busy="true"`, the overlay spinner "Loading rows" is shown.
+- Status: PASSED
+
+#### TC-FE00-064: First load spinner
+- Test: `shows the row spinner only for a first load without rows`
+- Expected Result: with no rows yet, the spinner is shown in the table body and no overlay is used.
+- Status: PASSED
+
+#### TC-FE00-065: Toast announced once
+- Test: `announces each toast once, through one live region`
+- Expected Result: toast elements have no `role` and no `aria-live`; a success toast sits in the polite region, an error toast in the assertive region, and the two regions are not nested.
+- Status: PASSED
+
+#### TC-FE00-066: Focus trap skips hidden elements
+- Test: `skips hidden elements when wrapping with Tab and Shift+Tab` (describe `modal focus trap`)
+- Steps: hidden buttons (`hidden` attribute, inside `aria-hidden="true"`, `display: none`) sit before First and after Last.
+- Expected Result: Shift+Tab from First goes to Last; Tab from Last goes to First.
+- Status: PASSED
+
+#### TC-FE00-067: Focus pulled back into the dialog
+- Test: `pulls focus back into the dialog when it moved outside`
+- Expected Result: focusing a button behind the dialog moves focus back to First; Tab keeps focus inside the dialog.
+- Status: PASSED
+
+#### Regression check
+
+Each guard added in round 2 was broken on purpose once and the matching tests failed (15 of 15), then the change was reverted: transient error ends the session (4 tests failed), RequireAuth ignoring the error status (3), refresh 404 not treated as rejected (1), Web Locks not used (2), no re-read inside the lock (1), no storage re-check after a rejected refresh (1), session not ended inside the lock (1), storage handler reacting to rotation (1), stale profile answers accepted (1), `/ui-kit` registered in production (1), Table dropping rows while loading (1), toast role added back (1), login without client checks (3), hidden elements not filtered (2), focus not pulled back (1).
+
+### 2.8 Build and lint
 
 #### TC-FE00-044: Production build (acceptance criterion 5)
 - Command: `npm run build`
@@ -314,12 +453,36 @@ If an account already exists the command returns 409; that is fine.
 | TC-FE00-M04 | Log in `coach@sportify.demo` / `Demo1234` | URL `/coach`, side menu "Coach workspace" with Teaching schedule and Class roster | |
 | TC-FE00-M05 | As member, type http://localhost:5173/manager/users in the address bar | 403 "Access denied", URL stays `/manager/users` | |
 | TC-FE00-M06 | Log in with a wrong password | Red message "Invalid email or password" | |
-| TC-FE00-M07 | Click Log in with empty fields | Messages "Email is required" and "Password is required" under the fields | |
+| TC-FE00-M07 | Click Log in with empty fields, then type `manager.sportify.com` as email | Messages "Email is required" and "Password is required" under the fields, then "Email is invalid"; DevTools Network shows no `/auth/login` request | |
 | TC-FE00-M08 | Logged in, open DevTools, Application, Local Storage, change `sportify.accessToken` to `abc`, reload the page | Page reloads without going to login; Network tab shows `/users/me` 401, `/auth/refresh` 200, `/users/me` 200; both tokens in storage have new values | |
 | TC-FE00-M09 | Change both `sportify.accessToken` and `sportify.refreshToken` to `abc`, reload | Login page; both keys removed from storage | |
-| TC-FE00-M10 | Open http://localhost:5173/ui-kit | All sections render; Open modal, Escape closes it; toasts appear bottom right; table pages with Next | |
+| TC-FE00-M10 | With `npm run dev`, open http://localhost:5173/ui-kit | All sections render; Open modal, Escape closes it; toasts appear bottom right; table pages with Next | |
 | TC-FE00-M11 | Stop the backend, try to log in | Message "Cannot reach the server. Check your connection and try again." | |
 | TC-FE00-M12 | Resize the browser to phone width on a staff page | Side menu collapses behind a Menu button, no horizontal scroll | |
+| TC-FE00-M13 | Logged in as manager, stop the backend (Ctrl+C in its terminal), reload the page | Screen "We could not load your account" with "Cannot reach the server..."; URL unchanged; DevTools, Application, Local Storage still has both tokens. Start the backend again, click Retry: the page comes back without logging in | |
+| TC-FE00-M14 | Expired or bad access token against the real backend (see the commands below) | `GET /users/me` returns 401 (not 403) for a missing, malformed and expired token; in the browser the Network tab shows `/users/me` 401, then `/auth/refresh` 200, then `/users/me` 200 | |
+| TC-FE00-M15 | Open the app in two tabs, both signed in. In DevTools of tab 1 set `sportify.accessToken` to `abc`. Reload tab 2 and tab 1 at the same time (or within a second) | Both tabs stay signed in. In the Network tabs, exactly one `POST /auth/refresh` returns 200 across both tabs; no `/auth/refresh` 401 and no login page | |
+| TC-FE00-M16 | Run `npm run dev` and open `/ui-kit`: the UI kit shows. Then stop it and run `npm run build` followed by `npm run preview`, open http://localhost:4173/ui-kit | Dev: UI kit page. Preview of the production build: "Page not found" | |
+
+Commands for TC-FE00-M14 (PowerShell, backend running; works in Windows PowerShell 5.1 and PowerShell 7):
+
+```powershell
+$api = "http://localhost:8080/api/v1"
+function Get-Status($token) {
+  $headers = @{}
+  if ($token) { $headers.Authorization = "Bearer $token" }
+  try { Invoke-RestMethod "$api/users/me" -Headers $headers | Out-Null; 200 }
+  catch { $_.Exception.Response.StatusCode.value__ }
+}
+Get-Status $null          # missing token, expected 401
+Get-Status "abc"          # malformed token, expected 401
+# Expired token: log in, wait more than 15 minutes (access token lifetime), then:
+$old = (Invoke-RestMethod -Method Post "$api/auth/login" -ContentType "application/json" -Body '{"email":"manager@sportify.com","password":"password"}').accessToken
+Start-Sleep -Seconds 960
+Get-Status $old           # expired token, expected 401
+```
+
+If any of these returns 403, the frontend will not refresh the token. Report it to the backend team with the evidence in docs/audit/FE-00_AI_Audit_Log.docx (section Review round 2, Step 1).
 
 ---
 
@@ -334,10 +497,25 @@ Run with Playwright against `npm run dev` and a local mock of the auth API (4 se
 | Manager opening `/member` sees 403 | PASSED |
 | "Log in with another account" on the 403 page clears the tokens | PASSED |
 | Wrong password shows "Invalid email or password" | PASSED |
-| Empty form shows field errors from `details` | PASSED |
+| Empty form shows field errors under the fields | PASSED |
 | Member login lands on `/member` without side navigation | PASSED |
 | Rejected refresh token after reload goes to `/login` and clears storage | PASSED |
 | `/ui-kit` renders, modal opens and closes with Escape | PASSED |
 | Unknown address shows 404 | PASSED |
 | No console errors other than the expected 400 and 401 responses | PASSED |
 | Receptionist and member layouts at 390 px width: no horizontal scroll, Menu button opens the staff menu | PASSED |
+
+Added in review round 2 (Chromium has a real `navigator.locks`):
+
+| Check | Result |
+|---|---|
+| Empty login form: messages shown, no request sent to the backend | PASSED |
+| Malformed email rejected on the client | PASSED |
+| Backend offline on reload: Retry screen, tokens kept, URL unchanged | PASSED |
+| Retry after the backend is back restores the session | PASSED |
+| Two tabs whose access token expired at the same time reload together: exactly one refresh call, both stay signed in | PASSED |
+| Logout in tab 1 sends tab 2 to the login page | PASSED |
+| Paging in the `/ui-kit` table keeps the 5 previous rows under the overlay | PASSED |
+| Production build served by `vite preview`: `/ui-kit` shows 404 | PASSED |
+
+All 12 round 1 checks were run again after round 2 and still pass.

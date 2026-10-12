@@ -80,6 +80,16 @@ export function ComponentDemoPage() {
   const [name, setName] = useState('')
   const [role, setRole] = useState('')
   const [saving, setSaving] = useState(false)
+  const [paging, setPaging] = useState(false)
+
+  // Simulates a server round trip so the loading overlay (previous rows kept, dimmed) is visible.
+  const handlePageChange = (nextPage: number) => {
+    setPaging(true)
+    window.setTimeout(() => {
+      setPage(nextPage)
+      setPaging(false)
+    }, 400)
+  }
 
   const columns = useMemo<TableColumn<DemoAccount>[]>(
     () => [
@@ -240,12 +250,12 @@ export function ComponentDemoPage() {
             columns={columns}
             rows={rows}
             rowKey={(row) => row.id}
-            loading={tableMode === 'loading'}
+            loading={tableMode === 'loading' || paging}
             error={tableMode === 'error' ? demoError : undefined}
             onRetry={() => setTableMode('data')}
             emptyTitle="No accounts found"
             emptyDescription="Try another name, email or role."
-            pagination={{ page, pageSize: PAGE_SIZE, totalItems: DEMO_ACCOUNTS.length, onPageChange: setPage }}
+            pagination={{ page, pageSize: PAGE_SIZE, totalItems: DEMO_ACCOUNTS.length, onPageChange: handlePageChange }}
           />
         </Card>
 

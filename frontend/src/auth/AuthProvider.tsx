@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { authApi } from '../api/authApi'
 import { onSessionExpired } from '../api/client'
+import { ApiError } from '../api/errors'
 import { tokenStorage } from '../api/tokenStorage'
 import type { LoginRequest, UserProfile } from '../api/types'
 import { AuthContext, type AuthContextValue, type AuthStatus } from './authContext'
@@ -10,76 +11,104 @@ interface AuthState {
   status: AuthStatus
   user: UserProfile | null
   sessionExpired: boolean
+  loadError: unknown
+}
+
+const ANONYMOUS: AuthState = { status: 'anonymous', user: null, sessionExpired: false, loadError: null }
+
+/**
+ * True when a failed GET /users/me means the session is over. The API client already tried a
+ * refresh before this point; a rejected refresh clears the stored tokens. Network errors (status
+ * 0), server errors (5xx) and rate limiting (429) do not end the session.
+ */
+function endsSession(error: unknown): boolean {
+  if (!tokenStorage.hasSession()) {
+    return true
+  }
+  return error instanceof ApiError && (error.status === 401 || error.status === 403)
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>(() => ({
+    ...ANONYMOUS,
     status: tokenStorage.hasSession() ? 'loading' : 'anonymous',
-    user: null,
-    sessionExpired: false,
   }))
+  // Only the latest profile request may change the state; older answers are ignored.
+  const loadCounter = useRef(0)
+
+  const loadProfile = useCallback(async (): Promise<UserProfile | null> => {
+    loadCounter.current += 1
+    const requestId = loadCounter.current
+    const epoch = tokenStorage.getEpoch()
+    const isCurrent = () => loadCounter.current === requestId && tokenStorage.getEpoch() === epoch
+    try {
+      const user = await authApi.me()
+      if (isCurrent()) {
+        setState({ status: 'authenticated', user, sessionExpired: false, loadError: null })
+      }
+      return user
+    } catch (error) {
+      if (!isCurrent()) {
+        return null
+      }
+      if (endsSession(error)) {
+        tokenStorage.clear()
+        setState(ANONYMOUS)
+      } else {
+        // Keep the tokens. A signed in screen stays as it is; a restore shows the Retry screen.
+        setState((previous) =>
+          previous.status === 'authenticated' ? previous : { ...ANONYMOUS, status: 'error', loadError: error },
+        )
+      }
+      return null
+    }
+  }, [])
 
   // Restore the session after a page reload. The API client refreshes the access token if needed.
   useEffect(() => {
-    if (!tokenStorage.hasSession()) {
-      return
+    if (tokenStorage.hasSession()) {
+      void loadProfile()
     }
-    let cancelled = false
-    // A login finished while this call was running must win over this older result.
-    const epoch = tokenStorage.getEpoch()
-    const isCurrent = () => !cancelled && tokenStorage.getEpoch() === epoch
-    authApi
-      .me()
-      .then((user) => {
-        if (isCurrent()) {
-          setState({ status: 'authenticated', user, sessionExpired: false })
-        }
-      })
-      .catch(() => {
-        if (isCurrent()) {
-          setState({ status: 'anonymous', user: null, sessionExpired: false })
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  }, [loadProfile])
 
   // The API client calls this when the refresh token is rejected.
   useEffect(
     () =>
       onSessionExpired(() => {
+        loadCounter.current += 1
         setState((previous) => ({
-          status: 'anonymous',
-          user: null,
+          ...ANONYMOUS,
           sessionExpired: previous.status === 'authenticated' || previous.sessionExpired,
         }))
       }),
     [],
   )
 
-  // Follow logout and login done in another browser tab, which share the same localStorage.
+  // Follow a login or logout done in another browser tab. Token rotation by a refresh in another
+  // tab changes only the token keys and is ignored here, so it does not trigger GET /users/me.
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
-      if (event.key !== tokenStorage.refreshKey && event.key !== null) {
+      if (event.key !== null && event.key !== tokenStorage.sessionKey) {
         return
       }
+      if (event.key !== null && event.oldValue === event.newValue) {
+        return
+      }
+      tokenStorage.markExternalSessionChange()
       if (!tokenStorage.hasSession()) {
-        setState({ status: 'anonymous', user: null, sessionExpired: false })
+        loadCounter.current += 1
+        setState(ANONYMOUS)
         return
       }
-      // A login (possibly another user) or a token refresh in another tab: reload the profile.
-      authApi
-        .me()
-        .then((user) => setState({ status: 'authenticated', user, sessionExpired: false }))
-        // A rejected session already logs out through onSessionExpired; other errors keep the state.
-        .catch(() => undefined)
+      void loadProfile()
     }
     window.addEventListener('storage', handleStorage)
     return () => window.removeEventListener('storage', handleStorage)
-  }, [])
+  }, [loadProfile])
 
   const login = useCallback(async (credentials: LoginRequest) => {
+    // Any profile request still running for an older session must not overwrite this login.
+    loadCounter.current += 1
     const tokens = await authApi.login({
       email: credentials.email.trim(),
       password: credentials.password,
@@ -87,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokenStorage.startSession(tokens)
     try {
       const user = await authApi.me()
-      setState({ status: 'authenticated', user, sessionExpired: false })
+      setState({ status: 'authenticated', user, sessionExpired: false, loadError: null })
       return user
     } catch (error) {
       tokenStorage.clear()
@@ -97,18 +126,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     // The backend has no logout endpoint; dropping the tokens ends the session on this device.
+    loadCounter.current += 1
     tokenStorage.clear()
-    setState({ status: 'anonymous', user: null, sessionExpired: false })
+    setState(ANONYMOUS)
   }, [])
 
   const reloadUser = useCallback(async () => {
     if (!tokenStorage.hasSession()) {
       return null
     }
-    const user = await authApi.me()
-    setState({ status: 'authenticated', user, sessionExpired: false })
-    return user
-  }, [])
+    setState((previous) => (previous.status === 'error' ? { ...previous, status: 'loading' } : previous))
+    return loadProfile()
+  }, [loadProfile])
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -116,6 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: state.user,
       role: roleOf(state.user),
       sessionExpired: state.sessionExpired,
+      loadError: state.loadError,
       login,
       logout,
       reloadUser,

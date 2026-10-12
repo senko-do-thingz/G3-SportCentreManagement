@@ -1,11 +1,11 @@
-import type { ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { RequireRole } from '../auth/RequireRole'
 import { MemberLayout } from '../layouts/MemberLayout'
 import { ALL_AREAS, type NavItem, type RoleArea } from '../layouts/navigation'
 import { PublicLayout } from '../layouts/PublicLayout'
 import { StaffLayout } from '../layouts/StaffLayout'
-import { ComponentDemoPage } from '../pages/dev/ComponentDemoPage'
+import { PageLoader } from '../components/ui/Spinner'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
 import { ForbiddenPage } from '../pages/public/ForbiddenPage'
 import { HomeRedirect } from '../pages/public/HomeRedirect'
@@ -17,6 +17,14 @@ import { NotFoundPage } from '../pages/public/NotFoundPage'
  * '/member/packages': <SportPackagesPage />. Paths without an entry show a placeholder.
  */
 const SCREENS: Record<string, ReactNode> = {}
+
+/**
+ * The UI kit demo page (/ui-kit) exists only in development (npm run dev) and in tests. In a
+ * production build import.meta.env.DEV is false, so Vite drops the route and the page code.
+ */
+const ComponentDemoPage = import.meta.env.DEV
+  ? lazy(() => import('../pages/dev/ComponentDemoPage').then((module) => ({ default: module.ComponentDemoPage })))
+  : null
 
 const REGISTER_PLACEHOLDER: Pick<NavItem, 'title' | 'description' | 'task' | 'screens'> = {
   title: 'Sign up',
@@ -49,7 +57,16 @@ export function AppRoutes() {
         <Route path="/register" element={<PlaceholderPage item={REGISTER_PLACEHOLDER} />} />
       </Route>
 
-      <Route path="/ui-kit" element={<ComponentDemoPage />} />
+      {import.meta.env.DEV && ComponentDemoPage && (
+        <Route
+          path="/ui-kit"
+          element={
+            <Suspense fallback={<PageLoader label="Loading UI kit" />}>
+              <ComponentDemoPage />
+            </Suspense>
+          }
+        />
+      )}
       <Route path="/403" element={<ForbiddenPage />} />
 
       {ALL_AREAS.map((area) => (
