@@ -1,5 +1,66 @@
 # Changelog
 
+## 2026-10-12 - Frontend foundation: routing, API client, auth, layouts (FE-00, Shared)
+
+Branch `feat/fe-foundation`. Status: Implemented and verified with `npm test` (68 tests after review round 3), `npm run lint` and `npm run build`, plus 25 browser checks against a mock of the auth API. Manual checks against the real backend (docs/tests/FE-00_test_cases.md section 3) must be run before merging. Builds on the Vite + React + TypeScript scaffold from PR #13; no backend change.
+
+### API client (`frontend/src/api/`)
+- `client.ts`: fetch wrapper with base URL from `VITE_API_BASE_URL` (default `http://localhost:8080/api/v1`), JSON request and response handling, query string builder, `Authorization: Bearer` header.
+- On 401 the client calls `POST /auth/refresh` once and retries the request once. Parallel 401 responses share one refresh call, because the backend rotates the refresh token on every refresh. A rejected refresh (400, 401, 403) clears the tokens and notifies the auth context (logout); a network or server error keeps the session.
+- Session epoch in `tokenStorage`: a refresh or failure that belongs to an older session (the user logged out or logged in again meanwhile) never writes or clears the tokens of the current session.
+- `errors.ts`: `ApiError` with `status`, `message` and `fieldErrors` (from the `details` map of validation errors). Status 0 means the server could not be reached; tokens are kept in that case.
+- `authApi.ts` (login, register, me), `types.ts` (`UserProfile`, `AuthTokens`, `Role`, `PageResponse`, `SpringPage`), `page.ts` (`normalizePage` for `GET /members`, which still returns a raw Spring page), `tokenStorage.ts` (localStorage, guarded with try/catch).
+
+### Auth and routing (`frontend/src/auth/`, `frontend/src/routes/`)
+- `AuthProvider` and `useAuth`: login, logout, current user from `GET /users/me`, role, session restore after reload, login and logout followed across browser tabs.
+- `RequireAuth` (redirects to `/login` and remembers the requested page) and `RequireRole(roles)` (shows the 403 page in place).
+- After login: back to the requested page when it belongs to the user's role, otherwise the role home (`/member`, `/reception`, `/manager`, `/coach`).
+- `AppRoutes.tsx`: public routes (`/login`, `/register` placeholder for FE-01, `/ui-kit`), one protected area per role generated from `layouts/navigation.ts`, 403 and 404 pages. Later tasks register real screens in the `SCREENS` map.
+
+### Layouts and UI (`frontend/src/layouts/`, `frontend/src/components/`, `frontend/src/styles/`)
+- `PublicLayout`, `MemberLayout` (top bar and tabs, Figma F1-07), `StaffLayout` (side navigation, breadcrumb, Figma F1-01, F1-15, F2-13) with a collapsible menu below 960 px.
+- Menus per role with placeholder pages naming the task and Figma screens that will replace them.
+- Shared UI kit: Button, Input, Select, Modal (focus trap, focus restore, Escape for the top modal only, backdrop), Table with Pagination, Badge and StatusBadge, Toast, Spinner and PageLoader, EmptyState, ErrorState, Card, StatCard, PageHeader. All shown at `/ui-kit`.
+- Design tokens in `styles/tokens.css` sampled from the Figma screens (primary `#2169ba`, navy `#102e50`, accent `#ffad66`, page `#f5f8fc`).
+- Formatters in `utils/format.ts`: `formatMoney` (`1.350.000 VND`), `formatDate` (`04 Jul 2027`, LocalDate read without time zone shift), `formatDateTime`, `formatTime`, `humanizeCode`, `initials`.
+- Log in page (Figma F1-05) working end to end; FE-01 finishes sign up and the final copy.
+
+### Tooling
+- Added dev dependencies `vitest`, `jsdom`, `@testing-library/react`, `@testing-library/dom`, `@testing-library/user-event`, `@testing-library/jest-dom`; scripts `npm test` and `npm run test:watch`.
+- `vite.config.ts`: dev server pinned to port 5173 (`strictPort`) to match the backend CORS default; Vitest config.
+- Added `frontend/.env.example`; removed the Vite starter assets (`App.css`, `assets/`, `public/icons.svg`).
+- `frontend/README.md`: how to call the API, use the auth context, add a screen and use the UI kit.
+
+### Docs
+- `docs/tests/FE-00_test_cases.md`: 70 automated cases (68 tests plus build and lint), 25 browser checks, 16 manual cases for the real backend.
+- `docs/audit/FE-00_AI_Audit_Log.docx`.
+
+### Review round 2
+- Step 1 (report only, no backend change): with the current backend a missing, expired or malformed access token on a protected endpoint returns 401, never 403 (JwtAuthenticationFilter.java line 64 catches JwtException, SecurityConfig.java lines 51-58 send anonymous requests to CustomAuthenticationEntryPoint, which sets 401 at line 21). Two latent backend risks are written up in the AI audit log with proposed fixes: an AccessDeniedException for an anonymous user would become 403 in GlobalExceptionHandler.java lines 99-101 if @PreAuthorize is ever added to a permitAll URL, and a token of a deleted user escapes the JWT filter as UsernameNotFoundException.
+- Session restore: new auth status `error`. A network error, 5xx or 429 while loading the profile keeps the tokens and shows a full page Retry screen (`SessionErrorPage`) instead of sending the user to `/login`. Only 401 or 403 after the refresh attempt, or a rejected refresh, end the session. `RequireAuth` and `HomeRedirect` handle the new status.
+- Refresh: 404 from `/auth/refresh` (user no longer exists) now ends the session like 400, 401 and 403.
+- Cross tab refresh: the refresh runs inside a Web Locks API lock (`navigator.locks.request`) with a fallback when it is missing. Inside the lock the stored tokens are read again and reused when another tab already refreshed. A rejected refresh reads storage again and keeps the session when another tab stored a newer refresh token. A rejected refresh ends the session while still holding the lock, so a waiting tab does not resend the same token.
+- Storage events: a new `sportify.sessionId` key marks a login. Other tabs reload the profile only when it changes (login or logout elsewhere), not on token rotation, and a late profile answer from an older change is ignored.
+- `/ui-kit` is registered only when `import.meta.env.DEV` is true and loaded lazily, so a production build contains neither the route nor the page (it shows 404).
+- `package.json` `engines.node` set to `^22.13.0 || ^24.0.0 || >=26.0.0` (the range shared by Vite 8, Vitest 5, ESLint 10 and jsdom), new `frontend/.nvmrc` (24), README documents the Node requirement and the fixed port 5173 (`strictPort`).
+- Table keeps the previous rows visible (dimmed, `aria-busy`) with a spinner overlay while loading another page.
+- Toast messages are announced once: two permanent live regions (assertive for errors, polite for the rest), no role on each toast.
+- Log in form checks email (required, basic format) and password (required) before sending; backend field errors still take precedence.
+- Modal focus trap ignores hidden elements (`hidden`, `aria-hidden="true"`, `inert`, `display: none`, `visibility: hidden`) and pulls focus back into the dialog when it moved outside.
+- 22 new tests (65 in total, 6 files); each new guard was broken on purpose once and its tests failed (15 of 15).
+
+### Review round 3
+- Refresh timeout: `POST /auth/refresh` runs while the tab holds the cross tab lock, so it now has a timeout of 15000 ms (constant `REFRESH_TIMEOUT_MS` in `frontend/src/api/client.ts`, AbortController and setTimeout, timer always cleared). A timeout behaves like a network error: `ApiError` status 0, tokens kept, no logout, and the lock is released so tabs waiting for it continue. Normal requests and caller supplied abort signals are unchanged.
+- 3 new tests with fake timers (68 in total); the guard was broken on purpose three times and the tests failed each time.
+- Text rules: the AI audit log row about the Node version requirement is now written in words. The bullet glyphs of the audit log list definitions (above code point 127) were replaced with a plain hyphen. In the BE-09 entry of this changelog, four arrows in prose were replaced with the word "gives" (wording only, meaning unchanged). A scan of the audit log, `frontend/README.md`, `docs/tests/FE-00_test_cases.md`, this changelog, `FE-00_CHANGES.md` and every file under `frontend/src` finds no character above code point 127 and no arrow or vertical bar pair in prose.
+
+### Follow-ups
+- Run the manual cases in docs/tests/FE-00_test_cases.md section 3 against the real backend before merging.
+- Tokens are stored in localStorage (no httpOnly cookie support in the backend); never render untrusted HTML.
+- Backend hardening proposals from review round 2 (R1: return 401 instead of 403 for anonymous AccessDeniedException; R2: catch UsernameNotFoundException in JwtAuthenticationFilter) are for the backend team to decide.
+- The backend has no logout endpoint, so logout only drops the tokens on this device; issued refresh tokens stay valid until they expire (7 days).
+- `GET /members` returns a raw Spring page; switching it to `PageResponse` would let screens drop `normalizePage`.
+
 ## 2026-10-11 - Class management for the manager (BE-09, Flow 2)
 
 Branch `feat/f2-class-management`. Status: Implemented, unit-verified, integration tests pending Docker. Not built or run against a real DB here: run mvn clean verify before merging (Testcontainers tests need Docker).
@@ -37,7 +98,7 @@ Branch `feat/f2-class-management`. Status: Implemented, unit-verified, integrati
 - `ManagerClassServiceImplTest`: unit tests covering create with `CL-xxxx`, coach qualification failure (400), coach unchanged on PUT but no longer qualified (400), sport change blocked with upcoming sessions (400), deactivation blocked with confirmed future booking (400), deactivation allowed without confirmed booking, upcoming sessions count logic, and single clock read. All null assertions use `assertNull`.
 - `AgeGroupServiceImplTest` and `CoachDirectoryServiceImplTest`: unit tests for lookup services.
 - `ManagerClassControllerTest`, `AgeGroupControllerTest`, `CoachControllerTest`: WebMvc controller slice tests for request validation, authorization matrix (401, 403 for non-manager), and status codes.
-- `ManagerClassIntegrationTest`: Testcontainers integration test extending `AbstractIntegrationTest` (following `ManagerUserIntegrationTest` pattern). Covers list with sportId/level/coachId/active/search/paging; create -> CL-xxxx; coach not teaching the sport -> 400; deactivate with a confirmed future booking -> 400; a past session and a today-before-now session are not counted; non-manager -> 403. Clean up only rows it created.
+- `ManagerClassIntegrationTest`: Testcontainers integration test extending `AbstractIntegrationTest` (following `ManagerUserIntegrationTest` pattern). Covers list with sportId/level/coachId/active/search/paging; create gives CL-xxxx; coach not teaching the sport gives 400; deactivate with a confirmed future booking gives 400; a past session and a today-before-now session are not counted; non-manager gives 403. Clean up only rows it created.
 
 ### Follow-ups
 - `sport_class.is_active` is not enforced by session creation or booking yet.
