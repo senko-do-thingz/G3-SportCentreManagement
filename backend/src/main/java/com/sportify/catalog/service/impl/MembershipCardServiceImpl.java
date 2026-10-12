@@ -16,6 +16,10 @@ import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.UserRepository;
+import com.sportify.payment.entity.Payment;
+import com.sportify.payment.entity.PaymentMethod;
+import com.sportify.payment.entity.PaymentStatus;
+import com.sportify.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -24,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -36,6 +41,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     private final MemberCardRepository memberCardRepository;
     private final MemberProfileRepository memberProfileRepository;
     private final UserRepository userRepository;
+    private final PaymentRepository paymentRepository;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
 
@@ -98,7 +104,23 @@ public class MembershipCardServiceImpl implements MembershipCardService {
 
         CardPlan plan = planCard(member.getId(), tier, today);
         CardStatus status = paidAtDesk ? CardStatus.ACTIVE : CardStatus.PENDING_PAYMENT;
-        MemberCard card = memberCardRepository.save(newCard(member, tier, plan.startDate(), plan.endDate(), status, plan.price()));
+        MemberCard card = newCard(member, tier, plan.startDate(), plan.endDate(), status, plan.price());
+        if (status == CardStatus.PENDING_PAYMENT) {
+            PaymentMethod method = request.getPaymentMethod() != null ? request.getPaymentMethod() : PaymentMethod.BANK_TRANSFER;
+            Long paymentSeq = paymentRepository.getNextPaymentCodeSequence();
+            long seq = paymentSeq != null ? paymentSeq : 1000L;
+            Payment payment = Payment.builder()
+                    .paymentCode(codeFormatter.formatPaymentCode(seq))
+                    .member(member)
+                    .amount(plan.price())
+                    .paymentMethod(method)
+                    .paymentStatus(PaymentStatus.PENDING)
+                    .paymentTime(LocalDateTime.now(clock))
+                    .build();
+            payment = paymentRepository.save(payment);
+            card.setPayment(payment);
+        }
+        card = memberCardRepository.save(card);
         if (paidAtDesk && plan.replaces() != null) {
             replace(plan.replaces());
         }
@@ -148,6 +170,12 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             throw new BusinessRuleException("Only a card request that is waiting for payment can be cancelled.");
         }
         card.setStatus(CardStatus.CANCELLED);
+        if (card.getPayment() != null && card.getPayment().getPaymentStatus() == PaymentStatus.PENDING) {
+            Payment payment = card.getPayment();
+            payment.setPaymentStatus(PaymentStatus.FAILED);
+            payment.setNotes("Payment cancelled due to card request cancellation");
+            paymentRepository.save(payment);
+        }
         return mapToCardResponse(memberCardRepository.save(card));
     }
 
@@ -274,7 +302,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     }
 
     private MemberCardResponse mapToCardResponse(MemberCard card) {
-        return MemberCardResponse.builder()
+        MemberCardResponse.MemberCardResponseBuilder builder = MemberCardResponse.builder()
                 .id(card.getId())
                 .cardCode(card.getCardCode())
                 .memberId(card.getMember().getId())
@@ -288,7 +316,13 @@ public class MembershipCardServiceImpl implements MembershipCardService {
                 .endDate(card.getEndDate())
                 .status(card.getStatus())
                 .pricePaid(card.getPricePaid())
-                .createdAt(card.getCreatedAt())
-                .build();
+                .createdAt(card.getCreatedAt());
+
+        if (card.getPayment() != null) {
+            builder.paymentId(card.getPayment().getId())
+                    .paymentCode(card.getPayment().getPaymentCode());
+        }
+
+        return builder.build();
     }
 }

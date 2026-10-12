@@ -15,6 +15,7 @@ import java.util.Optional;
 public interface SportPackageRegistrationRepository extends JpaRepository<SportPackageRegistration, Long> {
     Optional<SportPackageRegistration> findByRegistrationCode(String registrationCode);
     List<SportPackageRegistration> findByMemberIdOrderByStartDateDesc(Long memberId);
+    Optional<SportPackageRegistration> findByPaymentId(Long paymentId);
 
     @Query("SELECT spr FROM SportPackageRegistration spr JOIN FETCH spr.sportPackage p WHERE spr.member.id = :memberId AND spr.status = :status AND spr.startDate <= :today AND spr.endDate >= :today AND spr.remainingSessions > 0")
     List<SportPackageRegistration> findActiveRegistrations(@Param("memberId") Long memberId, @Param("status") PackageRegistrationStatus status, @Param("today") LocalDate today);

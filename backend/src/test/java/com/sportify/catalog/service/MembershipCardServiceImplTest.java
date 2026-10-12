@@ -33,12 +33,19 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
+import com.sportify.payment.entity.Payment;
+import com.sportify.payment.entity.PaymentMethod;
+import com.sportify.payment.entity.PaymentStatus;
+import com.sportify.payment.repository.PaymentRepository;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,6 +59,8 @@ public class MembershipCardServiceImplTest {
     private MemberProfileRepository memberProfileRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private PaymentRepository paymentRepository;
     @Mock
     private CodeFormatter codeFormatter;
     @Spy
@@ -68,6 +77,10 @@ public class MembershipCardServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(paymentRepository.getNextPaymentCodeSequence()).thenReturn(1000L);
+        lenient().when(codeFormatter.formatPaymentCode(anyLong())).thenReturn("PAY-1000");
+        lenient().when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+
         goldTier = MembershipCardTier.builder()
                 .id(2L)
                 .code("GOLD")
@@ -445,4 +458,56 @@ public class MembershipCardServiceImplTest {
 
         assertEquals(0, membershipCardService.getApplicableDiscountPercentage(100L, 30));
     }
+
+    @Test
+    void purchaseCard_AsMember_CreatesPendingPaymentAndSetsPaymentId() {
+        MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
+                .tierId(2L)
+                .paymentMethod(PaymentMethod.MOMO)
+                .build();
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(2L)).thenReturn(Optional.of(goldTier));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of());
+        stubNewCard(25L);
+        when(paymentRepository.getNextPaymentCodeSequence()).thenReturn(1005L);
+        when(codeFormatter.formatPaymentCode(1005L)).thenReturn("PAY-1005");
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> {
+            Payment p = i.getArgument(0);
+            p.setId(50L);
+            return p;
+        });
+
+        MemberCardResponse res = membershipCardService.purchaseCard(req, memberUser);
+
+        assertEquals(CardStatus.PENDING_PAYMENT, res.getStatus());
+        assertEquals(50L, res.getPaymentId());
+        assertEquals("PAY-1005", res.getPaymentCode());
+    }
+
+    @Test
+    void cancelCard_WithPendingPayment_SetsPaymentToFailedWithNote() {
+        Payment payment = Payment.builder()
+                .id(99L)
+                .paymentCode("PAY-0099")
+                .paymentStatus(PaymentStatus.PENDING)
+                .build();
+        MemberCard pending = MemberCard.builder()
+                .id(42L)
+                .cardCode("CARD-42")
+                .member(memberProfile)
+                .tier(goldTier)
+                .status(CardStatus.PENDING_PAYMENT)
+                .payment(payment)
+                .pricePaid(goldTier.getPrice())
+                .build();
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
+
+        MemberCardResponse res = membershipCardService.cancelCard(42L, memberUser);
+
+        assertEquals(CardStatus.CANCELLED, res.getStatus());
+        assertEquals(PaymentStatus.FAILED, payment.getPaymentStatus());
+        assertEquals("Payment cancelled due to card request cancellation", payment.getNotes());
+    }
 }
+

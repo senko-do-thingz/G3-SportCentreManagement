@@ -1,6 +1,7 @@
 package com.sportify.catalog.dto;
 
 import com.sportify.catalog.entity.RegistrationChannel;
+import com.sportify.payment.entity.PaymentMethod;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
@@ -22,4 +23,6 @@ public class PackageRegistrationRequest {
 
     /** Member or receptionist explicitly chooses the start date. Defaults to today if omitted. */
     private LocalDate startDate;
+
+    private PaymentMethod paymentMethod;
 }

@@ -14,6 +14,7 @@ public interface SportPackageService {
     SportPackageResponse createPackage(SportPackageCreateRequest request, UserAccount manager);
     PackageRegistrationResponse registerPackage(PackageRegistrationRequest request, UserAccount actor);
     PackageRegistrationResponse activateRegistration(Long registrationId, UserAccount actor);
+    PackageRegistrationResponse cancelRegistration(Long registrationId, UserAccount actor);
     List<PackageRegistrationResponse> getMyRegistrations(UserAccount currentUser);
     List<PackageRegistrationResponse> getMemberRegistrations(Long memberId);
 }

@@ -34,6 +34,8 @@ public class PackageRegistrationResponse {
     private LocalDate startDate;
     private LocalDate endDate;
     private PackageRegistrationStatus status;
+    private Long paymentId;
+    private String paymentCode;
     private LocalDateTime activatedAt;
     private LocalDateTime createdAt;
 }

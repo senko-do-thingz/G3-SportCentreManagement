@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-12 - Pending Payments for Online Requests and Payment Summary (BE-17, Flow 3)
+
+Branch `feat/f3-pending-payments`. Status: Implemented, verified with unit tests (422 passed, 4 skipped requiring Docker), `PaymentServiceImplTest` (12 tests), `PaymentControllerTest` (6 tests), `MembershipCardServiceImplTest` (25 tests), and `SportPackageServiceImplTest` (23 tests). Testcontainers integration test `PaymentPendingIntegrationTest` added for CI.
+
+### Endpoints and Business Logic
+- Online requests create PENDING payment: When `MembershipCardServiceImpl.purchaseCard` creates a `PENDING_PAYMENT` card or `SportPackageServiceImpl.registerPackage` creates a `PENDING_PAYMENT` registration (channel `ONLINE`), a `Payment` entity is created in the same transaction with `status = PENDING`, `amount` equal to price after discount, `method` chosen by member (default `BANK_TRANSFER`), and `payment_id` set on the card or registration.
+- `GET /api/v1/payments/{id}`: Returns payment code, status, amount, method, item description, original price, discount, and bank transfer instructions (account name, number, bank, transfer content = payment code) sourced from `application.yml` (`app.payment.bank-transfer`). Accessible by owner `MEMBER` and center staff (`RECEPTIONIST`, `MANAGER`, `ADMIN`).
+- `PUT /api/v1/payments/{id}/method`: Allows the payment owner (`MEMBER`) to update the payment method while the payment is in `PENDING` status. Rejects updates for non-pending payments with `BusinessRuleException` and non-owners with `AccessDeniedException`.
+- Cancellation sets payment to `FAILED`: Cancelling a member card or sport package registration while `PENDING_PAYMENT` transitions the associated payment to `FAILED` status with an audit note recorded in `payment.notes`.
+- New endpoint `PUT /api/v1/packages/registrations/{id}/cancel`: Exposes registration cancellation for owner `MEMBER` and center staff.
+
+### Docs and Test Artifacts
+- `docs/tests/BE-17_test_cases.md`: Full test matrix and detailed test specifications.
+- `docs/audit/BE-17_AI_Audit_Log.docx`: AI Audit Log document with implementation audit trail.
+
 ## 2026-10-12 - Log in and Sign up screens (FE-01, Flow 1)
 
 Branch `feat/f1-auth-screens`. Status: Implemented and verified with `npm test` (115 tests, 47 new), `npm run lint`, `tsc -b` and `npm run build`, plus 6 browser checks against a mock of the auth API. Manual checks against the real backend (docs/tests/FE-01_test_cases.md section 4) must be run before merging. No backend change.

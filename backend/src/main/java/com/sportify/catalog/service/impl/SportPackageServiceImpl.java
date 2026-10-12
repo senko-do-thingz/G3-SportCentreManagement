@@ -22,7 +22,12 @@ import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.UserRepository;
+import com.sportify.payment.entity.Payment;
+import com.sportify.payment.entity.PaymentMethod;
+import com.sportify.payment.entity.PaymentStatus;
+import com.sportify.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +49,7 @@ public class SportPackageServiceImpl implements SportPackageService {
     private final MemberProfileRepository memberProfileRepository;
     private final UserRepository userRepository;
     private final MembershipCardService membershipCardService;
+    private final PaymentRepository paymentRepository;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
 
@@ -183,6 +189,22 @@ public class SportPackageServiceImpl implements SportPackageService {
                 .createdByUser(actor)
                 .build();
 
+        if (initialStatus == PackageRegistrationStatus.PENDING_PAYMENT && channel == RegistrationChannel.ONLINE) {
+            PaymentMethod method = request.getPaymentMethod() != null ? request.getPaymentMethod() : PaymentMethod.BANK_TRANSFER;
+            Long nextPaymentSeq = paymentRepository.getNextPaymentCodeSequence();
+            long paymentSeqNum = nextPaymentSeq != null ? nextPaymentSeq : 1000L;
+            Payment payment = Payment.builder()
+                    .paymentCode(codeFormatter.formatPaymentCode(paymentSeqNum))
+                    .member(member)
+                    .amount(paidAmount)
+                    .paymentMethod(method)
+                    .paymentStatus(PaymentStatus.PENDING)
+                    .paymentTime(LocalDateTime.now(clock))
+                    .build();
+            payment = paymentRepository.save(payment);
+            registration.setPayment(payment);
+        }
+
         registration = registrationRepository.save(registration);
         return mapToRegistrationResponse(registration);
     }
@@ -207,6 +229,43 @@ public class SportPackageServiceImpl implements SportPackageService {
         registration.setActivatedAt(LocalDateTime.now(clock));
         registration = registrationRepository.save(registration);
         return mapToRegistrationResponse(registration);
+    }
+
+    @Override
+    @Transactional
+    public PackageRegistrationResponse cancelRegistration(Long registrationId, UserAccount actor) {
+        SportPackageRegistration registration = registrationRepository.findById(registrationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Package registration not found for id: " + registrationId));
+
+        if (!isStaff(actor) && !registration.getMember().getId().equals(actor.getId())) {
+            throw new AccessDeniedException("Cannot cancel another member's registration request");
+        }
+
+        if (registration.getStatus() != PackageRegistrationStatus.PENDING_PAYMENT) {
+            throw new BusinessRuleException("Only a package registration that is waiting for payment can be cancelled.");
+        }
+
+        registration.setStatus(PackageRegistrationStatus.CANCELLED);
+        registration.setCancelledAt(LocalDateTime.now(clock));
+        registration.setCancelReason("Cancelled by user");
+
+        if (registration.getPayment() != null && registration.getPayment().getPaymentStatus() == PaymentStatus.PENDING) {
+            Payment payment = registration.getPayment();
+            payment.setPaymentStatus(PaymentStatus.FAILED);
+            payment.setNotes("Payment cancelled due to package registration cancellation");
+            paymentRepository.save(payment);
+        }
+
+        registration = registrationRepository.save(registration);
+        return mapToRegistrationResponse(registration);
+    }
+
+    private static boolean isStaff(UserAccount actor) {
+        if (actor == null || actor.getRole() == null) {
+            return false;
+        }
+        String role = actor.getRole().getCode();
+        return "RECEPTIONIST".equals(role) || "MANAGER".equals(role) || "ADMIN".equals(role);
     }
 
     @Override
@@ -242,7 +301,7 @@ public class SportPackageServiceImpl implements SportPackageService {
     }
 
     private PackageRegistrationResponse mapToRegistrationResponse(SportPackageRegistration reg) {
-        return PackageRegistrationResponse.builder()
+        PackageRegistrationResponse.PackageRegistrationResponseBuilder builder = PackageRegistrationResponse.builder()
                 .id(reg.getId())
                 .registrationCode(reg.getRegistrationCode())
                 .memberId(reg.getMember().getId())
@@ -263,8 +322,14 @@ public class SportPackageServiceImpl implements SportPackageService {
                 .endDate(reg.getEndDate())
                 .status(reg.getStatus())
                 .activatedAt(reg.getActivatedAt())
-                .createdAt(reg.getCreatedAt())
-                .build();
+                .createdAt(reg.getCreatedAt());
+
+        if (reg.getPayment() != null) {
+            builder.paymentId(reg.getPayment().getId())
+                    .paymentCode(reg.getPayment().getPaymentCode());
+        }
+
+        return builder.build();
     }
 
     static LocalDate packageEnd(LocalDate startDate, int durationDays) {

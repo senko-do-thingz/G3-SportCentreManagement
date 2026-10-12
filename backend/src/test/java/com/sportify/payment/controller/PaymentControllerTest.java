@@ -1,0 +1,191 @@
+package com.sportify.payment.controller;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sportify.core.exception.GlobalExceptionHandler;
+import com.sportify.identity.entity.Role;
+import com.sportify.identity.entity.UserAccount;
+import com.sportify.identity.security.CustomAccessDeniedHandler;
+import com.sportify.identity.security.CustomAuthenticationEntryPoint;
+import com.sportify.identity.security.CustomUserDetails;
+import com.sportify.identity.security.JwtAuthenticationFilter;
+import com.sportify.identity.security.JwtService;
+import com.sportify.identity.security.SecurityConfig;
+import com.sportify.payment.dto.BankTransferInstructions;
+import com.sportify.payment.dto.PaymentResponse;
+import com.sportify.payment.dto.UpdatePaymentMethodRequest;
+import com.sportify.payment.entity.PaymentMethod;
+import com.sportify.payment.entity.PaymentStatus;
+import com.sportify.payment.service.PaymentService;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.math.BigDecimal;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(PaymentController.class)
+@Import({SecurityConfig.class, CustomAuthenticationEntryPoint.class, CustomAccessDeniedHandler.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class})
+public class PaymentControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @MockitoBean
+    private PaymentService paymentService;
+
+    @MockitoBean
+    private JwtService jwtService;
+
+    @MockitoBean
+    private AuthenticationProvider authenticationProvider;
+
+    @MockitoBean
+    private UserDetailsService userDetailsService;
+
+    private CustomUserDetails createUserDetails(Long id, String roleCode, String fullName) {
+        Role role = Role.builder().code(roleCode).name(roleCode).build();
+        UserAccount account = UserAccount.builder()
+                .id(id)
+                .email(roleCode.toLowerCase() + "@sportify.com")
+                .fullName(fullName)
+                .role(role)
+                .build();
+        return new CustomUserDetails(account);
+    }
+
+    @Test
+    void getPayment_AsMember_Returns200WithPaymentDetails() throws Exception {
+        CustomUserDetails member = createUserDetails(100L, "MEMBER", "Taylor Nguyen");
+        BankTransferInstructions bank = BankTransferInstructions.builder()
+                .accountName("Sportify Sports Center")
+                .accountNumber("0000 1041 2460")
+                .bank("Demo Bank")
+                .transferContent("PAY-1000")
+                .build();
+
+        PaymentResponse response = PaymentResponse.builder()
+                .id(1L)
+                .code("PAY-1000")
+                .status(PaymentStatus.PENDING)
+                .amount(BigDecimal.valueOf(810000.00))
+                .method(PaymentMethod.BANK_TRANSFER)
+                .itemDescription("Football / Coach-led / 30 days")
+                .originalPrice(BigDecimal.valueOf(900000.00))
+                .discount(BigDecimal.valueOf(90000.00))
+                .bankTransferInstructions(bank)
+                .memberId(100L)
+                .memberCode("MEM-0100")
+                .build();
+
+        when(paymentService.getPayment(eq(1L), any(UserAccount.class))).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/payments/1")
+                        .with(user(member)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1L))
+                .andExpect(jsonPath("$.code").value("PAY-1000"))
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.amount").value(810000.00))
+                .andExpect(jsonPath("$.method").value("BANK_TRANSFER"))
+                .andExpect(jsonPath("$.itemDescription").value("Football / Coach-led / 30 days"))
+                .andExpect(jsonPath("$.originalPrice").value(900000.00))
+                .andExpect(jsonPath("$.discount").value(90000.00))
+                .andExpect(jsonPath("$.bankTransferInstructions.accountName").value("Sportify Sports Center"))
+                .andExpect(jsonPath("$.bankTransferInstructions.accountNumber").value("0000 1041 2460"))
+                .andExpect(jsonPath("$.bankTransferInstructions.bank").value("Demo Bank"))
+                .andExpect(jsonPath("$.bankTransferInstructions.transferContent").value("PAY-1000"));
+    }
+
+    @Test
+    void getPayment_AsReceptionist_Returns200() throws Exception {
+        CustomUserDetails receptionist = createUserDetails(200L, "RECEPTIONIST", "Receptionist User");
+        PaymentResponse response = PaymentResponse.builder()
+                .id(1L)
+                .code("PAY-1000")
+                .status(PaymentStatus.PENDING)
+                .amount(BigDecimal.valueOf(810000.00))
+                .method(PaymentMethod.BANK_TRANSFER)
+                .build();
+
+        when(paymentService.getPayment(eq(1L), any(UserAccount.class))).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/payments/1")
+                        .with(user(receptionist)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("PAY-1000"));
+    }
+
+    @Test
+    void getPayment_Unauthenticated_Returns401() throws Exception {
+        mockMvc.perform(get("/api/v1/payments/1"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void updatePaymentMethod_AsMember_Returns200WithUpdatedMethod() throws Exception {
+        CustomUserDetails member = createUserDetails(100L, "MEMBER", "Taylor Nguyen");
+        UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
+                .paymentMethod(PaymentMethod.MOMO)
+                .build();
+
+        PaymentResponse response = PaymentResponse.builder()
+                .id(1L)
+                .code("PAY-1000")
+                .status(PaymentStatus.PENDING)
+                .amount(BigDecimal.valueOf(810000.00))
+                .method(PaymentMethod.MOMO)
+                .build();
+
+        when(paymentService.updatePaymentMethod(eq(1L), any(UpdatePaymentMethodRequest.class), any(UserAccount.class)))
+                .thenReturn(response);
+
+        mockMvc.perform(put("/api/v1/payments/1/method")
+                        .with(user(member))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.method").value("MOMO"));
+    }
+
+    @Test
+    void updatePaymentMethod_AsReceptionist_Returns403Forbidden() throws Exception {
+        CustomUserDetails receptionist = createUserDetails(200L, "RECEPTIONIST", "Receptionist User");
+        UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
+                .paymentMethod(PaymentMethod.MOMO)
+                .build();
+
+        mockMvc.perform(put("/api/v1/payments/1/method")
+                        .with(user(receptionist))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void updatePaymentMethod_MissingMethod_Returns400BadRequest() throws Exception {
+        CustomUserDetails member = createUserDetails(100L, "MEMBER", "Taylor Nguyen");
+
+        mockMvc.perform(put("/api/v1/payments/1/method")
+                        .with(user(member))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+}

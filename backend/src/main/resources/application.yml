@@ -38,3 +38,9 @@ app:
     # Comma separated list of origins allowed to call the API from a browser.
     # Empty means no cross-origin request is accepted. Overridden per profile.
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+  payment:
+    bank-transfer:
+      account-name: ${SPORTIFY_PAYMENT_ACCOUNT_NAME:Sportify Sports Center}
+      account-number: ${SPORTIFY_PAYMENT_ACCOUNT_NUMBER:0000 1041 2460}
+      bank: ${SPORTIFY_PAYMENT_BANK:Demo Bank}
+
