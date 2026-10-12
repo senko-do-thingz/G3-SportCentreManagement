@@ -31,6 +31,24 @@ Stop-Process -Id <OwningProcess>
 
 If you really need another port, run `npm run dev -- --port 5174` and add `http://localhost:5174` to `CORS_ALLOWED_ORIGINS` in `backend/.env`, then restart the backend.
 
+### Environment variables (`frontend/.env`, git-ignored)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `VITE_API_BASE_URL` | `http://localhost:8080/api/v1` | Base URL of the API, including `/api/v1` |
+| `VITE_SHOW_SAMPLE_ACCOUNT` | off | Shows the sample account box on the Log in screen only when it is exactly `true`, and only in `npm run dev` |
+| `VITE_SAMPLE_ACCOUNT_EMAIL` | empty | Email shown in that box |
+| `VITE_SAMPLE_ACCOUNT_PASSWORD` | empty | Password shown in that box |
+
+The box exists only in the development server (`npm run dev`): `sampleAccount()` also requires `import.meta.env.DEV`, so a production build (`npm run build`) never shows it and the values are not in the bundle. In development it stays hidden when the flag is not `true` or either value is empty. Use a throwaway demo member account for the box, never staff credentials, and never commit real values. Vite reads `.env` only when the dev server starts, so restart `npm run dev` after a change. Example in PowerShell:
+
+```powershell
+cd frontend
+Copy-Item .env.example .env
+notepad .env   # set VITE_SHOW_SAMPLE_ACCOUNT=true and the two values, then save
+npm run dev
+```
+
 | Command | What it does |
 |---|---|
 | `npm run dev` | Dev server with hot reload |
@@ -48,9 +66,9 @@ src/
   api/          client.ts (fetch wrapper, token refresh), authApi.ts, errors.ts (ApiError), types.ts, page.ts
   auth/         AuthProvider, useAuth, RequireAuth, RequireRole, roles.ts (role labels and home paths)
   components/   Brand.tsx and ui/ (shared UI kit, import from components/ui)
-  config/       env.ts (VITE_API_BASE_URL)
+  config/       env.ts (VITE_API_BASE_URL, sampleAccount())
   layouts/      PublicLayout, MemberLayout (top nav), StaffLayout (side nav), navigation.ts (menus)
-  pages/        public/ (login, 403, 404), dev/ComponentDemoPage (/ui-kit), PlaceholderPage
+  pages/        public/ (log in, sign up, 403, 404), dev/ComponentDemoPage (/ui-kit), PlaceholderPage
   routes/       AppRoutes.tsx
   styles/       tokens.css (design tokens), base.css, components.css, layouts.css
   utils/        format.ts (money, date, labels, initials)
@@ -79,8 +97,22 @@ await api.post('/manager/users', body)
 ### Current user and roles
 
 ```ts
-const { user, role, status, login, logout, reloadUser } = useAuth()
+const { user, role, status, login, register, logout, reloadUser } = useAuth()
+
+await login({ email, password }, { remember: true }) // remember: false keeps the session for this tab only
+await register({ fullName, email, password, phone })  // creates a MEMBER and signs in (remembered)
 ```
+
+"Remember me" (FE-01). Rule: one account per browser.
+
+- Remember me ticked (and every sign up): the tokens go to localStorage. All tabs share them and they survive a browser restart.
+- Remember me not ticked: the tokens go to the sessionStorage of the tab that logged in. They end when that tab is closed. Chrome and Edge with "Continue where you left off" restore sessionStorage when the browser reopens its tabs, so close the tab, not only the browser, to end such a session.
+- A new login (with or without Remember me) and a logout always clear both areas of that tab, including the shared localStorage. Another tab that was signed in with a remembered session therefore loses it: it becomes anonymous and its login page shows "You were signed out because another account signed in or out in this browser." A logout in the same tab never shows that notice.
+- A tab that holds its own session without Remember me also drops it when it sees another tab log in or out (`tokenStorage.endTabSession()`, called from the storage listener in `AuthProvider`).
+- When another tab logs in as a different user, this tab follows the new account, but never silently: it opens the home page of the new user's role (`/member`, `/reception`, `/manager` or `/coach`, never the 403 page of the old URL) and every layout shows "You are now signed in as <full name> because another account signed in in this browser." The notice can be dismissed and is cleared by the next login, sign up, logout or switch (`useAuth().accountSwitched`, `dismissAccountSwitch()`). The role area is mounted again for the new user, so no page or form of the previous user stays on screen. The same user logging in again in another tab changes nothing visible, and a tab that was anonymous shows nothing.
+- A request that was still running when the session changed fails with `StaleSessionError` (from `api/errors.ts`) instead of returning the previous account's answer, and it is never retried with the new account's token.
+- Limitation: a login without Remember me writes nothing to localStorage when it is already empty, so a second tab that also logged in without Remember me gets no event and keeps its own account.
+- `tokenStorage.startSession(tokens)` without options keeps the FE-00 behaviour (remembered). `useAuth().signedOutElsewhere` is true after such a sign out.
 
 `status` is one of:
 
@@ -107,7 +139,9 @@ Routes are already protected by role: a member opening a manager URL sees the 40
 
 All components are shown at http://localhost:5173/ui-kit with working examples. This page exists only in development (`npm run dev`) and in tests: the route is registered when `import.meta.env.DEV` is true, so a production build (`npm run build`) does not contain the page or its route (it shows 404).
 
-`Button`, `Input`, `Select`, `Modal`, `Table` (with `Pagination`), `Badge` and `StatusBadge`, `Toast` (`useToast()`), `Spinner` and `PageLoader`, `EmptyState`, `ErrorState`, `Card`, `StatCard`, `PageHeader`.
+`Button`, `Input` (with an optional `trailing` element), `PasswordInput` (Show or Hide), `Checkbox`, `Select`, `Modal`, `Table` (with `Pagination`), `Badge` and `StatusBadge`, `Toast` (`useToast()`), `Spinner` and `PageLoader`, `EmptyState`, `ErrorState`, `Card`, `StatCard`, `PageHeader`.
+
+Password rules for forms are in `auth/passwordRules.ts` (`checkPassword`, `isStrongPassword`), identical to the backend `@StrongPassword`. Reuse them for any screen that sets a password.
 
 Formatters in `utils/format.ts`: `formatMoney(1350000)` gives `1.350.000 VND`, `formatDate('2027-07-04')` gives `04 Jul 2027`, `formatDateTime`, `formatTime`, `humanizeCode('PENDING_PAYMENT')` gives `Pending payment`, `initials`.
 

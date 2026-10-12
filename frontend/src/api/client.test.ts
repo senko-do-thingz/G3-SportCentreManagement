@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backendError, installFakeFetch, json } from '../test/fakeBackend'
 import { api, buildUrl, onSessionExpired } from './client'
-import { ApiError } from './errors'
+import { ApiError, StaleSessionError } from './errors'
 import { tokenStorage } from './tokenStorage'
 
 describe('api client', () => {
@@ -167,10 +167,53 @@ describe('api client', () => {
     tokenStorage.startSession({ accessToken: 'new-user-access', refreshToken: 'new-user-refresh' })
     releaseRefresh()
 
-    await expect(pending).resolves.toMatchObject({ status: 401 })
+    // FE-01 round 3 (N1): the old request fails without returning anything; depending on timing
+    // it ends as a 401 of the old session or as StaleSessionError. Either way it is an ApiError.
+    await expect(pending).resolves.toBeInstanceOf(ApiError)
     expect(tokenStorage.getAccessToken()).toBe('new-user-access')
     expect(expired).not.toHaveBeenCalled()
     unsubscribe()
+  })
+
+  it('drops the answer of a request started before another tab switched the account (N1)', async () => {
+    let release: () => void = () => undefined
+    installFakeFetch(async () => {
+      await new Promise<void>((resolve) => {
+        release = resolve
+      })
+      return json(200, { owner: 'previous account' })
+    })
+
+    const pending = api.get('/members/me/cards').catch((caught: unknown) => caught)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    // Another tab logged in as someone else: the storage listener marks the change.
+    tokenStorage.markExternalSessionChange()
+    release()
+
+    const result = await pending
+    expect(result).toBeInstanceOf(StaleSessionError)
+    expect(result).not.toMatchObject({ owner: 'previous account' })
+  })
+
+  it('never retries an old 401 with the token of the new account (N1)', async () => {
+    let release: () => void = () => undefined
+    const { calls } = installFakeFetch(async (call) => {
+      if (call.authorization === 'Bearer access-1') {
+        await new Promise<void>((resolve) => {
+          release = resolve
+        })
+        return backendError(401, 'Unauthorized')
+      }
+      return json(200, { owner: 'new account' })
+    })
+
+    const pending = api.get('/members/me/cards').catch((caught: unknown) => caught)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    tokenStorage.startSession({ accessToken: 'new-access', refreshToken: 'new-refresh' })
+    release()
+
+    expect(await pending).toBeInstanceOf(StaleSessionError)
+    expect(calls.filter((call) => call.authorization === 'Bearer new-access')).toHaveLength(0)
   })
 
   it('keeps the session when the refresh endpoint fails with a server error', async () => {

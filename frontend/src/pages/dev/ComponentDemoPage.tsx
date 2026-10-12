@@ -7,7 +7,9 @@ import { Button } from '../../components/ui/Button'
 import { Card, StatCard } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { ErrorState } from '../../components/ui/ErrorState'
+import { Checkbox } from '../../components/ui/Checkbox'
 import { Input } from '../../components/ui/Input'
+import { PasswordInput } from '../../components/ui/PasswordInput'
 import { Modal } from '../../components/ui/Modal'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Select } from '../../components/ui/Select'
@@ -180,6 +182,9 @@ export function ComponentDemoPage() {
               <Input label="Email address" type="email" placeholder="you@example.com" hint="We never share your email." />
               <Input label="Phone" defaultValue="12" error="Phone must be 8-15 digits with optional leading +" />
               <Input label="Disabled" value="Read only value" disabled readOnly />
+              <PasswordInput label="Password (Show or Hide)" defaultValue="Train2026" autoComplete="off" />
+              <Checkbox label="Remember me" defaultChecked />
+              <Checkbox label="I agree to the terms" error="You must accept the terms to create an account" />
             </div>
           </Card>
           <Card title="Select">

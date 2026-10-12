@@ -1,5 +1,54 @@
 # Changelog
 
+## 2026-10-12 - Log in and Sign up screens (FE-01, Flow 1)
+
+Branch `feat/f1-auth-screens`. Status: Implemented and verified with `npm test` (115 tests, 47 new), `npm run lint`, `tsc -b` and `npm run build`, plus 6 browser checks against a mock of the auth API. Manual checks against the real backend (docs/tests/FE-01_test_cases.md section 4) must be run before merging. No backend change.
+
+### Screens (`frontend/src/pages/public/`)
+- `LoginPage.tsx` (Figma F1-05): password Show or Hide, Remember me, Forgot password (explains that the front desk resets passwords, the backend has no reset endpoint), clear messages for wrong credentials (401) and for a locked or inactive account (403), sample account box in development builds only.
+- `RegisterPage.tsx` (Figma F1-06): full name, phone, email, password with live rules and strength, confirm password, accept terms. Calls `POST /auth/register`, signs the new member in with the returned tokens and opens `/member`. Duplicate email (409) and backend validation details (400) are shown under their fields. If the account is created but the profile cannot be loaded, the user is sent to Log in with the email prefilled instead of submitting the form twice.
+- `AuthShell.tsx`: shared two column card with the photo hero from the Figma (`src/assets/auth-hero.jpg`), same 519 / 619 split as the design.
+- Both forms: Enter submits, every control is disabled while sending, the focus moves to the first invalid field.
+
+### Auth (`frontend/src/auth/`, `frontend/src/api/tokenStorage.ts`)
+- `passwordRules.ts`: same rules as `StrongPasswordValidator` (8 to 64 UTF-16 units, at most 72 UTF-8 bytes, one letter, one digit) and the same message.
+- `registerValidation.ts`: client checks with the `RegisterRequest` messages; phone separators are removed before sending. The phone is required on the form (the backend accepts it empty).
+- `AuthProvider`: `login(credentials, { remember })` and new `register(request)`; `AccountCreatedError` for the created-but-not-signed-in case.
+- `tokenStorage`: a session that is not remembered lives in sessionStorage (this tab only); a remembered one in localStorage as before. The default is unchanged.
+
+### UI kit (`frontend/src/components/ui/`)
+- `PasswordInput` (Show or Hide button), `Checkbox`, `Input` gains a `trailing` slot and merges an extra `aria-describedby`. Both shown on `/ui-kit`.
+
+### Docs
+- `docs/tests/FE-01_test_cases.md`: 47 automated cases, 6 browser checks, 14 manual cases.
+- `docs/audit/FE-01_AI_Audit_Log.docx`.
+- `frontend/README.md`: Remember me, `register`, password rules, new components.
+
+### FE-01 review fixes (round 2)
+Same branch, new commits on top of the FE-01 commit. Verified with `npm test` (141 tests, 26 new), `npm run lint -- --max-warnings 0`, `tsc -b`, `npm run build` and 7 browser checks; each fix was broken once on purpose and caught by a test. No backend change.
+- R2: rule "one account per browser". A login or logout still clears both storage areas; a tab that loses its session this way now shows "You were signed out because another account signed in or out in this browser." on its login page (never after a logout in the same tab). A tab with its own session without Remember me also drops it (`tokenStorage.endTabSession`). JSDoc, README and audit log now describe this exactly.
+- R3: the sample account box shows only with `VITE_SHOW_SAMPLE_ACCOUNT=true` and both `VITE_SAMPLE_ACCOUNT_EMAIL` and `VITE_SAMPLE_ACCOUNT_PASSWORD` (read through `config/env.ts`, documented in README and `.env.example`). No credentials in the code.
+- R4: "Passwords do not match" is recomputed when either password field changes.
+- R5: backend validation errors for keys without an input are shown above the form on both pages.
+- R6: only the 409 "Email is already registered" (`EMAIL_TAKEN_MESSAGE`) goes under Email; other 409 messages go above the form.
+- R7: the hero photo covers the full height of the column on both screens.
+- R8: focus after an error through a state counter and an effect (`utils/useFocusFirstInvalid.ts`); `utils/focus.ts` removed.
+- R9: the email and notice passed to /login are read once and removed from history.
+- R10: the top progress label is "Meets requirements" instead of "Strong".
+- R11: the rules list id comes from `useId`, `Checkbox` merges a caller's `aria-describedby`, unused `tokenStorage.isPersistent()` removed.
+- Docs: `docs/tests/FE-01_test_cases.md` (cases TC-FE01-048 to 073, manual section rewritten with PowerShell steps and SQL), `docs/audit/FE-01_AI_Audit_Log.docx` (sections 9 and 10).
+
+### FE-01 review fixes (round 3)
+Same branch, new commits. Verified with `npm test` (157 tests, 16 new), `npm run lint -- --max-warnings 0`, `tsc -b`, `npm run build` and 8 browser checks. The 13 guards of this round were each broken once on purpose and caught by a test. No backend change.
+- N1: a switch to another account is never silent. When another tab signs in as a different user, this tab opens the home page of the new user's role (never the 403 page) and every layout shows "You are now signed in as <name> because another account signed in in this browser." (dismissible). The role area is mounted again for the new user, so no page or form of the previous user survives. The same user logging in again, or an anonymous tab, shows nothing. The API client drops answers of requests that started before a session change (`StaleSessionError`) and never retries them with the new account's token. The round 2 decision to switch without a notice is reverted.
+- N3: the sign up form and its field errors live in one state, updated functionally (`applyFieldChange`).
+- N4: test for the focus after a server error on Sign up.
+- N5: the sample account box needs `import.meta.env.DEV`; a production build never shows it and does not contain the values.
+- N6: with an empty password every rule is shown as not met.
+- N7: the login history cleanup keeps the query string and hash.
+- N8: `sqlcmd -C` in the manual steps, with the SSMS alternative.
+- Docs: test cases TC-FE01-074 to 089, browser check B08, manual cases M19 and M20; README Remember me section.
+
 ## 2026-10-12 - Frontend foundation: routing, API client, auth, layouts (FE-00, Shared)
 
 Branch `feat/fe-foundation`. Status: Implemented and verified with `npm test` (68 tests after review round 3), `npm run lint` and `npm run build`, plus 25 browser checks against a mock of the auth API. Manual checks against the real backend (docs/tests/FE-00_test_cases.md section 3) must be run before merging. Builds on the Vite + React + TypeScript scaffold from PR #13; no backend change.

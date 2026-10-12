@@ -63,9 +63,10 @@
 
 .auth-shell {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* Same split as the Figma card: 519 px photo, 619 px form, 1140 px wide. */
+  grid-template-columns: minmax(0, 519fr) minmax(0, 619fr);
   width: 100%;
-  max-width: 1120px;
+  max-width: 1140px;
   min-height: 600px;
   overflow: hidden;
   border: 1px solid var(--color-border);
@@ -75,15 +76,31 @@
 }
 
 .auth-hero {
+  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   gap: var(--space-3);
   padding: var(--space-12) var(--space-10);
   color: var(--color-text-inverse);
+  background: var(--color-navy);
+}
+
+/*
+ * Photo from the Figma hero (F1-05, F1-06), covering the full height of the column on both
+ * screens like the Figma. The overlay darkens towards the bottom so the white slogan stays readable.
+ */
+.auth-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
   background:
-    radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.14), transparent 45%),
-    linear-gradient(160deg, #2a5f99 0%, var(--color-navy) 75%);
+    linear-gradient(180deg, rgba(16, 46, 80, 0.12) 0%, rgba(16, 46, 80, 0.35) 45%, rgba(16, 46, 80, 0.9) 100%),
+    url('../assets/auth-hero.jpg') center top / cover no-repeat;
+}
+
+.auth-hero > * {
+  position: relative;
 }
 
 .auth-hero__eyebrow {
@@ -132,6 +149,34 @@
 
 .auth-form .btn {
   margin-top: var(--space-2);
+}
+
+/* The fieldset only exists to disable every control while the form is being sent. */
+.auth-form__fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.auth-form__options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.auth-sample {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.auth-panel__footer a {
+  font-weight: var(--weight-medium);
 }
 
 .auth-panel__footer {

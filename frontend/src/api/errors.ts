@@ -26,6 +26,25 @@ export class ApiError extends Error {
   }
 }
 
+export const SESSION_CHANGED_MESSAGE =
+  'The signed in account changed while this request was running. Please try again.'
+
+/**
+ * Thrown by the API client when the session changed (logout, login, or another tab switched the
+ * account) while a request was running. The answer belonged to the previous account, so it is
+ * never returned to the caller and never retried with the new account's token.
+ */
+export class StaleSessionError extends ApiError {
+  constructor() {
+    super(0, SESSION_CHANGED_MESSAGE)
+    this.name = 'StaleSessionError'
+  }
+
+  override get isNetworkError(): boolean {
+    return false
+  }
+}
+
 export const NETWORK_ERROR_MESSAGE = 'Cannot reach the server. Check your connection and try again.'
 export const SESSION_EXPIRED_MESSAGE = 'Your session has expired. Please log in again.'
 
@@ -77,4 +96,27 @@ export function getErrorMessage(error: unknown): string {
     return error.message
   }
   return 'Something went wrong. Please try again.'
+}
+
+/**
+ * Splits backend validation details between the fields a form renders and the rest.
+ * fields: messages whose key matches a rendered input, shown under that input.
+ * formMessage: the messages whose key has no input (for example "role"), joined, to show above
+ * the form; null when every key matched. Without this, such errors would be lost and the form
+ * would simply be enabled again with no message.
+ */
+export function splitFieldErrors(
+  fieldErrors: Record<string, string>,
+  renderedFields: readonly string[],
+): { fields: Record<string, string>; formMessage: string | null } {
+  const fields: Record<string, string> = {}
+  const unmatched: string[] = []
+  for (const [key, message] of Object.entries(fieldErrors)) {
+    if (renderedFields.includes(key)) {
+      fields[key] = message
+    } else {
+      unmatched.push(message)
+    }
+  }
+  return { fields, formMessage: unmatched.length > 0 ? unmatched.join(' ') : null }
 }

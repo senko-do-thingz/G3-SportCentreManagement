@@ -1,8 +1,9 @@
 import { lazy, Suspense, type ReactNode } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { RequireRole } from '../auth/RequireRole'
+import { useAuth } from '../auth/useAuth'
 import { MemberLayout } from '../layouts/MemberLayout'
-import { ALL_AREAS, type NavItem, type RoleArea } from '../layouts/navigation'
+import { ALL_AREAS, type RoleArea } from '../layouts/navigation'
 import { PublicLayout } from '../layouts/PublicLayout'
 import { StaffLayout } from '../layouts/StaffLayout'
 import { PageLoader } from '../components/ui/Spinner'
@@ -11,6 +12,8 @@ import { ForbiddenPage } from '../pages/public/ForbiddenPage'
 import { HomeRedirect } from '../pages/public/HomeRedirect'
 import { LoginPage } from '../pages/public/LoginPage'
 import { NotFoundPage } from '../pages/public/NotFoundPage'
+import { RegisterPage } from '../pages/public/RegisterPage'
+import { AccountSwitchRedirect } from './AccountSwitchRedirect'
 
 /**
  * Real screens by full path. Later tasks register their page here, for example
@@ -25,13 +28,6 @@ const SCREENS: Record<string, ReactNode> = {}
 const ComponentDemoPage = import.meta.env.DEV
   ? lazy(() => import('../pages/dev/ComponentDemoPage').then((module) => ({ default: module.ComponentDemoPage })))
   : null
-
-const REGISTER_PLACEHOLDER: Pick<NavItem, 'title' | 'description' | 'task' | 'screens'> = {
-  title: 'Sign up',
-  description: 'Create a member account to register sport packages and book sessions.',
-  task: 'FE-01',
-  screens: ['F1-06'],
-}
 
 function areaRoutes(area: RoleArea) {
   return area.sections
@@ -48,13 +44,19 @@ function areaRoutes(area: RoleArea) {
 }
 
 export function AppRoutes() {
+  const { user } = useAuth()
+  // Keyed by user id: when the signed in account changes, the whole role area (layout, page and
+  // any form in it) is mounted again, so nothing typed or loaded for the previous user survives.
+  const accountKey = user ? `user-${user.id}` : 'anonymous'
   return (
-    <Routes>
+    <>
+      <AccountSwitchRedirect />
+      <Routes>
       <Route path="/" element={<HomeRedirect />} />
 
       <Route element={<PublicLayout />}>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<PlaceholderPage item={REGISTER_PLACEHOLDER} />} />
+        <Route path="/register" element={<RegisterPage />} />
       </Route>
 
       {import.meta.env.DEV && ComponentDemoPage && (
@@ -74,7 +76,7 @@ export function AppRoutes() {
           key={area.basePath}
           path={area.basePath}
           element={
-            <RequireRole roles={[area.role]}>
+            <RequireRole key={accountKey} roles={[area.role]}>
               {area.role === 'MEMBER' ? <MemberLayout /> : <StaffLayout />}
             </RequireRole>
           }
@@ -85,6 +87,7 @@ export function AppRoutes() {
       ))}
 
       <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+      </Routes>
+    </>
   )
 }

@@ -4,6 +4,7 @@ import {
   apiErrorFromBody,
   NETWORK_ERROR_MESSAGE,
   SESSION_EXPIRED_MESSAGE,
+  StaleSessionError,
 } from './errors'
 import { tokenStorage } from './tokenStorage'
 import type { AuthTokens } from './types'
@@ -262,6 +263,8 @@ async function send(path: string, options: RequestOptions, accessToken: string |
  * listeners run (the auth context logs the user out) and an ApiError with status 401 is thrown.
  * A network error or a server error during the refresh is thrown without logging out.
  * A 403 is never refreshed: it means the user is signed in but lacks the permission.
+ * When the session epoch changes while an authenticated request runs, the request fails with
+ * StaleSessionError instead of returning the previous account's answer.
  */
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const useAuth = options.auth !== false && !path.startsWith(AUTH_PATH_PREFIX)
@@ -269,6 +272,13 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const epoch = tokenStorage.getEpoch()
 
   let response = await send(path, options, accessToken)
+
+  // The session changed while the request was running (logout, login, or another tab switched
+  // the account). The answer belongs to the previous account: drop it, and never retry it with
+  // the token of the new account.
+  if (useAuth && tokenStorage.getEpoch() !== epoch) {
+    throw new StaleSessionError()
+  }
 
   if (response.status === 401 && useAuth && (accessToken || tokenStorage.getRefreshToken())) {
     // Another request may already have refreshed while this one was in flight: reuse that token.
@@ -281,6 +291,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       throw expireSession(epoch)
     }
     response = await send(path, options, newAccessToken)
+    if (tokenStorage.getEpoch() !== epoch) {
+      throw new StaleSessionError()
+    }
     if (response.status === 401) {
       throw expireSession(epoch)
     }
