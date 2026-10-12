@@ -119,11 +119,13 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
     void savePendingPayment_WithSportPackageRegistration_LinksAndFindsByPaymentId() {
         MemberProfile member = getOrCreateMember();
 
-        Sport sport = sportRepository.save(com.sportify.catalog.test.SportTestData.aValidSport().build());
+        Sport sport = sportRepository.findAll().stream().findFirst()
+                .orElseGet(() -> sportRepository.save(com.sportify.catalog.test.SportTestData.aValidSport().build()));
 
+        String pkgCode = "SWIM-30D-" + System.currentTimeMillis();
         SportPackage pkg = sportPackageRepository.save(SportPackage.builder()
-                .code("SWIM-30D")
-                .name("Swimming 30 Days")
+                .code(pkgCode)
+                .name("Swimming 30 Days " + System.currentTimeMillis())
                 .sport(sport)
                 .trainingFormat(TrainingFormat.SELF_TRAINING)
                 .durationDays(30)
