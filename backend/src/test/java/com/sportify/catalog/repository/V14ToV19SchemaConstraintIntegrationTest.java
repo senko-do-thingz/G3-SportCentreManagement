@@ -67,20 +67,20 @@ class V14ToV19SchemaConstraintIntegrationTest extends AbstractIntegrationTest {
 
         // Valid insert
         assertThatCode(() -> jdbc.update("""
-                INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status, reference_code)
-                VALUES ('PAY-TEST-001', ?, 500000.00, 'BANK_TRANSFER', 'SUCCESS', 'REF-001')
+                INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status, reference_code, payment_time)
+                VALUES ('PAY-TEST-001', ?, 500000.00, 'BANK_TRANSFER', 'SUCCESS', 'REF-001', SYSDATETIME())
                 """, memberId)).doesNotThrowAnyException();
 
         // Invalid amount (amount <= 0)
         assertThatThrownBy(() -> jdbc.update("""
                 INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status)
-                VALUES ('PAY-TEST-002', ?, -100.00, 'BANK_TRANSFER', 'SUCCESS')
+                VALUES ('PAY-TEST-002', ?, -100.00, 'BANK_TRANSFER', 'PENDING')
                 """, memberId)).isInstanceOf(DataAccessException.class);
 
         // Invalid payment_method
         assertThatThrownBy(() -> jdbc.update("""
                 INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status)
-                VALUES ('PAY-TEST-003', ?, 100000.00, 'CRYPTO', 'SUCCESS')
+                VALUES ('PAY-TEST-003', ?, 100000.00, 'CRYPTO', 'PENDING')
                 """, memberId)).isInstanceOf(DataAccessException.class);
 
         // Invalid payment_status
@@ -92,7 +92,7 @@ class V14ToV19SchemaConstraintIntegrationTest extends AbstractIntegrationTest {
         // Invalid member_id FK
         assertThatThrownBy(() -> jdbc.update("""
                 INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status)
-                VALUES ('PAY-TEST-005', 999999, 100000.00, 'CASH', 'SUCCESS')
+                VALUES ('PAY-TEST-005', 999999, 100000.00, 'CASH', 'PENDING')
                 """)).isInstanceOf(DataAccessException.class);
     }
 
@@ -102,8 +102,8 @@ class V14ToV19SchemaConstraintIntegrationTest extends AbstractIntegrationTest {
         long memberId = getOrCreateTestMember("fk.check@sportify.test", "MEM-PAY-02");
 
         jdbc.update("""
-                INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status)
-                VALUES ('PAY-FK-001', ?, 300000.00, 'CASH', 'SUCCESS')
+                INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status, payment_time)
+                VALUES ('PAY-FK-001', ?, 300000.00, 'CASH', 'SUCCESS', SYSDATETIME())
                 """, memberId);
         long paymentId = jdbc.queryForObject("SELECT id FROM payment WHERE payment_code = 'PAY-FK-001'", Long.class);
 
@@ -139,8 +139,8 @@ class V14ToV19SchemaConstraintIntegrationTest extends AbstractIntegrationTest {
     void invoiceAndInvoiceLineConstraints() {
         long memberId = getOrCreateTestMember("inv.check@sportify.test", "MEM-INV-01");
         jdbc.update("""
-                INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status)
-                VALUES ('PAY-INV-001', ?, 500000.00, 'BANK_TRANSFER', 'SUCCESS')
+                INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status, payment_time)
+                VALUES ('PAY-INV-001', ?, 500000.00, 'BANK_TRANSFER', 'SUCCESS', SYSDATETIME())
                 """, memberId);
         long paymentId = jdbc.queryForObject("SELECT id FROM payment WHERE payment_code = 'PAY-INV-001'", Long.class);
 

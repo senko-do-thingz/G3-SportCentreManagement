@@ -550,11 +550,12 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("Check constraint ck_payment_success_time rejects SUCCESS payment with NULL payment_time")
     void successPayment_WithNullPaymentTime_RejectedByCheckConstraint() {
         MemberProfile member = getOrCreateMember();
+        String code = "PAY-SN-" + (System.currentTimeMillis() % 1000000000L);
         assertThatThrownBy(() -> {
             jdbcTemplate.update(
                     "INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status, payment_time, created_at, updated_at) " +
                             "VALUES (?, ?, ?, ?, ?, NULL, SYSDATETIME(), SYSDATETIME())",
-                    "PAY-SUCCESS-NOTIME-" + System.currentTimeMillis(), member.getId(), BigDecimal.valueOf(100000.00), "CASH", "SUCCESS"
+                    code, member.getId(), BigDecimal.valueOf(100000.00), "CASH", "SUCCESS"
             );
         }).isInstanceOf(DataAccessException.class)
                 .hasMessageContaining("ck_payment_success_time");
@@ -564,7 +565,7 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("Native SQL insert of PENDING payment without payment_time leaves payment_time NULL because default constraint was dropped")
     void pendingPayment_NativeSqlInsertWithoutPaymentTime_LeavesPaymentTimeNull() {
         MemberProfile member = getOrCreateMember();
-        String paymentCode = "PAY-NULLTIME-" + System.currentTimeMillis();
+        String paymentCode = "PAY-NT-" + (System.currentTimeMillis() % 1000000000L);
         jdbcTemplate.update(
                 "INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status, created_at, updated_at) " +
                         "VALUES (?, ?, ?, ?, ?, SYSDATETIME(), SYSDATETIME())",
