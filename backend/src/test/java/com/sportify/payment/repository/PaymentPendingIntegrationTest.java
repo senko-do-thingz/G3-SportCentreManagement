@@ -507,7 +507,32 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("Optimistic lock conflict throws ObjectOptimisticLockingFailureException when concurrent transaction updates payment")
     void optimisticLockConflict_ThrowsObjectOptimisticLockingFailureException() {
         TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
-        Long memberId = txTemplate.execute(status -> getOrCreateMember().getId());
+
+        Role memberRole = txTemplate.execute(status -> roleRepository.findByCode("MEMBER")
+                .orElseGet(() -> roleRepository.saveAndFlush(Role.builder()
+                        .code("MEMBER")
+                        .name("Member")
+                        .isSystem(true)
+                        .build())));
+
+        Long memberId = txTemplate.execute(status -> {
+            UserAccount user = userRepository.saveAndFlush(UserAccount.builder()
+                    .email("it-optlock-" + System.nanoTime() + "@sportify.com")
+                    .passwordHash("DummyHashForTestPurposesOnly")
+                    .fullName("OptLock Test Member")
+                    .role(memberRole)
+                    .status("ACTIVE")
+                    .build());
+
+            Long memberSeq = memberProfileRepository.getNextMemberCode();
+            MemberProfile profile = memberProfileRepository.saveAndFlush(MemberProfile.builder()
+                    .userAccount(user)
+                    .memberCode(codeFormatter.formatMemberCode(memberSeq))
+                    .currentLevel("BEGINNER")
+                    .joinedOn(LocalDate.now())
+                    .build());
+            return profile.getId();
+        });
 
         Long paymentId = txTemplate.execute(status -> {
             MemberProfile member = memberProfileRepository.findById(memberId).orElseThrow();
@@ -540,10 +565,21 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
                 return null;
             })).isInstanceOf(ObjectOptimisticLockingFailureException.class);
         } finally {
-            txTemplate.execute(status -> {
-                paymentRepository.deleteById(paymentId);
-                return null;
-            });
+            if (paymentId != null) {
+                final Long pId = paymentId;
+                txTemplate.execute(status -> {
+                    paymentRepository.deleteById(pId);
+                    return null;
+                });
+            }
+            if (memberId != null) {
+                final Long mId = memberId;
+                txTemplate.execute(status -> {
+                    memberProfileRepository.deleteById(mId);
+                    userRepository.deleteById(mId);
+                    return null;
+                });
+            }
         }
     }
 
