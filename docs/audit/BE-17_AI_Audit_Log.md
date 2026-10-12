@@ -24,8 +24,8 @@ This audit log records all engineering actions taken to address the strict code 
   1. Created a reusable shared test fixture `SportTestData.java` in `backend/src/test/java/com/sportify/catalog/test/` that produces valid `Sport` entities with `SportVenueType.POOL` and unique names/codes.
   2. Updated `PaymentPendingIntegrationTest` to either look up existing seeded sports or build valid instances with `SportTestData`, and used timestamped unique package codes.
 - **CI Verification Evidence**:
-  - Run URL: https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/38276432896
-  - Outcome: Green check (535 tests run, 0 failures, 0 errors, 0 skipped).
+  - Run URL: https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/38278619863
+  - Outcome: Green check (558 tests run, 0 failures, 0 errors, 0 skipped). Total tests increased from 535 to 558 with zero regressions.
 
 ---
 
@@ -106,5 +106,5 @@ This audit log records all engineering actions taken to address the strict code 
   - Output: Tests run: 470, Failures: 0, Errors: 0, Skipped: 4. BUILD SUCCESS.
   - Tests NOT executed locally: 16 classes ending in `*IntegrationTest` (81 tests) and 4 Testcontainers tests (`FlywayMigrationTest`, `PermissionRepositoryTest`, `RoleRepositoryTest`, `UserAccountRepositoryTest`).
 - **CI Test Execution Evidence**:
-  - GitHub Actions Run URL: https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/38276432896
-  - Output: 535 tests run, 0 failures, 0 errors, 0 skipped. Green check verified.
+  - GitHub Actions Run URL: https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/38278619863
+  - Output: 558 tests run, 0 failures, 0 errors, 0 skipped. Green check verified across all unit and Docker-dependent integration tests.
