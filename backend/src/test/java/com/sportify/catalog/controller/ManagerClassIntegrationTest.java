@@ -273,17 +273,17 @@ class ManagerClassIntegrationTest extends AbstractIntegrationTest {
         insertSession(classId, sport1Id, coachId, today.minusDays(1), LocalTime.of(8, 0), LocalTime.of(9, 0));
 
         // 2. Today session with start time before now
-        LocalTime pastTime = now.toLocalTime().isAfter(LocalTime.of(0, 30))
-                ? now.toLocalTime().minusMinutes(20)
-                : LocalTime.of(0, 1);
-        insertSession(classId, sport1Id, coachId, today, pastTime, pastTime.plusMinutes(30));
+        LocalTime pastTime = now.toLocalTime().isAfter(LocalTime.of(0, 5))
+                ? now.toLocalTime().minusMinutes(5)
+                : LocalTime.MIN;
+        insertSession(classId, sport1Id, coachId, today, pastTime, pastTime.plusMinutes(1));
 
         // 3. Future day session (tomorrow) -> Upcoming #1
         insertSession(classId, sport1Id, coachId, today.plusDays(2), LocalTime.of(14, 0), LocalTime.of(15, 0));
 
         // 4. Today session with start time after now -> Upcoming #2
-        LocalTime futureTime = now.toLocalTime().isBefore(LocalTime.of(23, 30))
-                ? now.toLocalTime().plusMinutes(20)
+        LocalTime futureTime = now.toLocalTime().isBefore(LocalTime.of(23, 50))
+                ? now.toLocalTime().plusMinutes(5)
                 : LocalTime.of(23, 59);
         insertSession(classId, sport1Id, coachId, today, futureTime, futureTime.plusMinutes(1));
 
