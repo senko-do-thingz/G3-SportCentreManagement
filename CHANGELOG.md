@@ -1,5 +1,46 @@
 # Changelog
 
+## 2026-10-12 - Frontend foundation: routing, API client, auth, layouts (FE-00, Shared)
+
+Branch `feat/fe-foundation`. Status: Implemented and verified with `npm test` (43 tests), `npm run lint` and `npm run build`, plus browser checks against a mock of the auth API. Manual checks against the real backend (docs/tests/FE-00_test_cases.md section 3) must be run before merging. Builds on the Vite + React + TypeScript scaffold from PR #13; no backend change.
+
+### API client (`frontend/src/api/`)
+- `client.ts`: fetch wrapper with base URL from `VITE_API_BASE_URL` (default `http://localhost:8080/api/v1`), JSON request and response handling, query string builder, `Authorization: Bearer` header.
+- On 401 the client calls `POST /auth/refresh` once and retries the request once. Parallel 401 responses share one refresh call, because the backend rotates the refresh token on every refresh. A rejected refresh (400, 401, 403) clears the tokens and notifies the auth context (logout); a network or server error keeps the session.
+- Session epoch in `tokenStorage`: a refresh or failure that belongs to an older session (the user logged out or logged in again meanwhile) never writes or clears the tokens of the current session.
+- `errors.ts`: `ApiError` with `status`, `message` and `fieldErrors` (from the `details` map of validation errors). Status 0 means the server could not be reached; tokens are kept in that case.
+- `authApi.ts` (login, register, me), `types.ts` (`UserProfile`, `AuthTokens`, `Role`, `PageResponse`, `SpringPage`), `page.ts` (`normalizePage` for `GET /members`, which still returns a raw Spring page), `tokenStorage.ts` (localStorage, guarded with try/catch).
+
+### Auth and routing (`frontend/src/auth/`, `frontend/src/routes/`)
+- `AuthProvider` and `useAuth`: login, logout, current user from `GET /users/me`, role, session restore after reload, login and logout followed across browser tabs.
+- `RequireAuth` (redirects to `/login` and remembers the requested page) and `RequireRole(roles)` (shows the 403 page in place).
+- After login: back to the requested page when it belongs to the user's role, otherwise the role home (`/member`, `/reception`, `/manager`, `/coach`).
+- `AppRoutes.tsx`: public routes (`/login`, `/register` placeholder for FE-01, `/ui-kit`), one protected area per role generated from `layouts/navigation.ts`, 403 and 404 pages. Later tasks register real screens in the `SCREENS` map.
+
+### Layouts and UI (`frontend/src/layouts/`, `frontend/src/components/`, `frontend/src/styles/`)
+- `PublicLayout`, `MemberLayout` (top bar and tabs, Figma F1-07), `StaffLayout` (side navigation, breadcrumb, Figma F1-01, F1-15, F2-13) with a collapsible menu below 960 px.
+- Menus per role with placeholder pages naming the task and Figma screens that will replace them.
+- Shared UI kit: Button, Input, Select, Modal (focus trap, focus restore, Escape for the top modal only, backdrop), Table with Pagination, Badge and StatusBadge, Toast, Spinner and PageLoader, EmptyState, ErrorState, Card, StatCard, PageHeader. All shown at `/ui-kit`.
+- Design tokens in `styles/tokens.css` sampled from the Figma screens (primary `#2169ba`, navy `#102e50`, accent `#ffad66`, page `#f5f8fc`).
+- Formatters in `utils/format.ts`: `formatMoney` (`1.350.000 VND`), `formatDate` (`04 Jul 2027`, LocalDate read without time zone shift), `formatDateTime`, `formatTime`, `humanizeCode`, `initials`.
+- Log in page (Figma F1-05) working end to end; FE-01 finishes sign up and the final copy.
+
+### Tooling
+- Added dev dependencies `vitest`, `jsdom`, `@testing-library/react`, `@testing-library/dom`, `@testing-library/user-event`, `@testing-library/jest-dom`; scripts `npm test` and `npm run test:watch`.
+- `vite.config.ts`: dev server pinned to port 5173 (`strictPort`) to match the backend CORS default; Vitest config.
+- Added `frontend/.env.example`; removed the Vite starter assets (`App.css`, `assets/`, `public/icons.svg`).
+- `frontend/README.md`: how to call the API, use the auth context, add a screen and use the UI kit.
+
+### Docs
+- `docs/tests/FE-00_test_cases.md`: 45 automated cases (43 tests plus build and lint), 12 browser checks, 12 manual cases for the real backend.
+- `docs/audit/FE-00_AI_Audit_Log.docx`.
+
+### Follow-ups
+- Run the manual cases in docs/tests/FE-00_test_cases.md section 3 against the real backend before merging.
+- Tokens are stored in localStorage (no httpOnly cookie support in the backend); never render untrusted HTML.
+- The backend has no logout endpoint, so logout only drops the tokens on this device; issued refresh tokens stay valid until they expire (7 days).
+- `GET /members` returns a raw Spring page; switching it to `PageResponse` would let screens drop `normalizePage`.
+
 ## 2026-10-11 - Class management for the manager (BE-09, Flow 2)
 
 Branch `feat/f2-class-management`. Status: Implemented, unit-verified, integration tests pending Docker. Not built or run against a real DB here: run mvn clean verify before merging (Testcontainers tests need Docker).

@@ -1,0 +1,89 @@
+/*
+ * Design tokens sampled from the Figma screens in context/ (F1-05, F1-07, F1-09, F1-01, F1-15).
+ * Use these variables instead of raw values so every screen stays consistent.
+ */
+:root {
+  /* Brand */
+  --color-primary: #2169ba;
+  --color-primary-hover: #1a5698;
+  --color-primary-active: #154a85;
+  --color-primary-soft: #eaf3fd;
+  --color-primary-soft-hover: #dbeafb;
+  --color-navy: #102e50;
+  --color-accent: #ffad66;
+  --color-accent-hover: #f59b4c;
+
+  /* Neutrals */
+  --color-bg: #f5f8fc;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f7fafc;
+  --color-border: #dde6ef;
+  --color-border-strong: #c5d3e1;
+  --color-text: #17324e;
+  --color-text-muted: #5d7288;
+  --color-text-subtle: #7c90a4;
+  --color-text-inverse: #ffffff;
+
+  /* Status */
+  --color-success: #2f7a57;
+  --color-success-soft: #eaf7f0;
+  --color-warning: #9a5b00;
+  --color-warning-soft: #fff4e2;
+  --color-danger: #b4473a;
+  --color-danger-soft: #fff0ed;
+  --color-info: #2169ba;
+  --color-info-soft: #eaf3fd;
+  --color-neutral: #4f647a;
+  --color-neutral-soft: #eef2f6;
+
+  /* Focus */
+  --focus-ring: 0 0 0 3px rgba(33, 105, 186, 0.28);
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.125rem;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --tracking-eyebrow: 0.12em;
+
+  /* Spacing (4px scale) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(16, 46, 80, 0.06);
+  --shadow-md: 0 8px 24px rgba(16, 46, 80, 0.08);
+  --shadow-lg: 0 20px 48px rgba(16, 46, 80, 0.18);
+
+  /* Layout */
+  --header-height: 64px;
+  --sidebar-width: 232px;
+  --content-max-width: 1120px;
+  --z-header: 20;
+  --z-modal: 100;
+  --z-toast: 200;
+}
