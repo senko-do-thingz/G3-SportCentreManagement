@@ -653,7 +653,7 @@ public class SportPackageServiceImplTest {
     }
 
     @Test
-    void cancelRegistration_AsNonOwner_ThrowsAccessDeniedException() {
+    void cancelRegistration_AsNonOwner_ThrowsResourceNotFoundException() {
         UserAccount otherUser = UserAccount.builder().id(999L).role(memberUser.getRole()).build();
         SportPackageRegistration reg = SportPackageRegistration.builder()
                 .id(89L)
@@ -663,7 +663,7 @@ public class SportPackageServiceImplTest {
 
         when(registrationRepository.findById(89L)).thenReturn(Optional.of(reg));
 
-        assertThrows(AccessDeniedException.class, () -> sportPackageService.cancelRegistration(89L, otherUser));
+        assertThrows(ResourceNotFoundException.class, () -> sportPackageService.cancelRegistration(89L, otherUser));
     }
 
     @Test

@@ -121,15 +121,15 @@ public class SportPackageRegistrationCancelControllerTest {
     }
 
     @Test
-    @DisplayName("PUT /api/v1/packages/registrations/{id}/cancel as other member returns 403 Forbidden")
-    void cancelRegistration_AsOtherMember_Returns403Forbidden() throws Exception {
+    @DisplayName("PUT /api/v1/packages/registrations/{id}/cancel as other member returns 404 Not Found")
+    void cancelRegistration_AsOtherMember_Returns404NotFound() throws Exception {
         CustomUserDetails otherMember = createUserDetails(400L, "MEMBER", "Other Member");
         when(sportPackageService.cancelRegistration(eq(10L), any(UserAccount.class)))
-                .thenThrow(new AccessDeniedException("Cannot cancel another member's registration request"));
+                .thenThrow(new com.sportify.core.exception.ResourceNotFoundException("Package registration not found for id: 10"));
 
         mockMvc.perform(put("/api/v1/packages/registrations/10/cancel")
                         .with(user(otherMember)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound());
     }
 
     @Test

@@ -23,6 +23,7 @@ public class PaymentResponse {
     private String itemDescription;
     private BigDecimal originalPrice;
     private BigDecimal discount;
+    private LocalDateTime paymentTime;
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private BankTransferInstructions bankTransferInstructions;

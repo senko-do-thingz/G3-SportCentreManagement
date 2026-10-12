@@ -30,6 +30,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -114,7 +115,63 @@ public class PaymentControllerTest {
                 .andExpect(jsonPath("$.bankTransferInstructions.accountName").value("Sportify Sports Center"))
                 .andExpect(jsonPath("$.bankTransferInstructions.accountNumber").value("0000 1041 2460"))
                 .andExpect(jsonPath("$.bankTransferInstructions.bank").value("Demo Bank"))
-                .andExpect(jsonPath("$.bankTransferInstructions.transferContent").value("PAY-1000"));
+                .andExpect(jsonPath("$.bankTransferInstructions.transferContent").value("PAY-1000"))
+                .andExpect(jsonPath("$.paymentTime").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/payments/{id} for pending MOMO omits bank instructions and has null paymentTime")
+    void getPayment_WhenPendingMomo_OmitsBankTransferInstructionsAndHasNullPaymentTime() throws Exception {
+        CustomUserDetails member = createUserDetails(100L, "MEMBER", "Taylor Nguyen");
+        PaymentResponse response = PaymentResponse.builder()
+                .id(2L)
+                .code("PAY-1001")
+                .status(PaymentStatus.PENDING)
+                .amount(BigDecimal.valueOf(500000.00))
+                .method(PaymentMethod.MOMO)
+                .itemDescription("Gym Membership")
+                .paymentTime(null)
+                .bankTransferInstructions(null)
+                .memberId(100L)
+                .build();
+
+        when(paymentService.getPayment(eq(2L), any(UserAccount.class))).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/payments/2")
+                        .with(user(member)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("PAY-1001"))
+                .andExpect(jsonPath("$.method").value("MOMO"))
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.paymentTime").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.bankTransferInstructions").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/payments/{id} for SUCCESS payment includes paymentTime and omits bank instructions")
+    void getPayment_WhenSuccess_IncludesPaymentTimeAndOmitsBankTransferInstructions() throws Exception {
+        CustomUserDetails member = createUserDetails(100L, "MEMBER", "Taylor Nguyen");
+        PaymentResponse response = PaymentResponse.builder()
+                .id(3L)
+                .code("PAY-1002")
+                .status(PaymentStatus.SUCCESS)
+                .amount(BigDecimal.valueOf(500000.00))
+                .method(PaymentMethod.BANK_TRANSFER)
+                .itemDescription("Gym Membership")
+                .paymentTime(LocalDateTime.of(2026, 10, 12, 10, 0, 0))
+                .bankTransferInstructions(null)
+                .memberId(100L)
+                .build();
+
+        when(paymentService.getPayment(eq(3L), any(UserAccount.class))).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/payments/3")
+                        .with(user(member)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("PAY-1002"))
+                .andExpect(jsonPath("$.status").value("SUCCESS"))
+                .andExpect(jsonPath("$.paymentTime").value("2026-10-12T10:00:00"))
+                .andExpect(jsonPath("$.bankTransferInstructions").doesNotExist());
     }
 
     @Test

@@ -24,6 +24,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration/identity,classpath:db/migration/catalog
+    clean-disabled: true
+    out-of-order: false
+    validate-on-migrate: true
 
 application:
   security:

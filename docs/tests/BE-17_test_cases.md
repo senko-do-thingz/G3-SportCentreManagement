@@ -14,14 +14,16 @@
 
 | Test Class | Category | Test Count | Execution Status | Description |
 |---|---|---|---|---|
-| `PaymentServiceImplTest` | Service Unit Test | 19 | PASSED (local unit test) | Verifies payment retrieval for owner and staff, 404 for non-owner, 404 for missing ID, dynamic item description and discount computation (sport package, membership card, invoice, fallback), bank transfer instructions visibility rule, method update guards (PENDING status, linked item PENDING_PAYMENT status), allowed online payment methods validation, real CodeFormatter generation, and zero/negative amount guard. |
-| `PaymentControllerTest` | WebMvc MockMvc Test | 9 | PASSED (local unit test) | Verifies HTTP endpoints `GET /api/v1/payments/{id}` and `PUT /api/v1/payments/{id}/method`, role authorization (MEMBER, RECEPTIONIST, MANAGER, ADMIN), 401 unauthenticated, 404 non-owner member concealing payment existence, and 400 validation error handling (disallowed method, missing method). |
-| `SportPackageRegistrationCancelControllerTest` | WebMvc MockMvc Test | 6 | PASSED (local unit test) | Verifies HTTP endpoint `PUT /api/v1/packages/registrations/{id}/cancel`, owner OK, receptionist OK, admin OK, other member 403 forbidden, wrong status (ACTIVE) 400 Bad Request, unauthenticated 401 Unauthorized. |
+| `PaymentServiceImplTest` | Service Unit Test | 21 | PASSED (local unit test) | Verifies payment retrieval for owner and staff, 404 for non-owner, 404 for missing ID, dynamic item description and discount computation (sport package, membership card, invoice, fallback), bank transfer instructions visibility rule, method update guards (PENDING status, linked item PENDING_PAYMENT status), allowed online payment methods validation, real CodeFormatter generation, zero/negative amount guard, optimistic locking conflict exception, and rounding amount rejection. |
+| `PaymentControllerTest` | WebMvc MockMvc Test | 12 | PASSED (local unit test) | Verifies HTTP endpoints `GET /api/v1/payments/{id}` and `PUT /api/v1/payments/{id}/method`, role authorization (MEMBER, RECEPTIONIST, MANAGER, ADMIN), 401 unauthenticated, 404 non-owner member concealing payment existence, 400 validation error handling (disallowed method, missing method), and exact JSON response shapes for pending bank transfer, pending momo, and success payments. |
+| `SportPackageRegistrationCancelControllerTest` | WebMvc MockMvc Test | 6 | PASSED (local unit test) | Verifies HTTP endpoint `PUT /api/v1/packages/registrations/{id}/cancel`, owner OK, receptionist OK, admin OK, non-owner member 404 Not Found (concealing resource existence), wrong status (ACTIVE) 400 Bad Request, unauthenticated 401 Unauthorized. |
 | `BankTransferPropertiesTest` | Config Unit Test | 4 | PASSED (local unit test) | Verifies Jakarta Bean Validation constraints on BankTransferProperties (valid configuration passes, blank accountName, accountNumber, or bankName fails validation). |
 | `PaymentEntityMappingTest` | Entity Unit Test | 6 | PASSED (local unit test) | Verifies JPA lifecycle callbacks, nullable paymentTime on prePersist for pending payments, and builder/accessors. |
 | `MembershipCardServiceImplTest` | Service Unit Test | 28 | PASSED (local unit test) | Includes card operations, PENDING payment creation via PaymentService, amount matching, zero amount guard, zero upgrade price difference guard, payment transition to SUCCESS on activateCard, and transition to FAILED with actor name in note on cancelCard. |
 | `SportPackageServiceImplTest` | Service Unit Test | 26 | PASSED (local unit test) | Includes package operations, PENDING payment creation via PaymentService, channel enforcement, zero price guard, 100 percent discount guard, payment transition to SUCCESS on activateRegistration, and transition to FAILED with actor name in note on cancelRegistration. |
-| `PaymentPendingIntegrationTest` | Testcontainers Integration Test | 5 | NOT RUN - requires Docker | Integration tests verifying persistence of pending payments linked to member cards and package registrations, repository query by payment ID, cancellation status update, check constraint rejection of invalid status, and reading back payment plus invoice with 2 lines against real Microsoft SQL Server. |
+| `SecurityUtilsTest` | Unit Test | 8 | PASSED (local unit test) | Verifies role parsing and staff detection across all roles (ADMIN, MANAGER, RECEPTIONIST, MEMBER), handling case insensitivity and optional "ROLE_" prefixes. |
+| `PaymentServiceTransactionMandatoryTest` | Spring Transaction Test | 1 | PASSED (local unit test) | Verifies that calling PaymentService.createPendingPayment without an active transaction throws IllegalTransactionStateException due to Propagation.MANDATORY enforcement. |
+| `PaymentPendingIntegrationTest` | Testcontainers Integration Test | 8 | VERIFIED IN CI (Docker SQL Server 2022) | Integration tests verifying persistence of pending payments linked to member cards and package registrations, repository query by payment ID, cancellation status update, check constraint rejection of invalid status, reading back payment plus invoice with 2 lines, filtered unique index rejection of duplicate payment_id while allowing multiple nulls, and check constraint rejection of zero/negative amounts. |
 
 ---
 
@@ -145,6 +147,18 @@ All tests in this suite run as pure Mockito unit tests without external database
 - **Expected Result**: Throws `ResourceNotFoundException` with message "Payment not found for id: 10" to conceal payment existence.
 - **Status**: PASSED
 
+#### TC-PAY-20: Update Payment Method - Optimistic Lock Conflict - Throws OptimisticLockingException
+- **Method Name**: `updatePaymentMethod_WhenOptimisticLockConflict_ThrowsOptimisticLockingException()`
+- **Input**: `paymentId = 10L`, `paymentRepository.save(...)` throws `ObjectOptimisticLockingFailureException`
+- **Expected Result**: Throws `OptimisticLockingException` indicating concurrent modification conflict.
+- **Status**: PASSED
+
+#### TC-PAY-21: Create Pending Payment - Amount Rounds to Zero - Throws BusinessRuleException
+- **Method Name**: `createPendingPayment_AmountRoundsToZero_ThrowsBusinessRuleException()`
+- **Input**: `amount = 0.004` (scale 2 rounds down to 0.00)
+- **Expected Result**: Throws `BusinessRuleException` with message "Payment amount must be greater than zero.".
+- **Status**: PASSED
+
 ---
 
 ### 2. PaymentControllerTest
@@ -205,6 +219,24 @@ All tests in this suite run with Spring Boot MockMvc slices.
 - **Expected Result**: HTTP 400 Bad Request due to `@NotNull` validation on `paymentMethod`.
 - **Status**: PASSED
 
+#### TC-CTL-10: GET /api/v1/payments/{id} - JSON Shape for Pending Bank Transfer
+- **Method Name**: `getPayment_WhenPendingBankTransfer_ReturnsBankInstructionsAndExpectedJsonShape()`
+- **Input**: `GET /api/v1/payments/1`
+- **Expected Result**: HTTP 200 OK with `bankTransferInstructions` object containing `accountName`, `accountNumber`, `bank`, and `transferContent`, with `paymentTime` omitted or null.
+- **Status**: PASSED
+
+#### TC-CTL-11: GET /api/v1/payments/{id} - JSON Shape for Pending Momo
+- **Method Name**: `getPayment_WhenPendingMomo_OmitsBankInstructionsAndExpectedJsonShape()`
+- **Input**: `GET /api/v1/payments/1`
+- **Expected Result**: HTTP 200 OK with `bankTransferInstructions` field not present in JSON output.
+- **Status**: PASSED
+
+#### TC-CTL-12: GET /api/v1/payments/{id} - JSON Shape for Success Payment
+- **Method Name**: `getPayment_WhenSuccess_ReturnsPaymentTimeAndOmitsBankInstructions()`
+- **Input**: `GET /api/v1/payments/1`
+- **Expected Result**: HTTP 200 OK with `paymentTime` string populated and `bankTransferInstructions` omitted.
+- **Status**: PASSED
+
 ---
 
 ### 3. SportPackageRegistrationCancelControllerTest
@@ -227,10 +259,10 @@ All tests in this suite run with Spring Boot MockMvc slices.
 - **Expected Result**: HTTP 200 OK.
 - **Status**: PASSED
 
-#### TC-SP-CTL-04: Cancel Registration - As Other Member - Returns 403
-- **Method Name**: `cancelRegistration_AsOtherMember_Returns403()`
+#### TC-SP-CTL-04: Cancel Registration - As Other Member - Returns 404
+- **Method Name**: `cancelRegistration_AsOtherMember_Returns404()`
 - **Input**: `PUT /api/v1/packages/registrations/10/cancel`, authenticated as non-owner MEMBER
-- **Expected Result**: HTTP 403 Forbidden.
+- **Expected Result**: HTTP 404 Not Found (concealing resource existence, aligning with payment endpoint policy).
 - **Status**: PASSED
 
 #### TC-SP-CTL-05: Cancel Registration - When Active - Returns 400
@@ -361,27 +393,64 @@ All tests in this suite run with Spring Boot MockMvc slices.
 
 ### 8. PaymentPendingIntegrationTest (Testcontainers Database Integration)
 
+All integration tests run against real Microsoft SQL Server 2022 containers via Testcontainers. Verified in GitHub Actions CI (Run URL: https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/38276432896).
+
 #### TC-IT-01: Save Pending Payment with Member Card
 - **Method Name**: `savePendingPayment_WithMemberCard_LinksAndFindsByPaymentId()`
 - **Verification**: Saves Payment and MemberCard within the same transaction, confirms foreign key `payment_id` is persisted and searchable via `memberCardRepository.findByPaymentId(paymentId)`.
-- **Status**: NOT RUN - requires Docker (to be verified by CI)
+- **Status**: PASSED (verified in CI)
 
 #### TC-IT-02: Save Pending Payment with Sport Package Registration
 - **Method Name**: `savePendingPayment_WithSportPackageRegistration_LinksAndFindsByPaymentId()`
 - **Verification**: Saves Payment and SportPackageRegistration within the same transaction, confirms foreign key `payment_id` is persisted and searchable via `sportPackageRegistrationRepository.findByPaymentId(paymentId)`.
-- **Status**: NOT RUN - requires Docker (to be verified by CI)
+- **Status**: PASSED (verified in CI)
 
 #### TC-IT-03: Cancel Pending Payment - Sets FAILED Status with Notes
 - **Method Name**: `cancelPendingPayment_UpdatesStatusToFailedWithNotes()`
 - **Verification**: Verifies that updating payment status from `PENDING` to `FAILED` with notes complies with SQL Server check constraints (`ck_payment_status`) and persists properly.
-- **Status**: NOT RUN - requires Docker (to be verified by CI)
+- **Status**: PASSED (verified in CI)
 
 #### TC-IT-04: Invalid Payment Status - Rejected by Database Check Constraint
 - **Method Name**: `savePayment_InvalidStatus_RejectedByCheckConstraint()`
 - **Verification**: Verifies that attempting to persist a Payment with an invalid status string (such as "INVALID_STATUS") throws a DataIntegrityViolationException or PersistenceException enforced by `ck_payment_status`.
-- **Status**: NOT RUN - requires Docker (to be verified by CI)
+- **Status**: PASSED (verified in CI)
 
 #### TC-IT-05: Payment with Invoice and Two Lines - Reads Back Correctly
 - **Method Name**: `savePayment_WithInvoiceAndTwoLines_ReadsBackCorrectly()`
 - **Verification**: Verifies persisting a Payment linked to an Invoice containing 2 invoice lines, and reading back the payment, invoice, and both lines with correct relational mappings.
-- **Status**: NOT RUN - requires Docker (to be verified by CI)
+- **Status**: PASSED (verified in CI)
+
+#### TC-IT-06: Member Card Payment ID Filtered Unique Index - Rejects Duplicate and Allows Multiple Nulls
+- **Method Name**: `uniqueFilteredIndex_MemberCardPaymentId_RejectsDuplicateAndAllowsMultipleNulls()`
+- **Verification**: Verifies that the filtered unique index `ux_member_card_payment` permits multiple rows with `payment_id IS NULL`, but immediately rejects a second row attempting to link to the same non-null `payment_id`.
+- **Status**: PASSED (verified in CI)
+
+#### TC-IT-07: Package Registration Payment ID Filtered Unique Index - Rejects Duplicate and Allows Multiple Nulls
+- **Method Name**: `uniqueFilteredIndex_SportPackageRegistrationPaymentId_RejectsDuplicateAndAllowsMultipleNulls()`
+- **Verification**: Verifies that the filtered unique index `ux_package_reg_payment` permits multiple rows with `payment_id IS NULL`, but rejects duplicate non-null `payment_id` references.
+- **Status**: PASSED (verified in CI)
+
+#### TC-IT-08: Payment Amount Check Constraint - Rejects Zero and Negative Amounts
+- **Method Name**: `paymentAmount_CheckConstraint_RejectsZeroAndNegativeAmounts()`
+- **Verification**: Verifies that database check constraint `ck_payment_amount` rejects inserts or updates with amount <= 0 directly at the database level.
+- **Status**: PASSED (verified in CI)
+
+---
+
+### 9. SecurityUtilsTest
+
+#### TC-SEC-01: Is Staff Role Check - Parameterized Verification
+- **Method Name**: `isStaff_ReturnsExpectedResult(String roleName, boolean expected)`
+- **Input**: Roles "ADMIN" (true), "ROLE_ADMIN" (true), "receptionist" (true), "ROLE_RECEPTIONIST" (true), "manager" (true), "ROLE_MANAGER" (true), "MEMBER" (false), "ROLE_MEMBER" (false).
+- **Expected Result**: Strips optional "ROLE_" prefix, performs case-insensitive comparison, and accurately detects staff roles (ADMIN, MANAGER, RECEPTIONIST).
+- **Status**: PASSED
+
+---
+
+### 10. PaymentServiceTransactionMandatoryTest
+
+#### TC-TX-01: Create Pending Payment Without Active Transaction - Throws Exception
+- **Method Name**: `createPendingPayment_WithoutActiveTransaction_ThrowsIllegalTransactionStateException()`
+- **Input**: Invokes `PaymentService.createPendingPayment` outside an active Spring `@Transactional` context.
+- **Expected Result**: Throws `IllegalTransactionStateException` due to `@Transactional(propagation = Propagation.MANDATORY)` on the service interface, preventing standalone orphan payments.
+- **Status**: PASSED

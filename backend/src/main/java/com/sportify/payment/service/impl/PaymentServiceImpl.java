@@ -105,10 +105,9 @@ public class PaymentServiceImpl implements PaymentService {
             payment.setPaymentStatus(PaymentStatus.SUCCESS);
             payment.setPaymentTime(LocalDateTime.now(clock));
             if (confirmedBy != null) {
+                payment.setConfirmedByUser(confirmedBy);
                 String staffNote = "Confirmed by staff: " + confirmedBy.getFullName();
-                payment.setNotes(payment.getNotes() != null && !payment.getNotes().isBlank()
-                        ? payment.getNotes() + " | " + staffNote
-                        : staffNote);
+                payment.setNotes(appendNote(payment.getNotes(), staffNote));
             }
             return paymentRepository.save(payment);
         }
@@ -126,7 +125,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         if (payment.getPaymentStatus() == PaymentStatus.PENDING) {
             payment.setPaymentStatus(PaymentStatus.FAILED);
-            payment.setNotes(reason);
+            payment.setNotes(truncateNotes(reason));
             return paymentRepository.save(payment);
         }
         return payment;
@@ -217,9 +216,27 @@ public class PaymentServiceImpl implements PaymentService {
                 .memberId(payment.getMember() != null ? payment.getMember().getId() : null)
                 .memberCode(payment.getMember() != null ? payment.getMember().getMemberCode() : null)
                 .notes(payment.getNotes())
+                .paymentTime(payment.getPaymentTime())
                 .createdAt(payment.getCreatedAt())
                 .updatedAt(payment.getUpdatedAt())
                 .build();
+    }
+
+    private String appendNote(String existing, String append) {
+        if (append == null) {
+            return existing;
+        }
+        String combined = (existing != null && !existing.isBlank())
+                ? existing + " | " + append
+                : append;
+        return truncateNotes(combined);
+    }
+
+    private String truncateNotes(String note) {
+        if (note == null) {
+            return null;
+        }
+        return note.length() > 500 ? note.substring(0, 500) : note;
     }
 
     private record PaymentItemSummary(String description, BigDecimal originalPrice, BigDecimal discount) {}

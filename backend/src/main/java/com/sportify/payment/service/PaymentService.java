@@ -7,6 +7,9 @@ import com.sportify.payment.dto.UpdatePaymentMethodRequest;
 import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.util.Set;
 
@@ -19,8 +22,10 @@ public interface PaymentService {
             PaymentMethod.ZALOPAY
     );
 
+    @Transactional(propagation = Propagation.MANDATORY)
     Payment createPendingPayment(MemberProfile member, BigDecimal amount, PaymentMethod method);
 
+    @Transactional(propagation = Propagation.MANDATORY)
     Payment createPendingPayment(UserAccount memberUser, BigDecimal amount, PaymentMethod method);
 
     Payment markPaymentSuccess(Long paymentId, UserAccount confirmedBy);

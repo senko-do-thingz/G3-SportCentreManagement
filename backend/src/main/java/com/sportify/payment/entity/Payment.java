@@ -1,6 +1,7 @@
 package com.sportify.payment.entity;
 
 import com.sportify.identity.entity.MemberProfile;
+import com.sportify.identity.entity.UserAccount;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -46,6 +47,10 @@ public class Payment {
 
     @Column(name = "payment_time")
     private LocalDateTime paymentTime;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "confirmed_by_user_id")
+    private UserAccount confirmedByUser;
 
     @Version
     @Column(name = "version", nullable = false)

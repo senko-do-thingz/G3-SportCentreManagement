@@ -233,7 +233,7 @@ public class SportPackageServiceImpl implements SportPackageService {
 
         boolean isStaff = SecurityUtils.isStaff(actor);
         if (!isStaff && !registration.getMember().getId().equals(actor.getId())) {
-            throw new AccessDeniedException("Cannot cancel another member's registration request");
+            throw new ResourceNotFoundException("Package registration not found for id: " + registrationId);
         }
 
         if (registration.getStatus() != PackageRegistrationStatus.PENDING_PAYMENT) {

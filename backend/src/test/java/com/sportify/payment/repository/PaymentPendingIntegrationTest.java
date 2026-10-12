@@ -268,6 +268,220 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
         assertThat(foundLines).extracting(InvoiceLine::getId).containsExactlyInAnyOrder(line1.getId(), line2.getId());
     }
 
+    @Test
+    @DisplayName("Unique filtered index on member_card(payment_id) rejects duplicates and allows multiple nulls")
+    void uniqueFilteredIndex_MemberCardPaymentId_RejectsDuplicateAndAllowsMultipleNulls() {
+        MemberProfile member = getOrCreateMember();
+
+        MembershipCardTier tier = membershipCardTierRepository.save(MembershipCardTier.builder()
+                .code("TIER-UQ-" + System.currentTimeMillis())
+                .name("Unique Index Tier " + System.currentTimeMillis())
+                .price(BigDecimal.valueOf(100000.00))
+                .durationMonths(6)
+                .discountPercentage(0)
+                .isActive(true)
+                .build());
+
+        // 1. Multiple cards with NULL payment_id must succeed
+        Long seq1 = memberCardRepository.getNextCardCodeSequence();
+        MemberCard nullPaymentCard1 = memberCardRepository.saveAndFlush(MemberCard.builder()
+                .cardCode(codeFormatter.formatCardCode(seq1))
+                .member(member)
+                .tier(tier)
+                .startDate(LocalDate.now())
+                .endDate(LocalDate.now().plusMonths(6))
+                .status(CardStatus.ACTIVE)
+                .pricePaid(BigDecimal.valueOf(100000.00))
+                .payment(null)
+                .build());
+
+        Long seq2 = memberCardRepository.getNextCardCodeSequence();
+        MemberCard nullPaymentCard2 = memberCardRepository.saveAndFlush(MemberCard.builder()
+                .cardCode(codeFormatter.formatCardCode(seq2))
+                .member(member)
+                .tier(tier)
+                .startDate(LocalDate.now())
+                .endDate(LocalDate.now().plusMonths(6))
+                .status(CardStatus.ACTIVE)
+                .pricePaid(BigDecimal.valueOf(100000.00))
+                .payment(null)
+                .build());
+
+        assertThat(nullPaymentCard1.getId()).isNotNull();
+        assertThat(nullPaymentCard2.getId()).isNotNull();
+
+        // 2. First card with a non-null payment_id succeeds
+        Long paySeq = paymentRepository.getNextPaymentCodeSequence();
+        Payment payment = paymentRepository.save(Payment.builder()
+                .paymentCode(codeFormatter.formatPaymentCode(paySeq))
+                .member(member)
+                .amount(BigDecimal.valueOf(100000.00))
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                .paymentStatus(PaymentStatus.PENDING)
+                .build());
+
+        Long seq3 = memberCardRepository.getNextCardCodeSequence();
+        memberCardRepository.saveAndFlush(MemberCard.builder()
+                .cardCode(codeFormatter.formatCardCode(seq3))
+                .member(member)
+                .tier(tier)
+                .startDate(LocalDate.now())
+                .endDate(LocalDate.now().plusMonths(6))
+                .status(CardStatus.PENDING_PAYMENT)
+                .pricePaid(BigDecimal.valueOf(100000.00))
+                .payment(payment)
+                .build());
+
+        // 3. Second card with the same payment_id must fail unique constraint
+        Long seq4 = memberCardRepository.getNextCardCodeSequence();
+        MemberCard duplicateCard = MemberCard.builder()
+                .cardCode(codeFormatter.formatCardCode(seq4))
+                .member(member)
+                .tier(tier)
+                .startDate(LocalDate.now())
+                .endDate(LocalDate.now().plusMonths(6))
+                .status(CardStatus.PENDING_PAYMENT)
+                .pricePaid(BigDecimal.valueOf(100000.00))
+                .payment(payment)
+                .build();
+
+        assertThatThrownBy(() -> memberCardRepository.saveAndFlush(duplicateCard))
+                .isInstanceOf(DataAccessException.class);
+    }
+
+    @Test
+    @DisplayName("Unique filtered index on sport_package_registration(payment_id) rejects duplicates and allows multiple nulls")
+    void uniqueFilteredIndex_SportPackageRegistrationPaymentId_RejectsDuplicateAndAllowsMultipleNulls() {
+        MemberProfile member = getOrCreateMember();
+        Sport sport = sportRepository.findAll().stream().findFirst()
+                .orElseGet(() -> sportRepository.save(com.sportify.catalog.test.SportTestData.aValidSport().build()));
+
+        String pkgCode = "PKG-UQ-" + System.currentTimeMillis();
+        SportPackage pkg = sportPackageRepository.save(SportPackage.builder()
+                .code(pkgCode)
+                .name("Unique Index Pkg " + System.currentTimeMillis())
+                .sport(sport)
+                .trainingFormat(TrainingFormat.SELF_TRAINING)
+                .durationDays(30)
+                .sessionCount(10)
+                .sessionMinutes(60)
+                .priceAmount(BigDecimal.valueOf(200000.00))
+                .isActive(true)
+                .build());
+
+        // 1. Multiple registrations with NULL payment_id must succeed
+        Long regSeq1 = sportPackageRegistrationRepository.getNextRegistrationCodeSequence();
+        SportPackageRegistration nullReg1 = sportPackageRegistrationRepository.saveAndFlush(SportPackageRegistration.builder()
+                .registrationCode(codeFormatter.formatPackageRegCode(regSeq1))
+                .member(member)
+                .sportPackage(pkg)
+                .channel(RegistrationChannel.ONLINE)
+                .originalPrice(BigDecimal.valueOf(200000.00))
+                .discountPercentage(0)
+                .paidAmount(BigDecimal.valueOf(200000.00))
+                .totalSessions(10)
+                .remainingSessions(10)
+                .startDate(LocalDate.now())
+                .endDate(LocalDate.now().plusDays(29))
+                .status(PackageRegistrationStatus.ACTIVE)
+                .createdByUser(member.getUserAccount())
+                .payment(null)
+                .build());
+
+        Long regSeq2 = sportPackageRegistrationRepository.getNextRegistrationCodeSequence();
+        SportPackageRegistration nullReg2 = sportPackageRegistrationRepository.saveAndFlush(SportPackageRegistration.builder()
+                .registrationCode(codeFormatter.formatPackageRegCode(regSeq2))
+                .member(member)
+                .sportPackage(pkg)
+                .channel(RegistrationChannel.ONLINE)
+                .originalPrice(BigDecimal.valueOf(200000.00))
+                .discountPercentage(0)
+                .paidAmount(BigDecimal.valueOf(200000.00))
+                .totalSessions(10)
+                .remainingSessions(10)
+                .startDate(LocalDate.now())
+                .endDate(LocalDate.now().plusDays(29))
+                .status(PackageRegistrationStatus.ACTIVE)
+                .createdByUser(member.getUserAccount())
+                .payment(null)
+                .build());
+
+        assertThat(nullReg1.getId()).isNotNull();
+        assertThat(nullReg2.getId()).isNotNull();
+
+        // 2. First registration with non-null payment_id succeeds
+        Long paySeq = paymentRepository.getNextPaymentCodeSequence();
+        Payment payment = paymentRepository.save(Payment.builder()
+                .paymentCode(codeFormatter.formatPaymentCode(paySeq))
+                .member(member)
+                .amount(BigDecimal.valueOf(200000.00))
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                .paymentStatus(PaymentStatus.PENDING)
+                .build());
+
+        Long regSeq3 = sportPackageRegistrationRepository.getNextRegistrationCodeSequence();
+        sportPackageRegistrationRepository.saveAndFlush(SportPackageRegistration.builder()
+                .registrationCode(codeFormatter.formatPackageRegCode(regSeq3))
+                .member(member)
+                .sportPackage(pkg)
+                .channel(RegistrationChannel.ONLINE)
+                .originalPrice(BigDecimal.valueOf(200000.00))
+                .discountPercentage(0)
+                .paidAmount(BigDecimal.valueOf(200000.00))
+                .totalSessions(10)
+                .remainingSessions(10)
+                .startDate(LocalDate.now())
+                .endDate(LocalDate.now().plusDays(29))
+                .status(PackageRegistrationStatus.PENDING_PAYMENT)
+                .createdByUser(member.getUserAccount())
+                .payment(payment)
+                .build());
+
+        // 3. Second registration with duplicate payment_id fails
+        Long regSeq4 = sportPackageRegistrationRepository.getNextRegistrationCodeSequence();
+        SportPackageRegistration duplicateReg = SportPackageRegistration.builder()
+                .registrationCode(codeFormatter.formatPackageRegCode(regSeq4))
+                .member(member)
+                .sportPackage(pkg)
+                .channel(RegistrationChannel.ONLINE)
+                .originalPrice(BigDecimal.valueOf(200000.00))
+                .discountPercentage(0)
+                .paidAmount(BigDecimal.valueOf(200000.00))
+                .totalSessions(10)
+                .remainingSessions(10)
+                .startDate(LocalDate.now())
+                .endDate(LocalDate.now().plusDays(29))
+                .status(PackageRegistrationStatus.PENDING_PAYMENT)
+                .createdByUser(member.getUserAccount())
+                .payment(payment)
+                .build();
+
+        assertThatThrownBy(() -> sportPackageRegistrationRepository.saveAndFlush(duplicateReg))
+                .isInstanceOf(DataAccessException.class);
+    }
+
+    @Test
+    @DisplayName("Database check constraint ck_payment_amount rejects zero and negative amounts")
+    void paymentAmount_CheckConstraint_RejectsZeroAndNegativeAmounts() {
+        MemberProfile member = getOrCreateMember();
+
+        assertThatThrownBy(() -> {
+            jdbcTemplate.update(
+                    "INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status, created_at, updated_at) " +
+                            "VALUES (?, ?, ?, ?, ?, SYSDATETIME(), SYSDATETIME())",
+                    "PAY-ZERO", member.getId(), BigDecimal.ZERO, "CASH", "PENDING"
+            );
+        }).isInstanceOf(DataAccessException.class);
+
+        assertThatThrownBy(() -> {
+            jdbcTemplate.update(
+                    "INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status, created_at, updated_at) " +
+                            "VALUES (?, ?, ?, ?, ?, SYSDATETIME(), SYSDATETIME())",
+                    "PAY-NEG", member.getId(), BigDecimal.valueOf(-50000.00), "CASH", "PENDING"
+            );
+        }).isInstanceOf(DataAccessException.class);
+    }
+
     private MemberProfile getOrCreateMember() {
         Optional<MemberProfile> existing = memberProfileRepository.findAll().stream().findFirst();
         if (existing.isPresent()) {

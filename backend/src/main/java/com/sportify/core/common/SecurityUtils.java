@@ -11,9 +11,12 @@ public final class SecurityUtils {
         if (actor == null || actor.getRole() == null || actor.getRole().getCode() == null) {
             return false;
         }
-        String code = actor.getRole().getCode();
-        return "RECEPTIONIST".equalsIgnoreCase(code)
-                || "MANAGER".equalsIgnoreCase(code)
-                || "ADMIN".equalsIgnoreCase(code);
+        String code = actor.getRole().getCode().trim().toUpperCase();
+        if (code.startsWith("ROLE_")) {
+            code = code.substring(5);
+        }
+        return "RECEPTIONIST".equals(code)
+                || "MANAGER".equals(code)
+                || "ADMIN".equals(code);
     }
 }

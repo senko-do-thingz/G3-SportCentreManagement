@@ -185,10 +185,16 @@ class PaymentServiceImplTest {
         assertThatThrownBy(() -> paymentService.createPendingPayment(ownerProfile, BigDecimal.valueOf(-50000.00), PaymentMethod.BANK_TRANSFER))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Payment amount must be greater than zero");
+
+        // Discount producing 0.004 rounds to 0.00 with scale 2
+        BigDecimal roundedZero = BigDecimal.valueOf(0.004).setScale(2, java.math.RoundingMode.HALF_UP);
+        assertThatThrownBy(() -> paymentService.createPendingPayment(ownerProfile, roundedZero, PaymentMethod.BANK_TRANSFER))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Payment amount must be greater than zero");
     }
 
     @Test
-    @DisplayName("Mark payment success sets SUCCESS status, paymentTime, and staff notes")
+    @DisplayName("Mark payment success sets SUCCESS status, paymentTime, confirmedByUser, and staff notes")
     void markPaymentSuccess_UpdatesStatusTimeAndNotes() {
         when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -197,6 +203,7 @@ class PaymentServiceImplTest {
 
         assertThat(success.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
         assertThat(success.getPaymentTime()).isEqualTo(LocalDateTime.now(clock));
+        assertThat(success.getConfirmedByUser()).isEqualTo(receptionistUser);
         assertThat(success.getNotes()).contains("Confirmed by staff: Desk Staff");
     }
 
@@ -358,6 +365,23 @@ class PaymentServiceImplTest {
         assertThatThrownBy(() -> paymentService.updatePaymentMethod(10L, request, ownerUser))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("not allowed for online payment");
+    }
+
+    @Test
+    @DisplayName("Update payment method propagates optimistic locking failure cleanly")
+    void updatePaymentMethod_WhenOptimisticLockConflict_ThrowsOptimisticLockingException() {
+        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+        when(memberCardRepository.findByPaymentId(10L)).thenReturn(Optional.empty());
+        when(sportPackageRegistrationRepository.findByPaymentId(10L)).thenReturn(Optional.empty());
+        when(paymentRepository.save(any(Payment.class)))
+                .thenThrow(new org.springframework.orm.ObjectOptimisticLockingFailureException(Payment.class, 10L));
+
+        UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
+                .paymentMethod(PaymentMethod.MOMO)
+                .build();
+
+        assertThatThrownBy(() -> paymentService.updatePaymentMethod(10L, request, ownerUser))
+                .isInstanceOf(org.springframework.orm.ObjectOptimisticLockingFailureException.class);
     }
 
     @Test
