@@ -50,7 +50,7 @@ src/
   components/   Brand.tsx and ui/ (shared UI kit, import from components/ui)
   config/       env.ts (VITE_API_BASE_URL)
   layouts/      PublicLayout, MemberLayout (top nav), StaffLayout (side nav), navigation.ts (menus)
-  pages/        public/ (login, 403, 404), dev/ComponentDemoPage (/ui-kit), PlaceholderPage
+  pages/        public/ (log in, sign up, 403, 404), dev/ComponentDemoPage (/ui-kit), PlaceholderPage
   routes/       AppRoutes.tsx
   styles/       tokens.css (design tokens), base.css, components.css, layouts.css
   utils/        format.ts (money, date, labels, initials)
@@ -79,8 +79,13 @@ await api.post('/manager/users', body)
 ### Current user and roles
 
 ```ts
-const { user, role, status, login, logout, reloadUser } = useAuth()
+const { user, role, status, login, register, logout, reloadUser } = useAuth()
+
+await login({ email, password }, { remember: true }) // remember: false keeps the session for this tab only
+await register({ fullName, email, password, phone })  // creates a MEMBER and signs in (remembered)
 ```
+
+"Remember me" (FE-01): a remembered session is stored in localStorage (shared by all tabs, kept after the browser is closed); a session that is not remembered is stored in sessionStorage (this tab only, ends when the tab is closed). `tokenStorage.startSession(tokens)` without options keeps the FE-00 behaviour (remembered).
 
 `status` is one of:
 
@@ -107,7 +112,9 @@ Routes are already protected by role: a member opening a manager URL sees the 40
 
 All components are shown at http://localhost:5173/ui-kit with working examples. This page exists only in development (`npm run dev`) and in tests: the route is registered when `import.meta.env.DEV` is true, so a production build (`npm run build`) does not contain the page or its route (it shows 404).
 
-`Button`, `Input`, `Select`, `Modal`, `Table` (with `Pagination`), `Badge` and `StatusBadge`, `Toast` (`useToast()`), `Spinner` and `PageLoader`, `EmptyState`, `ErrorState`, `Card`, `StatCard`, `PageHeader`.
+`Button`, `Input` (with an optional `trailing` element), `PasswordInput` (Show or Hide), `Checkbox`, `Select`, `Modal`, `Table` (with `Pagination`), `Badge` and `StatusBadge`, `Toast` (`useToast()`), `Spinner` and `PageLoader`, `EmptyState`, `ErrorState`, `Card`, `StatCard`, `PageHeader`.
+
+Password rules for forms are in `auth/passwordRules.ts` (`checkPassword`, `isStrongPassword`), identical to the backend `@StrongPassword`. Reuse them for any screen that sets a password.
 
 Formatters in `utils/format.ts`: `formatMoney(1350000)` gives `1.350.000 VND`, `formatDate('2027-07-04')` gives `04 Jul 2027`, `formatDateTime`, `formatTime`, `humanizeCode('PENDING_PAYMENT')` gives `Pending payment`, `initials`.
 

@@ -3,8 +3,14 @@ import { authApi } from '../api/authApi'
 import { onSessionExpired } from '../api/client'
 import { ApiError } from '../api/errors'
 import { tokenStorage } from '../api/tokenStorage'
-import type { LoginRequest, UserProfile } from '../api/types'
-import { AuthContext, type AuthContextValue, type AuthStatus } from './authContext'
+import type { AuthTokens, LoginRequest, RegisterRequest, UserProfile } from '../api/types'
+import {
+  AccountCreatedError,
+  AuthContext,
+  type AuthContextValue,
+  type AuthStatus,
+  type LoginOptions,
+} from './authContext'
 import { roleOf } from './roles'
 
 interface AuthState {
@@ -106,14 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('storage', handleStorage)
   }, [loadProfile])
 
-  const login = useCallback(async (credentials: LoginRequest) => {
-    // Any profile request still running for an older session must not overwrite this login.
-    loadCounter.current += 1
-    const tokens = await authApi.login({
-      email: credentials.email.trim(),
-      password: credentials.password,
-    })
-    tokenStorage.startSession(tokens)
+  /** Stores a new token pair and loads its profile. A failed profile load drops the tokens again. */
+  const startSession = useCallback(async (tokens: AuthTokens, persistent: boolean) => {
+    tokenStorage.startSession(tokens, { persistent })
     try {
       const user = await authApi.me()
       setState({ status: 'authenticated', user, sessionExpired: false, loadError: null })
@@ -123,6 +124,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw error
     }
   }, [])
+
+  const login = useCallback(
+    async (credentials: LoginRequest, options: LoginOptions = {}) => {
+      // Any profile request still running for an older session must not overwrite this login.
+      loadCounter.current += 1
+      const tokens = await authApi.login({
+        email: credentials.email.trim(),
+        password: credentials.password,
+      })
+      return startSession(tokens, options.remember !== false)
+    },
+    [startSession],
+  )
+
+  const register = useCallback(
+    async (request: RegisterRequest) => {
+      loadCounter.current += 1
+      const tokens = await authApi.register(request)
+      try {
+        return await startSession(tokens, true)
+      } catch (error) {
+        throw new AccountCreatedError(error)
+      }
+    },
+    [startSession],
+  )
 
   const logout = useCallback(() => {
     // The backend has no logout endpoint; dropping the tokens ends the session on this device.
@@ -147,10 +174,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sessionExpired: state.sessionExpired,
       loadError: state.loadError,
       login,
+      register,
       logout,
       reloadUser,
     }),
-    [state, login, logout, reloadUser],
+    [state, login, register, logout, reloadUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

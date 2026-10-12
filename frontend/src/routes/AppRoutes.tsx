@@ -2,7 +2,7 @@ import { lazy, Suspense, type ReactNode } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { RequireRole } from '../auth/RequireRole'
 import { MemberLayout } from '../layouts/MemberLayout'
-import { ALL_AREAS, type NavItem, type RoleArea } from '../layouts/navigation'
+import { ALL_AREAS, type RoleArea } from '../layouts/navigation'
 import { PublicLayout } from '../layouts/PublicLayout'
 import { StaffLayout } from '../layouts/StaffLayout'
 import { PageLoader } from '../components/ui/Spinner'
@@ -11,6 +11,7 @@ import { ForbiddenPage } from '../pages/public/ForbiddenPage'
 import { HomeRedirect } from '../pages/public/HomeRedirect'
 import { LoginPage } from '../pages/public/LoginPage'
 import { NotFoundPage } from '../pages/public/NotFoundPage'
+import { RegisterPage } from '../pages/public/RegisterPage'
 
 /**
  * Real screens by full path. Later tasks register their page here, for example
@@ -25,13 +26,6 @@ const SCREENS: Record<string, ReactNode> = {}
 const ComponentDemoPage = import.meta.env.DEV
   ? lazy(() => import('../pages/dev/ComponentDemoPage').then((module) => ({ default: module.ComponentDemoPage })))
   : null
-
-const REGISTER_PLACEHOLDER: Pick<NavItem, 'title' | 'description' | 'task' | 'screens'> = {
-  title: 'Sign up',
-  description: 'Create a member account to register sport packages and book sessions.',
-  task: 'FE-01',
-  screens: ['F1-06'],
-}
 
 function areaRoutes(area: RoleArea) {
   return area.sections
@@ -54,7 +48,7 @@ export function AppRoutes() {
 
       <Route element={<PublicLayout />}>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<PlaceholderPage item={REGISTER_PLACEHOLDER} />} />
+        <Route path="/register" element={<RegisterPage />} />
       </Route>
 
       {import.meta.env.DEV && ComponentDemoPage && (

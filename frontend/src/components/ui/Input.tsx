@@ -7,14 +7,38 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string
   /** Element shown on the right of the label, for example a "Forgot password?" link. */
   labelAction?: ReactNode
+  /** Element shown inside the field on the right, for example the show or hide password button. */
+  trailing?: ReactNode
 }
 
-export function Input({ label, hint, error, labelAction, id, className, required, ...rest }: InputProps) {
+export function Input({
+  label,
+  hint,
+  error,
+  labelAction,
+  trailing,
+  id,
+  className,
+  required,
+  'aria-describedby': extraDescribedBy,
+  ...rest
+}: InputProps) {
   const generatedId = useId()
   const inputId = id ?? generatedId
   const hintId = hint ? `${inputId}-hint` : undefined
   const errorId = error ? `${inputId}-error` : undefined
-  const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined
+  const describedBy = [hintId, errorId, extraDescribedBy].filter(Boolean).join(' ') || undefined
+
+  const input = (
+    <input
+      id={inputId}
+      className={`input${error ? ' input--invalid' : ''}`}
+      aria-invalid={error ? true : undefined}
+      aria-describedby={describedBy}
+      required={required}
+      {...rest}
+    />
+  )
 
   return (
     <div className={['field', className ?? ''].filter(Boolean).join(' ')}>
@@ -29,14 +53,14 @@ export function Input({ label, hint, error, labelAction, id, className, required
           {labelAction}
         </div>
       )}
-      <input
-        id={inputId}
-        className={`input${error ? ' input--invalid' : ''}`}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={describedBy}
-        required={required}
-        {...rest}
-      />
+      {trailing ? (
+        <div className="input-wrap input-wrap--trailing">
+          {input}
+          <span className="input-wrap__trailing">{trailing}</span>
+        </div>
+      ) : (
+        input
+      )}
       {hint && !error && (
         <p className="field__hint" id={hintId}>
           {hint}

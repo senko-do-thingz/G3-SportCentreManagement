@@ -1,0 +1,88 @@
+import { describe, expect, it } from 'vitest'
+import { checkPassword, isStrongPassword, passwordStrength, utf8ByteLength } from './passwordRules'
+import { normalizePhone, toRegisterRequest, validateRegister, EMPTY_REGISTER_FORM } from './registerValidation'
+
+/** Cases copied from the rules of com.sportify.core.validation.StrongPasswordValidator. */
+describe('password rules (same as backend StrongPassword)', () => {
+  it.each([
+    ['Train202', true, 'exactly 8 characters with a letter and a digit'],
+    ['Train20', false, '7 characters is too short'],
+    [`a1${'b'.repeat(62)}`, true, 'exactly 64 characters'],
+    [`a1${'b'.repeat(63)}`, false, '65 characters is too long'],
+    ['abcdefgh', false, 'letters only'],
+    ['12345678', false, 'digits only'],
+    ['!!!!!!!a1', true, 'symbols are allowed but do not count'],
+    ['matkhaué1', true, 'an accented letter counts as a letter'],
+    ['١٢٣abcde', true, 'any Unicode decimal digit counts, like Character.isDigit'],
+  ])('%s -> %s (%s)', (password, expected) => {
+    expect(isStrongPassword(password)).toBe(expected)
+  })
+
+  it('rejects more than 72 UTF-8 bytes even when the length is below 64', () => {
+    const password = `${'é'.repeat(36)}1` // 37 characters, 73 bytes
+    expect(password.length).toBe(37)
+    expect(utf8ByteLength(password)).toBe(73)
+    expect(isStrongPassword(password)).toBe(false)
+    expect(checkPassword(password).find((rule) => rule.id === 'bytes')?.met).toBe(false)
+    expect(isStrongPassword(`${'é'.repeat(35)}1`)).toBe(true) // 71 bytes
+  })
+
+  it('counts UTF-16 code units for the length, like Java String.length', () => {
+    // One character outside the BMP is 2 code units in both Java and JavaScript.
+    const password = `${'\u{1F3C0}'.repeat(3)}a1` // 8 code units
+    expect(password.length).toBe(8)
+    expect(isStrongPassword(password)).toBe(true)
+  })
+
+  it('does not count a letter outside the BMP, like Character.isLetter(char) on a surrogate', () => {
+    const password = `${'\u{1D400}'.repeat(4)}1234` // 4 math letters (8 code units) + 4 digits
+    expect(checkPassword(password).find((rule) => rule.id === 'letter')?.met).toBe(false)
+    expect(isStrongPassword(password)).toBe(false)
+  })
+
+  it('reports the strength from the number of rules met', () => {
+    expect(passwordStrength('')).toBe('empty')
+    expect(passwordStrength('abc')).toBe('weak')
+    expect(passwordStrength('abcdefgh')).toBe('fair')
+    expect(passwordStrength('abcdefg1')).toBe('strong')
+  })
+})
+
+describe('sign up form checks', () => {
+  const valid = {
+    ...EMPTY_REGISTER_FORM,
+    fullName: 'Jamie Tran',
+    phone: '0901234599',
+    email: 'jamie@sportify.demo',
+    password: 'Train2026',
+    confirmPassword: 'Train2026',
+    acceptTerms: true,
+  }
+
+  it('accepts a complete form', () => {
+    expect(validateRegister(valid)).toEqual({})
+  })
+
+  it('uses the backend messages for length limits and phone format', () => {
+    expect(validateRegister({ ...valid, fullName: 'a'.repeat(101) }).fullName).toBe('Full name must be at most 100 characters')
+    expect(validateRegister({ ...valid, phone: '1234567' }).phone).toBe('Phone must be 8-15 digits with optional leading +')
+    expect(validateRegister({ ...valid, phone: '+8412345678901234' }).phone).toBe('Phone must be 8-15 digits with optional leading +')
+    expect(validateRegister({ ...valid, phone: '+841234567890123' }).phone).toBeUndefined() // 15 digits
+    expect(validateRegister({ ...valid, phone: '+84901234567' }).phone).toBeUndefined()
+    expect(validateRegister({ ...valid, email: 'jamie@sportify' }).email).toBe('Email is invalid')
+  })
+
+  it('removes separators from the phone number before checking and sending it', () => {
+    expect(normalizePhone('(+84) 901-234.567')).toBe('+84901234567')
+    expect(toRegisterRequest({ ...valid, fullName: ' Jamie ', email: ' j@s.vn ', phone: '0901 234 599' })).toEqual({
+      fullName: 'Jamie',
+      email: 'j@s.vn',
+      password: 'Train2026',
+      phone: '0901234599',
+    })
+  })
+
+  it('keeps the password exactly as typed', () => {
+    expect(toRegisterRequest({ ...valid, password: ' Train2026 ' }).password).toBe(' Train2026 ')
+  })
+})

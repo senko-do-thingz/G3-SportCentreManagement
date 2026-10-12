@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-10-12 - Log in and Sign up screens (FE-01, Flow 1)
+
+Branch `feat/f1-auth-screens`. Status: Implemented and verified with `npm test` (115 tests, 47 new), `npm run lint`, `tsc -b` and `npm run build`, plus 6 browser checks against a mock of the auth API. Manual checks against the real backend (docs/tests/FE-01_test_cases.md section 4) must be run before merging. No backend change.
+
+### Screens (`frontend/src/pages/public/`)
+- `LoginPage.tsx` (Figma F1-05): password Show or Hide, Remember me, Forgot password (explains that the front desk resets passwords, the backend has no reset endpoint), clear messages for wrong credentials (401) and for a locked or inactive account (403), sample account box in development builds only.
+- `RegisterPage.tsx` (Figma F1-06): full name, phone, email, password with live rules and strength, confirm password, accept terms. Calls `POST /auth/register`, signs the new member in with the returned tokens and opens `/member`. Duplicate email (409) and backend validation details (400) are shown under their fields. If the account is created but the profile cannot be loaded, the user is sent to Log in with the email prefilled instead of submitting the form twice.
+- `AuthShell.tsx`: shared two column card with the photo hero from the Figma (`src/assets/auth-hero.jpg`), same 519 / 619 split as the design.
+- Both forms: Enter submits, every control is disabled while sending, the focus moves to the first invalid field.
+
+### Auth (`frontend/src/auth/`, `frontend/src/api/tokenStorage.ts`)
+- `passwordRules.ts`: same rules as `StrongPasswordValidator` (8 to 64 UTF-16 units, at most 72 UTF-8 bytes, one letter, one digit) and the same message.
+- `registerValidation.ts`: client checks with the `RegisterRequest` messages; phone separators are removed before sending. The phone is required on the form (the backend accepts it empty).
+- `AuthProvider`: `login(credentials, { remember })` and new `register(request)`; `AccountCreatedError` for the created-but-not-signed-in case.
+- `tokenStorage`: a session that is not remembered lives in sessionStorage (this tab only); a remembered one in localStorage as before. The default is unchanged.
+
+### UI kit (`frontend/src/components/ui/`)
+- `PasswordInput` (Show or Hide button), `Checkbox`, `Input` gains a `trailing` slot and merges an extra `aria-describedby`. Both shown on `/ui-kit`.
+
+### Docs
+- `docs/tests/FE-01_test_cases.md`: 47 automated cases, 6 browser checks, 14 manual cases.
+- `docs/audit/FE-01_AI_Audit_Log.docx`.
+- `frontend/README.md`: Remember me, `register`, password rules, new components.
+
 ## 2026-10-12 - Frontend foundation: routing, API client, auth, layouts (FE-00, Shared)
 
 Branch `feat/fe-foundation`. Status: Implemented and verified with `npm test` (68 tests after review round 3), `npm run lint` and `npm run build`, plus 25 browser checks against a mock of the auth API. Manual checks against the real backend (docs/tests/FE-00_test_cases.md section 3) must be run before merging. Builds on the Vite + React + TypeScript scaffold from PR #13; no backend change.

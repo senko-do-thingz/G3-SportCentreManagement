@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import type { LoginRequest, Role, UserProfile } from '../api/types'
+import type { LoginRequest, RegisterRequest, Role, UserProfile } from '../api/types'
 
 /**
  * loading: a stored session is being restored.
@@ -10,6 +10,14 @@ import type { LoginRequest, Role, UserProfile } from '../api/types'
  */
 export type AuthStatus = 'loading' | 'authenticated' | 'anonymous' | 'error'
 
+export interface LoginOptions {
+  /**
+   * "Remember me". True (default) keeps the session after the browser is closed and shares it
+   * with every tab; false keeps it for this tab only.
+   */
+  remember?: boolean
+}
+
 export interface AuthContextValue {
   status: AuthStatus
   user: UserProfile | null
@@ -19,10 +27,27 @@ export interface AuthContextValue {
   sessionExpired: boolean
   /** The error behind status 'error', otherwise null. */
   loadError: unknown
-  login(credentials: LoginRequest): Promise<UserProfile>
+  login(credentials: LoginRequest, options?: LoginOptions): Promise<UserProfile>
+  /**
+   * Creates a member account with POST /auth/register, then signs the new member in with the
+   * returned tokens (remembered on this device) and loads the profile.
+   */
+  register(request: RegisterRequest): Promise<UserProfile>
   logout(): void
   /** Reloads GET /users/me, for example after the profile was edited or to retry after an error. */
   reloadUser(): Promise<UserProfile | null>
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)
+
+/**
+ * Thrown by register() when POST /auth/register created the account but the follow-up profile
+ * request failed (for example the server went down in between). The account exists, so the sign
+ * up form must not be sent again: the page asks the user to log in instead.
+ */
+export class AccountCreatedError extends Error {
+  constructor(cause: unknown) {
+    super('Your account was created, but we could not sign you in. Please log in.', { cause })
+    this.name = 'AccountCreatedError'
+  }
+}
