@@ -2,7 +2,7 @@
 
 ## 2026-10-12 - Frontend foundation: routing, API client, auth, layouts (FE-00, Shared)
 
-Branch `feat/fe-foundation`. Status: Implemented and verified with `npm test` (65 tests after review round 2), `npm run lint` and `npm run build`, plus 20 browser checks against a mock of the auth API. Manual checks against the real backend (docs/tests/FE-00_test_cases.md section 3) must be run before merging. Builds on the Vite + React + TypeScript scaffold from PR #13; no backend change.
+Branch `feat/fe-foundation`. Status: Implemented and verified with `npm test` (68 tests after review round 3), `npm run lint` and `npm run build`, plus 25 browser checks against a mock of the auth API. Manual checks against the real backend (docs/tests/FE-00_test_cases.md section 3) must be run before merging. Builds on the Vite + React + TypeScript scaffold from PR #13; no backend change.
 
 ### API client (`frontend/src/api/`)
 - `client.ts`: fetch wrapper with base URL from `VITE_API_BASE_URL` (default `http://localhost:8080/api/v1`), JSON request and response handling, query string builder, `Authorization: Bearer` header.
@@ -32,7 +32,7 @@ Branch `feat/fe-foundation`. Status: Implemented and verified with `npm test` (6
 - `frontend/README.md`: how to call the API, use the auth context, add a screen and use the UI kit.
 
 ### Docs
-- `docs/tests/FE-00_test_cases.md`: 67 automated cases (65 tests plus build and lint), 20 browser checks, 16 manual cases for the real backend.
+- `docs/tests/FE-00_test_cases.md`: 70 automated cases (68 tests plus build and lint), 25 browser checks, 16 manual cases for the real backend.
 - `docs/audit/FE-00_AI_Audit_Log.docx`.
 
 ### Review round 2
@@ -48,6 +48,11 @@ Branch `feat/fe-foundation`. Status: Implemented and verified with `npm test` (6
 - Log in form checks email (required, basic format) and password (required) before sending; backend field errors still take precedence.
 - Modal focus trap ignores hidden elements (`hidden`, `aria-hidden="true"`, `inert`, `display: none`, `visibility: hidden`) and pulls focus back into the dialog when it moved outside.
 - 22 new tests (65 in total, 6 files); each new guard was broken on purpose once and its tests failed (15 of 15).
+
+### Review round 3
+- Refresh timeout: `POST /auth/refresh` runs while the tab holds the cross tab lock, so it now has a timeout of 15000 ms (constant `REFRESH_TIMEOUT_MS` in `frontend/src/api/client.ts`, AbortController and setTimeout, timer always cleared). A timeout behaves like a network error: `ApiError` status 0, tokens kept, no logout, and the lock is released so tabs waiting for it continue. Normal requests and caller supplied abort signals are unchanged.
+- 3 new tests with fake timers (68 in total); the guard was broken on purpose three times and the tests failed each time.
+- Text rules: the AI audit log row about the Node version requirement is now written in words. The bullet glyphs of the audit log list definitions (above code point 127) were replaced with a plain hyphen. In the BE-09 entry of this changelog, four arrows in prose were replaced with the word "gives" (wording only, meaning unchanged). A scan of the audit log, `frontend/README.md`, `docs/tests/FE-00_test_cases.md`, this changelog, `FE-00_CHANGES.md` and every file under `frontend/src` finds no character above code point 127 and no arrow or vertical bar pair in prose.
 
 ### Follow-ups
 - Run the manual cases in docs/tests/FE-00_test_cases.md section 3 against the real backend before merging.
@@ -93,7 +98,7 @@ Branch `feat/f2-class-management`. Status: Implemented, unit-verified, integrati
 - `ManagerClassServiceImplTest`: unit tests covering create with `CL-xxxx`, coach qualification failure (400), coach unchanged on PUT but no longer qualified (400), sport change blocked with upcoming sessions (400), deactivation blocked with confirmed future booking (400), deactivation allowed without confirmed booking, upcoming sessions count logic, and single clock read. All null assertions use `assertNull`.
 - `AgeGroupServiceImplTest` and `CoachDirectoryServiceImplTest`: unit tests for lookup services.
 - `ManagerClassControllerTest`, `AgeGroupControllerTest`, `CoachControllerTest`: WebMvc controller slice tests for request validation, authorization matrix (401, 403 for non-manager), and status codes.
-- `ManagerClassIntegrationTest`: Testcontainers integration test extending `AbstractIntegrationTest` (following `ManagerUserIntegrationTest` pattern). Covers list with sportId/level/coachId/active/search/paging; create -> CL-xxxx; coach not teaching the sport -> 400; deactivate with a confirmed future booking -> 400; a past session and a today-before-now session are not counted; non-manager -> 403. Clean up only rows it created.
+- `ManagerClassIntegrationTest`: Testcontainers integration test extending `AbstractIntegrationTest` (following `ManagerUserIntegrationTest` pattern). Covers list with sportId/level/coachId/active/search/paging; create gives CL-xxxx; coach not teaching the sport gives 400; deactivate with a confirmed future booking gives 400; a past session and a today-before-now session are not counted; non-manager gives 403. Clean up only rows it created.
 
 ### Follow-ups
 - `sport_class.is_active` is not enforced by session creation or booking yet.

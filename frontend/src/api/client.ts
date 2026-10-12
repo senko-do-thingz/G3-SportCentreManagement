@@ -99,6 +99,12 @@ let refreshInFlight: { epoch: number; promise: Promise<string | null> } | null =
 
 const REFRESH_LOCK_NAME = 'sportify-auth-refresh'
 
+/**
+ * Maximum time in milliseconds for POST /auth/refresh. A refresh that takes longer is aborted and
+ * handled like a network error (session kept, lock released). Normal requests have no timeout.
+ */
+export const REFRESH_TIMEOUT_MS = 15000
+
 /** Refresh responses that mean the refresh token is no longer accepted (404: the user no longer exists). */
 const REJECTED_REFRESH_STATUSES = new Set([400, 401, 403, 404])
 
@@ -137,18 +143,27 @@ async function performRefresh(failedAccessToken: string | null): Promise<string 
       return null
     }
 
+    // The request runs while this tab holds the cross tab lock, so it must not wait forever:
+    // other tabs queue behind it. The timer covers the response headers and the body.
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS)
     let response: Response
+    let data: unknown
     try {
       response = await fetch(buildUrl('/auth/refresh'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ refreshToken }),
+        signal: controller.signal,
       })
+      data = await readBody(response)
     } catch {
-      // The server is unreachable: keep the tokens so the user is not logged out by a network blip.
+      // Unreachable server or timeout: keep the tokens so the user is not logged out by a network
+      // blip. Throwing also ends the lock callback, so the lock is released for other tabs.
       throw new ApiError(0, NETWORK_ERROR_MESSAGE)
+    } finally {
+      clearTimeout(timer)
     }
-    const data = await readBody(response)
 
     if (!response.ok) {
       if (!REJECTED_REFRESH_STATUSES.has(response.status)) {

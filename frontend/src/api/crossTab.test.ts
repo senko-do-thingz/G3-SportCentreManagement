@@ -129,3 +129,126 @@ describe('refresh across two tabs', () => {
     expect(tabB.expired).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('refresh timeout', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    removeLocks()
+    vi.unstubAllGlobals()
+  })
+
+  /** Spies that find the timer created for the refresh request and check that it is cleared. */
+  function watchRefreshTimer(timeoutMs: number) {
+    const setSpy = vi.spyOn(globalThis, 'setTimeout')
+    const clearSpy = vi.spyOn(globalThis, 'clearTimeout')
+    return {
+      ids: () =>
+        setSpy.mock.calls
+          .map((call, index) => (call[1] === timeoutMs ? setSpy.mock.results[index]?.value : undefined))
+          .filter((id) => id !== undefined),
+      wasCleared: (id: unknown) => clearSpy.mock.calls.some((call) => call[0] === id),
+    }
+  }
+
+  /**
+   * Fetch double: GET /users/me accepts only access-2. The first hangCount calls to
+   * POST /auth/refresh hang until their signal is aborted; later calls answer with a new pair.
+   */
+  function hangingBackend(hangCount = Number.POSITIVE_INFINITY) {
+    const state = { hangRefresh: true, refreshCalls: 0, abortedRefreshes: 0 }
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input)).pathname.replace('/api/v1', '')
+      if (path === '/auth/refresh') {
+        state.refreshCalls += 1
+        if (!state.hangRefresh || state.refreshCalls > hangCount) {
+          return Promise.resolve(json(200, { accessToken: 'access-2', refreshToken: 'refresh-2' }))
+        }
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            state.abortedRefreshes += 1
+            reject(new DOMException('The operation was aborted.', 'AbortError'))
+          })
+        })
+      }
+      const authorization = new Headers(init?.headers).get('Authorization')
+      return Promise.resolve(
+        authorization === 'Bearer access-2' ? json(200, { ok: true }) : backendError(401, 'Unauthorized'),
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    return state
+  }
+
+  it('aborts a refresh that never answers, keeps the session and releases the lock', async () => {
+    installFakeLocks()
+    const backend = hangingBackend()
+    const tab = await openTab()
+    const { REFRESH_TIMEOUT_MS } = await import('./client')
+    tab.tokenStorage.startSession({ accessToken: 'access-1', refreshToken: 'refresh-1' })
+    const timer = watchRefreshTimer(REFRESH_TIMEOUT_MS)
+
+    const pending = tab.api.get('/users/me').catch((caught: unknown) => caught)
+    await vi.advanceTimersByTimeAsync(REFRESH_TIMEOUT_MS - 1)
+    expect(backend.abortedRefreshes).toBe(0)
+    await vi.advanceTimersByTimeAsync(1)
+
+    const error = (await pending) as { status: number; message: string }
+    expect(REFRESH_TIMEOUT_MS).toBe(15000)
+    expect(backend.abortedRefreshes).toBe(1)
+    expect(error.status).toBe(0)
+    expect(error.message).toMatch(/cannot reach the server/i)
+    expect(window.localStorage.getItem('sportify.accessToken')).toBe('access-1')
+    expect(window.localStorage.getItem('sportify.refreshToken')).toBe('refresh-1')
+    expect(tab.expired).not.toHaveBeenCalled()
+    expect(timer.ids()).toHaveLength(1)
+    expect(timer.wasCleared(timer.ids()[0])).toBe(true)
+
+    // The lock was released: a second attempt can refresh once the server answers again.
+    backend.hangRefresh = false
+    await expect(tab.api.get('/users/me')).resolves.toEqual({ ok: true })
+    expect(backend.refreshCalls).toBe(2)
+    expect(window.localStorage.getItem('sportify.refreshToken')).toBe('refresh-2')
+  })
+
+  it('lets a tab waiting for the lock continue after the other tab timed out', async () => {
+    installFakeLocks()
+    // Only the first refresh call (tab A) hangs; the second one (tab B) answers.
+    const backend = hangingBackend(1)
+    const tabA = await openTab()
+    const tabB = await openTab()
+    const { REFRESH_TIMEOUT_MS } = await import('./client')
+    tabA.tokenStorage.startSession({ accessToken: 'access-1', refreshToken: 'refresh-1' })
+
+    const pendingA = tabA.api.get('/users/me').catch((caught: unknown) => caught)
+    const pendingB = tabB.api.get('/users/me')
+    await vi.advanceTimersByTimeAsync(REFRESH_TIMEOUT_MS)
+
+    // Tab A timed out and released the lock, so tab B could take it and refresh.
+    expect(await pendingA).toMatchObject({ status: 0 })
+    await expect(pendingB).resolves.toEqual({ ok: true })
+    expect(backend.refreshCalls).toBe(2)
+    expect(backend.abortedRefreshes).toBe(1)
+    expect(tabA.expired).not.toHaveBeenCalled()
+    expect(tabB.expired).not.toHaveBeenCalled()
+    expect(window.localStorage.getItem('sportify.refreshToken')).toBe('refresh-2')
+  })
+
+  it('clears the timer when the refresh answers in time', async () => {
+    const backend = hangingBackend()
+    backend.hangRefresh = false
+    const tab = await openTab()
+    const { REFRESH_TIMEOUT_MS } = await import('./client')
+    tab.tokenStorage.startSession({ accessToken: 'access-1', refreshToken: 'refresh-1' })
+    const timer = watchRefreshTimer(REFRESH_TIMEOUT_MS)
+
+    await expect(tab.api.get('/users/me')).resolves.toEqual({ ok: true })
+    expect(backend.refreshCalls).toBe(1)
+    expect(timer.ids()).toHaveLength(1)
+    expect(timer.wasCleared(timer.ids()[0])).toBe(true)
+  })
+})

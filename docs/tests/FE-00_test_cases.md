@@ -19,7 +19,7 @@
 ```powershell
 cd frontend
 npm install
-npm test          # automated cases TC-FE00-001 to TC-FE00-043 and TC-FE00-046 to TC-FE00-067
+npm test          # automated cases TC-FE00-001 to TC-FE00-043 and TC-FE00-046 to TC-FE00-070
 npm run lint
 npm run build
 ```
@@ -33,13 +33,13 @@ Manual cases (section 3) need the real backend: `cd backend` then `mvn spring-bo
 | Automated, page helper (`src/api/page.test.ts`) | 2 | 2 PASSED |
 | Automated, auth flow (`src/auth/auth.flow.test.tsx`) | 25 | 25 PASSED |
 | Automated, shared UI (`src/components/ui/components.test.tsx`) | 15 | 15 PASSED |
-| Automated, two tabs (`src/api/crossTab.test.ts`) | 3 | 3 PASSED |
+| Automated, two tabs and refresh timeout (`src/api/crossTab.test.ts`) | 6 | 6 PASSED |
 | Automated, formatters (`src/utils/format.test.ts`) | 5 | 5 PASSED |
 | Build and lint (`npm run build`, `npm run lint`) | 2 | 2 PASSED |
-| Browser checks in Chromium against a mock of the auth API | 20 | 20 PASSED |
+| Browser checks in Chromium against a mock of the auth API | 25 | 25 PASSED |
 | Manual checks against the real backend and SQL Server | 16 | NOT RUN YET (run before merge) |
 
-Total automated: 65 Vitest tests in 6 files (43 from round 1, 22 added in review round 2), plus build and lint.
+Total automated: 68 Vitest tests in 6 files (43 from round 1, 22 added in review round 2, 3 added in review round 3), plus build and lint.
 
 Note: the browser checks used a local mock server that copies the backend auth contract (login, refresh with token rotation, `/users/me`, error body `{timestamp, status, message, details}`) with a 4 second access token. The real Spring Boot backend could not be started in the AI workspace (no SQL Server image, and Maven Central is blocked there), so section 3 must be run on a team machine before the PR is merged.
 
@@ -416,7 +416,32 @@ Each tab is simulated with its own instance of the client and token storage modu
 
 Each guard added in round 2 was broken on purpose once and the matching tests failed (15 of 15), then the change was reverted: transient error ends the session (4 tests failed), RequireAuth ignoring the error status (3), refresh 404 not treated as rejected (1), Web Locks not used (2), no re-read inside the lock (1), no storage re-check after a rejected refresh (1), session not ended inside the lock (1), storage handler reacting to rotation (1), stale profile answers accepted (1), `/ui-kit` registered in production (1), Table dropping rows while loading (1), toast role added back (1), login without client checks (3), hidden elements not filtered (2), focus not pulled back (1).
 
-### 2.8 Build and lint
+### 2.8 Review round 3: refresh timeout (`frontend/src/api/crossTab.test.ts`, describe `refresh timeout`)
+
+These tests use Vitest fake timers for `setTimeout` and `clearTimeout`. The refresh timeout is the constant `REFRESH_TIMEOUT_MS` in `frontend/src/api/client.ts` (15000 ms).
+
+#### TC-FE00-068: A refresh that never answers is aborted
+- Test: `aborts a refresh that never answers, keeps the session and releases the lock`
+- Steps: stored session with an expired access token; `POST /auth/refresh` never answers; advance the clock by 14999 ms, then by 1 ms more.
+- Expected Result: nothing is aborted at 14999 ms; at 15000 ms the refresh request is aborted and the call fails with `ApiError` status 0 and the message "Cannot reach the server. Check your connection and try again."; both tokens are still stored; no session expired event; the refresh timer was cleared. A second call afterwards can take the lock, refresh and succeed.
+- Status: PASSED
+
+#### TC-FE00-069: A tab waiting for the lock continues after the other tab timed out
+- Test: `lets a tab waiting for the lock continue after the other tab timed out`
+- Steps: two tabs get 401 at the same time; the refresh of tab A never answers, the next refresh answers.
+- Expected Result: tab A fails with status 0 after the timeout and releases the lock; tab B then takes the lock, refreshes and succeeds; exactly 2 refresh calls, 1 aborted; nobody is logged out.
+- Status: PASSED
+
+#### TC-FE00-070: The timer is cleared when the refresh answers in time
+- Test: `clears the timer when the refresh answers in time`
+- Expected Result: one refresh call succeeds, and the timer created for it is cleared with `clearTimeout`.
+- Status: PASSED
+
+#### Regression check (round 3)
+
+The timeout guard was broken on purpose three times and the tests failed each time, then the change was reverted: signal not passed to the refresh fetch (2 tests failed), timer that never aborts (2 tests failed), timer not cleared (2 tests failed).
+
+### 2.9 Build and lint
 
 #### TC-FE00-044: Production build (acceptance criterion 5)
 - Command: `npm run build`
@@ -519,3 +544,15 @@ Added in review round 2 (Chromium has a real `navigator.locks`):
 | Production build served by `vite preview`: `/ui-kit` shows 404 | PASSED |
 
 All 12 round 1 checks were run again after round 2 and still pass.
+
+Added in review round 3 (the mock server can make the next refresh request hang without ever answering):
+
+| Check | Result |
+|---|---|
+| Two signed in tabs with an expired access token; the refresh of tab 1 hangs: tab 1 shows the Retry screen after about 16 seconds (15 second timeout plus page load) | PASSED |
+| Tab 1 keeps both tokens after the timeout | PASSED |
+| Tab 2, which was waiting for the lock, continues after the timeout and stays signed in | PASSED |
+| Retry in tab 1 restores the session | PASSED |
+| Both refresh requests reached the server (the hanging one and the next one) | PASSED |
+
+The 12 round 1 checks and the 8 round 2 checks were run again after round 3 and still pass.
