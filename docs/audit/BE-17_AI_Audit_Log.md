@@ -196,7 +196,8 @@ Option (b) was chosen over Option (a):
   4. `com.sportify.identity.repository.UserAccountRepositoryTest`: Skipped via `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` when Docker is unavailable.
 
 ### CI Evidence
-- **Run ID**: To be recorded following Git commit and push to `origin feat/f3-pending-payments`.
-- **Head SHA**: To be recorded following Git commit.
-- **Conclusion**: To be verified via GitHub Actions run.
+- **Run ID**: `38292426001`
+- **Head SHA**: `a446eeff4fc9e7b74d776b519982c4736d15efe2` (`a446eef`)
+- **Event**: `pull_request`
+- **Conclusion**: `success` (All 596 tests passed: Tests run: 596, Failures: 0, Errors: 0, Skipped: 0)
 
