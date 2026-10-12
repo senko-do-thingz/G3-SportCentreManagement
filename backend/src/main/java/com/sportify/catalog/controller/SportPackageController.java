@@ -73,7 +73,7 @@ public class SportPackageController {
 
     /** Cancels a package registration request that has not been paid yet. */
     @PutMapping("/registrations/{id}/cancel")
-    @PreAuthorize("hasAnyRole('MEMBER', 'RECEPTIONIST', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('MEMBER', 'RECEPTIONIST', 'MANAGER', 'ADMIN')")
     public PackageRegistrationResponse cancelRegistration(
             @PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {

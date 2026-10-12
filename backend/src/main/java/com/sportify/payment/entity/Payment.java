@@ -44,7 +44,7 @@ public class Payment {
     @Column(name = "notes", length = 500)
     private String notes;
 
-    @Column(name = "payment_time", nullable = false)
+    @Column(name = "payment_time")
     private LocalDateTime paymentTime;
 
     @Version
@@ -59,9 +59,6 @@ public class Payment {
 
     @PrePersist
     void prePersist() {
-        if (paymentTime == null) {
-            paymentTime = LocalDateTime.now();
-        }
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
         }

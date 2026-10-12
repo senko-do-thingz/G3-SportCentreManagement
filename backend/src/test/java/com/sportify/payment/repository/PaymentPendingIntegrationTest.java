@@ -14,20 +14,30 @@ import com.sportify.payment.entity.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Transactional
 class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private PaymentRepository paymentRepository;
+
+    @Autowired
+    private InvoiceRepository invoiceRepository;
+
+    @Autowired
+    private InvoiceLineRepository invoiceLineRepository;
 
     @Autowired
     private MemberCardRepository memberCardRepository;
@@ -56,6 +66,9 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private CodeFormatter codeFormatter;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @Test
     @DisplayName("Save pending payment and link with member card in same transaction")
     void savePendingPayment_WithMemberCard_LinksAndFindsByPaymentId() {
@@ -77,7 +90,7 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
                 .amount(BigDecimal.valueOf(250000.00))
                 .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .paymentStatus(PaymentStatus.PENDING)
-                .paymentTime(LocalDateTime.now())
+                .paymentTime(null)
                 .build();
         payment = paymentRepository.save(payment);
 
@@ -131,7 +144,7 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
                 .amount(BigDecimal.valueOf(400000.00))
                 .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .paymentStatus(PaymentStatus.PENDING)
-                .paymentTime(LocalDateTime.now())
+                .paymentTime(null)
                 .build();
         payment = paymentRepository.save(payment);
 
@@ -173,7 +186,7 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
                 .amount(BigDecimal.valueOf(150000.00))
                 .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .paymentStatus(PaymentStatus.PENDING)
-                .paymentTime(LocalDateTime.now())
+                .paymentTime(null)
                 .build();
         payment = paymentRepository.save(payment);
 
@@ -184,6 +197,77 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
         Payment reloaded = paymentRepository.findById(updated.getId()).orElseThrow();
         assertThat(reloaded.getPaymentStatus()).isEqualTo(PaymentStatus.FAILED);
         assertThat(reloaded.getNotes()).isEqualTo("Payment cancelled due to card request cancellation");
+    }
+
+    @Test
+    @DisplayName("Invalid payment status is rejected by ck_payment_status check constraint")
+    void invalidPaymentStatus_RejectedByCheckConstraint() {
+        MemberProfile member = getOrCreateMember();
+        Long memberId = member.getId();
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status)
+                VALUES ('PAY-BAD-STATUS', ?, 100000.00, 'BANK_TRANSFER', 'INVALID_STATUS')
+                """, memberId))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("ck_payment_status");
+    }
+
+    @Test
+    @DisplayName("Save payment, invoice with 2 lines, and read them back")
+    void savePaymentAndInvoiceWithTwoLines_ReadsThemBack() {
+        MemberProfile member = getOrCreateMember();
+
+        Long paySeq = paymentRepository.getNextPaymentCodeSequence();
+        Payment payment = paymentRepository.save(Payment.builder()
+                .paymentCode(codeFormatter.formatPaymentCode(paySeq))
+                .member(member)
+                .amount(BigDecimal.valueOf(500000.00))
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                .paymentStatus(PaymentStatus.SUCCESS)
+                .paymentTime(LocalDateTime.now())
+                .build());
+
+        Long invSeq = invoiceRepository.getNextInvoiceNumberSequence();
+        Invoice invoice = invoiceRepository.save(Invoice.builder()
+                .invoiceNumber(codeFormatter.formatInvoiceNumber(invSeq))
+                .payment(payment)
+                .member(member)
+                .subtotalAmount(BigDecimal.valueOf(500000.00))
+                .discountAmount(BigDecimal.ZERO)
+                .taxAmount(BigDecimal.ZERO)
+                .totalAmount(BigDecimal.valueOf(500000.00))
+                .status(InvoiceStatus.PAID)
+                .issueDate(LocalDateTime.now())
+                .build());
+
+        InvoiceLine line1 = invoiceLineRepository.save(InvoiceLine.builder()
+                .invoice(invoice)
+                .itemType(InvoiceItemType.SPORT_PACKAGE)
+                .itemReferenceId(101L)
+                .description("Line 1 item")
+                .quantity(1)
+                .unitPrice(BigDecimal.valueOf(300000.00))
+                .lineTotal(BigDecimal.valueOf(300000.00))
+                .build());
+
+        InvoiceLine line2 = invoiceLineRepository.save(InvoiceLine.builder()
+                .invoice(invoice)
+                .itemType(InvoiceItemType.MEMBERSHIP_CARD)
+                .itemReferenceId(202L)
+                .description("Line 2 item")
+                .quantity(1)
+                .unitPrice(BigDecimal.valueOf(200000.00))
+                .lineTotal(BigDecimal.valueOf(200000.00))
+                .build());
+
+        Optional<Invoice> foundInvoice = invoiceRepository.findById(invoice.getId());
+        assertThat(foundInvoice).isPresent();
+        assertThat(foundInvoice.get().getPayment().getId()).isEqualTo(payment.getId());
+
+        List<InvoiceLine> foundLines = invoiceLineRepository.findByInvoiceId(invoice.getId());
+        assertThat(foundLines).hasSize(2);
+        assertThat(foundLines).extracting(InvoiceLine::getId).containsExactlyInAnyOrder(line1.getId(), line2.getId());
     }
 
     private MemberProfile getOrCreateMember() {

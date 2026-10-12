@@ -26,7 +26,7 @@ public class PaymentController {
     }
 
     @PutMapping("/{id}/method")
-    @PreAuthorize("hasRole('MEMBER')")
+    @PreAuthorize("hasAnyRole('MEMBER', 'RECEPTIONIST', 'MANAGER', 'ADMIN')")
     public PaymentResponse updatePaymentMethod(
             @PathVariable Long id,
             @Valid @RequestBody UpdatePaymentMethodRequest request,

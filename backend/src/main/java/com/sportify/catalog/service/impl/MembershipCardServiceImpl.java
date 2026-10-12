@@ -12,14 +12,13 @@ import com.sportify.catalog.service.MembershipCardService;
 import com.sportify.core.common.CodeFormatter;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ResourceNotFoundException;
+import com.sportify.core.common.SecurityUtils;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.UserRepository;
 import com.sportify.payment.entity.Payment;
-import com.sportify.payment.entity.PaymentMethod;
-import com.sportify.payment.entity.PaymentStatus;
-import com.sportify.payment.repository.PaymentRepository;
+import com.sportify.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -41,7 +40,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     private final MemberCardRepository memberCardRepository;
     private final MemberProfileRepository memberProfileRepository;
     private final UserRepository userRepository;
-    private final PaymentRepository paymentRepository;
+    private final PaymentService paymentService;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
 
@@ -88,7 +87,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         }
 
         LocalDate today = LocalDate.now(clock);
-        boolean paidAtDesk = isStaff(actor);
+        boolean paidAtDesk = SecurityUtils.isStaff(actor);
 
         // Standard: free and permanent, nothing to pay
         if (tier.getDurationMonths() == null || tier.getDurationMonths() <= 0) {
@@ -103,21 +102,14 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         }
 
         CardPlan plan = planCard(member.getId(), tier, today);
+        if (!paidAtDesk && plan.price().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessRuleException("Payment amount must be greater than zero. Attempted card price: " + plan.price());
+        }
+
         CardStatus status = paidAtDesk ? CardStatus.ACTIVE : CardStatus.PENDING_PAYMENT;
         MemberCard card = newCard(member, tier, plan.startDate(), plan.endDate(), status, plan.price());
         if (status == CardStatus.PENDING_PAYMENT) {
-            PaymentMethod method = request.getPaymentMethod() != null ? request.getPaymentMethod() : PaymentMethod.BANK_TRANSFER;
-            Long paymentSeq = paymentRepository.getNextPaymentCodeSequence();
-            long seq = paymentSeq != null ? paymentSeq : 1000L;
-            Payment payment = Payment.builder()
-                    .paymentCode(codeFormatter.formatPaymentCode(seq))
-                    .member(member)
-                    .amount(plan.price())
-                    .paymentMethod(method)
-                    .paymentStatus(PaymentStatus.PENDING)
-                    .paymentTime(LocalDateTime.now(clock))
-                    .build();
-            payment = paymentRepository.save(payment);
+            Payment payment = paymentService.createPendingPayment(member, plan.price(), request.getPaymentMethod());
             card.setPayment(payment);
         }
         card = memberCardRepository.save(card);
@@ -152,6 +144,9 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         card.setEndDate(plan.endDate());
         card.setStatus(CardStatus.ACTIVE);
         card = memberCardRepository.save(card);
+        if (card.getPayment() != null) {
+            paymentService.markPaymentSuccess(card.getPayment().getId(), actor);
+        }
         if (plan.replaces() != null) {
             replace(plan.replaces());
         }
@@ -163,18 +158,18 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     public MemberCardResponse cancelCard(Long cardId, UserAccount actor) {
         MemberCard card = memberCardRepository.findById(cardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member card not found for id: " + cardId));
-        if (!isStaff(actor) && !card.getMember().getId().equals(actor.getId())) {
+        boolean isStaff = SecurityUtils.isStaff(actor);
+        if (!isStaff && !card.getMember().getId().equals(actor.getId())) {
             throw new AccessDeniedException("Cannot cancel another member's card request");
         }
         if (card.getStatus() != CardStatus.PENDING_PAYMENT) {
             throw new BusinessRuleException("Only a card request that is waiting for payment can be cancelled.");
         }
         card.setStatus(CardStatus.CANCELLED);
-        if (card.getPayment() != null && card.getPayment().getPaymentStatus() == PaymentStatus.PENDING) {
-            Payment payment = card.getPayment();
-            payment.setPaymentStatus(PaymentStatus.FAILED);
-            payment.setNotes("Payment cancelled due to card request cancellation");
-            paymentRepository.save(payment);
+        if (card.getPayment() != null) {
+            String actorDescription = isStaff ? "staff: " + actor.getFullName() : "member: " + actor.getFullName();
+            paymentService.markPaymentFailed(card.getPayment().getId(),
+                    "Payment cancelled due to card cancellation by " + actorDescription);
         }
         return mapToCardResponse(memberCardRepository.save(card));
     }
@@ -208,7 +203,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             LocalDate from = last.getEndDate().plusDays(1);
             return new CardPlan(from, cardEnd(from, months), tier.getPrice(), null);
         }
-        if (current != null && tier.getPrice().compareTo(current.getTier().getPrice()) > 0) {
+        if (current != null && tier.getPrice().compareTo(current.getTier().getPrice()) >= 0) {
             if (last != current) {
                 throw new BusinessRuleException("The current card is already renewed from " + last.getStartDate()
                         + ". The card can be upgraded once that term has started.");
@@ -232,11 +227,6 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     private void replace(MemberCard old) {
         old.setStatus(CardStatus.REPLACED);
         memberCardRepository.save(old);
-    }
-
-    private static boolean isStaff(UserAccount actor) {
-        String role = actor.getRole() != null ? actor.getRole().getCode() : null;
-        return "RECEPTIONIST".equals(role) || "MANAGER".equals(role);
     }
 
     private MemberCard newCard(MemberProfile member, MembershipCardTier tier, LocalDate start, LocalDate end,

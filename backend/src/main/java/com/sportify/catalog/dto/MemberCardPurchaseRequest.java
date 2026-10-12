@@ -17,4 +17,3 @@ public class MemberCardPurchaseRequest {
 
     private PaymentMethod paymentMethod;
 }
-

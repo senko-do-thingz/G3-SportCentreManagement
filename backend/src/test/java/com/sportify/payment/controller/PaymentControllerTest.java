@@ -1,7 +1,9 @@
 package com.sportify.payment.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.GlobalExceptionHandler;
+import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.security.CustomAccessDeniedHandler;
@@ -16,6 +18,7 @@ import com.sportify.payment.dto.UpdatePaymentMethodRequest;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.entity.PaymentStatus;
 import com.sportify.payment.service.PaymentService;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -71,6 +74,7 @@ public class PaymentControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/v1/payments/{id} as owner returns 200 with details and instructions")
     void getPayment_AsMember_Returns200WithPaymentDetails() throws Exception {
         CustomUserDetails member = createUserDetails(100L, "MEMBER", "Taylor Nguyen");
         BankTransferInstructions bank = BankTransferInstructions.builder()
@@ -114,6 +118,19 @@ public class PaymentControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/v1/payments/{id} as other member returns 404 Not Found (M5)")
+    void getPayment_AsOtherMember_Returns404NotFound() throws Exception {
+        CustomUserDetails otherMember = createUserDetails(200L, "MEMBER", "Other Member");
+        when(paymentService.getPayment(eq(1L), any(UserAccount.class)))
+                .thenThrow(new ResourceNotFoundException("Payment not found for id: 1"));
+
+        mockMvc.perform(get("/api/v1/payments/1")
+                        .with(user(otherMember)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/payments/{id} as staff returns 200")
     void getPayment_AsReceptionist_Returns200() throws Exception {
         CustomUserDetails receptionist = createUserDetails(200L, "RECEPTIONIST", "Receptionist User");
         PaymentResponse response = PaymentResponse.builder()
@@ -133,12 +150,14 @@ public class PaymentControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/v1/payments/{id} unauthenticated returns 401")
     void getPayment_Unauthenticated_Returns401() throws Exception {
         mockMvc.perform(get("/api/v1/payments/1"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
+    @DisplayName("PUT /api/v1/payments/{id}/method as owner returns 200 with updated method")
     void updatePaymentMethod_AsMember_Returns200WithUpdatedMethod() throws Exception {
         CustomUserDetails member = createUserDetails(100L, "MEMBER", "Taylor Nguyen");
         UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
@@ -165,20 +184,71 @@ public class PaymentControllerTest {
     }
 
     @Test
-    void updatePaymentMethod_AsReceptionist_Returns403Forbidden() throws Exception {
-        CustomUserDetails receptionist = createUserDetails(200L, "RECEPTIONIST", "Receptionist User");
+    @DisplayName("PUT /api/v1/payments/{id}/method as other member returns 404 Not Found (M5)")
+    void updatePaymentMethod_AsOtherMember_Returns404NotFound() throws Exception {
+        CustomUserDetails otherMember = createUserDetails(200L, "MEMBER", "Other Member");
         UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
                 .paymentMethod(PaymentMethod.MOMO)
                 .build();
+
+        when(paymentService.updatePaymentMethod(eq(1L), any(UpdatePaymentMethodRequest.class), any(UserAccount.class)))
+                .thenThrow(new ResourceNotFoundException("Payment not found for id: 1"));
+
+        mockMvc.perform(put("/api/v1/payments/1/method")
+                        .with(user(otherMember))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/payments/{id}/method as staff returns 200 (Staff keeps full access)")
+    void updatePaymentMethod_AsStaff_Returns200() throws Exception {
+        CustomUserDetails receptionist = createUserDetails(300L, "RECEPTIONIST", "Receptionist User");
+        UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
+                .paymentMethod(PaymentMethod.VNPAY)
+                .build();
+
+        PaymentResponse response = PaymentResponse.builder()
+                .id(1L)
+                .code("PAY-1000")
+                .status(PaymentStatus.PENDING)
+                .amount(BigDecimal.valueOf(810000.00))
+                .method(PaymentMethod.VNPAY)
+                .build();
+
+        when(paymentService.updatePaymentMethod(eq(1L), any(UpdatePaymentMethodRequest.class), any(UserAccount.class)))
+                .thenReturn(response);
 
         mockMvc.perform(put("/api/v1/payments/1/method")
                         .with(user(receptionist))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.method").value("VNPAY"));
     }
 
     @Test
+    @DisplayName("PUT /api/v1/payments/{id}/method with unallowed method returns 400 Bad Request")
+    void updatePaymentMethod_DisallowedMethod_Returns400BadRequest() throws Exception {
+        CustomUserDetails member = createUserDetails(100L, "MEMBER", "Taylor Nguyen");
+        UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
+                .paymentMethod(PaymentMethod.CASH)
+                .build();
+
+        when(paymentService.updatePaymentMethod(eq(1L), any(UpdatePaymentMethodRequest.class), any(UserAccount.class)))
+                .thenThrow(new BusinessRuleException("Payment method CASH is not allowed for online payment"));
+
+        mockMvc.perform(put("/api/v1/payments/1/method")
+                        .with(user(member))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Payment method CASH is not allowed for online payment"));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/payments/{id}/method missing method returns 400 Bad Request")
     void updatePaymentMethod_MissingMethod_Returns400BadRequest() throws Exception {
         CustomUserDetails member = createUserDetails(100L, "MEMBER", "Taylor Nguyen");
 

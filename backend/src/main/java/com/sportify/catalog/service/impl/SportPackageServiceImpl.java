@@ -18,14 +18,13 @@ import com.sportify.catalog.service.SportPackageService;
 import com.sportify.core.common.CodeFormatter;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ResourceNotFoundException;
+import com.sportify.core.common.SecurityUtils;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.UserRepository;
 import com.sportify.payment.entity.Payment;
-import com.sportify.payment.entity.PaymentMethod;
-import com.sportify.payment.entity.PaymentStatus;
-import com.sportify.payment.repository.PaymentRepository;
+import com.sportify.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -49,7 +48,7 @@ public class SportPackageServiceImpl implements SportPackageService {
     private final MemberProfileRepository memberProfileRepository;
     private final UserRepository userRepository;
     private final MembershipCardService membershipCardService;
-    private final PaymentRepository paymentRepository;
+    private final PaymentService paymentService;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
 
@@ -190,18 +189,10 @@ public class SportPackageServiceImpl implements SportPackageService {
                 .build();
 
         if (initialStatus == PackageRegistrationStatus.PENDING_PAYMENT && channel == RegistrationChannel.ONLINE) {
-            PaymentMethod method = request.getPaymentMethod() != null ? request.getPaymentMethod() : PaymentMethod.BANK_TRANSFER;
-            Long nextPaymentSeq = paymentRepository.getNextPaymentCodeSequence();
-            long paymentSeqNum = nextPaymentSeq != null ? nextPaymentSeq : 1000L;
-            Payment payment = Payment.builder()
-                    .paymentCode(codeFormatter.formatPaymentCode(paymentSeqNum))
-                    .member(member)
-                    .amount(paidAmount)
-                    .paymentMethod(method)
-                    .paymentStatus(PaymentStatus.PENDING)
-                    .paymentTime(LocalDateTime.now(clock))
-                    .build();
-            payment = paymentRepository.save(payment);
+            if (paidAmount.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BusinessRuleException("Payment amount must be greater than zero. Attempted package price: " + paidAmount);
+            }
+            Payment payment = paymentService.createPendingPayment(member, paidAmount, request.getPaymentMethod());
             registration.setPayment(payment);
         }
 
@@ -228,6 +219,9 @@ public class SportPackageServiceImpl implements SportPackageService {
         registration.setStatus(PackageRegistrationStatus.ACTIVE);
         registration.setActivatedAt(LocalDateTime.now(clock));
         registration = registrationRepository.save(registration);
+        if (registration.getPayment() != null) {
+            paymentService.markPaymentSuccess(registration.getPayment().getId(), actor);
+        }
         return mapToRegistrationResponse(registration);
     }
 
@@ -237,7 +231,8 @@ public class SportPackageServiceImpl implements SportPackageService {
         SportPackageRegistration registration = registrationRepository.findById(registrationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Package registration not found for id: " + registrationId));
 
-        if (!isStaff(actor) && !registration.getMember().getId().equals(actor.getId())) {
+        boolean isStaff = SecurityUtils.isStaff(actor);
+        if (!isStaff && !registration.getMember().getId().equals(actor.getId())) {
             throw new AccessDeniedException("Cannot cancel another member's registration request");
         }
 
@@ -245,27 +240,19 @@ public class SportPackageServiceImpl implements SportPackageService {
             throw new BusinessRuleException("Only a package registration that is waiting for payment can be cancelled.");
         }
 
+        String actorDescription = isStaff ? "staff: " + actor.getFullName() : "member: " + actor.getFullName();
+        String cancelReason = "Cancelled by " + actorDescription;
         registration.setStatus(PackageRegistrationStatus.CANCELLED);
         registration.setCancelledAt(LocalDateTime.now(clock));
-        registration.setCancelReason("Cancelled by user");
+        registration.setCancelReason(cancelReason);
 
-        if (registration.getPayment() != null && registration.getPayment().getPaymentStatus() == PaymentStatus.PENDING) {
-            Payment payment = registration.getPayment();
-            payment.setPaymentStatus(PaymentStatus.FAILED);
-            payment.setNotes("Payment cancelled due to package registration cancellation");
-            paymentRepository.save(payment);
+        if (registration.getPayment() != null) {
+            paymentService.markPaymentFailed(registration.getPayment().getId(),
+                    "Payment cancelled due to package registration cancellation: " + cancelReason);
         }
 
         registration = registrationRepository.save(registration);
         return mapToRegistrationResponse(registration);
-    }
-
-    private static boolean isStaff(UserAccount actor) {
-        if (actor == null || actor.getRole() == null) {
-            return false;
-        }
-        String role = actor.getRole().getCode();
-        return "RECEPTIONIST".equals(role) || "MANAGER".equals(role) || "ADMIN".equals(role);
     }
 
     @Override

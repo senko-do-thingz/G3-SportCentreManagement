@@ -75,7 +75,7 @@ class PaymentEntityMappingTest {
         Field paymentTime = Payment.class.getDeclaredField("paymentTime");
         Column ptimeCol = paymentTime.getAnnotation(Column.class);
         assertThat(ptimeCol.name()).isEqualTo("payment_time");
-        assertThat(ptimeCol.nullable()).isFalse();
+        assertThat(ptimeCol.nullable()).isTrue();
 
         Field version = Payment.class.getDeclaredField("version");
         assertThat(version.getAnnotation(Version.class)).isNotNull();
@@ -290,7 +290,7 @@ class PaymentEntityMappingTest {
     void testLifecycleDefaults() {
         Payment payment = Payment.builder().build();
         payment.prePersist();
-        assertThat(payment.getPaymentTime()).isNotNull();
+        assertThat(payment.getPaymentTime()).isNull();
         assertThat(payment.getCreatedAt()).isNotNull();
         assertThat(payment.getUpdatedAt()).isNotNull();
 

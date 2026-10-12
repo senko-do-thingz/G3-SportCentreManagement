@@ -1,5 +1,6 @@
 package com.sportify.payment.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.entity.PaymentStatus;
 import lombok.*;
@@ -22,7 +23,10 @@ public class PaymentResponse {
     private String itemDescription;
     private BigDecimal originalPrice;
     private BigDecimal discount;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private BankTransferInstructions bankTransferInstructions;
+
     private Long memberId;
     private String memberCode;
     private String notes;

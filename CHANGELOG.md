@@ -2,18 +2,24 @@
 
 ## 2026-10-12 - Pending Payments for Online Requests and Payment Summary (BE-17, Flow 3)
 
-Branch `feat/f3-pending-payments`. Status: Implemented, verified with unit tests (422 passed, 4 skipped requiring Docker), `PaymentServiceImplTest` (12 tests), `PaymentControllerTest` (6 tests), `MembershipCardServiceImplTest` (25 tests), and `SportPackageServiceImplTest` (23 tests). Testcontainers integration test `PaymentPendingIntegrationTest` added for CI.
+Branch `feat/f3-pending-payments`. Status: Implemented and reviewed. Verified with `mvn test -Dtest='!*IntegrationTest'` (450 tests run, 0 failures, 0 errors, 4 skipped requiring Docker). Testcontainers integration tests and `ddl-auto: validate` startup checks require Docker and will be verified in CI.
 
-### Endpoints and Business Logic
-- Online requests create PENDING payment: When `MembershipCardServiceImpl.purchaseCard` creates a `PENDING_PAYMENT` card or `SportPackageServiceImpl.registerPackage` creates a `PENDING_PAYMENT` registration (channel `ONLINE`), a `Payment` entity is created in the same transaction with `status = PENDING`, `amount` equal to price after discount, `method` chosen by member (default `BANK_TRANSFER`), and `payment_id` set on the card or registration.
-- `GET /api/v1/payments/{id}`: Returns payment code, status, amount, method, item description, original price, discount, and bank transfer instructions (account name, number, bank, transfer content = payment code) sourced from `application.yml` (`app.payment.bank-transfer`). Accessible by owner `MEMBER` and center staff (`RECEPTIONIST`, `MANAGER`, `ADMIN`).
-- `PUT /api/v1/payments/{id}/method`: Allows the payment owner (`MEMBER`) to update the payment method while the payment is in `PENDING` status. Rejects updates for non-pending payments with `BusinessRuleException` and non-owners with `AccessDeniedException`.
-- Cancellation sets payment to `FAILED`: Cancelling a member card or sport package registration while `PENDING_PAYMENT` transitions the associated payment to `FAILED` status with an audit note recorded in `payment.notes`.
-- New endpoint `PUT /api/v1/packages/registrations/{id}/cancel`: Exposes registration cancellation for owner `MEMBER` and center staff.
+### Review Fixes & Improvements
+- B1 Honest Testing: Added `invalidPaymentStatus_RejectedByCheckConstraint` and `savePaymentAndInvoiceWithTwoLines_ReadsThemBack` to `PaymentPendingIntegrationTest`. Documented that integration tests and database validation require CI due to local Docker unavailability.
+- B2 Payment Activation & Method Guard: `activateCard` and `activateRegistration` transition linked pending payment to `SUCCESS`, record completion timestamp in `payment_time`, and log confirming staff user in `notes`. `PUT /api/v1/payments/{id}/method` rejects updates if payment or linked card/registration is not `PENDING_PAYMENT`.
+- B3 Zero/Negative Amount Guard: Pre-payment validation rejects amounts <= 0 with `BusinessRuleException` preventing orphaned rows. Added unit tests for zero price, 100 percent discount, and equal-tier upgrade price differences. Open question documented for team consideration.
+- M1 Service Consolidation & Security Helper: Created `PaymentService.createPendingPayment` with `Propagation.MANDATORY`. Removed dead sequence fallback. Extracted shared `SecurityUtils.isStaff`. Catalog services decoupled from `PaymentRepository`.
+- M2 Schema Integrity & Flat Response Mapping: Added Flyway migration `V21__payment_pending_adjustments.sql` creating filtered unique indexes on `member_card(payment_id)` and `sport_package_registration(payment_id)` where `payment_id IS NOT NULL`. Refactored `PaymentServiceImpl` item resolution into flat, dedicated helper records.
+- M3 Bank Instructions & Allowed Methods: `BankTransferInstructions` included only when method is `BANK_TRANSFER` and status is `PENDING` (omitted via `@JsonInclude(NON_NULL)` otherwise). Restricted online payment creation to `BANK_TRANSFER`, `MOMO`, `VNPAY`, `ZALOPAY`, rejecting `CASH` and `CREDIT_CARD` with 400.
+- M4 Configuration Fail-Fast & Validation: Added `@Validated` and `@NotBlank` on `BankTransferProperties`. Removed hardcoded defaults from `application.yml` so unconfigured deploys fail fast. Demo values restricted to dev/test profiles. Added `BankTransferPropertiesTest`.
+- M5 Non-leaking Existence: Non-owner members receive 404 (`ResourceNotFoundException`) instead of 403 on payment endpoints to avoid leaking entity existence. Center staff maintains full access.
+- M6 Authorization Alignment: Added `ADMIN` to `@PreAuthorize` of `PUT /api/v1/packages/registrations/{id}/cancel` matching staff definition (`RECEPTIONIST`, `MANAGER`, `ADMIN`).
+- M7 Test Suite Expansion: Added `SportPackageRegistrationCancelControllerTest` (6 tests). Added real `CodeFormatter` tests, amount guard tests, and instruction visibility tests.
+- Minor: Dynamic cancellation notes recording actor role and name. `payment_time` made nullable in V21 and `Payment` entity. Removed trailing blank line in `MemberCardPurchaseRequest`.
 
 ### Docs and Test Artifacts
-- `docs/tests/BE-17_test_cases.md`: Full test matrix and detailed test specifications.
-- `docs/audit/BE-17_AI_Audit_Log.docx`: AI Audit Log document with implementation audit trail.
+- `docs/tests/BE-17_test_cases.md`: Complete test specifications and traceability matrix.
+- `docs/audit/BE-17_AI_Audit_Log.docx`: AI Audit Log document with complete audit trail, open questions, and CI verification notes.
 
 ## 2026-10-12 - Log in and Sign up screens (FE-01, Flow 1)
 
