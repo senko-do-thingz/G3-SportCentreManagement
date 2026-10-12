@@ -506,10 +506,11 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @DisplayName("Optimistic lock conflict throws ObjectOptimisticLockingFailureException when concurrent transaction updates payment")
     void optimisticLockConflict_ThrowsObjectOptimisticLockingFailureException() {
-        MemberProfile member = getOrCreateMember();
         TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
+        Long memberId = txTemplate.execute(status -> getOrCreateMember().getId());
 
         Long paymentId = txTemplate.execute(status -> {
+            MemberProfile member = memberProfileRepository.findById(memberId).orElseThrow();
             Long paySeq = paymentRepository.getNextPaymentCodeSequence();
             Payment payment = Payment.builder()
                     .paymentCode(codeFormatter.formatPaymentCode(paySeq))
@@ -550,6 +551,7 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("Check constraint ck_payment_success_time rejects SUCCESS payment with NULL payment_time")
     void successPayment_WithNullPaymentTime_RejectedByCheckConstraint() {
         MemberProfile member = getOrCreateMember();
+        memberProfileRepository.flush();
         String code = "PAY-SN-" + (System.currentTimeMillis() % 1000000000L);
         assertThatThrownBy(() -> {
             jdbcTemplate.update(
@@ -565,6 +567,7 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("Native SQL insert of PENDING payment without payment_time leaves payment_time NULL because default constraint was dropped")
     void pendingPayment_NativeSqlInsertWithoutPaymentTime_LeavesPaymentTimeNull() {
         MemberProfile member = getOrCreateMember();
+        memberProfileRepository.flush();
         String paymentCode = "PAY-NT-" + (System.currentTimeMillis() % 1000000000L);
         jdbcTemplate.update(
                 "INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status, created_at, updated_at) " +
@@ -618,13 +621,13 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
         }
 
         Role memberRole = roleRepository.findByCode("MEMBER")
-                .orElseGet(() -> roleRepository.save(Role.builder()
+                .orElseGet(() -> roleRepository.saveAndFlush(Role.builder()
                         .code("MEMBER")
                         .name("Member")
                         .isSystem(true)
                         .build()));
 
-        UserAccount user = userRepository.save(UserAccount.builder()
+        UserAccount user = userRepository.saveAndFlush(UserAccount.builder()
                 .email("it-member-" + System.nanoTime() + "@sportify.com")
                 .passwordHash("DummyHashForTestPurposesOnly")
                 .fullName("IT Test Member")
@@ -633,7 +636,7 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
                 .build());
 
         Long memberSeq = memberProfileRepository.getNextMemberCode();
-        return memberProfileRepository.save(MemberProfile.builder()
+        return memberProfileRepository.saveAndFlush(MemberProfile.builder()
                 .userAccount(user)
                 .memberCode(codeFormatter.formatMemberCode(memberSeq))
                 .currentLevel("BEGINNER")

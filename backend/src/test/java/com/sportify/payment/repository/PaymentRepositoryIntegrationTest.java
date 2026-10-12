@@ -274,6 +274,7 @@ class PaymentRepositoryIntegrationTest extends AbstractIntegrationTest {
         assertThat(initialVersion).isEqualTo(0);
 
         saved.setPaymentStatus(PaymentStatus.SUCCESS);
+        saved.setPaymentTime(LocalDateTime.now());
         Payment updated = paymentRepository.saveAndFlush(saved);
 
         assertThat(updated.getVersion()).isGreaterThan(initialVersion);
@@ -298,6 +299,7 @@ class PaymentRepositoryIntegrationTest extends AbstractIntegrationTest {
 
         Payment concurrentCopy = paymentRepository.findById(payment.getId()).orElseThrow();
         concurrentCopy.setPaymentStatus(PaymentStatus.SUCCESS);
+        concurrentCopy.setPaymentTime(LocalDateTime.now());
         paymentRepository.saveAndFlush(concurrentCopy);
 
         payment.setNotes("Stale update attempt");
