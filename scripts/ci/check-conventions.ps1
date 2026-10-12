@@ -7,12 +7,12 @@ $status = 0
 
 $added = git diff -U0 --diff-filter=AM $Base HEAD -- '*.java' '*.sql' '*.yml' '*.yaml' '*.properties' '*.md' '*.xml' '*.sh' '*.ps1' |
   Where-Object { $_ -match '^\+' -and $_ -notmatch '^\+\+\+' }
-$bad = $added | Select-String -Pattern $symbols
+$bad = $added | Select-String -Pattern $symbols -CaseSensitive
 if ($bad) { Write-Host "Forbidden symbol characters:"; $bad | ForEach-Object { $_.Line }; $status = 1 }
 
 $addedJava = git diff -U0 --diff-filter=AM $Base HEAD -- '*.java' |
   Where-Object { $_ -match '^\+' -and $_ -notmatch '^\+\+\+' }
-$bad = $addedJava | Select-String -Pattern $diacritics
+$bad = $addedJava | Select-String -Pattern $diacritics -CaseSensitive
 if ($bad) { Write-Host "Non English characters in Java:"; $bad | ForEach-Object { $_.Line }; $status = 1 }
 
 exit $status
