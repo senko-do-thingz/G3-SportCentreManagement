@@ -247,7 +247,7 @@ Option (b) was chosen over Option (a):
 ## 15. Round 6 Review Resolution
 
 ### Two-Step Verification Flow
-Per reviewer instructions, evidence in this section documents code commit `356e65e7c374148b8fac6432897931e74cf4a2a9` (`356e65e`). All code and test changes were committed, pushed to `feat/f3-pending-payments`, executed in GitHub Actions CI run `38333314704`, and verified via `gh`. This documentation update is committed subsequently as a docs-only commit, which will be validated by its own subsequent CI run.
+Per reviewer instructions, evidence in this section documents code commit `356e65e7c374148b8fac6432897931e74cf4a2a9` (`356e65e`). All code and test changes were committed, pushed to `feat/f3-pending-payments`, executed in GitHub Actions CI run `38333314704`, and verified via `gh`. This documentation update was committed subsequently as docs commit `8a66962`, which was verified in GitHub Actions CI run `38334030952`.
 
 ### Review Findings Resolution Matrix
 
@@ -413,6 +413,18 @@ Tests run: 614, Failures: 0, Errors: 0, Skipped: 0
   - `PaymentRepositoryIntegrationTest`: Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
   - `PaymentDdlValidateIntegrationTest`: Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
   - `V14ToV19SchemaConstraintIntegrationTest`: Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+
+### CI Execution Evidence (Docs Commit)
+- **Command**: `gh run view 38334030952 --json headSha,conclusion,event,status`
+- **Raw JSON Output**:
+```json
+{"conclusion":"success","event":"pull_request","headSha":"8a66962d82d4a7bbdd50635bb7b596326c928853","status":"completed"}
+```
+- **Surefire Totals from CI Run Log**:
+```
+Tests run: 614, Failures: 0, Errors: 0, Skipped: 0
+```
+
 
 
 
