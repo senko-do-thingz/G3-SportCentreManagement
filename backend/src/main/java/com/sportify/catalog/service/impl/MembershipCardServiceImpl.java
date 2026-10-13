@@ -63,7 +63,9 @@ public class MembershipCardServiceImpl implements MembershipCardService {
 
     /**
      * Determines whether the given tier is the STANDARD tier.
-     * Uses case-insensitive comparison to align with SQL Server default CI (case-insensitive) collation.
+     * Note: Specific SQL Server database collation is unknown (not explicitly configured in migrations),
+     * but case-insensitive comparison (equalsIgnoreCase) defensively treats codes like "standard" and "STANDARD"
+     * identically, matching case-insensitive database behavior verified by integration tests.
      */
     public static boolean isStandard(MembershipCardTier tier) {
         return tier != null && STANDARD_TIER_CODE.equalsIgnoreCase(tier.getCode());
@@ -88,6 +90,12 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     @Override
     @Transactional
     public CardTierResponse updateTier(Long id, MembershipCardTierUpdateRequest request, UserAccount actor) {
+        try {
+            tierRepository.findAllForUpdate();
+        } catch (PessimisticLockingFailureException ex) {
+            throw new BusinessRuleException("Membership tiers are currently being updated by another operation. Please retry in a few moments.");
+        }
+
         MembershipCardTier tier = tierRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Card tier not found for id: " + id));
 
@@ -215,8 +223,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             throw new BusinessRuleException("Payment amount must be greater than zero. Attempted card price: " + plan.price());
         }
         validateUpgradeFeeForActor(isUpgrade, plan.price(), paidAtDesk);
-        boolean isFree = isUpgrade && plan.price().compareTo(BigDecimal.ZERO) <= 0;
-        CardStatus status = (paidAtDesk || isFree) ? CardStatus.ACTIVE : CardStatus.PENDING_PAYMENT;
+        CardStatus status = paidAtDesk ? CardStatus.ACTIVE : CardStatus.PENDING_PAYMENT;
         MemberCard card = newCard(member, tier, plan.startDate(), plan.endDate(), status, plan.price(), isUpgrade, plan.replaces());
         if (status == CardStatus.PENDING_PAYMENT) {
             Payment payment = paymentService.createPendingPayment(member, plan.price(), request.getPaymentMethod());

@@ -1662,14 +1662,11 @@ public class MembershipCardServiceImplTest {
     }
 
     @Test
-    void purchaseCard_legacyUpgradeCardWithNullReplacesCard_usesTierPriceFallback() {
+    void purchaseCard_legacyUpgradeCardWithNullReplacesCard_throwsBusinessRuleException() {
         // N-03: Member holds an ACTIVE card that was an upgrade (upgradeRequest = true),
         // but replacesCard is NULL (legacy row unresolvable during migration backfill).
-        // pricePaid was only 150k (the incremental difference paid back then).
-        // Catalog price of this held SILVER tier is 350k.
-        // Target tier is GOLD (500k).
-        // If fallback works: base price is 350k (tier catalog price fallback), so fee = 500k - 350k = 150k.
-        // If fallback failed: base price would be 150k, overcharging the member 350k!
+        // System fails closed and rejects the upgrade attempt with BusinessRuleException
+        // ("Cannot determine upgrade baseline") rather than computing an inaccurate fee.
         MembershipCardTier silverTier = MembershipCardTier.builder()
                 .id(2L)
                 .code("SILVER")
@@ -2000,6 +1997,26 @@ public class MembershipCardServiceImplTest {
         assertFalse(res.getIsActive());
         verify(tierRepository).saveAndFlush(any());
         verify(tierRepository, never()).findByIsActiveTrue();
+    }
+
+    @Test
+    void updateTier_whenLockConflictOccurs_throwsBusinessRuleExceptionWithRetryMessage() {
+        when(tierRepository.findAllForUpdate())
+                .thenThrow(new org.springframework.dao.PessimisticLockingFailureException("Lock acquisition timeout"));
+
+        MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.valueOf(600000.00))
+                .durationMonths(12)
+                .discountPercentage(10)
+                .active(true)
+                .build();
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> membershipCardService.updateTier(3L, req, null));
+        assertEquals("Membership tiers are currently being updated by another operation. Please retry in a few moments.",
+                ex.getMessage());
+        verify(tierRepository, never()).findById(any());
+        verify(tierRepository, never()).saveAndFlush(any());
     }
 }
 

@@ -887,7 +887,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                     "VALUES ('CARD-MIG-AMBIG-CAND', ?, ?, '2026-04-01', ?, 'ACTIVE', ?, GETDATE(), GETDATE())", migMemberId, testTier2Id, endOct, upgDiff);
             Long ambigCandCardId = testJdbc.queryForObject("SELECT id FROM [member_card] WHERE card_code = 'CARD-MIG-AMBIG-CAND'", Long.class);
 
-            // Case 4: Duplicate in-force cards sharing the same candidate predecessor (Step 5 fails closed: both end up NULL)
+            // Case 4: Ambiguous predecessor claimed by two candidate upgrade cards (Step 4b ambiguity: predecessor claimed by multiple cards is not linked)
             LocalDate endSep = LocalDate.of(2026, 9, 30);
             testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
                     "VALUES ('CARD-MIG-DUP-BASE', ?, ?, '2026-01-01', ?, 'REPLACED', ?, GETDATE(), GETDATE())", migMemberId, testTier1Id, endSep, tier1Price);
@@ -938,16 +938,16 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
             assertTrue(Boolean.TRUE.equals(upgAmbig), "Ambiguous candidate card marked as upgrade by price difference");
             assertNull(repAmbig, "Ambiguous candidate card with multiple predecessors must keep replaces_card_id as NULL");
 
-            // Case 4: Duplicate in-force cards sharing the same candidate predecessor (Step 5 fails closed: both end up NULL)
+            // Case 4: Ambiguous predecessor claimed by two candidate upgrade cards (Step 4b ambiguity: predecessor claimed by multiple cards is not linked)
             Boolean upgD1 = testJdbc.queryForObject("SELECT upgrade_request FROM [member_card] WHERE id = ?", Boolean.class, cardD1Id);
             Long repD1 = testJdbc.queryForObject("SELECT replaces_card_id FROM [member_card] WHERE id = ?", Long.class, cardD1Id);
             assertTrue(Boolean.TRUE.equals(upgD1), "Card D1 marked as upgrade");
-            assertNull(repD1, "Card D1 in duplicate in-force group must have replaces_card_id set to NULL");
+            assertNull(repD1, "Card D1 claiming shared predecessor must keep replaces_card_id as NULL due to Step 4b ambiguity");
 
             Boolean upgD2 = testJdbc.queryForObject("SELECT upgrade_request FROM [member_card] WHERE id = ?", Boolean.class, cardD2Id);
             Long repD2 = testJdbc.queryForObject("SELECT replaces_card_id FROM [member_card] WHERE id = ?", Long.class, cardD2Id);
             assertTrue(Boolean.TRUE.equals(upgD2), "Card D2 marked as upgrade");
-            assertNull(repD2, "Card D2 in duplicate in-force group must have replaces_card_id set to NULL");
+            assertNull(repD2, "Card D2 claiming shared predecessor must keep replaces_card_id as NULL due to Step 4b ambiguity");
 
             // 5. Snapshot before re-migration
             List<Map<String, Object>> snapshotBefore = testJdbc.queryForList(
@@ -973,12 +973,51 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
             int tierRankChkCount = testJdbc.queryForObject(
                     "SELECT COUNT(*) FROM sys.check_constraints WHERE name = 'chk_membership_card_tier_rank'", Integer.class);
             assertEquals(1, tierRankChkCount, "Check constraint chk_membership_card_tier_rank must exist exactly once");
+
+            // 6. Case 5: Real test for Step 5 fail-closed deduplication
+            // Drop index ux_member_card_replaces_in_force, inject duplicate in-force replaces_card_id,
+            // re-run V22 migration, and assert both duplicate links are set to NULL while control link remains.
+            testJdbc.execute("DROP INDEX [ux_member_card_replaces_in_force] ON [member_card]");
+
+            // Set both cardD1 and cardD2 to point to cardAId (creating duplicate in-force replaces_card_id links)
+            testJdbc.update("UPDATE [member_card] SET replaces_card_id = ? WHERE id IN (?, ?)",
+                    cardAId, cardD1Id, cardD2Id);
+
+            // Re-run V22 migration
+            testJdbc.update("DELETE FROM [flyway_schema_history] WHERE [version] = '22'");
+            flywayV22.migrate();
+
+            // Assert BOTH cards now have replaces_card_id = NULL (fail closed)
+            Long repD1AfterStep5 = testJdbc.queryForObject("SELECT replaces_card_id FROM [member_card] WHERE id = ?", Long.class, cardD1Id);
+            Long repD2AfterStep5 = testJdbc.queryForObject("SELECT replaces_card_id FROM [member_card] WHERE id = ?", Long.class, cardD2Id);
+            assertNull(repD1AfterStep5, "Step 5 fail-closed deduplication must set replaces_card_id to NULL for first duplicate card");
+            assertNull(repD2AfterStep5, "Step 5 fail-closed deduplication must set replaces_card_id to NULL for second duplicate card");
+
+            // Assert control card with unique link (Card C -> Card B) retains its link
+            Long repCControl = testJdbc.queryForObject("SELECT replaces_card_id FROM [member_card] WHERE id = ?", Long.class, cardCId);
+            assertEquals(cardBId, repCControl, "Control card C must retain unique link to Card B");
+
+            // Assert unique filtered index exists exactly once afterwards
+            int finalIndexCount = testJdbc.queryForObject(
+                    "SELECT COUNT(*) FROM sys.indexes WHERE name = 'ux_member_card_replaces_in_force'", Integer.class);
+            assertEquals(1, finalIndexCount, "Index ux_member_card_replaces_in_force must be recreated exactly once");
         } finally {
             try {
                 jdbcTemplate.execute("ALTER DATABASE [" + testDbName + "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [" + testDbName + "];");
             } catch (Exception ignored) {
             }
         }
+    }
+
+    @Test
+    @DisplayName("Verify SQL Server database collation is case-insensitive (_CI_)")
+    void verifyDatabaseCollationIsCaseInsensitive() {
+        String collation = jdbcTemplate.queryForObject(
+                "SELECT CAST(DATABASEPROPERTYEX(DB_NAME(), 'Collation') AS VARCHAR(100))",
+                String.class);
+        assertNotNull(collation, "Database collation should not be null");
+        assertTrue(collation.contains("_CI_"),
+                "Database collation should be case-insensitive (_CI_), but was: " + collation);
     }
 
     @Test

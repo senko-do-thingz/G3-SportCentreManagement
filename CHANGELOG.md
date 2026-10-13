@@ -10,6 +10,7 @@ Branch `feat/f1-manager-catalog`. Owner: Dat (Senko). Priority: P1. Depends on: 
 - Explicit tier ranking via `tier_rank` column on `membership_card_tier` (STANDARD=1, SILVER=2, GOLD=3, VIP=4) in migration V22, completely decoupling upgrade hierarchy from promotional live catalog prices.
 - Unique filtered index `ux_member_card_replaces_in_force` on `member_card(replaces_card_id)` for active and pending cards, preventing concurrent double-replacement of in-force cards.
 - Upgrade chain migration backfill supporting multi-step upgrade chains (A -> B -> C) by linking each upgrade card to its immediate predecessor sharing the identical `end_date`.
+- Pessimistic write locking on tier table rows during tier updates to serialize concurrent price adjustments and enforce price monotonicity.
 
 ### Contract Changes Affecting Frontend
 - **Upgrade Fee Calculation Contract Change (`src/pages/member/cardsModel.ts` on `main`)**:
