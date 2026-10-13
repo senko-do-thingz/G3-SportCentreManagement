@@ -143,15 +143,32 @@ jobs:
 
       - name: Assert Flyway migrations were applied to sportify database
         run: |
-          echo "Verifying Flyway migrations in database sportify..."
-          MIGRATION_COUNT="$(docker compose -f deploy/compose.yaml --profile with-db exec -T sqlserver \
-            /opt/mssql-tools18/bin/sqlcmd -C -b -U sa -P "TestPass1234!StrongSA" -d sportify -h -1 -W -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1;" | head -n 1 | tr -d '\r\n ')"
-          echo "Flyway applied migrations count: $MIGRATION_COUNT"
-          if [ -z "$MIGRATION_COUNT" ] || [ "$MIGRATION_COUNT" -le 0 ]; then
-            echo "Error: Expected positive migration count in flyway_schema_history, got '$MIGRATION_COUNT'"
+          echo "Counting migration files dynamically under backend/src/main/resources/db/migration..."
+          EXPECTED_MIGRATIONS="$(find backend/src/main/resources/db/migration -type f -name 'V*.sql' | wc -l | tr -d ' ')"
+          echo "Expected migration files count: $EXPECTED_MIGRATIONS"
+          if [ -z "$EXPECTED_MIGRATIONS" ] || [ "$EXPECTED_MIGRATIONS" -le 0 ]; then
+            echo "Error: Failed to find migration files under backend/src/main/resources/db/migration"
             exit 1
           fi
-          echo "Verified: Flyway successfully applied $MIGRATION_COUNT migrations"
+
+          TOTAL_ROWS="$(docker compose -f deploy/compose.yaml --profile with-db exec -T sqlserver \
+            /opt/mssql-tools18/bin/sqlcmd -C -b -U sa -P "TestPass1234!StrongSA" -d sportify -h -1 -W -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM flyway_schema_history;" | head -n 1 | tr -d '\r\n ')"
+          SUCCESS_ROWS="$(docker compose -f deploy/compose.yaml --profile with-db exec -T sqlserver \
+            /opt/mssql-tools18/bin/sqlcmd -C -b -U sa -P "TestPass1234!StrongSA" -d sportify -h -1 -W -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1;" | head -n 1 | tr -d '\r\n ')"
+
+          echo "Flyway total rows: $TOTAL_ROWS, success rows: $SUCCESS_ROWS"
+
+          if [ "$TOTAL_ROWS" != "$EXPECTED_MIGRATIONS" ]; then
+            echo "Error: Expected $EXPECTED_MIGRATIONS migrations in flyway_schema_history, but found $TOTAL_ROWS"
+            exit 1
+          fi
+
+          if [ "$SUCCESS_ROWS" != "$EXPECTED_MIGRATIONS" ]; then
+            echo "Error: Expected all $EXPECTED_MIGRATIONS migrations to have success = 1, but found $SUCCESS_ROWS"
+            exit 1
+          fi
+
+          echo "Verified: Exactly $EXPECTED_MIGRATIONS migrations were applied with success = 1"
 
       - name: Dump compose logs on failure
         if: failure()
