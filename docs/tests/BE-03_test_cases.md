@@ -72,6 +72,18 @@
 | TC-BE03-49 | Integration test - Historical price snapshot preservation | Integration test | Skipped (Docker unavailable) / Passed |
 | TC-BE03-50 | Package description update with null or blank value clears description | PUT `/api/v1/packages/{id}` | 200 OK |
 | TC-BE03-51 | Card tier description update with null or blank value clears description | PUT `/api/v1/membership-cards/tiers/{id}` | 200 OK |
+| TC-BE03-52 | Integration test - V22 migration column and constraint verification | Integration test | Skipped (Docker unavailable) / Passed |
+| TC-BE03-53 | Integration test - V22 migration idempotency verification | Integration test | Skipped (Docker unavailable) / Passed |
+| TC-BE03-54 | Member requests lower/equal rank tier after live price raise is queued without replacing held card | POST `/api/v1/membership-cards/purchase` | 200 OK |
+| TC-BE03-55 | Upgrade to higher-ranked tier with non-positive fee (fee <= 0) returns 400 | POST `/api/v1/membership-cards/purchase` | 400 Bad Request |
+| TC-BE03-56 | Upgrade fee after tier price edit is based on amount paid toward term | POST `/api/v1/membership-cards/purchase` | 200 OK |
+| TC-BE03-57 | Multi-step upgrade chain (A -> B -> C) calculates fee using cumulative chain pricePaid | POST `/api/v1/membership-cards/purchase` | 200 OK |
+| TC-BE03-58 | Legacy upgrade card with null replaces_card_id uses catalog tier price fallback | POST `/api/v1/membership-cards/purchase` | 200 OK |
+| TC-BE03-59 | Activation of upgrade card with matching recorded replaces_card_id succeeds | POST `/api/v1/membership-cards/{id}/activate` | 200 OK |
+| TC-BE03-60 | Activation of upgrade card with mismatched replaces_card_id returns 400 | POST `/api/v1/membership-cards/{id}/activate` | 400 Bad Request |
+| TC-BE03-61 | Activation of legacy upgrade card with null replaces_card_id succeeds | POST `/api/v1/membership-cards/{id}/activate` | 200 OK |
+| TC-BE03-62 | Member purchase after tier price edit creates PENDING_PAYMENT card requiring payment | POST `/api/v1/membership-cards/purchase` | 200 OK |
+| TC-BE03-63 | Pending payment card activation succeeds after tier price increase retaining old pricePaid | POST `/api/v1/membership-cards/{id}/activate` | 200 OK |
 
 ---
 
@@ -506,4 +518,103 @@
 - **Expected Result**:
   - HTTP 200 OK.
   - Description is cleared to `null` in database under full-replace PUT semantics.
+
+### TC-BE03-52: Integration test - V22 migration column and constraint verification
+- **Preconditions**: Flyway applied all catalog migrations up to V22 on SQL Server database container.
+- **Steps**: Query `sys.columns` for `upgrade_request` and `replaces_card_id` on table `member_card`, and `sys.foreign_keys` for `fk_member_card_replaces_card`.
+- **Expected Result**:
+  - `upgrade_request` column exists on `member_card`.
+  - `replaces_card_id` column exists on `member_card`.
+  - Foreign key constraint `fk_member_card_replaces_card` exists.
+  - (Skipped locally when Docker is unavailable; verified in GitHub Actions CI).
+
+### TC-BE03-53: Integration test - V22 migration idempotency verification
+- **Preconditions**: Flyway applied V22 migration on database container.
+- **Steps**: Read `V22__add_upgrade_tracking_to_member_card.sql` from classpath, split batches on `GO`, and re-execute each batch sequentially.
+- **Expected Result**:
+  - Execution completes with 0 errors.
+  - Columns and foreign key constraints remain intact without schema or data corruption.
+  - (Skipped locally when Docker is unavailable; verified in GitHub Actions CI).
+
+### TC-BE03-54: Member requests lower/equal rank tier after live price raise is queued without replacing held card
+- **Preconditions**: Member holds active GOLD card (paid 500,000 originally). Manager later raises live GOLD tier price to 600,000. Live SILVER tier price is 550,000.
+- **Request**: `POST /api/v1/membership-cards/purchase` with `tierId = <SILVER_ID>`.
+- **Expected Result**:
+  - HTTP 200 OK.
+  - Even though target price (550k) > amount paid (500k), target SILVER rank (550k live) is not higher than held GOLD rank (600k live).
+  - Treated as non-upgrade: full SILVER price (550,000) charged.
+  - New card starts after GOLD card end date (`goldEndDate + 1 day`).
+  - Held GOLD card remains ACTIVE and is NOT replaced.
+
+### TC-BE03-55: Upgrade to higher-ranked tier with non-positive fee (fee <= 0) returns 400
+- **Preconditions**: Member paid 500,000 for SILVER when it was priced at 500,000. Later, SILVER is cheapened to 300,000 live. Target GOLD tier is priced at 450,000 live.
+- **Request**: `POST /api/v1/membership-cards/purchase` with `tierId = <GOLD_ID>`.
+- **Expected Result**:
+  - Rank rule matches upgrade (live GOLD 450k > live SILVER 300k).
+  - Upgrade fee calculation yields `450k - 500k = -50k <= 0`.
+  - HTTP 400 Bad Request with message "No payment is needed for this upgrade. Contact the front desk."
+  - No card or negative payment record is created.
+
+### TC-BE03-56: Upgrade fee after tier price edit is based on amount paid toward term
+- **Preconditions**: Member holds active SILVER card for which they actually paid 300,000. Manager raises SILVER catalog price to 450,000. Target GOLD tier is priced at 600,000.
+- **Request**: `POST /api/v1/membership-cards/purchase` with `tierId = <GOLD_ID>`.
+- **Expected Result**:
+  - HTTP 200 OK.
+  - Upgrade fee is `600,000 - 300,000 = 300,000` (based on actual `pricePaid`), not `600,000 - 450,000 = 150,000` (live price).
+
+### TC-BE03-57: Multi-step upgrade chain (A -> B -> C) calculates fee using cumulative chain pricePaid
+- **Preconditions**: Member originally purchased Tier A (150,000). Later upgraded to Tier B (350,000) paying 200,000 difference (cumulative paid = 350,000). Tier C is priced at 650,000.
+- **Request**: `POST /api/v1/membership-cards/purchase` with `tierId = <TIER_C_ID>`.
+- **Expected Result**:
+  - HTTP 200 OK.
+  - Upgrade fee is `650,000 - (150,000 + 200,000) = 300,000`.
+  - Card C records `pricePaid = 300,000`, `upgradeRequest = true`, and `replacesCard = Card B`.
+
+### TC-BE03-58: Legacy upgrade card with null replaces_card_id uses catalog tier price fallback
+- **Preconditions**: Member holds active SILVER card that was an upgrade (`upgradeRequest = true`), but `replacesCard = null` (unresolvable legacy backfill row). Member's `pricePaid` is only 150,000 (upgrade difference). Held SILVER tier catalog price is 350,000. Target GOLD tier is 500,000.
+- **Request**: `POST /api/v1/membership-cards/purchase` with `tierId = <GOLD_ID>`.
+- **Expected Result**:
+  - HTTP 200 OK.
+  - Service falls back to SILVER catalog price (350,000) as baseline to prevent overcharging.
+  - Upgrade fee is `500,000 - 350,000 = 150,000`.
+
+### TC-BE03-59: Activation of upgrade card with matching recorded replaces_card_id succeeds
+- **Preconditions**: Upgrade card request was created recording `replacesCard = Card A`. Card A is still the active card to replace today.
+- **Request**: `POST /api/v1/membership-cards/{id}/activate` by staff.
+- **Expected Result**:
+  - HTTP 200 OK.
+  - Card status transitions to ACTIVE.
+  - Card A status transitions to REPLACED.
+
+### TC-BE03-60: Activation of upgrade card with mismatched replaces_card_id returns 400
+- **Preconditions**: Upgrade card was requested to replace Card A (`id = 90`), but current active card has changed to Card B (`id = 91`).
+- **Request**: `POST /api/v1/membership-cards/{id}/activate` by staff.
+- **Expected Result**:
+  - HTTP 400 Bad Request with message "The member's card has changed since this request. Cancel it and request the card again."
+  - Card remains in PENDING_PAYMENT status.
+
+### TC-BE03-61: Activation of legacy upgrade card with null replaces_card_id succeeds
+- **Preconditions**: Legacy card request has `upgradeRequest = true` and `replacesCard = null`. Member currently holds an active card.
+- **Request**: `POST /api/v1/membership-cards/{id}/activate` by staff.
+- **Expected Result**:
+  - HTTP 200 OK.
+  - ID comparison is safely bypassed for legacy null card reference.
+  - Card activates successfully and current active card is REPLACED.
+
+### TC-BE03-62: Member purchase after tier price edit creates PENDING_PAYMENT card requiring payment
+- **Preconditions**: Manager updates a paid tier price and duration. Member submits purchase request online.
+- **Request**: `POST /api/v1/membership-cards/purchase` with updated tier ID.
+- **Expected Result**:
+  - HTTP 200 OK.
+  - Card is created with status PENDING_PAYMENT (not immediately ACTIVE).
+  - Associated payment record created with status PENDING.
+
+### TC-BE03-63: Pending payment card activation succeeds after tier price increase retaining old pricePaid
+- **Preconditions**: PENDING_PAYMENT card created when tier price was 500,000. Manager subsequently raises tier price to 650,000.
+- **Request**: `POST /api/v1/membership-cards/{id}/activate` by staff.
+- **Expected Result**:
+  - HTTP 200 OK.
+  - Card activates successfully into ACTIVE status.
+  - `pricePaid` retains original snapshot value 500,000.
+
 
