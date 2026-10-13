@@ -5,6 +5,7 @@ import com.sportify.catalog.dto.PackageRegistrationResponse;
 import com.sportify.catalog.dto.SportPackageCreateRequest;
 import com.sportify.catalog.dto.SportPackageResponse;
 import com.sportify.identity.entity.UserAccount;
+import com.sportify.payment.entity.PaymentMethod;
 
 import java.util.List;
 
@@ -14,6 +15,8 @@ public interface SportPackageService {
     SportPackageResponse createPackage(SportPackageCreateRequest request, UserAccount manager);
     PackageRegistrationResponse registerPackage(PackageRegistrationRequest request, UserAccount actor);
     PackageRegistrationResponse activateRegistration(Long registrationId, UserAccount actor);
+    PackageRegistrationResponse activateRegistration(Long registrationId, UserAccount actor, PaymentMethod actualMethod);
+    PackageRegistrationResponse cancelRegistration(Long registrationId, UserAccount actor);
     List<PackageRegistrationResponse> getMyRegistrations(UserAccount currentUser);
     List<PackageRegistrationResponse> getMemberRegistrations(Long memberId);
 }

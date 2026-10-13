@@ -11,6 +11,7 @@ import com.sportify.catalog.repository.MembershipCardTierRepository;
 import com.sportify.catalog.service.impl.MembershipCardServiceImpl;
 import com.sportify.core.common.CodeFormatter;
 import com.sportify.core.exception.BusinessRuleException;
+import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
@@ -33,12 +34,20 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
+import com.sportify.payment.entity.Payment;
+import com.sportify.payment.entity.PaymentMethod;
+import com.sportify.payment.entity.PaymentStatus;
+import com.sportify.payment.service.PaymentService;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,6 +61,8 @@ public class MembershipCardServiceImplTest {
     private MemberProfileRepository memberProfileRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private PaymentService paymentService;
     @Mock
     private CodeFormatter codeFormatter;
     @Spy
@@ -68,6 +79,16 @@ public class MembershipCardServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(paymentService.createPendingPayment(any(MemberProfile.class), any(BigDecimal.class), any()))
+                .thenAnswer(i -> Payment.builder()
+                        .id(50L)
+                        .paymentCode("PAY-1000")
+                        .amount(i.getArgument(1))
+                        .paymentMethod(i.getArgument(2) != null ? i.getArgument(2) : PaymentMethod.BANK_TRANSFER)
+                        .paymentStatus(PaymentStatus.PENDING)
+                        .build());
+        lenient().when(memberCardRepository.findByMemberIdAndStatus(anyLong(), any())).thenReturn(List.of());
+
         goldTier = MembershipCardTier.builder()
                 .id(2L)
                 .code("GOLD")
@@ -420,14 +441,14 @@ public class MembershipCardServiceImplTest {
     }
 
     @Test
-    void cancelCard_AnotherMembersRequest_ThrowsAccessDeniedException() {
+    void cancelCard_AnotherMembersRequest_ThrowsResourceNotFoundException() {
         UserAccount otherUser = UserAccount.builder().id(101L).role(memberUser.getRole()).fullName("Other").build();
         MemberProfile otherProfile = MemberProfile.builder().id(101L).userAccount(otherUser).memberCode("MEM-101").build();
         MemberCard pending = MemberCard.builder().id(41L).cardCode("CARD-41").member(otherProfile).tier(goldTier)
                 .status(CardStatus.PENDING_PAYMENT).pricePaid(goldTier.getPrice()).build();
         when(memberCardRepository.findById(41L)).thenReturn(Optional.of(pending));
 
-        assertThrows(AccessDeniedException.class, () -> membershipCardService.cancelCard(41L, memberUser));
+        assertThrows(ResourceNotFoundException.class, () -> membershipCardService.cancelCard(41L, memberUser));
     }
 
     @Test
@@ -445,4 +466,239 @@ public class MembershipCardServiceImplTest {
 
         assertEquals(0, membershipCardService.getApplicableDiscountPercentage(100L, 30));
     }
+
+    @Test
+    void purchaseCard_AsMember_CreatesPendingPaymentAndSetsPaymentId() {
+        MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
+                .tierId(2L)
+                .paymentMethod(PaymentMethod.MOMO)
+                .build();
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(2L)).thenReturn(Optional.of(goldTier));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of());
+        stubNewCard(25L);
+        when(paymentService.createPendingPayment(eq(memberProfile), eq(goldTier.getPrice()), eq(PaymentMethod.MOMO)))
+                .thenReturn(Payment.builder().id(50L).paymentCode("PAY-1005").paymentStatus(PaymentStatus.PENDING).build());
+
+        MemberCardResponse res = membershipCardService.purchaseCard(req, memberUser);
+
+        assertEquals(CardStatus.PENDING_PAYMENT, res.getStatus());
+        assertEquals(50L, res.getPaymentId());
+        assertEquals("PAY-1005", res.getPaymentCode());
+    }
+
+    @Test
+    void purchaseCard_Online_WithZeroPrice_ThrowsBusinessRuleException() {
+        MembershipCardTier freeTier = MembershipCardTier.builder()
+                .id(9L)
+                .code("FREE-12M")
+                .name("Free 12M")
+                .price(BigDecimal.ZERO)
+                .durationMonths(12)
+                .isActive(true)
+                .build();
+
+        MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
+                .tierId(9L)
+                .build();
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(9L)).thenReturn(Optional.of(freeTier));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of());
+
+        assertThrows(BusinessRuleException.class, () -> membershipCardService.purchaseCard(req, memberUser));
+    }
+
+    @Test
+    void purchaseCard_Online_WithEqualPriceTier_CreatesPendingCardStartingAfterCurrentEnd() {
+        // Current card is VIP (600k) ending 2027-09-30. Buying another tier with same price (600k)
+        // must not be treated as upgrade; it starts the day after last card ends at full tier price.
+        MembershipCardTier equalPriceTier = MembershipCardTier.builder()
+                .id(4L)
+                .code("VIP-EQUAL")
+                .name("VIP Equal")
+                .price(BigDecimal.valueOf(600000.00))
+                .durationMonths(12)
+                .isActive(true)
+                .build();
+
+        MemberCard currentVip = paidCard(vipTier, LocalDate.of(2026, 10, 1), LocalDate.of(2027, 9, 30));
+
+        MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
+                .tierId(4L)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                .build();
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(4L)).thenReturn(Optional.of(equalPriceTier));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class)))
+                .thenReturn(List.of(currentVip));
+        stubNewCard(26L);
+        when(paymentService.createPendingPayment(eq(memberProfile), eq(equalPriceTier.getPrice()), eq(PaymentMethod.BANK_TRANSFER)))
+                .thenReturn(Payment.builder().id(51L).paymentCode("PAY-1006").paymentStatus(PaymentStatus.PENDING).build());
+
+        MemberCardResponse res = membershipCardService.purchaseCard(req, memberUser);
+
+        assertEquals(CardStatus.PENDING_PAYMENT, res.getStatus());
+        assertEquals(LocalDate.of(2027, 10, 1), res.getStartDate());
+        assertEquals(LocalDate.of(2028, 9, 30), res.getEndDate());
+        assertEquals(BigDecimal.valueOf(600000.00), res.getPricePaid());
+        assertEquals(51L, res.getPaymentId());
+        assertEquals("PAY-1006", res.getPaymentCode());
+        // Verify current card was NOT replaced
+        assertEquals(CardStatus.ACTIVE, currentVip.getStatus());
+    }
+
+    @Test
+    void purchaseCard_AtDesk_WithEqualPriceTier_DoesNotReplaceCurrentCard() {
+        // Staff at desk buying an equal-price tier for a member with an active card
+        MembershipCardTier equalPriceTier = MembershipCardTier.builder()
+                .id(4L)
+                .code("VIP-EQUAL")
+                .name("VIP Equal")
+                .price(BigDecimal.valueOf(600000.00))
+                .durationMonths(12)
+                .isActive(true)
+                .build();
+
+        MemberCard currentVip = paidCard(vipTier, LocalDate.of(2026, 10, 1), LocalDate.of(2027, 9, 30));
+
+        MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
+                .memberId(100L)
+                .tierId(4L)
+                .build();
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(4L)).thenReturn(Optional.of(equalPriceTier));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class)))
+                .thenReturn(List.of(currentVip));
+        stubNewCard(27L);
+
+        MemberCardResponse res = membershipCardService.purchaseCard(req, receptionistUser);
+
+        assertEquals(CardStatus.ACTIVE, res.getStatus());
+        assertEquals(LocalDate.of(2027, 10, 1), res.getStartDate());
+        assertEquals(LocalDate.of(2028, 9, 30), res.getEndDate());
+        assertEquals(BigDecimal.valueOf(600000.00), res.getPricePaid());
+        // The current card must NOT be REPLACED
+        assertEquals(CardStatus.ACTIVE, currentVip.getStatus());
+    }
+
+    @Test
+    void activateCard_WithPendingPayment_CallsMarkPaymentSuccess() {
+        Payment payment = Payment.builder()
+                .id(99L)
+                .paymentCode("PAY-0099")
+                .paymentStatus(PaymentStatus.PENDING)
+                .build();
+        MemberCard pending = MemberCard.builder()
+                .id(42L)
+                .cardCode("CARD-42")
+                .member(memberProfile)
+                .tier(goldTier)
+                .status(CardStatus.PENDING_PAYMENT)
+                .payment(payment)
+                .pricePaid(goldTier.getPrice())
+                .build();
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of());
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
+
+        MemberCardResponse res = membershipCardService.activateCard(42L, receptionistUser);
+
+        assertEquals(CardStatus.ACTIVE, res.getStatus());
+        verify(paymentService).markPaymentSuccess(99L, receptionistUser, null);
+    }
+
+    @Test
+    void activateCard_WithActualPaymentMethodCash_PassesCashToPaymentService() {
+        Payment payment = Payment.builder()
+                .id(99L)
+                .paymentCode("PAY-0099")
+                .paymentStatus(PaymentStatus.PENDING)
+                .build();
+        MemberCard pending = MemberCard.builder()
+                .id(42L)
+                .cardCode("CARD-42")
+                .member(memberProfile)
+                .tier(goldTier)
+                .status(CardStatus.PENDING_PAYMENT)
+                .payment(payment)
+                .pricePaid(goldTier.getPrice())
+                .build();
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of());
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
+
+        MemberCardResponse res = membershipCardService.activateCard(42L, receptionistUser, PaymentMethod.CASH);
+
+        assertEquals(CardStatus.ACTIVE, res.getStatus());
+        verify(paymentService).markPaymentSuccess(99L, receptionistUser, PaymentMethod.CASH);
+    }
+
+    @Test
+    void cancelCard_WithPendingPayment_CallsMarkPaymentFailedWithActorNote() {
+        Payment payment = Payment.builder()
+                .id(99L)
+                .paymentCode("PAY-0099")
+                .paymentStatus(PaymentStatus.PENDING)
+                .build();
+        MemberCard pending = MemberCard.builder()
+                .id(42L)
+                .cardCode("CARD-42")
+                .member(memberProfile)
+                .tier(goldTier)
+                .status(CardStatus.PENDING_PAYMENT)
+                .payment(payment)
+                .pricePaid(goldTier.getPrice())
+                .build();
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
+
+        MemberCardResponse res = membershipCardService.cancelCard(42L, memberUser);
+
+        assertEquals(CardStatus.CANCELLED, res.getStatus());
+        verify(paymentService).markPaymentFailed(eq(99L), org.mockito.ArgumentMatchers.contains("member user id 100"));
+    }
+
+    @Test
+    void cancelCard_ByReceptionist_RecordsStaffInNote() {
+        Payment payment = Payment.builder()
+                .id(99L)
+                .paymentCode("PAY-0099")
+                .paymentStatus(PaymentStatus.PENDING)
+                .build();
+        MemberCard pending = MemberCard.builder()
+                .id(42L)
+                .cardCode("CARD-42")
+                .member(memberProfile)
+                .tier(goldTier)
+                .status(CardStatus.PENDING_PAYMENT)
+                .payment(payment)
+                .pricePaid(goldTier.getPrice())
+                .build();
+        receptionistUser.setFullName("Front Desk");
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
+
+        MemberCardResponse res = membershipCardService.cancelCard(42L, receptionistUser);
+
+        assertEquals(CardStatus.CANCELLED, res.getStatus());
+        verify(paymentService).markPaymentFailed(eq(99L), org.mockito.ArgumentMatchers.contains("staff user id 200"));
+    }
+
+    @Test
+    void activateCard_WithActualMethod_WhenNoPaymentLinked_ThrowsBusinessRuleException() {
+        MemberCard pending = MemberCard.builder()
+                .id(42L)
+                .cardCode("CARD-42")
+                .member(memberProfile)
+                .tier(goldTier)
+                .status(CardStatus.PENDING_PAYMENT)
+                .payment(null)
+                .pricePaid(goldTier.getPrice())
+                .build();
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+
+        assertThrows(BusinessRuleException.class,
+                () -> membershipCardService.activateCard(42L, receptionistUser, PaymentMethod.CASH));
+    }
 }
+

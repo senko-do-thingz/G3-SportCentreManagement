@@ -56,4 +56,30 @@ class CorsPropertiesConfigTest {
 
         assertTrue(content.contains("CORS_ALLOWED_ORIGINS="), "Missing CORS_ALLOWED_ORIGINS in .env.example");
     }
+
+    @Test
+    void envExample_shouldContainAllRequiredKeysAndNoDoubleQuotes() throws IOException {
+        java.util.List<String> lines = Files.readAllLines(Path.of(".env.example"));
+        java.util.List<String> requiredKeys = java.util.List.of(
+                "DB_URL",
+                "DB_USERNAME",
+                "DB_PASSWORD",
+                "JWT_SECRET",
+                "CORS_ALLOWED_ORIGINS",
+                "SPORTIFY_PAYMENT_ACCOUNT_NAME",
+                "SPORTIFY_PAYMENT_ACCOUNT_NUMBER",
+                "SPORTIFY_PAYMENT_BANK"
+        );
+
+        for (String key : requiredKeys) {
+            String matchingLine = lines.stream()
+                    .filter(line -> line.startsWith(key + "="))
+                    .findFirst()
+                    .orElse(null);
+
+            assertNotNull(matchingLine, "Missing required key in .env.example: " + key);
+            String value = matchingLine.substring(key.length() + 1).trim();
+            assertFalse(value.startsWith("\""), "Value for " + key + " must not start with double quote: " + value);
+        }
+    }
 }

@@ -18,10 +18,14 @@ import com.sportify.catalog.service.SportPackageService;
 import com.sportify.core.common.CodeFormatter;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ResourceNotFoundException;
+import com.sportify.core.common.SecurityUtils;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.UserRepository;
+import com.sportify.payment.entity.Payment;
+import com.sportify.payment.entity.PaymentMethod;
+import com.sportify.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +48,7 @@ public class SportPackageServiceImpl implements SportPackageService {
     private final MemberProfileRepository memberProfileRepository;
     private final UserRepository userRepository;
     private final MembershipCardService membershipCardService;
+    private final PaymentService paymentService;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
 
@@ -90,7 +95,7 @@ public class SportPackageServiceImpl implements SportPackageService {
     @Transactional
     public PackageRegistrationResponse registerPackage(PackageRegistrationRequest request, UserAccount actor) {
         Long targetMemberId;
-        if (actor.getRole() != null && "MEMBER".equals(actor.getRole().getCode())) {
+        if (SecurityUtils.isMember(actor)) {
             targetMemberId = actor.getId();
         } else {
             targetMemberId = request.getMemberId() != null ? request.getMemberId() : actor.getId();
@@ -100,7 +105,7 @@ public class SportPackageServiceImpl implements SportPackageService {
         if (member == null) {
             UserAccount targetUser = userRepository.findById(targetMemberId)
                     .orElseThrow(() -> new ResourceNotFoundException("User not found: " + targetMemberId));
-            if (targetUser.getRole() == null || !"MEMBER".equals(targetUser.getRole().getCode())) {
+            if (!SecurityUtils.isMember(targetUser)) {
                 throw new BusinessRuleException("Cannot create member profile for non-member user: " + targetMemberId);
             }
             Long nextSeq = memberProfileRepository.getNextMemberCode();
@@ -137,20 +142,23 @@ public class SportPackageServiceImpl implements SportPackageService {
         BigDecimal discountFactor = BigDecimal.valueOf(100 - discountPercentage).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
         BigDecimal paidAmount = originalPrice.multiply(discountFactor).setScale(2, RoundingMode.HALF_UP);
 
+        if (SecurityUtils.isMember(actor) && paidAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessRuleException("Payment amount must be greater than zero. Attempted package price: " + paidAmount);
+        }
+
         long seq = registrationRepository.getNextRegistrationCodeSequence();
         String regCode = codeFormatter.formatPackageRegCode(seq);
 
-        String roleCode = actor.getRole() != null ? actor.getRole().getCode() : null;
         RegistrationChannel channel;
         PackageRegistrationStatus initialStatus;
         LocalDateTime activatedAt;
 
-        if ("MEMBER".equals(roleCode)) {
+        if (SecurityUtils.isMember(actor)) {
             // For a MEMBER actor, ignore request.channel and force RegistrationChannel.ONLINE with initial status PENDING_PAYMENT
             channel = RegistrationChannel.ONLINE;
             initialStatus = PackageRegistrationStatus.PENDING_PAYMENT;
             activatedAt = null;
-        } else if ("RECEPTIONIST".equals(roleCode) || "MANAGER".equals(roleCode)) {
+        } else if (SecurityUtils.isStaff(actor)) {
             // Only RECEPTIONIST and MANAGER may create ACTIVE registrations (channel RECEPTION)
             channel = request.getChannel() != null ? request.getChannel() : RegistrationChannel.RECEPTION;
             if (channel == RegistrationChannel.RECEPTION) {
@@ -183,6 +191,11 @@ public class SportPackageServiceImpl implements SportPackageService {
                 .createdByUser(actor)
                 .build();
 
+        if (initialStatus == PackageRegistrationStatus.PENDING_PAYMENT && channel == RegistrationChannel.ONLINE) {
+            Payment payment = paymentService.createPendingPayment(member, paidAmount, request.getPaymentMethod());
+            registration.setPayment(payment);
+        }
+
         registration = registrationRepository.save(registration);
         return mapToRegistrationResponse(registration);
     }
@@ -190,11 +203,20 @@ public class SportPackageServiceImpl implements SportPackageService {
     @Override
     @Transactional
     public PackageRegistrationResponse activateRegistration(Long registrationId, UserAccount actor) {
+        return activateRegistration(registrationId, actor, null);
+    }
+
+    @Override
+    @Transactional
+    public PackageRegistrationResponse activateRegistration(Long registrationId, UserAccount actor, PaymentMethod actualMethod) {
         SportPackageRegistration registration = registrationRepository.findById(registrationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Package registration not found for id: " + registrationId));
 
         if (registration.getStatus() != PackageRegistrationStatus.PENDING_PAYMENT) {
             throw new BusinessRuleException("Cannot activate package registration with status: " + registration.getStatus() + ". Only PENDING_PAYMENT registrations can be activated.");
+        }
+        if (actualMethod != null && registration.getPayment() == null) {
+            throw new BusinessRuleException("Cannot specify payment method for a registration with no linked payment");
         }
 
         LocalDate today = LocalDate.now(clock);
@@ -205,6 +227,40 @@ public class SportPackageServiceImpl implements SportPackageService {
 
         registration.setStatus(PackageRegistrationStatus.ACTIVE);
         registration.setActivatedAt(LocalDateTime.now(clock));
+        registration = registrationRepository.save(registration);
+        if (registration.getPayment() != null) {
+            paymentService.markPaymentSuccess(registration.getPayment().getId(), actor, actualMethod);
+        }
+        return mapToRegistrationResponse(registration);
+    }
+
+    @Override
+    @Transactional
+    public PackageRegistrationResponse cancelRegistration(Long registrationId, UserAccount actor) {
+        SportPackageRegistration registration = registrationRepository.findById(registrationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Package registration not found for id: " + registrationId));
+
+        boolean isStaff = SecurityUtils.isStaff(actor);
+        // MemberProfile shares its primary key with UserAccount (@MapsId user_id), so member id equals user id by design.
+        if (!isStaff && !registration.getMember().getId().equals(actor.getId())) {
+            throw new ResourceNotFoundException("Package registration not found for id: " + registrationId);
+        }
+
+        if (registration.getStatus() != PackageRegistrationStatus.PENDING_PAYMENT) {
+            throw new BusinessRuleException("Only a package registration that is waiting for payment can be cancelled.");
+        }
+
+        String actorDescription = isStaff ? "staff user id " + actor.getId() : "member user id " + actor.getId();
+        String cancelReason = "Cancelled by " + actorDescription;
+        registration.setStatus(PackageRegistrationStatus.CANCELLED);
+        registration.setCancelledAt(LocalDateTime.now(clock));
+        registration.setCancelReason(cancelReason);
+
+        if (registration.getPayment() != null) {
+            paymentService.markPaymentFailed(registration.getPayment().getId(),
+                    "Payment cancelled due to package registration cancellation: " + cancelReason);
+        }
+
         registration = registrationRepository.save(registration);
         return mapToRegistrationResponse(registration);
     }
@@ -242,7 +298,7 @@ public class SportPackageServiceImpl implements SportPackageService {
     }
 
     private PackageRegistrationResponse mapToRegistrationResponse(SportPackageRegistration reg) {
-        return PackageRegistrationResponse.builder()
+        PackageRegistrationResponse.PackageRegistrationResponseBuilder builder = PackageRegistrationResponse.builder()
                 .id(reg.getId())
                 .registrationCode(reg.getRegistrationCode())
                 .memberId(reg.getMember().getId())
@@ -263,8 +319,14 @@ public class SportPackageServiceImpl implements SportPackageService {
                 .endDate(reg.getEndDate())
                 .status(reg.getStatus())
                 .activatedAt(reg.getActivatedAt())
-                .createdAt(reg.getCreatedAt())
-                .build();
+                .createdAt(reg.getCreatedAt());
+
+        if (reg.getPayment() != null) {
+            builder.paymentId(reg.getPayment().getId())
+                    .paymentCode(reg.getPayment().getPaymentCode());
+        }
+
+        return builder.build();
     }
 
     static LocalDate packageEnd(LocalDate startDate, int durationDays) {

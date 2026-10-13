@@ -12,18 +12,22 @@ import com.sportify.catalog.service.MembershipCardService;
 import com.sportify.core.common.CodeFormatter;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ResourceNotFoundException;
+import com.sportify.core.common.SecurityUtils;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.UserRepository;
+import com.sportify.payment.entity.Payment;
+import com.sportify.payment.entity.PaymentMethod;
+import com.sportify.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -36,6 +40,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     private final MemberCardRepository memberCardRepository;
     private final MemberProfileRepository memberProfileRepository;
     private final UserRepository userRepository;
+    private final PaymentService paymentService;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
 
@@ -51,7 +56,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     @Transactional
     public MemberCardResponse purchaseCard(MemberCardPurchaseRequest request, UserAccount actor) {
         Long targetMemberId;
-        if (actor.getRole() != null && "MEMBER".equals(actor.getRole().getCode())) {
+        if (SecurityUtils.isMember(actor)) {
             targetMemberId = actor.getId();
         } else {
             targetMemberId = request.getMemberId() != null ? request.getMemberId() : actor.getId();
@@ -61,7 +66,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         if (member == null) {
             UserAccount targetUser = userRepository.findById(targetMemberId)
                     .orElseThrow(() -> new ResourceNotFoundException("User not found: " + targetMemberId));
-            if (targetUser.getRole() == null || !"MEMBER".equals(targetUser.getRole().getCode())) {
+            if (!SecurityUtils.isMember(targetUser)) {
                 throw new BusinessRuleException("Cannot create member profile for non-member user: " + targetMemberId);
             }
             Long nextSeq = memberProfileRepository.getNextMemberCode();
@@ -82,7 +87,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         }
 
         LocalDate today = LocalDate.now(clock);
-        boolean paidAtDesk = isStaff(actor);
+        boolean paidAtDesk = SecurityUtils.isStaff(actor);
 
         // Standard: free and permanent, nothing to pay
         if (tier.getDurationMonths() == null || tier.getDurationMonths() <= 0) {
@@ -97,8 +102,17 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         }
 
         CardPlan plan = planCard(member.getId(), tier, today);
+        if (!paidAtDesk && plan.price().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessRuleException("Payment amount must be greater than zero. Attempted card price: " + plan.price());
+        }
+
         CardStatus status = paidAtDesk ? CardStatus.ACTIVE : CardStatus.PENDING_PAYMENT;
-        MemberCard card = memberCardRepository.save(newCard(member, tier, plan.startDate(), plan.endDate(), status, plan.price()));
+        MemberCard card = newCard(member, tier, plan.startDate(), plan.endDate(), status, plan.price());
+        if (status == CardStatus.PENDING_PAYMENT) {
+            Payment payment = paymentService.createPendingPayment(member, plan.price(), request.getPaymentMethod());
+            card.setPayment(payment);
+        }
+        card = memberCardRepository.save(card);
         if (paidAtDesk && plan.replaces() != null) {
             replace(plan.replaces());
         }
@@ -112,11 +126,20 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     @Override
     @Transactional
     public MemberCardResponse activateCard(Long cardId, UserAccount actor) {
+        return activateCard(cardId, actor, null);
+    }
+
+    @Override
+    @Transactional
+    public MemberCardResponse activateCard(Long cardId, UserAccount actor, PaymentMethod actualMethod) {
         MemberCard card = memberCardRepository.findById(cardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member card not found for id: " + cardId));
         if (card.getStatus() != CardStatus.PENDING_PAYMENT) {
             throw new BusinessRuleException("Cannot activate membership card with status: " + card.getStatus()
                     + ". Only PENDING_PAYMENT cards can be activated.");
+        }
+        if (actualMethod != null && card.getPayment() == null) {
+            throw new BusinessRuleException("Cannot specify payment method for a card with no linked payment");
         }
 
         LocalDate today = LocalDate.now(clock);
@@ -130,6 +153,9 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         card.setEndDate(plan.endDate());
         card.setStatus(CardStatus.ACTIVE);
         card = memberCardRepository.save(card);
+        if (card.getPayment() != null) {
+            paymentService.markPaymentSuccess(card.getPayment().getId(), actor, actualMethod);
+        }
         if (plan.replaces() != null) {
             replace(plan.replaces());
         }
@@ -141,13 +167,20 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     public MemberCardResponse cancelCard(Long cardId, UserAccount actor) {
         MemberCard card = memberCardRepository.findById(cardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member card not found for id: " + cardId));
-        if (!isStaff(actor) && !card.getMember().getId().equals(actor.getId())) {
-            throw new AccessDeniedException("Cannot cancel another member's card request");
+        boolean isStaff = SecurityUtils.isStaff(actor);
+        // MemberProfile shares its primary key with UserAccount (@MapsId user_id), so member id equals user id by design.
+        if (!isStaff && !card.getMember().getId().equals(actor.getId())) {
+            throw new ResourceNotFoundException("Member card not found for id: " + cardId);
         }
         if (card.getStatus() != CardStatus.PENDING_PAYMENT) {
             throw new BusinessRuleException("Only a card request that is waiting for payment can be cancelled.");
         }
         card.setStatus(CardStatus.CANCELLED);
+        if (card.getPayment() != null) {
+            String actorDescription = isStaff ? "staff user id " + actor.getId() : "member user id " + actor.getId();
+            paymentService.markPaymentFailed(card.getPayment().getId(),
+                    "Payment cancelled due to card cancellation by " + actorDescription);
+        }
         return mapToCardResponse(memberCardRepository.save(card));
     }
 
@@ -204,11 +237,6 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     private void replace(MemberCard old) {
         old.setStatus(CardStatus.REPLACED);
         memberCardRepository.save(old);
-    }
-
-    private static boolean isStaff(UserAccount actor) {
-        String role = actor.getRole() != null ? actor.getRole().getCode() : null;
-        return "RECEPTIONIST".equals(role) || "MANAGER".equals(role);
     }
 
     private MemberCard newCard(MemberProfile member, MembershipCardTier tier, LocalDate start, LocalDate end,
@@ -274,7 +302,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     }
 
     private MemberCardResponse mapToCardResponse(MemberCard card) {
-        return MemberCardResponse.builder()
+        MemberCardResponse.MemberCardResponseBuilder builder = MemberCardResponse.builder()
                 .id(card.getId())
                 .cardCode(card.getCardCode())
                 .memberId(card.getMember().getId())
@@ -288,7 +316,13 @@ public class MembershipCardServiceImpl implements MembershipCardService {
                 .endDate(card.getEndDate())
                 .status(card.getStatus())
                 .pricePaid(card.getPricePaid())
-                .createdAt(card.getCreatedAt())
-                .build();
+                .createdAt(card.getCreatedAt());
+
+        if (card.getPayment() != null) {
+            builder.paymentId(card.getPayment().getId())
+                    .paymentCode(card.getPayment().getPaymentCode());
+        }
+
+        return builder.build();
     }
 }

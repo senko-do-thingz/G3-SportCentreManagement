@@ -1,11 +1,13 @@
 package com.sportify.catalog.controller;
 
+import com.sportify.catalog.dto.ActivatePaymentRequest;
 import com.sportify.catalog.dto.PackageRegistrationRequest;
 import com.sportify.catalog.dto.PackageRegistrationResponse;
 import com.sportify.catalog.dto.SportPackageCreateRequest;
 import com.sportify.catalog.dto.SportPackageResponse;
 import com.sportify.catalog.service.SportPackageService;
 import com.sportify.identity.security.CustomUserDetails;
+import com.sportify.payment.entity.PaymentMethod;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -67,7 +69,18 @@ public class SportPackageController {
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'MANAGER')")
     public PackageRegistrationResponse activateRegistration(
             @PathVariable Long id,
+            @RequestBody(required = false) ActivatePaymentRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return sportPackageService.activateRegistration(id, userDetails.getUserAccount());
+        PaymentMethod actualMethod = request != null ? request.getPaymentMethod() : null;
+        return sportPackageService.activateRegistration(id, userDetails.getUserAccount(), actualMethod);
+    }
+
+    /** Cancels a package registration request that has not been paid yet. */
+    @PutMapping("/registrations/{id}/cancel")
+    @PreAuthorize("hasAnyRole('MEMBER', 'RECEPTIONIST', 'MANAGER')")
+    public PackageRegistrationResponse cancelRegistration(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return sportPackageService.cancelRegistration(id, userDetails.getUserAccount());
     }
 }

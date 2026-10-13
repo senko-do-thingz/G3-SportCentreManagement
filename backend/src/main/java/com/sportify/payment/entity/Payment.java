@@ -1,14 +1,19 @@
 package com.sportify.payment.entity;
 
 import com.sportify.identity.entity.MemberProfile;
+import com.sportify.identity.entity.UserAccount;
 import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "payment")
+@EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -44,34 +49,23 @@ public class Payment {
     @Column(name = "notes", length = 500)
     private String notes;
 
-    @Column(name = "payment_time", nullable = false)
+    @Column(name = "payment_time")
     private LocalDateTime paymentTime;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "confirmed_by_user_id")
+    private UserAccount confirmedByUser;
 
     @Version
     @Column(name = "version", nullable = false)
     private Integer version;
 
-    @Column(name = "created_at", nullable = false)
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    @PrePersist
-    void prePersist() {
-        if (paymentTime == null) {
-            paymentTime = LocalDateTime.now();
-        }
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
-        }
-        if (updatedAt == null) {
-            updatedAt = LocalDateTime.now();
-        }
-    }
-
-    @PreUpdate
-    void preUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
 }
+
