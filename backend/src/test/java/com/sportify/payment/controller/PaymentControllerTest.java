@@ -403,4 +403,29 @@ public class PaymentControllerTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("The resource was modified by another request. Please reload and try again."));
     }
+
+    @Test
+    @DisplayName("GET /api/v1/payments/{id} as admin returns 403 Forbidden")
+    void getPayment_AsAdmin_Returns403Forbidden() throws Exception {
+        CustomUserDetails admin = createUserDetails(999L, "ADMIN", "Administrator");
+
+        mockMvc.perform(get("/api/v1/payments/1")
+                        .with(user(admin)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/payments/{id}/method as admin returns 403 Forbidden")
+    void updatePaymentMethod_AsAdmin_Returns403Forbidden() throws Exception {
+        CustomUserDetails admin = createUserDetails(999L, "ADMIN", "Administrator");
+        UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                .build();
+
+        mockMvc.perform(put("/api/v1/payments/1/method")
+                        .with(user(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+    }
 }
