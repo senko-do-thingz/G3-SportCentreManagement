@@ -143,8 +143,9 @@ export function RefundDetailPage() {
 
 /**
  * Without a member, the refund is looked up in the APPROVED queue first (the one the desk acts
- * on), then in the PENDING queue. A failing queue does not hide a refund found in the other one;
- * when neither answers, the first error is shown.
+ * on), then in the PENDING queue. A refund found in a queue that answered is shown even when the
+ * other queue failed. When it is not found and any queue failed, the first error is thrown, so a
+ * 403 or 404 is shown with Try again and never read as "Refund not found".
  */
 async function findInQueues(id: number, signal: AbortSignal): Promise<Refund | null> {
   const queues = [
@@ -152,17 +153,15 @@ async function findInQueues(id: number, signal: AbortSignal): Promise<Refund | n
     () => receptionPaymentsApi.pendingRefunds({ signal }),
   ]
   let firstError: unknown = null
-  let anyAnswered = false
   for (const queue of queues) {
     try {
       const found = (await queue()).find((refund) => refund.id === id)
-      anyAnswered = true
       if (found) return found
     } catch (error) {
       firstError ??= error
     }
   }
-  if (!anyAnswered && firstError !== null) throw firstError
+  if (firstError !== null) throw firstError
   return null
 }
 

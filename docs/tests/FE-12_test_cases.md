@@ -50,17 +50,17 @@ npx tsc -b
 npm run build
 ```
 
-### 1.3 Result summary (2026-10-14, after review round 1)
+### 1.3 Result summary (2026-10-14, after review round 2)
 | Group | Cases | Result |
 |---|---|---|
 | Automated, rules (`src/pages/reception/receptionPaymentsModel.test.ts`) | 16 | 16 PASSED |
-| Automated, screens (`src/pages/reception/receptionPayments.test.tsx`) | 23 (TC-FE12-050 runs for 5 routes, 27 runs) | 27 PASSED |
+| Automated, screens (`src/pages/reception/receptionPayments.test.tsx`) | 24 (TC-FE12-050 runs for 5 routes, 28 runs) | 28 PASSED |
 | Automated, TextArea (`src/components/ui/TextArea.test.tsx`) | 2 | 2 PASSED |
 | Automated, all other files (FE-00 to FE-05, including the updated FE-05 cases) | 397 | 397 PASSED |
 | Lint (0 warnings), `tsc -b`, build | 3 | 3 PASSED |
 | Manual against the real backend (section 4) | 12 | NOT RUN (need BE-18 and BE-21) |
 
-Total: 442 automated tests in 23 files, 442 passed, 0 failed. All automated cases run against a fake backend that follows 1.1; they are not verified on main until BE-18 and BE-21 are merged.
+Total: 443 automated tests in 23 files, 443 passed, 0 failed. All automated cases run against a fake backend that follows 1.1; they are not verified on main until BE-18 and BE-21 are merged.
 
 ## 2. Automated cases - rules (`receptionPaymentsModel.test.ts`)
 | ID | Case | Expected | Result |
@@ -109,6 +109,7 @@ Signed in as RECEPTIONIST with a fake backend that follows 1.1; today is 2026-10
 | TC-FE12-045 | AC4 | Queues | `/reception/refunds?memberId=2` with APPROVED RF-1040, COMPLETED RF-1039, PENDING RF-1042 | `GET /refunds?status=APPROVED` called; first table is the approved queue with "Record refund" to `/reception/refunds/7?memberId=2`; member table shows APPROVED and COMPLETED, not RF-1042; RF-1042 appears once, in the approval queue | PASSED |
 | TC-FE12-046 | AC4 | Approved refund without memberId | `/reception/refunds/7` | Found in the approved queue: "Refund Approved"; no member refunds call | PASSED |
 | TC-FE12-047 | AC4 | Lookup when a queue fails | Approved queue 404, pending has the refund; then both fail | "Refund Request Submitted"; then "We could not load the refund" with the first error | PASSED |
+| TC-FE12-049 | AC4 | Queue error, refund missing from the other queue (review round 2) | `/reception/refunds/7`: approved queue 404, pending queue answers without id 7 | "We could not load the refund" with "Resource not found" and Try again; no "Refund not found" | PASSED |
 | TC-FE12-050 | AC5 | Role guard | MEMBER opens the 5 routes | Access denied, no payment, refund or invoice request | PASSED (5 runs) |
 | TC-FE12-060 | - | TextArea hint and error ids (`TextArea.test.tsx`) | Render with hint, then with error | aria-describedby lists the hint only while it is shown, then the error, plus the caller id | PASSED |
 | TC-FE12-061 | - | TextArea computed props | Caller passes aria-invalid false with an error | aria-invalid stays true; rows and required kept | PASSED |
@@ -169,3 +170,9 @@ Duplicated types: `Invoice` and `InvoiceLine` are defined in FE-11 `paymentsApi.
 | 9 | TextArea outside the UI kit | `src/components/ui/TextArea.tsx`, exported; style in `components.css`; hint id only when shown; rest props spread first | TC-FE12-060, 061 |
 | 10 | Magic margin, columns rebuilt every render | Search form aligned with `align-items: flex-end`; `REFUND_COLUMNS` module constant | Lint, screens |
 | 11 | Dropped Figma field not raised | Section 6 Q1 and Q2 | - |
+
+## 8. Review round 2 - findings and where they are covered
+| # | Finding | Fix | Cases |
+|---|---|---|---|
+| 1 | A failed queue plus a refund missing from the other queue showed "Refund not found" | `findInQueues` throws the first error whenever any queue failed and the refund was not found | TC-FE12-049, 047 |
+| 2 | Find member button aligned to the bottom of the error text | `.payment-picker-form` is a grid; the field wrapper uses `display: contents`, the input and the button share row 2, the error or hint sits in row 3. No fixed pixel margin | Lint, build (layout not checked in a browser, fast mode) |

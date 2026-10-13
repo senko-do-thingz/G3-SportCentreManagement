@@ -588,6 +588,17 @@ describe('FE-12 Refund Requests (F3-07)', () => {
     expect(await screen.findByRole('heading', { name: 'We could not load the refund' })).toBeInTheDocument()
     expect(screen.getByText('Resource not found')).toBeInTheDocument()
   })
+
+  it('TC-FE12-049 a queue error with the refund missing elsewhere is an error, not "Refund not found"', async () => {
+    await open('/reception/refunds/7', {
+      approvedRefunds: backendError(404, 'Resource not found'),
+      pendingRefunds: [refund({ id: 9, refundCode: 'RF-1042' })],
+    })
+    expect(await screen.findByRole('heading', { name: 'We could not load the refund' })).toBeInTheDocument()
+    expect(screen.getByText('Resource not found')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Refund not found' })).not.toBeInTheDocument()
+  })
 })
 
 describe('FE-12 access', () => {

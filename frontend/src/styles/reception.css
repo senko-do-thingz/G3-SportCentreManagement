@@ -351,9 +351,43 @@
   gap: var(--space-3);
 }
 
-/* The search button lines up with the input, not with the label above it. */
+/*
+ * The search button lines up with the input, whatever is shown above or below it. The field
+ * wrapper is flattened (display: contents) so its label, input and message become rows of this
+ * grid: label in row 1, input and button in row 2, error or hint in row 3.
+ */
 .payment-picker-form {
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-3);
+  row-gap: 6px;
+  align-items: center;
+}
+
+.payment-picker-form > .field {
+  display: contents;
+}
+
+.payment-picker-form > .field > * {
+  grid-column: 1;
+}
+
+.payment-picker-form .field__label-row {
+  grid-row: 1;
+}
+
+.payment-picker-form .input {
+  grid-row: 2;
+}
+
+.payment-picker-form .field__error,
+.payment-picker-form .field__hint {
+  grid-row: 3;
+}
+
+.payment-picker-form > .btn {
+  grid-column: 2;
+  grid-row: 2;
 }
 
 .payment-member-results {

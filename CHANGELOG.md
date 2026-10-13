@@ -30,6 +30,7 @@ Branch `feat/f3-reception-payments`, from main (6e82388). Owner: Phat. Priority:
 - "Refunded" instead of "Refunded / Member notified"; confirm toast no longer claims the item is active.
 - `receptionPaymentPath(paymentId, memberId)` without `item` and `itemId`. `TextArea` moved to the UI kit (`src/components/ui/TextArea.tsx`); refund table columns built once; no fixed pixel margin.
 - Verified with lint (0 warnings), `tsc -b`, `npm test` (442 tests in 23 files) and `npm run build`.
+- Review round 2: a failed refund queue now shows its error with Try again instead of "Refund not found" when the refund is not in the queue that answered; the Find member button stays aligned with the input when the field shows an error (grid layout). 443 tests pass.
 
 ## 2026-10-13 - Receptionist Member Search, Register and Renew, Check-in (FE-05, Flow 1)
 
