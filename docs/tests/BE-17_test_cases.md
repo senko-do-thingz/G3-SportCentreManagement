@@ -6,7 +6,7 @@
 - **Branch**: `feat/f3-pending-payments`
 - **Status**: Implemented, unit-verified, integration tests configured for Testcontainers (CI validation required)
 - **Objective**: Create a PENDING payment whenever a member asks for something online (MembershipCard or SportPackage registration), set payment_id on the card or registration in the same transaction, expose `GET /api/v1/payments/{id}` for F3-01 Payment Summary, F3-02 Payment Instructions & Status, and S3-Single Single Visit Payment Summary with bank transfer instructions from application properties, expose `PUT /api/v1/payments/{id}/method` to let owner or staff change payment method while PENDING and linked item is PENDING_PAYMENT, mark payment SUCCESS with payment_time and confirming staff when activating a card or registration, and mark payment FAILED with dynamic actor notes when cancelling.
-- **Environment Note**: Docker is not available in the local execution environment. Consequently, tests extending `AbstractIntegrationTest` (which rely on Testcontainers MSSQL Server) cannot be executed locally and are marked as "NOT RUN - requires Docker (to be verified by CI)". Unit tests, MockMvc controller slices, and Maven test compilation were executed and verified locally.
+- **Environment Note**: Docker is not available in the local execution environment. Consequently, tests extending `AbstractIntegrationTest` (which rely on Testcontainers MSSQL Server) cannot be executed locally and are marked as "NOT RUN - requires Docker (verified by GitHub Actions CI)". Unit tests, MockMvc controller slices, and Maven test compilation were executed and verified locally.
 
 ---
 

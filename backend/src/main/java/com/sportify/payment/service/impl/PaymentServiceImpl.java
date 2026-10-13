@@ -55,6 +55,12 @@ public class PaymentServiceImpl implements PaymentService {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessRuleException("Payment amount must be greater than zero. Attempted amount: " + amount);
         }
+        if (amount.scale() > 2 && amount.stripTrailingZeros().scale() > 2) {
+            throw new BusinessRuleException("Payment amount cannot have more than 2 decimal places. Attempted amount: " + amount);
+        }
+        if (amount.toBigInteger().toString().length() > 10) {
+            throw new BusinessRuleException("Payment amount cannot have more than 10 integer digits. Attempted amount: " + amount);
+        }
 
         PaymentMethod chosenMethod = (method != null) ? method : PaymentMethod.BANK_TRANSFER;
         if (!ONLINE_ALLOWED_PAYMENT_METHODS.contains(chosenMethod)) {
@@ -366,7 +372,9 @@ public class PaymentServiceImpl implements PaymentService {
         if (invoices.isEmpty()) {
             return Optional.empty();
         }
-        Invoice invoice = invoices.get(0);
+        Invoice invoice = invoices.stream()
+                .min(java.util.Comparator.comparing(Invoice::getId, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
+                .orElse(invoices.get(0));
         String description = "Invoice " + invoice.getInvoiceNumber();
         BigDecimal original = invoice.getSubtotalAmount() != null ? invoice.getSubtotalAmount() : fallbackAmount;
         BigDecimal discount = invoice.getDiscountAmount() != null ? invoice.getDiscountAmount() : BigDecimal.ZERO;

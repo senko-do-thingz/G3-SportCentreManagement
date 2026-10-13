@@ -207,6 +207,24 @@ class PaymentServiceImplTest {
     }
 
     @Test
+    @DisplayName("Payment amount with more than 2 decimal places throws BusinessRuleException")
+    void createPendingPayment_MoreThanTwoDecimalPlaces_ThrowsBusinessRuleException() {
+        BigDecimal invalidScale = new BigDecimal("100.555");
+        assertThatThrownBy(() -> paymentService.createPendingPayment(ownerProfile, invalidScale, PaymentMethod.BANK_TRANSFER))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Payment amount cannot have more than 2 decimal places");
+    }
+
+    @Test
+    @DisplayName("Payment amount with more than 10 integer digits throws BusinessRuleException")
+    void createPendingPayment_MoreThanTenIntegerDigits_ThrowsBusinessRuleException() {
+        BigDecimal invalidPrecision = new BigDecimal("10000000000.00");
+        assertThatThrownBy(() -> paymentService.createPendingPayment(ownerProfile, invalidPrecision, PaymentMethod.BANK_TRANSFER))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Payment amount cannot have more than 10 integer digits");
+    }
+
+    @Test
     @DisplayName("Mark payment success with null id throws BusinessRuleException")
     void markPaymentSuccess_NullPaymentId_ThrowsBusinessRuleException() {
         assertThrows(BusinessRuleException.class, () -> paymentService.markPaymentSuccess(null, receptionistUser));
@@ -622,5 +640,34 @@ class PaymentServiceImplTest {
         assertThat(response.getItemDescription()).isEqualTo("Invoice INV-1001");
         assertThat(response.getOriginalPrice()).isEqualByComparingTo(BigDecimal.valueOf(900000.00));
         assertThat(response.getDiscount()).isEqualByComparingTo(BigDecimal.valueOf(90000.00));
+    }
+
+    @Test
+    @DisplayName("Dynamic item resolution resolves invoice picking lowest id deterministically when multiple exist")
+    void getPayment_ResolvesInvoiceDetails_PicksLowestIdDeterministically() {
+        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+        when(sportPackageRegistrationRepository.findByPaymentId(10L)).thenReturn(Optional.empty());
+        when(memberCardRepository.findByPaymentId(10L)).thenReturn(Optional.empty());
+
+        Invoice higherIdInvoice = Invoice.builder()
+                .id(99L)
+                .invoiceNumber("INV-0099")
+                .subtotalAmount(BigDecimal.valueOf(990000.00))
+                .discountAmount(BigDecimal.valueOf(99000.00))
+                .build();
+        Invoice lowerIdInvoice = Invoice.builder()
+                .id(42L)
+                .invoiceNumber("INV-0042")
+                .subtotalAmount(BigDecimal.valueOf(420000.00))
+                .discountAmount(BigDecimal.valueOf(42000.00))
+                .build();
+
+        when(invoiceRepository.findByPaymentId(10L)).thenReturn(List.of(higherIdInvoice, lowerIdInvoice));
+
+        PaymentResponse response = paymentService.getPayment(10L, ownerUser);
+
+        assertThat(response.getItemDescription()).isEqualTo("Invoice INV-0042");
+        assertThat(response.getOriginalPrice()).isEqualByComparingTo(BigDecimal.valueOf(420000.00));
+        assertThat(response.getDiscount()).isEqualByComparingTo(BigDecimal.valueOf(42000.00));
     }
 }
