@@ -128,22 +128,43 @@ export function payment(overrides: Partial<Payment> = {}): Payment {
   }
 }
 
-/** Card tiers as seeded in V10: Standard (free), Gold Member and VIP Member. Override any field per test. */
+/**
+ * Card tiers with the exact values of the V10 seed
+ * (backend/src/main/resources/db/migration/catalog/V10__context_refresh_schema.sql): code, name,
+ * price, durationMonths, discountPercentage and description. Ids 1, 2 and 3 follow the insert
+ * order of the seed. cardTier() returns VIP Member; override any field per test.
+ */
 export function cardTier(overrides: Partial<CardTier> = {}): CardTier {
   return {
     id: 3,
     code: 'VIP',
-    name: 'VIP',
+    name: 'VIP Member',
     price: 600000,
     durationMonths: 12,
     discountPercentage: 10,
-    description: null,
+    description: 'VIP tier card valid for 12 months. 10% discount on 30-day and 90-day packages.',
     isActive: true,
     ...overrides,
   }
 }
 
-export const STANDARD_TIER = cardTier({ id: 1, code: 'STANDARD', name: 'Standard', price: 0, durationMonths: 0, discountPercentage: 0 })
-export const GOLD_TIER = cardTier({ id: 2, code: 'GOLD', name: 'Gold', price: 300000, discountPercentage: 5 })
+export const STANDARD_TIER = cardTier({
+  id: 1,
+  code: 'STANDARD',
+  name: 'Standard',
+  price: 0,
+  durationMonths: 0,
+  discountPercentage: 0,
+  description: 'Standard membership card. Free permanent membership with 0% discount.',
+})
+export const GOLD_TIER = cardTier({
+  id: 2,
+  code: 'GOLD',
+  name: 'Gold Member',
+  price: 300000,
+  durationMonths: 12,
+  discountPercentage: 5,
+  description: 'Gold tier card valid for 12 months. 5% discount on 30-day and 90-day packages.',
+})
 export const VIP_TIER = cardTier()
 export const CARD_TIERS = [STANDARD_TIER, GOLD_TIER, VIP_TIER]

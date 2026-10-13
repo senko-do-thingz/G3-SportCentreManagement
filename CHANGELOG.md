@@ -14,6 +14,10 @@ Branch `feat/f1-member-cards`, stacked on `feat/f1-member-packages` (FE-03) and 
 ### Changed
 - Dashboard quick link "My membership card" opens the Membership card tab (`MEMBER_PATHS.membershipCard`); TC-FE02 quick link assertion updated.
 
+### Review round 1
+- Must fix: overlay title "{tier name} card" (reads "VIP Member card" with the V10 names); tier fixtures use the exact V10 values; tier description no longer shown; Renew card only on the latest ended paid card when nothing is in force or queued (`renewableCardId`); a 400 or 404 on cancel and a 400 on purchase reload the data and keep the backend message; one "today" per page, the plan of the tier button is passed to the overlay.
+- Should fix: "Choose card" for the unknown plan; `MEMBER_PATHS.membershipCards` replaces `MEMBERSHIP_CARDS_PATH` and `MEMBERSHIP_CARD_TAB_PATH`; footer "Confirm and continue" then "Cancel"; Payment row removed from "How your card works"; both tabpanels rendered (inactive one hidden); cardsModel comment states the UTC+7 assumption. 352 tests pass (14 new).
+
 ### Notes
 - An ACTIVE card or registration past its end date is shown as Expired until the nightly jobs (F1-B3, F1-B4) exist.
 - The backend has no perks field on `CardTierResponse`; perks are built from the discount rule. Figma F1-11 says a mid-term change to a cheaper tier is not available; the task and the backend allow it as a card that starts later, which is what the screen does.

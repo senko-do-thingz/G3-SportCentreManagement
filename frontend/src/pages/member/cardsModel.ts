@@ -1,6 +1,5 @@
 import type { CardTier } from '../../api/cardsApi'
 import type { MemberCard, PackageRegistration } from '../../api/memberApi'
-import { MEMBER_PATHS } from './dashboardModel'
 
 /**
  * Pure rules of Membership Cards (F1-11) and My Membership and Sport Packages (F1-12).
@@ -15,7 +14,10 @@ import { MEMBER_PATHS } from './dashboardModel'
  *   after the last card ends, full price.
  * A card lasts durationMonths months: it ends the day before the same date durationMonths later
  * (Java LocalDate.plusMonths clamps to the last day of a shorter month).
- * Dates are ISO strings ("2026-10-13"), compared as strings, read in the local time zone.
+ * Dates are ISO strings ("2026-10-13"), compared as strings, read in the local time zone of the
+ * browser. The backend clock runs in Asia/Ho_Chi_Minh (UTC+7), so the preview matches what the
+ * backend saves only when the browser also runs in UTC+7; elsewhere "today" can differ by one day
+ * around midnight and the backend answer stays the authority.
  */
 
 export type CardPlanKind = 'new' | 'renew' | 'upgrade' | 'later' | 'blocked' | 'unknown'
@@ -168,7 +170,7 @@ export const PLAN_ACTION_LABELS: Record<CardPlanKind, string> = {
   upgrade: 'Upgrade card',
   later: 'Buy after current card',
   blocked: 'Upgrade card',
-  unknown: 'Get card',
+  unknown: 'Choose card',
 }
 
 /**
@@ -281,5 +283,20 @@ export function tabFromParam(value: string | null): MembershipTab {
   return value === 'card' ? 'card' : 'packages'
 }
 
-export const MEMBERSHIP_CARD_TAB_PATH = MEMBER_PATHS.membershipCard
-export const MEMBERSHIP_CARDS_PATH = '/member/membership/cards'
+/**
+ * Id of the card that gets "Renew card" on the Membership card tab of F1-12, or null.
+ * Only when nothing paid is in force or queued (cardInForce and lastPaidCard are both null), and
+ * only on the latest paid card that has ended: ACTIVE or EXPIRED with an end date, the latest end
+ * date wins. REPLACED, CANCELLED, PENDING_PAYMENT and the free Standard card never get it.
+ * Tiers are not loaded on F1-12; with an empty tier list every card with an end date counts as
+ * paid, which is the same test the backend applies (the free tier has no end date).
+ */
+export function renewableCardId(cards: MemberCard[], today: string): number | null {
+  if (cardInForce(cards, [], today) || lastPaidCard(cards, [], today)) {
+    return null
+  }
+  const ended = cards.filter(
+    (card) => (card.status === 'ACTIVE' || card.status === 'EXPIRED') && card.endDate !== null && card.endDate < today,
+  )
+  return latestEnding(ended)?.id ?? null
+}

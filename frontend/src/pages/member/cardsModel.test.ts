@@ -9,6 +9,8 @@ import {
   isFreeTier,
   pendingCard,
   planCard,
+  PLAN_ACTION_LABELS,
+  renewableCardId,
   sortCards,
   sortRegistrations,
   sortTiers,
@@ -165,5 +167,21 @@ describe('FE-04 helpers', () => {
     expect(tabFromParam('card')).toBe('card')
     expect(tabFromParam(null)).toBe('packages')
     expect(tabFromParam('other')).toBe('packages')
+  })
+
+  it('TC-FE04-020 renewableCardId: latest ended paid card, only when nothing is in force or queued', () => {
+    const older = card({ id: 1, status: 'EXPIRED', startDate: '2024-07-05', endDate: '2025-07-04' })
+    const latest = card({ id: 2, status: 'EXPIRED', startDate: '2025-07-05', endDate: '2026-07-04' })
+    const replaced = card({ id: 3, status: 'REPLACED', endDate: '2026-09-30' })
+    const cancelled = card({ id: 4, status: 'CANCELLED', endDate: '2026-09-30' })
+    expect(renewableCardId([older, latest, replaced, cancelled], TODAY)).toBe(2)
+    expect(renewableCardId([older, latest, VIP_CARD], TODAY)).toBeNull()
+    const queued = card({ id: 5, startDate: '2027-01-01', endDate: '2027-12-31' })
+    expect(renewableCardId([latest, queued], TODAY)).toBeNull()
+    expect(renewableCardId([replaced, cancelled, card({ id: 6, status: 'PENDING_PAYMENT' })], TODAY)).toBeNull()
+  })
+
+  it('TC-FE04-021 unknown plan uses the neutral label Choose card', () => {
+    expect(PLAN_ACTION_LABELS.unknown).toBe('Choose card')
   })
 })

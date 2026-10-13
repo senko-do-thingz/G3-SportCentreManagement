@@ -1,7 +1,7 @@
 import { useRef, useState, type KeyboardEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { cardsApi } from '../../api/cardsApi'
-import { getErrorMessage } from '../../api/errors'
+import { ApiError, getErrorMessage } from '../../api/errors'
 import { memberApi, type MemberCard, type PackageRegistration } from '../../api/memberApi'
 import { Badge, Button, Card, EmptyState, ErrorState, Modal, PageHeader, StatusBadge, useToast } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
@@ -11,7 +11,7 @@ import {
   canCancelCard,
   displayStatus,
   isQueued,
-  MEMBERSHIP_CARDS_PATH,
+  renewableCardId,
   sortCards,
   sortRegistrations,
   tabFromParam,
@@ -105,9 +105,19 @@ export function MyMembershipPage() {
           </button>
         ))}
       </div>
-      <div role="tabpanel" id={`membership-panel-${tab}`} aria-labelledby={`membership-tab-${tab}`}>
-        {tab === 'packages' ? <RegistrationsPanel today={today} /> : <CardsPanel today={today} />}
-      </div>
+      {/* Both panels exist so every aria-controls points to an element; only the active one
+          renders its content, so the hidden tab does not load data. */}
+      {TABS.map((item) => (
+        <div
+          key={item.id}
+          role="tabpanel"
+          id={`membership-panel-${item.id}`}
+          aria-labelledby={`membership-tab-${item.id}`}
+          hidden={tab !== item.id}
+        >
+          {tab === item.id && (item.id === 'packages' ? <RegistrationsPanel today={today} /> : <CardsPanel today={today} />)}
+        </div>
+      ))}
     </div>
   )
 }
@@ -263,7 +273,7 @@ function CardsPanel({ today }: { today: string }) {
       title="My membership card"
       aria-label="My membership card"
       actions={
-        <Link className={buttonClassName('secondary', 'sm')} to={MEMBERSHIP_CARDS_PATH}>
+        <Link className={buttonClassName('secondary', 'sm')} to={MEMBER_PATHS.membershipCards}>
           View card tiers
         </Link>
       }
@@ -276,15 +286,21 @@ function CardsPanel({ today }: { today: string }) {
             title="You are on the Standard tier"
             description="Standard is free and has no package discount. Get a membership card to save on sport packages."
             action={
-              <Link className={buttonClassName('primary', 'md')} to={MEMBERSHIP_CARDS_PATH}>
+              <Link className={buttonClassName('primary', 'md')} to={MEMBER_PATHS.membershipCards}>
                 View card tiers
               </Link>
             }
           />
         ) : (
           <ul className="package-list" aria-label="Membership cards">
-            {sortCards(cards.data, today).map((card) => (
-              <CardItem key={card.id} card={card} today={today} onCancel={() => setCancelling(card)} />
+            {sortCards(cards.data, today).map((card, _index, sorted) => (
+              <CardItem
+                key={card.id}
+                card={card}
+                today={today}
+                canRenew={card.id === renewableCardId(sorted, today)}
+                onCancel={() => setCancelling(card)}
+              />
             ))}
           </ul>
         ))}
@@ -296,13 +312,25 @@ function CardsPanel({ today }: { today: string }) {
             setCancelling(null)
             reload()
           }}
+          onStale={reload}
         />
       )}
     </Card>
   )
 }
 
-function CardItem({ card, today, onCancel }: { card: MemberCard; today: string; onCancel: () => void }) {
+function CardItem({
+  card,
+  today,
+  canRenew,
+  onCancel,
+}: {
+  card: MemberCard
+  today: string
+  /** True only for the latest paid card when nothing paid is in force or queued (renewableCardId). */
+  canRenew: boolean
+  onCancel: () => void
+}) {
   const status = displayStatus(card, today)
   const queued = isQueued(card, today)
   return (
@@ -353,9 +381,9 @@ function CardItem({ card, today, onCancel }: { card: MemberCard; today: string; 
           </Button>
         </div>
       )}
-      {status === 'EXPIRED' && (
+      {canRenew && (
         <div className="package-item__actions">
-          <Link className={buttonClassName('primary', 'sm')} to={MEMBERSHIP_CARDS_PATH}>
+          <Link className={buttonClassName('primary', 'sm')} to={MEMBER_PATHS.membershipCards}>
             Renew card
           </Link>
         </div>
@@ -368,10 +396,13 @@ function CancelCardModal({
   card,
   onClose,
   onCancelled,
+  onStale,
 }: {
   card: MemberCard
   onClose: () => void
   onCancelled: () => void
+  /** Reloads the card list when the backend says the request changed (400) or is gone (404). */
+  onStale: () => void
 }) {
   const toast = useToast()
   const [submitting, setSubmitting] = useState(false)
@@ -393,6 +424,9 @@ function CancelCardModal({
       setError(getErrorMessage(caught))
       sendingRef.current = false
       setSubmitting(false)
+      if (caught instanceof ApiError && (caught.status === 400 || caught.status === 404)) {
+        onStale()
+      }
     }
   }
 

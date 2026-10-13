@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { cardsApi, type CardTier } from '../../api/cardsApi'
-import { getErrorMessage } from '../../api/errors'
+import { ApiError, getErrorMessage } from '../../api/errors'
 import { memberApi, type MemberCard } from '../../api/memberApi'
 import { Badge, Button, Card, EmptyState, ErrorState, Modal, PageHeader, useToast } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
@@ -12,7 +12,6 @@ import {
   isFreeTier,
   isQueued,
   lastPaidCard,
-  MEMBERSHIP_CARD_TAB_PATH,
   pendingCard,
   PLAN_ACTION_LABELS,
   planCard,
@@ -37,18 +36,24 @@ function loadCardsData(signal: AbortSignal): Promise<CardsData> {
   }))
 }
 
+/** The tier the member chose and the plan its button was showing. */
+interface Selection {
+  tier: CardTier
+  plan: CardPlan
+}
+
 /**
  * Membership Cards (Figma F1-11) and the Renew Membership Card overlay.
  * Data: GET /membership-cards/tiers and GET /membership-cards/my. Each paid tier shows the action
- * the backend will apply (new, renew, upgrade or later start) and the overlay shows the computed
- * start date, end date and price before Confirm. Confirm sends POST /membership-cards/purchase,
- * which creates a PENDING_PAYMENT card and its payment; the member continues to the payment
- * summary /member/payments/{paymentId}.
+ * the backend will apply (new, renew, upgrade or later start). The plan is computed once per tier
+ * with one "today" for the whole page and the same plan is handed to the overlay, so the button
+ * and the overlay always agree. Confirm sends POST /membership-cards/purchase, which creates a
+ * PENDING_PAYMENT card and its payment; the member continues to /member/payments/{paymentId}.
  */
 export function MembershipCardsPage() {
   const [data, reload] = useMemberResource(loadCardsData)
   const [today] = useState(() => toIsoDate(new Date()))
-  const [selected, setSelected] = useState<CardTier | null>(null)
+  const [selected, setSelected] = useState<Selection | null>(null)
 
   const header = (
     <PageHeader
@@ -56,39 +61,44 @@ export function MembershipCardsPage() {
       title="Membership Cards"
       description="Enjoy discounts on sport packages with an eligible membership card."
       actions={
-        <Link className={buttonClassName('secondary', 'md')} to={MEMBERSHIP_CARD_TAB_PATH}>
+        <Link className={buttonClassName('secondary', 'md')} to={MEMBER_PATHS.membershipCard}>
           My membership card
         </Link>
       }
     />
   )
 
+  let content: ReactNode
   if (data.status === 'loading') {
-    return (
-      <div className="page">
-        {header}
-        <Spinner label="Loading membership cards" />
-      </div>
-    )
-  }
-  if (data.status === 'error') {
-    return (
-      <div className="page">
-        {header}
-        <ErrorState title="We could not load the membership cards" error={data.error} onRetry={reload} />
-      </div>
-    )
+    content = <Spinner label="Loading membership cards" />
+  } else if (data.status === 'error') {
+    content = <ErrorState title="We could not load the membership cards" error={data.error} onRetry={reload} />
+  } else {
+    content = <TierList data={data.data} today={today} onSelect={setSelected} />
   }
 
-  const { tiers, cards } = data.data
+  // The overlay keeps the same position in the tree whatever the page state, so a reload after a
+  // failed purchase does not unmount it and its error message stays visible.
+  return (
+    <div className="page">
+      {header}
+      <div className="cards-page__content">{content}</div>
+      {selected && (
+        <ConfirmCardModal tier={selected.tier} plan={selected.plan} onClose={() => setSelected(null)} onStale={reload} />
+      )}
+    </div>
+  )
+}
+
+function TierList({ data, today, onSelect }: { data: CardsData; today: string; onSelect: (selection: Selection) => void }) {
+  const { tiers, cards } = data
   const sorted = sortTiers(tiers)
   const current = cardInForce(cards, tiers, today)
   const last = lastPaidCard(cards, tiers, today)
   const pending = pendingCard(cards)
 
   return (
-    <div className="page">
-      {header}
+    <>
       {pending && (
         <div className="notice notice--warning cards-pending" role="status">
           <p>
@@ -101,7 +111,7 @@ export function MembershipCardsPage() {
                 Pay now
               </Link>
             )}
-            <Link className={buttonClassName('secondary', 'sm')} to={MEMBERSHIP_CARD_TAB_PATH}>
+            <Link className={buttonClassName('secondary', 'sm')} to={MEMBER_PATHS.membershipCard}>
               Manage request
             </Link>
           </div>
@@ -111,29 +121,24 @@ export function MembershipCardsPage() {
         <EmptyState title="No membership cards on sale" description="Please check again later or ask the front desk." />
       ) : (
         <ul className="tier-grid" aria-label="Membership card tiers">
-          {sorted.map((tier) => (
-            <TierCard
-              key={tier.id}
-              tier={tier}
-              plan={isFreeTier(tier) ? null : planCard(tier, cards, tiers, today)}
-              isCurrent={current ? current.tierId === tier.id : isFreeTier(tier)}
-              queuedFrom={last && last !== current && last.tierId === tier.id && isQueued(last, today) ? last.startDate : null}
-              isPending={pending?.tierId === tier.id}
-              onSelect={() => setSelected(tier)}
-            />
-          ))}
+          {sorted.map((tier) => {
+            const plan = isFreeTier(tier) ? null : planCard(tier, cards, tiers, today)
+            return (
+              <TierCard
+                key={tier.id}
+                tier={tier}
+                plan={plan}
+                isCurrent={current ? current.tierId === tier.id : isFreeTier(tier)}
+                queuedFrom={last && last !== current && last.tierId === tier.id && isQueued(last, today) ? last.startDate : null}
+                isPending={pending?.tierId === tier.id}
+                onSelect={() => plan && onSelect({ tier, plan })}
+              />
+            )
+          })}
         </ul>
       )}
       <HowCardWorks />
-      {selected && (
-        <ConfirmCardModal
-          tier={selected}
-          cards={cards}
-          tiers={tiers}
-          onClose={() => setSelected(null)}
-        />
-      )}
-    </div>
+    </>
   )
 }
 
@@ -171,7 +176,6 @@ function TierCard({
           <li key={perk}>{perk}</li>
         ))}
       </ul>
-      {tier.description && <p className="tier-card__description">{tier.description}</p>}
       <div className="tier-card__action">
         {free || !plan ? (
           <Link className={buttonClassName('secondary', 'md', true)} to={MEMBER_PATHS.packages}>
@@ -213,44 +217,31 @@ function HowCardWorks() {
           <dt>Your training access</dt>
           <dd>Purchase each sport package separately</dd>
         </div>
-        <div>
-          <dt>Payment</dt>
-          <dd>The card starts after the payment is confirmed</dd>
-        </div>
       </dl>
       <p className="notice notice--info">Card expiry does not cancel a paid sport package that is still valid.</p>
     </Card>
   )
 }
 
-const OVERLAY_EYEBROWS: Record<CardPlan['kind'], string> = {
-  new: 'New card',
-  renew: 'Renew card',
-  upgrade: 'Upgrade card',
-  later: 'New card after current card',
-  blocked: 'Upgrade card',
-  unknown: 'New card',
-}
-
 /**
- * Renew Membership Card overlay (F1-11). The plan is computed again when the overlay opens, so a
- * page left open past midnight still shows today's dates. The backend stays the authority: any
- * error it returns (for example a request already waiting for payment) is shown as is.
+ * Renew Membership Card overlay (F1-11). It shows the plan the tier button was computed with, so
+ * the eyebrow, the dates and the price always match the button. The backend stays the authority:
+ * its error message is shown as is (AC2), and a 400 also reloads the page data so the notice of
+ * a request already waiting for payment appears behind the overlay.
  */
 function ConfirmCardModal({
   tier,
-  cards,
-  tiers,
+  plan,
   onClose,
+  onStale,
 }: {
   tier: CardTier
-  cards: MemberCard[]
-  tiers: CardTier[]
+  plan: CardPlan
   onClose: () => void
+  onStale: () => void
 }) {
   const navigate = useNavigate()
   const toast = useToast()
-  const [plan] = useState(() => planCard(tier, cards, tiers, toIsoDate(new Date())))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const sendingRef = useRef(false)
@@ -269,12 +260,15 @@ function ConfirmCardModal({
         navigate(paymentSummaryPath(created.paymentId))
       } else {
         toast.success('Card request created', `${created.tierName} - ${created.cardCode}`)
-        navigate(MEMBERSHIP_CARD_TAB_PATH)
+        navigate(MEMBER_PATHS.membershipCard)
       }
     } catch (caught) {
       setError(getErrorMessage(caught))
       sendingRef.current = false
       setSubmitting(false)
+      if (caught instanceof ApiError && caught.status === 400) {
+        onStale()
+      }
     }
   }
 
@@ -285,18 +279,20 @@ function ConfirmCardModal({
       dismissible={!submitting}
       title={
         <>
-          <span className="eyebrow modal-eyebrow">{OVERLAY_EYEBROWS[plan.kind]}</span>
-          {tier.name} membership
+          <span className="eyebrow modal-eyebrow" data-testid="card-eyebrow">
+            {PLAN_ACTION_LABELS[plan.kind]}
+          </span>
+          {tier.name} card
         </>
       }
       description="Your sport packages are purchased separately."
       footer={
         <>
-          <Button variant="secondary" onClick={onClose} disabled={submitting}>
-            Cancel
-          </Button>
           <Button onClick={confirm} loading={submitting} disabled={plan.kind === 'blocked'}>
             Confirm and continue
+          </Button>
+          <Button variant="secondary" onClick={onClose} disabled={submitting}>
+            Cancel
           </Button>
         </>
       }

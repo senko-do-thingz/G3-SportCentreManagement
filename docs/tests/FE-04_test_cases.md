@@ -38,16 +38,16 @@ npm run lint
 npm run build
 ```
 
-### 1.3 Result summary (2026-10-13)
+### 1.3 Result summary (2026-10-13, after review round 1)
 | Group | Cases | Result |
 |---|---|---|
-| Automated, rules (`src/pages/member/cardsModel.test.ts`) | 19 | 19 PASSED |
-| Automated, screens (`src/pages/member/membershipCards.test.tsx`) | 21 | 21 PASSED |
+| Automated, rules (`src/pages/member/cardsModel.test.ts`) | 21 (2 new in round 1) | 21 PASSED |
+| Automated, screens (`src/pages/member/membershipCards.test.tsx`) | 33 (12 new in round 1; TC-FE04-057 changed; tier names updated in 030 to 039) | 33 PASSED |
 | Automated, all other files (FE-00 to FE-03) | 298 (1 FE-02 assertion updated for the card tab link) | 298 PASSED |
 | Lint, `tsc -b`, build | 3 | 3 PASSED |
 | Manual E2E against the real backend (section 4) | 10 | Not run (for the demo) |
 
-Today is fixed at 2026-10-13 in the automated tests. Seed tiers: Standard (free), Gold 300.000 VND 5%, VIP 600.000 VND 10%, 12 months.
+Today is fixed at 2026-10-13 in the automated tests. Tier fixtures use the exact V10 seed values: Standard (free, no expiry), Gold Member 300.000 VND 5%, VIP Member 600.000 VND 10%, both 12 months, with the seed descriptions. The plan preview matches the backend only when the browser runs in UTC+7 (backend clock Asia/Ho_Chi_Minh).
 
 ## 2. Automated - rules (cardsModel.test.ts)
 | ID | Case | Expected |
@@ -71,6 +71,8 @@ Today is fixed at 2026-10-13 in the automated tests. Seed tiers: Standard (free)
 | TC-FE04-017 | displayStatus | ACTIVE past end date -> EXPIRED; ending today stays ACTIVE |
 | TC-FE04-018 | Sort order | pending, active, expired, replaced, cancelled; newest first |
 | TC-FE04-019 | termDays, tab param | 2 Oct to 31 Oct = 30 days; unknown tab -> packages |
+| TC-FE04-020 | renewableCardId (new, round 1) | Latest ended ACTIVE or EXPIRED card only; null while a card is in force or queued; never REPLACED, CANCELLED or PENDING_PAYMENT |
+| TC-FE04-021 | Unknown plan label (new, round 1) | "Choose card" |
 
 ## 3. Automated - screens (membershipCards.test.tsx)
 | ID | AC | Case | Expected |
@@ -93,9 +95,25 @@ Today is fixed at 2026-10-13 in the automated tests. Seed tiers: Standard (free)
 | TC-FE04-054 | - | `?tab=card` with a VIP card | Card tab selected; Active, validity; no Cancel request; View card tiers link |
 | TC-FE04-055 | - | Switch tabs by click and arrow key | Panel and focus follow |
 | TC-FE04-056 | AC3 | Cancel a pending request | Confirm dialog; PUT `/membership-cards/9/cancel`; list reloads, row Cancelled, no Cancel button |
-| TC-FE04-057 | AC3 | Active, cancelled, replaced, expired cards | No Cancel request button; expired card offers Renew card |
+| TC-FE04-057 | AC3 | Active VIP card with cancelled, replaced and an old expired card (changed in round 1) | No Cancel request button; the old expired card has no Renew card because VIP is in force |
 | TC-FE04-058 | AC3 | Backend rejects the cancel (400) | Message shown in the dialog |
 | TC-FE04-059 | - | Menu | My Membership is the active item on the cards page |
+
+### 3.1 Review round 1 (new)
+| ID | Review item | Case | Expected |
+|---|---|---|---|
+| TC-FE04-060 | 1 | Overlay title with the seed names | "VIP Member card", never "Member membership" |
+| TC-FE04-061 | 2 | Tier cards | Seed description is not shown |
+| TC-FE04-062 | 9 | How your card works | No Payment row |
+| TC-FE04-063 | 3 | Two expired, one replaced, one cancelled card, nothing in force | Only the latest expired card (CARD-0006) has Renew card |
+| TC-FE04-064 | 3 | One ACTIVE card past its end date | Shown Expired, has Renew card |
+| TC-FE04-065 | 4 | Cancel fails with 400 (request activated meanwhile) | Message stays in the dialog; GET /membership-cards/my called twice; fresh row Active without Cancel |
+| TC-FE04-066 | 4 | Cancel fails with 404 | Message shown; list reloaded |
+| TC-FE04-067 | 4, AC2 | Purchase fails with 400 (request made in another tab) | Backend message stays in the overlay; data reloads; pending notice appears behind it |
+| TC-FE04-068 | 5 | VIP member opens Renew card and Buy after current card | Overlay eyebrow equals the button label each time |
+| TC-FE04-069 | 6 | Card in force has a tier that is not on sale | Button and eyebrow "Choose card"; amount "Calculated when you confirm" |
+| TC-FE04-070 | 8 | Overlay footer | "Confirm and continue" before "Cancel" |
+| TC-FE04-071 | 10 | Tabs | Both tabpanels exist, the inactive one is hidden; every aria-controls resolves |
 
 ## 4. Manual E2E against the real backend (for the demo)
 Precondition: backend running with the seed data, member account signed in, browser at `/member/membership/cards`.
@@ -103,7 +121,7 @@ Precondition: backend running with the seed data, member account signed in, brow
 | ID | AC | Steps | Expected |
 |---|---|---|---|
 | TC-FE04-M01 | - | New member opens Membership Cards | Standard is Current; Gold and VIP show Get card |
-| TC-FE04-M02 | AC1 | Gold -> Get card | Overlay: 300.000 VND, today to today + 12 months - 1 day |
+| TC-FE04-M02 | AC1 | Gold Member -> Get card | Overlay title "Gold Member card": 300.000 VND, today to today + 12 months - 1 day |
 | TC-FE04-M03 | - | Confirm | Payment Summary of the new payment (PENDING, 300.000 VND) |
 | TC-FE04-M04 | AC2 | Back to Membership Cards, VIP -> Get card -> Confirm | Pending notice at the top; overlay shows "A membership card request is already waiting for payment: CARD-.... Pay or cancel it first." |
 | TC-FE04-M05 | AC3 | My Membership -> Membership card tab -> Cancel request -> Cancel request | Row becomes Cancelled; the payment becomes FAILED in the backend |

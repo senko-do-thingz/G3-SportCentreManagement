@@ -488,6 +488,12 @@
 
 /* Membership Cards (F1-11) */
 
+.cards-page__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
 .cards-pending {
   display: flex;
   flex-wrap: wrap;
