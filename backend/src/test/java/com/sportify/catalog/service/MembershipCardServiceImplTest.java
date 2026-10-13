@@ -37,7 +37,13 @@ import java.util.Optional;
 import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.entity.PaymentStatus;
+import com.sportify.catalog.dto.MembershipCardTierUpdateRequest;
+import com.sportify.core.audit.AuditAction;
+import com.sportify.core.audit.AuditEvent;
+import com.sportify.core.audit.AuditService;
 import com.sportify.payment.service.PaymentService;
+import org.mockito.ArgumentCaptor;
+import org.springframework.data.domain.Sort;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -47,6 +53,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -65,6 +72,8 @@ public class MembershipCardServiceImplTest {
     private PaymentService paymentService;
     @Mock
     private CodeFormatter codeFormatter;
+    @Mock
+    private AuditService auditService;
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-10-06T00:00:00Z"), ZoneId.of("UTC"));
 
@@ -699,6 +708,351 @@ public class MembershipCardServiceImplTest {
 
         assertThrows(BusinessRuleException.class,
                 () -> membershipCardService.activateCard(42L, receptionistUser, PaymentMethod.CASH));
+    }
+
+    @Test
+    void updateTier_success_recordsAuditLog() {
+        MembershipCardTier tier = MembershipCardTier.builder()
+                .id(2L)
+                .code("GOLD")
+                .name("Gold Member")
+                .price(BigDecimal.valueOf(300000.00))
+                .durationMonths(12)
+                .discountPercentage(5)
+                .description("Gold tier")
+                .isActive(true)
+                .build();
+
+        when(tierRepository.findById(2L)).thenReturn(Optional.of(tier));
+        when(tierRepository.saveAndFlush(any(MembershipCardTier.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
+                .name("Gold Member Special")
+                .price(BigDecimal.valueOf(350000.00))
+                .durationMonths(12)
+                .discountPercentage(8)
+                .description("Updated Gold benefits")
+                .active(true)
+                .build();
+
+        UserAccount manager = UserAccount.builder().id(99L).email("mgr@sportify.com").fullName("Manager").build();
+        CardTierResponse res = membershipCardService.updateTier(2L, req, manager);
+
+        assertNotNull(res);
+        assertEquals("Gold Member Special", res.getName());
+        assertEquals(BigDecimal.valueOf(350000.00), res.getPrice());
+        assertEquals(8, res.getDiscountPercentage());
+
+        ArgumentCaptor<AuditEvent> eventCaptor = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService).record(eventCaptor.capture());
+        AuditEvent event = eventCaptor.getValue();
+        assertEquals(AuditAction.CARD_TIER_UPDATED, event.getAction());
+        assertEquals("MEMBERSHIP_CARD_TIER", event.getEntityType());
+        assertEquals(2L, event.getEntityId());
+        assertEquals("GOLD", event.getEntityCode());
+        assertEquals(manager, event.getActor());
+        assertNotNull(event.getDetails());
+        assertTrue(event.getDetails().containsKey("before"));
+        assertTrue(event.getDetails().containsKey("after"));
+    }
+
+    @Test
+    void updateTier_invalidDiscountPercentage_throwsBusinessRuleException() {
+        MembershipCardTier tier = MembershipCardTier.builder()
+                .id(2L)
+                .code("GOLD")
+                .name("Gold Member")
+                .price(BigDecimal.valueOf(300000.00))
+                .durationMonths(12)
+                .discountPercentage(5)
+                .isActive(true)
+                .build();
+
+        when(tierRepository.findById(2L)).thenReturn(Optional.of(tier));
+
+        MembershipCardTierUpdateRequest req150 = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.valueOf(350000.00))
+                .durationMonths(12)
+                .discountPercentage(150)
+                .active(true)
+                .build();
+
+        assertThrows(BusinessRuleException.class, () -> membershipCardService.updateTier(2L, req150, null));
+
+        MembershipCardTierUpdateRequest reqNeg = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.valueOf(350000.00))
+                .durationMonths(12)
+                .discountPercentage(-5)
+                .active(true)
+                .build();
+
+        assertThrows(BusinessRuleException.class, () -> membershipCardService.updateTier(2L, reqNeg, null));
+        verify(tierRepository, never()).saveAndFlush(any());
+        verify(auditService, never()).record(any());
+    }
+
+    @Test
+    void updateTier_paidTierZeroOrNegativePrice_throwsBusinessRuleException() {
+        MembershipCardTier tier = MembershipCardTier.builder()
+                .id(2L)
+                .code("GOLD")
+                .name("Gold Member")
+                .price(BigDecimal.valueOf(300000.00))
+                .durationMonths(12)
+                .discountPercentage(5)
+                .isActive(true)
+                .build();
+
+        when(tierRepository.findById(2L)).thenReturn(Optional.of(tier));
+
+        MembershipCardTierUpdateRequest zeroReq = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.ZERO)
+                .durationMonths(12)
+                .discountPercentage(5)
+                .active(true)
+                .build();
+
+        assertThrows(BusinessRuleException.class, () -> membershipCardService.updateTier(2L, zeroReq, null));
+
+        MembershipCardTierUpdateRequest negReq = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.valueOf(-1000))
+                .durationMonths(12)
+                .discountPercentage(5)
+                .active(true)
+                .build();
+
+        assertThrows(BusinessRuleException.class, () -> membershipCardService.updateTier(2L, negReq, null));
+    }
+
+    @Test
+    void updateTier_standardTierPriceChangeAttempt_throwsBusinessRuleException() {
+        MembershipCardTier standard = MembershipCardTier.builder()
+                .id(1L)
+                .code("STANDARD")
+                .name("Standard")
+                .price(BigDecimal.ZERO)
+                .durationMonths(0)
+                .discountPercentage(0)
+                .isActive(true)
+                .build();
+
+        when(tierRepository.findById(1L)).thenReturn(Optional.of(standard));
+
+        MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.valueOf(100000.00))
+                .durationMonths(0)
+                .discountPercentage(0)
+                .active(true)
+                .build();
+
+        assertThrows(BusinessRuleException.class, () -> membershipCardService.updateTier(1L, req, null));
+        verify(tierRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateTier_standardTierDeactivationAttempt_throwsBusinessRuleException() {
+        MembershipCardTier standard = MembershipCardTier.builder()
+                .id(1L)
+                .code("STANDARD")
+                .name("Standard")
+                .price(BigDecimal.ZERO)
+                .durationMonths(0)
+                .discountPercentage(0)
+                .isActive(true)
+                .build();
+
+        when(tierRepository.findById(1L)).thenReturn(Optional.of(standard));
+
+        MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.ZERO)
+                .durationMonths(0)
+                .discountPercentage(0)
+                .active(false)
+                .build();
+
+        assertThrows(BusinessRuleException.class, () -> membershipCardService.updateTier(1L, req, null));
+        verify(tierRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateTier_standardTierNonZeroDiscount_throwsBusinessRuleException() {
+        MembershipCardTier standard = MembershipCardTier.builder()
+                .id(1L)
+                .code("STANDARD")
+                .name("Standard")
+                .price(BigDecimal.ZERO)
+                .durationMonths(0)
+                .discountPercentage(0)
+                .isActive(true)
+                .build();
+
+        when(tierRepository.findById(1L)).thenReturn(Optional.of(standard));
+
+        MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.ZERO)
+                .durationMonths(0)
+                .discountPercentage(10)
+                .active(true)
+                .build();
+
+        assertThrows(BusinessRuleException.class, () -> membershipCardService.updateTier(1L, req, null));
+        verify(tierRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateTier_standardTierValidUpdate_succeeds() {
+        MembershipCardTier standard = MembershipCardTier.builder()
+                .id(1L)
+                .code("STANDARD")
+                .name("Standard")
+                .price(BigDecimal.ZERO)
+                .durationMonths(0)
+                .discountPercentage(0)
+                .description("Old standard description")
+                .isActive(true)
+                .build();
+
+        when(tierRepository.findById(1L)).thenReturn(Optional.of(standard));
+        when(tierRepository.saveAndFlush(any(MembershipCardTier.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
+                .name("Standard Tier")
+                .price(BigDecimal.ZERO)
+                .durationMonths(0)
+                .discountPercentage(0)
+                .description("Updated free standard membership card description")
+                .active(true)
+                .build();
+
+        CardTierResponse res = membershipCardService.updateTier(1L, req, null);
+        assertNotNull(res);
+        assertEquals("Standard Tier", res.getName());
+        assertEquals(BigDecimal.ZERO, res.getPrice());
+        assertEquals(0, res.getDiscountPercentage());
+        assertEquals(true, res.getIsActive());
+    }
+
+    @Test
+    void updateTier_unknownId_throwsResourceNotFoundException() {
+        when(tierRepository.findById(999L)).thenReturn(Optional.empty());
+
+        MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.valueOf(300000.00))
+                .durationMonths(12)
+                .discountPercentage(5)
+                .active(true)
+                .build();
+
+        assertThrows(ResourceNotFoundException.class, () -> membershipCardService.updateTier(999L, req, null));
+    }
+
+    @Test
+    void updateTier_existingCardsRetainSnapshotPrice() {
+        MembershipCardTier tier = MembershipCardTier.builder()
+                .id(2L)
+                .code("GOLD")
+                .name("Gold Member")
+                .price(BigDecimal.valueOf(300000.00))
+                .durationMonths(12)
+                .discountPercentage(5)
+                .isActive(true)
+                .build();
+
+        MemberCard existingCard = MemberCard.builder()
+                .id(100L)
+                .cardCode("CARD-0100")
+                .member(memberProfile)
+                .tier(tier)
+                .pricePaid(BigDecimal.valueOf(300000.00))
+                .status(CardStatus.ACTIVE)
+                .build();
+
+        when(tierRepository.findById(2L)).thenReturn(Optional.of(tier));
+        when(tierRepository.saveAndFlush(any(MembershipCardTier.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Manager updates tier price from 300,000 to 450,000
+        MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.valueOf(450000.00))
+                .durationMonths(12)
+                .discountPercentage(8)
+                .active(true)
+                .build();
+
+        membershipCardService.updateTier(2L, req, null);
+
+        // Verify tier price is updated
+        assertEquals(BigDecimal.valueOf(450000.00), tier.getPrice());
+
+        // Verify the existing card retains its original snapshot price paid
+        assertEquals(BigDecimal.valueOf(300000.00), existingCard.getPricePaid());
+        verify(memberCardRepository, never()).save(any());
+        verify(memberCardRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void memberImmediatelySeesNewTierPrice() {
+        MembershipCardTier tier = MembershipCardTier.builder()
+                .id(2L)
+                .code("GOLD")
+                .name("Gold Member")
+                .price(BigDecimal.valueOf(300000.00))
+                .durationMonths(12)
+                .discountPercentage(5)
+                .isActive(true)
+                .build();
+
+        when(tierRepository.findById(2L)).thenReturn(Optional.of(tier));
+        when(tierRepository.saveAndFlush(any(MembershipCardTier.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Manager updates tier price
+        MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.valueOf(400000.00))
+                .durationMonths(12)
+                .discountPercentage(5)
+                .active(true)
+                .build();
+
+        membershipCardService.updateTier(2L, req, null);
+
+        // Public active tiers immediately reflect the new price
+        when(tierRepository.findByIsActiveTrue()).thenReturn(List.of(tier));
+
+        List<CardTierResponse> activeTiers = membershipCardService.getAllActiveTiers();
+        assertEquals(1, activeTiers.size());
+        assertEquals(BigDecimal.valueOf(400000.00), activeTiers.get(0).getPrice());
+    }
+
+    @Test
+    void getAllTiersForManager_returnsAllTiersIncludingInactive() {
+        MembershipCardTier activeTier = MembershipCardTier.builder()
+                .id(1L)
+                .code("STANDARD")
+                .name("Standard")
+                .price(BigDecimal.ZERO)
+                .durationMonths(0)
+                .discountPercentage(0)
+                .isActive(true)
+                .build();
+
+        MembershipCardTier inactiveTier = MembershipCardTier.builder()
+                .id(4L)
+                .code("PLATINUM")
+                .name("Platinum")
+                .price(BigDecimal.valueOf(1000000.00))
+                .durationMonths(12)
+                .discountPercentage(15)
+                .isActive(false)
+                .build();
+
+        when(tierRepository.findAll(any(Sort.class)))
+                .thenReturn(List.of(activeTier, inactiveTier));
+
+        List<CardTierResponse> result = membershipCardService.getAllTiersForManager();
+        assertEquals(2, result.size());
+        assertEquals("STANDARD", result.get(0).getCode());
+        assertEquals(true, result.get(0).getIsActive());
+        assertEquals("PLATINUM", result.get(1).getCode());
+        assertEquals(false, result.get(1).getIsActive());
     }
 }
 
