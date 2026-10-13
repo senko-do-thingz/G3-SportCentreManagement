@@ -106,6 +106,9 @@ public class PaymentServiceImpl implements PaymentService {
         payment.setPaymentTime(now);
 
         if (confirmedBy != null) {
+            if (!SecurityUtils.isStaff(confirmedBy)) {
+                throw new BusinessRuleException("Only staff users can confirm payment");
+            }
             payment.setConfirmedByUser(confirmedBy);
             String staffNote = "Confirmed by user id " + confirmedBy.getId();
             payment.setNotes(appendNote(payment.getNotes(), staffNote));

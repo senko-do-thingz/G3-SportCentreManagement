@@ -252,6 +252,29 @@ class PaymentServiceImplTest {
     }
 
     @Test
+    @DisplayName("Mark payment success with non-staff confirmedBy throws BusinessRuleException")
+    void markPaymentSuccess_WithNonStaffConfirmedBy_ThrowsBusinessRuleException() {
+        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+
+        assertThatThrownBy(() -> paymentService.markPaymentSuccess(10L, ownerUser))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("Only staff users can confirm payment");
+    }
+
+    @Test
+    @DisplayName("Mark payment success with null confirmedBy succeeds and leaves confirmedByUser null")
+    void markPaymentSuccess_WithNullConfirmedBy_SucceedsWithoutStaffNote() {
+        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Payment success = paymentService.markPaymentSuccess(10L, null);
+
+        assertThat(success.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(success.getConfirmedByUser()).isNull();
+        assertThat(success.getNotes()).isEqualTo("Existing payment notes");
+    }
+
+    @Test
     @DisplayName("Mark payment failed with null id throws BusinessRuleException")
     void markPaymentFailed_NullPaymentId_ThrowsBusinessRuleException() {
         assertThrows(BusinessRuleException.class, () -> paymentService.markPaymentFailed(null, "some reason"));
