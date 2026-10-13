@@ -182,7 +182,8 @@ Before enabling automated deployments, target servers (staging and production) m
      ```
    - Copy `deploy/compose.yaml` from the repository to `/opt/sportify/docker-compose.yml`.
    - Copy `deploy/.env.example` to `/opt/sportify/.env` and edit it to set database credentials, JWT secret, CORS origins, and bank transfer details.
-   - **Fail-Fast Placeholders**: Placeholders in `.env.example` use `<REPLACE_...>` formats containing angle brackets (`<` and `>`), which are illegal in standard Base64 decoding and unaccepted passwords, guaranteeing that the application fails fast if deployed without editing.
+   - **Fail-Fast Placeholders & JWT Validation**: Placeholders in `.env.example` use `<REPLACE_...>` formats. `JwtService` executes eager startup validation via `@PostConstruct` across all Spring profiles. If `JWT_SECRET` is blank, empty, contains invalid Base64 characters, or decodes to fewer than 32 bytes (256 bits), the application throws `IllegalStateException: JWT_SECRET must be a valid Base64 string that decodes to at least 32 bytes` and aborts startup immediately.
+   - **Local Developer Action**: Developers running locally must ensure their `.env` or IDE environment variables supply a valid 32-byte Base64-encoded secret (e.g. generated via `openssl rand -base64 32`) if overriding the default `application-dev.yml` key.
    - **Database Credential Model**:
      - When using the `with-db` profile (`COMPOSE_PROFILES=with-db`), SQL Server runs inside Docker on the host and the backend connects as the superuser `sa`. This is an accepted trade-off for single-host or small staging environments. Do not treat this as a hardened multi-tenant setup.
      - When using an external SQL Server, a dedicated least-privilege database user (e.g., `sportify_user`) is recommended.

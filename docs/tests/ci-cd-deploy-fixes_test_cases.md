@@ -183,9 +183,9 @@
 - **Steps**:
   1. Boot backend container against valid database with unedited `JWT_SECRET='<REPLACE_WITH_BASE64_SECRET_MIN_32_BYTES>'` placeholder from `deploy/.env.example`.
   2. Capture startup logs and assert container termination.
-  3. Grep container logs for JWT decoding exception.
-- **Expected Result**: Backend aborts startup immediately during Spring bean initialization (`JwtService.validateSecretKey` via `@PostConstruct`), exiting with non-zero code and logging `io.jsonwebtoken.io.DecodingException: Illegal base64 character: 3c`.
-- **Actual Result**: Executed in `.github/workflows/compose-smoke-test.yml` step `Assert unedited JWT_SECRET placeholder causes backend startup failure`. Container exited with code 1, and logs confirmed expected JWT decoding error.
+  3. Grep container logs for application-owned `IllegalStateException` message.
+- **Expected Result**: Backend aborts startup immediately during Spring bean initialization (`JwtService.validateSecretKey` via `@PostConstruct`), exiting with non-zero code and logging `java.lang.IllegalStateException: JWT_SECRET must be a valid Base64 string that decodes to at least 32 bytes` (wrapping original cause `io.jsonwebtoken.io.DecodingException: Illegal base64 character: 3c`).
+- **Actual Result**: Executed in `.github/workflows/compose-smoke-test.yml` step `Assert unedited JWT_SECRET placeholder causes backend startup failure`. Container exited with code 1, and logs confirmed expected error message `JWT_SECRET must be a valid Base64 string that decodes to at least 32 bytes`.
 - **Status**: PASSED (CI)
 
 ### TC-DEPLOY-13: Automated Rollback via .current_tag Mechanism
@@ -207,7 +207,14 @@
 
 As required by project deployment safeguards, `cd.yml` is **NOT RUN** automatically during pull request checks. Instead, `TC-DEPLOY-01` and `TC-DEPLOY-02` must be verified by the reviewer via manual `workflow_dispatch` run of `cd.yml` (with `DEPLOY_ENABLED` unset) before or right after merge.
 
-Because repository variable `DEPLOY_ENABLED` is unset, the deployment jobs (`deploy-staging` and `deploy-production`) are skipped cleanly, executing only CI checks and the `build-image` job (including image name lowering, metadata tag generation, container image building, and Trivy security scanning).
+Because repository variable `DEPLOY_ENABLED` is unset, the deployment jobs (`deploy-staging` and `deploy-production`) are skipped cleanly, executing only CI checks and the `build-image` job (including image name lowering, metadata tag generation, container image building, pushing a sha-tagged image to GHCR, and Trivy security scanning).
+
+### Important Note on Trivy Scan and GHCR Push
+- A manual `workflow_dispatch` run builds and pushes a sha-tagged image (`ghcr.io/senko-do-thingz/g3-sportcentremanagement/backend:sha-<short-sha>`) to GitHub Packages (GHCR).
+- The subsequent `Scan image` step (`aquasecurity/trivy-action`) scans the published image with `severity: CRITICAL,HIGH` and `exit-code: 1`. It is possible for the Trivy step to fail due to pre-existing or newly discovered CVE vulnerabilities in upstream base images or operating system packages that are entirely unrelated to the CI/CD pipeline changes in this PR.
+- **How to differentiate in the logs**:
+  - **Pipeline / Case Bug (PR-related failure)**: The job fails early in step `Resolve lowercase image name`, step `Extract Docker metadata`, or step `Build and push image` (e.g. HTTP 400 Bad Request or invalid name syntax when pushing mixed-case image names to GHCR).
+  - **Upstream Vulnerability (Unrelated CVE)**: Step `Resolve lowercase image name` (proves TC-DEPLOY-01), `Extract Docker metadata` (proves TC-DEPLOY-02), and `Build and push image` ALL SUCCEED, and the image is successfully published to GHCR. The failure occurs strictly in step `Scan image`, where Trivy prints a table listing CVE IDs (e.g., `CVE-202X-XXXX`), package names, installed versions, and severity `CRITICAL` or `HIGH`. This confirms the CD workflow logic worked as intended.
 
 ### Option 1: Trigger via GitHub Web UI
 1. Navigate to: `https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/workflows/cd.yml`.
