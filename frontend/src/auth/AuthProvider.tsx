@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { authApi } from '../api/authApi'
 import { onSessionExpired } from '../api/client'
 import { ApiError } from '../api/errors'
@@ -55,7 +55,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const shownUser = useRef<UserProfile | null>(null)
   const switchCounter = useRef(0)
 
-  useEffect(() => {
+  // A layout effect runs in the same commit as the render that shows the user. A passive effect
+  // could run later, and a storage event from another tab in between read null here, so a login
+  // as another account was not seen as a switch and the tab stayed on the 403 page.
+  useLayoutEffect(() => {
     shownUser.current = state.status === 'authenticated' ? state.user : null
   }, [state])
 

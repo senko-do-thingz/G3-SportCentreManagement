@@ -19,6 +19,9 @@ Branch `feat/f3-member-payments`, rebased on main after PR #41 (FE-05, merge 6e8
 - `src/api/paymentsApi.ts`: `updateMethod`, `myPayments`, `invoice`, `Invoice` and `InvoiceLine` types, status and method lists, optional `invoiceId` and `invoiceNumber` on `Payment`.
 - The bank transfer details moved from the summary to the status screen (Figma F3-01 and F3-02); TC-FE03-036 updated.
 
+### CI fix
+- `AuthProvider` keeps the shown user in a layout effect instead of a passive effect. A storage event from another tab that arrived between the render and the passive effect read no user, so a login as another account was not treated as a switch and the tab stayed on the 403 page. This made the account switch tests in `auth.flow.test.tsx` and `authScreens.test.tsx` fail on a busy CI runner (PR #42, job "Frontend checks and build"). Full suite: 7 of 7 clean runs after the fix, about 1 in 3 runs failed before.
+
 ### Review round 1
 - Rebased on main after PR #41 (FE-05): kept both style imports (`payments.css`, `reception.css`), both route sets and both route doc comments.
 - Print rules scoped to the member receipt page (named page `receipt`, hide rules under `.member-layout:has(.receipt-page)`); reception styles untouched.
