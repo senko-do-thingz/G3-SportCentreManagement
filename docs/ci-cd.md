@@ -180,7 +180,11 @@ Before enabling automated deployments, target servers (staging and production) m
      sudo mkdir -p /opt/sportify && sudo chown -R deploy:deploy /opt/sportify
      ```
    - Copy `deploy/compose.yaml` from the repository to `/opt/sportify/docker-compose.yml`.
-   - Copy `deploy/.env.example` to `/opt/sportify/.env` and edit it to set production-grade database credentials, JWT secret, CORS origins, and bank transfer details.
+   - Copy `deploy/.env.example` to `/opt/sportify/.env` and edit it to set database credentials, JWT secret, CORS origins, and bank transfer details.
+   - **Database Credential Model**:
+     - When using the `with-db` profile (`COMPOSE_PROFILES=with-db`), SQL Server runs inside Docker on the host and the backend connects as the superuser `sa`. This is an accepted trade-off for single-host or small staging environments. Do not treat this as a hardened multi-tenant setup.
+     - When using an external SQL Server, a dedicated least-privilege database user (e.g., `sportify_user`) is recommended.
+   - **Internal Database Port**: Port 1433 is internal to the compose network and is not published on host interfaces. If host access is required for administrative maintenance, operators should bind to `127.0.0.1:1433:1433` only.
 
 7. **Default SSH Port 22 Requirement**:
    - The deployment composite action executes SSH commands using default port 22 (the action does not pass custom `-p` port flags). Ensure firewall rules and SSH daemon allow incoming traffic on port 22 from GitHub Actions runner IP ranges or bastion proxies.
