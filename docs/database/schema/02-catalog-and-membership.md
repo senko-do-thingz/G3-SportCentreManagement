@@ -154,7 +154,7 @@ Check constraints:
 | 8 | is_active | BIT | No | 1 | - | V10 | - |
 | 9 | created_at | DATETIME2(0) | No | SYSDATETIME() | - | V10 | - |
 | 10 | updated_at | DATETIME2(0) | Yes | - | - | V10 | - |
-| 11 | tier_rank | INT | No | 0 | - | V22 | Explicit hierarchy rank (STANDARD=0, GOLD=1, VIP=2) |
+| 11 | tier_rank | INT | No | 0 | - | V22 | Explicit hierarchy rank (STANDARD=1, SILVER=2, GOLD=3, VIP=4) |
 
 Unique constraints:
 

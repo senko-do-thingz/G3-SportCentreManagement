@@ -85,7 +85,7 @@ Defines the membership card discount tiers (Standard, Gold, VIP).
 | discount_percentage | INT | No | CHECK >= 0 | 0% for Standard, 5% for Gold, 10% for VIP |
 | description | NVARCHAR(500) | Yes | | Tier benefits description |
 | is_active | BIT | No | 1 | |
-| tier_rank | INT | No | 0 | Explicit hierarchy rank (STANDARD=0, GOLD=1, VIP=2) (V22) |
+| tier_rank | INT | No | 0 | Explicit hierarchy rank (STANDARD=1, SILVER=2, GOLD=3, VIP=4) (V22) |
 | created_at, updated_at | DATETIME2(0) | | | Audit |
 
 ### `member_card`

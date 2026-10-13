@@ -71,18 +71,7 @@ BEGIN
 END;
 GO
 
-IF NOT EXISTS (
-    SELECT 1 FROM sys.columns c
-    JOIN sys.tables t ON t.object_id = c.object_id
-    WHERE t.name = 'membership_card_tier' AND c.name = 'rank'
-)
-BEGIN
-    ALTER TABLE [membership_card_tier]
-    ADD [rank] AS [tier_rank];
-END;
-GO
-
--- Seed tier_rank for existing known tiers if 0
+-- Seed tier_rank for existing known tiers if 0 (STANDARD=1, SILVER=2, GOLD=3, VIP=4)
 UPDATE [membership_card_tier] SET [tier_rank] = 1 WHERE [code] = 'STANDARD' AND [tier_rank] = 0;
 UPDATE [membership_card_tier] SET [tier_rank] = 2 WHERE [code] = 'SILVER' AND [tier_rank] = 0;
 UPDATE [membership_card_tier] SET [tier_rank] = 3 WHERE [code] = 'GOLD' AND [tier_rank] = 0;
@@ -92,7 +81,8 @@ GO
 -- Step 4: Backfill legacy upgrade markers and deterministic replaces_card_id links
 -- Execute dynamically to prevent compile-time column resolution errors in SQL Server
 EXEC sp_executesql N'
-    -- 4a. Mark legacy upgrade cards where price_paid was an upgrade difference
+    -- 4a. Best-effort heuristic: mark legacy upgrade cards where price_paid was an upgrade difference (< tier.price).
+    -- Rows where replaces_card_id cannot be deterministically resolved remain NULL and fail closed on subsequent upgrade.
     UPDATE mc
     SET mc.[upgrade_request] = 1
     FROM [member_card] mc
@@ -146,8 +136,8 @@ EXEC sp_executesql N'
         WHERE mc.[status] = ''PENDING_PAYMENT''
           AND mc.[upgrade_request] = 1
           AND mc.[replaces_card_id] IS NULL
-          AND (ac.[start_date] IS NULL OR ac.[start_date] <= CAST(GETDATE() AS DATE))
-          AND (ac.[end_date] IS NULL OR ac.[end_date] >= CAST(GETDATE() AS DATE))
+          AND (ac.[start_date] IS NULL OR ac.[start_date] <= mc.[start_date])
+          AND (ac.[end_date] IS NULL OR ac.[end_date] >= mc.[start_date])
         GROUP BY mc.[id]
         HAVING COUNT(ac.[id]) = 1
     )
@@ -158,7 +148,27 @@ EXEC sp_executesql N'
 ';
 GO
 
--- Step 5: Add unique filtered index on replaces_card_id for in-force cards
+-- Step 5: Clean up / fail-safe pre-check: ensure no duplicate replaces_card_id exist on in-force cards before index creation
+IF EXISTS (
+    SELECT replaces_card_id
+    FROM [member_card]
+    WHERE [status] IN ('ACTIVE', 'PENDING_PAYMENT') AND [replaces_card_id] IS NOT NULL
+    GROUP BY [replaces_card_id]
+    HAVING COUNT(*) > 1
+)
+BEGIN
+    WITH DuplicateInForce AS (
+        SELECT [id], ROW_NUMBER() OVER (PARTITION BY [replaces_card_id] ORDER BY [id] DESC) AS rn
+        FROM [member_card]
+        WHERE [status] IN ('ACTIVE', 'PENDING_PAYMENT') AND [replaces_card_id] IS NOT NULL
+    )
+    UPDATE [member_card]
+    SET [replaces_card_id] = NULL
+    WHERE [id] IN (SELECT [id] FROM DuplicateInForce WHERE rn > 1);
+END;
+GO
+
+-- Add unique filtered index on replaces_card_id for in-force cards
 IF NOT EXISTS (
     SELECT 1 FROM sys.indexes i
     JOIN sys.tables t ON t.object_id = i.object_id

@@ -48,29 +48,8 @@ public class MembershipCardTier {
     @Builder.Default
     private Boolean isActive = true;
 
-    public Integer getRank() {
-        return tierRank != null ? tierRank : 0;
-    }
-
-    public void setRank(Integer rank) {
-        this.tierRank = rank != null ? rank : 0;
-    }
-
     public int getEffectiveRank() {
-        if (tierRank != null && tierRank > 0) {
-            return tierRank;
-        }
-        if ("STANDARD".equalsIgnoreCase(code)) return 1;
-        if ("SILVER".equalsIgnoreCase(code)) return 2;
-        if ("GOLD".equalsIgnoreCase(code)) return 3;
-        if ("VIP".equalsIgnoreCase(code)) return 4;
-        return 0;
-    }
-
-    public static class MembershipCardTierBuilder {
-        public MembershipCardTierBuilder rank(Integer rank) {
-            return this.tierRank(rank);
-        }
+        return (tierRank != null && tierRank > 0) ? tierRank : 0;
     }
 
     @Column(name = "created_at", nullable = false)

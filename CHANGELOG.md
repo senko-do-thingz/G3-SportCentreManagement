@@ -5,8 +5,8 @@
 Branch `feat/f1-manager-catalog`. Owner: Dat (Senko). Priority: P1. Depends on: none. Rebased on `origin/main` (commit 6e82388). Verified with `./mvnw.cmd test` and GitHub Actions CI workflow.
 
 ### Added
-- Manager Sport Packages API (`GET /api/v1/manager/packages`, `PUT /api/v1/manager/packages/{id}` and alias `PUT /api/v1/sport-packages/{id}`): dynamic filtering by `sportId`, `format`, `active`; update price, durationDays, sessionCount, sessionMinutes (60 or 90), active status; audit logging (`PACKAGE_UPDATED`) recording before and after snapshots.
-- Manager Card Tiers API (`GET /api/v1/manager/card-tiers`, `PUT /api/v1/manager/card-tiers/{id}` and alias `PUT /api/v1/membership-cards/tiers/{id}`): update price, durationMonths, discountPercentage (0-100), description, active status; invariant guards preventing alteration or deactivation of the STANDARD tier; audit logging (`CARD_TIER_UPDATED`).
+- Manager Sport Packages API: `PUT /api/v1/packages/{id}` (manager list under `GET /api/v1/manager/packages`): dynamic filtering by `sportId`, `format`, `active`; update price, durationDays, sessionCount, sessionMinutes (60 or 90), active status; audit logging (`PACKAGE_UPDATED`) recording before and after snapshots.
+- Manager Card Tiers API: `PUT /api/v1/membership-cards/tiers/{id}` (manager list under `GET /api/v1/manager/card-tiers`): update price, durationMonths, discountPercentage (0-100), description, active status; invariant guards preventing alteration or deactivation of the STANDARD tier; price ordering by rank enforcement; audit logging (`CARD_TIER_UPDATED`).
 - Explicit tier ranking via `tier_rank` column on `membership_card_tier` (STANDARD=1, SILVER=2, GOLD=3, VIP=4) in migration V22, completely decoupling upgrade hierarchy from promotional live catalog prices.
 - Unique filtered index `ux_member_card_replaces_in_force` on `member_card(replaces_card_id)` for active and pending cards, preventing concurrent double-replacement of in-force cards.
 - Upgrade chain migration backfill supporting multi-step upgrade chains (A -> B -> C) by linking each upgrade card to its immediate predecessor sharing the identical `end_date`.
@@ -14,10 +14,10 @@ Branch `feat/f1-manager-catalog`. Owner: Dat (Senko). Priority: P1. Depends on: 
 ### Contract Changes Affecting Frontend
 - **Upgrade Fee Calculation Contract Change (`src/pages/member/cardsModel.ts` on `main`)**:
   - On `main`, frontend `planCard` calculates upgrade price as `targetTier.price - currentTier.livePrice`.
-  - In BE-03, the backend computes upgrade fee as `targetTier.price - cumulativeBasePaid` (where `cumulativeBasePaid` is the actual cumulative amount paid by the member toward the current active term across the replacement chain, retaining historical pricePaid snapshots).
+  - In BE-03, the backend computes upgrade fee as `max(0, targetTier.price - cumulativeBasePaid)` (where `cumulativeBasePaid` is the actual cumulative amount paid by the member toward the current active term across the replacement chain, retaining historical pricePaid snapshots).
   - An upgrade is strictly determined by explicit tier rank (`targetTier.tierRank > currentTier.tierRank`), NOT by live price comparison (`targetTier.price > currentTier.price`). Consequently, price promotions or price adjustments cannot flip or invert upgrade rules.
-  - If the calculated upgrade fee is <= 0, or if a legacy card's upgrade chain cannot be resolved, the upgrade fails closed (HTTP 400 with a message directing the member to the front desk).
-  - Frontend `planCard` in `src/pages/member/cardsModel.ts` should be updated to mirror this contract by using cumulative base price from the active card's payment history and comparing explicit tier ranks rather than live catalog prices.
+  - If the calculated upgrade fee is <= 0, the upgrade is granted at fee 0.00 (free upgrade, immediately ACTIVE with 0 fee, replacing the current card) so a member is never stuck. If a legacy card's upgrade chain cannot be resolved, automated upgrade fails closed (HTTP 400 with a message directing the member to the front desk).
+  - Frontend `planCard` in `src/pages/member/cardsModel.ts` should be updated to mirror this contract by using cumulative base price from the active card's payment history, comparing explicit tier ranks rather than live catalog prices, and handling fee <= 0 as a free upgrade.
 
 ## 2026-10-13 - Receptionist Member Search, Register and Renew, Check-in (FE-05, Flow 1)
 

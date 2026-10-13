@@ -110,6 +110,7 @@ public class MembershipCardServiceImplTest {
                 .durationMonths(12)
                 .discountPercentage(5)
                 .isActive(true)
+                .tierRank(3)
                 .build();
 
         vipTier = MembershipCardTier.builder()
@@ -120,6 +121,7 @@ public class MembershipCardServiceImplTest {
                 .durationMonths(12)
                 .discountPercentage(10)
                 .isActive(true)
+                .tierRank(4)
                 .build();
 
         Role memberRole = Role.builder().id(1L).code("MEMBER").name("Member").build();
@@ -1222,13 +1224,14 @@ public class MembershipCardServiceImplTest {
                 .durationMonths(12)
                 .discountPercentage(10)
                 .isActive(true)
+                .tierRank(3)
                 .build();
 
         MemberCard activeBronzeCard = MemberCard.builder()
                 .id(90L)
                 .cardCode("CARD-0090")
                 .member(memberProfile)
-                .tier(MembershipCardTier.builder().id(10L).code("BRONZE").price(BigDecimal.valueOf(250000.00)).durationMonths(12).build())
+                .tier(MembershipCardTier.builder().id(10L).code("BRONZE").price(BigDecimal.valueOf(250000.00)).durationMonths(12).tierRank(1).build())
                 .startDate(LocalDate.now(clock).minusMonths(1))
                 .endDate(LocalDate.now(clock).plusMonths(11))
                 .status(CardStatus.ACTIVE)
@@ -1274,6 +1277,7 @@ public class MembershipCardServiceImplTest {
                 .durationMonths(12)
                 .discountPercentage(5)
                 .isActive(true)
+                .tierRank(2)
                 .build();
 
         MembershipCardTier goldTier = MembershipCardTier.builder()
@@ -1284,6 +1288,7 @@ public class MembershipCardServiceImplTest {
                 .durationMonths(12)
                 .discountPercentage(10)
                 .isActive(true)
+                .tierRank(3)
                 .build();
 
         MemberCard activeSilverCard = MemberCard.builder()
@@ -1331,6 +1336,7 @@ public class MembershipCardServiceImplTest {
                 .price(BigDecimal.valueOf(500000.00))
                 .durationMonths(12)
                 .isActive(true)
+                .tierRank(3)
                 .build();
 
         MembershipCardTier silverTier = MembershipCardTier.builder()
@@ -1340,6 +1346,7 @@ public class MembershipCardServiceImplTest {
                 .price(BigDecimal.valueOf(300000.00))
                 .durationMonths(6)
                 .isActive(true)
+                .tierRank(2)
                 .build();
 
         LocalDate goldEnd = LocalDate.now(clock).plusMonths(6);
@@ -1391,6 +1398,7 @@ public class MembershipCardServiceImplTest {
                 .durationMonths(12)
                 .discountPercentage(8) // Live discount updated from 5% to 8%
                 .isActive(true)
+                .tierRank(3)
                 .build();
 
         MemberCard activeCard = MemberCard.builder()
@@ -1423,6 +1431,7 @@ public class MembershipCardServiceImplTest {
                 .price(BigDecimal.valueOf(600000.00)) // Live price raised to 600k
                 .durationMonths(12)
                 .isActive(true)
+                .tierRank(3)
                 .build();
 
         MembershipCardTier silverTier = MembershipCardTier.builder()
@@ -1432,6 +1441,7 @@ public class MembershipCardServiceImplTest {
                 .price(BigDecimal.valueOf(550000.00)) // Live price 550k
                 .durationMonths(12)
                 .isActive(true)
+                .tierRank(2)
                 .build();
 
         LocalDate goldEnd = LocalDate.now(clock).plusMonths(6);
@@ -1480,11 +1490,11 @@ public class MembershipCardServiceImplTest {
     }
 
     @Test
-    void purchaseCard_higherRankTierCheapenedBelowPricePaid_throws400WithDocumentedMessage() {
-        // N-02 rank rule: member paid 500k for SILVER (when it was 500k).
+    void purchaseCard_higherRankTierCheapenedBelowPricePaid_allowsFreeUpgradeAndReplacesCard() {
+        // Member paid 500k for SILVER (when it was 500k).
         // Later SILVER is cheapened to 300k. Member requests GOLD which is priced at 450k (live).
         // Live prices: GOLD (450k) > SILVER (300k) -> RANK says upgrade!
-        // But fee = 450k - 500k (pricePaid) = -50k <= 0 -> rejected with HTTP 400.
+        // But fee = 450k - 500k (pricePaid) = -50k <= 0 -> free upgrade (0.00 fee), card ACTIVE immediately, old card REPLACED.
         MembershipCardTier cheapenedSilverTier = MembershipCardTier.builder()
                 .id(2L)
                 .code("SILVER")
@@ -1492,6 +1502,7 @@ public class MembershipCardServiceImplTest {
                 .price(BigDecimal.valueOf(300000.00)) // Live price lowered to 300k
                 .durationMonths(12)
                 .isActive(true)
+                .tierRank(2)
                 .build();
 
         MembershipCardTier goldTier = MembershipCardTier.builder()
@@ -1501,6 +1512,7 @@ public class MembershipCardServiceImplTest {
                 .price(BigDecimal.valueOf(450000.00)) // Live price 450k
                 .durationMonths(12)
                 .isActive(true)
+                .tierRank(3)
                 .build();
 
         MemberCard activeSilverCard = MemberCard.builder()
@@ -1519,15 +1531,21 @@ public class MembershipCardServiceImplTest {
         when(memberCardRepository.findByMemberIdAndStatus(100L, CardStatus.PENDING_PAYMENT)).thenReturn(List.of());
         when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class)))
                 .thenReturn(List.of(activeSilverCard));
+        when(memberCardRepository.getNextCardCodeSequence()).thenReturn(113L);
+        when(codeFormatter.formatCardCode(113L)).thenReturn("CARD-0113");
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
 
         MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
                 .tierId(3L)
                 .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
 
-        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
-                () -> membershipCardService.purchaseCard(req, memberUser));
-        assertEquals("No payment is needed for this upgrade. Contact the front desk.", ex.getMessage());
+        MemberCardResponse res = membershipCardService.purchaseCard(req, memberUser);
+        assertNotNull(res);
+        assertEquals(CardStatus.ACTIVE, res.getStatus());
+        assertEquals(BigDecimal.ZERO, res.getPricePaid());
+        assertEquals(CardStatus.REPLACED, activeSilverCard.getStatus());
+        verify(paymentService, never()).createPendingPayment(any(), any(), any());
     }
 
     @Test
@@ -1537,9 +1555,9 @@ public class MembershipCardServiceImplTest {
         // Then upgraded to Silver paying 200k difference (total paid so far = 300k).
         // Now member upgrades to Gold (600k).
         // Fee for Gold must be: 600k - (100k + 200k) = 300k.
-        MembershipCardTier bronzeTier = MembershipCardTier.builder().id(10L).code("BRONZE").price(BigDecimal.valueOf(100000.00)).durationMonths(12).build();
-        MembershipCardTier silverTier = MembershipCardTier.builder().id(20L).code("SILVER").price(BigDecimal.valueOf(300000.00)).durationMonths(12).build();
-        MembershipCardTier goldTier = MembershipCardTier.builder().id(30L).code("GOLD").price(BigDecimal.valueOf(600000.00)).durationMonths(12).build();
+        MembershipCardTier bronzeTier = MembershipCardTier.builder().id(10L).code("BRONZE").price(BigDecimal.valueOf(100000.00)).durationMonths(12).tierRank(1).build();
+        MembershipCardTier silverTier = MembershipCardTier.builder().id(20L).code("SILVER").price(BigDecimal.valueOf(300000.00)).durationMonths(12).tierRank(2).build();
+        MembershipCardTier goldTier = MembershipCardTier.builder().id(30L).code("GOLD").price(BigDecimal.valueOf(600000.00)).durationMonths(12).tierRank(3).build();
 
         MemberCard cardA = MemberCard.builder()
                 .id(1L)
@@ -1602,6 +1620,7 @@ public class MembershipCardServiceImplTest {
                 .price(BigDecimal.valueOf(350000.00))
                 .durationMonths(12)
                 .isActive(true)
+                .tierRank(2)
                 .build();
 
         MembershipCardTier goldTier = MembershipCardTier.builder()
@@ -1611,6 +1630,7 @@ public class MembershipCardServiceImplTest {
                 .price(BigDecimal.valueOf(500000.00))
                 .durationMonths(12)
                 .isActive(true)
+                .tierRank(3)
                 .build();
 
         MemberCard legacyUpgradeCard = MemberCard.builder()

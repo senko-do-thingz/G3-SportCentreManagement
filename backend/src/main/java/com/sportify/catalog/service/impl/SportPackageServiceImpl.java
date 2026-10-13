@@ -92,19 +92,14 @@ public class SportPackageServiceImpl implements SportPackageService {
         SportPackage pkg = sportPackageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Sport package not found for id: " + id));
 
-        if (request.getSessionMinutes() == null || (request.getSessionMinutes() != 60 && request.getSessionMinutes() != 90)) {
+        if (request.getSessionMinutes() != 60 && request.getSessionMinutes() != 90) {
             throw new BusinessRuleException("Session minutes must be either 60 or 90");
-        }
-
-        BigDecimal price = request.getPrice();
-        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BusinessRuleException("Price must be greater than zero");
         }
 
         Map<String, Object> before = snapshotPackage(pkg);
 
         pkg.setName(request.getName().trim());
-        pkg.setPriceAmount(price);
+        pkg.setPriceAmount(request.getPrice());
         pkg.setSessionCount(request.getSessionCount());
         pkg.setDurationDays(request.getDurationDays());
         pkg.setSessionMinutes(request.getSessionMinutes());

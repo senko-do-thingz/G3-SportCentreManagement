@@ -83,25 +83,26 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         boolean standard = isStandard(tier);
 
         if (standard) {
-            if (request.getPrice() != null && request.getPrice().compareTo(BigDecimal.ZERO) != 0) {
+            if (request.getPrice().compareTo(BigDecimal.ZERO) != 0) {
                 throw new BusinessRuleException("The STANDARD tier price cannot be changed");
             }
-            if (request.getActive() != null && !request.getActive()) {
+            if (!request.getActive()) {
                 throw new BusinessRuleException("The STANDARD tier cannot be deactivated");
             }
-            if (request.getDiscountPercentage() != null && request.getDiscountPercentage() != 0) {
+            if (request.getDiscountPercentage() != 0) {
                 throw new BusinessRuleException("The STANDARD tier discount percentage must be 0");
             }
-            if (request.getDurationMonths() != null && request.getDurationMonths() != 0) {
+            if (request.getDurationMonths() != 0) {
                 throw new BusinessRuleException("The STANDARD tier duration must be 0 months");
             }
         } else {
-            if (request.getPrice() == null || request.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
+            if (request.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
                 throw new BusinessRuleException("Price must be greater than zero for paid tiers");
             }
-            if (request.getDurationMonths() == null || request.getDurationMonths() < 1) {
+            if (request.getDurationMonths() < 1) {
                 throw new BusinessRuleException("Duration in months must be at least 1 for paid tiers");
             }
+
         }
 
         Map<String, Object> before = snapshotTier(tier);
@@ -196,20 +197,28 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         }
 
         CardPlan plan = planCard(member.getId(), tier, today);
-        if (!paidAtDesk && plan.price().compareTo(BigDecimal.ZERO) <= 0) {
+        boolean isUpgrade = (plan.replaces() != null);
+        if (!isUpgrade && !paidAtDesk && plan.price().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessRuleException("Payment amount must be greater than zero. Attempted card price: " + plan.price());
         }
-
-        CardStatus status = paidAtDesk ? CardStatus.ACTIVE : CardStatus.PENDING_PAYMENT;
-        boolean isUpgrade = (plan.replaces() != null);
+        boolean isFree = isUpgrade && plan.price().compareTo(BigDecimal.ZERO) <= 0;
+        CardStatus status = (paidAtDesk || isFree) ? CardStatus.ACTIVE : CardStatus.PENDING_PAYMENT;
         MemberCard card = newCard(member, tier, plan.startDate(), plan.endDate(), status, plan.price(), isUpgrade, plan.replaces());
         if (status == CardStatus.PENDING_PAYMENT) {
             Payment payment = paymentService.createPendingPayment(member, plan.price(), request.getPaymentMethod());
             card.setPayment(payment);
         }
-        card = memberCardRepository.save(card);
-        if (paidAtDesk && plan.replaces() != null) {
-            replace(plan.replaces());
+        try {
+            card = memberCardRepository.save(card);
+            memberCardRepository.flush();
+            if (status == CardStatus.ACTIVE && plan.replaces() != null) {
+                replace(plan.replaces());
+            }
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            if (isUpgrade) {
+                throw new BusinessRuleException("A concurrent upgrade is already in progress for this membership card.");
+            }
+            throw ex;
         }
         return mapToCardResponse(card);
     }
@@ -326,11 +335,11 @@ public class MembershipCardServiceImpl implements MembershipCardService {
      * <ul>
      *   <li>no paid card: a new card from today;</li>
      *   <li>the same tier: a renewal from the day after the last card ends;</li>
-     *   <li>a higher-ranked tier while a card is valid (rank defined by targetTier.price > currentCard.tier.price,
-     *       both live catalog prices): an upgrade from today that keeps the current card's end date.
-     *       The fee is targetTier.price - calculateTermBasePrice(current), where the base is what the member
-     *       actually paid toward the active term. If fee <= 0, the upgrade is rejected with HTTP 400.
-     *       The current card is replaced upon payment confirmation;</li>
+     *   <li>a higher-ranked tier while a card is valid (rank defined by tier_rank):
+     *       an upgrade from today that keeps the current card's end date.
+     *       The fee is max(0, targetTier.price - calculateTermBasePrice(current)), where the base is what the member
+     *       actually paid toward the active term. If fee is 0, the upgrade is immediately ACTIVE with 0 fee.
+     *       The current card is replaced upon activation;</li>
      *   <li>an equal or lower ranked tier: it starts the day after the last card ends, at full price.</li>
      * </ul>
      * A card lasts {@code durationMonths} months: it ends the day before the same date {@code durationMonths} later.
@@ -354,10 +363,11 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             return new CardPlan(from, cardEnd(from, months), tier.getPrice(), null);
         }
 
-        // Rank rule (R3-04): an upgrade is strictly determined by tier ranking,
+        // Rank rule: an upgrade is strictly determined by tier ranking,
         // decoupled from live catalog price edits.
         boolean isUpgradeRank = (current != null
                 && current.getTier() != null
+                && tier.getEffectiveRank() > 0
                 && tier.getEffectiveRank() > current.getTier().getEffectiveRank());
 
         if (isUpgradeRank) {
@@ -366,10 +376,8 @@ public class MembershipCardServiceImpl implements MembershipCardService {
                         + ". The card can be upgraded once that term has started.");
             }
             BigDecimal currentBasePrice = calculateTermBasePrice(current);
-            BigDecimal fee = tier.getPrice().subtract(currentBasePrice);
-            if (fee.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new BusinessRuleException("No payment is needed for this upgrade. Contact the front desk.");
-            }
+            BigDecimal diff = tier.getPrice().subtract(currentBasePrice);
+            BigDecimal fee = diff.compareTo(BigDecimal.ZERO) > 0 ? diff : BigDecimal.ZERO;
             return new CardPlan(today, current.getEndDate(), fee, current);
         }
 
@@ -454,7 +462,6 @@ public class MembershipCardServiceImpl implements MembershipCardService {
                 .discountPercentage(tier.getDiscountPercentage())
                 .description(tier.getDescription())
                 .isActive(tier.getIsActive())
-                .rank(tier.getEffectiveRank())
                 .tierRank(tier.getEffectiveRank())
                 .build();
     }

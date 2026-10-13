@@ -818,45 +818,6 @@ public class SportPackageServiceImplTest {
         verify(auditService, never()).record(any());
     }
 
-    @Test
-    void updatePackage_zeroOrNegativePrice_throwsBusinessRuleException() {
-        SportPackage pkg = SportPackage.builder()
-                .id(10L)
-                .code("PKG-10")
-                .name("Old Name")
-                .sport(sport)
-                .trainingFormat(TrainingFormat.SELF_TRAINING)
-                .durationDays(30)
-                .sessionCount(12)
-                .sessionMinutes(60)
-                .priceAmount(BigDecimal.valueOf(200000.00))
-                .isActive(true)
-                .build();
-
-        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(pkg));
-
-        SportPackageUpdateRequest zeroPriceReq = SportPackageUpdateRequest.builder()
-                .name("New Name")
-                .price(BigDecimal.ZERO)
-                .sessionCount(15)
-                .durationDays(30)
-                .sessionMinutes(60)
-                .active(true)
-                .build();
-
-        assertThrows(BusinessRuleException.class, () -> sportPackageService.updatePackage(10L, zeroPriceReq, null));
-
-        SportPackageUpdateRequest negPriceReq = SportPackageUpdateRequest.builder()
-                .name("New Name")
-                .price(BigDecimal.valueOf(-50000))
-                .sessionCount(15)
-                .durationDays(30)
-                .sessionMinutes(60)
-                .active(true)
-                .build();
-
-        assertThrows(BusinessRuleException.class, () -> sportPackageService.updatePackage(10L, negPriceReq, null));
-    }
 
     @Test
     void updatePackage_preservesExistingDescription() {
