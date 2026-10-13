@@ -407,6 +407,21 @@ class PaymentServiceImplTest {
     }
 
     @Test
+    @DisplayName("appendNote when trimmed existing segment becomes empty due to low surrogate boundary returns append without separator")
+    void appendNote_TrimmedExistingBecomesEmptyOnLowSurrogate_ReturnsAppendWithoutLeadingSeparator() {
+        String existing = "\uD83D\uDE00";
+        String append496 = "A".repeat(496);
+
+        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        pendingPayment.setNotes(existing);
+        Payment failed = paymentService.markPaymentFailed(10L, append496);
+
+        assertThat(failed.getNotes()).isEqualTo(append496);
+    }
+
+    @Test
     @DisplayName("getPayment and updatePaymentMethod with null actor throws IllegalArgumentException")
     void paymentMethods_NullActor_ThrowsIllegalArgumentException() {
         assertThrows(IllegalArgumentException.class, () -> paymentService.getPayment(10L, null));

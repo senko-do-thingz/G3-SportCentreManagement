@@ -296,6 +296,9 @@ public class PaymentServiceImpl implements PaymentService {
             start++;
         }
         String trimmedExisting = curExisting.substring(start);
+        if (trimmedExisting.isEmpty()) {
+            return append;
+        }
         return trimmedExisting + " | " + append;
     }
 
