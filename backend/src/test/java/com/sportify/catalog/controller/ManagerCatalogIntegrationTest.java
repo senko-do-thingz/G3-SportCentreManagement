@@ -3,10 +3,17 @@ package com.sportify.catalog.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sportify.AbstractIntegrationTest;
+import com.sportify.catalog.dto.MemberCardPurchaseRequest;
+import com.sportify.catalog.dto.MemberCardResponse;
 import com.sportify.catalog.dto.MembershipCardTierUpdateRequest;
 import com.sportify.catalog.dto.SportPackageResponse;
 import com.sportify.catalog.dto.SportPackageUpdateRequest;
 import com.sportify.catalog.entity.CardStatus;
+import com.sportify.payment.entity.PaymentMethod;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.util.StreamUtils;
+
+import java.nio.charset.StandardCharsets;
 import com.sportify.catalog.entity.MemberCard;
 import com.sportify.catalog.entity.MembershipCardTier;
 import com.sportify.catalog.entity.PackageRegistrationStatus;
@@ -147,9 +154,13 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
 
     private void cleanUp() {
         jdbcTemplate.update("DELETE FROM sport_package_registration WHERE registration_code LIKE '%" + MARKER + "%'");
-        jdbcTemplate.update("DELETE FROM member_card WHERE card_code LIKE '%" + MARKER + "%'");
+        jdbcTemplate.update("UPDATE member_card SET replaces_card_id = NULL WHERE card_code LIKE '%" + MARKER + "%' OR member_id IN (SELECT user_id FROM member_profile WHERE member_code LIKE '%" + MARKER + "%')");
+        jdbcTemplate.update("UPDATE member_card SET payment_id = NULL WHERE card_code LIKE '%" + MARKER + "%' OR member_id IN (SELECT user_id FROM member_profile WHERE member_code LIKE '%" + MARKER + "%')");
+        jdbcTemplate.update("DELETE FROM member_card WHERE card_code LIKE '%" + MARKER + "%' OR member_id IN (SELECT user_id FROM member_profile WHERE member_code LIKE '%" + MARKER + "%')");
+        jdbcTemplate.update("DELETE FROM payment WHERE member_id IN (SELECT user_id FROM member_profile WHERE member_code LIKE '%" + MARKER + "%') OR payment_code LIKE '%" + MARKER + "%'");
         jdbcTemplate.update("DELETE FROM activity_log WHERE summary LIKE '%" + MARKER + "%' OR entity_code LIKE '%" + MARKER + "%' OR details LIKE '%" + MARKER + "%'");
         jdbcTemplate.update("DELETE FROM sport_package WHERE code LIKE '%" + MARKER + "%'");
+        jdbcTemplate.update("DELETE FROM membership_card_tier WHERE code LIKE '%" + MARKER + "%'");
         jdbcTemplate.update("DELETE FROM member_profile WHERE member_code LIKE '%" + MARKER + "%'");
         jdbcTemplate.update("DELETE FROM user_account WHERE email LIKE '%" + MARKER + "%'");
     }
@@ -420,5 +431,312 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         // Restore tier price
         goldTier.setPrice(originalTierPrice);
         cardTierRepository.saveAndFlush(goldTier);
+    }
+
+    @Test
+    @DisplayName("Flyway applies all migrations including V22: member_card has upgrade_request and replaces_card_id")
+    void testFlywayAppliesV22_memberCardColumnsExist() {
+        Integer upgradeColCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys.columns c JOIN sys.tables t ON t.object_id = c.object_id WHERE t.name = 'member_card' AND c.name = 'upgrade_request'",
+                Integer.class
+        );
+        assertEquals(1, upgradeColCount, "Column upgrade_request must exist on member_card table");
+
+        Integer replacesColCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys.columns c JOIN sys.tables t ON t.object_id = c.object_id WHERE t.name = 'member_card' AND c.name = 'replaces_card_id'",
+                Integer.class
+        );
+        assertEquals(1, replacesColCount, "Column replaces_card_id must exist on member_card table");
+
+        Integer fkCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys.foreign_keys fk JOIN sys.tables t ON t.object_id = fk.parent_object_id WHERE t.name = 'member_card' AND fk.name = 'fk_member_card_replaces_card'",
+                Integer.class
+        );
+        assertEquals(1, fkCount, "Foreign key fk_member_card_replaces_card must exist on member_card");
+    }
+
+    @Test
+    @DisplayName("PENDING_PAYMENT card created, manager raises tier price, activation succeeds and card keeps old pricePaid")
+    void testPendingCardActivation_afterTierPriceRaise_retainsOldPricePaid() {
+        MembershipCardTier goldTier = cardTierRepository.findByCode("GOLD")
+                .orElseThrow(() -> new IllegalStateException("Seeded GOLD tier required"));
+        BigDecimal originalPrice = goldTier.getPrice();
+
+        // 1. Member creates pending card at original price
+        MemberCardPurchaseRequest purchaseReq = MemberCardPurchaseRequest.builder()
+                .memberId(memberProfile.getId())
+                .tierId(goldTier.getId())
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                .build();
+        MemberCardResponse pendingCard = membershipCardService.purchaseCard(purchaseReq, memberProfile.getUserAccount());
+        assertNotNull(pendingCard);
+        assertEquals(CardStatus.PENDING_PAYMENT, pendingCard.getStatus());
+        assertEquals(0, originalPrice.compareTo(pendingCard.getPricePaid()));
+
+        // 2. Manager raises tier price by 150k
+        BigDecimal raisedPrice = originalPrice.add(BigDecimal.valueOf(150000.00));
+        MembershipCardTierUpdateRequest tierUpdateReq = MembershipCardTierUpdateRequest.builder()
+                .name(goldTier.getName())
+                .price(raisedPrice)
+                .durationMonths(goldTier.getDurationMonths())
+                .discountPercentage(goldTier.getDiscountPercentage())
+                .active(true)
+                .build();
+        membershipCardService.updateTier(goldTier.getId(), tierUpdateReq, managerUser);
+
+        // 3. Manager activates card at desk
+        MemberCardResponse activatedCard = membershipCardService.activateCard(pendingCard.getId(), managerUser);
+        assertNotNull(activatedCard);
+        assertEquals(CardStatus.ACTIVE, activatedCard.getStatus());
+        assertEquals(0, originalPrice.compareTo(activatedCard.getPricePaid()),
+                "Card must retain old pricePaid snapshot even after tier price increase");
+
+        // Verify in DB
+        MemberCard reloaded = memberCardRepository.findById(pendingCard.getId()).orElseThrow();
+        assertEquals(CardStatus.ACTIVE, reloaded.getStatus());
+        assertEquals(0, originalPrice.compareTo(reloaded.getPricePaid()));
+
+        // Restore tier price
+        goldTier.setPrice(originalPrice);
+        cardTierRepository.saveAndFlush(goldTier);
+    }
+
+    @Test
+    @DisplayName("Upgrade chain A -> B -> C: fee for C is based on cumulative pricePaid")
+    void testUpgradeChain_ABC_cumulativePricePaid() {
+        // Create 3 tiers for the test
+        MembershipCardTier tierA = cardTierRepository.save(MembershipCardTier.builder()
+                .code("TIER-A-" + MARKER)
+                .name("Tier A " + MARKER)
+                .price(BigDecimal.valueOf(150000.00))
+                .durationMonths(12)
+                .discountPercentage(2)
+                .isActive(true)
+                .build());
+
+        MembershipCardTier tierB = cardTierRepository.save(MembershipCardTier.builder()
+                .code("TIER-B-" + MARKER)
+                .name("Tier B " + MARKER)
+                .price(BigDecimal.valueOf(350000.00))
+                .durationMonths(12)
+                .discountPercentage(5)
+                .isActive(true)
+                .build());
+
+        MembershipCardTier tierC = cardTierRepository.save(MembershipCardTier.builder()
+                .code("TIER-C-" + MARKER)
+                .name("Tier C " + MARKER)
+                .price(BigDecimal.valueOf(650000.00))
+                .durationMonths(12)
+                .discountPercentage(10)
+                .isActive(true)
+                .build());
+
+        // 1. Purchase Card A at desk (immediately ACTIVE, pricePaid = 150k)
+        MemberCardPurchaseRequest reqA = MemberCardPurchaseRequest.builder()
+                .memberId(memberProfile.getId())
+                .tierId(tierA.getId())
+                .build();
+        MemberCardResponse cardA = membershipCardService.purchaseCard(reqA, managerUser);
+        assertEquals(CardStatus.ACTIVE, cardA.getStatus());
+        assertEquals(0, BigDecimal.valueOf(150000.00).compareTo(cardA.getPricePaid()));
+
+        // 2. Upgrade to Tier B at desk (difference = 350k - 150k = 200k)
+        MemberCardPurchaseRequest reqB = MemberCardPurchaseRequest.builder()
+                .memberId(memberProfile.getId())
+                .tierId(tierB.getId())
+                .build();
+        MemberCardResponse cardB = membershipCardService.purchaseCard(reqB, managerUser);
+        assertEquals(CardStatus.ACTIVE, cardB.getStatus());
+        assertEquals(0, BigDecimal.valueOf(200000.00).compareTo(cardB.getPricePaid()));
+
+        // Verify Card A is REPLACED
+        MemberCard reloadedA = memberCardRepository.findById(cardA.getId()).orElseThrow();
+        assertEquals(CardStatus.REPLACED, reloadedA.getStatus());
+
+        // 3. Upgrade to Tier C at desk (fee = 650k - (150k + 200k) = 300k)
+        MemberCardPurchaseRequest reqC = MemberCardPurchaseRequest.builder()
+                .memberId(memberProfile.getId())
+                .tierId(tierC.getId())
+                .build();
+        MemberCardResponse cardC = membershipCardService.purchaseCard(reqC, managerUser);
+        assertEquals(CardStatus.ACTIVE, cardC.getStatus());
+        assertEquals(0, BigDecimal.valueOf(300000.00).compareTo(cardC.getPricePaid()),
+                "Upgrade fee for C must be target price (650k) minus cumulative chain paid (150k + 200k = 350k) = 300k");
+
+        // Verify Card B is REPLACED and Card C replaces Card B
+        MemberCard reloadedB = memberCardRepository.findById(cardB.getId()).orElseThrow();
+        assertEquals(CardStatus.REPLACED, reloadedB.getStatus());
+        MemberCard reloadedC = memberCardRepository.findById(cardC.getId()).orElseThrow();
+        assertNotNull(reloadedC.getReplacesCard());
+        assertEquals(cardB.getId(), reloadedC.getReplacesCard().getId());
+    }
+
+    @Test
+    @DisplayName("Upgrade after price edit: fee is based on pricePaid, not on live price of held tier")
+    void testUpgradeAfterPriceEdit_feeBasedOnPricePaidNotLivePrice() {
+        MembershipCardTier silverTier = cardTierRepository.save(MembershipCardTier.builder()
+                .code("SILVER-" + MARKER)
+                .name("Silver " + MARKER)
+                .price(BigDecimal.valueOf(300000.00))
+                .durationMonths(12)
+                .discountPercentage(5)
+                .isActive(true)
+                .build());
+
+        MembershipCardTier goldTier = cardTierRepository.save(MembershipCardTier.builder()
+                .code("GOLD-" + MARKER)
+                .name("Gold " + MARKER)
+                .price(BigDecimal.valueOf(600000.00))
+                .durationMonths(12)
+                .discountPercentage(10)
+                .isActive(true)
+                .build());
+
+        // 1. Member purchases Silver card at 300k
+        MemberCardPurchaseRequest silverReq = MemberCardPurchaseRequest.builder()
+                .memberId(memberProfile.getId())
+                .tierId(silverTier.getId())
+                .build();
+        MemberCardResponse silverCard = membershipCardService.purchaseCard(silverReq, managerUser);
+        assertEquals(CardStatus.ACTIVE, silverCard.getStatus());
+        assertEquals(0, BigDecimal.valueOf(300000.00).compareTo(silverCard.getPricePaid()));
+
+        // 2. Manager raises Silver tier price to 450,000
+        MembershipCardTierUpdateRequest silverUpdate = MembershipCardTierUpdateRequest.builder()
+                .name(silverTier.getName())
+                .price(BigDecimal.valueOf(450000.00))
+                .durationMonths(12)
+                .discountPercentage(5)
+                .active(true)
+                .build();
+        membershipCardService.updateTier(silverTier.getId(), silverUpdate, managerUser);
+
+        // 3. Member requests upgrade to Gold (600,000)
+        MemberCardPurchaseRequest goldReq = MemberCardPurchaseRequest.builder()
+                .memberId(memberProfile.getId())
+                .tierId(goldTier.getId())
+                .build();
+        MemberCardResponse goldCard = membershipCardService.purchaseCard(goldReq, managerUser);
+
+        // Upgrade fee must be 600k - 300k (pricePaid) = 300k, NOT 600k - 450k (live) = 150k
+        assertEquals(0, BigDecimal.valueOf(300000.00).compareTo(goldCard.getPricePaid()),
+                "Upgrade fee must be target tier price (600k) minus actual pricePaid (300k) = 300k");
+    }
+
+    @Test
+    @DisplayName("After manager edit of paid tier, member purchase produces PENDING_PAYMENT card requiring payment (R-01 regression)")
+    void testPurchaseAfterManagerEditOfPaidTier_producesPendingPaymentCardRequiringPayment() {
+        MembershipCardTier goldTier = cardTierRepository.findByCode("GOLD")
+                .orElseThrow(() -> new IllegalStateException("Seeded GOLD tier required"));
+        BigDecimal originalPrice = goldTier.getPrice();
+
+        // 1. Manager edits tier price and duration
+        MembershipCardTierUpdateRequest updateReq = MembershipCardTierUpdateRequest.builder()
+                .name(goldTier.getName())
+                .price(BigDecimal.valueOf(450000.00))
+                .durationMonths(12)
+                .discountPercentage(7)
+                .active(true)
+                .build();
+        membershipCardService.updateTier(goldTier.getId(), updateReq, managerUser);
+
+        // 2. Member purchases card online
+        MemberCardPurchaseRequest purchaseReq = MemberCardPurchaseRequest.builder()
+                .memberId(memberProfile.getId())
+                .tierId(goldTier.getId())
+                .paymentMethod(PaymentMethod.VNPAY)
+                .build();
+        MemberCardResponse response = membershipCardService.purchaseCard(purchaseReq, memberProfile.getUserAccount());
+
+        // Must NOT be immediately active; must be PENDING_PAYMENT with linked payment created
+        assertNotNull(response);
+        assertEquals(CardStatus.PENDING_PAYMENT, response.getStatus());
+        assertEquals(0, BigDecimal.valueOf(450000.00).compareTo(response.getPricePaid()));
+        assertNotNull(response.getPaymentId(), "Pending payment card must have linked payment created");
+
+        // Restore tier price
+        goldTier.setPrice(originalPrice);
+        cardTierRepository.saveAndFlush(goldTier);
+    }
+
+    @Test
+    @DisplayName("Rank rule from N-02: SILVER request after GOLD price raise does not replace GOLD")
+    void testRankRule_silverRequestAfterGoldPriceRaise_doesNotReplaceGold() {
+        // Create custom Gold and Silver tiers
+        MembershipCardTier goldTier = cardTierRepository.save(MembershipCardTier.builder()
+                .code("GOLD-RANK-" + MARKER)
+                .name("Gold Rank " + MARKER)
+                .price(BigDecimal.valueOf(500000.00))
+                .durationMonths(12)
+                .discountPercentage(10)
+                .isActive(true)
+                .build());
+
+        MembershipCardTier silverTier = cardTierRepository.save(MembershipCardTier.builder()
+                .code("SILVER-RANK-" + MARKER)
+                .name("Silver Rank " + MARKER)
+                .price(BigDecimal.valueOf(550000.00))
+                .durationMonths(12)
+                .discountPercentage(5)
+                .isActive(true)
+                .build());
+
+        // 1. Member purchases Gold card at 500k at desk -> ACTIVE
+        MemberCardPurchaseRequest goldPurchase = MemberCardPurchaseRequest.builder()
+                .memberId(memberProfile.getId())
+                .tierId(goldTier.getId())
+                .build();
+        MemberCardResponse activeGold = membershipCardService.purchaseCard(goldPurchase, managerUser);
+        assertEquals(CardStatus.ACTIVE, activeGold.getStatus());
+
+        // 2. Manager raises Gold live price to 600,000
+        MembershipCardTierUpdateRequest goldUpdate = MembershipCardTierUpdateRequest.builder()
+                .name(goldTier.getName())
+                .price(BigDecimal.valueOf(600000.00))
+                .durationMonths(12)
+                .discountPercentage(10)
+                .active(true)
+                .build();
+        membershipCardService.updateTier(goldTier.getId(), goldUpdate, managerUser);
+
+        // 3. Member requests Silver (live 550,000)
+        // Even though 550k > 500k (paid), Silver (550k) <= Gold (600k live) -> NOT an upgrade!
+        MemberCardPurchaseRequest silverPurchase = MemberCardPurchaseRequest.builder()
+                .memberId(memberProfile.getId())
+                .tierId(silverTier.getId())
+                .build();
+        MemberCardResponse silverCard = membershipCardService.purchaseCard(silverPurchase, managerUser);
+
+        assertNotNull(silverCard);
+        // Full price of Silver tier charged
+        assertEquals(0, BigDecimal.valueOf(550000.00).compareTo(silverCard.getPricePaid()));
+        // Queued after Gold card ends
+        assertEquals(activeGold.getEndDate().plusDays(1), silverCard.getStartDate());
+
+        // Active Gold card is NOT replaced
+        MemberCard reloadedGold = memberCardRepository.findById(activeGold.getId()).orElseThrow();
+        assertEquals(CardStatus.ACTIVE, reloadedGold.getStatus(), "Gold card must NOT be replaced when requesting lower-ranked tier");
+    }
+
+    @Test
+    @DisplayName("Migration V22 idempotency: re-executing V22 migration statements succeeds without error")
+    void testMigrationV22_idempotency() throws Exception {
+        // Test idempotency of V22 by executing its DDL and backfill statements a second time
+        ClassPathResource resource = new ClassPathResource("db/migration/catalog/V22__add_upgrade_tracking_to_member_card.sql");
+        String sql = StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
+        String[] batches = sql.split("(?i)^\\s*GO\\s*$");
+        for (String batch : batches) {
+            String trimmed = batch.trim();
+            if (!trimmed.isEmpty()) {
+                jdbcTemplate.execute(trimmed);
+            }
+        }
+        // Verification step: verify columns and FK still exist
+        Integer upgradeColCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys.columns c JOIN sys.tables t ON t.object_id = c.object_id WHERE t.name = 'member_card' AND c.name = 'upgrade_request'",
+                Integer.class
+        );
+        assertEquals(1, upgradeColCount);
     }
 }
