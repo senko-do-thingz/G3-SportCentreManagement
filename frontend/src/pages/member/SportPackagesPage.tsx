@@ -185,7 +185,8 @@ function PackageCard({
       <h2 className="package-card__title">{pkg.sportName}</h2>
       <p className="package-card__summary">{packageSummary(pkg)}</p>
       <p className="package-card__price" data-testid="final-price">
-        {formatMoney(price.final)}
+        {/* The price waits for the card, so a discounted package never shows the full price first. */}
+        {cardsLoading && !isSingleVisit(pkg) ? '-' : formatMoney(price.final)}
       </p>
       <p className="package-card__price-note">
         {cardsLoading && !isSingleVisit(pkg) ? (

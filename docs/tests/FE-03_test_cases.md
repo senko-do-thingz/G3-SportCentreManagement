@@ -31,16 +31,19 @@ npm run lint -- --max-warnings 0
 npm run build
 ```
 
-### 1.3 Result summary (2026-10-13, after review round 1)
+### 1.3 Result summary (2026-10-13, after review round 2)
 | Group | Cases | Result |
 |---|---|---|
 | Automated, rules (`src/pages/member/packagesModel.test.ts`) | 10 (3 new in round 1, TC-FE03-003 extended) | 10 PASSED |
-| Automated, screens (`src/pages/member/sportPackages.test.tsx`) | 32 (8 new in round 1, TC-FE03-013 and TC-FE03-039 changed) | 32 PASSED |
+| Automated, screens (`src/pages/member/sportPackages.test.tsx`) | 33 (8 new in round 1, 1 new in round 2; TC-FE03-048 extended in round 2) | 33 PASSED |
 | Automated, all other files (FE-00, FE-01, FE-02) | 255 (4 FE-02 assertions on the discount text changed in round 1) | 255 PASSED |
 | Lint (0 warnings), `tsc -b`, build | 3 | 3 PASSED |
 | Manual checks against the real backend (section 3) | 8 | NOT RUN YET (needs SQL Server) |
 
-Total: 297 Vitest tests in 16 files (286 before review round 1, 11 added).
+Total: 298 Vitest tests in 16 files (286 before review round 1, 297 after it, 1 added in round 2).
+
+Existing tests changed in review round 2:
+- `src/pages/member/sportPackages.test.tsx` TC-FE03-048 (price placeholder); both `openDetail` helpers now wait until "Checking your registrations" is gone before the test acts.
 
 Existing tests changed in review round 1:
 - `src/pages/member/dashboardModel.test.ts` TC-FE02-127 and `src/pages/member/memberDashboard.test.tsx` TC-FE02-021, TC-FE02-122, TC-FE02-126: the card discount text is now "<n>% off packages longer than a single visit" (B2).
@@ -100,8 +103,9 @@ Existing tests changed in the first FE-03 commit:
 | TC-FE03-045 | - | Pending registration of another package (round 1, B3) | Not blocked | PASSED |
 | TC-FE03-046 | - | Registrations fail to load (round 1, B3) | Not blocked, registration works | PASSED |
 | TC-FE03-047 | AC2 | Page open past midnight (round 1, B4) | Opened 13 Oct 23:59, submit at 14 Oct 00:01 -> "Start date cannot be in the past", no POST, min 2026-10-14 | PASSED |
-| TC-FE03-048 | AC1 | Cards still loading (round 1, M2) | "Checking your card discount" instead of "Original price"; VIP price after the cards arrive | PASSED |
+| TC-FE03-048 | AC1 | Cards still loading (round 1, M2; extended in round 2, N1) | Eligible card: price "-" and "Checking your card discount"; single visit keeps 80.000 VND; VIP price after the cards arrive | PASSED |
 | TC-FE03-049 | AC1 | `?sport=999&format=abc&duration=7` (round 1, M3) | Ignored: 5 cards, empty selects, links without the bad query | PASSED |
+| TC-FE03-052 | - | Registrations list never answers (round 2, B3b) | Confirm disabled, "Checking your registrations", click and form submit send no POST; after an empty list arrives Confirm is enabled and one POST is sent | PASSED |
 | TC-FE03-050 | AC3 | Payment cannot be loaded | Error with the backend message | PASSED |
 | TC-FE03-051 | - | Invalid payment id | "The payment link is not valid.", no request | PASSED |
 

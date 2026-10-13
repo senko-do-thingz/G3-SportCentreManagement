@@ -192,6 +192,8 @@ describe('FE-03 Package Detail and Registration (F1-10)', () => {
     signIn()
     renderApp(path)
     await screen.findByRole('form', { name: 'Package registration' })
+    // Confirm waits for the registrations list (B3b); every detail test starts after it arrived.
+    await waitFor(() => expect(screen.queryByText('Checking your registrations')).not.toBeInTheDocument())
     return fake
   }
 
@@ -341,6 +343,8 @@ describe('FE-03 review round 1', () => {
     signIn()
     renderApp(path)
     await screen.findByRole('form', { name: 'Package registration' })
+    // Confirm waits for the registrations list (B3b); every detail test starts after it arrived.
+    await waitFor(() => expect(screen.queryByText('Checking your registrations')).not.toBeInTheDocument())
     return fake
   }
 
@@ -400,7 +404,7 @@ describe('FE-03 review round 1', () => {
     expect(input).toHaveAttribute('min', '2026-10-14')
   })
 
-  it('TC-FE03-048 while the cards load, prices say "Checking your card discount" (M2)', async () => {
+  it('TC-FE03-048 while the cards load, eligible prices show "-" and "Checking your card discount" (M2, N1)', async () => {
     let release: (response: Response) => void = () => undefined
     // The cards answer stays open until the test releases it.
     installFakeFetch((call) => {
@@ -419,6 +423,9 @@ describe('FE-03 review round 1', () => {
     await screen.findByRole('list', { name: 'Sport packages' })
     expect(within(cardFor(/^Coach-led Football, 30 days/)).getByText(/Checking your card discount/)).toBeInTheDocument()
     expect(within(cardFor(/^Coach-led Football, 30 days/)).queryByText(/Original price/)).not.toBeInTheDocument()
+    // Round 2 (N1): the big price waits for the card; a single visit keeps its price.
+    expect(finalPrice(/^Coach-led Football, 30 days/)).toBe('-')
+    expect(finalPrice(/^Self-training Football, Single visit/)).toBe('80.000 VND')
     await act(async () => {
       release(json(200, [VIP]))
     })
@@ -438,6 +445,46 @@ describe('FE-03 review round 1', () => {
       'href',
       '/member/packages/4',
     )
+  })
+})
+
+describe('FE-03 review round 2', () => {
+  it('TC-FE03-052 Confirm waits for the registrations list: no POST while it loads (B3b)', async () => {
+    const user = userEvent.setup()
+    let release: (response: Response) => void = () => undefined
+    const { calls } = installFakeFetch((call) => {
+      if (call.path === '/users/me') return json(200, MEMBER)
+      if (call.path === '/packages') return json(200, PACKAGES)
+      if (call.path === '/membership-cards/my') return json(200, [])
+      if (call.path === '/packages/registrations/my') {
+        return new Promise<Response>((resolve) => {
+          release = resolve
+        })
+      }
+      if (call.path === '/packages/registrations' && call.method === 'POST') {
+        return json(201, registration({ status: 'PENDING_PAYMENT', paymentId: 52 }))
+      }
+      return json(200, [])
+    })
+    signIn()
+    renderApp('/member/packages/4')
+    const form = await screen.findByRole('form', { name: 'Package registration' })
+
+    const confirm = screen.getByRole('button', { name: 'Confirm registration' })
+    expect(confirm).toBeDisabled()
+    expect(screen.getByText('Checking your registrations')).toBeInTheDocument()
+    await user.click(confirm)
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    expect(calls.some((call) => call.method === 'POST')).toBe(false)
+
+    await act(async () => {
+      release(json(200, []))
+    })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm registration' })).toBeEnabled())
+    expect(screen.queryByText('Checking your registrations')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Confirm registration' }))
+    expect(await screen.findByRole('dialog', { name: 'Payment summary' })).toBeInTheDocument()
+    expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1)
   })
 })
 

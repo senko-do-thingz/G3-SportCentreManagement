@@ -106,8 +106,10 @@ export function PackageDetailPage() {
         card={cards.status === 'ready' ? currentCard(cards.data, today) : null}
         cardsFailed={cards.status === 'error'}
         cardsLoading={cards.status === 'loading'}
-        // The backend does not block a second pending registration, so the page does. If the list
-        // cannot be loaded, nothing is blocked: the backend stays the authority.
+        // The backend does not block a second pending registration, so the page does. While the
+        // list loads, Confirm is disabled; if it cannot be loaded, nothing is blocked (the backend
+        // stays the authority).
+        registrationsLoading={registrations.status === 'loading'}
         pendingRegistration={
           registrations.status === 'ready'
             ? (registrations.data.find(
@@ -125,12 +127,14 @@ function RegistrationForm({
   card,
   cardsFailed,
   cardsLoading,
+  registrationsLoading,
   pendingRegistration,
 }: {
   pkg: SportPackage
   card: MemberCard | null
   cardsFailed: boolean
   cardsLoading: boolean
+  registrationsLoading: boolean
   pendingRegistration: PackageRegistration | null
 }) {
   // "Today" is read again on focus, on change and at submit, so a page left open past midnight
@@ -149,11 +153,13 @@ function RegistrationForm({
   const price = priceBreakdown(pkg, card)
   const endDate = startDate && !validateStartDate(startDate, minDate) ? packageEndDate(startDate, pkg.durationDays) : null
   const blocked = pendingRegistration !== null && registration === null
+  // Confirm waits for the registrations list, so a fast click cannot create a duplicate.
+  const checking = registrationsLoading && registration === null
   const title = packageTitle(pkg)
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (sendingRef.current || registration || blocked) {
+    if (sendingRef.current || registration || blocked || checking) {
       return
     }
     setFormError(null)
@@ -301,9 +307,14 @@ function RegistrationForm({
               <dd>{endDate ? formatDate(endDate) : '-'}</dd>
             </div>
           </dl>
-          <Button type="submit" loading={submitting} disabled={registration !== null || blocked} fullWidth>
+          <Button type="submit" loading={submitting} disabled={registration !== null || blocked || checking} fullWidth>
             Confirm registration
           </Button>
+          {checking && (
+            <p className="package-detail__checking" role="status">
+              Checking your registrations
+            </p>
+          )}
           <p className="notice notice--info package-detail__note">
             Payment confirmation is required before activation. A package that starts later stays scheduled until its
             start date.

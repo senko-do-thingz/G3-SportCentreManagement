@@ -479,3 +479,9 @@
     grid-template-columns: 1fr;
   }
 }
+
+.package-detail__checking {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-align: center;
+}
