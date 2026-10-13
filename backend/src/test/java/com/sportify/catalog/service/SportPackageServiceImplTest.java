@@ -52,6 +52,7 @@ import org.springframework.data.jpa.domain.Specification;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -855,6 +856,74 @@ public class SportPackageServiceImplTest {
                 .build();
 
         assertThrows(BusinessRuleException.class, () -> sportPackageService.updatePackage(10L, negPriceReq, null));
+    }
+
+    @Test
+    void updatePackage_blankDescription_clearsDescription() {
+        SportPackage pkg = SportPackage.builder()
+                .id(10L)
+                .code("PKG-10")
+                .name("Yoga Flow")
+                .sport(sport)
+                .trainingFormat(TrainingFormat.SELF_TRAINING)
+                .durationDays(30)
+                .sessionCount(10)
+                .sessionMinutes(60)
+                .priceAmount(BigDecimal.valueOf(200000.00))
+                .description("Initial description")
+                .isActive(true)
+                .build();
+
+        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(pkg));
+        when(sportPackageRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        SportPackageUpdateRequest req = SportPackageUpdateRequest.builder()
+                .name("Yoga Flow")
+                .price(BigDecimal.valueOf(200000.00))
+                .sessionCount(10)
+                .durationDays(30)
+                .sessionMinutes(60)
+                .active(true)
+                .description("   ")
+                .build();
+
+        SportPackageResponse res = sportPackageService.updatePackage(10L, req, null);
+        assertNull(res.getDescription());
+        assertNull(pkg.getDescription());
+    }
+
+    @Test
+    void updatePackage_nullDescription_clearsDescription() {
+        SportPackage pkg = SportPackage.builder()
+                .id(10L)
+                .code("PKG-10")
+                .name("Yoga Flow")
+                .sport(sport)
+                .trainingFormat(TrainingFormat.SELF_TRAINING)
+                .durationDays(30)
+                .sessionCount(10)
+                .sessionMinutes(60)
+                .priceAmount(BigDecimal.valueOf(200000.00))
+                .description("Initial description")
+                .isActive(true)
+                .build();
+
+        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(pkg));
+        when(sportPackageRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        SportPackageUpdateRequest req = SportPackageUpdateRequest.builder()
+                .name("Yoga Flow")
+                .price(BigDecimal.valueOf(200000.00))
+                .sessionCount(10)
+                .durationDays(30)
+                .sessionMinutes(60)
+                .active(true)
+                .description(null)
+                .build();
+
+        SportPackageResponse res = sportPackageService.updatePackage(10L, req, null);
+        assertNull(res.getDescription());
+        assertNull(pkg.getDescription());
     }
 
     @Test

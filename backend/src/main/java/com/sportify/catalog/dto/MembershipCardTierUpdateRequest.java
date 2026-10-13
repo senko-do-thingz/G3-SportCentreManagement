@@ -1,9 +1,11 @@
 package com.sportify.catalog.dto;
 
-import com.fasterxml.jackson.annotation.JsonAlias;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -15,10 +17,12 @@ import java.math.BigDecimal;
 @Builder
 public class MembershipCardTierUpdateRequest {
 
+    @Size(max = 50, message = "Tier name must not exceed 50 characters")
     private String name;
 
     @NotNull(message = "Price is required")
-    @JsonAlias({"price", "priceAmount"})
+    @DecimalMin(value = "0.00", message = "Price must be greater than or equal to zero")
+    @Digits(integer = 12, fraction = 2, message = "Price format is invalid")
     private BigDecimal price;
 
     @NotNull(message = "Duration in months is required")
@@ -30,25 +34,9 @@ public class MembershipCardTierUpdateRequest {
     @Max(value = 100, message = "Discount percentage cannot be greater than 100")
     private Integer discountPercentage;
 
+    @Size(max = 500, message = "Description must not exceed 500 characters")
     private String description;
 
     @NotNull(message = "Active flag is required")
-    @JsonAlias({"active", "isActive"})
     private Boolean active;
-
-    public Boolean getIsActive() {
-        return active;
-    }
-
-    public void setIsActive(Boolean active) {
-        this.active = active;
-    }
-
-    public BigDecimal getPriceAmount() {
-        return price;
-    }
-
-    public void setPriceAmount(BigDecimal priceAmount) {
-        this.price = priceAmount;
-    }
 }

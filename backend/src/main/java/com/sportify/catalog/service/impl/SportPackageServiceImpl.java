@@ -125,9 +125,11 @@ public class SportPackageServiceImpl implements SportPackageService {
         pkg.setDurationDays(request.getDurationDays());
         pkg.setSessionMinutes(request.getSessionMinutes());
         pkg.setIsActive(request.getActive());
-        if (request.getDescription() != null) {
-            pkg.setDescription(request.getDescription().trim());
-        }
+        // Full-replace semantics: a null or blank value clears the description.
+        String cleanedDescription = (request.getDescription() == null || request.getDescription().isBlank())
+                ? null
+                : request.getDescription().trim();
+        pkg.setDescription(cleanedDescription);
 
         SportPackage saved = sportPackageRepository.saveAndFlush(pkg);
         Map<String, Object> after = snapshotPackage(saved);

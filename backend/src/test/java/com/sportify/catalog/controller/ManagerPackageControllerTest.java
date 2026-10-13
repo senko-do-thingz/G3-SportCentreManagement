@@ -289,6 +289,58 @@ class ManagerPackageControllerTest {
     }
 
     @Test
+    void updatePackage_name101Chars_shouldReturn400() throws Exception {
+        SportPackageUpdateRequest req = sampleUpdateRequest();
+        req.setName("A".repeat(101));
+
+        mockMvc.perform(put(PACKAGES_URL + "/10")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void updatePackage_description501Chars_shouldReturn400() throws Exception {
+        SportPackageUpdateRequest req = sampleUpdateRequest();
+        req.setDescription("D".repeat(501));
+
+        mockMvc.perform(put(PACKAGES_URL + "/10")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void updatePackage_priceWith3Decimals_shouldReturn400() throws Exception {
+        SportPackageUpdateRequest req = sampleUpdateRequest();
+        req.setPrice(new BigDecimal("100.999"));
+
+        mockMvc.perform(put(PACKAGES_URL + "/10")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void updatePackage_priceWith13IntegerDigits_shouldReturn400() throws Exception {
+        SportPackageUpdateRequest req = sampleUpdateRequest();
+        req.setPrice(new BigDecimal("1000000000000.00"));
+
+        mockMvc.perform(put(PACKAGES_URL + "/10")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
     void updatePackage_notFoundId_shouldReturn404() throws Exception {
         SportPackageUpdateRequest req = sampleUpdateRequest();
 

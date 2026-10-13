@@ -47,6 +47,7 @@ import org.springframework.data.domain.Sort;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -1023,6 +1024,64 @@ public class MembershipCardServiceImplTest {
         assertEquals(BigDecimal.ZERO, res.getPrice());
         assertEquals(0, res.getDiscountPercentage());
         assertEquals(true, res.getIsActive());
+    }
+
+    @Test
+    void updateTier_blankDescription_clearsDescription() {
+        MembershipCardTier tier = MembershipCardTier.builder()
+                .id(2L)
+                .code("GOLD")
+                .name("Gold")
+                .price(BigDecimal.valueOf(300000.00))
+                .durationMonths(12)
+                .discountPercentage(5)
+                .description("Initial description")
+                .isActive(true)
+                .build();
+
+        when(tierRepository.findById(2L)).thenReturn(Optional.of(tier));
+        when(tierRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.valueOf(300000.00))
+                .durationMonths(12)
+                .discountPercentage(5)
+                .active(true)
+                .description("   ")
+                .build();
+
+        CardTierResponse res = membershipCardService.updateTier(2L, req, null);
+        assertNull(res.getDescription());
+        assertNull(tier.getDescription());
+    }
+
+    @Test
+    void updateTier_nullDescription_clearsDescription() {
+        MembershipCardTier tier = MembershipCardTier.builder()
+                .id(2L)
+                .code("GOLD")
+                .name("Gold")
+                .price(BigDecimal.valueOf(300000.00))
+                .durationMonths(12)
+                .discountPercentage(5)
+                .description("Initial description")
+                .isActive(true)
+                .build();
+
+        when(tierRepository.findById(2L)).thenReturn(Optional.of(tier));
+        when(tierRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.valueOf(300000.00))
+                .durationMonths(12)
+                .discountPercentage(5)
+                .active(true)
+                .description(null)
+                .build();
+
+        CardTierResponse res = membershipCardService.updateTier(2L, req, null);
+        assertNull(res.getDescription());
+        assertNull(tier.getDescription());
     }
 
     @Test

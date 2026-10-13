@@ -119,9 +119,11 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         }
         tier.setDurationMonths(request.getDurationMonths());
         tier.setDiscountPercentage(request.getDiscountPercentage());
-        if (request.getDescription() != null) {
-            tier.setDescription(request.getDescription().trim());
-        }
+        // Full-replace semantics: a null or blank value clears the description.
+        String cleanedDescription = (request.getDescription() == null || request.getDescription().isBlank())
+                ? null
+                : request.getDescription().trim();
+        tier.setDescription(cleanedDescription);
         if (request.getName() != null && !request.getName().trim().isBlank()) {
             tier.setName(request.getName().trim());
         }

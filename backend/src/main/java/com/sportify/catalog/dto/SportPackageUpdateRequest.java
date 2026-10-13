@@ -1,10 +1,11 @@
 package com.sportify.catalog.dto;
 
-import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -17,11 +18,12 @@ import java.math.BigDecimal;
 public class SportPackageUpdateRequest {
 
     @NotBlank(message = "Package name is required")
+    @Size(max = 100, message = "Package name must not exceed 100 characters")
     private String name;
 
     @NotNull(message = "Price is required")
     @DecimalMin(value = "0.01", message = "Price must be greater than zero")
-    @JsonAlias({"price", "priceAmount"})
+    @Digits(integer = 12, fraction = 2, message = "Price format is invalid")
     private BigDecimal price;
 
     @NotNull(message = "Session count is required")
@@ -36,24 +38,8 @@ public class SportPackageUpdateRequest {
     private Integer sessionMinutes;
 
     @NotNull(message = "Active flag is required")
-    @JsonAlias({"active", "isActive"})
     private Boolean active;
 
+    @Size(max = 500, message = "Description must not exceed 500 characters")
     private String description;
-
-    public Boolean getIsActive() {
-        return active;
-    }
-
-    public void setIsActive(Boolean active) {
-        this.active = active;
-    }
-
-    public BigDecimal getPriceAmount() {
-        return price;
-    }
-
-    public void setPriceAmount(BigDecimal priceAmount) {
-        this.price = priceAmount;
-    }
 }

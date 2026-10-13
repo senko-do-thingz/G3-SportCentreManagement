@@ -253,6 +253,58 @@ class ManagerCardTierControllerTest {
     }
 
     @Test
+    void updateTier_name51Chars_shouldReturn400() throws Exception {
+        MembershipCardTierUpdateRequest req = sampleGoldUpdateRequest();
+        req.setName("A".repeat(51));
+
+        mockMvc.perform(put(CARD_TIERS_URL + "/2")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void updateTier_description501Chars_shouldReturn400() throws Exception {
+        MembershipCardTierUpdateRequest req = sampleGoldUpdateRequest();
+        req.setDescription("D".repeat(501));
+
+        mockMvc.perform(put(CARD_TIERS_URL + "/2")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void updateTier_priceWith3Decimals_shouldReturn400() throws Exception {
+        MembershipCardTierUpdateRequest req = sampleGoldUpdateRequest();
+        req.setPrice(new BigDecimal("100.999"));
+
+        mockMvc.perform(put(CARD_TIERS_URL + "/2")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void updateTier_priceWith13IntegerDigits_shouldReturn400() throws Exception {
+        MembershipCardTierUpdateRequest req = sampleGoldUpdateRequest();
+        req.setPrice(new BigDecimal("1000000000000.00"));
+
+        mockMvc.perform(put(CARD_TIERS_URL + "/2")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
     void updateTier_attemptChangeStandardPrice_shouldReturn400() throws Exception {
         MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
                 .name("Standard")
