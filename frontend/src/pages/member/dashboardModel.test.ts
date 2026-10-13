@@ -3,6 +3,7 @@ import { booking, card, registration } from '../../test/memberFixtures'
 import {
   activeRegistrations,
   canBook,
+  cardDiscountText,
   currentCard,
   dashboardState,
   hasHadPackage,
@@ -186,5 +187,12 @@ describe('FE-02 dashboard model', () => {
     expect(hasHadPackage([{ status: 'PENDING_PAYMENT' }, { status: 'CANCELLED' }])).toBe(false)
     expect(hasHadPackage([{ status: 'ACTIVE' }])).toBe(true)
     expect(hasHadPackage([{ status: 'EXPIRED' }])).toBe(true)
+  })
+
+  // Review round 3
+
+  it('TC-FE02-127 cardDiscountText states the documented rule', () => {
+    expect(cardDiscountText(10)).toBe('10% off 30 day and 90 day packages')
+    expect(cardDiscountText(5)).toBe('5% off 30 day and 90 day packages')
   })
 })

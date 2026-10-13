@@ -95,7 +95,7 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
     expect(screen.getByRole('heading', { name: 'Ready for your next session?' })).toBeInTheDocument()
     expect(screen.getByText('Welcome back, Taylor Nguyen')).toBeInTheDocument()
     expect(statValue('Membership tier')).toBe('VIP')
-    expect(statHint('Membership tier')).toBe('Active - Until 04 Jul 2027 - 10% off packages')
+    expect(statHint('Membership tier')).toBe('Active - Until 04 Jul 2027 - 10% off 30 day and 90 day packages')
     expect(statValue('Active packages')).toBe('1')
     expect(statValue('Upcoming sessions')).toBe('1')
 
@@ -384,6 +384,13 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
     ).toBeInTheDocument()
     expect(within(hero).getByRole('link', { name: 'Explore packages' })).toHaveAttribute('href', '/member/packages')
     expect(within(hero).queryByText(/no sessions left|have ended/)).not.toBeInTheDocument()
+  })
+
+  it('TC-FE02-126 the tier hint and the first-package hero state the same discount rule', async () => {
+    await openDashboard({ cards: [card()] })
+    const rule = '10% off 30 day and 90 day packages'
+    expect(statHint('Membership tier')).toContain(rule)
+    expect(screen.getByRole('region', { name: 'Choose your first sport package.' })).toHaveTextContent(rule)
   })
 
   it('TC-FE02-123 a member with only an expired card and no package gets the generic first package text', async () => {

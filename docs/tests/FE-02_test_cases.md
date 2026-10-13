@@ -38,23 +38,23 @@ npm run lint -- --max-warnings 0
 npm run build
 ```
 
-### 1.3 Result summary (2026-10-13, after review round 2)
+### 1.3 Result summary (2026-10-13, after review round 3)
 | Group | Cases | Result |
 |---|---|---|
-| Automated, dashboard rules (`src/pages/member/dashboardModel.test.ts`) | 21 (2 new in round 2, 1 changed) | 21 PASSED |
-| Automated, dashboard screen (`src/pages/member/memberDashboard.test.tsx`) | 28 (4 new in round 2) | 28 PASSED |
-| Automated, profile screen (`src/pages/member/myProfile.test.tsx`) | 26 (2 new in round 2, 1 changed) | 26 PASSED |
+| Automated, dashboard rules (`src/pages/member/dashboardModel.test.ts`) | 22 (1 new in round 3) | 22 PASSED |
+| Automated, dashboard screen (`src/pages/member/memberDashboard.test.tsx`) | 29 (1 new and 1 changed in round 3) | 29 PASSED |
+| Automated, profile screen (`src/pages/member/myProfile.test.tsx`) | 26 | 26 PASSED |
 | Automated, profile validation (`src/pages/member/profileValidation.test.ts`) | 10 | 10 PASSED |
 | Automated, load hook (`src/pages/member/useMemberResource.test.tsx`) | 5 | 5 PASSED |
 | Automated, menu lookup (`src/layouts/navigation.test.ts`) | 2 | 2 PASSED |
-| Automated, API client (`src/api/client.test.ts`) | 23 (the round 1 FE-02 test replaced by 6 tests in round 2) | 23 PASSED |
+| Automated, API client (`src/api/client.test.ts`) | 23 | 23 PASSED |
 | Automated, other FE-00 and FE-01 files | 140 | 140 PASSED |
 | Lint, type check and build | 3 | 3 PASSED, 0 warnings |
 | Deliberate regressions (section 3) | 10 (first round) + 14 (round 1) + 6 (round 2) | 30 caught |
 | Browser checks in Chromium against a mock API (section 4) | 10 (rounds 0 and 1; B10 superseded, see section 4) | 10 PASSED when run |
 | Manual checks against the real backend (section 5) | 14 | NOT RUN YET (needs BE-02 merged and SQL Server) |
 
-Total: 255 Vitest tests in 15 files. 13 added in review round 2 (242 before): 14 new tests, 1 round 1 client test removed with the option it tested.
+Total: 257 Vitest tests in 15 files. 2 added in review round 3 (255 before), 1 existing test changed (TC-FE02-021). Round 2 added 13 (242 -> 255).
 
 ---
 
@@ -86,6 +86,7 @@ Today is fixed at 2026-10-13, now at 2026-10-13 09:30.
 | TC-FE02-019 | heroVariant (round 1, B4, M2; changed in round 2: takes a facts object) | welcome, book, pay (with or without a past package), renew | PASSED |
 | TC-FE02-120 | heroVariant with a paid card and no package ever (round 2, R2-M1) | first-package, not renew | PASSED |
 | TC-FE02-121 | hasHadPackage (round 2, R2-M1) | False for none, pending and cancelled; true for ACTIVE or EXPIRED | PASSED |
+| TC-FE02-127 | cardDiscountText (round 3, R3-m1) | "10% off 30 day and 90 day packages", "5% off 30 day and 90 day packages" | PASSED |
 
 ### 2.2 Dashboard screen - `frontend/src/pages/member/memberDashboard.test.tsx`
 The whole app is rendered at `/member` with a member session and a fake backend.
@@ -93,7 +94,7 @@ The whole app is rendered at `/member` with a member session and a fake backend.
 | ID | AC | Case | Expected result | Result |
 |---|---|---|---|---|
 | TC-FE02-020 | AC1 | New member (no cards, packages or bookings) | data-state new-standard; hero "Welcome, Taylor Nguyen."; tier Standard with "Explore cards for package discounts"; 0 active packages; 0 sessions; "No sport packages yet" with Explore packages link to /member/packages; "No upcoming sessions"; no Pending payments block | PASSED |
-| TC-FE02-021 | AC1 | VIP card, one active package (6 of 8 sessions), one booking | data-state after-purchase; hero "Ready for your next session?"; tier VIP "Active - Until 04 Jul 2027 - 10% off packages"; package REG-0011 "Football - Coach-led", "Football 30 days - Ends 30 Oct 2026", "6 of 8 sessions remaining", progress bar 6 of 8, Book a session and Renew package links; session "14 Oct 2026, 17:00 to 18:30 - BK-0021" | PASSED |
+| TC-FE02-021 | AC1 | VIP card, one active package (6 of 8 sessions), one booking | data-state after-purchase; hero "Ready for your next session?"; tier VIP "Active - Until 04 Jul 2027 - 10% off 30 day and 90 day packages" (changed in round 3); package REG-0011 "Football - Coach-led", "Football 30 days - Ends 30 Oct 2026", "6 of 8 sessions remaining", progress bar 6 of 8, Book a session and Renew package links; session "14 Oct 2026, 17:00 to 18:30 - BK-0021" | PASSED |
 | TC-FE02-022 | AC1 | Active package | Hero button Book a session to /member/schedule | PASSED |
 | TC-FE02-023 | AC2 | Package in PENDING_PAYMENT with payment 52 | Pending payments block with title, "PAY-0052 - 810.000 VND", Pending payment badge, link "Pay now" to /member/payments/52; click opens My Payments and Receipts, not a 404 | PASSED |
 | TC-FE02-024 | AC2 | Card request in PENDING_PAYMENT with payment 51 | "Pay now" to /member/payments/51; tier stays Standard | PASSED |
@@ -116,6 +117,7 @@ The whole app is rendered at `/member` with a member session and a fake backend.
 | TC-FE02-091 | m4 | 12 remaining of 8 | aria-valuenow 8, aria-valuemax 8, "8 of 8 sessions remaining" | PASSED |
 | TC-FE02-092 | m6 | Cards fail, bookings load, then Try again | Cards called twice, bookings called once, Upcoming sessions shows 1 | PASSED |
 | TC-FE02-093 | m6 | Cards and bookings fail, then Try again | Bookings called again and shown | PASSED |
+| TC-FE02-126 | R3-m1 | ACTIVE VIP card, no registrations | Tier hint and first-package hero both contain "10% off 30 day and 90 day packages" | PASSED |
 | TC-FE02-122 | R2-M1 | ACTIVE VIP card, no registrations | Hero data-variant first-package, title "Choose your first sport package.", text "Your VIP card gives you 10% off 30 day and 90 day packages. Pick a sport to start training.", Explore packages to /member/packages; no "no sessions left" text | PASSED |
 | TC-FE02-123 | R2-M1 | Only an expired card, no registrations | Hero first-package with "Pick a sport and a training style to start training." | PASSED |
 | TC-FE02-124 | R2-m1 | One package with 0 sessions left | Active packages 1 (same as the list), hint "0 can be booked - 1 with no sessions left" | PASSED |
@@ -244,6 +246,11 @@ Deliberate regressions, each applied alone and reverted, full `npx vitest run`:
 | 5 | Active packages hint always the default | R2-m1 | 1 test failed |
 | 6 | My Payments menu entry renamed | R2-m2 | navigation test failed and 5 test files that render the app failed to load (module load error) |
 
+### 3.4 Review round 3
+- R3-m1: the rule "card discounts apply only to 30-day and 90-day packages" is documented in `docs/database/09-business-rules-and-state-machines.md` lines 149 to 153, so the wording was kept and moved into `cardDiscountText` (dashboardModel.ts), used by both the tier hint and the first-package hero.
+- Existing test changed: `memberDashboard.test.tsx` TC-FE02-021, the tier hint now reads "Active - Until 04 Jul 2027 - 10% off 30 day and 90 day packages" (was "10% off packages").
+- New tests: TC-FE02-126 (both texts agree), TC-FE02-127 (helper). TC-FE02-122 needed no change: its text is the same.
+
 ## 4. Browser checks (Chromium 1280x900 and 390x800, mock API on port 8099)
 
 | ID | Check | Result |
@@ -334,3 +341,14 @@ Preconditions: BE-02 merged (PUT /users/me and PUT /users/me/password), backend 
 - Steps: compare /member (both states) and /member/profile with the F1-07 and F1-08 exports.
 - Expected: same structure and colours; known differences listed in the AI Audit Log (no Notifications, Recommended for you, Interested sports, AI Assistant).
 - Result: NOT RUN
+
+---
+
+## 6. Open questions for the backend team
+- BE-02 `PUT /users/me`: body `{fullName, phone, dateOfBirth, address, mainGoal, currentLevel}` with phone and the optional fields allowed to be null; answer `UserProfileResponse` or 204.
+- BE-02 `GET /users/me`: add `dateOfBirth`, `address`, `mainGoal`, `currentLevel`, `memberCode`.
+- BE-02 `PUT /users/me/password`: preferred answer for a wrong current password is 400 with `details.currentPassword` (a 401 works but costs one token refresh per wrong attempt).
+- BE-02 `PUT /users/me/password` (review round 3): Does PUT /users/me/password revoke existing refresh tokens? If it does, the member is signed out at the next refresh after a successful change; the frontend should then tell the member and send them to login right after the change.
+- Discount rule (review round 3): `docs/database/09` says card discounts apply only to 30-day and 90-day packages, but `MembershipCardServiceImpl.getApplicableDiscountPercentage` (lines 275 to 279) only excludes packages of 1 day or less. With the seeded packages (1, 30 and 90 days) both agree; a package of another length created by the manager would be discounted although the dashboard text says otherwise. Which one is the rule?
+- BE-12: `GET /bookings/my?when=UPCOMING`.
+- Figma gaps: Notifications, Recommended for you, AI Assistant (F1-07) and Interested sports (F1-08).

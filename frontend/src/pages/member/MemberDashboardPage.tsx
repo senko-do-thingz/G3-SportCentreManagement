@@ -9,6 +9,7 @@ import { formatDate, formatDateTime } from '../../utils/format'
 import {
   activeRegistrations,
   canBook,
+  cardDiscountText,
   currentCard,
   dashboardState,
   hasHadPackage,
@@ -160,7 +161,7 @@ export function MemberDashboardPage() {
 }
 
 function cardHint(card: MemberCard): string {
-  const discount = card.discountPercentage ? `${card.discountPercentage}% off packages` : null
+  const discount = card.discountPercentage ? cardDiscountText(card.discountPercentage) : null
   const until = card.endDate ? `Active - Until ${formatDate(card.endDate)}` : 'Active'
   return discount ? `${until} - ${discount}` : until
 }
@@ -188,7 +189,7 @@ function activePackagesHint(activeCount: number, bookableCount: number): string 
 /** Text of the first-package hero: the card discount when a card is in force. */
 function firstPackageText(card: MemberCard | null): string {
   if (card && card.discountPercentage) {
-    return `Your ${card.tierName} card gives you ${card.discountPercentage}% off 30 day and 90 day packages. Pick a sport to start training.`
+    return `Your ${card.tierName} card gives you ${cardDiscountText(card.discountPercentage)}. Pick a sport to start training.`
   }
   return 'Pick a sport and a training style to start training.'
 }

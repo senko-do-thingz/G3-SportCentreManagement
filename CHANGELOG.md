@@ -2,7 +2,7 @@
 
 ## 2026-10-13 - Member Dashboard and My Profile (FE-02, Flow 1)
 
-Branch `feat/f1-member-dashboard`. Owner: Phat. Priority: P1. Depends on FE-01 (merged) and BE-02 (not merged yet, see Open Questions). Verified with `npm run lint -- --max-warnings 0`, `tsc -b`, `npm test` and `npm run build`, plus browser checks in Chromium against a mock of the member API. After review round 1: 242 tests in 15 files (30 added in round 1). After review round 2: 255 tests in 15 files (13 added in round 2).
+Branch `feat/f1-member-dashboard`. Owner: Phat. Priority: P1. Depends on FE-01 (merged) and BE-02 (not merged yet, see Open Questions). Verified with `npm run lint -- --max-warnings 0`, `tsc -b`, `npm test` and `npm run build`, plus browser checks in Chromium against a mock of the member API. After review round 1: 242 tests in 15 files (30 added in round 1). After review round 2: 255 tests in 15 files (13 added in round 2). After review round 3: 257 tests in 15 files.
 
 ### Review Fixes (Round 1)
 - B1 (superseded by R2-B1) Change password never signs out: new per-request option `skipAuthRefresh` in `api/client.ts` (a 401 is thrown as a normal ApiError, no refresh, no retry, no sign out; every other request unchanged). `memberApi.changePassword` uses it; a 401 is shown under Current password.
@@ -28,6 +28,11 @@ Branch `feat/f1-member-dashboard`. Owner: Phat. Priority: P1. Depends on FE-01 (
 - R2-m1 Active packages stat keeps counting the packages of the list; when some have no sessions left the hint reads "<n> can be booked - <m> with no sessions left".
 - R2-m2 `requireNavItem` kept at module load in `AppRoutes.tsx`; documented that it runs in every build and that a missing entry fails `navigation.test.ts` and every test that renders the app.
 - Verified: 255 tests in 15 files (13 added in round 2), lint, `tsc -b` and build green.
+
+### Review Fixes (Round 3)
+- R3-m1 The discount rule in the dashboard text is documented in `docs/database/09-business-rules-and-state-machines.md` lines 149 to 153 (30-day and 90-day packages only), so the wording stays. New helper `cardDiscountText` is used by both the tier stat hint and the first-package hero, so both read "<n>% off 30 day and 90 day packages". The backend code only excludes packages of 1 day or less; listed as an open question.
+- R3-doc New open question for BE-02: does `PUT /users/me/password` revoke existing refresh tokens? If it does, the member is signed out at the next refresh after a successful change, and the frontend should then tell the member and send them to login right after the change.
+- Verified: 257 tests in 15 files (2 added, 1 changed in round 3), lint, `tsc -b` and build green.
 
 ### Added
 - Member Dashboard (F1-07) at `/member`: greeting hero, membership tier stat, active packages and upcoming sessions stats, pending payments with a "Pay now" link to `/member/payments/{paymentId}`, active sport packages with remaining sessions, end date and progress bar, upcoming bookings, profile card and quick links.

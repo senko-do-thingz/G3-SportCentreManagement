@@ -53,6 +53,16 @@ export function registrationTitle(registration: Pick<PackageRegistration, 'sport
   return format ? `${registration.sportName} - ${format}` : registration.sportName
 }
 
+/**
+ * "10% off 30 day and 90 day packages". Shared by the tier stat hint and the first-package hero so
+ * both texts state the same rule. Source: docs/database/09-business-rules-and-state-machines.md
+ * lines 149 to 153 (card discounts apply only to 30-day and 90-day packages; single-visit packages
+ * are excluded).
+ */
+export function cardDiscountText(discountPercentage: number): string {
+  return `${discountPercentage}% off 30 day and 90 day packages`
+}
+
 /** True when the date range contains today. A missing start or end date is an open bound. */
 function coversToday(startDate: string | null, endDate: string | null, today: string): boolean {
   return (!startDate || startDate <= today) && (!endDate || endDate >= today)
