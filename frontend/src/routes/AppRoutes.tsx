@@ -10,9 +10,12 @@ import { PageLoader } from '../components/ui/Spinner'
 import { MemberDashboardPage } from '../pages/member/MemberDashboardPage'
 import { MembershipCardsPage } from '../pages/member/MembershipCardsPage'
 import { MyMembershipPage } from '../pages/member/MyMembershipPage'
+import { MyPaymentsPage } from '../pages/member/MyPaymentsPage'
 import { MyProfilePage } from '../pages/member/MyProfilePage'
 import { PackageDetailPage } from '../pages/member/PackageDetailPage'
+import { PaymentStatusPage } from '../pages/member/PaymentStatusPage'
 import { PaymentSummaryPage } from '../pages/member/PaymentSummaryPage'
+import { ReceiptPage } from '../pages/member/ReceiptPage'
 import { SportPackagesPage } from '../pages/member/SportPackagesPage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
 import { CheckInPage } from '../pages/reception/CheckInPage'
@@ -35,6 +38,7 @@ const SCREENS: Record<string, ReactNode> = {
   '/member/profile': <MyProfilePage />,
   '/member/packages': <SportPackagesPage />,
   '/member/membership': <MyMembershipPage />,
+  '/member/payments': <MyPaymentsPage />,
   '/reception': <MemberSearchPage />,
   '/reception/register': <RegisterRenewPage />,
   '/reception/check-in': <CheckInPage />,
@@ -45,9 +49,11 @@ const SCREENS: Record<string, ReactNode> = {
  * - 'packages/:packageId': Package Detail and Registration (F1-10, FE-03).
  * - 'membership/cards': Membership Cards and the Renew Membership Card overlay (F1-11, FE-04),
  *   linked from the Membership card tab of My Membership (F1-12).
- * - 'payments/:paymentId': Payment Summary (F3-01), linked from "Pay now" on the dashboard (FE-02)
- *   and reached after a registration (FE-03). FE-03 replaced the FE-02 placeholder with a read only
- *   summary; FE-11 adds the payment method and the status screens.
+ * - 'payments/:paymentId': Payment Summary (F3-01, S3-Single) with the payment method choice,
+ *   linked from "Pay now" on the dashboard (FE-02) and reached after a registration (FE-03).
+ * - 'payments/:paymentId/status': Payment Instructions and Status (F3-02, FE-11).
+ * - 'payments/receipts/:invoiceId': Receipt (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt,
+ *   FE-11). The static segment "receipts" ranks above ":paymentId", so the two never clash.
  * - '/reception' 'payments/:paymentId': payment confirmation and receipt for the front desk (FE-05),
  *   opened from a pending online request or after a desk sale. FE-12 extends it (F3-04 to F3-07).
  */
@@ -56,6 +62,8 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
     { path: 'packages/:packageId', element: <PackageDetailPage /> },
     { path: 'membership/cards', element: <MembershipCardsPage /> },
     { path: 'payments/:paymentId', element: <PaymentSummaryPage /> },
+    { path: 'payments/:paymentId/status', element: <PaymentStatusPage /> },
+    { path: 'payments/receipts/:invoiceId', element: <ReceiptPage /> },
   ],
   '/reception': [{ path: 'payments/:paymentId', element: <ReceptionPaymentPage /> }],
 }
