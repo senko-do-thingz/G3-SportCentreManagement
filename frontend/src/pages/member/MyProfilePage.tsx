@@ -14,11 +14,16 @@ import { useFocusFirstInvalid } from '../../utils/useFocusFirstInvalid'
 import { MEMBER_PATHS, toIsoDate } from './dashboardModel'
 import {
   ADDRESS_MAX_LENGTH,
+  CURRENT_PASSWORD_REJECTED_MESSAGE,
   EMPTY_PASSWORD_FORM,
+  FULL_NAME_MAX_LENGTH,
   GOAL_OPTIONS,
+  latestDateOfBirth,
   LEVEL_OPTIONS,
+  MIN_DATE_OF_BIRTH,
   PASSWORD_CHANGED_MESSAGE,
   PASSWORD_FIELDS,
+  PHONE_INPUT_MAX_LENGTH,
   PROFILE_FIELDS,
   PROFILE_SAVED_MESSAGE,
   profileFormFrom,
@@ -50,18 +55,21 @@ function profileFailure(error: unknown): FormFailure {
 }
 
 /**
- * A wrong current password must come back as 400 (BE-02 contract), never 401: a 401 makes the API
- * client refresh the token and then end the session. A 400 without details that talks about the
- * current password is shown under that field.
+ * Decides where a failed PUT /users/me/password is shown, from the HTTP status and the backend
+ * field keys only, never from the message text:
+ * - 401 (sent with skipAuthRefresh, so the session is kept): under Current password;
+ * - 400 with details: each key under its field (currentPassword, newPassword, confirmPassword),
+ *   unknown keys above the form;
+ * - anything else, including a 400 without details: above the form.
  */
 function passwordFailure(error: unknown): FormFailure {
   if (error instanceof ApiError) {
+    if (error.status === 401) {
+      return { fields: { currentPassword: CURRENT_PASSWORD_REJECTED_MESSAGE }, form: null }
+    }
     if (error.hasFieldErrors) {
       const { fields, formMessage } = splitFieldErrors(error.fieldErrors, PASSWORD_FIELDS)
       return { fields, form: formMessage }
-    }
-    if (error.status === 400 && /current password/i.test(error.message)) {
-      return { fields: { currentPassword: error.message }, form: null }
     }
   }
   return { fields: {}, form: getErrorMessage(error) }
@@ -190,9 +198,8 @@ function PersonalInfoCard({ initial, onSaved }: { initial: UserProfile; onSaved:
   return (
     <Card title="Personal information">
       {success && (
-        <p className="notice notice--success" role="status">
-          {success}
-        </p>
+        // Not a live region: the success toast is the single announcement for screen readers.
+        <p className="notice notice--success">{success}</p>
       )}
       {formError && (
         <p className="notice notice--danger" role="alert">
@@ -206,7 +213,7 @@ function PersonalInfoCard({ initial, onSaved }: { initial: UserProfile; onSaved:
               label="Full name"
               name="fullName"
               autoComplete="name"
-              maxLength={100}
+              maxLength={FULL_NAME_MAX_LENGTH}
               value={form.fullName}
               onChange={(event) => update('fullName', event.target.value)}
               error={fieldErrors.fullName}
@@ -217,8 +224,8 @@ function PersonalInfoCard({ initial, onSaved }: { initial: UserProfile; onSaved:
               type="date"
               name="dateOfBirth"
               autoComplete="bday"
-              min="1900-01-01"
-              max={today}
+              min={MIN_DATE_OF_BIRTH}
+              max={latestDateOfBirth(today)}
               value={form.dateOfBirth}
               onChange={(event) => update('dateOfBirth', event.target.value)}
               error={fieldErrors.dateOfBirth}
@@ -237,11 +244,10 @@ function PersonalInfoCard({ initial, onSaved }: { initial: UserProfile; onSaved:
               name="phone"
               autoComplete="tel"
               inputMode="tel"
-              maxLength={24}
+              maxLength={PHONE_INPUT_MAX_LENGTH}
               value={form.phone}
               onChange={(event) => update('phone', event.target.value)}
               error={fieldErrors.phone}
-              required
             />
             <Select
               label="Training goal"
@@ -349,9 +355,8 @@ function ChangePasswordCard() {
   return (
     <Card title="Change password">
       {success && (
-        <p className="notice notice--success" role="status">
-          {success}
-        </p>
+        // Not a live region: the success toast is the single announcement for screen readers.
+        <p className="notice notice--success">{success}</p>
       )}
       {formError && (
         <p className="notice notice--danger" role="alert">

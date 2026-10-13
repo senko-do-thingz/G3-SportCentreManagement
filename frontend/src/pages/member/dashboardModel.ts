@@ -11,6 +11,10 @@ import { formatMoney, humanizeCode } from '../../utils/format'
 export const MEMBER_PATHS = {
   profile: '/member/profile',
   packages: '/member/packages',
+  /**
+   * My Membership and Sport Packages (F1-11, F1-12). Its default tab "Sport packages" lists the
+   * member's registrations ("My registrations"), so "View all packages" points here.
+   */
   membership: '/member/membership',
   schedule: '/member/schedule',
   payments: '/member/payments',
@@ -71,9 +75,15 @@ export function currentCard(cards: MemberCard[], today: string): MemberCard | nu
   )
 }
 
-/** A paid tier the member has bought (pending, active, renewed or upgraded), not the free one. */
-function isPaidCard(card: MemberCard): boolean {
-  return card.tierCode?.toUpperCase() !== STANDARD_TIER_CODE && card.status !== 'CANCELLED'
+/**
+ * A paid tier the member has bought (pending, active, renewed or upgraded), not the free one.
+ * A missing tier code counts as paid: member_card.tier_id is NOT NULL, so a card row always has a
+ * real tier, and a missing code is a mapping problem. Counting it as a purchase never hides a card
+ * the member paid for behind the New Standard Member state.
+ */
+export function isPaidCard(card: Pick<MemberCard, 'tierCode' | 'status'>): boolean {
+  const code = (card.tierCode ?? '').toUpperCase()
+  return code !== STANDARD_TIER_CODE && card.status !== 'CANCELLED'
 }
 
 /**
@@ -102,14 +112,54 @@ export function startsLater(registration: Pick<PackageRegistration, 'startDate'>
   return Boolean(registration.startDate && registration.startDate > today)
 }
 
-/** Remaining sessions as a share of the total, between 0 and 1; null when there is no limit. */
-export function sessionShare(registration: Pick<PackageRegistration, 'totalSessions' | 'remainingSessions'>): number | null {
-  const total = registration.totalSessions
-  if (!total || total <= 0) {
+/** True for a package without a session limit (totalSessions is null). */
+export function hasNoSessionLimit(registration: Pick<PackageRegistration, 'totalSessions'>): boolean {
+  return registration.totalSessions === null || registration.totalSessions === undefined
+}
+
+/**
+ * Sessions still usable. Null means no limit. A limited package never goes below 0 or above its
+ * total; a total of 0 always gives 0 (an exhausted package, never "no limit").
+ */
+export function remainingSessionCount(
+  registration: Pick<PackageRegistration, 'totalSessions' | 'remainingSessions'>,
+): number | null {
+  if (hasNoSessionLimit(registration)) {
     return null
   }
-  const remaining = Math.max(0, Math.min(total, registration.remainingSessions ?? 0))
-  return remaining / total
+  const total = Math.max(0, registration.totalSessions ?? 0)
+  return Math.max(0, Math.min(total, registration.remainingSessions ?? 0))
+}
+
+/**
+ * Remaining sessions as a share of the total, between 0 and 1; null only when there is no limit.
+ * A total of 0 gives 0, the same as an exhausted package.
+ */
+export function sessionShare(registration: Pick<PackageRegistration, 'totalSessions' | 'remainingSessions'>): number | null {
+  const remaining = remainingSessionCount(registration)
+  if (remaining === null) {
+    return null
+  }
+  const total = registration.totalSessions ?? 0
+  return total > 0 ? remaining / total : 0
+}
+
+/** True when a limited package has no session left (including a total of 0). */
+export function isExhausted(registration: Pick<PackageRegistration, 'totalSessions' | 'remainingSessions'>): boolean {
+  return remainingSessionCount(registration) === 0
+}
+
+/**
+ * True when the member can book a session with this package: ACTIVE, not past its end date and
+ * with at least one session left (or no limit). A package bought in advance can be booked for
+ * sessions after its start date, so it counts as bookable.
+ */
+export function canBook(registration: PackageRegistration, today: string): boolean {
+  return (
+    registration.status === 'ACTIVE' &&
+    (!registration.endDate || registration.endDate >= today) &&
+    !isExhausted(registration)
+  )
 }
 
 /** One card request or package registration that waits for its payment. */
@@ -149,6 +199,25 @@ export function pendingItems(cards: MemberCard[], registrations: PackageRegistra
       paymentId: registration.paymentId,
     }))
   return [...fromCards, ...fromPackages].sort((a, b) => (b.requestedAt ?? '').localeCompare(a.requestedAt ?? ''))
+}
+
+/**
+ * Which hero the dashboard shows:
+ * - welcome: New Standard Member, nothing bought yet.
+ * - book: at least one package can be booked.
+ * - pay: nothing can be booked but a request waits for its payment.
+ * - renew: after a purchase, nothing to book and nothing to pay (packages used up or ended).
+ */
+export type HeroVariant = 'welcome' | 'book' | 'pay' | 'renew'
+
+export function heroVariant(state: DashboardState, hasBookablePackage: boolean, pendingCount: number): HeroVariant {
+  if (state === 'new-standard') {
+    return 'welcome'
+  }
+  if (hasBookablePackage) {
+    return 'book'
+  }
+  return pendingCount > 0 ? 'pay' : 'renew'
 }
 
 /** Path of the payment summary screen (F3-01, task FE-11) for a pending payment. */

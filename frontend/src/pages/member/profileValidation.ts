@@ -19,9 +19,26 @@ import type { SelectOption } from '../../components/ui/Select'
 export const PROFILE_SAVED_MESSAGE = 'Your profile was saved.'
 export const PASSWORD_CHANGED_MESSAGE = 'Your password was changed. Use the new password next time you log in.'
 
+export { FULL_NAME_MAX_LENGTH }
 export const ADDRESS_MAX_LENGTH = 255
 /** Oldest accepted date of birth; anything earlier is a typing mistake. */
 export const MIN_DATE_OF_BIRTH = '1900-01-01'
+/** Longest phone the input accepts as typed, separators included; the digits are checked by PHONE_PATTERN. */
+export const PHONE_INPUT_MAX_LENGTH = 24
+
+export const DATE_OF_BIRTH_PAST_MESSAGE = 'Date of birth must be before today'
+
+/**
+ * Latest accepted date of birth: the day before today. A date of birth must be strictly in the
+ * past, so today itself is rejected, and the date picker uses this value as its max.
+ */
+export function latestDateOfBirth(today: string): string {
+  const [year, month, day] = today.split('-').map(Number)
+  const previous = new Date(year, month - 1, day - 1)
+  const mm = String(previous.getMonth() + 1).padStart(2, '0')
+  const dd = String(previous.getDate()).padStart(2, '0')
+  return `${previous.getFullYear()}-${mm}-${dd}`
+}
 
 /** Values of member_profile.main_goal (docs/database/01-identity-and-access.md). */
 export const GOAL_OPTIONS: SelectOption[] = [
@@ -72,28 +89,28 @@ export function validateProfile(form: ProfileForm, today: string): Record<string
   if (!fullName) {
     errors.fullName = 'Full name is required'
   } else if (fullName.length > FULL_NAME_MAX_LENGTH) {
-    errors.fullName = 'Full name must be at most 100 characters'
+    errors.fullName = `Full name must be at most ${FULL_NAME_MAX_LENGTH} characters`
   }
 
+  // Phone is optional, as in RegisterRequest: a member who signed up without one must still be
+  // able to save other changes. The pattern is checked only when a value is entered.
   const phone = normalizePhone(form.phone)
-  if (!phone) {
-    errors.phone = 'Phone is required'
-  } else if (!PHONE_PATTERN.test(phone)) {
+  if (phone && !PHONE_PATTERN.test(phone)) {
     errors.phone = 'Phone must be 8-15 digits with optional leading +'
   }
 
   if (form.dateOfBirth) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(form.dateOfBirth)) {
       errors.dateOfBirth = 'Date of birth is invalid'
-    } else if (form.dateOfBirth > today) {
-      errors.dateOfBirth = 'Date of birth must be in the past'
+    } else if (form.dateOfBirth >= today) {
+      errors.dateOfBirth = DATE_OF_BIRTH_PAST_MESSAGE
     } else if (form.dateOfBirth < MIN_DATE_OF_BIRTH) {
       errors.dateOfBirth = 'Date of birth is invalid'
     }
   }
 
   if (form.address.trim().length > ADDRESS_MAX_LENGTH) {
-    errors.address = 'Address must be at most 255 characters'
+    errors.address = `Address must be at most ${ADDRESS_MAX_LENGTH} characters`
   }
 
   return errors
@@ -107,7 +124,7 @@ function orNull(value: string): string | null {
 export function toUpdateProfileRequest(form: ProfileForm): UpdateProfileRequest {
   return {
     fullName: form.fullName.trim(),
-    phone: normalizePhone(form.phone),
+    phone: orNull(normalizePhone(form.phone)),
     dateOfBirth: orNull(form.dateOfBirth),
     address: orNull(form.address),
     mainGoal: orNull(form.mainGoal),
@@ -124,6 +141,12 @@ export interface PasswordForm {
 export const EMPTY_PASSWORD_FORM: PasswordForm = { currentPassword: '', newPassword: '', confirmPassword: '' }
 
 export const PASSWORD_FIELDS = ['currentPassword', 'newPassword', 'confirmPassword'] as const
+
+/**
+ * Shown under Current password when PUT /users/me/password answers 401. The request is sent with
+ * skipAuthRefresh, so a 401 here describes the typed password and never ends the session.
+ */
+export const CURRENT_PASSWORD_REJECTED_MESSAGE = 'Current password is incorrect'
 
 export const SAME_PASSWORD_MESSAGE = 'New password must be different from the current password'
 

@@ -5,7 +5,13 @@ import { tokenStorage } from '../../api/tokenStorage'
 import { STRONG_PASSWORD_MESSAGE } from '../../auth/passwordRules'
 import { backendError, installFakeFetch, json, MEMBER, type RecordedCall } from '../../test/fakeBackend'
 import { renderApp } from '../../test/renderApp'
-import { PASSWORD_CHANGED_MESSAGE, PROFILE_SAVED_MESSAGE, SAME_PASSWORD_MESSAGE } from './profileValidation'
+import {
+  CURRENT_PASSWORD_REJECTED_MESSAGE,
+  DATE_OF_BIRTH_PAST_MESSAGE,
+  PASSWORD_CHANGED_MESSAGE,
+  PROFILE_SAVED_MESSAGE,
+  SAME_PASSWORD_MESSAGE,
+} from './profileValidation'
 
 /**
  * FE-02: My Profile (F1-08). The fake answers GET /users/me with the member profile fields
@@ -56,6 +62,22 @@ async function openProfile(options: ProfileBackendOptions = {}) {
   renderApp('/member/profile')
   await screen.findByRole('form', { name: 'Personal information' })
   return fake
+}
+
+/** Live regions (aria-live, role status or alert) whose text contains the message. */
+function liveRegionsWith(message: string): Element[] {
+  return Array.from(document.querySelectorAll('[aria-live], [role="status"], [role="alert"]')).filter(
+    (element) => element.textContent?.includes(message) && element.getAttribute('aria-live') !== 'off',
+  )
+}
+
+/** The inline success notice is shown but is not a live region; the toast is the one announcement. */
+async function expectSingleAnnouncement(message: string) {
+  const notice = await screen.findByText(message, { selector: '.notice' })
+  expect(notice).not.toHaveAttribute('role')
+  expect(notice.closest('[aria-live], [role="status"], [role="alert"]')).toBeNull()
+  await waitFor(() => expect(liveRegionsWith(message)).toHaveLength(1))
+  expect(liveRegionsWith(message)[0]).toHaveAttribute('aria-live', 'polite')
 }
 
 function personalForm() {
@@ -125,7 +147,7 @@ describe('FE-02 My Profile (F1-08) - personal information', () => {
     await user.clear(within(form).getByLabelText('Address'))
     await user.click(within(form).getByRole('button', { name: 'Save changes' }))
 
-    expect(await screen.findByText(PROFILE_SAVED_MESSAGE, { selector: '.notice' })).toHaveAttribute('role', 'status')
+    await expectSingleAnnouncement(PROFILE_SAVED_MESSAGE)
     const put = calls.find((call) => call.method === 'PUT' && call.path === '/users/me')
     expect(put?.body).toEqual({
       fullName: 'Taylor Tran',
@@ -157,7 +179,7 @@ describe('FE-02 My Profile (F1-08) - personal information', () => {
 
     expect(await within(form).findByText('Full name is required')).toBeInTheDocument()
     expect(within(form).getByText('Phone must be 8-15 digits with optional leading +')).toBeInTheDocument()
-    expect(within(form).getByText('Date of birth must be in the past')).toBeInTheDocument()
+    expect(within(form).getByText(DATE_OF_BIRTH_PAST_MESSAGE)).toBeInTheDocument()
     expect(calls.some((call) => call.method === 'PUT')).toBe(false)
     await waitFor(() => expect(within(form).getByLabelText(/Full name/)).toHaveFocus())
   })
@@ -254,6 +276,55 @@ describe('FE-02 My Profile (F1-08) - personal information', () => {
     expect(await screen.findByRole('form', { name: 'Personal information' })).toBeInTheDocument()
     expect(meCalls).toBe(3)
   })
+
+  // Review round 1
+
+  it('TC-FE02-050 a member without a phone can save an address change; phone is sent as null', async () => {
+    const user = userEvent.setup()
+    const { calls } = await openProfile({ profile: { ...FULL_PROFILE, phone: null } })
+    const form = personalForm()
+    expect(within(form).getByLabelText('Phone number')).not.toBeRequired()
+    const address = within(form).getByLabelText('Address')
+    await user.clear(address)
+    await user.type(address, 'District 7')
+    await user.click(within(form).getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText(PROFILE_SAVED_MESSAGE, { selector: '.notice' })).toBeInTheDocument()
+    const put = calls.find((call) => call.method === 'PUT' && call.path === '/users/me')
+    expect(put?.body).toMatchObject({ phone: null, address: 'District 7' })
+  })
+
+  it('TC-FE02-051 an invalid phone is still rejected', async () => {
+    const user = userEvent.setup()
+    const { calls } = await openProfile()
+    const form = personalForm()
+    const phone = within(form).getByLabelText('Phone number')
+    await user.clear(phone)
+    await user.type(phone, '1234567')
+    await user.click(within(form).getByRole('button', { name: 'Save changes' }))
+    expect(await within(form).findByText('Phone must be 8-15 digits with optional leading +')).toBeInTheDocument()
+    expect(calls.some((call) => call.method === 'PUT')).toBe(false)
+  })
+
+  it('TC-FE02-052 today is rejected as date of birth and the picker stops at yesterday', async () => {
+    const user = userEvent.setup()
+    await openProfile()
+    const form = personalForm()
+    const dob = within(form).getByLabelText('Date of birth')
+    expect(dob).toHaveAttribute('max', '2026-10-12')
+    expect(dob).toHaveAttribute('min', '1900-01-01')
+    await user.clear(dob)
+    await user.type(dob, '2026-10-13')
+    await user.click(within(form).getByRole('button', { name: 'Save changes' }))
+    expect(await within(form).findByText(DATE_OF_BIRTH_PAST_MESSAGE)).toBeInTheDocument()
+  })
+
+  it('TC-FE02-053 maxLength of full name and address come from the constants', async () => {
+    await openProfile()
+    const form = personalForm()
+    expect(within(form).getByLabelText(/Full name/)).toHaveAttribute('maxlength', '100')
+    expect(within(form).getByLabelText('Address')).toHaveAttribute('maxlength', '255')
+  })
 })
 
 describe('FE-02 My Profile (F1-08) - change password', () => {
@@ -277,7 +348,7 @@ describe('FE-02 My Profile (F1-08) - change password', () => {
     const { calls } = await openProfile()
     const form = await fillPassword('Demo123!', 'NewPass2026', 'NewPass2026')
 
-    expect(await screen.findByText(PASSWORD_CHANGED_MESSAGE, { selector: '.notice' })).toHaveAttribute('role', 'status')
+    await expectSingleAnnouncement(PASSWORD_CHANGED_MESSAGE)
     const put = calls.find((call) => call.path === '/users/me/password')
     expect(put?.method).toBe('PUT')
     expect(put?.body).toEqual({ currentPassword: 'Demo123!', newPassword: 'NewPass2026' })
@@ -286,8 +357,10 @@ describe('FE-02 My Profile (F1-08) - change password', () => {
     expect(within(form).getByLabelText(/Confirm new password/)).toHaveValue('')
   })
 
-  it('TC-FE02-061 a wrong current password (400) is shown under Current password', async () => {
-    await openProfile({ onPassword: () => backendError(400, 'Current password is incorrect') })
+  it('TC-FE02-061 a 400 with details.currentPassword is shown under Current password', async () => {
+    await openProfile({
+      onPassword: () => backendError(400, 'Validation Error', { currentPassword: 'Current password is incorrect' }),
+    })
     const form = await fillPassword('Wrong123', 'NewPass2026', 'NewPass2026')
     expect(await within(form).findByText('Current password is incorrect')).toBeInTheDocument()
     expect(screen.queryByText(PASSWORD_CHANGED_MESSAGE, { selector: '.notice' })).not.toBeInTheDocument()
@@ -344,5 +417,45 @@ describe('FE-02 My Profile (F1-08) - change password', () => {
     expect(form.querySelector('[data-rule="digit"]')).toHaveAttribute('data-met', 'false')
     await user.type(within(form).getByLabelText(/^New password/), '12345')
     expect(within(form).getByText('Meets requirements')).toBeInTheDocument()
+  })
+
+  // Review round 1
+
+  it('TC-FE02-067 a 401 is shown under Current password without refresh or sign out', async () => {
+    const user = userEvent.setup()
+    const { calls } = await openProfile({ onPassword: () => backendError(401, 'Unauthorized') })
+    const form = await fillPassword('Wrong123', 'NewPass2026', 'NewPass2026')
+
+    expect(await within(form).findByText(CURRENT_PASSWORD_REJECTED_MESSAGE)).toBeInTheDocument()
+    await waitFor(() => expect(within(form).getByLabelText(/Current password/)).toHaveFocus())
+    expect(calls.some((call) => call.path === '/auth/refresh')).toBe(false)
+    expect(calls.filter((call) => call.path === '/users/me/password')).toHaveLength(1)
+    expect(tokenStorage.getAccessToken()).toBe('member-access')
+    expect(tokenStorage.getRefreshToken()).toBe('member-refresh')
+    expect(screen.getByRole('heading', { name: 'My Profile' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /Log in|Welcome back/ })).not.toBeInTheDocument()
+
+    // The session still works: the profile form can be saved afterwards.
+    await user.click(within(personalForm()).getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText(PROFILE_SAVED_MESSAGE, { selector: '.notice' })).toBeInTheDocument()
+  })
+
+  it('TC-FE02-068 a 400 without details is shown above the form, whatever its text says', async () => {
+    await openProfile({ onPassword: () => backendError(400, 'Current password is incorrect') })
+    const form = await fillPassword('Wrong123', 'NewPass2026', 'NewPass2026')
+    const card = form.closest('.card') as HTMLElement
+    expect(await within(card).findByText('Current password is incorrect', { selector: '.notice' })).toHaveAttribute(
+      'role',
+      'alert',
+    )
+    expect(within(form).queryByText('Current password is incorrect')).not.toBeInTheDocument()
+  })
+
+  it('TC-FE02-069 a 400 with another message and no details is shown above the form', async () => {
+    await openProfile({ onPassword: () => backendError(400, 'Password change is not allowed right now') })
+    const form = await fillPassword('Demo123!', 'NewPass2026', 'NewPass2026')
+    const card = form.closest('.card') as HTMLElement
+    expect(await within(card).findByText('Password change is not allowed right now', { selector: '.notice' })).toBeInTheDocument()
+    expect(within(form).getByLabelText(/Current password/)).not.toHaveAttribute('aria-invalid')
   })
 })

@@ -15,13 +15,19 @@ export interface MemberCard {
   memberCode: string | null
   memberFullName: string | null
   tierId: number
-  tierCode: string
+  /** member_card.tier_id is NOT NULL, so null only appears if the tier mapping is broken. */
+  tierCode: string | null
   tierName: string
   discountPercentage: number | null
   startDate: string | null
   endDate: string | null
   /** PENDING_PAYMENT, ACTIVE, EXPIRED, CANCELLED or REPLACED. */
   status: string
+  /**
+   * Price of this card request. For a PENDING_PAYMENT card it is also the amount of the linked
+   * payment: MembershipCardServiceImpl.purchaseCard passes the same plan.price() to newCard
+   * (pricePaid) and to PaymentService.createPendingPayment (payment.amount).
+   */
   pricePaid: number | string | null
   paymentId: number | null
   paymentCode: string | null
@@ -140,7 +146,11 @@ export const memberApi = {
     return api.put<UserProfile | undefined>('/users/me', request)
   },
 
+  /**
+   * skipAuthRefresh: a wrong current password may come back as 401. That 401 is about the form,
+   * not the session, so it must never refresh the token or sign the member out.
+   */
   changePassword(request: ChangePasswordRequest): Promise<void> {
-    return api.put<void>('/users/me/password', request)
+    return api.put<void>('/users/me/password', request, { skipAuthRefresh: true })
   },
 }

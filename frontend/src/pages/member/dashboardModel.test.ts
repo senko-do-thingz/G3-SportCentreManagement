@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { booking, card, registration } from '../../test/memberFixtures'
 import {
   activeRegistrations,
+  canBook,
   currentCard,
   dashboardState,
+  heroVariant,
+  isExhausted,
+  isPaidCard,
+  remainingSessionCount,
   paymentSummaryPath,
   pendingItems,
   registrationTitle,
@@ -76,12 +81,13 @@ describe('FE-02 dashboard model', () => {
     expect(startsLater({ startDate: null }, TODAY)).toBe(false)
   })
 
-  it('TC-FE02-010 sessionShare is remaining over total, clamped, and null without a limit', () => {
+  it('TC-FE02-010 sessionShare is remaining over total, clamped, 0 for a total of 0 and null only without a limit', () => {
     expect(sessionShare({ totalSessions: 8, remainingSessions: 6 })).toBe(0.75)
     expect(sessionShare({ totalSessions: 8, remainingSessions: 12 })).toBe(1)
     expect(sessionShare({ totalSessions: 8, remainingSessions: null })).toBe(0)
     expect(sessionShare({ totalSessions: null, remainingSessions: null })).toBeNull()
-    expect(sessionShare({ totalSessions: 0, remainingSessions: 0 })).toBeNull()
+    expect(sessionShare({ totalSessions: 0, remainingSessions: 0 })).toBe(0)
+    expect(sessionShare({ totalSessions: 8, remainingSessions: 0 })).toBe(0)
   })
 
   it('TC-FE02-011 pending items list unpaid cards and packages, newest first, with the payment id', () => {
@@ -126,5 +132,41 @@ describe('FE-02 dashboard model', () => {
     expect(registrationTitle({ sportName: 'Swimming', trainingFormat: null })).toBe('Swimming')
     expect(shortTime('17:00:00')).toBe('17:00')
     expect(shortTime(null)).toBe('')
+  })
+
+  // Review round 1
+
+  it('TC-FE02-016 remainingSessionCount clamps to 0..total and is null only without a limit', () => {
+    expect(remainingSessionCount({ totalSessions: 8, remainingSessions: 12 })).toBe(8)
+    expect(remainingSessionCount({ totalSessions: 8, remainingSessions: -2 })).toBe(0)
+    expect(remainingSessionCount({ totalSessions: 0, remainingSessions: 0 })).toBe(0)
+    expect(remainingSessionCount({ totalSessions: null, remainingSessions: null })).toBeNull()
+    expect(isExhausted({ totalSessions: 8, remainingSessions: 0 })).toBe(true)
+    expect(isExhausted({ totalSessions: 0, remainingSessions: 0 })).toBe(true)
+    expect(isExhausted({ totalSessions: null, remainingSessions: null })).toBe(false)
+  })
+
+  it('TC-FE02-017 canBook needs ACTIVE, not ended and at least one session left (or no limit)', () => {
+    expect(canBook(registration(), TODAY)).toBe(true)
+    expect(canBook(registration({ totalSessions: null, remainingSessions: null }), TODAY)).toBe(true)
+    expect(canBook(registration({ startDate: '2026-10-20', endDate: '2026-11-18' }), TODAY)).toBe(true)
+    expect(canBook(registration({ remainingSessions: 0 }), TODAY)).toBe(false)
+    expect(canBook(registration({ totalSessions: 0, remainingSessions: 0 }), TODAY)).toBe(false)
+    expect(canBook(registration({ endDate: '2026-10-12' }), TODAY)).toBe(false)
+    expect(canBook(registration({ status: 'PENDING_PAYMENT' }), TODAY)).toBe(false)
+  })
+
+  it('TC-FE02-018 a missing tier code counts as a paid card; STANDARD in any case does not', () => {
+    expect(isPaidCard({ tierCode: null, status: 'ACTIVE' })).toBe(true)
+    expect(isPaidCard({ tierCode: 'standard', status: 'ACTIVE' })).toBe(false)
+    expect(isPaidCard({ tierCode: 'VIP', status: 'CANCELLED' })).toBe(false)
+    expect(dashboardState([card({ tierCode: null })], [])).toBe('after-purchase')
+  })
+
+  it('TC-FE02-019 heroVariant picks welcome, book, pay or renew', () => {
+    expect(heroVariant('new-standard', false, 0)).toBe('welcome')
+    expect(heroVariant('after-purchase', true, 2)).toBe('book')
+    expect(heroVariant('after-purchase', false, 1)).toBe('pay')
+    expect(heroVariant('after-purchase', false, 0)).toBe('renew')
   })
 })

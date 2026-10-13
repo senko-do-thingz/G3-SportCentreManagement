@@ -266,4 +266,110 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
     // The member did buy a card before, so the page is in the After Purchase state.
     expect(document.querySelector('.dashboard')).toHaveAttribute('data-state', 'after-purchase')
   })
+
+  // Review round 1
+
+  it('TC-FE02-035 a package with no sessions left shows only Renew and the hero does not offer booking', async () => {
+    await openDashboard({ registrations: [registration({ remainingSessions: 0 })] })
+    const item = screen.getByRole('listitem', { name: 'Football - Coach-led' })
+    expect(within(item).getByText('No sessions left')).toBeInTheDocument()
+    expect(within(item).getByText('0 of 8 sessions remaining')).toBeInTheDocument()
+    expect(within(item).queryByRole('link', { name: 'Book a session' })).not.toBeInTheDocument()
+    expect(within(item).getByRole('link', { name: 'Renew package' })).toHaveAttribute('href', '/member/packages')
+
+    const hero = screen.getByRole('region', { name: 'Find your next sport package.' })
+    expect(hero).toHaveAttribute('data-variant', 'renew')
+    expect(within(hero).queryByRole('link', { name: 'Book a session' })).not.toBeInTheDocument()
+    expect(within(hero).getByRole('link', { name: 'Explore packages' })).toHaveAttribute('href', '/member/packages')
+  })
+
+  it('TC-FE02-036 a package with a total of 0 sessions is exhausted, never "No session limit"', async () => {
+    await openDashboard({ registrations: [registration({ totalSessions: 0, remainingSessions: 0 })] })
+    const item = screen.getByRole('listitem', { name: 'Football - Coach-led' })
+    expect(within(item).getByText('0 of 0 sessions remaining')).toBeInTheDocument()
+    expect(within(item).getByText('No sessions left')).toBeInTheDocument()
+    expect(within(item).queryByText('No session limit')).not.toBeInTheDocument()
+    expect(within(item).queryByRole('progressbar')).not.toBeInTheDocument()
+    expect(within(item).queryByRole('link', { name: 'Book a session' })).not.toBeInTheDocument()
+  })
+
+  it('TC-FE02-037 the hero offers Book a session when at least one package can be booked', async () => {
+    await openDashboard({
+      registrations: [registration({ id: 1, remainingSessions: 0 }), registration({ id: 2, sportName: 'Swimming' })],
+    })
+    const hero = screen.getByRole('region', { name: 'Ready for your next session?' })
+    expect(within(hero).getByRole('link', { name: 'Book a session' })).toHaveAttribute('href', '/member/schedule')
+  })
+
+  it('TC-FE02-038 with only a pending payment the hero asks to complete it and links to its summary', async () => {
+    await openDashboard({ registrations: [registration({ status: 'PENDING_PAYMENT', paymentId: 52 })] })
+    const hero = screen.getByRole('region', { name: 'Complete your payment to start training.' })
+    expect(hero).toHaveAttribute('data-variant', 'pay')
+    expect(within(hero).queryByText(/Welcome back/)).not.toBeInTheDocument()
+    expect(within(hero).getByRole('link', { name: 'Pay now' })).toHaveAttribute('href', '/member/payments/52')
+  })
+
+  it('TC-FE02-039 when the first pending item has no payment the hero points to the Pending payments block', async () => {
+    await openDashboard({ cards: [card({ status: 'PENDING_PAYMENT', paymentId: null })] })
+    const hero = screen.getByRole('region', { name: 'Complete your payment to start training.' })
+    expect(within(hero).getByRole('link', { name: 'View pending payments' })).toHaveAttribute('href', '#pending-payments')
+    expect(document.getElementById('pending-payments')).toBe(screen.getByRole('region', { name: 'Pending payments' }))
+  })
+
+  it('TC-FE02-090 View all packages opens My Membership and Sport Packages (F1-12)', async () => {
+    await openDashboard({ registrations: [registration()] })
+    const packages = screen.getByRole('region', { name: 'My sport packages' })
+    expect(within(packages).getByRole('link', { name: 'View all packages' })).toHaveAttribute('href', '/member/membership')
+  })
+
+  it('TC-FE02-091 the progress bar value is clamped to the total, like the bar width', async () => {
+    await openDashboard({ registrations: [registration({ totalSessions: 8, remainingSessions: 12 })] })
+    const bar = screen.getByRole('progressbar')
+    expect(bar).toHaveAttribute('aria-valuenow', '8')
+    expect(bar).toHaveAttribute('aria-valuemax', '8')
+    expect(screen.getByText('8 of 8 sessions remaining')).toBeInTheDocument()
+  })
+
+  it('TC-FE02-092 Retry after a purchases error does not reload bookings that loaded', async () => {
+    const user = userEvent.setup()
+    let failCards = true
+    const { calls } = installFakeFetch((call) => {
+      if (call.path === '/membership-cards/my' && failCards) {
+        return backendError(500, 'Internal server error')
+      }
+      return dashboardBackend({ bookings: [booking()] })(call)
+    })
+    tokenStorage.startSession({ accessToken: 'member-access', refreshToken: 'member-refresh' })
+    renderApp('/member')
+    const alert = await screen.findByRole('alert')
+    await waitFor(() => expect(calls.filter((call) => call.path.startsWith('/bookings/my'))).toHaveLength(1))
+
+    failCards = false
+    await user.click(within(alert).getByRole('button', { name: 'Try again' }))
+    await screen.findByRole('region', { name: 'My sport packages' })
+    expect(calls.filter((call) => call.path === '/membership-cards/my')).toHaveLength(2)
+    expect(calls.filter((call) => call.path.startsWith('/bookings/my'))).toHaveLength(1)
+    expect(statValue('Upcoming sessions')).toBe('1')
+  })
+
+  it('TC-FE02-093 Retry after a purchases error reloads bookings that failed too', async () => {
+    const user = userEvent.setup()
+    let failing = true
+    const { calls } = installFakeFetch((call) => {
+      if (failing && (call.path === '/membership-cards/my' || call.path.startsWith('/bookings/my'))) {
+        return backendError(503, 'Service unavailable')
+      }
+      return dashboardBackend({ bookings: [booking()] })(call)
+    })
+    tokenStorage.startSession({ accessToken: 'member-access', refreshToken: 'member-refresh' })
+    renderApp('/member')
+    const alert = await screen.findByRole('alert')
+    await waitFor(() => expect(calls.filter((call) => call.path.startsWith('/bookings/my'))).toHaveLength(1))
+
+    failing = false
+    await user.click(within(alert).getByRole('button', { name: 'Try again' }))
+    await screen.findByRole('region', { name: 'My sport packages' })
+    await waitFor(() => expect(statValue('Upcoming sessions')).toBe('1'))
+    expect(calls.filter((call) => call.path.startsWith('/bookings/my'))).toHaveLength(2)
+  })
 })

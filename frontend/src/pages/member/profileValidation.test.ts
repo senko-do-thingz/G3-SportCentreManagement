@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { STRONG_PASSWORD_MESSAGE } from '../../auth/passwordRules'
 import { MEMBER } from '../../test/fakeBackend'
 import {
+  ADDRESS_MAX_LENGTH,
+  DATE_OF_BIRTH_PAST_MESSAGE,
+  FULL_NAME_MAX_LENGTH,
+  latestDateOfBirth,
   profileFormFrom,
   SAME_PASSWORD_MESSAGE,
   toChangePasswordRequest,
@@ -35,15 +39,18 @@ describe('FE-02 profile validation', () => {
     expect(validateProfile({ ...VALID, fullName: 'a'.repeat(100) }, TODAY).fullName).toBeUndefined()
   })
 
-  it('TC-FE02-072 phone follows the backend pattern after removing separators', () => {
-    expect(validateProfile({ ...VALID, phone: '' }, TODAY).phone).toBe('Phone is required')
+  it('TC-FE02-072 phone is optional and follows the backend pattern after removing separators', () => {
+    expect(validateProfile({ ...VALID, phone: '' }, TODAY).phone).toBeUndefined()
+    expect(validateProfile({ ...VALID, phone: '   ' }, TODAY).phone).toBeUndefined()
     expect(validateProfile({ ...VALID, phone: '1234567' }, TODAY).phone).toBe('Phone must be 8-15 digits with optional leading +')
     expect(validateProfile({ ...VALID, phone: '(+84) 901-234-567' }, TODAY).phone).toBeUndefined()
   })
 
-  it('TC-FE02-073 date of birth must be a real past date not before 1900', () => {
-    expect(validateProfile({ ...VALID, dateOfBirth: TODAY }, TODAY).dateOfBirth).toBeUndefined()
-    expect(validateProfile({ ...VALID, dateOfBirth: '2026-10-14' }, TODAY).dateOfBirth).toBe('Date of birth must be in the past')
+  it('TC-FE02-073 date of birth must be before today and not before 1900', () => {
+    expect(validateProfile({ ...VALID, dateOfBirth: '2026-10-12' }, TODAY).dateOfBirth).toBeUndefined()
+    expect(validateProfile({ ...VALID, dateOfBirth: TODAY }, TODAY).dateOfBirth).toBe(DATE_OF_BIRTH_PAST_MESSAGE)
+    expect(validateProfile({ ...VALID, dateOfBirth: '2026-10-14' }, TODAY).dateOfBirth).toBe(DATE_OF_BIRTH_PAST_MESSAGE)
+    expect(DATE_OF_BIRTH_PAST_MESSAGE).toBe('Date of birth must be before today')
     expect(validateProfile({ ...VALID, dateOfBirth: '1899-12-31' }, TODAY).dateOfBirth).toBe('Date of birth is invalid')
     expect(validateProfile({ ...VALID, dateOfBirth: '15/06/2004' }, TODAY).dateOfBirth).toBe('Date of birth is invalid')
   })
@@ -91,5 +98,23 @@ describe('FE-02 profile validation', () => {
       currentPassword: ' a ',
       newPassword: 'b',
     })
+  })
+
+  // Review round 1
+
+  it('TC-FE02-078 latestDateOfBirth is the day before today, across month and year ends', () => {
+    expect(latestDateOfBirth('2026-10-13')).toBe('2026-10-12')
+    expect(latestDateOfBirth('2026-03-01')).toBe('2026-02-28')
+    expect(latestDateOfBirth('2027-01-01')).toBe('2026-12-31')
+  })
+
+  it('TC-FE02-079 an empty phone is sent as null; length messages come from the constants', () => {
+    expect(toUpdateProfileRequest({ ...VALID, phone: '  ' }).phone).toBeNull()
+    expect(validateProfile({ ...VALID, fullName: 'a'.repeat(FULL_NAME_MAX_LENGTH + 1) }, TODAY).fullName).toBe(
+      `Full name must be at most ${FULL_NAME_MAX_LENGTH} characters`,
+    )
+    expect(validateProfile({ ...VALID, address: 'a'.repeat(ADDRESS_MAX_LENGTH + 1) }, TODAY).address).toBe(
+      `Address must be at most ${ADDRESS_MAX_LENGTH} characters`,
+    )
   })
 })

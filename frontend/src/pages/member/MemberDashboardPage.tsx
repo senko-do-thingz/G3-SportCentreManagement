@@ -8,12 +8,16 @@ import { Spinner } from '../../components/ui/Spinner'
 import { formatDate, formatDateTime } from '../../utils/format'
 import {
   activeRegistrations,
-  MEMBER_PATHS,
+  canBook,
   currentCard,
   dashboardState,
+  heroVariant,
+  isExhausted,
+  MEMBER_PATHS,
   paymentSummaryPath,
   pendingItems,
   registrationTitle,
+  remainingSessionCount,
   sessionShare,
   shortTime,
   STANDARD_TIER_NAME,
@@ -21,13 +25,16 @@ import {
   toIsoDate,
   trainingFormatLabel,
   upcomingBookings,
-  type DashboardState,
+  type HeroVariant,
   type PendingItem,
 } from './dashboardModel'
 import { useMemberResource, type Resource } from './useMemberResource'
 
 /** Number of packages and sessions listed on the dashboard; the rest is on the linked screens. */
 const LIST_LIMIT = 3
+
+/** Id of the Pending payments block, the target of the hero action when a payment has no summary yet. */
+const PENDING_PAYMENTS_ID = 'pending-payments'
 
 interface Purchases {
   cards: MemberCard[]
@@ -87,7 +94,10 @@ export function MemberDashboardPage() {
           error={purchases.error}
           onRetry={() => {
             reloadPurchases()
-            reloadBookings()
+            // Bookings that already loaded stay as they are; only a failed load is tried again.
+            if (bookings.status === 'error') {
+              reloadBookings()
+            }
           }}
         />
       </div>
@@ -99,13 +109,18 @@ export function MemberDashboardPage() {
   const card = currentCard(cards, today)
   const active = activeRegistrations(registrations, today)
   const pending = pendingItems(cards, registrations)
+  const bookable = active.some((registration) => canBook(registration, today))
   const upcoming = bookings.status === 'ready' ? upcomingBookings(bookings.data, now) : []
 
   return (
     <div className="page dashboard" data-state={state}>
       {header}
 
-      <DashboardHero state={state} fullName={user?.fullName ?? ''} hasActivePackage={active.length > 0} />
+      <DashboardHero
+        variant={heroVariant(state, bookable, pending.length)}
+        fullName={user?.fullName ?? ''}
+        firstPending={pending[0] ?? null}
+      />
 
       <div className="dashboard__stats">
         <StatCard
@@ -125,7 +140,7 @@ export function MemberDashboardPage() {
         <div className="dashboard__main">
           {pending.length > 0 && <PendingPaymentsCard items={pending} />}
           <PackagesCard registrations={active} today={today} />
-          <UpcomingSessionsCard bookings={bookings} upcoming={upcoming} hasActivePackage={active.length > 0} onRetry={reloadBookings} />
+          <UpcomingSessionsCard bookings={bookings} upcoming={upcoming} hasBookablePackage={bookable} onRetry={reloadBookings} />
         </div>
         <aside className="dashboard__side" aria-label="Profile and quick links">
           <ProfileCard />
@@ -142,44 +157,91 @@ function cardHint(card: MemberCard): string {
   return discount ? `${until} - ${discount}` : until
 }
 
+interface HeroContent {
+  eyebrow: string
+  title: string
+  text: string
+  action: { label: string; to?: string; href?: string }
+}
+
+function heroContent(variant: HeroVariant, name: string, firstPending: PendingItem | null): HeroContent {
+  switch (variant) {
+    case 'welcome':
+      return {
+        eyebrow: 'Welcome to Sportify',
+        title: `Welcome, ${name}.`,
+        text: 'Find a sport package that fits your goals.',
+        action: { label: 'Explore packages', to: MEMBER_PATHS.packages },
+      }
+    case 'book':
+      return {
+        eyebrow: `Welcome back, ${name}`,
+        title: 'Ready for your next session?',
+        text: 'Book a session with your active sport package.',
+        action: { label: 'Book a session', to: MEMBER_PATHS.schedule },
+      }
+    case 'pay':
+      return {
+        eyebrow: 'Almost there',
+        title: 'Complete your payment to start training.',
+        text: 'Your request starts after the payment is confirmed. Pay online or at the front desk.',
+        action:
+          firstPending && firstPending.paymentId !== null
+            ? { label: 'Pay now', to: paymentSummaryPath(firstPending.paymentId) }
+            : { label: 'View pending payments', href: `#${PENDING_PAYMENTS_ID}` },
+      }
+    case 'renew':
+      return {
+        eyebrow: `Welcome back, ${name}`,
+        title: 'Find your next sport package.',
+        text: 'Your packages have no sessions left or have ended. Renew one or choose a new sport.',
+        action: { label: 'Explore packages', to: MEMBER_PATHS.packages },
+      }
+  }
+}
+
 function DashboardHero({
-  state,
+  variant,
   fullName,
-  hasActivePackage,
+  firstPending,
 }: {
-  state: DashboardState
+  variant: HeroVariant
   fullName: string
-  hasActivePackage: boolean
+  firstPending: PendingItem | null
 }) {
-  const isNew = state === 'new-standard'
-  const title = isNew ? `Welcome, ${fullName || 'member'}.` : 'Ready for your next session?'
-  const text = isNew
-    ? 'Find a sport package that fits your goals.'
-    : hasActivePackage
-      ? 'Book a session with your active sport package.'
-      : 'Find a sport package that fits your goals.'
-  const action = !isNew && hasActivePackage
-    ? { to: MEMBER_PATHS.schedule, label: 'Book a session' }
-    : { to: MEMBER_PATHS.packages, label: 'Explore packages' }
+  const content = heroContent(variant, fullName || 'member', firstPending)
+  const actionClass = buttonClassName('accent', 'md')
   return (
-    <section className="dashboard-hero" aria-labelledby="dashboard-hero-title">
+    <section className="dashboard-hero" aria-labelledby="dashboard-hero-title" data-variant={variant}>
       <div className="dashboard-hero__text">
-        <p className="dashboard-hero__eyebrow">{isNew ? 'Welcome to Sportify' : `Welcome back, ${fullName || 'member'}`}</p>
+        <p className="dashboard-hero__eyebrow">{content.eyebrow}</p>
         <h2 className="dashboard-hero__title" id="dashboard-hero-title">
-          {title}
+          {content.title}
         </h2>
-        <p className="dashboard-hero__description">{text}</p>
+        <p className="dashboard-hero__description">{content.text}</p>
       </div>
-      <Link className={buttonClassName('accent', 'md')} to={action.to}>
-        {action.label}
-      </Link>
+      {content.action.to ? (
+        <Link className={actionClass} to={content.action.to}>
+          {content.action.label}
+        </Link>
+      ) : (
+        <a className={actionClass} href={content.action.href}>
+          {content.action.label}
+        </a>
+      )}
     </section>
   )
 }
 
 function PendingPaymentsCard({ items }: { items: PendingItem[] }) {
   return (
-    <Card title="Pending payments" className="dashboard-pending" aria-label="Pending payments">
+    <Card
+      title="Pending payments"
+      className="dashboard-pending"
+      aria-label="Pending payments"
+      id={PENDING_PAYMENTS_ID}
+      tabIndex={-1}
+    >
       <p className="dashboard-pending__intro">
         These requests start after the payment is confirmed. Pay online or at the front desk.
       </p>
@@ -246,12 +308,13 @@ function PackagesCard({ registrations, today }: { registrations: PackageRegistra
 
 function PackageItem({ registration, today }: { registration: PackageRegistration; today: string }) {
   const share = sessionShare(registration)
+  const remaining = remainingSessionCount(registration)
+  const exhausted = isExhausted(registration)
+  const bookable = canBook(registration, today)
   const title = registrationTitle(registration)
   const later = startsLater(registration, today)
-  const sessionsText =
-    share === null
-      ? 'No session limit'
-      : `${registration.remainingSessions ?? 0} of ${registration.totalSessions} sessions remaining`
+  const total = Math.max(0, registration.totalSessions ?? 0)
+  const sessionsText = remaining === null ? 'No session limit' : `${remaining} of ${total} sessions remaining`
   return (
     <li className="package-item" aria-label={title}>
       <div className="package-item__head">
@@ -263,30 +326,34 @@ function PackageItem({ registration, today }: { registration: PackageRegistratio
             {registration.endDate ? ` - Ends ${formatDate(registration.endDate)}` : ''}
           </p>
         </div>
-        {later ? (
+        {exhausted ? (
+          <Badge tone="warning">No sessions left</Badge>
+        ) : later ? (
           <Badge tone="info">Starts {formatDate(registration.startDate)}</Badge>
         ) : (
           <StatusBadge status={registration.status} />
         )}
       </div>
       <p className="package-item__sessions">{sessionsText}</p>
-      {share !== null && (
+      {share !== null && total > 0 && (
         <div
           className="progress"
           role="progressbar"
           aria-label={`${title} sessions remaining`}
           aria-valuemin={0}
-          aria-valuemax={registration.totalSessions ?? 0}
-          aria-valuenow={registration.remainingSessions ?? 0}
+          aria-valuemax={total}
+          aria-valuenow={remaining ?? 0}
         >
           <span className="progress__bar" style={{ width: `${Math.round(share * 100)}%` }} />
         </div>
       )}
       <div className="package-item__actions">
-        <Link className={buttonClassName('primary', 'sm')} to={MEMBER_PATHS.schedule}>
-          Book a session
-        </Link>
-        <Link className={buttonClassName('secondary', 'sm')} to={MEMBER_PATHS.packages}>
+        {bookable && (
+          <Link className={buttonClassName('primary', 'sm')} to={MEMBER_PATHS.schedule}>
+            Book a session
+          </Link>
+        )}
+        <Link className={buttonClassName(bookable ? 'secondary' : 'primary', 'sm')} to={MEMBER_PATHS.packages}>
           Renew package
         </Link>
       </div>
@@ -297,12 +364,12 @@ function PackageItem({ registration, today }: { registration: PackageRegistratio
 function UpcomingSessionsCard({
   bookings,
   upcoming,
-  hasActivePackage,
+  hasBookablePackage,
   onRetry,
 }: {
   bookings: Resource<MemberBooking[]>
   upcoming: MemberBooking[]
-  hasActivePackage: boolean
+  hasBookablePackage: boolean
   onRetry: () => void
 }) {
   const scheduleLink = (
@@ -320,7 +387,7 @@ function UpcomingSessionsCard({
       <EmptyState
         title="No upcoming sessions"
         description={
-          hasActivePackage
+          hasBookablePackage
             ? 'Book a session with your active sport package.'
             : 'Choose a session after your sport package becomes active.'
         }

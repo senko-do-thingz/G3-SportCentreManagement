@@ -238,4 +238,23 @@ describe('api client', () => {
     controller.abort('route changed')
     await expect(api.get('/users/me', { signal: controller.signal })).rejects.toBe('route changed')
   })
+
+  it('FE-02 skipAuthRefresh: a 401 is thrown as an ApiError without refresh, retry or sign out', async () => {
+    const expired = vi.fn()
+    const unsubscribe = onSessionExpired(expired)
+    const { calls } = installFakeFetch(() => backendError(401, 'Unauthorized'))
+
+    const error = await api.put('/users/me/password', { currentPassword: 'x', newPassword: 'y' }, { skipAuthRefresh: true }).catch(
+      (caught: unknown) => caught,
+    )
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).status).toBe(401)
+    expect(calls.map((call) => call.path)).toEqual(['/users/me/password'])
+    expect(calls[0].authorization).toBe('Bearer access-1')
+    expect(tokenStorage.getAccessToken()).toBe('access-1')
+    expect(tokenStorage.getRefreshToken()).toBe('refresh-1')
+    expect(expired).not.toHaveBeenCalled()
+    unsubscribe()
+  })
 })
