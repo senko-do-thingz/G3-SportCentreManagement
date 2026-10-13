@@ -1,5 +1,57 @@
 # Changelog
 
+## 2026-10-13 - Member Dashboard and My Profile (FE-02, Flow 1)
+
+Branch `feat/f1-member-dashboard`. Owner: Phat. Priority: P1. Depends on FE-01 (merged) and BE-02 (not merged yet, see Open Questions). Verified with `npm run lint -- --max-warnings 0`, `tsc -b`, `npm test` and `npm run build`, plus browser checks in Chromium against a mock of the member API. After review round 1: 242 tests in 15 files (30 added in round 1). After review round 2: 255 tests in 15 files (13 added in round 2). After review round 3: 257 tests in 15 files.
+
+### Review Fixes (Round 1)
+- B1 (superseded by R2-B1) Change password never signs out: new per-request option `skipAuthRefresh` in `api/client.ts` (a 401 is thrown as a normal ApiError, no refresh, no retry, no sign out; every other request unchanged). `memberApi.changePassword` uses it; a 401 is shown under Current password.
+- B2 No field detection from message text: `passwordFailure` decides by HTTP status (401) and backend field keys (`details.currentPassword`, `newPassword`, `confirmPassword`); a 400 without details goes above the form.
+- B3 Phone is optional on My Profile (as in `RegisterRequest`): pattern checked only when entered, sent as null when empty, `required` removed.
+- B4 Used up packages: new model helpers `canBook`, `isExhausted`, `remainingSessionCount`, `hasNoSessionLimit`. A package with 0 sessions left shows "No sessions left" and only Renew package; the hero offers Book a session only when a package can be booked. Only `totalSessions === null` means "No session limit"; a total of 0 is "0 of 0 sessions remaining" and exhausted.
+- M1 "View all packages" kept on `/member/membership` after checking `layouts/navigation.ts` and Figma F1-12 (its default tab "Sport packages" lists "My registrations"); covered by a test.
+- M2 New hero variants `pay` ("Complete your payment to start training." with Pay now to the first pending item, or "View pending payments" to the block) and `renew` (nothing to book or pay).
+- M3 FE-00 and FE-01 tests reverted to main; the account switch notice gets `aria-label="Account switched"` and the 5 assertions query `getByRole('status', { name: 'Account switched' })`.
+- M4 `useMemberResource`: documented stable `load`, answers tagged by loader and attempt (loading after reload or a new loader, never old data), StaleSessionError ends in the error state with Retry.
+- m1 Date of birth must be before today ("Date of birth must be before today"); the picker max is yesterday.
+- m2 maxLength and length messages use `FULL_NAME_MAX_LENGTH`, `ADDRESS_MAX_LENGTH`, `PHONE_INPUT_MAX_LENGTH`.
+- m3 `MemberCard.tierCode` typed `string | null`; a missing code counts as a paid card (documented and tested).
+- m4 Progress bar `aria-valuenow` clamped to 0..total like the bar width.
+- m5 One announcement per success: inline notice no longer a live region; the toast announces.
+- m6 Dashboard Retry reloads bookings only when they failed.
+- m7 `AppRoutes.tsx` children of `<Routes>` re-indented; `requireNavItem` throws when the My Payments menu entry is missing instead of dropping the route.
+- m8 Pending card amount stays `pricePaid`: `MembershipCardServiceImpl.java` lines 110 and 112 pass the same `plan.price()` to the card (`pricePaid`) and to `createPendingPayment` (payment `amount`).
+
+### Review Fixes (Round 2)
+- R2-B1 `skipAuthRefresh` removed (nothing else used it) and replaced by `authFailure: 'refresh-then-throw'` in `api/client.ts`. A 401 refreshes the token once with the shared single-flight refresh and retries once; a 401 on the retry is thrown as ApiError(401) without signing out and is shown under Current password; a rejected refresh token still signs out; a network or server error during the refresh is thrown without signing out. An expired access token no longer looks like a wrong password. Default behavior of every other request unchanged.
+- R2-M1 New hero variant `first-package` ("Choose your first sport package.", with the card discount when a card is in force) for a member with a paid card who never had a package; `renew` only when the member had packages (ACTIVE or EXPIRED) that are now used up or ended. `heroVariant` takes a facts object including `hasHadPackage`.
+- R2-m1 Active packages stat keeps counting the packages of the list; when some have no sessions left the hint reads "<n> can be booked - <m> with no sessions left".
+- R2-m2 `requireNavItem` kept at module load in `AppRoutes.tsx`; documented that it runs in every build and that a missing entry fails `navigation.test.ts` and every test that renders the app.
+- Verified: 255 tests in 15 files (13 added in round 2), lint, `tsc -b` and build green.
+
+### Review Fixes (Round 3)
+- R3-m1 The discount rule in the dashboard text is documented in `docs/database/09-business-rules-and-state-machines.md` lines 149 to 153 (30-day and 90-day packages only), so the wording stays. New helper `cardDiscountText` is used by both the tier stat hint and the first-package hero, so both read "<n>% off 30 day and 90 day packages". The backend code only excludes packages of 1 day or less; listed as an open question.
+- R3-doc New open question for BE-02: does `PUT /users/me/password` revoke existing refresh tokens? If it does, the member is signed out at the next refresh after a successful change, and the frontend should then tell the member and send them to login right after the change.
+- Verified: 257 tests in 15 files (2 added, 1 changed in round 3), lint, `tsc -b` and build green.
+
+### Added
+- Member Dashboard (F1-07) at `/member`: greeting hero, membership tier stat, active packages and upcoming sessions stats, pending payments with a "Pay now" link to `/member/payments/{paymentId}`, active sport packages with remaining sessions, end date and progress bar, upcoming bookings, profile card and quick links.
+- The two Figma states: "New Standard Member" (no paid card and no package) and "After Purchase" (any paid card or package, including one waiting for payment). The state is exposed as `data-state` on the page.
+- My Profile (F1-08) at `/member/profile`: view and edit full name, date of birth, phone, training goal, experience level and address (`PUT /users/me`); read only login email; change password form (`PUT /users/me/password`) with live password rules. Both forms show a success message and backend errors (under the field for 400 details, above the form otherwise).
+- `src/api/memberApi.ts`: typed calls for `GET /users/me`, `GET /membership-cards/my`, `GET /packages/registrations/my`, `GET /bookings/my?when=UPCOMING`, `PUT /users/me`, `PUT /users/me/password`. List answers that are not JSON arrays are reported as errors.
+- Route `/member/payments/:paymentId` that shows the My Payments placeholder until FE-11 builds the payment summary (F3-01), so "Pay now" never opens a 404 page.
+- `src/styles/member.css` for the two screens.
+
+### Changed
+- `UserProfile` gains the optional BE-02 fields `dateOfBirth`, `address`, `mainGoal`, `currentLevel`, `memberCode`.
+- `PasswordRules` moved from `RegisterPage.tsx` to `src/components/PasswordRules.tsx` (same markup) and is reused by the change password form.
+- FE-00 and FE-01 tests that read the account switch notice now query it by its accessible name (see Review Fixes M3), because the real dashboard also has loading spinners with role status.
+
+### Open Questions
+- BE-02 contract assumed by the frontend: `PUT /users/me` body `{fullName, phone, dateOfBirth, address, mainGoal, currentLevel}` (phone and the optional fields may be null) returning `UserProfileResponse` (or 204); `PUT /users/me/password` body `{currentPassword, newPassword}`. Preferred for a wrong current password: 400 with `details.currentPassword`; a 401 is also handled: since review round 2 the client refreshes once, retries once and shows a second 401 under Current password without signing out.
+- Interested sports (Figma F1-08) and the Notifications and Recommended for you cards (Figma F1-07) are not built: no endpoint exists yet.
+- Upcoming bookings are filtered again on the client until BE-12 adds `when=UPCOMING`.
+
 ## 2026-10-12 - Pending Payments for Online Requests and Payment Summary (BE-17, Flow 3)
 
 Branch `feat/f3-pending-payments`. Status: Implemented and hardened after Round 7 Code Review. Verified locally with `mvn -B -ntp test "-Dtest=!*IntegrationTest" "-Dsurefire.failIfNoSpecifiedTests=false"` (521 tests run, 0 failures, 0 errors, 4 skipped via `@Testcontainers(disabledWithoutDocker = true)`: FlywayMigrationTest, PermissionRepositoryTest, RoleRepositoryTest, UserAccountRepositoryTest). Integration tests verified in CI via GitHub Actions (Run ID 38335867540, 615 tests run, 0 failures, 0 errors, 0 skipped).

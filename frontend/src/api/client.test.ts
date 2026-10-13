@@ -238,4 +238,116 @@ describe('api client', () => {
     controller.abort('route changed')
     await expect(api.get('/users/me', { signal: controller.signal })).rejects.toBe('route changed')
   })
+
+  describe("FE-02 authFailure 'refresh-then-throw' (PUT /users/me/password)", () => {
+    const body = { currentPassword: 'x', newPassword: 'y' }
+    const options = { authFailure: 'refresh-then-throw' } as const
+
+    it('TC-FE02-105 an expired access token is refreshed and the retry succeeds', async () => {
+      const { calls } = installFakeFetch((call) => {
+        if (call.path === '/auth/refresh') {
+          return json(200, { accessToken: 'access-2', refreshToken: 'refresh-2' })
+        }
+        return call.authorization === 'Bearer access-2' ? new Response(null, { status: 204 }) : backendError(401, 'Unauthorized')
+      })
+
+      await expect(api.put('/users/me/password', body, options)).resolves.toBeUndefined()
+
+      expect(calls.map((call) => call.path)).toEqual(['/users/me/password', '/auth/refresh', '/users/me/password'])
+      expect(calls[2].authorization).toBe('Bearer access-2')
+      expect(tokenStorage.getAccessToken()).toBe('access-2')
+      expect(tokenStorage.getRefreshToken()).toBe('refresh-2')
+    })
+
+    it('TC-FE02-106 a 401 on the retry is thrown as ApiError(401) after exactly one refresh, without sign out', async () => {
+      const expired = vi.fn()
+      const unsubscribe = onSessionExpired(expired)
+      const { calls } = installFakeFetch((call) => {
+        if (call.path === '/auth/refresh') {
+          return json(200, { accessToken: 'access-2', refreshToken: 'refresh-2' })
+        }
+        return backendError(401, 'Unauthorized')
+      })
+
+      const error = await api.put('/users/me/password', body, options).catch((caught: unknown) => caught)
+
+      expect(error).toBeInstanceOf(ApiError)
+      expect((error as ApiError).status).toBe(401)
+      expect(calls.map((call) => call.path)).toEqual(['/users/me/password', '/auth/refresh', '/users/me/password'])
+      expect(tokenStorage.getAccessToken()).toBe('access-2')
+      expect(tokenStorage.getRefreshToken()).toBe('refresh-2')
+      expect(expired).not.toHaveBeenCalled()
+      unsubscribe()
+    })
+
+    it('TC-FE02-107 a rejected refresh token still ends the session', async () => {
+      const expired = vi.fn()
+      const unsubscribe = onSessionExpired(expired)
+      installFakeFetch((call) =>
+        call.path === '/auth/refresh' ? backendError(401, 'Invalid refresh token') : backendError(401, 'Unauthorized'),
+      )
+
+      const error = await api.put('/users/me/password', body, options).catch((caught: unknown) => caught)
+
+      expect((error as ApiError).status).toBe(401)
+      expect(tokenStorage.getAccessToken()).toBeNull()
+      expect(tokenStorage.getRefreshToken()).toBeNull()
+      expect(expired).toHaveBeenCalledTimes(1)
+      unsubscribe()
+    })
+
+    it('TC-FE02-108 a server error during the refresh is thrown without sign out', async () => {
+      const expired = vi.fn()
+      const unsubscribe = onSessionExpired(expired)
+      installFakeFetch((call) =>
+        call.path === '/auth/refresh' ? backendError(503, 'Service unavailable') : backendError(401, 'Unauthorized'),
+      )
+
+      const error = await api.put('/users/me/password', body, options).catch((caught: unknown) => caught)
+
+      expect((error as ApiError).status).toBe(503)
+      expect(tokenStorage.getAccessToken()).toBe('access-1')
+      expect(tokenStorage.getRefreshToken()).toBe('refresh-1')
+      expect(expired).not.toHaveBeenCalled()
+      unsubscribe()
+    })
+
+    it('TC-FE02-109 a password change and a normal request in parallel share one refresh call', async () => {
+      let refreshCount = 0
+      installFakeFetch(async (call) => {
+        if (call.path === '/auth/refresh') {
+          refreshCount += 1
+          await new Promise((resolve) => setTimeout(resolve, 10))
+          return json(200, { accessToken: 'access-2', refreshToken: 'refresh-2' })
+        }
+        if (call.authorization !== 'Bearer access-2') {
+          return backendError(401, 'Unauthorized')
+        }
+        return call.path === '/users/me/password' ? new Response(null, { status: 204 }) : json(200, { ok: true })
+      })
+
+      const [password, profile] = await Promise.all([api.put('/users/me/password', body, options), api.get('/users/me')])
+
+      expect(password).toBeUndefined()
+      expect(profile).toEqual({ ok: true })
+      expect(refreshCount).toBe(1)
+    })
+
+    it('TC-FE02-112 without the option a 401 on the retry still ends the session (default unchanged)', async () => {
+      const expired = vi.fn()
+      const unsubscribe = onSessionExpired(expired)
+      installFakeFetch((call) =>
+        call.path === '/auth/refresh'
+          ? json(200, { accessToken: 'access-2', refreshToken: 'refresh-2' })
+          : backendError(401, 'Unauthorized'),
+      )
+
+      const error = await api.put('/users/me/password', body).catch((caught: unknown) => caught)
+
+      expect((error as ApiError).status).toBe(401)
+      expect(tokenStorage.getAccessToken()).toBeNull()
+      expect(expired).toHaveBeenCalledTimes(1)
+      unsubscribe()
+    })
+  })
 })

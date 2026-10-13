@@ -11,6 +11,9 @@ import type { AuthTokens } from './types'
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
+/** See RequestOptions.authFailure. */
+export type AuthFailureMode = 'expire-session' | 'refresh-then-throw'
+
 export type QueryValue = string | number | boolean | null | undefined
 export type QueryParams = Record<string, QueryValue | QueryValue[]>
 
@@ -21,6 +24,17 @@ export interface RequestOptions {
   query?: QueryParams
   /** Send the Authorization header and refresh on 401. Defaults to true. */
   auth?: boolean
+  /**
+   * What a 401 on the retried request means. The first 401 always refreshes the token once (with
+   * the shared single-flight refresh) and retries once.
+   * - 'expire-session' (default): a 401 on the retry ends the session (tokens cleared, sign out).
+   * - 'refresh-then-throw': a 401 on the retry is thrown as a normal ApiError(401) and the session
+   *   is kept. For endpoints where 401 can describe the request body rather than the session, for
+   *   example PUT /users/me/password with a wrong current password.
+   * With both values a rejected refresh token still ends the session, and a network or server
+   * error during the refresh is thrown without signing out.
+   */
+  authFailure?: AuthFailureMode
   signal?: AbortSignal
   headers?: Record<string, string>
 }
@@ -263,6 +277,8 @@ async function send(path: string, options: RequestOptions, accessToken: string |
  * listeners run (the auth context logs the user out) and an ApiError with status 401 is thrown.
  * A network error or a server error during the refresh is thrown without logging out.
  * A 403 is never refreshed: it means the user is signed in but lacks the permission.
+ * With authFailure 'refresh-then-throw' a 401 on the retry is thrown as a normal ApiError and the
+ * session is kept; a rejected refresh token still ends the session.
  * When the session epoch changes while an authenticated request runs, the request fails with
  * StaleSessionError instead of returning the previous account's answer.
  */
@@ -294,9 +310,11 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     if (tokenStorage.getEpoch() !== epoch) {
       throw new StaleSessionError()
     }
-    if (response.status === 401) {
+    if (response.status === 401 && options.authFailure !== 'refresh-then-throw') {
       throw expireSession(epoch)
     }
+    // With 'refresh-then-throw' a 401 here falls through and is thrown below as a normal
+    // ApiError(401): the token is fresh, so the 401 is about the request, not the session.
   }
 
   const data = await readBody(response)

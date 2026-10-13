@@ -298,7 +298,7 @@ describe('auth flow', () => {
       // FE-01 round 3 (N1): a switch to another account is never silent. The tab opens the
       // member home page with a notice instead of showing the 403 page of the manager URL.
       expect(await screen.findByRole('heading', { name: 'Member Dashboard' })).toBeInTheDocument()
-      expect(screen.getByRole('status')).toHaveTextContent('You are now signed in as Taylor Nguyen')
+      expect(screen.getByRole('status', { name: 'Account switched' })).toHaveTextContent('You are now signed in as Taylor Nguyen')
       expect(screen.queryByRole('heading', { name: 'Access denied' })).not.toBeInTheDocument()
       expect(meCalls()).toBe(2)
     })

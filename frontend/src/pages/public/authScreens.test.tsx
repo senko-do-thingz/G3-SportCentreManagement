@@ -792,7 +792,7 @@ describe('FE-01 review fixes (round 3)', () => {
 
   /** Waits until the account switch notice for this name is on screen. */
   async function expectSwitchNotice(name: string) {
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(switchNotice(name)))
+    await waitFor(() => expect(screen.getByRole('status', { name: 'Account switched' })).toHaveTextContent(switchNotice(name)))
   }
 
   /** Fake /users/me: each access token belongs to one profile. */
@@ -827,7 +827,7 @@ describe('FE-01 review fixes (round 3)', () => {
       otherTabLogsIn('y-access')
 
       expect(await screen.findByRole('heading', { name: 'Member Dashboard' })).toBeInTheDocument()
-      expect(screen.getByRole('status')).toHaveTextContent(switchNotice('Jordan Pham'))
+      expect(screen.getByRole('status', { name: 'Account switched' })).toHaveTextContent(switchNotice('Jordan Pham'))
       expect(screen.queryByText('Taylor Nguyen')).not.toBeInTheDocument()
       expect(screen.queryByRole('heading', { name: 'Sport Packages' })).not.toBeInTheDocument()
     })
@@ -841,7 +841,7 @@ describe('FE-01 review fixes (round 3)', () => {
       otherTabLogsIn('manager-access')
 
       expect(await screen.findByRole('heading', { name: 'User Management' })).toBeInTheDocument()
-      expect(screen.getByRole('status')).toHaveTextContent(switchNotice('Morgan Lee'))
+      expect(screen.getByRole('status', { name: 'Account switched' })).toHaveTextContent(switchNotice('Morgan Lee'))
       expect(screen.queryByRole('heading', { name: 'Access denied' })).not.toBeInTheDocument()
     })
 
@@ -914,7 +914,7 @@ describe('FE-01 review fixes (round 3)', () => {
         await oldReload
       })
 
-      expect(screen.getByRole('status')).toHaveTextContent(switchNotice('Jordan Pham'))
+      expect(screen.getByRole('status', { name: 'Account switched' })).toHaveTextContent(switchNotice('Jordan Pham'))
       expect(screen.getAllByText('Jordan Pham').length).toBeGreaterThan(0)
       expect(screen.queryByText('Taylor Nguyen')).not.toBeInTheDocument()
     })
