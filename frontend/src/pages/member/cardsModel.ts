@@ -115,8 +115,23 @@ export function lastPaidCard(cards: MemberCard[], tiers: CardTier[], today: stri
   return latestEnding(paidTerms(cards, tiers, today))
 }
 
+/** Who reads the blocked reason: the member (F1-11) or the front desk (FE-05). Only the wording differs. */
+export type PlanAudience = 'member' | 'desk'
+
+function blockedReason(audience: PlanAudience, from: string): string {
+  return audience === 'desk'
+    ? `The member's card is already renewed from ${from}. It can be upgraded once that term has started.`
+    : `Your card is already renewed from ${from}. You can upgrade once that term has started.`
+}
+
 /** What buying tier means today for this member. See the file comment for the rules. */
-export function planCard(tier: CardTier, cards: MemberCard[], tiers: CardTier[], today: string): CardPlan {
+export function planCard(
+  tier: CardTier,
+  cards: MemberCard[],
+  tiers: CardTier[],
+  today: string,
+  audience: PlanAudience = 'member',
+): CardPlan {
   const months = tier.durationMonths ?? 0
   const tierPrice = cents(tier.price)
   const base = { tierPrice: tierPrice / 100, reason: null }
@@ -146,7 +161,7 @@ export function planCard(tier: CardTier, cards: MemberCard[], tiers: CardTier[],
           endDate: null,
           price: null,
           baseCard: current,
-          reason: `Your card is already renewed from ${last.startDate ?? 'a later date'}. You can upgrade once that term has started.`,
+          reason: blockedReason(audience, last.startDate ?? 'a later date'),
         }
       }
       return {

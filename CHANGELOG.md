@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-10-13 - Receptionist Member Search, Register and Renew, Check-in (FE-05, Flow 1)
+
+Branch `feat/f1-reception-screens`. Owner: Phat. Priority: P1. Depends on FE-00 (merged), BE-05 and BE-19 (not merged yet, see Notes). Rebased on main after FE-04. Verified after review round 1 with `npm run lint -- --max-warnings 0`, `tsc -b`, `npm test` (399 tests in 20 files: 47 for FE-05, 352 existing for FE-00 to FE-04) and `npm run build`.
+
+### Added
+- Member Search and Profile (F1-13) at `/reception`: search by name, phone or email (`GET /members`, query kept in the URL), a single result opens directly, member overview (`GET /members/{id}/overview`) with card, expiry, discount, card requests waiting for payment and sport registrations (pending first), Renew package and Check-in links.
+- Member Not Found state and Create Member overlay (`POST /members`) with client checks, field errors from the backend and the 409 duplicate message.
+- Payment Handoff overlay for pending online requests, opening the front desk payment confirmation; After Payment notice on the profile once confirmed.
+- Register and Renew (F1-14) at `/reception/register` with tabs Sport package, Membership card and Pending online requests. Desk sale with payment method, reference and amount received (BE-19), fee summary with the card discount, change for cash, renewal start after the current term, card term preview that mirrors `planCard` (new, renew, upgrade for the difference, blocked upgrade), and a receipt card with "View receipt".
+- Pending online requests tab (`GET /membership-cards/pending`, `GET /packages/registrations/pending`), oldest first, each opening the confirmation screen.
+- Payment confirmation and receipt at `/reception/payments/:paymentId`: `GET /payments/{id}`, Confirm payment through `PUT /membership-cards/{id}/activate` or `PUT /packages/registrations/{id}/activate` with the method used, Print receipt. FE-12 extends this screen.
+- Check-in (F1-15) at `/reception/check-in`: member code or card scan, `POST /check-ins`, Recorded and Rejected states with the backend reason, today's list (`GET /check-ins?date=`), field cleared and focused for the next scan.
+- `src/api/receptionApi.ts`, `src/pages/reception/*`, `src/styles/reception.css`; routes registered in `src/routes/AppRoutes.tsx`.
+
+### Notes
+- BE-05 and BE-19 are not on main. The contract assumed by the frontend is listed in `docs/tests/FE-05_test_cases.md` section 1.1 (one overview shape). On main a desk sale is ACTIVE with no payment record; the screen says so instead of showing a receipt.
+- Out of scope: F1-16 Support Requests (P3) and Edit profile from the desk (no endpoint).
+
+### Review round 1
+- Desk sale result decided from the payment: ACTIVE with paymentId null (main without BE-19) warns that no payment record exists; receipt only with a payment. Overview reloaded after each sale.
+- Card plan reuses FE-04 `planCard` (desk wording, blocked and unknown not sellable); duplicate card rules and `CardTier` removed. `parseAmount` accepts only whole VND.
+- Only 404 "Member not found" reads as a missing member; overview contract pinned to one shape with list checks. Confirm screen checks that the item belongs to the payment and waits for it. After Payment notice through router state.
+- Check-in: unknown code shown as Rejected "Member not found"; today's list without the BE-05 date filter shows a notice and this screen's check-ins.
+- `useResource` moved to `src/hooks/useResource.ts`, `toIsoDate` to `src/utils/date.ts`; single-result selection replaces the history entry.
 ## 2026-10-13 - Membership Cards and My Membership (FE-04, Flow 1)
 
 Branch `feat/f1-member-cards`, stacked on `feat/f1-member-packages` (FE-03) and `feat/f1-member-dashboard` (FE-02), both not merged yet: merge FE-02, then FE-03, then FE-04. Owner: Phat. Priority: P1. Depends on FE-00 and BE-17. Verified with `npm run lint`, `tsc -b`, `npm test` (338 tests in 18 files, 40 new) and `npm run build`.
