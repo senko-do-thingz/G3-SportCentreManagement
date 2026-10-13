@@ -75,12 +75,14 @@ When a workflow run fails:
 
 ### Repository Variables and Secrets
 
+#### Repository Variables (Settings -> Secrets and variables -> Actions -> Variables)
+- `DEPLOY_ENABLED`: Set to `true` to enable automated deployment jobs.
+
 #### Global Secrets (Settings -> Secrets and variables -> Actions)
 - `GITHUB_TOKEN`: Provided automatically by GitHub Actions with permissions defined in workflow YAML.
 
 #### Environment: `staging`
 Variables:
-- `DEPLOY_ENABLED`: Set to `true` to enable automated deployment.
 - `DEPLOY_HOST`: Remote hostname or IP for the staging server.
 - `DEPLOY_USER`: SSH username for deployment.
 - `DEPLOY_DIR`: Deployment path on the target server.
@@ -92,7 +94,6 @@ Secrets:
 
 #### Environment: `production`
 Variables:
-- `DEPLOY_ENABLED`: Set to `true` to enable production deployment.
 - `DEPLOY_HOST_PROD`: Remote hostname or IP for production.
 - `DEPLOY_USER`: SSH username for deployment.
 - `DEPLOY_DIR_PROD`: Deployment directory on production host.
