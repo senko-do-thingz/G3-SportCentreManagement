@@ -91,7 +91,7 @@
   1. Start `sqlserver` with `healthcheck` invoking `/opt/mssql-tools18/bin/sqlcmd -C -b -U sa -P "$$MSSQL_SA_PASSWORD" -Q 'SELECT 1'`.
   2. Monitor container status until health probe succeeds.
 - **Expected Result**: Healthcheck executes using `tools18` with `-C` flag and container reports `healthy`.
-- **Actual Result**: `sqlserver` container reached healthy state in `Compose template smoke test` GitHub Actions job.
+- **Actual Result**: `sqlserver` container reached healthy state in `Compose template smoke test` GitHub Actions job (Run `38347551726`).
 - **Status**: PASSED
 
 ### TC-DEPLOY-06: Database Creation and Idempotency in db-init
@@ -102,11 +102,11 @@
 - **Steps**:
   1. Run `db-init` service: executes `sqlcmd -C -b -Q "IF DB_ID(N'sportify') IS NULL CREATE DATABASE [sportify];"`.
   2. Verify database `sportify` was created.
-  3. Re-run `db-init` service a second time against the running database.
+  3. Re-run `db-init` service a second time against the running database via `docker compose run --rm db-init`.
 - **Expected Result**:
   - First run creates database `sportify` and exits with code 0.
   - Second run evaluates `IF DB_ID(N'sportify') IS NULL` as false, does nothing, and exits with code 0.
-- **Actual Result**: `db-init` exited with code 0 on both initial run and recreated second run.
+- **Actual Result**: `db-init` exited with code 0 on both initial run and second run (Run `38347551726`).
 - **Status**: PASSED
 
 ### TC-DEPLOY-07: Superuser sa Authentication against sportify DB
@@ -115,9 +115,9 @@
 - **Area**: Database Authentication (`deploy/compose.yaml`, `deploy/.env.example`)
 - **Preconditions**: `sqlserver` and `db-init` completed.
 - **Steps**:
-  1. Execute: `/opt/mssql-tools18/bin/sqlcmd -C -b -U sa -P "$DB_PASSWORD" -d sportify -Q "SELECT DB_NAME();"`.
+  1. Execute: `/opt/mssql-tools18/bin/sqlcmd -C -b -U sa -P "$DB_PASSWORD" -d sportify -Q "SET NOCOUNT ON; SELECT DB_NAME();"`.
 - **Expected Result**: Command authenticates as `sa`, connects to database `sportify`, and returns `sportify`.
-- **Actual Result**: Command returned `sportify` with exit code 0.
+- **Actual Result**: Command returned `sportify` with exit code 0 (Run `38347551726`).
 - **Status**: PASSED
 
 ### TC-DEPLOY-08: DB_USERNAME=sa Enforcement for with-db Profile

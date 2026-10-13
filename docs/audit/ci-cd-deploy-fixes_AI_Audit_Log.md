@@ -145,9 +145,9 @@ All issues have been resolved with strict compliance to project conventions (100
 | Compose Profiles | Optional with-db profile interpolation | `docker compose -f deploy/compose.yaml --profile with-db config` | PASSED | Activates `sqlserver`, `db-init`, and named volume cleanly. |
 | Optional Dependency | backend starts without with-db | `docker compose -f deploy/compose.yaml config` | PASSED | `required: false` allows `backend` to start without `sqlserver`. |
 | Required IMAGE_TAG | Config fails without IMAGE_TAG | `docker compose -f deploy/compose.yaml config` | PASSED | Exits with error when `IMAGE_TAG` is missing. |
-| Compose Smoke Test | Full container provisioning in CI | `.github/workflows/compose-smoke-test.yml` | PASSED | Healthcheck, db-init, sa login, idempotency, port isolation verified in GitHub Actions runner. |
-| CI Pipeline Gate | Full build, unit tests, integration tests | `.github/workflows/ci.yml` (Run `38343538187`) | PASSED | 618 tests run: 520 unit tests, 98 integration tests; 0 failures. |
-| Security Workflow | CodeQL and dependency analysis | `.github/workflows/security.yml` (Run `38343538186`) | PASSED | 0 security alerts. |
+| Compose Smoke Test | Full container provisioning in CI | `.github/workflows/compose-smoke-test.yml` (Run `38347551726`) | PASSED | Healthcheck, db-init, sa login, idempotency, port isolation verified in GitHub Actions runner. |
+| CI Pipeline Gate | Full build, unit tests, integration tests | `.github/workflows/ci.yml` (Run `38347551715`) | PASSED | 618 tests run: 520 unit tests, 98 integration tests; 0 failures. |
+| Security Workflow | CodeQL and dependency analysis | `.github/workflows/security.yml` (Run `38347551709`) | PASSED | 0 security alerts. |
 | Character Encoding | Pure ASCII across changed files | Python/Bash scan `[^\x00-\x7F]` | PASSED | 0 non-ASCII characters found. |
 
 ### Explicit Verification Boundaries (What Was NOT Verified Locally)
@@ -174,4 +174,7 @@ All issues have been resolved with strict compliance to project conventions (100
 | `65b2a2d` | Work Item A | fix(ci): fix mssql healthcheck and db-init in compose template |
 | `b4bcec1` | Work Item B | feat(ci): harden compose template and server deployment configuration |
 | `fe93dd1` | Work Item C | ci(deploy): add compose template smoke test workflow |
-| `9e89861` | Work Item D | docs(audit): update AI audit log and test cases for deployment review findings |
+| `ee3dea7` | Work Item D | docs(audit): update AI audit log and test cases for deployment review findings |
+| `42f4475` | Work Item C | fix(ci): export job-level IMAGE_TAG for compose smoke test steps |
+| `81ff235` | Work Item C | fix(ci): suppress row count in smoke test DB_NAME assertion query |
+| `cc79ab5` | Work Item C | fix(ci): refine port mapping assertion and idempotency step in compose smoke test |
