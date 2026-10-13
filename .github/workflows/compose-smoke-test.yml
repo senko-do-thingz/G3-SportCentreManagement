@@ -4,11 +4,15 @@ on:
   pull_request:
     paths:
       - "deploy/**"
+      - "backend/Dockerfile"
+      - "backend/src/main/resources/**"
       - ".github/workflows/compose-smoke-test.yml"
   push:
     branches: ["main"]
     paths:
       - "deploy/**"
+      - "backend/Dockerfile"
+      - "backend/src/main/resources/**"
       - ".github/workflows/compose-smoke-test.yml"
   schedule:
     - cron: "0 0 * * 0"
