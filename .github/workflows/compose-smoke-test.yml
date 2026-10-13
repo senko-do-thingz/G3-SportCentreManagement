@@ -10,6 +10,8 @@ on:
     paths:
       - "deploy/**"
       - ".github/workflows/compose-smoke-test.yml"
+  schedule:
+    - cron: "0 0 * * 0"
   workflow_dispatch:
 
 permissions:
@@ -23,9 +25,9 @@ jobs:
   compose-smoke-test:
     name: Compose template smoke test
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     env:
-      IMAGE_TAG: "test-smoke"
+      IMAGE_TAG: "ci"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,11 +46,27 @@ jobs:
           echo "Verified: docker compose config fails when IMAGE_TAG is not provided"
           rm -f deploy/.env
 
+      - name: Assert password policy violation makes sqlserver exit
+        run: |
+          echo "Testing that invalid password policy causes sqlserver to exit..."
+          if timeout 30s docker run --rm -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD=weak mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04; then
+            echo "Error: sqlserver unexpectedly succeeded with weak password"
+            exit 1
+          else
+            echo "Verified: sqlserver exits when password policy is violated"
+          fi
+
       - name: Create temporary test .env
         run: |
           cp deploy/.env.example deploy/.env
           sed -i 's/<REPLACE_WITH_STRONG_SA_PASSWORD>/TestPass1234!StrongSA/g' deploy/.env
           sed -i 's/<REPLACE_WITH_BASE64_SECRET_MIN_32_BYTES>/dGhpcy1pcy1hLXZlcnktc2VjdXJlLW1vY2stc2VjcmV0LWtleS1mb3ItdGVzdGluZy1vbmx5LWdoYWN0aW9ucw==/g' deploy/.env
+
+      - name: Build backend container image
+        run: |
+          echo "Building backend container image tagged as ghcr.io/senko-do-thingz/g3-sportcentremanagement/backend:ci..."
+          docker build -t ghcr.io/senko-do-thingz/g3-sportcentremanagement/backend:ci backend
+          echo "Verified: Backend image built successfully"
 
       - name: Start sqlserver service and wait for healthcheck
         run: |
@@ -93,6 +111,47 @@ jobs:
           echo "Running db-init a second time to verify idempotency..."
           docker compose -f deploy/compose.yaml --profile with-db run --rm db-init
           echo "Verified: db-init second run completed successfully"
+
+      - name: Assert non-sa DB_USERNAME causes backend connection failure
+        run: |
+          echo "Testing that non-sa DB_USERNAME causes backend startup failure..."
+          if docker compose -f deploy/compose.yaml run --rm -e DB_USERNAME=nonexistent_user backend; then
+            echo "Error: Backend unexpectedly started with non-sa user"
+            exit 1
+          else
+            echo "Verified: Non-sa DB_USERNAME causes backend startup failure as expected"
+          fi
+
+      - name: Start backend service and wait for actuator health UP
+        run: |
+          echo "Starting backend service with IMAGE_TAG=ci and DB_USERNAME=sa..."
+          docker compose -f deploy/compose.yaml --profile with-db up -d backend
+          echo "Waiting for http://localhost:8080/actuator/health to report UP..."
+          for i in $(seq 1 60); do
+            STATUS="$(curl -s -f http://localhost:8080/actuator/health 2>/dev/null | grep -o '"status":"UP"' || true)"
+            if [ "$STATUS" = '"status":"UP"' ]; then
+              echo "Backend healthcheck reported UP after $((i * 2))s"
+              break
+            fi
+            if [ "$i" -eq 60 ]; then
+              echo "Error: Backend health check timed out after 120s"
+              docker compose -f deploy/compose.yaml logs backend
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Assert Flyway migrations were applied to sportify database
+        run: |
+          echo "Verifying Flyway migrations in database sportify..."
+          MIGRATION_COUNT="$(docker compose -f deploy/compose.yaml --profile with-db exec -T sqlserver \
+            /opt/mssql-tools18/bin/sqlcmd -C -b -U sa -P "TestPass1234!StrongSA" -d sportify -h -1 -W -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1;" | head -n 1 | tr -d '\r\n ')"
+          echo "Flyway applied migrations count: $MIGRATION_COUNT"
+          if [ -z "$MIGRATION_COUNT" ] || [ "$MIGRATION_COUNT" -le 0 ]; then
+            echo "Error: Expected positive migration count in flyway_schema_history, got '$MIGRATION_COUNT'"
+            exit 1
+          fi
+          echo "Verified: Flyway successfully applied $MIGRATION_COUNT migrations"
 
       - name: Dump compose logs on failure
         if: failure()
