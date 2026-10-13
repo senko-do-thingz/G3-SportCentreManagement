@@ -4,9 +4,9 @@
 - **Task ID**: BE-17
 - **Feature Flow**: Flow 3 (Payments, Invoices, Refunds and Reports)
 - **Branch**: `feat/f3-pending-payments`
-- **Status**: Implemented, unit-verified, integration tests configured for Testcontainers (CI validation required)
+- **Status**: Implemented, unit-verified, integration tests verified via GitHub Actions CI
 - **Objective**: Create a PENDING payment whenever a member asks for something online (MembershipCard or SportPackage registration), set payment_id on the card or registration in the same transaction, expose `GET /api/v1/payments/{id}` for F3-01 Payment Summary, F3-02 Payment Instructions & Status, and S3-Single Single Visit Payment Summary with bank transfer instructions from application properties, expose `PUT /api/v1/payments/{id}/method` to let owner or staff change payment method while PENDING and linked item is PENDING_PAYMENT, mark payment SUCCESS with payment_time and confirming staff when activating a card or registration, and mark payment FAILED with dynamic actor notes when cancelling.
-- **Environment Note**: Docker is not available in the local execution environment. Consequently, tests extending `AbstractIntegrationTest` (which rely on Testcontainers MSSQL Server) cannot be executed locally and are marked as "NOT RUN - requires Docker (verified by GitHub Actions CI)". Unit tests, MockMvc controller slices, and Maven test compilation were executed and verified locally.
+- **Environment Note**: Docker is not available in the local execution environment. Consequently, tests extending `AbstractIntegrationTest` (which rely on Testcontainers MSSQL Server) cannot be executed locally and are verified only by GitHub Actions CI. Unit tests, MockMvc controller slices, and Maven test compilation were executed and verified locally.
 
 ---
 
@@ -14,17 +14,24 @@
 
 | Test Class | Category | Test Count | Execution Status | Description |
 |---|---|---|---|---|
-| `PaymentServiceImplTest` | Service Unit Test | 29 | PASSED (local unit test) | Verifies payment retrieval, notes masking for non-staff, surrogate pair safe truncation, Clock consistency (createdAt <= paymentTime), mandatory ID and non-PENDING status validations, staff CASH activation, updatePaymentMethod for members vs staff, and error cases. |
-| `PaymentControllerTest` | WebMvc MockMvc Test | 15 | PASSED (local unit test) | Verifies HTTP endpoints `GET /api/v1/payments/{id}` and `PUT /api/v1/payments/{id}/method`, role authorization (MEMBER, RECEPTIONIST, MANAGER), notes masking for members vs staff, staff CASH method update (200), member CASH rejection (400), and optimistic locking conflict mapping to HTTP 409. |
-| `MembershipCardControllerTest` | WebMvc MockMvc Test | 3 | PASSED (local unit test) | Verifies `PUT /api/v1/membership-cards/{id}/cancel` returning 404 for non-owners (concealing existence) and 200 for owners, and `PUT /api/v1/membership-cards/{id}/activate` with CASH paymentMethod returning 200. |
-| `SportPackageRegistrationCancelControllerTest` | WebMvc MockMvc Test | 6 | PASSED (local unit test) | Verifies HTTP endpoint `PUT /api/v1/packages/registrations/{id}/cancel`, owner OK, receptionist OK, manager OK, non-owner member 404 Not Found (concealing resource existence), wrong status (ACTIVE) 400 Bad Request, unauthenticated 401 Unauthorized. |
-| `BankTransferPropertiesTest` | Config Unit Test | 4 | PASSED (local unit test) | Verifies Jakarta Bean Validation constraints on BankTransferProperties (valid configuration passes, blank accountName, accountNumber, or bankName fails validation). |
-| `PaymentEntityMappingTest` | Entity Unit Test | 6 | PASSED (local unit test) | Verifies JPA mapping, version field increment, nullable paymentTime, and builder/accessors. |
-| `MembershipCardServiceImplTest` | Service Unit Test | 28 | PASSED (local unit test) | Includes card operations, equal-price tier purchase starting after current card without replacement, non-owner cancel throwing ResourceNotFoundException (404), CASH activation, and actor id notes. |
-| `SportPackageServiceImplTest` | Service Unit Test | 28 | PASSED (local unit test) | Includes package operations, zero price validation prior to sequence generation, non-owner cancel throwing ResourceNotFoundException (404), CASH activation, and actor id notes. |
-| `SecurityUtilsTest` | Unit Test | 26 | PASSED (local unit test) | Verifies role parsing and staff detection for RECEPTIONIST and MANAGER (excluding unseeded ADMIN), case insensitivity, optional "ROLE_" prefixes, and isMember checks. |
-| `PaymentServiceTransactionMandatoryTest` | Spring Transaction Test | 3 | PASSED (local unit test) | Verifies Propagation.MANDATORY enforcement throwing IllegalTransactionStateException outside an active transaction on createPendingPayment, markPaymentSuccess, and markPaymentFailed. |
-| `PaymentPendingIntegrationTest` | Testcontainers Integration Test | 12 | VERIFIED IN CI (Docker SQL Server 2022) | Integration tests verifying pending payment persistence, filtered unique index duplicate rejection, check constraint ck_payment_amount, optimistic lock conflict throwing ObjectOptimisticLockingFailureException, check constraint ck_payment_success_time, native SQL null payment_time default dropped, and findByMemberIdOrderByCreatedAtDesc sorting. |
+| `PaymentServiceImplTest` | Service Unit Test | 38 | PASSED (local unit test) | Mockito unit tests verifying pending payment creation, amount precision/scale, getPayment authorization/masking, updatePaymentMethod transitions, markPaymentSuccess/Failed, confirmedBy validation, notes truncation, and invoice/item summary resolution. |
+| `PaymentControllerTest` | WebMvc MockMvc Test | 17 | PASSED (local unit test) | MockMvc slice tests verifying `GET /api/v1/payments/{id}` and `PUT /api/v1/payments/{id}/method`, owner/receptionist access, non-owner 404, unauthenticated 401, unseeded ADMIN 403 Forbidden, notes masking, CASH method validation, and 409 conflict handling. |
+| `MembershipCardControllerTest` | WebMvc MockMvc Test | 3 | PASSED (local unit test) | WebMvc slice tests verifying card cancellation 404 for non-owners, 200 for owners, and card activation with CASH returning 200. |
+| `SportPackageRegistrationCancelControllerTest` | WebMvc MockMvc Test | 6 | PASSED (local unit test) | WebMvc slice tests verifying package cancellation for owner (200), receptionist (200), manager (200), other member (404), active status (400), and unauthenticated (401). |
+| `BankTransferPropertiesTest` | Config Unit Test | 4 | PASSED (local unit test) | Jakarta Validation tests verifying valid configuration passes, and blank accountName, accountNumber, or bankName fails validation. |
+| `PaymentEntityMappingTest` | Entity Unit Test | 6 | PASSED (local unit test) | Reflection and mapping tests verifying JPA table/column mapping, foreign keys, enums, versioning, and Spring Data JPA auditing annotations. |
+| `InvoiceEntityMappingTest` | Entity Unit Test | 1 | PASSED (local unit test) | Reflection and lifecycle tests verifying Invoice entity `@PrePersist` and `@PreUpdate` callback defaults. |
+| `InvoiceLineEntityMappingTest` | Entity Unit Test | 1 | PASSED (local unit test) | Reflection and lifecycle tests verifying InvoiceLine entity `@PrePersist` callback defaults. |
+| `MembershipCardServiceImplTest` | Service Unit Test | 32 | PASSED (local unit test) | Unit tests verifying card operations, pending payment linkage, equal-tier extensions, non-owner 404, desk vs online channels, and actor notes. |
+| `SportPackageServiceImplTest` | Service Unit Test | 29 | PASSED (local unit test) | Unit tests verifying registration operations, pending payment linkage, zero-price and 100% discount validations, non-owner 404, desk vs online channels, and actor notes. |
+| `SecurityUtilsTest` | Unit Test | 26 | PASSED (local unit test) | Parameterized tests verifying staff detection (RECEPTIONIST, MANAGER = true; ADMIN, MEMBER, COACH = false), member detection (MEMBER = true), case-insensitivity, "ROLE_" stripping, and null safety. |
+| `PaymentServiceTransactionMandatoryTest` | Spring Transaction Test | 3 | PASSED (local unit test) | Verifies `Propagation.MANDATORY` enforcement on createPendingPayment, markPaymentSuccess, and markPaymentFailed outside transactions. |
+| `AuditConfigTest` | Config Unit Test | 4 | PASSED (local unit test) | Parameterized unit tests verifying `AuditConfig.auditingDateTimeProvider` returns exact `LocalDateTime.now(clock)` across 4 timezones using fixed Clock. |
+| `CorsPropertiesConfigTest` | Config Unit Test | 5 | PASSED (local unit test) | Verifies CORS configuration and `.env.example` format without quotes. |
+| `PaymentAuditingFixedClockIntegrationTest` | Testcontainers Integration Test | 1 | PASSED (CI only) | Integration test in dedicated Spring context with fixed Clock in America/New_York asserting exact 0s equality between `created_at`, `updated_at`, and `payment_time`. |
+| `PaymentPendingIntegrationTest` | Testcontainers Integration Test | 13 | PASSED (CI only) | Integration tests verifying pending payment persistence, filtered unique index duplicate rejection, amount constraint, optimistic locking, null payment_time default, newest-first sorting, and shared PK mapping. |
+| `PaymentRepositoryIntegrationTest` | Testcontainers Integration Test | 6 | PASSED (CI only) | Integration tests verifying payment and invoice persistence with two lines, check constraints, version increments, stale entity optimistic lock exceptions, and payment code format. |
+| `V14ToV19SchemaConstraintIntegrationTest` | Testcontainers Integration Test | 9 | PASSED (CI only) | Integration tests verifying database sequences and schema constraints across V14 to V19 migrations. |
 
 ---
 
@@ -32,426 +39,716 @@
 
 ### 1. PaymentServiceImplTest
 
-All tests in this suite run as pure Mockito unit tests without external database dependencies.
+#### TC-PAY-01: Create Pending Payment - Valid Online Method
+- **Method Name**: `createPendingPayment_ValidOnlineMethod_Succeeds()`
+- **Input**: `member = memberProfile`, `amount = 500000.00`, `method = BANK_TRANSFER`
+- **Expected Result**: Payment created with status `PENDING`, paymentTime `null`, amount `500000.00`, and method `BANK_TRANSFER`.
+- **Status**: PASSED (local unit test)
 
-#### TC-PAY-01: Get Payment - As Owner - Success with Bank Transfer Instructions
-- **Method Name**: `getPayment_AsOwner_Success()`
-- **Input**: `paymentId = 10L`, `actor = ownerUser`, `method = BANK_TRANSFER`, `status = PENDING`
-- **Expected Result**: Returns `PaymentResponse` with `code = PAY-1000`, `status = PENDING`, `amount = 810000.00`, `method = BANK_TRANSFER`, and populated `bankTransferInstructions` (`accountName = Sportify Sports Center`, `accountNumber = 0000 1041 2460`, `bank = Demo Bank`, `transferContent = PAY-1000`).
-- **Status**: PASSED
+#### TC-PAY-02: Create Pending Payment - Real Code Formatter
+- **Method Name**: `createPendingPayment_WithRealCodeFormatter_GeneratesFormattedCode()`
+- **Input**: Real `CodeFormatter` instance, `sequence = 42L`
+- **Expected Result**: Payment code matches format `PAY-0042`.
+- **Status**: PASSED (local unit test)
 
-#### TC-PAY-02: Get Payment - Non-Bank-Transfer Method - Omits Instructions
-- **Method Name**: `getPayment_WhenPendingNonBankTransfer_OmitsBankTransferInstructions()`
-- **Input**: `paymentId = 10L`, `actor = ownerUser`, `method = MOMO`, `status = PENDING`
-- **Expected Result**: Returns `PaymentResponse` where `bankTransferInstructions` is null (omitted in JSON output).
-- **Status**: PASSED
+#### TC-PAY-03: Create Pending Payment - Time Source Uses Clock
+- **Method Name**: `timeSource_PaymentTime_UsesClock()`
+- **Input**: `Clock` bean fixed at `2026-10-15T12:00:00Z`
+- **Expected Result**: Payment time in markPaymentSuccess matches clock instant.
+- **Status**: PASSED (local unit test)
 
-#### TC-PAY-03: Get Payment - Non-Pending Status - Omits Instructions
-- **Method Name**: `getPayment_WhenSuccessBankTransfer_OmitsBankTransferInstructions()`
-- **Input**: `paymentId = 10L`, `actor = ownerUser`, `method = BANK_TRANSFER`, `status = SUCCESS`
-- **Expected Result**: Returns `PaymentResponse` where `bankTransferInstructions` is null.
-- **Status**: PASSED
-
-#### TC-PAY-04: Get Payment - As Staff - Success
-- **Method Name**: `getPayment_AsStaff_Success()`
-- **Input**: `paymentId = 10L`, `actor = receptionistUser`, `managerUser`, `adminUser`
-- **Expected Result**: All staff roles (RECEPTIONIST, MANAGER, ADMIN) can view any payment.
-- **Status**: PASSED
-
-#### TC-PAY-05: Get Payment - As Other Member - Throws ResourceNotFoundException (404)
-- **Method Name**: `getPayment_AsOtherMember_ThrowsResourceNotFoundException()`
-- **Input**: `paymentId = 10L`, `actor = otherUser` (MEMBER with id 200L != payment member id 100L)
-- **Expected Result**: Throws `ResourceNotFoundException` with message "Payment not found for id: 10" to conceal payment existence from non-owners.
-- **Status**: PASSED
-
-#### TC-PAY-06: Get Payment - Not Found - Throws ResourceNotFoundException
-- **Method Name**: `getPayment_NotFound_ThrowsResourceNotFoundException()`
-- **Input**: `paymentId = 999L`
-- **Expected Result**: Throws `ResourceNotFoundException` with message "Payment not found for id: 999".
-- **Status**: PASSED
-
-#### TC-PAY-07: Get Payment - Linked to Sport Package Registration - Resolves Package Summary
-- **Method Name**: `getPayment_ForSportPackageRegistration_ResolvesPackageDescriptionAndDiscount()`
-- **Input**: `paymentId = 10L`, linked to registration with package "Football / Coach-led / 30 days", `originalPrice = 900000.00`, `paidAmount = 810000.00`
-- **Expected Result**: `itemDescription = Football / Coach-led / 30 days`, `originalPrice = 900000.00`, `discount = 90000.00`, `amount = 810000.00`.
-- **Status**: PASSED
-
-#### TC-PAY-08: Get Payment - Linked to Member Card - Resolves Card Summary
-- **Method Name**: `getPayment_ForMemberCard_ResolvesCardDescriptionAndDiscount()`
-- **Input**: `paymentId = 10L`, linked to card with tier "Gold", `tierPrice = 500000.00`, `pricePaid = 400000.00`
-- **Expected Result**: `itemDescription = Gold Card`, `originalPrice = 500000.00`, `discount = 100000.00`, `amount = 400000.00`.
-- **Status**: PASSED
-
-#### TC-PAY-09: Get Payment - Linked to Invoice - Resolves Invoice Summary
-- **Method Name**: `getPayment_ForInvoice_ResolvesInvoiceDetails()`
-- **Input**: `paymentId = 10L`, linked to invoice "INV-1000", `subtotalAmount = 600000.00`, `discountAmount = 50000.00`
-- **Expected Result**: `itemDescription = Invoice INV-1000`, `originalPrice = 600000.00`, `discount = 50000.00`.
-- **Status**: PASSED
-
-#### TC-PAY-10: Get Payment - Fallback - Resolves Payment Code
-- **Method Name**: `getPayment_Fallback_ResolvesPaymentCodeAndAmount()`
-- **Input**: `paymentId = 10L` without linked card, registration, or invoice
-- **Expected Result**: `itemDescription = Payment PAY-1000`, `originalPrice = 810000.00`, `discount = 0.00`.
-- **Status**: PASSED
-
-#### TC-PAY-11: Create Pending Payment - Success with Real CodeFormatter
-- **Method Name**: `createPendingPayment_Success()`
-- **Input**: `member = memberUser`, `amount = 500000.00`, `method = BANK_TRANSFER`, real `CodeFormatter` instance
-- **Expected Result**: Payment saved with code matching `^PAY-\\d{4,}$`, status `PENDING`, `paymentTime = null`, correct amount and member.
-- **Status**: PASSED
-
-#### TC-PAY-12: Create Pending Payment - Zero or Negative Amount - Throws BusinessRuleException
-- **Method Name**: `createPendingPayment_ZeroOrNegativeAmount_ThrowsBusinessRuleException()`
-- **Input**: `amount = 0.00` and `amount = -10000.00`
-- **Expected Result**: Throws `BusinessRuleException` with message "Payment amount must be greater than zero.".
-- **Status**: PASSED
-
-#### TC-PAY-13: Create Pending Payment - Disallowed Online Method - Throws BusinessRuleException
+#### TC-PAY-04: Create Pending Payment - Disallowed Online Method
 - **Method Name**: `createPendingPayment_DisallowedOnlineMethod_ThrowsBusinessRuleException()`
-- **Input**: `method = CASH` or `CREDIT_CARD`
+- **Input**: `method = CASH`
 - **Expected Result**: Throws `BusinessRuleException` stating CASH is not allowed for online payment requests.
-- **Status**: PASSED
+- **Status**: PASSED (local unit test)
 
-#### TC-PAY-14: Update Payment Method - As Owner When Pending - Updates Method
-- **Method Name**: `updatePaymentMethod_AsOwner_WhenPending_UpdatesMethod()`
-- **Input**: `paymentId = 10L`, `request = { paymentMethod: MOMO }`, `actor = ownerUser`
-- **Expected Result**: Updates payment method to `MOMO`, saves entity, and returns updated response.
-- **Status**: PASSED
+#### TC-PAY-05: Create Pending Payment - Zero or Negative Amount
+- **Method Name**: `createPendingPayment_ZeroOrNegativeAmount_ThrowsBusinessRuleException()`
+- **Input**: `amount = 0.00` and `amount = -100.00`
+- **Expected Result**: Throws `BusinessRuleException` with message "Payment amount must be greater than zero.".
+- **Status**: PASSED (local unit test)
 
-#### TC-PAY-15: Update Payment Method - As Staff When Pending - Updates Method
-- **Method Name**: `updatePaymentMethod_AsStaff_WhenPending_UpdatesMethod()`
-- **Input**: `paymentId = 10L`, `request = { paymentMethod: VNPAY }`, `actor = receptionistUser`
-- **Expected Result**: Staff role updates payment method successfully.
-- **Status**: PASSED
-
-#### TC-PAY-16: Update Payment Method - Disallowed Method - Throws BusinessRuleException
-- **Method Name**: `updatePaymentMethod_DisallowedOnlineMethod_ThrowsBusinessRuleException()`
-- **Input**: `paymentId = 10L`, `request = { paymentMethod: CASH }`, `actor = ownerUser`
-- **Expected Result**: Throws `BusinessRuleException` rejecting CASH.
-- **Status**: PASSED
-
-#### TC-PAY-17: Update Payment Method - When Linked Card Not Pending Payment - Throws BusinessRuleException
-- **Method Name**: `updatePaymentMethod_WhenLinkedCardNotPendingPayment_ThrowsBusinessRuleException()`
-- **Input**: `paymentId = 10L`, linked card status is `ACTIVE`
-- **Expected Result**: Throws `BusinessRuleException` stating payment method cannot be changed because the linked membership card is no longer pending payment.
-- **Status**: PASSED
-
-#### TC-PAY-18: Update Payment Method - When Linked Registration Not Pending Payment - Throws BusinessRuleException
-- **Method Name**: `updatePaymentMethod_WhenLinkedRegistrationNotPendingPayment_ThrowsBusinessRuleException()`
-- **Input**: `paymentId = 10L`, linked registration status is `CANCELLED`
-- **Expected Result**: Throws `BusinessRuleException` stating payment method cannot be changed because the linked package registration is no longer pending payment.
-- **Status**: PASSED
-
-#### TC-PAY-19: Update Payment Method - As Non-Owner - Throws ResourceNotFoundException (404)
-- **Method Name**: `updatePaymentMethod_AsNonOwner_ThrowsResourceNotFoundException()`
-- **Input**: `paymentId = 10L`, `actor = otherUser`
-- **Expected Result**: Throws `ResourceNotFoundException` with message "Payment not found for id: 10" to conceal payment existence.
-- **Status**: PASSED
-
-#### TC-PAY-20: Update Payment Method - Optimistic Lock Conflict - Throws OptimisticLockingException
-- **Method Name**: `updatePaymentMethod_WhenOptimisticLockConflict_ThrowsOptimisticLockingException()`
-- **Input**: `paymentId = 10L`, `paymentRepository.save(...)` throws `ObjectOptimisticLockingFailureException`
-- **Expected Result**: Throws `OptimisticLockingException` indicating concurrent modification conflict.
-- **Status**: PASSED
-
-#### TC-PAY-21: Create Pending Payment - Amount Rounds to Zero - Throws BusinessRuleException
+#### TC-PAY-06: Create Pending Payment - Amount Rounds to Zero
 - **Method Name**: `createPendingPayment_AmountRoundsToZero_ThrowsBusinessRuleException()`
 - **Input**: `amount = 0.004` (scale 2 rounds down to 0.00)
 - **Expected Result**: Throws `BusinessRuleException` with message "Payment amount must be greater than zero.".
-- **Status**: PASSED
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-07: Create Pending Payment - More Than Two Decimal Places
+- **Method Name**: `createPendingPayment_MoreThanTwoDecimalPlaces_ThrowsBusinessRuleException()`
+- **Input**: `amount = 100.555`
+- **Expected Result**: Throws `BusinessRuleException` rejecting amounts with more than 2 decimal places.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-08: Create Pending Payment - More Than Ten Integer Digits
+- **Method Name**: `createPendingPayment_MoreThanTenIntegerDigits_ThrowsBusinessRuleException()`
+- **Input**: `amount = 12345678901.00`
+- **Expected Result**: Throws `BusinessRuleException` rejecting amounts exceeding 10 integer digits.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-09: Mark Payment Success - Null Payment ID
+- **Method Name**: `markPaymentSuccess_NullPaymentId_ThrowsBusinessRuleException()`
+- **Input**: `paymentId = null`
+- **Expected Result**: Throws `BusinessRuleException` with message "Payment ID cannot be null".
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-10: Mark Payment Success - Not Pending Status
+- **Method Name**: `markPaymentSuccess_NotPendingStatus_ThrowsBusinessRuleException()`
+- **Input**: `paymentId = 10L`, status already `SUCCESS`
+- **Expected Result**: Throws `BusinessRuleException` with message containing "expected PENDING".
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-11: Mark Payment Success - Updates Status and Notes
+- **Method Name**: `markPaymentSuccess_UpdatesStatusAndNotes()`
+- **Input**: `paymentId = 10L`, `confirmedBy = receptionistUser`
+- **Expected Result**: Payment status becomes `SUCCESS`, notes append "Confirmed by user id ...", `confirmedByUser` set.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-12: Mark Payment Success - Staff and Cash Method
+- **Method Name**: `markPaymentSuccess_WithStaffAndCashMethod_UpdatesPaymentMethodToCash()`
+- **Input**: `paymentId = 10L`, `confirmedBy = receptionistUser`, `actualMethod = CASH`
+- **Expected Result**: Payment method updated to `CASH`, status becomes `SUCCESS`.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-13: Mark Payment Success - Non-Staff ConfirmedBy
+- **Method Name**: `markPaymentSuccess_WithNonStaffConfirmedBy_ThrowsBusinessRuleException()`
+- **Input**: `paymentId = 10L`, `confirmedBy = ownerUser` (non-staff MEMBER)
+- **Expected Result**: Throws `BusinessRuleException` with message "Only staff users can confirm payment" before repository lookup or mutation; repository save and findById never called.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-14: Mark Payment Success - Null ConfirmedBy
+- **Method Name**: `markPaymentSuccess_WithNullConfirmedBy_SucceedsWithoutStaffNote()`
+- **Input**: `paymentId = 10L`, `confirmedBy = null`
+- **Expected Result**: Succeeds, status becomes `SUCCESS`, `confirmedByUser` remains null, notes unmutated.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-15: Mark Payment Failed - Null Payment ID
+- **Method Name**: `markPaymentFailed_NullPaymentId_ThrowsBusinessRuleException()`
+- **Input**: `paymentId = null`
+- **Expected Result**: Throws `BusinessRuleException` with message "Payment ID cannot be null".
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-16: Mark Payment Failed - Not Pending Status
+- **Method Name**: `markPaymentFailed_NotPendingStatus_ThrowsBusinessRuleException()`
+- **Input**: `paymentId = 10L`, status already `SUCCESS`
+- **Expected Result**: Throws `BusinessRuleException` with message containing "expected PENDING".
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-17: Mark Payment Failed - Updates Status and Appends Notes
+- **Method Name**: `markPaymentFailed_UpdatesStatusAndAppendsNotes()`
+- **Input**: `paymentId = 10L`, `reason = "Payment cancelled by member user id 100"`
+- **Expected Result**: Status becomes `FAILED`, reason appended to existing notes.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-18: Notes Truncation - Does Not Split Surrogate Pairs
+- **Method Name**: `truncateNotes_DoesNotSplitSurrogatePairs()`
+- **Input**: Prefix of 499 characters followed by 2-character surrogate pair (`\uD83D\uDE00`)
+- **Expected Result**: Truncates cleanly to 499 characters without splitting surrogate pair.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-19: Append Note - Preserves Newest Staff Note Intact
+- **Method Name**: `appendNote_Existing495Chars_PreservesStaffNoteIntact()`
+- **Input**: Existing notes of 495 characters plus staff confirmation note
+- **Expected Result**: Staff note preserved intact within 500-character limit; older content trimmed/dropped.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-20: Append Note - Single 600 Characters Cut Safely
+- **Method Name**: `appendNote_Single600CharsWithSurrogatePair_CutSafelyTo500()`
+- **Input**: Single note of 600 characters with surrogate pair near 500-char boundary
+- **Expected Result**: Cut safely to 499 characters without splitting surrogate pair.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-21: Append Note - Null and Blank Inputs Handled Cleanly
+- **Method Name**: `appendNote_NullAndBlankInputs_HandledCleanly()`
+- **Input**: Null, empty, and whitespace-only notes
+- **Expected Result**: Safely handles null and blank inputs without corruption.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-22: Append Note - Trimmed Existing Becomes Empty on Low Surrogate
+- **Method Name**: `appendNote_TrimmedExistingBecomesEmptyOnLowSurrogate_ReturnsAppendWithoutLeadingSeparator()`
+- **Input**: Existing surrogate pair `\uD83D\uDE00` and append note of 496 characters where remaining budget of 1 char lands on low surrogate
+- **Expected Result**: Returns appended note directly without leading separator `" | "`.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-23: Payment Methods - Null Actor Throws IllegalArgumentException
+- **Method Name**: `paymentMethods_NullActor_ThrowsIllegalArgumentException()`
+- **Input**: `actor = null` passed to `getPayment` or `updatePaymentMethod`
+- **Expected Result**: Throws `IllegalArgumentException`.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-24: Get Payment - Owner Returns Response with Notes Concealed
+- **Method Name**: `getPayment_Owner_ReturnsResponseWithNotesConcealed()`
+- **Input**: `paymentId = 10L`, `actor = ownerUser` (MEMBER)
+- **Expected Result**: Returns `PaymentResponse` with `notes = null` (concealed for privacy).
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-25: Get Payment - Staff Returns Response with Notes Visible
+- **Method Name**: `getPayment_Staff_ReturnsResponseWithNotesVisible()`
+- **Input**: `paymentId = 10L`, `actor = receptionistUser` and `managerUser`
+- **Expected Result**: Returns `PaymentResponse` with full internal `notes` visible.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-26: Get Payment - Other Member Throws ResourceNotFoundException (404)
+- **Method Name**: `getPayment_OtherMember_ThrowsResourceNotFoundException()`
+- **Input**: `paymentId = 10L`, `actor = otherUser` (MEMBER with ID 200L != payment member ID 100L)
+- **Expected Result**: Throws `ResourceNotFoundException` with message "Payment not found for id: 10" to conceal existence.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-27: Get Payment - Bank Transfer Instructions Visibility
+- **Method Name**: `getPayment_InstructionsVisibility_OnlyBankTransferAndPending()`
+- **Input**: Pending BANK_TRANSFER payment, MOMO payment, and SUCCESS payment
+- **Expected Result**: `bankTransferInstructions` populated only when method is `BANK_TRANSFER` and status is `PENDING`.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-28: Update Payment Method - Owner Pending Updates Method
+- **Method Name**: `updatePaymentMethod_OwnerPending_UpdatesMethod()`
+- **Input**: `paymentId = 10L`, `request = { paymentMethod: MOMO }`, `actor = ownerUser`
+- **Expected Result**: Updates payment method to `MOMO`, saves entity, returns response.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-29: Update Payment Method - Staff with Cash Succeeds
+- **Method Name**: `updatePaymentMethod_StaffWithCash_Succeeds()`
+- **Input**: `paymentId = 10L`, `request = { paymentMethod: CASH }`, `actor = receptionistUser`
+- **Expected Result**: Staff can switch payment method to `CASH`.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-30: Update Payment Method - Other Member Throws ResourceNotFoundException
+- **Method Name**: `updatePaymentMethod_OtherMember_ThrowsResourceNotFoundException()`
+- **Input**: `paymentId = 10L`, `actor = otherUser`
+- **Expected Result**: Throws `ResourceNotFoundException` with message "Payment not found for id: 10".
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-31: Update Payment Method - Not Pending Throws BusinessRuleException
+- **Method Name**: `updatePaymentMethod_NotPending_ThrowsBusinessRuleException()`
+- **Input**: `paymentId = 10L`, status `SUCCESS`
+- **Expected Result**: Throws `BusinessRuleException` stating payment is not in PENDING status.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-32: Update Payment Method - Linked Card Active Throws BusinessRuleException
+- **Method Name**: `updatePaymentMethod_LinkedCardActive_ThrowsBusinessRuleException()`
+- **Input**: `paymentId = 10L`, linked card status is `ACTIVE`
+- **Expected Result**: Throws `BusinessRuleException` stating card is no longer pending payment.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-33: Update Payment Method - Linked Registration Active Throws BusinessRuleException
+- **Method Name**: `updatePaymentMethod_LinkedRegistrationActive_ThrowsBusinessRuleException()`
+- **Input**: `paymentId = 10L`, linked registration status is `ACTIVE`
+- **Expected Result**: Throws `BusinessRuleException` stating registration is no longer pending payment.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-34: Update Payment Method - Disallowed Method Throws BusinessRuleException
+- **Method Name**: `updatePaymentMethod_DisallowedMethod_ThrowsBusinessRuleException()`
+- **Input**: Member requests `paymentMethod = CASH`
+- **Expected Result**: Throws `BusinessRuleException` rejecting CASH for non-staff.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-35: Get Payment - Resolves Sport Package Registration Details
+- **Method Name**: `getPayment_ResolvesSportPackageRegistrationDetails()`
+- **Input**: Payment linked to package registration
+- **Expected Result**: Returns item summary with package description, original price, and discount.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-36: Get Payment - Resolves Member Card Details
+- **Method Name**: `getPayment_ResolvesMemberCardDetails()`
+- **Input**: Payment linked to membership card
+- **Expected Result**: Returns item summary with tier name, original price, and discount.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-37: Get Payment - Resolves Invoice Details
+- **Method Name**: `getPayment_ResolvesInvoiceDetails()`
+- **Input**: Payment linked to invoice
+- **Expected Result**: Returns item summary with invoice number, subtotal, and discount.
+- **Status**: PASSED (local unit test)
+
+#### TC-PAY-38: Get Payment - Resolves Invoice Details Picks Lowest ID Deterministically
+- **Method Name**: `getPayment_ResolvesInvoiceDetails_PicksLowestIdDeterministically()`
+- **Input**: Payment linked to multiple invoices (ID 50L and ID 20L)
+- **Expected Result**: Deterministically selects invoice with lowest ID (20L).
+- **Status**: PASSED (local unit test)
 
 ---
 
 ### 2. PaymentControllerTest
 
-All tests in this suite run with Spring Boot MockMvc slices.
-
-#### TC-CTL-01: GET /api/v1/payments/{id} - As Member - Returns 200
+#### TC-CTL-01: GET /api/v1/payments/{id} - As Member Returns 200
 - **Method Name**: `getPayment_AsMember_Returns200WithPaymentDetails()`
 - **Input**: `GET /api/v1/payments/1`, authenticated as MEMBER
-- **Expected Result**: HTTP 200 OK with full payment JSON response including nested `bankTransferInstructions`.
-- **Status**: PASSED
+- **Expected Result**: HTTP 200 OK with full payment details.
+- **Status**: PASSED (local unit test)
 
-#### TC-CTL-02: GET /api/v1/payments/{id} - As Receptionist - Returns 200
+#### TC-CTL-02: GET /api/v1/payments/{id} - When Pending Momo Omits Bank Instructions
+- **Method Name**: `getPayment_WhenPendingMomo_OmitsBankTransferInstructionsAndHasNullPaymentTime()`
+- **Input**: `GET /api/v1/payments/1` with MOMO method
+- **Expected Result**: HTTP 200 OK with `bankTransferInstructions = null` and `paymentTime = null`.
+- **Status**: PASSED (local unit test)
+
+#### TC-CTL-03: GET /api/v1/payments/{id} - When Success Includes Payment Time
+- **Method Name**: `getPayment_WhenSuccess_IncludesPaymentTimeAndOmitsBankTransferInstructions()`
+- **Input**: `GET /api/v1/payments/1` with SUCCESS status
+- **Expected Result**: HTTP 200 OK with populated `paymentTime` and `bankTransferInstructions = null`.
+- **Status**: PASSED (local unit test)
+
+#### TC-CTL-04: GET /api/v1/payments/{id} - As Other Member Returns 404
+- **Method Name**: `getPayment_AsOtherMember_Returns404NotFound()`
+- **Input**: `GET /api/v1/payments/1`, authenticated as non-owner MEMBER
+- **Expected Result**: HTTP 404 Not Found (concealing resource existence).
+- **Status**: PASSED (local unit test)
+
+#### TC-CTL-05: GET /api/v1/payments/{id} - As Receptionist Returns 200
 - **Method Name**: `getPayment_AsReceptionist_Returns200()`
 - **Input**: `GET /api/v1/payments/1`, authenticated as RECEPTIONIST
 - **Expected Result**: HTTP 200 OK.
-- **Status**: PASSED
+- **Status**: PASSED (local unit test)
 
-#### TC-CTL-03: GET /api/v1/payments/{id} - Unauthenticated - Returns 401
+#### TC-CTL-06: GET /api/v1/payments/{id} - Unauthenticated Returns 401
 - **Method Name**: `getPayment_Unauthenticated_Returns401()`
-- **Input**: `GET /api/v1/payments/1`, no authentication header
+- **Input**: `GET /api/v1/payments/1` without credentials
 - **Expected Result**: HTTP 401 Unauthorized.
-- **Status**: PASSED
+- **Status**: PASSED (local unit test)
 
-#### TC-CTL-04: GET /api/v1/payments/{id} - As Non-Owner Member - Returns 404
-- **Method Name**: `getPayment_AsOtherMember_Returns404NotFound()`
-- **Input**: `GET /api/v1/payments/1`, authenticated as non-owner MEMBER
-- **Expected Result**: HTTP 404 Not Found (concealing payment existence).
-- **Status**: PASSED
-
-#### TC-CTL-05: PUT /api/v1/payments/{id}/method - As Member - Returns 200
+#### TC-CTL-07: PUT /api/v1/payments/{id}/method - As Member Returns 200
 - **Method Name**: `updatePaymentMethod_AsMember_Returns200WithUpdatedMethod()`
 - **Input**: `PUT /api/v1/payments/1/method` with `{"paymentMethod": "MOMO"}`, authenticated as MEMBER
-- **Expected Result**: HTTP 200 OK with `method = MOMO`.
-- **Status**: PASSED
+- **Expected Result**: HTTP 200 OK with updated method.
+- **Status**: PASSED (local unit test)
 
-#### TC-CTL-06: PUT /api/v1/payments/{id}/method - As Staff - Returns 200
-- **Method Name**: `updatePaymentMethod_AsStaff_Returns200WithUpdatedMethod()`
-- **Input**: `PUT /api/v1/payments/1/method` with `{"paymentMethod": "MOMO"}`, authenticated as RECEPTIONIST
-- **Expected Result**: HTTP 200 OK with `method = MOMO`.
-- **Status**: PASSED
-
-#### TC-CTL-07: PUT /api/v1/payments/{id}/method - As Non-Owner Member - Returns 404
+#### TC-CTL-08: PUT /api/v1/payments/{id}/method - As Other Member Returns 404
 - **Method Name**: `updatePaymentMethod_AsOtherMember_Returns404NotFound()`
-- **Input**: `PUT /api/v1/payments/1/method` with `{"paymentMethod": "MOMO"}`, authenticated as non-owner MEMBER
+- **Input**: `PUT /api/v1/payments/1/method`, authenticated as non-owner MEMBER
 - **Expected Result**: HTTP 404 Not Found.
-- **Status**: PASSED
+- **Status**: PASSED (local unit test)
 
-#### TC-CTL-08: PUT /api/v1/payments/{id}/method - Disallowed Method - Returns 400
+#### TC-CTL-09: PUT /api/v1/payments/{id}/method - As Staff Returns 200
+- **Method Name**: `updatePaymentMethod_AsStaff_Returns200()`
+- **Input**: `PUT /api/v1/payments/1/method`, authenticated as RECEPTIONIST
+- **Expected Result**: HTTP 200 OK.
+- **Status**: PASSED (local unit test)
+
+#### TC-CTL-10: PUT /api/v1/payments/{id}/method - Disallowed Method Returns 400
 - **Method Name**: `updatePaymentMethod_DisallowedMethod_Returns400BadRequest()`
-- **Input**: `PUT /api/v1/payments/1/method` with `{"paymentMethod": "CASH"}`
+- **Input**: `PUT /api/v1/payments/1/method` with `{"paymentMethod": "CASH"}` as member
 - **Expected Result**: HTTP 400 Bad Request.
-- **Status**: PASSED
+- **Status**: PASSED (local unit test)
 
-#### TC-CTL-09: PUT /api/v1/payments/{id}/method - Missing Method - Returns 400
+#### TC-CTL-11: PUT /api/v1/payments/{id}/method - Missing Method Returns 400
 - **Method Name**: `updatePaymentMethod_MissingMethod_Returns400BadRequest()`
 - **Input**: `PUT /api/v1/payments/1/method` with `{}`
-- **Expected Result**: HTTP 400 Bad Request due to `@NotNull` validation on `paymentMethod`.
-- **Status**: PASSED
+- **Expected Result**: HTTP 400 Bad Request due to validation constraint.
+- **Status**: PASSED (local unit test)
 
-#### TC-CTL-10: GET /api/v1/payments/{id} - JSON Shape for Pending Bank Transfer
-- **Method Name**: `getPayment_WhenPendingBankTransfer_ReturnsBankInstructionsAndExpectedJsonShape()`
-- **Input**: `GET /api/v1/payments/1`
-- **Expected Result**: HTTP 200 OK with `bankTransferInstructions` object containing `accountName`, `accountNumber`, `bank`, and `transferContent`, with `paymentTime` omitted or null.
-- **Status**: PASSED
+#### TC-CTL-12: GET /api/v1/payments/{id} - As Member Conceals Notes
+- **Method Name**: `getPayment_AsMember_ConcealsNotes()`
+- **Input**: `GET /api/v1/payments/1`, authenticated as MEMBER
+- **Expected Result**: Response JSON omits internal `notes`.
+- **Status**: PASSED (local unit test)
 
-#### TC-CTL-11: GET /api/v1/payments/{id} - JSON Shape for Pending Momo
-- **Method Name**: `getPayment_WhenPendingMomo_OmitsBankInstructionsAndExpectedJsonShape()`
-- **Input**: `GET /api/v1/payments/1`
-- **Expected Result**: HTTP 200 OK with `bankTransferInstructions` field not present in JSON output.
-- **Status**: PASSED
+#### TC-CTL-13: GET /api/v1/payments/{id} - As Staff Includes Notes
+- **Method Name**: `getPayment_AsStaff_IncludesNotes()`
+- **Input**: `GET /api/v1/payments/1`, authenticated as RECEPTIONIST
+- **Expected Result**: Response JSON includes full internal `notes`.
+- **Status**: PASSED (local unit test)
 
-#### TC-CTL-12: GET /api/v1/payments/{id} - JSON Shape for Success Payment
-- **Method Name**: `getPayment_WhenSuccess_ReturnsPaymentTimeAndOmitsBankInstructions()`
-- **Input**: `GET /api/v1/payments/1`
-- **Expected Result**: HTTP 200 OK with `paymentTime` string populated and `bankTransferInstructions` omitted.
-- **Status**: PASSED
+#### TC-CTL-14: PUT /api/v1/payments/{id}/method - As Staff with Cash Returns 200
+- **Method Name**: `updatePaymentMethod_AsStaffWithCash_Returns200()`
+- **Input**: `PUT /api/v1/payments/1/method` with `{"paymentMethod": "CASH"}`, authenticated as RECEPTIONIST
+- **Expected Result**: HTTP 200 OK.
+- **Status**: PASSED (local unit test)
+
+#### TC-CTL-15: PUT /api/v1/payments/{id}/method - Optimistic Lock Conflict Returns 409
+- **Method Name**: `updatePaymentMethod_WhenOptimisticLockConflict_Returns409Conflict()`
+- **Input**: Concurrent edit triggers `ObjectOptimisticLockingFailureException`
+- **Expected Result**: HTTP 409 Conflict.
+- **Status**: PASSED (local unit test)
+
+#### TC-CTL-16: GET /api/v1/payments/{id} - As Admin Returns 403 Forbidden
+- **Method Name**: `getPayment_AsAdmin_Returns403Forbidden()`
+- **Input**: `GET /api/v1/payments/1`, authenticated as unseeded `ADMIN`
+- **Expected Result**: HTTP 403 Forbidden (ADMIN is excluded by `@PreAuthorize`).
+- **Status**: PASSED (local unit test)
+
+#### TC-CTL-17: PUT /api/v1/payments/{id}/method - As Admin Returns 403 Forbidden
+- **Method Name**: `updatePaymentMethod_AsAdmin_Returns403Forbidden()`
+- **Input**: `PUT /api/v1/payments/1/method`, authenticated as unseeded `ADMIN`
+- **Expected Result**: HTTP 403 Forbidden (ADMIN is excluded by `@PreAuthorize`).
+- **Status**: PASSED (local unit test)
 
 ---
 
-### 3. SportPackageRegistrationCancelControllerTest
+### 3. MembershipCardControllerTest
 
-#### TC-SP-CTL-01: Cancel Registration - As Owner - Returns 200
-- **Method Name**: `cancelRegistration_AsOwner_Returns200()`
-- **Input**: `PUT /api/v1/packages/registrations/10/cancel`, authenticated as registration owner
+#### TC-MC-CTL-01: Cancel Card - By Non-Owner Member Returns 404
+- **Method Name**: `cancelCard_ByNonOwnerMember_Returns404NotFound()`
+- **Input**: `PUT /api/v1/membership-cards/10/cancel`, authenticated as non-owner member
+- **Expected Result**: HTTP 404 Not Found (concealing resource existence).
+- **Status**: PASSED (local unit test)
+
+#### TC-MC-CTL-02: Cancel Card - By Owner Member Returns 200
+- **Method Name**: `cancelCard_ByOwnerMember_Returns200Ok()`
+- **Input**: `PUT /api/v1/membership-cards/10/cancel`, authenticated as card owner
 - **Expected Result**: HTTP 200 OK.
-- **Status**: PASSED
+- **Status**: PASSED (local unit test)
 
-#### TC-SP-CTL-02: Cancel Registration - As Receptionist - Returns 200
-- **Method Name**: `cancelRegistration_AsReceptionist_Returns200()`
-- **Input**: `PUT /api/v1/packages/registrations/10/cancel`, authenticated as RECEPTIONIST
+#### TC-MC-CTL-03: Activate Card - By Staff with Cash Method Returns 200
+- **Method Name**: `activateCard_ByStaffWithCashPaymentMethod_Returns200Ok()`
+- **Input**: `PUT /api/v1/membership-cards/10/activate` with `{"paymentMethod": "CASH"}`, authenticated as RECEPTIONIST
 - **Expected Result**: HTTP 200 OK.
-- **Status**: PASSED
+- **Status**: PASSED (local unit test)
 
-#### TC-SP-CTL-03: Cancel Registration - As Admin - Returns 200
-- **Method Name**: `cancelRegistration_AsAdmin_Returns200()`
-- **Input**: `PUT /api/v1/packages/registrations/10/cancel`, authenticated as ADMIN
-- **Expected Result**: HTTP 200 OK.
-- **Status**: PASSED
+---
 
-#### TC-SP-CTL-04: Cancel Registration - As Other Member - Returns 404
-- **Method Name**: `cancelRegistration_AsOtherMember_Returns404()`
-- **Input**: `PUT /api/v1/packages/registrations/10/cancel`, authenticated as non-owner MEMBER
-- **Expected Result**: HTTP 404 Not Found (concealing resource existence, aligning with payment endpoint policy).
-- **Status**: PASSED
+### 4. SportPackageRegistrationCancelControllerTest
 
-#### TC-SP-CTL-05: Cancel Registration - When Active - Returns 400
-- **Method Name**: `cancelRegistration_WhenActive_Returns400()`
-- **Input**: `PUT /api/v1/packages/registrations/10/cancel` on registration with status ACTIVE
-- **Expected Result**: HTTP 400 Bad Request.
-- **Status**: PASSED
-
-#### TC-SP-CTL-06: Cancel Registration - Unauthenticated - Returns 401
+#### TC-SP-CTL-01: Cancel Registration - Unauthenticated Returns 401
 - **Method Name**: `cancelRegistration_Unauthenticated_Returns401()`
 - **Input**: `PUT /api/v1/packages/registrations/10/cancel` without authentication
 - **Expected Result**: HTTP 401 Unauthorized.
-- **Status**: PASSED
+- **Status**: PASSED (local unit test)
+
+#### TC-SP-CTL-02: Cancel Registration - As Owner Returns 200
+- **Method Name**: `cancelRegistration_AsOwner_Returns200()`
+- **Input**: `PUT /api/v1/packages/registrations/10/cancel`, authenticated as registration owner
+- **Expected Result**: HTTP 200 OK with `status = CANCELLED`.
+- **Status**: PASSED (local unit test)
+
+#### TC-SP-CTL-03: Cancel Registration - As Receptionist Returns 200
+- **Method Name**: `cancelRegistration_AsReceptionist_Returns200()`
+- **Input**: `PUT /api/v1/packages/registrations/10/cancel`, authenticated as RECEPTIONIST
+- **Expected Result**: HTTP 200 OK with `status = CANCELLED`.
+- **Status**: PASSED (local unit test)
+
+#### TC-SP-CTL-04: Cancel Registration - As Manager Returns 200
+- **Method Name**: `cancelRegistration_AsManager_Returns200()`
+- **Input**: `PUT /api/v1/packages/registrations/10/cancel`, authenticated as MANAGER
+- **Expected Result**: HTTP 200 OK with `status = CANCELLED`.
+- **Status**: PASSED (local unit test)
+
+#### TC-SP-CTL-05: Cancel Registration - As Other Member Returns 404 Not Found
+- **Method Name**: `cancelRegistration_AsOtherMember_Returns404NotFound()`
+- **Input**: `PUT /api/v1/packages/registrations/10/cancel`, authenticated as non-owner MEMBER
+- **Expected Result**: HTTP 404 Not Found (concealing resource existence).
+- **Status**: PASSED (local unit test)
+
+#### TC-SP-CTL-06: Cancel Registration - Active Status Returns 400 Bad Request
+- **Method Name**: `cancelRegistration_ActiveStatus_Returns400BadRequest()`
+- **Input**: `PUT /api/v1/packages/registrations/10/cancel` on active registration
+- **Expected Result**: HTTP 400 Bad Request stating only waiting-for-payment registrations can be cancelled.
+- **Status**: PASSED (local unit test)
 
 ---
 
-### 4. BankTransferPropertiesTest
+### 5. BankTransferPropertiesTest
 
-#### TC-PROP-01: Valid Properties - Passes Validation
-- **Method Name**: `bindAndValidate_ValidProperties_PassesValidation()`
-- **Input**: `accountName = Sportify Sports Center`, `accountNumber = 0000 1041 2460`, `bankName = Demo Bank`
+#### TC-PROP-01: Valid Properties Pass Validation
+- **Method Name**: `validProperties_PassValidation()`
+- **Input**: `accountName = "Sportify Sports Center"`, `accountNumber = "0000 1041 2460"`, `bankName = "Demo Bank"`
 - **Expected Result**: 0 validation constraint violations.
-- **Status**: PASSED
+- **Status**: PASSED (local unit test)
 
-#### TC-PROP-02: Blank Account Name - Fails Validation
-- **Method Name**: `bindAndValidate_BlankAccountName_FailsValidation()`
+#### TC-PROP-02: Blank Account Name Fails Validation
+- **Method Name**: `blankAccountName_FailsValidation()`
 - **Input**: `accountName = ""`
-- **Expected Result**: Constraint violation on property `accountName`.
-- **Status**: PASSED
+- **Expected Result**: Validation constraint violation on `accountName`.
+- **Status**: PASSED (local unit test)
 
-#### TC-PROP-03: Blank Account Number - Fails Validation
-- **Method Name**: `bindAndValidate_BlankAccountNumber_FailsValidation()`
+#### TC-PROP-03: Blank Account Number Fails Validation
+- **Method Name**: `blankAccountNumber_FailsValidation()`
 - **Input**: `accountNumber = "  "`
-- **Expected Result**: Constraint violation on property `accountNumber`.
-- **Status**: PASSED
+- **Expected Result**: Validation constraint violation on `accountNumber`.
+- **Status**: PASSED (local unit test)
 
-#### TC-PROP-04: Blank Bank Name - Fails Validation
-- **Method Name**: `bindAndValidate_BlankBankName_FailsValidation()`
+#### TC-PROP-04: Blank Bank Name Fails Validation
+- **Method Name**: `blankBankName_FailsValidation()`
 - **Input**: `bankName = null`
-- **Expected Result**: Constraint violation on property `bankName`.
-- **Status**: PASSED
+- **Expected Result**: Validation constraint violation on `bankName`.
+- **Status**: PASSED (local unit test)
 
 ---
 
-### 5. MembershipCardServiceImplTest (Payment & Review Fix Integration)
+### 6. PaymentEntityMappingTest
 
-#### TC-MC-01: Purchase Card - Online Member Request - Creates PENDING Payment
-- **Method Name**: `purchaseCard_AsMember_CreatesPendingPaymentAndSetsPaymentId()`
-- **Input**: `MemberCardPurchaseRequest` with `tierId = 2L`, `paymentMethod = MOMO`, `actor = memberUser`
-- **Expected Result**: Creates card with `status = PENDING_PAYMENT`, calls `PaymentService.createPendingPayment`, links `payment_id` on card, and populates `paymentId` and `paymentCode` in response.
-- **Status**: PASSED
+#### TC-ENT-01: Payment Entity Mapping
+- **Method Name**: `testPaymentEntityMapping()`
+- **Input**: Reflection check on `Payment.class`
+- **Expected Result**: Correct `@Table(name = "payment")`, `@Id`, `@Version`, and column annotations.
+- **Status**: PASSED (local unit test)
 
-#### TC-MC-02: Purchase Card - Amount Zero or Negative - Throws BusinessRuleException
-- **Method Name**: `purchaseCard_AmountZeroOrNegative_ThrowsBusinessRuleException()`
-- **Input**: Member card plan resolves to `price = 0.00`
-- **Expected Result**: Throws `BusinessRuleException` with message "Payment amount must be greater than zero.".
-- **Status**: PASSED
+#### TC-ENT-02: Invoice Entity Mapping
+- **Method Name**: `testInvoiceEntityMapping()`
+- **Input**: Reflection check on `Invoice.class`
+- **Expected Result**: Correct entity mapping annotations.
+- **Status**: PASSED (local unit test)
 
-#### TC-MC-03: Plan Card - Zero Upgrade Price Difference - Throws BusinessRuleException
-- **Method Name**: `planCard_ZeroUpgradePriceDifference_ThrowsBusinessRuleException()`
-- **Input**: Upgrade requested where target tier price equals current tier price (`difference = 0.00`)
-- **Expected Result**: Throws `BusinessRuleException` with message "Payment amount must be greater than zero.".
-- **Status**: PASSED
+#### TC-ENT-03: Invoice Line Entity Mapping
+- **Method Name**: `testInvoiceLineEntityMapping()`
+- **Input**: Reflection check on `InvoiceLine.class`
+- **Expected Result**: Correct entity mapping annotations.
+- **Status**: PASSED (local unit test)
 
-#### TC-MC-04: Activate Card - With Linked Pending Payment - Marks Payment Success and Records Staff
-- **Method Name**: `activateCard_WithPendingPayment_MarksPaymentSuccessAndRecordsStaff()`
-- **Input**: Staff calls `activateCard(42L, "BARCODE-01", receptionistUser)` on card with linked PENDING payment
-- **Expected Result**: Card becomes `ACTIVE`, payment status becomes `SUCCESS`, `paymentTime` is set to current timestamp, and `payment.notes` records "Confirmed by staff: Receptionist User".
-- **Status**: PASSED
+#### TC-ENT-04: Payment Foreign Keys on Existing Entities
+- **Method Name**: `testPaymentForeignKeysOnExistingEntities()`
+- **Input**: Reflection check on `MemberCard` and `SportPackageRegistration`
+- **Expected Result**: Verified `payment` relationship fields and foreign keys.
+- **Status**: PASSED (local unit test)
 
-#### TC-MC-05: Cancel Card - With Pending Payment - Sets Payment to FAILED with Actor in Note
-- **Method Name**: `cancelCard_WithPendingPayment_SetsPaymentToFailedWithActorInNote()`
-- **Input**: `cancelCard(42L, memberUser)` on card with linked PENDING payment
-- **Expected Result**: Card status becomes `CANCELLED`, payment status becomes `FAILED`, and `payment.notes` is set to "Cancelled by Member: Member User".
-- **Status**: PASSED
+#### TC-ENT-05: Enum Constants
+- **Method Name**: `testEnumConstants()`
+- **Input**: Enums `PaymentStatus` and `PaymentMethod`
+- **Expected Result**: Required enum constants present.
+- **Status**: PASSED (local unit test)
 
----
-
-### 6. SportPackageServiceImplTest (Payment & Review Fix Integration)
-
-#### TC-SP-01: Register Package - Online Member Request - Creates PENDING Payment
-- **Method Name**: `registerPackage_AsMember_CreatesPendingPaymentAndSetsPaymentId()`
-- **Input**: `PackageRegistrationRequest` with `packageId = 10L`, `paymentMethod = VNPAY`, `actor = memberUser`
-- **Expected Result**: Forces `channel = ONLINE`, `status = PENDING_PAYMENT`, calls `PaymentService.createPendingPayment`, links `payment_id` on registration, and returns `paymentId` and `paymentCode` in response.
-- **Status**: PASSED
-
-#### TC-SP-02: Register Package - Zero Price - Throws BusinessRuleException
-- **Method Name**: `registerPackage_ZeroPrice_ThrowsBusinessRuleException()`
-- **Input**: Package price configured as `0.00`
-- **Expected Result**: Throws `BusinessRuleException` with message "Payment amount must be greater than zero.".
-- **Status**: PASSED
-
-#### TC-SP-03: Register Package - Hundred Percent Discount - Throws BusinessRuleException
-- **Method Name**: `registerPackage_HundredPercentDiscount_ThrowsBusinessRuleException()`
-- **Input**: Package registration where promotion discount covers 100% of price (`paidAmount = 0.00`)
-- **Expected Result**: Throws `BusinessRuleException` with message "Payment amount must be greater than zero.".
-- **Status**: PASSED
-
-#### TC-SP-04: Activate Registration - With Linked Pending Payment - Marks Payment Success and Records Staff
-- **Method Name**: `activateRegistration_WithPendingPayment_MarksPaymentSuccessAndRecordsStaff()`
-- **Input**: Staff calls `activateRegistration(88L, receptionistUser)` on registration with linked PENDING payment
-- **Expected Result**: Registration becomes `ACTIVE`, payment status becomes `SUCCESS`, `paymentTime` is set to current timestamp, and `payment.notes` records "Confirmed by staff: Receptionist User".
-- **Status**: PASSED
-
-#### TC-SP-05: Cancel Registration - As Member - Cancels and Sets Payment to FAILED with Actor Note
-- **Method Name**: `cancelRegistration_AsMember_PendingRegistration_CancelsAndSetsPaymentToFailed()`
-- **Input**: `cancelRegistration(88L, memberUser)` on registration with linked PENDING payment
-- **Expected Result**: Registration status becomes `CANCELLED`, payment status becomes `FAILED`, and `payment.notes` is set to "Cancelled by Member: Member One".
-- **Status**: PASSED
+#### TC-ENT-06: Payment Auditing Annotations
+- **Method Name**: `testPaymentAuditingAnnotations()`
+- **Input**: Reflection check on `Payment.class`
+- **Expected Result**: Contains `@EntityListeners(AuditingEntityListener.class)`, `@CreatedDate` on `createdAt`, and `@LastModifiedDate` on `updatedAt`.
+- **Status**: PASSED (local unit test)
 
 ---
 
-### 7. PaymentEntityMappingTest
+### 7. InvoiceEntityMappingTest & InvoiceLineEntityMappingTest
 
-#### TC-ENT-01: PrePersist - Generates CreatedAt and UpdatedAt with Null PaymentTime
-- **Method Name**: `prePersist_GeneratesCreatedAtAndUpdatedAt()`
-- **Input**: `Payment` instance persisted with status `PENDING`
-- **Expected Result**: `createdAt` and `updatedAt` populated, `paymentTime` remains null.
-- **Status**: PASSED
+#### TC-INV-01: Invoice Lifecycle Defaults
+- **Method Name**: `testInvoiceLifecycleDefaults()`
+- **Input**: Reflection check on `Invoice.class` lifecycle callback annotations
+- **Expected Result**: Contains `@PrePersist` and `@PreUpdate` callback methods.
+- **Status**: PASSED (local unit test)
 
-#### TC-ENT-02: PaymentTime Can Be Set Explicitly on Success
-- **Method Name**: `paymentTime_CanBeSetExplicitlyOnSuccess()`
-- **Input**: `Payment` transitioning to `SUCCESS` with `paymentTime = LocalDateTime.now()`
-- **Expected Result**: `paymentTime` successfully updated and retrieved.
-- **Status**: PASSED
+#### TC-INVL-01: Invoice Line Lifecycle Defaults
+- **Method Name**: `testInvoiceLineLifecycleDefaults()`
+- **Input**: Reflection check on `InvoiceLine.class` lifecycle callback annotations
+- **Expected Result**: Contains `@PrePersist` callback method.
+- **Status**: PASSED (local unit test)
 
 ---
 
-### 8. PaymentPendingIntegrationTest (Testcontainers Database Integration)
+### 8. AuditConfigTest
 
-All integration tests run against real Microsoft SQL Server 2022 containers via Testcontainers. Verified in GitHub Actions CI (Run URL: https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/38276432896).
-
-#### TC-IT-01: Save Pending Payment with Member Card
-- **Method Name**: `savePendingPayment_WithMemberCard_LinksAndFindsByPaymentId()`
-- **Verification**: Saves Payment and MemberCard within the same transaction, confirms foreign key `payment_id` is persisted and searchable via `memberCardRepository.findByPaymentId(paymentId)`.
-- **Status**: PASSED (verified in CI)
-
-#### TC-IT-02: Save Pending Payment with Sport Package Registration
-- **Method Name**: `savePendingPayment_WithSportPackageRegistration_LinksAndFindsByPaymentId()`
-- **Verification**: Saves Payment and SportPackageRegistration within the same transaction, confirms foreign key `payment_id` is persisted and searchable via `sportPackageRegistrationRepository.findByPaymentId(paymentId)`.
-- **Status**: PASSED (verified in CI)
-
-#### TC-IT-03: Cancel Pending Payment - Sets FAILED Status with Notes
-- **Method Name**: `cancelPendingPayment_UpdatesStatusToFailedWithNotes()`
-- **Verification**: Verifies that updating payment status from `PENDING` to `FAILED` with notes complies with SQL Server check constraints (`ck_payment_status`) and persists properly.
-- **Status**: PASSED (verified in CI)
-
-#### TC-IT-04: Invalid Payment Status - Rejected by Database Check Constraint
-- **Method Name**: `savePayment_InvalidStatus_RejectedByCheckConstraint()`
-- **Verification**: Verifies that attempting to persist a Payment with an invalid status string (such as "INVALID_STATUS") throws a DataIntegrityViolationException or PersistenceException enforced by `ck_payment_status`.
-- **Status**: PASSED (verified in CI)
-
-#### TC-IT-05: Payment with Invoice and Two Lines - Reads Back Correctly
-- **Method Name**: `savePayment_WithInvoiceAndTwoLines_ReadsBackCorrectly()`
-- **Verification**: Verifies persisting a Payment linked to an Invoice containing 2 invoice lines, and reading back the payment, invoice, and both lines with correct relational mappings.
-- **Status**: PASSED (verified in CI)
-
-#### TC-IT-06: Member Card Payment ID Filtered Unique Index - Rejects Duplicate and Allows Multiple Nulls
-- **Method Name**: `uniqueFilteredIndex_MemberCardPaymentId_RejectsDuplicateAndAllowsMultipleNulls()`
-- **Verification**: Verifies that the filtered unique index `ux_member_card_payment` permits multiple rows with `payment_id IS NULL`, but immediately rejects a second row attempting to link to the same non-null `payment_id`.
-- **Status**: PASSED (verified in CI)
-
-#### TC-IT-07: Package Registration Payment ID Filtered Unique Index - Rejects Duplicate and Allows Multiple Nulls
-- **Method Name**: `uniqueFilteredIndex_SportPackageRegistrationPaymentId_RejectsDuplicateAndAllowsMultipleNulls()`
-- **Verification**: Verifies that the filtered unique index `ux_package_reg_payment` permits multiple rows with `payment_id IS NULL`, but rejects duplicate non-null `payment_id` references.
-- **Status**: PASSED (verified in CI)
-
-#### TC-IT-08: Payment Amount Check Constraint - Rejects Zero and Negative Amounts
-- **Method Name**: `paymentAmount_CheckConstraint_RejectsZeroAndNegativeAmounts()`
-- **Verification**: Verifies that database check constraint `ck_payment_amount` rejects inserts or updates with amount <= 0 directly at the database level.
-- **Status**: PASSED (verified in CI)
+#### TC-AUD-01: Auditing DateTimeProvider with Fixed Clock
+- **Method Name**: `auditingDateTimeProvider_WithFixedClock_ReturnsExactClockLocalDateTime()`
+- **Input**: Fixed `Clock` across 4 timezones ("America/New_York", "Europe/London", "Asia/Tokyo", "Pacific/Auckland")
+- **Expected Result**: `auditingDateTimeProvider.getNow()` returns exact `LocalDateTime.now(clock)`.
+- **Status**: PASSED (local unit test)
 
 ---
 
 ### 9. SecurityUtilsTest
 
-#### TC-SEC-01: Is Staff Role Check - Parameterized Verification
-- **Method Name**: `isStaff_ReturnsExpectedResult(String roleName, boolean expected)`
-- **Input**: Roles "ADMIN" (true), "ROLE_ADMIN" (true), "receptionist" (true), "ROLE_RECEPTIONIST" (true), "manager" (true), "ROLE_MANAGER" (true), "MEMBER" (false), "ROLE_MEMBER" (false).
-- **Expected Result**: Strips optional "ROLE_" prefix, performs case-insensitive comparison, and accurately detects staff roles (ADMIN, MANAGER, RECEPTIONIST).
-- **Status**: PASSED
+#### TC-SEC-01: isStaff Returns True for Staff Roles
+- **Method Name**: `isStaff_StaffRoles_ReturnsTrue()`
+- **Input**: Roles "RECEPTIONIST", "MANAGER", "ROLE_RECEPTIONIST", "ROLE_MANAGER", "receptionist", "manager"
+- **Expected Result**: Returns `true`.
+- **Status**: PASSED (local unit test)
+
+#### TC-SEC-02: isStaff Returns False for Non-Staff Roles
+- **Method Name**: `isStaff_NonStaffRoles_ReturnsFalse()`
+- **Input**: Roles "ADMIN", "ROLE_ADMIN", "admin", "MEMBER", "COACH", "ROLE_MEMBER", "ROLE_COACH", "GUEST", "UNKNOWN"
+- **Expected Result**: Returns `false` (unseeded `ADMIN` is strictly non-staff).
+- **Status**: PASSED (local unit test)
+
+#### TC-SEC-03: isStaff Returns False for Null Cases
+- **Method Name**: `isStaff_NullCases_ReturnsFalse()`
+- **Input**: Null user, user without role, or role with null code
+- **Expected Result**: Returns `false`.
+- **Status**: PASSED (local unit test)
+
+#### TC-SEC-04: isMember Returns True for Member Role
+- **Method Name**: `isMember_MemberRole_ReturnsTrue()`
+- **Input**: Roles "MEMBER", "ROLE_MEMBER", "member", "role_member"
+- **Expected Result**: Returns `true`.
+- **Status**: PASSED (local unit test)
+
+#### TC-SEC-05: isMember Returns False for Non-Member Roles
+- **Method Name**: `isMember_NonMemberRoles_ReturnsFalse()`
+- **Input**: Roles "RECEPTIONIST", "MANAGER", "ADMIN", "COACH", "GUEST"
+- **Expected Result**: Returns `false`.
+- **Status**: PASSED (local unit test)
+
+#### TC-SEC-06: isMember Returns False for Null Cases
+- **Method Name**: `isMember_NullCases_ReturnsFalse()`
+- **Input**: Null user, user without role, or role with null code
+- **Expected Result**: Returns `false`.
+- **Status**: PASSED (local unit test)
 
 ---
 
 ### 10. PaymentServiceTransactionMandatoryTest
 
-#### TC-TX-01: Create Pending Payment Without Active Transaction - Throws Exception
-- **Method Name**: `createPendingPayment_WithoutActiveTransaction_ThrowsIllegalTransactionStateException()`
-- **Input**: Invokes `PaymentService.createPendingPayment` outside an active Spring `@Transactional` context.
-- **Expected Result**: Throws `IllegalTransactionStateException` due to `@Transactional(propagation = Propagation.MANDATORY)` on the service interface, preventing standalone orphan payments.
-- **Status**: PASSED
+#### TC-TX-01: Create Pending Payment Outside Transaction Throws Exception
+- **Method Name**: `createPendingPayment_OutsideTransaction_ThrowsIllegalTransactionStateException()`
+- **Input**: Invokes `createPendingPayment` outside an active Spring transaction
+- **Expected Result**: Throws `IllegalTransactionStateException` due to `Propagation.MANDATORY`.
+- **Status**: PASSED (local unit test)
+
+#### TC-TX-02: Mark Payment Success Outside Transaction Throws Exception
+- **Method Name**: `markPaymentSuccess_OutsideTransaction_ThrowsIllegalTransactionStateException()`
+- **Input**: Invokes `markPaymentSuccess` outside an active Spring transaction
+- **Expected Result**: Throws `IllegalTransactionStateException`.
+- **Status**: PASSED (local unit test)
+
+#### TC-TX-03: Mark Payment Failed Outside Transaction Throws Exception
+- **Method Name**: `markPaymentFailed_OutsideTransaction_ThrowsIllegalTransactionStateException()`
+- **Input**: Invokes `markPaymentFailed` outside an active Spring transaction
+- **Expected Result**: Throws `IllegalTransactionStateException`.
+- **Status**: PASSED (local unit test)
+
+---
+
+### 11. PaymentAuditingFixedClockIntegrationTest (MSSQL Testcontainers)
+
+#### TC-AUD-IT-01: Exact Clock Equality on Auditing Timestamps
+- **Method Name**: `markPaymentSuccess_WithFixedClock_MatchesTimestampsExactly()`
+- **Input**: Isolated `@Primary` fixed Clock at `2026-10-15T12:30:45Z` in `America/New_York` (local instant `2026-10-15T08:30:45`)
+- **Expected Result**: `created_at`, `updated_at`, and `payment_time` all equal `2026-10-15T08:30:45` with exact 0-second tolerance in SQL Server container.
+- **Status**: PASSED (CI only)
+
+---
+
+### 12. PaymentPendingIntegrationTest (MSSQL Testcontainers)
+
+#### TC-IT-01: Save Pending Payment with Member Card
+- **Method Name**: `savePendingPayment_WithMemberCard_LinksAndFindsByPaymentId()`
+- **Verification**: Saves Payment and MemberCard in single transaction, verifies foreign key lookup.
+- **Status**: PASSED (CI only)
+
+#### TC-IT-02: Save Pending Payment with Sport Package Registration
+- **Method Name**: `savePendingPayment_WithSportPackageRegistration_LinksAndFindsByPaymentId()`
+- **Verification**: Saves Payment and SportPackageRegistration in single transaction, verifies foreign key lookup.
+- **Status**: PASSED (CI only)
+
+#### TC-IT-03: Cancel Pending Payment Updates Status to Failed with Notes
+- **Method Name**: `cancelPendingPayment_UpdatesStatusToFailedWithNotes()`
+- **Verification**: Verifies transition to `FAILED` with notes complies with SQL Server check constraints.
+- **Status**: PASSED (CI only)
+
+#### TC-IT-04: Invalid Payment Status Rejected by Check Constraint
+- **Method Name**: `invalidPaymentStatus_RejectedByCheckConstraint()`
+- **Verification**: Database check constraint `ck_payment_status` rejects invalid status strings.
+- **Status**: PASSED (CI only)
+
+#### TC-IT-05: Save Payment and Invoice with Two Lines Reads Them Back
+- **Method Name**: `savePaymentAndInvoiceWithTwoLines_ReadsThemBack()`
+- **Verification**: Persists Payment linked to Invoice and two InvoiceLines, reads back relational graph.
+- **Status**: PASSED (CI only)
+
+#### TC-IT-06: Member Card Payment ID Filtered Unique Index
+- **Method Name**: `uniqueFilteredIndex_MemberCardPaymentId_RejectsDuplicateAndAllowsMultipleNulls()`
+- **Verification**: Filtered unique index `ux_member_card_payment` permits multiple nulls, rejects duplicate payment_id.
+- **Status**: PASSED (CI only)
+
+#### TC-IT-07: Sport Package Registration Payment ID Filtered Unique Index
+- **Method Name**: `uniqueFilteredIndex_SportPackageRegistrationPaymentId_RejectsDuplicateAndAllowsMultipleNulls()`
+- **Verification**: Filtered unique index `ux_package_reg_payment` permits multiple nulls, rejects duplicate payment_id.
+- **Status**: PASSED (CI only)
+
+#### TC-IT-08: Payment Amount Check Constraint Rejects Zero and Negative Amounts
+- **Method Name**: `paymentAmount_CheckConstraint_RejectsZeroAndNegativeAmounts()`
+- **Verification**: Database check constraint `ck_payment_amount` rejects amounts <= 0.
+- **Status**: PASSED (CI only)
+
+#### TC-IT-09: Optimistic Lock Conflict Throws Exception
+- **Method Name**: `optimisticLockConflict_ThrowsObjectOptimisticLockingFailureException()`
+- **Verification**: Concurrent modification on `@Version` column triggers `ObjectOptimisticLockingFailureException`.
+- **Status**: PASSED (CI only)
+
+#### TC-IT-10: Success Payment with Null Payment Time Rejected by Check Constraint
+- **Method Name**: `successPayment_WithNullPaymentTime_RejectedByCheckConstraint()`
+- **Verification**: Database check constraint `ck_payment_success_time` enforces `payment_time IS NOT NULL` when `payment_status = 'SUCCESS'`.
+- **Status**: PASSED (CI only)
+
+#### TC-IT-11: Native SQL Insert Without Payment Time Leaves Column Null
+- **Method Name**: `pendingPayment_NativeSqlInsertWithoutPaymentTime_LeavesPaymentTimeNull()`
+- **Verification**: Verifies dropped `df_payment_payment_time` default allows pending rows without payment_time.
+- **Status**: PASSED (CI only)
+
+#### TC-IT-12: Find By Member ID Order By Created At Desc Returns Newest First
+- **Method Name**: `findByMemberIdOrderByCreatedAtDesc_ReturnsNewestPendingPaymentFirst()`
+- **Verification**: Queries payments sorted by `createdAt DESC`, returning newest pending payment first.
+- **Status**: PASSED (CI only)
+
+#### TC-IT-13: MemberProfile Primary Key Equals UserAccount ID by Design
+- **Method Name**: `memberProfilePrimaryKey_EqualsUserAccountId_ByDesign()`
+- **Verification**: Asserts `profile.getId() == user.getId()` and `profile.getId() == profile.getUserAccount().getId()` by `@MapsId user_id` design.
+- **Status**: PASSED (CI only)
+
+---
+
+### 13. PaymentRepositoryIntegrationTest (MSSQL Testcontainers)
+
+#### TC-REPO-01: Saves Payment Invoice with Two Lines and Reads Them Back
+- **Method Name**: `savesPaymentInvoiceWithTwoLinesAndReadsThemBack()`
+- **Verification**: Verifies Payment, Invoice, and InvoiceLine relationships in database.
+- **Status**: PASSED (CI only)
+
+#### TC-REPO-02: Check Constraints Reject Bad Statuses and Invalid Values
+- **Method Name**: `checkConstraintsRejectBadStatusesAndInvalidValues()`
+- **Verification**: Verifies SQL Server constraints enforce valid data values.
+- **Status**: PASSED (CI only)
+
+#### TC-REPO-03: Updating Payment Increases Version
+- **Method Name**: `updatingPaymentIncreasesVersion()`
+- **Verification**: Verifies `@Version` increments on update.
+- **Status**: PASSED (CI only)
+
+#### TC-REPO-04: Saving Stale Payment Throws Optimistic Locking Exception
+- **Method Name**: `savingStalePaymentThrowsOptimisticLockingFailureException()`
+- **Verification**: Stale version update triggers optimistic locking conflict.
+- **Status**: PASSED (CI only)
+
+#### TC-REPO-05: Codes Are Generated in the Right Format
+- **Method Name**: `codesAreGeneratedInTheRightFormat()`
+- **Verification**: Code generator produces valid format strings.
+- **Status**: PASSED (CI only)
+
+#### TC-REPO-06: Payment ID Foreign Keys on Existing Entities
+- **Method Name**: `paymentIdForeignKeysOnExistingEntities()`
+- **Verification**: Verifies foreign key constraints on `member_card` and `sport_package_registration`.
+- **Status**: PASSED (CI only)
+
+---
+
+### 14. MembershipCardServiceImplTest & SportPackageServiceImplTest (Flow 3 Operations)
+
+#### TC-MC-SRV-01: Purchase Card Creates Pending Payment
+- **Method Name**: `purchaseCard_AsMember_CreatesPendingPaymentAndSetsPaymentId()`
+- **Verification**: Online card purchase creates PENDING payment and links payment ID.
+- **Status**: PASSED (local unit test)
+
+#### TC-MC-SRV-02: Purchase Card Online with Zero Price Throws Exception
+- **Method Name**: `purchaseCard_Online_WithZeroPrice_ThrowsBusinessRuleException()`
+- **Verification**: Rejects 0.00 price before creating payment or sequence.
+- **Status**: PASSED (local unit test)
+
+#### TC-MC-SRV-03: Activate Card with Pending Payment
+- **Method Name**: `activateCard_WithPendingPayment_CallsMarkPaymentSuccess()`
+- **Verification**: Card activation marks payment SUCCESS with confirming staff.
+- **Status**: PASSED (local unit test)
+
+#### TC-MC-SRV-04: Cancel Card with Pending Payment
+- **Method Name**: `cancelCard_WithPendingPayment_CallsMarkPaymentFailedWithActorNote()`
+- **Verification**: Card cancellation marks payment FAILED with actor note.
+- **Status**: PASSED (local unit test)
+
+#### TC-SP-SRV-01: Register Package Creates Pending Payment
+- **Method Name**: `registerPackage_AsMember_CreatesPendingPaymentAndSetsPaymentId()`
+- **Verification**: Online registration creates PENDING payment and links payment ID.
+- **Status**: PASSED (local unit test)
+
+#### TC-SP-SRV-02: Register Package Online with Zero Price Throws Exception
+- **Method Name**: `registerPackage_Online_WithZeroPrice_ThrowsBusinessRuleException()`
+- **Verification**: Rejects 0.00 price before creating payment or sequence.
+- **Status**: PASSED (local unit test)
+
+#### TC-SP-SRV-03: Register Package Online with 100% Discount Throws Exception
+- **Method Name**: `registerPackage_Online_With100PercentDiscount_ThrowsBusinessRuleException()`
+- **Verification**: Rejects 100% discount resolving to 0.00 before creating payment or sequence.
+- **Status**: PASSED (local unit test)
+
+#### TC-SP-SRV-04: Activate Registration with Pending Payment
+- **Method Name**: `activateRegistration_WithPendingPayment_CallsMarkPaymentSuccess()`
+- **Verification**: Registration activation marks payment SUCCESS with confirming staff.
+- **Status**: PASSED (local unit test)
+
+#### TC-SP-SRV-05: Cancel Registration with Pending Payment
+- **Method Name**: `cancelRegistration_AsMember_PendingRegistration_CancelsAndSetsPaymentToFailed()`
+- **Verification**: Registration cancellation marks payment FAILED with actor note.
+- **Status**: PASSED (local unit test)
