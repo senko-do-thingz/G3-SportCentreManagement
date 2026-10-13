@@ -205,9 +205,8 @@ describe('FE-05 receptionModel - lists, paths and readers', () => {
 
   it('TC-FE05-015 paths, ids, verdicts and the identifier check', () => {
     expect(registerPath({ memberId: 2, packageId: 4 })).toBe('/reception/register?memberId=2&packageId=4')
-    expect(receptionPaymentPath(52, { kind: 'package', id: 40, memberId: 2 })).toBe(
-      '/reception/payments/52?item=package&itemId=40&memberId=2',
-    )
+    expect(receptionPaymentPath(52, 2)).toBe('/reception/payments/52?memberId=2')
+    expect(receptionPaymentPath(52)).toBe('/reception/payments/52')
     expect(positiveId('12')).toBe(12)
     expect(positiveId('0')).toBeNull()
     expect(positiveId('1e3')).toBeNull()

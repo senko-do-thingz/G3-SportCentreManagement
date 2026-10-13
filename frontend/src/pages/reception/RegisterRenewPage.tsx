@@ -343,7 +343,7 @@ function SaleReceipt({ result, memberId, onNewSale }: { result: SaleResult; memb
         {outcome === 'pending' && result.paymentId !== null && (
           <Link
             className={buttonClassName('primary', 'md')}
-            to={receptionPaymentPath(result.paymentId, { kind: result.kind, id: result.itemId, memberId })}
+            to={receptionPaymentPath(result.paymentId, memberId)}
           >
             Confirm payment
           </Link>
@@ -764,7 +764,7 @@ function PendingRequestsPanel() {
         row.paymentId !== null ? (
           <Link
             className={buttonClassName('primary', 'sm')}
-            to={receptionPaymentPath(row.paymentId, { kind: row.kind, id: row.itemId, memberId: row.memberId })}
+            to={receptionPaymentPath(row.paymentId, row.memberId)}
             aria-label={`Confirm payment for ${row.code}`}
           >
             Confirm payment

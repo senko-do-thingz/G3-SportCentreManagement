@@ -15,7 +15,10 @@ import type { PageResponse, SpringPage } from './types'
  *   PUT /payments/{id}/fail and GET /invoices/by-payment/{paymentId}. A confirm whose amount does
  *   not match answers 409 with code PAYMENT_AMOUNT_MISMATCH and leaves the payment PENDING.
  * - Planned in BE-21: GET /refunds/quote?registrationId=, amountRequested on POST /refunds,
- *   refundReference on PUT /refunds/{id}/complete, and GET /refunds/pending opened to RECEPTIONIST.
+ *   refundReference on PUT /refunds/{id}/complete, GET /refunds?status=APPROVED (contract request)
+ *   and GET /refunds/pending opened to RECEPTIONIST.
+ * FE-12 is blocked by BE-18 and BE-21: none of the planned calls exist on main, so the PR stays a
+ * draft until they are merged. There is no fallback to the FE-05 activate endpoints.
  * The shapes below are the ones written in docs/tests/FE-12_test_cases.md section 1.1. Unknown
  * fields are ignored; a missing required field is reported as an unexpected response.
  */
@@ -296,6 +299,14 @@ export const receptionPaymentsApi = {
   /** GET /refunds/pending: every refund waiting for a manager decision. */
   pendingRefunds(options: RequestSignal = {}): Promise<Refund[]> {
     return api.get<unknown>('/refunds/pending', options).then(asRefundList)
+  },
+
+  /**
+   * GET /refunds?status=APPROVED (requested from BE-21, RECEPTIONIST and MANAGER): approved refunds
+   * waiting for the money to be returned. Not on main.
+   */
+  approvedRefunds(options: RequestSignal = {}): Promise<Refund[]> {
+    return api.get<unknown>('/refunds', { ...options, query: { status: 'APPROVED' } }).then(asRefundList)
   },
 
   /** GET /refunds/member/{memberId}: every refund of one member, all statuses. */

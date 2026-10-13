@@ -13,6 +13,7 @@ import {
   PageHeader,
   StatusBadge,
   Table,
+  TextArea,
   useToast,
   type TableColumn,
 } from '../../components/ui'
@@ -32,12 +33,12 @@ import {
   refundCreatePath,
   refundDetailPath,
   refundStatusLabel,
+  memberRefundHistory,
   sortRefunds,
   validateRefundForm,
   type RefundErrors,
   type RefundForm,
 } from './receptionPaymentsModel'
-import { TextAreaField } from './TextAreaField'
 
 const EYEBROW = 'Receptionist / Payments and reports'
 
@@ -46,8 +47,10 @@ const EYEBROW = 'Receptionist / Payments and reports'
  * - Find the member (GET /members) and one of their paid registrations, then
  *   GET /refunds/quote?registrationId= (BE-21) fills the refund amount with the suggested value and
  *   the eligibility check. Submit for approval sends POST /refunds and opens S3-RefundSubmitted.
- * - The queue lists GET /refunds/pending and, for the chosen member, GET /refunds/member/{id} with
- *   every status, so an APPROVED refund can be opened and completed (S3-RefundApproved).
+ * - Queues: first the APPROVED refunds waiting to be paid back (GET /refunds?status=APPROVED,
+ *   BE-21), which open S3-RefundApproved; then, for the chosen member, GET /refunds/member/{id}
+ *   without PENDING rows; last the PENDING refunds of GET /refunds/pending. A PENDING refund is
+ *   therefore shown in one table only.
  * The member and registration are kept in the URL (?memberId=&registrationId=).
  */
 export function RefundRequestsPage() {
@@ -71,6 +74,7 @@ export function RefundRequestsPage() {
           </Link>
         }
       />
+      <ApprovedRefunds />
       {memberId !== null && registrationId !== null ? (
         <RefundFormSection key={registrationId} memberId={memberId} registrationId={registrationId} />
       ) : (
@@ -111,7 +115,7 @@ function RegistrationPicker({ memberId, onMember }: { memberId: number | null; o
     <Card title="Find the registration" aria-label="Find the registration">
       {memberId === null ? (
         <>
-          <form className="member-picker__form" role="search" aria-label="Find member for refund" onSubmit={onSearch} noValidate>
+          <form className="member-picker__form payment-picker-form" role="search" aria-label="Find member for refund" onSubmit={onSearch} noValidate>
             <Input
               label="Member"
               value={query}
@@ -120,7 +124,7 @@ function RegistrationPicker({ memberId, onMember }: { memberId: number | null; o
               placeholder="Name, phone, email or member code"
               onChange={(event) => setQuery(event.target.value)}
             />
-            <Button type="submit" variant="secondary" className="payment-search-button">
+            <Button type="submit" variant="secondary">
               Find member
             </Button>
           </form>
@@ -320,7 +324,7 @@ function RefundFormCards({ memberId, quote }: { memberId: number; quote: RefundQ
               onChange={(event) => change('amount', event.target.value)}
               onBlur={() => setTouched((current) => ({ ...current, amount: true }))}
             />
-            <TextAreaField
+            <TextArea
               label="Reason"
               required
               rows={2}
@@ -381,78 +385,108 @@ function RefundFormCards({ memberId, quote }: { memberId: number; quote: RefundQ
 
 /* Queues */
 
-function refundColumns(): TableColumn<Refund>[] {
-  return [
-    {
-      key: 'refundCode',
-      header: 'Refund',
-      render: (row) => (
-        <>
-          <span className="reception-cell__title">{row.refundCode}</span>
-          <span className="reception-cell__meta">{row.registrationCode ?? '-'}</span>
-        </>
-      ),
-    },
-    { key: 'member', header: 'Member', render: (row) => memberLine(row.memberFullName, row.memberCode, row.memberId) },
-    { key: 'amount', header: 'Amount', render: (row) => formatMoney(refundAmount(row)) },
-    { key: 'createdAt', header: 'Requested', render: (row) => formatDateTime(row.createdAt) },
-    { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} label={refundStatusLabel(row.status)} /> },
-    {
-      key: 'action',
-      header: 'Action',
-      render: (row) => (
-        <Link
-          className={buttonClassName('secondary', 'sm')}
-          to={refundDetailPath(row.id, row.memberId)}
-          aria-label={`Open refund ${row.refundCode}`}
-        >
-          {row.status === 'APPROVED' ? 'Record refund' : 'Open'}
-        </Link>
-      ),
-    },
-  ]
-}
+/** Built once: the columns do not depend on any state. */
+const REFUND_COLUMNS: TableColumn<Refund>[] = [
+  {
+    key: 'refundCode',
+    header: 'Refund',
+    render: (row) => (
+      <>
+        <span className="reception-cell__title">{row.refundCode}</span>
+        <span className="reception-cell__meta">{row.registrationCode ?? '-'}</span>
+      </>
+    ),
+  },
+  { key: 'member', header: 'Member', render: (row) => memberLine(row.memberFullName, row.memberCode, row.memberId) },
+  { key: 'amount', header: 'Amount', render: (row) => formatMoney(refundAmount(row)) },
+  { key: 'createdAt', header: 'Requested', render: (row) => formatDateTime(row.createdAt) },
+  { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} label={refundStatusLabel(row.status)} /> },
+  {
+    key: 'action',
+    header: 'Action',
+    render: (row) => (
+      <Link
+        className={buttonClassName('secondary', 'sm')}
+        to={refundDetailPath(row.id, row.memberId)}
+        aria-label={`Open refund ${row.refundCode}`}
+      >
+        {row.status === 'APPROVED' ? 'Record refund' : 'Open'}
+      </Link>
+    ),
+  },
+]
 
-function MemberRefunds({ memberId }: { memberId: number }) {
-  const load = useCallback(
-    (signal: AbortSignal) => receptionPaymentsApi.memberRefunds(memberId, { signal }).then(sortRefunds),
-    [memberId],
-  )
+function RefundQueue({
+  title,
+  caption,
+  load,
+  emptyTitle,
+  hint,
+}: {
+  title: string
+  caption: string
+  load: (signal: AbortSignal) => Promise<Refund[]>
+  emptyTitle: string
+  hint?: string
+}) {
   const [refunds, reload] = useResource(load)
   return (
-    <Card title="Refunds of this member">
+    <Card title={title}>
       <Table
-        caption="Refunds of this member"
-        columns={refundColumns()}
+        caption={caption}
+        columns={REFUND_COLUMNS}
         rows={refunds.status === 'ready' ? refunds.data : []}
         rowKey={(row) => row.id}
         loading={refunds.status === 'loading'}
         error={refunds.status === 'error' ? refunds.error : undefined}
         onRetry={reload}
-        emptyTitle="No refunds yet"
+        emptyTitle={emptyTitle}
       />
+      {hint && <p className="payment-hint">{hint}</p>}
     </Card>
+  )
+}
+
+const loadApproved = (signal: AbortSignal) => receptionPaymentsApi.approvedRefunds({ signal }).then(sortRefunds)
+const loadPending = (signal: AbortSignal) => receptionPaymentsApi.pendingRefunds({ signal }).then(sortRefunds)
+
+/** APPROVED refunds, the only ones the desk acts on (S3-RefundApproved). GET /refunds?status=APPROVED (BE-21). */
+function ApprovedRefunds() {
+  return (
+    <RefundQueue
+      title="Approved - waiting to be refunded"
+      caption="Approved refunds waiting to be refunded"
+      load={loadApproved}
+      emptyTitle="No approved refund is waiting"
+      hint="Return the money first, then open the refund and record the transaction reference."
+    />
   )
 }
 
 function PendingRefunds() {
-  const load = useCallback((signal: AbortSignal) => receptionPaymentsApi.pendingRefunds({ signal }).then(sortRefunds), [])
-  const [refunds, reload] = useResource(load)
   return (
-    <Card title="Waiting for manager approval">
-      <Table
-        caption="Refunds waiting for approval"
-        columns={refundColumns()}
-        rows={refunds.status === 'ready' ? refunds.data : []}
-        rowKey={(row) => row.id}
-        loading={refunds.status === 'loading'}
-        error={refunds.status === 'error' ? refunds.error : undefined}
-        onRetry={reload}
-        emptyTitle="No refund is waiting"
-      />
-      <p className="payment-hint">
-        Approved refunds are listed under the member. Find the member above to record them.
-      </p>
-    </Card>
+    <RefundQueue
+      title="Waiting for manager approval"
+      caption="Refunds waiting for approval"
+      load={loadPending}
+      emptyTitle="No refund is waiting"
+    />
+  )
+}
+
+/** Refund history of the chosen member, without PENDING ones (they are in the approval queue). */
+function MemberRefunds({ memberId }: { memberId: number }) {
+  const load = useCallback(
+    (signal: AbortSignal) => receptionPaymentsApi.memberRefunds(memberId, { signal }).then(memberRefundHistory),
+    [memberId],
+  )
+  return (
+    <RefundQueue
+      title="Refunds of this member"
+      caption="Refunds of this member"
+      load={load}
+      emptyTitle="No refund to show"
+      hint="Pending refunds of this member are listed under Waiting for manager approval."
+    />
   )
 }

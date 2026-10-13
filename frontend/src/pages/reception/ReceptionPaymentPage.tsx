@@ -15,6 +15,7 @@ import {
   PageHeader,
   Select,
   StatusBadge,
+  TextArea,
   useToast,
 } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
@@ -23,6 +24,7 @@ import { useResource } from '../../hooks/useResource'
 import { formatDate, formatDateTime, formatMoney, humanizeCode } from '../../utils/format'
 import {
   memberSearchPath,
+  parseAmount,
   PAYMENT_METHOD_LABELS,
   PAYMENT_METHOD_OPTIONS,
   positiveId,
@@ -34,7 +36,9 @@ import {
   canConfirm,
   findPaidItem,
   initialConfirmForm,
+  INVALID_AMOUNT_DUE_MESSAGE,
   isAmountMismatch,
+  isAmountToReview,
   memberLine,
   mismatchAmounts,
   NOTE_MAX,
@@ -47,12 +51,12 @@ import {
   referenceRequired,
   toConfirmRequest,
   validateConfirmForm,
+  validAmountDue,
   VERIFY_STATEMENT,
   type ConfirmErrors,
   type ConfirmForm,
   type MismatchAmounts,
 } from './receptionPaymentsModel'
-import { TextAreaField } from './TextAreaField'
 
 const EYEBROW = 'Receptionist / Payments and reports'
 
@@ -66,7 +70,8 @@ function methodName(method: string | null | undefined): string {
  * confirmation). GET /payments/{id}, then by status:
  * - PENDING: Verify and Record Payment (F3-05). PUT /payments/{id}/confirm (BE-18) with method,
  *   reference (required except for cash), amount received and note, only after the checkbox is
- *   ticked. A 409 PAYMENT_AMOUNT_MISMATCH shows Payment Needs Review (S3-Mismatch) and the
+ *   ticked. Amount rule of the FE-05 desk sale: a non-cash method must equal the amount due, cash
+ *   may be equal or above; any other amount goes to "Amount does not match". A 409 PAYMENT_AMOUNT_MISMATCH shows Payment Needs Review (S3-Mismatch) and the
  *   payment stays PENDING. Mark as failed calls PUT /payments/{id}/fail with a reason.
  * - SUCCESS or REFUNDED: Payment Confirmed and Receipt (F3-06) with the invoice of
  *   GET /invoices/by-payment/{id} and the card or package the payment activated.
@@ -155,11 +160,15 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
   const [mismatch, setMismatch] = useState<MismatchAmounts | null>(null)
   const [failOpen, setFailOpen] = useState(false)
 
-  const amountDue = Number(payment.amount)
-  const errors = validateConfirmForm(form)
-  const ready = canConfirm(form)
+  // Null when the backend sent no usable amount: the form shows an error and both actions stay
+  // disabled, so NaN never reaches the screen or the request.
+  const amountDue = validAmountDue(payment.amount)
+  const errors = validateConfirmForm(form, amountDue)
+  const ready = canConfirm(form, amountDue)
   const check = amountCheck(amountDue, form.amountReceived)
   const difference = amountDifference(amountDue, form.amountReceived)
+  const received = parseAmount(form.amountReceived)
+  const toReview = isAmountToReview(form, amountDue)
   const discount = Number(payment.discount ?? 0)
 
   const change = <K extends keyof ConfirmForm>(key: K, value: ConfirmForm[K]) => {
@@ -179,11 +188,11 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
     setFormError(null)
     try {
       await receptionPaymentsApi.confirm(payment.id, toConfirmRequest(form))
-      toast.success('Payment confirmed', 'The payment is recorded and the request is active.')
+      toast.success('Payment confirmed', 'The payment is recorded. Check the service status on this page.')
       onDone()
     } catch (failure) {
       setSaving(false)
-      if (isAmountMismatch(failure)) {
+      if (isAmountMismatch(failure) && amountDue !== null) {
         setMismatch(mismatchAmounts(amountDue, form.amountReceived, failure))
         return
       }
@@ -272,7 +281,7 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
                 label="Amount received"
                 required
                 inputMode="numeric"
-                placeholder={String(amountDue)}
+                placeholder={amountDue !== null ? String(amountDue) : undefined}
                 value={form.amountReceived}
                 disabled={saving}
                 error={fieldError('amountReceived')}
@@ -292,7 +301,7 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
               onChange={(event) => change('reference', event.target.value)}
               onBlur={() => touch('reference')}
             />
-            <TextAreaField
+            <TextArea
               label="Note"
               maxLength={NOTE_MAX}
               value={form.note}
@@ -310,9 +319,18 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
               disabled={saving}
               onChange={(event) => change('verified', event.target.checked)}
             />
-            {!ready && (
+            {amountDue === null && (
+              <p className="notice notice--danger" role="alert">
+                {INVALID_AMOUNT_DUE_MESSAGE}
+              </p>
+            )}
+            {!ready && amountDue !== null && (
               <p className="payment-hint" id="confirm-hint">
-                Tick the checkbox and fill the required fields to confirm.
+                {toReview
+                  ? form.method === 'CASH'
+                    ? 'Cash received is less than the amount due. Use Amount does not match to review the payment.'
+                    : 'For this method the amount received must equal the amount due. Use Amount does not match to review the payment.'
+                  : 'Tick the checkbox and fill the required fields to confirm.'}
               </p>
             )}
             {formError && (
@@ -321,13 +339,20 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
               </p>
             )}
             <div className="reception-form__actions">
-              <Button type="submit" loading={saving} disabled={!ready} aria-describedby={!ready ? 'confirm-hint' : undefined}>
+              <Button
+                type="submit"
+                loading={saving}
+                disabled={!ready}
+                aria-describedby={!ready && amountDue !== null ? 'confirm-hint' : undefined}
+              >
                 Confirm payment
               </Button>
               <Button
                 variant="secondary"
-                disabled={saving || check === 'empty' || check === 'match'}
-                onClick={() => setMismatch(mismatchAmounts(amountDue, form.amountReceived))}
+                disabled={saving || amountDue === null || !toReview}
+                onClick={() => {
+                  if (amountDue !== null) setMismatch(mismatchAmounts(amountDue, form.amountReceived))
+                }}
               >
                 Amount does not match
               </Button>
@@ -357,11 +382,11 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
             )}
             <div>
               <dt>Amount due</dt>
-              <dd data-testid="amount-due">{formatMoney(amountDue)}</dd>
+              <dd data-testid="amount-due">{amountDue === null ? '-' : formatMoney(amountDue)}</dd>
             </div>
             <div>
               <dt>Received</dt>
-              <dd>{difference === null ? '-' : formatMoney(amountDue + difference)}</dd>
+              <dd data-testid="received">{received === null ? '-' : formatMoney(received)}</dd>
             </div>
             <div>
               <dt>Difference</dt>
@@ -369,7 +394,7 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
             </div>
           </dl>
           <div className="payment-check" role="status">
-            <AmountCheckBadge check={check} method={form.method} />
+            <AmountCheckBadge check={check} method={form.method} difference={difference} />
           </div>
         </Card>
       </div>
@@ -386,14 +411,27 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
   )
 }
 
-function AmountCheckBadge({ check, method }: { check: ReturnType<typeof amountCheck>; method: string }) {
+/** Same rule as validateConfirmForm: cash above the amount due is change, any other gap is a mismatch. */
+function AmountCheckBadge({
+  check,
+  method,
+  difference,
+}: {
+  check: ReturnType<typeof amountCheck>
+  method: string
+  difference: number | null
+}) {
   switch (check) {
     case 'match':
       return <Badge tone="success">Ready to confirm</Badge>
     case 'short':
-      return <Badge tone="warning">Amount is short</Badge>
+      return <Badge tone="warning">Amount is short - review needed</Badge>
     case 'over':
-      return method === 'CASH' ? <Badge tone="info">Give change for cash</Badge> : <Badge tone="warning">Amount is above the amount due</Badge>
+      return method === 'CASH' ? (
+        <Badge tone="info">Ready to confirm - give {formatMoney(difference)} change</Badge>
+      ) : (
+        <Badge tone="warning">Amount is above the amount due - review needed</Badge>
+      )
     default:
       return <Badge tone="neutral">Waiting for the amount received</Badge>
   }
@@ -461,7 +499,7 @@ function FailPaymentDialog({
         </>
       }
     >
-      <TextAreaField
+      <TextArea
         label="Reason"
         required
         maxLength={REASON_MAX}

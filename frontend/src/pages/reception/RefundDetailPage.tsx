@@ -24,7 +24,8 @@ const EYEBROW = 'Receptionist / Payments and reports'
 /**
  * One refund at /reception/refunds/:refundId?memberId= (FE-12). There is no GET /refunds/{id}, so
  * the refund is read from GET /refunds/member/{memberId} (all statuses) or, without a member,
- * from GET /refunds/pending. The status picks the Figma state:
+ * from GET /refunds?status=APPROVED (BE-21) and then GET /refunds/pending. The status picks the
+ * Figma state:
  * - PENDING: Refund Request Submitted (S3-RefundSubmitted), the payment stays paid.
  * - APPROVED: Refund Approved (S3-RefundApproved) with the refund transaction reference and
  *   Record completed refund (PUT /refunds/{id}/complete).
@@ -40,11 +41,11 @@ export function RefundDetailPage() {
   const load = useCallback(
     async (signal: AbortSignal) => {
       if (id === null) throw new Error('The refund link is not valid.')
-      const refunds =
-        memberId !== null
-          ? await receptionPaymentsApi.memberRefunds(memberId, { signal })
-          : await receptionPaymentsApi.pendingRefunds({ signal })
-      return refunds.find((refund) => refund.id === id) ?? null
+      if (memberId !== null) {
+        const refunds = await receptionPaymentsApi.memberRefunds(memberId, { signal })
+        return refunds.find((refund) => refund.id === id) ?? null
+      }
+      return findInQueues(id, signal)
     },
     [id, memberId],
   )
@@ -79,7 +80,7 @@ export function RefundDetailPage() {
         <PageHeader eyebrow={EYEBROW} title="Refund" />
         <EmptyState
           title="Refund not found"
-          description="Open the refund again from the member's refunds."
+          description="Open the refund again from the approved queue or the member's refunds."
           action={back}
         />
       </div>
@@ -115,7 +116,7 @@ export function RefundDetailPage() {
           <Row label="Amount returned" value={formatMoney(refundAmount(data))} />
           <Row label="Refund reference" value={data.refundReference ?? '-'} />
           {data.completedAt && <Row label="Completed at" value={formatDateTime(data.completedAt)} />}
-          <Row label="Status" value="Refunded / Member notified" />
+          <Row label="Status" value="Refunded" />
         </RefundState>
       )
     case 'rejected':
@@ -138,6 +139,31 @@ export function RefundDetailPage() {
         </RefundState>
       )
   }
+}
+
+/**
+ * Without a member, the refund is looked up in the APPROVED queue first (the one the desk acts
+ * on), then in the PENDING queue. A failing queue does not hide a refund found in the other one;
+ * when neither answers, the first error is shown.
+ */
+async function findInQueues(id: number, signal: AbortSignal): Promise<Refund | null> {
+  const queues = [
+    () => receptionPaymentsApi.approvedRefunds({ signal }),
+    () => receptionPaymentsApi.pendingRefunds({ signal }),
+  ]
+  let firstError: unknown = null
+  let anyAnswered = false
+  for (const queue of queues) {
+    try {
+      const found = (await queue()).find((refund) => refund.id === id)
+      anyAnswered = true
+      if (found) return found
+    } catch (error) {
+      firstError ??= error
+    }
+  }
+  if (!anyAnswered && firstError !== null) throw firstError
+  return null
 }
 
 function Row({ label, value }: { label: string; value: ReactNode }) {

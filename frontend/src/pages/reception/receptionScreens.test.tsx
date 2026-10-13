@@ -408,7 +408,7 @@ describe('FE-05 Register and Renew (F1-14)', () => {
     expect(within(receipt).getByText(/saved as pending payment/)).toBeInTheDocument()
     expect(within(receipt).getByRole('link', { name: 'Confirm payment' })).toHaveAttribute(
       'href',
-      '/reception/payments/61?item=package&itemId=61&memberId=2',
+      '/reception/payments/61?memberId=2',
     )
   })
 

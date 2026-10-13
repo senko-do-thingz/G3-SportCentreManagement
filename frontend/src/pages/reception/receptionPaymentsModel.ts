@@ -3,7 +3,7 @@ import type { MemberCard, PackageRegistration } from '../../api/memberApi'
 import type { PaymentMethod } from '../../api/receptionApi'
 import type { ConfirmPaymentRequest, Refund } from '../../api/receptionPaymentsApi'
 import { humanizeCode } from '../../utils/format'
-import { isPaymentMethod, parseAmount } from './receptionModel'
+import { isPaymentMethod, parseAmount, validateDeskPayment, type DeskPaymentErrors } from './receptionModel'
 
 /**
  * Rules of the receptionist payment screens (FE-12): Payment Requests (F3-04), Verify and Record
@@ -141,26 +141,39 @@ export function referenceRequired(method: string): boolean {
 
 export type ConfirmErrors = Partial<Record<'method' | 'reference' | 'amountReceived' | 'note', string>>
 
+/** A usable amount due: a finite number of at least 0. Anything else is null, never NaN. */
+export function validAmountDue(amount: number | string | null | undefined): number | null {
+  if (amount === null || amount === undefined || amount === '') return null
+  const value = typeof amount === 'number' ? amount : Number(amount)
+  return Number.isFinite(value) && value >= 0 ? value : null
+}
+
+export const INVALID_AMOUNT_DUE_MESSAGE = 'The amount due of this payment is not valid. Reload the payment or ask a manager.'
+
 /**
- * Every field rule of the confirm form. Required fields that are still empty are errors too, so
- * the Confirm button can use the same result; the screen shows only the errors of touched fields.
+ * Every field rule of the confirm form, with the same amount rule as the FE-05 desk sale
+ * (validateDeskPayment): a non-cash method must record exactly the amount due; cash may be equal
+ * or above (the desk gives change). Required fields that are still empty are errors too, so the
+ * Confirm button can use the same result; the screen shows only the errors of touched fields.
  */
-export function validateConfirmForm(form: ConfirmForm): ConfirmErrors {
+export function validateConfirmForm(form: ConfirmForm, amountDue: number | null): ConfirmErrors {
   const errors: ConfirmErrors = {}
-  if (!isPaymentMethod(form.method)) {
+  if (amountDue === null) {
+    errors.amountReceived = INVALID_AMOUNT_DUE_MESSAGE
+  } else {
+    const desk: DeskPaymentErrors = validateDeskPayment(
+      { method: form.method, reference: form.reference, amountReceived: form.amountReceived },
+      amountDue,
+    )
+    if (desk.method) errors.method = desk.method
+    if (desk.reference) errors.reference = 'Reference code is required for this method'
+    if (desk.amountReceived) errors.amountReceived = desk.amountReceived
+  }
+  if (!errors.method && !isPaymentMethod(form.method)) {
     errors.method = 'Choose a payment method'
   }
-  const reference = form.reference.trim()
-  if (referenceRequired(form.method) && !reference) {
-    errors.reference = 'Reference code is required for this method'
-  } else if (reference.length > REFERENCE_MAX) {
+  if (!errors.reference && form.reference.trim().length > REFERENCE_MAX) {
     errors.reference = `Reference code must be at most ${REFERENCE_MAX} characters`
-  }
-  const amount = parseAmount(form.amountReceived)
-  if (form.amountReceived.trim() === '') {
-    errors.amountReceived = 'Amount received is required'
-  } else if (amount === null || amount <= 0) {
-    errors.amountReceived = 'Amount received must be a whole number of VND above 0'
   }
   if (form.note.trim().length > NOTE_MAX) {
     errors.note = `Note must be at most ${NOTE_MAX} characters`
@@ -168,12 +181,17 @@ export function validateConfirmForm(form: ConfirmForm): ConfirmErrors {
   return errors
 }
 
-/** Confirm stays disabled until the checkbox is ticked and every required field is valid. */
-export function canConfirm(form: ConfirmForm): boolean {
-  return form.verified && Object.keys(validateConfirmForm(form)).length === 0
+/** Confirm stays disabled until the checkbox is ticked and every rule passes. */
+export function canConfirm(form: ConfirmForm, amountDue: number | null): boolean {
+  return form.verified && Object.keys(validateConfirmForm(form, amountDue)).length === 0
 }
 
-/** Request body built from a valid form. Cash sends no reference. */
+/**
+ * Request body built from a valid form. amountReceived is the money actually handed over: for
+ * cash it may be above the amount due and the desk gives the change (the backend is assumed to
+ * accept amountReceived >= amount due for CASH, to confirm with Truc). Cash without a reference
+ * sends null.
+ */
 export function toConfirmRequest(form: ConfirmForm): ConfirmPaymentRequest {
   const reference = form.reference.trim()
   const note = form.note.trim()
@@ -188,17 +206,26 @@ export function toConfirmRequest(form: ConfirmForm): ConfirmPaymentRequest {
 export type AmountCheck = 'empty' | 'match' | 'short' | 'over'
 
 /** Compares the amount typed with the amount due, for the Amount verification panel. */
-export function amountCheck(amountDue: number, amountReceived: string): AmountCheck {
+export function amountCheck(amountDue: number | null, amountReceived: string): AmountCheck {
   const received = parseAmount(amountReceived)
-  if (received === null) return 'empty'
+  if (received === null || amountDue === null) return 'empty'
   if (received === amountDue) return 'match'
   return received < amountDue ? 'short' : 'over'
 }
 
-/** Received minus due; null while the amount is not a valid number. */
-export function amountDifference(amountDue: number, amountReceived: string): number | null {
+/** Received minus due; null while either amount is not a valid number. */
+export function amountDifference(amountDue: number | null, amountReceived: string): number | null {
   const received = parseAmount(amountReceived)
-  return received === null ? null : received - amountDue
+  return received === null || amountDue === null ? null : received - amountDue
+}
+
+/**
+ * The typed amount is a mismatch to review (S3-Mismatch): less than the amount due for any
+ * method, or above it for a non-cash method. Cash above the amount due is change, not a mismatch.
+ */
+export function isAmountToReview(form: Pick<ConfirmForm, 'method' | 'amountReceived'>, amountDue: number | null): boolean {
+  const check = amountCheck(amountDue, form.amountReceived)
+  return check === 'short' || (check === 'over' && form.method !== 'CASH')
 }
 
 export const AMOUNT_MISMATCH_CODE = 'PAYMENT_AMOUNT_MISMATCH'
@@ -206,7 +233,7 @@ export const AMOUNT_MISMATCH_CODE = 'PAYMENT_AMOUNT_MISMATCH'
 /** The 409 of PUT /payments/{id}/confirm that keeps the payment PENDING (BE-18). */
 export function isAmountMismatch(error: unknown): boolean {
   if (!(error instanceof ApiError) || error.status !== 409) return false
-  return error.code === AMOUNT_MISMATCH_CODE || error.message.includes(AMOUNT_MISMATCH_CODE)
+  return error.code === AMOUNT_MISMATCH_CODE
 }
 
 /** Amounts shown on S3-Mismatch; the backend values win over the typed one when it sends them. */
@@ -294,6 +321,11 @@ export function refundStage(status: string): RefundStage {
     default:
       return 'other'
   }
+}
+
+/** Members table: every refund except PENDING ones, which are listed only in the approval queue. */
+export function memberRefundHistory(refunds: Refund[]): Refund[] {
+  return sortRefunds(refunds.filter((refund) => refund.status !== 'PENDING'))
 }
 
 const REFUND_STATUS_LABELS: Record<string, string> = {

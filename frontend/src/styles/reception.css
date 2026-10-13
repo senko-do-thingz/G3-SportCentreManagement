@@ -351,8 +351,9 @@
   gap: var(--space-3);
 }
 
-.payment-search-button {
-  margin-top: 26px;
+/* The search button lines up with the input, not with the label above it. */
+.payment-picker-form {
+  align-items: flex-end;
 }
 
 .payment-member-results {
@@ -370,11 +371,6 @@
 .payment-receipt .card__title {
   text-transform: uppercase;
   letter-spacing: 0.02em;
-}
-
-.textarea {
-  min-height: 72px;
-  resize: vertical;
 }
 
 @media (max-width: 960px) {

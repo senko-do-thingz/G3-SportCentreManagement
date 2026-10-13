@@ -55,21 +55,12 @@ export function checkInPath(memberCode?: string | null): string {
 export type PaymentItemKind = 'card' | 'package'
 
 /**
- * Verify and Record Payment and receipt screen (F3-05, F3-06). Since FE-12 the payment is confirmed
- * through PUT /payments/{id}/confirm, so the item kind and id only describe where the link came
- * from; memberId adds the way back to the profile.
+ * Verify and Record Payment and receipt screen (F3-05, F3-06). The backend confirms by payment id,
+ * so only memberId travels in the URL, for the way back to the profile.
  */
-export function receptionPaymentPath(
-  paymentId: number,
-  item?: { kind: PaymentItemKind; id: number; memberId?: number | null },
-): string {
+export function receptionPaymentPath(paymentId: number, memberId?: number | null): string {
   const base = `/reception/payments/${paymentId}`
-  if (!item) {
-    return base
-  }
-  const params = new URLSearchParams({ item: item.kind, itemId: String(item.id) })
-  if (item.memberId) params.set('memberId', String(item.memberId))
-  return `${base}?${params.toString()}`
+  return memberId ? `${base}?memberId=${memberId}` : base
 }
 
 /** Reads a positive integer from a URL parameter; anything else is null. */

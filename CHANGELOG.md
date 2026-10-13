@@ -2,6 +2,8 @@
 
 ## 2026-10-14 - Receptionist payments, receipts and refunds (FE-12, Flow 3)
 
+**Blocked by BE-18 and BE-21, do not merge.** Draft PR. origin/main (6e82388, checked with `git fetch` on 2026-10-14) has none of the BE-18 or BE-21 endpoints, so on main the FE-05 confirmation and the desk sale receipt would answer 404.
+
 Branch `feat/f3-reception-payments`, from main (6e82388). Owner: Phat. Priority: P1. Depends on FE-00 (merged), BE-18 and BE-21 (not merged yet, see Notes). Verified with `npm run lint -- --max-warnings 0`, `tsc -b`, `npm test` (432 tests in 22 files: 35 new for FE-12, 2 FE-05 cases updated, 2 retired) and `npm run build`.
 
 ### Added
@@ -14,11 +16,20 @@ Branch `feat/f3-reception-payments`, from main (6e82388). Owner: Phat. Priority:
 - `src/api/receptionPaymentsApi.ts`, `src/pages/reception/receptionPaymentsModel.ts`, the new pages, nav item "Refund requests", styles in `src/styles/reception.css`; `ApiError` now keeps the body `code` and raw `details`.
 
 ### Changed
-- The FE-05 confirmation screen is replaced by Verify and Record Payment; `receptionApi.activateCard`, `receptionApi.activateRegistration` and `confirmCheck` are removed. Links from the member profile, the pending tab and desk sales keep working.
+- The FE-05 confirmation screen is replaced by Verify and Record Payment; `receptionApi.activateCard`, `receptionApi.activateRegistration` and `confirmCheck` are removed. The FE-05 links (member profile, pending tab, desk sale) open this screen, which needs BE-18 to work.
 
 ### Notes
 - BE-18 and BE-21 are not on main. The contract assumed by the frontend is in `docs/tests/FE-12_test_cases.md` section 1.1, including the 409 body `{code: "PAYMENT_AMOUNT_MISMATCH", details: {amountDue, amountReceived}}`. On main `GET /refunds/pending` is MANAGER only, so the refund queue shows an error for a receptionist until BE-21.
-- There is no `GET /refunds/{id}`; a refund is opened from the member's refunds.
+- There is no `GET /refunds/{id}`; a refund is opened from the member's refunds or found in the approved and pending queues.
+- Merge with FE-11 (`feat/f3-member-payments`) conflicts in `CHANGELOG.md` and `frontend/src/routes/AppRoutes.tsx` (route doc comment), both ways; `Invoice` and `InvoiceLine` are defined in both branches. Resolution and type plan in `docs/tests/FE-12_test_cases.md` section 5.
+
+### Review round 1
+- Confirm amount rule reuses FE-05 `validateDeskPayment`: non-cash must equal the amount due, cash may be equal or above (sends the cash handed over, to confirm with Truc); badge, hint, Amount does not match and the body agree. Mismatch is matched on 409 plus `code` only.
+- Amount due that is not a number shows an error and blocks both actions; Received row uses the parsed amount.
+- "Approved - waiting to be refunded" queue first (`GET /refunds?status=APPROVED`, BE-21 contract request); refund detail found in the approved or pending queue without `?memberId=`; PENDING refunds shown in one table only.
+- "Refunded" instead of "Refunded / Member notified"; confirm toast no longer claims the item is active.
+- `receptionPaymentPath(paymentId, memberId)` without `item` and `itemId`. `TextArea` moved to the UI kit (`src/components/ui/TextArea.tsx`); refund table columns built once; no fixed pixel margin.
+- Verified with lint (0 warnings), `tsc -b`, `npm test` (442 tests in 23 files) and `npm run build`.
 
 ## 2026-10-13 - Receptionist Member Search, Register and Renew, Check-in (FE-05, Flow 1)
 

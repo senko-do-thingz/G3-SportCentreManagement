@@ -10,6 +10,8 @@ import {
   findPaidItem,
   initialConfirmForm,
   isAmountMismatch,
+  isAmountToReview,
+  memberRefundHistory,
   mismatchAmounts,
   paymentStatusLabel,
   paymentStatusTone,
@@ -26,9 +28,12 @@ import {
   validateConfirmForm,
   validateRefundForm,
   validateRefundReference,
+  validAmountDue,
   writePaymentListParams,
   type ConfirmForm,
 } from './receptionPaymentsModel'
+
+const DUE = 810000
 
 const VALID_TRANSFER: ConfirmForm = {
   method: 'BANK_TRANSFER',
@@ -68,27 +73,60 @@ describe('FE-12 receptionPaymentsModel - payment list', () => {
 })
 
 describe('FE-12 receptionPaymentsModel - verify and confirm', () => {
-  it('TC-FE12-003 a transfer needs method, reference and a whole positive amount', () => {
-    expect(validateConfirmForm(VALID_TRANSFER)).toEqual({})
+  it('TC-FE12-003 a transfer needs method, reference and the exact amount due', () => {
+    expect(validateConfirmForm(VALID_TRANSFER, DUE)).toEqual({})
     const empty = initialConfirmForm('BANK_TRANSFER')
-    expect(validateConfirmForm(empty)).toEqual({
+    expect(validateConfirmForm(empty, DUE)).toEqual({
       reference: 'Reference code is required for this method',
       amountReceived: 'Amount received is required',
     })
-    expect(validateConfirmForm({ ...VALID_TRANSFER, amountReceived: '810000.50' }).amountReceived).toMatch(/whole number/)
-    expect(validateConfirmForm({ ...VALID_TRANSFER, amountReceived: '0' }).amountReceived).toMatch(/above 0/)
-    expect(validateConfirmForm({ ...VALID_TRANSFER, note: 'x'.repeat(501) }).note).toMatch(/at most 500/)
-    expect(validateConfirmForm({ ...VALID_TRANSFER, method: 'CHEQUE' }).method).toBe('Choose a payment method')
+    expect(validateConfirmForm({ ...VALID_TRANSFER, amountReceived: '810000.50' }, DUE).amountReceived).toMatch(/whole number/)
+    expect(validateConfirmForm({ ...VALID_TRANSFER, note: 'x'.repeat(501) }, DUE).note).toMatch(/at most 500/)
+    expect(validateConfirmForm({ ...VALID_TRANSFER, reference: 'x'.repeat(101) }, DUE).reference).toMatch(/at most 100/)
+    expect(validateConfirmForm({ ...VALID_TRANSFER, method: 'CHEQUE' }, DUE).method).toBe('Choose a payment method')
   })
 
   it('TC-FE12-004 cash needs no reference; Confirm also needs the checkbox', () => {
     const cash: ConfirmForm = { ...VALID_TRANSFER, method: 'CASH', reference: '' }
-    expect(validateConfirmForm(cash)).toEqual({})
-    expect(canConfirm(cash)).toBe(true)
-    expect(canConfirm({ ...cash, verified: false })).toBe(false)
-    expect(canConfirm({ ...VALID_TRANSFER, reference: '  ' })).toBe(false)
+    expect(validateConfirmForm(cash, DUE)).toEqual({})
+    expect(canConfirm(cash, DUE)).toBe(true)
+    expect(canConfirm({ ...cash, verified: false }, DUE)).toBe(false)
+    expect(canConfirm({ ...VALID_TRANSFER, reference: '  ' }, DUE)).toBe(false)
     expect(initialConfirmForm('MOMO').method).toBe('MOMO')
     expect(initialConfirmForm(null).method).toBe('BANK_TRANSFER')
+  })
+
+  it('TC-FE12-015 amount rule of the FE-05 desk sale: non-cash exact, cash equal or above', () => {
+    const shortTransfer = { ...VALID_TRANSFER, amountReceived: '800000' }
+    const overTransfer = { ...VALID_TRANSFER, amountReceived: '900000' }
+    expect(validateConfirmForm(shortTransfer, DUE).amountReceived).toBe('Amount received is less than the amount payable')
+    expect(validateConfirmForm(overTransfer, DUE).amountReceived).toBe('Amount received must equal the amount payable for this method')
+    expect(canConfirm(shortTransfer, DUE)).toBe(false)
+    expect(canConfirm(overTransfer, DUE)).toBe(false)
+    expect(isAmountToReview(shortTransfer, DUE)).toBe(true)
+    expect(isAmountToReview(overTransfer, DUE)).toBe(true)
+
+    const cashOver: ConfirmForm = { ...VALID_TRANSFER, method: 'CASH', reference: '', amountReceived: '1.000.000' }
+    expect(canConfirm(cashOver, DUE)).toBe(true)
+    expect(isAmountToReview(cashOver, DUE)).toBe(false)
+    expect(toConfirmRequest(cashOver).amountReceived).toBe(1000000)
+    const cashShort = { ...cashOver, amountReceived: '800000' }
+    expect(canConfirm(cashShort, DUE)).toBe(false)
+    expect(isAmountToReview(cashShort, DUE)).toBe(true)
+    expect(isAmountToReview({ ...VALID_TRANSFER }, DUE)).toBe(false)
+  })
+
+  it('TC-FE12-016 an amount due that is not a number blocks every action and never yields NaN', () => {
+    expect(validAmountDue('810000.00')).toBe(810000)
+    expect(validAmountDue(810000)).toBe(810000)
+    expect(validAmountDue('abc')).toBeNull()
+    expect(validAmountDue(null)).toBeNull()
+    expect(validAmountDue(-1)).toBeNull()
+    expect(validateConfirmForm(VALID_TRANSFER, null).amountReceived).toMatch(/amount due of this payment is not valid/)
+    expect(canConfirm(VALID_TRANSFER, null)).toBe(false)
+    expect(amountCheck(null, '810000')).toBe('empty')
+    expect(amountDifference(null, '810000')).toBeNull()
+    expect(isAmountToReview(VALID_TRANSFER, null)).toBe(false)
   })
 
   it('TC-FE12-005 the confirm body trims the text and sends no reference for empty cash', () => {
@@ -115,9 +153,9 @@ describe('FE-12 receptionPaymentsModel - verify and confirm', () => {
     expect(amountDifference(810000, 'abc')).toBeNull()
   })
 
-  it('TC-FE12-007 only a 409 with the PAYMENT_AMOUNT_MISMATCH code or message is a mismatch', () => {
+  it('TC-FE12-007 only a 409 with the PAYMENT_AMOUNT_MISMATCH code is a mismatch', () => {
     expect(isAmountMismatch(new ApiError(409, 'Amount does not match', {}, 'PAYMENT_AMOUNT_MISMATCH'))).toBe(true)
-    expect(isAmountMismatch(new ApiError(409, 'PAYMENT_AMOUNT_MISMATCH: received 800000'))).toBe(true)
+    expect(isAmountMismatch(new ApiError(409, 'PAYMENT_AMOUNT_MISMATCH: received 800000'))).toBe(false)
     expect(isAmountMismatch(new ApiError(409, 'The resource was modified by another request.'))).toBe(false)
     expect(isAmountMismatch(new ApiError(400, 'x', {}, 'PAYMENT_AMOUNT_MISMATCH'))).toBe(false)
     expect(isAmountMismatch(new Error('PAYMENT_AMOUNT_MISMATCH'))).toBe(false)
@@ -203,6 +241,8 @@ describe('FE-12 receptionPaymentsModel - refunds', () => {
     expect(refundableRegistrations(rows).map((row) => row.id)).toEqual([1, 3])
     const older = { ...REFUND, id: 1, createdAt: '2026-10-01T10:00:00' }
     expect(sortRefunds([older, REFUND]).map((row) => row.id)).toEqual([7, 1])
+    const approved = { ...REFUND, id: 3, status: 'APPROVED' }
+    expect(memberRefundHistory([REFUND, older, approved]).map((row) => row.id)).toEqual([3])
   })
 
   it('TC-FE12-013 the refund quote reader fills defaults and refuses a quote without an amount', () => {
