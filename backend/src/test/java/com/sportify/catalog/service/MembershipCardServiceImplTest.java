@@ -900,6 +900,96 @@ public class MembershipCardServiceImplTest {
     }
 
     @Test
+    void updateTier_paidTierDurationZero_throwsBusinessRuleException() {
+        MembershipCardTier tier = MembershipCardTier.builder()
+                .id(2L)
+                .code("GOLD")
+                .name("Gold")
+                .price(BigDecimal.valueOf(300000.00))
+                .durationMonths(12)
+                .discountPercentage(5)
+                .isActive(true)
+                .build();
+
+        when(tierRepository.findById(2L)).thenReturn(Optional.of(tier));
+
+        MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.valueOf(300000.00))
+                .durationMonths(0)
+                .discountPercentage(5)
+                .active(true)
+                .build();
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> membershipCardService.updateTier(2L, req, null));
+        assertEquals("Duration in months must be at least 1 for paid tiers", ex.getMessage());
+        verify(tierRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateTier_standardTierDurationNonZero_throwsBusinessRuleException() {
+        MembershipCardTier standard = MembershipCardTier.builder()
+                .id(1L)
+                .code("STANDARD")
+                .name("Standard")
+                .price(BigDecimal.ZERO)
+                .durationMonths(0)
+                .discountPercentage(0)
+                .isActive(true)
+                .build();
+
+        when(tierRepository.findById(1L)).thenReturn(Optional.of(standard));
+
+        MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.ZERO)
+                .durationMonths(12)
+                .discountPercentage(0)
+                .active(true)
+                .build();
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> membershipCardService.updateTier(1L, req, null));
+        assertEquals("The STANDARD tier duration must be 0 months", ex.getMessage());
+        verify(tierRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void purchaseCard_afterValidEditOfPaidTier_createsPendingPaymentCard() {
+        MembershipCardTier paidTier = MembershipCardTier.builder()
+                .id(2L)
+                .code("GOLD")
+                .name("Gold")
+                .price(BigDecimal.valueOf(300000.00))
+                .durationMonths(6)
+                .discountPercentage(5)
+                .isActive(true)
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(2L)).thenReturn(Optional.of(paidTier));
+        when(memberCardRepository.findByMemberIdAndStatus(100L, CardStatus.PENDING_PAYMENT)).thenReturn(List.of());
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of());
+        when(memberCardRepository.getNextCardCodeSequence()).thenReturn(99L);
+        when(codeFormatter.formatCardCode(99L)).thenReturn("CARD-0099");
+        when(paymentService.createPendingPayment(eq(memberProfile), any(BigDecimal.class), eq(PaymentMethod.VNPAY)))
+                .thenReturn(Payment.builder().id(501L).paymentCode("PAY-0501").build());
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
+
+        MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
+                .tierId(2L)
+                .paymentMethod(PaymentMethod.VNPAY)
+                .build();
+
+        MemberCardResponse res = membershipCardService.purchaseCard(req, memberUser);
+
+        assertNotNull(res);
+        assertEquals(CardStatus.PENDING_PAYMENT, res.getStatus());
+        assertEquals("CARD-0099", res.getCardCode());
+        assertEquals(BigDecimal.valueOf(300000.00), res.getPricePaid());
+        assertEquals(501L, res.getPaymentId());
+    }
+
+    @Test
     void updateTier_standardTierValidUpdate_succeeds() {
         MembershipCardTier standard = MembershipCardTier.builder()
                 .id(1L)

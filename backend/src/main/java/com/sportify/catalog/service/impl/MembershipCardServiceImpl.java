@@ -43,6 +43,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MembershipCardServiceImpl implements MembershipCardService {
 
+    public static final String STANDARD_TIER_CODE = "STANDARD";
+
     private final MembershipCardTierRepository tierRepository;
     private final MemberCardRepository memberCardRepository;
     private final MemberProfileRepository memberProfileRepository;
@@ -51,6 +53,10 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     private final CodeFormatter codeFormatter;
     private final AuditService auditService;
     private final Clock clock;
+
+    public static boolean isStandard(MembershipCardTier tier) {
+        return tier != null && STANDARD_TIER_CODE.equalsIgnoreCase(tier.getCode());
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -78,17 +84,20 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             throw new BusinessRuleException("Discount percentage must be between 0 and 100");
         }
 
-        boolean isStandard = "STANDARD".equalsIgnoreCase(tier.getCode());
+        boolean standard = isStandard(tier);
 
-        if (isStandard) {
+        if (standard) {
             if (request.getPrice() != null && request.getPrice().compareTo(BigDecimal.ZERO) != 0) {
                 throw new BusinessRuleException("The STANDARD tier price cannot be changed");
             }
             if (request.getActive() != null && !request.getActive()) {
                 throw new BusinessRuleException("The STANDARD tier cannot be deactivated");
             }
-            if (request.getDiscountPercentage() != 0) {
+            if (request.getDiscountPercentage() != null && request.getDiscountPercentage() != 0) {
                 throw new BusinessRuleException("The STANDARD tier discount percentage must be 0");
+            }
+            if (request.getDurationMonths() != null && request.getDurationMonths() != 0) {
+                throw new BusinessRuleException("The STANDARD tier duration must be 0 months");
             }
         } else {
             if (request.getPrice() == null || request.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
@@ -97,15 +106,14 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             if (request.getActive() == null) {
                 throw new BusinessRuleException("Active flag is required");
             }
-        }
-
-        if (request.getDurationMonths() == null || request.getDurationMonths() < 0) {
-            throw new BusinessRuleException("Duration in months must be non-negative");
+            if (request.getDurationMonths() == null || request.getDurationMonths() < 1) {
+                throw new BusinessRuleException("Duration in months must be at least 1 for paid tiers");
+            }
         }
 
         Map<String, Object> before = snapshotTier(tier);
 
-        if (!isStandard) {
+        if (!standard) {
             tier.setPrice(request.getPrice());
             tier.setIsActive(request.getActive());
         }
@@ -182,9 +190,10 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         LocalDate today = LocalDate.now(clock);
         boolean paidAtDesk = SecurityUtils.isStaff(actor);
 
-        // Standard: free and permanent, nothing to pay
-        if (tier.getDurationMonths() == null || tier.getDurationMonths() <= 0) {
-            return mapToCardResponse(memberCardRepository.save(newCard(member, tier, today, null, CardStatus.ACTIVE, tier.getPrice())));
+        // Standard: free and permanent, nothing to pay.
+        // Invariant: STANDARD always has durationMonths 0 and price 0; every paid tier has durationMonths >= 1.
+        if (isStandard(tier)) {
+            return mapToCardResponse(memberCardRepository.save(newCard(member, tier, today, null, CardStatus.ACTIVE, BigDecimal.ZERO)));
         }
 
         // One card per member: a second request cannot be made while one is waiting for payment
