@@ -652,16 +652,43 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("MemberProfile primary key equals UserAccount id by @MapsId design")
+    void memberProfilePrimaryKey_EqualsUserAccountId_ByDesign() {
+        Role memberRole = roleRepository.findByCode("MEMBER")
+                .orElseThrow(() -> new IllegalStateException("Required seeded role MEMBER not found"));
+
+        UserAccount user = userRepository.saveAndFlush(UserAccount.builder()
+                .email("it-pk-check-" + System.nanoTime() + "@sportify.com")
+                .passwordHash("DummyHashForTestPurposesOnly")
+                .fullName("PK Check Member")
+                .role(memberRole)
+                .status("ACTIVE")
+                .build());
+
+        Long memberSeq = memberProfileRepository.getNextMemberCode();
+        MemberProfile profile = memberProfileRepository.saveAndFlush(MemberProfile.builder()
+                .userAccount(user)
+                .memberCode(codeFormatter.formatMemberCode(memberSeq))
+                .currentLevel("BEGINNER")
+                .joinedOn(LocalDate.now())
+                .build());
+
+        assertThat(profile.getId()).isEqualTo(user.getId());
+        assertThat(profile.getId()).isEqualTo(profile.getUserAccount().getId());
+    }
+
+    @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @DisplayName("markPaymentSuccess sets updated_at and payment_time consistently within 5 seconds via Clock auditing")
     void markPaymentSuccess_AuditingTimestamps_ConsistentWithClockAndPaymentTime() {
         TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
 
         Long memberId = null;
+        Long userId = null;
         Long paymentId = null;
 
         try {
-            memberId = txTemplate.execute(status -> {
+            Long[] ids = txTemplate.execute(status -> {
                 Role memberRole = roleRepository.findByCode("MEMBER")
                         .orElseThrow(() -> new IllegalStateException("Required seeded role MEMBER not found"));
 
@@ -680,8 +707,12 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
                         .currentLevel("BEGINNER")
                         .joinedOn(LocalDate.now())
                         .build());
-                return profile.getId();
+                return new Long[] { profile.getId(), profile.getUserAccount().getId() };
             });
+            if (ids != null) {
+                memberId = ids[0];
+                userId = ids[1];
+            }
 
             final Long mId = memberId;
             paymentId = txTemplate.execute(status -> {
@@ -727,7 +758,13 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
                 final Long mId = memberId;
                 txTemplate.execute(status -> {
                     memberProfileRepository.deleteById(mId);
-                    userRepository.deleteById(mId);
+                    return null;
+                });
+            }
+            if (userId != null) {
+                final Long uId = userId;
+                txTemplate.execute(status -> {
+                    userRepository.deleteById(uId);
                     return null;
                 });
             }

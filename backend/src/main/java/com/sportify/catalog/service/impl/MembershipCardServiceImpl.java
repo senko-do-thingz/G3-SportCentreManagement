@@ -168,6 +168,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         MemberCard card = memberCardRepository.findById(cardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member card not found for id: " + cardId));
         boolean isStaff = SecurityUtils.isStaff(actor);
+        // MemberProfile shares its primary key with UserAccount (@MapsId user_id), so member id equals user id by design.
         if (!isStaff && !card.getMember().getId().equals(actor.getId())) {
             throw new ResourceNotFoundException("Member card not found for id: " + cardId);
         }

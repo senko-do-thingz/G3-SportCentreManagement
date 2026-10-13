@@ -143,6 +143,7 @@ public class PaymentServiceImpl implements PaymentService {
         Payment payment = paymentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found for id: " + id));
 
+        // MemberProfile shares its primary key with UserAccount (@MapsId user_id), so member id equals user id by design.
         boolean isOwner = payment.getMember() != null && payment.getMember().getId().equals(actor.getId());
         boolean isStaffUser = SecurityUtils.isStaff(actor);
 
@@ -166,6 +167,7 @@ public class PaymentServiceImpl implements PaymentService {
         Payment payment = paymentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found for id: " + id));
 
+        // MemberProfile shares its primary key with UserAccount (@MapsId user_id), so member id equals user id by design.
         boolean isOwner = payment.getMember() != null && payment.getMember().getId().equals(actor.getId());
         boolean isStaffUser = SecurityUtils.isStaff(actor);
 

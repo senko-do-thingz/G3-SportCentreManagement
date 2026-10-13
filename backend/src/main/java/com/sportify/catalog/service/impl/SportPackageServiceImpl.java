@@ -241,6 +241,7 @@ public class SportPackageServiceImpl implements SportPackageService {
                 .orElseThrow(() -> new ResourceNotFoundException("Package registration not found for id: " + registrationId));
 
         boolean isStaff = SecurityUtils.isStaff(actor);
+        // MemberProfile shares its primary key with UserAccount (@MapsId user_id), so member id equals user id by design.
         if (!isStaff && !registration.getMember().getId().equals(actor.getId())) {
             throw new ResourceNotFoundException("Package registration not found for id: " + registrationId);
         }
