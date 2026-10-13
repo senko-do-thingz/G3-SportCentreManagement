@@ -314,9 +314,12 @@ public class MembershipCardServiceImpl implements MembershipCardService {
      * <ul>
      *   <li>no paid card: a new card from today;</li>
      *   <li>the same tier: a renewal from the day after the last card ends;</li>
-     *   <li>a dearer tier while a card is valid: an upgrade from today that keeps the current end date;
-     *       the member pays only the price difference and the current card is replaced;</li>
-     *   <li>a cheaper tier: it starts the day after the last card ends, full price.</li>
+     *   <li>a higher-ranked tier while a card is valid (rank defined by targetTier.price > currentCard.tier.price,
+     *       both live catalog prices): an upgrade from today that keeps the current card's end date.
+     *       The fee is targetTier.price - calculateTermBasePrice(current), where the base is what the member
+     *       actually paid toward the active term. If fee <= 0, the upgrade is rejected with HTTP 400.
+     *       The current card is replaced upon payment confirmation;</li>
+     *   <li>an equal or lower ranked tier: it starts the day after the last card ends, at full price.</li>
      * </ul>
      * A card lasts {@code durationMonths} months: it ends the day before the same date {@code durationMonths} later.
      */
@@ -338,15 +341,27 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             LocalDate from = last.getEndDate().plusDays(1);
             return new CardPlan(from, cardEnd(from, months), tier.getPrice(), null);
         }
-        BigDecimal currentBasePrice = calculateTermBasePrice(current);
-        if (current != null && tier.getPrice().compareTo(currentBasePrice) > 0) {
+
+        // Rank rule (N-02): an upgrade is strictly determined by tier ranking, defined as
+        // target live catalog price > current held tier live catalog price.
+        boolean isUpgradeRank = (current != null
+                && current.getTier() != null
+                && tier.getPrice().compareTo(current.getTier().getPrice()) > 0);
+
+        if (isUpgradeRank) {
             if (last != current) {
                 throw new BusinessRuleException("The current card is already renewed from " + last.getStartDate()
                         + ". The card can be upgraded once that term has started.");
             }
-            BigDecimal difference = tier.getPrice().subtract(currentBasePrice);
-            return new CardPlan(today, current.getEndDate(), difference, current);
+            BigDecimal currentBasePrice = calculateTermBasePrice(current);
+            BigDecimal fee = tier.getPrice().subtract(currentBasePrice);
+            if (fee.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BusinessRuleException("No payment is needed for this upgrade. Contact the front desk.");
+            }
+            return new CardPlan(today, current.getEndDate(), fee, current);
         }
+
+        // Equal or lower rank keeps the existing path that queues the new card after the last card ends at full price.
         LocalDate from = last.getEndDate().plusDays(1);
         return new CardPlan(from, cardEnd(from, months), tier.getPrice(), null);
     }
