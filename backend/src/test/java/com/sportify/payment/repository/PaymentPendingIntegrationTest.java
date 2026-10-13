@@ -46,6 +46,9 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
     private PlatformTransactionManager transactionManager;
 
     @Autowired
+    private jakarta.persistence.EntityManager entityManager;
+
+    @Autowired
     private InvoiceRepository invoiceRepository;
 
     @Autowired
@@ -623,7 +626,7 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
     void findByMemberIdOrderByCreatedAtDesc_ReturnsNewestPendingPaymentFirst() {
         MemberProfile member = getOrCreateMember();
 
-        Payment olderPending = paymentRepository.save(Payment.builder()
+        Payment olderPending = paymentRepository.saveAndFlush(Payment.builder()
                 .paymentCode(codeFormatter.formatPaymentCode(paymentRepository.getNextPaymentCodeSequence()))
                 .member(member)
                 .amount(BigDecimal.valueOf(100000.00))
@@ -633,13 +636,15 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
         jdbcTemplate.update("UPDATE payment SET created_at = ? WHERE id = ?",
                 Timestamp.valueOf(LocalDateTime.now().minusHours(2)), olderPending.getId());
 
-        Payment newerPending = paymentRepository.save(Payment.builder()
+        Payment newerPending = paymentRepository.saveAndFlush(Payment.builder()
                 .paymentCode(codeFormatter.formatPaymentCode(paymentRepository.getNextPaymentCodeSequence()))
                 .member(member)
                 .amount(BigDecimal.valueOf(200000.00))
                 .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .paymentStatus(PaymentStatus.PENDING)
                 .build());
+
+        entityManager.clear();
 
         List<Payment> list = paymentRepository.findByMemberIdOrderByCreatedAtDesc(member.getId());
         assertThat(list).isNotEmpty();
@@ -652,41 +657,81 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
     void markPaymentSuccess_AuditingTimestamps_ConsistentWithClockAndPaymentTime() {
         TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
 
-        Long memberId = txTemplate.execute(status -> {
-            MemberProfile member = getOrCreateMember();
-            return member.getId();
-        });
+        Long memberId = null;
+        Long paymentId = null;
 
-        Long paymentId = txTemplate.execute(status -> {
-            MemberProfile member = memberProfileRepository.findById(memberId).orElseThrow();
-            Payment payment = paymentService.createPendingPayment(member, BigDecimal.valueOf(150000.00), PaymentMethod.BANK_TRANSFER);
-            return payment.getId();
-        });
+        try {
+            memberId = txTemplate.execute(status -> {
+                Role memberRole = roleRepository.findByCode("MEMBER")
+                        .orElseThrow(() -> new IllegalStateException("Required seeded role MEMBER not found"));
 
-        txTemplate.execute(status -> {
-            paymentService.markPaymentSuccess(paymentId, null);
-            return null;
-        });
+                UserAccount user = userRepository.saveAndFlush(UserAccount.builder()
+                        .email("it-audit-member-" + System.nanoTime() + "@sportify.com")
+                        .passwordHash("DummyHashForTestPurposesOnly")
+                        .fullName("Audit Test Member")
+                        .role(memberRole)
+                        .status("ACTIVE")
+                        .build());
 
-        var row = jdbcTemplate.queryForMap(
-                "SELECT created_at, updated_at, payment_time FROM payment WHERE id = ?", paymentId
-        );
+                Long memberSeq = memberProfileRepository.getNextMemberCode();
+                MemberProfile profile = memberProfileRepository.saveAndFlush(MemberProfile.builder()
+                        .userAccount(user)
+                        .memberCode(codeFormatter.formatMemberCode(memberSeq))
+                        .currentLevel("BEGINNER")
+                        .joinedOn(LocalDate.now())
+                        .build());
+                return profile.getId();
+            });
 
-        Timestamp createdAtTs = (Timestamp) row.get("created_at");
-        Timestamp updatedAtTs = (Timestamp) row.get("updated_at");
-        Timestamp paymentTimeTs = (Timestamp) row.get("payment_time");
+            final Long mId = memberId;
+            paymentId = txTemplate.execute(status -> {
+                MemberProfile member = memberProfileRepository.findById(mId).orElseThrow();
+                Payment payment = paymentService.createPendingPayment(member, BigDecimal.valueOf(150000.00), PaymentMethod.BANK_TRANSFER);
+                return payment.getId();
+            });
 
-        assertThat(createdAtTs).isNotNull();
-        assertThat(updatedAtTs).isNotNull();
-        assertThat(paymentTimeTs).isNotNull();
+            final Long pId = paymentId;
+            txTemplate.execute(status -> {
+                paymentService.markPaymentSuccess(pId, null);
+                return null;
+            });
 
-        LocalDateTime createdAt = createdAtTs.toLocalDateTime();
-        LocalDateTime updatedAt = updatedAtTs.toLocalDateTime();
-        LocalDateTime paymentTime = paymentTimeTs.toLocalDateTime();
+            var row = jdbcTemplate.queryForMap(
+                    "SELECT created_at, updated_at, payment_time FROM payment WHERE id = ?", paymentId
+            );
 
-        java.time.Duration diff = java.time.Duration.between(updatedAt, paymentTime).abs();
-        assertThat(diff.getSeconds()).isLessThanOrEqualTo(5L);
-        assertThat(createdAt).isBeforeOrEqualTo(updatedAt);
+            Timestamp createdAtTs = (Timestamp) row.get("created_at");
+            Timestamp updatedAtTs = (Timestamp) row.get("updated_at");
+            Timestamp paymentTimeTs = (Timestamp) row.get("payment_time");
+
+            assertThat(createdAtTs).isNotNull();
+            assertThat(updatedAtTs).isNotNull();
+            assertThat(paymentTimeTs).isNotNull();
+
+            LocalDateTime createdAt = createdAtTs.toLocalDateTime();
+            LocalDateTime updatedAt = updatedAtTs.toLocalDateTime();
+            LocalDateTime paymentTime = paymentTimeTs.toLocalDateTime();
+
+            java.time.Duration diff = java.time.Duration.between(updatedAt, paymentTime).abs();
+            assertThat(diff.getSeconds()).isLessThanOrEqualTo(5L);
+            assertThat(createdAt).isBeforeOrEqualTo(updatedAt);
+        } finally {
+            if (paymentId != null) {
+                final Long pId = paymentId;
+                txTemplate.execute(status -> {
+                    paymentRepository.deleteById(pId);
+                    return null;
+                });
+            }
+            if (memberId != null) {
+                final Long mId = memberId;
+                txTemplate.execute(status -> {
+                    memberProfileRepository.deleteById(mId);
+                    userRepository.deleteById(mId);
+                    return null;
+                });
+            }
+        }
     }
 
     private MemberProfile getOrCreateMember() {
