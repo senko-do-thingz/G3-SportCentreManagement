@@ -6,9 +6,12 @@ import {
   filterPackages,
   filtersFromParams,
   filtersToParams,
+  isDiscountEligible,
   packageEndDate,
   packageSummary,
   priceBreakdown,
+  sanitizeFilters,
+  sessionsLabel,
   START_DATE_IN_PAST,
   START_DATE_REQUIRED,
   validateStartDate,
@@ -38,7 +41,11 @@ describe('FE-03 packages model', () => {
     expect(priceBreakdown(sportPackage({ durationDays: 1, priceAmount: 80000 }), VIP).final).toBe(80000)
   })
 
-  it('TC-FE03-003 price rounding is half up to 2 decimals like RoundingMode.HALF_UP', () => {
+  it('TC-FE03-003 price rounding in integer cents matches BigDecimal HALF_UP to 2 decimals', () => {
+    // Float math gave 0.31 for 0.35 with 10%; the backend gives 0.32.
+    expect(priceBreakdown(sportPackage({ priceAmount: 0.35 }), VIP).final).toBe(0.32)
+    expect(priceBreakdown(sportPackage({ priceAmount: '2.30' }), GOLD).final).toBe(2.19)
+    expect(priceBreakdown(sportPackage({ priceAmount: '2.30' }), GOLD).discountAmount).toBe(0.11)
     // 99999.99 * 0.90 = 89999.991 -> 89999.99; 10.05 * 0.95 = 9.5475 -> 9.55
     expect(priceBreakdown(sportPackage({ priceAmount: 99999.99 }), VIP).final).toBe(89999.99)
     expect(priceBreakdown(sportPackage({ priceAmount: '10.05' }), GOLD).final).toBe(9.55)
@@ -86,5 +93,37 @@ describe('FE-03 packages model', () => {
     const params = filtersToParams({ sport: '1', format: '', duration: '30' })
     expect(params.toString()).toBe('sport=1&duration=30')
     expect(filtersFromParams(params)).toEqual({ sport: '1', format: '', duration: '30' })
+  })
+
+  // Review round 1
+
+  it('TC-FE03-008 sessionsLabel handles null, undefined, 1 and N the same way everywhere', () => {
+    expect(sessionsLabel(null)).toBe('No session limit')
+    expect(sessionsLabel(undefined)).toBe('No session limit')
+    expect(sessionsLabel(1)).toBe('1 session')
+    expect(sessionsLabel(8)).toBe('8 sessions')
+    expect(packageSummary(sportPackage({ sessionCount: undefined as unknown as null }))).toBe('30 days - No session limit')
+  })
+
+  it('TC-FE03-009 discount eligibility follows the backend: every package longer than 1 day', () => {
+    expect(isDiscountEligible(1)).toBe(false)
+    expect(isDiscountEligible(2)).toBe(true)
+    expect(isDiscountEligible(60)).toBe(true)
+    expect(priceBreakdown(sportPackage({ durationDays: 60, priceAmount: 1000000 }), GOLD).final).toBe(950000)
+  })
+
+  it('TC-FE03-020 sanitizeFilters drops unknown sport, format and duration values', () => {
+    const sports = [{ id: 1 }, { id: 2 }]
+    const packages = [sportPackage({ durationDays: 30 }), sportPackage({ durationDays: 90 })]
+    expect(sanitizeFilters({ sport: '999', format: 'abc', duration: '7' }, sports, packages)).toEqual({
+      sport: '',
+      format: '',
+      duration: '',
+    })
+    expect(sanitizeFilters({ sport: '2', format: 'COACH_LED', duration: '90' }, sports, packages)).toEqual({
+      sport: '2',
+      format: 'COACH_LED',
+      duration: '90',
+    })
   })
 })

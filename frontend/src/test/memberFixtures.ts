@@ -1,5 +1,6 @@
 import type { MemberBooking, MemberCard, PackageRegistration } from '../api/memberApi'
-import type { Payment, Sport, SportPackage } from '../api/packagesApi'
+import type { Sport, SportPackage } from '../api/packagesApi'
+import type { Payment } from '../api/paymentsApi'
 
 /** Sample backend answers for the member screens (FE-02). Override any field per test. */
 

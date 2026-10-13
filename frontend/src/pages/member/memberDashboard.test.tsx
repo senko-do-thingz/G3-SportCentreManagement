@@ -95,7 +95,7 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
     expect(screen.getByRole('heading', { name: 'Ready for your next session?' })).toBeInTheDocument()
     expect(screen.getByText('Welcome back, Taylor Nguyen')).toBeInTheDocument()
     expect(statValue('Membership tier')).toBe('VIP')
-    expect(statHint('Membership tier')).toBe('Active - Until 04 Jul 2027 - 10% off 30 day and 90 day packages')
+    expect(statHint('Membership tier')).toBe('Active - Until 04 Jul 2027 - 10% off packages longer than a single visit')
     expect(statValue('Active packages')).toBe('1')
     expect(statValue('Upcoming sessions')).toBe('1')
 
@@ -380,7 +380,7 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
     const hero = screen.getByRole('region', { name: 'Choose your first sport package.' })
     expect(hero).toHaveAttribute('data-variant', 'first-package')
     expect(
-      within(hero).getByText('Your VIP card gives you 10% off 30 day and 90 day packages. Pick a sport to start training.'),
+      within(hero).getByText('Your VIP card gives you 10% off packages longer than a single visit. Pick a sport to start training.'),
     ).toBeInTheDocument()
     expect(within(hero).getByRole('link', { name: 'Explore packages' })).toHaveAttribute('href', '/member/packages')
     expect(within(hero).queryByText(/no sessions left|have ended/)).not.toBeInTheDocument()
@@ -388,7 +388,7 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
 
   it('TC-FE02-126 the tier hint and the first-package hero state the same discount rule', async () => {
     await openDashboard({ cards: [card()] })
-    const rule = '10% off 30 day and 90 day packages'
+    const rule = '10% off packages longer than a single visit'
     expect(statHint('Membership tier')).toContain(rule)
     expect(screen.getByRole('region', { name: 'Choose your first sport package.' })).toHaveTextContent(rule)
   })

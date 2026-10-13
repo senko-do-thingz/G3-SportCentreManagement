@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { packagesApi } from '../../api/packagesApi'
+import { paymentsApi } from '../../api/paymentsApi'
 import { Card, EmptyState, ErrorState, PageHeader, StatusBadge } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
@@ -20,7 +20,7 @@ export function PaymentSummaryPage() {
   // Stable per payment id, as useMemberResource requires.
   const load = useCallback(
     (signal: AbortSignal) =>
-      valid ? packagesApi.payment(id, { signal }) : Promise.reject(new Error('The payment link is not valid.')),
+      valid ? paymentsApi.payment(id, { signal }) : Promise.reject(new Error('The payment link is not valid.')),
     [id, valid],
   )
   const [payment, reload] = useMemberResource(load)

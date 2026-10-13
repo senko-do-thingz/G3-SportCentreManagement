@@ -1,13 +1,15 @@
 import type { MemberCard } from '../../api/memberApi'
-import type { SportPackage } from '../../api/packagesApi'
+import type { Sport, SportPackage } from '../../api/packagesApi'
 import { trainingFormatLabel } from './dashboardModel'
 
 /**
  * Pure rules of Sport Packages (F1-09) and Package Detail (F1-10). The discount rule mirrors
  * the backend: MembershipCardServiceImpl.getApplicableDiscountPercentage returns 0 for packages
  * of 1 day or less (single visit) and otherwise the highest discount of the ACTIVE card in force
- * today; SportPackageServiceImpl.registerPackage then charges price * (100 - discount) / 100,
- * rounded half up to 2 decimals.
+ * today; SportPackageServiceImpl.registerPackage then charges price * (100 - discount) / 100
+ * with BigDecimal, rounded half up to 2 decimals. priceBreakdown repeats that in integer cents.
+ * The docs (docs/database/09) say 30-day and 90-day packages only; the frontend follows the code,
+ * so the price shown is the price charged (open question in the FE-03 audit log).
  */
 
 /** A package of this many days or less is a single visit and never gets a card discount. */
@@ -33,9 +35,14 @@ export function isSingleVisit(pkg: Pick<SportPackage, 'durationDays'>): boolean 
   return pkg.durationDays <= SINGLE_VISIT_MAX_DAYS
 }
 
+/** Backend rule: a card discount applies to every package longer than a single visit. */
+export function isDiscountEligible(durationDays: number): boolean {
+  return durationDays > SINGLE_VISIT_MAX_DAYS
+}
+
 /** Discount percent the backend will apply to this package for a member holding this card. */
 export function discountPercentFor(pkg: Pick<SportPackage, 'durationDays'>, card: MemberCard | null): number {
-  if (isSingleVisit(pkg) || !card) {
+  if (!isDiscountEligible(pkg.durationDays) || !card) {
     return 0
   }
   return Math.max(0, Math.min(100, card.discountPercentage ?? 0))
@@ -48,14 +55,22 @@ export interface PriceBreakdown {
   final: number
 }
 
-/** Original price, discount and final price, computed in cents like the backend (half up). */
+/**
+ * Original price, discount and final price, computed in integer cents so the result matches the
+ * backend BigDecimal HALF_UP to 2 decimals (for example 0.35 with 10% -> 0.32, 2.30 with 5% -> 2.19).
+ * cents * (100 - discount) is an exact integer; dividing by 100 leaves at most two decimals, so
+ * Math.round (half up for positive values) never sees a binary rounding error at .5.
+ */
 export function priceBreakdown(pkg: Pick<SportPackage, 'durationDays' | 'priceAmount'>, card: MemberCard | null): PriceBreakdown {
-  const original = Number(pkg.priceAmount) || 0
+  const cents = Math.round((Number(pkg.priceAmount) || 0) * 100)
   const discountPercent = discountPercentFor(pkg, card)
-  // original * (100 - discount) is the final price in cents; Math.round rounds half up for
-  // positive values, like RoundingMode.HALF_UP on the backend.
-  const final = Math.round(original * (100 - discountPercent)) / 100
-  return { original, discountPercent, discountAmount: original - final, final }
+  const finalCents = Math.round((cents * (100 - discountPercent)) / 100)
+  return {
+    original: cents / 100,
+    discountPercent,
+    discountAmount: (cents - finalCents) / 100,
+    final: finalCents / 100,
+  }
 }
 
 /** Last day of a package that starts on startDate: N days include the start date. */
@@ -72,13 +87,17 @@ export function durationLabel(days: number): string {
   return days <= SINGLE_VISIT_MAX_DAYS ? 'Single visit' : `${days} days`
 }
 
+/** "No session limit" for null or undefined, "1 session", otherwise "N sessions". */
+export function sessionsLabel(count: number | null | undefined): string {
+  if (count === null || count === undefined) {
+    return 'No session limit'
+  }
+  return `${count} ${count === 1 ? 'session' : 'sessions'}`
+}
+
 /** "30 days - 8 sessions", "Single visit - 1 session" or "30 days - No session limit". */
 export function packageSummary(pkg: Pick<SportPackage, 'durationDays' | 'sessionCount'>): string {
-  const sessions =
-    pkg.sessionCount === null || pkg.sessionCount === undefined
-      ? 'No session limit'
-      : `${pkg.sessionCount} ${pkg.sessionCount === 1 ? 'session' : 'sessions'}`
-  return `${durationLabel(pkg.durationDays)} - ${sessions}`
+  return `${durationLabel(pkg.durationDays)} - ${sessionsLabel(pkg.sessionCount)}`
 }
 
 /** "Football - Coach-led". */
@@ -107,6 +126,22 @@ export function filterPackages(packages: SportPackage[], filters: PackageFilters
         a.trainingFormat.localeCompare(b.trainingFormat) ||
         a.durationDays - b.durationDays,
     )
+}
+
+/**
+ * Drops filter values that match nothing selectable (unknown sport id, unknown format, a duration
+ * no package has), so the selects and the list always agree.
+ */
+export function sanitizeFilters(
+  filters: PackageFilters,
+  sports: Pick<Sport, 'id'>[],
+  packages: Pick<SportPackage, 'durationDays'>[],
+): PackageFilters {
+  return {
+    sport: sports.some((sport) => String(sport.id) === filters.sport) ? filters.sport : '',
+    format: FORMAT_FILTER_OPTIONS.some((option) => option.value === filters.format) ? filters.format : '',
+    duration: durationOptions(packages).some((option) => option.value === filters.duration) ? filters.duration : '',
+  }
 }
 
 /** Reads the filters from the URL query, so Back to packages keeps them. */

@@ -2,7 +2,7 @@ import { api } from './client'
 import { UNEXPECTED_RESPONSE_MESSAGE, type PackageRegistration, type RequestSignal } from './memberApi'
 
 /**
- * Sport packages, registration and the payment summary (FE-03, Figma F1-09, F1-10, F3-01).
+ * Sport packages and registration (FE-03, Figma F1-09, F1-10).
  * Types mirror the backend DTOs on main; BigDecimal values arrive as numbers.
  */
 
@@ -46,33 +46,6 @@ export interface PackageRegistrationRequest {
   channel: 'ONLINE'
 }
 
-/** Mirrors com.sportify.payment.dto.BankTransferInstructions. */
-export interface BankTransferInstructions {
-  accountName: string | null
-  accountNumber: string | null
-  bank: string | null
-  transferContent: string | null
-}
-
-/** Mirrors com.sportify.payment.dto.PaymentResponse (GET /payments/{id}). */
-export interface Payment {
-  id: number
-  code: string
-  /** PENDING, SUCCESS, FAILED or REFUNDED. */
-  status: string
-  amount: number | string
-  method: string | null
-  itemDescription: string | null
-  originalPrice: number | string | null
-  /** Discount as an amount of money, not a percent. */
-  discount: number | string | null
-  paymentTime: string | null
-  bankTransferInstructions?: BankTransferInstructions | null
-  memberId: number | null
-  memberCode: string | null
-  createdAt: string | null
-}
-
 function asList<T>(value: unknown): T[] {
   if (!Array.isArray(value)) {
     throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
@@ -98,9 +71,5 @@ export const packagesApi = {
 
   register(request: PackageRegistrationRequest): Promise<PackageRegistration> {
     return api.post<unknown>('/packages/registrations', request).then(asObjectWithId<PackageRegistration>)
-  },
-
-  payment(paymentId: number, options: RequestSignal = {}): Promise<Payment> {
-    return api.get<unknown>(`/payments/${paymentId}`, options).then(asObjectWithId<Payment>)
   },
 }

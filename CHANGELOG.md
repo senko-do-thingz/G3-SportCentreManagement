@@ -15,6 +15,10 @@ Branch `feat/f1-member-packages`, stacked on `feat/f1-member-dashboard` (FE-02, 
 - `requireNavItem` and its test removed: the payment route no longer reuses the My Payments menu entry.
 - FE-02 test TC-FE02-023 expects the real "Payment Summary" heading.
 
+### Review round 1
+- B1 `sessionsLabel` ("1 session"), B2 `isDiscountEligible` and `cardDiscountText` now say "% off packages longer than a single visit" (same rule as the prices), B3 a pending registration of the same package blocks Confirm and links to its payment, B4 the real 400 "Start date cannot be in the past" goes under the date field and "today" is read at submit.
+- M1 prices in integer cents (matches BigDecimal HALF_UP), M2 "Checking your card discount" while cards load, M3 unknown URL filters ignored, M4 `src/api/paymentsApi.ts`. 297 tests pass.
+
 ### Notes
 - Single visit cards open the detail page ("View package") like the others; Figma F1-09 shows "Find a session" for them, which needs the schedule screen (FE-08).
 - The discount preview uses the card in force today, like the backend; the overlay shows the amount the backend actually charged.

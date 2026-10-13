@@ -9,7 +9,16 @@ import { Spinner } from '../../components/ui/Spinner'
 import { formatDate, formatMoney } from '../../utils/format'
 import { useFocusFirstInvalid } from '../../utils/useFocusFirstInvalid'
 import { currentCard, MEMBER_PATHS, paymentSummaryPath, toIsoDate, trainingFormatLabel } from './dashboardModel'
-import { isSingleVisit, packageEndDate, packageSummary, packageTitle, priceBreakdown, validateStartDate } from './packagesModel'
+import {
+  isSingleVisit,
+  packageEndDate,
+  packageSummary,
+  packageTitle,
+  priceBreakdown,
+  sessionsLabel,
+  START_DATE_IN_PAST,
+  validateStartDate,
+} from './packagesModel'
 import { useMemberResource } from './useMemberResource'
 
 function loadPackages(signal: AbortSignal): Promise<SportPackage[]> {
@@ -18,6 +27,11 @@ function loadPackages(signal: AbortSignal): Promise<SportPackage[]> {
 
 function loadMyCards(signal: AbortSignal): Promise<MemberCard[]> {
   return memberApi.myCards({ signal })
+}
+
+/** Used to find a registration of this package that still waits for payment (no duplicates). */
+function loadMyRegistrations(signal: AbortSignal): Promise<PackageRegistration[]> {
+  return memberApi.myRegistrations({ signal })
 }
 
 /**
@@ -32,6 +46,7 @@ export function PackageDetailPage() {
   const location = useLocation()
   const [packages, reloadPackages] = useMemberResource(loadPackages)
   const [cards] = useMemberResource(loadMyCards)
+  const [registrations] = useMemberResource(loadMyRegistrations)
   const [today] = useState(() => toIsoDate(new Date()))
   const backTo = `${MEMBER_PATHS.packages}${location.search}`
 
@@ -91,7 +106,15 @@ export function PackageDetailPage() {
         card={cards.status === 'ready' ? currentCard(cards.data, today) : null}
         cardsFailed={cards.status === 'error'}
         cardsLoading={cards.status === 'loading'}
-        today={today}
+        // The backend does not block a second pending registration, so the page does. If the list
+        // cannot be loaded, nothing is blocked: the backend stays the authority.
+        pendingRegistration={
+          registrations.status === 'ready'
+            ? (registrations.data.find(
+                (candidate) => candidate.packageId === pkg.id && candidate.status === 'PENDING_PAYMENT',
+              ) ?? null)
+            : null
+        }
       />
     </div>
   )
@@ -102,15 +125,19 @@ function RegistrationForm({
   card,
   cardsFailed,
   cardsLoading,
-  today,
+  pendingRegistration,
 }: {
   pkg: SportPackage
   card: MemberCard | null
   cardsFailed: boolean
   cardsLoading: boolean
-  today: string
+  pendingRegistration: PackageRegistration | null
 }) {
-  const [startDate, setStartDate] = useState(today)
+  // "Today" is read again on focus, on change and at submit, so a page left open past midnight
+  // never accepts yesterday and the picker minimum follows the date.
+  const [minDate, setMinDate] = useState(() => toIsoDate(new Date()))
+  const refreshMinDate = () => setMinDate(toIsoDate(new Date()))
+  const [startDate, setStartDate] = useState(minDate)
   const [fieldError, setFieldError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -120,16 +147,19 @@ function RegistrationForm({
   const focusFirstInvalid = useFocusFirstInvalid(formRef)
 
   const price = priceBreakdown(pkg, card)
-  const endDate = startDate && !validateStartDate(startDate, today) ? packageEndDate(startDate, pkg.durationDays) : null
+  const endDate = startDate && !validateStartDate(startDate, minDate) ? packageEndDate(startDate, pkg.durationDays) : null
+  const blocked = pendingRegistration !== null && registration === null
   const title = packageTitle(pkg)
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (sendingRef.current || registration) {
+    if (sendingRef.current || registration || blocked) {
       return
     }
     setFormError(null)
-    const error = validateStartDate(startDate, today)
+    const now = toIsoDate(new Date())
+    setMinDate(now)
+    const error = validateStartDate(startDate, now)
     setFieldError(error)
     if (error) {
       focusFirstInvalid()
@@ -142,6 +172,15 @@ function RegistrationForm({
     } catch (caught) {
       if (caught instanceof ApiError && caught.fieldErrors.startDate) {
         setFieldError(caught.fieldErrors.startDate)
+        focusFirstInvalid()
+      } else if (
+        caught instanceof ApiError &&
+        caught.status === 400 &&
+        !caught.hasFieldErrors &&
+        caught.message === START_DATE_IN_PAST
+      ) {
+        // BusinessRuleException from registerPackage: 400 {timestamp, status, message}, no details.
+        setFieldError(caught.message)
         focusFirstInvalid()
       } else {
         setFormError(getErrorMessage(caught))
@@ -177,7 +216,7 @@ function RegistrationForm({
           <dl className="summary-list">
             <div>
               <dt>Included sessions</dt>
-              <dd>{pkg.sessionCount === null ? 'No session limit' : `${pkg.sessionCount} sessions`}</dd>
+              <dd>{sessionsLabel(pkg.sessionCount)}</dd>
             </div>
             <div>
               <dt>Session duration</dt>
@@ -188,16 +227,18 @@ function RegistrationForm({
               <dd>{isSingleVisit(pkg) ? 'The start date only' : `${pkg.durationDays} consecutive days`}</dd>
             </div>
           </dl>
-          <fieldset className="profile-form" disabled={submitting || registration !== null}>
+          <fieldset className="profile-form" disabled={submitting || registration !== null || blocked}>
             <Input
               label="Start date"
               type="date"
               name="startDate"
-              min={today}
+              min={minDate}
               value={startDate}
+              onFocus={refreshMinDate}
               onChange={(event) => {
                 setStartDate(event.target.value)
                 setFieldError(null)
+                refreshMinDate()
               }}
               error={fieldError ?? undefined}
               hint="Today or later."
@@ -215,6 +256,16 @@ function RegistrationForm({
             <p className="notice notice--danger" role="alert">
               {formError}
             </p>
+          )}
+          {blocked && pendingRegistration && (
+            <div className="notice notice--warning" role="status">
+              <p>You already have a registration waiting for payment for this package ({pendingRegistration.registrationCode}).</p>
+              {pendingRegistration.paymentId !== null ? (
+                <Link to={paymentSummaryPath(pendingRegistration.paymentId)}>Continue to payment</Link>
+              ) : (
+                <p>Please pay at the front desk.</p>
+              )}
+            </div>
           )}
           <dl className="summary-list">
             <div>
@@ -250,7 +301,7 @@ function RegistrationForm({
               <dd>{endDate ? formatDate(endDate) : '-'}</dd>
             </div>
           </dl>
-          <Button type="submit" loading={submitting} disabled={registration !== null} fullWidth>
+          <Button type="submit" loading={submitting} disabled={registration !== null || blocked} fullWidth>
             Confirm registration
           </Button>
           <p className="notice notice--info package-detail__note">

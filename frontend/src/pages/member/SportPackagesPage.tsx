@@ -18,6 +18,7 @@ import {
   packageDetailPath,
   packageSummary,
   priceBreakdown,
+  sanitizeFilters,
   type PackageFilters,
 } from './packagesModel'
 import { useMemberResource } from './useMemberResource'
@@ -49,11 +50,7 @@ export function SportPackagesPage() {
   const [cards] = useMemberResource(loadMyCards)
   const [searchParams, setSearchParams] = useSearchParams()
   const [today] = useState(() => toIsoDate(new Date()))
-  const filters = filtersFromParams(searchParams)
-
-  const setFilter = (key: keyof PackageFilters, value: string) => {
-    setSearchParams(filtersToParams({ ...filters, [key]: value }), { replace: true })
-  }
+  const rawFilters = filtersFromParams(searchParams)
 
   const header = (
     <PageHeader
@@ -86,9 +83,15 @@ export function SportPackagesPage() {
   }
 
   const { sports, packages } = catalog.data
+  // Values in the URL that match nothing selectable are ignored, so the selects and the list agree.
+  const filters = sanitizeFilters(rawFilters, sports, packages)
+  const setFilter = (key: keyof PackageFilters, value: string) => {
+    setSearchParams(filtersToParams({ ...filters, [key]: value }), { replace: true })
+  }
   const card = cards.status === 'ready' ? currentCard(cards.data, today) : null
   const shown = filterPackages(packages, filters)
-  const search = searchParams.toString() ? `?${searchParams.toString()}` : ''
+  const query = filtersToParams(filters).toString()
+  const search = query ? `?${query}` : ''
 
   return (
     <div className="page">
@@ -155,7 +158,7 @@ export function SportPackagesPage() {
       ) : (
         <ul className="package-grid" aria-label="Sport packages">
           {shown.map((pkg) => (
-            <PackageCard key={pkg.id} pkg={pkg} card={card} search={search} />
+            <PackageCard key={pkg.id} pkg={pkg} card={card} cardsLoading={cards.status === 'loading'} search={search} />
           ))}
         </ul>
       )}
@@ -163,7 +166,17 @@ export function SportPackagesPage() {
   )
 }
 
-function PackageCard({ pkg, card, search }: { pkg: SportPackage; card: MemberCard | null; search: string }) {
+function PackageCard({
+  pkg,
+  card,
+  cardsLoading,
+  search,
+}: {
+  pkg: SportPackage
+  card: MemberCard | null
+  cardsLoading: boolean
+  search: string
+}) {
   const price = priceBreakdown(pkg, card)
   const title = `${pkg.sportName} - ${packageSummary(pkg)}`
   return (
@@ -175,7 +188,9 @@ function PackageCard({ pkg, card, search }: { pkg: SportPackage; card: MemberCar
         {formatMoney(price.final)}
       </p>
       <p className="package-card__price-note">
-        {price.discountPercent > 0 ? (
+        {cardsLoading && !isSingleVisit(pkg) ? (
+          'Checking your card discount'
+        ) : price.discountPercent > 0 ? (
           <>
             <s>{formatMoney(price.original)}</s> - {card?.tierName} {price.discountPercent}% off
           </>

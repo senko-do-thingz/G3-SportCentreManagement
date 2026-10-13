@@ -24,6 +24,8 @@ const VIP = card()
 
 interface Options {
   cards?: unknown[] | Response
+  registrations?: unknown[] | Response
+  packages?: unknown[]
   onRegister?: (call: RecordedCall) => Response | Promise<Response>
 }
 
@@ -31,7 +33,7 @@ function packagesBackend(options: Options = {}) {
   return installFakeFetch((call) => {
     if (call.path === '/users/me') return json(200, MEMBER)
     if (call.path === '/sports') return json(200, SPORTS)
-    if (call.path === '/packages') return json(200, PACKAGES)
+    if (call.path === '/packages') return json(200, options.packages ?? PACKAGES)
     if (call.path === '/membership-cards/my') {
       return options.cards instanceof Response ? options.cards : json(200, options.cards ?? [])
     }
@@ -41,7 +43,10 @@ function packagesBackend(options: Options = {}) {
         : json(201, registration({ id: 40, registrationCode: 'REG-0040', status: 'PENDING_PAYMENT', paymentId: 52, paymentCode: 'PAY-0052', startDate: '2026-10-13', paidAmount: 810000 }))
     }
     if (call.path === '/payments/52') return json(200, payment())
-    if (call.path.startsWith('/bookings/my') || call.path === '/packages/registrations/my') return json(200, [])
+    if (call.path === '/packages/registrations/my') {
+      return options.registrations instanceof Response ? options.registrations : json(200, options.registrations ?? [])
+    }
+    if (call.path.startsWith('/bookings/my')) return json(200, [])
     return backendError(404, 'Resource not found')
   })
 }
@@ -110,7 +115,7 @@ describe('FE-03 Sport Packages (F1-09)', () => {
     expect(finalPrice(/^Coach-led Football, 30 days/)).toBe('810.000 VND')
     expect(finalPrice(/^Coach-led Football, 90 days/)).toBe('2.160.000 VND')
     expect(finalPrice(/^Self-training Football, Single visit/)).toBe('80.000 VND')
-    expect(screen.getByText(/Your VIP card gives you 10% off 30 day and 90 day packages/)).toBeInTheDocument()
+    expect(screen.getByText(/Your VIP card gives you 10% off packages longer than a single visit/)).toBeInTheDocument()
   })
 
   it('TC-FE03-014 a pending or expired card gives no discount', async () => {
@@ -303,11 +308,16 @@ describe('FE-03 Package Detail and Registration (F1-10)', () => {
     expect(screen.getByRole('button', { name: 'Confirm registration' })).toBeEnabled()
   })
 
-  it('TC-FE03-039 a backend startDate detail is shown under the date field', async () => {
+  it('TC-FE03-039 the real backend answer for a past start date goes under the date field', async () => {
     const user = userEvent.setup()
-    await openDetail({ onRegister: () => backendError(400, 'Validation Error', { startDate: 'Start date cannot be in the past' }) })
+    // GlobalExceptionHandler.handleBusinessRuleException: 400 {timestamp, status, message}, no details.
+    await openDetail({ onRegister: () => backendError(400, 'Start date cannot be in the past') })
     await user.click(screen.getByRole('button', { name: 'Confirm registration' }))
-    expect(await screen.findByText('Start date cannot be in the past')).toBeInTheDocument()
+    const input = screen.getByLabelText(/Start date/)
+    await waitFor(() => expect(input).toHaveAttribute('aria-invalid', 'true'))
+    expect(screen.getByText('Start date cannot be in the past', { selector: '.field__error' })).toBeInTheDocument()
+    await waitFor(() => expect(input).toHaveFocus())
+    expect(within(screen.getByRole('region', { name: 'Registration summary' })).queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('TC-FE03-040 an unknown package id shows "This package is not available"; Back keeps the filters', async () => {
@@ -322,6 +332,112 @@ describe('FE-03 Package Detail and Registration (F1-10)', () => {
     await openDetail({ cards: backendError(500, 'Internal server error') })
     expect(summaryValue('Membership discount')).toBe('Calculated when you confirm')
     expect(summaryValue('Total payable')).toBe('900.000 VND')
+  })
+})
+
+describe('FE-03 review round 1', () => {
+  async function openDetail(options: Options = {}, path = '/member/packages/4') {
+    const fake = packagesBackend(options)
+    signIn()
+    renderApp(path)
+    await screen.findByRole('form', { name: 'Package registration' })
+    return fake
+  }
+
+  it('TC-FE03-042 single visit detail shows "1 session" (B1)', async () => {
+    await openDetail({}, '/member/packages/1')
+    expect(screen.getByRole('heading', { name: 'Football - Single visit - 1 session' })).toBeInTheDocument()
+    const term = screen.getByText('Included sessions', { selector: 'dt' })
+    expect(term.nextElementSibling).toHaveTextContent(/^1 session$/)
+    expect(screen.queryByText(/1 sessions/)).not.toBeInTheDocument()
+  })
+
+  it('TC-FE03-043 a 60 day package is discounted for GOLD and the note states the same rule (B2)', async () => {
+    const sixty = sportPackage({ id: 9, durationDays: 60, sessionCount: 16, priceAmount: 1000000 })
+    await openList({ cards: [GOLD], packages: [...PACKAGES, sixty] })
+    expect(finalPrice(/^Coach-led Football, 60 days/)).toBe('950.000 VND')
+    const note = screen.getByText(/Your Gold card gives you/)
+    expect(note).toHaveTextContent('Your Gold card gives you 5% off packages longer than a single visit.')
+    expect(note).not.toHaveTextContent('30 day and 90 day')
+  })
+
+  it('TC-FE03-044 a pending registration of this package blocks Confirm and links to its payment (B3)', async () => {
+    const { calls } = await openDetail({
+      registrations: [registration({ packageId: 4, registrationCode: 'REG-0030', status: 'PENDING_PAYMENT', paymentId: 60 })],
+    })
+    const notice = await screen.findByText(/You already have a registration waiting for payment for this package/)
+    expect(notice).toHaveTextContent('REG-0030')
+    expect(screen.getByRole('link', { name: 'Continue to payment' })).toHaveAttribute('href', '/member/payments/60')
+    expect(screen.getByRole('button', { name: 'Confirm registration' })).toBeDisabled()
+    screen.getByRole('form', { name: 'Package registration' }).dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    expect(calls.some((call) => call.method === 'POST')).toBe(false)
+  })
+
+  it('TC-FE03-045 a pending registration of another package does not block (B3)', async () => {
+    await openDetail({ registrations: [registration({ packageId: 6, status: 'PENDING_PAYMENT', paymentId: 61 })] })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm registration' })).toBeEnabled())
+    expect(screen.queryByText(/already have a registration waiting/)).not.toBeInTheDocument()
+  })
+
+  it('TC-FE03-046 if the registrations cannot be loaded nothing is blocked and nothing crashes (B3)', async () => {
+    const user = userEvent.setup()
+    await openDetail({ registrations: backendError(500, 'Internal server error') })
+    await user.click(screen.getByRole('button', { name: 'Confirm registration' }))
+    expect(await screen.findByRole('dialog', { name: 'Payment summary' })).toBeInTheDocument()
+  })
+
+  it('TC-FE03-047 a page left open past midnight cannot submit yesterday; the picker minimum follows (B4)', async () => {
+    const user = userEvent.setup()
+    vi.setSystemTime(new Date(2026, 9, 13, 23, 59))
+    const { calls } = await openDetail()
+    const input = screen.getByLabelText(/Start date/)
+    expect(input).toHaveValue('2026-10-13')
+
+    vi.setSystemTime(new Date(2026, 9, 14, 0, 1))
+    await user.click(screen.getByRole('button', { name: 'Confirm registration' }))
+    expect(await screen.findByText('Start date cannot be in the past', { selector: '.field__error' })).toBeInTheDocument()
+    expect(calls.some((call) => call.method === 'POST')).toBe(false)
+    expect(input).toHaveAttribute('min', '2026-10-14')
+  })
+
+  it('TC-FE03-048 while the cards load, prices say "Checking your card discount" (M2)', async () => {
+    let release: (response: Response) => void = () => undefined
+    // The cards answer stays open until the test releases it.
+    installFakeFetch((call) => {
+      if (call.path === '/users/me') return json(200, MEMBER)
+      if (call.path === '/sports') return json(200, SPORTS)
+      if (call.path === '/packages') return json(200, PACKAGES)
+      if (call.path === '/membership-cards/my') {
+        return new Promise<Response>((resolve) => {
+          release = resolve
+        })
+      }
+      return json(200, [])
+    })
+    signIn()
+    renderApp('/member/packages')
+    await screen.findByRole('list', { name: 'Sport packages' })
+    expect(within(cardFor(/^Coach-led Football, 30 days/)).getByText(/Checking your card discount/)).toBeInTheDocument()
+    expect(within(cardFor(/^Coach-led Football, 30 days/)).queryByText(/Original price/)).not.toBeInTheDocument()
+    await act(async () => {
+      release(json(200, [VIP]))
+    })
+    expect(finalPrice(/^Coach-led Football, 30 days/)).toBe('810.000 VND')
+    expect(within(cardFor(/^Coach-led Football, 30 days/)).queryByText(/Checking your card discount/)).not.toBeInTheDocument()
+  })
+
+  it('TC-FE03-049 unknown URL filters are ignored: selects and list agree (M3)', async () => {
+    packagesBackend()
+    signIn()
+    renderApp('/member/packages?sport=999&format=abc&duration=7')
+    expect(await screen.findAllByRole('listitem')).toHaveLength(5)
+    expect(screen.getByLabelText('Sport')).toHaveValue('')
+    expect(screen.getByLabelText('Training type')).toHaveValue('')
+    expect(screen.getByLabelText('Duration')).toHaveValue('')
+    expect(within(cardFor(/^Coach-led Football, 30 days/)).getByRole('link', { name: /View package/ })).toHaveAttribute(
+      'href',
+      '/member/packages/4',
+    )
   })
 })
 
