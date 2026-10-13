@@ -13,6 +13,8 @@ import {
   cardForPayment,
   discountPercent,
   isPending,
+  DEFAULT_PAYMENT_METHOD,
+  isMethodAvailable,
   isSingleVisitRegistration,
   methodLabel,
   parseIdParam,
@@ -207,8 +209,9 @@ interface OrderSummaryProps {
 function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
   const navigate = useNavigate()
   const pending = isPending(payment)
-  const currentOnline = (ONLINE_PAYMENT_METHODS as readonly string[]).includes(payment.method ?? '')
-  const [method, setMethod] = useState<string>(currentOnline && payment.method ? payment.method : 'BANK_TRANSFER')
+  // Only bank transfer can be paid online today. A payment created with a wallet method starts on
+  // bank transfer here, so Continue switches it (PUT) and the next screen shows the bank details.
+  const [method, setMethod] = useState<string>(DEFAULT_PAYMENT_METHOD)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -243,7 +246,7 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
           <dd>{formatMoney(payment.originalPrice ?? payment.amount)}</dd>
         </div>
         <div>
-          <dt>{percent !== null ? `Discount / ${percent}%` : singleVisit ? 'Card discount' : 'Discount'}</dt>
+          <dt>{percent !== null ? `Discount (${percent}%)` : singleVisit ? 'Card discount' : 'Discount'}</dt>
           <dd>
             {discount > 0 ? `-${formatMoney(discount)}` : singleVisit ? `${formatMoney(0)} - Single visits excluded` : formatMoney(0)}
           </dd>
@@ -261,23 +264,36 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
         <form className="payment-method-form" onSubmit={handleSubmit} noValidate>
           <fieldset className="payment-methods" disabled={saving}>
             <legend className="payment-methods__legend">Payment method</legend>
-            {ONLINE_PAYMENT_METHODS.map((option) => (
-              <label key={option} className="payment-methods__option">
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  value={option}
-                  checked={method === option}
-                  onChange={() => setMethod(option)}
-                />
-                <span>{methodLabel(option)}</span>
-              </label>
-            ))}
+            {ONLINE_PAYMENT_METHODS.map((option) => {
+              const available = isMethodAvailable(option)
+              return (
+                <label
+                  key={option}
+                  className={`payment-methods__option${available ? '' : ' payment-methods__option--disabled'}`}
+                >
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value={option}
+                    checked={method === option}
+                    disabled={!available}
+                    aria-describedby={available ? undefined : `payment-method-${option}-soon`}
+                    onChange={() => setMethod(option)}
+                  />
+                  <span>{methodLabel(option)}</span>
+                  {!available && (
+                    // Hidden from the label name and read as the radio description instead.
+                    <span className="payment-methods__soon" id={`payment-method-${option}-soon`} aria-hidden="true">
+                      Not available yet
+                    </span>
+                  )}
+                </label>
+              )
+            })}
           </fieldset>
           <p className="payment-methods__hint">
-            {method === 'BANK_TRANSFER'
-              ? 'You will see the bank account and the transfer content on the next screen.'
-              : 'Pay at reception with this payment reference; reception records the payment.'}
+            You will see the bank account and the transfer content on the next screen. You can also pay at
+            reception with your payment reference.
           </p>
           {error && (
             <div className="notice notice--danger" role="alert">
@@ -293,7 +309,9 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
         </form>
       ) : (
         <div className="payment-summary__actions">
-          <p className="payment-methods__hint">Paid with: {methodLabel(payment.method)}</p>
+          <p className="payment-methods__hint">
+            {payment.status === 'SUCCESS' ? 'Paid with' : 'Method'}: {methodLabel(payment.method)}
+          </p>
           {payment.invoiceId ? (
             <Link className={buttonClassName('primary', 'md', true)} to={PAYMENT_PATHS.receipt(payment.invoiceId)}>
               View receipt

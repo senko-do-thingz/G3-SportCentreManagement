@@ -20,6 +20,19 @@ export const PAYMENT_PATHS = {
   receipt: (invoiceId: number) => `/member/payments/receipts/${invoiceId}`,
 } as const
 
+/**
+ * Methods a member can pay with online today. The backend also accepts MOMO, VNPAY and ZALOPAY,
+ * but none of them has a checkout yet, so the summary shows them disabled ("Not available yet").
+ */
+export const AVAILABLE_ONLINE_METHODS: readonly string[] = ['BANK_TRANSFER']
+
+/** Method preselected on the summary; Continue switches any other method to it. */
+export const DEFAULT_PAYMENT_METHOD = 'BANK_TRANSFER'
+
+export function isMethodAvailable(method: string): boolean {
+  return AVAILABLE_ONLINE_METHODS.includes(method)
+}
+
 const METHOD_LABELS: Record<string, string> = {
   BANK_TRANSFER: 'Bank transfer',
   MOMO: 'MoMo',

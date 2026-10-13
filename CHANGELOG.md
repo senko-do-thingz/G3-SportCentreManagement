@@ -2,22 +2,31 @@
 
 ## 2026-10-13 - Member Payments: Summary, Instructions and Status, My Payments, Receipts (FE-11, Flow 3)
 
-Branch `feat/f3-member-payments` from main (after PR #39). Owner: Phat. Priority: P1. Depends on FE-00 and BE-17 (main) and BE-20 (not on main yet, see Open Questions). Verified with `npm run lint -- --max-warnings 0`, `tsc -b`, `npm test` (392 tests in 20 files, 40 new) and `npm run build`.
+Branch `feat/f3-member-payments`, rebased on main after PR #41 (FE-05, merge 6e82388). Owner: Phat. Priority: P1. Depends on FE-00 and BE-17 (main) and BE-20 (not on main yet, see Open Questions). Verified after review round 1 with `npm run lint -- --max-warnings 0`, `tsc -b`, `npm test` (446 tests in 22 files, 47 of them FE-11) and `npm run build`.
 
 ### Added
 - Payment Summary (F3-01) at `/member/payments/:paymentId`: Payment details (reference, status, registration or card request, training format, start date, validity, member, requested time) and Order summary (original price, discount with percent, total due). Item details come from `GET /packages/registrations/my` and `GET /membership-cards/my`; if they fail only those rows are left out.
 - Single Visit Payment Summary (S3-Single): a one day registration gets its own title and "0 VND - Single visits excluded".
-- Payment method choice for a PENDING payment (Bank transfer, MoMo, VNPay, ZaloPay, the online methods of `PaymentService`); "Continue to payment" sends `PUT /payments/{id}/method` only when the method changed, then opens the status screen; a 400 is shown with "Reload the payment".
-- Payment Instructions and Status (F3-02) at `/member/payments/:paymentId/status`: bank, account name, account number, transfer content (the payment code) and amount, with Copy buttons (account number without spaces, amount as plain digits); status badge and text; Refresh status; `GET /payments/{id}` every 15 seconds while PENDING (next check only after the previous answer), stops on SUCCESS, FAILED or REFUNDED; a toast when the status changes; a failed check keeps the last data and retries.
+- Payment method for a PENDING payment: Bank transfer is preselected; MoMo, VNPay and ZaloPay (accepted by `PaymentService` but with no checkout) are shown disabled with "Not available yet". "Continue to payment" sends `PUT /payments/{id}/method` only when the payment has another method, then opens the status screen; a 400 is shown with "Reload the payment".
+- Payment Instructions and Status (F3-02) at `/member/payments/:paymentId/status`: bank, account name, account number, transfer content (the payment code) and amount, with Copy buttons (account number without spaces, amount as plain digits); status badge and text; Refresh status; `GET /payments/{id}` every 15 seconds while PENDING (next check only after the previous answer), stops on SUCCESS, FAILED or REFUNDED; a toast when the status changes; a network or 5xx error keeps the last data and retries, a 4xx stops the checks until Refresh status.
 - My Payments and Receipts (F3-03, S3-PaidHistory) at `/member/payments`: `GET /payments/my` with the status filter kept in the URL (`?status=PENDING`), newest first, Check status, View receipt or View details per row, empty state "No payments yet" and an empty state per filter.
 - Receipt (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt) at `/member/payments/receipts/:invoiceId`: `GET /invoices/{id}`, item lines, base price, discount, tax when present, paid total, payment, status; "Print receipt" calls `window.print()`.
-- Print stylesheet (A4 portrait, 15 mm margins): hides the member header and menu, the payment tabs, toasts and every `.no-print` element, so the receipt prints on one page.
+- Print stylesheet for the member receipt only: named page `receipt` (A4 portrait, 15 mm margins); the member header and menu, the payment tabs, toasts and `.no-print` elements are hidden only in a member layout that contains a receipt, so other pages, including the FE-05 reception receipt, print as before.
 - Payment sub navigation (Payment summary, Payment status, My payments) as in Figma.
 - `src/pages/member/paymentsModel.ts`, `src/pages/member/usePaymentPolling.ts`, `src/utils/clipboard.ts` (Clipboard API with a textarea fallback for plain http), `src/styles/payments.css`, `invoice()` fixture.
 
 ### Changed
 - `src/api/paymentsApi.ts`: `updateMethod`, `myPayments`, `invoice`, `Invoice` and `InvoiceLine` types, status and method lists, optional `invoiceId` and `invoiceNumber` on `Payment`.
 - The bank transfer details moved from the summary to the status screen (Figma F3-01 and F3-02); TC-FE03-036 updated.
+
+### Review round 1
+- Rebased on main after PR #41 (FE-05): kept both style imports (`payments.css`, `reception.css`), both route sets and both route doc comments.
+- Print rules scoped to the member receipt page (named page `receipt`, hide rules under `.member-layout:has(.receipt-page)`); reception styles untouched.
+- Wallet methods disabled with "Not available yet"; Bank transfer always preselected, so Continue switches a wallet payment to it.
+- Polling stops on a 4xx answer and shows the error with Refresh status; only network errors and 5xx retry. Refresh status does nothing while a check is running.
+- "Paid with" only for SUCCESS, "Method" otherwise; "Discount (10%)"; page titles "Payment Instructions and Status" and "My Payments and Receipts".
+- Receipt "Issued to" uses only the invoice member name and code, never the signed in account.
+- 7 new tests (4xx stop, unmount, refresh in flight, failed method label, issued to, available methods, retryable errors); screen test IDs renumbered TC-FE11-001 to 036 with no gaps.
 
 ### Open Questions
 - BE-20 contract assumed by the frontend: `GET /payments/my?status=` returns a JSON array of `PaymentResponse` (a page `{content}` is accepted too); `PaymentResponse` gains `invoiceId` and `invoiceNumber`; `GET /invoices/{id}` returns `id, invoiceNumber, paymentId, paymentCode, paymentMethod, paymentTime, memberId, memberCode, memberFullName, subtotalAmount, discountAmount, taxAmount, totalAmount, status, issueDate, lines[{id, itemType, description, quantity, unitPrice, lineTotal}]`. Without `invoiceId` a paid payment shows "View details" instead of "View receipt".

@@ -42,7 +42,7 @@ const COLUMNS: TableColumn<Payment>[] = [
 
 /** Check status for a pending payment, View receipt once an invoice exists, otherwise View details. */
 function PaymentAction({ payment }: { payment: Payment }) {
-  const label = `${payment.code}`
+  const label = payment.code
   if (payment.status === 'PENDING') {
     return (
       <Link
@@ -100,7 +100,7 @@ export function MyPaymentsPage() {
     <div className="page">
       <PageHeader
         eyebrow="Member / Payments"
-        title="My Payments & Receipts"
+        title="My Payments and Receipts"
         description="Track payments and open receipts for confirmed transactions."
       />
       <Card

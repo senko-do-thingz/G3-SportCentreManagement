@@ -1,7 +1,6 @@
 import { useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { paymentsApi, type Invoice } from '../../api/paymentsApi'
-import { useAuth } from '../../auth/useAuth'
 import { Button, Card, EmptyState, ErrorState, PageHeader, StatusBadge } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
@@ -65,10 +64,9 @@ function ReceiptView({ invoiceId }: { invoiceId: number }) {
 }
 
 function ReceiptContent({ invoice }: { invoice: Invoice }) {
-  const { user } = useAuth()
   const lines = invoice.lines ?? []
-  const memberName = invoice.memberFullName ?? user?.fullName ?? null
-  const issuedTo = [memberName, invoice.memberCode].filter(Boolean).join(' / ') || '-'
+  // Only the invoice decides who it was issued to; the signed in account is never used here.
+  const issuedTo = [invoice.memberFullName, invoice.memberCode].filter(Boolean).join(' / ') || '-'
   const service = lines.length > 0 ? lines.map((line) => line.description).join(', ') : '-'
   const discount = Number(invoice.discountAmount ?? 0)
   const tax = Number(invoice.taxAmount ?? 0)

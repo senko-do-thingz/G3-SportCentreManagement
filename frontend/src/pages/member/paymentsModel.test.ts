@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
+import { ApiError, StaleSessionError } from '../../api/errors'
 import { payment, registration } from '../../test/memberFixtures'
 import {
   accountNumberToCopy,
   amountToCopy,
+  DEFAULT_PAYMENT_METHOD,
   discountPercent,
   filterAndSortPayments,
+  isMethodAvailable,
   isPollingStatus,
   isSingleVisitRegistration,
   methodLabel,
@@ -16,6 +19,7 @@ import {
   transferContentToCopy,
   validityRange,
 } from './paymentsModel'
+import { isRetryableError } from './usePaymentPolling'
 
 describe('FE-11 paymentsModel', () => {
   it('TC-FE11-M01 only PENDING keeps polling', () => {
@@ -96,5 +100,23 @@ describe('FE-11 paymentsModel', () => {
     expect(PAYMENT_PATHS.status(52)).toBe('/member/payments/52/status')
     expect(PAYMENT_PATHS.receipt(7)).toBe('/member/payments/receipts/7')
     expect(validityRange('2026-10-02', '2026-10-31')).toBe('02 Oct 2026 - 31 Oct 2026')
+  })
+
+  it('TC-FE11-M10 only bank transfer can be chosen online; it is the default', () => {
+    expect(DEFAULT_PAYMENT_METHOD).toBe('BANK_TRANSFER')
+    expect(isMethodAvailable('BANK_TRANSFER')).toBe(true)
+    expect(isMethodAvailable('MOMO')).toBe(false)
+    expect(isMethodAvailable('VNPAY')).toBe(false)
+    expect(isMethodAvailable('ZALOPAY')).toBe(false)
+  })
+
+  it('TC-FE11-M11 polling retries only network errors and 5xx', () => {
+    expect(isRetryableError(new ApiError(0, 'offline'))).toBe(true)
+    expect(isRetryableError(new ApiError(500, 'Server error'))).toBe(true)
+    expect(isRetryableError(new ApiError(503, 'Unavailable'))).toBe(true)
+    expect(isRetryableError(new ApiError(403, 'Access denied'))).toBe(false)
+    expect(isRetryableError(new ApiError(404, 'Not found'))).toBe(false)
+    expect(isRetryableError(new StaleSessionError())).toBe(false)
+    expect(isRetryableError(new Error('The server returned an unexpected response.'))).toBe(false)
   })
 })

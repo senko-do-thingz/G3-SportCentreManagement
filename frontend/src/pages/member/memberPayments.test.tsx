@@ -94,7 +94,7 @@ describe('FE-11 Payment Summary (F3-01, S3-Single)', () => {
 
     const order = screen.getByRole('region', { name: 'Order summary' })
     expect(within(order).getByText('Original price').nextSibling).toHaveTextContent('900.000 VND')
-    expect(within(order).getByText('Discount / 10%').nextSibling).toHaveTextContent('-90.000 VND')
+    expect(within(order).getByText('Discount (10%)').nextSibling).toHaveTextContent('-90.000 VND')
     expect(within(order).getByText('Total due').nextSibling).toHaveTextContent('810.000 VND')
     expect(within(order).getByTestId('payment-amount')).toHaveTextContent('810.000 VND')
     expect(screen.getByRole('heading', { level: 1, name: 'Payment Summary' })).toBeInTheDocument()
@@ -131,33 +131,45 @@ describe('FE-11 Payment Summary (F3-01, S3-Single)', () => {
     const order = await screen.findByRole('region', { name: 'Order summary' })
     expect(within(order).getByRole('radio', { name: 'Bank transfer' })).toBeChecked()
     await user.click(within(order).getByRole('button', { name: 'Continue to payment' }))
-    expect(await screen.findByRole('heading', { level: 1, name: 'Payment Instructions & Status' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Payment Instructions and Status' })).toBeInTheDocument()
     expect(calls.some((call) => call.method === 'PUT')).toBe(false)
   })
 
-  it('TC-FE11-005 choosing another method sends PUT /payments/{id}/method then opens the status screen', async () => {
+  it('TC-FE11-005 wallets are shown disabled; a wallet payment is switched to bank transfer by Continue', async () => {
     const user = userEvent.setup()
     const { calls } = paymentsBackend({
-      payments: [payment(), payment({ method: 'MOMO', bankTransferInstructions: null })],
+      payments: [payment({ method: 'MOMO', bankTransferInstructions: null }), payment()],
     })
     renderApp('/member/payments/52')
     const order = await screen.findByRole('region', { name: 'Order summary' })
+    expect(within(order).getByRole('radio', { name: 'Bank transfer' })).toBeChecked()
+    for (const wallet of ['MoMo', 'VNPay', 'ZaloPay']) {
+      const radio = within(order).getByRole('radio', { name: wallet })
+      expect(radio).toBeDisabled()
+      expect(radio).not.toBeChecked()
+      expect(radio).toHaveAccessibleDescription('Not available yet')
+    }
+    expect(within(order).getAllByText('Not available yet')).toHaveLength(3)
     await user.click(within(order).getByRole('radio', { name: 'MoMo' }))
+    expect(within(order).getByRole('radio', { name: 'Bank transfer' })).toBeChecked()
+
     await user.click(within(order).getByRole('button', { name: 'Continue to payment' }))
-    expect(await screen.findByRole('heading', { level: 1, name: 'Payment Instructions & Status' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Payment Instructions and Status' })).toBeInTheDocument()
     const put = calls.filter((call) => call.method === 'PUT')
     expect(put).toHaveLength(1)
     expect(put[0].path).toBe('/payments/52/method')
-    expect(put[0].body).toEqual({ paymentMethod: 'MOMO' })
-    expect(await screen.findByRole('region', { name: 'Payment instructions' })).toHaveTextContent('PAY-0052')
+    expect(put[0].body).toEqual({ paymentMethod: 'BANK_TRANSFER' })
+    expect(await screen.findByRole('region', { name: 'Bank transfer' })).toHaveTextContent('0123456789')
   })
 
   it('TC-FE11-006 a rejected method change shows the backend message and stays on the summary', async () => {
     const user = userEvent.setup()
-    paymentsBackend({ onMethod: () => backendError(400, 'Only pending payments can have their payment method updated') })
+    paymentsBackend({
+      payments: [payment({ method: 'VNPAY', bankTransferInstructions: null })],
+      onMethod: () => backendError(400, 'Only pending payments can have their payment method updated'),
+    })
     renderApp('/member/payments/52')
     const order = await screen.findByRole('region', { name: 'Order summary' })
-    await user.click(within(order).getByRole('radio', { name: 'VNPay' }))
     await user.click(within(order).getByRole('button', { name: 'Continue to payment' }))
     const alert = await within(order).findByRole('alert')
     expect(alert).toHaveTextContent('Only pending payments can have their payment method updated')
@@ -171,11 +183,20 @@ describe('FE-11 Payment Summary (F3-01, S3-Single)', () => {
     renderApp('/member/payments/52')
     const order = await screen.findByRole('region', { name: 'Order summary' })
     expect(within(order).queryByRole('radio')).not.toBeInTheDocument()
+    expect(within(order).getByText('Paid with: Bank transfer')).toBeInTheDocument()
     expect(within(order).getByRole('link', { name: 'View receipt' })).toHaveAttribute('href', '/member/payments/receipts/7')
     expect(within(screen.getByRole('region', { name: 'Payment details' })).getByText('Paid')).toBeInTheDocument()
   })
 
-  it('TC-FE11-008 the payment sub navigation links to summary, status and my payments', async () => {
+  it('TC-FE11-008 a failed or refunded payment says Method, not Paid with', async () => {
+    paymentsBackend({ payments: [payment({ status: 'FAILED', bankTransferInstructions: null })] })
+    renderApp('/member/payments/52')
+    const order = await screen.findByRole('region', { name: 'Order summary' })
+    expect(within(order).getByText('Method: Bank transfer')).toBeInTheDocument()
+    expect(within(order).queryByText(/Paid with/)).not.toBeInTheDocument()
+  })
+
+  it('TC-FE11-009 the payment sub navigation links to summary, status and my payments', async () => {
     paymentsBackend()
     renderApp('/member/payments/52')
     const nav = await screen.findByRole('navigation', { name: 'Payment pages' })
@@ -184,7 +205,7 @@ describe('FE-11 Payment Summary (F3-01, S3-Single)', () => {
     expect(within(nav).getByRole('link', { name: 'My payments' })).toHaveAttribute('href', '/member/payments')
   })
 
-  it('TC-FE11-009 the summary still works when the registration list fails', async () => {
+  it('TC-FE11-010 the summary still works when the registration list fails', async () => {
     installFakeFetch((call) => {
       if (call.path === '/users/me') return json(200, MEMBER)
       if (call.path === '/payments/52') return json(200, payment())
@@ -201,7 +222,7 @@ describe('FE-11 Payment Summary (F3-01, S3-Single)', () => {
 describe('FE-11 Payment Instructions and Status (F3-02)', () => {
   beforeEach(signIn)
 
-  it('TC-FE11-010 shows the bank transfer details and the copy buttons copy the right text', async () => {
+  it('TC-FE11-011 shows the bank transfer details and the copy buttons copy the right text', async () => {
     const user = userEvent.setup()
     paymentsBackend()
     renderApp('/member/payments/52/status')
@@ -220,7 +241,7 @@ describe('FE-11 Payment Instructions and Status (F3-02)', () => {
     expect(await screen.findByText('Copied amount')).toBeInTheDocument()
   })
 
-  it('TC-FE11-011 an account number with spaces is copied without spaces', async () => {
+  it('TC-FE11-012 an account number with spaces is copied without spaces', async () => {
     const user = userEvent.setup()
     paymentsBackend({
       payments: [
@@ -237,7 +258,7 @@ describe('FE-11 Payment Instructions and Status (F3-02)', () => {
     expect(writeText).toHaveBeenLastCalledWith('000010412460')
   })
 
-  it('TC-FE11-012 when copying fails the member is told to copy by hand', async () => {
+  it('TC-FE11-013 when copying fails the member is told to copy by hand', async () => {
     const user = userEvent.setup()
     paymentsBackend()
     renderApp('/member/payments/52/status')
@@ -249,7 +270,7 @@ describe('FE-11 Payment Instructions and Status (F3-02)', () => {
     expect(await screen.findByText('Could not copy the transfer content')).toBeInTheDocument()
   })
 
-  it('TC-FE11-013 a pending payment updates by itself when reception confirms it, then polling stops', async () => {
+  it('TC-FE11-014 a pending payment updates by itself when reception confirms it, then polling stops', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const { calls } = paymentsBackend({
       payments: [
@@ -278,7 +299,7 @@ describe('FE-11 Payment Instructions and Status (F3-02)', () => {
     expect(paymentGets(calls)).toHaveLength(2)
   })
 
-  it('TC-FE11-014 no check is sent before 15 seconds and a still pending payment is checked again', async () => {
+  it('TC-FE11-015 no check is sent before 15 seconds and a still pending payment is checked again', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const { calls } = paymentsBackend()
     renderApp('/member/payments/52/status')
@@ -297,7 +318,7 @@ describe('FE-11 Payment Instructions and Status (F3-02)', () => {
     await waitFor(() => expect(paymentGets(calls)).toHaveLength(3))
   })
 
-  it('TC-FE11-015 Refresh status asks the backend at once', async () => {
+  it('TC-FE11-016 Refresh status asks the backend at once', async () => {
     const user = userEvent.setup()
     const { calls } = paymentsBackend({ payments: [payment(), payment({ status: 'FAILED', bankTransferInstructions: null })] })
     renderApp('/member/payments/52/status')
@@ -309,7 +330,7 @@ describe('FE-11 Payment Instructions and Status (F3-02)', () => {
     expect(within(panel).getByRole('link', { name: 'My membership and packages' })).toHaveAttribute('href', '/member/membership')
   })
 
-  it('TC-FE11-016 a failed check keeps the payment on screen and the next check recovers', async () => {
+  it('TC-FE11-017 a failed check keeps the payment on screen and the next check recovers', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     paymentsBackend({
       payments: [payment(), backendError(500, 'Server error'), payment({ status: 'SUCCESS', bankTransferInstructions: null })],
@@ -329,16 +350,92 @@ describe('FE-11 Payment Instructions and Status (F3-02)', () => {
     expect(within(panel).queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('TC-FE11-017 a wallet method without bank details shows the reference to give at reception', async () => {
+  it('TC-FE11-018 a 4xx answer stops the automatic checks; Refresh status checks again', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const { calls } = paymentsBackend({
+      payments: [payment(), backendError(403, 'Access denied'), payment()],
+    })
+    renderApp('/member/payments/52/status')
+    const panel = await screen.findByRole('region', { name: 'Payment status' })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS)
+    })
+    expect(await within(panel).findByRole('alert')).toHaveTextContent('Access denied')
+    expect(within(panel).getByText(/Automatic checks stopped/)).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Bank transfer' })).toBeInTheDocument()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 3)
+    })
+    expect(paymentGets(calls)).toHaveLength(2)
+
+    await user.click(within(panel).getByRole('button', { name: 'Refresh status' }))
+    await waitFor(() => expect(paymentGets(calls)).toHaveLength(3))
+    await waitFor(() => expect(within(panel).queryByRole('alert')).not.toBeInTheDocument())
+    expect(within(panel).getByText(/Checks again every 15 seconds/)).toBeInTheDocument()
+  })
+
+  it('TC-FE11-019 leaving the page stops polling: no request after unmount', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const { calls } = paymentsBackend()
+    const { unmount } = renderApp('/member/payments/52/status')
+    await screen.findByRole('region', { name: 'Payment status' })
+    expect(paymentGets(calls)).toHaveLength(1)
+    unmount()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 4)
+    })
+    expect(paymentGets(calls)).toHaveLength(1)
+  })
+
+  it('TC-FE11-020 Refresh status while a check is running sends no second request', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    let release: (response: Response) => void = () => undefined
+    let gets = 0
+    const { calls } = installFakeFetch((call) => {
+      if (call.path === '/users/me') return json(200, MEMBER)
+      if (call.path === '/payments/52') {
+        gets += 1
+        if (gets === 2) {
+          return new Promise<Response>((resolve) => {
+            release = resolve
+          })
+        }
+        return json(200, payment())
+      }
+      return backendError(404, 'Resource not found')
+    })
+    renderApp('/member/payments/52/status')
+    const panel = await screen.findByRole('region', { name: 'Payment status' })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS)
+    })
+    await waitFor(() => expect(paymentGets(calls)).toHaveLength(2))
+
+    // The automatic check is still running: both clicks are ignored.
+    await user.click(within(panel).getByRole('button', { name: 'Refresh status' }))
+    await user.click(within(panel).getByRole('button', { name: 'Refresh status' }))
+    expect(paymentGets(calls)).toHaveLength(2)
+
+    await act(async () => {
+      release(json(200, payment()))
+    })
+    await user.click(within(panel).getByRole('button', { name: 'Refresh status' }))
+    await waitFor(() => expect(paymentGets(calls)).toHaveLength(3))
+  })
+
+  it('TC-FE11-021 a wallet method without bank details shows the reference to give at reception', async () => {
     paymentsBackend({ payments: [payment({ method: 'ZALOPAY', bankTransferInstructions: null })] })
     renderApp('/member/payments/52/status')
     const instructions = await screen.findByRole('region', { name: 'Payment instructions' })
     expect(within(instructions).getByRole('heading', { name: 'ZaloPay' })).toBeInTheDocument()
     expect(within(instructions).getByText('PAY-0052')).toBeInTheDocument()
-    expect(within(instructions).getByRole('link', { name: 'Choose another method' })).toHaveAttribute('href', '/member/payments/52')
+    expect(instructions).toHaveTextContent('ZaloPay has no online checkout yet')
+    expect(within(instructions).getByRole('link', { name: 'Switch to bank transfer' })).toHaveAttribute('href', '/member/payments/52')
   })
 
-  it('TC-FE11-018 a first load error shows Retry, and Retry loads the payment', async () => {
+  it('TC-FE11-022 a first load error shows Retry, and Retry loads the payment', async () => {
     const user = userEvent.setup()
     paymentsBackend({ payments: [backendError(404, 'Payment not found for id: 52'), payment()] })
     renderApp('/member/payments/52/status')
@@ -348,7 +445,7 @@ describe('FE-11 Payment Instructions and Status (F3-02)', () => {
     expect(await screen.findByRole('region', { name: 'Bank transfer' })).toBeInTheDocument()
   })
 
-  it('TC-FE11-019 an invalid payment id makes no request', async () => {
+  it('TC-FE11-023 an invalid payment id makes no request', async () => {
     const { calls } = paymentsBackend()
     renderApp('/member/payments/abc/status')
     expect(await screen.findByText('The payment link is not valid.')).toBeInTheDocument()
@@ -379,7 +476,7 @@ describe('FE-11 My Payments and Receipts (F3-03, S3-PaidHistory)', () => {
     return within(table).getAllByRole('row').slice(1)
   }
 
-  it('TC-FE11-020 lists payments newest first with Check status, View receipt and View details', async () => {
+  it('TC-FE11-024 lists payments newest first with Check status, View receipt and View details', async () => {
     paymentsBackend({ myPayments: () => json(200, [HISTORY[2], HISTORY[0], HISTORY[1]]) })
     renderApp('/member/payments')
     await screen.findByText('PAY-0052')
@@ -393,7 +490,7 @@ describe('FE-11 My Payments and Receipts (F3-03, S3-PaidHistory)', () => {
     expect(within(rows[2]).getByRole('link', { name: 'View details of PAY-0031' })).toHaveAttribute('href', '/member/payments/31')
   })
 
-  it('TC-FE11-021 the status filter asks the backend with ?status= and shows only that status', async () => {
+  it('TC-FE11-025 the status filter asks the backend with ?status= and shows only that status', async () => {
     const user = userEvent.setup()
     // A backend that ignores the filter: the screen still shows only the chosen status.
     const { calls } = paymentsBackend({ myPayments: () => json(200, HISTORY) })
@@ -409,7 +506,7 @@ describe('FE-11 My Payments and Receipts (F3-03, S3-PaidHistory)', () => {
     expect(calls.filter((call) => call.path === '/payments/my')).toHaveLength(2)
   })
 
-  it('TC-FE11-022 the status filter is read from the URL', async () => {
+  it('TC-FE11-026 the status filter is read from the URL', async () => {
     const { calls } = paymentsBackend({ myPayments: () => json(200, [HISTORY[1]]) })
     renderApp('/member/payments?status=success')
     await screen.findByText('INV-0007')
@@ -417,35 +514,35 @@ describe('FE-11 My Payments and Receipts (F3-03, S3-PaidHistory)', () => {
     expect(calls.some((call) => call.path === '/payments/my?status=SUCCESS')).toBe(true)
   })
 
-  it('TC-FE11-023 shows an empty state when the member has no payments', async () => {
+  it('TC-FE11-027 shows an empty state when the member has no payments', async () => {
     paymentsBackend({ myPayments: () => json(200, []) })
     renderApp('/member/payments')
     expect(await screen.findByRole('heading', { name: 'No payments yet' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Browse sport packages' })).toHaveAttribute('href', '/member/packages')
   })
 
-  it('TC-FE11-024 a filter with no match shows its own empty state', async () => {
+  it('TC-FE11-028 a filter with no match shows its own empty state', async () => {
     paymentsBackend({ myPayments: () => json(200, []) })
     renderApp('/member/payments?status=REFUNDED')
     expect(await screen.findByRole('heading', { name: 'No refunded payments' })).toBeInTheDocument()
   })
 
-  it('TC-FE11-025 a page answer ({content: [...]}) is accepted', async () => {
+  it('TC-FE11-029 a page answer ({content: [...]}) is accepted', async () => {
     paymentsBackend({ myPayments: () => json(200, { content: [HISTORY[0]], page: 0, size: 20, totalElements: 1, totalPages: 1 }) })
     renderApp('/member/payments')
     expect(await screen.findByText('PAY-0052')).toBeInTheDocument()
   })
 
-  it('TC-FE11-026 a load error shows the message with Retry', async () => {
+  it('TC-FE11-030 a load error shows the message with Retry', async () => {
     paymentsBackend({ myPayments: () => backendError(500, 'Server error') })
     renderApp('/member/payments')
     expect(await screen.findByRole('alert')).toHaveTextContent('Server error')
   })
 
-  it('TC-FE11-027 the My Payments menu item opens the real screen', async () => {
+  it('TC-FE11-031 the My Payments menu item opens the real screen', async () => {
     paymentsBackend({ myPayments: () => json(200, []) })
     renderApp('/member/payments')
-    expect(await screen.findByRole('heading', { level: 1, name: 'My Payments & Receipts' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'My Payments and Receipts' })).toBeInTheDocument()
     const nav = screen.getByRole('navigation', { name: 'Member navigation' })
     expect(within(nav).getByRole('link', { name: 'My Payments' })).toHaveClass('member-nav__link--active')
   })
@@ -454,7 +551,7 @@ describe('FE-11 My Payments and Receipts (F3-03, S3-PaidHistory)', () => {
 describe('FE-11 Receipts (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt)', () => {
   beforeEach(signIn)
 
-  it('TC-FE11-030 shows the receipt rows and Print receipt calls window.print', async () => {
+  it('TC-FE11-032 shows the receipt rows and Print receipt calls window.print', async () => {
     const user = userEvent.setup()
     const print = vi.fn()
     vi.stubGlobal('print', print)
@@ -478,7 +575,21 @@ describe('FE-11 Receipts (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt)', 
     expect(screen.getByRole('navigation', { name: 'Payment pages' })).toHaveClass('no-print')
   })
 
-  it('TC-FE11-031 a card receipt and a receipt with several lines list every item', async () => {
+  it('TC-FE11-033 Issued to comes from the invoice only, never from the signed in account', async () => {
+    paymentsBackend({ invoice: json(200, invoice({ memberFullName: null })) })
+    const first = renderApp('/member/payments/receipts/7')
+    const receipt = await screen.findByRole('region', { name: 'Receipt INV-0007' })
+    expect(within(receipt).getByText('Issued to').nextSibling).toHaveTextContent('MEM-0002')
+    expect(within(receipt).getByText('Issued to').nextSibling).not.toHaveTextContent('Taylor Nguyen')
+    first.unmount()
+
+    paymentsBackend({ invoice: json(200, invoice({ memberFullName: null, memberCode: null })) })
+    renderApp('/member/payments/receipts/7')
+    const second = await screen.findByRole('region', { name: 'Receipt INV-0007' })
+    expect(within(second).getByText('Issued to').nextSibling).toHaveTextContent(/^-$/)
+  })
+
+  it('TC-FE11-034 a card receipt and a receipt with several lines list every item', async () => {
     paymentsBackend({
       invoice: json(
         200,
@@ -501,7 +612,7 @@ describe('FE-11 Receipts (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt)', 
     expect(screen.getByText('Discount').nextSibling).toHaveTextContent('0 VND')
   })
 
-  it('TC-FE11-032 a receipt that cannot be loaded shows an error with Retry', async () => {
+  it('TC-FE11-035 a receipt that cannot be loaded shows an error with Retry', async () => {
     paymentsBackend({ invoice: backendError(404, 'Invoice not found') })
     renderApp('/member/payments/receipts/7')
     const alert = await screen.findByRole('alert')
@@ -509,7 +620,7 @@ describe('FE-11 Receipts (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt)', 
     expect(alert).toHaveTextContent('Invoice not found')
   })
 
-  it('TC-FE11-033 an invalid receipt id makes no request', async () => {
+  it('TC-FE11-036 an invalid receipt id makes no request', async () => {
     const { calls } = paymentsBackend()
     renderApp('/member/payments/receipts/x1')
     expect(await screen.findByText('The receipt link is not valid.')).toBeInTheDocument()

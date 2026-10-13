@@ -34,7 +34,7 @@ export function PaymentStatusPage() {
   if (id === null) {
     return (
       <div className="page">
-        <PageHeader eyebrow="Member / Payments" title="Payment Instructions & Status" />
+        <PageHeader eyebrow="Member / Payments" title="Payment Instructions and Status" />
         <EmptyState
           title="Payment not found"
           description="The payment link is not valid."
@@ -71,7 +71,7 @@ function PaymentStatusView({ paymentId }: { paymentId: number }) {
   const header = (
     <PageHeader
       eyebrow="Member / Payments"
-      title="Payment Instructions & Status"
+      title="Payment Instructions and Status"
       description="Pay at reception or use the bank transfer details below."
     />
   )
@@ -144,10 +144,13 @@ function Instructions({ payment }: { payment: Payment }) {
           </div>
         </dl>
         <div className="notice notice--info payment-summary__note">
-          <p>Online {methodLabel(payment.method)} checkout is not available yet. Pay at reception and give them this payment reference.</p>
+          <p>
+            {methodLabel(payment.method)} has no online checkout yet. Switch to bank transfer on the summary, or pay at
+            reception with this payment reference.
+          </p>
         </div>
         <Link className={buttonClassName('secondary', 'md', true)} to={PAYMENT_PATHS.summary(payment.id)}>
-          Choose another method
+          Switch to bank transfer
         </Link>
       </Card>
     )
@@ -259,7 +262,9 @@ function StatusPanel({ polling, payment }: { polling: ReturnType<typeof usePayme
             <p>Reception confirms the funds received. Do not submit a second request.</p>
           </div>
           <p className="payment-status__check">
-            {polling.polling ? `Checks again every ${POLL_INTERVAL_MS / 1000} seconds.` : 'Automatic checks paused.'}{' '}
+            {polling.polling
+              ? `Checks again every ${POLL_INTERVAL_MS / 1000} seconds.`
+              : 'Automatic checks stopped. Use Refresh status to check again.'}{' '}
             Last checked {checkedAt ? formatTime(checkedAt) : '-'}.
           </p>
           {refreshError ? (

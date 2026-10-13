@@ -111,6 +111,18 @@
   accent-color: var(--color-primary);
 }
 
+.payment-methods__option--disabled {
+  background: var(--color-surface-muted);
+  color: var(--color-text-subtle);
+  cursor: not-allowed;
+}
+
+.payment-methods__soon {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+}
+
 .payment-methods__hint {
   margin: 0;
   font-size: var(--text-sm);
@@ -269,29 +281,30 @@
 }
 
 /*
- * Print: only the receipt card, on one A4 page. Navigation, page header buttons, toasts and every
- * element marked no-print are hidden; colors fall back to black on white.
+ * Print: only the member receipt page uses these rules. The receipt page gets the named page
+ * "receipt" (A4 portrait, 15 mm margins), and every hide rule is scoped to a member layout that
+ * contains a receipt, so printing any other page, including the reception receipt (FE-05), is
+ * unchanged.
  */
-@page {
+.receipt-page {
+  page: receipt;
+}
+
+@page receipt {
   size: A4 portrait;
   margin: 15mm;
 }
 
 @media print {
-  html,
-  body {
-    background: #fff;
-  }
-
-  .member-header,
-  .member-nav,
-  .toast-region,
-  .account-switch-notice,
-  .no-print {
+  .member-layout:has(.receipt-page) > .member-header,
+  .member-layout:has(.receipt-page) .member-nav,
+  .member-layout:has(.receipt-page) .account-switch-notice,
+  .member-layout:has(.receipt-page) .no-print,
+  body:has(.receipt-page) .toast-region {
     display: none !important;
   }
 
-  .member-main {
+  .member-layout:has(.receipt-page) .member-main {
     max-width: none;
     margin: 0;
     padding: 0;
