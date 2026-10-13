@@ -1,7 +1,7 @@
 # AI Audit Log: CI/CD Deployment Readiness Fixes
 
 ## Metadata
-- **Task Identifier**: Deployment Readiness Fixes (chore/ci-cd-deploy-fixes)
+- **Task Identifier**: Deployment Readiness Fixes (PR #36 Review Findings)
 - **Branch**: `chore/ci-cd-deploy-fixes`
 - **Target Branch**: `main`
 - **Role**: DevOps & Senior Backend Engineer
@@ -11,10 +11,21 @@
 ---
 
 ## 1. Executive Summary
-This audit log documents technical resolutions for three deployment-readiness issues identified in the CI/CD pipeline following the merge of PR #22 into `main`:
+This audit log documents technical resolutions for deployment-readiness issues identified in the CI/CD pipeline following the initial implementation and subsequent code review on PR #36:
 1. Environment variable name mismatch in documentation: `docs/ci-cd.md` referenced outdated variable names (`SPRING_DATASOURCE_*`, `BANK_TRANSFER_*`) that would lead to fail-fast application startup failures in staging and production, alongside unused test environment variables in `.github/workflows/ci.yml`.
 2. Container image name casing discrepancy: GitHub repository names containing uppercase letters (`G3-SportCentreManagement`) caused container scan failures in Trivy because image references in registry paths must be lowercase, whereas `docker/metadata-action` automatically lowercases pushed images.
-3. Missing server-side compose infrastructure and deployment setup documentation: Composite action `.github/actions/deploy-compose` requires a compose file and `.env` template in `DEPLOY_DIR` on the remote server, but no deployment-ready template existed in the repository.
+3. Server-side compose template defects:
+   - SQL Server 2022 container ships `mssql-tools18` at `/opt/mssql-tools18/bin/sqlcmd` rather than legacy `/opt/mssql-tools/bin/sqlcmd`, and requires the `-C` flag (trust server certificate) to avoid connection encryption failures.
+   - The initial `db-init` command used invalid T-SQL double quotes `N\"sportify\"` and lacked `-b`, failing to report errors. It is rewritten using the official SQL Server 2022 image, exec-form entrypoint, and `SQLCMDPASSWORD`.
+   - Credential model for `with-db` profile uses `sa` by default, separated cleanly from external database configurations.
+   - Host port 1433 publication is eliminated so database traffic remains isolated within the Docker network.
+4. Hardening and consistency improvements:
+   - Replaced placeholders in `deploy/.env.example` with intentionally invalid strings (`<REPLACE_...>`) to guarantee fail-fast behavior if unedited.
+   - Documented SQL Server password complexity requirements.
+   - Configured `backend` `depends_on.sqlserver` with `required: false` (supported in Docker Compose 2.20+).
+   - Removed fixed `container_name` entries to prevent multi-environment container collisions on shared Docker hosts.
+5. CI smoke test workflow:
+   - Added `.github/workflows/compose-smoke-test.yml` running in GitHub Actions to test `sqlserver` healthcheck, `db-init` database creation, idempotency, port 1433 isolation, and `IMAGE_TAG` requirement.
 
 All issues have been resolved with strict compliance to project conventions (100% English, ASCII-only, conventional commits, no migration alterations).
 
@@ -44,7 +55,7 @@ All issues have been resolved with strict compliance to project conventions (100
   - `docker/metadata-action` automatically lowercases pushed image tags, causing a reference mismatch where Trivy attempts to pull an invalid uppercase reference.
 - **Investigation of `steps.meta.outputs.version`**:
   - Evaluated `docker/metadata-action` behavior across triggers:
-    - **Tag push `v*.*.*`**: `type=semver,pattern={{version}}` matches and produces the semantic version (e.g. `1.2.3`). `type=sha` generates `sha-<short-sha>`. `steps.meta.outputs.version` resolves to `1.2.3`. Both tags are built and pushed to GHCR. Trivy scans `1.2.3`, which exists in GHCR.
+    - **Tag push `v*.*.*`**: `type=semver,pattern={{version}}` matches and produces the semantic version (e.g. `1.0.0`). `type=sha` generates `sha-<short-sha>`. `steps.meta.outputs.version` resolves to `1.0.0`. Both tags are built and pushed to GHCR. Trivy scans `1.0.0`, which exists in GHCR.
     - **Workflow dispatch on a branch**: `type=semver` does not match and is omitted. `type=sha` generates `sha-<short-sha>`. `steps.meta.outputs.version` resolves to `sha-<short-sha>`. This tag is built and pushed to GHCR. Trivy scans `sha-<short-sha>`, which exists in GHCR.
   - In both triggers, `steps.meta.outputs.version` refers to a tag that is actively built and pushed.
 - **Resolution**:
@@ -57,29 +68,70 @@ All issues have been resolved with strict compliance to project conventions (100
   - Configured Trivy `image-ref:` input to `${{ steps.image.outputs.name }}:${{ steps.meta.outputs.version }}`.
   - Established a single source of truth for the image name inside `build-image`.
 
-### Item 3: Add Server-Side Compose Template and Server Setup Documentation
+### Item 3: Initial Server-Side Compose Template and Server Setup Documentation
 - **Problem**:
   - Composite action `.github/actions/deploy-compose` executes `docker compose pull` and `docker compose up -d` in `DEPLOY_DIR` with `IMAGE_TAG`, but the repository contained no production-oriented compose file.
   - Target server preparation procedures were undocumented.
 - **Resolution**:
-  - Created `deploy/compose.yaml`:
-    - `backend` service uses image `ghcr.io/senko-do-thingz/g3-sportcentremanagement/backend:${IMAGE_TAG:?IMAGE_TAG is required}`, `restart: unless-stopped`, `env_file: .env`, and port mapping `8080:8080`.
-    - Optional `sqlserver` and `db-init` services grouped under compose profile `with-db` with named volume `sqlserver_data`. Default `docker compose up -d` starts only the backend service. No hard `depends_on` from `backend` to prevent startup errors when the profile is inactive.
-  - Created `deploy/.env.example`:
-    - Contains placeholders for all application environment variables (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `CORS_ALLOWED_ORIGINS`, `SPORTIFY_PAYMENT_*`).
-    - Contains commented `# COMPOSE_PROFILES=with-db`.
-    - Explicitly documents that `IMAGE_TAG` must NOT be defined in `.env` because it is injected dynamically by the deployment workflow.
-  - Added Section 6 "Server Setup" in `docs/ci-cd.md` detailing:
-    1. Dedicated deploy system user.
-    2. SSH key pair generation and distribution.
-    3. Host key fingerprint verification via `ssh-keyscan`.
-    4. Docker Engine and Compose plugin installation.
-    5. GHCR authentication with personal access token (`read:packages`).
-    6. Compose template and `.env` copying to `DEPLOY_DIR`.
-    7. Default SSH port 22 requirement.
-    8. Public `/actuator/health` endpoint reachability and trailing slash avoidance.
-    9. Rollback mechanism via `.current_tag`.
-    10. `DEPLOY_ENABLED` repository-level variable gate.
+  - Created `deploy/compose.yaml` with `backend`, `sqlserver`, and `db-init` services.
+  - Created `deploy/.env.example`.
+  - Added Section 6 "Server Setup" in `docs/ci-cd.md`.
+
+### Work Item A: Fix Blocking Defects in deploy/compose.yaml (Review Findings A1-A4)
+- **A1. Healthcheck Path**:
+  - The `mcr.microsoft.com/mssql/server:2022-latest` image ships `/opt/mssql-tools18/bin/sqlcmd`. In tools18, encryption is enabled by default, requiring `-C` (trust certificate).
+  - Healthcheck was updated to use `CMD-SHELL`, double dollar sign `$$MSSQL_SA_PASSWORD` to prevent host interpolation, and `-b` for strict non-zero exit on failure:
+    `test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -b -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1'"]`
+- **A2. db-init Database Creation**:
+  - Replaced unpinned `mssql-tools:latest` with pinned `mcr.microsoft.com/mssql/server:2022-latest`.
+  - Replaced shell command containing invalid quotes with exec-form `entrypoint`.
+  - Supplied password via `SQLCMDPASSWORD` environment variable instead of `-P` CLI flag.
+  - Set idempotent SQL statement: `IF DB_ID(N'sportify') IS NULL CREATE DATABASE [sportify];` with `-C -b`.
+  - Added `restart: "no"`.
+- **A3. Credential Model for with-db Profile**:
+  - Specified `DB_USERNAME=sa` by default for the `with-db` profile, passing `DB_PASSWORD` directly to `MSSQL_SA_PASSWORD`.
+  - Added explicit comment in `deploy/compose.yaml`: `# For the with-db profile, the backend connects as the sa login; DB_USERNAME must be sa.`
+  - Separated `deploy/.env.example` into Option 1 (`with-db` single-host DB) and Option 2 (External SQL Server with dedicated least-privilege user), with only one option active at a time.
+  - Documented in `docs/ci-cd.md` Section 6 that `with-db` connects as `sa` (superuser), which is an accepted trade-off for single-host deployments, while dedicated least-privilege logins are recommended for external databases.
+- **A4. Remove Published Port 1433**:
+  - Removed `ports: - "1433:1433"` from `sqlserver` service in `deploy/compose.yaml`. The backend communicates over the private compose network.
+  - Documented that operators requiring host access should bind to `127.0.0.1:1433:1433` only.
+
+### Work Item B: Hardening and Consistency (Review Findings B1-B6)
+- **B1. Placeholders in deploy/.env.example**:
+  - Replaced placeholders with intentionally invalid values (`<REPLACE_WITH_STRONG_SA_PASSWORD>`, `<REPLACE_WITH_BASE64_SECRET_MIN_32_BYTES>`) to guarantee fail-fast startup if unedited.
+  - Documented SQL Server password complexity policy (minimum 8 characters, at least 3 of 4 classes: uppercase, lowercase, numbers, symbols) which causes startup failure if violated.
+  - Documented JWT secret decoding requirement (`Decoders.BASE64.decode`).
+- **B2. backend depends_on**:
+  - Added `depends_on.sqlserver` with `condition: service_healthy` and `required: false` to `backend` service.
+  - Documented Docker Compose v2.20.0+ requirement for `required: false` support in `docs/ci-cd.md`.
+- **B3. Git ignore**:
+  - Explicitly added `deploy/.env` to `.gitignore` to prevent secret commits.
+- **B4. Leftover Uppercase Image References**:
+  - Grepped all `.github` workflows and actions for `github.repository` and `ghcr.io`. Confirmed zero remaining unhandled uppercase references exist.
+- **B5. Dynamic Container Naming**:
+  - Removed fixed `container_name` attributes from `deploy/compose.yaml` so multiple deployment environments (e.g. staging and production) can run on a single host without container name collisions.
+- **B6. Documentation Review**:
+  - Synchronized `docs/ci-cd.md` Section 6 with all hardening, credential, port, and version requirements.
+
+### Work Item C: CI Smoke Test for Compose Template (Review Finding C)
+- Added `.github/workflows/compose-smoke-test.yml` triggering on `deploy/**` and workflow file changes.
+- Automated verification steps:
+  1. Validates that `docker compose -f deploy/compose.yaml config` fails when `IMAGE_TAG` is missing.
+  2. Generates temporary test `.env` with strong SA password and valid Base64 JWT secret.
+  3. Starts `sqlserver` service and waits for healthy status via healthcheck.
+  4. Runs `db-init` service and verifies exit code 0.
+  5. Verifies database `sportify` exists in `sys.databases` via `sqlcmd -C -b`.
+  6. Verifies `SELECT DB_NAME()` returns `sportify` with `sa` login.
+  7. Asserts port 1433 is not published on host interfaces.
+  8. Runs `db-init` a second time to verify re-run idempotency.
+  9. Dumps compose logs on failure and tears down stack in `always()` step.
+
+### Work Item D: Documentation, Test Cases, and Traceability (Review Findings D1-D2)
+- Created test specifications file `docs/test-specs/ci-cd-deploy-fixes_Test_Cases.md` covering all 13 required test cases (TC-DEPLOY-01 through TC-DEPLOY-13).
+- Updated `docs/audit/ci-cd-deploy-fixes_AI_Audit_Log.md` with complete commit traceability and verification matrix.
+- Generated `docs/audit/ci-cd-deploy-fixes_AI_Audit_Log.docx` deliverable.
+- Updated PR #36 description with accurate issue counts, work items, and checklist mappings.
 
 ---
 
@@ -91,7 +143,11 @@ All issues have been resolved with strict compliance to project conventions (100
 | Migrations | Migration immutability and sequence | `bash scripts/ci/check-migrations.sh origin/main` | PASSED | 0 migration collisions or alterations. |
 | Compose Syntax | Default profile interpolation | `docker compose -f deploy/compose.yaml config` | PASSED | Evaluates `backend` service cleanly with `.env` and `IMAGE_TAG`. |
 | Compose Profiles | Optional with-db profile interpolation | `docker compose -f deploy/compose.yaml --profile with-db config` | PASSED | Activates `sqlserver`, `db-init`, and named volume cleanly. |
-| Unit Tests | Local backend test suite | `mvn -B -ntp test` in `backend` | PASSED | 520 tests run, 0 failures, 0 errors, 0 skipped. |
+| Optional Dependency | backend starts without with-db | `docker compose -f deploy/compose.yaml config` | PASSED | `required: false` allows `backend` to start without `sqlserver`. |
+| Required IMAGE_TAG | Config fails without IMAGE_TAG | `docker compose -f deploy/compose.yaml config` | PASSED | Exits with error when `IMAGE_TAG` is missing. |
+| Compose Smoke Test | Full container provisioning in CI | `.github/workflows/compose-smoke-test.yml` | PASSED | Healthcheck, db-init, sa login, idempotency, port isolation verified in GitHub Actions runner. |
+| CI Pipeline Gate | Full build, unit tests, integration tests | `.github/workflows/ci.yml` (Run `38343538187`) | PASSED | 618 tests run: 520 unit tests, 98 integration tests; 0 failures. |
+| Security Workflow | CodeQL and dependency analysis | `.github/workflows/security.yml` (Run `38343538186`) | PASSED | 0 security alerts. |
 | Character Encoding | Pure ASCII across changed files | Python/Bash scan `[^\x00-\x7F]` | PASSED | 0 non-ASCII characters found. |
 
 ### Explicit Verification Boundaries (What Was NOT Verified Locally)
@@ -101,9 +157,9 @@ All issues have been resolved with strict compliance to project conventions (100
 2. **GHCR Container Pull on Remote Server**:
    - Status: **NOT VERIFIED LOCALLY**.
    - Reason: Requires live remote host with Docker daemon and GHCR authentication configured.
-3. **Full Multi-Container Stack Runtime Execution**:
+3. **Local Container Runtime Execution**:
    - Status: **NOT VERIFIED LOCALLY**.
-   - Reason: Compose syntax and interpolation were verified via `docker compose config`, but running containers locally requires background daemon capabilities that are reserved for CI runners and remote environments.
+   - Reason: In accordance with project conventions, containers are not started in the local Windows environment. Runtime container execution was verified in GitHub Actions runners via `.github/workflows/compose-smoke-test.yml` and Testcontainers.
 
 ---
 
@@ -114,4 +170,8 @@ All issues have been resolved with strict compliance to project conventions (100
 | `458dac4` | Item 1 | fix(ci): correct application environment variable names in docs and remove unused test env |
 | `23eeffc` | Item 2 | fix(ci): compute lowercase image name for metadata-action and Trivy scan in cd.yml |
 | `939280e` | Item 3 | feat(ci): add server compose template and document deployment setup |
-| (Audit log commit) | Item 4 | docs(audit): add AI audit log for deployment readiness fixes |
+| `772cacb` | Item 4 | docs(audit): add AI audit log for deployment readiness fixes |
+| `65b2a2d` | Work Item A | fix(ci): fix mssql healthcheck and db-init in compose template |
+| `b4bcec1` | Work Item B | feat(ci): harden compose template and server deployment configuration |
+| `fe93dd1` | Work Item C | ci(deploy): add compose template smoke test workflow |
+| `9e89861` | Work Item D | docs(audit): update AI audit log and test cases for deployment review findings |
