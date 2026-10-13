@@ -184,8 +184,8 @@ Check constraints:
 | 9 | created_at | DATETIME2(0) | No | SYSDATETIME() | - | V10 | - |
 | 10 | updated_at | DATETIME2(0) | Yes | - | - | V10 | - |
 | 11 | payment_id | BIGINT | Yes | - | FK -> payment.id | V14 | Mapped in entity |
-| 12 | upgrade_request | BIT | No | 0 | - | V22 | Explicit marker for upgrade requests |
-| 13 | replaces_card_id | BIGINT | Yes | - | FK -> member_card.id | V22 | Replaced card in upgrade chain |
+| 12 | upgrade_request | BIT | No | 0 | - | V22 | Explicit marker for upgrade requests. Backfilled for legacy rows where price_paid < tier.price |
+| 13 | replaces_card_id | BIGINT | Yes | - | FK -> member_card.id | V22 | Replaced card in upgrade chain. Deterministically backfilled for ACTIVE upgrades via matching REPLACED end_date and PENDING_PAYMENT upgrades via active started card. Ambiguous/missing matches remain NULL |
 
 Foreign keys:
 
