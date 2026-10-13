@@ -31,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -376,8 +377,8 @@ public class PaymentServiceImpl implements PaymentService {
             return Optional.empty();
         }
         Invoice invoice = invoices.stream()
-                .min(java.util.Comparator.comparing(Invoice::getId, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
-                .orElse(invoices.get(0));
+                .min(Comparator.comparing(Invoice::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+                .orElseThrow();
         String description = "Invoice " + invoice.getInvoiceNumber();
         BigDecimal original = invoice.getSubtotalAmount() != null ? invoice.getSubtotalAmount() : fallbackAmount;
         BigDecimal discount = invoice.getDiscountAmount() != null ? invoice.getDiscountAmount() : BigDecimal.ZERO;
