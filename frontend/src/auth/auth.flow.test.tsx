@@ -5,6 +5,18 @@ import { tokenStorage } from '../api/tokenStorage'
 import { backendError, installFakeFetch, json, MANAGER, MEMBER, type RecordedCall } from '../test/fakeBackend'
 import { renderApp } from '../test/renderApp'
 
+/**
+ * The account switch notice (role status). Since FE-02 the member home is the real dashboard,
+ * which also has role status elements (loading spinners), so the notice is picked by its class.
+ */
+function accountSwitchNotice(): HTMLElement {
+  const notice = screen.getAllByRole('status').find((element) => element.classList.contains('account-switch-notice'))
+  if (!notice) {
+    throw new Error('Account switch notice not found')
+  }
+  return notice
+}
+
 type Account = typeof MANAGER
 
 /** Minimal stand-in for AuthenticationController and GET /users/me. */
@@ -298,7 +310,7 @@ describe('auth flow', () => {
       // FE-01 round 3 (N1): a switch to another account is never silent. The tab opens the
       // member home page with a notice instead of showing the 403 page of the manager URL.
       expect(await screen.findByRole('heading', { name: 'Member Dashboard' })).toBeInTheDocument()
-      expect(screen.getByRole('status')).toHaveTextContent('You are now signed in as Taylor Nguyen')
+      expect(accountSwitchNotice()).toHaveTextContent('You are now signed in as Taylor Nguyen')
       expect(screen.queryByRole('heading', { name: 'Access denied' })).not.toBeInTheDocument()
       expect(meCalls()).toBe(2)
     })

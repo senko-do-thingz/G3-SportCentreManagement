@@ -3,10 +3,12 @@ import { Route, Routes } from 'react-router-dom'
 import { RequireRole } from '../auth/RequireRole'
 import { useAuth } from '../auth/useAuth'
 import { MemberLayout } from '../layouts/MemberLayout'
-import { ALL_AREAS, type RoleArea } from '../layouts/navigation'
+import { ALL_AREAS, areaItems, MEMBER_AREA, type RoleArea } from '../layouts/navigation'
 import { PublicLayout } from '../layouts/PublicLayout'
 import { StaffLayout } from '../layouts/StaffLayout'
 import { PageLoader } from '../components/ui/Spinner'
+import { MemberDashboardPage } from '../pages/member/MemberDashboardPage'
+import { MyProfilePage } from '../pages/member/MyProfilePage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
 import { ForbiddenPage } from '../pages/public/ForbiddenPage'
 import { HomeRedirect } from '../pages/public/HomeRedirect'
@@ -19,7 +21,28 @@ import { AccountSwitchRedirect } from './AccountSwitchRedirect'
  * Real screens by full path. Later tasks register their page here, for example
  * '/member/packages': <SportPackagesPage />. Paths without an entry show a placeholder.
  */
-const SCREENS: Record<string, ReactNode> = {}
+const SCREENS: Record<string, ReactNode> = {
+  '/member': <MemberDashboardPage />,
+  '/member/profile': <MyProfilePage />,
+}
+
+const MEMBER_PAYMENTS_ITEM = areaItems(MEMBER_AREA).find((item) => item.path === 'payments')
+
+/**
+ * Sub pages by area base path, relative to the area. '/member/payments/:paymentId' is the payment
+ * summary (F3-01) linked from "Pay now" on the dashboard (FE-02). It shows the payments placeholder
+ * until FE-11 registers the real screen here, so the link never opens a 404 page.
+ */
+const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
+  '/member': MEMBER_PAYMENTS_ITEM
+    ? [
+        {
+          path: 'payments/:paymentId',
+          element: <PlaceholderPage item={MEMBER_PAYMENTS_ITEM} eyebrow={MEMBER_AREA.workspaceLabel} />,
+        },
+      ]
+    : [],
+}
 
 /**
  * The UI kit demo page (/ui-kit) exists only in development (npm run dev) and in tests. In a
@@ -30,7 +53,10 @@ const ComponentDemoPage = import.meta.env.DEV
   : null
 
 function areaRoutes(area: RoleArea) {
-  return area.sections
+  const subRoutes = (SUB_SCREENS[area.basePath] ?? []).map((screen) => (
+    <Route key={`${area.basePath}/${screen.path}`} path={screen.path} element={screen.element} />
+  ))
+  const itemRoutes = area.sections
     .flatMap((section) => section.items)
     .map((item) => {
       const fullPath = item.path ? `${area.basePath}/${item.path}` : area.basePath
@@ -41,6 +67,7 @@ function areaRoutes(area: RoleArea) {
         <Route key={fullPath} index element={element} />
       )
     })
+  return [...itemRoutes, ...subRoutes]
 }
 
 export function AppRoutes() {

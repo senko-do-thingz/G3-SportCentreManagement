@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-10-13 - Member Dashboard and My Profile (FE-02, Flow 1)
+
+Branch `feat/f1-member-dashboard`. Owner: Phat. Priority: P1. Depends on FE-01 (merged) and BE-02 (not merged yet, see Open Questions). Verified with `npm run lint -- --max-warnings 0`, `tsc -b`, `npm test` (212 tests in 13 files, 55 new) and `npm run build`, plus browser checks in Chromium against a mock of the member API.
+
+### Added
+- Member Dashboard (F1-07) at `/member`: greeting hero, membership tier stat, active packages and upcoming sessions stats, pending payments with a "Pay now" link to `/member/payments/{paymentId}`, active sport packages with remaining sessions, end date and progress bar, upcoming bookings, profile card and quick links.
+- The two Figma states: "New Standard Member" (no paid card and no package) and "After Purchase" (any paid card or package, including one waiting for payment). The state is exposed as `data-state` on the page.
+- My Profile (F1-08) at `/member/profile`: view and edit full name, date of birth, phone, training goal, experience level and address (`PUT /users/me`); read only login email; change password form (`PUT /users/me/password`) with live password rules. Both forms show a success message and backend errors (under the field for 400 details, above the form otherwise).
+- `src/api/memberApi.ts`: typed calls for `GET /users/me`, `GET /membership-cards/my`, `GET /packages/registrations/my`, `GET /bookings/my?when=UPCOMING`, `PUT /users/me`, `PUT /users/me/password`. List answers that are not JSON arrays are reported as errors.
+- Route `/member/payments/:paymentId` that shows the My Payments placeholder until FE-11 builds the payment summary (F3-01), so "Pay now" never opens a 404 page.
+- `src/styles/member.css` for the two screens.
+
+### Changed
+- `UserProfile` gains the optional BE-02 fields `dateOfBirth`, `address`, `mainGoal`, `currentLevel`, `memberCode`.
+- `PasswordRules` moved from `RegisterPage.tsx` to `src/components/PasswordRules.tsx` (same markup) and is reused by the change password form.
+- FE-00 and FE-01 tests that read the account switch notice with `getByRole('status')` now pick the notice by its class, because the real dashboard also has loading spinners with role status.
+
+### Open Questions
+- BE-02 contract assumed by the frontend: `PUT /users/me` body `{fullName, phone, dateOfBirth, address, mainGoal, currentLevel}` returning `UserProfileResponse` (or 204); `PUT /users/me/password` body `{currentPassword, newPassword}`; a wrong current password must return 400, never 401 (a 401 makes the API client refresh and then end the session).
+- Interested sports (Figma F1-08) and the Notifications and Recommended for you cards (Figma F1-07) are not built: no endpoint exists yet.
+- Upcoming bookings are filtered again on the client until BE-12 adds `when=UPCOMING`.
+
 ## 2026-10-12 - Pending Payments for Online Requests and Payment Summary (BE-17, Flow 3)
 
 Branch `feat/f3-pending-payments`. Status: Implemented and hardened after Round 7 Code Review. Verified locally with `mvn -B -ntp test "-Dtest=!*IntegrationTest" "-Dsurefire.failIfNoSpecifiedTests=false"` (521 tests run, 0 failures, 0 errors, 4 skipped via `@Testcontainers(disabledWithoutDocker = true)`: FlywayMigrationTest, PermissionRepositoryTest, RoleRepositoryTest, UserAccountRepositoryTest). Integration tests verified in CI via GitHub Actions (Run ID 38335867540, 615 tests run, 0 failures, 0 errors, 0 skipped).

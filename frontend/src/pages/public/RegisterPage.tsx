@@ -2,7 +2,6 @@ import { useId, useRef, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ApiError, getErrorMessage, splitFieldErrors } from '../../api/errors'
 import { AccountCreatedError } from '../../auth/authContext'
-import { checkPassword, passwordProgress } from '../../auth/passwordRules'
 import {
   applyFieldChange,
   EMAIL_MAX_LENGTH,
@@ -17,6 +16,7 @@ import {
 } from '../../auth/registerValidation'
 import { homePathFor } from '../../auth/roles'
 import { useAuth } from '../../auth/useAuth'
+import { PasswordRules } from '../../components/PasswordRules'
 import { Button } from '../../components/ui/Button'
 import { Checkbox } from '../../components/ui/Checkbox'
 import { Input } from '../../components/ui/Input'
@@ -24,13 +24,6 @@ import { PasswordInput } from '../../components/ui/PasswordInput'
 import { useFocusFirstInvalid } from '../../utils/useFocusFirstInvalid'
 import { AuthShell } from './AuthShell'
 import type { LoginPrefillState } from './LoginPage'
-
-const PROGRESS_LABELS = {
-  empty: '',
-  weak: 'Password strength: Weak',
-  fair: 'Password strength: Fair',
-  valid: 'Meets requirements',
-} as const
 
 /** Field names of the form. Backend validation keys use the same names. */
 type FieldName = keyof RegisterForm
@@ -56,33 +49,6 @@ function registerErrors(error: unknown): { fields: Record<string, string>; form:
     }
   }
   return { fields: {}, form: getErrorMessage(error) }
-}
-
-function PasswordRules({ id, password }: { id: string; password: string }) {
-  const rules = checkPassword(password)
-  const progress = passwordProgress(password)
-  return (
-    <div className="password-rules" id={id}>
-      {progress !== 'empty' && (
-        <p className={`password-rules__strength password-rules__strength--${progress}`} aria-live="polite">
-          {PROGRESS_LABELS[progress]}
-        </p>
-      )}
-      <ul className="password-rules__list">
-        {rules.map((rule) => (
-          <li
-            key={rule.id}
-            className={`password-rules__item${rule.met ? ' password-rules__item--met' : ''}`}
-            data-rule={rule.id}
-            data-met={rule.met}
-          >
-            <span>{rule.label}</span>
-            <span className="visually-hidden">{rule.met ? ' - met' : ' - not met'}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
 }
 
 /** Sign up screen (Figma F1-06). A new account is always a MEMBER; it opens the member dashboard. */

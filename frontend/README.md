@@ -63,12 +63,12 @@ Demo accounts: `manager@sportify.com` / `password` (seeded by V4). Other roles: 
 
 ```
 src/
-  api/          client.ts (fetch wrapper, token refresh), authApi.ts, errors.ts (ApiError), types.ts, page.ts
+  api/          client.ts (fetch wrapper, token refresh), authApi.ts, memberApi.ts, errors.ts (ApiError), types.ts, page.ts
   auth/         AuthProvider, useAuth, RequireAuth, RequireRole, roles.ts (role labels and home paths)
   components/   Brand.tsx and ui/ (shared UI kit, import from components/ui)
   config/       env.ts (VITE_API_BASE_URL, sampleAccount())
   layouts/      PublicLayout, MemberLayout (top nav), StaffLayout (side nav), navigation.ts (menus)
-  pages/        public/ (log in, sign up, 403, 404), dev/ComponentDemoPage (/ui-kit), PlaceholderPage
+  pages/        public/ (log in, sign up, 403, 404), member/ (dashboard, my profile), dev/ComponentDemoPage (/ui-kit), PlaceholderPage
   routes/       AppRoutes.tsx
   styles/       tokens.css (design tokens), base.css, components.css, layouts.css
   utils/        format.ts (money, date, labels, initials)
@@ -131,7 +131,8 @@ Roles: `MEMBER`, `RECEPTIONIST`, `MANAGER`, `COACH`. Home pages: `/member`, `/re
 
 1. Build the page under `src/pages/<area>/`.
 2. Register it in `SCREENS` in `src/routes/AppRoutes.tsx` with its full path, for example `'/member/packages': <SportPackagesPage />`.
-3. The menu entry already exists in `src/layouts/navigation.ts`. Add one there only for a new menu item. Sub pages (for example `/member/packages/:id`) go as extra routes inside the area.
+3. A sub page that has no menu entry (for example `/member/payments/:paymentId`) goes in `SUB_SCREENS` in the same file.
+4. The menu entry already exists in `src/layouts/navigation.ts`. Add one there only for a new menu item. Sub pages (for example `/member/packages/:id`) go as extra routes inside the area.
 
 Routes are already protected by role: a member opening a manager URL sees the 403 page.
 

@@ -13,6 +13,18 @@ import { backendError, installFakeFetch, json, MANAGER, MEMBER, type RecordedCal
 import { renderApp } from '../../test/renderApp'
 
 /**
+ * The account switch notice (role status). Since FE-02 the member home is the real dashboard,
+ * which also has role status elements (loading spinners), so the notice is picked by its class.
+ */
+function accountSwitchNotice(): HTMLElement {
+  const notice = screen.getAllByRole('status').find((element) => element.classList.contains('account-switch-notice'))
+  if (!notice) {
+    throw new Error('Account switch notice not found')
+  }
+  return notice
+}
+
+/**
  * FE-01: Log in (F1-05) and Sign up (F1-06) against a stand-in for AuthenticationController.
  * The fake copies the backend contract: 401 "Invalid email or password", 403 "Account is
  * disabled" for a locked or inactive account, 409 "Email is already registered", 400
@@ -792,7 +804,7 @@ describe('FE-01 review fixes (round 3)', () => {
 
   /** Waits until the account switch notice for this name is on screen. */
   async function expectSwitchNotice(name: string) {
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(switchNotice(name)))
+    await waitFor(() => expect(accountSwitchNotice()).toHaveTextContent(switchNotice(name)))
   }
 
   /** Fake /users/me: each access token belongs to one profile. */
@@ -827,7 +839,7 @@ describe('FE-01 review fixes (round 3)', () => {
       otherTabLogsIn('y-access')
 
       expect(await screen.findByRole('heading', { name: 'Member Dashboard' })).toBeInTheDocument()
-      expect(screen.getByRole('status')).toHaveTextContent(switchNotice('Jordan Pham'))
+      expect(accountSwitchNotice()).toHaveTextContent(switchNotice('Jordan Pham'))
       expect(screen.queryByText('Taylor Nguyen')).not.toBeInTheDocument()
       expect(screen.queryByRole('heading', { name: 'Sport Packages' })).not.toBeInTheDocument()
     })
@@ -841,7 +853,7 @@ describe('FE-01 review fixes (round 3)', () => {
       otherTabLogsIn('manager-access')
 
       expect(await screen.findByRole('heading', { name: 'User Management' })).toBeInTheDocument()
-      expect(screen.getByRole('status')).toHaveTextContent(switchNotice('Morgan Lee'))
+      expect(accountSwitchNotice()).toHaveTextContent(switchNotice('Morgan Lee'))
       expect(screen.queryByRole('heading', { name: 'Access denied' })).not.toBeInTheDocument()
     })
 
@@ -914,7 +926,7 @@ describe('FE-01 review fixes (round 3)', () => {
         await oldReload
       })
 
-      expect(screen.getByRole('status')).toHaveTextContent(switchNotice('Jordan Pham'))
+      expect(accountSwitchNotice()).toHaveTextContent(switchNotice('Jordan Pham'))
       expect(screen.getAllByText('Jordan Pham').length).toBeGreaterThan(0)
       expect(screen.queryByText('Taylor Nguyen')).not.toBeInTheDocument()
     })

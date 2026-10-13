@@ -13,7 +13,12 @@ export interface AuthTokens {
   refreshToken: string
 }
 
-/** Mirrors com.sportify.identity.dto.UserProfileResponse (GET /users/me). */
+/**
+ * Mirrors com.sportify.identity.dto.UserProfileResponse (GET /users/me).
+ * The optional fields are the member profile fields planned in BE-02 (date_of_birth and address
+ * of user_account, main_goal and current_level of member_profile). The backend on main does not
+ * return them yet, so every screen must treat a missing value as empty.
+ */
 export interface UserProfile {
   id: number
   email: string
@@ -21,6 +26,14 @@ export interface UserProfile {
   phone: string | null
   role: string
   status: string
+  /** ISO date "2004-06-15" (Java LocalDate). */
+  dateOfBirth?: string | null
+  address?: string | null
+  /** IMPROVE_FITNESS, BUILD_SKILLS or COMPETITION. */
+  mainGoal?: string | null
+  /** BEGINNER, INTERMEDIATE or ADVANCED. */
+  currentLevel?: string | null
+  memberCode?: string | null
 }
 
 /** Mirrors com.sportify.identity.dto.AuthRequest. */
