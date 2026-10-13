@@ -285,19 +285,6 @@ export function itemHref(area: RoleArea, item: NavItem): string {
   return item.path ? `${area.basePath}/${item.path}` : area.basePath
 }
 
-/**
- * Returns the menu item with this path in the area, or throws. Used for routes that depend on a
- * menu entry (for example /member/payments/:paymentId reuses the My Payments item), so removing
- * or renaming that entry fails loudly when the routes are built instead of dropping a route.
- */
-export function requireNavItem(area: RoleArea, path: string): NavItem {
-  const item = areaItems(area).find((candidate) => candidate.path === path)
-  if (!item) {
-    throw new Error(`Menu item "${path}" is missing from ${area.basePath} in layouts/navigation.ts`)
-  }
-  return item
-}
-
 /** Finds the nav item that matches the current location, for page titles and breadcrumbs. */
 export function findActiveItem(area: RoleArea, pathname: string): NavItem | undefined {
   const items = areaItems(area)
