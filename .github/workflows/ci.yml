@@ -94,7 +94,7 @@ jobs:
 
       - name: Publish test report
         if: always()
-        uses: mikepenz/action-junit-report@v5
+        uses: mikepenz/action-junit-report@v6
         with:
           report_paths: backend/target/surefire-reports/TEST-*.xml
           check_name: Unit test report
@@ -146,7 +146,7 @@ jobs:
 
       - name: Publish test report
         if: always()
-        uses: mikepenz/action-junit-report@v5
+        uses: mikepenz/action-junit-report@v6
         with:
           report_paths: backend/target/failsafe-reports/TEST-*.xml
           check_name: Integration test report
