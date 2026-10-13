@@ -253,6 +253,11 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         if (requestedAsUpgrade != (plan.replaces() != null)) {
             throw new BusinessRuleException("The member's card has changed since this request. Cancel it and request the card again.");
         }
+        if (requestedAsUpgrade && card.getReplacesCard() != null) {
+            if (plan.replaces() == null || !plan.replaces().getId().equals(card.getReplacesCard().getId())) {
+                throw new BusinessRuleException("The member's card has changed since this request. Cancel it and request the card again.");
+            }
+        }
 
         card.setStartDate(plan.startDate());
         card.setEndDate(plan.endDate());
@@ -295,10 +300,21 @@ public class MembershipCardServiceImpl implements MembershipCardService {
      * so we sum pricePaid recursively across the replacement chain.
      * This guarantees the member is credited for the entire cumulative amount paid toward the current term,
      * rather than live tier prices which may have changed since purchase.
+     * For unresolvable legacy upgrade rows (upgradeRequest = true and replacesCard = null), we fall back
+     * to the tier catalog price to avoid overcharging the member on subsequent upgrades.
      */
     private BigDecimal calculateTermBasePrice(MemberCard card) {
         if (card == null || card.getPricePaid() == null) {
             return BigDecimal.ZERO;
+        }
+        if (card.isUpgradeRequest() && card.getReplacesCard() == null) {
+            // Documented fallback for legacy upgrade rows where replaces_card_id could not be
+            // deterministically resolved during migration backfill. Since pricePaid represents only the
+            // incremental upgrade difference, using pricePaid alone would overcharge the member on subsequent
+            // upgrades. We fall back to the tier catalog price as the best available estimate of the full term value.
+            if (card.getTier() != null && card.getTier().getPrice() != null) {
+                return card.getTier().getPrice();
+            }
         }
         BigDecimal total = card.getPricePaid();
         MemberCard replaced = card.getReplacesCard();
