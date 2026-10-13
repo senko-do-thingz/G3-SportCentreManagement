@@ -24,6 +24,8 @@ jobs:
     name: Compose template smoke test
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      IMAGE_TAG: "test-smoke"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,8 +36,9 @@ jobs:
           cp deploy/.env.example deploy/.env
           sed -i 's/<REPLACE_WITH_STRONG_SA_PASSWORD>/TestPass1234!StrongSA/g' deploy/.env
           sed -i 's/<REPLACE_WITH_BASE64_SECRET_MIN_32_BYTES>/dGhpcy1pcy1hLXZlcnktc2VjdXJlLW1vY2stc2VjcmV0LWtleS1mb3ItdGVzdGluZy1vbmx5LWdoYWN0aW9ucw==/g' deploy/.env
-          if docker compose -f deploy/compose.yaml config >/dev/null 2>&1; then
+          if env -u IMAGE_TAG docker compose -f deploy/compose.yaml config >/dev/null 2>&1; then
             echo "Error: docker compose config unexpectedly succeeded without IMAGE_TAG"
+            rm -f deploy/.env
             exit 1
           fi
           echo "Verified: docker compose config fails when IMAGE_TAG is not provided"
@@ -48,14 +51,10 @@ jobs:
           sed -i 's/<REPLACE_WITH_BASE64_SECRET_MIN_32_BYTES>/dGhpcy1pcy1hLXZlcnktc2VjdXJlLW1vY2stc2VjcmV0LWtleS1mb3ItdGVzdGluZy1vbmx5LWdoYWN0aW9ucw==/g' deploy/.env
 
       - name: Start sqlserver service and wait for healthcheck
-        env:
-          IMAGE_TAG: "test-smoke"
         run: |
           docker compose -f deploy/compose.yaml --profile with-db up -d --wait sqlserver
 
       - name: Run db-init service
-        env:
-          IMAGE_TAG: "test-smoke"
         run: |
           docker compose -f deploy/compose.yaml --profile with-db up --exit-code-from db-init db-init
 
@@ -84,8 +83,6 @@ jobs:
           echo "Verified: Port 1433 is not published on the host"
 
       - name: Assert db-init idempotency by running a second time
-        env:
-          IMAGE_TAG: "test-smoke"
         run: |
           docker compose -f deploy/compose.yaml --profile with-db up --force-recreate --exit-code-from db-init db-init
 
