@@ -149,6 +149,13 @@ All issues have been resolved with strict compliance to project conventions (100
 - **Follow-Up 6 (Proof of Port 1433 Negative Test Assertion)**:
   - Verified diffs of commits `81ff235` and `cc79ab5`.
   - Proved the port 1433 check fails when published by temporarily mapping `1433:1433` (Run `38349858419` failed with `Error: Port 1433 is mapped to host port: 14331433`), then reverted via commit `92aef11`.
+- **Follow-Up 7 (Dynamic Migrations, Failure Log Proofs, Path Filters, and Fail-Fast JWT CI Check)**:
+  - Dynamically counted migration files in `.github/workflows/compose-smoke-test.yml` using `find backend/src/main/resources/db/migration -type f -name 'V*.sql'`, replacing the hardcoded 19-count assertion. Asserted both total rows and `success = 1` rows equal the dynamic count.
+  - Made negative checks prove failure reasons by capturing output and asserting specific log strings: grepped backend logs for `Login failed for user 'nonexistent_user'`, and grepped sqlserver logs for `password policy`. Steps fail if expected messages are absent.
+  - Added `backend/Dockerfile` and `backend/src/main/resources/**` to `compose-smoke-test.yml` PR and push path filters, and updated `docs/ci-cd.md`.
+  - Added eager validation in `JwtService` via `@PostConstruct` calling `getSignInKey()`, ensuring fail-fast startup behavior when `JWT_SECRET` is invalid or unedited. Added unit tests in `JwtServiceTest`.
+  - Added automated CI check for TC-DEPLOY-12 in `compose-smoke-test.yml`: running the backend container against a healthy database with the unedited placeholder `<REPLACE_WITH_BASE64_SECRET_MIN_32_BYTES>` and asserting startup failure with JWT decoding error.
+  - Documented that TC-DEPLOY-01 and TC-DEPLOY-02 are NOT RUN on PR #36 and provided exact reviewer steps to trigger `cd.yml` via `workflow_dispatch` (with `DEPLOY_ENABLED` unset) before or right after merge.
 
 ---
 
@@ -166,9 +173,10 @@ All issues have been resolved with strict compliance to project conventions (100
 | db-init & Idempotency | DB creation and idempotent rerun | `.github/workflows/compose-smoke-test.yml` | PASSED (CI) | `IF DB_ID(N'sportify') IS NULL` creates database; rerun exits 0. |
 | sa Authentication | sa login against database sportify | `.github/workflows/compose-smoke-test.yml` | PASSED (CI) | `SELECT DB_NAME()` returns `sportify`. |
 | Port 1433 Isolation | Port 1433 unmapped from host | `.github/workflows/compose-smoke-test.yml` | PASSED (CI) | Verified unmapped; negative test run 38349858419 failed when published. |
-| Non-sa Rejection | Non-sa DB_USERNAME rejected | `.github/workflows/compose-smoke-test.yml` | PASSED (CI) | Backend fails startup on invalid database user. |
-| Password Policy | Weak password causes sqlserver exit | `.github/workflows/compose-smoke-test.yml` | PASSED (CI) | Container terminates immediately on policy violation. |
-| Backend & Flyway | Actuator health UP and migrations applied | `.github/workflows/compose-smoke-test.yml` | PASSED (CI) | `/actuator/health` reports UP; 19 Flyway migrations applied. |
+| Non-sa Rejection | Non-sa DB_USERNAME rejected with login error | `.github/workflows/compose-smoke-test.yml` | PASSED (CI) | Backend fails startup; logs contain `Login failed for user 'nonexistent_user'`. |
+| Password Policy | Weak password rejected with policy error | `.github/workflows/compose-smoke-test.yml` | PASSED (CI) | Container terminates immediately; logs contain `password policy`. |
+| Fail-Fast JWT Secret | Default placeholder causes startup failure (TC-DEPLOY-12) | `.github/workflows/compose-smoke-test.yml` | PASSED (CI) | Eager `@PostConstruct` throws `DecodingException`; container exits with code 1. |
+| Backend & Flyway | Actuator health UP and dynamic migrations | `.github/workflows/compose-smoke-test.yml` | PASSED (CI) | `/actuator/health` UP; dynamic migration file count matches `flyway_schema_history`. |
 | CI Pipeline Gate | Full build, unit tests, integration tests | `.github/workflows/ci.yml` | PASSED (CI) | 618 tests run: 520 unit tests, 98 integration tests; 0 failures. |
 | Security Workflow | CodeQL and dependency analysis | `.github/workflows/security.yml` | PASSED (CI) | 0 security alerts. |
 | Character Encoding | Pure ASCII across changed files | Python/Bash scan `[^\x00-\x7F]` | PASSED | 0 non-ASCII characters found. |
@@ -184,12 +192,9 @@ All issues have been resolved with strict compliance to project conventions (100
    - Status: **NOT VERIFIED LOCALLY**.
    - Reason: In accordance with project conventions, containers are not started in the local Windows environment. Runtime container execution was verified in GitHub Actions runners via `.github/workflows/compose-smoke-test.yml` and Testcontainers.
 4. **CD Workflow Execution on Tag Push vs Dispatch (TC-DEPLOY-01, TC-DEPLOY-02)**:
-   - Status: **NOT RUN**.
-   - Reason: Workflow `cd.yml` only runs on semver tag push or manual workflow dispatch, not on PR pull requests.
-5. **Fail-Fast on Unedited Placeholders (TC-DEPLOY-12)**:
-   - Status: **NOT RUN**.
-   - Reason: Verified through code analysis of base64 decoding logic, not run as a dedicated CI test job.
-6. **Deployment Rollback Script Execution (TC-DEPLOY-13)**:
+   - Status: **NOT RUN in PR #36**.
+   - Reason: Workflow `cd.yml` only runs on semver tag push or manual workflow dispatch. To be verified by the reviewer via manual `workflow_dispatch` run of `cd.yml` (with `DEPLOY_ENABLED` unset) before or right after merge.
+5. **Deployment Rollback Script Execution (TC-DEPLOY-13)**:
    - Status: **NOT RUN**.
    - Reason: Rollback script in `.github/actions/deploy-compose` only executes during live SSH deployment in `cd.yml`.
 
@@ -216,3 +221,8 @@ All issues have been resolved with strict compliance to project conventions (100
 | `2f07b3c` | Follow-Up 2 | refactor(tests): remove duplicate test case file in favor of standard repository convention |
 | `b8ff946` | Follow-Up 4 | feat(ci): pin mssql server image to 2022-CU27-ubuntu-22.04 in compose template |
 | `a674a42` | Follow-Up 3 | ci(deploy): extend compose smoke test with backend build, actuator health, and negative checks |
+| `f87ae83` | Follow-Up 1 | docs(tests): align test case statuses with honest execution evidence |
+| `d49e92d` | Follow-Up 7 (Item 1) | ci(deploy): assert dynamic migration file count in compose smoke test |
+| `1c900d1` | Follow-Up 7 (Item 2) | ci(deploy): assert specific failure error messages in smoke test negative checks |
+| `0e12b6b` | Follow-Up 7 (Item 3) | ci(deploy): add backend Dockerfile and resources to smoke test path filter |
+| `c6133fa` | Follow-Up 7 (Item 4) | feat(security): add eager JWT validation and TC-DEPLOY-12 compose smoke test check |

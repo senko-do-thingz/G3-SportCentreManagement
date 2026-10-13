@@ -14,8 +14,8 @@
 
 | Test ID | Test Title | Category | Execution Mode | Status |
 |---|---|---|---|---|
-| TC-DEPLOY-01 | Lowercase Image Name with Mixed-Case Repository | CD Pipeline | GitHub Actions CI (`cd.yml`) | NOT RUN |
-| TC-DEPLOY-02 | Metadata-Action Version Output across Triggers | CD Pipeline | GitHub Actions CI (`cd.yml`) | NOT RUN |
+| TC-DEPLOY-01 | Lowercase Image Name with Mixed-Case Repository | CD Pipeline | GitHub Actions CI (`cd.yml` dispatch) | NOT RUN |
+| TC-DEPLOY-02 | Metadata-Action Version Output across Triggers | CD Pipeline | GitHub Actions CI (`cd.yml` dispatch) | NOT RUN |
 | TC-DEPLOY-03 | Compose Config Requires IMAGE_TAG | Compose Template | CI Smoke Test (`compose-smoke-test.yml`) | PASSED (CI) |
 | TC-DEPLOY-04 | Default Compose Profile Starts Backend Only | Compose Template | Static Configuration Interpolation | PASSED (static check only) |
 | TC-DEPLOY-05 | Compose with-db Profile SQL Server Healthcheck | Database Provisioning | CI Smoke Test (`compose-smoke-test.yml`) | PASSED (CI) |
@@ -44,7 +44,8 @@
 - **Expected Result**: Output string is strictly lowercase (`ghcr.io/senko-do-thingz/g3-sportcentremanagement/backend`), preventing 400 Bad Request errors from GHCR and Trivy.
 - **Actual Result**: Verified via workflow definition logic and bash parameter expansion. Job `build-image` in `cd.yml` was not triggered during PR checks.
 - **Status**: NOT RUN
-- **Reason**: CD workflow `cd.yml` executes only on release tag push (`v*.*.*`) or manual `workflow_dispatch`; not triggered during PR workflows.
+- **Reason**: CD workflow `cd.yml` executes only on release tag push (`v*.*.*`) or manual `workflow_dispatch`; not triggered automatically during PR workflows.
+- **Reviewer Verification**: NOT RUN in PR #36. This test must be verified by the reviewer via manual `workflow_dispatch` run of `cd.yml` (with `DEPLOY_ENABLED` unset) before or right after merge. See the Reviewer Verification Steps section below.
 
 ### TC-DEPLOY-02: Metadata-Action Version Output across Triggers
 - **ID**: TC-DEPLOY-02
@@ -57,10 +58,11 @@
   3. Inspect `steps.meta.outputs.version`.
 - **Expected Result**:
   - For tag pushes: `steps.meta.outputs.version` resolves to semver string `1.0.0`, matching the pushed tag.
-  - For branch dispatch: `steps.meta.outputs.version` resolves to `sha-<short-sha>`, matching the pushed tag.
+  - For branch dispatch: `steps.meta.outputs.version` resolves to `sha-<short-sha>`, matching the commit sha.
 - **Actual Result**: Verified via action configuration analysis. Workflow `cd.yml` was not dispatched during PR checks.
 - **Status**: NOT RUN
-- **Reason**: `cd.yml` metadata-action step executes only on semver tag push or manual branch dispatch; not executed in PR workflows.
+- **Reason**: `cd.yml` metadata-action step executes only on semver tag push or manual branch dispatch; not executed automatically in PR workflows.
+- **Reviewer Verification**: NOT RUN in PR #36. This test must be verified by the reviewer via manual `workflow_dispatch` run of `cd.yml` (with `DEPLOY_ENABLED` unset) before or right after merge. See the Reviewer Verification Steps section below.
 
 ### TC-DEPLOY-03: Compose Config Requires IMAGE_TAG
 - **ID**: TC-DEPLOY-03
@@ -130,8 +132,9 @@
 - **Steps**:
   1. Start a backend container with `DB_USERNAME=nonexistent_user`.
   2. Observe application connection attempt.
-- **Expected Result**: Backend fails to connect, HikariCP times out, and the container exits with non-zero status.
-- **Actual Result**: Negative test `docker compose run --rm -e DB_USERNAME=nonexistent_user backend` failed to connect and exited with non-zero exit code as expected.
+  3. Grep backend container logs for SQL Server authentication failure message.
+- **Expected Result**: Backend fails to connect, HikariCP times out, container exits with non-zero status, and logs contain `Login failed for user 'nonexistent_user'`.
+- **Actual Result**: Negative test `docker compose run --rm -e DB_USERNAME=nonexistent_user backend` failed to connect, exited with non-zero exit code, and logs verified `Login failed for user 'nonexistent_user'`.
 - **Status**: PASSED (CI)
 
 ### TC-DEPLOY-09: Password Policy Violation Fails SQL Server Startup
@@ -141,8 +144,9 @@
 - **Preconditions**: Pinned SQL Server 2022 container image.
 - **Steps**:
   1. Run container with weak password: `docker run --rm -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD=weak mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04`.
-- **Expected Result**: Container terminates immediately with non-zero exit code due to password policy requirements.
-- **Actual Result**: Container failed startup and exited with non-zero code in CI smoke test step.
+  2. Capture container output and grep for password policy failure message.
+- **Expected Result**: Container terminates immediately with non-zero exit code, and logs explicitly report SQL Server password policy requirement violation.
+- **Actual Result**: Container failed startup, exited with non-zero code, and logs verified `password policy` violation in CI smoke test step.
 - **Status**: PASSED (CI)
 
 ### TC-DEPLOY-10: Flyway Migration Compatibility on with-db Database
@@ -152,10 +156,11 @@
 - **Preconditions**: SQL Server 2022 instance running with database `sportify`; backend container running with `with-db` profile.
 - **Steps**:
   1. Start backend container pointing to `sqlserver` database `sportify`.
-  2. Wait for Spring Boot startup and Flyway auto-migration.
-  3. Query `flyway_schema_history` table in database `sportify`.
-- **Expected Result**: Flyway executes all migrations cleanly; `SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1;` returns a positive count.
-- **Actual Result**: Backend started, reported health UP, and query returned 19 successfully applied migrations in CI smoke test.
+  2. Wait for Spring Boot startup and Flyway auto-migration to report `/actuator/health` UP.
+  3. Dynamically count migration files matching `V*.sql` under `backend/src/main/resources/db/migration` across all subdirectories (`catalog` and `identity`).
+  4. Query `flyway_schema_history` table in database `sportify` for total rows and rows with `success = 1`.
+- **Expected Result**: Flyway executes all migrations cleanly; total rows and rows with `success = 1` in `flyway_schema_history` both equal the dynamic migration file count.
+- **Actual Result**: Backend started and reported health UP; dynamic scan counted 19 migration files, and `flyway_schema_history` queries confirmed exactly 19 total rows and 19 rows with `success = 1` in CI smoke test.
 - **Status**: PASSED (CI)
 
 ### TC-DEPLOY-11: Port 1433 Isolation from Host Interfaces
@@ -195,3 +200,35 @@
 - **Actual Result**: Script logic in `.github/actions/deploy-compose/action.yml` reviewed and documented in `docs/ci-cd.md`. Live deployment was not executed on PR #36.
 - **Status**: NOT RUN
 - **Reason**: Deployment action `.github/actions/deploy-compose` rollback script executes only during live SSH deployments in `cd.yml`, which did not run on PR #36.
+
+---
+
+## Reviewer Verification Steps for TC-DEPLOY-01 and TC-DEPLOY-02 (cd.yml Dispatch)
+
+As required by project deployment safeguards, `cd.yml` is **NOT RUN** automatically during pull request checks. Instead, `TC-DEPLOY-01` and `TC-DEPLOY-02` must be verified by the reviewer via manual `workflow_dispatch` run of `cd.yml` (with `DEPLOY_ENABLED` unset) before or right after merge.
+
+Because repository variable `DEPLOY_ENABLED` is unset, the deployment jobs (`deploy-staging` and `deploy-production`) are skipped cleanly, executing only CI checks and the `build-image` job (including image name lowering, metadata tag generation, container image building, and Trivy security scanning).
+
+### Option 1: Trigger via GitHub Web UI
+1. Navigate to: `https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/workflows/cd.yml`.
+2. In the "Actions" tab under "All workflows", select **Continuous Delivery**.
+3. Click the **Run workflow** dropdown button on the right:
+   - **Use workflow from**: Select `branch: chore/ci-cd-deploy-fixes` (if verifying before merge) or `branch: main` (if verifying after merge).
+   - **Existing image tag to deploy**: Leave empty (to build from ref).
+4. Click the green **Run workflow** button.
+5. Wait for the `build-image` job to run and inspect the step logs:
+   - **TC-DEPLOY-01 verification**: Open step `Resolve lowercase image name` and confirm the output is `ghcr.io/senko-do-thingz/g3-sportcentremanagement/backend`.
+   - **TC-DEPLOY-02 verification**: Open step `Extract Docker metadata` and confirm the generated version output is `sha-<short-sha>` for branch dispatch, or semver `1.0.0` for tag release.
+
+### Option 2: Trigger via GitHub CLI (gh)
+```bash
+# Before merge (on PR branch):
+gh workflow run cd.yml --ref chore/ci-cd-deploy-fixes
+
+# Or right after merge to main:
+gh workflow run cd.yml --ref main
+
+# To view the queued and executing run:
+gh run list --workflow=cd.yml
+gh run view <run-id> --log
+```
