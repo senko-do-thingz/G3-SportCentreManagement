@@ -5,6 +5,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,18 @@ public class JwtService {
 
     @Value("${application.security.jwt.expiration}")
     private long jwtExpiration;
+
+    @PostConstruct
+    public void validateSecretKey() {
+        try {
+            if (secretKey == null || secretKey.trim().isEmpty()) {
+                throw new IllegalArgumentException("JWT_SECRET is null or blank");
+            }
+            getSignInKey();
+        } catch (Exception ex) {
+            throw new IllegalStateException("JWT_SECRET must be a valid Base64 string that decodes to at least 32 bytes", ex);
+        }
+    }
 
     @Value("${application.security.jwt.refresh-token.expiration}")
     private long refreshExpiration;

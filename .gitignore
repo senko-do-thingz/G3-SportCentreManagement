@@ -73,6 +73,7 @@ venv/
 .env
 .env.*
 !.env.example
+deploy/.env
 logs/ai_audit/
 parsed_docs.txt
 read_files.py
