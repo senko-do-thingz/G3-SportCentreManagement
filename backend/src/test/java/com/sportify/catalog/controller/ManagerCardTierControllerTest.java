@@ -195,21 +195,6 @@ class ManagerCardTierControllerTest {
                 .andExpect(jsonPath("$.discountPercentage").value(7));
     }
 
-    @Test
-    void updateTier_asManager_viaManagerUrl_shouldReturn200() throws Exception {
-        MembershipCardTierUpdateRequest req = sampleGoldUpdateRequest();
-        CardTierResponse res = sampleTier(2L, "GOLD", req.getName(), req.getPrice(), req.getDiscountPercentage(), true);
-
-        when(membershipCardService.updateTier(eq(2L), any(MembershipCardTierUpdateRequest.class), any()))
-                .thenReturn(res);
-
-        mockMvc.perform(put(MANAGER_TIERS_URL + "/2")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(2));
-    }
 
     @Test
     void updateTier_discountPercentageAbove100_shouldReturn400() throws Exception {

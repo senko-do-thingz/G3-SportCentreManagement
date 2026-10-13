@@ -35,7 +35,7 @@ public class MembershipCardController {
             @PathVariable Long id,
             @Valid @RequestBody MembershipCardTierUpdateRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return membershipCardService.updateTier(id, request, userDetails != null ? userDetails.getUserAccount() : null);
+        return membershipCardService.updateTier(id, request, userDetails.getUserAccount());
     }
 
     @PostMapping("/purchase")

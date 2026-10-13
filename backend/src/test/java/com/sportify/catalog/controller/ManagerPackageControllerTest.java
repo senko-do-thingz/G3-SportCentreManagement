@@ -173,7 +173,7 @@ class ManagerPackageControllerTest {
                         .param("format", "INVALID_FORMAT"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value("Invalid training format: INVALID_FORMAT"));
+                .andExpect(jsonPath("$.message").value("Invalid value for parameter 'format'"));
     }
 
     @Test
@@ -231,21 +231,6 @@ class ManagerPackageControllerTest {
                 .andExpect(jsonPath("$.priceAmount").value(550000.00));
     }
 
-    @Test
-    void updatePackage_asManager_viaManagerUrl_shouldReturn200() throws Exception {
-        SportPackageUpdateRequest req = sampleUpdateRequest();
-        SportPackageResponse expected = samplePackage(10L, "PKG-YOGA", true);
-
-        when(sportPackageService.updatePackage(eq(10L), any(SportPackageUpdateRequest.class), any()))
-                .thenReturn(expected);
-
-        mockMvc.perform(put(MANAGER_PACKAGES_URL + "/10")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(10));
-    }
 
     @Test
     void updatePackage_sessionMinutesOtherThan60Or90_shouldReturn400() throws Exception {

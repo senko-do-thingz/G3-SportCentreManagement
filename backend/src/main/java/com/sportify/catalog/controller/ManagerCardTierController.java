@@ -1,19 +1,17 @@
 package com.sportify.catalog.controller;
 
 import com.sportify.catalog.dto.CardTierResponse;
-import com.sportify.catalog.dto.MembershipCardTierUpdateRequest;
 import com.sportify.catalog.service.MembershipCardService;
-import com.sportify.identity.security.CustomUserDetails;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
 /**
- * Manager workspace "Membership Cards & Benefits" (screen F1-03 and overlay "Edit Membership Card").
+ * Manager workspace "Membership Cards & Benefits" (screen F1-03).
  */
 @RestController
 @RequestMapping("/api/v1/manager/card-tiers")
@@ -26,13 +24,5 @@ public class ManagerCardTierController {
     @GetMapping
     public List<CardTierResponse> getAllCardTiers() {
         return membershipCardService.getAllTiersForManager();
-    }
-
-    @PutMapping("/{id}")
-    public CardTierResponse updateTier(
-            @PathVariable Long id,
-            @Valid @RequestBody MembershipCardTierUpdateRequest request,
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return membershipCardService.updateTier(id, request, userDetails != null ? userDetails.getUserAccount() : null);
     }
 }

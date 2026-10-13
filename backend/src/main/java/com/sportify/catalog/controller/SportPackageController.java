@@ -50,7 +50,7 @@ public class SportPackageController {
             @PathVariable Long id,
             @Valid @RequestBody SportPackageUpdateRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return sportPackageService.updatePackage(id, request, userDetails != null ? userDetails.getUserAccount() : null);
+        return sportPackageService.updatePackage(id, request, userDetails.getUserAccount());
     }
 
     @PostMapping("/registrations")
