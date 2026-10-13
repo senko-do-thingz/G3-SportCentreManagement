@@ -59,4 +59,21 @@ class JwtServiceTest {
         Thread.sleep(10);
         assertThrows(io.jsonwebtoken.ExpiredJwtException.class, () -> jwtService.isTokenValid(token, userDetails));
     }
+
+    @Test
+    void validateSecretKey_shouldSucceedWithValidSecret() {
+        assertDoesNotThrow(() -> jwtService.validateSecretKey());
+    }
+
+    @Test
+    void validateSecretKey_shouldFailWithUneditedPlaceholder() {
+        ReflectionTestUtils.setField(jwtService, "secretKey", "<REPLACE_WITH_BASE64_SECRET_MIN_32_BYTES>");
+        assertThrows(io.jsonwebtoken.io.DecodingException.class, () -> jwtService.validateSecretKey());
+    }
+
+    @Test
+    void validateSecretKey_shouldFailWithWeakKey() {
+        ReflectionTestUtils.setField(jwtService, "secretKey", "c2hvcnRzZWNyZXQxMjM0NQ==");
+        assertThrows(io.jsonwebtoken.security.WeakKeyException.class, () -> jwtService.validateSecretKey());
+    }
 }

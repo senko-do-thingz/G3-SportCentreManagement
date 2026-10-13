@@ -130,6 +130,18 @@ jobs:
             exit 1
           fi
 
+      - name: Assert unedited JWT_SECRET placeholder causes backend startup failure
+        run: |
+          echo "Testing that unedited JWT_SECRET placeholder from .env.example causes startup failure..."
+          JWT_LOGS="$(docker compose -f deploy/compose.yaml run --rm -e JWT_SECRET='<REPLACE_WITH_BASE64_SECRET_MIN_32_BYTES>' backend 2>&1 || true)"
+          echo "$JWT_LOGS"
+          if echo "$JWT_LOGS" | grep -qiE "(Illegal base64 character|DecodingException|WeakKeyException|secret-key|jwt)"; then
+            echo "Verified: Backend startup failed with expected JWT secret decoding error"
+          else
+            echo "Error: Expected JWT-related error message in backend logs, but was not found"
+            exit 1
+          fi
+
       - name: Start backend service and wait for actuator health UP
         run: |
           echo "Starting backend service with IMAGE_TAG=ci and DB_USERNAME=sa..."

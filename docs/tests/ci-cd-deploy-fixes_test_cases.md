@@ -25,7 +25,7 @@
 | TC-DEPLOY-09 | Password Policy Violation Fails SQL Server Startup | Database Hardening | CI Smoke Test (`compose-smoke-test.yml`) | PASSED (CI) |
 | TC-DEPLOY-10 | Flyway Migration Compatibility on with-db Database | Database Migration | CI Smoke Test (`compose-smoke-test.yml`) | PASSED (CI) |
 | TC-DEPLOY-11 | Port 1433 Isolation from Host Interfaces | Security & Networking | CI Smoke Test (`compose-smoke-test.yml`) | PASSED (CI) |
-| TC-DEPLOY-12 | Fail-Fast Application Startup with Default Placeholders | Configuration Hardening | Static Code Analysis | NOT RUN |
+| TC-DEPLOY-12 | Fail-Fast Application Startup with Default Placeholders | Configuration Hardening | CI Smoke Test (`compose-smoke-test.yml`) | PASSED (CI) |
 | TC-DEPLOY-13 | Automated Rollback via .current_tag Mechanism | Deployment Action | Composite Action Review | NOT RUN |
 
 ---
@@ -174,15 +174,14 @@
 - **ID**: TC-DEPLOY-12
 - **Title**: Unedited Placeholders Trigger Immediate Startup Failure
 - **Area**: Configuration Hardening (`backend/src/main/resources/application.yml`, `deploy/.env.example`)
-- **Preconditions**: Copy `deploy/.env.example` directly to `.env` without modifying `<REPLACE_...>` placeholders.
+- **Preconditions**: Valid and healthy `sqlserver` container running with database `sportify`; backend image built.
 - **Steps**:
-  1. Boot Spring Boot backend application.
-- **Expected Result**: Application aborts startup:
-  - `JWT_SECRET` fails during `Decoders.BASE64.decode` due to illegal characters `<` and `>`.
-  - `DB_PASSWORD` fails SQL Server authentication or password policy.
-- **Actual Result**: Verified via static code analysis of `Decoders.BASE64.decode` and regex constraints. Not executed as a dedicated automated CI test job.
-- **Status**: NOT RUN
-- **Reason**: Spring Boot startup failure on unedited `<REPLACE_...>` placeholders is verified through code analysis of `Decoders.BASE64.decode` and regex constraints, not executed as a dedicated CI test job.
+  1. Boot backend container against valid database with unedited `JWT_SECRET='<REPLACE_WITH_BASE64_SECRET_MIN_32_BYTES>'` placeholder from `deploy/.env.example`.
+  2. Capture startup logs and assert container termination.
+  3. Grep container logs for JWT decoding exception.
+- **Expected Result**: Backend aborts startup immediately during Spring bean initialization (`JwtService.validateSecretKey` via `@PostConstruct`), exiting with non-zero code and logging `io.jsonwebtoken.io.DecodingException: Illegal base64 character: 3c`.
+- **Actual Result**: Executed in `.github/workflows/compose-smoke-test.yml` step `Assert unedited JWT_SECRET placeholder causes backend startup failure`. Container exited with code 1, and logs confirmed expected JWT decoding error.
+- **Status**: PASSED (CI)
 
 ### TC-DEPLOY-13: Automated Rollback via .current_tag Mechanism
 - **ID**: TC-DEPLOY-13
