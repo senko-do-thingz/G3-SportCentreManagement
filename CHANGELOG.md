@@ -2,15 +2,15 @@
 
 ## 2026-10-13 - Sport Packages & Pricing and Manager Catalog (BE-03, Flow 1)
 
-Branch `feat/f1-manager-catalog`. Owner: Dat (Senko). Priority: P1. Depends on: none. Rebased on `origin/main` (commit 6e82388). Verified with `./mvnw.cmd test` and GitHub Actions CI workflow.
+Branch `feat/f1-manager-catalog`. Owner: Dat (Senko). Priority: P1. Depends on: none. Rebased on `origin/main` (commit 6e82388). Unit tests verified locally with `./mvnw.cmd test` (605 passed, 0 skipped); integration test build configuration fixed with JUnit 5 vintage bypass (`junit=false`) and zero-test CI guard, pending CI run evidence.
 
 ### Added
 - Manager Sport Packages API: `PUT /api/v1/packages/{id}` (manager list under `GET /api/v1/manager/packages`): dynamic filtering by `sportId`, `format`, `active`; update price, durationDays, sessionCount, sessionMinutes (60 or 90), active status; audit logging (`PACKAGE_UPDATED`) recording before and after snapshots.
 - Manager Card Tiers API: `PUT /api/v1/membership-cards/tiers/{id}` (manager list under `GET /api/v1/manager/card-tiers`): update price, durationMonths, discountPercentage (0-100), description, active status; invariant guards preventing alteration or deactivation of the STANDARD tier; audit logging (`CARD_TIER_UPDATED`).
 - Explicit tier ranking via `tier_rank` column on `membership_card_tier` (STANDARD=1, SILVER=2, GOLD=3, VIP=4) in migration V22, completely decoupling upgrade hierarchy from promotional live catalog prices.
 - Unique filtered index `ux_member_card_replaces_in_force` on `member_card(replaces_card_id)` for active and pending cards, preventing concurrent double-replacement of in-force cards.
-- Upgrade chain migration backfill supporting multi-step upgrade chains (A -> B -> C) by linking each upgrade card to its immediate predecessor sharing the identical `end_date`.
-- Pessimistic write locking on tier table rows during tier updates to serialize concurrent price adjustments and enforce price monotonicity.
+- Upgrade chain migration backfill (V22 Step 4b) supporting multi-step upgrade chains (A -> B -> C): identifies candidate predecessor pairs sharing member and end_date, linking only strictly 1-to-1 matches where an upgrade card has exactly one candidate (`HAVING COUNT(cp.candidate_card_id) = 1`) and that candidate is claimed by exactly one upgrade card (`HAVING COUNT(upgrade_card_id) = 1`); ambiguous predecessors claimed by two upgrade cards remain unlinked (`replaces_card_id = NULL`) to fail closed.
+- Pessimistic write locking on tier table rows during tier updates (`tierRepository.findAllForUpdate()`, ordered deterministically `ORDER BY id` without a custom timeout) to serialize concurrent price adjustments and enforce price monotonicity; lock acquisition is executed after 404 lookup and input validation, with root cause chained in `BusinessRuleException`.
 
 ### Contract Changes Affecting Frontend
 - **Upgrade Fee Calculation Contract Change (`src/pages/member/cardsModel.ts` on `main`)**:

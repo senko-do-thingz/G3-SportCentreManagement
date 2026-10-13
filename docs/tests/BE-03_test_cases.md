@@ -82,13 +82,13 @@
 | TC-BE03-59 | Activation of upgrade card with matching recorded replaces_card_id succeeds | POST `/api/v1/membership-cards/{id}/activate` | 200 OK | Passed (Unit test) |
 | TC-BE03-60 | Activation of upgrade card with mismatched replaces_card_id returns 400 | POST `/api/v1/membership-cards/{id}/activate` | 400 Bad Request | Passed (Unit test) |
 | TC-BE03-61 | Activation of legacy upgrade card with null replaces_card_id fails closed | POST `/api/v1/membership-cards/{id}/activate` | 400 Bad Request | Passed (Unit test) |
-| TC-BE03-62 | Intentionally unused | N/A | N/A | Intentionally unused |
-| TC-BE03-63 | Intentionally unused | N/A | N/A | Intentionally unused |
 | TC-BE03-64 | Card tier update validation - price <= lower-ranked active tier returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request | Passed (Unit test) |
 | TC-BE03-65 | Card tier update validation - price >= higher-ranked active tier returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request | Passed (Unit test) |
 | TC-BE03-66 | Migration V22 Step 5 - duplicate in-force replaces_card_id links fail closed | Integration test | N/A (Schema) | Not run locally (Docker unavailable), pending CI |
 | TC-BE03-67 | Staff desk upgrade with fee <= 0 allowed and activated immediately | POST `/api/v1/membership-cards/purchase` | 201 Created | Passed (Unit test) |
-| TC-BE03-68 | Card tier update validation - concurrent edit lock acquisition conflict returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request | Passed (Unit test) |
+| TC-BE03-68 | Card tier update validation - concurrent edit lock conflict (mocked unit test) returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request | Passed (Unit test) |
+
+*Note: Test IDs TC-BE03-62 and TC-BE03-63 are intentionally unused.*
 
 
 ## Detailed Test Specifications
@@ -718,13 +718,13 @@
   - Prior SILVER card transitions to `status = REPLACED`.
 - **Status**: Passed (Unit test)
 
-### TC-BE03-68: Card tier update validation - concurrent edit lock acquisition conflict returns 400
-- **Preconditions**: Manager updates a membership card tier while another transaction holds a pessimistic lock on the tier table.
+### TC-BE03-68: Card tier update validation - concurrent edit lock conflict (mocked unit test) returns 400
+- **Preconditions**: Mock unit test (`MembershipCardServiceImplTest.updateTier_whenLockConflictOccurs_throwsBusinessRuleExceptionWithRetryMessage`). Manager updates a membership card tier while repository `findAllForUpdate()` throws `PessimisticLockingFailureException`.
 - **Request**:
   - `PUT /api/v1/membership-cards/tiers/{id}`
   - Header: `Authorization: Bearer <MANAGER_JWT>`
 - **Expected Result**:
   - HTTP 400 Bad Request.
-  - Message: `Membership tiers are currently being updated by another operation. Please retry in a few moments.`
-  - Database entities remain unchanged.
+  - Throws `BusinessRuleException` with message `Membership tiers are currently being updated by another operation. Please retry in a few moments.` and preserves root cause `PessimisticLockingFailureException`.
+  - Verifies `findById` and basic validation run before lock acquisition, while `saveAndFlush` is never called. Note: Under deterministic `ORDER BY id` pessimistic locking without custom timeout (Option 2), concurrent updates in real SQL Server serialize sequentially; this unit test specifically verifies exception mapping if a lock acquisition failure is raised.
 - **Status**: Passed (Unit test)

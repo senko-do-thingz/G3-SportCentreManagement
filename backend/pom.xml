@@ -178,6 +178,9 @@
                     <argLine>@{argLine}</argLine>
                     <skipTests>${skipUnitTests}</skipTests>
                     <excludedGroups>integration</excludedGroups>
+                    <properties>
+                        <junit>false</junit>
+                    </properties>
                 </configuration>
             </plugin>
             <!-- Maven Failsafe Plugin (runs integration tests tagged @Tag("integration")) -->
@@ -186,11 +189,13 @@
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <version>3.6.0</version>
                 <configuration>
-                    <argLine>@{argLine}</argLine>
                     <groups>integration</groups>
                     <includes>
                         <include>**/*Test.java</include>
                     </includes>
+                    <properties>
+                        <junit>false</junit>
+                    </properties>
                 </configuration>
                 <executions>
                     <execution>

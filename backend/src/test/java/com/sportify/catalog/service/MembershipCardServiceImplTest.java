@@ -2001,8 +2001,19 @@ public class MembershipCardServiceImplTest {
 
     @Test
     void updateTier_whenLockConflictOccurs_throwsBusinessRuleExceptionWithRetryMessage() {
+        MembershipCardTier gold = MembershipCardTier.builder()
+                .id(3L)
+                .code("GOLD")
+                .name("Gold Tier")
+                .price(BigDecimal.valueOf(500000.00))
+                .durationMonths(12)
+                .discountPercentage(10)
+                .tierRank(3)
+                .isActive(true)
+                .build();
+        when(tierRepository.findById(3L)).thenReturn(Optional.of(gold));
         when(tierRepository.findAllForUpdate())
-                .thenThrow(new org.springframework.dao.PessimisticLockingFailureException("Lock acquisition timeout"));
+                .thenThrow(new org.springframework.dao.PessimisticLockingFailureException("Lock acquisition failure"));
 
         MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
                 .price(BigDecimal.valueOf(600000.00))
@@ -2015,7 +2026,9 @@ public class MembershipCardServiceImplTest {
                 () -> membershipCardService.updateTier(3L, req, null));
         assertEquals("Membership tiers are currently being updated by another operation. Please retry in a few moments.",
                 ex.getMessage());
-        verify(tierRepository, never()).findById(any());
+        assertNotNull(ex.getCause());
+        assertTrue(ex.getCause() instanceof org.springframework.dao.PessimisticLockingFailureException);
+        verify(tierRepository).findById(3L);
         verify(tierRepository, never()).saveAndFlush(any());
     }
 }

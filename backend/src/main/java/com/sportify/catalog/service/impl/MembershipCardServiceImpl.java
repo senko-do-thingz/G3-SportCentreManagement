@@ -90,12 +90,6 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     @Override
     @Transactional
     public CardTierResponse updateTier(Long id, MembershipCardTierUpdateRequest request, UserAccount actor) {
-        try {
-            tierRepository.findAllForUpdate();
-        } catch (PessimisticLockingFailureException ex) {
-            throw new BusinessRuleException("Membership tiers are currently being updated by another operation. Please retry in a few moments.");
-        }
-
         MembershipCardTier tier = tierRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Card tier not found for id: " + id));
 
@@ -121,9 +115,16 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             if (request.getDurationMonths() < 1) {
                 throw new BusinessRuleException("Duration in months must be at least 1 for paid tiers");
             }
-            if (Boolean.TRUE.equals(request.getActive())) {
-                validateTierPriceMonotonicity(tier, request.getPrice());
-            }
+        }
+
+        try {
+            tierRepository.findAllForUpdate();
+        } catch (PessimisticLockingFailureException ex) {
+            throw new BusinessRuleException("Membership tiers are currently being updated by another operation. Please retry in a few moments.", ex);
+        }
+
+        if (!standard && Boolean.TRUE.equals(request.getActive())) {
+            validateTierPriceMonotonicity(tier, request.getPrice());
         }
 
         Map<String, Object> before = snapshotTier(tier);
