@@ -323,6 +323,68 @@ class PaymentServiceImplTest {
     }
 
     @Test
+    @DisplayName("appendNote with existing 495 characters preserves staff note intact within 500 characters")
+    void appendNote_Existing495Chars_PreservesStaffNoteIntact() {
+        String existing495 = "E".repeat(495);
+        pendingPayment.setNotes(existing495);
+
+        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Payment success = paymentService.markPaymentSuccess(10L, receptionistUser);
+
+        String staffNote = "Confirmed by user id " + receptionistUser.getId();
+        assertThat(success.getNotes()).isNotNull();
+        assertThat(success.getNotes().length()).isLessThanOrEqualTo(500);
+        assertThat(success.getNotes()).endsWith(" | " + staffNote);
+    }
+
+    @Test
+    @DisplayName("appendNote with single 600 character note is cut to 500 without splitting surrogate pair")
+    void appendNote_Single600CharsWithSurrogatePair_CutSafelyTo500() {
+        String prefix = "B".repeat(499);
+        String surrogatePair = "\uD83D\uDE00";
+        String suffix = "C".repeat(99);
+        String note600 = prefix + surrogatePair + suffix;
+
+        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        pendingPayment.setNotes(null);
+
+        Payment failed = paymentService.markPaymentFailed(10L, note600);
+
+        assertThat(failed.getNotes()).isNotNull();
+        assertThat(failed.getNotes().length()).isEqualTo(499);
+        assertThat(failed.getNotes()).isEqualTo(prefix);
+    }
+
+    @Test
+    @DisplayName("appendNote handles null and blank inputs cleanly")
+    void appendNote_NullAndBlankInputs_HandledCleanly() {
+        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        pendingPayment.setPaymentStatus(PaymentStatus.PENDING);
+        pendingPayment.setNotes("Initial note");
+        Payment resNullAppend = paymentService.markPaymentSuccess(10L, null);
+        assertThat(resNullAppend.getNotes()).isEqualTo("Initial note");
+
+        pendingPayment.setPaymentStatus(PaymentStatus.PENDING);
+        Payment resBlankAppend = paymentService.markPaymentFailed(10L, "   ");
+        assertThat(resBlankAppend.getNotes()).isEqualTo("Initial note");
+
+        pendingPayment.setPaymentStatus(PaymentStatus.PENDING);
+        pendingPayment.setNotes(null);
+        Payment resNullExisting = paymentService.markPaymentFailed(10L, "New reason");
+        assertThat(resNullExisting.getNotes()).isEqualTo("New reason");
+
+        pendingPayment.setPaymentStatus(PaymentStatus.PENDING);
+        pendingPayment.setNotes(null);
+        Payment resBothNullOrBlank = paymentService.markPaymentFailed(10L, "   ");
+        assertThat(resBothNullOrBlank.getNotes()).isNull();
+    }
+
+    @Test
     @DisplayName("getPayment and updatePaymentMethod with null actor throws IllegalArgumentException")
     void paymentMethods_NullActor_ThrowsIllegalArgumentException() {
         assertThrows(IllegalArgumentException.class, () -> paymentService.getPayment(10L, null));
