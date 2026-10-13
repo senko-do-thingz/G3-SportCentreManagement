@@ -72,15 +72,12 @@ jobs:
     env:
       DOCKER_HOST: unix:///nonexistent.sock
       JWT_SECRET: "dGhpcy1pcy1hLXZlcnktc2VjdXJlLW1vY2stc2VjcmV0LWtleS1mb3ItdGVzdGluZy1vbmx5LWdoYWN0aW9ucw=="
-      BANK_TRANSFER_ACCOUNT_NAME: "Sportify Demo Center"
-      BANK_TRANSFER_ACCOUNT_NUMBER: "0000 1041 2460"
-      BANK_TRANSFER_BANK_NAME: "Demo Bank"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
@@ -97,7 +94,7 @@ jobs:
 
       - name: Publish test report
         if: always()
-        uses: mikepenz/action-junit-report@v5
+        uses: mikepenz/action-junit-report@v6
         with:
           report_paths: backend/target/surefire-reports/TEST-*.xml
           check_name: Unit test report
@@ -121,15 +118,12 @@ jobs:
       pull-requests: write
     env:
       JWT_SECRET: "dGhpcy1pcy1hLXZlcnktc2VjdXJlLW1vY2stc2VjcmV0LWtleS1mb3ItdGVzdGluZy1vbmx5LWdoYWN0aW9ucw=="
-      BANK_TRANSFER_ACCOUNT_NAME: "Sportify Demo Center"
-      BANK_TRANSFER_ACCOUNT_NUMBER: "0000 1041 2460"
-      BANK_TRANSFER_BANK_NAME: "Demo Bank"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
@@ -152,7 +146,7 @@ jobs:
 
       - name: Publish test report
         if: always()
-        uses: mikepenz/action-junit-report@v5
+        uses: mikepenz/action-junit-report@v6
         with:
           report_paths: backend/target/failsafe-reports/TEST-*.xml
           check_name: Integration test report
@@ -175,7 +169,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
