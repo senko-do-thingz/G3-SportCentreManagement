@@ -34,6 +34,8 @@ interface ProfileBackendOptions {
   profile?: Record<string, unknown>
   onUpdate?: Handler
   onPassword?: Handler
+  /** Answer of POST /auth/refresh; by default it rotates to member-access-2 and member-refresh-2. */
+  onRefresh?: Handler
 }
 
 function profileBackend(options: ProfileBackendOptions = {}) {
@@ -51,6 +53,11 @@ function profileBackend(options: ProfileBackendOptions = {}) {
     }
     if (call.path === '/users/me/password' && call.method === 'PUT') {
       return options.onPassword ? options.onPassword(call) : new Response(null, { status: 204 })
+    }
+    if (call.path === '/auth/refresh') {
+      return options.onRefresh
+        ? options.onRefresh(call)
+        : json(200, { accessToken: 'member-access-2', refreshToken: 'member-refresh-2' })
     }
     return backendError(404, 'Resource not found')
   })
@@ -421,23 +428,56 @@ describe('FE-02 My Profile (F1-08) - change password', () => {
 
   // Review round 1
 
-  it('TC-FE02-067 a 401 is shown under Current password without refresh or sign out', async () => {
+  it('TC-FE02-067 wrong password: 401, one refresh, retry 401 -> message under Current password, still signed in', async () => {
     const user = userEvent.setup()
     const { calls } = await openProfile({ onPassword: () => backendError(401, 'Unauthorized') })
     const form = await fillPassword('Wrong123', 'NewPass2026', 'NewPass2026')
 
     expect(await within(form).findByText(CURRENT_PASSWORD_REJECTED_MESSAGE)).toBeInTheDocument()
     await waitFor(() => expect(within(form).getByLabelText(/Current password/)).toHaveFocus())
-    expect(calls.some((call) => call.path === '/auth/refresh')).toBe(false)
-    expect(calls.filter((call) => call.path === '/users/me/password')).toHaveLength(1)
-    expect(tokenStorage.getAccessToken()).toBe('member-access')
-    expect(tokenStorage.getRefreshToken()).toBe('member-refresh')
+    expect(calls.filter((call) => call.path === '/auth/refresh')).toHaveLength(1)
+    expect(calls.filter((call) => call.path === '/users/me/password').map((call) => call.authorization)).toEqual([
+      'Bearer member-access',
+      'Bearer member-access-2',
+    ])
+    expect(tokenStorage.getAccessToken()).toBe('member-access-2')
+    expect(tokenStorage.getRefreshToken()).toBe('member-refresh-2')
     expect(screen.getByRole('heading', { name: 'My Profile' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: /Log in|Welcome back/ })).not.toBeInTheDocument()
 
     // The session still works: the profile form can be saved afterwards.
     await user.click(within(personalForm()).getByRole('button', { name: 'Save changes' }))
     expect(await screen.findByText(PROFILE_SAVED_MESSAGE, { selector: '.notice' })).toBeInTheDocument()
+  })
+
+  it('TC-FE02-080 expired access token with the correct password: refresh, retry succeeds, success message', async () => {
+    const { calls } = await openProfile({
+      // Only the refreshed token is accepted, like a backend after the access token lifetime.
+      onPassword: (call) =>
+        call.authorization === 'Bearer member-access-2' ? new Response(null, { status: 204 }) : backendError(401, 'Unauthorized'),
+    })
+    const form = await fillPassword('Demo123!', 'NewPass2026', 'NewPass2026')
+
+    await expectSingleAnnouncement(PASSWORD_CHANGED_MESSAGE)
+    expect(calls.filter((call) => call.path === '/auth/refresh')).toHaveLength(1)
+    expect(calls.filter((call) => call.path === '/users/me/password')).toHaveLength(2)
+    expect(tokenStorage.getAccessToken()).toBe('member-access-2')
+    expect(tokenStorage.getRefreshToken()).toBe('member-refresh-2')
+    expect(within(form).queryByText(CURRENT_PASSWORD_REJECTED_MESSAGE)).not.toBeInTheDocument()
+    expect(within(form).getByLabelText(/Current password/)).toHaveValue('')
+  })
+
+  it('TC-FE02-081 a rejected refresh token signs the member out like any other request', async () => {
+    await openProfile({
+      onPassword: () => backendError(401, 'Unauthorized'),
+      onRefresh: () => backendError(401, 'Invalid refresh token'),
+    })
+    await fillPassword('Demo123!', 'NewPass2026', 'NewPass2026')
+
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(tokenStorage.getAccessToken()).toBeNull()
+    expect(tokenStorage.getRefreshToken()).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'My Profile' })).not.toBeInTheDocument()
   })
 
   it('TC-FE02-068 a 400 without details is shown above the form, whatever its text says', async () => {

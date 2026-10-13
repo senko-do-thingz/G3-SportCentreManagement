@@ -2,10 +2,10 @@
 
 ## 2026-10-13 - Member Dashboard and My Profile (FE-02, Flow 1)
 
-Branch `feat/f1-member-dashboard`. Owner: Phat. Priority: P1. Depends on FE-01 (merged) and BE-02 (not merged yet, see Open Questions). Verified with `npm run lint -- --max-warnings 0`, `tsc -b`, `npm test` and `npm run build`, plus browser checks in Chromium against a mock of the member API. After review round 1: 242 tests in 15 files (30 added in round 1).
+Branch `feat/f1-member-dashboard`. Owner: Phat. Priority: P1. Depends on FE-01 (merged) and BE-02 (not merged yet, see Open Questions). Verified with `npm run lint -- --max-warnings 0`, `tsc -b`, `npm test` and `npm run build`, plus browser checks in Chromium against a mock of the member API. After review round 1: 242 tests in 15 files (30 added in round 1). After review round 2: 255 tests in 15 files (13 added in round 2).
 
 ### Review Fixes (Round 1)
-- B1 Change password never signs out: new per-request option `skipAuthRefresh` in `api/client.ts` (a 401 is thrown as a normal ApiError, no refresh, no retry, no sign out; every other request unchanged). `memberApi.changePassword` uses it; a 401 is shown under Current password.
+- B1 (superseded by R2-B1) Change password never signs out: new per-request option `skipAuthRefresh` in `api/client.ts` (a 401 is thrown as a normal ApiError, no refresh, no retry, no sign out; every other request unchanged). `memberApi.changePassword` uses it; a 401 is shown under Current password.
 - B2 No field detection from message text: `passwordFailure` decides by HTTP status (401) and backend field keys (`details.currentPassword`, `newPassword`, `confirmPassword`); a 400 without details goes above the form.
 - B3 Phone is optional on My Profile (as in `RegisterRequest`): pattern checked only when entered, sent as null when empty, `required` removed.
 - B4 Used up packages: new model helpers `canBook`, `isExhausted`, `remainingSessionCount`, `hasNoSessionLimit`. A package with 0 sessions left shows "No sessions left" and only Renew package; the hero offers Book a session only when a package can be booked. Only `totalSessions === null` means "No session limit"; a total of 0 is "0 of 0 sessions remaining" and exhausted.
@@ -22,6 +22,13 @@ Branch `feat/f1-member-dashboard`. Owner: Phat. Priority: P1. Depends on FE-01 (
 - m7 `AppRoutes.tsx` children of `<Routes>` re-indented; `requireNavItem` throws when the My Payments menu entry is missing instead of dropping the route.
 - m8 Pending card amount stays `pricePaid`: `MembershipCardServiceImpl.java` lines 110 and 112 pass the same `plan.price()` to the card (`pricePaid`) and to `createPendingPayment` (payment `amount`).
 
+### Review Fixes (Round 2)
+- R2-B1 `skipAuthRefresh` removed (nothing else used it) and replaced by `authFailure: 'refresh-then-throw'` in `api/client.ts`. A 401 refreshes the token once with the shared single-flight refresh and retries once; a 401 on the retry is thrown as ApiError(401) without signing out and is shown under Current password; a rejected refresh token still signs out; a network or server error during the refresh is thrown without signing out. An expired access token no longer looks like a wrong password. Default behavior of every other request unchanged.
+- R2-M1 New hero variant `first-package` ("Choose your first sport package.", with the card discount when a card is in force) for a member with a paid card who never had a package; `renew` only when the member had packages (ACTIVE or EXPIRED) that are now used up or ended. `heroVariant` takes a facts object including `hasHadPackage`.
+- R2-m1 Active packages stat keeps counting the packages of the list; when some have no sessions left the hint reads "<n> can be booked - <m> with no sessions left".
+- R2-m2 `requireNavItem` kept at module load in `AppRoutes.tsx`; documented that it runs in every build and that a missing entry fails `navigation.test.ts` and every test that renders the app.
+- Verified: 255 tests in 15 files (13 added in round 2), lint, `tsc -b` and build green.
+
 ### Added
 - Member Dashboard (F1-07) at `/member`: greeting hero, membership tier stat, active packages and upcoming sessions stats, pending payments with a "Pay now" link to `/member/payments/{paymentId}`, active sport packages with remaining sessions, end date and progress bar, upcoming bookings, profile card and quick links.
 - The two Figma states: "New Standard Member" (no paid card and no package) and "After Purchase" (any paid card or package, including one waiting for payment). The state is exposed as `data-state` on the page.
@@ -36,7 +43,7 @@ Branch `feat/f1-member-dashboard`. Owner: Phat. Priority: P1. Depends on FE-01 (
 - FE-00 and FE-01 tests that read the account switch notice now query it by its accessible name (see Review Fixes M3), because the real dashboard also has loading spinners with role status.
 
 ### Open Questions
-- BE-02 contract assumed by the frontend: `PUT /users/me` body `{fullName, phone, dateOfBirth, address, mainGoal, currentLevel}` (phone and the optional fields may be null) returning `UserProfileResponse` (or 204); `PUT /users/me/password` body `{currentPassword, newPassword}`. Preferred for a wrong current password: 400 with `details.currentPassword`; a 401 is also handled without signing out since review round 1.
+- BE-02 contract assumed by the frontend: `PUT /users/me` body `{fullName, phone, dateOfBirth, address, mainGoal, currentLevel}` (phone and the optional fields may be null) returning `UserProfileResponse` (or 204); `PUT /users/me/password` body `{currentPassword, newPassword}`. Preferred for a wrong current password: 400 with `details.currentPassword`; a 401 is also handled: since review round 2 the client refreshes once, retries once and shows a second 401 under Current password without signing out.
 - Interested sports (Figma F1-08) and the Notifications and Recommended for you cards (Figma F1-07) are not built: no endpoint exists yet.
 - Upcoming bookings are filtered again on the client until BE-12 adds `when=UPCOMING`.
 

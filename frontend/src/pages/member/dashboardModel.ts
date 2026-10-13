@@ -206,18 +206,38 @@ export function pendingItems(cards: MemberCard[], registrations: PackageRegistra
  * - welcome: New Standard Member, nothing bought yet.
  * - book: at least one package can be booked.
  * - pay: nothing can be booked but a request waits for its payment.
- * - renew: after a purchase, nothing to book and nothing to pay (packages used up or ended).
+ * - first-package: after a purchase (a paid card) but the member has never had a package.
+ * - renew: the member had packages, and they are now used up or ended.
  */
-export type HeroVariant = 'welcome' | 'book' | 'pay' | 'renew'
+export type HeroVariant = 'welcome' | 'book' | 'pay' | 'first-package' | 'renew'
 
-export function heroVariant(state: DashboardState, hasBookablePackage: boolean, pendingCount: number): HeroVariant {
+export interface HeroFacts {
+  state: DashboardState
+  hasBookablePackage: boolean
+  pendingCount: number
+  /** True when at least one registration was ever paid (ACTIVE or EXPIRED). */
+  hasHadPackage: boolean
+}
+
+export function heroVariant({ state, hasBookablePackage, pendingCount, hasHadPackage }: HeroFacts): HeroVariant {
   if (state === 'new-standard') {
     return 'welcome'
   }
   if (hasBookablePackage) {
     return 'book'
   }
-  return pendingCount > 0 ? 'pay' : 'renew'
+  if (pendingCount > 0) {
+    return 'pay'
+  }
+  return hasHadPackage ? 'renew' : 'first-package'
+}
+
+/**
+ * True when the member has had at least one paid package: ACTIVE (even used up) or EXPIRED.
+ * Pending and cancelled registrations were never paid, so they do not count.
+ */
+export function hasHadPackage(registrations: Pick<PackageRegistration, 'status'>[]): boolean {
+  return registrations.some((registration) => registration.status === 'ACTIVE' || registration.status === 'EXPIRED')
 }
 
 /** Path of the payment summary screen (F3-01, task FE-11) for a pending payment. */

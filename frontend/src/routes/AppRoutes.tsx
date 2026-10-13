@@ -31,6 +31,10 @@ const SCREENS: Record<string, ReactNode> = {
  * summary (F3-01) linked from "Pay now" on the dashboard (FE-02). It shows the payments placeholder
  * until FE-11 registers the real screen here, so the link never opens a 404 page. requireNavItem
  * throws if the My Payments menu entry disappears, so the route is never dropped silently.
+ * The lookup runs when this module loads, in every build (development, tests and production).
+ * MEMBER_AREA is a static constant, so it can only fail after an edit of layouts/navigation.ts;
+ * layouts/navigation.test.ts and every test that renders the app fail at once in that case, long
+ * before a build ships.
  */
 const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
   '/member': [

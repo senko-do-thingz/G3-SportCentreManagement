@@ -57,7 +57,9 @@ function profileFailure(error: unknown): FormFailure {
 /**
  * Decides where a failed PUT /users/me/password is shown, from the HTTP status and the backend
  * field keys only, never from the message text:
- * - 401 (sent with skipAuthRefresh, so the session is kept): under Current password;
+ * - 401: under Current password. The request uses authFailure 'refresh-then-throw', so the client
+ *   has already refreshed the token and retried once: this 401 came with a fresh token, and the
+ *   session is kept;
  * - 400 with details: each key under its field (currentPassword, newPassword, confirmPassword),
  *   unknown keys above the form;
  * - anything else, including a 400 without details: above the form.

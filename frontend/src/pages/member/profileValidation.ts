@@ -143,8 +143,9 @@ export const EMPTY_PASSWORD_FORM: PasswordForm = { currentPassword: '', newPassw
 export const PASSWORD_FIELDS = ['currentPassword', 'newPassword', 'confirmPassword'] as const
 
 /**
- * Shown under Current password when PUT /users/me/password answers 401. The request is sent with
- * skipAuthRefresh, so a 401 here describes the typed password and never ends the session.
+ * Shown under Current password when PUT /users/me/password still answers 401 after the client
+ * refreshed the token and retried (authFailure 'refresh-then-throw'). An expired access token is
+ * fixed by that refresh, so this 401 describes the typed password and never ends the session.
  */
 export const CURRENT_PASSWORD_REJECTED_MESSAGE = 'Current password is incorrect'
 

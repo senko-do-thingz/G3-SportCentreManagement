@@ -5,6 +5,7 @@ import {
   canBook,
   currentCard,
   dashboardState,
+  hasHadPackage,
   heroVariant,
   isExhausted,
   isPaidCard,
@@ -164,9 +165,26 @@ describe('FE-02 dashboard model', () => {
   })
 
   it('TC-FE02-019 heroVariant picks welcome, book, pay or renew', () => {
-    expect(heroVariant('new-standard', false, 0)).toBe('welcome')
-    expect(heroVariant('after-purchase', true, 2)).toBe('book')
-    expect(heroVariant('after-purchase', false, 1)).toBe('pay')
-    expect(heroVariant('after-purchase', false, 0)).toBe('renew')
+    const facts = { state: 'after-purchase', hasBookablePackage: false, pendingCount: 0, hasHadPackage: true } as const
+    expect(heroVariant({ ...facts, state: 'new-standard' })).toBe('welcome')
+    expect(heroVariant({ ...facts, hasBookablePackage: true, pendingCount: 2 })).toBe('book')
+    expect(heroVariant({ ...facts, pendingCount: 1 })).toBe('pay')
+    expect(heroVariant({ ...facts, pendingCount: 1, hasHadPackage: false })).toBe('pay')
+    expect(heroVariant(facts)).toBe('renew')
+  })
+
+  // Review round 2
+
+  it('TC-FE02-120 heroVariant: a paid card and no package ever gives first-package, not renew', () => {
+    expect(
+      heroVariant({ state: 'after-purchase', hasBookablePackage: false, pendingCount: 0, hasHadPackage: false }),
+    ).toBe('first-package')
+  })
+
+  it('TC-FE02-121 hasHadPackage counts ACTIVE and EXPIRED registrations only', () => {
+    expect(hasHadPackage([])).toBe(false)
+    expect(hasHadPackage([{ status: 'PENDING_PAYMENT' }, { status: 'CANCELLED' }])).toBe(false)
+    expect(hasHadPackage([{ status: 'ACTIVE' }])).toBe(true)
+    expect(hasHadPackage([{ status: 'EXPIRED' }])).toBe(true)
   })
 })

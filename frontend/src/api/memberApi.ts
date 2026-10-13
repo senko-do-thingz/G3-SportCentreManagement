@@ -147,10 +147,12 @@ export const memberApi = {
   },
 
   /**
-   * skipAuthRefresh: a wrong current password may come back as 401. That 401 is about the form,
-   * not the session, so it must never refresh the token or sign the member out.
+   * authFailure 'refresh-then-throw': a 401 first refreshes the token and retries once, so an
+   * expired access token never looks like a wrong password. A 401 on the retry (fresh token) is
+   * thrown as ApiError(401) without signing out and is shown under Current password. A rejected
+   * refresh token still ends the session like any other request.
    */
   changePassword(request: ChangePasswordRequest): Promise<void> {
-    return api.put<void>('/users/me/password', request, { skipAuthRefresh: true })
+    return api.put<void>('/users/me/password', request, { authFailure: 'refresh-then-throw' })
   },
 }

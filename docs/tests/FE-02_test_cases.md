@@ -21,11 +21,13 @@
 | `GET /api/v1/packages/registrations/my` | Exists (MEMBER) | Active packages, pending packages, state |
 | `GET /api/v1/bookings/my?when=UPCOMING` | Exists without the filter; `when` comes with BE-12. The frontend filters again (CONFIRMED and start time from now) | Upcoming sessions |
 | `PUT /api/v1/users/me` | Planned in BE-02. Assumed body `{fullName, phone, dateOfBirth, address, mainGoal, currentLevel}` (phone, dateOfBirth, address, mainGoal, currentLevel may be null), answer `UserProfileResponse` or 204, 400 `Validation Error` with `details` | Save changes |
-| `PUT /api/v1/users/me/password` | Planned in BE-02. Assumed body `{currentPassword, newPassword}`, answer 200 or 204. Preferred: wrong current password as 400 with `details.currentPassword`. Since review round 1 a 401 is also safe: the request is sent with `skipAuthRefresh`, so it never refreshes or signs out | Change password |
+| `PUT /api/v1/users/me/password` | Planned in BE-02. Assumed body `{currentPassword, newPassword}`, answer 200 or 204. Preferred: wrong current password as 400 with `details.currentPassword`. Since review round 2 the request uses `authFailure: 'refresh-then-throw'`: a 401 refreshes the token once and retries once; a 401 on the retry is shown under Current password without signing out; a rejected refresh token still signs out | Change password |
 
 State rules: New Standard Member = no paid card (tier other than STANDARD, not CANCELLED; a missing tier code counts as paid) and no package registration (not CANCELLED). After Purchase = anything else, including a request in PENDING_PAYMENT. The tier shown is the ACTIVE card whose dates contain today (highest discount wins), otherwise "Standard".
 
-Hero (review round 1): welcome (New Standard Member), book (at least one package can be booked: ACTIVE, not ended, sessions left or no limit), pay (nothing to book, at least one pending item: Pay now to the first item's summary, or "View pending payments" to the block when it has no payment id), renew (nothing to book and nothing to pay).
+Hero (review rounds 1 and 2): welcome (New Standard Member), book (at least one package can be booked: ACTIVE, not ended, sessions left or no limit), pay (nothing to book, at least one pending item: Pay now to the first item's summary, or "View pending payments" to the block when it has no payment id), first-package (round 2: a paid card but never a paid package, "Choose your first sport package."), renew (the member had packages that are now used up or ended).
+
+Active packages stat (round 2): the value counts the same packages as the list (ACTIVE, not ended); when some have no sessions left the hint says "<n> can be booked - <m> with no sessions left".
 
 ### 1.2 How to run (PowerShell)
 ```powershell
@@ -36,23 +38,23 @@ npm run lint -- --max-warnings 0
 npm run build
 ```
 
-### 1.3 Result summary (2026-10-13, after review round 1)
+### 1.3 Result summary (2026-10-13, after review round 2)
 | Group | Cases | Result |
 |---|---|---|
-| Automated, dashboard rules (`src/pages/member/dashboardModel.test.ts`) | 19 (4 new in round 1, 1 changed) | 19 PASSED |
-| Automated, dashboard screen (`src/pages/member/memberDashboard.test.tsx`) | 24 (9 new in round 1) | 24 PASSED |
-| Automated, profile screen (`src/pages/member/myProfile.test.tsx`) | 24 (7 new in round 1, 4 changed) | 24 PASSED |
-| Automated, profile validation (`src/pages/member/profileValidation.test.ts`) | 10 (2 new in round 1, 2 changed) | 10 PASSED |
-| Automated, load hook (`src/pages/member/useMemberResource.test.tsx`, new in round 1) | 5 | 5 PASSED |
-| Automated, menu lookup (`src/layouts/navigation.test.ts`, new in round 1) | 2 | 2 PASSED |
-| Automated, API client (`src/api/client.test.ts`) | 18 (1 new in round 1) | 18 PASSED |
-| Automated, other FE-00 and FE-01 files (5 assertions now query the notice by its accessible name, see section 3) | 140 | 140 PASSED |
+| Automated, dashboard rules (`src/pages/member/dashboardModel.test.ts`) | 21 (2 new in round 2, 1 changed) | 21 PASSED |
+| Automated, dashboard screen (`src/pages/member/memberDashboard.test.tsx`) | 28 (4 new in round 2) | 28 PASSED |
+| Automated, profile screen (`src/pages/member/myProfile.test.tsx`) | 26 (2 new in round 2, 1 changed) | 26 PASSED |
+| Automated, profile validation (`src/pages/member/profileValidation.test.ts`) | 10 | 10 PASSED |
+| Automated, load hook (`src/pages/member/useMemberResource.test.tsx`) | 5 | 5 PASSED |
+| Automated, menu lookup (`src/layouts/navigation.test.ts`) | 2 | 2 PASSED |
+| Automated, API client (`src/api/client.test.ts`) | 23 (the round 1 FE-02 test replaced by 6 tests in round 2) | 23 PASSED |
+| Automated, other FE-00 and FE-01 files | 140 | 140 PASSED |
 | Lint, type check and build | 3 | 3 PASSED, 0 warnings |
-| Deliberate regressions (section 3) | 10 (first round) + 14 (review round 1) | 24 caught |
-| Browser checks in Chromium against a mock API (section 4) | 7 + 3 (review round 1) | 10 PASSED |
-| Manual checks against the real backend (section 5) | 13 | NOT RUN YET (needs BE-02 merged and SQL Server) |
+| Deliberate regressions (section 3) | 10 (first round) + 14 (round 1) + 6 (round 2) | 30 caught |
+| Browser checks in Chromium against a mock API (section 4) | 10 (rounds 0 and 1; B10 superseded, see section 4) | 10 PASSED when run |
+| Manual checks against the real backend (section 5) | 14 | NOT RUN YET (needs BE-02 merged and SQL Server) |
 
-Total: 242 Vitest tests in 15 files. 30 added in review round 1 (212 before).
+Total: 255 Vitest tests in 15 files. 13 added in review round 2 (242 before): 14 new tests, 1 round 1 client test removed with the option it tested.
 
 ---
 
@@ -81,7 +83,9 @@ Today is fixed at 2026-10-13, now at 2026-10-13 09:30.
 | TC-FE02-016 | remainingSessionCount and isExhausted (round 1, B4, m4) | 12 of 8 gives 8; -2 gives 0; total 0 gives 0; no limit gives null; 0 of 8 and 0 of 0 are exhausted | PASSED |
 | TC-FE02-017 | canBook (round 1, B4) | True for ACTIVE with sessions, no limit, or later start; false for 0 left, total 0, ended, pending | PASSED |
 | TC-FE02-018 | isPaidCard with a missing tier code (round 1, m3) | null tier code counts as paid; "standard" in lower case is free; cancelled is not paid; state after-purchase | PASSED |
-| TC-FE02-019 | heroVariant (round 1, B4, M2) | welcome, book, pay, renew as listed | PASSED |
+| TC-FE02-019 | heroVariant (round 1, B4, M2; changed in round 2: takes a facts object) | welcome, book, pay (with or without a past package), renew | PASSED |
+| TC-FE02-120 | heroVariant with a paid card and no package ever (round 2, R2-M1) | first-package, not renew | PASSED |
+| TC-FE02-121 | hasHadPackage (round 2, R2-M1) | False for none, pending and cancelled; true for ACTIVE or EXPIRED | PASSED |
 
 ### 2.2 Dashboard screen - `frontend/src/pages/member/memberDashboard.test.tsx`
 The whole app is rendered at `/member` with a member session and a fake backend.
@@ -112,6 +116,10 @@ The whole app is rendered at `/member` with a member session and a fake backend.
 | TC-FE02-091 | m4 | 12 remaining of 8 | aria-valuenow 8, aria-valuemax 8, "8 of 8 sessions remaining" | PASSED |
 | TC-FE02-092 | m6 | Cards fail, bookings load, then Try again | Cards called twice, bookings called once, Upcoming sessions shows 1 | PASSED |
 | TC-FE02-093 | m6 | Cards and bookings fail, then Try again | Bookings called again and shown | PASSED |
+| TC-FE02-122 | R2-M1 | ACTIVE VIP card, no registrations | Hero data-variant first-package, title "Choose your first sport package.", text "Your VIP card gives you 10% off 30 day and 90 day packages. Pick a sport to start training.", Explore packages to /member/packages; no "no sessions left" text | PASSED |
+| TC-FE02-123 | R2-M1 | Only an expired card, no registrations | Hero first-package with "Pick a sport and a training style to start training." | PASSED |
+| TC-FE02-124 | R2-m1 | One package with 0 sessions left | Active packages 1 (same as the list), hint "0 can be booked - 1 with no sessions left" | PASSED |
+| TC-FE02-125 | R2-m1 | One bookable package | Hint "Your paid sport access" | PASSED |
 
 ### 2.3 My Profile screen - `frontend/src/pages/member/myProfile.test.tsx`
 
@@ -138,7 +146,9 @@ The whole app is rendered at `/member` with a member session and a fake backend.
 | TC-FE02-064 | AC3 | Backend 400 details for newPassword | Message under New password | PASSED |
 | TC-FE02-065 | AC3 | Backend 500 | Message above the form, button enabled again | PASSED |
 | TC-FE02-066 | - | Type a new password | Live rules update; "Meets requirements" when valid | PASSED |
-| TC-FE02-067 | B1, AC3 | Backend 401 on PUT /users/me/password | "Current password is incorrect" under Current password (focused); no call to /auth/refresh; one password call; both tokens still stored; still on My Profile; Save changes still works afterwards | PASSED |
+| TC-FE02-067 | R2-B1, AC3 | Wrong password: PUT /users/me/password always answers 401 (changed in round 2) | 401 -> one /auth/refresh -> retry with the new token -> 401; "Current password is incorrect" under Current password (focused); exactly one refresh; tokens rotated to member-access-2 and member-refresh-2; still on My Profile; Save changes still works afterwards | PASSED |
+| TC-FE02-080 | R2-B1, AC3 | Expired access token, correct password: only the refreshed token is accepted | 401 -> refresh -> retry 204; one success announcement; one refresh, two password calls; tokens rotated; no field error; form cleared | PASSED |
+| TC-FE02-081 | R2-B1 | Password call 401 and the refresh token rejected | Signed out like any other request: login page "Welcome back", tokens cleared | PASSED |
 | TC-FE02-068 | B2 | 400 "Current password is incorrect" without details | Shown above the form (role alert), not under the field | PASSED |
 | TC-FE02-069 | B2 | 400 "Password change is not allowed right now" without details | Shown above the form; Current password not marked invalid | PASSED |
 
@@ -171,7 +181,12 @@ The whole app is rendered at `/member` with a member session and a fake backend.
 
 | ID | File | Case | Expected result | Result |
 |---|---|---|---|---|
-| TC-FE02-105 | `frontend/src/api/client.test.ts` ("FE-02 skipAuthRefresh ...") | PUT with skipAuthRefresh answers 401 | ApiError 401; only one call, no /auth/refresh; Bearer token sent; tokens kept; session expired listener not called. The 17 existing client tests (normal 401 refresh) still pass unchanged | PASSED |
+| TC-FE02-105 | `frontend/src/api/client.test.ts` (round 2) | authFailure refresh-then-throw, expired token | 401 -> refresh -> retry succeeds; tokens rotated | PASSED |
+| TC-FE02-106 | `frontend/src/api/client.test.ts` (round 2) | authFailure refresh-then-throw, retry answers 401 | ApiError 401 after exactly one refresh; calls password, refresh, password; tokens are the rotated ones; session expired listener not called | PASSED |
+| TC-FE02-107 | `frontend/src/api/client.test.ts` (round 2) | authFailure refresh-then-throw, refresh rejected | ApiError 401; tokens cleared; session expired listener called once | PASSED |
+| TC-FE02-108 | `frontend/src/api/client.test.ts` (round 2) | authFailure refresh-then-throw, refresh answers 503 | ApiError 503; tokens kept; no sign out | PASSED |
+| TC-FE02-109 | `frontend/src/api/client.test.ts` (round 2) | Password change and GET /users/me in parallel, both 401 | One refresh call shared; both succeed | PASSED |
+| TC-FE02-112 | `frontend/src/api/client.test.ts` (round 2) | Same request without the option, retry answers 401 | Session ends as before (default unchanged) | PASSED |
 | TC-FE02-110 | `frontend/src/layouts/navigation.test.ts` | requireNavItem for payments | Returns "My Payments and Receipts" | PASSED |
 | TC-FE02-111 | `frontend/src/layouts/navigation.test.ts` | requireNavItem for a missing path | Throws 'Menu item "missing" is missing from /member in layouts/navigation.ts' | PASSED |
 
@@ -212,6 +227,23 @@ Deliberate regressions, each applied alone and reverted, full `npx vitest run`:
 
 ---
 
+### 3.3 Review round 2
+Existing tests changed in round 2:
+- `frontend/src/api/client.test.ts`: the round 1 test "FE-02 skipAuthRefresh" was removed together with the option; replaced by TC-FE02-105 to TC-FE02-109 and TC-FE02-112. The 17 client tests from FE-00 and FE-01 are unchanged and pass.
+- `frontend/src/pages/member/myProfile.test.tsx` TC-FE02-067: a 401 now refreshes once and retries; the test expects exactly one refresh and rotated tokens (was: no refresh). The fake backend gained a POST /auth/refresh handler.
+- `frontend/src/pages/member/dashboardModel.test.ts` TC-FE02-019: heroVariant now takes a facts object; one extra assertion for pay without a past package.
+
+Deliberate regressions, each applied alone and reverted, full `npx vitest run`:
+
+| # | Code broken on purpose | Item | Result |
+|---|---|---|---|
+| 1 | A 401 on the retry ends the session again | R2-B1 | 2 tests failed |
+| 2 | changePassword does not pass the option | R2-B1 | 1 test failed |
+| 3 | The option skips the refresh (round 1 behavior) | R2-B1 | 8 tests failed |
+| 4 | first-package branch removed | R2-M1 | 3 tests failed |
+| 5 | Active packages hint always the default | R2-m1 | 1 test failed |
+| 6 | My Payments menu entry renamed | R2-m2 | navigation test failed and 5 test files that render the app failed to load (module load error) |
+
 ## 4. Browser checks (Chromium 1280x900 and 390x800, mock API on port 8099)
 
 | ID | Check | Result |
@@ -225,7 +257,7 @@ Deliberate regressions, each applied alone and reverted, full `npx vitest run`:
 | TC-FE02-B07 | Header name follows the saved full name | PASSED |
 | TC-FE02-B08 | Round 1: member with only a pending package sees "Complete your payment to start training." with Pay now | PASSED |
 | TC-FE02-B09 | Round 1: member with a used up package sees "No sessions left", only Renew package, hero "Find your next sport package." | PASSED |
-| TC-FE02-B10 | Round 1: member without a phone saves an address; a 401 on change password shows "Current password is incorrect" and the page stays on /member/profile | PASSED |
+| TC-FE02-B10 | Round 1: member without a phone saves an address; a 401 on change password shows "Current password is incorrect" and the page stays on /member/profile | PASSED on the round 1 code. Superseded by round 2 (a 401 now refreshes first); not re-run in the browser, covered by TC-FE02-067, TC-FE02-080 and TC-FE02-081 |
 
 ---
 
@@ -275,7 +307,7 @@ Preconditions: BE-02 merged (PUT /users/me and PUT /users/me/password), backend 
 
 ### M09 - Wrong current password (AC3)
 - Steps: change password with a wrong current password.
-- Expected: message under Current password; the member stays signed in whether BE-02 answers 400 with `details.currentPassword` or 401. A 400 without details is shown above the form.
+- Expected: message under Current password; the member stays signed in whether BE-02 answers 400 with `details.currentPassword` or 401 (with a 401 the Network tab shows exactly one POST /auth/refresh and one retry). A 400 without details is shown above the form.
 - Result: NOT RUN
 
 ### M10 - Backend down
@@ -291,6 +323,11 @@ Preconditions: BE-02 merged (PUT /users/me and PUT /users/me/password), backend 
 ### M13 - Member without a phone (review round 1)
 - Steps: as a member registered without a phone, change only the address on /member/profile.
 - Expected: saved; PUT body has phone null; BE-02 accepts a null phone.
+- Result: NOT RUN
+
+### M14 - Change password after the access token expired (review round 2)
+- Steps: log in as a member, open /member/profile and stay on the page longer than the access token lifetime (JWT expiry in backend/.env, or shorten it for the test). Then change the password with the correct current password.
+- Expected: success message; DevTools Network shows PUT /users/me/password 401, POST /auth/refresh 200, PUT /users/me/password 200 or 204; the member stays signed in; the new password works at the next login.
 - Result: NOT RUN
 
 ### M12 - Compare with Figma

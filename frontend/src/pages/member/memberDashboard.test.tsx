@@ -372,4 +372,35 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
     await waitFor(() => expect(statValue('Upcoming sessions')).toBe('1'))
     expect(calls.filter((call) => call.path.startsWith('/bookings/my'))).toHaveLength(2)
   })
+
+  // Review round 2
+
+  it('TC-FE02-122 a member with an ACTIVE VIP card and no package is invited to choose a first package', async () => {
+    await openDashboard({ cards: [card()] })
+    const hero = screen.getByRole('region', { name: 'Choose your first sport package.' })
+    expect(hero).toHaveAttribute('data-variant', 'first-package')
+    expect(
+      within(hero).getByText('Your VIP card gives you 10% off 30 day and 90 day packages. Pick a sport to start training.'),
+    ).toBeInTheDocument()
+    expect(within(hero).getByRole('link', { name: 'Explore packages' })).toHaveAttribute('href', '/member/packages')
+    expect(within(hero).queryByText(/no sessions left|have ended/)).not.toBeInTheDocument()
+  })
+
+  it('TC-FE02-123 a member with only an expired card and no package gets the generic first package text', async () => {
+    await openDashboard({ cards: [card({ status: 'EXPIRED', endDate: '2026-10-01' })] })
+    const hero = screen.getByRole('region', { name: 'Choose your first sport package.' })
+    expect(within(hero).getByText('Pick a sport and a training style to start training.')).toBeInTheDocument()
+  })
+
+  it('TC-FE02-124 the Active packages stat says how many of its packages can still be booked', async () => {
+    await openDashboard({ registrations: [registration({ remainingSessions: 0 })] })
+    expect(statValue('Active packages')).toBe('1')
+    expect(statHint('Active packages')).toBe('0 can be booked - 1 with no sessions left')
+    expect(screen.getAllByRole('listitem', { name: 'Football - Coach-led' })).toHaveLength(1)
+  })
+
+  it('TC-FE02-125 the Active packages hint stays "Your paid sport access" when every package can be booked', async () => {
+    await openDashboard({ registrations: [registration()] })
+    expect(statHint('Active packages')).toBe('Your paid sport access')
+  })
 })

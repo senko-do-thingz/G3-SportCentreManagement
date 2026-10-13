@@ -11,6 +11,7 @@ import {
   canBook,
   currentCard,
   dashboardState,
+  hasHadPackage,
   heroVariant,
   isExhausted,
   MEMBER_PATHS,
@@ -109,7 +110,8 @@ export function MemberDashboardPage() {
   const card = currentCard(cards, today)
   const active = activeRegistrations(registrations, today)
   const pending = pendingItems(cards, registrations)
-  const bookable = active.some((registration) => canBook(registration, today))
+  const bookableCount = active.filter((registration) => canBook(registration, today)).length
+  const bookable = bookableCount > 0
   const upcoming = bookings.status === 'ready' ? upcomingBookings(bookings.data, now) : []
 
   return (
@@ -117,9 +119,15 @@ export function MemberDashboardPage() {
       {header}
 
       <DashboardHero
-        variant={heroVariant(state, bookable, pending.length)}
+        variant={heroVariant({
+          state,
+          hasBookablePackage: bookable,
+          pendingCount: pending.length,
+          hasHadPackage: hasHadPackage(registrations),
+        })}
         fullName={user?.fullName ?? ''}
         firstPending={pending[0] ?? null}
+        card={card}
       />
 
       <div className="dashboard__stats">
@@ -128,7 +136,7 @@ export function MemberDashboardPage() {
           value={card ? card.tierName : STANDARD_TIER_NAME}
           hint={card ? cardHint(card) : 'Explore cards for package discounts'}
         />
-        <StatCard label="Active packages" value={active.length} hint="Your paid sport access" />
+        <StatCard label="Active packages" value={active.length} hint={activePackagesHint(active.length, bookableCount)} />
         <StatCard
           label="Upcoming sessions"
           value={bookings.status === 'ready' ? upcoming.length : '-'}
@@ -164,7 +172,33 @@ interface HeroContent {
   action: { label: string; to?: string; href?: string }
 }
 
-function heroContent(variant: HeroVariant, name: string, firstPending: PendingItem | null): HeroContent {
+/**
+ * Hint of the Active packages stat. The value counts the same packages as the My sport packages
+ * list (ACTIVE and not ended), so the hint says how many of them can still be booked when some
+ * have no sessions left.
+ */
+function activePackagesHint(activeCount: number, bookableCount: number): string {
+  const usedUp = activeCount - bookableCount
+  if (usedUp <= 0) {
+    return 'Your paid sport access'
+  }
+  return `${bookableCount} can be booked - ${usedUp} with no sessions left`
+}
+
+/** Text of the first-package hero: the card discount when a card is in force. */
+function firstPackageText(card: MemberCard | null): string {
+  if (card && card.discountPercentage) {
+    return `Your ${card.tierName} card gives you ${card.discountPercentage}% off 30 day and 90 day packages. Pick a sport to start training.`
+  }
+  return 'Pick a sport and a training style to start training.'
+}
+
+function heroContent(
+  variant: HeroVariant,
+  name: string,
+  firstPending: PendingItem | null,
+  card: MemberCard | null,
+): HeroContent {
   switch (variant) {
     case 'welcome':
       return {
@@ -190,6 +224,13 @@ function heroContent(variant: HeroVariant, name: string, firstPending: PendingIt
             ? { label: 'Pay now', to: paymentSummaryPath(firstPending.paymentId) }
             : { label: 'View pending payments', href: `#${PENDING_PAYMENTS_ID}` },
       }
+    case 'first-package':
+      return {
+        eyebrow: `Welcome back, ${name}`,
+        title: 'Choose your first sport package.',
+        text: firstPackageText(card),
+        action: { label: 'Explore packages', to: MEMBER_PATHS.packages },
+      }
     case 'renew':
       return {
         eyebrow: `Welcome back, ${name}`,
@@ -204,12 +245,14 @@ function DashboardHero({
   variant,
   fullName,
   firstPending,
+  card,
 }: {
   variant: HeroVariant
   fullName: string
   firstPending: PendingItem | null
+  card: MemberCard | null
 }) {
-  const content = heroContent(variant, fullName || 'member', firstPending)
+  const content = heroContent(variant, fullName || 'member', firstPending, card)
   const actionClass = buttonClassName('accent', 'md')
   return (
     <section className="dashboard-hero" aria-labelledby="dashboard-hero-title" data-variant={variant}>
