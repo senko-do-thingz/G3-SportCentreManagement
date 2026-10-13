@@ -105,15 +105,15 @@ Secrets:
 
 ### Application Environment Variables (Runtime Configuration)
 
-The Spring Boot backend requires the following environment variables configured in production (`.env` or server environment):
-- `SPRING_DATASOURCE_URL`: JDBC connection string (e.g., `jdbc:sqlserver://localhost:1433;databaseName=Sportify;encrypt=false`).
-- `SPRING_DATASOURCE_USERNAME`: Database username.
-- `SPRING_DATASOURCE_PASSWORD`: Database password.
-- `JWT_SECRET`: Base64-encoded HMAC-SHA secret key for JWT signing.
-- `CORS_ALLOWED_ORIGINS`: Comma-separated list of allowed frontend origins (e.g., `https://sportify.example.com`).
-- `BANK_TRANSFER_ACCOUNT_NAME`: Account owner name for F3-01/F3-02 bank transfer instructions.
-- `BANK_TRANSFER_ACCOUNT_NUMBER`: Bank account number for bank transfer instructions.
-- `BANK_TRANSFER_BANK_NAME`: Financial institution name for bank transfer instructions.
+The Spring Boot backend requires the following environment variables configured in production (`.env` or server environment). Source of truth is `backend/src/main/resources/application.yml` and `backend/.env.example`:
+- `DB_URL`: Optional (defaults to `jdbc:sqlserver://localhost:1433;databaseName=sportify;encrypt=false;trustServerCertificate=true`). JDBC connection string for Microsoft SQL Server. In production, configure with the target server host, database name, and encryption settings (e.g., `jdbc:sqlserver://db-host:1433;databaseName=sportify;encrypt=true;trustServerCertificate=false`).
+- `DB_USERNAME`: Optional (defaults to `sa`). Database user account name.
+- `DB_PASSWORD`: Required (no default). Database user password.
+- `JWT_SECRET`: Required (no default). Secret key for HMAC-SHA signing and verification of JWT authentication tokens (at least 256 bits / 32 bytes).
+- `CORS_ALLOWED_ORIGINS`: Optional (defaults to empty string in `application.yml` and `application-prod.yml`; in `dev` profile defaults to `http://localhost:5173,http://localhost:3000`). Comma-separated list of allowed frontend origins (e.g., `https://sportify.example.com`). When empty, cross-origin browser requests are rejected.
+- `SPORTIFY_PAYMENT_ACCOUNT_NAME`: Required in non-dev profiles (no default in base `application.yml`; `dev` profile provides a fallback in `application-dev.yml`). Account owner name displayed on bank transfer payment instructions. Validated with `@NotBlank`.
+- `SPORTIFY_PAYMENT_ACCOUNT_NUMBER`: Required in non-dev profiles (no default in base `application.yml`; `dev` profile provides a fallback in `application-dev.yml`). Bank account number displayed on bank transfer payment instructions. Validated with `@NotBlank`.
+- `SPORTIFY_PAYMENT_BANK`: Required in non-dev profiles (no default in base `application.yml`; `dev` profile provides a fallback in `application-dev.yml`). Beneficiary bank name displayed on bank transfer payment instructions. Validated with `@NotBlank`.
 
 ---
 
@@ -171,5 +171,5 @@ The repository administrator must configure the following settings on GitHub:
 - **Remedy**: Rebase the feature branch onto `origin/main` before opening the pull request. Ensure all new migration scripts have version numbers strictly greater than the highest version existing on `origin/main`.
 
 ### Fail-Fast Configuration Errors on Startup
-- **Symptom**: Application fails to start with `BeanInitializationException` on `BankTransferProperties`.
-- **Remedy**: Ensure `BANK_TRANSFER_ACCOUNT_NAME`, `BANK_TRANSFER_ACCOUNT_NUMBER`, and `BANK_TRANSFER_BANK_NAME` are set in the environment or `.env` file. In test slices, `@ActiveProfiles("test")` supplies dummy values from `application-test.yml`.
+- **Symptom**: Application fails to start with `ConfigurationPropertiesBindException` on `bankTransferProperties` (caused by `IllegalArgumentException: Could not resolve placeholder 'SPORTIFY_PAYMENT_ACCOUNT_NAME'` when variables are missing, or `BindValidationException` when validation fails on blank values).
+- **Remedy**: Ensure `SPORTIFY_PAYMENT_ACCOUNT_NAME`, `SPORTIFY_PAYMENT_ACCOUNT_NUMBER`, and `SPORTIFY_PAYMENT_BANK` are set in the environment or `.env` file with non-empty values. In `dev` profile, fallback values are loaded from `application-dev.yml`. In test slices, `@ActiveProfiles("test")` supplies dummy values from `application-test.yml`.
