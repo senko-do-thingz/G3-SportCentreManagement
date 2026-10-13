@@ -75,8 +75,14 @@ jobs:
 
       - name: Assert port 1433 is not published on host
         run: |
+          CONTAINER_ID="$(docker compose -f deploy/compose.yaml --profile with-db ps -q sqlserver)"
+          HOST_PORT="$(docker inspect "$CONTAINER_ID" --format '{{range $p, $conf := .NetworkSettings.Ports}}{{if eq $p "1433/tcp"}}{{range $conf}}{{.HostPort}}{{end}}{{end}}{{end}}')"
+          if [ -n "$HOST_PORT" ]; then
+            echo "Error: Port 1433 is mapped to host port: $HOST_PORT"
+            exit 1
+          fi
           PUBLISHED_PORT="$(docker compose -f deploy/compose.yaml --profile with-db port sqlserver 1433 2>/dev/null || true)"
-          if [ -n "$PUBLISHED_PORT" ]; then
+          if [ -n "$PUBLISHED_PORT" ] && [ "$PUBLISHED_PORT" != ":0" ]; then
             echo "Error: Port 1433 is published on host: $PUBLISHED_PORT"
             exit 1
           fi
@@ -84,7 +90,9 @@ jobs:
 
       - name: Assert db-init idempotency by running a second time
         run: |
-          docker compose -f deploy/compose.yaml --profile with-db up --force-recreate --exit-code-from db-init db-init
+          echo "Running db-init a second time to verify idempotency..."
+          docker compose -f deploy/compose.yaml --profile with-db run --rm db-init
+          echo "Verified: db-init second run completed successfully"
 
       - name: Dump compose logs on failure
         if: failure()
