@@ -8,6 +8,8 @@ import { PublicLayout } from '../layouts/PublicLayout'
 import { StaffLayout } from '../layouts/StaffLayout'
 import { PageLoader } from '../components/ui/Spinner'
 import { MemberDashboardPage } from '../pages/member/MemberDashboardPage'
+import { MembershipCardsPage } from '../pages/member/MembershipCardsPage'
+import { MyMembershipPage } from '../pages/member/MyMembershipPage'
 import { MyProfilePage } from '../pages/member/MyProfilePage'
 import { PackageDetailPage } from '../pages/member/PackageDetailPage'
 import { PaymentSummaryPage } from '../pages/member/PaymentSummaryPage'
@@ -28,11 +30,14 @@ const SCREENS: Record<string, ReactNode> = {
   '/member': <MemberDashboardPage />,
   '/member/profile': <MyProfilePage />,
   '/member/packages': <SportPackagesPage />,
+  '/member/membership': <MyMembershipPage />,
 }
 
 /**
  * Sub pages by area base path, relative to the area.
  * - 'packages/:packageId': Package Detail and Registration (F1-10, FE-03).
+ * - 'membership/cards': Membership Cards and the Renew Membership Card overlay (F1-11, FE-04),
+ *   linked from the Membership card tab of My Membership (F1-12).
  * - 'payments/:paymentId': Payment Summary (F3-01), linked from "Pay now" on the dashboard (FE-02)
  *   and reached after a registration (FE-03). FE-03 replaced the FE-02 placeholder with a read only
  *   summary; FE-11 adds the payment method and the status screens.
@@ -40,6 +45,7 @@ const SCREENS: Record<string, ReactNode> = {
 const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
   '/member': [
     { path: 'packages/:packageId', element: <PackageDetailPage /> },
+    { path: 'membership/cards', element: <MembershipCardsPage /> },
     { path: 'payments/:paymentId', element: <PaymentSummaryPage /> },
   ],
 }

@@ -251,7 +251,7 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
     const user = userEvent.setup()
     await openDashboard()
     const quickLinks = screen.getByRole('navigation', { name: 'Quick links' })
-    expect(within(quickLinks).getByRole('link', { name: /My membership card/ })).toHaveAttribute('href', '/member/membership')
+    expect(within(quickLinks).getByRole('link', { name: /My membership card/ })).toHaveAttribute('href', '/member/membership?tab=card')
     expect(within(quickLinks).getByRole('link', { name: /Sport packages/ })).toHaveAttribute('href', '/member/packages')
     expect(within(quickLinks).getByRole('link', { name: /My schedule/ })).toHaveAttribute('href', '/member/schedule')
     expect(within(quickLinks).getByRole('link', { name: /My payments/ })).toHaveAttribute('href', '/member/payments')

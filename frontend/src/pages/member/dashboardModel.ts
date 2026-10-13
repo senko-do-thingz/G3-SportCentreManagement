@@ -16,6 +16,10 @@ export const MEMBER_PATHS = {
    * member's registrations ("My registrations"), so "View all packages" points here.
    */
   membership: '/member/membership',
+  /** The Membership card tab of F1-12 (FE-04), opened by the "My membership card" quick link. */
+  membershipCard: '/member/membership?tab=card',
+  /** Membership Cards (F1-11, FE-04), a sub page of My Membership. */
+  membershipCards: '/member/membership/cards',
   schedule: '/member/schedule',
   payments: '/member/payments',
 } as const

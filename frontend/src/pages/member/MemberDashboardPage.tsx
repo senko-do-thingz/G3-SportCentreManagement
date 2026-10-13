@@ -480,7 +480,7 @@ function ProfileCard() {
 }
 
 const QUICK_LINKS = [
-  { to: MEMBER_PATHS.membership, label: 'My membership card', hint: 'Tier, benefits and renewal' },
+  { to: MEMBER_PATHS.membershipCard, label: 'My membership card', hint: 'Tier, benefits and renewal' },
   { to: MEMBER_PATHS.packages, label: 'Sport packages', hint: 'Prices by sport and training style' },
   { to: MEMBER_PATHS.schedule, label: 'My schedule', hint: 'Book and manage sessions' },
   { to: MEMBER_PATHS.payments, label: 'My payments', hint: 'Payment status and receipts' },

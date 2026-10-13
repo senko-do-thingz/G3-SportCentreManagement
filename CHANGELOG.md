@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-10-13 - Membership Cards and My Membership (FE-04, Flow 1)
+
+Branch `feat/f1-member-cards`, stacked on `feat/f1-member-packages` (FE-03) and `feat/f1-member-dashboard` (FE-02), both not merged yet: merge FE-02, then FE-03, then FE-04. Owner: Phat. Priority: P1. Depends on FE-00 and BE-17. Verified with `npm run lint`, `tsc -b`, `npm test` (338 tests in 18 files, 40 new) and `npm run build`.
+
+### Added
+- Membership Cards (F1-11) at `/member/membership/cards`: `GET /membership-cards/tiers` and `GET /membership-cards/my`; each tier shows price, validity, discount, perks and description; the tier in force is marked Active (Standard is marked Current when there is no paid card), a queued renewal shows "Starts", a pending request shows "Pending payment".
+- Tier buttons follow `MembershipCardServiceImpl.planCard`: same tier as the last card -> Renew card (from the day after it ends), dearer tier -> Upgrade card (pay the difference, keep the end date; blocked with the reason while a renewal is queued), cheaper tier -> Buy after current card (starts after the last card ends), no paid card -> Get card.
+- Renew Membership Card overlay: card fee, upgrade credit, amount to pay, validity, discount, start and end date computed before Confirm; `POST /membership-cards/purchase` with `{tierId}` then the payment summary `/member/payments/{paymentId}`. Backend errors (for example a request already waiting for payment) are shown in the overlay as is.
+- My Membership and Sport Packages (F1-12) at `/member/membership` with tabs Sport packages and Membership card (`?tab=card`): registrations from `GET /packages/registrations/my` with the states Pending Payment (Pay now), Active (Book a session, Renew package) and Expired (Renew package, View payment); cards from `GET /membership-cards/my` with Pay now and Cancel request for pending requests only (`PUT /membership-cards/{id}/cancel`, then the list reloads).
+- `src/api/cardsApi.ts`, `src/pages/member/cardsModel.ts`, tier fixtures in `src/test/memberFixtures.ts`, styles in `src/styles/member.css`.
+
+### Changed
+- Dashboard quick link "My membership card" opens the Membership card tab (`MEMBER_PATHS.membershipCard`); TC-FE02 quick link assertion updated.
+
+### Review round 1
+- Must fix: overlay title "{tier name} card" (reads "VIP Member card" with the V10 names); tier fixtures use the exact V10 values; tier description no longer shown; Renew card only on the latest ended paid card when nothing is in force or queued (`renewableCardId`); a 400 or 404 on cancel and a 400 on purchase reload the data and keep the backend message; one "today" per page, the plan of the tier button is passed to the overlay.
+- Should fix: "Choose card" for the unknown plan; `MEMBER_PATHS.membershipCards` replaces `MEMBERSHIP_CARDS_PATH` and `MEMBERSHIP_CARD_TAB_PATH`; footer "Confirm and continue" then "Cancel"; Payment row removed from "How your card works"; both tabpanels rendered (inactive one hidden); cardsModel comment states the UTC+7 assumption. 352 tests pass (14 new).
+
+### Notes
+- An ACTIVE card or registration past its end date is shown as Expired until the nightly jobs (F1-B3, F1-B4) exist.
+- The backend has no perks field on `CardTierResponse`; perks are built from the discount rule. Figma F1-11 says a mid-term change to a cheaper tier is not available; the task and the backend allow it as a card that starts later, which is what the screen does.
+- Activation recomputes the dates on the day the payment is confirmed; the pending card says so.
+
 ## 2026-10-13 - Sport Packages and Registration (FE-03, Flow 1)
 
 Branch `feat/f1-member-packages`, stacked on `feat/f1-member-dashboard` (FE-02, not merged yet): merge FE-02 first. Owner: Phat. Priority: P1. Depends on FE-00 and BE-17. Verified with `npm run lint -- --max-warnings 0`, `tsc -b`, `npm test` (286 tests in 16 files, 31 new) and `npm run build`.
