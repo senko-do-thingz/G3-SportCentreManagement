@@ -177,11 +177,24 @@ Front desk arrival record (F1-15).
 ## Operator Runbook: Migration V22 Upgrade Chain Verification and Unresolved Rows
 
 ### Overview
-Migration V22 introduces upgrade chain tracking (`upgrade_request` and `replaces_card_id` on `member_card`) and explicit tier ranking (`tier_rank` on `membership_card_tier`). While deterministic multi-step chains sharing matching `end_date` are linked automatically, legacy ambiguous rows (multiple candidate predecessors or missing predecessor) leave `replaces_card_id` as `NULL`. When members holding these unresolved cards attempt automated self-service upgrades or activation, the backend fails closed (HTTP 400 directing the member to the front desk) to prevent incorrect upgrade pricing or invalid replacement links.
+Migration V22 introduces upgrade chain tracking (`upgrade_request` and `replaces_card_id` on `member_card`) and explicit tier ranking (`tier_rank` on `membership_card_tier`). While deterministic multi-step chains sharing matching `end_date` are linked automatically, legacy ambiguous rows (multiple candidate predecessors, duplicate in-force targets, or missing predecessor) leave `replaces_card_id` as `NULL`. When members holding these unresolved cards attempt automated self-service upgrades or activation, the backend fails closed (HTTP 400 directing the member to the front desk) to prevent incorrect upgrade pricing or invalid replacement links.
 
-### Inspection Query (Read-Only)
-Operators can run the following read-only SQL query post-migration to identify active or pending legacy cards with unresolved predecessor links:
+### Pre-Deployment Dry-Run Queries (Production Copy)
+> [!IMPORTANT]
+> The following read-only inspection queries MUST be executed against a staging replica / production copy BEFORE deploying Migration V22 to production, and the results recorded in the deployment change log.
 
+**Query 1: Dry-run count of unresolved cards grouped by status:**
+```sql
+SELECT 
+    status,
+    COUNT(*) AS unresolved_count
+FROM member_card
+WHERE upgrade_request = 1 
+  AND replaces_card_id IS NULL
+GROUP BY status;
+```
+
+**Query 2: Detailed list of affected cards with pricing comparison:**
 ```sql
 SELECT 
     mc.id AS card_id,
@@ -189,9 +202,11 @@ SELECT
     mc.member_id,
     u.full_name AS member_name,
     u.email AS member_email,
+    mct.code AS tier_code,
     mct.name AS tier_name,
-    mc.status,
     mc.price_paid,
+    mct.price AS live_tier_price,
+    mc.status,
     mc.start_date,
     mc.end_date,
     mc.created_at
@@ -205,6 +220,27 @@ WHERE mc.upgrade_request = 1
 ORDER BY mc.member_id, mc.created_at DESC;
 ```
 
+### Operational Notes & Constraints
+
+#### 1. Promotional and Pre-Price-Increase Cards
+Cards originally purchased at full price during a temporary promotional discount, or purchased before a manager increased the catalog price of the tier, satisfy the legacy backfill heuristic `price_paid < tier.price`. Because no predecessor card exists sharing their term dates, their `replaces_card_id` remains `NULL`.
+When a member holding such a card attempts an online self-service upgrade, the system fails closed with HTTP 400 (`Cannot determine upgrade baseline for this membership card. Please contact the front desk.`), preventing automated calculation errors until staff resolves their baseline credit at the front desk.
+
+#### 2. SQL Server `SET QUOTED_IDENTIFIER ON;` Requirement
+Table `member_card` contains a filtered unique index:
+`ux_member_card_replaces_in_force ON member_card(replaces_card_id) WHERE status IN ('ACTIVE', 'PENDING_PAYMENT') AND replaces_card_id IS NOT NULL;`
+SQL Server requires `QUOTED_IDENTIFIER` to be `ON` for any session executing DML statements (`INSERT`, `UPDATE`, `DELETE`) against tables with filtered indexes.
+When running ad-hoc SQL maintenance or scripts through command-line tools like `sqlcmd`, operators MUST explicitly issue:
+```sql
+SET QUOTED_IDENTIFIER ON;
+```
+Failure to set this will cause DML operations to abort with SQL Server error 1934 (`UPDATE failed because SET options have incorrect settings 'QUOTED_IDENTIFIER'`).
+
+#### 3. Tier Rank Rules and Inactive Tiers
+- Non-STANDARD tiers configured with `tier_rank = 0` cannot be purchased (backend rejects with HTTP 400: `Tier ranking is not configured for this tier`).
+- Currently, no public or manager API modifies `tier_rank`; it is initialized via schema migration seeds (STANDARD=1, SILVER=2, GOLD=3, VIP=4).
+- The filtered unique index `ux_membership_card_tier_rank` enforces rank uniqueness across all tiers where `tier_rank > 0`, including inactive tiers (`is_active = 0`). This ensures that deactivating a tier does not permit re-using its rank for another active tier, maintaining strict upgrade hierarchy invariants.
+
 ### Front-Desk Handling Procedure
 When a member receives the error message "Cannot determine upgrade baseline for this membership card. Please contact the front desk.", staff should follow this resolution procedure:
 1. Lookup Member: Search member in Reception Member Search (F1-12) by email, phone, or member code.
@@ -212,4 +248,5 @@ When a member receives the error message "Cannot determine upgrade baseline for 
 3. Determine Baseline Credit: Sum the actual payments (`price_paid`) made by the member toward the current active period.
 4. Desk Sale or Resolution: Use Front Desk Register and Renew (F1-14) to sell the target tier card with manual credit adjustment or issue a replacement card as appropriate.
 5. Record Note: Add a note to the member record documenting the legacy upgrade baseline resolution.
+
 

@@ -156,15 +156,17 @@ Check constraints:
 | 10 | updated_at | DATETIME2(0) | Yes | - | - | V10 | - |
 | 11 | tier_rank | INT | No | 0 | - | V22 | Explicit hierarchy rank (STANDARD=1, SILVER=2, GOLD=3, VIP=4) |
 
-Unique constraints:
+Unique constraints and filtered indexes:
 
 - `uq_membership_card_tier_code`: (code)
+- `ux_membership_card_tier_rank`: (tier_rank) WHERE tier_rank > 0 (V22, enforces unique rank across active and inactive tiers)
 
 Check constraints:
 
 - `ck_membership_card_tier_price`: `(price >= 0)`
 - `ck_membership_card_tier_duration`: `(duration_months >= 0)`
 - `ck_membership_card_tier_discount`: `(discount_percentage >= 0 AND discount_percentage <= 100)`
+- `chk_membership_card_tier_rank`: `(tier_rank >= 0)` (V22)
 
 ## `member_card`
 

@@ -48,6 +48,11 @@ public class MembershipCardTier {
     @Builder.Default
     private Boolean isActive = true;
 
+    /**
+     * Returns the effective positive rank of this tier, or 0 if rank is zero or unconfigured.
+     * The database column tier_rank is NOT NULL DEFAULT 0. The null check guards
+     * transient unpersisted instances before persistence lifecycle defaults apply.
+     */
     public int getEffectiveRank() {
         return (tierRank != null && tierRank > 0) ? tierRank : 0;
     }

@@ -26,7 +26,6 @@ import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.data.domain.Sort;
@@ -62,6 +61,10 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     private final AuditService auditService;
     private final Clock clock;
 
+    /**
+     * Determines whether the given tier is the STANDARD tier.
+     * Uses case-insensitive comparison to align with SQL Server default CI (case-insensitive) collation.
+     */
     public static boolean isStandard(MembershipCardTier tier) {
         return tier != null && STANDARD_TIER_CODE.equalsIgnoreCase(tier.getCode());
     }
@@ -109,6 +112,9 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             }
             if (request.getDurationMonths() < 1) {
                 throw new BusinessRuleException("Duration in months must be at least 1 for paid tiers");
+            }
+            if (Boolean.TRUE.equals(request.getActive())) {
+                validateTierPriceMonotonicity(tier, request.getPrice());
             }
         }
 
@@ -208,6 +214,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         if (!isUpgrade && !paidAtDesk && plan.price().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessRuleException("Payment amount must be greater than zero. Attempted card price: " + plan.price());
         }
+        validateUpgradeFeeForActor(isUpgrade, plan.price(), paidAtDesk);
         boolean isFree = isUpgrade && plan.price().compareTo(BigDecimal.ZERO) <= 0;
         CardStatus status = (paidAtDesk || isFree) ? CardStatus.ACTIVE : CardStatus.PENDING_PAYMENT;
         MemberCard card = newCard(member, tier, plan.startDate(), plan.endDate(), status, plan.price(), isUpgrade, plan.replaces());
@@ -426,6 +433,60 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     private void replace(MemberCard old) {
         old.setStatus(CardStatus.REPLACED);
         memberCardRepository.save(old);
+    }
+
+    /**
+     * Temporary fail-closed policy pending Product Owner decision:
+     * Self-service members cannot execute zero-fee upgrades online.
+     * When computed upgrade fee is <= 0, non-staff actors are directed to the front desk.
+     * Staff-assisted purchases at the desk remain permitted to process zero-fee upgrades immediately.
+     */
+    private void validateUpgradeFeeForActor(boolean isUpgrade, BigDecimal fee, boolean paidAtDesk) {
+        if (isUpgrade && !paidAtDesk && fee.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessRuleException("Zero-fee upgrades cannot be completed online. Please contact the front desk.");
+        }
+    }
+
+    /**
+     * Enforces price monotonicity for active paid tiers:
+     * When ordered by tier_rank, active paid tier prices must be strictly increasing.
+     * Compares the proposed price against the nearest active lower-ranked and nearest active higher-ranked paid tier.
+     * Decision on inactive tiers: Inactive tiers are excluded from active price monotonicity enforcement
+     * because they are not on sale to members. When an inactive tier is edited or reactivated, its price is validated
+     * if request.getActive() is true. STANDARD tier is excluded from this rule.
+     */
+    private void validateTierPriceMonotonicity(MembershipCardTier tierBeingUpdated, BigDecimal newPrice) {
+        int targetRank = tierBeingUpdated.getEffectiveRank();
+        if (targetRank <= 0) {
+            return;
+        }
+        List<MembershipCardTier> activeTiers = tierRepository.findByIsActiveTrue().stream()
+                .filter(t -> !isStandard(t))
+                .filter(t -> !t.getId().equals(tierBeingUpdated.getId()))
+                .filter(t -> t.getEffectiveRank() > 0)
+                .collect(Collectors.toList());
+
+        // Nearest lower-ranked active paid tier
+        activeTiers.stream()
+                .filter(t -> t.getEffectiveRank() < targetRank)
+                .max(Comparator.comparingInt(MembershipCardTier::getEffectiveRank))
+                .ifPresent(lowerTier -> {
+                    if (newPrice.compareTo(lowerTier.getPrice()) <= 0) {
+                        throw new BusinessRuleException("Tier price must be strictly greater than lower-ranked tier '"
+                                + lowerTier.getName() + "' (" + lowerTier.getPrice() + ")");
+                    }
+                });
+
+        // Nearest higher-ranked active paid tier
+        activeTiers.stream()
+                .filter(t -> t.getEffectiveRank() > targetRank)
+                .min(Comparator.comparingInt(MembershipCardTier::getEffectiveRank))
+                .ifPresent(higherTier -> {
+                    if (newPrice.compareTo(higherTier.getPrice()) >= 0) {
+                        throw new BusinessRuleException("Tier price must be strictly less than higher-ranked tier '"
+                                + higherTier.getName() + "' (" + higherTier.getPrice() + ")");
+                    }
+                });
     }
 
     private MemberCard newCard(MemberProfile member, MembershipCardTier tier, LocalDate start, LocalDate end,

@@ -118,7 +118,8 @@ EXEC sp_executesql N'
       AND mc.[upgrade_request] = 0;
 
     -- 4b. Deterministically link upgrade cards in an upgrade chain (including A -> B -> C).
-    -- Each upgrade card is linked ONLY when exactly one eligible predecessor candidate exists.
+    -- Each upgrade card is linked ONLY when exactly one eligible predecessor candidate exists,
+    -- and that predecessor candidate is claimed by exactly one upgrade card (unambiguous 1-to-1 match).
     -- Candidates already referenced as replaces_card_id are excluded so deeper chains (A -> B -> C)
     -- resolve unambiguously without mislinking ambiguous multiple predecessors.
     -- If zero or several candidates exist, replaces_card_id remains NULL (fail-closed).
@@ -128,10 +129,10 @@ EXEC sp_executesql N'
     BEGIN
         SET @chain_iter = @chain_iter + 1;
 
-        WITH SinglePredecessor AS (
+        WITH CandidatePairs AS (
             SELECT
                 mc.[id] AS upgrade_card_id,
-                MIN(rc.[id]) AS candidate_card_id
+                rc.[id] AS candidate_card_id
             FROM [member_card] mc
             JOIN [member_card] rc
               ON rc.[member_id] = mc.[member_id]
@@ -146,8 +147,21 @@ EXEC sp_executesql N'
                   FROM [member_card]
                   WHERE [replaces_card_id] IS NOT NULL
               )
-            GROUP BY mc.[id]
-            HAVING COUNT(rc.[id]) = 1
+        ),
+        UnambiguousCandidate AS (
+            SELECT candidate_card_id
+            FROM CandidatePairs
+            GROUP BY candidate_card_id
+            HAVING COUNT(upgrade_card_id) = 1
+        ),
+        SinglePredecessor AS (
+            SELECT
+                cp.upgrade_card_id,
+                MIN(cp.candidate_card_id) AS candidate_card_id
+            FROM CandidatePairs cp
+            JOIN UnambiguousCandidate uc ON cp.candidate_card_id = uc.candidate_card_id
+            GROUP BY cp.upgrade_card_id
+            HAVING COUNT(cp.candidate_card_id) = 1
         )
         UPDATE mc
         SET mc.[replaces_card_id] = sp.candidate_card_id
@@ -158,10 +172,10 @@ EXEC sp_executesql N'
     END;
 
     -- 4c. Deterministically link PENDING_PAYMENT legacy upgrades to the unique active paid card whose term started
-    WITH SingleActiveCard AS (
+    WITH CandidatePairs AS (
         SELECT
             mc.[id] AS pending_card_id,
-            MIN(ac.[id]) AS candidate_card_id
+            ac.[id] AS candidate_card_id
         FROM [member_card] mc
         JOIN [member_card] ac
           ON ac.[member_id] = mc.[member_id]
@@ -175,8 +189,21 @@ EXEC sp_executesql N'
           AND mc.[replaces_card_id] IS NULL
           AND (ac.[start_date] IS NULL OR ac.[start_date] <= mc.[start_date])
           AND (ac.[end_date] IS NULL OR ac.[end_date] >= mc.[start_date])
-        GROUP BY mc.[id]
-        HAVING COUNT(ac.[id]) = 1
+    ),
+    UnambiguousCandidate AS (
+        SELECT candidate_card_id
+        FROM CandidatePairs
+        GROUP BY candidate_card_id
+        HAVING COUNT(pending_card_id) = 1
+    ),
+    SingleActiveCard AS (
+        SELECT
+            cp.pending_card_id,
+            MIN(cp.candidate_card_id) AS candidate_card_id
+        FROM CandidatePairs cp
+        JOIN UnambiguousCandidate uc ON cp.candidate_card_id = uc.candidate_card_id
+        GROUP BY cp.pending_card_id
+        HAVING COUNT(cp.candidate_card_id) = 1
     )
     UPDATE mc
     SET mc.[replaces_card_id] = s.candidate_card_id
@@ -186,7 +213,9 @@ EXEC sp_executesql N'
 GO
 
 -- Step 5: Clean up / fail-safe pre-check: ensure no duplicate replaces_card_id exist on in-force cards before index creation
+-- Fail closed: if multiple in-force cards point to the same replaces_card_id, set replaces_card_id = NULL for ALL cards in the duplicate group.
 DECLARE @cleared_count INT = 0;
+DECLARE @cleared_ids NVARCHAR(MAX) = N'';
 IF EXISTS (
     SELECT replaces_card_id
     FROM [member_card]
@@ -195,16 +224,40 @@ IF EXISTS (
     HAVING COUNT(*) > 1
 )
 BEGIN
-    WITH DuplicateInForce AS (
-        SELECT [id], ROW_NUMBER() OVER (PARTITION BY [replaces_card_id] ORDER BY [id] DESC) AS rn
-        FROM [member_card]
-        WHERE [status] IN ('ACTIVE', 'PENDING_PAYMENT') AND [replaces_card_id] IS NOT NULL
-    )
-    UPDATE [member_card]
-    SET [replaces_card_id] = NULL
-    WHERE [id] IN (SELECT [id] FROM DuplicateInForce WHERE rn > 1);
+    SELECT @cleared_ids = STRING_AGG(CAST([id] AS NVARCHAR(20)), ', ')
+    FROM (
+        SELECT TOP 50 mc.[id]
+        FROM [member_card] mc
+        WHERE mc.[status] IN ('ACTIVE', 'PENDING_PAYMENT')
+          AND mc.[replaces_card_id] IN (
+              SELECT [replaces_card_id]
+              FROM [member_card]
+              WHERE [status] IN ('ACTIVE', 'PENDING_PAYMENT') AND [replaces_card_id] IS NOT NULL
+              GROUP BY [replaces_card_id]
+              HAVING COUNT(*) > 1
+          )
+        ORDER BY mc.[id]
+    ) sub;
+
+    UPDATE mc
+    SET mc.[replaces_card_id] = NULL
+    FROM [member_card] mc
+    WHERE mc.[status] IN ('ACTIVE', 'PENDING_PAYMENT')
+      AND mc.[replaces_card_id] IN (
+          SELECT [replaces_card_id]
+          FROM [member_card]
+          WHERE [status] IN ('ACTIVE', 'PENDING_PAYMENT') AND [replaces_card_id] IS NOT NULL
+          GROUP BY [replaces_card_id]
+          HAVING COUNT(*) > 1
+      );
 
     SET @cleared_count = @@ROWCOUNT;
+
+    PRINT 'Step 5: Cleared ' + CAST(@cleared_count AS VARCHAR(10)) + ' ambiguous in-force replaces_card_id links (all duplicates nulled).';
+    IF LEN(@cleared_ids) > 0
+    BEGIN
+        PRINT 'Step 5: Sample of affected card IDs: ' + @cleared_ids;
+    END;
 END;
 
 -- Add unique filtered index on replaces_card_id for in-force cards

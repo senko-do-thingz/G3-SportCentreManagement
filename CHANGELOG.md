@@ -16,8 +16,11 @@ Branch `feat/f1-manager-catalog`. Owner: Dat (Senko). Priority: P1. Depends on: 
   - On `main`, frontend `planCard` calculates upgrade price as `targetTier.price - currentTier.livePrice`.
   - In BE-03, the backend computes upgrade fee as `max(0, targetTier.price - cumulativeBasePaid)` (where `cumulativeBasePaid` is the actual cumulative amount paid by the member toward the current active term across the replacement chain, retaining historical pricePaid snapshots).
   - An upgrade is strictly determined by explicit tier rank (`targetTier.tierRank > currentTier.tierRank`), NOT by live price comparison (`targetTier.price > currentTier.price`). Consequently, price promotions or price adjustments cannot flip or invert upgrade rules.
-  - If the calculated upgrade fee is <= 0, the upgrade is granted at fee 0.00 (free upgrade, immediately ACTIVE with 0 fee, replacing the current card) so a member is never stuck. If a legacy card's upgrade chain cannot be resolved, automated upgrade fails closed (HTTP 400 with a message directing the member to the front desk).
-  - Frontend `planCard` in `src/pages/member/cardsModel.ts` should be updated to mirror this contract by using cumulative base price from the active card's payment history, comparing explicit tier ranks rather than live catalog prices, and handling fee <= 0 as a free upgrade.
+  - Price monotonicity rule for active paid tiers: When updating a paid tier, its price must be strictly increasing with tier_rank compared to the nearest lower-ranked and nearest higher-ranked active paid tier. STANDARD tier is excluded.
+  - Zero-fee upgrade policy (temporary fail-closed pending PO approval): If the calculated upgrade fee is <= 0, self-service online upgrade attempts fail closed (HTTP 400 directing member to the front desk) to prevent irreversible automated zero-fee tier upgrades; staff-assisted purchases at the desk remain permitted to process zero-fee upgrades immediately.
+  - If a legacy card's upgrade chain cannot be resolved, automated upgrade fails closed (HTTP 400 with a message directing the member to the front desk).
+  - Open PO questions: free upgrade policy, refund policy, proration, and optimistic concurrency locking for manager catalog edits.
+  - Frontend `planCard` in `src/pages/member/cardsModel.ts` should be updated to mirror this contract by using cumulative base price from the active card's payment history, comparing explicit tier ranks rather than live catalog prices, and directing fee <= 0 requests to the front desk.
 
 ## 2026-10-13 - Receptionist Member Search, Register and Renew, Check-in (FE-05, Flow 1)
 

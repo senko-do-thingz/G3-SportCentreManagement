@@ -93,6 +93,12 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
     @Value("${spring.flyway.locations}")
     private String flywayLocations;
 
+    private String[] getFlywayLocationArray() {
+        return (flywayLocations != null && !flywayLocations.isBlank())
+                ? flywayLocations.split(",")
+                : new String[]{"classpath:db/migration"};
+    }
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -343,7 +349,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         MembershipCardTier testTier = cardTierRepository.save(MembershipCardTier.builder()
                 .code("TIER-UPD-" + MARKER)
                 .name("Tier Update " + MARKER)
-                .price(BigDecimal.valueOf(300000.00))
+                .price(BigDecimal.valueOf(700000.00))
                 .durationMonths(12)
                 .discountPercentage(5)
                 .description("Initial description " + MARKER)
@@ -354,7 +360,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         Integer originalDiscount = testTier.getDiscountPercentage();
 
         MembershipCardTierUpdateRequest request = MembershipCardTierUpdateRequest.builder()
-                .price(BigDecimal.valueOf(380000.00))
+                .price(BigDecimal.valueOf(780000.00))
                 .durationMonths(12)
                 .discountPercentage(7)
                 .description("Updated tier description " + MARKER)
@@ -366,7 +372,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         // Verify entity persisted in DB
         MembershipCardTier reloaded = cardTierRepository.findById(testTier.getId()).orElseThrow();
         assertEquals(testTier.getName(), reloaded.getName());
-        assertEquals(0, BigDecimal.valueOf(380000.00).compareTo(reloaded.getPrice()));
+        assertEquals(0, BigDecimal.valueOf(780000.00).compareTo(reloaded.getPrice()));
         assertEquals(7, reloaded.getDiscountPercentage());
         assertEquals("Updated tier description " + MARKER, reloaded.getDescription());
 
@@ -383,7 +389,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         assertTrue(detailsNode.has("before"));
         assertTrue(detailsNode.has("after"));
         assertEquals(originalPrice.doubleValue(), detailsNode.get("before").get("price").asDouble());
-        assertEquals(380000.00, detailsNode.get("after").get("price").asDouble());
+        assertEquals(780000.00, detailsNode.get("after").get("price").asDouble());
         assertEquals(originalDiscount.intValue(), detailsNode.get("before").get("discountPercentage").asInt());
         assertEquals(7, detailsNode.get("after").get("discountPercentage").asInt());
     }
@@ -424,7 +430,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         MembershipCardTier testTier = cardTierRepository.save(MembershipCardTier.builder()
                 .code("TIER-SNAP-" + MARKER)
                 .name("Snapshot Tier " + MARKER)
-                .price(BigDecimal.valueOf(300000.00))
+                .price(BigDecimal.valueOf(800000.00))
                 .durationMonths(12)
                 .discountPercentage(5)
                 .tierRank(11)
@@ -435,7 +441,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .cardCode("CARD-" + MARKER)
                 .member(memberProfile)
                 .tier(testTier)
-                .pricePaid(BigDecimal.valueOf(300000.00))
+                .pricePaid(BigDecimal.valueOf(800000.00))
                 .status(CardStatus.ACTIVE)
                 .startDate(LocalDate.now())
                 .endDate(LocalDate.now().plusMonths(12))
@@ -452,9 +458,9 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .build();
         sportPackageService.updatePackage(pkg.getId(), packageUpdateReq, managerUser);
 
-        // 4. Manager updates tier price to 450,000
+        // 4. Manager updates tier price to 850,000
         MembershipCardTierUpdateRequest tierUpdateReq = MembershipCardTierUpdateRequest.builder()
-                .price(BigDecimal.valueOf(450000.00))
+                .price(BigDecimal.valueOf(850000.00))
                 .durationMonths(testTier.getDurationMonths())
                 .discountPercentage(testTier.getDiscountPercentage())
                 .active(true)
@@ -471,8 +477,8 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
 
         // 6. Assert existing member card still retains snapshot pricePaid in DB
         MemberCard reloadedCard = memberCardRepository.findById(card.getId()).orElseThrow();
-        assertEquals(0, BigDecimal.valueOf(300000.00).compareTo(reloadedCard.getPricePaid()),
-                "Historical pricePaid must remain 300000");
+        assertEquals(0, BigDecimal.valueOf(800000.00).compareTo(reloadedCard.getPricePaid()),
+                "Historical pricePaid must remain 800000");
     }
 
     @Test
@@ -515,7 +521,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         MembershipCardTier testTier = cardTierRepository.save(MembershipCardTier.builder()
                 .code("TIER-PEND-" + MARKER)
                 .name("Pending Tier " + MARKER)
-                .price(BigDecimal.valueOf(300000.00))
+                .price(BigDecimal.valueOf(900000.00))
                 .durationMonths(12)
                 .discountPercentage(5)
                 .tierRank(12)
@@ -637,7 +643,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         MembershipCardTier silverTier = cardTierRepository.save(MembershipCardTier.builder()
                 .code("SILVER-" + MARKER)
                 .name("Silver " + MARKER)
-                .price(BigDecimal.valueOf(300000.00))
+                .price(BigDecimal.valueOf(1100000.00))
                 .durationMonths(12)
                 .discountPercentage(5)
                 .tierRank(31)
@@ -647,41 +653,41 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         MembershipCardTier goldTier = cardTierRepository.save(MembershipCardTier.builder()
                 .code("GOLD-" + MARKER)
                 .name("Gold " + MARKER)
-                .price(BigDecimal.valueOf(600000.00))
+                .price(BigDecimal.valueOf(1400000.00))
                 .durationMonths(12)
                 .discountPercentage(10)
                 .tierRank(32)
                 .isActive(true)
                 .build());
 
-        // 1. Member purchases Silver card at 300k
+        // 1. Member purchases Silver card at 1100k
         MemberCardPurchaseRequest silverReq = MemberCardPurchaseRequest.builder()
                 .memberId(memberProfile.getId())
                 .tierId(silverTier.getId())
                 .build();
         MemberCardResponse silverCard = membershipCardService.purchaseCard(silverReq, managerUser);
         assertEquals(CardStatus.ACTIVE, silverCard.getStatus());
-        assertEquals(0, BigDecimal.valueOf(300000.00).compareTo(silverCard.getPricePaid()));
+        assertEquals(0, BigDecimal.valueOf(1100000.00).compareTo(silverCard.getPricePaid()));
 
-        // 2. Manager raises Silver tier price to 450,000
+        // 2. Manager raises Silver tier price to 1,250,000
         MembershipCardTierUpdateRequest silverUpdate = MembershipCardTierUpdateRequest.builder()
-                .price(BigDecimal.valueOf(450000.00))
+                .price(BigDecimal.valueOf(1250000.00))
                 .durationMonths(12)
                 .discountPercentage(5)
                 .active(true)
                 .build();
         membershipCardService.updateTier(silverTier.getId(), silverUpdate, managerUser);
 
-        // 3. Member requests upgrade to Gold (600,000)
+        // 3. Member requests upgrade to Gold (1,400,000)
         MemberCardPurchaseRequest goldReq = MemberCardPurchaseRequest.builder()
                 .memberId(memberProfile.getId())
                 .tierId(goldTier.getId())
                 .build();
         MemberCardResponse goldCard = membershipCardService.purchaseCard(goldReq, managerUser);
 
-        // Upgrade fee must be 600k - 300k (pricePaid) = 300k, NOT 600k - 450k (live) = 150k
+        // Upgrade fee must be 1400k - 1100k (pricePaid) = 300k, NOT 1400k - 1250k (live) = 150k
         assertEquals(0, BigDecimal.valueOf(300000.00).compareTo(goldCard.getPricePaid()),
-                "Upgrade fee must be target tier price (600k) minus actual pricePaid (300k) = 300k");
+                "Upgrade fee must be target tier price (1400k) minus actual pricePaid (1100k) = 300k");
     }
 
     @Test
@@ -690,7 +696,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         MembershipCardTier testTier = cardTierRepository.save(MembershipCardTier.builder()
                 .code("TIER-EDIT-" + MARKER)
                 .name("Edit Tier " + MARKER)
-                .price(BigDecimal.valueOf(400000.00))
+                .price(BigDecimal.valueOf(1500000.00))
                 .durationMonths(12)
                 .discountPercentage(5)
                 .tierRank(41)
@@ -699,7 +705,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
 
         // 1. Manager edits tier price and duration
         MembershipCardTierUpdateRequest updateReq = MembershipCardTierUpdateRequest.builder()
-                .price(BigDecimal.valueOf(450000.00))
+                .price(BigDecimal.valueOf(1550000.00))
                 .durationMonths(12)
                 .discountPercentage(7)
                 .active(true)
@@ -717,18 +723,18 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         // Must NOT be immediately active; must be PENDING_PAYMENT with linked payment created
         assertNotNull(response);
         assertEquals(CardStatus.PENDING_PAYMENT, response.getStatus());
-        assertEquals(0, BigDecimal.valueOf(450000.00).compareTo(response.getPricePaid()));
+        assertEquals(0, BigDecimal.valueOf(1550000.00).compareTo(response.getPricePaid()));
         assertNotNull(response.getPaymentId(), "Pending payment card must have linked payment created");
     }
 
     @Test
-    @DisplayName("Tier rank rule: member holds SILVER paid 550k, GOLD live price 500k, requests GOLD -> fee <= 0 free upgrade")
+    @DisplayName("Tier rank rule: member holds SILVER paid 1750k, GOLD live price 1700k, requests GOLD -> fee <= 0 free upgrade")
     void testRankRule_memberHoldsSilverPaid550k_goldLive500k_requestsGold() {
-        // Create Silver (rank 2) at 550k and Gold (rank 3) at 600k
+        // Create Silver (rank 51) at 1750k and Gold (rank 52) at 1800k
         MembershipCardTier silverTier = cardTierRepository.save(MembershipCardTier.builder()
                 .code("SILVER-RR-" + MARKER)
                 .name("Silver RR " + MARKER)
-                .price(BigDecimal.valueOf(550000.00))
+                .price(BigDecimal.valueOf(1750000.00))
                 .durationMonths(12)
                 .discountPercentage(5)
                 .tierRank(51)
@@ -738,25 +744,25 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         MembershipCardTier goldTier = cardTierRepository.save(MembershipCardTier.builder()
                 .code("GOLD-RR-" + MARKER)
                 .name("Gold RR " + MARKER)
-                .price(BigDecimal.valueOf(600000.00))
+                .price(BigDecimal.valueOf(1800000.00))
                 .durationMonths(12)
                 .discountPercentage(10)
                 .tierRank(52)
                 .isActive(true)
                 .build());
 
-        // 1. Member purchases Silver card at 550k at desk -> ACTIVE
+        // 1. Member purchases Silver card at 1750k at desk -> ACTIVE
         MemberCardPurchaseRequest silverPurchase = MemberCardPurchaseRequest.builder()
                 .memberId(memberProfile.getId())
                 .tierId(silverTier.getId())
                 .build();
         MemberCardResponse activeSilver = membershipCardService.purchaseCard(silverPurchase, managerUser);
         assertEquals(CardStatus.ACTIVE, activeSilver.getStatus());
-        assertEquals(0, BigDecimal.valueOf(550000.00).compareTo(activeSilver.getPricePaid()));
+        assertEquals(0, BigDecimal.valueOf(1750000.00).compareTo(activeSilver.getPricePaid()));
 
-        // 2. Manager lowers Silver tier to 450k and Gold tier to 500k
+        // 2. Manager lowers Silver tier to 1650k and Gold tier to 1700k
         MembershipCardTierUpdateRequest silverUpdate = MembershipCardTierUpdateRequest.builder()
-                .price(BigDecimal.valueOf(450000.00))
+                .price(BigDecimal.valueOf(1650000.00))
                 .durationMonths(12)
                 .discountPercentage(5)
                 .active(true)
@@ -764,24 +770,28 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         membershipCardService.updateTier(silverTier.getId(), silverUpdate, managerUser);
 
         MembershipCardTierUpdateRequest goldUpdate = MembershipCardTierUpdateRequest.builder()
-                .price(BigDecimal.valueOf(500000.00))
+                .price(BigDecimal.valueOf(1700000.00))
                 .durationMonths(12)
                 .discountPercentage(10)
                 .active(true)
                 .build();
         membershipCardService.updateTier(goldTier.getId(), goldUpdate, managerUser);
 
-        // 3. Member requests upgrade to Gold (live price 500k).
-        // Since member paid 550k for Silver, diff = 500k - 550k = -50k <= 0.
-        // Rank rule applies (GOLD rank 3 > SILVER rank 2), fee is 0.00, card is immediately ACTIVE and replaces Silver.
+        // 3. Member attempts self-service upgrade to Gold online (diff <= 0).
+        // Under B5 fail-closed policy, self-service zero-fee upgrade is rejected.
         MemberCardPurchaseRequest goldUpgrade = MemberCardPurchaseRequest.builder()
                 .memberId(memberProfile.getId())
                 .tierId(goldTier.getId())
                 .build();
-        MemberCardResponse goldCard = membershipCardService.purchaseCard(goldUpgrade, memberUser);
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> membershipCardService.purchaseCard(goldUpgrade, memberUser));
+        assertEquals("Zero-fee upgrades cannot be completed online. Please contact the front desk.", ex.getMessage());
+
+        // 4. Staff processes the zero-fee upgrade at the desk -> allowed and activates immediately
+        MemberCardResponse goldCard = membershipCardService.purchaseCard(goldUpgrade, managerUser);
 
         assertNotNull(goldCard);
-        assertEquals(CardStatus.ACTIVE, goldCard.getStatus(), "Fee <= 0 upgrade must activate immediately");
+        assertEquals(CardStatus.ACTIVE, goldCard.getStatus(), "Desk fee <= 0 upgrade must activate immediately");
         assertEquals(0, BigDecimal.ZERO.compareTo(goldCard.getPricePaid()), "Upgrade fee must be 0.00");
 
         // Verify in DB that upgrade tracking fields are set
@@ -822,7 +832,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
             // 1. Programmatically migrate to target V21 using configured flyway locations
             Flyway flywayV21 = Flyway.configure()
                     .dataSource(testDs)
-                    .locations(flywayLocations.split(","))
+                    .locations(getFlywayLocationArray())
                     .target("21")
                     .load();
             flywayV21.migrate();
@@ -833,48 +843,68 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
             Long migMemberId = testJdbc.queryForObject("SELECT id FROM [user_account] WHERE email = 'mig_test_user@test.com'", Long.class);
             testJdbc.update("INSERT INTO [member_profile] (user_id, member_code, current_level, joined_on) VALUES (?, 'MBR-MIG-01', 'BEGINNER', CAST(SYSDATETIME() AS DATE))", migMemberId);
 
-            // Fetch dynamic prices and IDs from V21 schema
-            Long goldTierId = testJdbc.queryForObject("SELECT id FROM [membership_card_tier] WHERE code = 'GOLD'", Long.class);
-            Long vipTierId = testJdbc.queryForObject("SELECT id FROM [membership_card_tier] WHERE code = 'VIP'", Long.class);
-            BigDecimal goldPrice = testJdbc.queryForObject("SELECT price FROM [membership_card_tier] WHERE id = ?", BigDecimal.class, goldTierId);
-            BigDecimal vipPrice = testJdbc.queryForObject("SELECT price FROM [membership_card_tier] WHERE id = ?", BigDecimal.class, vipTierId);
-            BigDecimal upgDiff = vipPrice.subtract(goldPrice);
+            // Insert dedicated test tiers into the V21 database with fixed explicit prices and unique codes
+            testJdbc.update("INSERT INTO [membership_card_tier] (code, name, price, duration_months, discount_percentage, is_active, created_at) " +
+                    "VALUES ('TIER-MIG-1', 'Mig Tier 1', 200000.00, 12, 5, 1, SYSDATETIME())");
+            Long testTier1Id = testJdbc.queryForObject("SELECT id FROM [membership_card_tier] WHERE code = 'TIER-MIG-1'", Long.class);
 
-            // 2. Seed legacy card rows in V21 schema across three test cases:
+            testJdbc.update("INSERT INTO [membership_card_tier] (code, name, price, duration_months, discount_percentage, is_active, created_at) " +
+                    "VALUES ('TIER-MIG-2', 'Mig Tier 2', 500000.00, 12, 10, 1, SYSDATETIME())");
+            Long testTier2Id = testJdbc.queryForObject("SELECT id FROM [membership_card_tier] WHERE code = 'TIER-MIG-2'", Long.class);
+
+            BigDecimal tier1Price = BigDecimal.valueOf(200000.00);
+            BigDecimal tier2Price = BigDecimal.valueOf(500000.00);
+            BigDecimal upgDiff = tier2Price.subtract(tier1Price); // 300,000.00
+
+            // 2. Seed legacy card rows in V21 schema across four test cases:
             // Case 1: Clean chain A -> B -> C (A is replaced by B, B is replaced by C, all sharing identical end_date)
             LocalDate endDec = LocalDate.of(2026, 12, 31);
             testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
-                    "VALUES ('CARD-MIG-A', ?, ?, '2026-01-01', ?, 'REPLACED', ?, GETDATE(), GETDATE())", migMemberId, goldTierId, endDec, goldPrice);
+                    "VALUES ('CARD-MIG-A', ?, ?, '2026-01-01', ?, 'REPLACED', ?, GETDATE(), GETDATE())", migMemberId, testTier1Id, endDec, tier1Price);
             Long cardAId = testJdbc.queryForObject("SELECT id FROM [member_card] WHERE card_code = 'CARD-MIG-A'", Long.class);
 
             testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
-                    "VALUES ('CARD-MIG-B', ?, ?, '2026-03-01', ?, 'REPLACED', ?, GETDATE(), GETDATE())", migMemberId, vipTierId, endDec, upgDiff.divide(BigDecimal.valueOf(2)));
+                    "VALUES ('CARD-MIG-B', ?, ?, '2026-03-01', ?, 'REPLACED', ?, GETDATE(), GETDATE())", migMemberId, testTier2Id, endDec, upgDiff.divide(BigDecimal.valueOf(2)));
             Long cardBId = testJdbc.queryForObject("SELECT id FROM [member_card] WHERE card_code = 'CARD-MIG-B'", Long.class);
 
             testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
-                    "VALUES ('CARD-MIG-C', ?, ?, '2026-06-01', ?, 'ACTIVE', ?, GETDATE(), GETDATE())", migMemberId, vipTierId, endDec, upgDiff.divide(BigDecimal.valueOf(2)));
+                    "VALUES ('CARD-MIG-C', ?, ?, '2026-06-01', ?, 'ACTIVE', ?, GETDATE(), GETDATE())", migMemberId, testTier2Id, endDec, upgDiff.divide(BigDecimal.valueOf(2)));
             Long cardCId = testJdbc.queryForObject("SELECT id FROM [member_card] WHERE card_code = 'CARD-MIG-C'", Long.class);
 
             // Case 2: No predecessor (card with price_paid < tier price, but no candidate predecessor exists sharing end_date)
             LocalDate endNov = LocalDate.of(2026, 11, 30);
             testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
-                    "VALUES ('CARD-MIG-NOPRED', ?, ?, '2026-05-01', ?, 'ACTIVE', ?, GETDATE(), GETDATE())", migMemberId, vipTierId, endNov, upgDiff);
+                    "VALUES ('CARD-MIG-NOPRED', ?, ?, '2026-05-01', ?, 'ACTIVE', ?, GETDATE(), GETDATE())", migMemberId, testTier2Id, endNov, upgDiff);
             Long noPredCardId = testJdbc.queryForObject("SELECT id FROM [member_card] WHERE card_code = 'CARD-MIG-NOPRED'", Long.class);
 
             // Case 3: Multiple predecessors (ambiguous candidate where multiple REPLACED cards share end_date)
             LocalDate endOct = LocalDate.of(2026, 10, 31);
             testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
-                    "VALUES ('CARD-MIG-AMBIG-P1', ?, ?, '2026-01-01', ?, 'REPLACED', ?, GETDATE(), GETDATE())", migMemberId, goldTierId, endOct, goldPrice);
+                    "VALUES ('CARD-MIG-AMBIG-P1', ?, ?, '2026-01-01', ?, 'REPLACED', ?, GETDATE(), GETDATE())", migMemberId, testTier1Id, endOct, tier1Price);
             testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
-                    "VALUES ('CARD-MIG-AMBIG-P2', ?, ?, '2026-02-01', ?, 'REPLACED', ?, GETDATE(), GETDATE())", migMemberId, goldTierId, endOct, goldPrice);
+                    "VALUES ('CARD-MIG-AMBIG-P2', ?, ?, '2026-02-01', ?, 'REPLACED', ?, GETDATE(), GETDATE())", migMemberId, testTier1Id, endOct, tier1Price);
             testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
-                    "VALUES ('CARD-MIG-AMBIG-CAND', ?, ?, '2026-04-01', ?, 'ACTIVE', ?, GETDATE(), GETDATE())", migMemberId, vipTierId, endOct, upgDiff);
+                    "VALUES ('CARD-MIG-AMBIG-CAND', ?, ?, '2026-04-01', ?, 'ACTIVE', ?, GETDATE(), GETDATE())", migMemberId, testTier2Id, endOct, upgDiff);
             Long ambigCandCardId = testJdbc.queryForObject("SELECT id FROM [member_card] WHERE card_code = 'CARD-MIG-AMBIG-CAND'", Long.class);
+
+            // Case 4: Duplicate in-force cards sharing the same candidate predecessor (Step 5 fails closed: both end up NULL)
+            LocalDate endSep = LocalDate.of(2026, 9, 30);
+            testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
+                    "VALUES ('CARD-MIG-DUP-BASE', ?, ?, '2026-01-01', ?, 'REPLACED', ?, GETDATE(), GETDATE())", migMemberId, testTier1Id, endSep, tier1Price);
+            Long dupBaseCardId = testJdbc.queryForObject("SELECT id FROM [member_card] WHERE card_code = 'CARD-MIG-DUP-BASE'", Long.class);
+
+            testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
+                    "VALUES ('CARD-MIG-DUP-1', ?, ?, '2026-03-01', ?, 'ACTIVE', ?, GETDATE(), GETDATE())", migMemberId, testTier2Id, endSep, upgDiff.divide(BigDecimal.valueOf(2)));
+            Long cardD1Id = testJdbc.queryForObject("SELECT id FROM [member_card] WHERE card_code = 'CARD-MIG-DUP-1'", Long.class);
+
+            testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
+                    "VALUES ('CARD-MIG-DUP-2', ?, ?, '2026-04-01', ?, 'ACTIVE', ?, GETDATE(), GETDATE())", migMemberId, testTier2Id, endSep, upgDiff.divide(BigDecimal.valueOf(2)));
+            Long cardD2Id = testJdbc.queryForObject("SELECT id FROM [member_card] WHERE card_code = 'CARD-MIG-DUP-2'", Long.class);
 
             // 3. Migrate to V22
             Flyway flywayV22 = Flyway.configure()
                     .dataSource(testDs)
-                    .locations(flywayLocations.split(","))
+                    .locations(getFlywayLocationArray())
                     .target("22")
                     .load();
             flywayV22.migrate();
@@ -907,6 +937,17 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
             Long repAmbig = testJdbc.queryForObject("SELECT replaces_card_id FROM [member_card] WHERE id = ?", Long.class, ambigCandCardId);
             assertTrue(Boolean.TRUE.equals(upgAmbig), "Ambiguous candidate card marked as upgrade by price difference");
             assertNull(repAmbig, "Ambiguous candidate card with multiple predecessors must keep replaces_card_id as NULL");
+
+            // Case 4: Duplicate in-force cards sharing the same candidate predecessor (Step 5 fails closed: both end up NULL)
+            Boolean upgD1 = testJdbc.queryForObject("SELECT upgrade_request FROM [member_card] WHERE id = ?", Boolean.class, cardD1Id);
+            Long repD1 = testJdbc.queryForObject("SELECT replaces_card_id FROM [member_card] WHERE id = ?", Long.class, cardD1Id);
+            assertTrue(Boolean.TRUE.equals(upgD1), "Card D1 marked as upgrade");
+            assertNull(repD1, "Card D1 in duplicate in-force group must have replaces_card_id set to NULL");
+
+            Boolean upgD2 = testJdbc.queryForObject("SELECT upgrade_request FROM [member_card] WHERE id = ?", Boolean.class, cardD2Id);
+            Long repD2 = testJdbc.queryForObject("SELECT replaces_card_id FROM [member_card] WHERE id = ?", Long.class, cardD2Id);
+            assertTrue(Boolean.TRUE.equals(upgD2), "Card D2 marked as upgrade");
+            assertNull(repD2, "Card D2 in duplicate in-force group must have replaces_card_id set to NULL");
 
             // 5. Snapshot before re-migration
             List<Map<String, Object>> snapshotBefore = testJdbc.queryForList(
