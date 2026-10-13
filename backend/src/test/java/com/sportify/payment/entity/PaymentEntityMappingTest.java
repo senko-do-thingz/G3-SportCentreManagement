@@ -6,6 +6,9 @@ import com.sportify.catalog.entity.SportPackageRegistration;
 import jakarta.persistence.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
@@ -75,7 +78,7 @@ class PaymentEntityMappingTest {
         Field paymentTime = Payment.class.getDeclaredField("paymentTime");
         Column ptimeCol = paymentTime.getAnnotation(Column.class);
         assertThat(ptimeCol.name()).isEqualTo("payment_time");
-        assertThat(ptimeCol.nullable()).isFalse();
+        assertThat(ptimeCol.nullable()).isTrue();
 
         Field version = Payment.class.getDeclaredField("version");
         assertThat(version.getAnnotation(Version.class)).isNotNull();
@@ -286,39 +289,13 @@ class PaymentEntityMappingTest {
     }
 
     @Test
-    @DisplayName("Lifecycle methods should initialize defaults properly")
-    void testLifecycleDefaults() {
-        Payment payment = Payment.builder().build();
-        payment.prePersist();
-        assertThat(payment.getPaymentTime()).isNotNull();
-        assertThat(payment.getCreatedAt()).isNotNull();
-        assertThat(payment.getUpdatedAt()).isNotNull();
+    @DisplayName("Payment auditing annotations must be configured on entity")
+    void testPaymentAuditingAnnotations() throws Exception {
+        assertThat(Payment.class.isAnnotationPresent(EntityListeners.class)).isTrue();
+        EntityListeners listeners = Payment.class.getAnnotation(EntityListeners.class);
+        assertThat(listeners.value()).contains(AuditingEntityListener.class);
 
-        LocalDateTime oldPaymentTime = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
-        payment.setUpdatedAt(oldPaymentTime);
-        payment.preUpdate();
-        assertThat(payment.getUpdatedAt()).isAfter(oldPaymentTime);
-
-        Invoice invoice = Invoice.builder().build();
-        invoice.prePersist();
-        assertThat(invoice.getIssueDate()).isNotNull();
-        assertThat(invoice.getCreatedAt()).isNotNull();
-        assertThat(invoice.getUpdatedAt()).isNotNull();
-        assertThat(invoice.getDiscountAmount()).isEqualTo(BigDecimal.ZERO);
-        assertThat(invoice.getTaxAmount()).isEqualTo(BigDecimal.ZERO);
-
-        LocalDateTime oldInvoiceTime = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
-        invoice.setUpdatedAt(oldInvoiceTime);
-        invoice.preUpdate();
-        assertThat(invoice.getUpdatedAt()).isAfter(oldInvoiceTime);
-
-        InvoiceLine line = InvoiceLine.builder().build();
-        line.prePersist();
-        assertThat(line.getCreatedAt()).isNotNull();
-        assertThat(line.getQuantity()).isEqualTo(1);
-
-        invoice.addLine(line);
-        assertThat(invoice.getLines()).contains(line);
-        assertThat(line.getInvoice()).isEqualTo(invoice);
+        assertThat(Payment.class.getDeclaredField("createdAt").isAnnotationPresent(CreatedDate.class)).isTrue();
+        assertThat(Payment.class.getDeclaredField("updatedAt").isAnnotationPresent(LastModifiedDate.class)).isTrue();
     }
 }

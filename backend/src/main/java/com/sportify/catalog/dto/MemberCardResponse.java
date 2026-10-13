@@ -26,5 +26,7 @@ public class MemberCardResponse {
     private LocalDate endDate;
     private CardStatus status;
     private BigDecimal pricePaid;
+    private Long paymentId;
+    private String paymentCode;
     private LocalDateTime createdAt;
 }

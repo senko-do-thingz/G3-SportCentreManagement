@@ -18,6 +18,8 @@ public interface MemberCardRepository extends JpaRepository<MemberCard, Long> {
 
     List<MemberCard> findByMemberIdAndStatus(Long memberId, CardStatus status);
 
+    Optional<MemberCard> findByPaymentId(Long paymentId);
+
     @Query("SELECT mc FROM MemberCard mc JOIN FETCH mc.tier WHERE mc.member.id = :memberId AND mc.status = :status AND (mc.endDate IS NULL OR mc.endDate >= :today) ORDER BY mc.tier.discountPercentage DESC")
     List<MemberCard> findActiveCardsForMember(@Param("memberId") Long memberId, @Param("status") CardStatus status, @Param("today") LocalDate today);
 

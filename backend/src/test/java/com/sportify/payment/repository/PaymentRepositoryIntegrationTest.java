@@ -190,7 +190,7 @@ class PaymentRepositoryIntegrationTest extends AbstractIntegrationTest {
         // 2. Invalid payment_method rejected by ck_payment_method
         assertThatThrownBy(() -> jdbcTemplate.update("""
                 INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status)
-                VALUES ('PAY-BAD-METHOD', ?, 100000.00, 'BITCOIN', 'SUCCESS')
+                VALUES ('PAY-BAD-METHOD', ?, 100000.00, 'BITCOIN', 'PENDING')
                 """, memberId))
                 .isInstanceOf(DataAccessException.class)
                 .hasMessageContaining("ck_payment_method");
@@ -198,15 +198,15 @@ class PaymentRepositoryIntegrationTest extends AbstractIntegrationTest {
         // 3. Invalid payment amount (<= 0) rejected by ck_payment_amount
         assertThatThrownBy(() -> jdbcTemplate.update("""
                 INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status)
-                VALUES ('PAY-BAD-AMOUNT', ?, 0.00, 'CASH', 'SUCCESS')
+                VALUES ('PAY-BAD-AMOUNT', ?, 0.00, 'CASH', 'PENDING')
                 """, memberId))
                 .isInstanceOf(DataAccessException.class)
                 .hasMessageContaining("ck_payment_amount");
 
         // 4. Valid payment insert to test invoice checks
         jdbcTemplate.update("""
-                INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status)
-                VALUES ('PAY-FOR-INV-CK', ?, 200000.00, 'MOMO', 'SUCCESS')
+                INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status, payment_time)
+                VALUES ('PAY-FOR-INV-CK', ?, 200000.00, 'MOMO', 'SUCCESS', SYSDATETIME())
                 """, memberId);
         long paymentId = jdbcTemplate.queryForObject(
                 "SELECT id FROM payment WHERE payment_code = 'PAY-FOR-INV-CK'", Long.class);
@@ -270,6 +270,7 @@ class PaymentRepositoryIntegrationTest extends AbstractIntegrationTest {
         assertThat(initialVersion).isEqualTo(0);
 
         saved.setPaymentStatus(PaymentStatus.SUCCESS);
+        saved.setPaymentTime(LocalDateTime.now());
         Payment updated = paymentRepository.saveAndFlush(saved);
 
         assertThat(updated.getVersion()).isGreaterThan(initialVersion);
@@ -292,6 +293,7 @@ class PaymentRepositoryIntegrationTest extends AbstractIntegrationTest {
 
         Payment concurrentCopy = paymentRepository.findById(payment.getId()).orElseThrow();
         concurrentCopy.setPaymentStatus(PaymentStatus.SUCCESS);
+        concurrentCopy.setPaymentTime(LocalDateTime.now());
         paymentRepository.saveAndFlush(concurrentCopy);
 
         payment.setNotes("Stale update attempt");
@@ -326,6 +328,7 @@ class PaymentRepositoryIntegrationTest extends AbstractIntegrationTest {
                 .amount(new BigDecimal("500000.00"))
                 .paymentMethod(PaymentMethod.CASH)
                 .paymentStatus(PaymentStatus.SUCCESS)
+                .paymentTime(LocalDateTime.now())
                 .build());
 
         // 2. MemberCard with payment_id
