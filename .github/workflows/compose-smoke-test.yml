@@ -48,12 +48,14 @@ jobs:
 
       - name: Assert password policy violation makes sqlserver exit
         run: |
-          echo "Testing that invalid password policy causes sqlserver to exit..."
-          if timeout 30s docker run --rm -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD=weak mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04; then
-            echo "Error: sqlserver unexpectedly succeeded with weak password"
-            exit 1
+          echo "Testing that invalid password policy causes sqlserver to exit with policy message..."
+          OUTPUT="$(timeout 30s docker run --rm -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD=weak mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04 2>&1 || true)"
+          echo "$OUTPUT"
+          if echo "$OUTPUT" | grep -qi "password policy"; then
+            echo "Verified: sqlserver failed startup due to password policy requirements as expected"
           else
-            echo "Verified: sqlserver exits when password policy is violated"
+            echo "Error: Expected password policy message in sqlserver output, but was not found"
+            exit 1
           fi
 
       - name: Create temporary test .env
@@ -114,12 +116,14 @@ jobs:
 
       - name: Assert non-sa DB_USERNAME causes backend connection failure
         run: |
-          echo "Testing that non-sa DB_USERNAME causes backend startup failure..."
-          if docker compose -f deploy/compose.yaml run --rm -e DB_USERNAME=nonexistent_user backend; then
-            echo "Error: Backend unexpectedly started with non-sa user"
-            exit 1
+          echo "Testing that non-sa DB_USERNAME causes backend startup failure with login error..."
+          LOGS="$(docker compose -f deploy/compose.yaml run --rm -e DB_USERNAME=nonexistent_user backend 2>&1 || true)"
+          echo "$LOGS"
+          if echo "$LOGS" | grep -qi "Login failed for user 'nonexistent_user'"; then
+            echo "Verified: Backend startup failed with expected SQL Server login failure message"
           else
-            echo "Verified: Non-sa DB_USERNAME causes backend startup failure as expected"
+            echo "Error: Expected 'Login failed for user' message in backend logs, but was not found"
+            exit 1
           fi
 
       - name: Start backend service and wait for actuator health UP
