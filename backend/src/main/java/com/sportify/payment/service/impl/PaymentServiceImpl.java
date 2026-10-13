@@ -95,6 +95,9 @@ public class PaymentServiceImpl implements PaymentService {
         if (paymentId == null) {
             throw new BusinessRuleException("Payment ID cannot be null");
         }
+        if (confirmedBy != null && !SecurityUtils.isStaff(confirmedBy)) {
+            throw new BusinessRuleException("Only staff users can confirm payment");
+        }
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found for id: " + paymentId));
 
@@ -112,9 +115,6 @@ public class PaymentServiceImpl implements PaymentService {
         payment.setPaymentTime(now);
 
         if (confirmedBy != null) {
-            if (!SecurityUtils.isStaff(confirmedBy)) {
-                throw new BusinessRuleException("Only staff users can confirm payment");
-            }
             payment.setConfirmedByUser(confirmedBy);
             String staffNote = "Confirmed by user id " + confirmedBy.getId();
             payment.setNotes(appendNote(payment.getNotes(), staffNote));

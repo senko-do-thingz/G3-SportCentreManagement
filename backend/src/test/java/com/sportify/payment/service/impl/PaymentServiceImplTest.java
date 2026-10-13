@@ -270,13 +270,17 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    @DisplayName("Mark payment success with non-staff confirmedBy throws BusinessRuleException")
+    @DisplayName("Mark payment success with non-staff confirmedBy throws BusinessRuleException before repository lookup or mutation")
     void markPaymentSuccess_WithNonStaffConfirmedBy_ThrowsBusinessRuleException() {
-        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
-
         assertThatThrownBy(() -> paymentService.markPaymentSuccess(10L, ownerUser))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessage("Only staff users can confirm payment");
+
+        verify(paymentRepository, never()).findById(any());
+        verify(paymentRepository, never()).save(any());
+        assertThat(pendingPayment.getPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
+        assertThat(pendingPayment.getPaymentTime()).isNull();
+        assertThat(pendingPayment.getConfirmedByUser()).isNull();
     }
 
     @Test
