@@ -1,0 +1,45 @@
+services:
+  backend:
+    image: ghcr.io/senko-do-thingz/g3-sportcentremanagement/backend:${IMAGE_TAG:?IMAGE_TAG is required}
+    container_name: sportify-backend
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8080:8080"
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sportify-sqlserver
+    profiles:
+      - with-db
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
+    ports:
+      - "1433:1433"
+    healthcheck:
+      test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-U", "sa", "-P", "${DB_PASSWORD}", "-Q", "SELECT 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+
+  db-init:
+    image: mcr.microsoft.com/mssql-tools:latest
+    container_name: sportify-db-init
+    profiles:
+      - with-db
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    command: >
+      /bin/bash -c "
+      echo 'Initializing Database sportify...' &&
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P ${DB_PASSWORD} -Q 'IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N\"sportify\") CREATE DATABASE [sportify];'
+      "
+
+volumes:
+  sqlserver_data:

@@ -135,7 +135,73 @@ The Spring Boot backend requires the following environment variables configured 
 
 ---
 
-## 6. Repository Settings Checklist (Manual Setup)
+## 6. Server Setup
+
+Before enabling automated deployments, target servers (staging and production) must be prepared according to the following steps:
+
+1. **Dedicated Deploy User**:
+   - Create a dedicated system user (e.g., `deploy`) with restricted privileges on the target server:
+     ```bash
+     sudo useradd -m -s /bin/bash deploy
+     sudo usermod -aG docker deploy
+     ```
+   - The deploy user requires group access to Docker to run compose commands without sudo.
+
+2. **SSH Key Pair Generation**:
+   - Generate an ed25519 or 4096-bit RSA key pair on a secure workstation or runner:
+     ```bash
+     ssh-keygen -t ed25519 -C "deploy@sportify" -f deploy_key
+     ```
+   - **Public key** (`deploy_key.pub`): Append to `~deploy/.ssh/authorized_keys` on the target server. Set permissions: `chmod 700 ~deploy/.ssh && chmod 600 ~deploy/.ssh/authorized_keys`.
+   - **Private key** (`deploy_key`): Store as the GitHub Environment secret `DEPLOY_SSH_KEY` in the respective environment (`staging` or `production`).
+
+3. **SSH Known Hosts (`DEPLOY_KNOWN_HOSTS`)**:
+   - Retrieve the server public host key using `ssh-keyscan`:
+     ```bash
+     ssh-keyscan -H <deploy-server-host>
+     ```
+   - Store the complete output line as GitHub Environment secret `DEPLOY_KNOWN_HOSTS`.
+   - **Verification note**: Verify the key fingerprint against the server console out of band (e.g., `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`) before saving to GitHub to guard against man-in-the-middle attacks.
+
+4. **Docker and Compose Plugin Installation**:
+   - Install the official Docker Engine and the Compose plugin (`docker-compose-plugin`) following Docker official documentation.
+   - Verify installation: `docker --version` and `docker compose version`.
+
+5. **GHCR Authentication**:
+   - Authenticate the deploy user with GitHub Container Registry on the server to allow pulling private images:
+     ```bash
+     echo "<PAT_WITH_READ_PACKAGES>" | docker login ghcr.io -u <GITHUB_USERNAME> --password-stdin
+     ```
+   - Alternatively, make the container package public in the GitHub repository package settings.
+
+6. **Compose File and Environment File Deployment**:
+   - Create the target deployment directory defined in `DEPLOY_DIR` (e.g., `/opt/sportify`):
+     ```bash
+     sudo mkdir -p /opt/sportify && sudo chown -R deploy:deploy /opt/sportify
+     ```
+   - Copy `deploy/compose.yaml` from the repository to `/opt/sportify/docker-compose.yml`.
+   - Copy `deploy/.env.example` to `/opt/sportify/.env` and edit it to set production-grade database credentials, JWT secret, CORS origins, and bank transfer details.
+
+7. **Default SSH Port 22 Requirement**:
+   - The deployment composite action executes SSH commands using default port 22 (the action does not pass custom `-p` port flags). Ensure firewall rules and SSH daemon allow incoming traffic on port 22 from GitHub Actions runner IP ranges or bastion proxies.
+
+8. **Public Health Endpoint for Smoke Tests**:
+   - Both `STAGING_BASE_URL` and `PRODUCTION_BASE_URL` must allow the runner to access `/actuator/health` over HTTP or HTTPS (e.g., via Nginx reverse proxy or open port 8080).
+   - Ensure there is **no trailing slash** in the configured URL variable (e.g., `https://staging.sportify.example.com`, not `https://staging.sportify.example.com/`). The smoke test appends `/actuator/health` directly.
+
+9. **Rollback Mechanism via `.current_tag`**:
+   - On each deployment, the action checks for an existing `DEPLOY_DIR/.current_tag` file.
+   - If present, its content is saved as `PREVIOUS_TAG`.
+   - When `docker compose up -d` succeeds and `/actuator/health` responds with HTTP 200 within 150 seconds, `.current_tag` is updated to the newly deployed tag.
+   - If the smoke test fails or times out, the action rolls back by re-running `IMAGE_TAG=$PREVIOUS_TAG docker compose up -d` and restoring `.current_tag`.
+
+10. **Deployment Enablement Gate (`DEPLOY_ENABLED`)**:
+    - `DEPLOY_ENABLED` is a repository-level variable (`Settings -> Secrets and variables -> Actions -> Variables`).
+    - Deployments remain completely disabled until `DEPLOY_ENABLED` is explicitly set to `true`. When unset or `false`, the CI/CD pipeline runs builds and tests but skips all deployment jobs.
+
+---
+
+## 7. Repository Settings Checklist (Manual Setup)
 
 The repository administrator must configure the following settings on GitHub:
 
@@ -160,7 +226,7 @@ The repository administrator must configure the following settings on GitHub:
 
 ---
 
-## 7. Troubleshooting Guide
+## 8. Troubleshooting Guide
 
 ### Testcontainers Pull Timeouts in CI
 - **Symptom**: CI integration test job fails with container startup timeout or rate limit error.
