@@ -15,6 +15,10 @@ import { PackageDetailPage } from '../pages/member/PackageDetailPage'
 import { PaymentSummaryPage } from '../pages/member/PaymentSummaryPage'
 import { SportPackagesPage } from '../pages/member/SportPackagesPage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
+import { CheckInPage } from '../pages/reception/CheckInPage'
+import { MemberSearchPage } from '../pages/reception/MemberSearchPage'
+import { ReceptionPaymentPage } from '../pages/reception/ReceptionPaymentPage'
+import { RegisterRenewPage } from '../pages/reception/RegisterRenewPage'
 import { ForbiddenPage } from '../pages/public/ForbiddenPage'
 import { HomeRedirect } from '../pages/public/HomeRedirect'
 import { LoginPage } from '../pages/public/LoginPage'
@@ -31,6 +35,9 @@ const SCREENS: Record<string, ReactNode> = {
   '/member/profile': <MyProfilePage />,
   '/member/packages': <SportPackagesPage />,
   '/member/membership': <MyMembershipPage />,
+  '/reception': <MemberSearchPage />,
+  '/reception/register': <RegisterRenewPage />,
+  '/reception/check-in': <CheckInPage />,
 }
 
 /**
@@ -41,6 +48,8 @@ const SCREENS: Record<string, ReactNode> = {
  * - 'payments/:paymentId': Payment Summary (F3-01), linked from "Pay now" on the dashboard (FE-02)
  *   and reached after a registration (FE-03). FE-03 replaced the FE-02 placeholder with a read only
  *   summary; FE-11 adds the payment method and the status screens.
+ * - '/reception' 'payments/:paymentId': payment confirmation and receipt for the front desk (FE-05),
+ *   opened from a pending online request or after a desk sale. FE-12 extends it (F3-04 to F3-07).
  */
 const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
   '/member': [
@@ -48,6 +57,7 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
     { path: 'membership/cards', element: <MembershipCardsPage /> },
     { path: 'payments/:paymentId', element: <PaymentSummaryPage /> },
   ],
+  '/reception': [{ path: 'payments/:paymentId', element: <ReceptionPaymentPage /> }],
 }
 
 /**

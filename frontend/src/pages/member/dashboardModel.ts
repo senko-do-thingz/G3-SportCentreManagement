@@ -36,13 +36,8 @@ export const TRAINING_FORMAT_LABELS: Record<string, string> = {
   COACH_LED: 'Coach-led',
 }
 
-/** "2026-10-13" for the given moment, in the local time zone. */
-export function toIsoDate(moment: Date): string {
-  const year = moment.getFullYear()
-  const month = String(moment.getMonth() + 1).padStart(2, '0')
-  const day = String(moment.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
+/** Moved to src/utils/date.ts in FE-05; re-exported so the member screens keep their import. */
+export { toIsoDate } from '../../utils/date'
 
 export function trainingFormatLabel(format: string | null | undefined): string {
   if (!format) {
