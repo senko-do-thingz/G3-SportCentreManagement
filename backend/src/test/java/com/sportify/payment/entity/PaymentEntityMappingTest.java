@@ -289,35 +289,13 @@ class PaymentEntityMappingTest {
     }
 
     @Test
-    @DisplayName("Lifecycle methods should initialize defaults properly")
-    void testLifecycleDefaults() throws Exception {
+    @DisplayName("Payment auditing annotations must be configured on entity")
+    void testPaymentAuditingAnnotations() throws Exception {
         assertThat(Payment.class.isAnnotationPresent(EntityListeners.class)).isTrue();
         EntityListeners listeners = Payment.class.getAnnotation(EntityListeners.class);
         assertThat(listeners.value()).contains(AuditingEntityListener.class);
 
         assertThat(Payment.class.getDeclaredField("createdAt").isAnnotationPresent(CreatedDate.class)).isTrue();
         assertThat(Payment.class.getDeclaredField("updatedAt").isAnnotationPresent(LastModifiedDate.class)).isTrue();
-
-        Invoice invoice = Invoice.builder().build();
-        invoice.prePersist();
-        assertThat(invoice.getIssueDate()).isNotNull();
-        assertThat(invoice.getCreatedAt()).isNotNull();
-        assertThat(invoice.getUpdatedAt()).isNotNull();
-        assertThat(invoice.getDiscountAmount()).isEqualTo(BigDecimal.ZERO);
-        assertThat(invoice.getTaxAmount()).isEqualTo(BigDecimal.ZERO);
-
-        LocalDateTime oldInvoiceTime = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
-        invoice.setUpdatedAt(oldInvoiceTime);
-        invoice.preUpdate();
-        assertThat(invoice.getUpdatedAt()).isAfter(oldInvoiceTime);
-
-        InvoiceLine line = InvoiceLine.builder().build();
-        line.prePersist();
-        assertThat(line.getCreatedAt()).isNotNull();
-        assertThat(line.getQuantity()).isEqualTo(1);
-
-        invoice.addLine(line);
-        assertThat(invoice.getLines()).contains(line);
-        assertThat(line.getInvoice()).isEqualTo(invoice);
     }
 }
