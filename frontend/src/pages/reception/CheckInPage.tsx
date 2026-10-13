@@ -1,7 +1,7 @@
 import { useCallback, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiError, getErrorMessage } from '../../api/errors'
-import { MEMBER_NOT_FOUND_MESSAGE, receptionApi, type CheckInRecord } from '../../api/receptionApi'
+import { isMemberNotFound, MEMBER_NOT_FOUND_MESSAGE, receptionApi, type CheckInRecord } from '../../api/receptionApi'
 import { Badge, Button, Card, Input, PageHeader, Table, type TableColumn } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { useResource } from '../../hooks/useResource'
@@ -26,7 +26,11 @@ const IDENTIFIER_ID = 'check-in-identifier'
 
 export const DATE_FILTER_MISSING_MESSAGE = "Today's list needs the date filter from BE-05."
 
-/** 400 or 5xx from GET /check-ins?date=: the backend has no date filter yet. */
+/**
+ * 400 or 5xx from GET /check-ins?date=: the backend has no date filter yet (on main the missing
+ * memberId parameter ends in the generic 500 handler).
+ * TODO(BE-05): remove the 5xx branch once the date filter is merged, so real server errors are not hidden.
+ */
 function isMissingDateFilter(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 400 || error.status >= 500)
 }
@@ -89,8 +93,9 @@ export function CheckInPage() {
       reloadToday()
     } catch (failure) {
       setLast(null)
-      if (failure instanceof ApiError && failure.status === 404) {
-        // Rejected with the reason; the code stays in the field for correction.
+      if (isMemberNotFound(failure)) {
+        // Rejected with the reason; the code stays in the field for correction. Any other 404 (for
+        // example "Resource not found") is a technical error and goes to the notice below.
         const record = memberNotFoundRecord(code)
         setLast({ record, identifier: code })
         setSessionRecords((current) => [record, ...current])

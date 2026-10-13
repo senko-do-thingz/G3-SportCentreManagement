@@ -281,7 +281,7 @@ describe('FE-05 Member Search and Profile (F1-13)', () => {
     expect(screen.queryByText(/is confirmed and the request is active/)).not.toBeInTheDocument()
   })
 
-  it('TC-FE05-037 only the agreed 404 "Member not found" reads as a missing member', async () => {
+  it('TC-FE05-037 only the proposed 404 "Member not found" reads as a missing member', async () => {
     await open('/reception?memberId=2', { overviewError: backendError(404, 'Resource not found') })
     expect(await screen.findByRole('heading', { name: 'We could not load the member profile' })).toBeInTheDocument()
     expect(screen.getByText('Resource not found')).toBeInTheDocument()
@@ -503,7 +503,12 @@ describe('FE-05 Check-in (F1-15)', () => {
   })
 
   it('TC-FE05-052 an empty code is refused; an unknown code is Rejected with "Member not found" and stays for correction', async () => {
-    const { calls } = await open('/reception/check-in', { onCheckIn: () => backendError(404, 'Member not found') })
+    const { calls } = await open('/reception/check-in', {
+      onCheckIn: (call) =>
+        (call.body as { identifier: string }).identifier === 'MB-0000'
+          ? backendError(404, 'Resource not found')
+          : backendError(404, 'Member not found'),
+    })
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'Confirm check-in' }))
     expect(screen.getByText('Enter a member code or scan the member card')).toBeInTheDocument()
@@ -516,6 +521,12 @@ describe('FE-05 Check-in (F1-15)', () => {
     expect(within(result).getByText('MB-9999')).toBeInTheDocument()
     expect(field).toHaveValue('MB-9999')
     expect(field).toHaveFocus()
+    // Any other 404 is a technical error: danger notice with the backend message, no Rejected panel.
+    await user.clear(field)
+    await user.type(field, 'MB-0000')
+    await user.click(screen.getByRole('button', { name: 'Confirm check-in' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Resource not found')
+    expect(screen.queryByRole('status', { name: 'Check-in rejected' })).not.toBeInTheDocument()
   })
 
   it('TC-FE05-053 without the BE-05 date filter the list shows a neutral notice and this screen\'s check-ins', async () => {

@@ -112,7 +112,7 @@ function MemberOverviewPanel({ memberId, paidReference }: { memberId: number; pa
     return <Spinner label="Loading the member profile" />
   }
   if (overview.status === 'error') {
-    // Only the agreed "Member not found" 404 means a missing member; any other 404 (for example an
+    // Only the proposed "Member not found" 404 (to confirm with BE-05) means a missing member; any other 404 (for example an
     // endpoint that is not deployed yet) is shown as an error with Retry.
     if (isMemberNotFound(overview.error)) {
       return <EmptyState title="Member not found" description="This member profile does not exist any more." />

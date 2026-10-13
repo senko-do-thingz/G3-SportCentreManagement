@@ -24,6 +24,10 @@ Branch `feat/f1-reception-screens`. Owner: Phat. Priority: P1. Depends on FE-00 
 - Only 404 "Member not found" reads as a missing member; overview contract pinned to one shape with list checks. Confirm screen checks that the item belongs to the payment and waits for it. After Payment notice through router state.
 - Check-in: unknown code shown as Rejected "Member not found"; today's list without the BE-05 date filter shows a notice and this screen's check-ins.
 - `useResource` moved to `src/hooks/useResource.ts`, `toIsoDate` to `src/utils/date.ts`; single-result selection replaces the history entry.
+
+### Review round 2
+- Check-in shows Rejected "Member not found" only for that 404 message; any other 404 is an error notice. Comments call the overview shape and the 404 message proposed until BE-05 confirms them.
+
 ## 2026-10-13 - Membership Cards and My Membership (FE-04, Flow 1)
 
 Branch `feat/f1-member-cards`, stacked on `feat/f1-member-packages` (FE-03) and `feat/f1-member-dashboard` (FE-02), both not merged yet: merge FE-02, then FE-03, then FE-04. Owner: Phat. Priority: P1. Depends on FE-00 and BE-17. Verified with `npm run lint`, `tsc -b`, `npm test` (338 tests in 18 files, 40 new) and `npm run build`.

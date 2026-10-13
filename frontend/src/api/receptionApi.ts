@@ -149,7 +149,7 @@ export function toMemberSummary(value: unknown): MemberSummary {
 }
 
 /**
- * Reads GET /members/{id}/overview (BE-05). The one agreed shape:
+ * Reads GET /members/{id}/overview (BE-05). The one shape proposed, to confirm with BE-05:
  * { member: member row with status, cards: MemberCardResponse[], registrations: PackageRegistrationResponse[] }.
  */
 export function toMemberOverview(value: unknown): MemberOverview {
@@ -164,7 +164,7 @@ export function toMemberOverview(value: unknown): MemberOverview {
 }
 
 /**
- * Message of the 404 that means the member itself does not exist (agreed with BE-05, the same text
+ * Message of the 404 that means the member itself does not exist (proposed, to confirm with BE-05; the same text
  * as ResourceNotFoundException("Member not found") in CheckInServiceImpl). Any other 404, for
  * example "Resource not found" for an endpoint that is not deployed, is a technical error.
  */

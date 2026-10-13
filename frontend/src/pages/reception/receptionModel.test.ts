@@ -225,7 +225,7 @@ describe('FE-05 receptionModel - lists, paths and readers', () => {
     expect(validateIdentifier('MB-0248')).toBeNull()
   })
 
-  it('TC-FE05-016 the overview reader accepts only the agreed shape and checks list elements', () => {
+  it('TC-FE05-016 the overview reader accepts only the proposed shape and checks list elements', () => {
     const overview = toMemberOverview({
       member: { userId: 2, fullName: 'Taylor Nguyen', memberCode: 'MB-0248', status: 'ACTIVE' },
       cards: [card()],
@@ -242,7 +242,7 @@ describe('FE-05 receptionModel - lists, paths and readers', () => {
     expect(() => toMemberSummary({ userId: 3 })).toThrow('unexpected response')
   })
 
-  it('TC-FE05-020 only the agreed 404 message means a missing member; router state carries the paid notice', () => {
+  it('TC-FE05-020 only the proposed 404 message means a missing member; router state carries the paid notice', () => {
     expect(isMemberNotFound(new ApiError(404, 'Member not found'))).toBe(true)
     expect(isMemberNotFound(new ApiError(404, 'Resource not found'))).toBe(false)
     expect(isMemberNotFound(new ApiError(500, 'Member not found'))).toBe(false)

@@ -48,7 +48,7 @@ npx tsc -b
 npm run build
 ```
 
-### 1.3 Result summary (2026-10-13, after review round 1)
+### 1.3 Result summary (2026-10-13, after review round 2)
 | Group | Cases | Result |
 |---|---|---|
 | Automated, rules (`src/pages/reception/receptionModel.test.ts`) | 20 | 20 PASSED |
@@ -77,7 +77,7 @@ Total: 399 automated tests in 20 files, 399 passed, 0 failed. All automated case
 | TC-FE05-013 | One pending card and one pending package | Merged oldest first, member labels | PASSED |
 | TC-FE05-014 | Registrations EXPIRED, ACTIVE, PENDING | Pending, active, then the rest | PASSED |
 | TC-FE05-015 | Paths, ids, verdicts, identifier check | As listed in the test | PASSED |
-| TC-FE05-016 | Overview reader: agreed shape; flat member, id instead of userId, activeCard, element without id | Agreed shape read; every other shape refused | PASSED |
+| TC-FE05-016 | Overview reader: proposed shape (to confirm with BE-05); flat member, id instead of userId, activeCard, element without id | Proposed shape read; every other shape refused | PASSED |
 | TC-FE05-017 | ACTIVE card of a tier that is no longer listed, VIP chosen | unknown, never new from today, not sellable, fixed message | PASSED |
 | TC-FE05-018 | Sale outcome | ACTIVE + payment -> paid; ACTIVE + null -> unrecorded; PENDING_PAYMENT -> pending; other | PASSED |
 | TC-FE05-019 | Confirmation check | ok; not-found; other-payment; not-pending | PASSED |
@@ -109,7 +109,7 @@ Signed in as RECEPTIONIST with a fake backend that follows 1.1; today is 2026-10
 | TC-FE05-047 | AC2 | Pending online requests | `tab=pending` | Both lists, oldest first; the row link opens the confirmation | PASSED |
 | TC-FE05-050 | AC3 | Check-in Recorded | `?code=MB-0248`, Confirm check-in | POST `{identifier: "MB-0248", note: null}`; Recorded with name, 17:02, BK-0021; list loaded twice; field cleared | PASSED |
 | TC-FE05-051 | AC3 | Check-in Rejected | Backend answers DENIED | Rejected with "No confirmed booking for today", Register or renew link, Rejected badge | PASSED |
-| TC-FE05-052 | AC3 | Empty and unknown code | Empty submit; then MB-9999 answered 404 | Required message without request; Rejected panel with "Member not found", field keeps MB-9999 and the focus | PASSED |
+| TC-FE05-052 | AC3 | Empty and unknown code | Empty submit; then MB-9999 answered 404 "Member not found"; then MB-0000 answered 404 "Resource not found" | Required message without request; Rejected panel with "Member not found", field keeps MB-9999 and the focus; for MB-0000 a danger notice "Resource not found" and no Rejected panel | PASSED |
 | TC-FE05-053 | AC3 | List without the date filter (main) | GET /check-ins answers 400; check in MB-0248, then MB-9999 | Neutral notice and Retry, no error alert; table lists MB-9999 rejected then Taylor Nguyen recorded (newest first) | PASSED |
 | TC-FE05-060 | AC4 | MEMBER on `/reception`, `/reception/register`, `/reception/check-in`, `/reception/payments/41` | Sign in as MEMBER | Access denied, no receptionist request | PASSED (4 runs) |
 
@@ -146,3 +146,11 @@ Signed in as RECEPTIONIST with a fake backend that follows 1.1; today is 2026-10
 | 12 | Hook and date helper in pages/member | `src/hooks/useResource.ts`, `src/utils/date.ts`, re-exported from the old paths | Full suite |
 | 13 | Back after the automatic selection | `replace: true` for the single result | Code review, M01 |
 | 14 | Unknown check-in code | Rejected panel "Member not found", field kept and focused, local list | TC-FE05-052, 053 |
+
+## 6. Review round 2 - findings and where they are covered
+| # | Finding | Fix | Cases |
+|---|---|---|---|
+| 1 | Comments called the overview shape and the 404 message "agreed" | Worded as proposed, to confirm with BE-05 | TC-FE05-016, 020, 037 (titles) |
+| 2 | Check-in read any 404 as "Member not found" | `isMemberNotFound` as on the profile; other 404 is an error notice | TC-FE05-052 |
+| 3 | CHANGELOG missing blank line before FE-04 | Added | - |
+| 4 | 5xx read as a missing date filter | TODO(BE-05) to remove the 5xx branch after the date filter is merged | - |
