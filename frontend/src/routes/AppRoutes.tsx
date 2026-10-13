@@ -3,12 +3,15 @@ import { Route, Routes } from 'react-router-dom'
 import { RequireRole } from '../auth/RequireRole'
 import { useAuth } from '../auth/useAuth'
 import { MemberLayout } from '../layouts/MemberLayout'
-import { ALL_AREAS, MEMBER_AREA, requireNavItem, type RoleArea } from '../layouts/navigation'
+import { ALL_AREAS, type RoleArea } from '../layouts/navigation'
 import { PublicLayout } from '../layouts/PublicLayout'
 import { StaffLayout } from '../layouts/StaffLayout'
 import { PageLoader } from '../components/ui/Spinner'
 import { MemberDashboardPage } from '../pages/member/MemberDashboardPage'
 import { MyProfilePage } from '../pages/member/MyProfilePage'
+import { PackageDetailPage } from '../pages/member/PackageDetailPage'
+import { PaymentSummaryPage } from '../pages/member/PaymentSummaryPage'
+import { SportPackagesPage } from '../pages/member/SportPackagesPage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
 import { ForbiddenPage } from '../pages/public/ForbiddenPage'
 import { HomeRedirect } from '../pages/public/HomeRedirect'
@@ -24,24 +27,20 @@ import { AccountSwitchRedirect } from './AccountSwitchRedirect'
 const SCREENS: Record<string, ReactNode> = {
   '/member': <MemberDashboardPage />,
   '/member/profile': <MyProfilePage />,
+  '/member/packages': <SportPackagesPage />,
 }
 
 /**
- * Sub pages by area base path, relative to the area. '/member/payments/:paymentId' is the payment
- * summary (F3-01) linked from "Pay now" on the dashboard (FE-02). It shows the payments placeholder
- * until FE-11 registers the real screen here, so the link never opens a 404 page. requireNavItem
- * throws if the My Payments menu entry disappears, so the route is never dropped silently.
- * The lookup runs when this module loads, in every build (development, tests and production).
- * MEMBER_AREA is a static constant, so it can only fail after an edit of layouts/navigation.ts;
- * layouts/navigation.test.ts and every test that renders the app fail at once in that case, long
- * before a build ships.
+ * Sub pages by area base path, relative to the area.
+ * - 'packages/:packageId': Package Detail and Registration (F1-10, FE-03).
+ * - 'payments/:paymentId': Payment Summary (F3-01), linked from "Pay now" on the dashboard (FE-02)
+ *   and reached after a registration (FE-03). FE-03 replaced the FE-02 placeholder with a read only
+ *   summary; FE-11 adds the payment method and the status screens.
  */
 const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
   '/member': [
-    {
-      path: 'payments/:paymentId',
-      element: <PlaceholderPage item={requireNavItem(MEMBER_AREA, 'payments')} eyebrow={MEMBER_AREA.workspaceLabel} />,
-    },
+    { path: 'packages/:packageId', element: <PackageDetailPage /> },
+    { path: 'payments/:paymentId', element: <PaymentSummaryPage /> },
   ],
 }
 

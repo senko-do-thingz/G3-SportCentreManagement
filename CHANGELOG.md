@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-10-13 - Sport Packages and Registration (FE-03, Flow 1)
+
+Branch `feat/f1-member-packages`, stacked on `feat/f1-member-dashboard` (FE-02, not merged yet): merge FE-02 first. Owner: Phat. Priority: P1. Depends on FE-00 and BE-17. Verified with `npm run lint -- --max-warnings 0`, `tsc -b`, `npm test` (286 tests in 16 files, 31 new) and `npm run build`.
+
+### Added
+- Sport Packages (F1-09) at `/member/packages`: `GET /sports` and `GET /packages`, filters by sport, training type and duration (kept in the URL query), cards with duration, sessions, minutes per session and the price after the member's card discount (STANDARD 0%, GOLD 5%, VIP 10%; single visit never discounted, as in the backend).
+- Package Detail and Registration (F1-10) at `/member/packages/:packageId`: package info, start date picker (today or later), price breakdown (original, discount percent and amount, total), expiry date; `POST /packages/registrations` with channel ONLINE.
+- Payment Handoff overlay: registration and payment references and the amount from the backend answer, "Continue to payment" to `/member/payments/{paymentId}`.
+- Read only Payment Summary (F3-01) at `/member/payments/:paymentId` from `GET /payments/{id}` (BE-17): reference, status, original price, discount, amount, method, bank transfer details. It replaces the FE-02 placeholder; FE-11 adds the method change and status screens.
+- `src/api/packagesApi.ts`, `src/pages/member/packagesModel.ts`, styles in `src/styles/member.css`.
+
+### Changed
+- `requireNavItem` and its test removed: the payment route no longer reuses the My Payments menu entry.
+- FE-02 test TC-FE02-023 expects the real "Payment Summary" heading.
+
+### Notes
+- Single visit cards open the detail page ("View package") like the others; Figma F1-09 shows "Find a session" for them, which needs the schedule screen (FE-08).
+- The discount preview uses the card in force today, like the backend; the overlay shows the amount the backend actually charged.
+
 ## 2026-10-13 - Member Dashboard and My Profile (FE-02, Flow 1)
 
 Branch `feat/f1-member-dashboard`. Owner: Phat. Priority: P1. Depends on FE-01 (merged) and BE-02 (not merged yet, see Open Questions). Verified with `npm run lint -- --max-warnings 0`, `tsc -b`, `npm test` and `npm run build`, plus browser checks in Chromium against a mock of the member API. After review round 1: 242 tests in 15 files (30 added in round 1). After review round 2: 255 tests in 15 files (13 added in round 2). After review round 3: 257 tests in 15 files.

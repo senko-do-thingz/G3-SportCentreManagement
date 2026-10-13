@@ -1,4 +1,5 @@
 import type { MemberBooking, MemberCard, PackageRegistration } from '../api/memberApi'
+import type { Payment, Sport, SportPackage } from '../api/packagesApi'
 
 /** Sample backend answers for the member screens (FE-02). Override any field per test. */
 
@@ -64,6 +65,63 @@ export function booking(overrides: Partial<MemberBooking> = {}): MemberBooking {
     packageRegistrationId: 11,
     status: 'CONFIRMED',
     bookedAt: '2026-10-12T08:00:00',
+    ...overrides,
+  }
+}
+
+export function sport(overrides: Partial<Sport> = {}): Sport {
+  return {
+    id: 1,
+    code: 'FOOTBALL',
+    name: 'Football',
+    venueType: 'FIELD',
+    description: null,
+    imageUrl: null,
+    displayOrder: 1,
+    ...overrides,
+  }
+}
+
+/** Football coach-led 30 days, 8 sessions of 90 minutes, 900.000 VND (seed PK-0xx). */
+export function sportPackage(overrides: Partial<SportPackage> = {}): SportPackage {
+  return {
+    id: 4,
+    code: 'PK-024',
+    name: 'Football - 30-day package',
+    sportId: 1,
+    sportName: 'Football',
+    sportCode: 'FOOTBALL',
+    trainingFormat: 'COACH_LED',
+    durationDays: 30,
+    sessionCount: 8,
+    sessionMinutes: 90,
+    priceAmount: 900000,
+    description: 'Train with a coach in an eligible class.',
+    isActive: true,
+    ...overrides,
+  }
+}
+
+export function payment(overrides: Partial<Payment> = {}): Payment {
+  return {
+    id: 52,
+    code: 'PAY-0052',
+    status: 'PENDING',
+    amount: 810000,
+    method: 'BANK_TRANSFER',
+    itemDescription: 'Football - 30-day package',
+    originalPrice: 900000,
+    discount: 90000,
+    paymentTime: null,
+    bankTransferInstructions: {
+      accountName: 'SPORTIFY CENTER',
+      accountNumber: '0123456789',
+      bank: 'Demo Bank',
+      transferContent: 'PAY-0052',
+    },
+    memberId: 2,
+    memberCode: 'MEM-0002',
+    createdAt: '2026-10-13T09:30:00',
     ...overrides,
   }
 }

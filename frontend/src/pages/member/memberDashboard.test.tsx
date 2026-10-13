@@ -137,7 +137,7 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
     expect(statValue('Active packages')).toBe('0')
 
     await user.click(payNow)
-    expect(await screen.findByRole('heading', { name: 'My Payments and Receipts' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Payment Summary' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Page not found' })).not.toBeInTheDocument()
   })
 
