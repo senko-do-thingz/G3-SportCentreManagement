@@ -55,8 +55,9 @@ export function checkInPath(memberCode?: string | null): string {
 export type PaymentItemKind = 'card' | 'package'
 
 /**
- * Payment confirmation and receipt screen (F3-05, F3-07). The item kind and id tell the screen which
- * activation endpoint confirms the payment; memberId is used for the way back to the profile.
+ * Verify and Record Payment and receipt screen (F3-05, F3-06). Since FE-12 the payment is confirmed
+ * through PUT /payments/{id}/confirm, so the item kind and id only describe where the link came
+ * from; memberId adds the way back to the profile.
  */
 export function receptionPaymentPath(
   paymentId: number,
@@ -280,20 +281,6 @@ export function saleOutcome(item: { status: string; paymentId: number | null }):
     return item.paymentId !== null ? 'paid' : 'unrecorded'
   }
   return item.status === 'PENDING_PAYMENT' ? 'pending' : 'other'
-}
-
-/* Payment confirmation */
-
-export type ConfirmCheck = 'ok' | 'not-found' | 'other-payment' | 'not-pending'
-
-/** The item opened from the URL must belong to the payment and still wait for it. */
-export function confirmCheck(
-  item: { paymentId: number | null; status: string } | undefined,
-  paymentId: number,
-): ConfirmCheck {
-  if (!item) return 'not-found'
-  if (item.paymentId !== paymentId) return 'other-payment'
-  return item.status === 'PENDING_PAYMENT' ? 'ok' : 'not-pending'
 }
 
 /* Pending online requests (F1-14 tab) */

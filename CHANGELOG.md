@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-10-14 - Receptionist payments, receipts and refunds (FE-12, Flow 3)
+
+Branch `feat/f3-reception-payments`, from main (6e82388). Owner: Phat. Priority: P1. Depends on FE-00 (merged), BE-18 and BE-21 (not merged yet, see Notes). Verified with `npm run lint -- --max-warnings 0`, `tsc -b`, `npm test` (432 tests in 22 files: 35 new for FE-12, 2 FE-05 cases updated, 2 retired) and `npm run build`.
+
+### Added
+- Payment Requests (F3-04) at `/reception/payments`: `GET /payments?status=&query=&page=&size=` with status filter (Pending payment by default, Paid, Failed, Refunded, All), member or reference search and paging kept in the URL; stat cards for requests found, amount due on the page and pending refunds; Review payment for pending rows.
+- Verify and Record Payment (F3-05) at `/reception/payments/:paymentId`: payment method, reference code (required except for cash), amount received, note and the checkbox "I have verified the full amount was received"; Confirm stays disabled until the checkbox and the required fields are valid; amount verification panel with difference and status; `PUT /payments/{id}/confirm`. Mark as failed with a reason through `PUT /payments/{id}/fail`.
+- Payment Needs Review (S3-Mismatch) on a 409 `PAYMENT_AMOUNT_MISMATCH` or the "Amount does not match" button: amount due, received and outstanding balance; the payment stays pending; Return to verification keeps the values and unticks the checkbox.
+- Payment Confirmed and Receipt (F3-06): receipt from `GET /invoices/by-payment/{id}` and "Service updated" read again from the member's cards and registrations, so the ACTIVE status shown is the real one. Printable receipt page (S3-Receipt) at `/reception/payments/:paymentId/receipt`.
+- Refund Requests (F3-07) at `/reception/refunds`: find the member and a paid registration, `GET /refunds/quote?registrationId=` prefills the suggested amount and the eligibility check, `POST /refunds`; queues from `GET /refunds/pending` and `GET /refunds/member/{id}`.
+- Refund states at `/reception/refunds/:refundId?memberId=`: Refund Request Submitted, Refund Approved with the refund transaction reference and `PUT /refunds/{id}/complete`, Refund Completed, Refund Rejected.
+- `src/api/receptionPaymentsApi.ts`, `src/pages/reception/receptionPaymentsModel.ts`, the new pages, nav item "Refund requests", styles in `src/styles/reception.css`; `ApiError` now keeps the body `code` and raw `details`.
+
+### Changed
+- The FE-05 confirmation screen is replaced by Verify and Record Payment; `receptionApi.activateCard`, `receptionApi.activateRegistration` and `confirmCheck` are removed. Links from the member profile, the pending tab and desk sales keep working.
+
+### Notes
+- BE-18 and BE-21 are not on main. The contract assumed by the frontend is in `docs/tests/FE-12_test_cases.md` section 1.1, including the 409 body `{code: "PAYMENT_AMOUNT_MISMATCH", details: {amountDue, amountReceived}}`. On main `GET /refunds/pending` is MANAGER only, so the refund queue shows an error for a receptionist until BE-21.
+- There is no `GET /refunds/{id}`; a refund is opened from the member's refunds.
+
 ## 2026-10-13 - Receptionist Member Search, Register and Renew, Check-in (FE-05, Flow 1)
 
 Branch `feat/f1-reception-screens`. Owner: Phat. Priority: P1. Depends on FE-00 (merged), BE-05 and BE-19 (not merged yet, see Notes). Rebased on main after FE-04. Verified after review round 1 with `npm run lint -- --max-warnings 0`, `tsc -b`, `npm test` (399 tests in 20 files: 47 for FE-05, 352 existing for FE-00 to FE-04) and `npm run build`.

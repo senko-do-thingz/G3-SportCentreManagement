@@ -297,3 +297,89 @@
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
+
+/* Receptionist payments and refunds (FE-12): F3-04 to F3-07 */
+
+.payment-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.payment-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  align-items: end;
+  margin-bottom: var(--space-4);
+}
+
+.payment-row-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.payment-note {
+  margin-top: var(--space-4);
+}
+
+.payment-rows {
+  margin: var(--space-3) 0 var(--space-4);
+}
+
+.payment-rows--narrow {
+  max-width: 860px;
+}
+
+.payment-check {
+  margin-top: var(--space-4);
+}
+
+.payment-hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.payment-invoice-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.payment-search-button {
+  margin-top: 26px;
+}
+
+.payment-member-results {
+  margin-top: var(--space-4);
+}
+
+.payment-member-results__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.payment-receipt .card__title {
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+@media (max-width: 960px) {
+  .payment-stats,
+  .payment-filters {
+    grid-template-columns: 1fr;
+  }
+}

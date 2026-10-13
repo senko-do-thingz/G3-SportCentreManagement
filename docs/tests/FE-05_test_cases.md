@@ -80,7 +80,7 @@ Total: 399 automated tests in 20 files, 399 passed, 0 failed. All automated case
 | TC-FE05-016 | Overview reader: proposed shape (to confirm with BE-05); flat member, id instead of userId, activeCard, element without id | Proposed shape read; every other shape refused | PASSED |
 | TC-FE05-017 | ACTIVE card of a tier that is no longer listed, VIP chosen | unknown, never new from today, not sellable, fixed message | PASSED |
 | TC-FE05-018 | Sale outcome | ACTIVE + payment -> paid; ACTIVE + null -> unrecorded; PENDING_PAYMENT -> pending; other | PASSED |
-| TC-FE05-019 | Confirmation check | ok; not-found; other-payment; not-pending | PASSED |
+| TC-FE05-019 | Confirmation check | Retired in FE-12: confirmation goes through `PUT /payments/{id}/confirm` | RETIRED |
 | TC-FE05-020 | 404 messages and router state | Only 404 "Member not found" is a missing member; only a string paidReference in state | PASSED |
 
 ## 3. Automated cases - screens (`receptionScreens.test.tsx`)
@@ -93,10 +93,10 @@ Signed in as RECEPTIONIST with a fake backend that follows 1.1; today is 2026-10
 | TC-FE05-032 | AC1 | Empty search | Click Search with an empty box | "Enter a name, phone number or email", no request | PASSED |
 | TC-FE05-033 | AC1 | Member Not Found and Create Member | Search with no result, Create member, Save empty, fill and save | Required messages; POST body as in 1.1; overview of member 7 opens | PASSED |
 | TC-FE05-034 | AC1 | Duplicate member | POST /members answers 409 | Dialog stays open with the backend message and a hint to search | PASSED |
-| TC-FE05-035 | AC1, AC2 | Payment Handoff and After Payment | Continue to payment, Open payment confirmation (item check passes), Cash, Confirm payment, Back to member profile | PUT activate body `{paymentMethod: "CASH"}`; "Payment receipt"; profile shows "Payment PAY-0041 is confirmed" from router state | PASSED |
+| TC-FE05-035 | AC1, AC2 | Payment Handoff and After Payment | Continue to payment, Open payment confirmation (item check passes), Cash, Confirm payment, Back to member profile | PUT activate body `{paymentMethod: "CASH"}`; "Payment receipt"; profile shows "Payment PAY-0041 is confirmed" from router state | PASSED (updated in FE-12, see FE-12 3.2) |
 | TC-FE05-036 | AC1 | Spoofed notice | `/reception?memberId=2&paid=ANY` | No After Payment notice | PASSED |
 | TC-FE05-037 | AC1 | Overview 404 | Answer 404 "Resource not found"; then 404 "Member not found" | First: "We could not load the member profile", the message and Try again; second: Member not found | PASSED |
-| TC-FE05-038 | AC2 | Item of another payment | `/reception/payments/41?item=package&itemId=10&memberId=2` (registration 10 has payment 30) | Warning "belongs to another payment", Confirm payment disabled, no PUT | PASSED |
+| TC-FE05-038 | AC2 | Item of another payment | `/reception/payments/41?item=package&itemId=10&memberId=2` (registration 10 has payment 30) | Warning "belongs to another payment", Confirm payment disabled, no PUT | RETIRED (FE-12) |
 | TC-FE05-040 | AC1 | Register without a member | `/reception/register` | "Choose a member" picker; after search the sale form | PASSED |
 | TC-FE05-041 | AC1 | Desk package sale with cash (BE-19 contract) | Football coach-led 30 days, 1.000.000 | Fee summary 810.000; change 190.000; POST body as in 1.1; receipt with View receipt to `/reception/payments/60` | PASSED |
 | TC-FE05-042 | AC1 | Transfer validation | Bank transfer, no reference, 800000 | Two field messages, no POST | PASSED |
@@ -106,7 +106,7 @@ Signed in as RECEPTIONIST with a fake backend that follows 1.1; today is 2026-10
 | TC-FE05-046 | AC1, AC2 | Sale answered as PENDING_PAYMENT (hypothetical backend, not main) | Package sale | Warning "saved as pending payment" and Confirm payment link | PASSED |
 | TC-FE05-048 | AC1 | Main without BE-19 | Sale answers ACTIVE with paymentId null | Warning "no payment record was created (needs BE-19)", "No payment record", no "is recorded", no View receipt | PASSED |
 | TC-FE05-049 | AC1 | Stale data after a sale | Sell VIP card, New sale, choose VIP again | Overview reloaded (2 calls); Renew, 05 Jul 2028 to 04 Jul 2029 | PASSED |
-| TC-FE05-047 | AC2 | Pending online requests | `tab=pending` | Both lists, oldest first; the row link opens the confirmation | PASSED |
+| TC-FE05-047 | AC2 | Pending online requests | `tab=pending` | Both lists, oldest first; the row link opens the confirmation | PASSED (updated in FE-12, see FE-12 3.2) |
 | TC-FE05-050 | AC3 | Check-in Recorded | `?code=MB-0248`, Confirm check-in | POST `{identifier: "MB-0248", note: null}`; Recorded with name, 17:02, BK-0021; list loaded twice; field cleared | PASSED |
 | TC-FE05-051 | AC3 | Check-in Rejected | Backend answers DENIED | Rejected with "No confirmed booking for today", Register or renew link, Rejected badge | PASSED |
 | TC-FE05-052 | AC3 | Empty and unknown code | Empty submit; then MB-9999 answered 404 "Member not found"; then MB-0000 answered 404 "Resource not found" | Required message without request; Rejected panel with "Member not found", field keeps MB-9999 and the focus; for MB-0000 a danger notice "Resource not found" and no Rejected panel | PASSED |
