@@ -71,6 +71,31 @@ BEGIN
 END;
 GO
 
+-- Add CHECK constraint on tier_rank >= 0
+IF NOT EXISTS (
+    SELECT 1 FROM sys.check_constraints cc
+    JOIN sys.tables t ON t.object_id = cc.parent_object_id
+    WHERE t.name = 'membership_card_tier' AND cc.name = 'chk_membership_card_tier_rank'
+)
+BEGIN
+    ALTER TABLE [membership_card_tier]
+    ADD CONSTRAINT [chk_membership_card_tier_rank] CHECK ([tier_rank] >= 0);
+END;
+GO
+
+-- Add unique filtered index on membership_card_tier(tier_rank) WHERE tier_rank > 0
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes i
+    JOIN sys.tables t ON t.object_id = i.object_id
+    WHERE t.name = 'membership_card_tier' AND i.name = 'ux_membership_card_tier_rank'
+)
+BEGIN
+    CREATE UNIQUE NONCLUSTERED INDEX ux_membership_card_tier_rank
+    ON [membership_card_tier] (tier_rank)
+    WHERE tier_rank > 0;
+END;
+GO
+
 -- Seed tier_rank for existing known tiers if 0 (STANDARD=1, SILVER=2, GOLD=3, VIP=4)
 UPDATE [membership_card_tier] SET [tier_rank] = 1 WHERE [code] = 'STANDARD' AND [tier_rank] = 0;
 UPDATE [membership_card_tier] SET [tier_rank] = 2 WHERE [code] = 'SILVER' AND [tier_rank] = 0;
@@ -92,33 +117,45 @@ EXEC sp_executesql N'
       AND mc.[price_paid] < t.[price]
       AND mc.[upgrade_request] = 0;
 
-    -- 4b. Deterministically link upgrade cards in an upgrade chain (including A -> B -> C)
-    -- Each upgrade card is linked to the immediately preceding REPLACED card for the same member
-    -- sharing the identical end_date.
-    WITH RankedPredecessors AS (
-        SELECT
-            mc.[id] AS upgrade_card_id,
-            rc.[id] AS candidate_card_id,
-            ROW_NUMBER() OVER (
-                PARTITION BY mc.[id]
-                ORDER BY rc.[id] DESC
-            ) AS rn
+    -- 4b. Deterministically link upgrade cards in an upgrade chain (including A -> B -> C).
+    -- Each upgrade card is linked ONLY when exactly one eligible predecessor candidate exists.
+    -- Candidates already referenced as replaces_card_id are excluded so deeper chains (A -> B -> C)
+    -- resolve unambiguously without mislinking ambiguous multiple predecessors.
+    -- If zero or several candidates exist, replaces_card_id remains NULL (fail-closed).
+    DECLARE @chain_iter INT = 0;
+    DECLARE @chain_rows INT = 1;
+    WHILE @chain_rows > 0 AND @chain_iter < 20
+    BEGIN
+        SET @chain_iter = @chain_iter + 1;
+
+        WITH SinglePredecessor AS (
+            SELECT
+                mc.[id] AS upgrade_card_id,
+                MIN(rc.[id]) AS candidate_card_id
+            FROM [member_card] mc
+            JOIN [member_card] rc
+              ON rc.[member_id] = mc.[member_id]
+             AND rc.[end_date] = mc.[end_date]
+             AND rc.[status] = ''REPLACED''
+             AND rc.[id] < mc.[id]
+            WHERE mc.[status] IN (''ACTIVE'', ''REPLACED'')
+              AND mc.[upgrade_request] = 1
+              AND mc.[replaces_card_id] IS NULL
+              AND rc.[id] NOT IN (
+                  SELECT [replaces_card_id]
+                  FROM [member_card]
+                  WHERE [replaces_card_id] IS NOT NULL
+              )
+            GROUP BY mc.[id]
+            HAVING COUNT(rc.[id]) = 1
+        )
+        UPDATE mc
+        SET mc.[replaces_card_id] = sp.candidate_card_id
         FROM [member_card] mc
-        JOIN [member_card] rc
-          ON rc.[member_id] = mc.[member_id]
-         AND rc.[end_date] = mc.[end_date]
-         AND rc.[status] = ''REPLACED''
-         AND rc.[id] < mc.[id]
-        WHERE mc.[status] IN (''ACTIVE'', ''REPLACED'')
-          AND mc.[upgrade_request] = 1
-          AND mc.[replaces_card_id] IS NULL
-    )
-    UPDATE mc
-    SET mc.[replaces_card_id] = r.candidate_card_id
-    FROM [member_card] mc
-    JOIN RankedPredecessors r
-      ON mc.[id] = r.upgrade_card_id
-     AND r.rn = 1;
+        JOIN SinglePredecessor sp ON mc.[id] = sp.upgrade_card_id;
+
+        SET @chain_rows = @@ROWCOUNT;
+    END;
 
     -- 4c. Deterministically link PENDING_PAYMENT legacy upgrades to the unique active paid card whose term started
     WITH SingleActiveCard AS (
@@ -149,6 +186,7 @@ EXEC sp_executesql N'
 GO
 
 -- Step 5: Clean up / fail-safe pre-check: ensure no duplicate replaces_card_id exist on in-force cards before index creation
+DECLARE @cleared_count INT = 0;
 IF EXISTS (
     SELECT replaces_card_id
     FROM [member_card]
@@ -165,8 +203,9 @@ BEGIN
     UPDATE [member_card]
     SET [replaces_card_id] = NULL
     WHERE [id] IN (SELECT [id] FROM DuplicateInForce WHERE rn > 1);
+
+    SET @cleared_count = @@ROWCOUNT;
 END;
-GO
 
 -- Add unique filtered index on replaces_card_id for in-force cards
 IF NOT EXISTS (
@@ -179,7 +218,6 @@ BEGIN
     ON [member_card] (replaces_card_id)
     WHERE status IN ('ACTIVE', 'PENDING_PAYMENT') AND replaces_card_id IS NOT NULL;
 END;
-GO
 
 -- Step 6: Post-condition validation
 EXEC sp_executesql N'
@@ -220,6 +258,24 @@ EXEC sp_executesql N'
     END;
 
     IF NOT EXISTS (
+        SELECT 1 FROM sys.check_constraints cc
+        JOIN sys.tables t ON t.object_id = cc.parent_object_id
+        WHERE t.name = ''membership_card_tier'' AND cc.name = ''chk_membership_card_tier_rank''
+    )
+    BEGIN
+        THROW 50001, ''Migration V22 verification failed: chk_membership_card_tier_rank constraint missing'', 1;
+    END;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM sys.indexes i
+        JOIN sys.tables t ON t.object_id = i.object_id
+        WHERE t.name = ''membership_card_tier'' AND i.name = ''ux_membership_card_tier_rank''
+    )
+    BEGIN
+        THROW 50001, ''Migration V22 verification failed: ux_membership_card_tier_rank index missing'', 1;
+    END;
+
+    IF NOT EXISTS (
         SELECT 1 FROM sys.indexes i
         JOIN sys.tables t ON t.object_id = i.object_id
         WHERE t.name = ''member_card'' AND i.name = ''ux_member_card_replaces_in_force''
@@ -228,4 +284,14 @@ EXEC sp_executesql N'
         THROW 50001, ''Migration V22 verification failed: ux_member_card_replaces_in_force index missing'', 1;
     END;
 ';
+
+-- Step 7: Diagnostics output for operator visibility
+DECLARE @unresolved_count INT;
+SELECT @unresolved_count = COUNT(*)
+FROM [member_card]
+WHERE [upgrade_request] = 1 AND [replaces_card_id] IS NULL;
+
+PRINT 'Migration V22 diagnostics:';
+PRINT '  - Upgrade cards with NULL replaces_card_id (unresolved baseline): ' + CAST(@unresolved_count AS VARCHAR(10));
+PRINT '  - Duplicate in-force links cleared by Step 5: ' + CAST(@cleared_count AS VARCHAR(10));
 GO

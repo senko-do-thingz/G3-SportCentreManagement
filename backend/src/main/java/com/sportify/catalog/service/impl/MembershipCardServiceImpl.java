@@ -25,6 +25,10 @@ import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,16 +38,20 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MembershipCardServiceImpl implements MembershipCardService {
 
     public static final String STANDARD_TIER_CODE = "STANDARD";
+    private static final int MAX_CHAIN_DEPTH = 20;
 
     private final MembershipCardTierRepository tierRepository;
     private final MemberCardRepository memberCardRepository;
@@ -102,7 +110,6 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             if (request.getDurationMonths() < 1) {
                 throw new BusinessRuleException("Duration in months must be at least 1 for paid tiers");
             }
-
         }
 
         Map<String, Object> before = snapshotTier(tier);
@@ -197,7 +204,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         }
 
         CardPlan plan = planCard(member.getId(), tier, today);
-        boolean isUpgrade = (plan.replaces() != null);
+        boolean isUpgrade = plan.replaces() != null;
         if (!isUpgrade && !paidAtDesk && plan.price().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessRuleException("Payment amount must be greater than zero. Attempted card price: " + plan.price());
         }
@@ -214,9 +221,20 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             if (status == CardStatus.ACTIVE && plan.replaces() != null) {
                 replace(plan.replaces());
             }
-        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+        } catch (DataIntegrityViolationException ex) {
             if (isUpgrade) {
-                throw new BusinessRuleException("A concurrent upgrade is already in progress for this membership card.");
+                if (isIndexViolation(ex, "ux_member_card_replaces_in_force")) {
+                    log.warn("Concurrent upgrade conflict for memberId={} replacing cardId={}: {}",
+                            member.getId(), plan.replaces().getId(), ex.getMessage());
+                    throw new BusinessRuleException("A concurrent upgrade is already in progress for this membership card.", ex);
+                }
+            }
+            throw ex;
+        } catch (PessimisticLockingFailureException ex) {
+            if (isUpgrade) {
+                log.warn("Lock acquisition failure during upgrade for memberId={} replacing cardId={}: {}",
+                        member.getId(), plan.replaces().getId(), ex.getMessage());
+                throw new BusinessRuleException("The upgrade could not be processed due to a concurrent conflict. Please retry.", ex);
             }
             throw ex;
         }
@@ -249,13 +267,15 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         LocalDate today = LocalDate.now(clock);
         CardPlan plan = planCard(card.getMember().getId(), card.getTier(), today);
         boolean requestedAsUpgrade = card.isUpgradeRequest();
-        if (requestedAsUpgrade != (plan.replaces() != null)) {
-            throw new BusinessRuleException("The member's card has changed since this request. Cancel it and request the card again.");
-        }
-        if (requestedAsUpgrade && card.getReplacesCard() != null) {
+        if (requestedAsUpgrade) {
+            if (card.getReplacesCard() == null) {
+                throw new BusinessRuleException("Cannot determine upgrade baseline for this membership card. Please contact the front desk.");
+            }
             if (plan.replaces() == null || !plan.replaces().getId().equals(card.getReplacesCard().getId())) {
                 throw new BusinessRuleException("The member's card has changed since this request. Cancel it and request the card again.");
             }
+        } else if (plan.replaces() != null) {
+            throw new BusinessRuleException("The member's card has changed since this request. Cancel it and request the card again.");
         }
 
         card.setStartDate(plan.startDate());
@@ -293,6 +313,17 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         return mapToCardResponse(memberCardRepository.save(card));
     }
 
+    private boolean isIndexViolation(Throwable throwable, String indexName) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current.getMessage() != null && current.getMessage().contains(indexName)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
     /**
      * Calculates the baseline price paid for the active term.
      * If the current card was created via an upgrade, the member only paid the price difference for that card,
@@ -312,14 +343,13 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         BigDecimal total = card.getPricePaid();
         MemberCard replaced = card.getReplacesCard();
         int depth = 0;
-        final int MAX_CHAIN_DEPTH = 20;
-        java.util.Set<Long> visited = new java.util.HashSet<>();
+        Set<Long> visited = new HashSet<>();
         if (card.getId() != null) {
             visited.add(card.getId());
         }
         while (replaced != null && replaced.getPricePaid() != null) {
             if (++depth > MAX_CHAIN_DEPTH || (replaced.getId() != null && !visited.add(replaced.getId()))) {
-                throw new BusinessRuleException("Membership card upgrade chain exceeds maximum allowed depth or contains cycle");
+                throw new BusinessRuleException("Membership card upgrade chain exceeds maximum allowed depth or contains cycle. Please contact the front desk.");
             }
             if (replaced.isUpgradeRequest() && replaced.getReplacesCard() == null) {
                 throw new BusinessRuleException("Cannot determine upgrade baseline for this membership card. Please contact the front desk.");
@@ -345,6 +375,9 @@ public class MembershipCardServiceImpl implements MembershipCardService {
      * A card lasts {@code durationMonths} months: it ends the day before the same date {@code durationMonths} later.
      */
     private CardPlan planCard(Long memberId, MembershipCardTier tier, LocalDate today) {
+        if (!isStandard(tier) && tier.getEffectiveRank() <= 0) {
+            throw new BusinessRuleException("Tier ranking is not configured for this tier");
+        }
         int months = tier.getDurationMonths();
         List<MemberCard> paid = memberCardRepository.findActiveCardsForMember(memberId, CardStatus.ACTIVE, today).stream()
                 .filter(c -> c.getTier().getDurationMonths() != null && c.getTier().getDurationMonths() > 0 && c.getEndDate() != null)

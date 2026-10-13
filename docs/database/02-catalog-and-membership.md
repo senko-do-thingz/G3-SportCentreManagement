@@ -173,3 +173,43 @@ Front desk arrival record (F1-15).
 - `plan_feature`: Monolithic plan feature bullet points.
 - `membership`: Monolithic membership registration periods.
 - `membership_sport`: Sports chosen under monolithic membership.
+
+## Operator Runbook: Migration V22 Upgrade Chain Verification and Unresolved Rows
+
+### Overview
+Migration V22 introduces upgrade chain tracking (`upgrade_request` and `replaces_card_id` on `member_card`) and explicit tier ranking (`tier_rank` on `membership_card_tier`). While deterministic multi-step chains sharing matching `end_date` are linked automatically, legacy ambiguous rows (multiple candidate predecessors or missing predecessor) leave `replaces_card_id` as `NULL`. When members holding these unresolved cards attempt automated self-service upgrades or activation, the backend fails closed (HTTP 400 directing the member to the front desk) to prevent incorrect upgrade pricing or invalid replacement links.
+
+### Inspection Query (Read-Only)
+Operators can run the following read-only SQL query post-migration to identify active or pending legacy cards with unresolved predecessor links:
+
+```sql
+SELECT 
+    mc.id AS card_id,
+    mc.card_code,
+    mc.member_id,
+    u.full_name AS member_name,
+    u.email AS member_email,
+    mct.name AS tier_name,
+    mc.status,
+    mc.price_paid,
+    mc.start_date,
+    mc.end_date,
+    mc.created_at
+FROM member_card mc
+JOIN membership_card_tier mct ON mc.tier_id = mct.id
+JOIN member_profile mp ON mc.member_id = mp.user_id
+JOIN user_account u ON mp.user_id = u.id
+WHERE mc.upgrade_request = 1
+  AND mc.replaces_card_id IS NULL
+  AND mc.status IN ('ACTIVE', 'PENDING_PAYMENT')
+ORDER BY mc.member_id, mc.created_at DESC;
+```
+
+### Front-Desk Handling Procedure
+When a member receives the error message "Cannot determine upgrade baseline for this membership card. Please contact the front desk.", staff should follow this resolution procedure:
+1. Lookup Member: Search member in Reception Member Search (F1-12) by email, phone, or member code.
+2. Review Card History: Open member overview to view all historical cards (`GET /members/{id}/overview`), identifying original card purchases and intermediate upgrades.
+3. Determine Baseline Credit: Sum the actual payments (`price_paid`) made by the member toward the current active period.
+4. Desk Sale or Resolution: Use Front Desk Register and Renew (F1-14) to sell the target tier card with manual credit adjustment or issue a replacement card as appropriate.
+5. Record Note: Add a note to the member record documenting the legacy upgrade baseline resolution.
+

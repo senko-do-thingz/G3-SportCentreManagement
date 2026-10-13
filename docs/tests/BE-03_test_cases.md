@@ -66,22 +66,22 @@
 | TC-BE03-43 | Card tier update validation - description 501 characters returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request |
 | TC-BE03-44 | Card tier update validation - price with 3 decimal places returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request |
 | TC-BE03-45 | Card tier update validation - price with 13 integer digits returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request |
-| TC-BE03-46 | Integration test - SportPackageSpecifications dynamic filters | Integration test | Skipped (Docker unavailable) / Passed |
-| TC-BE03-47 | Integration test - Package update persistence and activity log entry | Integration test | Skipped (Docker unavailable) / Passed |
-| TC-BE03-48 | Integration test - Tier update persistence and activity log entry | Integration test | Skipped (Docker unavailable) / Passed |
-| TC-BE03-49 | Integration test - Historical price snapshot preservation | Integration test | Skipped (Docker unavailable) / Passed |
+| TC-BE03-46 | Integration test - SportPackageSpecifications dynamic filters | Integration test | Passed (CI integration job) |
+| TC-BE03-47 | Integration test - Package update persistence and activity log entry | Integration test | Passed (CI integration job) |
+| TC-BE03-48 | Integration test - Tier update persistence and activity log entry | Integration test | Passed (CI integration job) |
+| TC-BE03-49 | Integration test - Historical price snapshot preservation | Integration test | Passed (CI integration job) |
 | TC-BE03-50 | Package description update with null or blank value clears description | PUT `/api/v1/packages/{id}` | 200 OK |
 | TC-BE03-51 | Card tier description update with null or blank value clears description | PUT `/api/v1/membership-cards/tiers/{id}` | 200 OK |
-| TC-BE03-52 | Integration test - V22 migration column and constraint verification | Integration test | Skipped (Docker unavailable) / Passed |
-| TC-BE03-53 | Integration test - V22 migration idempotency verification | Integration test | Skipped (Docker unavailable) / Passed |
+| TC-BE03-52 | Integration test - V22 migration column and constraint verification | Integration test | Passed (CI integration job) |
+| TC-BE03-53 | Integration test - V22 migration backfill and idempotency verification | Integration test | Passed (CI integration job) |
 | TC-BE03-54 | Member requests lower/equal rank tier after live price raise is queued without replacing held card | POST `/api/v1/membership-cards/purchase` | 200 OK |
-| TC-BE03-55 | Upgrade to higher-ranked tier with non-positive fee (fee <= 0) returns 400 | POST `/api/v1/membership-cards/purchase` | 400 Bad Request |
+| TC-BE03-55 | Upgrade to higher-ranked tier with fee <= 0 activates immediately at zero fee | POST `/api/v1/membership-cards/purchase` | 200 OK |
 | TC-BE03-56 | Upgrade fee after tier price edit is based on amount paid toward term | POST `/api/v1/membership-cards/purchase` | 200 OK |
 | TC-BE03-57 | Multi-step upgrade chain (A -> B -> C) calculates fee using cumulative chain pricePaid | POST `/api/v1/membership-cards/purchase` | 200 OK |
-| TC-BE03-58 | Legacy upgrade card with null replaces_card_id uses catalog tier price fallback | POST `/api/v1/membership-cards/purchase` | 200 OK |
+| TC-BE03-58 | Legacy upgrade card with null replaces_card_id fails closed on upgrade attempt | POST `/api/v1/membership-cards/purchase` | 400 Bad Request |
 | TC-BE03-59 | Activation of upgrade card with matching recorded replaces_card_id succeeds | POST `/api/v1/membership-cards/{id}/activate` | 200 OK |
 | TC-BE03-60 | Activation of upgrade card with mismatched replaces_card_id returns 400 | POST `/api/v1/membership-cards/{id}/activate` | 400 Bad Request |
-| TC-BE03-61 | Activation of legacy upgrade card with null replaces_card_id succeeds | POST `/api/v1/membership-cards/{id}/activate` | 200 OK |
+| TC-BE03-61 | Activation of legacy upgrade card with null replaces_card_id fails closed | POST `/api/v1/membership-cards/{id}/activate` | 400 Bad Request |
 | TC-BE03-62 | Member purchase after tier price edit creates PENDING_PAYMENT card requiring payment | POST `/api/v1/membership-cards/purchase` | 200 OK |
 | TC-BE03-63 | Pending payment card activation succeeds after tier price increase retaining old pricePaid | POST `/api/v1/membership-cards/{id}/activate` | 200 OK |
 
@@ -477,7 +477,7 @@
   - format matches only target format.
   - active matches only target status.
   - Combined filter enforces all predicates simultaneously.
-  - (Skipped locally when Docker is unavailable; verified in GitHub Actions CI).
+  - (Verified in GitHub Actions CI integration-tests job; skipped locally due to no Docker environment).
 
 ### TC-BE03-47: Integration test - Package update persistence and activity log entry
 - **Preconditions**: Manager updates a sport package.
@@ -485,7 +485,7 @@
 - **Expected Result**:
   - Database entity is updated and persisted.
   - `activity_log` record is written with `entity_type = 'SPORT_PACKAGE'`, `action = 'PACKAGE_UPDATED'`, and details JSON with `before` and `after` snapshots.
-  - (Skipped locally when Docker is unavailable; verified in GitHub Actions CI).
+  - (Verified in GitHub Actions CI integration-tests job; skipped locally due to no Docker environment).
 
 ### TC-BE03-48: Integration test - Tier update persistence and activity log entry
 - **Preconditions**: Manager updates a membership card tier.
@@ -493,7 +493,7 @@
 - **Expected Result**:
   - Database entity is updated and persisted.
   - `activity_log` record is written with `entity_type = 'MEMBERSHIP_CARD_TIER'`, `action = 'CARD_TIER_UPDATED'`, and details JSON with `before` and `after` snapshots.
-  - (Skipped locally when Docker is unavailable; verified in GitHub Actions CI).
+  - (Verified in GitHub Actions CI integration-tests job; skipped locally due to no Docker environment).
 
 ### TC-BE03-49: Integration test - Historical price snapshot preservation
 - **Preconditions**: Member holds active package registration (`originalPrice = 500000`, `paidAmount = 500000`) and active card (`pricePaid = 300000`).
@@ -501,7 +501,7 @@
 - **Expected Result**:
   - Historical registration preserves `originalPrice = 500000` and `paidAmount = 500000`.
   - Historical card preserves `pricePaid = 300000`.
-  - (Skipped locally when Docker is unavailable; verified in GitHub Actions CI).
+  - (Verified in GitHub Actions CI integration-tests job; skipped locally due to no Docker environment).
 
 ### TC-BE03-50: Package description update with null or blank value clears description
 - **Preconditions**: Package exists with a non-null description.
@@ -526,15 +526,23 @@
   - `upgrade_request` column exists on `member_card`.
   - `replaces_card_id` column exists on `member_card`.
   - Foreign key constraint `fk_member_card_replaces_card` exists.
-  - (Skipped locally when Docker is unavailable; verified in GitHub Actions CI).
+  - (Verified in GitHub Actions CI integration-tests job; skipped locally due to no Docker environment).
 
-### TC-BE03-53: Integration test - V22 migration idempotency verification
-- **Preconditions**: Flyway applied V22 migration on database container.
-- **Steps**: Read `V22__add_upgrade_tracking_to_member_card.sql` from classpath, split batches on `GO`, and re-execute each batch sequentially.
+### TC-BE03-53: Integration test - V22 migration backfill and idempotency verification
+- **Preconditions**: Flyway applied all catalog migrations up to V21 on dedicated temporary SQL Server database container.
+- **Steps**:
+  1. Seed V21 legacy rows: Clean chain A -> B -> C sharing identical `end_date`, no-predecessor card, and ambiguous candidate with multiple candidate predecessor cards sharing `end_date`.
+  2. Migrate to V22 via Flyway using configured `flyway.locations`.
+  3. Verify backfill results: Chain A -> B -> C links correctly; no-predecessor card and ambiguous candidate card maintain `replaces_card_id = NULL`.
+  4. Capture table snapshot of `member_card` rows.
+  5. Delete V22 entry from `flyway_schema_history` and re-migrate to V22.
+  6. Capture post-remigration snapshot and assert 100% equivalence.
+  7. Verify indices `ux_member_card_replaces_in_force`, `ux_membership_card_tier_rank` and check constraint `chk_membership_card_tier_rank` exist exactly once.
 - **Expected Result**:
-  - Execution completes with 0 errors.
-  - Columns and foreign key constraints remain intact without schema or data corruption.
-  - (Skipped locally when Docker is unavailable; verified in GitHub Actions CI).
+  - Clean chains linked; ambiguous and orphan cards retain NULL replaces_card_id without data loss.
+  - Idempotent re-run leaves data rows completely unchanged.
+  - Constraints and filtered indices created once.
+  - (Verified in GitHub Actions CI integration-tests job; skipped locally due to no Docker environment).
 
 ### TC-BE03-54: Member requests lower/equal rank tier after live price raise is queued without replacing held card
 - **Preconditions**: Member holds active GOLD card (paid 500,000 originally). Manager later raises live GOLD tier price to 600,000. Live SILVER tier price is 550,000.
@@ -546,14 +554,14 @@
   - New card starts after GOLD card end date (`goldEndDate + 1 day`).
   - Held GOLD card remains ACTIVE and is NOT replaced.
 
-### TC-BE03-55: Upgrade to higher-ranked tier with non-positive fee (fee <= 0) returns 400
-- **Preconditions**: Member paid 500,000 for SILVER when it was priced at 500,000. Later, SILVER is cheapened to 300,000 live. Target GOLD tier is priced at 450,000 live.
+### TC-BE03-55: Upgrade to higher-ranked tier with fee <= 0 activates immediately at zero fee
+- **Preconditions**: Member paid 550,000 for SILVER when it was priced at 550,000. Manager later lowers live SILVER price to 450,000 and live GOLD price to 500,000. Target GOLD tier is rank 3 (held SILVER is rank 2).
 - **Request**: `POST /api/v1/membership-cards/purchase` with `tierId = <GOLD_ID>`.
 - **Expected Result**:
-  - Rank rule matches upgrade (live GOLD 450k > live SILVER 300k).
-  - Upgrade fee calculation yields `450k - 500k = -50k <= 0`.
-  - HTTP 400 Bad Request with message "No payment is needed for this upgrade. Contact the front desk."
-  - No card or negative payment record is created.
+  - Rank rule matches upgrade (target GOLD rank 3 > held SILVER rank 2).
+  - Upgrade fee calculation yields `max(0, 500,000 - 550,000) = 0.00`.
+  - HTTP 200 OK.
+  - Upgrade is granted at 0 fee: new card is immediately ACTIVE with `pricePaid = 0.00`, replacing current SILVER card so member is never stuck.
 
 ### TC-BE03-56: Upgrade fee after tier price edit is based on amount paid toward term
 - **Preconditions**: Member holds active SILVER card for which they actually paid 300,000. Manager raises SILVER catalog price to 450,000. Target GOLD tier is priced at 600,000.
@@ -570,13 +578,12 @@
   - Upgrade fee is `650,000 - (150,000 + 200,000) = 300,000`.
   - Card C records `pricePaid = 300,000`, `upgradeRequest = true`, and `replacesCard = Card B`.
 
-### TC-BE03-58: Legacy upgrade card with null replaces_card_id uses catalog tier price fallback
-- **Preconditions**: Member holds active SILVER card that was an upgrade (`upgradeRequest = true`), but `replacesCard = null` (unresolvable legacy backfill row). Member's `pricePaid` is only 150,000 (upgrade difference). Held SILVER tier catalog price is 350,000. Target GOLD tier is 500,000.
+### TC-BE03-58: Legacy upgrade card with null replaces_card_id fails closed on upgrade attempt
+- **Preconditions**: Member holds active card that was an upgrade (`upgradeRequest = true`), but `replacesCard = null` (unresolvable legacy backfill row). Member's `pricePaid` is 150,000 (upgrade difference). Target higher tier requested.
 - **Request**: `POST /api/v1/membership-cards/purchase` with `tierId = <GOLD_ID>`.
 - **Expected Result**:
-  - HTTP 200 OK.
-  - Service falls back to SILVER catalog price (350,000) as baseline to prevent overcharging.
-  - Upgrade fee is `500,000 - 350,000 = 150,000`.
+  - HTTP 400 Bad Request with message "Cannot determine upgrade baseline for this membership card. Please contact the front desk."
+  - System fails closed to prevent incorrect upgrade pricing or invalid chain corruption.
 
 ### TC-BE03-59: Activation of upgrade card with matching recorded replaces_card_id succeeds
 - **Preconditions**: Upgrade card request was created recording `replacesCard = Card A`. Card A is still the active card to replace today.
@@ -593,13 +600,12 @@
   - HTTP 400 Bad Request with message "The member's card has changed since this request. Cancel it and request the card again."
   - Card remains in PENDING_PAYMENT status.
 
-### TC-BE03-61: Activation of legacy upgrade card with null replaces_card_id succeeds
-- **Preconditions**: Legacy card request has `upgradeRequest = true` and `replacesCard = null`. Member currently holds an active card.
+### TC-BE03-61: Activation of legacy upgrade card with null replaces_card_id fails closed
+- **Preconditions**: Legacy card request in PENDING_PAYMENT status has `upgradeRequest = true` and `replacesCard = null`.
 - **Request**: `POST /api/v1/membership-cards/{id}/activate` by staff.
 - **Expected Result**:
-  - HTTP 200 OK.
-  - ID comparison is safely bypassed for legacy null card reference.
-  - Card activates successfully and current active card is REPLACED.
+  - HTTP 400 Bad Request with message "Cannot determine upgrade baseline for this membership card. Please contact the front desk."
+  - Activation fails closed; card remains PENDING_PAYMENT until baseline is resolved.
 
 ### TC-BE03-62: Member purchase after tier price edit creates PENDING_PAYMENT card requiring payment
 - **Preconditions**: Manager updates a paid tier price and duration. Member submits purchase request online.

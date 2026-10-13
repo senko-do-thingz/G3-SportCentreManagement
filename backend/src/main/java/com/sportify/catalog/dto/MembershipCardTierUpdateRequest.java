@@ -24,6 +24,7 @@ public class MembershipCardTierUpdateRequest {
 
     @NotNull(message = "Duration in months is required")
     @Min(value = 0, message = "Duration months must be non-negative")
+    @Max(value = 120, message = "Duration months cannot exceed 120")
     private Integer durationMonths;
 
     @NotNull(message = "Discount percentage is required")

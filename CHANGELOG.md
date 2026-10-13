@@ -6,7 +6,7 @@ Branch `feat/f1-manager-catalog`. Owner: Dat (Senko). Priority: P1. Depends on: 
 
 ### Added
 - Manager Sport Packages API: `PUT /api/v1/packages/{id}` (manager list under `GET /api/v1/manager/packages`): dynamic filtering by `sportId`, `format`, `active`; update price, durationDays, sessionCount, sessionMinutes (60 or 90), active status; audit logging (`PACKAGE_UPDATED`) recording before and after snapshots.
-- Manager Card Tiers API: `PUT /api/v1/membership-cards/tiers/{id}` (manager list under `GET /api/v1/manager/card-tiers`): update price, durationMonths, discountPercentage (0-100), description, active status; invariant guards preventing alteration or deactivation of the STANDARD tier; price ordering by rank enforcement; audit logging (`CARD_TIER_UPDATED`).
+- Manager Card Tiers API: `PUT /api/v1/membership-cards/tiers/{id}` (manager list under `GET /api/v1/manager/card-tiers`): update price, durationMonths, discountPercentage (0-100), description, active status; invariant guards preventing alteration or deactivation of the STANDARD tier; audit logging (`CARD_TIER_UPDATED`).
 - Explicit tier ranking via `tier_rank` column on `membership_card_tier` (STANDARD=1, SILVER=2, GOLD=3, VIP=4) in migration V22, completely decoupling upgrade hierarchy from promotional live catalog prices.
 - Unique filtered index `ux_member_card_replaces_in_force` on `member_card(replaces_card_id)` for active and pending cards, preventing concurrent double-replacement of in-force cards.
 - Upgrade chain migration backfill supporting multi-step upgrade chains (A -> B -> C) by linking each upgrade card to its immediate predecessor sharing the identical `end_date`.

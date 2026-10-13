@@ -24,6 +24,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
@@ -512,6 +514,7 @@ public class MembershipCardServiceImplTest {
                 .name("Free 12M")
                 .price(BigDecimal.ZERO)
                 .durationMonths(12)
+                .tierRank(2)
                 .isActive(true)
                 .build();
 
@@ -535,6 +538,7 @@ public class MembershipCardServiceImplTest {
                 .name("VIP Equal")
                 .price(BigDecimal.valueOf(600000.00))
                 .durationMonths(12)
+                .tierRank(4)
                 .isActive(true)
                 .build();
 
@@ -573,6 +577,7 @@ public class MembershipCardServiceImplTest {
                 .name("VIP Equal")
                 .price(BigDecimal.valueOf(600000.00))
                 .durationMonths(12)
+                .tierRank(4)
                 .isActive(true)
                 .build();
 
@@ -935,6 +940,7 @@ public class MembershipCardServiceImplTest {
                 .price(BigDecimal.valueOf(300000.00))
                 .durationMonths(6)
                 .discountPercentage(5)
+                .tierRank(3)
                 .isActive(true)
                 .build();
 
@@ -1184,6 +1190,7 @@ public class MembershipCardServiceImplTest {
                 .price(BigDecimal.valueOf(450000.00)) // Live price raised to 450k
                 .durationMonths(12)
                 .discountPercentage(5)
+                .tierRank(3)
                 .isActive(true)
                 .build();
 
@@ -1712,9 +1719,7 @@ public class MembershipCardServiceImplTest {
     }
 
     @Test
-    void activateCard_legacyUpgradeWithNullReplacesCard_activatesSuccessfully() {
-        // N-04: Legacy upgrade row with upgradeRequest = true and replacesCard = null.
-        // It must activate without throwing ID mismatch exception.
+    void activateCard_legacyUpgradeWithNullReplacesCard_failsClosed() {
         MemberCard activeGold = paidCard(goldTier, LocalDate.of(2026, 3, 1), LocalDate.of(2027, 2, 28));
 
         MemberCard legacyPendingUpgrade = MemberCard.builder()
@@ -1734,14 +1739,111 @@ public class MembershipCardServiceImplTest {
         when(memberCardRepository.findById(141L)).thenReturn(Optional.of(legacyPendingUpgrade));
         when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class)))
                 .thenReturn(List.of(activeGold));
-        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
 
-        MemberCardResponse res = membershipCardService.activateCard(141L, receptionistUser);
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> membershipCardService.activateCard(141L, receptionistUser));
+        assertEquals("Cannot determine upgrade baseline for this membership card. Please contact the front desk.", ex.getMessage());
+        assertEquals(CardStatus.PENDING_PAYMENT, legacyPendingUpgrade.getStatus());
+        verify(paymentService, never()).markPaymentSuccess(anyLong(), any(), any());
+    }
 
-        assertNotNull(res);
-        assertEquals(CardStatus.ACTIVE, res.getStatus());
-        assertEquals(CardStatus.REPLACED, activeGold.getStatus());
-        verify(paymentService).markPaymentSuccess(eq(404L), eq(receptionistUser), isNull());
+    @Test
+    void purchaseCard_upgrade_unrelatedDataIntegrityViolation_rethrownUnchanged() {
+        MemberCard activeGold = paidCard(goldTier, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(3L)).thenReturn(Optional.of(vipTier));
+        when(memberCardRepository.findByMemberIdAndStatus(100L, CardStatus.PENDING_PAYMENT)).thenReturn(List.of());
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class)))
+                .thenReturn(List.of(activeGold));
+        when(memberCardRepository.getNextCardCodeSequence()).thenReturn(999L);
+        when(codeFormatter.formatCardCode(999L)).thenReturn("CARD-0999");
+        when(memberCardRepository.save(any(MemberCard.class)))
+                .thenThrow(new DataIntegrityViolationException("fk_member_card_user violation"));
+
+        MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
+                .memberId(100L)
+                .tierId(3L)
+                .build();
+
+        DataIntegrityViolationException ex = assertThrows(DataIntegrityViolationException.class,
+                () -> membershipCardService.purchaseCard(req, receptionistUser));
+        assertTrue(ex.getMessage().contains("fk_member_card_user"));
+    }
+
+    @Test
+    void purchaseCard_upgrade_indexViolation_mappedToBusinessRuleExceptionWithChainedCause() {
+        MemberCard activeGold = paidCard(goldTier, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(3L)).thenReturn(Optional.of(vipTier));
+        when(memberCardRepository.findByMemberIdAndStatus(100L, CardStatus.PENDING_PAYMENT)).thenReturn(List.of());
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class)))
+                .thenReturn(List.of(activeGold));
+        when(memberCardRepository.getNextCardCodeSequence()).thenReturn(999L);
+        when(codeFormatter.formatCardCode(999L)).thenReturn("CARD-0999");
+
+        DataIntegrityViolationException rootEx = new DataIntegrityViolationException("Violation of UNIQUE KEY constraint 'ux_member_card_replaces_in_force'");
+        when(memberCardRepository.save(any(MemberCard.class))).thenThrow(rootEx);
+
+        MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
+                .memberId(100L)
+                .tierId(3L)
+                .build();
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> membershipCardService.purchaseCard(req, receptionistUser));
+        assertEquals("A concurrent upgrade is already in progress for this membership card.", ex.getMessage());
+        assertEquals(rootEx, ex.getCause());
+    }
+
+    @Test
+    void purchaseCard_upgrade_lockFailure_mappedToRetryableBusinessRuleExceptionWithChainedCause() {
+        MemberCard activeGold = paidCard(goldTier, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(3L)).thenReturn(Optional.of(vipTier));
+        when(memberCardRepository.findByMemberIdAndStatus(100L, CardStatus.PENDING_PAYMENT)).thenReturn(List.of());
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class)))
+                .thenReturn(List.of(activeGold));
+        when(memberCardRepository.getNextCardCodeSequence()).thenReturn(999L);
+        when(codeFormatter.formatCardCode(999L)).thenReturn("CARD-0999");
+
+        CannotAcquireLockException lockEx = new CannotAcquireLockException("Lock timeout on transaction");
+        when(memberCardRepository.save(any(MemberCard.class))).thenThrow(lockEx);
+
+        MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
+                .memberId(100L)
+                .tierId(3L)
+                .build();
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> membershipCardService.purchaseCard(req, receptionistUser));
+        assertEquals("The upgrade could not be processed due to a concurrent conflict. Please retry.", ex.getMessage());
+        assertEquals(lockEx, ex.getCause());
+    }
+
+    @Test
+    void purchaseCard_paidTierWithZeroTierRank_throwsBusinessRuleException() {
+        MembershipCardTier unrankedTier = MembershipCardTier.builder()
+                .id(44L)
+                .code("BRONZE")
+                .name("Bronze")
+                .price(BigDecimal.valueOf(200000.00))
+                .durationMonths(6)
+                .tierRank(0) // unranked
+                .isActive(true)
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(44L)).thenReturn(Optional.of(unrankedTier));
+        when(memberCardRepository.findByMemberIdAndStatus(100L, CardStatus.PENDING_PAYMENT)).thenReturn(List.of());
+
+        MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
+                .memberId(100L)
+                .tierId(44L)
+                .build();
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> membershipCardService.purchaseCard(req, receptionistUser));
+        assertEquals("Tier ranking is not configured for this tier", ex.getMessage());
     }
 }
 

@@ -50,6 +50,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SportPackageServiceImpl implements SportPackageService {
 
+    public static final int SESSION_MINUTES_60 = 60;
+    public static final int SESSION_MINUTES_90 = 90;
+
     private final SportPackageRepository sportPackageRepository;
     private final SportPackageRegistrationRepository registrationRepository;
     private final SportRepository sportRepository;
@@ -92,7 +95,7 @@ public class SportPackageServiceImpl implements SportPackageService {
         SportPackage pkg = sportPackageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Sport package not found for id: " + id));
 
-        if (request.getSessionMinutes() != 60 && request.getSessionMinutes() != 90) {
+        if (request.getSessionMinutes() != SESSION_MINUTES_60 && request.getSessionMinutes() != SESSION_MINUTES_90) {
             throw new BusinessRuleException("Session minutes must be either 60 or 90");
         }
 

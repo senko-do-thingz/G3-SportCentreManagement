@@ -2,6 +2,7 @@ package com.sportify.catalog.dto;
 
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -28,10 +29,12 @@ public class SportPackageUpdateRequest {
 
     @NotNull(message = "Session count is required")
     @Min(value = 1, message = "Session count must be at least 1")
+    @Max(value = 1000, message = "Session count cannot exceed 1000")
     private Integer sessionCount;
 
     @NotNull(message = "Duration in days is required")
     @Min(value = 1, message = "Duration must be at least 1 day")
+    @Max(value = 3650, message = "Duration in days cannot exceed 3650")
     private Integer durationDays;
 
     @NotNull(message = "Session minutes is required")

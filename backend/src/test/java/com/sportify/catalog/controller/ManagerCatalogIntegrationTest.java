@@ -9,11 +9,6 @@ import com.sportify.catalog.dto.MembershipCardTierUpdateRequest;
 import com.sportify.catalog.dto.SportPackageResponse;
 import com.sportify.catalog.dto.SportPackageUpdateRequest;
 import com.sportify.catalog.entity.CardStatus;
-import com.sportify.payment.entity.PaymentMethod;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.util.StreamUtils;
-
-import java.nio.charset.StandardCharsets;
 import com.sportify.catalog.entity.MemberCard;
 import com.sportify.catalog.entity.MembershipCardTier;
 import com.sportify.catalog.entity.PackageRegistrationStatus;
@@ -31,6 +26,7 @@ import com.sportify.catalog.repository.SportRepository;
 import com.sportify.catalog.service.MembershipCardService;
 import com.sportify.catalog.service.SportPackageService;
 import com.sportify.core.audit.AuditAction;
+import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.identity.entity.ActivityLog;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.Role;
@@ -39,59 +35,63 @@ import com.sportify.identity.repository.ActivityLogRepository;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.RoleRepository;
 import com.sportify.identity.repository.UserRepository;
+import com.sportify.identity.security.CustomUserDetails;
+import com.sportify.identity.security.JwtService;
+import com.sportify.payment.entity.PaymentMethod;
+import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.List;
-
-import com.sportify.core.exception.BusinessRuleException;
-import org.springframework.dao.DataAccessException;
-import org.flywaydb.core.Flyway;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.http.MediaType;
-import com.sportify.identity.security.JwtService;
-import com.sportify.identity.security.CustomUserDetails;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.hamcrest.Matchers.containsString;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import org.junit.jupiter.api.Tag;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Integration tests for task BE-03 Manager Catalog and Pricing features.
- * Extends AbstractIntegrationTest (uses Testcontainers; skipped locally when Docker is unavailable).
+ * Extends AbstractIntegrationTest. Requires Docker and Testcontainers to execute.
+ * Runs in CI (GitHub Actions) where Docker is available; skipped locally when Docker is unavailable.
  */
 @Tag("integration")
 @AutoConfigureMockMvc
 class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
 
     private static final String MARKER = "be03it";
+
+    @Value("${spring.flyway.locations}")
+    private String flywayLocations;
 
     @Autowired
     private MockMvc mockMvc;
@@ -347,7 +347,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .durationMonths(12)
                 .discountPercentage(5)
                 .description("Initial description " + MARKER)
-                .tierRank(2)
+                .tierRank(10)
                 .isActive(true)
                 .build());
         BigDecimal originalPrice = testTier.getPrice();
@@ -427,7 +427,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .price(BigDecimal.valueOf(300000.00))
                 .durationMonths(12)
                 .discountPercentage(5)
-                .tierRank(2)
+                .tierRank(11)
                 .isActive(true)
                 .build());
 
@@ -518,7 +518,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .price(BigDecimal.valueOf(300000.00))
                 .durationMonths(12)
                 .discountPercentage(5)
-                .tierRank(2)
+                .tierRank(12)
                 .isActive(true)
                 .build());
         BigDecimal originalPrice = testTier.getPrice();
@@ -567,7 +567,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .price(BigDecimal.valueOf(150000.00))
                 .durationMonths(12)
                 .discountPercentage(2)
-                .tierRank(1)
+                .tierRank(21)
                 .isActive(true)
                 .build());
 
@@ -577,7 +577,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .price(BigDecimal.valueOf(350000.00))
                 .durationMonths(12)
                 .discountPercentage(5)
-                .tierRank(2)
+                .tierRank(22)
                 .isActive(true)
                 .build());
 
@@ -587,7 +587,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .price(BigDecimal.valueOf(650000.00))
                 .durationMonths(12)
                 .discountPercentage(10)
-                .tierRank(3)
+                .tierRank(23)
                 .isActive(true)
                 .build());
 
@@ -640,7 +640,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .price(BigDecimal.valueOf(300000.00))
                 .durationMonths(12)
                 .discountPercentage(5)
-                .tierRank(1)
+                .tierRank(31)
                 .isActive(true)
                 .build());
 
@@ -650,7 +650,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .price(BigDecimal.valueOf(600000.00))
                 .durationMonths(12)
                 .discountPercentage(10)
-                .tierRank(2)
+                .tierRank(32)
                 .isActive(true)
                 .build());
 
@@ -693,7 +693,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .price(BigDecimal.valueOf(400000.00))
                 .durationMonths(12)
                 .discountPercentage(5)
-                .tierRank(2)
+                .tierRank(41)
                 .isActive(true)
                 .build());
 
@@ -731,7 +731,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .price(BigDecimal.valueOf(550000.00))
                 .durationMonths(12)
                 .discountPercentage(5)
-                .tierRank(2)
+                .tierRank(51)
                 .isActive(true)
                 .build());
 
@@ -741,7 +741,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .price(BigDecimal.valueOf(600000.00))
                 .durationMonths(12)
                 .discountPercentage(10)
-                .tierRank(3)
+                .tierRank(52)
                 .isActive(true)
                 .build());
 
@@ -754,7 +754,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         assertEquals(CardStatus.ACTIVE, activeSilver.getStatus());
         assertEquals(0, BigDecimal.valueOf(550000.00).compareTo(activeSilver.getPricePaid()));
 
-        // 2. Manager lowers Silver tier to 450k and Gold tier to 500k (valid price ordering: Gold 500k >= Silver 450k)
+        // 2. Manager lowers Silver tier to 450k and Gold tier to 500k
         MembershipCardTierUpdateRequest silverUpdate = MembershipCardTierUpdateRequest.builder()
                 .price(BigDecimal.valueOf(450000.00))
                 .durationMonths(12)
@@ -819,10 +819,10 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         JdbcTemplate testJdbc = new JdbcTemplate(testDs);
 
         try {
-            // 1. Programmatically migrate to target V21
+            // 1. Programmatically migrate to target V21 using configured flyway locations
             Flyway flywayV21 = Flyway.configure()
                     .dataSource(testDs)
-                    .locations("classpath:db/migration/identity", "classpath:db/migration/catalog")
+                    .locations(flywayLocations.split(","))
                     .target("21")
                     .load();
             flywayV21.migrate();
@@ -833,82 +833,105 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
             Long migMemberId = testJdbc.queryForObject("SELECT id FROM [user_account] WHERE email = 'mig_test_user@test.com'", Long.class);
             testJdbc.update("INSERT INTO [member_profile] (user_id, member_code, current_level, joined_on) VALUES (?, 'MBR-MIG-01', 'BEGINNER', CAST(SYSDATETIME() AS DATE))", migMemberId);
 
+            // Fetch dynamic prices and IDs from V21 schema
             Long goldTierId = testJdbc.queryForObject("SELECT id FROM [membership_card_tier] WHERE code = 'GOLD'", Long.class);
             Long vipTierId = testJdbc.queryForObject("SELECT id FROM [membership_card_tier] WHERE code = 'VIP'", Long.class);
+            BigDecimal goldPrice = testJdbc.queryForObject("SELECT price FROM [membership_card_tier] WHERE id = ?", BigDecimal.class, goldTierId);
+            BigDecimal vipPrice = testJdbc.queryForObject("SELECT price FROM [membership_card_tier] WHERE id = ?", BigDecimal.class, vipTierId);
+            BigDecimal upgDiff = vipPrice.subtract(goldPrice);
 
-            // 2. Seed legacy card rows in V21 schema (no upgrade_request or replaces_card_id columns)
+            // 2. Seed legacy card rows in V21 schema across three test cases:
+            // Case 1: Clean chain A -> B -> C (A is replaced by B, B is replaced by C, all sharing identical end_date)
             LocalDate endDec = LocalDate.of(2026, 12, 31);
-            // Card A: Initial purchase (REPLACED), started Jan 1, ends Dec 31, paid 300k (full GOLD price)
             testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
-                    "VALUES ('CARD-MIG-A', ?, ?, '2026-01-01', ?, 'REPLACED', 300000.00, GETDATE(), GETDATE())", migMemberId, goldTierId, endDec);
+                    "VALUES ('CARD-MIG-A', ?, ?, '2026-01-01', ?, 'REPLACED', ?, GETDATE(), GETDATE())", migMemberId, goldTierId, endDec, goldPrice);
             Long cardAId = testJdbc.queryForObject("SELECT id FROM [member_card] WHERE card_code = 'CARD-MIG-A'", Long.class);
 
-            // Card B: Mid-term upgrade from A (REPLACED), started Mar 1, ends Dec 31, paid 150k (< VIP 600k)
             testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
-                    "VALUES ('CARD-MIG-B', ?, ?, '2026-03-01', ?, 'REPLACED', 150000.00, GETDATE(), GETDATE())", migMemberId, vipTierId, endDec);
+                    "VALUES ('CARD-MIG-B', ?, ?, '2026-03-01', ?, 'REPLACED', ?, GETDATE(), GETDATE())", migMemberId, vipTierId, endDec, upgDiff.divide(BigDecimal.valueOf(2)));
             Long cardBId = testJdbc.queryForObject("SELECT id FROM [member_card] WHERE card_code = 'CARD-MIG-B'", Long.class);
 
-            // Card C: Subsequent upgrade from B (ACTIVE), started Jun 1, ends Dec 31, paid 150k (< VIP 600k)
             testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
-                    "VALUES ('CARD-MIG-C', ?, ?, '2026-06-01', ?, 'ACTIVE', 150000.00, GETDATE(), GETDATE())", migMemberId, vipTierId, endDec);
+                    "VALUES ('CARD-MIG-C', ?, ?, '2026-06-01', ?, 'ACTIVE', ?, GETDATE(), GETDATE())", migMemberId, vipTierId, endDec, upgDiff.divide(BigDecimal.valueOf(2)));
             Long cardCId = testJdbc.queryForObject("SELECT id FROM [member_card] WHERE card_code = 'CARD-MIG-C'", Long.class);
 
-            // Ambiguous row: An upgrade card without a matching predecessor (e.g. no predecessor sharing end_date)
+            // Case 2: No predecessor (card with price_paid < tier price, but no candidate predecessor exists sharing end_date)
             LocalDate endNov = LocalDate.of(2026, 11, 30);
             testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
-                    "VALUES ('CARD-MIG-AMBIG', ?, ?, '2026-05-01', ?, 'ACTIVE', 150000.00, GETDATE(), GETDATE())", migMemberId, vipTierId, endNov);
-            Long ambigCardId = testJdbc.queryForObject("SELECT id FROM [member_card] WHERE card_code = 'CARD-MIG-AMBIG'", Long.class);
+                    "VALUES ('CARD-MIG-NOPRED', ?, ?, '2026-05-01', ?, 'ACTIVE', ?, GETDATE(), GETDATE())", migMemberId, vipTierId, endNov, upgDiff);
+            Long noPredCardId = testJdbc.queryForObject("SELECT id FROM [member_card] WHERE card_code = 'CARD-MIG-NOPRED'", Long.class);
+
+            // Case 3: Multiple predecessors (ambiguous candidate where multiple REPLACED cards share end_date)
+            LocalDate endOct = LocalDate.of(2026, 10, 31);
+            testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
+                    "VALUES ('CARD-MIG-AMBIG-P1', ?, ?, '2026-01-01', ?, 'REPLACED', ?, GETDATE(), GETDATE())", migMemberId, goldTierId, endOct, goldPrice);
+            testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
+                    "VALUES ('CARD-MIG-AMBIG-P2', ?, ?, '2026-02-01', ?, 'REPLACED', ?, GETDATE(), GETDATE())", migMemberId, goldTierId, endOct, goldPrice);
+            testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
+                    "VALUES ('CARD-MIG-AMBIG-CAND', ?, ?, '2026-04-01', ?, 'ACTIVE', ?, GETDATE(), GETDATE())", migMemberId, vipTierId, endOct, upgDiff);
+            Long ambigCandCardId = testJdbc.queryForObject("SELECT id FROM [member_card] WHERE card_code = 'CARD-MIG-AMBIG-CAND'", Long.class);
 
             // 3. Migrate to V22
             Flyway flywayV22 = Flyway.configure()
                     .dataSource(testDs)
-                    .locations("classpath:db/migration/identity", "classpath:db/migration/catalog")
+                    .locations(flywayLocations.split(","))
                     .target("22")
                     .load();
             flywayV22.migrate();
 
             // 4. Assert backfill results
-            // Card A: Initial purchase -> upgrade_request = 0, replaces_card_id = NULL
+            // Case 1: Clean chain A -> B -> C
             Boolean upgA = testJdbc.queryForObject("SELECT upgrade_request FROM [member_card] WHERE id = ?", Boolean.class, cardAId);
             Long repA = testJdbc.queryForObject("SELECT replaces_card_id FROM [member_card] WHERE id = ?", Long.class, cardAId);
             assertFalse(Boolean.TRUE.equals(upgA), "Initial card A was not purchased as upgrade difference");
             assertNull(repA, "Initial card A does not replace any card");
 
-            // Card B: Mid-term upgrade -> upgrade_request = 1, replaces_card_id = Card A
             Boolean upgB = testJdbc.queryForObject("SELECT upgrade_request FROM [member_card] WHERE id = ?", Boolean.class, cardBId);
             Long repB = testJdbc.queryForObject("SELECT replaces_card_id FROM [member_card] WHERE id = ?", Long.class, cardBId);
-            assertTrue(Boolean.TRUE.equals(upgB), "Card B paid 150k < VIP 600k, must be marked as upgrade");
+            assertTrue(Boolean.TRUE.equals(upgB), "Card B paid < tier price, must be marked as upgrade");
             assertEquals(cardAId, repB, "Card B must be linked to predecessor Card A");
 
-            // Card C: Subsequent upgrade -> upgrade_request = 1, replaces_card_id = Card B
             Boolean upgC = testJdbc.queryForObject("SELECT upgrade_request FROM [member_card] WHERE id = ?", Boolean.class, cardCId);
             Long repC = testJdbc.queryForObject("SELECT replaces_card_id FROM [member_card] WHERE id = ?", Long.class, cardCId);
-            assertTrue(Boolean.TRUE.equals(upgC), "Card C paid 150k < VIP 600k, must be marked as upgrade");
+            assertTrue(Boolean.TRUE.equals(upgC), "Card C paid < tier price, must be marked as upgrade");
             assertEquals(cardBId, repC, "Card C must be linked to immediate predecessor Card B");
 
-            // Cumulative price_paid for Card C through chain A -> B -> C:
-            // Card A (300k) + Card B (150k) + Card C (150k) = 600k
-            BigDecimal cumPricePaid = testJdbc.queryForObject(
-                    "WITH Chain AS (" +
-                    "  SELECT id, replaces_card_id, price_paid FROM [member_card] WHERE id = ? " +
-                    "  UNION ALL " +
-                    "  SELECT mc.id, mc.replaces_card_id, mc.price_paid FROM [member_card] mc " +
-                    "  JOIN Chain c ON mc.id = c.replaces_card_id" +
-                    ") SELECT SUM(price_paid) FROM Chain",
-                    BigDecimal.class,
-                    cardCId
-            );
-            assertEquals(0, BigDecimal.valueOf(600000.00).compareTo(cumPricePaid),
-                    "Cumulative price paid along chain A -> B -> C must equal full VIP tier price (600,000)");
+            // Case 2: No predecessor -> upgrade_request = 1, replaces_card_id = NULL
+            Boolean upgNoPred = testJdbc.queryForObject("SELECT upgrade_request FROM [member_card] WHERE id = ?", Boolean.class, noPredCardId);
+            Long repNoPred = testJdbc.queryForObject("SELECT replaces_card_id FROM [member_card] WHERE id = ?", Long.class, noPredCardId);
+            assertTrue(Boolean.TRUE.equals(upgNoPred), "No-predecessor card marked as upgrade by price difference");
+            assertNull(repNoPred, "Card without matching predecessor must keep replaces_card_id as NULL");
 
-            // Ambiguous row: marked as upgrade by best-effort heuristic, but replaces_card_id cannot be resolved deterministically
-            Boolean upgAmbig = testJdbc.queryForObject("SELECT upgrade_request FROM [member_card] WHERE id = ?", Boolean.class, ambigCardId);
-            Long repAmbig = testJdbc.queryForObject("SELECT replaces_card_id FROM [member_card] WHERE id = ?", Long.class, ambigCardId);
-            assertTrue(Boolean.TRUE.equals(upgAmbig), "Ambiguous card paid 150k < 600k, marked upgrade by best-effort heuristic");
-            assertNull(repAmbig, "Ambiguous card has no deterministically resolvable predecessor, must remain NULL");
+            // Case 3: Ambiguous predecessors -> upgrade_request = 1, replaces_card_id = NULL
+            Boolean upgAmbig = testJdbc.queryForObject("SELECT upgrade_request FROM [member_card] WHERE id = ?", Boolean.class, ambigCandCardId);
+            Long repAmbig = testJdbc.queryForObject("SELECT replaces_card_id FROM [member_card] WHERE id = ?", Long.class, ambigCandCardId);
+            assertTrue(Boolean.TRUE.equals(upgAmbig), "Ambiguous candidate card marked as upgrade by price difference");
+            assertNull(repAmbig, "Ambiguous candidate card with multiple predecessors must keep replaces_card_id as NULL");
 
-            // 5. Verify idempotency: re-running migration on same database succeeds without error
+            // 5. Snapshot before re-migration
+            List<Map<String, Object>> snapshotBefore = testJdbc.queryForList(
+                    "SELECT id, card_code, upgrade_request, replaces_card_id, price_paid, status FROM [member_card] ORDER BY id");
+
+            // Verify idempotency: delete V22 entry from flyway_schema_history and re-migrate to V22
+            testJdbc.update("DELETE FROM [flyway_schema_history] WHERE [version] = '22'");
             flywayV22.migrate();
+
+            List<Map<String, Object>> snapshotAfter = testJdbc.queryForList(
+                    "SELECT id, card_code, upgrade_request, replaces_card_id, price_paid, status FROM [member_card] ORDER BY id");
+            assertEquals(snapshotBefore, snapshotAfter, "Member card snapshot must be identical after re-running V22");
+
+            // Assert constraints and unique indices exist exactly once
+            int indexCount = testJdbc.queryForObject(
+                    "SELECT COUNT(*) FROM sys.indexes WHERE name = 'ux_member_card_replaces_in_force'", Integer.class);
+            assertEquals(1, indexCount, "Index ux_member_card_replaces_in_force must exist exactly once");
+
+            int tierRankIndexCount = testJdbc.queryForObject(
+                    "SELECT COUNT(*) FROM sys.indexes WHERE name = 'ux_membership_card_tier_rank'", Integer.class);
+            assertEquals(1, tierRankIndexCount, "Index ux_membership_card_tier_rank must exist exactly once");
+
+            int tierRankChkCount = testJdbc.queryForObject(
+                    "SELECT COUNT(*) FROM sys.check_constraints WHERE name = 'chk_membership_card_tier_rank'", Integer.class);
+            assertEquals(1, tierRankChkCount, "Check constraint chk_membership_card_tier_rank must exist exactly once");
         } finally {
             try {
                 jdbcTemplate.execute("ALTER DATABASE [" + testDbName + "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [" + testDbName + "];");
@@ -996,62 +1019,74 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("Two concurrent upgrade requests targeting the same active card: exactly one succeeds and one fails gracefully")
+    @DisplayName("Two concurrent upgrade requests targeting the same active card: exactly one succeeds and one fails gracefully across 5 iterations")
     void testConcurrency_duplicateUpgradeFailsGracefully() throws Exception {
         MembershipCardTier goldTier = cardTierRepository.findByCode("GOLD").orElseThrow();
         MembershipCardTier vipTier = cardTierRepository.findByCode("VIP").orElseThrow();
 
-        MemberCard baseCard = memberCardRepository.saveAndFlush(MemberCard.builder()
-                .cardCode("CARD-CONC-" + MARKER)
-                .member(memberProfile)
-                .tier(goldTier)
-                .startDate(LocalDate.now())
-                .endDate(LocalDate.now().plusMonths(12))
-                .status(CardStatus.ACTIVE)
-                .pricePaid(goldTier.getPrice())
-                .build());
+        for (int iter = 0; iter < 5; iter++) {
+            // Clean up member cards and payments before each iteration
+            jdbcTemplate.update("UPDATE member_card SET replaces_card_id = NULL WHERE member_id = ?", memberProfile.getId());
+            jdbcTemplate.update("UPDATE member_card SET payment_id = NULL WHERE member_id = ?", memberProfile.getId());
+            jdbcTemplate.update("DELETE FROM member_card WHERE member_id = ?", memberProfile.getId());
+            jdbcTemplate.update("DELETE FROM payment WHERE member_id = ?", memberProfile.getId());
 
-        MemberCardPurchaseRequest upgradeReq = MemberCardPurchaseRequest.builder()
-                .memberId(memberProfile.getId())
-                .tierId(vipTier.getId())
-                .paymentMethod(PaymentMethod.BANK_TRANSFER)
-                .build();
+            MemberCard baseCard = memberCardRepository.saveAndFlush(MemberCard.builder()
+                    .cardCode("CARD-CONC-" + iter + "-" + MARKER)
+                    .member(memberProfile)
+                    .tier(goldTier)
+                    .startDate(LocalDate.now())
+                    .endDate(LocalDate.now().plusMonths(12))
+                    .status(CardStatus.ACTIVE)
+                    .pricePaid(goldTier.getPrice())
+                    .build());
 
-        int threadCount = 2;
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-        CountDownLatch readyLatch = new CountDownLatch(threadCount);
-        CountDownLatch startLatch = new CountDownLatch(1);
-        AtomicInteger successCount = new AtomicInteger(0);
-        AtomicInteger businessRuleExCount = new AtomicInteger(0);
-        List<Throwable> unexpectedErrors = Collections.synchronizedList(new ArrayList<>());
+            MemberCardPurchaseRequest upgradeReq = MemberCardPurchaseRequest.builder()
+                    .memberId(memberProfile.getId())
+                    .tierId(vipTier.getId())
+                    .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                    .build();
 
-        for (int i = 0; i < threadCount; i++) {
-            executor.submit(() -> {
-                readyLatch.countDown();
-                try {
-                    startLatch.await();
-                    membershipCardService.purchaseCard(upgradeReq, memberUser);
-                    successCount.incrementAndGet();
-                } catch (BusinessRuleException e) {
-                    if (e.getMessage().contains("concurrent upgrade")) {
+            int threadCount = 2;
+            ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+            CyclicBarrier barrier = new CyclicBarrier(threadCount);
+            AtomicInteger successCount = new AtomicInteger(0);
+            AtomicInteger businessRuleExCount = new AtomicInteger(0);
+            List<Throwable> unexpectedErrors = Collections.synchronizedList(new ArrayList<>());
+
+            for (int i = 0; i < threadCount; i++) {
+                executor.submit(() -> {
+                    try {
+                        barrier.await();
+                        membershipCardService.purchaseCard(upgradeReq, memberUser);
+                        successCount.incrementAndGet();
+                    } catch (BusinessRuleException e) {
                         businessRuleExCount.incrementAndGet();
-                    } else {
-                        unexpectedErrors.add(e);
+                    } catch (Throwable t) {
+                        unexpectedErrors.add(t);
                     }
-                } catch (Throwable t) {
-                    unexpectedErrors.add(t);
-                }
-            });
+                });
+            }
+
+            executor.shutdown();
+            assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+
+            assertEquals(0, unexpectedErrors.size(), "Iteration " + iter + " had unexpected errors: " + unexpectedErrors);
+            assertEquals(1, successCount.get(), "Iteration " + iter + ": exactly one concurrent upgrade should succeed");
+            assertEquals(1, businessRuleExCount.get(), "Iteration " + iter + ": exactly one concurrent upgrade should receive BusinessRuleException");
+
+            Integer inForceCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM member_card WHERE replaces_card_id = ? AND status IN ('ACTIVE', 'PENDING_PAYMENT')",
+                    Integer.class,
+                    baseCard.getId());
+            assertEquals(1, inForceCount, "Iteration " + iter + ": exactly one in-force card must replace baseCard in database");
+
+            // Clean up iteration cards and payments
+            jdbcTemplate.update("UPDATE member_card SET replaces_card_id = NULL WHERE member_id = ?", memberProfile.getId());
+            jdbcTemplate.update("UPDATE member_card SET payment_id = NULL WHERE member_id = ?", memberProfile.getId());
+            jdbcTemplate.update("DELETE FROM member_card WHERE member_id = ?", memberProfile.getId());
+            jdbcTemplate.update("DELETE FROM payment WHERE member_id = ?", memberProfile.getId());
         }
-
-        readyLatch.await(5, TimeUnit.SECONDS);
-        startLatch.countDown();
-        executor.shutdown();
-        assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
-
-        assertEquals(0, unexpectedErrors.size(), "Unexpected errors: " + unexpectedErrors);
-        assertEquals(1, successCount.get(), "Exactly one concurrent upgrade should succeed");
-        assertEquals(1, businessRuleExCount.get(), "Exactly one concurrent upgrade should receive BusinessRuleException");
     }
 
     @Test
@@ -1173,5 +1208,201 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", containsString("Session minutes must be either 60 or 90")));
+    }
+
+    @Test
+    @DisplayName("Member purchase upgrade for legacy card with null replaces_card_id returns 400 Bad Request via HTTP")
+    void testPurchaseUpgrade_legacyUnresolvedCard_returns400() throws Exception {
+        MembershipCardTier goldTier = cardTierRepository.findByCode("GOLD").orElseThrow();
+        MembershipCardTier vipTier = cardTierRepository.findByCode("VIP").orElseThrow();
+
+        // Create active legacy card with upgradeRequest = true and replacesCard = null
+        memberCardRepository.saveAndFlush(MemberCard.builder()
+                .cardCode("CARD-MOCK-UNRES-" + MARKER)
+                .member(memberProfile)
+                .tier(goldTier)
+                .startDate(LocalDate.now().minusMonths(1))
+                .endDate(LocalDate.now().plusMonths(11))
+                .status(CardStatus.ACTIVE)
+                .pricePaid(BigDecimal.valueOf(150000.00))
+                .upgradeRequest(true)
+                .replacesCard(null)
+                .build());
+
+        MemberCardPurchaseRequest upgradeReq = MemberCardPurchaseRequest.builder()
+                .memberId(memberProfile.getId())
+                .tierId(vipTier.getId())
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                .build();
+
+        String memberToken = jwtService.generateToken(new CustomUserDetails(memberUser));
+
+        mockMvc.perform(post("/api/v1/membership-cards/purchase")
+                        .header("Authorization", "Bearer " + memberToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(upgradeReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("Cannot determine upgrade baseline")));
+    }
+
+    @Test
+    @DisplayName("Updating card tier durationMonths to 121 returns 400; durationMonths 120 returns 200")
+    void testUpdateTier_durationMonthsUpperBounds() throws Exception {
+        MembershipCardTier goldTier = cardTierRepository.findByCode("GOLD").orElseThrow();
+
+        // 121 months -> 400 Bad Request
+        MembershipCardTierUpdateRequest invalidReq = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.valueOf(500000.00))
+                .durationMonths(121)
+                .discountPercentage(5)
+                .active(true)
+                .build();
+
+        mockMvc.perform(put("/api/v1/membership-cards/tiers/" + goldTier.getId())
+                        .header("Authorization", "Bearer " + managerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+
+        // 120 months -> 200 OK
+        MembershipCardTierUpdateRequest validReq = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.valueOf(500000.00))
+                .durationMonths(120)
+                .discountPercentage(5)
+                .active(true)
+                .build();
+
+        mockMvc.perform(put("/api/v1/membership-cards/tiers/" + goldTier.getId())
+                        .header("Authorization", "Bearer " + managerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.durationMonths").value(120));
+    }
+
+    @Test
+    @DisplayName("Updating sport package sessionCount to 1001 returns 400; sessionCount 1000 returns 200")
+    void testUpdatePackage_sessionCountUpperBounds() throws Exception {
+        SportPackage pkg = sportPackageRepository.save(SportPackage.builder()
+                .code("PKG-SESS-UB-" + MARKER)
+                .name("Session UB Pkg " + MARKER)
+                .sport(activeSport1)
+                .trainingFormat(TrainingFormat.SELF_TRAINING)
+                .durationDays(30)
+                .sessionCount(10)
+                .sessionMinutes(60)
+                .priceAmount(BigDecimal.valueOf(150000.00))
+                .isActive(true)
+                .build());
+
+        // 1001 sessions -> 400 Bad Request
+        SportPackageUpdateRequest invalidReq = SportPackageUpdateRequest.builder()
+                .name("Session UB Pkg " + MARKER)
+                .price(BigDecimal.valueOf(150000.00))
+                .sessionCount(1001)
+                .durationDays(30)
+                .sessionMinutes(60)
+                .active(true)
+                .build();
+
+        mockMvc.perform(put("/api/v1/packages/" + pkg.getId())
+                        .header("Authorization", "Bearer " + managerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+
+        // 1000 sessions -> 200 OK
+        SportPackageUpdateRequest validReq = SportPackageUpdateRequest.builder()
+                .name("Session UB Pkg " + MARKER)
+                .price(BigDecimal.valueOf(150000.00))
+                .sessionCount(1000)
+                .durationDays(30)
+                .sessionMinutes(60)
+                .active(true)
+                .build();
+
+        mockMvc.perform(put("/api/v1/packages/" + pkg.getId())
+                        .header("Authorization", "Bearer " + managerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sessionCount").value(1000));
+    }
+
+    @Test
+    @DisplayName("Updating sport package durationDays to 3651 returns 400; durationDays 3650 returns 200")
+    void testUpdatePackage_durationDaysUpperBounds() throws Exception {
+        SportPackage pkg = sportPackageRepository.save(SportPackage.builder()
+                .code("PKG-DAYS-UB-" + MARKER)
+                .name("Days UB Pkg " + MARKER)
+                .sport(activeSport1)
+                .trainingFormat(TrainingFormat.SELF_TRAINING)
+                .durationDays(30)
+                .sessionCount(10)
+                .sessionMinutes(60)
+                .priceAmount(BigDecimal.valueOf(150000.00))
+                .isActive(true)
+                .build());
+
+        // 3651 days -> 400 Bad Request
+        SportPackageUpdateRequest invalidReq = SportPackageUpdateRequest.builder()
+                .name("Days UB Pkg " + MARKER)
+                .price(BigDecimal.valueOf(150000.00))
+                .sessionCount(10)
+                .durationDays(3651)
+                .sessionMinutes(60)
+                .active(true)
+                .build();
+
+        mockMvc.perform(put("/api/v1/packages/" + pkg.getId())
+                        .header("Authorization", "Bearer " + managerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+
+        // 3650 days -> 200 OK
+        SportPackageUpdateRequest validReq = SportPackageUpdateRequest.builder()
+                .name("Days UB Pkg " + MARKER)
+                .price(BigDecimal.valueOf(150000.00))
+                .sessionCount(10)
+                .durationDays(3650)
+                .sessionMinutes(60)
+                .active(true)
+                .build();
+
+        mockMvc.perform(put("/api/v1/packages/" + pkg.getId())
+                        .header("Authorization", "Bearer " + managerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.durationDays").value(3650));
+    }
+
+    @Test
+    @DisplayName("Activating legacy upgrade card with null replaces_card_id fails closed directing to front desk")
+    void testActivateCard_legacyUnresolvedUpgrade_failsClosed() {
+        MembershipCardTier vipTier = cardTierRepository.findByCode("VIP").orElseThrow();
+
+        // Pending upgrade card with replacesCard = null
+        MemberCard legacyPendingCard = memberCardRepository.save(MemberCard.builder()
+                .cardCode("CARD-ACT-UNRES-" + MARKER)
+                .member(memberProfile)
+                .tier(vipTier)
+                .startDate(LocalDate.now())
+                .endDate(LocalDate.now().plusMonths(12))
+                .status(CardStatus.PENDING_PAYMENT)
+                .pricePaid(BigDecimal.valueOf(300000.00))
+                .upgradeRequest(true)
+                .replacesCard(null)
+                .build());
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class, () ->
+                membershipCardService.activateCard(legacyPendingCard.getId(), managerUser)
+        );
+        assertTrue(ex.getMessage().contains("Cannot determine upgrade baseline"),
+                "Activating legacy upgrade with null replaces_card_id must fail closed: " + ex.getMessage());
     }
 }
