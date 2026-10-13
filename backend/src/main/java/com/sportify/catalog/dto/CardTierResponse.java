@@ -18,4 +18,6 @@ public class CardTierResponse {
     private Integer discountPercentage;
     private String description;
     private Boolean isActive;
+    private Integer rank;
+    private Integer tierRank;
 }

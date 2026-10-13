@@ -85,6 +85,7 @@ Defines the membership card discount tiers (Standard, Gold, VIP).
 | discount_percentage | INT | No | CHECK >= 0 | 0% for Standard, 5% for Gold, 10% for VIP |
 | description | NVARCHAR(500) | Yes | | Tier benefits description |
 | is_active | BIT | No | 1 | |
+| tier_rank | INT | No | 0 | Explicit hierarchy rank (STANDARD=0, GOLD=1, VIP=2) (V22) |
 | created_at, updated_at | DATETIME2(0) | | | Audit |
 
 ### `member_card`
@@ -103,7 +104,7 @@ Member's card holding record.
 | price_paid | DECIMAL(14,2) | No | CHECK >= 0 | Snapshot of fee paid |
 | payment_id | BIGINT | Yes | FK -> payment.id | Associated payment (V14) |
 | upgrade_request | BIT | No | 0 | Explicit marker for upgrade requests (V22). Backfilled for legacy rows where price_paid < tier.price |
-| replaces_card_id | BIGINT | Yes | FK -> member_card.id | Replaced card in upgrade chain (V22). Deterministically backfilled for ACTIVE upgrades via matching REPLACED card end_date, and PENDING_PAYMENT upgrades via active started card. Ambiguous or missing matches remain NULL and rely on tier catalog price fallback |
+| replaces_card_id | BIGINT | Yes | FK -> member_card.id | Replaced card in upgrade chain (V22). Deterministically backfilled for ACTIVE upgrades via matching REPLACED card end_date, and PENDING_PAYMENT upgrades via active started card. Legacy rows with unresolved replaces_card_id fail closed during upgrade pricing. Enforced unique across in-force cards via filtered index ux_member_card_replaces_in_force |
 | created_at, updated_at | DATETIME2(0) | | | Audit |
 
 ### `sport_package`

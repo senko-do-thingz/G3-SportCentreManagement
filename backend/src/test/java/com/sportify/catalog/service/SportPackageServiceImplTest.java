@@ -763,7 +763,6 @@ public class SportPackageServiceImplTest {
                 .durationDays(30)
                 .sessionMinutes(90)
                 .active(true)
-                .description("Updated description")
                 .build();
 
         UserAccount manager = UserAccount.builder().id(99L).email("mgr@sportify.com").fullName("Manager").build();
@@ -860,7 +859,7 @@ public class SportPackageServiceImplTest {
     }
 
     @Test
-    void updatePackage_blankDescription_clearsDescription() {
+    void updatePackage_preservesExistingDescription() {
         SportPackage pkg = SportPackage.builder()
                 .id(10L)
                 .code("PKG-10")
@@ -879,52 +878,17 @@ public class SportPackageServiceImplTest {
         when(sportPackageRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         SportPackageUpdateRequest req = SportPackageUpdateRequest.builder()
-                .name("Yoga Flow")
-                .price(BigDecimal.valueOf(200000.00))
-                .sessionCount(10)
+                .name("Yoga Flow Updated")
+                .price(BigDecimal.valueOf(220000.00))
+                .sessionCount(12)
                 .durationDays(30)
                 .sessionMinutes(60)
                 .active(true)
-                .description("   ")
                 .build();
 
         SportPackageResponse res = sportPackageService.updatePackage(10L, req, null);
-        assertNull(res.getDescription());
-        assertNull(pkg.getDescription());
-    }
-
-    @Test
-    void updatePackage_nullDescription_clearsDescription() {
-        SportPackage pkg = SportPackage.builder()
-                .id(10L)
-                .code("PKG-10")
-                .name("Yoga Flow")
-                .sport(sport)
-                .trainingFormat(TrainingFormat.SELF_TRAINING)
-                .durationDays(30)
-                .sessionCount(10)
-                .sessionMinutes(60)
-                .priceAmount(BigDecimal.valueOf(200000.00))
-                .description("Initial description")
-                .isActive(true)
-                .build();
-
-        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(pkg));
-        when(sportPackageRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        SportPackageUpdateRequest req = SportPackageUpdateRequest.builder()
-                .name("Yoga Flow")
-                .price(BigDecimal.valueOf(200000.00))
-                .sessionCount(10)
-                .durationDays(30)
-                .sessionMinutes(60)
-                .active(true)
-                .description(null)
-                .build();
-
-        SportPackageResponse res = sportPackageService.updatePackage(10L, req, null);
-        assertNull(res.getDescription());
-        assertNull(pkg.getDescription());
+        assertEquals("Initial description", res.getDescription());
+        assertEquals("Initial description", pkg.getDescription());
     }
 
     @Test

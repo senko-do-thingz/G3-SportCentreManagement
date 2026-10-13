@@ -733,7 +733,6 @@ public class MembershipCardServiceImplTest {
         when(tierRepository.saveAndFlush(any(MembershipCardTier.class))).thenAnswer(inv -> inv.getArgument(0));
 
         MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
-                .name("Gold Member Special")
                 .price(BigDecimal.valueOf(350000.00))
                 .durationMonths(12)
                 .discountPercentage(8)
@@ -745,7 +744,7 @@ public class MembershipCardServiceImplTest {
         CardTierResponse res = membershipCardService.updateTier(2L, req, manager);
 
         assertNotNull(res);
-        assertEquals("Gold Member Special", res.getName());
+        assertEquals("Gold Member", res.getName());
         assertEquals(BigDecimal.valueOf(350000.00), res.getPrice());
         assertEquals(8, res.getDiscountPercentage());
 
@@ -762,40 +761,6 @@ public class MembershipCardServiceImplTest {
         assertTrue(event.getDetails().containsKey("after"));
     }
 
-    @Test
-    void updateTier_invalidDiscountPercentage_throwsBusinessRuleException() {
-        MembershipCardTier tier = MembershipCardTier.builder()
-                .id(2L)
-                .code("GOLD")
-                .name("Gold Member")
-                .price(BigDecimal.valueOf(300000.00))
-                .durationMonths(12)
-                .discountPercentage(5)
-                .isActive(true)
-                .build();
-
-        when(tierRepository.findById(2L)).thenReturn(Optional.of(tier));
-
-        MembershipCardTierUpdateRequest req150 = MembershipCardTierUpdateRequest.builder()
-                .price(BigDecimal.valueOf(350000.00))
-                .durationMonths(12)
-                .discountPercentage(150)
-                .active(true)
-                .build();
-
-        assertThrows(BusinessRuleException.class, () -> membershipCardService.updateTier(2L, req150, null));
-
-        MembershipCardTierUpdateRequest reqNeg = MembershipCardTierUpdateRequest.builder()
-                .price(BigDecimal.valueOf(350000.00))
-                .durationMonths(12)
-                .discountPercentage(-5)
-                .active(true)
-                .build();
-
-        assertThrows(BusinessRuleException.class, () -> membershipCardService.updateTier(2L, reqNeg, null));
-        verify(tierRepository, never()).saveAndFlush(any());
-        verify(auditService, never()).record(any());
-    }
 
     @Test
     void updateTier_paidTierZeroOrNegativePrice_throwsBusinessRuleException() {
@@ -1012,7 +977,6 @@ public class MembershipCardServiceImplTest {
         when(tierRepository.saveAndFlush(any(MembershipCardTier.class))).thenAnswer(inv -> inv.getArgument(0));
 
         MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
-                .name("Standard Tier")
                 .price(BigDecimal.ZERO)
                 .durationMonths(0)
                 .discountPercentage(0)
@@ -1022,7 +986,7 @@ public class MembershipCardServiceImplTest {
 
         CardTierResponse res = membershipCardService.updateTier(1L, req, null);
         assertNotNull(res);
-        assertEquals("Standard Tier", res.getName());
+        assertEquals("Standard", res.getName());
         assertEquals(BigDecimal.ZERO, res.getPrice());
         assertEquals(0, res.getDiscountPercentage());
         assertEquals(true, res.getIsActive());
@@ -1667,26 +1631,15 @@ public class MembershipCardServiceImplTest {
         when(memberCardRepository.findByMemberIdAndStatus(100L, CardStatus.PENDING_PAYMENT)).thenReturn(List.of());
         when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class)))
                 .thenReturn(List.of(legacyUpgradeCard));
-        when(memberCardRepository.getNextCardCodeSequence()).thenReturn(131L);
-        when(codeFormatter.formatCardCode(131L)).thenReturn("CARD-0131");
-        when(paymentService.createPendingPayment(eq(memberProfile), any(BigDecimal.class), eq(PaymentMethod.MOMO)))
-                .thenReturn(Payment.builder().id(403L).build());
-        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
 
         MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
                 .tierId(3L)
                 .paymentMethod(PaymentMethod.MOMO)
                 .build();
 
-        MemberCardResponse res = membershipCardService.purchaseCard(req, memberUser);
-
-        assertNotNull(res);
-        // Fallback uses silverTier.price (350k), so fee is 500k - 350k = 150k
-        assertEquals(BigDecimal.valueOf(150000.00), res.getPricePaid());
-        ArgumentCaptor<MemberCard> cardCaptor = ArgumentCaptor.forClass(MemberCard.class);
-        verify(memberCardRepository).save(cardCaptor.capture());
-        assertTrue(cardCaptor.getValue().isUpgradeRequest());
-        assertEquals(legacyUpgradeCard.getId(), cardCaptor.getValue().getReplacesCard().getId());
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> membershipCardService.purchaseCard(req, memberUser));
+        assertTrue(ex.getMessage().contains("Cannot determine upgrade baseline"));
     }
 
     @Test

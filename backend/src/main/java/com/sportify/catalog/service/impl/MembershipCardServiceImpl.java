@@ -80,10 +80,6 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         MembershipCardTier tier = tierRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Card tier not found for id: " + id));
 
-        if (request.getDiscountPercentage() == null || request.getDiscountPercentage() < 0 || request.getDiscountPercentage() > 100) {
-            throw new BusinessRuleException("Discount percentage must be between 0 and 100");
-        }
-
         boolean standard = isStandard(tier);
 
         if (standard) {
@@ -103,9 +99,6 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             if (request.getPrice() == null || request.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
                 throw new BusinessRuleException("Price must be greater than zero for paid tiers");
             }
-            if (request.getActive() == null) {
-                throw new BusinessRuleException("Active flag is required");
-            }
             if (request.getDurationMonths() == null || request.getDurationMonths() < 1) {
                 throw new BusinessRuleException("Duration in months must be at least 1 for paid tiers");
             }
@@ -124,9 +117,6 @@ public class MembershipCardServiceImpl implements MembershipCardService {
                 ? null
                 : request.getDescription().trim();
         tier.setDescription(cleanedDescription);
-        if (request.getName() != null && !request.getName().trim().isBlank()) {
-            tier.setName(request.getName().trim());
-        }
 
         MembershipCardTier saved = tierRepository.saveAndFlush(tier);
         Map<String, Object> after = snapshotTier(saved);
@@ -297,28 +287,34 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     /**
      * Calculates the baseline price paid for the active term.
      * If the current card was created via an upgrade, the member only paid the price difference for that card,
-     * so we sum pricePaid recursively across the replacement chain.
-     * This guarantees the member is credited for the entire cumulative amount paid toward the current term,
-     * rather than live tier prices which may have changed since purchase.
-     * For unresolvable legacy upgrade rows (upgradeRequest = true and replacesCard = null), we fall back
-     * to the tier catalog price to avoid overcharging the member on subsequent upgrades.
+     * so we sum pricePaid across the replacement chain.
+     * Legacy rows with unresolved replaces_card_id fail closed (throws BusinessRuleException), requiring front desk assistance.
+     * Traversal is bounded to prevent infinite cycles.
      */
     private BigDecimal calculateTermBasePrice(MemberCard card) {
         if (card == null || card.getPricePaid() == null) {
             return BigDecimal.ZERO;
         }
         if (card.isUpgradeRequest() && card.getReplacesCard() == null) {
-            // Documented fallback for legacy upgrade rows where replaces_card_id could not be
-            // deterministically resolved during migration backfill. Since pricePaid represents only the
-            // incremental upgrade difference, using pricePaid alone would overcharge the member on subsequent
-            // upgrades. We fall back to the tier catalog price as the best available estimate of the full term value.
-            if (card.getTier() != null && card.getTier().getPrice() != null) {
-                return card.getTier().getPrice();
-            }
+            // Fail closed: legacy upgrade rows where replaces_card_id could not be resolved
+            // cannot safely determine baseline price. Automated upgrade is rejected and member is directed to the front desk.
+            throw new BusinessRuleException("Cannot determine upgrade baseline for this membership card. Please contact the front desk.");
         }
         BigDecimal total = card.getPricePaid();
         MemberCard replaced = card.getReplacesCard();
+        int depth = 0;
+        final int MAX_CHAIN_DEPTH = 20;
+        java.util.Set<Long> visited = new java.util.HashSet<>();
+        if (card.getId() != null) {
+            visited.add(card.getId());
+        }
         while (replaced != null && replaced.getPricePaid() != null) {
+            if (++depth > MAX_CHAIN_DEPTH || (replaced.getId() != null && !visited.add(replaced.getId()))) {
+                throw new BusinessRuleException("Membership card upgrade chain exceeds maximum allowed depth or contains cycle");
+            }
+            if (replaced.isUpgradeRequest() && replaced.getReplacesCard() == null) {
+                throw new BusinessRuleException("Cannot determine upgrade baseline for this membership card. Please contact the front desk.");
+            }
             total = total.add(replaced.getPricePaid());
             replaced = replaced.getReplacesCard();
         }
@@ -358,11 +354,11 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             return new CardPlan(from, cardEnd(from, months), tier.getPrice(), null);
         }
 
-        // Rank rule (N-02): an upgrade is strictly determined by tier ranking, defined as
-        // target live catalog price > current held tier live catalog price.
+        // Rank rule (R3-04): an upgrade is strictly determined by tier ranking,
+        // decoupled from live catalog price edits.
         boolean isUpgradeRank = (current != null
                 && current.getTier() != null
-                && tier.getPrice().compareTo(current.getTier().getPrice()) > 0);
+                && tier.getEffectiveRank() > current.getTier().getEffectiveRank());
 
         if (isUpgradeRank) {
             if (last != current) {
@@ -458,6 +454,8 @@ public class MembershipCardServiceImpl implements MembershipCardService {
                 .discountPercentage(tier.getDiscountPercentage())
                 .description(tier.getDescription())
                 .isActive(tier.getIsActive())
+                .rank(tier.getEffectiveRank())
+                .tierRank(tier.getEffectiveRank())
                 .build();
     }
 

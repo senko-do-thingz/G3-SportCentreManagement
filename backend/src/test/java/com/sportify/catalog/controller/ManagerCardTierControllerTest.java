@@ -109,7 +109,6 @@ class ManagerCardTierControllerTest {
 
     private static MembershipCardTierUpdateRequest sampleGoldUpdateRequest() {
         return MembershipCardTierUpdateRequest.builder()
-                .name("Gold Member Updated")
                 .price(BigDecimal.valueOf(350000.00))
                 .durationMonths(12)
                 .discountPercentage(7)
@@ -179,7 +178,7 @@ class ManagerCardTierControllerTest {
     @Test
     void updateTier_asManager_validGoldUpdate_shouldReturn200() throws Exception {
         MembershipCardTierUpdateRequest req = sampleGoldUpdateRequest();
-        CardTierResponse res = sampleTier(2L, "GOLD", req.getName(), req.getPrice(), req.getDiscountPercentage(), true);
+        CardTierResponse res = sampleTier(2L, "GOLD", "Gold Member", req.getPrice(), req.getDiscountPercentage(), true);
 
         when(membershipCardService.updateTier(eq(2L), any(MembershipCardTierUpdateRequest.class), any()))
                 .thenReturn(res);
@@ -190,7 +189,7 @@ class ManagerCardTierControllerTest {
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(2))
-                .andExpect(jsonPath("$.name").value("Gold Member Updated"))
+                .andExpect(jsonPath("$.name").value("Gold Member"))
                 .andExpect(jsonPath("$.price").value(350000.00))
                 .andExpect(jsonPath("$.discountPercentage").value(7));
     }
@@ -237,18 +236,6 @@ class ManagerCardTierControllerTest {
                 .andExpect(jsonPath("$.message").value("Price must be greater than zero for paid tiers"));
     }
 
-    @Test
-    void updateTier_name51Chars_shouldReturn400() throws Exception {
-        MembershipCardTierUpdateRequest req = sampleGoldUpdateRequest();
-        req.setName("A".repeat(51));
-
-        mockMvc.perform(put(CARD_TIERS_URL + "/2")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400));
-    }
 
     @Test
     void updateTier_description501Chars_shouldReturn400() throws Exception {
@@ -292,7 +279,6 @@ class ManagerCardTierControllerTest {
     @Test
     void updateTier_attemptChangeStandardPrice_shouldReturn400() throws Exception {
         MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
-                .name("Standard")
                 .price(BigDecimal.valueOf(100000.00))
                 .durationMonths(0)
                 .discountPercentage(0)
@@ -314,7 +300,6 @@ class ManagerCardTierControllerTest {
     @Test
     void updateTier_attemptDeactivateStandard_shouldReturn400() throws Exception {
         MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
-                .name("Standard")
                 .price(BigDecimal.ZERO)
                 .durationMonths(0)
                 .discountPercentage(0)

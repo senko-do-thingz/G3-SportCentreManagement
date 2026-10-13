@@ -17,9 +17,6 @@ import java.math.BigDecimal;
 @Builder
 public class MembershipCardTierUpdateRequest {
 
-    @Size(max = 50, message = "Tier name must not exceed 50 characters")
-    private String name;
-
     @NotNull(message = "Price is required")
     @DecimalMin(value = "0.00", message = "Price must be greater than or equal to zero")
     @Digits(integer = 12, fraction = 2, message = "Price format is invalid")

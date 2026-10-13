@@ -101,22 +101,6 @@ public class SportPackageServiceImpl implements SportPackageService {
             throw new BusinessRuleException("Price must be greater than zero");
         }
 
-        if (request.getName() == null || request.getName().trim().isBlank()) {
-            throw new BusinessRuleException("Package name cannot be blank");
-        }
-
-        if (request.getSessionCount() == null || request.getSessionCount() <= 0) {
-            throw new BusinessRuleException("Session count must be at least 1");
-        }
-
-        if (request.getDurationDays() == null || request.getDurationDays() <= 0) {
-            throw new BusinessRuleException("Duration in days must be at least 1");
-        }
-
-        if (request.getActive() == null) {
-            throw new BusinessRuleException("Active flag is required");
-        }
-
         Map<String, Object> before = snapshotPackage(pkg);
 
         pkg.setName(request.getName().trim());
@@ -125,11 +109,6 @@ public class SportPackageServiceImpl implements SportPackageService {
         pkg.setDurationDays(request.getDurationDays());
         pkg.setSessionMinutes(request.getSessionMinutes());
         pkg.setIsActive(request.getActive());
-        // Full-replace semantics: a null or blank value clears the description.
-        String cleanedDescription = (request.getDescription() == null || request.getDescription().isBlank())
-                ? null
-                : request.getDescription().trim();
-        pkg.setDescription(cleanedDescription);
 
         SportPackage saved = sportPackageRepository.saveAndFlush(pkg);
         Map<String, Object> after = snapshotPackage(saved);

@@ -154,6 +154,7 @@ Check constraints:
 | 8 | is_active | BIT | No | 1 | - | V10 | - |
 | 9 | created_at | DATETIME2(0) | No | SYSDATETIME() | - | V10 | - |
 | 10 | updated_at | DATETIME2(0) | Yes | - | - | V10 | - |
+| 11 | tier_rank | INT | No | 0 | - | V22 | Explicit hierarchy rank (STANDARD=0, GOLD=1, VIP=2) |
 
 Unique constraints:
 
@@ -185,7 +186,7 @@ Check constraints:
 | 10 | updated_at | DATETIME2(0) | Yes | - | - | V10 | - |
 | 11 | payment_id | BIGINT | Yes | - | FK -> payment.id | V14 | Mapped in entity |
 | 12 | upgrade_request | BIT | No | 0 | - | V22 | Explicit marker for upgrade requests. Backfilled for legacy rows where price_paid < tier.price |
-| 13 | replaces_card_id | BIGINT | Yes | - | FK -> member_card.id | V22 | Replaced card in upgrade chain. Deterministically backfilled for ACTIVE upgrades via matching REPLACED end_date and PENDING_PAYMENT upgrades via active started card. Ambiguous/missing matches remain NULL |
+| 13 | replaces_card_id | BIGINT | Yes | - | FK -> member_card.id | V22 | Replaced card in upgrade chain. Deterministically backfilled for ACTIVE upgrades via matching REPLACED end_date and PENDING_PAYMENT upgrades via active started card. Legacy rows with unresolved replaces_card_id fail closed during upgrade pricing |
 
 Foreign keys:
 
@@ -197,6 +198,7 @@ Foreign keys:
 Unique constraints:
 
 - `uq_member_card_code`: (card_code)
+- `ux_member_card_replaces_in_force`: (replaces_card_id) WHERE status IN ('ACTIVE', 'PENDING_PAYMENT') AND replaces_card_id IS NOT NULL (V22)
 
 Check constraints:
 
