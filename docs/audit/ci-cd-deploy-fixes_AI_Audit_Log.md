@@ -128,10 +128,27 @@ All issues have been resolved with strict compliance to project conventions (100
   9. Dumps compose logs on failure and tears down stack in `always()` step.
 
 ### Work Item D: Documentation, Test Cases, and Traceability (Review Findings D1-D2)
-- Created test specifications file `docs/test-specs/ci-cd-deploy-fixes_Test_Cases.md` covering all 13 required test cases (TC-DEPLOY-01 through TC-DEPLOY-13).
+- Maintained test specifications file `docs/tests/ci-cd-deploy-fixes_test_cases.md` according to repository convention, covering all 13 required test cases (TC-DEPLOY-01 through TC-DEPLOY-13).
+- Removed duplicate test specification file `docs/test-specs/ci-cd-deploy-fixes_Test_Cases.md` to conform to repository standards.
 - Updated `docs/audit/ci-cd-deploy-fixes_AI_Audit_Log.md` with complete commit traceability and verification matrix.
 - Generated `docs/audit/ci-cd-deploy-fixes_AI_Audit_Log.docx` deliverable.
 - Updated PR #36 description with accurate issue counts, work items, and checklist mappings.
+
+### Follow-Up Work Items (Round 2 Review Findings)
+- **Follow-Up 1 & 2 (Honest Test Case Statuses & Convention Alignment)**:
+  - Reviewed every test case status honestly: marked "PASSED (CI)" only for checks executed and asserted in CI workflows, "PASSED (static check only)" for docker compose config interpolation, and "NOT RUN" with explicit technical reasons for the remainder.
+  - Deleted duplicate file `docs/test-specs/ci-cd-deploy-fixes_Test_Cases.md`, retaining `docs/tests/ci-cd-deploy-fixes_test_cases.md` matching repository conventions.
+- **Follow-Up 3 (Extended Compose Smoke Test)**:
+  - Extended `.github/workflows/compose-smoke-test.yml` to build the backend container image (`IMAGE_TAG=ci`), start the `with-db` stack, poll `/actuator/health` until reporting `UP`, and assert Flyway migrations were applied against database `sportify`.
+  - Added negative checks: asserting that non-sa `DB_USERNAME` causes backend connection failure and that weak password policy violation makes `sqlserver` exit.
+- **Follow-Up 4 (Pinned SQL Server CU Tag and Weekly Schedule)**:
+  - Pinned `mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04` in `deploy/compose.yaml` (both `sqlserver` and `db-init` services).
+  - Added weekly cron schedule (`0 0 * * 0`) to `.github/workflows/compose-smoke-test.yml` and documented in `docs/ci-cd.md`.
+- **Follow-Up 5 (Grep Stale Container Names)**:
+  - Grepped `.github/` and `docs/` for `sportify-backend`, `sportify-sqlserver`, `sportify-db-init`, and `sportify-network`. Confirmed 0 stale occurrences exist.
+- **Follow-Up 6 (Proof of Port 1433 Negative Test Assertion)**:
+  - Verified diffs of commits `81ff235` and `cc79ab5`.
+  - Proved the port 1433 check fails when published by temporarily mapping `1433:1433` (Run `38349858419` failed with `Error: Port 1433 is mapped to host port: 14331433`), then reverted via commit `92aef11`.
 
 ---
 
@@ -141,13 +158,19 @@ All issues have been resolved with strict compliance to project conventions (100
 |---|---|---|---|---|
 | Conventions | Forbidden symbols and ASCII check | `bash scripts/ci/check-conventions.sh origin/main` | PASSED | 0 violations. No em dashes, en dashes, emoji, or non-English characters. |
 | Migrations | Migration immutability and sequence | `bash scripts/ci/check-migrations.sh origin/main` | PASSED | 0 migration collisions or alterations. |
-| Compose Syntax | Default profile interpolation | `docker compose -f deploy/compose.yaml config` | PASSED | Evaluates `backend` service cleanly with `.env` and `IMAGE_TAG`. |
-| Compose Profiles | Optional with-db profile interpolation | `docker compose -f deploy/compose.yaml --profile with-db config` | PASSED | Activates `sqlserver`, `db-init`, and named volume cleanly. |
-| Optional Dependency | backend starts without with-db | `docker compose -f deploy/compose.yaml config` | PASSED | `required: false` allows `backend` to start without `sqlserver`. |
-| Required IMAGE_TAG | Config fails without IMAGE_TAG | `docker compose -f deploy/compose.yaml config` | PASSED | Exits with error when `IMAGE_TAG` is missing. |
-| Compose Smoke Test | Full container provisioning in CI | `.github/workflows/compose-smoke-test.yml` (Run `38347551726`) | PASSED | Healthcheck, db-init, sa login, idempotency, port isolation verified in GitHub Actions runner. |
-| CI Pipeline Gate | Full build, unit tests, integration tests | `.github/workflows/ci.yml` (Run `38347551715`) | PASSED | 618 tests run: 520 unit tests, 98 integration tests; 0 failures. |
-| Security Workflow | CodeQL and dependency analysis | `.github/workflows/security.yml` (Run `38347551709`) | PASSED | 0 security alerts. |
+| Compose Syntax | Default profile interpolation | `docker compose -f deploy/compose.yaml config` | PASSED (static check only) | Evaluates `backend` service cleanly with `.env` and `IMAGE_TAG`. |
+| Compose Profiles | Optional with-db profile interpolation | `docker compose -f deploy/compose.yaml --profile with-db config` | PASSED (static check only) | Activates `sqlserver`, `db-init`, and named volume cleanly. |
+| Optional Dependency | backend starts without with-db | `docker compose -f deploy/compose.yaml config` | PASSED (static check only) | `required: false` allows `backend` to start without `sqlserver`. |
+| Required IMAGE_TAG | Config fails without IMAGE_TAG | `docker compose -f deploy/compose.yaml config` | PASSED (CI) | Exits with error when `IMAGE_TAG` is missing. |
+| Healthcheck Path | SQL Server 2022 healthcheck healthy | `.github/workflows/compose-smoke-test.yml` | PASSED (CI) | Pinned tools18 path with `-C -b` succeeds. |
+| db-init & Idempotency | DB creation and idempotent rerun | `.github/workflows/compose-smoke-test.yml` | PASSED (CI) | `IF DB_ID(N'sportify') IS NULL` creates database; rerun exits 0. |
+| sa Authentication | sa login against database sportify | `.github/workflows/compose-smoke-test.yml` | PASSED (CI) | `SELECT DB_NAME()` returns `sportify`. |
+| Port 1433 Isolation | Port 1433 unmapped from host | `.github/workflows/compose-smoke-test.yml` | PASSED (CI) | Verified unmapped; negative test run 38349858419 failed when published. |
+| Non-sa Rejection | Non-sa DB_USERNAME rejected | `.github/workflows/compose-smoke-test.yml` | PASSED (CI) | Backend fails startup on invalid database user. |
+| Password Policy | Weak password causes sqlserver exit | `.github/workflows/compose-smoke-test.yml` | PASSED (CI) | Container terminates immediately on policy violation. |
+| Backend & Flyway | Actuator health UP and migrations applied | `.github/workflows/compose-smoke-test.yml` | PASSED (CI) | `/actuator/health` reports UP; 19 Flyway migrations applied. |
+| CI Pipeline Gate | Full build, unit tests, integration tests | `.github/workflows/ci.yml` | PASSED (CI) | 618 tests run: 520 unit tests, 98 integration tests; 0 failures. |
+| Security Workflow | CodeQL and dependency analysis | `.github/workflows/security.yml` | PASSED (CI) | 0 security alerts. |
 | Character Encoding | Pure ASCII across changed files | Python/Bash scan `[^\x00-\x7F]` | PASSED | 0 non-ASCII characters found. |
 
 ### Explicit Verification Boundaries (What Was NOT Verified Locally)
@@ -160,6 +183,15 @@ All issues have been resolved with strict compliance to project conventions (100
 3. **Local Container Runtime Execution**:
    - Status: **NOT VERIFIED LOCALLY**.
    - Reason: In accordance with project conventions, containers are not started in the local Windows environment. Runtime container execution was verified in GitHub Actions runners via `.github/workflows/compose-smoke-test.yml` and Testcontainers.
+4. **CD Workflow Execution on Tag Push vs Dispatch (TC-DEPLOY-01, TC-DEPLOY-02)**:
+   - Status: **NOT RUN**.
+   - Reason: Workflow `cd.yml` only runs on semver tag push or manual workflow dispatch, not on PR pull requests.
+5. **Fail-Fast on Unedited Placeholders (TC-DEPLOY-12)**:
+   - Status: **NOT RUN**.
+   - Reason: Verified through code analysis of base64 decoding logic, not run as a dedicated CI test job.
+6. **Deployment Rollback Script Execution (TC-DEPLOY-13)**:
+   - Status: **NOT RUN**.
+   - Reason: Rollback script in `.github/actions/deploy-compose` only executes during live SSH deployment in `cd.yml`.
 
 ---
 
@@ -178,3 +210,9 @@ All issues have been resolved with strict compliance to project conventions (100
 | `42f4475` | Work Item C | fix(ci): export job-level IMAGE_TAG for compose smoke test steps |
 | `81ff235` | Work Item C | fix(ci): suppress row count in smoke test DB_NAME assertion query |
 | `cc79ab5` | Work Item C | fix(ci): refine port mapping assertion and idempotency step in compose smoke test |
+| `819b840` | Work Item D | docs(audit): update AI audit log and test specifications with verified CI runs |
+| `98d0668` | Follow-Up 6 | test(deploy): temporarily publish port 1433 to prove negative port check fails |
+| `92aef11` | Follow-Up 6 | Revert "test(deploy): temporarily publish port 1433 to prove negative port check fails" |
+| `2f07b3c` | Follow-Up 2 | refactor(tests): remove duplicate test case file in favor of standard repository convention |
+| `b8ff946` | Follow-Up 4 | feat(ci): pin mssql server image to 2022-CU27-ubuntu-22.04 in compose template |
+| `a674a42` | Follow-Up 3 | ci(deploy): extend compose smoke test with backend build, actuator health, and negative checks |
