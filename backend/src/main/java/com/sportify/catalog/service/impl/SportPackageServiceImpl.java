@@ -12,9 +12,14 @@ import com.sportify.catalog.entity.SportPackageRegistration;
 import com.sportify.catalog.entity.TrainingFormat;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.repository.SportPackageRepository;
+import com.sportify.catalog.dto.SportPackageUpdateRequest;
+import com.sportify.catalog.repository.SportPackageSpecifications;
 import com.sportify.catalog.repository.SportRepository;
 import com.sportify.catalog.service.MembershipCardService;
 import com.sportify.catalog.service.SportPackageService;
+import com.sportify.core.audit.AuditAction;
+import com.sportify.core.audit.AuditEvent;
+import com.sportify.core.audit.AuditService;
 import com.sportify.core.common.CodeFormatter;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ResourceNotFoundException;
@@ -27,6 +32,7 @@ import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,7 +41,9 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -50,6 +58,7 @@ public class SportPackageServiceImpl implements SportPackageService {
     private final MembershipCardService membershipCardService;
     private final PaymentService paymentService;
     private final CodeFormatter codeFormatter;
+    private final AuditService auditService;
     private final Clock clock;
 
     @Override
@@ -66,6 +75,86 @@ public class SportPackageServiceImpl implements SportPackageService {
         return sportPackageRepository.findBySportIdAndIsActiveTrue(sportId).stream()
                 .map(this::mapToPackageResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SportPackageResponse> getManagerPackages(Long sportId, TrainingFormat format, Boolean active) {
+        return sportPackageRepository.findAll(SportPackageSpecifications.withFilters(sportId, format, active), Sort.by(Sort.Direction.ASC, "id"))
+                .stream()
+                .map(this::mapToPackageResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public SportPackageResponse updatePackage(Long id, SportPackageUpdateRequest request, UserAccount actor) {
+        SportPackage pkg = sportPackageRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Sport package not found for id: " + id));
+
+        if (request.getSessionMinutes() == null || (request.getSessionMinutes() != 60 && request.getSessionMinutes() != 90)) {
+            throw new BusinessRuleException("Session minutes must be either 60 or 90");
+        }
+
+        BigDecimal price = request.getPrice();
+        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessRuleException("Price must be greater than zero");
+        }
+
+        if (request.getName() == null || request.getName().trim().isBlank()) {
+            throw new BusinessRuleException("Package name cannot be blank");
+        }
+
+        if (request.getSessionCount() == null || request.getSessionCount() <= 0) {
+            throw new BusinessRuleException("Session count must be at least 1");
+        }
+
+        if (request.getDurationDays() == null || request.getDurationDays() <= 0) {
+            throw new BusinessRuleException("Duration in days must be at least 1");
+        }
+
+        if (request.getActive() == null) {
+            throw new BusinessRuleException("Active flag is required");
+        }
+
+        Map<String, Object> before = snapshotPackage(pkg);
+
+        pkg.setName(request.getName().trim());
+        pkg.setPriceAmount(price);
+        pkg.setSessionCount(request.getSessionCount());
+        pkg.setDurationDays(request.getDurationDays());
+        pkg.setSessionMinutes(request.getSessionMinutes());
+        pkg.setIsActive(request.getActive());
+        if (request.getDescription() != null) {
+            pkg.setDescription(request.getDescription().trim());
+        }
+
+        SportPackage saved = sportPackageRepository.saveAndFlush(pkg);
+        Map<String, Object> after = snapshotPackage(saved);
+
+        auditService.record(AuditEvent.builder()
+                .actor(actor)
+                .action(AuditAction.PACKAGE_UPDATED)
+                .entityType("SPORT_PACKAGE")
+                .entityId(saved.getId())
+                .entityCode(saved.getCode())
+                .summary("Sport package '" + saved.getName() + "' updated")
+                .details(Map.of("before", before, "after", after))
+                .build());
+
+        return mapToPackageResponse(saved);
+    }
+
+    private Map<String, Object> snapshotPackage(SportPackage p) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("name", p.getName());
+        map.put("priceAmount", p.getPriceAmount());
+        map.put("sessionCount", p.getSessionCount());
+        map.put("durationDays", p.getDurationDays());
+        map.put("sessionMinutes", p.getSessionMinutes());
+        map.put("isActive", p.getIsActive());
+        map.put("description", p.getDescription());
+        return map;
     }
 
     @Override

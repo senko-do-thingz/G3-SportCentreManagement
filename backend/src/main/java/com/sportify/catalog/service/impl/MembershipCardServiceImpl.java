@@ -21,6 +21,11 @@ import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
+import com.sportify.catalog.dto.MembershipCardTierUpdateRequest;
+import com.sportify.core.audit.AuditAction;
+import com.sportify.core.audit.AuditEvent;
+import com.sportify.core.audit.AuditService;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,7 +34,9 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,6 +49,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     private final UserRepository userRepository;
     private final PaymentService paymentService;
     private final CodeFormatter codeFormatter;
+    private final AuditService auditService;
     private final Clock clock;
 
     @Override
@@ -50,6 +58,91 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         return tierRepository.findByIsActiveTrue().stream()
                 .map(this::mapToTierResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CardTierResponse> getAllTiersForManager() {
+        return tierRepository.findAll(Sort.by(Sort.Direction.ASC, "id")).stream()
+                .map(this::mapToTierResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public CardTierResponse updateTier(Long id, MembershipCardTierUpdateRequest request, UserAccount actor) {
+        MembershipCardTier tier = tierRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Card tier not found for id: " + id));
+
+        if (request.getDiscountPercentage() == null || request.getDiscountPercentage() < 0 || request.getDiscountPercentage() > 100) {
+            throw new BusinessRuleException("Discount percentage must be between 0 and 100");
+        }
+
+        boolean isStandard = "STANDARD".equalsIgnoreCase(tier.getCode());
+
+        if (isStandard) {
+            if (request.getPrice() != null && request.getPrice().compareTo(BigDecimal.ZERO) != 0) {
+                throw new BusinessRuleException("The STANDARD tier price cannot be changed");
+            }
+            if (request.getActive() != null && !request.getActive()) {
+                throw new BusinessRuleException("The STANDARD tier cannot be deactivated");
+            }
+            if (request.getDiscountPercentage() != 0) {
+                throw new BusinessRuleException("The STANDARD tier discount percentage must be 0");
+            }
+        } else {
+            if (request.getPrice() == null || request.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BusinessRuleException("Price must be greater than zero for paid tiers");
+            }
+            if (request.getActive() == null) {
+                throw new BusinessRuleException("Active flag is required");
+            }
+        }
+
+        if (request.getDurationMonths() == null || request.getDurationMonths() < 0) {
+            throw new BusinessRuleException("Duration in months must be non-negative");
+        }
+
+        Map<String, Object> before = snapshotTier(tier);
+
+        if (!isStandard) {
+            tier.setPrice(request.getPrice());
+            tier.setIsActive(request.getActive());
+        }
+        tier.setDurationMonths(request.getDurationMonths());
+        tier.setDiscountPercentage(request.getDiscountPercentage());
+        if (request.getDescription() != null) {
+            tier.setDescription(request.getDescription().trim());
+        }
+        if (request.getName() != null && !request.getName().trim().isBlank()) {
+            tier.setName(request.getName().trim());
+        }
+
+        MembershipCardTier saved = tierRepository.saveAndFlush(tier);
+        Map<String, Object> after = snapshotTier(saved);
+
+        auditService.record(AuditEvent.builder()
+                .actor(actor)
+                .action(AuditAction.CARD_TIER_UPDATED)
+                .entityType("MEMBERSHIP_CARD_TIER")
+                .entityId(saved.getId())
+                .entityCode(saved.getCode())
+                .summary("Membership card tier '" + saved.getName() + "' updated")
+                .details(Map.of("before", before, "after", after))
+                .build());
+
+        return mapToTierResponse(saved);
+    }
+
+    private Map<String, Object> snapshotTier(MembershipCardTier t) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("name", t.getName());
+        map.put("price", t.getPrice());
+        map.put("durationMonths", t.getDurationMonths());
+        map.put("discountPercentage", t.getDiscountPercentage());
+        map.put("description", t.getDescription());
+        map.put("isActive", t.getIsActive());
+        return map;
     }
 
     @Override
