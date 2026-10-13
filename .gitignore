@@ -86,3 +86,6 @@ desktop.ini
 testcases.md
 Review_Module1_Module2_Topic4.xlsx
 REVIEW_RESOLUTION_REPORT.md
+# AI Audit Logs are kept locally only
+docs/audit/*_AI_Audit_Log.docx
+docs/audit/*_AI_Audit_Log.md
