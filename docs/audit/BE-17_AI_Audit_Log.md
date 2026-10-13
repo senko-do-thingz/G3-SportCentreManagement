@@ -235,7 +235,9 @@ Option (b) was chosen over Option (a):
   4. `com.sportify.identity.repository.UserAccountRepositoryTest`: Skipped via `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` when Docker is unavailable.
 
 ### CI Evidence
-- **Run ID**: To be recorded following Git commit and push to `origin feat/f3-pending-payments`.
-- **Head SHA**: To be recorded following Git commit.
-- **Conclusion**: To be verified via GitHub Actions run.
+- **Run ID**: `38327818756`
+- **Head SHA**: `781ff8b44ddbe83d6af9ef098e8019079f1b096e` (`781ff8b`)
+- **Event**: `pull_request`
+- **Conclusion**: `success` (All 597 tests passed: Tests run: 597, Failures: 0, Errors: 0, Skipped: 0; confirms `markPaymentSuccess_AuditingTimestamps_ConsistentWithClockAndPaymentTime` in `PaymentPendingIntegrationTest` executed and passed)
+
 
