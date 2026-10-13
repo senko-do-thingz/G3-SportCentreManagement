@@ -1,0 +1,127 @@
+name: CD
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Existing image tag to deploy (leave empty to build from this ref)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: Run CI
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+
+  build-image:
+    name: Build and push image
+    needs: ci
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/backend
+          tags: |
+            type=semver,pattern={{version}}
+            type=sha
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: true
+          sbom: true
+      - name: Scan image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ghcr.io/${{ github.repository }}/backend:${{ steps.meta.outputs.version }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+  deploy-staging:
+    name: Deploy to staging
+    if: vars.DEPLOY_ENABLED == 'true'
+    needs: build-image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_BASE_URL }}
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to staging via composite action
+        uses: ./.github/actions/deploy-compose
+        with:
+          ssh_key: ${{ secrets.DEPLOY_SSH_KEY }}
+          known_hosts: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          deploy_user: ${{ vars.DEPLOY_USER }}
+          deploy_host: ${{ vars.DEPLOY_HOST }}
+          deploy_dir: ${{ vars.DEPLOY_DIR }}
+          image_tag: ${{ needs.build-image.outputs.image_tag }}
+          base_url: ${{ vars.STAGING_BASE_URL }}
+
+  deploy-production:
+    name: Deploy to production
+    if: vars.DEPLOY_ENABLED == 'true'
+    needs: [build-image, deploy-staging]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_BASE_URL }}
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to production via composite action
+        uses: ./.github/actions/deploy-compose
+        with:
+          ssh_key: ${{ secrets.DEPLOY_SSH_KEY }}
+          known_hosts: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          deploy_user: ${{ vars.DEPLOY_USER }}
+          deploy_host: ${{ vars.DEPLOY_HOST_PROD }}
+          deploy_dir: ${{ vars.DEPLOY_DIR_PROD }}
+          image_tag: ${{ needs.build-image.outputs.image_tag }}
+          base_url: ${{ vars.PRODUCTION_BASE_URL }}
+      - name: Create GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag

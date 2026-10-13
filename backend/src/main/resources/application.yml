@@ -47,3 +47,12 @@ app:
       account-number: ${SPORTIFY_PAYMENT_ACCOUNT_NUMBER}
       bank: ${SPORTIFY_PAYMENT_BANK}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+

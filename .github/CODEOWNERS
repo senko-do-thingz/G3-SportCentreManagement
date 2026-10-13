@@ -1,2 +1,7 @@
 # All changes must be reviewed by senko-do-thingz before merging
 * @senko-do-thingz
+
+# Critical infrastructure, database migrations, and financial payment flows
+/.github/ @senko-do-thingz
+/backend/src/main/resources/db/migration/ @senko-do-thingz
+/backend/src/main/java/com/sportify/payment/ @senko-do-thingz

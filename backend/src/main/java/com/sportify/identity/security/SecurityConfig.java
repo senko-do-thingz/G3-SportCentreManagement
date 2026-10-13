@@ -48,6 +48,9 @@ public class SecurityConfig {
                                 // Public catalog (read only)
                                 .requestMatchers(HttpMethod.GET, "/api/v1/sports", "/api/v1/sports/*", "/api/v1/plans", "/api/v1/plans/*", "/api/v1/packages", "/api/v1/packages/*", "/api/v1/packages/sport/*", "/api/v1/membership-cards/tiers")
                                 .permitAll()
+                                // Health endpoint for deployment smoke test
+                                .requestMatchers(HttpMethod.GET, "/actuator/health")
+                                .permitAll()
                                 .anyRequest()
                                 .authenticated()
                 )
