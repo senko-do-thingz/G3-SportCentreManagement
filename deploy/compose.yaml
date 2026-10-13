@@ -19,8 +19,6 @@ services:
       ACCEPT_EULA: "Y"
       # For the with-db profile, the backend connects as the sa login; DB_USERNAME must be sa.
       MSSQL_SA_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
-    ports:
-      - "1433:1433"
     healthcheck:
       test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -b -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1'"]
       interval: 10s
