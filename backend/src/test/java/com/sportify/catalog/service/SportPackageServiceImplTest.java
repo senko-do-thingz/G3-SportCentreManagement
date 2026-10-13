@@ -61,6 +61,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -990,8 +991,8 @@ public class SportPackageServiceImplTest {
         // Verify the existing registration keeps its original snapshot price
         assertEquals(BigDecimal.valueOf(100000.00), existingRegistration.getOriginalPrice());
         assertEquals(BigDecimal.valueOf(100000.00), existingRegistration.getPaidAmount());
-        verify(registrationRepository, never()).save(any());
-        verify(registrationRepository, never()).saveAndFlush(any());
+        assertEquals(0, existingRegistration.getDiscountPercentage());
+        verifyNoInteractions(registrationRepository);
     }
 
     @Test

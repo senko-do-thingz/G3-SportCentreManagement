@@ -57,6 +57,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -1137,8 +1138,7 @@ public class MembershipCardServiceImplTest {
 
         // Verify the existing card retains its original snapshot price paid
         assertEquals(BigDecimal.valueOf(300000.00), existingCard.getPricePaid());
-        verify(memberCardRepository, never()).save(any());
-        verify(memberCardRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(memberCardRepository);
     }
 
     @Test
