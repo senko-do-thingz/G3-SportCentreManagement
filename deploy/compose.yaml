@@ -1,15 +1,17 @@
 services:
   backend:
     image: ghcr.io/senko-do-thingz/g3-sportcentremanagement/backend:${IMAGE_TAG:?IMAGE_TAG is required}
-    container_name: sportify-backend
     restart: unless-stopped
     env_file: .env
     ports:
       - "8080:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+        required: false
 
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: sportify-sqlserver
     profiles:
       - with-db
     restart: unless-stopped
@@ -28,7 +30,6 @@ services:
 
   db-init:
     image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: sportify-db-init
     profiles:
       - with-db
     restart: "no"

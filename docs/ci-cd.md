@@ -165,6 +165,7 @@ Before enabling automated deployments, target servers (staging and production) m
 
 4. **Docker and Compose Plugin Installation**:
    - Install the official Docker Engine and the Compose plugin (`docker-compose-plugin`) following Docker official documentation.
+   - **Version Requirement**: Docker Compose **v2.20.0 or later** is required for optional dependency support (`depends_on.<service>.required: false`).
    - Verify installation: `docker --version` and `docker compose version`.
 
 5. **GHCR Authentication**:
@@ -181,9 +182,13 @@ Before enabling automated deployments, target servers (staging and production) m
      ```
    - Copy `deploy/compose.yaml` from the repository to `/opt/sportify/docker-compose.yml`.
    - Copy `deploy/.env.example` to `/opt/sportify/.env` and edit it to set database credentials, JWT secret, CORS origins, and bank transfer details.
+   - **Fail-Fast Placeholders**: Placeholders in `.env.example` use `<REPLACE_...>` formats containing angle brackets (`<` and `>`), which are illegal in standard Base64 decoding and unaccepted passwords, guaranteeing that the application fails fast if deployed without editing.
    - **Database Credential Model**:
      - When using the `with-db` profile (`COMPOSE_PROFILES=with-db`), SQL Server runs inside Docker on the host and the backend connects as the superuser `sa`. This is an accepted trade-off for single-host or small staging environments. Do not treat this as a hardened multi-tenant setup.
      - When using an external SQL Server, a dedicated least-privilege database user (e.g., `sportify_user`) is recommended.
+   - **SQL Server Password Policy**: `DB_PASSWORD` for SQL Server must be at least 8 characters long and contain at least 3 of 4 character classes (uppercase, lowercase, numbers, symbols). If this policy is not met, the `sqlserver` container fails at startup and exits immediately.
+   - **Dynamic Container Naming**: `compose.yaml` intentionally omits fixed `container_name` declarations. Compose automatically prefixes container names with the project or directory name, allowing staging and production stacks to coexist on a single host without container name collisions.
+   - **Service Dependency Handling**: The `backend` service configures `depends_on.sqlserver` with `condition: service_healthy` and `required: false`. When `COMPOSE_PROFILES=with-db` is enabled, the backend waits for SQL Server to be fully healthy; when `with-db` is not active, the dependency is ignored cleanly.
    - **Internal Database Port**: Port 1433 is internal to the compose network and is not published on host interfaces. If host access is required for administrative maintenance, operators should bind to `127.0.0.1:1433:1433` only.
 
 7. **Default SSH Port 22 Requirement**:
