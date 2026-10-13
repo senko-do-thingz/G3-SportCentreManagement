@@ -51,7 +51,7 @@ Workstream B (CI/CD pipeline architecture and workflows) is tracked independentl
 | 6 | Authorization | Consistent 404 vs 403 policy for non-owner member requests | FIXED | Updated `MembershipCardServiceImpl.cancelCard` and `SportPackageServiceImpl.cancelRegistration` to throw `ResourceNotFoundException` (404) for non-owners to conceal resource existence. Verified in controller and service tests. |
 | 7 | Exception | DataIntegrityViolationException mapping to 409 without SQL leaks | FIXED / VERIFIED | Verified `GlobalExceptionHandler` handles `DataIntegrityViolationException` returning HTTP 409 with sanitized message. |
 | 8 | Concurrency | Protect payment method update and activation races | FIXED | Facts clarified: `@Version private Integer version;` pre-existed on `Payment` since BE-16 in V14. Added real concurrency test `optimisticLockConflict_ThrowsObjectOptimisticLockingFailureException` in `PaymentPendingIntegrationTest.java` and verified 409 mapping in `PaymentControllerTest.java`. |
-| 9 | Time / Clock | Replace LocalDateTime.now() with injectable Clock | FIXED | Clock single source of time: Removed uncoordinated `@PrePersist` and `@PreUpdate` calls from `Payment.java`. Timestamps set via `LocalDateTime.now(clock)` in `PaymentServiceImpl.java`. |
+| 9 | Time / Clock | Replace LocalDateTime.now() with injectable Clock | FIXED | Clock-backed Spring Data JPA auditing: Configured DateTimeProvider backed by Clock bean for @CreatedDate and @LastModifiedDate on Payment.java, while PaymentServiceImpl sets paymentTime via Clock. |
 | 10 | Audit | Staff confirmation audit & notes length safety | FIXED | Added `confirmed_by_user_id` foreign key column in `V21__payment_pending_adjustments.sql` and mapped `@ManyToOne confirmedByUser` on `Payment.java`. Appended notes with `truncateNotes(..., 500)` in `PaymentServiceImpl.java`. |
 | 11 | Business Rule | Amount > 0 rule & rounding edge cases | FIXED | Tracked open question `TODO-BE17-DISCOUNT` in `CHANGELOG.md`. Added unit test `createPendingPayment_AmountRoundsToZero_ThrowsBusinessRuleException` verifying amounts rounding to 0.00 are rejected. |
 | 12 | Security | SecurityUtils.isStaff role prefix and case insensitivity | FIXED | Updated `SecurityUtils.java` to strip optional "ROLE_" prefix and handle case-insensitivity. Created `SecurityUtilsTest.java` with parameterized test scenarios. |
@@ -82,7 +82,7 @@ All Workstream B deliverables (CI/CD workflows, Docker packaging, scripts, and q
 2. **Recording Payments for Counter Desk Walk-in Sales (`TODO-BE17-COUNTER-PAYMENT`)**: Desk direct sales (`paidAtDesk` membership cards and registrations created through `RegistrationChannel.RECEPTION`) currently do not generate rows in the `payment` table. The team must determine if all counter transactions require unified `payment` and `invoice` creation or keep legacy desk workflows.
 3. **Cancellation Status Semantics**: Currently, user cancellation sets payment status to `FAILED`. Using `FAILED` for user cancellation is semantically imprecise. Consider introducing a distinct `CANCELLED` status in `PaymentStatus` and associated database CHECK constraint.
 4. **Architectural Layering**: `SecurityUtils` in `com.sportify.core.common` depends on `UserAccount` in `com.sportify.identity.entity`. This creates an inversion where core utilities depend on an identity feature entity. Consider decoupling by passing role code strings or introducing a core identity interface.
-5. **Single Time Source for Remaining Entities**: While `Payment` now strictly uses the injected `Clock` bean for `createdAt`, `updatedAt`, and `paymentTime`, other entities (`Invoice`, `InvoiceLine`, `MemberCard`) still invoke `LocalDateTime.now()` directly in `@PrePersist`. Consider unifying Spring Data JPA Auditing across all entities via a Clock-backed `DateTimeProvider`.
+5. **Single Time Source for Remaining Entities**: While `Payment` now uses Clock-backed Spring Data JPA auditing for `createdAt` and `updatedAt`, and the injected `Clock` bean for `paymentTime`, other entities (`Invoice`, `InvoiceLine`, `MemberCard`) still invoke `LocalDateTime.now()` directly in `@PrePersist`. Consider unifying Spring Data JPA Auditing across all entities via a Clock-backed `DateTimeProvider`.
 6. **DTO / Entity Module Coupling**: `ActivatePaymentRequest` in `com.sportify.catalog.dto` depends on `PaymentMethod` in `com.sportify.payment.entity`. This couples a catalog DTO directly to an entity enum in the payment module. Consider decoupling catalog request DTOs from payment entity enums via a shared API type or string representation.
 
 ---
@@ -122,7 +122,7 @@ All Workstream B deliverables (CI/CD workflows, Docker packaging, scripts, and q
 | **B1** | FIXED | `MembershipCardServiceImpl.java:232` (upgrade check reverted to `> 0`), lines 212-218 (Javadoc updated) | `purchaseCard_Online_WithEqualTierPrice_SucceedsAndStartsAfterCurrentCard`, `purchaseCard_AtDesk_WithEqualTierPrice_DoesNotReplaceCurrentCard` in `MembershipCardServiceImplTest.java` |
 | **B2** | FIXED | `ActivatePaymentRequest.java:1-12` (new DTO), `PaymentServiceImpl.java:86-105` (`markPaymentSuccess` overload with `actualMethod`), `MembershipCardServiceImpl.java:132-154`, `SportPackageServiceImpl.java:210-230`, `PaymentServiceImpl.java:185-195` (`updatePaymentMethod`), `MembershipCardController.java:41-47`, `SportPackageController.java:68-74` | `activateCard_WithPendingPayment_AndActualPaymentMethodCash_RecordsCashPayment`, `activateRegistration_WithPendingPayment_AndActualPaymentMethodCash_RecordsCashPayment`, `markPaymentSuccess_WithStaffAndActualMethodCash_UpdatesMethodAndSucceeds`, `updatePaymentMethod_ByStaff_AllowsCashMethod`, `MembershipCardControllerTest.activateCard_ByStaffWithCashPaymentMethod_Returns200Ok`, `PaymentControllerTest.updatePaymentMethod_DisallowedMethod_Returns400BadRequest` |
 | **B3** | FIXED | `V21__payment_pending_adjustments.sql:1-55` (removed Step 5 `ck_payment_amount`), `MembershipCardServiceImpl.java:204` (throw `ResourceNotFoundException`), `PaymentPendingIntegrationTest.java:490-530` (real optimistic locking integration test), `PaymentControllerTest.java:275-290` (409 conflict test) | `cancelCard_AnotherMembersRequest_ThrowsResourceNotFoundException`, `MembershipCardControllerTest.cancelCard_ByNonOwnerMember_Returns404NotFound`, `optimisticLockConflict_ThrowsObjectOptimisticLockingFailureException`, `updatePaymentMethod_WhenOptimisticLockConflict_Returns409Conflict` |
-| **M1** | FIXED | `Payment.java:55-63` (removed `@PrePersist` and `@PreUpdate`), `PaymentServiceImpl.java:65-75, 95-105, 140-150` (set `createdAt`/`updatedAt` via `LocalDateTime.now(clock)`) | `timeSource_CreatedAtAndPaymentTime_UseSameClock` in `PaymentServiceImplTest.java` |
+| **M1** | FIXED | Clock-backed Spring Data JPA auditing: Configured DateTimeProvider backed by Clock bean, @EntityListeners(AuditingEntityListener.class) on Payment.java, @CreatedDate on createdAt, @LastModifiedDate on updatedAt. paymentTime set via Clock in PaymentServiceImpl.java | `markPaymentSuccess_AuditingTimestamps_ConsistentWithClockAndPaymentTime` in `PaymentPendingIntegrationTest.java` |
 | **M2** | FIXED | `V21__payment_pending_adjustments.sql:10-38` (dropped `df_payment_payment_time`, backfilled `payment_time = NULL` for non-SUCCESS, added `ck_payment_success_time`, removed redundant `IF NOT EXISTS`) | `successPayment_WithNullPaymentTime_RejectedByCheckConstraint`, `pendingPayment_NativeSqlInsertWithoutPaymentTime_LeavesPaymentTimeNull` in `PaymentPendingIntegrationTest.java` |
 | **M3** | FIXED | `PaymentRepository.java:17` (replaced with `findByMemberIdOrderByCreatedAtDesc`), `PaymentServiceImpl.java:208` | `findByMemberIdOrderByCreatedAtDesc_ReturnsNewestPendingPaymentFirst` in `PaymentPendingIntegrationTest.java` |
 | **M4** | FIXED | `PaymentServiceImpl.java:108-115, 145-155, 230-245` (notes format `"staff user id " + id`, masked notes to null for non-staff in `mapToResponse`, default item summary does not leak notes) | `getPayment_AsMember_HidesInternalNotes`, `getPayment_AsStaff_ShowsInternalNotes` in `PaymentControllerTest.java` |
@@ -200,4 +200,42 @@ Option (b) was chosen over Option (a):
 - **Head SHA**: `a446eeff4fc9e7b74d776b519982c4736d15efe2` (`a446eef`)
 - **Event**: `pull_request`
 - **Conclusion**: `success` (All 596 tests passed: Tests run: 596, Failures: 0, Errors: 0, Skipped: 0)
+
+
+---
+
+## 13. Independent Code Review Round 5 (2026-10-13)
+- **Reviewer**: AI code reviewer (Antigravity), read-only review, no production code changed.
+- **Scope**: HEAD `b5549c1` (delta from `28ed796`: 13 files, 186 insertions, 53 deletions).
+- **Verdict**: One remaining must-fix, otherwise approved.
+- **Verified evidence**: GitHub Actions runs `38292826361` (head `b5549c1`) and `38292426001` (head `a446eef`) concluded `success`. Round 4 items verified: `.env.example` restored and extended without quotes, with a key and quote test; skip reason corrected; `actualMethod` without linked payment rejected; MEMBER role fixture no longer created; coupling Open Question added.
+- **R5-1 (must fix)**: `Payment.@PreUpdate` sets `updatedAt = LocalDateTime.now()` (JVM default zone) and overrides the Clock-based value set by `PaymentServiceImpl`, reopening round 3 finding M1 (7 hour skew between `updated_at` and `payment_time` on UTC hosts). `@PrePersist` fallback also uses the JVM zone. Not caught because unit tests mock the repository and no integration test compares the two columns. Root cause includes the round 4 reviewer prompt, which asked to "always refresh updatedAt" without requiring the Clock bean.
+- **R5-2 (must fix)**: CHANGELOG M1, audit item 9, audit section 10 M1 and Open Question 5 still state that the lifecycle callbacks were removed and that Payment strictly uses the Clock bean.
+- **Recommended fix**: Spring Data JPA auditing on `Payment` with a Clock-backed `DateTimeProvider`, plus an integration test asserting `updated_at` and `payment_time` differ by at most 5 seconds after `markPaymentSuccess`.
+- **Full report**: `BE-17_code_review_round5.md` (review artifact).
+
+---
+
+## 14. Round 5 Review Resolution
+
+### Review Findings Resolution Matrix
+
+| Item | Area | Status | Changed File & Line | Proving Test |
+|---|---|---|---|---|
+| **R5-1** | JPA Auditing | FIXED | `AuditConfig.java:1-21` (configured `dateTimeProviderRef = "auditingDateTimeProvider"` backed by `Clock`), `Payment.java:13, 57-63` (`@EntityListeners(AuditingEntityListener.class)`, `@CreatedDate` on `createdAt`, `@LastModifiedDate` on `updatedAt`, removed `@PrePersist` and `@PreUpdate`), `PaymentServiceImpl.java:65-75, 105-115, 125-135, 205-212` (removed manual assignments, kept `paymentTime = LocalDateTime.now(clock)`) | `markPaymentSuccess_AuditingTimestamps_ConsistentWithClockAndPaymentTime` in `PaymentPendingIntegrationTest.java`, `testLifecycleDefaults` in `PaymentEntityMappingTest.java` |
+| **R5-2** | Documentation | FIXED | `CHANGELOG.md` (M1 & header), `docs/audit/BE-17_AI_Audit_Log.md` (Section 4 item 9, Section 7 Open Question 5, Section 10 M1, Section 14) | Document alignment audit |
+
+### Local Test Execution Evidence
+- **Command**: `mvn -B -ntp test "-Dtest=!*IntegrationTest" "-Dsurefire.failIfNoSpecifiedTests=false"`
+- **Result**: Tests run: 504, Failures: 0, Errors: 0, Skipped: 4. Build Success.
+- **Skipped Tests Detail**:
+  1. `com.sportify.FlywayMigrationTest`: Skipped via `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` when Docker is unavailable.
+  2. `com.sportify.identity.repository.PermissionRepositoryTest`: Skipped via `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` when Docker is unavailable.
+  3. `com.sportify.identity.repository.RoleRepositoryTest`: Skipped via `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` when Docker is unavailable.
+  4. `com.sportify.identity.repository.UserAccountRepositoryTest`: Skipped via `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` when Docker is unavailable.
+
+### CI Evidence
+- **Run ID**: To be recorded following Git commit and push to `origin feat/f3-pending-payments`.
+- **Head SHA**: To be recorded following Git commit.
+- **Conclusion**: To be verified via GitHub Actions run.
 

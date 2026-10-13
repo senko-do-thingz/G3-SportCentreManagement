@@ -113,7 +113,7 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    @DisplayName("Create pending payment with valid online method succeeds and sets timestamps from Clock")
+    @DisplayName("Create pending payment with valid online method succeeds and initializes pending status")
     void createPendingPayment_ValidOnlineMethod_Succeeds() {
         when(paymentRepository.getNextPaymentCodeSequence()).thenReturn(1001L);
         when(codeFormatter.formatPaymentCode(1001L)).thenReturn("PAY-1001");
@@ -126,13 +126,11 @@ class PaymentServiceImplTest {
         assertThat(payment.getPaymentMethod()).isEqualTo(PaymentMethod.MOMO);
         assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(payment.getPaymentTime()).isNull();
-        assertThat(payment.getCreatedAt()).isEqualTo(LocalDateTime.now(clock));
-        assertThat(payment.getUpdatedAt()).isEqualTo(LocalDateTime.now(clock));
     }
 
     @Test
-    @DisplayName("Clock consistency: createdAt and paymentTime use same time zone and paymentTime >= createdAt")
-    void timeSource_CreatedAtAndPaymentTime_UseSameClock() {
+    @DisplayName("Clock consistency: markPaymentSuccess sets paymentTime from Clock bean")
+    void timeSource_PaymentTime_UsesClock() {
         when(paymentRepository.getNextPaymentCodeSequence()).thenReturn(1002L);
         when(codeFormatter.formatPaymentCode(1002L)).thenReturn("PAY-1002");
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> {
@@ -148,9 +146,7 @@ class PaymentServiceImplTest {
 
         Payment successfulPayment = paymentService.markPaymentSuccess(payment.getId(), receptionistUser);
 
-        assertThat(successfulPayment.getCreatedAt()).isEqualTo(LocalDateTime.now(clock));
         assertThat(successfulPayment.getPaymentTime()).isEqualTo(LocalDateTime.now(clock));
-        assertThat(successfulPayment.getPaymentTime()).isAfterOrEqualTo(successfulPayment.getCreatedAt());
     }
 
     @Test

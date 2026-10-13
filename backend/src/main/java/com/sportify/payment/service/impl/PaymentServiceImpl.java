@@ -64,7 +64,6 @@ public class PaymentServiceImpl implements PaymentService {
 
         Long seq = paymentRepository.getNextPaymentCodeSequence();
         String code = codeFormatter.formatPaymentCode(seq);
-        LocalDateTime now = LocalDateTime.now(clock);
 
         Payment payment = Payment.builder()
                 .paymentCode(code)
@@ -73,8 +72,6 @@ public class PaymentServiceImpl implements PaymentService {
                 .paymentMethod(chosenMethod)
                 .paymentStatus(PaymentStatus.PENDING)
                 .paymentTime(null)
-                .createdAt(now)
-                .updatedAt(now)
                 .build();
 
         return paymentRepository.save(payment);
@@ -107,7 +104,6 @@ public class PaymentServiceImpl implements PaymentService {
         LocalDateTime now = LocalDateTime.now(clock);
         payment.setPaymentStatus(PaymentStatus.SUCCESS);
         payment.setPaymentTime(now);
-        payment.setUpdatedAt(now);
 
         if (confirmedBy != null) {
             payment.setConfirmedByUser(confirmedBy);
@@ -132,10 +128,8 @@ public class PaymentServiceImpl implements PaymentService {
                     + payment.getPaymentStatus() + ", expected PENDING");
         }
 
-        LocalDateTime now = LocalDateTime.now(clock);
         payment.setPaymentStatus(PaymentStatus.FAILED);
         payment.setNotes(appendNote(payment.getNotes(), reason));
-        payment.setUpdatedAt(now);
 
         return paymentRepository.save(payment);
     }
@@ -207,7 +201,6 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         payment.setPaymentMethod(newMethod);
-        payment.setUpdatedAt(LocalDateTime.now(clock));
         payment = paymentRepository.save(payment);
 
         PaymentResponse response = mapToPaymentResponse(payment);

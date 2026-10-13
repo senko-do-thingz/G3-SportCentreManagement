@@ -6,6 +6,9 @@ import com.sportify.catalog.entity.SportPackageRegistration;
 import jakarta.persistence.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
@@ -287,26 +290,13 @@ class PaymentEntityMappingTest {
 
     @Test
     @DisplayName("Lifecycle methods should initialize defaults properly")
-    void testLifecycleDefaults() {
-        Payment payment = Payment.builder().build();
-        assertThat(payment.getCreatedAt()).isNull();
-        assertThat(payment.getUpdatedAt()).isNull();
-        assertThat(payment.getPaymentTime()).isNull();
+    void testLifecycleDefaults() throws Exception {
+        assertThat(Payment.class.isAnnotationPresent(EntityListeners.class)).isTrue();
+        EntityListeners listeners = Payment.class.getAnnotation(EntityListeners.class);
+        assertThat(listeners.value()).contains(AuditingEntityListener.class);
 
-        payment.prePersist();
-        assertThat(payment.getCreatedAt()).isNotNull();
-        assertThat(payment.getUpdatedAt()).isNotNull();
-        assertThat(payment.getPaymentTime()).isNull();
-
-        LocalDateTime oldTime = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
-        payment.setUpdatedAt(oldTime);
-        payment.preUpdate();
-        assertThat(payment.getUpdatedAt()).isAfter(oldTime);
-
-        LocalDateTime serviceCreatedAt = LocalDateTime.of(2026, 10, 12, 10, 0, 0);
-        Payment paymentWithClock = Payment.builder().createdAt(serviceCreatedAt).build();
-        paymentWithClock.prePersist();
-        assertThat(paymentWithClock.getCreatedAt()).isEqualTo(serviceCreatedAt);
+        assertThat(Payment.class.getDeclaredField("createdAt").isAnnotationPresent(CreatedDate.class)).isTrue();
+        assertThat(Payment.class.getDeclaredField("updatedAt").isAnnotationPresent(LastModifiedDate.class)).isTrue();
 
         Invoice invoice = Invoice.builder().build();
         invoice.prePersist();

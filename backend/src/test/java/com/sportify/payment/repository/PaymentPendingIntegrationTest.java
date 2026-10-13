@@ -11,6 +11,7 @@ import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.RoleRepository;
 import com.sportify.identity.repository.UserRepository;
 import com.sportify.payment.entity.*;
+import com.sportify.payment.service.PaymentService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +38,9 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private PaymentRepository paymentRepository;
+
+    @Autowired
+    private PaymentService paymentService;
 
     @Autowired
     private PlatformTransactionManager transactionManager;
@@ -539,8 +543,6 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
                     .amount(BigDecimal.valueOf(100000.00))
                     .paymentMethod(PaymentMethod.BANK_TRANSFER)
                     .paymentStatus(PaymentStatus.PENDING)
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
                     .build();
             return paymentRepository.save(payment).getId();
         });
@@ -621,15 +623,15 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
     void findByMemberIdOrderByCreatedAtDesc_ReturnsNewestPendingPaymentFirst() {
         MemberProfile member = getOrCreateMember();
 
-        paymentRepository.save(Payment.builder()
+        Payment olderPending = paymentRepository.save(Payment.builder()
                 .paymentCode(codeFormatter.formatPaymentCode(paymentRepository.getNextPaymentCodeSequence()))
                 .member(member)
                 .amount(BigDecimal.valueOf(100000.00))
                 .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .paymentStatus(PaymentStatus.PENDING)
-                .createdAt(LocalDateTime.now().minusHours(2))
-                .updatedAt(LocalDateTime.now().minusHours(2))
                 .build());
+        jdbcTemplate.update("UPDATE payment SET created_at = ? WHERE id = ?",
+                Timestamp.valueOf(LocalDateTime.now().minusHours(2)), olderPending.getId());
 
         Payment newerPending = paymentRepository.save(Payment.builder()
                 .paymentCode(codeFormatter.formatPaymentCode(paymentRepository.getNextPaymentCodeSequence()))
@@ -637,13 +639,54 @@ class PaymentPendingIntegrationTest extends AbstractIntegrationTest {
                 .amount(BigDecimal.valueOf(200000.00))
                 .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .paymentStatus(PaymentStatus.PENDING)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
                 .build());
 
         List<Payment> list = paymentRepository.findByMemberIdOrderByCreatedAtDesc(member.getId());
         assertThat(list).isNotEmpty();
         assertThat(list.get(0).getId()).isEqualTo(newerPending.getId());
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @DisplayName("markPaymentSuccess sets updated_at and payment_time consistently within 5 seconds via Clock auditing")
+    void markPaymentSuccess_AuditingTimestamps_ConsistentWithClockAndPaymentTime() {
+        TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
+
+        Long memberId = txTemplate.execute(status -> {
+            MemberProfile member = getOrCreateMember();
+            return member.getId();
+        });
+
+        Long paymentId = txTemplate.execute(status -> {
+            MemberProfile member = memberProfileRepository.findById(memberId).orElseThrow();
+            Payment payment = paymentService.createPendingPayment(member, BigDecimal.valueOf(150000.00), PaymentMethod.BANK_TRANSFER);
+            return payment.getId();
+        });
+
+        txTemplate.execute(status -> {
+            paymentService.markPaymentSuccess(paymentId, null);
+            return null;
+        });
+
+        var row = jdbcTemplate.queryForMap(
+                "SELECT created_at, updated_at, payment_time FROM payment WHERE id = ?", paymentId
+        );
+
+        Timestamp createdAtTs = (Timestamp) row.get("created_at");
+        Timestamp updatedAtTs = (Timestamp) row.get("updated_at");
+        Timestamp paymentTimeTs = (Timestamp) row.get("payment_time");
+
+        assertThat(createdAtTs).isNotNull();
+        assertThat(updatedAtTs).isNotNull();
+        assertThat(paymentTimeTs).isNotNull();
+
+        LocalDateTime createdAt = createdAtTs.toLocalDateTime();
+        LocalDateTime updatedAt = updatedAtTs.toLocalDateTime();
+        LocalDateTime paymentTime = paymentTimeTs.toLocalDateTime();
+
+        java.time.Duration diff = java.time.Duration.between(updatedAt, paymentTime).abs();
+        assertThat(diff.getSeconds()).isLessThanOrEqualTo(5L);
+        assertThat(createdAt).isBeforeOrEqualTo(updatedAt);
     }
 
     private MemberProfile getOrCreateMember() {
