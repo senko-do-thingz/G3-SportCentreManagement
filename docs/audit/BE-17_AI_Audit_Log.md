@@ -240,4 +240,179 @@ Option (b) was chosen over Option (a):
 - **Event**: `pull_request`
 - **Conclusion**: `success` (All 597 tests passed: Tests run: 597, Failures: 0, Errors: 0, Skipped: 0; confirms `markPaymentSuccess_AuditingTimestamps_ConsistentWithClockAndPaymentTime` in `PaymentPendingIntegrationTest` executed and passed)
 
+*(Note: Section 14 records the Round 5 code commit 781ff8b and Run ID 38327818756. The 5-second tolerance and Payment-scoped wording are superseded by Section 15, items M1 and M3. Round 6 code commit 356e65e and Run ID 38333314704 are recorded in Section 15 below).*
+
+---
+
+## 15. Round 6 Review Resolution
+
+### Two-Step Verification Flow
+Per reviewer instructions, evidence in this section documents code commit `356e65e7c374148b8fac6432897931e74cf4a2a9` (`356e65e`). All code and test changes were committed, pushed to `feat/f3-pending-payments`, executed in GitHub Actions CI run `38333314704`, and verified via `gh`. This documentation update is committed subsequently as a docs-only commit, which will be validated by its own subsequent CI run.
+
+### Review Findings Resolution Matrix
+
+| Item | Area | Status | Changed File & Exact Lines | Proving Test | Evidence |
+|---|---|---|---|---|---|
+| **K1** | Evidence & Artifacts | FIXED | `docs/audit/BE-17_AI_Audit_Log.md`, `docs/tests/BE-17_test_cases.md:9` | Clean non-ASCII scan, fresh zip generation from HEAD, gh verification | GitHub Actions run `38333314704` success (614 tests) |
+| **K2** | Ownership & Shared PK | FIXED | `PaymentServiceImpl.java:155, 179`, `MembershipCardServiceImpl.java:171`, `SportPackageServiceImpl.java:244`, `PaymentPendingIntegrationTest.java:656-678` | `memberProfilePrimaryKey_EqualsUserAccountId_ByDesign` in `PaymentPendingIntegrationTest`, negative ownership tests in `PaymentServiceImplTest:441, 507` | `MemberProfile` shares PK with `UserAccount` via `@MapsId user_id`. Integration test verified in CI. Cleanup uses explicit user id. |
+| **M1** | Time-Source Tests | FIXED | `AuditConfigTest.java:17-41`, `PaymentAuditingFixedClockIntegrationTest.java:38-164`, `PaymentEntityMappingTest.java:293-301`, `InvoiceEntityMappingTest.java:11-37`, `InvoiceLineEntityMappingTest.java:8-25` | `AuditConfigTest` (4 timezones under Pacific/Auckland), `PaymentAuditingFixedClockIntegrationTest` (exact 0s tolerance in CI) | Unit tests passed locally and in CI; exact 0-second tolerance verified in CI with MSSQL container. |
+| **M2** | Notes Truncation | FIXED | `PaymentServiceImpl.java:257-314` | `appendNote_Existing495Chars_PreservesStaffNoteIntact`, `appendNote_Single600CharsWithSurrogatePair_CutSafelyTo500`, `appendNote_NullAndBlankInputs_HandledCleanly` in `PaymentServiceImplTest:345-402` | Unit tests verify newest note preserved intact, length <= 500, oldest content dropped/trimmed safely without splitting surrogate pairs. |
+| **M3** | Auditing Scope Clarification | FIXED | `docs/audit/BE-17_AI_Audit_Log.md:Section 15`, `CHANGELOG.md:8-13` | Document alignment and entity scan audit | Clarified that `auditingDateTimeProvider` is a global bean backed by Clock, affecting `BaseAuditableEntity` and all subclasses. Follow-ups recorded. |
+| **M4** | Migration V21 Safety | FIXED | `docs/audit/BE-17_AI_Audit_Log.md:Section 15`, `CHANGELOG.md:14` | Code and git history inspection | Proved `df_payment_payment_time` was explicitly named in `V14:31`. Proved V21 was already pushed in `d2ca75d`, `79a95c2`, `f59fb53`. Kept V21 intact to preserve Flyway checksums. Destructive backfill documented. |
+| **M5** | Role Consistency | FIXED | `PaymentControllerTest.java:409-432` | `getPayment_AsAdmin_Returns403Forbidden`, `updatePaymentMethod_AsAdmin_Returns403Forbidden` in `PaymentControllerTest` | Verified that unseeded ADMIN role is rejected with HTTP 403 Forbidden on PaymentController by `@PreAuthorize`. |
+| **M6** | Defensive Check for confirmedBy | FIXED | `PaymentServiceImpl.java:115-117` | `markPaymentSuccess_WithNonStaffConfirmedBy_ThrowsBusinessRuleException`, `markPaymentSuccess_WithNullConfirmedBy_SucceedsWithoutStaffNote` in `PaymentServiceImplTest:274-296` | Throws `BusinessRuleException` if confirmedBy is non-null and not staff. Both callers pass only staff actors. |
+| **m1** | Safe Test Cleanup | FIXED | `PaymentAuditingFixedClockIntegrationTest.java:136-163` | `cleanupPaymentAndUser` helper with null guards and exception handling | Null guards prevent NullPointerException in test cleanup. |
+| **m2** | Deterministic Invoice Pick | FIXED | `PaymentServiceImpl.java:374-376` | `getPayment_ResolvesInvoiceDetails_PicksLowestIdDeterministically` in `PaymentServiceImplTest:647-673` | Picks invoice with lowest id deterministically via `min(Comparator.comparing(Invoice::getId))`. |
+| **m3** | Payment Amount Scale & Precision | FIXED | `PaymentServiceImpl.java:58-63` | `createPendingPayment_MoreThanTwoDecimalPlaces_ThrowsBusinessRuleException`, `createPendingPayment_MoreThanTenIntegerDigits_ThrowsBusinessRuleException` in `PaymentServiceImplTest:211-228` | Rejects amounts with > 2 decimal places or > 10 integer digits with `BusinessRuleException`. |
+| **m4** | Placeholder Text Cleanup | FIXED | `docs/tests/BE-17_test_cases.md:9` | `git grep -n -i "to be verified"` and `git grep -n -i "to be recorded"` (both clean) | Replaced leftover placeholder text with verified CI statements. |
+
+### Detailed Item Resolutions
+
+#### K2. MemberProfile and UserAccount Entity ID Mapping
+Examination of `MemberProfile.java` and `UserAccount.java` confirms that `MemberProfile` shares its primary key with `UserAccount` via JPA `@MapsId`:
+
+```java
+// MemberProfile.java lines 18-25:
+@Id
+@Column(name = "user_id")
+private Long id;
+
+@OneToOne(fetch = FetchType.LAZY)
+@MapsId
+@JoinColumn(name = "user_id")
+private UserAccount userAccount;
+```
+
+```java
+// UserAccount.java lines 19-21:
+@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;
+```
+
+```sql
+-- V2__add_identity_tables.sql lines 4-15:
+CREATE TABLE [member_profile] (
+    [user_id] BIGINT NOT NULL,
+    ...
+    CONSTRAINT [pk_member_profile] PRIMARY KEY ([user_id]),
+    CONSTRAINT [fk_member_profile_user] FOREIGN KEY ([user_id]) REFERENCES [user_account]([id]) ON DELETE CASCADE
+);
+```
+
+By database schema design, `member_profile.user_id` is both the primary key and the foreign key referencing `user_account.id`. Therefore, `payment.getMember().getId().equals(actor.getId())` compares identical entity IDs by design.
+
+To safeguard this assumption against future schema changes:
+1. Added integration test `memberProfilePrimaryKey_EqualsUserAccountId_ByDesign` in `PaymentPendingIntegrationTest.java` (lines 656-678) asserting `assertThat(profile.getId()).isEqualTo(user.getId())` and `assertThat(profile.getId()).isEqualTo(profile.getUserAccount().getId())`.
+2. Added clear English comments at each ownership check stating that member id equals user id by design:
+   - `PaymentServiceImpl.java` lines 155 and 179
+   - `MembershipCardServiceImpl.java` line 171
+   - `SportPackageServiceImpl.java` line 244
+3. Changed unit test fixtures in `PaymentServiceImplTest.java` so `ownerProfile` and `ownerUser` share equal IDs (100L), and negative tests `getPayment_OtherMember_ThrowsResourceNotFoundException` (line 441) and `updatePaymentMethod_OtherMember_ThrowsResourceNotFoundException` (line 507) verify a different user ID (200L) is denied with `ResourceNotFoundException`.
+4. Fixed integration test cleanup so it deletes the user by `userId` captured explicitly from `user.getId()`, never by `profileId`.
+
+#### M1. Robust Time-Source Verification
+1. Added plain unit test `AuditConfigTest.java` (lines 17-41) testing `AuditConfig.auditingDateTimeProvider` over 4 timezones ("America/New_York", "Europe/London", "Asia/Tokyo", "Pacific/Auckland") using `Clock.fixed`. Verified locally under `-DargLine=-Duser.timezone=Pacific/Auckland` with 4 passed tests.
+2. Replaced weak 5-second tolerance test with exact 0-second assertions in dedicated integration test class `PaymentAuditingFixedClockIntegrationTest.java` (lines 38-164). Configured an isolated `@Primary` fixed Clock at whole-second instant `2026-10-15T12:30:45Z` in `America/New_York` (EDT UTC-4 -> `2026-10-15T08:30:45`). Asserted that `created_at`, `updated_at`, and `payment_time` all exactly equal `2026-10-15T08:30:45`. Running this test in its own class prevents polluting the application Clock bean across other tests.
+3. Split `testLifecycleDefaults` in `PaymentEntityMappingTest.java`: kept Payment auditing annotations in `testPaymentAuditingAnnotations` (`PaymentEntityMappingTest.java:293-301`), moved Invoice lifecycle checks to `InvoiceEntityMappingTest.java:11-37`, and moved InvoiceLine lifecycle checks to `InvoiceLineEntityMappingTest.java:8-25`. All original assertions were preserved intact.
+
+#### M2. Notes Truncation Preserving Newest Notes
+Updated `appendNote` in `PaymentServiceImpl.java` (lines 257-314):
+1. Ensures total length <= 500 characters.
+2. If `append` alone is <= 500 characters, it is preserved completely intact. Older segments in `existing` are dropped or trimmed from the beginning using `" | "` as separator.
+3. If `existing` contains surrogate pairs, trimming from the start checks `Character.isLowSurrogate(existing.charAt(start))` and advances `start++` to avoid orphan low surrogates.
+4. If `append` alone exceeds 500 characters, it is trimmed to 500 characters safely without splitting high surrogates (`Character.isHighSurrogate(note.charAt(cutoff - 1))`).
+5. Added unit tests in `PaymentServiceImplTest.java`:
+   - `appendNote_Existing495Chars_PreservesStaffNoteIntact` (line 345): existing 495 chars + staff note preserves staff note intact within 500 chars.
+   - `appendNote_Single600CharsWithSurrogatePair_CutSafelyTo500` (line 362): single 600-char note cut to 499 chars without splitting surrogate pair.
+   - `appendNote_NullAndBlankInputs_HandledCleanly` (line 381): handles null and blank inputs safely.
+6. Note on audit record: The `confirmed_by_user_id` foreign key column on the `payment` table remains the primary, authoritative, un-truncated database record of which staff user confirmed the payment.
+
+#### M3. Global Scope of DateTimeProvider
+`AuditConfig.auditingDateTimeProvider` configures `dateTimeProviderRef = "auditingDateTimeProvider"` globally for Spring Data JPA auditing.
+Entities using Spring Data JPA auditing:
+1. `BaseAuditableEntity` (inherited by `Facility`, `Membership`, `Sport`, `CoachProfile`, `MemberProfile`, `Role`, and `BaseMasterEntity` -> `MembershipPlan`, `UserAccount`)
+2. `ActivityLog`
+3. `CoachCertification`
+4. `PasswordResetToken`
+5. `Payment`
+
+All these entities now receive timestamps backed by the configured `Clock` bean (`Asia/Ho_Chi_Minh`) instead of JVM default system time. No existing query or test depends on JVM default skew.
+
+Follow-ups:
+- `Invoice.issueDate`, `Invoice.createdAt`, `Invoice.updatedAt`, `InvoiceLine.createdAt`, and `MemberCard.createdAt`/`MemberCard.updatedAt` currently use `LocalDateTime.now()` in `@PrePersist`/`@PreUpdate` callbacks and can differ from `payment_time` when running under a mock Clock. Migrating these entities to Spring Data JPA auditing with Clock provider is recorded as a follow-up task.
+
+#### M4. Migration V21 Safety and Analysis
+1. Proof of constraint name:
+   `backend/src/main/resources/db/migration/catalog/V14__create_payment_and_invoice_tables.sql` line 31 explicitly declared:
+   `[payment_time] DATETIME2(0) NOT NULL CONSTRAINT [df_payment_payment_time] DEFAULT SYSDATETIME(),`
+   Because the constraint was explicitly named in V14, `ALTER TABLE [payment] DROP CONSTRAINT [df_payment_payment_time]` in V21 is deterministic and will not fail on real databases.
+2. Proof of V21 remote push history:
+   `git log --oneline origin/feat/f3-pending-payments -- backend/src/main/resources/db/migration/catalog/V21__payment_pending_adjustments.sql` confirms V21 was pushed in commits `d2ca75d`, `79a95c2`, `f59fb53`.
+   Because V21 was already pushed to the remote branch and executed across multiple CI runs, editing V21 would alter its checksum and cause Flyway `Validate failed: Migration checksum mismatch` on any existing database. Therefore, V21 was intentionally left unmodified.
+3. Timestamp erasure analysis:
+   Searching codebase with `Select-String -Pattern "getPaymentTime|payment_time"` confirms only `Payment.paymentTime` and `PaymentServiceImpl.mapToPaymentResponse` read this field. Non-SUCCESS payments map `paymentTime` to null. The backfill `UPDATE [payment] SET [payment_time] = NULL WHERE [payment_status] <> 'SUCCESS'` is intentionally destructive to enforce the domain rule that non-SUCCESS payments do not have a payment timestamp.
+
+#### M5. Role Matrix and Controller Security
+1. Role matrix inspection: `V3__seed_identity_data.sql` seeds `MEMBER`, `COACH`, `RECEPTIONIST`, and `MANAGER` (where MANAGER is description "Administrator"). No `ADMIN` role is seeded in the database.
+2. `SecurityUtils.isStaff` treats only `RECEPTIONIST` and `MANAGER` as staff. `ADMIN` returns `false`.
+3. All controllers across catalog, identity, and payment use `@PreAuthorize("hasAnyRole('MEMBER', 'RECEPTIONIST', 'MANAGER')")` or `@PreAuthorize("hasAnyRole('RECEPTIONIST', 'MANAGER')")`. None allow `ADMIN`.
+4. Consistent behavior: `PaymentController` excludes unseeded `ADMIN`. Added slice tests in `PaymentControllerTest.java` lines 409-432 (`getPayment_AsAdmin_Returns403Forbidden` and `updatePaymentMethod_AsAdmin_Returns403Forbidden`) proving that ADMIN requests return HTTP 403 Forbidden.
+
+#### M6. Defensive Check on confirmedBy
+In `PaymentServiceImpl.markPaymentSuccess` (`PaymentServiceImpl.java:115-117`), added validation:
+```java
+if (confirmedBy != null) {
+    if (!SecurityUtils.isStaff(confirmedBy)) {
+        throw new BusinessRuleException("Only staff users can confirm payment");
+    }
+    ...
+}
+```
+Added unit tests in `PaymentServiceImplTest.java`:
+- `markPaymentSuccess_WithNonStaffConfirmedBy_ThrowsBusinessRuleException` (line 274): asserts `BusinessRuleException` with message "Only staff users can confirm payment".
+- `markPaymentSuccess_WithNullConfirmedBy_SucceedsWithoutStaffNote` (line 284): null confirmedBy allowed, succeeds without staff note.
+Existing callers confirmed:
+- `MembershipCardServiceImpl.java:157`: called inside `activateCard`, protected by `@PreAuthorize("hasAnyRole('RECEPTIONIST', 'MANAGER')")` on `MembershipCardController:42`.
+- `SportPackageServiceImpl.java:232`: called inside `activateRegistration`, protected by `@PreAuthorize("hasAnyRole('RECEPTIONIST', 'MANAGER')")` on `SportPackageController:63`.
+Both callers only pass authenticated staff actors.
+
+#### Minor Items (m1-m4)
+- **m1 Test cleanup**: Added `cleanupPaymentAndUser` helper with null guards and try-catch blocks in `PaymentAuditingFixedClockIntegrationTest.java` (lines 136-163).
+- **m2 Deterministic invoice selection**: `PaymentServiceImpl.resolveInvoiceSummary` (lines 374-376) selects invoice via `invoices.stream().min(Comparator.comparing(Invoice::getId, Comparator.nullsLast(Comparator.naturalOrder())))`. Tested in `PaymentServiceImplTest.java` (line 647).
+- **m3 Payment amount validation**: `PaymentServiceImpl.createPendingPayment` (lines 58-63) rejects amounts with > 2 decimal places or > 10 integer digits with `BusinessRuleException`. Tested in `PaymentServiceImplTest.java` (lines 211-228).
+- **m4 Placeholder text removal**: Removed "(to be verified by CI)" from `docs/tests/BE-17_test_cases.md:9`. Verified with `git grep -i "to be verified"` (0 hits).
+
+### Follow-ups
+1. **Auditing migration for Invoice and MemberCard**: Migrate `Invoice.issueDate`, `Invoice.createdAt`, `Invoice.updatedAt`, `InvoiceLine.createdAt`, `MemberCard.createdAt`, and `MemberCard.updatedAt` to Spring Data JPA auditing with Clock provider to ensure exact timestamp alignment across all domain entities under fixed clock testing.
+2. **Zero-amount orders (TODO-BE17-DISCOUNT)**: Address handling of 100% discount promotions and free class passes relative to database `ck_payment_amount CHECK (amount > 0)` constraint.
+3. **Walk-in desk counter sales (TODO-BE17-COUNTER-PAYMENT)**: Implement payment row creation and invoice generation for direct counter walk-in sales.
+
+### Local Test Execution Evidence
+- **Command**: `mvn -B -ntp test "-Dtest=!*IntegrationTest" "-Dsurefire.failIfNoSpecifiedTests=false"`
+- **Result**: Tests run: 520, Failures: 0, Errors: 0, Skipped: 4. Build Success.
+- **Skipped Tests Detail**:
+  1. `com.sportify.FlywayMigrationTest`: Skipped via `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` when Docker is unavailable.
+  2. `com.sportify.identity.repository.PermissionRepositoryTest`: Skipped via `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` when Docker is unavailable.
+  3. `com.sportify.identity.repository.RoleRepositoryTest`: Skipped via `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` when Docker is unavailable.
+  4. `com.sportify.identity.repository.UserAccountRepositoryTest`: Skipped via `@Testcontainers(disabledWithoutDocker = true)` in `AbstractIntegrationTest` when Docker is unavailable.
+
+### CI Execution Evidence (Code Commit)
+- **Command**: `gh run view 38333314704 --json headSha,conclusion,event,status`
+- **Raw JSON Output**:
+```json
+{"conclusion":"success","event":"pull_request","headSha":"356e65e7c374148b8fac6432897931e74cf4a2a9","status":"completed"}
+```
+- **Surefire Totals from CI Run Log**:
+```
+Tests run: 614, Failures: 0, Errors: 0, Skipped: 0
+```
+- **Key CI-Only Integration Tests Verified**:
+  - `PaymentAuditingFixedClockIntegrationTest`: Tests run: 1, Failures: 0, Errors: 0, Skipped: 0 (Exact 0s tolerance with MSSQL container)
+  - `PaymentPendingIntegrationTest`: Tests run: 13, Failures: 0, Errors: 0, Skipped: 0 (Includes `memberProfilePrimaryKey_EqualsUserAccountId_ByDesign`)
+  - `PaymentRepositoryIntegrationTest`: Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+  - `PaymentDdlValidateIntegrationTest`: Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+  - `V14ToV19SchemaConstraintIntegrationTest`: Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+
+
 
