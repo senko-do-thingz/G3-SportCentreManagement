@@ -19,6 +19,10 @@
         <org.mapstruct.version>1.6.3</org.mapstruct.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <lombok.version>1.18.40</lombok.version>
+        <!-- Security fix: upgrade Jackson to fix CVE-2026-89407, CVE-2026-89425, CVE-2026-68497, CVE-2026-91776, CVE-2026-91777 -->
+        <jackson-bom.version>2.21.7</jackson-bom.version>
+        <!-- Security fix: upgrade embedded Tomcat to fix CVE-2026-65182, CVE-2026-65905, CVE-2026-68525 -->
+        <tomcat.version>10.1.59</tomcat.version>
     </properties>
     <dependencies>
         <!-- Spring Boot Starters -->

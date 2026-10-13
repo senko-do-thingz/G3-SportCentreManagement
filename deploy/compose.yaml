@@ -1,0 +1,53 @@
+services:
+  backend:
+    image: ghcr.io/senko-do-thingz/g3-sportcentremanagement/backend:${IMAGE_TAG:?IMAGE_TAG is required}
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8080:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+        required: false
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04
+    profiles:
+      - with-db
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      # For the with-db profile, the backend connects as the sa login; DB_USERNAME must be sa.
+      MSSQL_SA_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -b -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1'"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04
+    profiles:
+      - with-db
+    restart: "no"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      SQLCMDPASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
+    entrypoint:
+      - /opt/mssql-tools18/bin/sqlcmd
+      - -S
+      - sqlserver
+      - -U
+      - sa
+      - -C
+      - -b
+      - -Q
+      - "IF DB_ID(N'sportify') IS NULL CREATE DATABASE [sportify];"
+
+volumes:
+  sqlserver_data:
