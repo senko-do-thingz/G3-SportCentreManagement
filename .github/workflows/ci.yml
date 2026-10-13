@@ -147,6 +147,7 @@ jobs:
             echo "Error: Failsafe reports directory $REPORTS_DIR not found"
             exit 1
           fi
+          # shellcheck disable=SC2126
           TEST_COUNT=$(grep -h "<testcase" "$REPORTS_DIR"/TEST-*.xml 2>/dev/null | wc -l || true)
           echo "Discovered $TEST_COUNT integration test cases in $REPORTS_DIR"
           if [ "$TEST_COUNT" -eq 0 ]; then
