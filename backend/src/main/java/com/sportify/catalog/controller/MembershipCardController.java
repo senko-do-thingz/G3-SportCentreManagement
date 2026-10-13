@@ -4,6 +4,7 @@ import com.sportify.catalog.dto.ActivatePaymentRequest;
 import com.sportify.catalog.dto.CardTierResponse;
 import com.sportify.catalog.dto.MemberCardPurchaseRequest;
 import com.sportify.catalog.dto.MemberCardResponse;
+import com.sportify.catalog.dto.MembershipCardTierUpdateRequest;
 import com.sportify.catalog.service.MembershipCardService;
 import com.sportify.identity.security.CustomUserDetails;
 import com.sportify.payment.entity.PaymentMethod;
@@ -26,6 +27,15 @@ public class MembershipCardController {
     @GetMapping("/tiers")
     public List<CardTierResponse> getAllActiveTiers() {
         return membershipCardService.getAllActiveTiers();
+    }
+
+    @PutMapping("/tiers/{id}")
+    @PreAuthorize("hasRole('MANAGER')")
+    public CardTierResponse updateTier(
+            @PathVariable Long id,
+            @Valid @RequestBody MembershipCardTierUpdateRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return membershipCardService.updateTier(id, request, userDetails != null ? userDetails.getUserAccount() : null);
     }
 
     @PostMapping("/purchase")
