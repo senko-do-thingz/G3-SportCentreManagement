@@ -2,7 +2,14 @@
 
 ## 2026-10-12 - Pending Payments for Online Requests and Payment Summary (BE-17, Flow 3)
 
-Branch `feat/f3-pending-payments`. Status: Implemented and hardened after Round 6 Code Review. Verified locally with `mvn -B -ntp test "-Dtest=!*IntegrationTest" "-Dsurefire.failIfNoSpecifiedTests=false"` (520 tests run, 0 failures, 0 errors, 4 skipped via `@Testcontainers(disabledWithoutDocker = true)`: FlywayMigrationTest, PermissionRepositoryTest, RoleRepositoryTest, UserAccountRepositoryTest). Integration tests verified in CI via GitHub Actions (Run ID 38333314704, 614 tests run, 0 failures, 0 errors, 0 skipped).
+Branch `feat/f3-pending-payments`. Status: Implemented and hardened after Round 7 Code Review. Verified locally with `mvn -B -ntp test "-Dtest=!*IntegrationTest" "-Dsurefire.failIfNoSpecifiedTests=false"` (521 tests run, 0 failures, 0 errors, 4 skipped via `@Testcontainers(disabledWithoutDocker = true)`: FlywayMigrationTest, PermissionRepositoryTest, RoleRepositoryTest, UserAccountRepositoryTest). Integration tests verified in CI via GitHub Actions (Run ID 38335867540, 615 tests run, 0 failures, 0 errors, 0 skipped).
+
+### Review Fixes & Hardening (Round 7)
+- D1 Test Documentation Integrity: Audited `docs/tests/BE-17_test_cases.md` end-to-end; removed all phantom method names and non-existent test references; aligned test suite counts with Surefire reports; reconciled ADMIN exclusion consistently with code and security rules; added missing test cases from rounds 5 and 6.
+- M-B Early confirmedBy Validation: Moved non-null and non-staff validation for `confirmedBy` in `PaymentServiceImpl.markPaymentSuccess` before repository `findById` and entity mutation; strengthened unit tests to assert repository methods are never called and entity remains unmutated upon exception.
+- M-A Migration V21 History & Checksum Clarification: Verified via path-filtered git log that V21 changed between pushed commits (`f59fb53`, `79a95c2`, `d2ca75d`); documented consequences for developer databases and explicit recovery options (recreate vs repair).
+- M-C Commit Traceability: Documented the full commit and CI execution chain for rounds 6 and 7 in the AI Audit Log and PR description draft.
+- Minor Fixes: [m1] handled empty trimmed note segment in `PaymentServiceImpl.appendNote` to prevent leading delimiter; [m2] imported `java.util.Comparator` normally and cleaned up redundant fallback in `resolveInvoiceSummary`; [m3] documented `SecurityUtils` case-insensitive parsing; [m4] documented `isMember` scope refactor.
 
 ### Review Fixes & Hardening (Round 6)
 - K1 Audit Log & Evidence: Synchronized AI audit log with code commit and CI run evidence, regenerated delivery artifacts cleanly from HEAD, and replaced all stale line references.
