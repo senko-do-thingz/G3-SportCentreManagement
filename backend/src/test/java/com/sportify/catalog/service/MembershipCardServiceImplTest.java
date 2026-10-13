@@ -52,6 +52,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -402,7 +403,8 @@ public class MembershipCardServiceImplTest {
         MemberCard gold = paidCard(goldTier, LocalDate.of(2026, 3, 1), LocalDate.of(2027, 2, 28));
         MemberCard upgrade = MemberCard.builder().id(31L).cardCode("CARD-31").member(memberProfile).tier(vipTier)
                 .startDate(LocalDate.of(2026, 10, 4)).endDate(LocalDate.of(2027, 2, 28))
-                .status(CardStatus.PENDING_PAYMENT).pricePaid(BigDecimal.valueOf(400000.00)).build();
+                .status(CardStatus.PENDING_PAYMENT).pricePaid(BigDecimal.valueOf(400000.00))
+                .upgradeRequest(true).replacesCard(gold).build();
         when(memberCardRepository.findById(31L)).thenReturn(Optional.of(upgrade));
         when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of(gold));
         when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
@@ -418,7 +420,8 @@ public class MembershipCardServiceImplTest {
     void activateCard_UpgradeButTheCurrentCardHasEnded_ThrowsBusinessRuleException() {
         MemberCard upgrade = MemberCard.builder().id(32L).cardCode("CARD-32").member(memberProfile).tier(vipTier)
                 .startDate(LocalDate.of(2026, 9, 1)).endDate(LocalDate.of(2026, 10, 1))
-                .status(CardStatus.PENDING_PAYMENT).pricePaid(BigDecimal.valueOf(400000.00)).build();
+                .status(CardStatus.PENDING_PAYMENT).pricePaid(BigDecimal.valueOf(400000.00))
+                .upgradeRequest(true).build();
         when(memberCardRepository.findById(32L)).thenReturn(Optional.of(upgrade));
         when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of());
 
@@ -1143,6 +1146,245 @@ public class MembershipCardServiceImplTest {
         assertEquals(true, result.get(0).getIsActive());
         assertEquals("PLATINUM", result.get(1).getCode());
         assertEquals(false, result.get(1).getIsActive());
+    }
+
+    @Test
+    void activateCard_pendingCardAtOldPrice_activatesSuccessfullyAndRetainsOldPrice() {
+        // (1) create a PENDING_PAYMENT card, raise tier price, activate -> succeeds and retains old pricePaid
+        MembershipCardTier tier = MembershipCardTier.builder()
+                .id(2L)
+                .code("GOLD")
+                .name("Gold")
+                .price(BigDecimal.valueOf(450000.00)) // Live price raised to 450k
+                .durationMonths(12)
+                .discountPercentage(5)
+                .isActive(true)
+                .build();
+
+        MemberCard pendingCard = MemberCard.builder()
+                .id(101L)
+                .cardCode("CARD-0101")
+                .member(memberProfile)
+                .tier(tier)
+                .startDate(LocalDate.now(clock))
+                .endDate(LocalDate.now(clock).plusMonths(12).minusDays(1))
+                .status(CardStatus.PENDING_PAYMENT)
+                .pricePaid(BigDecimal.valueOf(300000.00)) // Requested at old price 300k
+                .upgradeRequest(false)
+                .payment(Payment.builder().id(201L).build())
+                .build();
+
+        when(memberCardRepository.findById(101L)).thenReturn(Optional.of(pendingCard));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class)))
+                .thenReturn(List.of());
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
+
+        MemberCardResponse res = membershipCardService.activateCard(101L, receptionistUser);
+
+        assertNotNull(res);
+        assertEquals(CardStatus.ACTIVE, res.getStatus());
+        assertEquals(BigDecimal.valueOf(300000.00), res.getPricePaid());
+        verify(paymentService).markPaymentSuccess(eq(201L), eq(receptionistUser), isNull());
+    }
+
+    @Test
+    void activateCard_pendingUpgradeCard_whenTierPricesChange_activatesSuccessfully() {
+        // (2) create a pending upgrade card, change prices, activate -> succeeds
+        MembershipCardTier goldTier = MembershipCardTier.builder()
+                .id(2L)
+                .code("GOLD")
+                .name("Gold")
+                .price(BigDecimal.valueOf(600000.00)) // Live price changed to 600k
+                .durationMonths(12)
+                .discountPercentage(10)
+                .isActive(true)
+                .build();
+
+        MemberCard activeBronzeCard = MemberCard.builder()
+                .id(90L)
+                .cardCode("CARD-0090")
+                .member(memberProfile)
+                .tier(MembershipCardTier.builder().id(10L).code("BRONZE").price(BigDecimal.valueOf(250000.00)).durationMonths(12).build())
+                .startDate(LocalDate.now(clock).minusMonths(1))
+                .endDate(LocalDate.now(clock).plusMonths(11))
+                .status(CardStatus.ACTIVE)
+                .pricePaid(BigDecimal.valueOf(200000.00))
+                .build();
+
+        MemberCard pendingUpgradeCard = MemberCard.builder()
+                .id(102L)
+                .cardCode("CARD-0102")
+                .member(memberProfile)
+                .tier(goldTier)
+                .startDate(LocalDate.now(clock))
+                .endDate(activeBronzeCard.getEndDate())
+                .status(CardStatus.PENDING_PAYMENT)
+                .pricePaid(BigDecimal.valueOf(300000.00)) // Difference when Gold was 500k
+                .upgradeRequest(true)
+                .replacesCard(activeBronzeCard)
+                .payment(Payment.builder().id(202L).build())
+                .build();
+
+        when(memberCardRepository.findById(102L)).thenReturn(Optional.of(pendingUpgradeCard));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class)))
+                .thenReturn(List.of(activeBronzeCard));
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
+
+        MemberCardResponse res = membershipCardService.activateCard(102L, receptionistUser);
+
+        assertNotNull(res);
+        assertEquals(CardStatus.ACTIVE, res.getStatus());
+        assertEquals(BigDecimal.valueOf(300000.00), res.getPricePaid());
+        assertEquals(CardStatus.REPLACED, activeBronzeCard.getStatus());
+        verify(paymentService).markPaymentSuccess(eq(202L), eq(receptionistUser), isNull());
+    }
+
+    @Test
+    void purchaseCard_upgradeDifference_calculatedFromPricePaid_notLivePrice() {
+        // (3) member holds ACTIVE card, manager edits that tier price, member requests upgrade -> difference is based on pricePaid
+        MembershipCardTier silverTier = MembershipCardTier.builder()
+                .id(2L)
+                .code("SILVER")
+                .name("Silver")
+                .price(BigDecimal.valueOf(350000.00)) // Live price raised to 350k
+                .durationMonths(12)
+                .discountPercentage(5)
+                .isActive(true)
+                .build();
+
+        MembershipCardTier goldTier = MembershipCardTier.builder()
+                .id(3L)
+                .code("GOLD")
+                .name("Gold")
+                .price(BigDecimal.valueOf(500000.00))
+                .durationMonths(12)
+                .discountPercentage(10)
+                .isActive(true)
+                .build();
+
+        MemberCard activeSilverCard = MemberCard.builder()
+                .id(95L)
+                .cardCode("CARD-0095")
+                .member(memberProfile)
+                .tier(silverTier)
+                .startDate(LocalDate.now(clock).minusMonths(2))
+                .endDate(LocalDate.now(clock).plusMonths(10))
+                .status(CardStatus.ACTIVE)
+                .pricePaid(BigDecimal.valueOf(300000.00)) // Member actually paid 300k (not 350k)
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(3L)).thenReturn(Optional.of(goldTier));
+        when(memberCardRepository.findByMemberIdAndStatus(100L, CardStatus.PENDING_PAYMENT)).thenReturn(List.of());
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class)))
+                .thenReturn(List.of(activeSilverCard));
+        when(memberCardRepository.getNextCardCodeSequence()).thenReturn(105L);
+        when(codeFormatter.formatCardCode(105L)).thenReturn("CARD-0105");
+        when(paymentService.createPendingPayment(eq(memberProfile), any(BigDecimal.class), eq(PaymentMethod.VNPAY)))
+                .thenReturn(Payment.builder().id(301L).build());
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
+
+        MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
+                .tierId(3L)
+                .paymentMethod(PaymentMethod.VNPAY)
+                .build();
+
+        MemberCardResponse res = membershipCardService.purchaseCard(req, memberUser);
+
+        assertNotNull(res);
+        assertEquals(CardStatus.PENDING_PAYMENT, res.getStatus());
+        // Difference: 500,000 - 300,000 (pricePaid) = 200,000, NOT 500,000 - 350,000 = 150,000
+        assertEquals(BigDecimal.valueOf(200000.00), res.getPricePaid());
+    }
+
+    @Test
+    void purchaseCard_cheaperTierThanCurrentHolding_startsAfterCurrentCardEndsAtFullPrice() {
+        // (4) lower price scenario still works: starts after last card ends, full price
+        MembershipCardTier goldTier = MembershipCardTier.builder()
+                .id(3L)
+                .code("GOLD")
+                .name("Gold")
+                .price(BigDecimal.valueOf(500000.00))
+                .durationMonths(12)
+                .isActive(true)
+                .build();
+
+        MembershipCardTier silverTier = MembershipCardTier.builder()
+                .id(2L)
+                .code("SILVER")
+                .name("Silver")
+                .price(BigDecimal.valueOf(300000.00))
+                .durationMonths(6)
+                .isActive(true)
+                .build();
+
+        LocalDate goldEnd = LocalDate.now(clock).plusMonths(6);
+        MemberCard activeGoldCard = MemberCard.builder()
+                .id(96L)
+                .cardCode("CARD-0096")
+                .member(memberProfile)
+                .tier(goldTier)
+                .startDate(LocalDate.now(clock).minusMonths(6))
+                .endDate(goldEnd)
+                .status(CardStatus.ACTIVE)
+                .pricePaid(BigDecimal.valueOf(500000.00))
+                .build();
+
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(2L)).thenReturn(Optional.of(silverTier));
+        when(memberCardRepository.findByMemberIdAndStatus(100L, CardStatus.PENDING_PAYMENT)).thenReturn(List.of());
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class)))
+                .thenReturn(List.of(activeGoldCard));
+        when(memberCardRepository.getNextCardCodeSequence()).thenReturn(106L);
+        when(codeFormatter.formatCardCode(106L)).thenReturn("CARD-0106");
+        when(paymentService.createPendingPayment(eq(memberProfile), any(BigDecimal.class), eq(PaymentMethod.VNPAY)))
+                .thenReturn(Payment.builder().id(302L).build());
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
+
+        MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
+                .tierId(2L)
+                .paymentMethod(PaymentMethod.VNPAY)
+                .build();
+
+        MemberCardResponse res = membershipCardService.purchaseCard(req, memberUser);
+
+        assertNotNull(res);
+        assertEquals(CardStatus.PENDING_PAYMENT, res.getStatus());
+        // Full price of Silver tier
+        assertEquals(BigDecimal.valueOf(300000.00), res.getPricePaid());
+        // Starts the day after Gold card ends
+        assertEquals(goldEnd.plusDays(1), res.getStartDate());
+    }
+
+    @Test
+    void getApplicableDiscountPercentage_benefitsFollowTier_liveDiscountReturned() {
+        // (5) editing a tier discount changes discount returned for existing card holders for NEW registrations
+        MembershipCardTier goldTier = MembershipCardTier.builder()
+                .id(2L)
+                .code("GOLD")
+                .name("Gold")
+                .price(BigDecimal.valueOf(300000.00))
+                .durationMonths(12)
+                .discountPercentage(8) // Live discount updated from 5% to 8%
+                .isActive(true)
+                .build();
+
+        MemberCard activeCard = MemberCard.builder()
+                .id(100L)
+                .cardCode("CARD-0100")
+                .member(memberProfile)
+                .tier(goldTier)
+                .startDate(LocalDate.now(clock).minusMonths(1))
+                .endDate(LocalDate.now(clock).plusMonths(11))
+                .status(CardStatus.ACTIVE)
+                .pricePaid(BigDecimal.valueOf(300000.00))
+                .build();
+
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class)))
+                .thenReturn(List.of(activeCard));
+
+        int discount = membershipCardService.getApplicableDiscountPercentage(100L, 30);
+        assertEquals(8, discount);
     }
 }
 

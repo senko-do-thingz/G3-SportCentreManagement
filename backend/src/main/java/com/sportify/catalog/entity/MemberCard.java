@@ -52,6 +52,18 @@ public class MemberCard {
     @JoinColumn(name = "payment_id")
     private Payment payment;
 
+    @Column(name = "upgrade_request", nullable = false)
+    @Builder.Default
+    private Boolean upgradeRequest = false;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "replaces_card_id")
+    private MemberCard replacesCard;
+
+    public boolean isUpgradeRequest() {
+        return Boolean.TRUE.equals(upgradeRequest);
+    }
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 

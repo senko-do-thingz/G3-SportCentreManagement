@@ -183,13 +183,16 @@ Check constraints:
 | 8 | price_paid | DECIMAL(14,2) | No | 0 | - | V10 | - |
 | 9 | created_at | DATETIME2(0) | No | SYSDATETIME() | - | V10 | - |
 | 10 | updated_at | DATETIME2(0) | Yes | - | - | V10 | - |
-| 11 | payment_id | BIGINT | Yes | - | FK -> payment.id | V14 | Not mapped in the entity yet; Added in V14 |
+| 11 | payment_id | BIGINT | Yes | - | FK -> payment.id | V14 | Mapped in entity |
+| 12 | upgrade_request | BIT | No | 0 | - | V22 | Explicit marker for upgrade requests |
+| 13 | replaces_card_id | BIGINT | Yes | - | FK -> member_card.id | V22 | Replaced card in upgrade chain |
 
 Foreign keys:
 
 - `fk_member_card_member`: (member_id) -> member_profile(user_id)
 - `fk_member_card_tier`: (tier_id) -> membership_card_tier(id)
 - `fk_member_card_payment`: (payment_id) -> payment(id)
+- `fk_member_card_replaces_card`: (replaces_card_id) -> member_card(id)
 
 Unique constraints:
 

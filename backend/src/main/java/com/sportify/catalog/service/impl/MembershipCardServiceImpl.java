@@ -193,7 +193,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         // Standard: free and permanent, nothing to pay.
         // Invariant: STANDARD always has durationMonths 0 and price 0; every paid tier has durationMonths >= 1.
         if (isStandard(tier)) {
-            return mapToCardResponse(memberCardRepository.save(newCard(member, tier, today, null, CardStatus.ACTIVE, BigDecimal.ZERO)));
+            return mapToCardResponse(memberCardRepository.save(newCard(member, tier, today, null, CardStatus.ACTIVE, BigDecimal.ZERO, false, null)));
         }
 
         // One card per member: a second request cannot be made while one is waiting for payment
@@ -209,7 +209,8 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         }
 
         CardStatus status = paidAtDesk ? CardStatus.ACTIVE : CardStatus.PENDING_PAYMENT;
-        MemberCard card = newCard(member, tier, plan.startDate(), plan.endDate(), status, plan.price());
+        boolean isUpgrade = (plan.replaces() != null);
+        MemberCard card = newCard(member, tier, plan.startDate(), plan.endDate(), status, plan.price(), isUpgrade, plan.replaces());
         if (status == CardStatus.PENDING_PAYMENT) {
             Payment payment = paymentService.createPendingPayment(member, plan.price(), request.getPaymentMethod());
             card.setPayment(payment);
@@ -246,7 +247,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
 
         LocalDate today = LocalDate.now(clock);
         CardPlan plan = planCard(card.getMember().getId(), card.getTier(), today);
-        boolean requestedAsUpgrade = isUpgradePrice(card);
+        boolean requestedAsUpgrade = card.isUpgradeRequest();
         if (requestedAsUpgrade != (plan.replaces() != null)) {
             throw new BusinessRuleException("The member's card has changed since this request. Cancel it and request the card again.");
         }
@@ -287,6 +288,26 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     }
 
     /**
+     * Calculates the baseline price paid for the active term.
+     * If the current card was created via an upgrade, the member only paid the price difference for that card,
+     * so we sum pricePaid recursively across the replacement chain.
+     * This guarantees the member is credited for the entire cumulative amount paid toward the current term,
+     * rather than live tier prices which may have changed since purchase.
+     */
+    private BigDecimal calculateTermBasePrice(MemberCard card) {
+        if (card == null || card.getPricePaid() == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal total = card.getPricePaid();
+        MemberCard replaced = card.getReplacesCard();
+        while (replaced != null && replaced.getPricePaid() != null) {
+            total = total.add(replaced.getPricePaid());
+            replaced = replaced.getReplacesCard();
+        }
+        return total;
+    }
+
+    /**
      * What buying {@code tier} means today for this member:
      * <ul>
      *   <li>no paid card: a new card from today;</li>
@@ -315,12 +336,13 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             LocalDate from = last.getEndDate().plusDays(1);
             return new CardPlan(from, cardEnd(from, months), tier.getPrice(), null);
         }
-        if (current != null && tier.getPrice().compareTo(current.getTier().getPrice()) > 0) {
+        BigDecimal currentBasePrice = calculateTermBasePrice(current);
+        if (current != null && tier.getPrice().compareTo(currentBasePrice) > 0) {
             if (last != current) {
                 throw new BusinessRuleException("The current card is already renewed from " + last.getStartDate()
                         + ". The card can be upgraded once that term has started.");
             }
-            BigDecimal difference = tier.getPrice().subtract(current.getTier().getPrice());
+            BigDecimal difference = tier.getPrice().subtract(currentBasePrice);
             return new CardPlan(today, current.getEndDate(), difference, current);
         }
         LocalDate from = last.getEndDate().plusDays(1);
@@ -331,18 +353,13 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         return start.plusMonths(months).minusDays(1);
     }
 
-    /** A card request priced below its tier was requested as an upgrade (the member pays only the difference). */
-    private static boolean isUpgradePrice(MemberCard card) {
-        return card.getPricePaid() != null && card.getPricePaid().compareTo(card.getTier().getPrice()) < 0;
-    }
-
     private void replace(MemberCard old) {
         old.setStatus(CardStatus.REPLACED);
         memberCardRepository.save(old);
     }
 
     private MemberCard newCard(MemberProfile member, MembershipCardTier tier, LocalDate start, LocalDate end,
-                               CardStatus status, BigDecimal price) {
+                               CardStatus status, BigDecimal price, boolean isUpgrade, MemberCard replacesCard) {
         long seq = memberCardRepository.getNextCardCodeSequence();
         return MemberCard.builder()
                 .cardCode(codeFormatter.formatCardCode(seq))
@@ -352,6 +369,8 @@ public class MembershipCardServiceImpl implements MembershipCardService {
                 .endDate(end)
                 .status(status)
                 .pricePaid(price)
+                .upgradeRequest(isUpgrade)
+                .replacesCard(replacesCard)
                 .build();
     }
 
@@ -372,6 +391,12 @@ public class MembershipCardServiceImpl implements MembershipCardService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Decision: benefits follow the tier. Existing active cards use the CURRENT discountPercentage
+     * of their tier (live tier benefits). We do not snapshot discount on member_card.
+     * When package registrations occur, they snapshot originalPrice, discountPercentage, and paidAmount
+     * at registration time, which must never be recomputed.
+     */
     @Override
     @Transactional(readOnly = true)
     public int getApplicableDiscountPercentage(Long memberId, int packageDurationDays) {

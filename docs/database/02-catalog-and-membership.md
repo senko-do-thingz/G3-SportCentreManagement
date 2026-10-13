@@ -101,7 +101,9 @@ Member's card holding record.
 | end_date | DATE | Yes | | Null for permanent Standard, date for Gold/VIP |
 | status | NVARCHAR(20) | No | `ACTIVE` | `PENDING_PAYMENT`, `ACTIVE`, `EXPIRED`, `CANCELLED`, `REPLACED` (V20). `PENDING_PAYMENT` = online request not paid yet, `REPLACED` = old card after an upgrade |
 | price_paid | DECIMAL(14,2) | No | CHECK >= 0 | Snapshot of fee paid |
-| payment_id | BIGINT | Yes | FK -> payment.id | Associated payment (V14). Not mapped by the entity yet |
+| payment_id | BIGINT | Yes | FK -> payment.id | Associated payment (V14) |
+| upgrade_request | BIT | No | 0 | Explicit marker for upgrade requests (V22) |
+| replaces_card_id | BIGINT | Yes | FK -> member_card.id | Replaced card in upgrade chain (V22) |
 | created_at, updated_at | DATETIME2(0) | | | Audit |
 
 ### `sport_package`
