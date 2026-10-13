@@ -27,7 +27,14 @@ public class JwtService {
 
     @PostConstruct
     public void validateSecretKey() {
-        getSignInKey();
+        try {
+            if (secretKey == null || secretKey.trim().isEmpty()) {
+                throw new IllegalArgumentException("JWT_SECRET is null or blank");
+            }
+            getSignInKey();
+        } catch (Exception ex) {
+            throw new IllegalStateException("JWT_SECRET must be a valid Base64 string that decodes to at least 32 bytes", ex);
+        }
     }
 
     @Value("${application.security.jwt.refresh-token.expiration}")

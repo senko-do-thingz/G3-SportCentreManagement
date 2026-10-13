@@ -66,14 +66,42 @@ class JwtServiceTest {
     }
 
     @Test
-    void validateSecretKey_shouldFailWithUneditedPlaceholder() {
+    void validateSecretKey_shouldFailWithIllegalBase64Characters() {
         ReflectionTestUtils.setField(jwtService, "secretKey", "<REPLACE_WITH_BASE64_SECRET_MIN_32_BYTES>");
-        assertThrows(io.jsonwebtoken.io.DecodingException.class, () -> jwtService.validateSecretKey());
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> jwtService.validateSecretKey());
+        assertEquals("JWT_SECRET must be a valid Base64 string that decodes to at least 32 bytes", ex.getMessage());
+        assertInstanceOf(io.jsonwebtoken.io.DecodingException.class, ex.getCause());
     }
 
     @Test
-    void validateSecretKey_shouldFailWithWeakKey() {
+    void validateSecretKey_shouldFailWithKeyShorterThan256Bits() {
         ReflectionTestUtils.setField(jwtService, "secretKey", "c2hvcnRzZWNyZXQxMjM0NQ==");
-        assertThrows(io.jsonwebtoken.security.WeakKeyException.class, () -> jwtService.validateSecretKey());
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> jwtService.validateSecretKey());
+        assertEquals("JWT_SECRET must be a valid Base64 string that decodes to at least 32 bytes", ex.getMessage());
+        assertInstanceOf(io.jsonwebtoken.security.WeakKeyException.class, ex.getCause());
+    }
+
+    @Test
+    void validateSecretKey_shouldFailWithEmptySecret() {
+        ReflectionTestUtils.setField(jwtService, "secretKey", "");
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> jwtService.validateSecretKey());
+        assertEquals("JWT_SECRET must be a valid Base64 string that decodes to at least 32 bytes", ex.getMessage());
+        assertInstanceOf(IllegalArgumentException.class, ex.getCause());
+    }
+
+    @Test
+    void validateSecretKey_shouldFailWithBlankSecret() {
+        ReflectionTestUtils.setField(jwtService, "secretKey", "   ");
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> jwtService.validateSecretKey());
+        assertEquals("JWT_SECRET must be a valid Base64 string that decodes to at least 32 bytes", ex.getMessage());
+        assertInstanceOf(IllegalArgumentException.class, ex.getCause());
+    }
+
+    @Test
+    void validateSecretKey_shouldFailWithNullSecret() {
+        ReflectionTestUtils.setField(jwtService, "secretKey", null);
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> jwtService.validateSecretKey());
+        assertEquals("JWT_SECRET must be a valid Base64 string that decodes to at least 32 bytes", ex.getMessage());
+        assertInstanceOf(IllegalArgumentException.class, ex.getCause());
     }
 }
