@@ -49,6 +49,29 @@
 | TC-BE03-26 | Snapshot pricing preservation for existing member cards | Service verification | N/A (Unit / Service) |
 | TC-BE03-27 | Immediate visibility of new tier price to members | Public catalog query | 200 OK |
 | TC-BE03-28 | Activity log creation for card tier update | Service / Audit | N/A (Unit / Service) |
+| TC-BE03-29 | Paid tier update with durationMonths 0 returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request |
+| TC-BE03-30 | STANDARD tier update with durationMonths 12 returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request |
+| TC-BE03-31 | Purchase card for edited paid tier creates PENDING_PAYMENT card | POST `/api/v1/membership-cards/purchase` | 200 OK |
+| TC-BE03-32 | Pending payment card activation succeeds after tier price increase retaining old pricePaid | Card activation service | 200 OK |
+| TC-BE03-33 | Pending upgrade card activation succeeds after tier price changes retaining old pricePaid | Card activation service | 200 OK |
+| TC-BE03-34 | Upgrade calculation base uses pricePaid when tier price is raised | POST `/api/v1/membership-cards/purchase` | 200 OK |
+| TC-BE03-35 | Upgrade calculation base for multi-step upgrade uses accumulated term base price | POST `/api/v1/membership-cards/purchase` | 200 OK |
+| TC-BE03-36 | Upgrade calculation lower price scenario prevents downgrade or negative difference | POST `/api/v1/membership-cards/purchase` | 400 Bad Request |
+| TC-BE03-37 | Updating tier discount applies to existing cardholders on new registrations only | Registration service | 200 OK |
+| TC-BE03-38 | Package update validation - package name 101 characters returns 400 | PUT `/api/v1/packages/{id}` | 400 Bad Request |
+| TC-BE03-39 | Package update validation - description 501 characters returns 400 | PUT `/api/v1/packages/{id}` | 400 Bad Request |
+| TC-BE03-40 | Package update validation - price with 3 decimal places returns 400 | PUT `/api/v1/packages/{id}` | 400 Bad Request |
+| TC-BE03-41 | Package update validation - price with 13 integer digits returns 400 | PUT `/api/v1/packages/{id}` | 400 Bad Request |
+| TC-BE03-42 | Card tier update validation - tier name 51 characters returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request |
+| TC-BE03-43 | Card tier update validation - description 501 characters returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request |
+| TC-BE03-44 | Card tier update validation - price with 3 decimal places returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request |
+| TC-BE03-45 | Card tier update validation - price with 13 integer digits returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request |
+| TC-BE03-46 | Integration test - SportPackageSpecifications dynamic filters | Integration test | Skipped (Docker unavailable) / Passed |
+| TC-BE03-47 | Integration test - Package update persistence and activity log entry | Integration test | Skipped (Docker unavailable) / Passed |
+| TC-BE03-48 | Integration test - Tier update persistence and activity log entry | Integration test | Skipped (Docker unavailable) / Passed |
+| TC-BE03-49 | Integration test - Historical price snapshot preservation | Integration test | Skipped (Docker unavailable) / Passed |
+| TC-BE03-50 | Package description update with null or blank value clears description | PUT `/api/v1/packages/{id}` | 200 OK |
+| TC-BE03-51 | Card tier description update with null or blank value clears description | PUT `/api/v1/membership-cards/tiers/{id}` | 200 OK |
 
 ---
 
@@ -79,7 +102,7 @@
   - Header: `Authorization: Bearer <MANAGER_JWT>`
 - **Expected Result**:
   - HTTP 400 Bad Request.
-  - Standard error body with `status: 400` and message `Invalid training format: INVALID_FORMAT`.
+  - Standard error body with `status: 400` and message `Invalid value for parameter 'format'`.
 
 ### TC-BE03-04: List packages as non-manager roles
 - **Preconditions**: User is authenticated with role `MEMBER`, `RECEPTIONIST`, or `COACH`.
@@ -313,3 +336,174 @@
   - Entity type is `MEMBERSHIP_CARD_TIER`.
   - Entity ID and code match the updated tier.
   - Details payload includes `before` and `after` snapshots containing name, price, durationMonths, discountPercentage, description, and isActive.
+
+### TC-BE03-29: Paid tier update with durationMonths 0 returns 400
+- **Preconditions**: User is authenticated with role `MANAGER`. Tier ID 2 is a paid tier (e.g. GOLD).
+- **Request**:
+  - `PUT /api/v1/membership-cards/tiers/2` with `"durationMonths": 0`, `"price": 300000.00`, `"discountPercentage": 5`, `"active": true`
+  - Header: `Authorization: Bearer <MANAGER_JWT>`
+- **Expected Result**:
+  - HTTP 400 Bad Request.
+  - Message: `Duration months must be at least 1 for paid tiers`.
+  - Tier remains unchanged in the database.
+
+### TC-BE03-30: STANDARD tier update with durationMonths 12 returns 400
+- **Preconditions**: User is authenticated with role `MANAGER`. Tier ID 1 is code `STANDARD`.
+- **Request**:
+  - `PUT /api/v1/membership-cards/tiers/1` with `"durationMonths": 12`, `"price": 0.00`, `"discountPercentage": 0`, `"active": true`
+  - Header: `Authorization: Bearer <MANAGER_JWT>`
+- **Expected Result**:
+  - HTTP 400 Bad Request.
+  - Message: `The STANDARD tier duration months must be 0 (permanent)`.
+  - Tier remains unchanged in the database.
+
+### TC-BE03-31: Purchase card for edited paid tier creates PENDING_PAYMENT card
+- **Preconditions**: Manager successfully updates a paid tier (e.g. GOLD price to 350,000.00, durationMonths 12).
+- **Request**:
+  - `POST /api/v1/membership-cards/purchase` by an active member holding STANDARD card.
+  - Payload: `{"tierId": 2, "paymentMethod": "CASH"}`
+- **Expected Result**:
+  - HTTP 200 OK.
+  - Returns `MemberCardResponse` with status `PENDING_PAYMENT` and `pricePaid = 350000.00`.
+  - Card is not activated immediately; requires payment confirmation.
+
+### TC-BE03-32: Pending payment card activation succeeds after tier price increase retaining old pricePaid
+- **Preconditions**: Member creates a card purchase request for GOLD tier at 300,000.00 VND (card status `PENDING_PAYMENT`, `pricePaid = 300000.00`). Manager subsequently raises the GOLD tier live price to 450,000.00 VND.
+- **Steps**: Receptionist or payment callback triggers `activateCard(cardId)`.
+- **Expected Result**:
+  - Activation succeeds without throwing exception.
+  - Card status transitions to `ACTIVE`.
+  - Card retains its original snapshot `pricePaid = 300000.00` despite the tier's live price having increased to 450,000.00 VND.
+
+### TC-BE03-33: Pending upgrade card activation succeeds after tier price changes retaining old pricePaid
+- **Preconditions**: Member holding an active GOLD card (paid 300,000.00) requests an upgrade to VIP (price 600,000.00), creating a pending upgrade card with difference `pricePaid = 300000.00`. Manager subsequently alters VIP price to 700,000.00.
+- **Steps**: Trigger `activateCard(pendingCardId)`.
+- **Expected Result**:
+  - Activation succeeds.
+  - Previous card status transitions to `EXPIRED`.
+  - New card status transitions to `ACTIVE` with snapshot `pricePaid = 300000.00`.
+
+### TC-BE03-34: Upgrade calculation base uses pricePaid when tier price is raised
+- **Preconditions**: Member holds an active GOLD card purchased for 300,000.00 VND. Manager subsequently increases GOLD tier price to 400,000.00 VND. VIP tier is priced at 600,000.00 VND.
+- **Request**:
+  - Member requests upgrade to VIP: `POST /api/v1/membership-cards/purchase` with `tierId = 3`.
+- **Expected Result**:
+  - Upgrade difference is calculated based on what member actually paid: `600000.00 - 300000.00 = 300000.00` VND (NOT `600000.00 - 400000.00`).
+  - Pending upgrade card created with `pricePaid = 300000.00` and `upgradeRequest = true`.
+
+### TC-BE03-35: Upgrade calculation base for multi-step upgrade uses accumulated term base price
+- **Preconditions**: Member originally purchased GOLD for 300,000.00 VND, then upgraded to PLATINUM for a 150,000.00 difference (so card.pricePaid = 150,000.00, total term paid = 450,000.00). Member now requests an upgrade to DIAMOND (price 700,000.00).
+- **Request**:
+  - `POST /api/v1/membership-cards/purchase` with DIAMOND tier ID.
+- **Expected Result**:
+  - Upgrade difference correctly deducts the full accumulated term price: `700000.00 - 450000.00 = 250000.00` VND.
+  - Pending upgrade card created with `pricePaid = 250000.00`.
+
+### TC-BE03-36: Upgrade calculation lower price scenario prevents downgrade or negative difference
+- **Preconditions**: Member holds an active VIP card purchased for 600,000.00 VND. Target tier GOLD is priced at 300,000.00 VND.
+- **Request**:
+  - Member requests card purchase for GOLD: `POST /api/v1/membership-cards/purchase` with `tierId = 2`.
+- **Expected Result**:
+  - HTTP 400 Bad Request.
+  - Message: `Downgrading to a lower or equal tier is not permitted`.
+
+### TC-BE03-37: Updating tier discount applies to existing cardholders on new registrations only
+- **Preconditions**: Member holds an active GOLD card (originally 5% discount). Historical registration row exists with `discountPercentage = 5%`, `originalPrice = 100000.00`, `paidAmount = 95000.00`. Manager updates GOLD tier discount to 10%.
+- **Steps**:
+  1. Verify existing registration row in DB.
+  2. Member registers a new sport package priced at 200,000.00 VND.
+- **Expected Result**:
+  - Existing registration row remains unchanged (`discountPercentage = 5%`, `paidAmount = 95000.00`).
+  - New registration applies the updated live tier discount (10%): `originalPrice = 200000.00`, `discountPercentage = 10%`, `paidAmount = 180000.00`.
+
+### TC-BE03-38: Package update validation - package name 101 characters returns 400
+- **Preconditions**: User is authenticated with role `MANAGER`.
+- **Request**: `PUT /api/v1/packages/1` with `name` containing 101 characters.
+- **Expected Result**: HTTP 400 Bad Request with project standard error response.
+
+### TC-BE03-39: Package update validation - description 501 characters returns 400
+- **Preconditions**: User is authenticated with role `MANAGER`.
+- **Request**: `PUT /api/v1/packages/1` with `description` containing 501 characters.
+- **Expected Result**: HTTP 400 Bad Request with project standard error response.
+
+### TC-BE03-40: Package update validation - price with 3 decimal places returns 400
+- **Preconditions**: User is authenticated with role `MANAGER`.
+- **Request**: `PUT /api/v1/packages/1` with `price = 100.999`.
+- **Expected Result**: HTTP 400 Bad Request with project standard error response.
+
+### TC-BE03-41: Package update validation - price with 13 integer digits returns 400
+- **Preconditions**: User is authenticated with role `MANAGER`.
+- **Request**: `PUT /api/v1/packages/1` with `price = 1000000000000.00`.
+- **Expected Result**: HTTP 400 Bad Request with project standard error response.
+
+### TC-BE03-42: Card tier update validation - tier name 51 characters returns 400
+- **Preconditions**: User is authenticated with role `MANAGER`.
+- **Request**: `PUT /api/v1/membership-cards/tiers/2` with `name` containing 51 characters.
+- **Expected Result**: HTTP 400 Bad Request with project standard error response.
+
+### TC-BE03-43: Card tier update validation - description 501 characters returns 400
+- **Preconditions**: User is authenticated with role `MANAGER`.
+- **Request**: `PUT /api/v1/membership-cards/tiers/2` with `description` containing 501 characters.
+- **Expected Result**: HTTP 400 Bad Request with project standard error response.
+
+### TC-BE03-44: Card tier update validation - price with 3 decimal places returns 400
+- **Preconditions**: User is authenticated with role `MANAGER`.
+- **Request**: `PUT /api/v1/membership-cards/tiers/2` with `price = 300000.999`.
+- **Expected Result**: HTTP 400 Bad Request with project standard error response.
+
+### TC-BE03-45: Card tier update validation - price with 13 integer digits returns 400
+- **Preconditions**: User is authenticated with role `MANAGER`.
+- **Request**: `PUT /api/v1/membership-cards/tiers/2` with `price = 1000000000000.00`.
+- **Expected Result**: HTTP 400 Bad Request with project standard error response.
+
+### TC-BE03-46: Integration test - SportPackageSpecifications dynamic filters
+- **Preconditions**: Multiple packages exist with varying `sportId`, `trainingFormat` (SELF_TRAINING, COACH_LED), and `isActive` (true, false).
+- **Steps**: Execute `SportPackageSpecifications.withFilters(...)` for each permutation: sportId, format, active, unconstrained, and combined.
+- **Expected Result**:
+  - Unconstrained returns all packages.
+  - sportId matches only target sport.
+  - format matches only target format.
+  - active matches only target status.
+  - Combined filter enforces all predicates simultaneously.
+  - (Skipped locally when Docker is unavailable; verified in GitHub Actions CI).
+
+### TC-BE03-47: Integration test - Package update persistence and activity log entry
+- **Preconditions**: Manager updates a sport package.
+- **Steps**: Call `SportPackageService.updatePackage(...)` with valid request.
+- **Expected Result**:
+  - Database entity is updated and persisted.
+  - `activity_log` record is written with `entity_type = 'SPORT_PACKAGE'`, `action = 'PACKAGE_UPDATED'`, and details JSON with `before` and `after` snapshots.
+  - (Skipped locally when Docker is unavailable; verified in GitHub Actions CI).
+
+### TC-BE03-48: Integration test - Tier update persistence and activity log entry
+- **Preconditions**: Manager updates a membership card tier.
+- **Steps**: Call `MembershipCardService.updateTier(...)` with valid request.
+- **Expected Result**:
+  - Database entity is updated and persisted.
+  - `activity_log` record is written with `entity_type = 'MEMBERSHIP_CARD_TIER'`, `action = 'CARD_TIER_UPDATED'`, and details JSON with `before` and `after` snapshots.
+  - (Skipped locally when Docker is unavailable; verified in GitHub Actions CI).
+
+### TC-BE03-49: Integration test - Historical price snapshot preservation
+- **Preconditions**: Member holds active package registration (`originalPrice = 500000`, `paidAmount = 500000`) and active card (`pricePaid = 300000`).
+- **Steps**: Manager updates package price to 750,000 and tier price to 450,000. Re-query historical rows from database.
+- **Expected Result**:
+  - Historical registration preserves `originalPrice = 500000` and `paidAmount = 500000`.
+  - Historical card preserves `pricePaid = 300000`.
+  - (Skipped locally when Docker is unavailable; verified in GitHub Actions CI).
+
+### TC-BE03-50: Package description update with null or blank value clears description
+- **Preconditions**: Package exists with a non-null description.
+- **Request**:
+  - `PUT /api/v1/packages/{id}` with `"description": null` or `"description": "   "`.
+- **Expected Result**:
+  - HTTP 200 OK.
+  - Description is cleared to `null` in database under full-replace PUT semantics.
+
+### TC-BE03-51: Card tier description update with null or blank value clears description
+- **Preconditions**: Card tier exists with a non-null description.
+- **Request**:
+  - `PUT /api/v1/membership-cards/tiers/{id}` with `"description": null` or `"description": "   "`.
+- **Expected Result**:
+  - HTTP 200 OK.
+  - Description is cleared to `null` in database under full-replace PUT semantics.
+
