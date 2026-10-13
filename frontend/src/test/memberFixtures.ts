@@ -1,3 +1,4 @@
+import type { CardTier } from '../api/cardsApi'
 import type { MemberBooking, MemberCard, PackageRegistration } from '../api/memberApi'
 import type { Sport, SportPackage } from '../api/packagesApi'
 import type { Payment } from '../api/paymentsApi'
@@ -126,3 +127,23 @@ export function payment(overrides: Partial<Payment> = {}): Payment {
     ...overrides,
   }
 }
+
+/** Card tiers as seeded in V10: Standard (free), Gold Member and VIP Member. Override any field per test. */
+export function cardTier(overrides: Partial<CardTier> = {}): CardTier {
+  return {
+    id: 3,
+    code: 'VIP',
+    name: 'VIP',
+    price: 600000,
+    durationMonths: 12,
+    discountPercentage: 10,
+    description: null,
+    isActive: true,
+    ...overrides,
+  }
+}
+
+export const STANDARD_TIER = cardTier({ id: 1, code: 'STANDARD', name: 'Standard', price: 0, durationMonths: 0, discountPercentage: 0 })
+export const GOLD_TIER = cardTier({ id: 2, code: 'GOLD', name: 'Gold', price: 300000, discountPercentage: 5 })
+export const VIP_TIER = cardTier()
+export const CARD_TIERS = [STANDARD_TIER, GOLD_TIER, VIP_TIER]

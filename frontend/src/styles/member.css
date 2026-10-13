@@ -485,3 +485,138 @@
   color: var(--color-text-muted);
   text-align: center;
 }
+
+/* Membership Cards (F1-11) */
+
+.cards-pending {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.cards-pending__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.tier-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tier-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.tier-card--current {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.tier-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.tier-card__badges,
+.membership-item__badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.tier-card__name {
+  font-size: var(--text-lg);
+}
+
+.tier-card__price {
+  margin-top: var(--space-2);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  color: var(--color-navy);
+}
+
+.tier-card__validity,
+.tier-card__description,
+.tier-card__hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.tier-card__perks {
+  margin: var(--space-2) 0;
+  padding-left: var(--space-5);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.tier-card__perks li + li {
+  margin-top: var(--space-1);
+}
+
+.tier-card__action {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
+.modal-eyebrow {
+  display: block;
+  margin-bottom: var(--space-1);
+}
+
+/* My Membership and Sport Packages (F1-12) */
+
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-lg);
+  background: var(--color-primary-soft);
+}
+
+.tabs__tab {
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.tabs__tab:hover {
+  color: var(--color-primary);
+}
+
+.tabs__tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tabs__tab--active {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 960px) {
+  .tier-grid {
+    grid-template-columns: 1fr;
+  }
+}
