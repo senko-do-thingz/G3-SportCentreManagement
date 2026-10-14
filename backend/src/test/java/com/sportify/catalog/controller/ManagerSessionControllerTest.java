@@ -215,7 +215,8 @@ class ManagerSessionControllerTest {
         }
         mvc.perform(endpoint(operation).with(user("manager").roles("MANAGER")))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.status").value(409))
-                .andExpect(jsonPath("$.timestamp").exists()).andExpect(jsonPath("$.message").isString())
+                .andExpect(jsonPath("$.timestamp").exists()).andExpect(jsonPath("$.message").value(
+                        "The selected coach, facility or time conflicts with existing sessions. Choose another coach, facility or time."))
                 .andExpect(jsonPath("$.details.conflicts[0].sessionId").value(101))
                 .andExpect(jsonPath("$.details.conflicts[0].requestedDate").value("2026-10-19"))
                 .andExpect(jsonPath("$.details.conflicts[0].date").value("2026-10-19"))

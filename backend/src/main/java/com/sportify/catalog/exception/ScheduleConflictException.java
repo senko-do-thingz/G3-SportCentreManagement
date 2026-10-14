@@ -8,7 +8,7 @@ import java.util.Map;
 
 public class ScheduleConflictException extends ConflictException {
     public ScheduleConflictException(List<SessionConflictResponse> conflicts) {
-        super("Choose another coach, facility or time; the session remains unpublished.",
+        super("The selected coach, facility or time conflicts with existing sessions. Choose another coach, facility or time.",
                 Map.of("conflicts", List.copyOf(conflicts)));
     }
 }
