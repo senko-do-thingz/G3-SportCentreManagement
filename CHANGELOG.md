@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-14 - Payment at the desk (BE-19, Flow 3)
+
+Branch `feat/f3-desk-payment`. Owner: Truc. Priority: P1. Depends on BE-18 (PR #49, not merged yet; this branch is built on it). Screens F1-13 Payment Handoff and F1-14 Register and Renew. Provides the BE-19 contract FE-05 already sends.
+
+### Added
+- Desk sale records the money at once: `POST /api/v1/membership-cards/purchase` and `POST /api/v1/packages/registrations` (channel `RECEPTION`) by RECEPTIONIST or MANAGER accept `paymentMethod` (alias `method`, `CASH` when omitted), `referenceCode` (aliases `paymentReference`, `reference`; required except for `CASH`) and `amountReceived` (the price when omitted). A `SUCCESS` payment is created and linked, the item is `ACTIVE`, and the BE-18 receipt step `PaymentVerificationService.recordPaymentConfirmed` issues the `PAID` invoice and writes `PAYMENT_CONFIRMED`.
+- Cash may be more than the price (the change is written in the payment notes); less money, or a non-cash amount that differs, answers 409 `PAYMENT_AMOUNT_MISMATCH` and nothing is saved. Nothing to pay (STANDARD tier, zero fee upgrade, full discount) creates no payment.
+- `MemberCardResponse` and `PackageRegistrationResponse` carry `invoiceId` and `invoiceNumber` (with the existing `paymentId`) after a desk sale or an activation, so the screen opens the receipt (F1-13 State After Payment).
+- `PaymentService.recordDeskPayment` and `PaymentVerificationService.recordDeskPayment`; tests in `PaymentVerificationServiceImplTest` (+7), `MembershipCardServiceImplTest` (+2), `SportPackageServiceImplTest` (+2) and `PaymentVerificationIntegrationTest` (+4); test cases in `docs/tests/BE-19_test_cases.md`.
+
+### Changed
+- A member who reads another member's payment (`GET /api/v1/payments/{id}`, `PUT /api/v1/payments/{id}/method`) or invoice (`GET /api/v1/invoices/by-payment/{paymentId}`) now gets 403 instead of 404 (acceptance criterion); four tests updated.
+- Reference validation of confirm and desk sale shares one helper; payment amount validation of online and desk payments shares one helper.
+- `docs/database/04` and `09`: desk sale rules, visibility, invoice totals rule.
+
 ## 2026-10-14 - Receptionist verifies and confirms payments (BE-18, Flow 3)
 
 Branch `feat/f3-confirm-payment`. Owner: Truc. Priority: P1. Depends on BE-17 (merged). Screens F3-04, F3-05, F3-06 and S3-Mismatch. Provides the BE-18 part of what FE-12 (`feat/f3-reception-payments`) needs; FE-12 is also blocked by BE-21.

@@ -1,5 +1,6 @@
 package com.sportify.payment;
 
+import com.jayway.jsonpath.JsonPath;
 import com.sportify.AbstractIntegrationTest;
 import com.sportify.catalog.entity.CardStatus;
 import com.sportify.catalog.entity.MemberCard;
@@ -76,6 +77,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -739,5 +741,189 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         DefaultTransactionDefinition definition = new DefaultTransactionDefinition();
         definition.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         return definition;
+    }
+
+    // ---------- BE-19: payment at the desk (F1-13, F1-14) ----------
+
+    /** An active 400.000 package of a new sport, tracked for the cleanup. */
+    private Long newPackage() {
+        return tx().execute(st -> {
+            Sport sport = sportRepository.save(SportTestData.aValidSport().build());
+            SportPackage pkg = sportPackageRepository.save(SportPackage.builder()
+                    .code("BE19-PKG-" + System.nanoTime())
+                    .name("BE19 Swimming 30 Days")
+                    .sport(sport)
+                    .trainingFormat(TrainingFormat.SELF_TRAINING)
+                    .durationDays(30)
+                    .sessionCount(10)
+                    .sessionMinutes(60)
+                    .priceAmount(new BigDecimal("400000.00"))
+                    .isActive(true)
+                    .build());
+            sportIds.add(sport.getId());
+            packageIds.add(pkg.getId());
+            return pkg.getId();
+        });
+    }
+
+    /** An active 1.200.000 ranked tier, tracked for the cleanup. */
+    private Long newTier() {
+        return tx().execute(st -> {
+            MembershipCardTier tier = tierRepository.save(MembershipCardTier.builder()
+                    .code("BE19-" + System.nanoTime())
+                    .name("BE19 Gold")
+                    .price(new BigDecimal("1200000.00"))
+                    .durationMonths(12)
+                    .discountPercentage(5)
+                    .tierRank(nextTierRank())
+                    .isActive(true)
+                    .build());
+            tierIds.add(tier.getId());
+            return tier.getId();
+        });
+    }
+
+    private static long longAt(String json, String path) {
+        return ((Number) JsonPath.read(json, path)).longValue();
+    }
+
+    /** Invoice totals: the sum of the lines minus the discount plus the tax equals the total. */
+    private void assertInvoiceTotalsAddUp(Long invoiceId, String expectedTotal) {
+        tx().executeWithoutResult(st -> {
+            Invoice invoice = invoiceRepository.findById(invoiceId).orElseThrow();
+            BigDecimal lines = invoiceLineRepository.findByInvoiceId(invoiceId).stream()
+                    .map(InvoiceLine::getLineTotal)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            assertThat(invoice.getStatus()).isEqualTo(InvoiceStatus.PAID);
+            assertThat(invoice.getSubtotalAmount()).isEqualByComparingTo(lines);
+            assertThat(lines.subtract(invoice.getDiscountAmount()).add(invoice.getTaxAmount()))
+                    .isEqualByComparingTo(invoice.getTotalAmount());
+            assertThat(invoice.getTotalAmount()).isEqualByComparingTo(expectedTotal);
+        });
+    }
+
+    @Test
+    @DisplayName("BE-19: desk package sale by transfer records a SUCCESS payment, activates it and returns the receipt")
+    void deskPackageSale_ByTransfer_RecordsPaymentAndReceipt() throws Exception {
+        MemberProfile member = tx().execute(st -> newMember());
+        Long packageId = newPackage();
+        UserAccount receptionist = tx().execute(st -> newUser("RECEPTIONIST"));
+
+        String body = mockMvc.perform(post("/api/v1/packages/registrations")
+                        .with(user(new CustomUserDetails(receptionist)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":" + member.getId() + ",\"packageId\":" + packageId
+                                + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"BANK_TRANSFER\""
+                                + ",\"paymentReference\":\"FT-BE19-1\",\"amountReceived\":400000}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.channel").value("RECEPTION"))
+                .andReturn().getResponse().getContentAsString();
+        long registrationId = longAt(body, "$.id");
+        long paymentId = longAt(body, "$.paymentId");
+        long invoiceId = longAt(body, "$.invoiceId");
+        registrationIds.add(registrationId);
+        paymentIds.add(paymentId);
+        assertThat((String) JsonPath.read(body, "$.invoiceNumber")).startsWith("INV-");
+
+        tx().executeWithoutResult(st -> {
+            Payment payment = paymentRepository.findById(paymentId).orElseThrow();
+            assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+            assertThat(payment.getPaymentMethod()).isEqualTo(PaymentMethod.BANK_TRANSFER);
+            assertThat(payment.getReferenceCode()).isEqualTo("FT-BE19-1");
+            assertThat(payment.getAmount()).isEqualByComparingTo("400000");
+            assertThat(payment.getPaymentTime()).isNotNull();
+            assertThat(payment.getConfirmedByUser().getId()).isEqualTo(receptionist.getId());
+            assertThat(registrationRepository.findById(registrationId).orElseThrow().getPayment().getId()).isEqualTo(paymentId);
+            assertThat(invoiceRepository.findByPaymentId(paymentId)).extracting(Invoice::getId).containsExactly(invoiceId);
+            assertThat(activityRows(payment.getPaymentCode(), "PAYMENT_CONFIRMED")).isEqualTo(1);
+        });
+        assertInvoiceTotalsAddUp(invoiceId, "400000");
+    }
+
+    @Test
+    @DisplayName("BE-19: desk card sale in cash with more money keeps the change in the notes and returns the receipt")
+    void deskCardSale_CashWithChange_RecordsPaymentAndReceipt() throws Exception {
+        MemberProfile member = tx().execute(st -> newMember());
+        Long tierId = newTier();
+        UserAccount receptionist = tx().execute(st -> newUser("RECEPTIONIST"));
+
+        String body = mockMvc.perform(post("/api/v1/membership-cards/purchase")
+                        .with(user(new CustomUserDetails(receptionist)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":" + member.getId() + ",\"tierId\":" + tierId
+                                + ",\"method\":\"CASH\",\"amountReceived\":1500000}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andReturn().getResponse().getContentAsString();
+        cardIds.add(longAt(body, "$.id"));
+        long paymentId = longAt(body, "$.paymentId");
+        long invoiceId = longAt(body, "$.invoiceId");
+        paymentIds.add(paymentId);
+
+        tx().executeWithoutResult(st -> {
+            Payment payment = paymentRepository.findById(paymentId).orElseThrow();
+            assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+            assertThat(payment.getPaymentMethod()).isEqualTo(PaymentMethod.CASH);
+            assertThat(payment.getAmount()).isEqualByComparingTo("1200000");
+            assertThat(payment.getNotes()).contains("Cash received 1500000, change 300000.00");
+        });
+        assertInvoiceTotalsAddUp(invoiceId, "1200000");
+    }
+
+    @Test
+    @DisplayName("BE-19: desk sale with less cash than the price answers 409 and creates nothing")
+    void deskSale_ShortCash_ConflictAndNothingCreated() throws Exception {
+        MemberProfile member = tx().execute(st -> newMember());
+        Long packageId = newPackage();
+        UserAccount receptionist = tx().execute(st -> newUser("RECEPTIONIST"));
+
+        mockMvc.perform(post("/api/v1/packages/registrations")
+                        .with(user(new CustomUserDetails(receptionist)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":" + member.getId() + ",\"packageId\":" + packageId
+                                + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"CASH\",\"amountReceived\":300000}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PAYMENT_AMOUNT_MISMATCH"));
+
+        Integer registrations = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sport_package_registration WHERE member_id = ?", Integer.class, member.getId());
+        Integer payments = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM payment WHERE member_id = ?", Integer.class, member.getId());
+        assertThat(registrations).isZero();
+        assertThat(payments).isZero();
+    }
+
+    @Test
+    @DisplayName("BE-19: a member reads their own payment and invoice; another member gets 403 for both")
+    void memberSeesOnlyOwnPaymentAndInvoice() throws Exception {
+        MemberProfile owner = tx().execute(st -> newMember());
+        MemberProfile other = tx().execute(st -> newMember());
+        Long packageId = newPackage();
+        UserAccount receptionist = tx().execute(st -> newUser("RECEPTIONIST"));
+
+        String body = mockMvc.perform(post("/api/v1/packages/registrations")
+                        .with(user(new CustomUserDetails(receptionist)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":" + owner.getId() + ",\"packageId\":" + packageId
+                                + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"CASH\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        registrationIds.add(longAt(body, "$.id"));
+        long paymentId = longAt(body, "$.paymentId");
+        paymentIds.add(paymentId);
+
+        CustomUserDetails ownerLogin = new CustomUserDetails(owner.getUserAccount());
+        CustomUserDetails otherLogin = new CustomUserDetails(other.getUserAccount());
+        mockMvc.perform(get("/api/v1/payments/" + paymentId).with(user(ownerLogin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCESS"));
+        mockMvc.perform(get("/api/v1/invoices/by-payment/" + paymentId).with(user(ownerLogin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lines.length()").value(1));
+        mockMvc.perform(get("/api/v1/payments/" + paymentId).with(user(otherLogin)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/invoices/by-payment/" + paymentId).with(user(otherLogin)))
+                .andExpect(status().isForbidden());
     }
 }

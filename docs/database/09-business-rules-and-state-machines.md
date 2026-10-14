@@ -80,6 +80,19 @@ Payment confirmation rules (BE-18, F3-05):
 | Amount matches | `SUCCESS`, item `ACTIVE`, one `PAID` invoice, `activity_log` `PAYMENT_CONFIRMED` |
 | Card or package activate endpoint (FE-05) | Same receipt: one `PAID` invoice and one `PAYMENT_CONFIRMED` row; no reference needed, amount received = amount |
 
+Desk sale rules (BE-19, F1-13 and F1-14), for a card purchase or a `RECEPTION` package registration by RECEPTIONIST or MANAGER:
+
+| Rule | Result |
+|---|---|
+| `paymentMethod` omitted | `CASH` |
+| `referenceCode` missing for any method except `CASH` | 400, nothing saved |
+| `amountReceived` omitted | The price |
+| `CASH` and `amountReceived` more than the price | Sale succeeds; the change is written in `payment.notes` |
+| `amountReceived` less than the price, or a non-cash amount that differs | 409 `PAYMENT_AMOUNT_MISMATCH`, nothing saved |
+| Nothing to pay (STANDARD tier, zero fee upgrade, full discount) | Item `ACTIVE`, no payment, no invoice |
+| Price to pay above zero | `SUCCESS` payment linked by `payment_id`, item `ACTIVE`, one `PAID` invoice, `activity_log` `PAYMENT_CONFIRMED`; the response has `paymentId` and `invoiceId` |
+| A member reads another member's payment or invoice | 403 |
+
 ### Booking (`booking.status`)
 
 ```mermaid
@@ -187,6 +200,7 @@ Front desk check-in validates member arrival at the center:
 | Cancel unpaid card requests after 7 days | Not done |
 | Map `sport_class.coach_id`, `booking.cancelled_by_user_id`, `member_card.payment_id` in entities | Not done |
 | Front desk confirms a card or package payment with the exact amount, invoice issued (BE-18) | Done |
+| Desk sale records a SUCCESS payment and issues the invoice at once (BE-19) | Done |
 
 ## Sport Package & Booking Eligibility Rules
 

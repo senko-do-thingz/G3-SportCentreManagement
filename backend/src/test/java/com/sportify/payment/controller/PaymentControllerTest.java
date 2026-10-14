@@ -3,7 +3,6 @@ package com.sportify.payment.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.GlobalExceptionHandler;
-import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.security.CustomAccessDeniedHandler;
@@ -24,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -175,15 +175,15 @@ public class PaymentControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/payments/{id} as other member returns 404 Not Found (M5)")
-    void getPayment_AsOtherMember_Returns404NotFound() throws Exception {
+    @DisplayName("GET /api/v1/payments/{id} as other member returns 403 Forbidden (BE-19)")
+    void getPayment_AsOtherMember_Returns403Forbidden() throws Exception {
         CustomUserDetails otherMember = createUserDetails(200L, "MEMBER", "Other Member");
         when(paymentService.getPayment(eq(1L), any(UserAccount.class)))
-                .thenThrow(new ResourceNotFoundException("Payment not found for id: 1"));
+                .thenThrow(new AccessDeniedException("You can only access your own payments"));
 
         mockMvc.perform(get("/api/v1/payments/1")
                         .with(user(otherMember)))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -241,21 +241,21 @@ public class PaymentControllerTest {
     }
 
     @Test
-    @DisplayName("PUT /api/v1/payments/{id}/method as other member returns 404 Not Found (M5)")
-    void updatePaymentMethod_AsOtherMember_Returns404NotFound() throws Exception {
+    @DisplayName("PUT /api/v1/payments/{id}/method as other member returns 403 Forbidden (BE-19)")
+    void updatePaymentMethod_AsOtherMember_Returns403Forbidden() throws Exception {
         CustomUserDetails otherMember = createUserDetails(200L, "MEMBER", "Other Member");
         UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
                 .paymentMethod(PaymentMethod.MOMO)
                 .build();
 
         when(paymentService.updatePaymentMethod(eq(1L), any(UpdatePaymentMethodRequest.class), any(UserAccount.class)))
-                .thenThrow(new ResourceNotFoundException("Payment not found for id: 1"));
+                .thenThrow(new AccessDeniedException("You can only access your own payments"));
 
         mockMvc.perform(put("/api/v1/payments/1/method")
                         .with(user(otherMember))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden());
     }
 
     @Test

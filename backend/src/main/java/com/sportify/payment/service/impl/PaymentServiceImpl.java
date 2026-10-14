@@ -22,6 +22,7 @@ import com.sportify.payment.entity.PaymentStatus;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,18 +46,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public Payment createPendingPayment(MemberProfile member, BigDecimal amount, PaymentMethod method) {
-        if (member == null) {
-            throw new BusinessRuleException("Member cannot be null when creating a payment");
-        }
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BusinessRuleException("Payment amount must be greater than zero. Attempted amount: " + amount);
-        }
-        if (amount.scale() > 2 && amount.stripTrailingZeros().scale() > 2) {
-            throw new BusinessRuleException("Payment amount cannot have more than 2 decimal places. Attempted amount: " + amount);
-        }
-        if (amount.toBigInteger().toString().length() > 10) {
-            throw new BusinessRuleException("Payment amount cannot have more than 10 integer digits. Attempted amount: " + amount);
-        }
+        validateNewPayment(member, amount);
 
         PaymentMethod chosenMethod = (method != null) ? method : PaymentMethod.BANK_TRANSFER;
         if (!ONLINE_ALLOWED_PAYMENT_METHODS.contains(chosenMethod)) {
@@ -77,6 +67,51 @@ public class PaymentServiceImpl implements PaymentService {
                 .build();
 
         return paymentRepository.save(payment);
+    }
+
+    /**
+     * Money taken at the desk (BE-19): the payment is created already SUCCESS, with payment_time now, the method and
+     * reference the receptionist recorded and confirmed_by_user_id. Any method is allowed at the desk, cash included.
+     */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Payment recordDeskPayment(MemberProfile member, BigDecimal amount, PaymentMethod method, String referenceCode,
+                                     UserAccount confirmedBy) {
+        validateNewPayment(member, amount);
+        if (method == null) {
+            throw new BusinessRuleException("Payment method is required for a desk payment");
+        }
+        if (confirmedBy == null || !SecurityUtils.isStaff(confirmedBy)) {
+            throw new BusinessRuleException("Only staff users can record a desk payment");
+        }
+
+        Payment payment = Payment.builder()
+                .paymentCode(codeFormatter.formatPaymentCode(paymentRepository.getNextPaymentCodeSequence()))
+                .member(member)
+                .amount(amount)
+                .paymentMethod(method)
+                .paymentStatus(PaymentStatus.SUCCESS)
+                .paymentTime(LocalDateTime.now(clock))
+                .referenceCode(referenceCode)
+                .confirmedByUser(confirmedBy)
+                .notes("Paid at the desk, confirmed by user id " + confirmedBy.getId())
+                .build();
+        return paymentRepository.save(payment);
+    }
+
+    private static void validateNewPayment(MemberProfile member, BigDecimal amount) {
+        if (member == null) {
+            throw new BusinessRuleException("Member cannot be null when creating a payment");
+        }
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessRuleException("Payment amount must be greater than zero. Attempted amount: " + amount);
+        }
+        if (amount.scale() > 2 && amount.stripTrailingZeros().scale() > 2) {
+            throw new BusinessRuleException("Payment amount cannot have more than 2 decimal places. Attempted amount: " + amount);
+        }
+        if (amount.toBigInteger().toString().length() > 10) {
+            throw new BusinessRuleException("Payment amount cannot have more than 10 integer digits. Attempted amount: " + amount);
+        }
     }
 
     @Override
@@ -163,7 +198,8 @@ public class PaymentServiceImpl implements PaymentService {
         boolean isStaffUser = SecurityUtils.isStaff(actor);
 
         if (!isOwner && !isStaffUser) {
-            throw new ResourceNotFoundException("Payment not found for id: " + id);
+            // BE-19: a member sees only their own payments; another member's payment answers 403.
+            throw new AccessDeniedException("You can only access your own payments");
         }
 
         PaymentResponse response = mapToPaymentResponse(payment);
@@ -187,7 +223,8 @@ public class PaymentServiceImpl implements PaymentService {
         boolean isStaffUser = SecurityUtils.isStaff(actor);
 
         if (!isOwner && !isStaffUser) {
-            throw new ResourceNotFoundException("Payment not found for id: " + id);
+            // BE-19: a member sees only their own payments; another member's payment answers 403.
+            throw new AccessDeniedException("You can only access your own payments");
         }
 
         if (payment.getPaymentStatus() != PaymentStatus.PENDING) {

@@ -1,15 +1,18 @@
 package com.sportify.payment.service;
 
 import com.sportify.catalog.dto.PageResponse;
+import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.payment.dto.ConfirmPaymentRequest;
 import com.sportify.payment.dto.FailPaymentRequest;
 import com.sportify.payment.dto.InvoiceResponse;
 import com.sportify.payment.dto.StaffPaymentResponse;
 import com.sportify.payment.entity.Invoice;
+import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.entity.PaymentStatus;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
@@ -44,6 +47,18 @@ public interface PaymentVerificationService {
      * @param note front desk note to keep in the log details, or null
      */
     Invoice recordPaymentConfirmed(Long paymentId, UserAccount actor, String note);
+
+    /**
+     * Money taken at the desk when staff sell a card or a package (BE-19, F1-13 and F1-14). Checks the method,
+     * the reference (required except for CASH) and the amount received (cash may be more, the change is noted;
+     * any other method must match), then creates a SUCCESS payment. The caller links it to the item and calls
+     * {@link #recordPaymentConfirmed} for the invoice. Must run in the caller's transaction.
+     *
+     * @param method         payment method; CASH when null
+     * @param amountReceived money handed over; the amount itself when null
+     */
+    Payment recordDeskPayment(MemberProfile member, BigDecimal amount, PaymentMethod method, String referenceCode,
+                              BigDecimal amountReceived, UserAccount actor);
 
     /**
      * Marks a PENDING payment FAILED and cancels the card or package request it pays for.
