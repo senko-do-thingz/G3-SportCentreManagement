@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-10-15 - Financial overview, transactions and revenue reports (BE-22, Flow 3)
+
+Branch `feat/f3-revenue-reports`, based on `feat/f3-confirm-payment` (BE-18). Owner: Truc. Priority: P2. Depends on BE-18. Screens F3-08, F3-09, F3-10 and S3-Export.
+
+### Added
+- Migration `V25__create_finance_report_views.sql`: views `vw_payment_ledger` (every payment with member, invoice, item and sport) and `vw_paid_payment` (SUCCESS only, the revenue source), index `ix_payment_status_time`. V23 and V24 are taken by `feat/f2-sessions-schedule` and `feat/f3-refund-payment-link`.
+- `ManagerFinanceController` (MANAGER only, other roles 403):
+  - `GET /api/v1/manager/finance/overview?month=yyyy-MM`: paid revenue, paid transactions, average payment, pending amount, refunded amount, comparison with the previous month.
+  - `GET /api/v1/manager/finance/trend?months=6`: revenue per month (1 to 24 months), zero months included.
+  - `GET /api/v1/manager/finance/transactions?status=&method=&type=&from=&to=&search=&page=&size=`: ledger with every status.
+  - `GET /api/v1/manager/finance/revenue?from=&to=&groupBy=ITEM_TYPE|METHOD|SPORT`: totals with share percent that add up to exactly 100.00.
+  - `GET /api/v1/manager/finance/revenue/export?from=&to=`: CSV, UTF-8 with BOM, header row, CRLF, formula-safe text cells.
+- `FinanceReportService` / `FinanceReportServiceImpl`, `FinanceReportRepository` (native SQL with NamedParameterJdbcTemplate), DTOs in `payment.dto.finance`.
+- Tests: `FinanceReportServiceImplTest` (19 tests, 24 runs), `ManagerFinanceControllerTest` (11 tests, 20 runs), `FinanceReportIntegrationTest` (6, Testcontainers, known payments in March 2001); test cases in `docs/tests/BE-22_test_cases.md`.
+
+### Changed
+- `docs/database/04`: the planned view is now V25; endpoint rules; revenue by item type sums `payment.amount`, not `invoice_line.line_total` (a line holds the price before the card discount since BE-18).
+
+### Notes
+- Revenue counts only SUCCESS payments by `payment_time`; a payment later REFUNDED leaves revenue, and the refund is shown in `refundedAmount` (COMPLETED refund requests by `updated_at`, since `refund_request` has no `completed_at`).
+- Excel with a Vietnamese regional format uses ";" as list separator and may put every column in A on double-click; the manual check in the test cases shows the import path.
+- Not verified in the authoring environment (Maven Central and the SQL Server image were blocked there). Run `mvn -B test` before merging; integration tests run in CI.
+
 ## 2026-10-14 - Receptionist verifies and confirms payments (BE-18, Flow 3)
 
 Branch `feat/f3-confirm-payment`. Owner: Truc. Priority: P1. Depends on BE-17 (merged). Screens F3-04, F3-05, F3-06 and S3-Mismatch. Provides the BE-18 part of what FE-12 (`feat/f3-reception-payments`) needs; FE-12 is also blocked by BE-21.
