@@ -183,7 +183,7 @@ class ManagerFinanceControllerTest {
     @Test
     @DisplayName("GET /revenue/export returns text/csv UTF-8 as an attachment, bytes unchanged")
     void export_Manager() throws Exception {
-        byte[] body = ("﻿Payment code,Member name\r\nPAY-0001,Nguyễn Văn Ánh\r\n").getBytes(StandardCharsets.UTF_8);
+        byte[] body = ("\ufeffPayment code,Member name\r\nPAY-0001,Nguy\u1ec5n V\u0103n \u00c1nh\r\n").getBytes(StandardCharsets.UTF_8);
         when(financeReportService.exportRevenue(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 15)))
                 .thenReturn(new CsvExport("revenue_2026-10-01_2026-10-15.csv", body));
 

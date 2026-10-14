@@ -23,6 +23,9 @@ Branch `feat/f3-revenue-reports`, based on `feat/f3-confirm-payment` (BE-18). Ow
 - Excel with a Vietnamese regional format uses ";" as list separator and may put every column in A on double-click; the manual check in the test cases shows the import path.
 - Not verified in the authoring environment (Maven Central and the SQL Server image were blocked there). Run `mvn -B test` before merging; integration tests run in CI.
 
+### CI fix 1
+- "Project conventions and workflow lint" failed: `scripts/ci/check-conventions.sh` rejects accented characters in added Java lines, and the tests held Vietnamese names as plain text. The Vietnamese test data in `FinanceReportIntegrationTest`, `FinanceReportServiceImplTest` and `ManagerFinanceControllerTest` is now written with Unicode escapes; the values and the assertions are unchanged. No production code changed.
+
 ## 2026-10-14 - Receptionist verifies and confirms payments (BE-18, Flow 3)
 
 Branch `feat/f3-confirm-payment`. Owner: Truc. Priority: P1. Depends on BE-17 (merged). Screens F3-04, F3-05, F3-06 and S3-Mismatch. Provides the BE-18 part of what FE-12 (`feat/f3-reception-payments`) needs; FE-12 is also blocked by BE-21.

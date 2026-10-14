@@ -237,11 +237,13 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
         codePrefix = "B22" + Math.floorMod(System.nanoTime(), 1_000_000_000L);
         manager = newUser("MANAGER", "BE22 Manager");
         tx().executeWithoutResult(s -> {
-            MemberProfile anh = newMember("Nguyễn Văn Ánh");
-            MemberProfile bich = newMember("Trần Thị Bích, \"VIP\"");
+            // Vietnamese test data is written with Unicode escapes: scripts/ci/check-conventions.sh rejects
+            // accented characters in Java lines. The values are still real Vietnamese names at run time.
+            MemberProfile anh = newMember("Nguy\u1ec5n V\u0103n \u00c1nh");
+            MemberProfile bich = newMember("Tr\u1ea7n Th\u1ecb B\u00edch, \"VIP\"");
 
-            Sport sportA = sportRepository.save(SportTestData.aValidSport().name("Bơi lội " + SEQ.incrementAndGet()).build());
-            Sport sportB = sportRepository.save(SportTestData.aValidSport().name("Cầu lông " + SEQ.incrementAndGet()).build());
+            Sport sportA = sportRepository.save(SportTestData.aValidSport().name("B\u01a1i l\u1ed9i " + SEQ.incrementAndGet()).build());
+            Sport sportB = sportRepository.save(SportTestData.aValidSport().name("C\u1ea7u l\u00f4ng " + SEQ.incrementAndGet()).build());
             sportIds.add(sportA.getId());
             sportIds.add(sportB.getId());
             sportAId = sportA.getId();
@@ -294,7 +296,7 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
             jdbc.update("""
                     INSERT INTO refund_request (refund_code, payment_id, package_registration_id, member_id, amount_requested,
                         amount_approved, reason, status, requested_by, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, 400000.00, 200000.00, N'Chuyển nhà', 'COMPLETED', ?, ?, ?)
+                    VALUES (?, ?, ?, ?, 400000.00, 200000.00, N'Chuy\u1ec3n nh\u00e0', 'COMPLETED', ?, ?, ?)
                     """, "RF-" + codePrefix.substring(3), p7.getId(), refundedReg.getId(), bich.getId(),
                     bich.getId(), Timestamp.valueOf(LocalDateTime.of(2001, 3, 13, 9, 0)),
                     Timestamp.valueOf(LocalDateTime.of(2001, 3, 25, 9, 0)));
@@ -429,7 +431,7 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
 
         JsonNode p1 = getJson("/api/v1/manager/finance/transactions?search=" + invoiceNumber).get("content").get(0);
         assertThat(p1.get("id").asLong()).isEqualTo(payments.get("P1"));
-        assertThat(p1.get("memberName").asText()).isEqualTo("Nguyễn Văn Ánh");
+        assertThat(p1.get("memberName").asText()).isEqualTo("Nguy\u1ec5n V\u0103n \u00c1nh");
         assertThat(p1.get("itemType").asText()).isEqualTo("SPORT_PACKAGE");
         assertThat(p1.get("sportName").asText()).isEqualTo(sportAName);
 
@@ -456,9 +458,9 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
         assertThat(lines.get(0)).isEqualTo("Payment code,Paid at,Invoice number,Member code,Member name,Item type,Item code,Item,Sport,Method,Amount");
         // Rows of other tests (paid now) are outside March 2001; only the 3 paid March rows remain.
         assertThat(lines).hasSize(4);
-        assertThat(lines.get(1)).contains("2001-03-05 10:00:00").contains(invoiceNumber).contains("Nguyễn Văn Ánh")
+        assertThat(lines.get(1)).contains("2001-03-05 10:00:00").contains(invoiceNumber).contains("Nguy\u1ec5n V\u0103n \u00c1nh")
                 .contains(sportAName).contains("BANK_TRANSFER").endsWith(",300000");
-        assertThat(lines.get(2)).contains("\"Trần Thị Bích, \"\"VIP\"\"\"").endsWith(",500000");
+        assertThat(lines.get(2)).contains("\"Tr\u1ea7n Th\u1ecb B\u00edch, \"\"VIP\"\"\"").endsWith(",500000");
         assertThat(lines.get(3)).contains("MEMBERSHIP_CARD").contains("MOMO").endsWith(",1200000");
         // The PENDING (P4), FAILED (P5) and REFUNDED (P7) payments and the April payment (P8) are not exported.
         assertThat(lines.stream().noneMatch(l -> l.endsWith(",700000") || l.endsWith(",250000")

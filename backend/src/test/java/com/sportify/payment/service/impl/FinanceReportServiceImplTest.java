@@ -231,12 +231,12 @@ class FinanceReportServiceImplTest {
     void revenue_BySport_NullGroup() {
         when(repository.revenueBy(eq(RevenueGroupBy.SPORT), any(), any())).thenReturn(List.of(
                 new GroupTotal(null, null, new BigDecimal("1200000"), 1),
-                new GroupTotal("7", "Bơi lội", new BigDecimal("800000"), 2)));
+                new GroupTotal("7", "B\u01a1i l\u1ed9i", new BigDecimal("800000"), 2)));
 
         RevenueBreakdownResponse r = service.revenue(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), RevenueGroupBy.SPORT);
 
         assertThat(r.rows().get(0).label()).isEqualTo("No sport (membership card or other)");
-        assertThat(r.rows().get(1).label()).isEqualTo("Bơi lội");
+        assertThat(r.rows().get(1).label()).isEqualTo("B\u01a1i l\u1ed9i");
     }
 
     @Test
@@ -292,10 +292,10 @@ class FinanceReportServiceImplTest {
     void export_Format() {
         when(repository.paidRows(OCT, LocalDateTime.of(2026, 10, 16, 0, 0))).thenReturn(List.of(
                 new ExportRow("PAY-0001", LocalDateTime.of(2026, 10, 5, 10, 0), "INV-0001", "MEM-0001",
-                        "Nguyễn Văn Ánh", "SPORT_PACKAGE", "REG-PKG-0001", "Bơi lội 30 ngày", "Bơi lội",
+                        "Nguy\u1ec5n V\u0103n \u00c1nh", "SPORT_PACKAGE", "REG-PKG-0001", "B\u01a1i l\u1ed9i 30 ng\u00e0y", "B\u01a1i l\u1ed9i",
                         "BANK_TRANSFER", new BigDecimal("300000.00")),
                 new ExportRow("PAY-0002", LocalDateTime.of(2026, 10, 6, 9, 0), null, "MEM-0002",
-                        "Trần, \"Bích\"", "MEMBERSHIP_CARD", "CARD-0002", "=HYPERLINK(\"x\")", null,
+                        "Tr\u1ea7n, \"B\u00edch\"", "MEMBERSHIP_CARD", "CARD-0002", "=HYPERLINK(\"x\")", null,
                         "MOMO", new BigDecimal("1200000.50"))));
 
         CsvExport export = service.exportRevenue(null, null);
@@ -305,9 +305,9 @@ class FinanceReportServiceImplTest {
         assertThat(Arrays.copyOf(bytes, 3)).containsExactly((byte) 0xEF, (byte) 0xBB, (byte) 0xBF);
         String text = new String(bytes, 3, bytes.length - 3, StandardCharsets.UTF_8);
         assertThat(text).isEqualTo(FinanceReportServiceImpl.CSV_HEADER + "\r\n"
-                + "PAY-0001,2026-10-05 10:00:00,INV-0001,MEM-0001,Nguyễn Văn Ánh,SPORT_PACKAGE,REG-PKG-0001,"
-                + "Bơi lội 30 ngày,Bơi lội,BANK_TRANSFER,300000\r\n"
-                + "PAY-0002,2026-10-06 09:00:00,,MEM-0002,\"Trần, \"\"Bích\"\"\",MEMBERSHIP_CARD,CARD-0002,"
+                + "PAY-0001,2026-10-05 10:00:00,INV-0001,MEM-0001,Nguy\u1ec5n V\u0103n \u00c1nh,SPORT_PACKAGE,REG-PKG-0001,"
+                + "B\u01a1i l\u1ed9i 30 ng\u00e0y,B\u01a1i l\u1ed9i,BANK_TRANSFER,300000\r\n"
+                + "PAY-0002,2026-10-06 09:00:00,,MEM-0002,\"Tr\u1ea7n, \"\"B\u00edch\"\"\",MEMBERSHIP_CARD,CARD-0002,"
                 + "\"'=HYPERLINK(\"\"x\"\")\",,MOMO,1200000.5\r\n");
     }
 
@@ -318,7 +318,7 @@ class FinanceReportServiceImplTest {
 
         byte[] bytes = service.exportRevenue(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)).content();
 
-        assertThat(new String(bytes, StandardCharsets.UTF_8)).isEqualTo("﻿" + FinanceReportServiceImpl.CSV_HEADER + "\r\n");
+        assertThat(new String(bytes, StandardCharsets.UTF_8)).isEqualTo("\ufeff" + FinanceReportServiceImpl.CSV_HEADER + "\r\n");
     }
 
     @Test
