@@ -251,7 +251,6 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         return start.plusMonths(months).minusDays(1);
     }
 
-    /** A card request priced below its tier was requested as an upgrade (the member pays only the difference). */
     /**
      * Lock order rule (docs/database/09): lock the payment row before the card is read or written. Only the payment
      * id is read before the lock (a single value, no card entity), so the card is first loaded after the lock and
@@ -261,6 +260,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         memberCardRepository.findPaymentIdById(cardId).ifPresent(paymentService::lockPayment);
     }
 
+    /** A card request priced below its tier was requested as an upgrade (the member pays only the difference). */
     private static boolean isUpgradePrice(MemberCard card) {
         return card.getPricePaid() != null && card.getPricePaid().compareTo(card.getTier().getPrice()) < 0;
     }

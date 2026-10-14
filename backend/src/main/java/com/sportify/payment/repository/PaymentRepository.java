@@ -22,8 +22,11 @@ public interface PaymentRepository extends JpaRepository<Payment, Long>, JpaSpec
      * Reads a payment and holds a row lock (SQL Server UPDLOCK, HOLDLOCK) until the transaction ends.
      * Lock order rule: every path that changes a payment and the card or registration it pays for takes this
      * lock first and only then reads and writes the card or registration (confirm, fail, the card and package
-     * activate and cancel endpoints). A second caller waits here holding no other lock, so the paths cannot
-     * deadlock, and it then sees the payment as it is now instead of acting on a stale copy.
+     * activate and cancel endpoints). A second caller waits here holding no other lock, so paths that lock one
+     * payment and then its own card or registration cannot deadlock with each other, and the waiter then sees the
+     * payment as it is now instead of acting on a stale copy. The known remaining case (an upgrade activation that
+     * also replaces the member's current card, with two different payments of the same member) is documented in
+     * docs/database/09.
      * Calling it again in the same transaction is harmless: the transaction already owns the lock.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -58,6 +58,7 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
     static final String CODE_PAYMENT_NOT_PENDING = "PAYMENT_NOT_PENDING";
     static final String CODE_INVOICE_ALREADY_ISSUED = "INVOICE_ALREADY_ISSUED";
     static final String CODE_PAYMENT_CONCURRENT_UPDATE = "PAYMENT_CONCURRENT_UPDATE";
+    static final String CODE_PAYMENT_ITEM_AMOUNT_MISMATCH = "PAYMENT_ITEM_AMOUNT_MISMATCH";
     static final String ENTITY_TYPE = "PAYMENT";
     private static final int DESCRIPTION_MAX = 255;
     private static final int SUMMARY_MAX = 255;
@@ -301,18 +302,20 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
 
     /**
      * Amounts come from PaymentItemResolver (the same rule as the payment screens): subtotal = original price,
-     * discount = resolver discount, total = payment amount. If subtotal - discount does not equal the payment amount
-     * the item and the payment disagree, and no invoice is written.
+     * discount = resolver discount, total = payment amount. If subtotal - discount does not equal the payment amount,
+     * the price stored on the item (paid_amount or price_paid) differs from the payment amount: corrupted data. The
+     * call answers 409 PAYMENT_ITEM_AMOUNT_MISMATCH and the transaction rolls back, so nothing is written.
      */
     private Invoice issueInvoice(Payment payment, PaymentItem item) {
         BigDecimal total = payment.getAmount();
         BigDecimal unitPrice = item.originalPrice() != null ? item.originalPrice() : total;
         BigDecimal discount = item.discount() != null ? item.discount() : BigDecimal.ZERO;
         if (unitPrice.subtract(discount).compareTo(total) != 0) {
-            throw new IllegalStateException("Cannot issue the invoice of payment " + payment.getPaymentCode()
+            throw new ConflictException("Cannot issue the invoice of payment " + payment.getPaymentCode()
                     + ": original price " + unitPrice.toPlainString() + " - discount " + discount.toPlainString()
                     + " does not equal the payment amount " + total.toPlainString()
-                    + " (" + item.code() + " and the payment disagree)");
+                    + ". The price stored on " + item.code() + " and the payment disagree; check the data.",
+                    CODE_PAYMENT_ITEM_AMOUNT_MISMATCH);
         }
 
         LocalDateTime now = LocalDateTime.now(clock);

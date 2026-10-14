@@ -26,7 +26,9 @@ import java.util.Optional;
  *
  * Pricing rule (unchanged from BE-17):
  * - package registration: original price = registration.original_price, paid = registration.paid_amount;
- * - membership card: original price = tier price, paid = card.price_paid (lower than the tier price for an upgrade);
+ * - membership card: original price = max(current tier price, card.price_paid), paid = card.price_paid. price_paid
+ *   is the snapshot taken at request time; it is lower than the tier price for an upgrade, and higher when a manager
+ *   lowered the tier price after the request, in which case the card is shown at what was priced, with no discount;
  * - discount = original price - paid, never below zero; a missing value falls back to the payment amount.
  */
 @Component
@@ -136,10 +138,15 @@ public class PaymentItemResolver {
 
     private PaymentItem fromCard(MemberCard card, BigDecimal paymentAmount) {
         String name = card.getTier() != null ? card.getTier().getName() + " Card" : "Membership Card";
-        BigDecimal original = card.getTier() != null && card.getTier().getPrice() != null
-                ? card.getTier().getPrice()
-                : paymentAmount;
+        BigDecimal tierPrice = card.getTier() != null ? card.getTier().getPrice() : null;
         BigDecimal paid = card.getPricePaid() != null ? card.getPricePaid() : paymentAmount;
+        BigDecimal original;
+        if (tierPrice != null && paid != null) {
+            // Never below what was priced at request time, so original - discount always equals price_paid.
+            original = tierPrice.max(paid);
+        } else {
+            original = tierPrice != null ? tierPrice : paymentAmount;
+        }
         boolean upgradeCredit = paid != null && original != null && paid.compareTo(original) < 0;
         String description = name + " (" + card.getCardCode() + ")"
                 + (upgradeCredit ? " - upgrade, credit for the current card applied" : "");

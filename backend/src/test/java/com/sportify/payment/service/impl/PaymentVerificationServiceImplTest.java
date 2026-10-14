@@ -531,8 +531,8 @@ class PaymentVerificationServiceImplTest {
     }
 
     @Test
-    @DisplayName("Invoice amounts that would break subtotal - discount = total throw IllegalStateException, nothing saved")
-    void recordPaymentConfirmed_InconsistentAmounts_IllegalStateAndNoInvoice() {
+    @DisplayName("Stored item price differs from the payment amount: 409 PAYMENT_ITEM_AMOUNT_MISMATCH, no invoice saved")
+    void recordPaymentConfirmed_ItemPriceDiffersFromPayment_ConflictAndNoInvoice() {
         payment.setPaymentStatus(PaymentStatus.SUCCESS);
         payment.setAmount(new BigDecimal("390000.00"));
         when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
@@ -540,10 +540,44 @@ class PaymentVerificationServiceImplTest {
         when(invoiceRepository.findByPaymentId(1L)).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.recordPaymentConfirmed(1L, receptionist, null))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("does not equal the payment amount 390000.00");
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("does not equal the payment amount 390000.00")
+                .satisfies(ex -> assertThat(((ConflictException) ex).getCode()).isEqualTo("PAYMENT_ITEM_AMOUNT_MISMATCH"));
         verify(invoiceRepository, never()).save(any());
         verify(invoiceRepository, never()).getNextInvoiceNumberSequence();
         verifyNoInteractions(auditService);
+    }
+
+    @Test
+    @DisplayName("Tier price lowered after the request: confirm succeeds, invoice at price_paid with no discount")
+    void confirm_TierPriceLoweredAfterRequest_InvoiceAtPricePaid() {
+        payment.setAmount(new BigDecimal("1200000.00"));
+        MemberCard card = pendingCard(new BigDecimal("1200000.00"));
+        card.getTier().setPrice(new BigDecimal("1000000.00"));
+        stubLockedPayment();
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(registrationRepository.findByPaymentId(1L)).thenReturn(Optional.empty());
+        when(memberCardRepository.findByPaymentId(1L)).thenReturn(Optional.of(card));
+        when(membershipCardService.activateCardForPaymentConfirmation(eq(30L), eq(receptionist), eq(PaymentMethod.CASH)))
+                .thenAnswer(inv -> {
+                    markSuccessOnActivation();
+                    card.setStatus(CardStatus.ACTIVE);
+                    return null;
+                });
+        stubInvoiceSave();
+
+        StaffPaymentResponse response = service.confirmPayment(1L,
+                confirmRequest(PaymentMethod.CASH, null, "1200000"), receptionist);
+
+        ArgumentCaptor<Invoice> invoiceCaptor = ArgumentCaptor.forClass(Invoice.class);
+        verify(invoiceRepository).save(invoiceCaptor.capture());
+        Invoice invoice = invoiceCaptor.getValue();
+        assertThat(invoice.getSubtotalAmount()).isEqualByComparingTo("1200000");
+        assertThat(invoice.getDiscountAmount()).isEqualByComparingTo("0");
+        assertThat(invoice.getTotalAmount()).isEqualByComparingTo("1200000");
+        assertThat(invoice.getLines().get(0).getDescription()).isEqualTo("VIP Member Card (CARD-1030)");
+        assertThat(response.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(response.getOriginalPrice()).isEqualByComparingTo("1200000");
+        assertThat(response.getDiscount()).isEqualByComparingTo("0");
     }
 }

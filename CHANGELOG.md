@@ -30,6 +30,7 @@ Branch `feat/f3-confirm-payment`. Owner: Truc. Priority: P1. Depends on BE-17 (m
 
 ### Review round 2
 - The card and package activate and cancel endpoints also lock the payment row before the card or registration, so every path uses one lock order and cannot deadlock with confirm or fail. Invoice amounts come from `PaymentItemResolver` and must satisfy subtotal - discount = total.
+- Review round 3: a card's original price is never below its `price_paid` snapshot, so a tier price lowered after the request no longer blocks confirmation; an item price that differs from the payment answers 409 `PAYMENT_ITEM_AMOUNT_MISMATCH` instead of 500.
 
 ## 2026-10-13 - Receptionist Member Search, Register and Renew, Check-in (FE-05, Flow 1)
 

@@ -153,4 +153,20 @@ class PaymentPricingConsistencyTest {
 
         assertBothViewsAgree(payment, "VIP Member Card", "2000000", "500000");
     }
+
+    @Test
+    @DisplayName("Tier price lowered after the request: both views show price_paid as the original price, no discount")
+    void tierPriceLoweredAfterRequest_SameValues() {
+        Payment payment = payment("1200000.00");
+        MemberCard card = MemberCard.builder().id(30L).cardCode("CARD-1030").member(member)
+                .tier(MembershipCardTier.builder().id(3L).code("VIP").name("VIP Member")
+                        .price(new BigDecimal("1000000.00")).durationMonths(12).discountPercentage(10).build())
+                .status(CardStatus.PENDING_PAYMENT).pricePaid(new BigDecimal("1200000.00")).payment(payment).build();
+        when(registrationRepository.findByPaymentId(1L)).thenReturn(Optional.empty());
+        when(memberCardRepository.findByPaymentId(1L)).thenReturn(Optional.of(card));
+        when(registrationRepository.findByPaymentIdIn(anyCollection())).thenReturn(List.of());
+        when(memberCardRepository.findByPaymentIdIn(anyCollection())).thenReturn(List.of(card));
+
+        assertBothViewsAgree(payment, "VIP Member Card", "1200000", "0");
+    }
 }
