@@ -228,17 +228,28 @@ class ManagerSessionControllerTest {
                 .andExpect(jsonPath("$.details.conflicts[0].conflictType").value("BOTH"));
     }
 
-    @Test
-    void calendar_missingRangeIsDelegatedForBusinessValidation() throws Exception {
-        when(service.listSessions(isNull(), isNull(), isNull(), isNull(), isNull()))
-                .thenThrow(new BusinessRuleException("From and to are required"));
-        mvc.perform(get(BASE).with(user("manager").roles("MANAGER"))).andExpect(status().isBadRequest());
+    @ParameterizedTest
+    @ValueSource(strings = {"from", "to"})
+    void calendar_missingBoundReturns400WithExistingEnvelopeBeforeService(String missing) throws Exception {
+        String supplied = missing.equals("from") ? "to" : "from";
+        mvc.perform(get(BASE).param(supplied, "2026-10-19").with(user("manager").roles("MANAGER")))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.message").value("Required parameter '" + missing + "' is missing"))
+                .andExpect(jsonPath("$.details").doesNotExist());
+        verifyNoInteractions(service);
     }
 
-    @Test
-    void calendar_invalidDateReturns400() throws Exception {
-        mvc.perform(get(BASE).param("from", "not-a-date").param("to", "2026-10-19")
-                        .with(user("manager").roles("MANAGER"))).andExpect(status().isBadRequest());
+    @ParameterizedTest
+    @ValueSource(strings = {"from", "to"})
+    void calendar_invalidDateReturns400(String malformed) throws Exception {
+        String valid = malformed.equals("from") ? "to" : "from";
+        mvc.perform(get(BASE).param(malformed, "not-a-date").param(valid, "2026-10-19")
+                        .with(user("manager").roles("MANAGER")))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.message").value("Invalid value for parameter '" + malformed + "'"))
+                .andExpect(jsonPath("$.details").doesNotExist());
         verifyNoInteractions(service);
     }
 }

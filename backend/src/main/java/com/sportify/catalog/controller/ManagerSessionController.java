@@ -35,8 +35,8 @@ public class ManagerSessionController {
 
     @GetMapping("/sessions")
     public ResponseEntity<List<ManagerSessionResponse>> listSessions(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) Long classId,
             @RequestParam(required = false) Long coachId,
             @RequestParam(required = false) Long facilityId) {
