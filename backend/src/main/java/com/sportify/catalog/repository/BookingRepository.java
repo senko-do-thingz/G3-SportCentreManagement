@@ -43,4 +43,18 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                               @Param("sessionStatuses") Collection<SessionStatus> sessionStatuses,
                               @Param("today") LocalDate today,
                               @Param("now") LocalTime now);
+
+    /**
+     * Bookings of a package registration with the given status on sessions that have not started yet
+     * (session date after today, or today with a start time after now), with their session loaded.
+     * Used by the refund quote (they count as unused sessions) and by refund completion (they are cancelled).
+     */
+    @Query("SELECT b FROM Booking b JOIN FETCH b.session s "
+            + "WHERE b.packageRegistration.id = :registrationId "
+            + "AND b.status = :bookingStatus "
+            + "AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime > cast(:now as time)))")
+    List<Booking> findUpcomingByPackageRegistration(@Param("registrationId") Long registrationId,
+                                                   @Param("bookingStatus") BookingStatus bookingStatus,
+                                                   @Param("today") LocalDate today,
+                                                   @Param("now") LocalTime now);
 }

@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-10-15 - Refunds linked to payments (BE-21, Flow 3)
+
+Branch `feat/f3-refund-payment-link`, based on `feat/f3-confirm-payment` (BE-18). Owner: Truc. Priority: P2. Depends on BE-18. Screens F3-07, F3-09 (refund part), S3-RefundSubmitted, S3-RefundReview, S3-RefundApproved, S3-RefundRejected, S3-RefundDone.
+
+### Added
+- `GET /api/v1/refunds/quote?registrationId=` (owner MEMBER, RECEPTIONIST, MANAGER): suggested amount = paid amount * unused sessions / total sessions (half up, 2 decimals, never above the payment amount). Unused sessions = remaining sessions + upcoming CONFIRMED bookings of the registration without an allowed check-in. Every session used gives 0.00.
+- `POST /api/v1/refunds` accepts an optional `amountRequested` (default: the quote), validated above 0, at most 2 decimals and not above the payment amount.
+- `PaymentRefundService.markRefunded`: payment SUCCESS -> REFUNDED with a note, PAID or ISSUED invoices -> REFUNDED. 409 codes `PAYMENT_ALREADY_REFUNDED` and `PAYMENT_NOT_REFUNDABLE`.
+- Migration `V24__refund_request_payment_link.sql`: filtered unique index `ux_refund_request_payment_live` (one PENDING, APPROVED or COMPLETED refund per payment) with a duplicate guard, and an index on `package_registration_id`. V23 is taken by `feat/f2-sessions-schedule`.
+- Audit action `REFUND_COMPLETED`; `RefundResponse` gains `paymentId`, `paymentCode` and, on complete, `cancelledBookings`.
+- Tests: `RefundPaymentLinkTest` (22 tests, 24 runs), `PaymentRefundServiceImplTest` (4 tests, 5 runs), `RefundQuoteControllerTest` (9 tests, 11 runs), `RefundPaymentLinkIntegrationTest` (4, Testcontainers); test cases in `docs/tests/BE-21_test_cases.md`.
+
+### Changed
+- Submitting a refund requires a SUCCESS payment linked to the registration and stores `refund_request.payment_id`. A second refund on the same payment answers 409 `PAYMENT_ALREADY_REFUNDED`, also after approval when the registration is already REFUNDED; a REJECTED request does not block a new one. A race on the same payment is caught by the unique index and mapped to the same 409.
+- Review: `amountApproved` must be above 0 and not above the payment amount. Approval still moves the registration to REFUNDED (kept as it was).
+- Complete runs in one transaction: payment REFUNDED, invoices REFUNDED, registration REFUNDED (if not already), upcoming CONFIRMED bookings of the registration CANCELLED with the seat released (sessions are not returned to the refunded registration), refund COMPLETED, REFUND_COMPLETED activity log. Legacy refunds without a payment complete without the payment step.
+- Lock order follows BE-18: submit locks the payment before reading the registration; review and complete lock the payment, then the refund row.
+- The pro-rated amount multiplies before dividing (the old code rounded the fraction to 4 decimals first, which could be off by a few dong).
+- `RefundServiceImplTest`: fixtures give the registration a SUCCESS payment and stub the new locked reads; assertions are unchanged.
+- `docs/database/04`: refund rules.
+
+### Notes
+- Not verified in the authoring environment (Maven Central and the SQL Server image were blocked there). Run `mvn -B test` before merging; integration tests run in CI.
+- Existing `refund_request` rows keep `payment_id` NULL (no backfill), so the one-refund rule applies to refunds created from now on.
+
 ## 2026-10-14 - Receptionist verifies and confirms payments (BE-18, Flow 3)
 
 Branch `feat/f3-confirm-payment`. Owner: Truc. Priority: P1. Depends on BE-17 (merged). Screens F3-04, F3-05, F3-06 and S3-Mismatch. Provides the BE-18 part of what FE-12 (`feat/f3-reception-payments`) needs; FE-12 is also blocked by BE-21.

@@ -26,6 +26,9 @@ public class GlobalExceptionHandler {
 
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final String DUPLICATE_BOOKING_MESSAGE = "Member already has a confirmed booking for this session";
+    private static final String DUPLICATE_REFUND_MESSAGE = "This payment already has a refund; a payment can be refunded only once";
+    /** Same value as PaymentRefundService.CODE_PAYMENT_ALREADY_REFUNDED; core does not depend on the payment module. */
+    private static final String DUPLICATE_REFUND_CODE = "PAYMENT_ALREADY_REFUNDED";
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidationExceptions(MethodArgumentNotValidException ex) {
@@ -92,6 +95,14 @@ public class GlobalExceptionHandler {
         logger.warn("Data integrity violation: {}", rootMsg);
         if (rootMsg != null && rootMsg.toLowerCase(Locale.ROOT).contains("ux_booking_active")) {
             return buildErrorResponse(HttpStatus.CONFLICT, DUPLICATE_BOOKING_MESSAGE, null);
+        }
+        if (rootMsg != null && rootMsg.toLowerCase(Locale.ROOT).contains("ux_refund_request_payment_live")) {
+            ResponseEntity<Map<String, Object>> response = buildErrorResponse(HttpStatus.CONFLICT,
+                    DUPLICATE_REFUND_MESSAGE, null);
+            if (response.getBody() != null) {
+                response.getBody().put("code", DUPLICATE_REFUND_CODE);
+            }
+            return response;
         }
         return buildErrorResponse(HttpStatus.CONFLICT, "The request conflicts with existing data", null);
     }

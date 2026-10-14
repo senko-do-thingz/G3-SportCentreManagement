@@ -28,7 +28,7 @@ and added `confirmed_by_user_id` (BE-17).
 - **One payment row, linked from what it pays for.** `member_card`, `sport_package_registration` and `refund_request` hold a nullable `payment_id`. A payment does not point back to the item; `invoice_line.item_type` + `item_reference_id` say what was bought.
 - **Payment requests and verification (F3-04, F3-05).** A `PENDING` payment is created when a package or card is requested online. The receptionist checks the money, records `reference_code`, and sets `payment_status = 'SUCCESS'`. The linked card or package is then activated (`PENDING_PAYMENT -> ACTIVE`).
 - **Card discount on invoices.** A Gold (5%) or VIP (10%) discount is computed at package registration and shown in `invoice.discount_amount` and the invoice lines. Single visits get no discount.
-- **Refund Request Workflow (F3-07, F3-09).** Receptionist or member files a request, the Center Manager approves or rejects it with a note, approved refunds become `COMPLETED` on payout, and the payment becomes `REFUNDED`.
+- **Refund Request Workflow (F3-07, F3-09).** Receptionist or member files a request, the Center Manager approves or rejects it with a note, approved refunds become `COMPLETED` on payout, and the payment becomes `REFUNDED` (rules under `refund_request`, BE-21).
 - **Invoice = snapshot.** An invoice is issued for a successful payment. `invoice.payment_id` is indexed but not unique.
 - **Revenue is computed, not stored.** Reports read `vw_paid_payment` (planned view) filtered by `payment_time`. `PENDING` and `FAILED` rows stay in the ledger but are not revenue.
 - **Front desk verification (BE-18).** `GET /api/v1/payments` lists payment requests for RECEPTIONIST and MANAGER, `PENDING` first (oldest first), then the rest newest first; filters `status`, `method`, `search` (member name, member code, payment code, reference code; `query` is accepted as another name), `from` and `to` (inclusive dates on `created_at`), `page`, `size` (1 to 100, default 20).
@@ -125,7 +125,7 @@ Front desk refund filing and Manager review/approval workflow (F3-07, F3-09).
 |---|---|---|---|---|
 | id | BIGINT | No | PK, IDENTITY | |
 | refund_code | NVARCHAR(30) | No | UQ | `REF-1000` |
-| payment_id | BIGINT | Yes | FK -> payment.id | Original payment (added in V14) |
+| payment_id | BIGINT | Yes | FK -> payment.id, UQ filtered (V24) | Original payment (added in V14, set on every new refund since BE-21). `ux_refund_request_payment_live`: one row per payment with status `PENDING`, `APPROVED` or `COMPLETED` |
 | package_registration_id | BIGINT | Yes | FK -> sport_package_registration.id | Package being refunded |
 | member_id | BIGINT | No | FK -> member_profile.user_id | Member receiving refund |
 | amount_requested | DECIMAL(14,2) | No | CHECK > 0 | Amount requested |
@@ -137,6 +137,14 @@ Front desk refund filing and Manager review/approval workflow (F3-07, F3-09).
 | reviewed_at | DATETIME2(0) | Yes | | Review timestamp |
 | manager_note | NVARCHAR(500) | Yes | | Manager decision note |
 | created_at, updated_at | DATETIME2(0) | | | Audit |
+
+Refund rules (BE-21, F3-07, F3-09 refund part, S3-RefundSubmitted to S3-RefundDone):
+
+- **Quote.** `GET /api/v1/refunds/quote?registrationId=` (owner MEMBER, RECEPTIONIST, MANAGER): suggested amount = `paid_amount` * unused sessions / `total_sessions`, rounded half up to 2 decimals, never above the payment amount. Unused sessions = `remaining_sessions` + CONFIRMED bookings of the registration on sessions that have not started and have no allowed check-in (booking already took one session; completion cancels it). Every session used -> suggested 0.00.
+- **Submit.** `POST /api/v1/refunds` with optional `amountRequested` (default: the quote). Order of checks: registration exists (404), member owns it (403), it has a payment (409 `PAYMENT_NOT_REFUNDABLE`), the payment has no live refund and is not `REFUNDED` (409 `PAYMENT_ALREADY_REFUNDED`), the payment is `SUCCESS` (409 `PAYMENT_NOT_REFUNDABLE`), the registration is `ACTIVE` (400), there is an unused session (400), `amountRequested` is above 0 and not above the payment amount (400). `refund_request.payment_id` is set. The payment row is locked first; the filtered unique index catches a race (409 `PAYMENT_ALREADY_REFUNDED`).
+- **Review.** Unchanged rule: approving moves the registration to `REFUNDED`. New: `amountApproved` must be above 0 and, for a refund with a payment, not above the payment amount (400). Payment row, then refund row, are locked first.
+- **Complete.** `PUT /api/v1/refunds/{id}/complete` in one transaction: payment `SUCCESS` -> `REFUNDED` with a note, every `PAID` or `ISSUED` invoice of the payment -> `REFUNDED`, registration `REFUNDED` (kept if already), upcoming CONFIRMED bookings of the registration (not checked in) -> `CANCELLED` with `cancelled_by_user_id`, reason `Refund completed: <code>` and the session seat released (sessions are not returned to the refunded registration), refund `COMPLETED`, `activity_log` `REFUND_COMPLETED`. Any failure rolls all of it back. A payment already `REFUNDED` -> 409 `PAYMENT_ALREADY_REFUNDED`. Legacy refunds without `payment_id` complete without the payment step.
+- **One refund per payment.** A `REJECTED` request does not count, so the member may ask again after a rejection.
 
 ### Report queries
 
