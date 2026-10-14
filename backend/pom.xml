@@ -178,6 +178,14 @@
                     <argLine>@{argLine}</argLine>
                     <skipTests>${skipUnitTests}</skipTests>
                     <excludedGroups>integration</excludedGroups>
+                    <!-- Surefire 3.6.0 auto-detects transitive JUnit 4 and switches groups to Vintage categories.
+                         Disable Vintage auto-addition so integration is interpreted as a Jupiter tag. -->
+                    <properties>
+                        <property>
+                            <name>junit</name>
+                            <value>false</value>
+                        </property>
+                    </properties>
                 </configuration>
             </plugin>
             <!-- Maven Failsafe Plugin (runs integration tests tagged @Tag("integration")) -->
@@ -191,6 +199,13 @@
                     <includes>
                         <include>**/*Test.java</include>
                     </includes>
+                    <!-- Keep the same Jupiter tag semantics as Surefire; do not auto-add Vintage. -->
+                    <properties>
+                        <property>
+                            <name>junit</name>
+                            <value>false</value>
+                        </property>
+                    </properties>
                 </configuration>
                 <executions>
                     <execution>

@@ -8,9 +8,9 @@ import type { MemberCard, PackageRegistration } from '../../api/memberApi'
  * before Confirm are the ones the backend will save:
  * - no paid card in force: a new card from today, full price;
  * - the same tier as the last paid card: a renewal from the day after that card ends, full price;
- * - a dearer tier than the card in force today: an upgrade from today that keeps the current end
- *   date; the member pays only the price difference (blocked while a renewal is already queued);
- * - otherwise (a cheaper tier, or a different tier while a renewal is queued): it starts the day
+ * - a higher-ranked tier than the card in force today: an upgrade from today that keeps the end
+ *   date; the fee uses historical payments on the explicit replacement chain;
+ * - otherwise (a lower-ranked tier, or a different tier while a renewal is queued): it starts the day
  *   after the last card ends, full price.
  * A card lasts durationMonths months: it ends the day before the same date durationMonths later
  * (Java LocalDate.plusMonths clamps to the last day of a shorter month).
@@ -115,8 +115,48 @@ export function lastPaidCard(cards: MemberCard[], tiers: CardTier[], today: stri
   return latestEnding(paidTerms(cards, tiers, today))
 }
 
-/** Who reads the blocked reason: the member (F1-11) or the front desk (FE-05). Only the wording differs. */
+/** Members cannot request a zero-fee upgrade online; staff can perform it at the desk. */
 export type PlanAudience = 'member' | 'desk'
+
+const BASELINE_UNAVAILABLE = 'Cannot verify the card upgrade baseline. Please contact the front desk.'
+const MAX_CHAIN_DEPTH = 20
+
+function validRank(rank: number | null | undefined): rank is number {
+  return typeof rank === 'number' && Number.isInteger(rank) && rank > 0
+}
+
+/** Follow only server-mapped links. Missing metadata or invalid history cannot produce a partial fee. */
+function termBaseCents(active: MemberCard, cards: MemberCard[]): number | null {
+  const visited = new Set<number>()
+  let current = active
+  let total = 0
+  let depth = 0
+  while (true) {
+    if (visited.has(current.id) || depth > MAX_CHAIN_DEPTH
+      || typeof current.upgradeRequest !== 'boolean' || current.replacesCardId === undefined
+      || current.memberId !== active.memberId || current.endDate !== active.endDate
+      || (depth > 0 && current.status !== 'REPLACED')) {
+      return null
+    }
+    visited.add(current.id)
+    const amount = current.pricePaid === null || current.pricePaid === '' ? NaN : Number(current.pricePaid)
+    const amountCents = Math.round(amount * 100)
+    if (!Number.isFinite(amount) || amount < 0 || !Number.isSafeInteger(amountCents)
+      || !Number.isSafeInteger(total + amountCents)) {
+      return null
+    }
+    total += amountCents
+    if (current.replacesCardId === null) {
+      return current.upgradeRequest ? null : total
+    }
+    const predecessors = cards.filter((candidate) => candidate.id === current.replacesCardId)
+    if (predecessors.length !== 1) {
+      return null
+    }
+    current = predecessors[0]
+    depth += 1
+  }
+}
 
 function blockedReason(audience: PlanAudience, from: string): string {
   return audience === 'desk'
@@ -138,6 +178,14 @@ export function planCard(
   const current = cardInForce(cards, tiers, today)
   const last = lastPaidCard(cards, tiers, today)
 
+  const unavailable = (card: MemberCard | null): CardPlan => ({
+    ...base, kind: 'unknown', startDate: null, endDate: null, price: null,
+    baseCard: card, reason: BASELINE_UNAVAILABLE,
+  })
+  if (!validRank(tier.tierRank)) {
+    return unavailable(current)
+  }
+
   if (!last) {
     return { ...base, kind: 'new', startDate: today, endDate: cardEndDate(today, months), price: tierPrice / 100, baseCard: null }
   }
@@ -147,12 +195,11 @@ export function planCard(
   }
   if (current) {
     const currentTier = tiers.find((candidate) => candidate.id === current.tierId)
-    if (!currentTier) {
-      // The tier of the card in force is no longer on sale, so its price is unknown here.
-      return { ...base, kind: 'unknown', startDate: null, endDate: null, price: null, baseCard: current }
+    const currentRank = currentTier ? currentTier.tierRank : current.tierRank
+    if (!validRank(currentRank)) {
+      return unavailable(current)
     }
-    const currentPrice = cents(currentTier.price)
-    if (tierPrice > currentPrice) {
+    if (tier.tierRank > currentRank) {
       if (last !== current) {
         return {
           ...base,
@@ -164,12 +211,24 @@ export function planCard(
           reason: blockedReason(audience, last.startDate ?? 'a later date'),
         }
       }
+      const baseline = termBaseCents(current, cards)
+      if (baseline === null) {
+        return unavailable(current)
+      }
+      const fee = Math.max(0, tierPrice - baseline)
+      if (fee === 0 && audience === 'member') {
+        return {
+          ...base, kind: 'blocked', startDate: null, endDate: null, price: 0,
+          baseCard: current,
+          reason: 'Zero-fee upgrades cannot be completed online. Please contact the front desk.',
+        }
+      }
       return {
         ...base,
         kind: 'upgrade',
         startDate: today,
         endDate: current.endDate,
-        price: (tierPrice - currentPrice) / 100,
+        price: fee / 100,
         baseCard: current,
       }
     }

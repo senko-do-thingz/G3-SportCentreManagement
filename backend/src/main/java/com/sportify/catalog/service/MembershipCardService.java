@@ -3,6 +3,7 @@ package com.sportify.catalog.service;
 import com.sportify.catalog.dto.CardTierResponse;
 import com.sportify.catalog.dto.MemberCardPurchaseRequest;
 import com.sportify.catalog.dto.MemberCardResponse;
+import com.sportify.catalog.dto.MembershipCardTierUpdateRequest;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.payment.entity.PaymentMethod;
 
@@ -10,6 +11,8 @@ import java.util.List;
 
 public interface MembershipCardService {
     List<CardTierResponse> getAllActiveTiers();
+    List<CardTierResponse> getAllTiersForManager();
+    CardTierResponse updateTier(Long id, MembershipCardTierUpdateRequest request, UserAccount actor);
     MemberCardResponse purchaseCard(MemberCardPurchaseRequest request, UserAccount actor);
     MemberCardResponse activateCard(Long cardId, UserAccount actor);
     MemberCardResponse activateCard(Long cardId, UserAccount actor, PaymentMethod actualMethod);

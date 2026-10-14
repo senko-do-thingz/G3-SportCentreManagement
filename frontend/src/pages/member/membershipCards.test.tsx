@@ -485,11 +485,23 @@ describe('FE-04 review round 1', () => {
     }
   })
 
-  it('TC-FE04-069 unknown plan: neutral label "Choose card" on the button and the overlay', async () => {
-    await openCards({ cards: [card({ tierId: 99, tierName: 'Legacy Member' })] })
-    const { dialog } = await openOverlay('Gold Member', 'Choose card')
-    expect(within(dialog).getByTestId('card-eyebrow')).toHaveTextContent('Choose card')
-    expect(within(dialog).getByTestId('card-amount')).toHaveTextContent('Calculated when you confirm')
+  it('TC-FE04-069 unknown plan cannot open an actionable purchase overlay', async () => {
+    await openCards({ cards: [card({ tierId: 99, tierRank: null, tierName: 'Legacy Member' })] })
+    expect(screen.queryByRole('button', { name: 'Choose card' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Confirm and continue' })).not.toBeInTheDocument()
+    expect(screen.getAllByText(/Cannot verify the card upgrade baseline/).length).toBeGreaterThan(0)
+  })
+
+  it('RV40-UI-01 an orphan upgrade cannot submit another upgrade purchase', async () => {
+    const { calls } = await openCards({ cards: [card({
+      tierId: 2, tierCode: 'GOLD', tierRank: 3, tierName: 'Gold', pricePaid: 300000,
+      upgradeRequest: true, replacesCardId: null,
+    })] })
+    const vip = within(tier('VIP Member'))
+    expect(vip.getByText(/Cannot verify the card upgrade baseline/)).toBeInTheDocument()
+    expect(vip.queryByRole('button', { name: 'Upgrade card' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(calls.some((call) => call.path === '/membership-cards/purchase')).toBe(false)
   })
 
   it('TC-FE04-070 overlay footer order: Confirm and continue, then Cancel', async () => {

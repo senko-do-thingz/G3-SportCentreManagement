@@ -5,6 +5,7 @@ import com.sportify.catalog.dto.PackageRegistrationRequest;
 import com.sportify.catalog.dto.PackageRegistrationResponse;
 import com.sportify.catalog.dto.SportPackageCreateRequest;
 import com.sportify.catalog.dto.SportPackageResponse;
+import com.sportify.catalog.dto.SportPackageUpdateRequest;
 import com.sportify.catalog.service.SportPackageService;
 import com.sportify.identity.security.CustomUserDetails;
 import com.sportify.payment.entity.PaymentMethod;
@@ -41,6 +42,15 @@ public class SportPackageController {
             @Valid @RequestBody SportPackageCreateRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return sportPackageService.createPackage(request, userDetails.getUserAccount());
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('MANAGER')")
+    public SportPackageResponse updatePackage(
+            @PathVariable Long id,
+            @Valid @RequestBody SportPackageUpdateRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return sportPackageService.updatePackage(id, request, userDetails.getUserAccount());
     }
 
     @PostMapping("/registrations")
