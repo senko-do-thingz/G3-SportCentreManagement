@@ -33,6 +33,7 @@ Branch `feat/f3-confirm-payment`. Owner: Truc. Priority: P1. Depends on BE-17 (m
 - Review round 3: a card's original price is never below its `price_paid` snapshot, so a tier price lowered after the request no longer blocks confirmation; an item price that differs from the payment answers 409 `PAYMENT_ITEM_AMOUNT_MISMATCH` instead of 500.
 - CI fix: `PaymentVerificationIntegrationTest` failed to compile (ambiguous `assertThat` on `tx().execute(...)`); the invoice count is read through an `int` helper `invoiceCount`.
 - Rebased on main after PR #40 (manager catalog, BE-03) as one commit: conflicts in `MembershipCardServiceImpl`, `SportPackageServiceImpl` and their unit tests resolved by keeping the PR #40 upgrade rules (rank based, `upgradeRequest`) and the BE-18 lock order and receipt step; the integration test tier now gets a unique `tierRank`, and `ManagerCatalogIntegrationTest` cleanup deletes the invoices that card activation now issues before their payments.
+- CI fix 2: `PaymentVerificationIntegrationTest` deletes the rows it creates after each test (the SQL Server container is shared, and its leftover sports, packages, ranked tiers and the member code MEM-0001 broke 9 catalog and member tests); its member codes now use the `BE18-MEM-` prefix.
 
 ## 2026-10-13 - Sport Packages & Pricing and Manager Catalog (BE-03, Flow 1)
 

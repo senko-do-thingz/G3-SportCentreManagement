@@ -40,6 +40,7 @@ import com.sportify.payment.repository.InvoiceLineRepository;
 import com.sportify.payment.repository.InvoiceRepository;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.service.PaymentVerificationService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +62,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.CountDownLatch;
@@ -109,36 +111,88 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         return new TransactionTemplate(transactionManager);
     }
 
+    /*
+     * Every integration test class shares one SQL Server container, so the rows created here are deleted after each
+     * test; leftovers (sports, packages, ranked tiers, member codes) would break the catalog and member tests.
+     */
+    private final List<Long> userIds = new ArrayList<>();
+    private final List<Long> paymentIds = new ArrayList<>();
+    private final List<Long> registrationIds = new ArrayList<>();
+    private final List<Long> cardIds = new ArrayList<>();
+    private final List<Long> packageIds = new ArrayList<>();
+    private final List<Long> sportIds = new ArrayList<>();
+    private final List<Long> tierIds = new ArrayList<>();
+
+    @AfterEach
+    void cleanUp() {
+        if (!paymentIds.isEmpty()) {
+            String payments = idList(paymentIds);
+            jdbcTemplate.update("DELETE FROM activity_log WHERE entity_type = 'PAYMENT' AND entity_id IN (" + payments + ")");
+            jdbcTemplate.update("DELETE FROM invoice_line WHERE invoice_id IN (SELECT id FROM invoice WHERE payment_id IN (" + payments + "))");
+            jdbcTemplate.update("DELETE FROM invoice WHERE payment_id IN (" + payments + ")");
+        }
+        if (!userIds.isEmpty()) {
+            jdbcTemplate.update("DELETE FROM activity_log WHERE actor_user_id IN (" + idList(userIds) + ")");
+        }
+        deleteByIds("member_card", cardIds);
+        deleteByIds("sport_package_registration", registrationIds);
+        deleteByIds("payment", paymentIds);
+        deleteByIds("sport_package", packageIds);
+        deleteByIds("sport", sportIds);
+        deleteByIds("membership_card_tier", tierIds);
+        if (!userIds.isEmpty()) {
+            jdbcTemplate.update("DELETE FROM member_profile WHERE user_id IN (" + idList(userIds) + ")");
+        }
+        deleteByIds("user_account", userIds);
+    }
+
+    private void deleteByIds(String table, List<Long> ids) {
+        if (!ids.isEmpty()) {
+            jdbcTemplate.update("DELETE FROM " + table + " WHERE id IN (" + idList(ids) + ")");
+        }
+    }
+
+    private static String idList(List<Long> ids) {
+        return ids.stream().map(String::valueOf).collect(Collectors.joining(","));
+    }
+
+    /** Member codes outside the MEM-0001 sequence range, which other test classes insert literally. */
+    private static final AtomicInteger MEMBER_CODE = new AtomicInteger();
+
     private UserAccount newUser(String roleCode) {
         Role role = roleRepository.findByCode(roleCode)
                 .orElseThrow(() -> new IllegalStateException("Seeded role " + roleCode + " not found"));
-        return userRepository.saveAndFlush(UserAccount.builder()
+        UserAccount user = userRepository.saveAndFlush(UserAccount.builder()
                 .email("be18-" + roleCode.toLowerCase() + "-" + System.nanoTime() + "@sportify.com")
                 .passwordHash("DummyHashForTestPurposesOnly")
                 .fullName("BE18 " + roleCode)
                 .role(role)
                 .status("ACTIVE")
                 .build());
+        userIds.add(user.getId());
+        return user;
     }
 
     private MemberProfile newMember() {
         UserAccount user = newUser("MEMBER");
         return memberProfileRepository.saveAndFlush(MemberProfile.builder()
                 .userAccount(user)
-                .memberCode(codeFormatter.formatMemberCode(memberProfileRepository.getNextMemberCode()))
+                .memberCode("BE18-MEM-" + MEMBER_CODE.incrementAndGet())
                 .currentLevel("BEGINNER")
                 .joinedOn(LocalDate.now(clock))
                 .build());
     }
 
     private Payment newPendingPayment(MemberProfile member, BigDecimal amount) {
-        return paymentRepository.saveAndFlush(Payment.builder()
+        Payment payment = paymentRepository.saveAndFlush(Payment.builder()
                 .paymentCode(codeFormatter.formatPaymentCode(paymentRepository.getNextPaymentCodeSequence()))
                 .member(member)
                 .amount(amount)
                 .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .paymentStatus(PaymentStatus.PENDING)
                 .build());
+        paymentIds.add(payment.getId());
+        return payment;
     }
 
     /** A registration requested three days ago, so activation must move its start date to today. */
@@ -175,6 +229,9 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
                     .createdByUser(member.getUserAccount())
                     .payment(payment)
                     .build());
+            sportIds.add(sport.getId());
+            packageIds.add(pkg.getId());
+            registrationIds.add(reg.getId());
             return new Long[]{payment.getId(), reg.getId()};
         });
     }
@@ -202,6 +259,8 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
                     .pricePaid(new BigDecimal("1200000.00"))
                     .payment(payment)
                     .build());
+            tierIds.add(tier.getId());
+            cardIds.add(card.getId());
             return new Long[]{payment.getId(), card.getId()};
         });
     }
