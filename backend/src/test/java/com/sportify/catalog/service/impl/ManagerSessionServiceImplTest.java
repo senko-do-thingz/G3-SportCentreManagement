@@ -388,6 +388,60 @@ class ManagerSessionServiceImplTest {
         assertThrows(BusinessRuleException.class, () -> service.updateSession(100L, update(2), manager));
         verify(sessions, never()).saveAndFlush(any());
         verifyNoInteractions(coaches, facilities, audit);
+        verify(bookings, never()).countOutsidePackageValidity(anyLong(), any(), any());
+    }
+
+    @Test
+    void update_dateOutsideBookedPackageValidityRejectsBeforeAssignmentLocksOrWrites() {
+        ClassSession session = existing(100L);
+        when(sessions.findForUpdate(100L)).thenReturn(Optional.of(session));
+        confirmed(100L, 2);
+        LocalDate newDate = DATE.plusDays(7);
+        when(bookings.countOutsidePackageValidity(100L, BookingStatus.CONFIRMED, newDate)).thenReturn(1L);
+        var request = new SessionUpdateRequest(newDate, START, END, 30L, 20L, 16);
+
+        var ex = assertThrows(BusinessRuleException.class, () -> service.updateSession(100L, request, manager));
+
+        assertEquals("The new date is outside the validity period of packages used by confirmed bookings of this session",
+                ex.getMessage());
+        assertEquals(DATE, session.getSessionDate());
+        verify(bookings).countOutsidePackageValidity(100L, BookingStatus.CONFIRMED, newDate);
+        verify(sessions, never()).saveAndFlush(any());
+        verifyNoInteractions(coaches, facilities, audit);
+    }
+
+    @Test
+    void update_dateWithinBookedPackageValidityAllowsChangeAfterOneCountBeforeAssignmentLocks() {
+        ClassSession session = existing(100L);
+        when(sessions.findForUpdate(100L)).thenReturn(Optional.of(session));
+        confirmed(100L, 2);
+        LocalDate newDate = DATE.plusDays(1);
+        when(bookings.countOutsidePackageValidity(100L, BookingStatus.CONFIRMED, newDate)).thenReturn(0L);
+        validAssignment();
+        when(sessions.saveAndFlush(session)).thenReturn(session);
+
+        var result = service.updateSession(100L, new SessionUpdateRequest(newDate, START, END, 30L, 20L, 16), manager);
+
+        assertEquals(newDate, result.date());
+        assertEquals(2, result.bookedCount());
+        var order = inOrder(sessions, bookings, coaches, facilities);
+        order.verify(sessions).findForUpdate(100L);
+        order.verify(bookings).countBySessionIds(List.of(100L), BookingStatus.CONFIRMED);
+        order.verify(bookings).countOutsidePackageValidity(100L, BookingStatus.CONFIRMED, newDate);
+        order.verify(coaches).findForScheduleUpdate(20L);
+        order.verify(facilities).findForScheduleUpdate(30L);
+    }
+
+    @Test
+    void update_withoutConfirmedBookingsSkipsPackageValidityQuery() {
+        ClassSession session = existing(100L);
+        when(sessions.findForUpdate(100L)).thenReturn(Optional.of(session));
+        validAssignment();
+        when(sessions.saveAndFlush(session)).thenReturn(session);
+
+        assertEquals(0, service.updateSession(100L, update(16), manager).bookedCount());
+
+        verify(bookings, never()).countOutsidePackageValidity(anyLong(), any(), any());
     }
 
     @Test

@@ -21,6 +21,12 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Query("SELECT b.session.id FROM Booking b WHERE b.id = :bookingId")
     Optional<Long> findSessionIdByBookingId(@Param("bookingId") Long bookingId);
 
+    @Query("SELECT COUNT(b) FROM Booking b JOIN b.packageRegistration r "
+            + "WHERE b.session.id = :sessionId AND b.status = :status "
+            + "AND (r.startDate > :date OR r.endDate < :date)")
+    long countOutsidePackageValidity(@Param("sessionId") Long sessionId,
+            @Param("status") BookingStatus status, @Param("date") LocalDate date);
+
     @Query("SELECT b.session.id AS sessionId, COUNT(b) AS bookingCount FROM Booking b "
             + "WHERE b.session.id IN :sessionIds AND b.status = :status GROUP BY b.session.id")
     List<SessionBookingCount> countBySessionIds(@Param("sessionIds") Collection<Long> sessionIds,

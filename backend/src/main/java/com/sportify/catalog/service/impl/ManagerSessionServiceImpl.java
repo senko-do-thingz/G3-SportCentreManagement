@@ -133,9 +133,14 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
             ensureActiveClass(sportClass);
             long booked = bookingCounts(List.of(id)).getOrDefault(id, 0L);
             validateCapacity(request.capacity(), sportClass, booked);
+            LocalDate date = requireDate(request.date());
+            if (booked > 0 && bookingRepository.countOutsidePackageValidity(id, BookingStatus.CONFIRMED, date) > 0) {
+                throw new BusinessRuleException(
+                        "The new date is outside the validity period of packages used by confirmed bookings of this session");
+            }
             Assignment assignment = lockAndValidateAssignment(sportClass, request.coachId(),
                     request.facilityId(), session.getTrainingType());
-            validateFutureDates(List.of(requireDate(request.date())), request.startTime());
+            validateFutureDates(List.of(date), request.startTime());
             checkConflicts(List.of(request.date()), request.startTime(), request.endTime(), assignment, id);
             Map<String, Object> before = snapshot(session);
             session.setSessionDate(request.date());

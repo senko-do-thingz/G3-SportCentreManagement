@@ -45,6 +45,7 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
     @Autowired private ManagerSessionService service;
     @Autowired private BookingService bookingService;
     @Autowired private ClassSessionRepository sessions;
+    @Autowired private BookingRepository bookingRepository;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private SportClassRepository classes;
     @Autowired private SportRepository sports;
@@ -313,6 +314,39 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Again\"}"))
                 .andExpect(status().isBadRequest());
         assertEquals(4, count("SELECT remaining_sessions FROM sport_package_registration WHERE id = ?", normalReg));
+    }
+
+    @Test
+    void update_packageValidityQueryUsesInclusiveBoundsAndIgnoresNullLinksCancelledBookingsAndOtherSessions() {
+        long id = service.createSessions(sportClass.getId(), single(), manager).getFirst().id();
+        long firstMember = member();
+        long firstReg = registration(firstMember, 5, 3, "ACTIVE");
+        long secondMember = member();
+        long secondReg = registration(secondMember, 5, 3, "ACTIVE");
+        jdbc.update("UPDATE sport_package_registration SET start_date = ?, end_date = ? WHERE id IN (?, ?)",
+                date, date.plusDays(2), firstReg, secondReg);
+        booking(id, firstMember, firstReg, "CONFIRMED");
+        booking(id, secondMember, secondReg, "CONFIRMED");
+        booking(id, member(), null, "CONFIRMED");
+        long ignoredMember = member();
+        long ignoredReg = registration(ignoredMember, 5, 3, "ACTIVE");
+        jdbc.update("UPDATE sport_package_registration SET end_date = ? WHERE id = ?", date.minusDays(1), ignoredReg);
+        booking(id, ignoredMember, ignoredReg, "CANCELLED");
+        long otherId = insertSession(date.plusDays(10), LocalTime.of(10, 0), LocalTime.of(11, 0), coachId, facilityId, "PUBLISHED");
+        booking(otherId, ignoredMember, ignoredReg, "CONFIRMED");
+        assertEquals(0, bookingRepository.countOutsidePackageValidity(id, BookingStatus.CONFIRMED, date));
+        assertEquals(0, bookingRepository.countOutsidePackageValidity(id, BookingStatus.CONFIRMED, date.plusDays(2)));
+        assertEquals(2, bookingRepository.countOutsidePackageValidity(id, BookingStatus.CONFIRMED, date.minusDays(1)));
+        assertEquals(2, bookingRepository.countOutsidePackageValidity(id, BookingStatus.CONFIRMED, date.plusDays(3)));
+        int auditsBefore = count("SELECT COUNT(*) FROM activity_log WHERE entity_id = ? AND action = 'SESSION_UPDATED'", id);
+        var error = assertThrows(BusinessRuleException.class, () -> service.updateSession(id,
+                new SessionUpdateRequest(date.plusDays(3), LocalTime.of(11, 0), LocalTime.of(12, 0), facilityId, coachId, 16), manager));
+        assertEquals("The new date is outside the validity period of packages used by confirmed bookings of this session",
+                error.getMessage());
+        assertEquals(date, jdbc.queryForObject("SELECT session_date FROM class_session WHERE id = ?", LocalDate.class, id));
+        assertEquals(auditsBefore, count("SELECT COUNT(*) FROM activity_log WHERE entity_id = ? AND action = 'SESSION_UPDATED'", id));
+        assertEquals(date.plusDays(2), service.updateSession(id,
+                new SessionUpdateRequest(date.plusDays(2), LocalTime.of(11, 0), LocalTime.of(12, 0), facilityId, coachId, 16), manager).date());
     }
 
     @ParameterizedTest
