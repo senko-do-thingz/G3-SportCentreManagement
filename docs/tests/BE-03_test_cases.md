@@ -5,6 +5,8 @@
 - **Feature Flow**: Flow 1 (Manager Catalog - Sport Packages and Membership Card Tiers)
 - **Branch**: feat/f1-manager-catalog
 - **Status**: Implemented; Unit tests verified locally, Integration tests verified via GitHub Actions CI
+- **Integration Test Verification**: Local failsafe discovery: 122 (source: local mvnw verify). Static source count: 122 (source: count script). CI check-run: 124 (source: check-run). Difference of 2 is explained by source analysis (BookingV20IntegrationTest: 1 @ParameterizedTest with 3 values counts as 1 locally and 3 in CI); not yet confirmed by the CI artifact.
+- **Artifact Prediction**: TEST-...BookingV20IntegrationTest.xml must show 6 testcases in CI (3 @Test + 3 invocations), and the total of failsafe-reports-integration must be 124 (not verified until confirmed from the artifact).
 - **Objective**: Implement endpoints and business rules for manager catalog management:
   1. `GET /api/v1/manager/packages?sportId=&format=&active=`
   2. `PUT /api/v1/packages/{id}`
