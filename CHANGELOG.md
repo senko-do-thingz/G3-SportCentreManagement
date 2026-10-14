@@ -14,6 +14,7 @@ Branch `feat/f3-desk-payment`. Owner: Truc. Priority: P1. Depends on BE-18 (PR #
 - A member who reads another member's payment (`GET /api/v1/payments/{id}`, `PUT /api/v1/payments/{id}/method`) or invoice (`GET /api/v1/invoices/by-payment/{paymentId}`) now gets 403 instead of 404 (acceptance criterion); four tests updated.
 - Reference validation of confirm and desk sale shares one helper; payment amount validation of online and desk payments shares one helper.
 - `docs/database/04` and `09`: desk sale rules, visibility, invoice totals rule.
+- CI fix: the desk sale integration tests expect 201 Created (the purchase and registration endpoints answer 201), and the test cleanup deletes every row of the members it created, so a failing test can no longer leave sports, packages or tiers behind for other test classes.
 
 ## 2026-10-14 - Receptionist verifies and confirms payments (BE-18, Flow 3)
 

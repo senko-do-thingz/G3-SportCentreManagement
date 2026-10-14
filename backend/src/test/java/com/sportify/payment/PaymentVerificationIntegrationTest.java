@@ -127,14 +127,26 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
 
     @AfterEach
     void cleanUp() {
+        if (!userIds.isEmpty()) {
+            // Everything that belongs to the members created here goes first, keyed by member, so a test that
+            // failed before it recorded an id (a sale made through the API) still leaves nothing behind.
+            String users = idList(userIds);
+            String memberPayments = "SELECT id FROM payment WHERE member_id IN (" + users + ")";
+            jdbcTemplate.update("DELETE FROM activity_log WHERE actor_user_id IN (" + users + ")"
+                    + " OR (entity_type = 'PAYMENT' AND entity_id IN (" + memberPayments + "))");
+            jdbcTemplate.update("DELETE FROM invoice_line WHERE invoice_id IN (SELECT id FROM invoice WHERE member_id IN ("
+                    + users + ") OR payment_id IN (" + memberPayments + "))");
+            jdbcTemplate.update("DELETE FROM invoice WHERE member_id IN (" + users + ") OR payment_id IN (" + memberPayments + ")");
+            jdbcTemplate.update("UPDATE member_card SET replaces_card_id = NULL WHERE member_id IN (" + users + ")");
+            jdbcTemplate.update("DELETE FROM member_card WHERE member_id IN (" + users + ")");
+            jdbcTemplate.update("DELETE FROM sport_package_registration WHERE member_id IN (" + users + ")");
+            jdbcTemplate.update("DELETE FROM payment WHERE member_id IN (" + users + ")");
+        }
         if (!paymentIds.isEmpty()) {
             String payments = idList(paymentIds);
             jdbcTemplate.update("DELETE FROM activity_log WHERE entity_type = 'PAYMENT' AND entity_id IN (" + payments + ")");
             jdbcTemplate.update("DELETE FROM invoice_line WHERE invoice_id IN (SELECT id FROM invoice WHERE payment_id IN (" + payments + "))");
             jdbcTemplate.update("DELETE FROM invoice WHERE payment_id IN (" + payments + ")");
-        }
-        if (!userIds.isEmpty()) {
-            jdbcTemplate.update("DELETE FROM activity_log WHERE actor_user_id IN (" + idList(userIds) + ")");
         }
         deleteByIds("member_card", cardIds);
         deleteByIds("sport_package_registration", registrationIds);
@@ -815,7 +827,7 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
                         .content("{\"memberId\":" + member.getId() + ",\"packageId\":" + packageId
                                 + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"BANK_TRANSFER\""
                                 + ",\"paymentReference\":\"FT-BE19-1\",\"amountReceived\":400000}"))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.channel").value("RECEPTION"))
                 .andReturn().getResponse().getContentAsString();
@@ -853,7 +865,7 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"memberId\":" + member.getId() + ",\"tierId\":" + tierId
                                 + ",\"method\":\"CASH\",\"amountReceived\":1500000}"))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andReturn().getResponse().getContentAsString();
         cardIds.add(longAt(body, "$.id"));
@@ -907,7 +919,7 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"memberId\":" + owner.getId() + ",\"packageId\":" + packageId
                                 + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"CASH\"}"))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         registrationIds.add(longAt(body, "$.id"));
         long paymentId = longAt(body, "$.paymentId");
