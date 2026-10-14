@@ -254,6 +254,7 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
         long id = service.createSessions(sportClass.getId(), single(), manager).getFirst().id();
         booking(id, member(), null, "CONFIRMED");
         booking(id, member(), null, "CONFIRMED");
+        jdbc.update("UPDATE class_session SET booked_count = 1 WHERE id = ?", id);
         mvc.perform(put("/api/v1/manager/sessions/" + id).with(user(new CustomUserDetails(manager)))
                         .contentType(MediaType.APPLICATION_JSON).content("""
                                 {"date":"%s","startTime":"10:00:00","endTime":"11:00:00",
@@ -264,6 +265,7 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
                 facilityId, coachId, 2), manager);
         assertEquals(2, result.capacity());
         assertEquals(2, result.bookedCount());
+        assertEquals(1, count("SELECT booked_count FROM class_session WHERE id = ?", id));
         assertEquals(1, count("SELECT COUNT(*) FROM activity_log WHERE actor_user_id = ? AND action = 'SESSION_UPDATED'", manager.getId()));
     }
 
@@ -294,7 +296,7 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
         assertEquals(4, count("SELECT remaining_sessions FROM sport_package_registration WHERE id = ?", normalReg));
         assertEquals(4, count("SELECT remaining_sessions FROM sport_package_registration WHERE id = ?", cappedReg));
         assertEquals(1, count("SELECT remaining_sessions FROM sport_package_registration WHERE id = ?", cancelledReg));
-        assertEquals(1, count("SELECT remaining_sessions FROM sport_package_registration WHERE id = ?", expiredReg));
+        assertEquals(0, count("SELECT remaining_sessions FROM sport_package_registration WHERE id = ?", expiredReg));
         assertEquals("EXPIRED", jdbc.queryForObject("SELECT status FROM sport_package_registration WHERE id = ?", String.class, expiredReg));
         assertEquals(manager.getId(), jdbc.queryForObject("SELECT cancelled_by_user_id FROM booking WHERE id = ?", Long.class, firstBooking));
         assertNotNull(jdbc.queryForObject("SELECT cancelled_at FROM booking WHERE id = ?", LocalDateTime.class, firstBooking));
@@ -307,6 +309,28 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Again\"}"))
                 .andExpect(status().isBadRequest());
         assertEquals(4, count("SELECT remaining_sessions FROM sport_package_registration WHERE id = ?", normalReg));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"PENDING_PAYMENT", "EXPIRED", "CANCELLED", "REFUNDED"})
+    void cancel_refundsActiveRegistrationOnlyButCancelsBookingsForEveryRegistrationStatus(String inactiveStatus) {
+        long id = service.createSessions(sportClass.getId(), single(), manager).getFirst().id();
+        long activeMember = member();
+        long activeRegistration = registration(activeMember, 5, 2, "ACTIVE");
+        booking(id, activeMember, activeRegistration, "CONFIRMED");
+        long inactiveMember = member();
+        long inactiveRegistration = registration(inactiveMember, 5, 2, inactiveStatus);
+        booking(id, inactiveMember, inactiveRegistration, "CONFIRMED");
+
+        assertEquals(SessionStatus.CANCELLED, service.cancelSession(id, new SessionCancelRequest("Weather"), manager).status());
+
+        assertEquals(3, count("SELECT remaining_sessions FROM sport_package_registration WHERE id = ?", activeRegistration));
+        assertEquals(2, count("SELECT remaining_sessions FROM sport_package_registration WHERE id = ?", inactiveRegistration));
+        assertEquals(inactiveStatus, jdbc.queryForObject("SELECT status FROM sport_package_registration WHERE id = ?",
+                String.class, inactiveRegistration));
+        assertEquals(2, count("SELECT COUNT(*) FROM booking WHERE session_id = ? AND status = 'CANCELLED' AND cancelled_by_user_id = ?",
+                id, manager.getId()));
+        assertEquals(0, count("SELECT booked_count FROM class_session WHERE id = ?", id));
     }
 
     @Test

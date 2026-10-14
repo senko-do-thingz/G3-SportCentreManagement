@@ -144,7 +144,6 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
             session.setFacility(assignment.facility());
             session.setCoach(assignment.coach());
             session.setCapacity(request.capacity());
-            session.setBookedCount(Math.toIntExact(booked));
             ClassSession saved = sessionRepository.saveAndFlush(session);
             audit(saved, actor, AuditAction.SESSION_UPDATED, Map.of("before", before, "after", snapshot(saved)));
             return toResponse(saved, booked);
@@ -155,11 +154,11 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
     @Transactional
     public ManagerSessionResponse cancelSession(Long id, SessionCancelRequest request, UserAccount actor) {
         return withLockHandling(() -> {
-            ClassSession session = findForUpdate(id);
-            ensureCanChange(session);
             if (request.reason() == null || request.reason().isBlank() || request.reason().length() > 255) {
                 throw new BusinessRuleException("Cancellation reason is required and must be at most 255 characters");
             }
+            ClassSession session = findForUpdate(id);
+            ensureCanChange(session);
             if (actor == null || actor.getId() == null) {
                 throw new BusinessRuleException("An authenticated manager is required to cancel a session");
             }

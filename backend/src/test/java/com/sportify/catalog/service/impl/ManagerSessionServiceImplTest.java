@@ -360,11 +360,13 @@ class ManagerSessionServiceImplTest {
     @Test
     void update_excludesSelfRevalidatesCoachAndWritesBeforeAfterAudit() {
         ClassSession session = existing(100L);
+        session.setBookedCount(1);
         when(sessions.findForUpdate(100L)).thenReturn(Optional.of(session));
         validAssignment();
         confirmed(100L, 3);
         when(sessions.saveAndFlush(session)).thenReturn(session);
         assertEquals(3, service.updateSession(100L, update(3), manager).bookedCount());
+        assertEquals(1, session.getBookedCount(), "Updating the schedule must not repair the cached counter");
         verify(sessions).findCoachConflicts(eq(20L), eq(List.of(DATE)), eq(START), eq(END), anySet(), eq(100L));
         verify(sessions).findFacilityConflicts(eq(30L), eq(List.of(DATE)), eq(START), eq(END), anySet(), eq(100L));
         verify(qualifications).existsById(new CoachSportId(20L, 1L));
@@ -373,6 +375,8 @@ class ManagerSessionServiceImplTest {
         assertEquals(AuditAction.SESSION_UPDATED, event.getValue().getAction());
         assertEquals(16, ((Map<?, ?>) event.getValue().getDetails().get("before")).get("capacity"));
         assertEquals(3, ((Map<?, ?>) event.getValue().getDetails().get("after")).get("capacity"));
+        assertEquals(1, ((Map<?, ?>) event.getValue().getDetails().get("before")).get("bookedCount"));
+        assertEquals(1, ((Map<?, ?>) event.getValue().getDetails().get("after")).get("bookedCount"));
     }
 
     @Test
@@ -526,12 +530,15 @@ class ManagerSessionServiceImplTest {
         assertThrows(ResourceNotFoundException.class, () -> service.cancelSession(100L, new SessionCancelRequest("Weather"), manager));
     }
 
+    static Stream<String> invalidCancellationReasons() {
+        return Stream.of(null, "", "   ", "x".repeat(256));
+    }
+
     @ParameterizedTest
-    @ValueSource(strings = {"", "   "})
-    void cancel_rejectsBlankReasonBeforeBulkUpdates(String reason) {
-        when(sessions.findForUpdate(100L)).thenReturn(Optional.of(existing(100L)));
+    @MethodSource("invalidCancellationReasons")
+    void cancel_rejectsInvalidReasonBeforeSessionLookupOrLock(String reason) {
         assertThrows(BusinessRuleException.class, () -> service.cancelSession(100L, new SessionCancelRequest(reason), manager));
-        verifyNoInteractions(cancellations, audit);
+        verifyNoInteractions(sessions, cancellations, audit);
     }
 
     static Stream<Arguments> invalidCalendarRanges() {

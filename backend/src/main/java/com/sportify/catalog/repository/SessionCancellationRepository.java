@@ -1,5 +1,6 @@
 package com.sportify.catalog.repository;
 
+import com.sportify.catalog.entity.PackageRegistrationStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -22,7 +23,7 @@ public class SessionCancellationRepository {
                 WHERE session_id = ? AND status = 'CONFIRMED'
                 """, Integer.class, sessionId);
 
-        // total_sessions is the purchased snapshot, not the current package catalog session_count.
+        // Match BE-08: only ACTIVE registrations receive credits, capped at the purchased snapshot.
         jdbcTemplate.update("""
                 UPDATE r SET remaining_sessions = CASE
                     WHEN CAST(r.remaining_sessions AS BIGINT) + refund.sessions > r.total_sessions
@@ -33,7 +34,8 @@ public class SessionCancellationRepository {
                 JOIN (SELECT package_registration_id, COUNT(*) AS sessions FROM booking
                       WHERE session_id = ? AND status = 'CONFIRMED' AND package_registration_id IS NOT NULL
                       GROUP BY package_registration_id) refund ON refund.package_registration_id = r.id
-                """, now, sessionId);
+                WHERE r.status = ?
+                """, now, sessionId, PackageRegistrationStatus.ACTIVE.name());
 
         return jdbcTemplate.update("""
                 UPDATE booking SET status = 'CANCELLED', cancelled_by_user_id = ?, cancelled_at = ?,
