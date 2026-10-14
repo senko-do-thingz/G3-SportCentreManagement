@@ -10,9 +10,6 @@ import com.sportify.payment.entity.Invoice;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.entity.PaymentStatus;
 
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDate;
 
 /**
@@ -41,11 +38,11 @@ public interface PaymentVerificationService {
      * Receipt of a payment that has just become SUCCESS: issues the PAID invoice with its line and writes the
      * PAYMENT_CONFIRMED activity log. Both confirmation paths call it, PUT /payments/{id}/confirm and the
      * PUT /membership-cards/{id}/activate and PUT /packages/registrations/{id}/activate endpoints, so every
-     * confirmed payment has exactly one invoice and one PAYMENT_CONFIRMED row. Runs in the caller's transaction.
+     * confirmed payment has exactly one invoice and one PAYMENT_CONFIRMED row. Must run in the caller's
+     * transaction (the implementation declares Propagation.MANDATORY).
      *
      * @param note front desk note to keep in the log details, or null
      */
-    @Transactional(propagation = Propagation.MANDATORY)
     Invoice recordPaymentConfirmed(Long paymentId, UserAccount actor, String note);
 
     /**

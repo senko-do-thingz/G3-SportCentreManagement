@@ -97,4 +97,12 @@ class PaymentServiceTransactionMandatoryTest {
                 .isInstanceOf(IllegalTransactionStateException.class)
                 .hasMessageContaining("No existing transaction found for transaction marked with propagation 'mandatory'");
     }
+
+    @Test
+    @DisplayName("lockPayment with Propagation.MANDATORY throws IllegalTransactionStateException outside a transaction")
+    void lockPayment_OutsideTransaction_ThrowsIllegalTransactionStateException() {
+        assertThatThrownBy(() -> proxy.lockPayment(10L))
+                .isInstanceOf(IllegalTransactionStateException.class)
+                .hasMessageContaining("No existing transaction found for transaction marked with propagation 'mandatory'");
+    }
 }

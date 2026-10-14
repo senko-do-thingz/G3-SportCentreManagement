@@ -151,6 +151,7 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         } else {
             sportPackageService.activateRegistrationForPaymentConfirmation(item.id(), actor, method);
         }
+        // Self-invocation: no proxy is involved, so this runs in the current transaction as plain code.
         Invoice invoice = recordPaymentConfirmed(payment.getId(), actor, note);
         flushPayment();
 
@@ -298,12 +299,21 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
                 .build());
     }
 
+    /**
+     * Amounts come from PaymentItemResolver (the same rule as the payment screens): subtotal = original price,
+     * discount = resolver discount, total = payment amount. If subtotal - discount does not equal the payment amount
+     * the item and the payment disagree, and no invoice is written.
+     */
     private Invoice issueInvoice(Payment payment, PaymentItem item) {
         BigDecimal total = payment.getAmount();
-        BigDecimal unitPrice = item.originalPrice() != null && item.originalPrice().compareTo(total) > 0
-                ? item.originalPrice()
-                : total;
-        BigDecimal discount = unitPrice.subtract(total);
+        BigDecimal unitPrice = item.originalPrice() != null ? item.originalPrice() : total;
+        BigDecimal discount = item.discount() != null ? item.discount() : BigDecimal.ZERO;
+        if (unitPrice.subtract(discount).compareTo(total) != 0) {
+            throw new IllegalStateException("Cannot issue the invoice of payment " + payment.getPaymentCode()
+                    + ": original price " + unitPrice.toPlainString() + " - discount " + discount.toPlainString()
+                    + " does not equal the payment amount " + total.toPlainString()
+                    + " (" + item.code() + " and the payment disagree)");
+        }
 
         LocalDateTime now = LocalDateTime.now(clock);
         Invoice invoice = Invoice.builder()
@@ -332,9 +342,9 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
     }
 
     /**
-     * Writes the pending changes now, so a failed version check surfaces inside the call. The row lock makes it
-     * unlikely; it can still happen when a card or package activate endpoint, which does not take the lock,
-     * confirms the same payment at the same moment.
+     * Writes the pending changes now, so a failed version check surfaces inside the call. Every path that changes a
+     * payment and its card or registration takes the payment row lock first, so this is only a backstop for a write
+     * that skips the lock (for example a future code path or a manual database change).
      */
     private void flushPayment() {
         try {

@@ -18,6 +18,13 @@ public interface SportPackageRegistrationRepository extends JpaRepository<SportP
     List<SportPackageRegistration> findByMemberIdOrderByStartDateDesc(Long memberId);
     Optional<SportPackageRegistration> findByPaymentId(Long paymentId);
 
+    /**
+     * The payment id of a registration, read as a single value so that no registration entity is loaded before the
+     * payment row is locked (lock order: payment first, then the registration). Empty when there is none.
+     */
+    @Query("SELECT r.payment.id FROM SportPackageRegistration r WHERE r.id = :registrationId")
+    Optional<Long> findPaymentIdById(@Param("registrationId") Long registrationId);
+
     /** Registrations paid by the given payments, with their package, for the front desk payment list. */
     @Query("SELECT r FROM SportPackageRegistration r JOIN FETCH r.sportPackage WHERE r.payment.id IN :paymentIds")
     List<SportPackageRegistration> findByPaymentIdIn(@Param("paymentIds") Collection<Long> paymentIds);

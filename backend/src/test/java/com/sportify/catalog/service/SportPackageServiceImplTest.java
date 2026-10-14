@@ -809,4 +809,56 @@ public class SportPackageServiceImplTest {
         assertThrows(BusinessRuleException.class,
                 () -> sportPackageService.activateRegistration(91L, receptionistUser, PaymentMethod.CASH));
     }
+
+    private SportPackageRegistration pendingRegistrationWithPayment() {
+        Payment payment = Payment.builder()
+                .id(88L)
+                .paymentCode("PAY-0088")
+                .paymentStatus(PaymentStatus.PENDING)
+                .build();
+        return SportPackageRegistration.builder()
+                .id(88L)
+                .registrationCode("REG-PKG-0088")
+                .member(memberProfile)
+                .sportPackage(sportPackage)
+                .status(PackageRegistrationStatus.PENDING_PAYMENT)
+                .payment(payment)
+                .originalPrice(sportPackage.getPriceAmount())
+                .paidAmount(sportPackage.getPriceAmount())
+                .startDate(LocalDate.now(clock))
+                .endDate(LocalDate.now(clock).plusDays(29))
+                .build();
+    }
+
+    @Test
+    void activateRegistration_LocksThePaymentBeforeReadingTheRegistration() {
+        SportPackageRegistration reg = pendingRegistrationWithPayment();
+        when(registrationRepository.findPaymentIdById(88L)).thenReturn(Optional.of(88L));
+        when(registrationRepository.findById(88L)).thenReturn(Optional.of(reg));
+        when(registrationRepository.save(any(SportPackageRegistration.class))).thenAnswer(i -> i.getArgument(0));
+
+        sportPackageService.activateRegistration(88L, receptionistUser, PaymentMethod.CASH);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(registrationRepository, paymentService);
+        order.verify(registrationRepository).findPaymentIdById(88L);
+        order.verify(paymentService).lockPayment(88L);
+        order.verify(registrationRepository).findById(88L);
+        order.verify(paymentService).markPaymentSuccess(88L, receptionistUser, PaymentMethod.CASH);
+    }
+
+    @Test
+    void cancelRegistration_LocksThePaymentBeforeReadingTheRegistration() {
+        SportPackageRegistration reg = pendingRegistrationWithPayment();
+        when(registrationRepository.findPaymentIdById(88L)).thenReturn(Optional.of(88L));
+        when(registrationRepository.findById(88L)).thenReturn(Optional.of(reg));
+        when(registrationRepository.save(any(SportPackageRegistration.class))).thenAnswer(i -> i.getArgument(0));
+
+        sportPackageService.cancelRegistration(88L, memberUser);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(registrationRepository, paymentService);
+        order.verify(registrationRepository).findPaymentIdById(88L);
+        order.verify(paymentService).lockPayment(88L);
+        order.verify(registrationRepository).findById(88L);
+        order.verify(paymentService).markPaymentFailed(eq(88L), any());
+    }
 }

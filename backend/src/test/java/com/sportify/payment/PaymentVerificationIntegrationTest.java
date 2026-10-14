@@ -46,6 +46,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.hibernate.Hibernate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -390,6 +393,66 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("FE-05 card activate and PUT /payments/{id}/confirm at the same time: one 200, the other 400 or 409, never 500, one invoice")
+    void concurrentActivateEndpointAndConfirm_NoDeadlock() throws Exception {
+        Long[] ids = pendingCard();
+        UserAccount first = tx().execute(s -> newUser("RECEPTIONIST"));
+        UserAccount second = tx().execute(s -> newUser("RECEPTIONIST"));
+
+        List<MvcResult> results = performTogether(List.of(
+                put("/api/v1/membership-cards/" + ids[1] + "/activate")
+                        .with(user(new CustomUserDetails(first)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"paymentMethod\":\"CASH\"}"),
+                put("/api/v1/payments/" + ids[0] + "/confirm")
+                        .with(user(new CustomUserDetails(second)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"method\":\"CASH\",\"amountReceived\":1200000}")));
+
+        assertOneOkOneBusinessError(results);
+        tx().executeWithoutResult(s -> {
+            assertThat(paymentRepository.findById(ids[0]).orElseThrow().getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+            assertThat(memberCardRepository.findById(ids[1]).orElseThrow().getStatus()).isEqualTo(CardStatus.ACTIVE);
+            assertThat(invoiceRepository.findByPaymentId(ids[0])).hasSize(1);
+            String code = paymentRepository.findById(ids[0]).orElseThrow().getPaymentCode();
+            assertThat(activityRows(code, "PAYMENT_CONFIRMED")).isEqualTo(1);
+        });
+    }
+
+    @Test
+    @DisplayName("Member cancels a card request while a receptionist confirms it: one wins, never 500, states consistent")
+    void concurrentMemberCancelAndConfirm_ConsistentOutcome() throws Exception {
+        Long[] ids = pendingCard();
+        UserAccount owner = cardOwner(ids[1]);
+        UserAccount receptionist = tx().execute(s -> newUser("RECEPTIONIST"));
+
+        List<MvcResult> results = performTogether(List.of(
+                put("/api/v1/membership-cards/" + ids[1] + "/cancel")
+                        .with(user(new CustomUserDetails(owner))),
+                put("/api/v1/payments/" + ids[0] + "/confirm")
+                        .with(user(new CustomUserDetails(receptionist)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"method\":\"CASH\",\"amountReceived\":1200000}")));
+
+        assertOneOkOneBusinessError(results);
+        boolean cancelWon = results.get(0).getResponse().getStatus() == 200;
+        tx().executeWithoutResult(s -> {
+            Payment payment = paymentRepository.findById(ids[0]).orElseThrow();
+            MemberCard card = memberCardRepository.findById(ids[1]).orElseThrow();
+            int invoices = invoiceRepository.findByPaymentId(ids[0]).size();
+            if (cancelWon) {
+                assertThat(card.getStatus()).isEqualTo(CardStatus.CANCELLED);
+                assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.FAILED);
+                assertThat(invoices).isZero();
+            } else {
+                assertThat(card.getStatus()).isEqualTo(CardStatus.ACTIVE);
+                assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+                assertThat(invoices).isEqualTo(1);
+            }
+        });
+    }
+
+    @Test
     @DisplayName("PUT /membership-cards/{id}/activate (FE-05) issues one invoice and one PAYMENT_CONFIRMED row")
     void activateCardEndpoint_IssuesReceipt() throws Exception {
         Long[] ids = pendingCard();
@@ -509,6 +572,53 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         });
     }
 
+    /** The member who owns a card, with the role loaded so it can be used outside a transaction. */
+    private UserAccount cardOwner(Long cardId) {
+        return tx().execute(s -> {
+            Long memberId = memberCardRepository.findById(cardId).orElseThrow().getMember().getId();
+            UserAccount account = userRepository.findById(memberId).orElseThrow();
+            Hibernate.initialize(account.getRole());
+            return account;
+        });
+    }
+
+    /** Sends every request at the same moment and returns the results in the same order. */
+    private List<MvcResult> performTogether(List<MockHttpServletRequestBuilder> requests) throws Exception {
+        List<Callable<MvcResult>> calls = new ArrayList<>();
+        for (MockHttpServletRequestBuilder request : requests) {
+            calls.add(() -> mockMvc.perform(request).andReturn());
+        }
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(calls.size());
+        try {
+            List<Future<MvcResult>> futures = new ArrayList<>();
+            for (Callable<MvcResult> call : calls) {
+                futures.add(pool.submit(() -> {
+                    start.await(10, TimeUnit.SECONDS);
+                    return call.call();
+                }));
+            }
+            start.countDown();
+            List<MvcResult> results = new ArrayList<>();
+            for (Future<MvcResult> future : futures) {
+                results.add(future.get(60, TimeUnit.SECONDS));
+            }
+            return results;
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    /** Exactly one 200; the other is 400 or 409 with a business message. A 500 (for example a deadlock victim) fails. */
+    private static void assertOneOkOneBusinessError(List<MvcResult> results) throws Exception {
+        List<Integer> statuses = results.stream().<Integer>map(r -> r.getResponse().getStatus()).toList();
+        assertThat(statuses).filteredOn(code -> code == 200).hasSize(1);
+        MvcResult loser = results.stream().filter(r -> r.getResponse().getStatus() != 200).findFirst().orElseThrow();
+        assertThat(loser.getResponse().getStatus()).isIn(400, 409);
+        assertThat(loser.getResponse().getContentAsString()).contains("\"message\"");
+        assertThat(loser.getResponse().getContentAsString()).doesNotContain("Internal server error");
+    }
+
     /** Starts every call at the same moment; the result holds null for a call that returned, else its exception. */
     private List<Throwable> runTogether(List<Callable<?>> calls) throws Exception {
         CountDownLatch start = new CountDownLatch(1);
@@ -538,8 +648,10 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
     }
 
     /**
-     * Both calls start with the payment row lock, so the second waits for the first to commit and then reads a
-     * payment that is no longer PENDING. Both take the same single lock first, so they cannot deadlock.
+     * Lock order rule: every path takes the payment row lock before it reads or writes the card or registration.
+     * The only read before that lock is a single-value query for the payment id, whose shared lock is released at
+     * once, so a waiting caller holds no lock the winner needs and the calls cannot deadlock. The second caller
+     * waits for the first to commit and then reads a payment that is no longer PENDING.
      */
     private static void assertOneWinnerOneNotPending(List<Throwable> outcomes) {
         assertThat(outcomes).hasSize(2);

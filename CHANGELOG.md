@@ -28,6 +28,9 @@ Branch `feat/f3-confirm-payment`. Owner: Truc. Priority: P1. Depends on BE-17 (m
 - Confirm and fail lock the payment row first (`findByIdForUpdate`), so the second caller always gets 409 `PAYMENT_NOT_PENDING`; a version check failure inside them answers 409 `PAYMENT_CONCURRENT_UPDATE`. Non-staff actors in the service get 403.
 - Mismatch also writes an activity_log row PAYMENT_AMOUNT_MISMATCH. One `PaymentItemResolver` gives the item name, original price and discount for `GET /payments/{id}`, `GET /payments` and the invoice. The fail reason is stored in `sport_package_registration.cancel_reason`.
 
+### Review round 2
+- The card and package activate and cancel endpoints also lock the payment row before the card or registration, so every path uses one lock order and cannot deadlock with confirm or fail. Invoice amounts come from `PaymentItemResolver` and must satisfy subtotal - discount = total.
+
 ## 2026-10-13 - Receptionist Member Search, Register and Renew, Check-in (FE-05, Flow 1)
 
 Branch `feat/f1-reception-screens`. Owner: Phat. Priority: P1. Depends on FE-00 (merged), BE-05 and BE-19 (not merged yet, see Notes). Rebased on main after FE-04. Verified after review round 1 with `npm run lint -- --max-warnings 0`, `tsc -b`, `npm test` (399 tests in 20 files: 47 for FE-05, 352 existing for FE-00 to FE-04) and `npm run build`.

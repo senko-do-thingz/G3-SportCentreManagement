@@ -152,6 +152,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     }
 
     private MemberCard activatePending(Long cardId, UserAccount actor, PaymentMethod actualMethod) {
+        lockLinkedPayment(cardId);
         MemberCard card = memberCardRepository.findById(cardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member card not found for id: " + cardId));
         if (card.getStatus() != CardStatus.PENDING_PAYMENT) {
@@ -185,6 +186,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     @Override
     @Transactional
     public MemberCardResponse cancelCard(Long cardId, UserAccount actor) {
+        lockLinkedPayment(cardId);
         MemberCard card = memberCardRepository.findById(cardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member card not found for id: " + cardId));
         boolean isStaff = SecurityUtils.isStaff(actor);
@@ -250,6 +252,15 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     }
 
     /** A card request priced below its tier was requested as an upgrade (the member pays only the difference). */
+    /**
+     * Lock order rule (docs/database/09): lock the payment row before the card is read or written. Only the payment
+     * id is read before the lock (a single value, no card entity), so the card is first loaded after the lock and
+     * every check runs on its current state. A card with no payment keeps the old behaviour.
+     */
+    private void lockLinkedPayment(Long cardId) {
+        memberCardRepository.findPaymentIdById(cardId).ifPresent(paymentService::lockPayment);
+    }
+
     private static boolean isUpgradePrice(MemberCard card) {
         return card.getPricePaid() != null && card.getPricePaid().compareTo(card.getTier().getPrice()) < 0;
     }

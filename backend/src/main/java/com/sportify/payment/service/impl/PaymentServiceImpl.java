@@ -140,6 +140,16 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Payment lockPayment(Long paymentId) {
+        if (paymentId == null) {
+            throw new BusinessRuleException("Payment ID cannot be null");
+        }
+        return paymentRepository.findByIdForUpdate(paymentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment not found for id: " + paymentId));
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public PaymentResponse getPayment(Long id, UserAccount actor) {
         if (actor == null) {

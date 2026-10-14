@@ -736,5 +736,67 @@ public class MembershipCardServiceImplTest {
         assertThrows(BusinessRuleException.class,
                 () -> membershipCardService.activateCard(42L, receptionistUser, PaymentMethod.CASH));
     }
-}
 
+    private MemberCard pendingCardWithPayment() {
+        Payment payment = Payment.builder()
+                .id(99L)
+                .paymentCode("PAY-0099")
+                .paymentStatus(PaymentStatus.PENDING)
+                .build();
+        return MemberCard.builder()
+                .id(42L)
+                .cardCode("CARD-42")
+                .member(memberProfile)
+                .tier(goldTier)
+                .status(CardStatus.PENDING_PAYMENT)
+                .payment(payment)
+                .pricePaid(goldTier.getPrice())
+                .build();
+    }
+
+    @Test
+    void activateCard_LocksThePaymentBeforeReadingTheCard() {
+        MemberCard pending = pendingCardWithPayment();
+        when(memberCardRepository.findPaymentIdById(42L)).thenReturn(Optional.of(99L));
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of());
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
+
+        membershipCardService.activateCard(42L, receptionistUser, PaymentMethod.CASH);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(memberCardRepository, paymentService);
+        order.verify(memberCardRepository).findPaymentIdById(42L);
+        order.verify(paymentService).lockPayment(99L);
+        order.verify(memberCardRepository).findById(42L);
+        order.verify(paymentService).markPaymentSuccess(99L, receptionistUser, PaymentMethod.CASH);
+    }
+
+    @Test
+    void cancelCard_LocksThePaymentBeforeReadingTheCard() {
+        MemberCard pending = pendingCardWithPayment();
+        when(memberCardRepository.findPaymentIdById(42L)).thenReturn(Optional.of(99L));
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
+
+        MemberCardResponse res = membershipCardService.cancelCard(42L, memberUser);
+
+        assertEquals(CardStatus.CANCELLED, res.getStatus());
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(memberCardRepository, paymentService);
+        order.verify(memberCardRepository).findPaymentIdById(42L);
+        order.verify(paymentService).lockPayment(99L);
+        order.verify(memberCardRepository).findById(42L);
+        order.verify(paymentService).markPaymentFailed(eq(99L), any());
+    }
+
+    @Test
+    void cancelCard_WithoutPayment_TakesNoPaymentLock() {
+        MemberCard pending = pendingCardWithPayment();
+        pending.setPayment(null);
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
+
+        membershipCardService.cancelCard(42L, memberUser);
+
+        org.mockito.Mockito.verify(paymentService, org.mockito.Mockito.never()).lockPayment(anyLong());
+    }
+}

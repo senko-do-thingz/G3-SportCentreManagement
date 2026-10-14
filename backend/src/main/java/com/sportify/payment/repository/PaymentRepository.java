@@ -20,8 +20,11 @@ public interface PaymentRepository extends JpaRepository<Payment, Long>, JpaSpec
 
     /**
      * Reads a payment and holds a row lock (SQL Server UPDLOCK, HOLDLOCK) until the transaction ends.
-     * The front desk confirm and fail calls start with it, so a second caller waits for the first one to
-     * commit and then sees the payment as it is now (no longer PENDING) instead of acting on a stale copy.
+     * Lock order rule: every path that changes a payment and the card or registration it pays for takes this
+     * lock first and only then reads and writes the card or registration (confirm, fail, the card and package
+     * activate and cancel endpoints). A second caller waits here holding no other lock, so the paths cannot
+     * deadlock, and it then sees the payment as it is now instead of acting on a stale copy.
+     * Calling it again in the same transaction is harmless: the transaction already owns the lock.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Payment p WHERE p.id = :id")

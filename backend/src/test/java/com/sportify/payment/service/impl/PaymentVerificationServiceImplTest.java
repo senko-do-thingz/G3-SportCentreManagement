@@ -529,4 +529,21 @@ class PaymentVerificationServiceImplTest {
         assertThatThrownBy(() -> service.getInvoiceByPayment(1L, otherMember))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
+
+    @Test
+    @DisplayName("Invoice amounts that would break subtotal - discount = total throw IllegalStateException, nothing saved")
+    void recordPaymentConfirmed_InconsistentAmounts_IllegalStateAndNoInvoice() {
+        payment.setPaymentStatus(PaymentStatus.SUCCESS);
+        payment.setAmount(new BigDecimal("390000.00"));
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(registrationRepository.findByPaymentId(1L)).thenReturn(Optional.of(pendingRegistration()));
+        when(invoiceRepository.findByPaymentId(1L)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.recordPaymentConfirmed(1L, receptionist, null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("does not equal the payment amount 390000.00");
+        verify(invoiceRepository, never()).save(any());
+        verify(invoiceRepository, never()).getNextInvoiceNumberSequence();
+        verifyNoInteractions(auditService);
+    }
 }

@@ -233,6 +233,7 @@ public class SportPackageServiceImpl implements SportPackageService {
     }
 
     private SportPackageRegistration activatePending(Long registrationId, UserAccount actor, PaymentMethod actualMethod) {
+        lockLinkedPayment(registrationId);
         SportPackageRegistration registration = registrationRepository.findById(registrationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Package registration not found for id: " + registrationId));
 
@@ -267,6 +268,7 @@ public class SportPackageServiceImpl implements SportPackageService {
     @Override
     @Transactional
     public PackageRegistrationResponse cancelRegistration(Long registrationId, UserAccount actor, String reason) {
+        lockLinkedPayment(registrationId);
         SportPackageRegistration registration = registrationRepository.findById(registrationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Package registration not found for id: " + registrationId));
 
@@ -363,6 +365,15 @@ public class SportPackageServiceImpl implements SportPackageService {
 
     static LocalDate packageEnd(LocalDate startDate, int durationDays) {
         return startDate.plusDays(durationDays - 1L);
+    }
+
+    /**
+     * Lock order rule (docs/database/09): lock the payment row before the registration is read or written. Only the
+     * payment id is read before the lock (a single value, no registration entity), so the registration is first
+     * loaded after the lock and every check runs on its current state. A registration with no payment is unchanged.
+     */
+    private void lockLinkedPayment(Long registrationId) {
+        registrationRepository.findPaymentIdById(registrationId).ifPresent(paymentService::lockPayment);
     }
 
     private static String truncate(String value, int max) {

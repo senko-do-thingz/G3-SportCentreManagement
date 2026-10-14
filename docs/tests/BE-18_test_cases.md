@@ -7,8 +7,8 @@
 - **Branch**: `feat/f3-confirm-payment`
 - **Priority**: P1 (core flow demo)
 - **Depends on**: BE-17 (pending payments, merged)
-- **Objective**: Let RECEPTIONIST and MANAGER list payment requests (PENDING first), confirm a payment when the amount received matches (payment SUCCESS, card or package ACTIVE with recomputed dates, one PAID invoice with its line, activity log), answer 409 PAYMENT_AMOUNT_MISMATCH without changing anything but a note and a PAYMENT_AMOUNT_MISMATCH log, refuse a second confirm or fail with 409 PAYMENT_NOT_PENDING, and mark a payment FAILED with a reason. Review round 1: the FE-05 card and package activate endpoints issue the same receipt.
-- **Environment Note**: Maven Central and the SQL Server image could not be downloaded in the environment that wrote this change (initial commit and review round 1), so nothing below was executed there. The unit and MockMvc tests run with `mvn test` on a developer machine; the Testcontainers tests need Docker and run in GitHub Actions CI. Update the Execution Status column after the first run.
+- **Objective**: Let RECEPTIONIST and MANAGER list payment requests (PENDING first), confirm a payment when the amount received matches (payment SUCCESS, card or package ACTIVE with recomputed dates, one PAID invoice with its line, activity log), answer 409 PAYMENT_AMOUNT_MISMATCH without changing anything but a note and a PAYMENT_AMOUNT_MISMATCH log, refuse a second confirm or fail with 409 PAYMENT_NOT_PENDING, and mark a payment FAILED with a reason. Review round 1: the FE-05 card and package activate endpoints issue the same receipt. Review round 2: every path that changes a payment and its card or registration locks the payment row first.
+- **Environment Note**: Maven Central and the SQL Server image could not be downloaded in the environment that wrote this change (initial commit, review rounds 1 and 2), so nothing below was executed there. The unit and MockMvc tests run with `mvn test` on a developer machine; the Testcontainers tests need Docker and run in GitHub Actions CI. Update the Execution Status column after the first run.
 
 ---
 
@@ -66,13 +66,13 @@ Request unchanged: `{"paymentMethod": "CASH"}` or no body. No reference is requi
 
 | Test Class | Category | Tests | Execution Status | Description |
 |---|---|---|---|---|
-| `PaymentVerificationServiceImplTest` | Service unit test (Mockito) | 18 | Not run yet | Row lock, invoice amounts and line, activation per item type without receipt duplication, mismatch note and log, 409 codes (NOT_PENDING, CONCURRENT_UPDATE, INVOICE_ALREADY_ISSUED), 403 for non-staff on confirm and fail, reason passed to cancelRegistration, list mapping, invoice visibility |
+| `PaymentVerificationServiceImplTest` | Service unit test (Mockito) | 19 | Not run yet | Row lock, invoice amounts and line, activation per item type without receipt duplication, invoice invariant subtotal - discount = total, mismatch note and log, 409 codes (NOT_PENDING, CONCURRENT_UPDATE, INVOICE_ALREADY_ISSUED), 403 for non-staff on confirm and fail, reason passed to cancelRegistration, list mapping, invoice visibility |
 | `PaymentPricingConsistencyTest` | Service unit test (Mockito) | 3 | Not run yet | `GET /payments/{id}` and `GET /payments` show the same item name, original price and discount (package, package with a paid amount different from the payment, card upgrade) |
 | `PaymentVerificationControllerTest` | WebMvc MockMvc test | 15 methods, 17 runs | Not run yet | Roles 200/403/401, service AccessDeniedException as 403, JSON aliases, 409 body codes, bean validation 400, list parameters and defaults |
-| `PaymentVerificationIntegrationTest` | Testcontainers integration test | 12 | Not run yet (CI only) | Real SQL Server: activation dates, invoice rows, committed mismatch note and log, double confirm, confirm vs confirm and confirm vs fail races, version check, fail reasons, FE-05 activate endpoints issue the receipt, list order and search |
-| `MembershipCardServiceImplTest` (existing, changed) | Service unit test | +1 new, 1 assertion added | Not run yet | activateCard calls recordPaymentConfirmed; activateCardForPaymentConfirmation does not |
-| `SportPackageServiceImplTest` (existing, changed) | Service unit test | +3 new, 1 assertion added | Not run yet | activateRegistration calls recordPaymentConfirmed; the confirmation variant does not; cancel reason stored or defaulted |
-| `PaymentServiceImplTest`, `PaymentServiceTransactionMandatoryTest` (existing) | Regression | 38 and 3 | Not run yet | Constructor now takes `PaymentItemResolver`; expected values unchanged |
+| `PaymentVerificationIntegrationTest` | Testcontainers integration test | 14 | Not run yet (CI only) | Real SQL Server: activation dates, invoice rows, committed mismatch note and log, double confirm, confirm vs confirm, confirm vs fail, activate endpoint vs confirm and member cancel vs confirm races, version check, fail reasons, FE-05 activate endpoints issue the receipt, list order and search |
+| `MembershipCardServiceImplTest` (existing, changed) | Service unit test | +4 new (1 in round 1, 3 in round 2), 1 assertion added | Not run yet | activateCard calls recordPaymentConfirmed; activateCardForPaymentConfirmation does not; activate and cancel lock the payment before reading the card; no lock without a payment |
+| `SportPackageServiceImplTest` (existing, changed) | Service unit test | +5 new (3 in round 1, 2 in round 2), 1 assertion added | Not run yet | activateRegistration calls recordPaymentConfirmed; the confirmation variant does not; cancel reason stored or defaulted; activate and cancel lock the payment before reading the registration |
+| `PaymentServiceImplTest`, `PaymentServiceTransactionMandatoryTest` (existing) | Service unit test | 40 and 4 | Not run yet | Constructor takes `PaymentItemResolver`; new `lockPayment` (found, not found, MANDATORY outside a transaction) |
 | `PaymentControllerTest`, `GlobalExceptionHandlerTest`, `MembershipCardControllerTest`, `RefreshedCatalogAuthorizationTest` (existing) | Regression | | Not run yet | 409 bodies carry `code` only when set; activate endpoints keep their contract |
 
 ---
@@ -104,6 +104,17 @@ Request unchanged: `{"paymentMethod": "CASH"}` or no body. No reference is requi
 | TC-BE18-14 | Confirm does not issue the receipt twice | Activation variant used by confirm does not call recordPaymentConfirmed | Unit `activateCardForPaymentConfirmation_ActivatesWithoutIssuingTheReceipt`, `activateRegistrationForPaymentConfirmation_ActivatesWithoutIssuingTheReceipt` |
 | TC-BE18-15 | Second invoice refused | recordPaymentConfirmed with an invoice already present | 409 INVOICE_ALREADY_ISSUED, nothing saved | Unit `recordPaymentConfirmed_InvoiceAlreadyIssued_Conflict` |
 | TC-BE18-16 | Receipt only for SUCCESS | recordPaymentConfirmed on a PENDING payment | IllegalStateException | Unit `recordPaymentConfirmed_NotSuccess_IllegalState` |
+
+### 3.2b Lock order (review round 2)
+
+| ID | Case | Expected | Covered by |
+|---|---|---|---|
+| TC-BE18-36 | Activate and cancel lock the payment first | Order: read payment id, lockPayment, read card or registration, change the payment | Unit `activateCard_LocksThePaymentBeforeReadingTheCard`, `cancelCard_LocksThePaymentBeforeReadingTheCard`, `activateRegistration_LocksThePaymentBeforeReadingTheRegistration`, `cancelRegistration_LocksThePaymentBeforeReadingTheRegistration` |
+| TC-BE18-37 | Item without payment | No payment lock, old behaviour | Unit `cancelCard_WithoutPayment_TakesNoPaymentLock` |
+| TC-BE18-38 | FE-05 activate endpoint and confirm on the same card at once | Exactly one 200; the other 400 (card already ACTIVE) or 409 (PAYMENT_NOT_PENDING) with a message, never 500; payment SUCCESS, card ACTIVE, one invoice, one PAYMENT_CONFIRMED | IT `concurrentActivateEndpointAndConfirm_NoDeadlock` |
+| TC-BE18-39 | MEMBER cancels the card request while a receptionist confirms | Exactly one 200, the other 400 or 409, never 500; either CANCELLED + FAILED + no invoice, or ACTIVE + SUCCESS + one invoice | IT `concurrentMemberCancelAndConfirm_ConsistentOutcome` |
+| TC-BE18-40 | Invoice invariant | Resolver amounts that break original price - discount = payment amount -> IllegalStateException, no invoice, no log | Unit `recordPaymentConfirmed_InconsistentAmounts_IllegalStateAndNoInvoice` |
+| TC-BE18-41 | lockPayment | Uses the lock query; 404 when missing; MANDATORY outside a transaction | Unit `lockPayment_Found_ReturnsLockedPayment`, `lockPayment_NotFound_Throws`, `lockPayment_OutsideTransaction_ThrowsIllegalTransactionStateException` |
 
 ### 3.3 Validation and edge cases
 
