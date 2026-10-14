@@ -6,7 +6,7 @@
 
 - Manager session calendar with inclusive date ranges, class/coach/facility filters, deterministic ordering and grouped confirmed booking counts.
 - Single and weekly DRAFT or PUBLISHED session creation, coach qualification checks, class capacity bounds and complete coach/facility conflict details in the existing 409 error envelope. Weekly batches reject every insertion if any requested date conflicts.
-- Pessimistic coach/facility resource locks for concurrent scheduling, session updates that exclude themselves from overlap checks, and future-session cancellation with manager/reason metadata, bulk booking cancellation and capped package-session restoration in one audited transaction.
+- Pessimistic coach/facility resource locks for concurrent scheduling, session updates that exclude themselves from overlap checks and preserve the cached booking counter, and future-session cancellation with manager/reason metadata, bulk booking cancellation and capped session-credit restoration only to ACTIVE package registrations in one audited transaction.
 - V23 cancellation metadata and resource/date and booking/session indexes, SQL Server integration coverage registered in the required-suite manifest, and test cases in `docs/tests/BE-10_test_cases.md`.
 
 ## 2026-10-13 - Sport Packages & Pricing and Manager Catalog (BE-03, Flow 1)
