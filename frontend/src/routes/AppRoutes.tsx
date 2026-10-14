@@ -1,0 +1,134 @@
+import { lazy, Suspense, type ReactNode } from 'react'
+import { Route, Routes } from 'react-router-dom'
+import { RequireRole } from '../auth/RequireRole'
+import { useAuth } from '../auth/useAuth'
+import { MemberLayout } from '../layouts/MemberLayout'
+import { ALL_AREAS, type RoleArea } from '../layouts/navigation'
+import { PublicLayout } from '../layouts/PublicLayout'
+import { StaffLayout } from '../layouts/StaffLayout'
+import { PageLoader } from '../components/ui/Spinner'
+import { MemberDashboardPage } from '../pages/member/MemberDashboardPage'
+import { MembershipCardsPage } from '../pages/member/MembershipCardsPage'
+import { MyMembershipPage } from '../pages/member/MyMembershipPage'
+import { MyProfilePage } from '../pages/member/MyProfilePage'
+import { PackageDetailPage } from '../pages/member/PackageDetailPage'
+import { PaymentSummaryPage } from '../pages/member/PaymentSummaryPage'
+import { SportPackagesPage } from '../pages/member/SportPackagesPage'
+import { PlaceholderPage } from '../pages/PlaceholderPage'
+import { ForbiddenPage } from '../pages/public/ForbiddenPage'
+import { HomeRedirect } from '../pages/public/HomeRedirect'
+import { LoginPage } from '../pages/public/LoginPage'
+import { NotFoundPage } from '../pages/public/NotFoundPage'
+import { RegisterPage } from '../pages/public/RegisterPage'
+import { AccountSwitchRedirect } from './AccountSwitchRedirect'
+import { UserManagementPage } from '../pages/manager/UserManagementPage'
+import { ManagerPackagesPage } from '../pages/manager/ManagerPackagesPage'
+import { MembershipCardsManagementPage } from '../pages/manager/MembershipCardsManagementPage'
+import { ActivityLogPage } from '../pages/manager/ActivityLogPage'
+
+/**
+ * Real screens by full path. Later tasks register their page here, for example
+ * '/member/packages': <SportPackagesPage />. Paths without an entry show a placeholder.
+ */
+const SCREENS: Record<string, ReactNode> = {
+  '/manager': <UserManagementPage />,
+  '/manager/packages': <ManagerPackagesPage />,
+  '/manager/cards': <MembershipCardsManagementPage />,
+  '/manager/activity': <ActivityLogPage />,
+  '/member': <MemberDashboardPage />,
+  '/member/profile': <MyProfilePage />,
+  '/member/packages': <SportPackagesPage />,
+  '/member/membership': <MyMembershipPage />,
+}
+
+/**
+ * Sub pages by area base path, relative to the area.
+ * - 'packages/:packageId': Package Detail and Registration (F1-10, FE-03).
+ * - 'membership/cards': Membership Cards and the Renew Membership Card overlay (F1-11, FE-04),
+ *   linked from the Membership card tab of My Membership (F1-12).
+ * - 'payments/:paymentId': Payment Summary (F3-01), linked from "Pay now" on the dashboard (FE-02)
+ *   and reached after a registration (FE-03). FE-03 replaced the FE-02 placeholder with a read only
+ *   summary; FE-11 adds the payment method and the status screens.
+ */
+const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
+  '/member': [
+    { path: 'packages/:packageId', element: <PackageDetailPage /> },
+    { path: 'membership/cards', element: <MembershipCardsPage /> },
+    { path: 'payments/:paymentId', element: <PaymentSummaryPage /> },
+  ],
+}
+
+/**
+ * The UI kit demo page (/ui-kit) exists only in development (npm run dev) and in tests. In a
+ * production build import.meta.env.DEV is false, so Vite drops the route and the page code.
+ */
+const ComponentDemoPage = import.meta.env.DEV
+  ? lazy(() => import('../pages/dev/ComponentDemoPage').then((module) => ({ default: module.ComponentDemoPage })))
+  : null
+
+function areaRoutes(area: RoleArea) {
+  const subRoutes = (SUB_SCREENS[area.basePath] ?? []).map((screen) => (
+    <Route key={`${area.basePath}/${screen.path}`} path={screen.path} element={screen.element} />
+  ))
+  const itemRoutes = area.sections
+    .flatMap((section) => section.items)
+    .map((item) => {
+      const fullPath = item.path ? `${area.basePath}/${item.path}` : area.basePath
+      const element = SCREENS[fullPath] ?? <PlaceholderPage item={item} eyebrow={area.workspaceLabel} />
+      return item.path ? (
+        <Route key={fullPath} path={item.path} element={element} />
+      ) : (
+        <Route key={fullPath} index element={element} />
+      )
+    })
+  return [...itemRoutes, ...subRoutes]
+}
+
+export function AppRoutes() {
+  const { user } = useAuth()
+  // Keyed by user id: when the signed in account changes, the whole role area (layout, page and
+  // any form in it) is mounted again, so nothing typed or loaded for the previous user survives.
+  const accountKey = user ? `user-${user.id}` : 'anonymous'
+  return (
+    <>
+      <AccountSwitchRedirect />
+      <Routes>
+        <Route path="/" element={<HomeRedirect />} />
+
+        <Route element={<PublicLayout />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+        </Route>
+
+        {import.meta.env.DEV && ComponentDemoPage && (
+          <Route
+            path="/ui-kit"
+            element={
+              <Suspense fallback={<PageLoader label="Loading UI kit" />}>
+                <ComponentDemoPage />
+              </Suspense>
+            }
+          />
+        )}
+        <Route path="/403" element={<ForbiddenPage />} />
+
+        {ALL_AREAS.map((area) => (
+          <Route
+            key={area.basePath}
+            path={area.basePath}
+            element={
+              <RequireRole key={accountKey} roles={[area.role]}>
+                {area.role === 'MEMBER' ? <MemberLayout /> : <StaffLayout />}
+              </RequireRole>
+            }
+          >
+            {areaRoutes(area)}
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+        ))}
+
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </>
+  )
+}
