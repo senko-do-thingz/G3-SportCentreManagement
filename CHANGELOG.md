@@ -1,5 +1,39 @@
 # Changelog
 
+## 2026-10-14 - Receptionist verifies and confirms payments (BE-18, Flow 3)
+
+Branch `feat/f3-confirm-payment`. Owner: Truc. Priority: P1. Depends on BE-17 (merged). Screens F3-04, F3-05, F3-06 and S3-Mismatch. Provides the BE-18 part of what FE-12 (`feat/f3-reception-payments`) needs; FE-12 is also blocked by BE-21.
+
+### Added
+- `GET /api/v1/payments` (RECEPTIONIST, MANAGER): payment requests with filters `status`, `method`, `search` (`query` also accepted), `from`, `to`, `page`, `size` (max 100); PENDING first, oldest first, then newest first; each row has member name and code, item type, code and status, original price, discount and invoice number.
+- `PUT /api/v1/payments/{id}/confirm`: `method`, `referenceCode` (required except for CASH, 400 otherwise), `amountReceived`, `note`. Matching amount -> payment SUCCESS with payment_time, card or registration ACTIVE with dates recomputed from today, one PAID invoice with one line (price before discount, card discount or upgrade credit as `discount_amount`, total = payment amount), activity_log PAYMENT_CONFIRMED. Different amount -> 409 `PAYMENT_AMOUNT_MISMATCH`, payment stays PENDING, only a note is committed. Not PENDING -> 409 `PAYMENT_NOT_PENDING`; a concurrent second confirmation fails on the payment `@Version` (409).
+- `PUT /api/v1/payments/{id}/fail` with `reason`: cancels the linked card or package request, payment FAILED with the reason in the notes, activity_log PAYMENT_FAILED.
+- `GET /api/v1/invoices/by-payment/{paymentId}`: receipt with lines, for staff or the member who owns the payment.
+- `PaymentVerificationService`, `PaymentVerificationController`, `InvoiceController`, `PaymentSpecifications`, DTOs `ConfirmPaymentRequest`, `FailPaymentRequest`, `StaffPaymentResponse`, `InvoiceResponse`, `InvoiceLineResponse`, `PaymentAmountMismatchException`; audit actions `PAYMENT_CONFIRMED`, `PAYMENT_FAILED`.
+- Tests: `PaymentVerificationServiceImplTest` (13), `PaymentVerificationControllerTest` (15), `PaymentVerificationIntegrationTest` (8, Testcontainers); test cases in `docs/tests/BE-18_test_cases.md`.
+
+### Changed
+- `ConflictException` takes an optional `code`; the 409 body includes `code` only when one is set (existing 409 bodies are unchanged).
+- Note appending moved from `PaymentServiceImpl` to `PaymentNotes` so both services keep the same 500 character rule; behaviour unchanged.
+- `PaymentRepository` is a `JpaSpecificationExecutor`; `MemberCardRepository`, `SportPackageRegistrationRepository` and `InvoiceRepository` get batch `findByPaymentIdIn` lookups for the list.
+- `docs/database/04` and `09`: verification endpoints, invoice amount rule, mismatch and double confirmation rules, payment state machine, V21 columns of `payment`.
+
+### Notes
+- No migration: `amount_received` is not a column (a confirmed payment always received exactly its amount); a different amount is kept only in the PAYMENT_AMOUNT_MISMATCH log details.
+- Not verified in the authoring environment (Maven Central and Docker images were blocked there). Run `mvn -B test` before merging; integration tests run in CI.
+- Failing a payment cancels the request it paid for, so the member asks again and a new payment row is created (state machine "Retry (creates new row)").
+
+### Review round 1
+- The card and package activate endpoints (FE-05) now issue the same receipt as confirm through `PaymentVerificationService.recordPaymentConfirmed`: one PAID invoice and one PAYMENT_CONFIRMED row per confirmed payment; their request is unchanged.
+- Confirm and fail lock the payment row first (`findByIdForUpdate`), so the second caller always gets 409 `PAYMENT_NOT_PENDING`; a version check failure inside them answers 409 `PAYMENT_CONCURRENT_UPDATE`. Non-staff actors in the service get 403.
+- Mismatch also writes an activity_log row PAYMENT_AMOUNT_MISMATCH. One `PaymentItemResolver` gives the item name, original price and discount for `GET /payments/{id}`, `GET /payments` and the invoice. The fail reason is stored in `sport_package_registration.cancel_reason`.
+
+### Review round 2
+- The card and package activate and cancel endpoints also lock the payment row before the card or registration, so every path uses one lock order and cannot deadlock with confirm or fail. Invoice amounts come from `PaymentItemResolver` and must satisfy subtotal - discount = total.
+- Review round 3: a card's original price is never below its `price_paid` snapshot, so a tier price lowered after the request no longer blocks confirmation; an item price that differs from the payment answers 409 `PAYMENT_ITEM_AMOUNT_MISMATCH` instead of 500.
+- CI fix: `PaymentVerificationIntegrationTest` failed to compile (ambiguous `assertThat` on `tx().execute(...)`); the invoice count is read through an `int` helper `invoiceCount`.
+- Rebased on main after PR #40 (manager catalog, BE-03) as one commit: conflicts in `MembershipCardServiceImpl`, `SportPackageServiceImpl` and their unit tests resolved by keeping the PR #40 upgrade rules (rank based, `upgradeRequest`) and the BE-18 lock order and receipt step; the integration test tier now gets a unique `tierRank`, and `ManagerCatalogIntegrationTest` cleanup deletes the invoices that card activation now issues before their payments.
+
 ## 2026-10-13 - Sport Packages & Pricing and Manager Catalog (BE-03, Flow 1)
 
 Branch `feat/f1-manager-catalog`. Owner: Dat (Senko). Priority: P1. Depends on: none. Rebased on `origin/main` (commit 6e82388). Execution counts and current validation status are recorded per run and revision in `docs/tests/PR40_remediation_test_cases.md`; revised SQL Server coverage still requires Docker.

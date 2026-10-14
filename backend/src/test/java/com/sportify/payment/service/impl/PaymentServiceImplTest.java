@@ -77,7 +77,7 @@ class PaymentServiceImplTest {
                 paymentRepository,
                 memberCardRepository,
                 sportPackageRegistrationRepository,
-                invoiceRepository,
+                new PaymentItemResolver(memberCardRepository, sportPackageRegistrationRepository, invoiceRepository),
                 bankProperties,
                 codeFormatter,
                 clock
@@ -157,7 +157,7 @@ class PaymentServiceImplTest {
                 paymentRepository,
                 memberCardRepository,
                 sportPackageRegistrationRepository,
-                invoiceRepository,
+                new PaymentItemResolver(memberCardRepository, sportPackageRegistrationRepository, invoiceRepository),
                 bankProperties,
                 realFormatter,
                 clock
@@ -688,5 +688,24 @@ class PaymentServiceImplTest {
         assertThat(response.getItemDescription()).isEqualTo("Invoice INV-0042");
         assertThat(response.getOriginalPrice()).isEqualByComparingTo(BigDecimal.valueOf(420000.00));
         assertThat(response.getDiscount()).isEqualByComparingTo(BigDecimal.valueOf(42000.00));
+    }
+
+    @Test
+    @DisplayName("lockPayment reads the payment with the row lock query")
+    void lockPayment_Found_ReturnsLockedPayment() {
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingPayment));
+
+        Payment locked = paymentService.lockPayment(10L);
+
+        assertThat(locked).isSameAs(pendingPayment);
+        verify(paymentRepository, never()).findById(anyLong());
+    }
+
+    @Test
+    @DisplayName("lockPayment on a missing payment throws ResourceNotFoundException")
+    void lockPayment_NotFound_Throws() {
+        when(paymentRepository.findByIdForUpdate(404L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> paymentService.lockPayment(404L)).isInstanceOf(ResourceNotFoundException.class);
     }
 }

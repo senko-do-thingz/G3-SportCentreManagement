@@ -57,11 +57,28 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
     [*] --> PENDING : Initiated
-    PENDING --> SUCCESS : Confirmed
-    PENDING --> FAILED : Mark Failed
+    PENDING --> PENDING : Amount mismatch (409, note and PAYMENT_AMOUNT_MISMATCH log)
+    PENDING --> SUCCESS : Confirmed (amount received equals amount)
+    PENDING --> FAILED : Mark Failed (item request cancelled)
     SUCCESS --> REFUNDED : Refund approved
     FAILED --> PENDING : Retry (creates new row)
 ```
+
+Payment confirmation rules (BE-18, F3-05):
+
+| Rule | Result |
+|---|---|
+| Caller is not RECEPTIONIST or MANAGER | 403 (controller check, and AccessDeniedException in the service) |
+| `referenceCode` missing for any method except `CASH` | 400 |
+| Payment not linked to a card or a package registration | 400 |
+| Payment is not `PENDING` (already confirmed, failed or refunded) | 409 `PAYMENT_NOT_PENDING` |
+| `amountReceived` differs from `payment.amount` | 409 `PAYMENT_AMOUNT_MISMATCH`, payment stays `PENDING`, a note and an `activity_log` `PAYMENT_AMOUNT_MISMATCH` row are committed |
+| Another receptionist confirms or fails the same payment at the same moment | The row lock makes the second call wait, then 409 `PAYMENT_NOT_PENDING` |
+| Version check fails inside confirm or fail (backstop) | 409 `PAYMENT_CONCURRENT_UPDATE` |
+| Item price snapshot (`paid_amount`, `price_paid`) differs from `payment.amount` (corrupted data) | 409 `PAYMENT_ITEM_AMOUNT_MISMATCH`, nothing written |
+| Tier price lowered by a manager after the card request | Confirm succeeds; invoice original price = `price_paid`, discount 0 |
+| Amount matches | `SUCCESS`, item `ACTIVE`, one `PAID` invoice, `activity_log` `PAYMENT_CONFIRMED` |
+| Card or package activate endpoint (FE-05) | Same receipt: one `PAID` invoice and one `PAYMENT_CONFIRMED` row; no reference needed, amount received = amount |
 
 ### Booking (`booking.status`)
 
@@ -169,6 +186,7 @@ Front desk check-in validates member arrival at the center:
 | One confirmed booking per member and session (`ux_booking_active`) | Done (database) |
 | Cancel unpaid card requests after 7 days | Not done |
 | Map `sport_class.coach_id`, `booking.cancelled_by_user_id`, `member_card.payment_id` in entities | Not done |
+| Front desk confirms a card or package payment with the exact amount, invoice issued (BE-18) | Done |
 
 ## Sport Package & Booking Eligibility Rules
 
@@ -215,14 +233,17 @@ Front desk check-in validates member arrival at the center:
    `UPDATE sport_package_registration SET remaining_sessions = remaining_sessions + 1 WHERE id = @pkgId`.
 4. Check `waitlist_entry` for the oldest `WAITING` entry and offer seat.
 
-### Confirming a Payment
+### Confirming a Payment (implemented in BE-18)
 
-1. Pessimistic lock on `payment` to prevent double confirmation.
-2. Verify status is `PENDING`.
-3. Set `payment_status` to `SUCCESS` and record `payment_time` (V14 has no `amount_received` column).
-4. Activate corresponding package registration or member card.
-5. Issue `invoice` (status `PAID`) and itemized `invoice_line` snapshot with applied discounts.
-6. Insert `activity_log`.
+**Lock order rule.** Every path that changes a payment together with the card or package registration it pays for locks the `payment` row first (`PaymentRepository.findByIdForUpdate`, PESSIMISTIC_WRITE, SQL Server UPDLOCK HOLDLOCK) and only then reads and writes the card or registration. This covers `PUT /payments/{id}/confirm`, `PUT /payments/{id}/fail`, `PUT /membership-cards/{id}/activate`, `PUT /membership-cards/{id}/cancel`, `PUT /packages/registrations/{id}/activate` and `PUT /packages/registrations/{id}/cancel`. The card and package services read only the payment id before the lock (`findPaymentIdById`, a single-value query, no entity), call `PaymentService.lockPayment`, then load the card or registration and run their checks on its current state. Locking again inside the same transaction (confirm and fail call activate or cancel) is harmless. The database does not use READ_COMMITTED_SNAPSHOT, so without one order a payment lock and a card lock held by two requests could wait on each other (deadlock, HTTP 500 for the victim). Items without a payment are not locked. Scope: paths that lock one payment and then its own card or registration cannot deadlock with each other. Known remaining case: an upgrade activation also reads and replaces the member's current card, so two different payments of the same member (for example an upgrade confirmed while another request of that member is cancelled) are not ordered against each other; accepted as very unlikely.
+
+1. Validate the request (`referenceCode` for non-cash methods) and check the caller is staff (403 otherwise).
+2. Read the payment with a pessimistic write lock (`findByIdForUpdate`, SQL Server UPDLOCK HOLDLOCK). A concurrent confirm, fail, activate or cancel on the same payment waits here.
+3. Verify status is `PENDING`, otherwise 409 `PAYMENT_NOT_PENDING`.
+4. Compare `amountReceived` with `amount`. On a difference, append the mismatch note, write `activity_log` `PAYMENT_AMOUNT_MISMATCH`, commit only those, answer 409 `PAYMENT_AMOUNT_MISMATCH`.
+5. Store `reference_code`, activate the member card or package registration (dates recomputed from today); activation sets `payment_status = 'SUCCESS'`, `payment_time` and `confirmed_by_user_id`.
+6. `recordPaymentConfirmed`: issue `invoice` (status `PAID`) and one `invoice_line` snapshot with the original price and discount from `PaymentItemResolver`; if original price - discount does not equal the payment amount, nothing is written (409 `PAYMENT_ITEM_AMOUNT_MISMATCH`); insert `activity_log` `PAYMENT_CONFIRMED` (details: method, reference, amount, item, invoice number, note). The card and package activate endpoints call the same method.
+7. Flush: `@Version` on `payment` stays as a backstop; a failure answers 409 `PAYMENT_CONCURRENT_UPDATE` (other modules keep the generic 409 body).
 
 ## Scheduled Jobs
 

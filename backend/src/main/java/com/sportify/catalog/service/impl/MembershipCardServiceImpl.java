@@ -24,12 +24,15 @@ import com.sportify.identity.repository.UserRepository;
 import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.service.PaymentService;
+import com.sportify.payment.service.PaymentVerificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -64,6 +67,8 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     private final CodeFormatter codeFormatter;
     private final AuditService auditService;
     private final Clock clock;
+    /** Resolved on use: PaymentVerificationService itself depends on this service. */
+    private final ObjectProvider<PaymentVerificationService> paymentVerificationService;
 
     /**
      * Determines whether the given tier is the STANDARD tier.
@@ -313,6 +318,22 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     @Override
     @Transactional
     public MemberCardResponse activateCard(Long cardId, UserAccount actor, PaymentMethod actualMethod) {
+        MemberCard card = activatePending(cardId, actor, actualMethod);
+        if (card.getPayment() != null) {
+            // Same receipt as PUT /payments/{id}/confirm: one PAID invoice and one PAYMENT_CONFIRMED row.
+            paymentVerificationService.getObject().recordPaymentConfirmed(card.getPayment().getId(), actor, null);
+        }
+        return mapToCardResponse(card);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public MemberCardResponse activateCardForPaymentConfirmation(Long cardId, UserAccount actor, PaymentMethod actualMethod) {
+        return mapToCardResponse(activatePending(cardId, actor, actualMethod));
+    }
+
+    private MemberCard activatePending(Long cardId, UserAccount actor, PaymentMethod actualMethod) {
+        lockLinkedPayment(cardId);
         MemberCard card = memberCardRepository.findById(cardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member card not found for id: " + cardId));
         if (card.getStatus() != CardStatus.PENDING_PAYMENT) {
@@ -349,12 +370,13 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         if (plan.replaces() != null) {
             replace(plan.replaces());
         }
-        return mapToCardResponse(card);
+        return card;
     }
 
     @Override
     @Transactional
     public MemberCardResponse cancelCard(Long cardId, UserAccount actor) {
+        lockLinkedPayment(cardId);
         MemberCard card = memberCardRepository.findById(cardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member card not found for id: " + cardId));
         boolean isStaff = SecurityUtils.isStaff(actor);
@@ -504,6 +526,15 @@ public class MembershipCardServiceImpl implements MembershipCardService {
 
     private static LocalDate cardEnd(LocalDate start, int months) {
         return start.plusMonths(months).minusDays(1);
+    }
+
+    /**
+     * Lock order rule (docs/database/09): lock the payment row before the card is read or written. Only the payment
+     * id is read before the lock (a single value, no card entity), so the card is first loaded after the lock and
+     * every check runs on its current state. A card with no payment keeps the old behaviour.
+     */
+    private void lockLinkedPayment(Long cardId) {
+        memberCardRepository.findPaymentIdById(cardId).ifPresent(paymentService::lockPayment);
     }
 
     private void replace(MemberCard old) {

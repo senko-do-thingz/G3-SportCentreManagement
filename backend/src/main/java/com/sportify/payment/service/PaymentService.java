@@ -34,6 +34,13 @@ public interface PaymentService {
     @Transactional(propagation = Propagation.MANDATORY)
     Payment markPaymentFailed(Long paymentId, String reason);
 
+    /**
+     * Locks the payment row (pessimistic write) for the rest of the caller's transaction. Card and package
+     * activation and cancellation call it before they read the card or registration (lock order: payment first).
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    Payment lockPayment(Long paymentId);
+
     PaymentResponse getPayment(Long id, UserAccount actor);
 
     PaymentResponse updatePaymentMethod(Long id, UpdatePaymentMethodRequest request, UserAccount actor);
