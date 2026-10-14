@@ -5,7 +5,6 @@ import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.payment.dto.ConfirmPaymentRequest;
 import com.sportify.payment.dto.FailPaymentRequest;
-import com.sportify.payment.dto.InvoiceResponse;
 import com.sportify.payment.dto.StaffPaymentResponse;
 import com.sportify.payment.entity.Invoice;
 import com.sportify.payment.entity.Payment;
@@ -64,9 +63,4 @@ public interface PaymentVerificationService {
      * Marks a PENDING payment FAILED and cancels the card or package request it pays for.
      */
     StaffPaymentResponse failPayment(Long paymentId, FailPaymentRequest request, UserAccount actor);
-
-    /**
-     * The invoice issued for a payment. Staff see every invoice, a member only the invoices of their own payments.
-     */
-    InvoiceResponse getInvoiceByPayment(Long paymentId, UserAccount actor);
 }

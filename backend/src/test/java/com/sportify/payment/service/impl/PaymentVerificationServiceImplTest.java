@@ -24,7 +24,6 @@ import com.sportify.identity.entity.UserAccount;
 import com.sportify.payment.config.BankTransferProperties;
 import com.sportify.payment.dto.ConfirmPaymentRequest;
 import com.sportify.payment.dto.FailPaymentRequest;
-import com.sportify.payment.dto.InvoiceResponse;
 import com.sportify.payment.dto.StaffPaymentResponse;
 import com.sportify.payment.entity.Invoice;
 import com.sportify.payment.entity.InvoiceItemType;
@@ -556,30 +555,6 @@ class PaymentVerificationServiceImplTest {
                 LocalDate.of(2026, 10, 14), LocalDate.of(2026, 10, 1), 0, 10))
                 .isInstanceOf(BusinessRuleException.class);
         verifyNoInteractions(paymentRepository);
-    }
-
-    @Test
-    @DisplayName("Invoice by payment: staff read it, another member gets 404")
-    void invoiceByPayment_Visibility() {
-        Invoice invoice = Invoice.builder().id(55L).invoiceNumber("INV-1001").payment(payment).member(member)
-                .subtotalAmount(new BigDecimal("400000")).discountAmount(new BigDecimal("20000"))
-                .taxAmount(BigDecimal.ZERO).totalAmount(new BigDecimal("380000")).status(InvoiceStatus.PAID).build();
-        invoice.addLine(InvoiceLine.builder().id(1L).itemType(InvoiceItemType.SPORT_PACKAGE).itemReferenceId(20L)
-                .description("Swimming 30 Days (REG-PKG-1020)").quantity(1)
-                .unitPrice(new BigDecimal("400000")).lineTotal(new BigDecimal("400000")).build());
-        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
-        when(invoiceRepository.findByPaymentId(1L)).thenReturn(List.of(invoice));
-
-        InvoiceResponse response = service.getInvoiceByPayment(1L, receptionist);
-        assertThat(response.getInvoiceNumber()).isEqualTo("INV-1001");
-        assertThat(response.getMemberFullName()).isEqualTo("Minh Member");
-        assertThat(response.getLines()).hasSize(1);
-        assertThat(response.getTotalAmount()).isEqualByComparingTo("380000");
-
-        UserAccount otherMember = UserAccount.builder().id(999L)
-                .role(Role.builder().code("MEMBER").name("Member").build()).build();
-        assertThatThrownBy(() -> service.getInvoiceByPayment(1L, otherMember))
-                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test

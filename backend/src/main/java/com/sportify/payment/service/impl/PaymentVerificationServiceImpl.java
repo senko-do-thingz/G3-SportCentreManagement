@@ -15,8 +15,6 @@ import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.payment.dto.ConfirmPaymentRequest;
 import com.sportify.payment.dto.FailPaymentRequest;
-import com.sportify.payment.dto.InvoiceLineResponse;
-import com.sportify.payment.dto.InvoiceResponse;
 import com.sportify.payment.dto.StaffPaymentResponse;
 import com.sportify.payment.entity.Invoice;
 import com.sportify.payment.entity.InvoiceItemType;
@@ -46,7 +44,6 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -286,24 +283,6 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         return toResponse(payment, refreshed, null);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public InvoiceResponse getInvoiceByPayment(Long paymentId, UserAccount actor) {
-        if (actor == null) {
-            throw new IllegalArgumentException("Actor cannot be null");
-        }
-        Payment payment = findPayment(paymentId);
-        // MemberProfile shares its primary key with UserAccount (@MapsId user_id), so member id equals user id by design.
-        boolean isOwner = payment.getMember() != null && payment.getMember().getId().equals(actor.getId());
-        if (!isOwner && !SecurityUtils.isStaff(actor)) {
-            throw new ResourceNotFoundException("Payment not found for id: " + paymentId);
-        }
-        Invoice invoice = invoiceRepository.findByPaymentId(paymentId).stream()
-                .min(Comparator.comparing(Invoice::getId, Comparator.nullsLast(Comparator.naturalOrder())))
-                .orElseThrow(() -> new ResourceNotFoundException("No invoice has been issued for payment id: " + paymentId));
-        return toInvoiceResponse(invoice, payment);
-    }
-
     /**
      * S3-Mismatch: keeps the payment PENDING and records what the front desk saw, as a note on the payment and a
      * PAYMENT_AMOUNT_MISMATCH activity log row, both committed with the 409 answer.
@@ -444,42 +423,6 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
                 .invoiceNumber(invoice != null ? invoice.getInvoiceNumber() : null)
                 .createdAt(payment.getCreatedAt())
                 .updatedAt(payment.getUpdatedAt())
-                .build();
-    }
-
-    private InvoiceResponse toInvoiceResponse(Invoice invoice, Payment payment) {
-        MemberProfile member = invoice.getMember();
-        UserAccount account = member != null ? member.getUserAccount() : null;
-        List<InvoiceLineResponse> lines = invoice.getLines().stream()
-                .sorted(Comparator.comparing(InvoiceLine::getId, Comparator.nullsLast(Comparator.naturalOrder())))
-                .map(line -> InvoiceLineResponse.builder()
-                        .id(line.getId())
-                        .itemType(line.getItemType())
-                        .itemReferenceId(line.getItemReferenceId())
-                        .description(line.getDescription())
-                        .quantity(line.getQuantity())
-                        .unitPrice(line.getUnitPrice())
-                        .lineTotal(line.getLineTotal())
-                        .build())
-                .toList();
-        return InvoiceResponse.builder()
-                .id(invoice.getId())
-                .invoiceNumber(invoice.getInvoiceNumber())
-                .status(invoice.getStatus())
-                .issueDate(invoice.getIssueDate())
-                .paymentId(payment.getId())
-                .paymentCode(payment.getPaymentCode())
-                .paymentMethod(payment.getPaymentMethod())
-                .paymentReference(payment.getReferenceCode())
-                .paymentTime(payment.getPaymentTime())
-                .memberId(member != null ? member.getId() : null)
-                .memberCode(member != null ? member.getMemberCode() : null)
-                .memberFullName(account != null ? account.getFullName() : null)
-                .subtotalAmount(invoice.getSubtotalAmount())
-                .discountAmount(invoice.getDiscountAmount())
-                .taxAmount(invoice.getTaxAmount())
-                .totalAmount(invoice.getTotalAmount())
-                .lines(lines)
                 .build();
     }
 

@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-10-14 - My payments and receipts (BE-20, Flow 3)
+
+Branch `feat/f3-my-payments`, based on `feat/f3-confirm-payment` (BE-18). Owner: Truc. Priority: P1. Depends on BE-18. Screens F3-03, S3-PaidHistory, S3-CardReceipt, S3-MemberReceipt and S3-SingleReceipt. Provides the BE-20 endpoints FE-11 (`feat/f3-member-payments`) already calls; the response shapes match the contract FE-11 assumed.
+
+### Added
+- `GET /api/v1/payments/my?status=&page=&size=` (MEMBER only): the signed-in member's payments, newest first (`created_at`, then `id`), page size 1 to 100 (default 20). Each row: id, code, status, amount, method, item type, reference id, code and description, original price, discount, `time` (payment time once confirmed, otherwise request time), `paymentTime`, `createdAt`, member id and code, `invoiceId` and `invoiceNumber` (null until the receipt is issued). Staff get 403.
+- `GET /api/v1/invoices/{id}` (MEMBER, RECEPTIONIST, MANAGER): invoice header (number, issue date, status, member name and code, payment code, method, reference and time, subtotal, discount, tax, total) and lines in insert order.
+- `ReceiptService` / `ReceiptServiceImpl`, `MemberPaymentController`, `MemberPaymentResponse`, `InvoiceResponseMapper`; `PaymentRepository.findByMemberId` and `findByMemberIdAndPaymentStatus` with paging.
+- Tests: `ReceiptServiceImplTest` (17 tests, 20 runs), `ReceiptControllerTest` (12 tests, 16 runs), `ReceiptIntegrationTest` (4, Testcontainers); test cases in `docs/tests/BE-20_test_cases.md`.
+
+### Changed
+- `GET /api/v1/invoices/by-payment/{paymentId}` moved from `PaymentVerificationService` to `ReceiptService`. A member asking for another member's payment receipt now gets 403 (was 404), as the BE-20 acceptance criteria require; staff and owner answers are unchanged. The moved unit test lives in `ReceiptServiceImplTest`.
+- Reading a receipt checks total = sum of line totals - discount + tax (and subtotal = sum of line totals). Invoices are already validated when issued (BE-18), so a stored invoice that breaks the rule is returned as recorded and logged as a warning.
+- `docs/database/04`: BE-20 endpoints, visibility rule and totals rule.
+
+### Notes
+- No migration.
+- Not verified in the authoring environment (Maven Central and the SQL Server image were blocked there, the same as BE-18). Run `mvn -B verify` (or `mvn -B test` without Docker) before merging; integration tests run in CI.
+
 ## 2026-10-14 - Payment at the desk (BE-19, Flow 3)
 
 Branch `feat/f3-desk-payment`. Owner: Truc. Priority: P1. Depends on BE-18 (merged in PR #60; main is merged into this branch). Screens F1-13 Payment Handoff and F1-14 Register and Renew. Provides the BE-19 contract FE-05 already sends.
