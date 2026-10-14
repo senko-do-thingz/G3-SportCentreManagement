@@ -52,3 +52,16 @@ All cases below use the environment and working revision stated above. Passed me
 | PR40-TC-20 | B1-B5, S5 | GitHub governance access, authorized publication, maintainer acceptance | Verify final head CI, eligible review, audit tracking, Draft transition and S5 decision | Confirm actual readiness, never infer it from a proposed checklist | PR open/Draft; protection 401; no publication/final-head run; S5 acceptance pending | Verified by source/API inspection only | remote-pr.json; completion report |
 
 Pure model fixtures are not evidence of catalog/database validity. The zero-fee model scenario does not bypass manager price-monotonicity validation. The migrated SQL Server data scenarios are integration tests, not mocks or an H2 substitution.
+
+## Executed publication follow up
+
+The user subsequently authorized commit and push. Source publication commit `52c3d441ee12d3d2841cd9ec4baa34e6a4ccc3c0` is published on the PR40 branch. Earlier Blocked labels describe the local Docker-free run; they do not describe the later executed GitHub Actions integration run.
+
+| ID | Steps | Expected | Actual | Status | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| PR40-PUB-01 | Stage all current repository changes and force-track relevant audit files; check ASCII/whitespace; commit; run official guards | Complete publication snapshot with valid conventions/migration policy | 41 files committed; ASCII/whitespace and both official guards exit 0 | Passed | Source commit 52c3d441ee12d3d2841cd9ec4baa34e6a4ccc3c0 |
+| PR40-PUB-02 | Push source commit; compare remote ref and public PR head | PR40 branch contains exact committed source | Push exit 0; ls-remote and PR REST head both match source commit | Passed | docs/reviews/PR40_publication_status.md |
+| PR40-PUB-03 | Read exact source-commit CI run, jobs and test check reports | Positive executed SQL Server coverage; unit/integration isolation guards pass without skips | 620 unit and 124 integration tests run/passed; 0 failed/skipped; all CI jobs and gate successful | Passed in GitHub Actions | https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/38573197151 |
+| PR40-PUB-04 | Read Security and Compose Smoke conclusions for source commit | Required supplementary workflows succeed | Both completed with success on the source commit | Passed in GitHub Actions | Exact run URLs in publication status |
+
+The final documentation-head checks are verified separately after publishing the follow-up; source-run evidence is tied explicitly to its source revision. The staging dry-run and maintainer/governance cases remain unverified.

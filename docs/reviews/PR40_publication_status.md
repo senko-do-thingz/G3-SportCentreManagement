@@ -23,7 +23,7 @@ No merge, PR body edit, Draft-state change, branch-protection change or reviewer
 
 ## Publication file inventory
 
-All entries below are staged for the publication commit. The five previously ignored audit files are explicitly included. The initial 33-file remediation inventory remains available separately.
+All 41 entries below were committed in source publication commit `52c3d441ee12d3d2841cd9ec4baa34e6a4ccc3c0` and pushed to the PR40 branch. The five previously ignored audit files are tracked and published. The initial 33-file remediation inventory remains available separately. This report and the audit/test evidence receive a subsequent documentation-only commit to record the observed publication outcome.
 
 | Change | Repository-relative path | Absolute path |
 | --- | --- | --- |
@@ -68,3 +68,19 @@ All entries below are staged for the publication commit. The five previously ign
 | A | scripts/ci/check-test-reports.py | D:/G3-SportCentreManagement/SWP/scripts/ci/check-test-reports.py |
 | A | scripts/ci/required-integration-tests.txt | D:/G3-SportCentreManagement/SWP/scripts/ci/required-integration-tests.txt |
 | A | scripts/ci/test_report_guard.py | D:/G3-SportCentreManagement/SWP/scripts/ci/test_report_guard.py |
+
+## Verified source publication outcome
+
+Commit: `52c3d441ee12d3d2841cd9ec4baa34e6a4ccc3c0`, message `fix(be-03): remediate PR40 upgrade planning and test isolation`. Commit command exited 0 and included 41 files. The staged ASCII check passed for 4928 added lines. The clean staged whitespace check exited 0 after normalizing seven embedded BOM characters, 93 trailing-whitespace lines in the historical Markdown audit and two in the pre-existing PR description. Original bytes remain in the external backups. All nine fallback DOCX pages were inspected, with normal Office-pagination validation still unavailable.
+
+`bash scripts/ci/check-conventions.sh origin/main` and `bash scripts/ci/check-migrations.sh origin/main` both exited 0 on the publication commit. No application source or executable test changed during publication; the previously verified local results remain applicable.
+
+`git push origin HEAD:refs/heads/feat/f1-manager-catalog` exited 0. `git ls-remote origin refs/heads/feat/f1-manager-catalog` exited 0 and returned exactly `52c3d441ee12d3d2841cd9ec4baa34e6a4ccc3c0`. Public PR REST metadata independently confirmed the same head, branch `feat/f1-manager-catalog`, state open and Draft true.
+
+Exact source-commit CI run: [CI run 38573197151](https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/38573197151), conclusion success. GitHub check reports show 620 unit tests run/passed and 124 integration tests run/passed, with 0 skipped and 0 failed. The CI gate, unit/integration jobs and their report guards, workflow lint, migration guard, frontend checks/build and package job all concluded success. This is real SQL Server integration execution in GitHub Actions, distinct from the local all-skipped attempt.
+
+[Security run 38573197204](https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/38573197204) and [Compose Smoke Test run 38573197208](https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/38573197208) also concluded success on this exact source commit. Raw API evidence is preserved in `.pr40-work/source-publication-remote.json` and `.pr40-work/source-publication-ci.json` outside the repository.
+
+The documentation follow-up containing this observed outcome is committed and pushed separately. The final branch head and its exact Actions runs are verified after that push and reported in the final response; the source-commit run above is not represented as the later documentation-head run.
+
+Remaining merge requirements: PR is still Draft, its live description is unchanged, reviewer/branch-protection governance remains unverified, staging/persistent migration history remains unverified, and S5 acceptance is pending. Successful publication and CI do not alone establish complete merge readiness.
