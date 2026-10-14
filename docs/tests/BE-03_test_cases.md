@@ -4,9 +4,7 @@
 - **Task ID**: BE-03
 - **Feature Flow**: Flow 1 (Manager Catalog - Sport Packages and Membership Card Tiers)
 - **Branch**: feat/f1-manager-catalog
-- **Status**: Implemented; Unit tests verified locally, Integration tests verified via GitHub Actions CI
-- **Integration Test Verification**: Local failsafe discovery: 122 (source: local mvnw verify). Static source count: 122 (source: count script). CI check-run: 124 (source: check-run). Difference of 2 is explained by source analysis (BookingV20IntegrationTest: 1 @ParameterizedTest with 3 values counts as 1 locally and 3 in CI); not yet confirmed by the CI artifact.
-- **Artifact Prediction**: TEST-...BookingV20IntegrationTest.xml must show 6 testcases in CI (3 @Test + 3 invocations), and the total of failsafe-reports-integration must be 124 (not verified until confirmed from the artifact).
+- **Status**: Implemented; unit tests passed locally and in CI; integration tests passed in CI (Testcontainers, SQL Server 2022).
 - **Objective**: Implement endpoints and business rules for manager catalog management:
   1. `GET /api/v1/manager/packages?sportId=&format=&active=`
   2. `PUT /api/v1/packages/{id}`
@@ -68,14 +66,14 @@
 | TC-BE03-43 | Card tier update validation - description 501 characters returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request | Passed (Unit test) |
 | TC-BE03-44 | Card tier update validation - price with 3 decimal places returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request | Passed (Unit test) |
 | TC-BE03-45 | Card tier update validation - price with 13 integer digits returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request | Passed (Unit test) |
-| TC-BE03-46 | Integration test - SportPackageSpecifications dynamic filters | Integration test | 200 OK | Not run locally (Docker unavailable), pending CI |
-| TC-BE03-47 | Integration test - Package update persistence and activity log entry | Integration test | 200 OK | Not run locally (Docker unavailable), pending CI |
-| TC-BE03-48 | Integration test - Tier update persistence and activity log entry | Integration test | 200 OK | Not run locally (Docker unavailable), pending CI |
-| TC-BE03-49 | Integration test - Historical price snapshot preservation | Integration test | 200 OK | Not run locally (Docker unavailable), pending CI |
+| TC-BE03-46 | Integration test - SportPackageSpecifications dynamic filters | Integration test | 200 OK | Passed (Integration test, CI) |
+| TC-BE03-47 | Integration test - Package update persistence and activity log entry | Integration test | 200 OK | Passed (Integration test, CI) |
+| TC-BE03-48 | Integration test - Tier update persistence and activity log entry | Integration test | 200 OK | Passed (Integration test, CI) |
+| TC-BE03-49 | Integration test - Historical price snapshot preservation | Integration test | 200 OK | Passed (Integration test, CI) |
 | TC-BE03-50 | Package update validation - durationDays 3651 returns 400 | PUT `/api/v1/packages/{id}` | 400 Bad Request | Passed (Unit test) |
 | TC-BE03-51 | Card tier description update with null or blank value clears description | PUT `/api/v1/membership-cards/tiers/{id}` | 200 OK | Passed (Unit test) |
-| TC-BE03-52 | Integration test - V22 migration column and constraint verification | Integration test | N/A (Schema) | Not run locally (Docker unavailable), pending CI |
-| TC-BE03-53 | Integration test - V22 migration backfill and idempotency verification | Integration test | N/A (Schema) | Not run locally (Docker unavailable), pending CI |
+| TC-BE03-52 | Integration test - V22 migration column and constraint verification | Integration test | N/A (Schema) | Passed (Integration test, CI) |
+| TC-BE03-53 | Integration test - V22 migration backfill and idempotency verification | Integration test | N/A (Schema) | Passed (Integration test, CI) |
 | TC-BE03-54 | Member requests lower/equal rank tier after live price raise is queued without replacing held card | POST `/api/v1/membership-cards/purchase` | 201 Created | Passed (Unit test) |
 | TC-BE03-55 | Self-service upgrade to higher tier with fee <= 0 rejected online | POST `/api/v1/membership-cards/purchase` | 400 Bad Request | Passed (Unit test) |
 | TC-BE03-56 | Upgrade fee after tier price edit is based on amount paid toward term | POST `/api/v1/membership-cards/purchase` | 201 Created | Passed (Unit test) |
@@ -86,10 +84,10 @@
 | TC-BE03-61 | Activation of legacy upgrade card with null replaces_card_id fails closed | POST `/api/v1/membership-cards/{id}/activate` | 400 Bad Request | Passed (Unit test) |
 | TC-BE03-64 | Card tier update validation - price <= lower-ranked active tier returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request | Passed (Unit test) |
 | TC-BE03-65 | Card tier update validation - price >= higher-ranked active tier returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request | Passed (Unit test) |
-| TC-BE03-66 | Migration V22 Step 5 - duplicate in-force replaces_card_id links fail closed | Integration test | N/A (Schema) | Not run locally (Docker unavailable), pending CI |
+| TC-BE03-66 | Migration V22 Step 5 - duplicate in-force replaces_card_id links fail closed | Integration test | N/A (Schema) | Passed (Integration test, CI) |
 | TC-BE03-67 | Staff desk upgrade with fee <= 0 allowed and activated immediately | POST `/api/v1/membership-cards/purchase` | 201 Created | Passed (Unit test) |
 | TC-BE03-68 | Card tier update validation - concurrent edit lock conflict (mocked unit test) returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request | Passed (Unit test) |
-| TC-BE03-69 | Card tier concurrent update serialization - post-lock read ensures audit before snapshot reflects prior commit | PUT `/api/v1/membership-cards/tiers/{id}` | 200 OK | Not run locally (Docker unavailable), pending CI |
+| TC-BE03-69 | Card tier concurrent update serialization - post-lock read ensures audit before snapshot reflects prior commit | PUT `/api/v1/membership-cards/tiers/{id}` | 200 OK | Passed (Integration test, CI) |
 
 *Note: Test IDs TC-BE03-62 and TC-BE03-63 are intentionally unused.*
 
@@ -533,7 +531,7 @@
   - active matches only target status.
   - Combined filter enforces all predicates simultaneously.
   - Database records verified via integration assertions.
-- **Status**: Not run locally (Docker unavailable), pending CI
+- **Status**: Passed (Integration test, CI)
 
 ### TC-BE03-47: Integration test - Package update persistence and activity log entry
 - **Preconditions**: Manager updates a sport package.
@@ -542,7 +540,7 @@
   - Database entity is updated and persisted.
   - `activity_log` record is written with `entity_type = 'SPORT_PACKAGE'`, `action = 'PACKAGE_UPDATED'`, and details JSON with `before` and `after` snapshots.
   - Database records verified via integration assertions.
-- **Status**: Not run locally (Docker unavailable), pending CI
+- **Status**: Passed (Integration test, CI)
 
 ### TC-BE03-48: Integration test - Tier update persistence and activity log entry
 - **Preconditions**: Manager updates a membership card tier.
@@ -551,7 +549,7 @@
   - Database entity is updated and persisted.
   - `activity_log` record is written with `entity_type = 'MEMBERSHIP_CARD_TIER'`, `action = 'CARD_TIER_UPDATED'`, and details JSON with `before` and `after` snapshots.
   - Database records verified via integration assertions.
-- **Status**: Not run locally (Docker unavailable), pending CI
+- **Status**: Passed (Integration test, CI)
 
 ### TC-BE03-49: Integration test - Historical price snapshot preservation
 - **Preconditions**: Member holds active package registration (`originalPrice = 500000`, `paidAmount = 500000`) and active card (`pricePaid = 300000`).
@@ -560,7 +558,7 @@
   - Historical registration preserves `originalPrice = 500000` and `paidAmount = 500000`.
   - Historical card preserves `pricePaid = 300000`.
   - Database records verified via integration assertions.
-- **Status**: Not run locally (Docker unavailable), pending CI
+- **Status**: Passed (Integration test, CI)
 
 ### TC-BE03-50: Package update validation - durationDays 3651 returns 400
 - **Preconditions**: User is authenticated with role `MANAGER`.
@@ -585,7 +583,7 @@
   - `replaces_card_id` column exists on `member_card`.
   - Foreign key constraint `fk_member_card_replaces_card` exists.
   - Database records verified via integration assertions.
-- **Status**: Not run locally (Docker unavailable), pending CI
+- **Status**: Passed (Integration test, CI)
 
 ### TC-BE03-53: Integration test - V22 migration backfill and idempotency verification
 - **Preconditions**: Flyway applied all catalog migrations up to V21 on dedicated temporary SQL Server database container.
@@ -602,7 +600,7 @@
   - Idempotent re-run leaves data rows completely unchanged.
   - Constraints and filtered indices created once.
   - Database records verified via integration assertions.
-- **Status**: Not run locally (Docker unavailable), pending CI
+- **Status**: Passed (Integration test, CI)
 
 ### TC-BE03-54: Member requests lower/equal rank tier after live price raise is queued without replacing held card
 - **Preconditions**: Member holds active GOLD card (tier_rank = 3, paid 500,000 originally). Manager later raises live GOLD tier price to 600,000. Live SILVER tier price is 550,000 (tier_rank = 2).
@@ -707,7 +705,7 @@
   - Step 5 deduplication detects duplicate in-force group (`HAVING COUNT(*) > 1`) and sets `replaces_card_id = NULL` for BOTH cards D1 and D2 (fail closed).
   - Control card C retains its unique valid link to Card B (`replaces_card_id = cardBId`).
   - Unique filtered index `ux_member_card_replaces_in_force` is recreated exactly once without collision.
-- **Status**: Not run locally (Docker unavailable), pending CI
+- **Status**: Passed (Integration test, CI)
 
 ### TC-BE03-67: Staff desk upgrade with fee <= 0 allowed and activated immediately
 - **Preconditions**: Member holds active SILVER card (paid 550,000 originally). Live GOLD tier price is 500,000 (higher rank 3 vs 2). Incremental upgrade fee calculation yields 0.00 VND. Staff actor submits purchase request at front desk (`paidAtDesk = true`).
@@ -747,4 +745,4 @@
   - The `before` snapshot in Thread B's `activity_log` entry matches the exact values committed by Thread A (520,000.00), not the stale initial values (500,000.00).
   - Teardown cleanup restores all mutated fields of the tier and cleans the activity log row without swallowing errors.
   - Hard timeouts protect against build hangs.
-- **Status**: Not run locally (Docker unavailable), pending CI
+- **Status**: Passed (Integration test, CI)
