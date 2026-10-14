@@ -17,6 +17,10 @@ import java.util.Optional;
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
+    /** Scalar lookup keeps Booking out of the persistence context until its session is locked. */
+    @Query("SELECT b.session.id FROM Booking b WHERE b.id = :bookingId")
+    Optional<Long> findSessionIdByBookingId(@Param("bookingId") Long bookingId);
+
     @Query("SELECT b.session.id AS sessionId, COUNT(b) AS bookingCount FROM Booking b "
             + "WHERE b.session.id IN :sessionIds AND b.status = :status GROUP BY b.session.id")
     List<SessionBookingCount> countBySessionIds(@Param("sessionIds") Collection<Long> sessionIds,

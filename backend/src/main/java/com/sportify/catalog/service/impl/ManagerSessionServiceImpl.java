@@ -214,7 +214,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
 
     private Assignment lockAndValidateAssignment(SportClass sportClass, Long coachId, Long facilityId,
             TrainingFormat trainingType) {
-        // Global resource order: COACH first, then FACILITY. Locks are held through conflict checks and flush.
+        // Lock order: session first on edits, then coach, then facility; creates have no session row.
         CoachProfile coach = null;
         if (coachId == null && trainingType == TrainingFormat.COACH_LED) {
             throw new BusinessRuleException("Coach is required for a coach-led session");
@@ -235,6 +235,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
         if (facilityId == null) {
             throw new BusinessRuleException("Facility is required");
         }
+        // Lock order: session first on edits, then coach, then facility.
         Facility facility = facilityRepository.findForScheduleUpdate(facilityId)
                 .orElseThrow(() -> new ResourceNotFoundException("Facility not found: " + facilityId));
         if (!Boolean.TRUE.equals(facility.getIsActive())) {
@@ -286,6 +287,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
     }
 
     private ClassSession findForUpdate(Long id) {
+        // Lock order: session first, then coach/facility or booking range/package registrations.
         return sessionRepository.findForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + id));
     }

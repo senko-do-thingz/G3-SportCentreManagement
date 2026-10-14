@@ -64,7 +64,8 @@ public class BookingServiceImpl implements BookingService {
         MemberProfile member = memberProfileRepository.findById(targetMemberId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member profile not found for id: " + targetMemberId));
 
-        ClassSession session = sessionRepository.findById(request.getSessionId())
+        // Lock order: session first, then bookings and package registrations.
+        ClassSession session = sessionRepository.findForUpdate(request.getSessionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Class session not found for id: " + request.getSessionId()));
 
         LocalDate today = LocalDate.now(clock);
@@ -169,6 +170,11 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional
     public BookingResponse cancelBooking(Long bookingId, UserAccount actor) {
+        Long sessionId = bookingRepository.findSessionIdByBookingId(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found for id: " + bookingId));
+        // Lock order: session first, then bookings and package registrations.
+        ClassSession session = sessionRepository.findForUpdate(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Class session not found for id: " + sessionId));
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found for id: " + bookingId));
 
@@ -205,7 +211,6 @@ public class BookingServiceImpl implements BookingService {
         booking.setCancelledBy(actor);
 
         // Restore session seat
-        ClassSession session = booking.getSession();
         if (session.getBookedCount() > 0) {
             session.setBookedCount(session.getBookedCount() - 1);
             sessionRepository.save(session);

@@ -6,6 +6,8 @@ import com.sportify.catalog.entity.*;
 import com.sportify.catalog.exception.ScheduleConflictException;
 import com.sportify.catalog.repository.*;
 import com.sportify.catalog.service.ManagerSessionService;
+import com.sportify.catalog.service.BookingService;
+import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.identity.entity.*;
 import com.sportify.identity.repository.RoleRepository;
 import com.sportify.identity.repository.UserRepository;
@@ -41,6 +43,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestPropertySource(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
     @Autowired private ManagerSessionService service;
+    @Autowired private BookingService bookingService;
+    @Autowired private ClassSessionRepository sessions;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private SportClassRepository classes;
     @Autowired private SportRepository sports;
@@ -350,6 +354,63 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void createBooking_racingWithSessionCancellationWaitsAndRejectsWithoutLosingCancellationOrRefund() throws Exception {
+        long id = service.createSessions(sportClass.getId(), single(), manager).getFirst().id();
+        long memberId = member();
+        UserAccount actor = users.findById(memberId).orElseThrow();
+        long registrationId = registration(memberId, 5, 3, "ACTIVE");
+        booking(id, memberId, registrationId, "CONFIRMED");
+        jdbc.update("UPDATE class_session SET booked_count = 1 WHERE id = ?", id);
+        var request = BookingCreateRequest.builder().sessionId(id).packageRegistrationId(registrationId).build();
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch bookingStarted = new CountDownLatch(1);
+        AtomicInteger cancellationSpid = new AtomicInteger();
+        AtomicInteger bookingSpid = new AtomicInteger();
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        Future<?> cancellation = null;
+        Future<?> creation = null;
+        try {
+            cancellation = executor.submit(() -> new TransactionTemplate(transactionManager).execute(status -> {
+                cancellationSpid.set(count("SELECT @@SPID"));
+                sessions.findForUpdate(id).orElseThrow();
+                locked.countDown();
+                await(release);
+                return service.cancelSession(id, new SessionCancelRequest("Weather race"), manager);
+            }));
+            assertTrue(locked.await(10, TimeUnit.SECONDS), "Cancellation must lock the session first");
+            creation = executor.submit(() -> new TransactionTemplate(transactionManager).execute(status -> {
+                bookingSpid.set(count("SELECT @@SPID"));
+                bookingStarted.countDown();
+                return bookingService.createBooking(request, actor);
+            }));
+            assertTrue(bookingStarted.await(10, TimeUnit.SECONDS));
+            awaitBlocked(bookingSpid.get(), cancellationSpid.get());
+            release.countDown();
+            assertNotNull(cancellation.get(20, TimeUnit.SECONDS));
+            Future<?> competingBooking = creation;
+            ExecutionException error = assertThrows(ExecutionException.class,
+                    () -> competingBooking.get(20, TimeUnit.SECONDS));
+            var businessError = assertInstanceOf(BusinessRuleException.class, error.getCause());
+            assertEquals("Session is not published for booking", businessError.getMessage());
+            assertEquals("CANCELLED", jdbc.queryForObject("SELECT status FROM class_session WHERE id = ?", String.class, id));
+            assertEquals("Weather race", jdbc.queryForObject("SELECT cancel_reason FROM class_session WHERE id = ?", String.class, id));
+            assertEquals(0, count("SELECT booked_count FROM class_session WHERE id = ?", id));
+            assertEquals(0, count("SELECT COUNT(*) FROM booking WHERE session_id = ? AND status = 'CONFIRMED'", id));
+            assertEquals(1, count("SELECT COUNT(*) FROM booking WHERE session_id = ?", id));
+            assertEquals(4, count("SELECT remaining_sessions FROM sport_package_registration WHERE id = ?", registrationId));
+        } finally {
+            release.countDown();
+            executor.shutdown();
+            if (!executor.awaitTermination(30, TimeUnit.SECONDS)) {
+                if (cancellation != null) cancellation.cancel(true);
+                if (creation != null) creation.cancel(true);
+                executor.shutdownNow();
+            }
+        }
+    }
+
+    @Test
     void cancel_withoutBookingsSucceedsAndAuditsZeroCancellations() {
         long id = service.createSessions(sportClass.getId(), single(), manager).getFirst().id();
         assertEquals(SessionStatus.CANCELLED, service.cancelSession(id, new SessionCancelRequest("Maintenance"), manager).status());
@@ -406,17 +467,7 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
                 return service.createSessions(sportClass.getId(), secondRequest, manager);
             }));
             assertTrue(secondStarted.await(10, TimeUnit.SECONDS));
-            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-            boolean blocked = false;
-            while (System.nanoTime() < deadline) {
-                blocked = count("SELECT COUNT(*) FROM sys.dm_exec_requests WHERE session_id = ? AND blocking_session_id = ?",
-                        secondSpid.get(), firstSpid.get()) > 0;
-                if (blocked) {
-                    break;
-                }
-                Thread.sleep(25);
-            }
-            assertTrue(blocked, "SQL Server must report the competing writer waiting for the first transaction");
+            awaitBlocked(secondSpid.get(), firstSpid.get());
             release.countDown();
             assertNotNull(first.get(20, TimeUnit.SECONDS));
             Future<?> competingWriter = second;
@@ -432,6 +483,17 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
                 executor.shutdownNow();
             }
         }
+    }
+
+    private void awaitBlocked(int waitingSpid, int blockingSpid) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        do {
+            if (count("SELECT COUNT(*) FROM sys.dm_exec_requests WHERE session_id = ? AND blocking_session_id = ?",
+                    waitingSpid, blockingSpid) > 0) {
+                return;
+            }
+        } while (System.nanoTime() < deadline);
+        fail("SQL Server must report the competing writer waiting for the first transaction");
     }
 
     private static void await(CountDownLatch latch) {
