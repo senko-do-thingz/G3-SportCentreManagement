@@ -57,11 +57,24 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
     [*] --> PENDING : Initiated
-    PENDING --> SUCCESS : Confirmed
-    PENDING --> FAILED : Mark Failed
+    PENDING --> PENDING : Amount mismatch (409, note appended)
+    PENDING --> SUCCESS : Confirmed (amount received equals amount)
+    PENDING --> FAILED : Mark Failed (item request cancelled)
     SUCCESS --> REFUNDED : Refund approved
     FAILED --> PENDING : Retry (creates new row)
 ```
+
+Payment confirmation rules (BE-18, F3-05):
+
+| Rule | Result |
+|---|---|
+| Caller is not RECEPTIONIST or MANAGER | 403 |
+| `referenceCode` missing for any method except `CASH` | 400 |
+| Payment not linked to a card or a package registration | 400 |
+| Payment is not `PENDING` (already confirmed, failed or refunded) | 409 `PAYMENT_NOT_PENDING` |
+| `amountReceived` differs from `payment.amount` | 409 `PAYMENT_AMOUNT_MISMATCH`, payment stays `PENDING`, only a note is appended |
+| Another receptionist confirmed the same payment at the same moment | 409 (optimistic lock on `payment.version`) |
+| Amount matches | `SUCCESS`, item `ACTIVE`, one `PAID` invoice, `activity_log` `PAYMENT_CONFIRMED` |
 
 ### Booking (`booking.status`)
 
@@ -169,6 +182,7 @@ Front desk check-in validates member arrival at the center:
 | One confirmed booking per member and session (`ux_booking_active`) | Done (database) |
 | Cancel unpaid card requests after 7 days | Not done |
 | Map `sport_class.coach_id`, `booking.cancelled_by_user_id`, `member_card.payment_id` in entities | Not done |
+| Front desk confirms a card or package payment with the exact amount, invoice issued (BE-18) | Done |
 
 ## Sport Package & Booking Eligibility Rules
 
@@ -215,14 +229,15 @@ Front desk check-in validates member arrival at the center:
    `UPDATE sport_package_registration SET remaining_sessions = remaining_sessions + 1 WHERE id = @pkgId`.
 4. Check `waitlist_entry` for the oldest `WAITING` entry and offer seat.
 
-### Confirming a Payment
+### Confirming a Payment (implemented in BE-18)
 
-1. Pessimistic lock on `payment` to prevent double confirmation.
-2. Verify status is `PENDING`.
-3. Set `payment_status` to `SUCCESS` and record `payment_time` (V14 has no `amount_received` column).
-4. Activate corresponding package registration or member card.
-5. Issue `invoice` (status `PAID`) and itemized `invoice_line` snapshot with applied discounts.
-6. Insert `activity_log`.
+1. Validate the request (`referenceCode` for non-cash methods) and read the payment.
+2. Verify status is `PENDING`, otherwise 409 `PAYMENT_NOT_PENDING`.
+3. Compare `amountReceived` with `amount`. On a difference, append the mismatch note, commit only that, answer 409 `PAYMENT_AMOUNT_MISMATCH`.
+4. Store `reference_code`, activate the member card or package registration (dates recomputed from today); activation sets `payment_status = 'SUCCESS'`, `payment_time` and `confirmed_by_user_id`.
+5. Issue `invoice` (status `PAID`) and one `invoice_line` snapshot with the price before discount.
+6. Flush: the `@Version` check on `payment` turns a concurrent second confirmation into 409 (optimistic lock, used instead of the pessimistic lock first planned here).
+7. Insert `activity_log` (`PAYMENT_CONFIRMED`, details: method, reference, amount, amount received, item, invoice number).
 
 ## Scheduled Jobs
 

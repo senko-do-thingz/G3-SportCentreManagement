@@ -38,4 +38,7 @@ public final class AuditAction {
     public static final String CLASS_CREATED = "CLASS_CREATED";
     public static final String CLASS_UPDATED = "CLASS_UPDATED";
     public static final String CLASS_STATUS_CHANGED = "CLASS_STATUS_CHANGED";
+
+    public static final String PAYMENT_CONFIRMED = "PAYMENT_CONFIRMED";
+    public static final String PAYMENT_FAILED = "PAYMENT_FAILED";
 }

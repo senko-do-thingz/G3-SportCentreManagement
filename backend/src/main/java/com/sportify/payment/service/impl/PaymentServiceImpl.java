@@ -118,7 +118,7 @@ public class PaymentServiceImpl implements PaymentService {
         if (confirmedBy != null) {
             payment.setConfirmedByUser(confirmedBy);
             String staffNote = "Confirmed by user id " + confirmedBy.getId();
-            payment.setNotes(appendNote(payment.getNotes(), staffNote));
+            payment.setNotes(PaymentNotes.append(payment.getNotes(), staffNote));
         }
 
         return paymentRepository.save(payment);
@@ -139,7 +139,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         payment.setPaymentStatus(PaymentStatus.FAILED);
-        payment.setNotes(appendNote(payment.getNotes(), reason));
+        payment.setNotes(PaymentNotes.append(payment.getNotes(), reason));
 
         return paymentRepository.save(payment);
     }
@@ -253,68 +253,6 @@ public class PaymentServiceImpl implements PaymentService {
                 .createdAt(payment.getCreatedAt())
                 .updatedAt(payment.getUpdatedAt())
                 .build();
-    }
-
-    private String appendNote(String existing, String append) {
-        if (append == null || append.isBlank()) {
-            return truncateSingleNote(existing);
-        }
-        if (existing == null || existing.isBlank()) {
-            return truncateSingleNote(append);
-        }
-
-        // If append alone exceeds 500 characters, cut append to 500 safely and drop existing.
-        if (append.length() > 500) {
-            return truncateSingleNote(append);
-        }
-
-        // Here append is <= 500 characters and must be preserved intact.
-        String candidate = existing + " | " + append;
-        if (candidate.length() <= 500) {
-            return candidate;
-        }
-
-        // Drop oldest segments separated by " | " until candidate length fits or no more separators.
-        String curExisting = existing;
-        while (curExisting.contains(" | ") && (curExisting.length() + 3 + append.length() > 500)) {
-            int firstSep = curExisting.indexOf(" | ");
-            curExisting = curExisting.substring(firstSep + 3);
-        }
-
-        if (curExisting.length() + 3 + append.length() <= 500) {
-            return curExisting + " | " + append;
-        }
-
-        // If even the remaining single segment is too long to fit with " | " + append:
-        int remainingBudget = 500 - 3 - append.length();
-        if (remainingBudget <= 0) {
-            return append;
-        }
-
-        // Cut oldest characters from curExisting (keep tail) to fit remainingBudget
-        int start = curExisting.length() - remainingBudget;
-        if (Character.isLowSurrogate(curExisting.charAt(start))) {
-            start++;
-        }
-        String trimmedExisting = curExisting.substring(start);
-        if (trimmedExisting.isEmpty()) {
-            return append;
-        }
-        return trimmedExisting + " | " + append;
-    }
-
-    private String truncateSingleNote(String note) {
-        if (note == null) {
-            return null;
-        }
-        if (note.length() <= 500) {
-            return note;
-        }
-        int cutoff = 500;
-        if (Character.isHighSurrogate(note.charAt(cutoff - 1))) {
-            cutoff--;
-        }
-        return note.substring(0, cutoff);
     }
 
     private record PaymentItemSummary(String description, BigDecimal originalPrice, BigDecimal discount) {}
