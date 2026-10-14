@@ -90,11 +90,44 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     @Override
     @Transactional
     public CardTierResponse updateTier(Long id, MembershipCardTierUpdateRequest request, UserAccount actor) {
-        MembershipCardTier tier = tierRepository.findById(id)
+        if (request == null) {
+            throw new IllegalArgumentException("Request must not be null");
+        }
+        // Basic request checks that require no database state
+        if (request.getPrice() != null && request.getPrice().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BusinessRuleException("Price cannot be negative");
+        }
+        if (request.getDurationMonths() != null && request.getDurationMonths() < 0) {
+            throw new BusinessRuleException("Duration in months must be non-negative");
+        }
+        if (request.getDiscountPercentage() != null && (request.getDiscountPercentage() < 0 || request.getDiscountPercentage() > 100)) {
+            throw new BusinessRuleException("Discount percentage must be between 0 and 100");
+        }
+
+        // Concurrency decision (Option 2): deterministic row locking via findAllForUpdate() (ORDER BY id).
+        // In SQL Server, concurrent tier updates are serialized sequentially without lock timeouts;
+        // a second concurrent transaction waits until the first transaction ends.
+        // Catching PessimisticLockingFailureException maps database or driver-level lock failures (such as deadlock victim selection)
+        // and does not imply a timeout. Known limitation: unbounded wait holds a database connection while waiting.
+        List<MembershipCardTier> lockedTiers;
+        try {
+            lockedTiers = tierRepository.findAllForUpdate();
+        } catch (PessimisticLockingFailureException ex) {
+            throw new BusinessRuleException("Membership tiers are currently being updated by another operation. Please retry in a few moments.", ex);
+        }
+
+        // The target tier is resolved from lockedTiers AFTER the lock is held.
+        // This ensures the entity state in the persistence context is fresh and reflects any prior commits,
+        // preventing stale state in the activity_log 'before' snapshot.
+        // Evaluating 404 after lock acquisition is acceptable for this low-traffic manager-only catalog endpoint.
+        MembershipCardTier tier = lockedTiers.stream()
+                .filter(t -> t.getId().equals(id))
+                .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Card tier not found for id: " + id));
 
         boolean standard = isStandard(tier);
 
+        // Database-dependent validations
         if (standard) {
             if (request.getPrice().compareTo(BigDecimal.ZERO) != 0) {
                 throw new BusinessRuleException("The STANDARD tier price cannot be changed");
@@ -115,12 +148,6 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             if (request.getDurationMonths() < 1) {
                 throw new BusinessRuleException("Duration in months must be at least 1 for paid tiers");
             }
-        }
-
-        try {
-            tierRepository.findAllForUpdate();
-        } catch (PessimisticLockingFailureException ex) {
-            throw new BusinessRuleException("Membership tiers are currently being updated by another operation. Please retry in a few moments.", ex);
         }
 
         if (!standard && Boolean.TRUE.equals(request.getActive())) {

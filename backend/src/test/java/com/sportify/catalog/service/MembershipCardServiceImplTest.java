@@ -33,7 +33,9 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import com.sportify.payment.entity.Payment;
@@ -45,6 +47,7 @@ import com.sportify.core.audit.AuditEvent;
 import com.sportify.core.audit.AuditService;
 import com.sportify.payment.service.PaymentService;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.data.domain.Sort;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -57,6 +60,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -125,6 +129,13 @@ public class MembershipCardServiceImplTest {
                 .isActive(true)
                 .tierRank(4)
                 .build();
+
+        lenient().when(tierRepository.findAllForUpdate()).thenAnswer(inv -> {
+            List<MembershipCardTier> list = new ArrayList<>();
+            if (goldTier != null) list.add(goldTier);
+            if (vipTier != null) list.add(vipTier);
+            return list;
+        });
 
         Role memberRole = Role.builder().id(1L).code("MEMBER").name("Member").build();
         memberUser = UserAccount.builder().id(100L).role(memberRole).fullName("Test Member").build();
@@ -736,7 +747,7 @@ public class MembershipCardServiceImplTest {
                 .isActive(true)
                 .build();
 
-        when(tierRepository.findById(2L)).thenReturn(Optional.of(tier));
+        when(tierRepository.findAllForUpdate()).thenReturn(List.of(tier));
         when(tierRepository.saveAndFlush(any(MembershipCardTier.class))).thenAnswer(inv -> inv.getArgument(0));
 
         MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
@@ -781,7 +792,7 @@ public class MembershipCardServiceImplTest {
                 .isActive(true)
                 .build();
 
-        when(tierRepository.findById(2L)).thenReturn(Optional.of(tier));
+        when(tierRepository.findAllForUpdate()).thenReturn(List.of(tier));
 
         MembershipCardTierUpdateRequest zeroReq = MembershipCardTierUpdateRequest.builder()
                 .price(BigDecimal.ZERO)
@@ -814,7 +825,7 @@ public class MembershipCardServiceImplTest {
                 .isActive(true)
                 .build();
 
-        when(tierRepository.findById(1L)).thenReturn(Optional.of(standard));
+        when(tierRepository.findAllForUpdate()).thenReturn(List.of(standard));
 
         MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
                 .price(BigDecimal.valueOf(100000.00))
@@ -839,7 +850,7 @@ public class MembershipCardServiceImplTest {
                 .isActive(true)
                 .build();
 
-        when(tierRepository.findById(1L)).thenReturn(Optional.of(standard));
+        when(tierRepository.findAllForUpdate()).thenReturn(List.of(standard));
 
         MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
                 .price(BigDecimal.ZERO)
@@ -864,7 +875,7 @@ public class MembershipCardServiceImplTest {
                 .isActive(true)
                 .build();
 
-        when(tierRepository.findById(1L)).thenReturn(Optional.of(standard));
+        when(tierRepository.findAllForUpdate()).thenReturn(List.of(standard));
 
         MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
                 .price(BigDecimal.ZERO)
@@ -889,7 +900,7 @@ public class MembershipCardServiceImplTest {
                 .isActive(true)
                 .build();
 
-        when(tierRepository.findById(2L)).thenReturn(Optional.of(tier));
+        when(tierRepository.findAllForUpdate()).thenReturn(List.of(tier));
 
         MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
                 .price(BigDecimal.valueOf(300000.00))
@@ -916,7 +927,7 @@ public class MembershipCardServiceImplTest {
                 .isActive(true)
                 .build();
 
-        when(tierRepository.findById(1L)).thenReturn(Optional.of(standard));
+        when(tierRepository.findAllForUpdate()).thenReturn(List.of(standard));
 
         MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
                 .price(BigDecimal.ZERO)
@@ -981,7 +992,7 @@ public class MembershipCardServiceImplTest {
                 .isActive(true)
                 .build();
 
-        when(tierRepository.findById(1L)).thenReturn(Optional.of(standard));
+        when(tierRepository.findAllForUpdate()).thenReturn(List.of(standard));
         when(tierRepository.saveAndFlush(any(MembershipCardTier.class))).thenAnswer(inv -> inv.getArgument(0));
 
         MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
@@ -1013,7 +1024,7 @@ public class MembershipCardServiceImplTest {
                 .isActive(true)
                 .build();
 
-        when(tierRepository.findById(2L)).thenReturn(Optional.of(tier));
+        when(tierRepository.findAllForUpdate()).thenReturn(List.of(tier));
         when(tierRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
@@ -1042,7 +1053,7 @@ public class MembershipCardServiceImplTest {
                 .isActive(true)
                 .build();
 
-        when(tierRepository.findById(2L)).thenReturn(Optional.of(tier));
+        when(tierRepository.findAllForUpdate()).thenReturn(List.of(tier));
         when(tierRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
@@ -1060,7 +1071,7 @@ public class MembershipCardServiceImplTest {
 
     @Test
     void updateTier_unknownId_throwsResourceNotFoundException() {
-        when(tierRepository.findById(999L)).thenReturn(Optional.empty());
+        when(tierRepository.findAllForUpdate()).thenReturn(List.of());
 
         MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
                 .price(BigDecimal.valueOf(300000.00))
@@ -1093,7 +1104,7 @@ public class MembershipCardServiceImplTest {
                 .status(CardStatus.ACTIVE)
                 .build();
 
-        when(tierRepository.findById(2L)).thenReturn(Optional.of(tier));
+        when(tierRepository.findAllForUpdate()).thenReturn(List.of(tier));
         when(tierRepository.saveAndFlush(any(MembershipCardTier.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // Manager updates tier price from 300,000 to 450,000
@@ -1126,7 +1137,7 @@ public class MembershipCardServiceImplTest {
                 .isActive(true)
                 .build();
 
-        when(tierRepository.findById(2L)).thenReturn(Optional.of(tier));
+        when(tierRepository.findAllForUpdate()).thenReturn(List.of(tier));
         when(tierRepository.saveAndFlush(any(MembershipCardTier.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // Manager updates tier price
@@ -1902,7 +1913,7 @@ public class MembershipCardServiceImplTest {
                 .id(3L).code("GOLD").name("Gold").price(BigDecimal.valueOf(500000.00))
                 .durationMonths(12).discountPercentage(10).tierRank(3).isActive(true).build();
 
-        when(tierRepository.findById(3L)).thenReturn(Optional.of(goldTier));
+        when(tierRepository.findAllForUpdate()).thenReturn(List.of(silverTier, goldTier));
         when(tierRepository.findByIsActiveTrue()).thenReturn(List.of(silverTier, goldTier));
 
         // Attempting to update Gold price to 250,000 (lower than Silver at 300,000)
@@ -1928,7 +1939,7 @@ public class MembershipCardServiceImplTest {
                 .id(4L).code("VIP").name("VIP").price(BigDecimal.valueOf(1000000.00))
                 .durationMonths(12).discountPercentage(15).tierRank(4).isActive(true).build();
 
-        when(tierRepository.findById(3L)).thenReturn(Optional.of(goldTier));
+        when(tierRepository.findAllForUpdate()).thenReturn(List.of(goldTier, vipTier));
         when(tierRepository.findByIsActiveTrue()).thenReturn(List.of(goldTier, vipTier));
 
         // Attempting to update Gold price to 1,200,000 (higher than VIP at 1,000,000)
@@ -1957,7 +1968,7 @@ public class MembershipCardServiceImplTest {
                 .id(4L).code("VIP").name("VIP").price(BigDecimal.valueOf(1000000.00))
                 .durationMonths(12).discountPercentage(15).tierRank(4).isActive(true).build();
 
-        when(tierRepository.findById(3L)).thenReturn(Optional.of(goldTier));
+        when(tierRepository.findAllForUpdate()).thenReturn(List.of(silverTier, goldTier, vipTier));
         when(tierRepository.findByIsActiveTrue()).thenReturn(List.of(silverTier, goldTier, vipTier));
         when(tierRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -1981,7 +1992,7 @@ public class MembershipCardServiceImplTest {
                 .id(3L).code("GOLD").name("Gold").price(BigDecimal.valueOf(500000.00))
                 .durationMonths(12).discountPercentage(10).tierRank(3).isActive(true).build();
 
-        when(tierRepository.findById(3L)).thenReturn(Optional.of(goldTier));
+        when(tierRepository.findAllForUpdate()).thenReturn(List.of(goldTier));
         when(tierRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // Deactivating Gold and setting price to 200,000 -> allowed without active monotonicity check because active = false
@@ -2001,17 +2012,6 @@ public class MembershipCardServiceImplTest {
 
     @Test
     void updateTier_whenLockConflictOccurs_throwsBusinessRuleExceptionWithRetryMessage() {
-        MembershipCardTier gold = MembershipCardTier.builder()
-                .id(3L)
-                .code("GOLD")
-                .name("Gold Tier")
-                .price(BigDecimal.valueOf(500000.00))
-                .durationMonths(12)
-                .discountPercentage(10)
-                .tierRank(3)
-                .isActive(true)
-                .build();
-        when(tierRepository.findById(3L)).thenReturn(Optional.of(gold));
         when(tierRepository.findAllForUpdate())
                 .thenThrow(new org.springframework.dao.PessimisticLockingFailureException("Lock acquisition failure"));
 
@@ -2028,8 +2028,47 @@ public class MembershipCardServiceImplTest {
                 ex.getMessage());
         assertNotNull(ex.getCause());
         assertTrue(ex.getCause() instanceof org.springframework.dao.PessimisticLockingFailureException);
-        verify(tierRepository).findById(3L);
+        verify(tierRepository).findAllForUpdate();
         verify(tierRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateTier_readsTierAfterLock_andSnapshotsLockedState() {
+        MembershipCardTier lockedTier = MembershipCardTier.builder()
+                .id(3L)
+                .code("GOLD")
+                .name("Gold Tier")
+                .price(BigDecimal.valueOf(500000.00))
+                .durationMonths(12)
+                .discountPercentage(10)
+                .tierRank(3)
+                .isActive(true)
+                .build();
+
+        when(tierRepository.findAllForUpdate()).thenReturn(List.of(lockedTier));
+        when(tierRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.valueOf(550000.00))
+                .durationMonths(12)
+                .discountPercentage(10)
+                .active(true)
+                .build();
+
+        UserAccount manager = UserAccount.builder().id(99L).email("mgr@sportify.com").fullName("Manager").build();
+        membershipCardService.updateTier(3L, req, manager);
+
+        InOrder inOrder = inOrder(tierRepository, auditService);
+        inOrder.verify(tierRepository).findAllForUpdate();
+        inOrder.verify(tierRepository).saveAndFlush(lockedTier);
+        inOrder.verify(auditService).record(any());
+
+        ArgumentCaptor<AuditEvent> captor = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService).record(captor.capture());
+        Map<?, ?> details = captor.getValue().getDetails();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> before = (Map<String, Object>) details.get("before");
+        assertEquals(BigDecimal.valueOf(500000.00), before.get("price"));
     }
 }
 

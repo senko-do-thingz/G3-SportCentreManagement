@@ -77,7 +77,7 @@
 | TC-BE03-54 | Member requests lower/equal rank tier after live price raise is queued without replacing held card | POST `/api/v1/membership-cards/purchase` | 201 Created | Passed (Unit test) |
 | TC-BE03-55 | Self-service upgrade to higher tier with fee <= 0 rejected online | POST `/api/v1/membership-cards/purchase` | 400 Bad Request | Passed (Unit test) |
 | TC-BE03-56 | Upgrade fee after tier price edit is based on amount paid toward term | POST `/api/v1/membership-cards/purchase` | 201 Created | Passed (Unit test) |
-| TC-BE03-57 | Multi-step upgrade chain (A -> B -> C) calculates fee using cumulative chain pricePaid | POST `/api/v1/membership-cards/purchase` | 201 Created | Passed (Unit test) |
+| TC-BE03-57 | Multi-step upgrade chain (A to B to C) calculates fee using cumulative chain pricePaid | POST `/api/v1/membership-cards/purchase` | 201 Created | Passed (Unit test) |
 | TC-BE03-58 | Legacy upgrade card with null replaces_card_id fails closed on upgrade attempt | POST `/api/v1/membership-cards/purchase` | 400 Bad Request | Passed (Unit test) |
 | TC-BE03-59 | Activation of upgrade card with matching recorded replaces_card_id succeeds | POST `/api/v1/membership-cards/{id}/activate` | 200 OK | Passed (Unit test) |
 | TC-BE03-60 | Activation of upgrade card with mismatched replaces_card_id returns 400 | POST `/api/v1/membership-cards/{id}/activate` | 400 Bad Request | Passed (Unit test) |
@@ -87,6 +87,7 @@
 | TC-BE03-66 | Migration V22 Step 5 - duplicate in-force replaces_card_id links fail closed | Integration test | N/A (Schema) | Not run locally (Docker unavailable), pending CI |
 | TC-BE03-67 | Staff desk upgrade with fee <= 0 allowed and activated immediately | POST `/api/v1/membership-cards/purchase` | 201 Created | Passed (Unit test) |
 | TC-BE03-68 | Card tier update validation - concurrent edit lock conflict (mocked unit test) returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request | Passed (Unit test) |
+| TC-BE03-69 | Card tier concurrent update serialization - post-lock read ensures audit before snapshot reflects prior commit | PUT `/api/v1/membership-cards/tiers/{id}` | 200 OK | Not run locally (Docker unavailable), pending CI |
 
 *Note: Test IDs TC-BE03-62 and TC-BE03-63 are intentionally unused.*
 
@@ -587,9 +588,9 @@
 ### TC-BE03-53: Integration test - V22 migration backfill and idempotency verification
 - **Preconditions**: Flyway applied all catalog migrations up to V21 on dedicated temporary SQL Server database container.
 - **Steps**:
-  1. Seed V21 legacy rows: Clean chain A -> B -> C sharing identical `end_date`, no-predecessor card, and ambiguous candidate with multiple candidate predecessor cards sharing `end_date`.
+  1. Seed V21 legacy rows: Clean chain A to B to C sharing identical `end_date`, no-predecessor card, and ambiguous candidate with multiple candidate predecessor cards sharing `end_date`.
   2. Migrate to V22 via Flyway using configured `flyway.locations`.
-  3. Verify backfill results: Chain A -> B -> C links correctly; no-predecessor card and ambiguous candidate card maintain `replaces_card_id = NULL`.
+  3. Verify backfill results: Chain A to B to C links correctly; no-predecessor card and ambiguous candidate card maintain `replaces_card_id = NULL`.
   4. Capture table snapshot of `member_card` rows.
   5. Delete V22 entry from `flyway_schema_history` and re-migrate to V22.
   6. Capture post-remigration snapshot and assert 100% equivalence.
@@ -629,7 +630,7 @@
   - Upgrade fee is `600,000 - 300,000 = 300,000` (based on actual `pricePaid`), not `600,000 - 450,000 = 150,000` (live price).
 - **Status**: Passed (Unit test)
 
-### TC-BE03-57: Multi-step upgrade chain (A -> B -> C) calculates fee using cumulative chain pricePaid
+### TC-BE03-57: Multi-step upgrade chain (A to B to C) calculates fee using cumulative chain pricePaid
 - **Preconditions**: Member originally purchased Tier A (150,000). Later upgraded to Tier B (350,000) paying 200,000 difference (cumulative paid = 350,000). Tier C is priced at 650,000.
 - **Request**: `POST /api/v1/membership-cards/purchase` with `tierId = <TIER_C_ID>`.
 - **Expected Result**:
@@ -726,5 +727,18 @@
 - **Expected Result**:
   - HTTP 400 Bad Request.
   - Throws `BusinessRuleException` with message `Membership tiers are currently being updated by another operation. Please retry in a few moments.` and preserves root cause `PessimisticLockingFailureException`.
-  - Verifies `findById` and basic validation run before lock acquisition, while `saveAndFlush` is never called. Note: Under deterministic `ORDER BY id` pessimistic locking without custom timeout (Option 2), concurrent updates in real SQL Server serialize sequentially; this unit test specifically verifies exception mapping if a lock acquisition failure is raised.
+  - Verifies basic request validations run before lock acquisition, `findAllForUpdate()` is called, and `saveAndFlush` is never called when a lock acquisition failure or deadlock occurs. Note: Under deterministic `ORDER BY id` pessimistic locking without custom timeout (Option 2), concurrent updates in real SQL Server serialize sequentially (a second transaction waits for the first transaction to end; no timeout is configured; catching PessimisticLockingFailureException maps database or driver-level lock failures such as a deadlock victim and does not imply a timeout). Real concurrent serialization and post-lock snapshot accuracy are verified at integration level in TC-BE03-69.
 - **Status**: Passed (Unit test)
+
+### TC-BE03-69: Card tier concurrent update serialization - post-lock read ensures audit before snapshot reflects prior commit
+- **Preconditions**: Integration test (`ManagerCatalogIntegrationTest.testUpdateTier_concurrentTransactions_secondTransactionReadsCommittedStateAfterLock`). Real SQL Server database. Two concurrent transactions or threads execute against the same tier. Thread A acquires the pessimistic write lock (`findAllForUpdate()`) and updates the tier price inside an open transaction.
+- **Request**:
+  - Thread B: `PUT /api/v1/membership-cards/tiers/{id}`
+  - Header: `Authorization: Bearer <MANAGER_JWT>`
+- **Expected Result**:
+  - Under Option 2 (no timeout configured), Thread B blocks inside SQL Server waiting for Thread A's transaction to commit.
+  - When Thread A commits, Thread B acquires the lock and resolves the tier entity from `findAllForUpdate()`, reading the fresh state committed by Thread A.
+  - Thread B applies its update and writes an `activity_log` entry with action `CARD_TIER_UPDATED`.
+  - The `before` snapshot in Thread B's `activity_log` entry matches the exact values committed by Thread A, not the stale values from before Thread A.
+  - Hard timeouts protect against build hangs.
+- **Status**: Not run locally (Docker unavailable), pending CI

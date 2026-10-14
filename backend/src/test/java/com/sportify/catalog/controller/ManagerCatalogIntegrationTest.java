@@ -3,6 +3,7 @@ package com.sportify.catalog.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sportify.AbstractIntegrationTest;
+import com.sportify.catalog.dto.CardTierResponse;
 import com.sportify.catalog.dto.MemberCardPurchaseRequest;
 import com.sportify.catalog.dto.MemberCardResponse;
 import com.sportify.catalog.dto.MembershipCardTierUpdateRequest;
@@ -53,8 +54,12 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -64,6 +69,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -73,6 +79,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -143,6 +150,9 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private Sport activeSport1;
     private Sport activeSport2;
@@ -1484,5 +1494,113 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         );
         assertTrue(ex.getMessage().contains("Cannot determine upgrade baseline"),
                 "Activating legacy upgrade with null replaces_card_id must fail closed: " + ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("TC-BE03-69: Concurrent tier updates - second transaction serializes on lock and reads post-commit state for before snapshot")
+    void testUpdateTier_concurrentTransactions_secondTransactionReadsCommittedStateAfterLock() {
+        assertTimeoutPreemptively(Duration.ofSeconds(20), () -> {
+            MembershipCardTier testTier = cardTierRepository.findByCode("GOLD").orElseThrow();
+            BigDecimal initialPrice = testTier.getPrice();
+            BigDecimal priceAfterA = BigDecimal.valueOf(520000.00);
+            BigDecimal priceAfterB = BigDecimal.valueOf(540000.00);
+
+            CountDownLatch latchALockedAndUpdated = new CountDownLatch(1);
+            CountDownLatch latchBStarted = new CountDownLatch(1);
+
+            ExecutorService executor = Executors.newFixedThreadPool(2);
+            try {
+                // Thread A: open transaction, acquire pessimistic lock, modify tier, wait for B to queue, commit
+                Future<?> futureA = executor.submit(() -> {
+                    TransactionTemplate ttA = new TransactionTemplate(transactionManager);
+                    ttA.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                    ttA.execute(status -> {
+                        List<MembershipCardTier> locked = cardTierRepository.findAllForUpdate();
+                        MembershipCardTier tierA = locked.stream()
+                                .filter(t -> t.getId().equals(testTier.getId()))
+                                .findFirst()
+                                .orElseThrow();
+                        tierA.setPrice(priceAfterA);
+                        cardTierRepository.saveAndFlush(tierA);
+
+                        // Signal Thread B that lock is held and entity modified
+                        latchALockedAndUpdated.countDown();
+
+                        // Wait for Thread B to start and enter updateTier (where it will block on findAllForUpdate)
+                        try {
+                            assertTrue(latchBStarted.await(5, TimeUnit.SECONDS), "Thread B should start within timeout");
+                            // Give Thread B time to block on the SQL Server lock
+                            Thread.sleep(500);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            throw new RuntimeException(e);
+                        }
+                        return null; // commits transaction A
+                    });
+                });
+
+                // Thread B: waits for A to lock and update, then calls updateTier (which serializes and waits for A to commit)
+                Future<CardTierResponse> futureB = executor.submit(() -> {
+                    try {
+                        assertTrue(latchALockedAndUpdated.await(5, TimeUnit.SECONDS), "Thread A should acquire lock within timeout");
+                        latchBStarted.countDown();
+
+                        MembershipCardTierUpdateRequest reqB = MembershipCardTierUpdateRequest.builder()
+                                .price(priceAfterB)
+                                .durationMonths(testTier.getDurationMonths())
+                                .discountPercentage(testTier.getDiscountPercentage())
+                                .description("Updated by Thread B")
+                                .active(true)
+                                .build();
+
+                        return membershipCardService.updateTier(testTier.getId(), reqB, managerUser);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+
+                // Wait for both to complete
+                futureA.get(10, TimeUnit.SECONDS);
+                CardTierResponse resB = futureB.get(10, TimeUnit.SECONDS);
+                assertNotNull(resB);
+                assertEquals(0, priceAfterB.compareTo(resB.getPrice()));
+
+                // Verify that ActivityLog for B recorded before snapshot = priceAfterA (committed by A), NOT initialPrice!
+                List<ActivityLog> logs = activityLogRepository.findAll().stream()
+                        .filter(l -> "MEMBERSHIP_CARD_TIER".equals(l.getEntityType()) && testTier.getId().equals(l.getEntityId()))
+                        .filter(l -> AuditAction.CARD_TIER_UPDATED.equals(l.getAction()))
+                        .toList();
+                assertFalse(logs.isEmpty(), "Activity log row must be written for tier update by Thread B");
+                ActivityLog lastLog = logs.get(logs.size() - 1);
+                JsonNode detailsNode = objectMapper.readTree(lastLog.getDetails());
+                assertTrue(detailsNode.has("before"), "ActivityLog details must contain 'before' snapshot");
+                assertTrue(detailsNode.has("after"), "ActivityLog details must contain 'after' snapshot");
+
+                double loggedBeforePrice = detailsNode.get("before").get("price").asDouble();
+                double loggedAfterPrice = detailsNode.get("after").get("price").asDouble();
+
+                assertEquals(priceAfterA.doubleValue(), loggedBeforePrice,
+                        "Before snapshot in Thread B must reflect the price committed by Thread A (520000.00), not pre-A price (" + initialPrice + ")");
+                assertEquals(priceAfterB.doubleValue(), loggedAfterPrice,
+                        "After snapshot in Thread B must reflect Thread B price (540000.00)");
+
+            } finally {
+                executor.shutdownNow();
+                // Clean up / restore testTier price
+                try {
+                    TransactionTemplate ttClean = new TransactionTemplate(transactionManager);
+                    ttClean.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                    ttClean.execute(status -> {
+                        MembershipCardTier reset = cardTierRepository.findById(testTier.getId()).orElse(null);
+                        if (reset != null) {
+                            reset.setPrice(initialPrice);
+                            cardTierRepository.saveAndFlush(reset);
+                        }
+                        return null;
+                    });
+                } catch (Exception ignored) {
+                }
+            }
+        });
     }
 }
