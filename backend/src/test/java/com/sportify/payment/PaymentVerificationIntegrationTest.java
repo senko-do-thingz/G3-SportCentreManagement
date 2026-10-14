@@ -327,7 +327,8 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> verificationService.confirmPayment(ids[0], confirm("380000"), receptionist))
                 .isInstanceOf(ConflictException.class)
                 .satisfies(ex -> assertThat(((ConflictException) ex).getCode()).isEqualTo("PAYMENT_NOT_PENDING"));
-        assertThat(tx().execute(s -> invoiceRepository.findByPaymentId(ids[0]).size())).isEqualTo(1);
+        Integer invoiceCount = tx().execute(s -> invoiceRepository.findByPaymentId(ids[0]).size());
+        assertThat(invoiceCount).isEqualTo(1);
     }
 
     @Test
@@ -345,7 +346,8 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
             paymentRepository.saveAndFlush(stale);
         })).isInstanceOf(ObjectOptimisticLockingFailureException.class);
 
-        assertThat(tx().execute(s -> invoiceRepository.findByPaymentId(ids[0]).size())).isEqualTo(1);
+        Integer invoiceCount = tx().execute(s -> invoiceRepository.findByPaymentId(ids[0]).size());
+        assertThat(invoiceCount).isEqualTo(1);
     }
 
     @Test
@@ -360,7 +362,8 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
                 () -> verificationService.confirmPayment(ids[0], confirm("380000"), second)));
 
         assertOneWinnerOneNotPending(outcomes);
-        assertThat(tx().execute(s -> invoiceRepository.findByPaymentId(ids[0]).size())).isEqualTo(1);
+        Integer invoiceCount = tx().execute(s -> invoiceRepository.findByPaymentId(ids[0]).size());
+        assertThat(invoiceCount).isEqualTo(1);
     }
 
     @Test
