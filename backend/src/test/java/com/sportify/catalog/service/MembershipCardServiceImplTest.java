@@ -26,7 +26,6 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -1081,6 +1080,9 @@ public class MembershipCardServiceImplTest {
                 .build();
 
         assertThrows(ResourceNotFoundException.class, () -> membershipCardService.updateTier(999L, req, null));
+        verify(tierRepository).findAllForUpdate();
+        verify(tierRepository, never()).saveAndFlush(any());
+        verify(auditService, never()).record(any());
     }
 
     @Test
@@ -2034,11 +2036,15 @@ public class MembershipCardServiceImplTest {
 
     @Test
     void updateTier_readsTierAfterLock_andSnapshotsLockedState() {
+        // Use unique sentinel prices so snapshot value is proven to originate strictly from the locked tier
+        BigDecimal initialLockedPrice = BigDecimal.valueOf(488888.00);
+        BigDecimal targetUpdatedPrice = BigDecimal.valueOf(599999.00);
+
         MembershipCardTier lockedTier = MembershipCardTier.builder()
                 .id(3L)
                 .code("GOLD")
                 .name("Gold Tier")
-                .price(BigDecimal.valueOf(500000.00))
+                .price(initialLockedPrice)
                 .durationMonths(12)
                 .discountPercentage(10)
                 .tierRank(3)
@@ -2049,7 +2055,7 @@ public class MembershipCardServiceImplTest {
         when(tierRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         MembershipCardTierUpdateRequest req = MembershipCardTierUpdateRequest.builder()
-                .price(BigDecimal.valueOf(550000.00))
+                .price(targetUpdatedPrice)
                 .durationMonths(12)
                 .discountPercentage(10)
                 .active(true)
@@ -2068,7 +2074,49 @@ public class MembershipCardServiceImplTest {
         Map<?, ?> details = captor.getValue().getDetails();
         @SuppressWarnings("unchecked")
         Map<String, Object> before = (Map<String, Object>) details.get("before");
-        assertEquals(BigDecimal.valueOf(500000.00), before.get("price"));
+        assertEquals(initialLockedPrice, before.get("price"));
+    }
+
+    @Test
+    void updateTier_withInvalidRequest_failsPreLockValidationBeforeResourceCheck_returns400() {
+        MembershipCardTierUpdateRequest invalidReq = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.valueOf(-50.00))
+                .durationMonths(12)
+                .discountPercentage(10)
+                .active(true)
+                .build();
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> membershipCardService.updateTier(9999L, invalidReq, null));
+        assertEquals("Price cannot be negative", ex.getMessage());
+        verify(tierRepository, never()).findAllForUpdate();
+        verify(tierRepository, never()).saveAndFlush(any());
+        verify(auditService, never()).record(any());
+    }
+
+    @Test
+    void updateTier_nullRequiredFields_failFastWithBusinessRuleException() {
+        MembershipCardTierUpdateRequest nullPrice = MembershipCardTierUpdateRequest.builder()
+                .durationMonths(12).discountPercentage(10).active(true).build();
+        assertEquals("Price is required",
+                assertThrows(BusinessRuleException.class, () -> membershipCardService.updateTier(1L, nullPrice, null)).getMessage());
+
+        MembershipCardTierUpdateRequest nullDuration = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.valueOf(100000.00)).discountPercentage(10).active(true).build();
+        assertEquals("Duration in months is required",
+                assertThrows(BusinessRuleException.class, () -> membershipCardService.updateTier(1L, nullDuration, null)).getMessage());
+
+        MembershipCardTierUpdateRequest nullDiscount = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.valueOf(100000.00)).durationMonths(12).active(true).build();
+        assertEquals("Discount percentage is required",
+                assertThrows(BusinessRuleException.class, () -> membershipCardService.updateTier(1L, nullDiscount, null)).getMessage());
+
+        MembershipCardTierUpdateRequest nullActive = MembershipCardTierUpdateRequest.builder()
+                .price(BigDecimal.valueOf(100000.00)).durationMonths(12).discountPercentage(10).build();
+        assertEquals("Active flag is required",
+                assertThrows(BusinessRuleException.class, () -> membershipCardService.updateTier(1L, nullActive, null)).getMessage());
+
+        verify(tierRepository, never()).findAllForUpdate();
     }
 }
 

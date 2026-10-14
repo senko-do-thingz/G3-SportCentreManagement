@@ -35,7 +35,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -93,20 +92,33 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         if (request == null) {
             throw new IllegalArgumentException("Request must not be null");
         }
-        // Basic request checks that require no database state
-        if (request.getPrice() != null && request.getPrice().compareTo(BigDecimal.ZERO) < 0) {
+        // Basic request checks that require no database state (fail fast with HTTP 400 before lock acquisition)
+        if (request.getPrice() == null) {
+            throw new BusinessRuleException("Price is required");
+        }
+        if (request.getPrice().compareTo(BigDecimal.ZERO) < 0) {
             throw new BusinessRuleException("Price cannot be negative");
         }
-        if (request.getDurationMonths() != null && request.getDurationMonths() < 0) {
+        if (request.getDurationMonths() == null) {
+            throw new BusinessRuleException("Duration in months is required");
+        }
+        if (request.getDurationMonths() < 0) {
             throw new BusinessRuleException("Duration in months must be non-negative");
         }
-        if (request.getDiscountPercentage() != null && (request.getDiscountPercentage() < 0 || request.getDiscountPercentage() > 100)) {
+        if (request.getDiscountPercentage() == null) {
+            throw new BusinessRuleException("Discount percentage is required");
+        }
+        if (request.getDiscountPercentage() < 0 || request.getDiscountPercentage() > 100) {
             throw new BusinessRuleException("Discount percentage must be between 0 and 100");
+        }
+        if (request.getActive() == null) {
+            throw new BusinessRuleException("Active flag is required");
         }
 
         // Concurrency decision (Option 2): deterministic row locking via findAllForUpdate() (ORDER BY id).
-        // In SQL Server, concurrent tier updates are serialized sequentially without lock timeouts;
-        // a second concurrent transaction waits until the first transaction ends.
+        // In SQL Server, the dialect supports NOWAIT (which fails immediately) but does not support a per-query bounded wait.
+        // Sequential serialization (unbounded wait) was kept because a fail-fast response was not requested.
+        // A second concurrent transaction waits until the first transaction ends.
         // Catching PessimisticLockingFailureException maps database or driver-level lock failures (such as deadlock victim selection)
         // and does not imply a timeout. Known limitation: unbounded wait holds a database connection while waiting.
         List<MembershipCardTier> lockedTiers;

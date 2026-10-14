@@ -89,7 +89,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Integration tests for task BE-03 Manager Catalog and Pricing features.
  * Extends AbstractIntegrationTest. Requires Docker and Testcontainers to execute.
- * Runs in CI (GitHub Actions) where Docker is available; skipped locally when Docker is unavailable.
+ * Runs in CI (GitHub Actions) where Docker is available. When running mvn verify locally
+ * without Docker, integration tests are skipped by Testcontainers; integration tests are excluded from mvn test via @Tag("integration").
  */
 @Tag("integration")
 @AutoConfigureMockMvc
@@ -153,6 +154,9 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private PlatformTransactionManager transactionManager;
+
+    @Autowired
+    private jakarta.persistence.EntityManager entityManager;
 
     private Sport activeSport1;
     private Sport activeSport2;
@@ -1502,54 +1506,66 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         assertTimeoutPreemptively(Duration.ofSeconds(20), () -> {
             MembershipCardTier testTier = cardTierRepository.findByCode("GOLD").orElseThrow();
             BigDecimal initialPrice = testTier.getPrice();
+            String initialDescription = testTier.getDescription();
+            Integer initialDuration = testTier.getDurationMonths();
+            Integer initialDiscount = testTier.getDiscountPercentage();
+            Boolean initialActive = testTier.getIsActive();
+
             BigDecimal priceAfterA = BigDecimal.valueOf(520000.00);
             BigDecimal priceAfterB = BigDecimal.valueOf(540000.00);
+            String uniqueMarker = "Concurrent-Test-Marker-" + System.currentTimeMillis();
 
-            CountDownLatch latchALockedAndUpdated = new CountDownLatch(1);
-            CountDownLatch latchBStarted = new CountDownLatch(1);
+            CountDownLatch latchALocked = new CountDownLatch(1);
+            CountDownLatch latchAProceedToModify = new CountDownLatch(1);
+            AtomicInteger capturedSpidA = new AtomicInteger(0);
+            Long[] createdLogId = new Long[1];
 
             ExecutorService executor = Executors.newFixedThreadPool(2);
+            Throwable cleanFailure = null;
             try {
-                // Thread A: open transaction, acquire pessimistic lock, modify tier, wait for B to queue, commit
+                // Thread A: open REQUIRES_NEW transaction, acquire pessimistic lock via findAllForUpdate(),
+                // capture its own session ID (@@SPID), and wait for verification that Thread B is blocked before modifying anything.
                 Future<?> futureA = executor.submit(() -> {
                     TransactionTemplate ttA = new TransactionTemplate(transactionManager);
                     ttA.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
                     ttA.execute(status -> {
                         List<MembershipCardTier> locked = cardTierRepository.findAllForUpdate();
+                        int spid = ((Number) entityManager.createNativeQuery("SELECT @@SPID").getSingleResult()).intValue();
+                        capturedSpidA.set(spid);
+
+                        // Signal that Thread A holds the lock and SPID is captured
+                        latchALocked.countDown();
+
+                        // Wait until test main thread confirms Thread B is blocked in SQL Server DMV
+                        try {
+                            assertTrue(latchAProceedToModify.await(10, TimeUnit.SECONDS),
+                                    "Thread A should be signaled to proceed within timeout");
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            throw new RuntimeException("Thread A interrupted while holding lock", e);
+                        }
+
+                        // Now modify tier and flush under lock
                         MembershipCardTier tierA = locked.stream()
                                 .filter(t -> t.getId().equals(testTier.getId()))
                                 .findFirst()
                                 .orElseThrow();
                         tierA.setPrice(priceAfterA);
                         cardTierRepository.saveAndFlush(tierA);
-
-                        // Signal Thread B that lock is held and entity modified
-                        latchALockedAndUpdated.countDown();
-
-                        // Wait for Thread B to start and enter updateTier (where it will block on findAllForUpdate)
-                        try {
-                            assertTrue(latchBStarted.await(5, TimeUnit.SECONDS), "Thread B should start within timeout");
-                            // Give Thread B time to block on the SQL Server lock
-                            Thread.sleep(500);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            throw new RuntimeException(e);
-                        }
-                        return null; // commits transaction A
+                        return null; // commit tx A, releasing lock
                     });
                 });
 
-                // Thread B: waits for A to lock and update, then calls updateTier (which serializes and waits for A to commit)
+                // Thread B: waits for Thread A to lock, then calls updateTier (which serializes and blocks on findAllForUpdate)
                 Future<CardTierResponse> futureB = executor.submit(() -> {
                     try {
-                        assertTrue(latchALockedAndUpdated.await(5, TimeUnit.SECONDS), "Thread A should acquire lock within timeout");
-                        latchBStarted.countDown();
+                        assertTrue(latchALocked.await(5, TimeUnit.SECONDS), "Thread A should acquire lock within timeout");
 
                         MembershipCardTierUpdateRequest reqB = MembershipCardTierUpdateRequest.builder()
                                 .price(priceAfterB)
                                 .durationMonths(testTier.getDurationMonths())
                                 .discountPercentage(testTier.getDiscountPercentage())
-                                .description("Updated by Thread B")
+                                .description(uniqueMarker)
                                 .active(true)
                                 .build();
 
@@ -1559,20 +1575,58 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                     }
                 });
 
-                // Wait for both to complete
+                // Main test thread: wait for Thread A to lock and capture SPID
+                assertTrue(latchALocked.await(5, TimeUnit.SECONDS), "Thread A should lock within 5s");
+                int spidA = capturedSpidA.get();
+                assertTrue(spidA > 0, "Thread A SPID must be positive");
+
+                // Deterministically poll SQL Server DMV (sys.dm_os_waiting_tasks / sys.dm_exec_requests)
+                // until Thread B is observed blocked by Thread A session on a lock wait (LCK_M_%)
+                long deadline = System.currentTimeMillis() + 10000;
+                boolean blockedObserved = false;
+                while (System.currentTimeMillis() < deadline) {
+                    List<Map<String, Object>> waiters = jdbcTemplate.queryForList(
+                            "SELECT session_id, wait_type, blocking_session_id " +
+                            "FROM sys.dm_os_waiting_tasks " +
+                            "WHERE blocking_session_id = ? AND wait_type LIKE 'LCK_M_%' " +
+                            "UNION " +
+                            "SELECT session_id, wait_type, blocking_session_id " +
+                            "FROM sys.dm_exec_requests " +
+                            "WHERE blocking_session_id = ? AND wait_type LIKE 'LCK_M_%'",
+                            spidA, spidA
+                    );
+                    if (!waiters.isEmpty()) {
+                        blockedObserved = true;
+                        break;
+                    }
+                    Thread.sleep(50);
+                }
+
+                assertTrue(blockedObserved,
+                        "Thread B must be observed in SQL Server DMV as blocked by Thread A session " + spidA);
+                assertFalse(futureB.isDone(),
+                        "Thread B must still be blocked and not finished while Thread A holds the lock");
+
+                // Now allow Thread A to modify the price and commit
+                latchAProceedToModify.countDown();
+
+                // Wait for both threads to complete
                 futureA.get(10, TimeUnit.SECONDS);
                 CardTierResponse resB = futureB.get(10, TimeUnit.SECONDS);
                 assertNotNull(resB);
                 assertEquals(0, priceAfterB.compareTo(resB.getPrice()));
 
-                // Verify that ActivityLog for B recorded before snapshot = priceAfterA (committed by A), NOT initialPrice!
-                List<ActivityLog> logs = activityLogRepository.findAll().stream()
+                // Deterministically query ActivityLog for Thread B using the unique description marker
+                List<ActivityLog> matchingLogs = activityLogRepository.findAll().stream()
                         .filter(l -> "MEMBERSHIP_CARD_TIER".equals(l.getEntityType()) && testTier.getId().equals(l.getEntityId()))
                         .filter(l -> AuditAction.CARD_TIER_UPDATED.equals(l.getAction()))
+                        .filter(l -> l.getDetails() != null && l.getDetails().contains(uniqueMarker))
                         .toList();
-                assertFalse(logs.isEmpty(), "Activity log row must be written for tier update by Thread B");
-                ActivityLog lastLog = logs.get(logs.size() - 1);
-                JsonNode detailsNode = objectMapper.readTree(lastLog.getDetails());
+                assertFalse(matchingLogs.isEmpty(), "Activity log row must be written for Thread B with marker: " + uniqueMarker);
+                ActivityLog bLog = matchingLogs.get(0);
+                createdLogId[0] = bLog.getId();
+
+                JsonNode detailsNode = objectMapper.readTree(bLog.getDetails());
                 assertTrue(detailsNode.has("before"), "ActivityLog details must contain 'before' snapshot");
                 assertTrue(detailsNode.has("after"), "ActivityLog details must contain 'after' snapshot");
 
@@ -1586,7 +1640,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
 
             } finally {
                 executor.shutdownNow();
-                // Clean up / restore testTier price
+                // Clean up / restore testTier and clean activity log without swallowing errors
                 try {
                     TransactionTemplate ttClean = new TransactionTemplate(transactionManager);
                     ttClean.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -1594,12 +1648,27 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                         MembershipCardTier reset = cardTierRepository.findById(testTier.getId()).orElse(null);
                         if (reset != null) {
                             reset.setPrice(initialPrice);
+                            reset.setDescription(initialDescription);
+                            reset.setDurationMonths(initialDuration);
+                            reset.setDiscountPercentage(initialDiscount);
+                            reset.setIsActive(initialActive);
                             cardTierRepository.saveAndFlush(reset);
+                        }
+                        if (createdLogId[0] != null) {
+                            activityLogRepository.deleteById(createdLogId[0]);
                         }
                         return null;
                     });
-                } catch (Exception ignored) {
+                } catch (Exception ex) {
+                    cleanFailure = ex;
                 }
+            }
+
+            if (cleanFailure != null) {
+                if (cleanFailure instanceof RuntimeException re) {
+                    throw re;
+                }
+                throw new RuntimeException("Teardown cleanup failed", cleanFailure);
             }
         });
     }

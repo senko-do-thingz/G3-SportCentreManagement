@@ -178,6 +178,7 @@
                     <argLine>@{argLine}</argLine>
                     <skipTests>${skipUnitTests}</skipTests>
                     <excludedGroups>integration</excludedGroups>
+                    <!-- Required by experiment so that groups and excludedGroups are applied as JUnit 5 tags; verified by ablation; mechanism not proven -->
                     <properties>
                         <junit>false</junit>
                     </properties>
@@ -189,10 +190,12 @@
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <version>3.6.0</version>
                 <configuration>
+                    <argLine>@{argLine}</argLine>
                     <groups>integration</groups>
                     <includes>
                         <include>**/*Test.java</include>
                     </includes>
+                    <!-- Required by experiment so that groups and excludedGroups are applied as JUnit 5 tags; verified by ablation; mechanism not proven -->
                     <properties>
                         <junit>false</junit>
                     </properties>

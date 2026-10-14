@@ -727,18 +727,22 @@
 - **Expected Result**:
   - HTTP 400 Bad Request.
   - Throws `BusinessRuleException` with message `Membership tiers are currently being updated by another operation. Please retry in a few moments.` and preserves root cause `PessimisticLockingFailureException`.
-  - Verifies basic request validations run before lock acquisition, `findAllForUpdate()` is called, and `saveAndFlush` is never called when a lock acquisition failure or deadlock occurs. Note: Under deterministic `ORDER BY id` pessimistic locking without custom timeout (Option 2), concurrent updates in real SQL Server serialize sequentially (a second transaction waits for the first transaction to end; no timeout is configured; catching PessimisticLockingFailureException maps database or driver-level lock failures such as a deadlock victim and does not imply a timeout). Real concurrent serialization and post-lock snapshot accuracy are verified at integration level in TC-BE03-69.
+  - Verifies basic request validations run before lock acquisition, `findAllForUpdate()` is called, and `saveAndFlush` is never called when a lock acquisition failure or deadlock occurs. Note: Basic request checks (null checks, negative price, duration, discount bounds) execute before lock acquisition, so invalid requests fail fast with HTTP 400 before checking tier existence (404). Under deterministic `ORDER BY id` pessimistic locking without custom timeout (Option 2), concurrent updates in real SQL Server serialize sequentially (a second transaction waits for the first transaction to end; no timeout is configured; catching PessimisticLockingFailureException maps database or driver-level lock failures such as a deadlock victim and does not imply a timeout). Real concurrent serialization, deterministic lock-wait verification via DMVs, and post-lock snapshot accuracy are verified at integration level in TC-BE03-69.
 - **Status**: Passed (Unit test)
 
 ### TC-BE03-69: Card tier concurrent update serialization - post-lock read ensures audit before snapshot reflects prior commit
-- **Preconditions**: Integration test (`ManagerCatalogIntegrationTest.testUpdateTier_concurrentTransactions_secondTransactionReadsCommittedStateAfterLock`). Real SQL Server database. Two concurrent transactions or threads execute against the same tier. Thread A acquires the pessimistic write lock (`findAllForUpdate()`) and updates the tier price inside an open transaction.
+- **Preconditions**: Integration test (`ManagerCatalogIntegrationTest.testUpdateTier_concurrentTransactions_secondTransactionReadsCommittedStateAfterLock`). Real SQL Server 2022 database in Testcontainers. Two concurrent transactions or threads execute against the same tier. Thread A acquires the pessimistic write lock (`findAllForUpdate()`) in a `REQUIRES_NEW` transaction, captures its connection session ID (`SELECT @@SPID`), and pauses before modifying any entity state. Thread B starts `updateTier` on the same tier with a unique description marker.
 - **Request**:
   - Thread B: `PUT /api/v1/membership-cards/tiers/{id}`
   - Header: `Authorization: Bearer <MANAGER_JWT>`
 - **Expected Result**:
-  - Under Option 2 (no timeout configured), Thread B blocks inside SQL Server waiting for Thread A's transaction to commit.
-  - When Thread A commits, Thread B acquires the lock and resolves the tier entity from `findAllForUpdate()`, reading the fresh state committed by Thread A.
-  - Thread B applies its update and writes an `activity_log` entry with action `CARD_TIER_UPDATED`.
-  - The `before` snapshot in Thread B's `activity_log` entry matches the exact values committed by Thread A, not the stale values from before Thread A.
+  - Under Option 2 (sequential unbounded wait), Thread B blocks inside SQL Server waiting for Thread A's lock.
+  - The test deterministically polls SQL Server DMVs (`sys.dm_os_waiting_tasks` and `sys.dm_exec_requests`) until Thread B is observed blocked by Thread A's session with lock wait type `LCK_M_%`.
+  - The test verifies `futureB.isDone()` is false while Thread A still holds the lock.
+  - Thread A modifies tier price, flushes, and commits, releasing the lock.
+  - Thread B acquires the lock, resolves the tier entity post-lock from `findAllForUpdate()`, reading the fresh state committed by Thread A.
+  - Thread B applies its update, returns HTTP 200, and writes an `activity_log` entry with action `CARD_TIER_UPDATED`.
+  - The `before` snapshot in Thread B's `activity_log` entry matches the exact values committed by Thread A (520,000.00), not the stale initial values (500,000.00).
+  - Teardown cleanup restores all mutated fields of the tier and cleans the activity log row without swallowing errors.
   - Hard timeouts protect against build hangs.
 - **Status**: Not run locally (Docker unavailable), pending CI
