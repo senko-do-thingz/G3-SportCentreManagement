@@ -16,6 +16,26 @@ import java.util.Optional;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
+
+    @Query("SELECT b.session.id AS sessionId, COUNT(b) AS bookingCount FROM Booking b "
+            + "WHERE b.session.id IN :sessionIds AND b.status = :status GROUP BY b.session.id")
+    List<SessionBookingCount> countBySessionIds(@Param("sessionIds") Collection<Long> sessionIds,
+            @Param("status") BookingStatus status);
+
+    /** Calendar filters avoid an unbounded IN list and SQL Server's parameter limit. */
+    @Query("SELECT s.id AS sessionId, COUNT(b) AS bookingCount FROM Booking b JOIN b.session s "
+            + "WHERE s.sessionDate BETWEEN :from AND :to AND b.status = :status "
+            + "AND (:classId IS NULL OR s.sportClass.id = :classId) "
+            + "AND (:coachId IS NULL OR s.coach.id = :coachId) "
+            + "AND (:facilityId IS NULL OR s.facility.id = :facilityId) GROUP BY s.id")
+    List<SessionBookingCount> countForSessionCalendar(@Param("from") LocalDate from, @Param("to") LocalDate to,
+            @Param("classId") Long classId, @Param("coachId") Long coachId, @Param("facilityId") Long facilityId,
+            @Param("status") BookingStatus status);
+
+    interface SessionBookingCount {
+        Long getSessionId();
+        long getBookingCount();
+    }
     Optional<Booking> findByBookingCode(String bookingCode);
     List<Booking> findByMemberIdOrderByBookedAtDesc(Long memberId);
     

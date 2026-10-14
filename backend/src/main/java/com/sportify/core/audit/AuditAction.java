@@ -39,4 +39,7 @@ public final class AuditAction {
     public static final String CLASS_CREATED = "CLASS_CREATED";
     public static final String CLASS_UPDATED = "CLASS_UPDATED";
     public static final String CLASS_STATUS_CHANGED = "CLASS_STATUS_CHANGED";
+    public static final String SESSION_CREATED = "SESSION_CREATED";
+    public static final String SESSION_UPDATED = "SESSION_UPDATED";
+    public static final String SESSION_CANCELLED = "SESSION_CANCELLED";
 }
