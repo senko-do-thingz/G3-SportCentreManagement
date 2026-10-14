@@ -169,7 +169,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
             }
             Map<String, Object> before = snapshot(session);
             LocalDateTime now = LocalDateTime.now(clock);
-            int cancelled = cancellationRepository.cancelConfirmedBookings(id, actor.getId(), request.reason(), now);
+            var cancellation = cancellationRepository.cancelConfirmedBookings(id, actor.getId(), request.reason(), now);
             session.setStatus(SessionStatus.CANCELLED);
             session.setCancelReason(request.reason());
             session.setCancelledBy(actor);
@@ -177,7 +177,9 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
             session.setBookedCount(0);
             ClassSession saved = sessionRepository.saveAndFlush(session);
             audit(saved, actor, AuditAction.SESSION_CANCELLED, Map.of("before", before,
-                    "after", snapshot(saved), "reason", request.reason(), "bookingsCancelled", cancelled));
+                    "after", snapshot(saved), "reason", request.reason(), "bookingsCancelled", cancellation.cancelledCount(),
+                    "registrations", cancellation.registrations().stream().map(row -> Map.of(
+                            "registrationId", row.registrationId(), "packageBookings", row.packageBookings())).toList()));
             return toResponse(saved, 0);
         });
     }

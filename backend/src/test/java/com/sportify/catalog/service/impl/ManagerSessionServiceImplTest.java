@@ -564,7 +564,9 @@ class ManagerSessionServiceImplTest {
     void cancel_bulkCancelsAndRefundsBookingsAndRecordsManagerReasonAndCount() {
         ClassSession session = existing(100L);
         when(sessions.findForUpdate(100L)).thenReturn(Optional.of(session));
-        when(cancellations.cancelConfirmedBookings(100L, 40L, "Unsafe weather", LocalDateTime.now(CLOCK))).thenReturn(3);
+        when(cancellations.cancelConfirmedBookings(100L, 40L, "Unsafe weather", LocalDateTime.now(CLOCK)))
+                .thenReturn(new SessionCancellationRepository.CancellationResult(3,
+                        List.of(new SessionCancellationRepository.PackageBookings(50L, 2))));
         when(sessions.saveAndFlush(session)).thenReturn(session);
         ManagerSessionResponse result = service.cancelSession(100L, new SessionCancelRequest("  Unsafe weather  "), manager);
         assertEquals(SessionStatus.CANCELLED, result.status());
@@ -576,6 +578,8 @@ class ManagerSessionServiceImplTest {
         verify(audit).record(event.capture());
         assertEquals(AuditAction.SESSION_CANCELLED, event.getValue().getAction());
         assertEquals(3, event.getValue().getDetails().get("bookingsCancelled"));
+        assertEquals(List.of(Map.of("registrationId", 50L, "packageBookings", 2)),
+                event.getValue().getDetails().get("registrations"));
         verifyNoInteractions(bookings);
     }
 

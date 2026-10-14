@@ -1,6 +1,7 @@
 package com.sportify.catalog.controller;
 
 import com.sportify.AbstractIntegrationTest;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sportify.catalog.dto.*;
 import com.sportify.catalog.entity.*;
 import com.sportify.catalog.exception.ScheduleConflictException;
@@ -56,6 +57,7 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
     @Autowired private EntityManagerFactory entityManagerFactory;
     @Autowired private Clock clock;
     @Autowired private MockMvc mvc;
+    @Autowired private ObjectMapper objectMapper;
     private final String marker = "be10it" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
     private int serial;
     private Sport sport;
@@ -310,6 +312,18 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
                 SELECT COUNT(*) FROM activity_log WHERE actor_user_id = ? AND action = 'SESSION_CANCELLED'
                     AND JSON_VALUE(details, '$.bookingsCancelled') = '4' AND JSON_VALUE(details, '$.reason') = 'Unsafe weather'
                 """, manager.getId()));
+        var auditDetails = objectMapper.readTree(jdbc.queryForObject("""
+                SELECT details FROM activity_log WHERE entity_type = 'CLASS_SESSION' AND entity_id = ?
+                    AND action = 'SESSION_CANCELLED'
+                """, String.class, id));
+        Map<Long, Integer> packageBookings = new HashMap<>();
+        for (var registration : auditDetails.get("registrations")) {
+            assertEquals(2, registration.size());
+            packageBookings.put(registration.get("registrationId").asLong(), registration.get("packageBookings").asInt());
+        }
+        assertEquals(3, auditDetails.get("registrations").size());
+        assertEquals(Map.of(normalReg, 1, cappedReg, 1, expiredReg, 1), packageBookings,
+                "Audit counts bookings even when credits are capped or the registration is inactive");
         mvc.perform(put("/api/v1/manager/sessions/" + id + "/cancel").with(user(new CustomUserDetails(manager)))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Again\"}"))
                 .andExpect(status().isBadRequest());
@@ -391,7 +405,6 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
     void createBooking_racingWithSessionCancellationWaitsAndRejectsWithoutLosingCancellationOrRefund() throws Exception {
         long id = service.createSessions(sportClass.getId(), single(), manager).getFirst().id();
         long memberId = member();
-        UserAccount actor = users.findById(memberId).orElseThrow();
         long registrationId = registration(memberId, 5, 3, "ACTIVE");
         booking(id, memberId, registrationId, "CONFIRMED");
         jdbc.update("UPDATE class_session SET booked_count = 1 WHERE id = ?", id);
@@ -416,7 +429,7 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
             creation = executor.submit(() -> new TransactionTemplate(transactionManager).execute(status -> {
                 bookingSpid.set(count("SELECT @@SPID"));
                 bookingStarted.countDown();
-                return bookingService.createBooking(request, actor);
+                return bookingService.createBooking(request, users.findById(memberId).orElseThrow());
             }));
             assertTrue(bookingStarted.await(10, TimeUnit.SECONDS));
             awaitBlocked(bookingSpid.get(), cancellationSpid.get());
@@ -451,6 +464,7 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
         assertEquals(1, count("""
                 SELECT COUNT(*) FROM activity_log WHERE entity_type = 'CLASS_SESSION' AND entity_id = ?
                     AND action = 'SESSION_CANCELLED' AND JSON_VALUE(details, '$.bookingsCancelled') = '0'
+                    AND JSON_QUERY(details, '$.registrations') = '[]'
                 """, id));
     }
 
