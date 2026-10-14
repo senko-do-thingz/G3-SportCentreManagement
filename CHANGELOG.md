@@ -2,7 +2,7 @@
 
 ## 2026-10-13 - Sport Packages & Pricing and Manager Catalog (BE-03, Flow 1)
 
-Branch `feat/f1-manager-catalog`. Owner: Dat (Senko). Priority: P1. Depends on: none. Rebased on `origin/main` (commit 6e82388). Unit tests verified locally with `./mvnw.cmd test` (608 passed, 0 failures, 0 skipped); 122 integration tests are discovered across 22 classes locally (source: `mvnw verify -DskipUnitTests=true`) and executed by `maven-failsafe-plugin` in GitHub Actions CI (check-run reports 124 tests run; local 122 vs CI 124 is marked unexplained pending artifact comparison).
+Branch `feat/f1-manager-catalog`. Owner: Dat (Senko). Priority: P1. Depends on: none. Rebased on `origin/main` (commit 6e82388). Unit tests verified locally with `./mvnw.cmd test` (608 passed, 0 failures, 0 skipped); integration tests: local failsafe discovery: 122 (source: local `mvnw verify`), static source count: 122 across 22 classes (source: PowerShell count script), CI check-run: 124 (source: check-run), difference unexplained pending artifact comparison.
 
 ### Added
 - Manager Sport Packages API: `PUT /api/v1/packages/{id}` (manager list under `GET /api/v1/manager/packages`): dynamic filtering by `sportId`, `format`, `active`; update price, durationDays, sessionCount, sessionMinutes (60 or 90), active status; audit logging (`PACKAGE_UPDATED`) recording before and after snapshots.
