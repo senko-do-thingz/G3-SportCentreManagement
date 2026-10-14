@@ -33,6 +33,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.sql.SQLException;
+import java.util.ArrayDeque;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.regex.Pattern;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Comparator;
@@ -318,6 +323,8 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             throw new BusinessRuleException("Cannot specify payment method for a card with no linked payment");
         }
 
+        // Honor a previously requested card after tier deactivation, retaining its requested price.
+        // Revalidate the member baseline and payment through the existing activation path.
         LocalDate today = LocalDate.now(clock);
         CardPlan plan = planCard(card.getMember().getId(), card.getTier(), today);
         boolean requestedAsUpgrade = card.isUpgradeRequest();
@@ -368,12 +375,29 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     }
 
     private boolean isIndexViolation(Throwable throwable, String indexName) {
-        Throwable current = throwable;
-        while (current != null) {
-            if (current.getMessage() != null && current.getMessage().contains(indexName)) {
+        Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        ArrayDeque<Throwable> pending = new ArrayDeque<>();
+        pending.add(throwable);
+        Pattern indexEvidence = Pattern.compile("(?i)(?:unique\\s+(?:key\\s+)?(?:index|constraint)|constraint)\\s+['\\\"\\[]"
+                + Pattern.quote(indexName) + "['\\\"\\]]");
+        while (!pending.isEmpty()) {
+            Throwable current = pending.removeFirst();
+            if (!visited.add(current)) {
+                continue;
+            }
+            // Error codes alone cannot identify which unique constraint failed.
+            boolean uniqueCode = !(current instanceof SQLException sql)
+                    || sql.getErrorCode() == 2601 || sql.getErrorCode() == 2627;
+            if (uniqueCode && current.getMessage() != null
+                    && indexEvidence.matcher(current.getMessage()).find()) {
                 return true;
             }
-            current = current.getCause();
+            if (current.getCause() != null) {
+                pending.add(current.getCause());
+            }
+            if (current instanceof SQLException sql && sql.getNextException() != null) {
+                pending.add(sql.getNextException());
+            }
         }
         return false;
     }
@@ -387,7 +411,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
      */
     private BigDecimal calculateTermBasePrice(MemberCard card) {
         if (card == null || card.getPricePaid() == null) {
-            return BigDecimal.ZERO;
+            throw new BusinessRuleException("Cannot determine upgrade baseline for this membership card. Please contact the front desk.");
         }
         if (card.isUpgradeRequest() && card.getReplacesCard() == null) {
             // Fail closed: legacy upgrade rows where replaces_card_id could not be resolved
@@ -401,11 +425,16 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         if (card.getId() != null) {
             visited.add(card.getId());
         }
-        while (replaced != null && replaced.getPricePaid() != null) {
+        while (replaced != null) {
             if (++depth > MAX_CHAIN_DEPTH || (replaced.getId() != null && !visited.add(replaced.getId()))) {
                 throw new BusinessRuleException("Membership card upgrade chain exceeds maximum allowed depth or contains cycle. Please contact the front desk.");
             }
-            if (replaced.isUpgradeRequest() && replaced.getReplacesCard() == null) {
+            if (replaced.getPricePaid() == null
+                    || replaced.getMember() == null || card.getMember() == null
+                    || !replaced.getMember().getId().equals(card.getMember().getId())
+                    || replaced.getStatus() != CardStatus.REPLACED
+                    || !java.util.Objects.equals(replaced.getEndDate(), card.getEndDate())
+                    || (replaced.isUpgradeRequest() && replaced.getReplacesCard() == null)) {
                 throw new BusinessRuleException("Cannot determine upgrade baseline for this membership card. Please contact the front desk.");
             }
             total = total.add(replaced.getPricePaid());
@@ -617,6 +646,9 @@ public class MembershipCardServiceImpl implements MembershipCardService {
                 .tierId(card.getTier().getId())
                 .tierCode(card.getTier().getCode())
                 .tierName(card.getTier().getName())
+                .tierRank(card.getTier().getEffectiveRank())
+                .upgradeRequest(card.isUpgradeRequest())
+                .replacesCardId(card.getReplacesCard() == null ? null : card.getReplacesCard().getId())
                 .discountPercentage(card.getTier().getDiscountPercentage())
                 .startDate(card.getStartDate())
                 .endDate(card.getEndDate())

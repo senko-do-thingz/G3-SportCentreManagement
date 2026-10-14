@@ -19,6 +19,9 @@ import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -28,6 +31,8 @@ import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
+import java.sql.SQLException;
+import java.util.stream.Stream;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -68,6 +73,94 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class MembershipCardServiceImplTest {
+
+    @Test
+    void tcBE0371_activateAfterTierDeactivation_retainsRequestedPriceAndPaymentValidation() {
+        MemberCard pending = paidCard(goldTier, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        pending.setStatus(CardStatus.PENDING_PAYMENT);
+        pending.setPricePaid(new BigDecimal("123456.78"));
+        pending.setPayment(Payment.builder().id(500L).paymentStatus(PaymentStatus.PENDING).build());
+        goldTier.setIsActive(false);
+        goldTier.setPrice(new BigDecimal("450000.00"));
+        when(memberCardRepository.findById(7L)).thenReturn(Optional.of(pending));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class)))
+                .thenReturn(List.of());
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        MemberCardResponse result = membershipCardService.activateCard(7L, receptionistUser, PaymentMethod.CASH);
+
+        assertEquals(CardStatus.ACTIVE, result.getStatus());
+        assertEquals(new BigDecimal("123456.78"), result.getPricePaid());
+        assertFalse(goldTier.getIsActive());
+        verify(paymentService).markPaymentSuccess(500L, receptionistUser, PaymentMethod.CASH);
+    }
+
+    @Test
+    void upgradePreviewMetadata_preservesExplicitHistoricalChain() {
+        MemberCard predecessor = paidCard(goldTier, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        predecessor.setStatus(CardStatus.REPLACED);
+        MemberCard active = paidCard(vipTier, predecessor.getStartDate(), predecessor.getEndDate());
+        active.setId(8L);
+        active.setUpgradeRequest(true);
+        active.setReplacesCard(predecessor);
+        active.setPricePaid(new BigDecimal("300000.00"));
+        when(memberCardRepository.findByMemberIdOrderByCreatedAtDesc(100L)).thenReturn(List.of(active, predecessor));
+
+        List<MemberCardResponse> response = membershipCardService.getMyCards(memberUser);
+
+        assertEquals(2, response.size());
+        assertEquals(7L, response.get(0).getReplacesCardId());
+        assertTrue(response.get(0).isUpgradeRequest());
+        assertEquals(4, response.get(0).getTierRank());
+        assertEquals(new BigDecimal("300000.00"), response.get(0).getPricePaid());
+        assertNull(response.get(1).getReplacesCardId());
+        assertFalse(response.get(1).isUpgradeRequest());
+        verify(memberCardRepository).findByMemberIdOrderByCreatedAtDesc(memberUser.getId());
+    }
+
+    @ParameterizedTest(name = "RV40 constraint evidence {0}")
+    @MethodSource("constraintFailures")
+    void purchaseCard_sqlConstraintEvidence_onlyMapsTheIntendedIndex(String scenario, Throwable cause, boolean conflict) {
+        MemberCard active = paidCard(goldTier, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(3L)).thenReturn(Optional.of(vipTier));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class)))
+                .thenReturn(List.of(active));
+        when(memberCardRepository.getNextCardCodeSequence()).thenReturn(999L);
+        when(codeFormatter.formatCardCode(999L)).thenReturn("CARD-0999");
+        DataIntegrityViolationException original = new DataIntegrityViolationException("Insert failed", cause);
+        when(memberCardRepository.save(any(MemberCard.class))).thenThrow(original);
+        MemberCardPurchaseRequest request = MemberCardPurchaseRequest.builder().memberId(100L).tierId(3L).build();
+        if (conflict) {
+            BusinessRuleException result = assertThrows(BusinessRuleException.class,
+                    () -> membershipCardService.purchaseCard(request, receptionistUser), scenario);
+            assertEquals(original, result.getCause());
+            assertTrue(result.getMessage().contains("concurrent upgrade"));
+        } else {
+            assertEquals(original, assertThrows(DataIntegrityViolationException.class,
+                    () -> membershipCardService.purchaseCard(request, receptionistUser), scenario));
+        }
+    }
+
+    static Stream<Arguments> constraintFailures() {
+        SQLException chained = new SQLException("Batch failed", "23000", 0);
+        chained.setNextException(new SQLException("Cannot insert duplicate key row with unique index 'ux_member_card_replaces_in_force'.", "23000", 2601));
+        SQLException cyclic = new SQLException("Duplicate key without identifiable index", "23000", 2601) {
+            @Override
+            public SQLException getNextException() { return this; }
+        };
+        return Stream.of(
+                Arguments.of("intended index 2601", new SQLException("Cannot insert duplicate key row with unique index 'ux_member_card_replaces_in_force'.", "23000", 2601), true),
+                Arguments.of("other index 2601", new SQLException("Duplicate key in unique index 'ux_member_card_code'.", "23000", 2601), false),
+                Arguments.of("primary key 2627", new SQLException("Violation of PRIMARY KEY constraint 'pk_member_card'.", "23000", 2627), false),
+                Arguments.of("other constraint 2627", new SQLException("Violation of UNIQUE KEY constraint 'ux_member_card_code'.", "23000", 2627), false),
+                Arguments.of("missing name", new SQLException("Duplicate key", "23000", 2601), false),
+                Arguments.of("nested intended index", new RuntimeException("wrapper", new SQLException("Violation of UNIQUE KEY constraint 'ux_member_card_replaces_in_force'.", "23000", 2627)), true),
+                Arguments.of("chained SQL exception", chained, true),
+                Arguments.of("index name substring", new SQLException("Duplicate key in unique index 'ux_member_card_replaces_in_force_archive'.", "23000", 2601), false),
+                Arguments.of("SQL text without violation evidence", new SQLException("INSERT using ux_member_card_replaces_in_force failed", "23000", 2601), false),
+                Arguments.of("cyclic SQL exception chain", cyclic, false));
+    }
 
     @Mock
     private MembershipCardTierRepository tierRepository;
@@ -1631,6 +1724,8 @@ public class MembershipCardServiceImplTest {
 
         MemberCard cardA = MemberCard.builder()
                 .id(1L)
+                .member(memberProfile)
+                .endDate(LocalDate.now(clock).plusMonths(11))
                 .tier(bronzeTier)
                 .pricePaid(BigDecimal.valueOf(100000.00))
                 .status(CardStatus.REPLACED)
@@ -1638,6 +1733,7 @@ public class MembershipCardServiceImplTest {
 
         MemberCard cardB = MemberCard.builder()
                 .id(2L)
+                .member(memberProfile)
                 .tier(silverTier)
                 .pricePaid(BigDecimal.valueOf(200000.00)) // Difference paid
                 .upgradeRequest(true)

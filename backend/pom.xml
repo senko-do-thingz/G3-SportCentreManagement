@@ -178,9 +178,13 @@
                     <argLine>@{argLine}</argLine>
                     <skipTests>${skipUnitTests}</skipTests>
                     <excludedGroups>integration</excludedGroups>
-                    <!-- Required by experiment so that groups and excludedGroups are applied as JUnit 5 tags; verified by ablation; mechanism not proven -->
+                    <!-- Surefire 3.6.0 auto-detects transitive JUnit 4 and switches groups to Vintage categories.
+                         Disable Vintage auto-addition so integration is interpreted as a Jupiter tag. -->
                     <properties>
-                        <junit>false</junit>
+                        <property>
+                            <name>junit</name>
+                            <value>false</value>
+                        </property>
                     </properties>
                 </configuration>
             </plugin>
@@ -195,9 +199,12 @@
                     <includes>
                         <include>**/*Test.java</include>
                     </includes>
-                    <!-- Required by experiment so that groups and excludedGroups are applied as JUnit 5 tags; verified by ablation; mechanism not proven -->
+                    <!-- Keep the same Jupiter tag semantics as Surefire; do not auto-add Vintage. -->
                     <properties>
-                        <junit>false</junit>
+                        <property>
+                            <name>junit</name>
+                            <value>false</value>
+                        </property>
                     </properties>
                 </configuration>
                 <executions>

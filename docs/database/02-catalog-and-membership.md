@@ -103,7 +103,7 @@ Member's card holding record.
 | status | NVARCHAR(20) | No | `ACTIVE` | `PENDING_PAYMENT`, `ACTIVE`, `EXPIRED`, `CANCELLED`, `REPLACED` (V20). `PENDING_PAYMENT` = online request not paid yet, `REPLACED` = old card after an upgrade |
 | price_paid | DECIMAL(14,2) | No | CHECK >= 0 | Snapshot of fee paid |
 | payment_id | BIGINT | Yes | FK -> payment.id | Associated payment (V14) |
-| upgrade_request | BIT | No | 0 | Explicit marker for upgrade requests (V22). Backfilled for legacy rows where price_paid < tier.price |
+| upgrade_request | BIT | No | 0 | Explicit marker for upgrade requests (V22). Legacy backfill requires price_paid < tier.price and an eligible same-member predecessor |
 | replaces_card_id | BIGINT | Yes | FK -> member_card.id | Replaced card in upgrade chain (V22). Deterministically backfilled for ACTIVE upgrades via matching REPLACED card end_date, and PENDING_PAYMENT upgrades via active started card. Legacy rows with unresolved replaces_card_id fail closed during upgrade pricing. Enforced unique across in-force cards via filtered index ux_member_card_replaces_in_force |
 | created_at, updated_at | DATETIME2(0) | | | Audit |
 
@@ -177,11 +177,11 @@ Front desk arrival record (F1-15).
 ## Operator Runbook: Migration V22 Upgrade Chain Verification and Unresolved Rows
 
 ### Overview
-Migration V22 introduces upgrade chain tracking (`upgrade_request` and `replaces_card_id` on `member_card`) and explicit tier ranking (`tier_rank` on `membership_card_tier`). While deterministic multi-step chains sharing matching `end_date` are linked automatically, legacy ambiguous rows (multiple candidate predecessors, duplicate in-force targets, or missing predecessor) leave `replaces_card_id` as `NULL`. When members holding these unresolved cards attempt automated self-service upgrades or activation, the backend fails closed (HTTP 400 directing the member to the front desk) to prevent incorrect upgrade pricing or invalid replacement links.
+Migration V22 introduces upgrade chain tracking (`upgrade_request` and `replaces_card_id` on `member_card`) and explicit tier ranking (`tier_rank` on `membership_card_tier`). The discounted-price heuristic now also requires an eligible same-member predecessor. Purchases without that evidence retain `upgrade_request = 0`. Ambiguous predecessors or duplicate in-force targets leave an upgrade marker with a NULL link and fail closed on later upgrade attempts. Deterministic chains retain their historical `price_paid` snapshots.
 
 ### Pre-Deployment Dry-Run Queries (Production Copy)
 > [!IMPORTANT]
-> The following read-only inspection queries MUST be executed against a staging replica / production copy BEFORE deploying Migration V22 to production, and the results recorded in the deployment change log.
+Run V22 on a disposable staging copy first, then run the following post-migration queries and record the results in the deployment change log. These queries reference columns that do not exist at V21. No production-copy counts or persistent-environment deployment history were available for the 2026-10-14 remediation. Before deployment, confirm that V22 has not been applied in a persistent environment. If it has, preserve its applied checksum and move the revised backfill into a successor migration.
 
 **Query 1: Dry-run count of unresolved cards grouped by status:**
 ```sql
@@ -223,8 +223,7 @@ ORDER BY mc.member_id, mc.created_at DESC;
 ### Operational Notes & Constraints
 
 #### 1. Promotional and Pre-Price-Increase Cards
-Cards originally purchased at full price during a temporary promotional discount, or purchased before a manager increased the catalog price of the tier, satisfy the legacy backfill heuristic `price_paid < tier.price`. Because no predecessor card exists sharing their term dates, their `replaces_card_id` remains `NULL`.
-When a member holding such a card attempts an online self-service upgrade, the system fails closed with HTTP 400 (`Cannot determine upgrade baseline for this membership card. Please contact the front desk.`), preventing automated calculation errors until staff resolves their baseline credit at the front desk.
+Cards bought during a promotion or before a catalog price increase may have `price_paid < tier.price`. Without an eligible predecessor, V22 leaves `upgrade_request = 0` and `replaces_card_id = NULL`. Their historical paid amount remains the baseline for future upgrades. A price difference alone is not evidence of an upgrade. The narrowed rule is still a heuristic: rows with coincidentally matching predecessor dates require operator review.
 
 #### 2. SQL Server `SET QUOTED_IDENTIFIER ON;` Requirement
 Table `member_card` contains a filtered unique index:
@@ -246,7 +245,7 @@ When a member receives the error message "Cannot determine upgrade baseline for 
 1. Lookup Member: Search member in Reception Member Search (F1-12) by email, phone, or member code.
 2. Review Card History: Open member overview to view all historical cards (`GET /members/{id}/overview`), identifying original card purchases and intermediate upgrades.
 3. Determine Baseline Credit: Sum the actual payments (`price_paid`) made by the member toward the current active period.
-4. Desk Sale or Resolution: Use Front Desk Register and Renew (F1-14) to sell the target tier card with manual credit adjustment or issue a replacement card as appropriate.
-5. Record Note: Add a note to the member record documenting the legacy upgrade baseline resolution.
+4. Escalate Ambiguous Links: The normal desk sale also rejects unverifiable chains. No manual credit-adjustment API is implemented here. A maintainer must approve a data repair using verified payment evidence before another sale is attempted.
+5. Record the Repair: Preserve the reviewed predecessor links, original paid snapshots, approval and deployment record.
 
 

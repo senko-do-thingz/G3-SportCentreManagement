@@ -2,7 +2,9 @@
 
 ## 2026-10-13 - Sport Packages & Pricing and Manager Catalog (BE-03, Flow 1)
 
-Branch `feat/f1-manager-catalog`. Owner: Dat (Senko). Priority: P1. Depends on: none. Rebased on `origin/main` (commit 6e82388). Unit tests: 608 passed. Integration tests: 124 passed in CI (Testcontainers, SQL Server 2022).
+Branch `feat/f1-manager-catalog`. Owner: Dat (Senko). Priority: P1. Depends on: none. Rebased on `origin/main` (commit 6e82388). Execution counts and current validation status are recorded per run and revision in `docs/tests/PR40_remediation_test_cases.md`; revised SQL Server coverage still requires Docker.
+
+PR40 remediation adds mapped `tierRank`, `upgradeRequest` and `replacesCardId` fields to card responses. Frontend previews validate the explicit replacement chain, retain historical paid snapshots, block unverifiable plans, and use rank-based classification. Member zero-fee upgrades are blocked; staff-assisted zero-fee upgrades remain supported. V22 now requires matching predecessor evidence before marking discounted legacy purchases. Surefire and Failsafe retain Jupiter tag selection with Vintage auto-addition disabled, and shared report guards use a required-suite manifest. Current evidence and pending merge requirements are in `docs/reviews/PR40_remediation_completion_report.md`.
 
 ### Added
 - Manager Sport Packages API: `PUT /api/v1/packages/{id}` (manager list under `GET /api/v1/manager/packages`): dynamic filtering by `sportId`, `format`, `active`; update price, durationDays, sessionCount, sessionMinutes (60 or 90), active status; audit logging (`PACKAGE_UPDATED`) recording before and after snapshots.

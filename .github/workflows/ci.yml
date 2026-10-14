@@ -92,6 +92,13 @@ jobs:
         if: always()
         run: bash scripts/ci/check-no-skipped-tests.sh backend/target/surefire-reports
 
+      - name: Verify unit tag isolation and report counts
+        if: always()
+        run: python3 scripts/ci/check-test-reports.py unit backend/target/surefire-reports
+
+      - name: Test shared report guard
+        run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
+
       - name: Publish test report
         if: always()
         uses: mikepenz/action-junit-report@v6
@@ -140,26 +147,9 @@ jobs:
         working-directory: backend
         run: mvn -B -ntp verify -DskipUnitTests=true
 
-      - name: Fail on zero integration tests
-        run: |
-          REPORTS_DIR="backend/target/failsafe-reports"
-          if [ ! -d "$REPORTS_DIR" ]; then
-            echo "Error: Failsafe reports directory $REPORTS_DIR not found"
-            exit 1
-          fi
-          shopt -s nullglob
-          CRITICAL_REPORTS=("$REPORTS_DIR"/TEST-*ManagerCatalogIntegrationTest.xml)
-          if [ ${#CRITICAL_REPORTS[@]} -eq 0 ]; then
-            echo "Error: Critical integration test report matching TEST-*ManagerCatalogIntegrationTest.xml not found in $REPORTS_DIR"
-            exit 1
-          fi
-          # shellcheck disable=SC2126
-          TEST_COUNT=$(grep -o "<testcase" "$REPORTS_DIR"/TEST-*.xml 2>/dev/null | wc -l)
-          echo "Discovered $TEST_COUNT integration test cases in $REPORTS_DIR"
-          if [ "$TEST_COUNT" -eq 0 ]; then
-            echo "Error: Zero integration tests were executed in $REPORTS_DIR"
-            exit 1
-          fi
+      - name: Verify executed integration suites and report counts
+        if: always()
+        run: python3 scripts/ci/check-test-reports.py integration backend/target/failsafe-reports
 
       - name: Fail on skipped tests
         if: always()

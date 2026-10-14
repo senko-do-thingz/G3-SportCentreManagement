@@ -4,7 +4,7 @@
 - **Task ID**: BE-03
 - **Feature Flow**: Flow 1 (Manager Catalog - Sport Packages and Membership Card Tiers)
 - **Branch**: feat/f1-manager-catalog
-- **Status**: Implemented; unit tests passed locally and in CI; integration tests passed in CI (Testcontainers, SQL Server 2022).
+- **Status**: Local remediation implemented. Current execution evidence is recorded in `docs/tests/PR40_remediation_test_cases.md`. Existing Passed labels below describe historical branch evidence, not execution of the revised SQL Server suite.
 - **Objective**: Implement endpoints and business rules for manager catalog management:
   1. `GET /api/v1/manager/packages?sportId=&format=&active=`
   2. `PUT /api/v1/packages/{id}`
@@ -89,7 +89,11 @@
 | TC-BE03-68 | Card tier update validation - concurrent edit lock conflict (mocked unit test) returns 400 | PUT `/api/v1/membership-cards/tiers/{id}` | 400 Bad Request | Passed (Unit test) |
 | TC-BE03-69 | Card tier concurrent update serialization - post-lock read ensures audit before snapshot reflects prior commit | PUT `/api/v1/membership-cards/tiers/{id}` | 200 OK | Passed (Integration test, CI) |
 
-*Note: Test IDs TC-BE03-62 and TC-BE03-63 are intentionally unused.*
+| TC-BE03-70 | Narrowed V22 backfill: promotion, historical price increase, matching chain, ambiguity, pending payment, unrelated member and rerun | SQL Server migration | No false upgrade marker | Not run for remediation; Docker unavailable |
+| TC-BE03-71 | Activate an already-requested card after tier deactivation, retaining requested price and payment validation | PUT `/api/v1/membership-cards/{id}/activate` | ACTIVE at original price | See current remediation evidence |
+| TC-BE03-72 | Rank-based frontend upgrades use the explicit historical chain; member zero-fee blocked, desk allowed | Frontend pure model | Correct fee and audience policy | See current remediation evidence |
+
+*Note: Test IDs TC-BE03-62 and TC-BE03-63 are intentionally unused. Test counts belong to a specific run and revision; they are not permanent feature totals. The new TC70-TC72 rows are detailed in `PR40_remediation_test_cases.md` as PR40-TC-17, PR40-TC-15 and PR40-TC-09 respectively.*
 
 
 ## Detailed Test Specifications

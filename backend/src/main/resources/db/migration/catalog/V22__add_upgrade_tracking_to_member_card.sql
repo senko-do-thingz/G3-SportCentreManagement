@@ -11,7 +11,7 @@
 --      that no two in-force cards can concurrently replace the same card.
 --   5. Idempotently backfill existing cards and deterministic replacement links:
 --      - For existing cards (ACTIVE, PENDING_PAYMENT, or REPLACED) where tier.duration_months > 0
---        and price_paid < tier.price (legacy upgrade heuristic), set upgrade_request = 1.
+--        and price_paid < tier.price with a matching predecessor, set upgrade_request = 1.
 --      - For legacy upgrades in a chain (including A -> B -> C), link each upgrade card
 --        to the immediately preceding REPLACED card for the same member sharing the exact end_date.
 --      - For PENDING_PAYMENT legacy upgrades where replaces_card_id IS NULL: link to
@@ -106,8 +106,9 @@ GO
 -- Step 4: Backfill legacy upgrade markers and deterministic replaces_card_id links
 -- Execute dynamically to prevent compile-time column resolution errors in SQL Server
 EXEC sp_executesql N'
-    -- 4a. Best-effort heuristic: mark legacy upgrade cards where price_paid was an upgrade difference (< tier.price).
-    -- Rows where replaces_card_id cannot be deterministically resolved remain NULL and fail closed on subsequent upgrade.
+    -- 4a. Mark discounted legacy rows only when a same-member predecessor exists.
+    -- Promotional and historical-price purchases without a predecessor remain ordinary purchases.
+    -- Ambiguous matches retain the marker but no link, failing closed during later upgrades.
     UPDATE mc
     SET mc.[upgrade_request] = 1
     FROM [member_card] mc
@@ -115,7 +116,25 @@ EXEC sp_executesql N'
     WHERE mc.[status] IN (''ACTIVE'', ''PENDING_PAYMENT'', ''REPLACED'')
       AND t.[duration_months] > 0
       AND mc.[price_paid] < t.[price]
-      AND mc.[upgrade_request] = 0;
+      AND mc.[upgrade_request] = 0
+      AND (
+          (mc.[status] IN (''ACTIVE'', ''REPLACED'') AND EXISTS (
+              SELECT 1 FROM [member_card] rc
+              WHERE rc.[member_id] = mc.[member_id]
+                AND rc.[status] = ''REPLACED''
+                AND rc.[end_date] = mc.[end_date]
+                AND rc.[id] < mc.[id]
+          ))
+          OR (mc.[status] = ''PENDING_PAYMENT'' AND EXISTS (
+              SELECT 1 FROM [member_card] ac
+              JOIN [membership_card_tier] act ON ac.[tier_id] = act.[id]
+              WHERE ac.[member_id] = mc.[member_id]
+                AND ac.[status] = ''ACTIVE'' AND ac.[id] <> mc.[id]
+                AND act.[duration_months] > 0
+                AND (ac.[start_date] IS NULL OR ac.[start_date] <= mc.[start_date])
+                AND (ac.[end_date] IS NULL OR ac.[end_date] >= mc.[start_date])
+          ))
+      );
 
     -- 4b. Deterministically link upgrade cards in an upgrade chain (including A -> B -> C).
     -- Each upgrade card is linked ONLY when exactly one eligible predecessor candidate exists,

@@ -821,7 +821,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("Migration V21 to V22: programmatically migrate from V21, seed legacy rows, migrate to V22, assert backfill and idempotency")
+    @DisplayName("TC-BE03-70 Migration V21 to V22: predecessor verification, historical prices and idempotency")
     void testMigrationV22_backfillUpgradeChainAndIdempotency() throws Exception {
         String testDbName = "sportify_mig_v22_" + System.currentTimeMillis();
         jdbcTemplate.execute("CREATE DATABASE " + testDbName);
@@ -915,6 +915,30 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                     "VALUES ('CARD-MIG-DUP-2', ?, ?, '2026-04-01', ?, 'ACTIVE', ?, GETDATE(), GETDATE())", migMemberId, testTier2Id, endSep, upgDiff.divide(BigDecimal.valueOf(2)));
             Long cardD2Id = testJdbc.queryForObject("SELECT id FROM [member_card] WHERE card_code = 'CARD-MIG-DUP-2'", Long.class);
 
+            // Promotions and historical prices without matching predecessors are ordinary purchases.
+            testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
+                    "VALUES ('CARD-MIG-PROMO', ?, ?, '2031-01-01', '2031-12-31', 'ACTIVE', 100000.00, GETDATE(), GETDATE())", migMemberId, testTier2Id);
+            testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
+                    "VALUES ('CARD-MIG-HIST', ?, ?, '2032-01-01', '2032-12-31', 'ACTIVE', 500000.00, GETDATE(), GETDATE())", migMemberId, testTier2Id);
+            testJdbc.update("UPDATE [membership_card_tier] SET price = 700000.00 WHERE id = ?", testTier2Id);
+
+            // An unrelated member's replaced card must not turn a promotional purchase into an upgrade.
+            testJdbc.update("INSERT INTO [user_account] (email, password_hash, full_name, role_id, status, created_at) " +
+                    "VALUES ('mig_other@test.com', 'hash', 'Other Member', (SELECT TOP 1 id FROM [role] WHERE code = 'MEMBER'), 'ACTIVE', SYSDATETIME())");
+            Long otherMemberId = testJdbc.queryForObject("SELECT id FROM [user_account] WHERE email = 'mig_other@test.com'", Long.class);
+            testJdbc.update("INSERT INTO [member_profile] (user_id, member_code, current_level, joined_on) VALUES (?, 'MBR-MIG-02', 'BEGINNER', '2026-01-01')", otherMemberId);
+            testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
+                    "VALUES ('CARD-MIG-OTHER', ?, ?, '2031-01-01', '2031-12-31', 'REPLACED', 200000.00, GETDATE(), GETDATE())", otherMemberId, testTier1Id);
+            testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
+                    "VALUES ('CARD-MIG-OTHER-ONLY', ?, ?, '2031-02-01', '2031-12-31', 'ACTIVE', 100000.00, GETDATE(), GETDATE())", migMemberId, testTier2Id);
+
+            // A pending upgrade links only to a paid active term covering the request date.
+            testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
+                    "VALUES ('CARD-MIG-PENDING-BASE', ?, ?, '2030-01-01', '2030-12-31', 'ACTIVE', 200000.00, GETDATE(), GETDATE())", migMemberId, testTier1Id);
+            Long pendingBaseId = testJdbc.queryForObject("SELECT id FROM [member_card] WHERE card_code = 'CARD-MIG-PENDING-BASE'", Long.class);
+            testJdbc.update("INSERT INTO [member_card] (card_code, member_id, tier_id, start_date, end_date, status, price_paid, created_at, updated_at) " +
+                    "VALUES ('CARD-MIG-PENDING', ?, ?, '2030-06-01', '2030-12-31', 'PENDING_PAYMENT', 300000.00, GETDATE(), GETDATE())", migMemberId, testTier2Id);
+
             // 3. Migrate to V22
             Flyway flywayV22 = Flyway.configure()
                     .dataSource(testDs)
@@ -940,10 +964,10 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
             assertTrue(Boolean.TRUE.equals(upgC), "Card C paid < tier price, must be marked as upgrade");
             assertEquals(cardBId, repC, "Card C must be linked to immediate predecessor Card B");
 
-            // Case 2: No predecessor -> upgrade_request = 1, replaces_card_id = NULL
+            // Case 2: No predecessor -> upgrade_request = 0, replaces_card_id = NULL
             Boolean upgNoPred = testJdbc.queryForObject("SELECT upgrade_request FROM [member_card] WHERE id = ?", Boolean.class, noPredCardId);
             Long repNoPred = testJdbc.queryForObject("SELECT replaces_card_id FROM [member_card] WHERE id = ?", Long.class, noPredCardId);
-            assertTrue(Boolean.TRUE.equals(upgNoPred), "No-predecessor card marked as upgrade by price difference");
+            assertFalse(Boolean.TRUE.equals(upgNoPred), "Discounted purchase without a predecessor is not an upgrade");
             assertNull(repNoPred, "Card without matching predecessor must keep replaces_card_id as NULL");
 
             // Case 3: Ambiguous predecessors -> upgrade_request = 1, replaces_card_id = NULL
@@ -962,6 +986,19 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
             Long repD2 = testJdbc.queryForObject("SELECT replaces_card_id FROM [member_card] WHERE id = ?", Long.class, cardD2Id);
             assertTrue(Boolean.TRUE.equals(upgD2), "Card D2 marked as upgrade");
             assertNull(repD2, "Card D2 claiming shared predecessor must keep replaces_card_id as NULL due to Step 4b ambiguity");
+
+            for (String code : List.of("CARD-MIG-PROMO", "CARD-MIG-HIST", "CARD-MIG-OTHER-ONLY")) {
+                assertFalse(Boolean.TRUE.equals(testJdbc.queryForObject(
+                        "SELECT upgrade_request FROM [member_card] WHERE card_code = ?", Boolean.class, code)), code);
+                assertNull(testJdbc.queryForObject(
+                        "SELECT replaces_card_id FROM [member_card] WHERE card_code = ?", Long.class, code), code);
+            }
+            assertEquals(new BigDecimal("500000.00"), testJdbc.queryForObject(
+                    "SELECT price_paid FROM [member_card] WHERE card_code = 'CARD-MIG-HIST'", BigDecimal.class));
+            assertTrue(Boolean.TRUE.equals(testJdbc.queryForObject(
+                    "SELECT upgrade_request FROM [member_card] WHERE card_code = 'CARD-MIG-PENDING'", Boolean.class)));
+            assertEquals(pendingBaseId, testJdbc.queryForObject(
+                    "SELECT replaces_card_id FROM [member_card] WHERE card_code = 'CARD-MIG-PENDING'", Long.class));
 
             // 5. Snapshot before re-migration
             List<Map<String, Object>> snapshotBefore = testJdbc.queryForList(
