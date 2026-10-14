@@ -88,8 +88,9 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
     state "Schedule Status" as SS {
-        [*] --> DRAFT : Create Session
-        DRAFT --> PUBLISHED : Publish
+        [*] --> DRAFT : Create with explicit DRAFT
+        [*] --> PUBLISHED : Create with default status
+        DRAFT --> CANCELLED : Manager cancels before start
         PUBLISHED --> CANCELLED : Cancel Session
         PUBLISHED --> COMPLETED : Daily Job (time passed)
     }
@@ -223,6 +224,18 @@ Front desk check-in validates member arrival at the center:
 4. Activate corresponding package registration or member card.
 5. Issue `invoice` (status `PAID`) and itemized `invoice_line` snapshot with applied discounts.
 6. Insert `activity_log`.
+
+## Manager Session Scheduling and Cancellation BE-10
+
+1. Calendar ranges include both endpoints and contain at most 62 calendar days. Missing bounds, reversed bounds and out-of-database-range dates return 400. Unknown optional filter ids produce an empty calendar.
+2. Creation selects exactly one mode: one date, or a complete weekly recurrence. Recurrences select named weekdays in the inclusive range and generate 1 through 100 sessions. PUBLISHED is the default; DRAFT is the only alternate creation status. DRAFT occupies resources and requires the same assignments as PUBLISHED. There is no draft-to-published endpoint in BE-10.
+3. COACH_LED requires an active COACH account with a `coach_sport` row for the class sport. SELF_TRAINING allows a null coach; a supplied coach is validated. The linked class and facility must be active. Capacity must be within 1 and the class maximum. On edit, confirmed booking rows determine the minimum capacity.
+4. Only future DRAFT or PUBLISHED sessions can be edited or cancelled. The exact start time is already started. Repeated cancellation returns 400, preventing duplicate refunds. Editing time or coach with existing bookings is allowed; no notifications are sent. Cancelled and completed sessions remain visible on the calendar.
+5. Resource overlap is checked with strict inequalities, so adjacent sessions are allowed. Coach and facility matches are queried separately using resource/date indexes; a matching session is returned once, with conflict type COACH, FACILITY or BOTH. An edit excludes itself. Every generated date is checked before any batch insertion; one conflict rejects the complete batch with 409 and all conflict details.
+6. Writers lock coach then facility rows in a fixed resource-type order. Each operation assigns at most one of each resource, so no within-type id ordering is needed. Update/cancel also lock the session row. Locks, conflict checks, persistence and audit share one transaction. Concurrent overlapping BE-10 creates cannot both commit. SQL Server can choose a deadlock victim during competing edits; that request returns a retryable 409. Existing unbounded catalog lock waits are retained.
+7. Manager cancellation locks the CONFIRMED booking set using SQL Server UPDLOCK and HOLDLOCK. One grouped UPDATE restores the number of linked confirmed reservations per registration, capped at that registration's purchased `total_sessions`, then one UPDATE cancels all those bookings. Already cancelled bookings and bookings without a package registration do not produce a refund. A non-null package link is the BE-08 evidence that one package session was consumed. Refunds apply even if the registration has since expired or been cancelled; its status and validity dates do not change.
+8. The session and cancelled bookings store `cancel_reason`, `cancelled_at` and `cancelled_by_user_id`. The session becomes CANCELLED with cached `booked_count = 0`. Any transaction failure rolls back session metadata, bookings, registration balances and activity logs together. This restores session credits only, without monetary refunds, waitlist promotion or notifications.
+9. The existing individual booking service uses read-modify-write counters without the BE-10 resource locking protocol. Interoperation with in-flight legacy booking/cancellation operations remains an out-of-scope concurrency limitation. This task does not change BE-08 behavior or claim a general booking concurrency fix.
 
 ## Scheduled Jobs
 
