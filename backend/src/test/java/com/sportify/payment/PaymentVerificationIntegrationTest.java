@@ -21,6 +21,7 @@ import com.sportify.core.exception.ConflictException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
+import com.sportify.identity.security.CustomUserDetails;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.RoleRepository;
 import com.sportify.identity.repository.UserRepository;
@@ -42,8 +43,10 @@ import com.sportify.payment.service.PaymentVerificationService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -56,6 +59,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -64,12 +68,21 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * BE-18 against a real SQL Server (Testcontainers). Not @Transactional: each step commits, so the tests see
- * what a second request would see (the mismatch note that survives the 409, the version check on payment).
+ * what a second request would see (the mismatch note that survives the 409, the row lock on payment).
+ * MockMvc drives the card and package activate endpoints that FE-05 still uses.
  */
+@AutoConfigureMockMvc
 class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
+
+    @Autowired private MockMvc mockMvc;
 
     @Autowired private PaymentVerificationService verificationService;
     @Autowired private PaymentRepository paymentRepository;
@@ -267,10 +280,11 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("Wrong amount: 409, payment stays PENDING with the mismatch note committed, nothing else changes")
+    @DisplayName("Wrong amount: 409, payment stays PENDING, note and one PAYMENT_AMOUNT_MISMATCH row committed, nothing else changes")
     void confirm_AmountMismatch_CommitsNoteOnly() {
         Long[] ids = pendingRegistration();
         UserAccount receptionist = tx().execute(s -> newUser("RECEPTIONIST"));
+        LocalDate startBefore = tx().execute(s -> registrationRepository.findById(ids[1]).orElseThrow().getStartDate());
 
         assertThatThrownBy(() -> verificationService.confirmPayment(ids[0], confirm("350000"), receptionist))
                 .isInstanceOf(PaymentAmountMismatchException.class);
@@ -280,11 +294,19 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
             assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
             assertThat(payment.getPaymentTime()).isNull();
             assertThat(payment.getReferenceCode()).isNull();
+            assertThat(payment.getConfirmedByUser()).isNull();
             assertThat(payment.getNotes()).contains("Amount mismatch: received 350000");
-            assertThat(registrationRepository.findById(ids[1]).orElseThrow().getStatus())
-                    .isEqualTo(PackageRegistrationStatus.PENDING_PAYMENT);
+            SportPackageRegistration reg = registrationRepository.findById(ids[1]).orElseThrow();
+            assertThat(reg.getStatus()).isEqualTo(PackageRegistrationStatus.PENDING_PAYMENT);
+            assertThat(reg.getStartDate()).isEqualTo(startBefore);
+            assertThat(reg.getActivatedAt()).isNull();
             assertThat(invoiceRepository.findByPaymentId(ids[0])).isEmpty();
+            assertThat(activityRows(payment.getPaymentCode(), "PAYMENT_AMOUNT_MISMATCH")).isEqualTo(1);
             assertThat(activityRows(payment.getPaymentCode(), "PAYMENT_CONFIRMED")).isZero();
+            String details = jdbcTemplate.queryForObject(
+                    "SELECT details FROM activity_log WHERE entity_type = 'PAYMENT' AND entity_code = ? AND action = ?",
+                    String.class, payment.getPaymentCode(), "PAYMENT_AMOUNT_MISMATCH");
+            assertThat(details).contains("\"amountReceived\":350000").contains("\"method\":\"BANK_TRANSFER\"");
         });
 
         // The member can still be served: the right amount confirms the same payment afterwards.
@@ -324,44 +346,83 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("Two receptionists at the same time: exactly one confirmation succeeds, one invoice")
+    @DisplayName("Two receptionists confirm at the same time: one succeeds, the other gets 409 PAYMENT_NOT_PENDING, one invoice")
     void concurrentConfirm_OnlyOneSucceeds() throws Exception {
         Long[] ids = pendingRegistration();
         UserAccount first = tx().execute(s -> newUser("RECEPTIONIST"));
         UserAccount second = tx().execute(s -> newUser("RECEPTIONIST"));
-        CountDownLatch start = new CountDownLatch(1);
-        ExecutorService pool = Executors.newFixedThreadPool(2);
-        try {
-            List<Callable<Boolean>> calls = new ArrayList<>();
-            for (UserAccount actor : List.of(first, second)) {
-                calls.add(() -> {
-                    start.await(10, TimeUnit.SECONDS);
-                    try {
-                        verificationService.confirmPayment(ids[0], confirm("380000"), actor);
-                        return true;
-                    } catch (ConflictException | ObjectOptimisticLockingFailureException
-                             | PessimisticLockingFailureException ex) {
-                        // Lost the race: 409 from the status check or the version check (a deadlock victim counts too).
-                        return false;
-                    }
-                });
-            }
-            List<Future<Boolean>> futures = new ArrayList<>();
-            for (Callable<Boolean> call : calls) {
-                futures.add(pool.submit(call));
-            }
-            start.countDown();
-            int successes = 0;
-            for (Future<Boolean> future : futures) {
-                if (future.get(60, TimeUnit.SECONDS)) {
-                    successes++;
-                }
-            }
-            assertThat(successes).isEqualTo(1);
-        } finally {
-            pool.shutdownNow();
-        }
+
+        List<Throwable> outcomes = runTogether(List.of(
+                () -> verificationService.confirmPayment(ids[0], confirm("380000"), first),
+                () -> verificationService.confirmPayment(ids[0], confirm("380000"), second)));
+
+        assertOneWinnerOneNotPending(outcomes);
         assertThat(tx().execute(s -> invoiceRepository.findByPaymentId(ids[0]).size())).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Confirm and fail at the same time: one succeeds, the other gets 409 PAYMENT_NOT_PENDING")
+    void concurrentConfirmAndFail_OnlyOneSucceeds() throws Exception {
+        Long[] ids = pendingCard();
+        UserAccount first = tx().execute(s -> newUser("RECEPTIONIST"));
+        UserAccount second = tx().execute(s -> newUser("RECEPTIONIST"));
+
+        List<Throwable> outcomes = runTogether(List.of(
+                () -> verificationService.confirmPayment(ids[0], confirm("1200000"), first),
+                () -> verificationService.failPayment(ids[0],
+                        FailPaymentRequest.builder().reason("No transfer found").build(), second)));
+
+        assertOneWinnerOneNotPending(outcomes);
+        tx().executeWithoutResult(s -> {
+            Payment payment = paymentRepository.findById(ids[0]).orElseThrow();
+            MemberCard card = memberCardRepository.findById(ids[1]).orElseThrow();
+            int invoices = invoiceRepository.findByPaymentId(ids[0]).size();
+            if (outcomes.get(0) == null) {
+                assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+                assertThat(card.getStatus()).isEqualTo(CardStatus.ACTIVE);
+                assertThat(invoices).isEqualTo(1);
+            } else {
+                assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.FAILED);
+                assertThat(card.getStatus()).isEqualTo(CardStatus.CANCELLED);
+                assertThat(invoices).isZero();
+            }
+        });
+    }
+
+    @Test
+    @DisplayName("PUT /membership-cards/{id}/activate (FE-05) issues one invoice and one PAYMENT_CONFIRMED row")
+    void activateCardEndpoint_IssuesReceipt() throws Exception {
+        Long[] ids = pendingCard();
+        UserAccount receptionist = tx().execute(s -> newUser("RECEPTIONIST"));
+
+        mockMvc.perform(put("/api/v1/membership-cards/" + ids[1] + "/activate")
+                        .with(user(new CustomUserDetails(receptionist)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"paymentMethod\":\"CASH\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+
+        assertReceiptIssued(ids[0], InvoiceItemType.MEMBERSHIP_CARD, ids[1], "1200000");
+    }
+
+    @Test
+    @DisplayName("PUT /packages/registrations/{id}/activate (FE-05) issues one invoice and one PAYMENT_CONFIRMED row")
+    void activateRegistrationEndpoint_IssuesReceipt() throws Exception {
+        Long[] ids = pendingRegistration();
+        UserAccount receptionist = tx().execute(s -> newUser("RECEPTIONIST"));
+
+        mockMvc.perform(put("/api/v1/packages/registrations/" + ids[1] + "/activate")
+                        .with(user(new CustomUserDetails(receptionist)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"paymentMethod\":\"CASH\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+
+        assertReceiptIssued(ids[0], InvoiceItemType.SPORT_PACKAGE, ids[1], "380000");
+        mockMvc.perform(get("/api/v1/invoices/by-payment/" + ids[0])
+                        .with(user(new CustomUserDetails(receptionist))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lines.length()").value(1));
     }
 
     @Test
@@ -380,6 +441,22 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
             assertThat(payment.getNotes()).endsWith("No transfer found");
             assertThat(memberCardRepository.findById(ids[1]).orElseThrow().getStatus()).isEqualTo(CardStatus.CANCELLED);
             assertThat(activityRows(payment.getPaymentCode(), "PAYMENT_FAILED")).isEqualTo(1);
+        });
+    }
+
+    @Test
+    @DisplayName("Fail a registration: the receptionist's reason is stored as the registration cancel reason")
+    void failRegistration_StoresReason() {
+        Long[] ids = pendingRegistration();
+        UserAccount receptionist = tx().execute(s -> newUser("RECEPTIONIST"));
+
+        verificationService.failPayment(ids[0], FailPaymentRequest.builder().reason("No transfer found").build(), receptionist);
+
+        tx().executeWithoutResult(s -> {
+            SportPackageRegistration reg = registrationRepository.findById(ids[1]).orElseThrow();
+            assertThat(reg.getStatus()).isEqualTo(PackageRegistrationStatus.CANCELLED);
+            assertThat(reg.getCancelReason()).isEqualTo("No transfer found");
+            assertThat(paymentRepository.findById(ids[0]).orElseThrow().getPaymentStatus()).isEqualTo(PaymentStatus.FAILED);
         });
     }
 
@@ -413,6 +490,63 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         assertThat(found).allMatch(r -> r.getStatus() == PaymentStatus.PENDING);
         assertThat(found.get(0).getMemberFullName()).isEqualTo("BE18 MEMBER");
         assertThat(found.get(0).getItemType()).isEqualTo(InvoiceItemType.SPORT_PACKAGE);
+    }
+
+    private void assertReceiptIssued(Long paymentId, InvoiceItemType type, Long itemId, String total) {
+        tx().executeWithoutResult(s -> {
+            Payment payment = paymentRepository.findById(paymentId).orElseThrow();
+            assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+            assertThat(payment.getPaymentMethod()).isEqualTo(PaymentMethod.CASH);
+            List<Invoice> invoices = invoiceRepository.findByPaymentId(paymentId);
+            assertThat(invoices).hasSize(1);
+            assertThat(invoices.get(0).getStatus()).isEqualTo(InvoiceStatus.PAID);
+            assertThat(invoices.get(0).getTotalAmount()).isEqualByComparingTo(total);
+            List<InvoiceLine> lines = invoiceLineRepository.findByInvoiceId(invoices.get(0).getId());
+            assertThat(lines).hasSize(1);
+            assertThat(lines.get(0).getItemType()).isEqualTo(type);
+            assertThat(lines.get(0).getItemReferenceId()).isEqualTo(itemId);
+            assertThat(activityRows(payment.getPaymentCode(), "PAYMENT_CONFIRMED")).isEqualTo(1);
+        });
+    }
+
+    /** Starts every call at the same moment; the result holds null for a call that returned, else its exception. */
+    private List<Throwable> runTogether(List<Callable<?>> calls) throws Exception {
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(calls.size());
+        try {
+            List<Future<?>> futures = new ArrayList<>();
+            for (Callable<?> call : calls) {
+                futures.add(pool.submit(() -> {
+                    start.await(10, TimeUnit.SECONDS);
+                    return call.call();
+                }));
+            }
+            start.countDown();
+            List<Throwable> outcomes = new ArrayList<>();
+            for (Future<?> future : futures) {
+                try {
+                    future.get(60, TimeUnit.SECONDS);
+                    outcomes.add(null);
+                } catch (ExecutionException ex) {
+                    outcomes.add(ex.getCause());
+                }
+            }
+            return outcomes;
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    /**
+     * Both calls start with the payment row lock, so the second waits for the first to commit and then reads a
+     * payment that is no longer PENDING. Both take the same single lock first, so they cannot deadlock.
+     */
+    private static void assertOneWinnerOneNotPending(List<Throwable> outcomes) {
+        assertThat(outcomes).hasSize(2);
+        assertThat(outcomes).filteredOn(o -> o == null).hasSize(1);
+        Throwable loser = outcomes.stream().filter(o -> o != null).findFirst().orElseThrow();
+        assertThat(loser).isInstanceOf(ConflictException.class);
+        assertThat(((ConflictException) loser).getCode()).isEqualTo("PAYMENT_NOT_PENDING");
     }
 
     private static TransactionDefinition propagationRequiresNew() {

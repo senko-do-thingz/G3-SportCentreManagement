@@ -2,7 +2,7 @@
 
 ## 2026-10-14 - Receptionist verifies and confirms payments (BE-18, Flow 3)
 
-Branch `feat/f3-confirm-payment`. Owner: Truc. Priority: P1. Depends on BE-17 (merged). Screens F3-04, F3-05, F3-06 and S3-Mismatch. Unblocks FE-12 (`feat/f3-reception-payments`).
+Branch `feat/f3-confirm-payment`. Owner: Truc. Priority: P1. Depends on BE-17 (merged). Screens F3-04, F3-05, F3-06 and S3-Mismatch. Provides the BE-18 part of what FE-12 (`feat/f3-reception-payments`) needs; FE-12 is also blocked by BE-21.
 
 ### Added
 - `GET /api/v1/payments` (RECEPTIONIST, MANAGER): payment requests with filters `status`, `method`, `search` (`query` also accepted), `from`, `to`, `page`, `size` (max 100); PENDING first, oldest first, then newest first; each row has member name and code, item type, code and status, original price, discount and invoice number.
@@ -19,9 +19,14 @@ Branch `feat/f3-confirm-payment`. Owner: Truc. Priority: P1. Depends on BE-17 (m
 - `docs/database/04` and `09`: verification endpoints, invoice amount rule, mismatch and double confirmation rules, payment state machine, V21 columns of `payment`.
 
 ### Notes
-- No migration: `amount_received` is not a column (a confirmed payment always received exactly its amount); it is kept in the activity_log details.
+- No migration: `amount_received` is not a column (a confirmed payment always received exactly its amount); a different amount is kept only in the PAYMENT_AMOUNT_MISMATCH log details.
 - Not verified in the authoring environment (Maven Central and Docker images were blocked there). Run `mvn -B test` before merging; integration tests run in CI.
 - Failing a payment cancels the request it paid for, so the member asks again and a new payment row is created (state machine "Retry (creates new row)").
+
+### Review round 1
+- The card and package activate endpoints (FE-05) now issue the same receipt as confirm through `PaymentVerificationService.recordPaymentConfirmed`: one PAID invoice and one PAYMENT_CONFIRMED row per confirmed payment; their request is unchanged.
+- Confirm and fail lock the payment row first (`findByIdForUpdate`), so the second caller always gets 409 `PAYMENT_NOT_PENDING`; a version check failure inside them answers 409 `PAYMENT_CONCURRENT_UPDATE`. Non-staff actors in the service get 403.
+- Mismatch also writes an activity_log row PAYMENT_AMOUNT_MISMATCH. One `PaymentItemResolver` gives the item name, original price and discount for `GET /payments/{id}`, `GET /payments` and the invoice. The fail reason is stored in `sport_package_registration.cancel_reason`.
 
 ## 2026-10-13 - Receptionist Member Search, Register and Renew, Check-in (FE-05, Flow 1)
 

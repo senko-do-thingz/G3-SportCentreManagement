@@ -20,8 +20,11 @@ import com.sportify.identity.repository.UserRepository;
 import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.service.PaymentService;
+import com.sportify.payment.service.PaymentVerificationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -43,6 +46,8 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     private final PaymentService paymentService;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
+    /** Resolved on use: PaymentVerificationService itself depends on this service. */
+    private final ObjectProvider<PaymentVerificationService> paymentVerificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -132,6 +137,21 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     @Override
     @Transactional
     public MemberCardResponse activateCard(Long cardId, UserAccount actor, PaymentMethod actualMethod) {
+        MemberCard card = activatePending(cardId, actor, actualMethod);
+        if (card.getPayment() != null) {
+            // Same receipt as PUT /payments/{id}/confirm: one PAID invoice and one PAYMENT_CONFIRMED row.
+            paymentVerificationService.getObject().recordPaymentConfirmed(card.getPayment().getId(), actor, null);
+        }
+        return mapToCardResponse(card);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public MemberCardResponse activateCardForPaymentConfirmation(Long cardId, UserAccount actor, PaymentMethod actualMethod) {
+        return mapToCardResponse(activatePending(cardId, actor, actualMethod));
+    }
+
+    private MemberCard activatePending(Long cardId, UserAccount actor, PaymentMethod actualMethod) {
         MemberCard card = memberCardRepository.findById(cardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member card not found for id: " + cardId));
         if (card.getStatus() != CardStatus.PENDING_PAYMENT) {
@@ -159,7 +179,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         if (plan.replaces() != null) {
             replace(plan.replaces());
         }
-        return mapToCardResponse(card);
+        return card;
     }
 
     @Override

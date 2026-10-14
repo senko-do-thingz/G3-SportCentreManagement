@@ -1,10 +1,6 @@
 package com.sportify.payment.service.impl;
 
 import com.sportify.catalog.dto.PageResponse;
-import com.sportify.catalog.entity.MemberCard;
-import com.sportify.catalog.entity.SportPackageRegistration;
-import com.sportify.catalog.repository.MemberCardRepository;
-import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.MembershipCardService;
 import com.sportify.catalog.service.SportPackageService;
 import com.sportify.core.audit.AuditAction;
@@ -34,25 +30,26 @@ import com.sportify.payment.repository.InvoiceRepository;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.repository.PaymentSpecifications;
 import com.sportify.payment.service.PaymentVerificationService;
+import com.sportify.payment.service.impl.PaymentItemResolver.PaymentItem;
+import com.sportify.payment.service.impl.PaymentItemResolver.PaymentItemSummary;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -60,14 +57,14 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
 
     static final String CODE_PAYMENT_NOT_PENDING = "PAYMENT_NOT_PENDING";
     static final String CODE_INVOICE_ALREADY_ISSUED = "INVOICE_ALREADY_ISSUED";
+    static final String CODE_PAYMENT_CONCURRENT_UPDATE = "PAYMENT_CONCURRENT_UPDATE";
     static final String ENTITY_TYPE = "PAYMENT";
     private static final int DESCRIPTION_MAX = 255;
     private static final int SUMMARY_MAX = 255;
 
     private final PaymentRepository paymentRepository;
     private final InvoiceRepository invoiceRepository;
-    private final MemberCardRepository memberCardRepository;
-    private final SportPackageRegistrationRepository registrationRepository;
+    private final PaymentItemResolver itemResolver;
     private final MembershipCardService membershipCardService;
     private final SportPackageService sportPackageService;
     private final AuditService auditService;
@@ -96,8 +93,8 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
                 PageRequest.of(page, size));
 
         List<Payment> payments = result.getContent();
-        Map<Long, LinkedItem> items = resolveItems(payments.stream().map(Payment::getId).toList());
-        Map<Long, Invoice> invoices = firstInvoiceByPayment(payments.stream().map(Payment::getId).toList());
+        Map<Long, PaymentItem> items = itemResolver.findItems(payments);
+        Map<Long, Invoice> invoices = itemResolver.findFirstInvoices(payments.stream().map(Payment::getId).toList());
 
         List<StaffPaymentResponse> content = payments.stream()
                 .map(p -> toResponse(p, items.get(p.getId()), invoices.get(p.getId())))
@@ -107,9 +104,9 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
     }
 
     /**
-     * Runs in one transaction. A mismatch commits the note it appends (noRollbackFor) and changes nothing else;
-     * every other error rolls the whole confirmation back. Two receptionists confirming the same payment at the
-     * same time are told apart by the @Version column of payment: the later flush fails with 409.
+     * Runs in one transaction that starts by locking the payment row, so a second confirm or fail on the same
+     * payment waits and then gets 409 PAYMENT_NOT_PENDING. A mismatch commits its note and its
+     * PAYMENT_AMOUNT_MISMATCH log (noRollbackFor) and changes nothing else; every other error rolls back.
      */
     @Override
     @Transactional(noRollbackFor = PaymentAmountMismatchException.class)
@@ -128,30 +125,20 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         }
         String note = trimToNull(request.getNote());
 
-        Payment payment = findPayment(paymentId);
+        Payment payment = lockPayment(paymentId);
         requirePending(payment, "confirmed");
 
         BigDecimal amountReceived = request.getAmountReceived();
         if (amountReceived.compareTo(payment.getAmount()) != 0) {
-            String mismatchNote = "Amount mismatch: received " + amountReceived.toPlainString()
-                    + ", expected " + payment.getAmount().toPlainString()
-                    + " by " + method + (reference != null ? " reference " + reference : "")
-                    + ", checked by user id " + actor.getId()
-                    + (note != null ? ". Note: " + note : "");
-            payment.setNotes(PaymentNotes.append(payment.getNotes(), mismatchNote));
-            paymentRepository.saveAndFlush(payment);
+            recordMismatch(payment, method, reference, amountReceived, note, actor);
             throw new PaymentAmountMismatchException("Amount received " + amountReceived.toPlainString()
                     + " does not match the payment amount " + payment.getAmount().toPlainString()
                     + ". The payment stays PENDING and needs review.");
         }
 
-        LinkedItem item = resolveItem(payment.getId())
+        PaymentItem item = itemResolver.findItem(payment)
                 .orElseThrow(() -> new BusinessRuleException("Payment " + payment.getPaymentCode()
                         + " is not linked to a membership card or a package registration"));
-        if (!invoiceRepository.findByPaymentId(payment.getId()).isEmpty()) {
-            throw new ConflictException("An invoice already exists for payment " + payment.getPaymentCode(),
-                    CODE_INVOICE_ALREADY_ISSUED);
-        }
 
         payment.setReferenceCode(reference);
         if (note != null) {
@@ -160,23 +147,39 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
 
         // Activation recomputes the card or package dates and marks this payment SUCCESS with payment_time now.
         if (item.type() == InvoiceItemType.MEMBERSHIP_CARD) {
-            membershipCardService.activateCard(item.id(), actor, method);
+            membershipCardService.activateCardForPaymentConfirmation(item.id(), actor, method);
         } else {
-            sportPackageService.activateRegistration(item.id(), actor, method);
+            sportPackageService.activateRegistrationForPaymentConfirmation(item.id(), actor, method);
         }
+        Invoice invoice = recordPaymentConfirmed(payment.getId(), actor, note);
+        flushPayment();
+
+        PaymentItem refreshed = itemResolver.findItem(payment).orElse(item);
+        return toResponse(payment, refreshed, invoice);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Invoice recordPaymentConfirmed(Long paymentId, UserAccount actor, String note) {
+        Payment payment = findPayment(paymentId);
         if (payment.getPaymentStatus() != PaymentStatus.SUCCESS) {
-            throw new IllegalStateException("Payment " + payment.getPaymentCode() + " was not marked SUCCESS on activation");
+            throw new IllegalStateException("Payment " + payment.getPaymentCode()
+                    + " must be SUCCESS before its invoice is issued, but is " + payment.getPaymentStatus());
+        }
+        PaymentItem item = itemResolver.findItem(payment)
+                .orElseThrow(() -> new BusinessRuleException("Payment " + payment.getPaymentCode()
+                        + " is not linked to a membership card or a package registration"));
+        if (!invoiceRepository.findByPaymentId(payment.getId()).isEmpty()) {
+            throw new ConflictException("An invoice already exists for payment " + payment.getPaymentCode(),
+                    CODE_INVOICE_ALREADY_ISSUED);
         }
 
         Invoice invoice = issueInvoice(payment, item);
-        // Flush here so a concurrent confirmation fails inside this call (optimistic lock, mapped to 409).
-        paymentRepository.flush();
 
         Map<String, Object> details = new LinkedHashMap<>();
-        details.put("method", method.name());
-        details.put("referenceCode", reference);
+        details.put("method", payment.getPaymentMethod() != null ? payment.getPaymentMethod().name() : null);
+        details.put("referenceCode", payment.getReferenceCode());
         details.put("amount", payment.getAmount());
-        details.put("amountReceived", amountReceived);
         details.put("itemType", item.type().name());
         details.put("itemReferenceId", item.id());
         details.put("itemCode", item.code());
@@ -189,13 +192,11 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
                 .entityId(payment.getId())
                 .entityCode(payment.getPaymentCode())
                 .summary(truncate("Payment " + payment.getPaymentCode() + " confirmed: "
-                        + payment.getAmount().toPlainString() + " by " + method
+                        + payment.getAmount().toPlainString() + " by " + payment.getPaymentMethod()
                         + ", " + item.code() + " activated, invoice " + invoice.getInvoiceNumber(), SUMMARY_MAX))
                 .details(details)
                 .build());
-
-        LinkedItem refreshed = resolveItem(payment.getId()).orElse(item);
-        return toResponse(payment, refreshed, invoice);
+        return invoice;
     }
 
     @Override
@@ -207,33 +208,32 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
             throw new BusinessRuleException("Reason is required");
         }
 
-        Payment payment = findPayment(paymentId);
+        Payment payment = lockPayment(paymentId);
         requirePending(payment, "marked as failed");
 
-        Optional<LinkedItem> item = resolveItem(payment.getId());
+        Optional<PaymentItem> item = itemResolver.findItem(payment);
         String failNote = "Payment failed, checked by user id " + actor.getId() + ": " + reason;
         if (item.isPresent()) {
             // Cancelling the request marks this payment FAILED; the member has to request the item again.
             if (item.get().type() == InvoiceItemType.MEMBERSHIP_CARD) {
                 membershipCardService.cancelCard(item.get().id(), actor);
             } else {
-                sportPackageService.cancelRegistration(item.get().id(), actor);
+                sportPackageService.cancelRegistration(item.get().id(), actor, reason);
             }
-            payment.setNotes(PaymentNotes.append(payment.getNotes(), failNote));
         } else {
             payment.setPaymentStatus(PaymentStatus.FAILED);
-            payment.setNotes(PaymentNotes.append(payment.getNotes(), failNote));
         }
+        payment.setNotes(PaymentNotes.append(payment.getNotes(), failNote));
         if (payment.getPaymentStatus() != PaymentStatus.FAILED) {
             throw new IllegalStateException("Payment " + payment.getPaymentCode() + " was not marked FAILED");
         }
-        paymentRepository.saveAndFlush(payment);
+        flushPayment();
 
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("reason", reason);
         details.put("itemType", item.map(i -> i.type().name()).orElse(null));
-        details.put("itemReferenceId", item.map(LinkedItem::id).orElse(null));
-        details.put("itemCode", item.map(LinkedItem::code).orElse(null));
+        details.put("itemReferenceId", item.map(PaymentItem::id).orElse(null));
+        details.put("itemCode", item.map(PaymentItem::code).orElse(null));
         auditService.record(AuditEvent.builder()
                 .actor(actor)
                 .action(AuditAction.PAYMENT_FAILED)
@@ -244,7 +244,7 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
                 .details(details)
                 .build());
 
-        LinkedItem refreshed = resolveItem(payment.getId()).orElse(null);
+        PaymentItem refreshed = itemResolver.findItem(payment).orElse(null);
         return toResponse(payment, refreshed, null);
     }
 
@@ -266,7 +266,39 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         return toInvoiceResponse(invoice, payment);
     }
 
-    private Invoice issueInvoice(Payment payment, LinkedItem item) {
+    /**
+     * S3-Mismatch: keeps the payment PENDING and records what the front desk saw, as a note on the payment and a
+     * PAYMENT_AMOUNT_MISMATCH activity log row, both committed with the 409 answer.
+     */
+    private void recordMismatch(Payment payment, PaymentMethod method, String reference, BigDecimal amountReceived,
+                                String note, UserAccount actor) {
+        String mismatchNote = "Amount mismatch: received " + amountReceived.toPlainString()
+                + ", expected " + payment.getAmount().toPlainString()
+                + " by " + method + (reference != null ? " reference " + reference : "")
+                + ", checked by user id " + actor.getId()
+                + (note != null ? ". Note: " + note : "");
+        payment.setNotes(PaymentNotes.append(payment.getNotes(), mismatchNote));
+        flushPayment();
+
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("amount", payment.getAmount());
+        details.put("amountReceived", amountReceived);
+        details.put("method", method.name());
+        details.put("referenceCode", reference);
+        details.put("note", note);
+        auditService.record(AuditEvent.builder()
+                .actor(actor)
+                .action(AuditAction.PAYMENT_AMOUNT_MISMATCH)
+                .entityType(ENTITY_TYPE)
+                .entityId(payment.getId())
+                .entityCode(payment.getPaymentCode())
+                .summary(truncate("Payment " + payment.getPaymentCode() + " needs review: received "
+                        + amountReceived.toPlainString() + ", expected " + payment.getAmount().toPlainString(), SUMMARY_MAX))
+                .details(details)
+                .build());
+    }
+
+    private Invoice issueInvoice(Payment payment, PaymentItem item) {
         BigDecimal total = payment.getAmount();
         BigDecimal unitPrice = item.originalPrice() != null && item.originalPrice().compareTo(total) > 0
                 ? item.originalPrice()
@@ -299,63 +331,25 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         return invoiceRepository.save(invoice);
     }
 
-    private Optional<LinkedItem> resolveItem(Long paymentId) {
-        return Optional.ofNullable(resolveItems(List.of(paymentId)).get(paymentId));
-    }
-
-    /** What each payment pays for: a membership card or a sport package registration. */
-    private Map<Long, LinkedItem> resolveItems(Collection<Long> paymentIds) {
-        Map<Long, LinkedItem> items = new HashMap<>();
-        if (paymentIds.isEmpty()) {
-            return items;
+    /**
+     * Writes the pending changes now, so a failed version check surfaces inside the call. The row lock makes it
+     * unlikely; it can still happen when a card or package activate endpoint, which does not take the lock,
+     * confirms the same payment at the same moment.
+     */
+    private void flushPayment() {
+        try {
+            paymentRepository.flush();
+        } catch (ObjectOptimisticLockingFailureException ex) {
+            throw new ConflictException("The payment was changed by another request. Reload it and try again.",
+                    CODE_PAYMENT_CONCURRENT_UPDATE);
         }
-        for (SportPackageRegistration reg : registrationRepository.findByPaymentIdIn(paymentIds)) {
-            items.put(reg.getPayment().getId(), fromRegistration(reg));
-        }
-        for (MemberCard card : memberCardRepository.findByPaymentIdIn(paymentIds)) {
-            items.putIfAbsent(card.getPayment().getId(), fromCard(card));
-        }
-        return items;
     }
 
-    private Map<Long, Invoice> firstInvoiceByPayment(Collection<Long> paymentIds) {
-        if (paymentIds.isEmpty()) {
-            return Map.of();
-        }
-        return invoiceRepository.findByPaymentIdIn(paymentIds).stream()
-                .collect(Collectors.toMap(i -> i.getPayment().getId(), Function.identity(),
-                        (a, b) -> a.getId() <= b.getId() ? a : b));
-    }
-
-    private LinkedItem fromRegistration(SportPackageRegistration reg) {
-        String name = reg.getSportPackage() != null ? reg.getSportPackage().getName() : "Sport package";
-        return new LinkedItem(InvoiceItemType.SPORT_PACKAGE, reg.getId(), reg.getRegistrationCode(),
-                name, reg.getStatus() != null ? reg.getStatus().name() : null,
-                reg.getOriginalPrice(),
-                name + " (" + reg.getRegistrationCode() + ")");
-    }
-
-    private LinkedItem fromCard(MemberCard card) {
-        String tierName = card.getTier() != null ? card.getTier().getName() : null;
-        String name = tierName != null ? tierName + " Card" : "Membership Card";
-        BigDecimal tierPrice = card.getTier() != null ? card.getTier().getPrice() : null;
-        boolean upgradeCredit = tierPrice != null && card.getPricePaid() != null
-                && card.getPricePaid().compareTo(tierPrice) < 0;
-        String description = name + " (" + card.getCardCode() + ")"
-                + (upgradeCredit ? " - upgrade, credit for the current card applied" : "");
-        return new LinkedItem(InvoiceItemType.MEMBERSHIP_CARD, card.getId(), card.getCardCode(),
-                name, card.getStatus() != null ? card.getStatus().name() : null,
-                tierPrice, description);
-    }
-
-    private StaffPaymentResponse toResponse(Payment payment, LinkedItem item, Invoice invoice) {
+    private StaffPaymentResponse toResponse(Payment payment, PaymentItem item, Invoice invoice) {
         MemberProfile member = payment.getMember();
         UserAccount account = member != null ? member.getUserAccount() : null;
         UserAccount confirmedBy = payment.getConfirmedByUser();
-        BigDecimal original = item != null && item.originalPrice() != null ? item.originalPrice() : payment.getAmount();
-        BigDecimal discount = original.compareTo(payment.getAmount()) > 0
-                ? original.subtract(payment.getAmount())
-                : BigDecimal.ZERO;
+        PaymentItemSummary summary = itemResolver.summarize(payment, item, invoice);
         return StaffPaymentResponse.builder()
                 .id(payment.getId())
                 .code(payment.getPaymentCode())
@@ -371,10 +365,10 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
                 .itemType(item != null ? item.type() : null)
                 .itemReferenceId(item != null ? item.id() : null)
                 .itemCode(item != null ? item.code() : null)
-                .itemDescription(item != null ? item.name() : "Payment " + payment.getPaymentCode())
+                .itemDescription(summary.description())
                 .itemStatus(item != null ? item.status() : null)
-                .originalPrice(original)
-                .discount(discount)
+                .originalPrice(summary.originalPrice())
+                .discount(summary.discount())
                 .confirmedByUserId(confirmedBy != null ? confirmedBy.getId() : null)
                 .confirmedByName(confirmedBy != null ? confirmedBy.getFullName() : null)
                 .invoiceId(invoice != null ? invoice.getId() : null)
@@ -420,6 +414,14 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
                 .build();
     }
 
+    private Payment lockPayment(Long paymentId) {
+        if (paymentId == null) {
+            throw new BusinessRuleException("Payment ID cannot be null");
+        }
+        return paymentRepository.findByIdForUpdate(paymentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment not found for id: " + paymentId));
+    }
+
     private Payment findPayment(Long paymentId) {
         if (paymentId == null) {
             throw new BusinessRuleException("Payment ID cannot be null");
@@ -435,9 +437,10 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         }
     }
 
+    /** Mapped to 403 by GlobalExceptionHandler, like the @PreAuthorize check on the controller. */
     private void requireStaff(UserAccount actor) {
         if (!SecurityUtils.isStaff(actor)) {
-            throw new BusinessRuleException("Only staff users can verify payments");
+            throw new AccessDeniedException("Only staff users can verify payments");
         }
     }
 
@@ -454,16 +457,5 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
             return value;
         }
         return value.substring(0, max);
-    }
-
-    /**
-     * The card or package registration a payment pays for.
-     *
-     * @param name               short name shown in the payment list
-     * @param originalPrice      price before the card discount or the upgrade credit
-     * @param invoiceDescription description written on the invoice line
-     */
-    private record LinkedItem(InvoiceItemType type, Long id, String code, String name, String status,
-                              BigDecimal originalPrice, String invoiceDescription) {
     }
 }

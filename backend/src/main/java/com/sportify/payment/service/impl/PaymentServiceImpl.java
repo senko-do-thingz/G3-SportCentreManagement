@@ -16,11 +16,9 @@ import com.sportify.payment.config.BankTransferProperties;
 import com.sportify.payment.dto.BankTransferInstructions;
 import com.sportify.payment.dto.PaymentResponse;
 import com.sportify.payment.dto.UpdatePaymentMethodRequest;
-import com.sportify.payment.entity.Invoice;
 import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.entity.PaymentStatus;
-import com.sportify.payment.repository.InvoiceRepository;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
@@ -31,9 +29,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -42,7 +37,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final MemberCardRepository memberCardRepository;
     private final SportPackageRegistrationRepository sportPackageRegistrationRepository;
-    private final InvoiceRepository invoiceRepository;
+    private final PaymentItemResolver itemResolver;
     private final BankTransferProperties bankProperties;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
@@ -234,7 +229,7 @@ public class PaymentServiceImpl implements PaymentService {
                     .build();
         }
 
-        PaymentItemSummary summary = resolveItemSummary(payment);
+        PaymentItemResolver.PaymentItemSummary summary = itemResolver.summarize(payment);
 
         return PaymentResponse.builder()
                 .id(payment.getId())
@@ -253,77 +248,5 @@ public class PaymentServiceImpl implements PaymentService {
                 .createdAt(payment.getCreatedAt())
                 .updatedAt(payment.getUpdatedAt())
                 .build();
-    }
-
-    private record PaymentItemSummary(String description, BigDecimal originalPrice, BigDecimal discount) {}
-
-    private PaymentItemSummary resolveItemSummary(Payment payment) {
-        Long paymentId = payment.getId();
-        BigDecimal amount = payment.getAmount();
-
-        Optional<PaymentItemSummary> pkgSummary = resolvePackageSummary(paymentId, amount);
-        if (pkgSummary.isPresent()) {
-            return pkgSummary.get();
-        }
-
-        Optional<PaymentItemSummary> cardSummary = resolveCardSummary(paymentId, amount);
-        if (cardSummary.isPresent()) {
-            return cardSummary.get();
-        }
-
-        Optional<PaymentItemSummary> invSummary = resolveInvoiceSummary(paymentId, amount);
-        if (invSummary.isPresent()) {
-            return invSummary.get();
-        }
-
-        return defaultItemSummary(payment);
-    }
-
-    private Optional<PaymentItemSummary> resolvePackageSummary(Long paymentId, BigDecimal fallbackAmount) {
-        return sportPackageRegistrationRepository.findByPaymentId(paymentId)
-                .map(reg -> {
-                    String description = reg.getSportPackage() != null
-                            ? reg.getSportPackage().getName()
-                            : "Sport Package Registration";
-                    BigDecimal original = reg.getOriginalPrice() != null ? reg.getOriginalPrice() : fallbackAmount;
-                    BigDecimal paid = reg.getPaidAmount() != null ? reg.getPaidAmount() : fallbackAmount;
-                    BigDecimal diff = original.subtract(paid);
-                    BigDecimal discount = diff.compareTo(BigDecimal.ZERO) > 0 ? diff : BigDecimal.ZERO;
-                    return new PaymentItemSummary(description, original, discount);
-                });
-    }
-
-    private Optional<PaymentItemSummary> resolveCardSummary(Long paymentId, BigDecimal fallbackAmount) {
-        return memberCardRepository.findByPaymentId(paymentId)
-                .map(card -> {
-                    String description = card.getTier() != null
-                            ? card.getTier().getName() + " Card"
-                            : "Membership Card";
-                    BigDecimal original = card.getTier() != null && card.getTier().getPrice() != null
-                            ? card.getTier().getPrice()
-                            : fallbackAmount;
-                    BigDecimal paid = card.getPricePaid() != null ? card.getPricePaid() : fallbackAmount;
-                    BigDecimal diff = original.subtract(paid);
-                    BigDecimal discount = diff.compareTo(BigDecimal.ZERO) > 0 ? diff : BigDecimal.ZERO;
-                    return new PaymentItemSummary(description, original, discount);
-                });
-    }
-
-    private Optional<PaymentItemSummary> resolveInvoiceSummary(Long paymentId, BigDecimal fallbackAmount) {
-        List<Invoice> invoices = invoiceRepository.findByPaymentId(paymentId);
-        if (invoices.isEmpty()) {
-            return Optional.empty();
-        }
-        Invoice invoice = invoices.stream()
-                .min(Comparator.comparing(Invoice::getId, Comparator.nullsLast(Comparator.naturalOrder())))
-                .orElseThrow();
-        String description = "Invoice " + invoice.getInvoiceNumber();
-        BigDecimal original = invoice.getSubtotalAmount() != null ? invoice.getSubtotalAmount() : fallbackAmount;
-        BigDecimal discount = invoice.getDiscountAmount() != null ? invoice.getDiscountAmount() : BigDecimal.ZERO;
-        return Optional.of(new PaymentItemSummary(description, original, discount));
-    }
-
-    private PaymentItemSummary defaultItemSummary(Payment payment) {
-        return new PaymentItemSummary("Payment " + payment.getPaymentCode(), payment.getAmount(), BigDecimal.ZERO);
     }
 }

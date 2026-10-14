@@ -46,6 +46,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -91,9 +93,9 @@ class PaymentVerificationServiceImplTest {
     @BeforeEach
     void setUp() {
         Clock clock = Clock.fixed(Instant.parse("2026-10-14T03:00:00Z"), ZoneId.of("Asia/Ho_Chi_Minh"));
-        service = new PaymentVerificationServiceImpl(paymentRepository, invoiceRepository, memberCardRepository,
-                registrationRepository, membershipCardService, sportPackageService, auditService,
-                new CodeFormatter(), clock);
+        PaymentItemResolver resolver = new PaymentItemResolver(memberCardRepository, registrationRepository, invoiceRepository);
+        service = new PaymentVerificationServiceImpl(paymentRepository, invoiceRepository, resolver,
+                membershipCardService, sportPackageService, auditService, new CodeFormatter(), clock);
 
         receptionist = UserAccount.builder().id(7L).fullName("Rita Reception")
                 .role(Role.builder().code("RECEPTIONIST").name("Receptionist").build()).build();
@@ -156,7 +158,12 @@ class PaymentVerificationServiceImplTest {
         payment.setConfirmedByUser(receptionist);
     }
 
+    private void stubLockedPayment() {
+        when(paymentRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(payment));
+    }
+
     private void stubInvoiceSave() {
+        when(invoiceRepository.findByPaymentId(1L)).thenReturn(List.of());
         when(invoiceRepository.getNextInvoiceNumberSequence()).thenReturn(1001L);
         when(invoiceRepository.save(any(Invoice.class))).thenAnswer(inv -> {
             Invoice invoice = inv.getArgument(0);
@@ -166,14 +173,13 @@ class PaymentVerificationServiceImplTest {
     }
 
     @Test
-    @DisplayName("Confirm with the exact amount activates the registration and issues one PAID invoice")
+    @DisplayName("Confirm with the exact amount: locks the payment, activates the registration, one PAID invoice and one PAYMENT_CONFIRMED")
     void confirm_ExactAmount_Registration_ActivatesAndIssuesInvoice() {
         SportPackageRegistration reg = pendingRegistration();
+        stubLockedPayment();
         when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
-        when(registrationRepository.findByPaymentIdIn(anyCollection())).thenReturn(List.of(reg));
-        when(memberCardRepository.findByPaymentIdIn(anyCollection())).thenReturn(List.of());
-        when(invoiceRepository.findByPaymentId(1L)).thenReturn(List.of());
-        when(sportPackageService.activateRegistration(eq(20L), eq(receptionist), eq(PaymentMethod.BANK_TRANSFER)))
+        when(registrationRepository.findByPaymentId(1L)).thenReturn(Optional.of(reg));
+        when(sportPackageService.activateRegistrationForPaymentConfirmation(eq(20L), eq(receptionist), eq(PaymentMethod.BANK_TRANSFER)))
                 .thenAnswer(inv -> {
                     markSuccessOnActivation();
                     reg.setStatus(PackageRegistrationStatus.ACTIVE);
@@ -211,14 +217,20 @@ class PaymentVerificationServiceImplTest {
         assertThat(response.getItemType()).isEqualTo(InvoiceItemType.SPORT_PACKAGE);
         assertThat(response.getItemStatus()).isEqualTo("ACTIVE");
         assertThat(response.getPaymentReference()).isEqualTo("FT2610140001");
-        verify(membershipCardService, never()).activateCard(anyLong(), any(), any());
+        verify(paymentRepository).findByIdForUpdate(1L);
+        verify(membershipCardService, never()).activateCardForPaymentConfirmation(anyLong(), any(), any());
+        verify(sportPackageService, never()).activateRegistration(anyLong(), any(), any());
         verify(paymentRepository).flush();
 
         ArgumentCaptor<AuditEvent> auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
         verify(auditService).record(auditCaptor.capture());
         assertThat(auditCaptor.getValue().getAction()).isEqualTo(AuditAction.PAYMENT_CONFIRMED);
         assertThat(auditCaptor.getValue().getEntityCode()).isEqualTo("PAY-1001");
-        assertThat(auditCaptor.getValue().getDetails()).containsEntry("invoiceNumber", "INV-1001");
+        assertThat(auditCaptor.getValue().getDetails())
+                .containsEntry("invoiceNumber", "INV-1001")
+                .containsEntry("referenceCode", "FT2610140001")
+                .containsEntry("note", "Checked bank app")
+                .doesNotContainKey("amountReceived");
     }
 
     @Test
@@ -226,11 +238,11 @@ class PaymentVerificationServiceImplTest {
     void confirm_ExactAmount_CardUpgrade_InvoiceShowsCredit() {
         payment.setAmount(new BigDecimal("1500000.00"));
         MemberCard card = pendingCard(new BigDecimal("1500000.00"));
+        stubLockedPayment();
         when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
-        when(registrationRepository.findByPaymentIdIn(anyCollection())).thenReturn(List.of());
-        when(memberCardRepository.findByPaymentIdIn(anyCollection())).thenReturn(List.of(card));
-        when(invoiceRepository.findByPaymentId(1L)).thenReturn(List.of());
-        when(membershipCardService.activateCard(eq(30L), eq(receptionist), eq(PaymentMethod.CASH)))
+        when(registrationRepository.findByPaymentId(1L)).thenReturn(Optional.empty());
+        when(memberCardRepository.findByPaymentId(1L)).thenReturn(Optional.of(card));
+        when(membershipCardService.activateCardForPaymentConfirmation(eq(30L), eq(receptionist), eq(PaymentMethod.CASH)))
                 .thenAnswer(inv -> {
                     markSuccessOnActivation();
                     card.setStatus(CardStatus.ACTIVE);
@@ -252,14 +264,16 @@ class PaymentVerificationServiceImplTest {
                 .isEqualTo("VIP Member Card (CARD-1030) - upgrade, credit for the current card applied");
         assertThat(payment.getReferenceCode()).isNull();
         assertThat(response.getItemCode()).isEqualTo("CARD-1030");
-        verify(sportPackageService, never()).activateRegistration(anyLong(), any(), any());
+        assertThat(response.getOriginalPrice()).isEqualByComparingTo("2000000");
+        assertThat(response.getDiscount()).isEqualByComparingTo("500000");
+        verify(sportPackageService, never()).activateRegistrationForPaymentConfirmation(anyLong(), any(), any());
     }
 
     @Test
-    @DisplayName("Confirm with a different amount: 409 PAYMENT_AMOUNT_MISMATCH, note appended, nothing else changes")
-    void confirm_AmountMismatch_KeepsPendingAndAppendsNote() {
+    @DisplayName("Wrong amount: 409 PAYMENT_AMOUNT_MISMATCH, note and PAYMENT_AMOUNT_MISMATCH log, nothing else changes")
+    void confirm_AmountMismatch_KeepsPendingAndRecordsTrace() {
         payment.setNotes("Member says paid");
-        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        stubLockedPayment();
 
         assertThatThrownBy(() -> service.confirmPayment(1L,
                 confirmRequest(PaymentMethod.BANK_TRANSFER, "FT2610140001", "350000"), receptionist))
@@ -272,8 +286,20 @@ class PaymentVerificationServiceImplTest {
         assertThat(payment.getReferenceCode()).isNull();
         assertThat(payment.getNotes()).startsWith("Member says paid | Amount mismatch: received 350000, expected 380000.00");
         assertThat(payment.getNotes()).contains("Note: Checked bank app");
-        verify(paymentRepository).saveAndFlush(payment);
-        verifyNoInteractions(membershipCardService, sportPackageService, auditService);
+        verify(paymentRepository).flush();
+
+        ArgumentCaptor<AuditEvent> auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService).record(auditCaptor.capture());
+        AuditEvent event = auditCaptor.getValue();
+        assertThat(event.getAction()).isEqualTo(AuditAction.PAYMENT_AMOUNT_MISMATCH);
+        assertThat(event.isRequiresNew()).isFalse();
+        assertThat(event.getDetails())
+                .containsEntry("amount", new BigDecimal("380000.00"))
+                .containsEntry("amountReceived", new BigDecimal("350000"))
+                .containsEntry("method", "BANK_TRANSFER")
+                .containsEntry("referenceCode", "FT2610140001")
+                .containsEntry("note", "Checked bank app");
+        verifyNoInteractions(membershipCardService, sportPackageService, registrationRepository, memberCardRepository);
         verify(invoiceRepository, never()).save(any());
     }
 
@@ -281,7 +307,7 @@ class PaymentVerificationServiceImplTest {
     @DisplayName("Confirm a payment that is not PENDING returns 409 PAYMENT_NOT_PENDING")
     void confirm_NotPending_Conflict() {
         payment.setPaymentStatus(PaymentStatus.SUCCESS);
-        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        stubLockedPayment();
 
         assertThatThrownBy(() -> service.confirmPayment(1L,
                 confirmRequest(PaymentMethod.BANK_TRANSFER, "FT1", "380000"), receptionist))
@@ -303,7 +329,7 @@ class PaymentVerificationServiceImplTest {
     @Test
     @DisplayName("Cash needs no reference")
     void confirm_CashWithoutReference_PassesReferenceCheck() {
-        when(paymentRepository.findById(1L)).thenReturn(Optional.empty());
+        when(paymentRepository.findByIdForUpdate(1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.confirmPayment(1L,
                 confirmRequest(PaymentMethod.CASH, null, "380000"), receptionist))
@@ -313,9 +339,9 @@ class PaymentVerificationServiceImplTest {
     @Test
     @DisplayName("A payment linked to no card and no registration cannot be confirmed")
     void confirm_NoLinkedItem_BadRequest() {
-        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
-        when(registrationRepository.findByPaymentIdIn(anyCollection())).thenReturn(List.of());
-        when(memberCardRepository.findByPaymentIdIn(anyCollection())).thenReturn(List.of());
+        stubLockedPayment();
+        when(registrationRepository.findByPaymentId(1L)).thenReturn(Optional.empty());
+        when(memberCardRepository.findByPaymentId(1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.confirmPayment(1L,
                 confirmRequest(PaymentMethod.BANK_TRANSFER, "FT1", "380000"), receptionist))
@@ -325,11 +351,20 @@ class PaymentVerificationServiceImplTest {
     }
 
     @Test
-    @DisplayName("A member actor is refused by the service as well")
+    @DisplayName("A member actor reaching confirm gets AccessDeniedException (403)")
     void confirm_MemberActor_Refused() {
         assertThatThrownBy(() -> service.confirmPayment(1L,
                 confirmRequest(PaymentMethod.CASH, null, "380000"), memberUser))
-                .isInstanceOf(BusinessRuleException.class);
+                .isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(paymentRepository);
+    }
+
+    @Test
+    @DisplayName("A member actor reaching fail gets AccessDeniedException (403)")
+    void fail_MemberActor_Refused() {
+        assertThatThrownBy(() -> service.failPayment(1L,
+                FailPaymentRequest.builder().reason("No transfer found").build(), memberUser))
+                .isInstanceOf(AccessDeniedException.class);
         verifyNoInteractions(paymentRepository);
     }
 
@@ -337,9 +372,9 @@ class PaymentVerificationServiceImplTest {
     @DisplayName("Fail cancels the linked card request, records the reason and writes the activity log")
     void fail_PendingCard_CancelsCardAndRecordsReason() {
         MemberCard card = pendingCard(new BigDecimal("2000000.00"));
-        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
-        when(registrationRepository.findByPaymentIdIn(anyCollection())).thenReturn(List.of());
-        when(memberCardRepository.findByPaymentIdIn(anyCollection())).thenReturn(List.of(card));
+        stubLockedPayment();
+        when(registrationRepository.findByPaymentId(1L)).thenReturn(Optional.empty());
+        when(memberCardRepository.findByPaymentId(1L)).thenReturn(Optional.of(card));
         when(membershipCardService.cancelCard(30L, receptionist)).thenAnswer(inv -> {
             card.setStatus(CardStatus.CANCELLED);
             payment.setPaymentStatus(PaymentStatus.FAILED);
@@ -353,7 +388,7 @@ class PaymentVerificationServiceImplTest {
         assertThat(response.getStatus()).isEqualTo(PaymentStatus.FAILED);
         assertThat(response.getItemStatus()).isEqualTo("CANCELLED");
         assertThat(payment.getNotes()).endsWith("Payment failed, checked by user id 7: No transfer found");
-        verify(paymentRepository).saveAndFlush(payment);
+        verify(paymentRepository).flush();
         ArgumentCaptor<AuditEvent> auditCaptor = ArgumentCaptor.forClass(AuditEvent.class);
         verify(auditService).record(auditCaptor.capture());
         assertThat(auditCaptor.getValue().getAction()).isEqualTo(AuditAction.PAYMENT_FAILED);
@@ -361,15 +396,77 @@ class PaymentVerificationServiceImplTest {
     }
 
     @Test
-    @DisplayName("Fail on a payment that is not PENDING returns 409")
+    @DisplayName("Fail on a registration passes the reason to cancelRegistration so it lands in cancel_reason")
+    void fail_PendingRegistration_PassesReasonToCancel() {
+        SportPackageRegistration reg = pendingRegistration();
+        stubLockedPayment();
+        when(registrationRepository.findByPaymentId(1L)).thenReturn(Optional.of(reg));
+        when(sportPackageService.cancelRegistration(20L, receptionist, "No transfer found")).thenAnswer(inv -> {
+            reg.setStatus(PackageRegistrationStatus.CANCELLED);
+            reg.setCancelReason("No transfer found");
+            payment.setPaymentStatus(PaymentStatus.FAILED);
+            return null;
+        });
+
+        StaffPaymentResponse response = service.failPayment(1L,
+                FailPaymentRequest.builder().reason("  No transfer found ").build(), receptionist);
+
+        assertThat(response.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        verify(sportPackageService).cancelRegistration(20L, receptionist, "No transfer found");
+        verify(sportPackageService, never()).cancelRegistration(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("Fail on a payment that is not PENDING returns 409 PAYMENT_NOT_PENDING")
     void fail_NotPending_Conflict() {
         payment.setPaymentStatus(PaymentStatus.FAILED);
-        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        stubLockedPayment();
 
         assertThatThrownBy(() -> service.failPayment(1L,
                 FailPaymentRequest.builder().reason("Duplicate").build(), receptionist))
-                .isInstanceOf(ConflictException.class);
+                .isInstanceOf(ConflictException.class)
+                .satisfies(ex -> assertThat(((ConflictException) ex).getCode()).isEqualTo("PAYMENT_NOT_PENDING"));
         verifyNoInteractions(membershipCardService, sportPackageService, auditService);
+    }
+
+    @Test
+    @DisplayName("An optimistic lock failure on flush answers 409 PAYMENT_CONCURRENT_UPDATE")
+    void fail_OptimisticLockOnFlush_ConcurrentUpdateCode() {
+        stubLockedPayment();
+        when(registrationRepository.findByPaymentId(1L)).thenReturn(Optional.empty());
+        when(memberCardRepository.findByPaymentId(1L)).thenReturn(Optional.empty());
+        doThrow(new ObjectOptimisticLockingFailureException(Payment.class, 1L)).when(paymentRepository).flush();
+
+        assertThatThrownBy(() -> service.failPayment(1L,
+                FailPaymentRequest.builder().reason("Duplicate").build(), receptionist))
+                .isInstanceOf(ConflictException.class)
+                .satisfies(ex -> assertThat(((ConflictException) ex).getCode()).isEqualTo("PAYMENT_CONCURRENT_UPDATE"));
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    @DisplayName("recordPaymentConfirmed refuses a second invoice with 409 INVOICE_ALREADY_ISSUED")
+    void recordPaymentConfirmed_InvoiceAlreadyIssued_Conflict() {
+        payment.setPaymentStatus(PaymentStatus.SUCCESS);
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(registrationRepository.findByPaymentId(1L)).thenReturn(Optional.of(pendingRegistration()));
+        when(invoiceRepository.findByPaymentId(1L)).thenReturn(List.of(Invoice.builder().id(9L).build()));
+
+        assertThatThrownBy(() -> service.recordPaymentConfirmed(1L, receptionist, null))
+                .isInstanceOf(ConflictException.class)
+                .satisfies(ex -> assertThat(((ConflictException) ex).getCode()).isEqualTo("INVOICE_ALREADY_ISSUED"));
+        verify(invoiceRepository, never()).save(any());
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    @DisplayName("recordPaymentConfirmed refuses a payment that is not SUCCESS")
+    void recordPaymentConfirmed_NotSuccess_IllegalState() {
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+
+        assertThatThrownBy(() -> service.recordPaymentConfirmed(1L, receptionist, null))
+                .isInstanceOf(IllegalStateException.class);
+        verify(invoiceRepository, never()).save(any());
     }
 
     @Test

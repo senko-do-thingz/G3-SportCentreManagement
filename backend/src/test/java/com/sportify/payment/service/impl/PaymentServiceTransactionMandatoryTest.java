@@ -7,7 +7,6 @@ import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.payment.config.BankTransferProperties;
 import com.sportify.payment.entity.PaymentMethod;
-import com.sportify.payment.repository.InvoiceRepository;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.service.PaymentService;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,7 +57,7 @@ class PaymentServiceTransactionMandatoryTest {
                 mock(PaymentRepository.class),
                 mock(MemberCardRepository.class),
                 mock(SportPackageRegistrationRepository.class),
-                mock(InvoiceRepository.class),
+                mock(PaymentItemResolver.class),
                 mock(BankTransferProperties.class),
                 mock(CodeFormatter.class),
                 Clock.systemUTC()

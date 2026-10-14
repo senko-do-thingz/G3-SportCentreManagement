@@ -26,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -188,6 +189,34 @@ class PaymentVerificationControllerTest {
                         .content(CONFIRM_BODY))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("PAYMENT_NOT_PENDING"));
+    }
+
+    @Test
+    @DisplayName("AccessDeniedException thrown by the service answers 403")
+    void confirm_ServiceDenies_Returns403() throws Exception {
+        when(paymentVerificationService.confirmPayment(eq(1L), any(), any()))
+                .thenThrow(new AccessDeniedException("Only staff users can verify payments"));
+
+        mockMvc.perform(put("/api/v1/payments/1/confirm")
+                        .with(user(userWithRole("RECEPTIONIST")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CONFIRM_BODY))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("A concurrent update returns 409 with code PAYMENT_CONCURRENT_UPDATE")
+    void confirm_ConcurrentUpdate_Returns409WithCode() throws Exception {
+        when(paymentVerificationService.confirmPayment(eq(1L), any(), any()))
+                .thenThrow(new ConflictException("The payment was changed by another request. Reload it and try again.",
+                        "PAYMENT_CONCURRENT_UPDATE"));
+
+        mockMvc.perform(put("/api/v1/payments/1/confirm")
+                        .with(user(userWithRole("RECEPTIONIST")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CONFIRM_BODY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PAYMENT_CONCURRENT_UPDATE"));
     }
 
     @Test

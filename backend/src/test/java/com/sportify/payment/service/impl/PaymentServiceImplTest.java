@@ -77,7 +77,7 @@ class PaymentServiceImplTest {
                 paymentRepository,
                 memberCardRepository,
                 sportPackageRegistrationRepository,
-                invoiceRepository,
+                new PaymentItemResolver(memberCardRepository, sportPackageRegistrationRepository, invoiceRepository),
                 bankProperties,
                 codeFormatter,
                 clock
@@ -157,7 +157,7 @@ class PaymentServiceImplTest {
                 paymentRepository,
                 memberCardRepository,
                 sportPackageRegistrationRepository,
-                invoiceRepository,
+                new PaymentItemResolver(memberCardRepository, sportPackageRegistrationRepository, invoiceRepository),
                 bankProperties,
                 realFormatter,
                 clock

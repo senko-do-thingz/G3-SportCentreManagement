@@ -26,8 +26,11 @@ import com.sportify.identity.repository.UserRepository;
 import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.service.PaymentService;
+import com.sportify.payment.service.PaymentVerificationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -42,6 +45,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SportPackageServiceImpl implements SportPackageService {
 
+    /** Length of sport_package_registration.cancel_reason. */
+    private static final int CANCEL_REASON_MAX = 255;
+
     private final SportPackageRepository sportPackageRepository;
     private final SportPackageRegistrationRepository registrationRepository;
     private final SportRepository sportRepository;
@@ -51,6 +57,8 @@ public class SportPackageServiceImpl implements SportPackageService {
     private final PaymentService paymentService;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
+    /** Resolved on use: PaymentVerificationService itself depends on this service. */
+    private final ObjectProvider<PaymentVerificationService> paymentVerificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -209,6 +217,22 @@ public class SportPackageServiceImpl implements SportPackageService {
     @Override
     @Transactional
     public PackageRegistrationResponse activateRegistration(Long registrationId, UserAccount actor, PaymentMethod actualMethod) {
+        SportPackageRegistration registration = activatePending(registrationId, actor, actualMethod);
+        if (registration.getPayment() != null) {
+            // Same receipt as PUT /payments/{id}/confirm: one PAID invoice and one PAYMENT_CONFIRMED row.
+            paymentVerificationService.getObject().recordPaymentConfirmed(registration.getPayment().getId(), actor, null);
+        }
+        return mapToRegistrationResponse(registration);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public PackageRegistrationResponse activateRegistrationForPaymentConfirmation(Long registrationId, UserAccount actor,
+                                                                                  PaymentMethod actualMethod) {
+        return mapToRegistrationResponse(activatePending(registrationId, actor, actualMethod));
+    }
+
+    private SportPackageRegistration activatePending(Long registrationId, UserAccount actor, PaymentMethod actualMethod) {
         SportPackageRegistration registration = registrationRepository.findById(registrationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Package registration not found for id: " + registrationId));
 
@@ -231,12 +255,18 @@ public class SportPackageServiceImpl implements SportPackageService {
         if (registration.getPayment() != null) {
             paymentService.markPaymentSuccess(registration.getPayment().getId(), actor, actualMethod);
         }
-        return mapToRegistrationResponse(registration);
+        return registration;
     }
 
     @Override
     @Transactional
     public PackageRegistrationResponse cancelRegistration(Long registrationId, UserAccount actor) {
+        return cancelRegistration(registrationId, actor, null);
+    }
+
+    @Override
+    @Transactional
+    public PackageRegistrationResponse cancelRegistration(Long registrationId, UserAccount actor, String reason) {
         SportPackageRegistration registration = registrationRepository.findById(registrationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Package registration not found for id: " + registrationId));
 
@@ -251,7 +281,9 @@ public class SportPackageServiceImpl implements SportPackageService {
         }
 
         String actorDescription = isStaff ? "staff user id " + actor.getId() : "member user id " + actor.getId();
-        String cancelReason = "Cancelled by " + actorDescription;
+        String cancelReason = reason != null && !reason.isBlank()
+                ? truncate(reason.trim(), CANCEL_REASON_MAX)
+                : "Cancelled by " + actorDescription;
         registration.setStatus(PackageRegistrationStatus.CANCELLED);
         registration.setCancelledAt(LocalDateTime.now(clock));
         registration.setCancelReason(cancelReason);
@@ -331,5 +363,9 @@ public class SportPackageServiceImpl implements SportPackageService {
 
     static LocalDate packageEnd(LocalDate startDate, int durationDays) {
         return startDate.plusDays(durationDays - 1L);
+    }
+
+    private static String truncate(String value, int max) {
+        return value.length() <= max ? value : value.substring(0, max);
     }
 }

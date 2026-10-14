@@ -7,8 +7,8 @@
 - **Branch**: `feat/f3-confirm-payment`
 - **Priority**: P1 (core flow demo)
 - **Depends on**: BE-17 (pending payments, merged)
-- **Objective**: Let RECEPTIONIST and MANAGER list payment requests (PENDING first), confirm a payment when the amount received matches (payment SUCCESS, card or package ACTIVE with recomputed dates, one PAID invoice with its line, activity log), answer 409 PAYMENT_AMOUNT_MISMATCH without changing anything but a note, refuse a second confirmation with 409, and mark a payment FAILED with a reason.
-- **Environment Note**: Maven Central and the SQL Server image could not be downloaded in the environment that wrote this change, so nothing below was executed there. The unit and MockMvc tests run with `mvn test` on a developer machine; the Testcontainers tests need Docker and run in GitHub Actions CI. Update the Execution Status column after the first run.
+- **Objective**: Let RECEPTIONIST and MANAGER list payment requests (PENDING first), confirm a payment when the amount received matches (payment SUCCESS, card or package ACTIVE with recomputed dates, one PAID invoice with its line, activity log), answer 409 PAYMENT_AMOUNT_MISMATCH without changing anything but a note and a PAYMENT_AMOUNT_MISMATCH log, refuse a second confirm or fail with 409 PAYMENT_NOT_PENDING, and mark a payment FAILED with a reason. Review round 1: the FE-05 card and package activate endpoints issue the same receipt.
+- **Environment Note**: Maven Central and the SQL Server image could not be downloaded in the environment that wrote this change (initial commit and review round 1), so nothing below was executed there. The unit and MockMvc tests run with `mvn test` on a developer machine; the Testcontainers tests need Docker and run in GitHub Actions CI. Update the Execution Status column after the first run.
 
 ---
 
@@ -43,17 +43,22 @@ Aliases accepted: `paymentMethod` for `method`, `paymentReference` for `referenc
 | Payment not found | 404 | |
 | Amount differs | 409 | `code: PAYMENT_AMOUNT_MISMATCH` |
 | Payment not PENDING | 409 | `code: PAYMENT_NOT_PENDING` |
-| Concurrent confirmation lost the version check | 409 | `The resource was modified by another request. Please reload and try again.` |
-| MEMBER or COACH | 403 | |
+| A second confirm or fail at the same moment (row lock, then status check) | 409 | `code: PAYMENT_NOT_PENDING` |
+| Version check fails inside the call (backstop) | 409 | `code: PAYMENT_CONCURRENT_UPDATE` |
+| MEMBER or COACH (controller or service) | 403 | |
 | No token | 401 | |
 
 ### 1.3 PUT /api/v1/payments/{id}/fail (RECEPTIONIST, MANAGER)
 
-Body: `{"reason": "No transfer found"}` (required, up to 255 characters). The linked card or registration is cancelled, the payment becomes FAILED, the reason is appended to the notes. 409 `PAYMENT_NOT_PENDING` when the payment is not PENDING.
+Body: `{"reason": "No transfer found"}` (required, up to 255 characters). The linked card or registration is cancelled (for a registration the reason is stored in `cancel_reason`), the payment becomes FAILED, the reason is appended to the notes. Cancelling the item on fail is pending team confirmation. 409 `PAYMENT_NOT_PENDING` when the payment is not PENDING.
 
 ### 1.4 GET /api/v1/invoices/by-payment/{paymentId} (MEMBER owner, RECEPTIONIST, MANAGER)
 
 Answer: `id, invoiceNumber, status, issueDate, paymentId, paymentCode, paymentMethod, paymentReference, paymentTime, memberId, memberCode, memberFullName, subtotalAmount, discountAmount, taxAmount, totalAmount, lines[{id, itemType, itemReferenceId, description, quantity, unitPrice, lineTotal}]`. 404 when no invoice exists or the member does not own the payment.
+
+### 1.5 PUT /api/v1/membership-cards/{id}/activate and PUT /api/v1/packages/registrations/{id}/activate (FE-05)
+
+Request unchanged: `{"paymentMethod": "CASH"}` or no body. No reference is required and the amount received is the payment amount. After activation the same `PaymentVerificationService.recordPaymentConfirmed` as confirm issues one PAID invoice and writes one PAYMENT_CONFIRMED row, so `GET /api/v1/invoices/by-payment/{id}` answers 200 for counter payments too.
 
 ---
 
@@ -61,11 +66,14 @@ Answer: `id, invoiceNumber, status, issueDate, paymentId, paymentCode, paymentMe
 
 | Test Class | Category | Tests | Execution Status | Description |
 |---|---|---|---|---|
-| `PaymentVerificationServiceImplTest` | Service unit test (Mockito) | 13 | Not run yet | Invoice amounts and line, activation per item type, mismatch note, 409 codes, reference rule, fail cancels the item, list mapping and parameter checks, invoice visibility |
-| `PaymentVerificationControllerTest` | WebMvc MockMvc test | 15 (with parameterized cases) | Not run yet | Roles 200/403/401, JSON aliases, 409 body code, bean validation 400, list parameters and defaults |
-| `PaymentVerificationIntegrationTest` | Testcontainers integration test | 8 | Not run yet (CI only) | Real SQL Server: activation dates, invoice rows, committed mismatch note, double and concurrent confirmation, version check, fail, list order and search |
-| `PaymentServiceImplTest` (existing) | Service unit test | 38 | Regression | Note appending moved to `PaymentNotes`; the four appendNote tests must still pass unchanged |
-| `PaymentControllerTest`, `GlobalExceptionHandlerTest` (existing) | Regression | | Regression | 409 bodies now carry `code` only when the exception has one |
+| `PaymentVerificationServiceImplTest` | Service unit test (Mockito) | 18 | Not run yet | Row lock, invoice amounts and line, activation per item type without receipt duplication, mismatch note and log, 409 codes (NOT_PENDING, CONCURRENT_UPDATE, INVOICE_ALREADY_ISSUED), 403 for non-staff on confirm and fail, reason passed to cancelRegistration, list mapping, invoice visibility |
+| `PaymentPricingConsistencyTest` | Service unit test (Mockito) | 3 | Not run yet | `GET /payments/{id}` and `GET /payments` show the same item name, original price and discount (package, package with a paid amount different from the payment, card upgrade) |
+| `PaymentVerificationControllerTest` | WebMvc MockMvc test | 15 methods, 17 runs | Not run yet | Roles 200/403/401, service AccessDeniedException as 403, JSON aliases, 409 body codes, bean validation 400, list parameters and defaults |
+| `PaymentVerificationIntegrationTest` | Testcontainers integration test | 12 | Not run yet (CI only) | Real SQL Server: activation dates, invoice rows, committed mismatch note and log, double confirm, confirm vs confirm and confirm vs fail races, version check, fail reasons, FE-05 activate endpoints issue the receipt, list order and search |
+| `MembershipCardServiceImplTest` (existing, changed) | Service unit test | +1 new, 1 assertion added | Not run yet | activateCard calls recordPaymentConfirmed; activateCardForPaymentConfirmation does not |
+| `SportPackageServiceImplTest` (existing, changed) | Service unit test | +3 new, 1 assertion added | Not run yet | activateRegistration calls recordPaymentConfirmed; the confirmation variant does not; cancel reason stored or defaulted |
+| `PaymentServiceImplTest`, `PaymentServiceTransactionMandatoryTest` (existing) | Regression | 38 and 3 | Not run yet | Constructor now takes `PaymentItemResolver`; expected values unchanged |
+| `PaymentControllerTest`, `GlobalExceptionHandlerTest`, `MembershipCardControllerTest`, `RefreshedCatalogAuthorizationTest` (existing) | Regression | | Not run yet | 409 bodies carry `code` only when set; activate endpoints keep their contract |
 
 ---
 
@@ -75,48 +83,61 @@ Answer: `id, invoiceNumber, status, issueDate, paymentId, paymentCode, paymentMe
 
 | ID | Acceptance criterion | Steps | Expected | Covered by |
 |---|---|---|---|---|
-| TC-BE18-01 | Confirm with the right amount (package) | PENDING payment 380000 for a registration requested 3 days ago (original 400000, 5% discount); confirm BANK_TRANSFER, reference, 380000 | Payment SUCCESS, payment_time set, reference stored, confirmed_by_user_id = receptionist; registration ACTIVE, start = today, end = today + 29; one invoice PAID, subtotal 400000, discount 20000, tax 0, total 380000; one line SPORT_PACKAGE, reference id = registration id, unit price and line total 400000; one activity_log PAYMENT_CONFIRMED | Unit `confirm_ExactAmount_Registration_ActivatesAndIssuesInvoice`, IT `confirmRegistration_ExactAmount` |
-| TC-BE18-02 | Confirm with the right amount (card) | PENDING card request 1200000, no current card; confirm 1200000.00 | Card ACTIVE, start = today, end = today + 12 months - 1 day; invoice discount 0, total 1200000; line MEMBERSHIP_CARD | IT `confirmCard_ExactAmount` |
-| TC-BE18-03 | Card upgrade invoice | Upgrade request paying 1500000 for a 2000000 tier; confirm CASH 1500000 without reference | Line unit price 2000000, discount 500000 (upgrade credit), total 1500000, description ends with "upgrade, credit for the current card applied"; reference stays empty | Unit `confirm_ExactAmount_CardUpgrade_InvoiceShowsCredit` |
-| TC-BE18-04 | Wrong amount -> 409 PAYMENT_AMOUNT_MISMATCH, nothing else changes | Confirm 350000 for a 380000 payment | 409 with code PAYMENT_AMOUNT_MISMATCH; payment PENDING, payment_time null, reference null; notes end with "Amount mismatch: received 350000, expected 380000.00 ..." and the note; registration PENDING_PAYMENT; no invoice; no activity_log row; a later confirm with 380000 succeeds | Unit `confirm_AmountMismatch_KeepsPendingAndAppendsNote`, Controller `confirm_Mismatch_Returns409WithCode`, IT `confirm_AmountMismatch_CommitsNoteOnly` |
-| TC-BE18-05 | Confirming twice -> 409 | Confirm, then confirm the same payment again | Second call 409 code PAYMENT_NOT_PENDING; still one invoice | Unit `confirm_NotPending_Conflict`, Controller `confirm_NotPending_Returns409`, IT `confirm_Twice_Conflict` |
-| TC-BE18-06 | Two receptionists at the same time | Two threads confirm the same payment at once | Exactly one succeeds, the other gets 409 (status check or version check); one invoice | IT `concurrentConfirm_OnlyOneSucceeds` |
-| TC-BE18-07 | @Version optimistic lock | Load the payment, confirm it in another transaction, save the stale copy | ObjectOptimisticLockingFailureException (409 through the handler); one invoice | IT `staleVersion_IsRejected` |
-| TC-BE18-08 | Bank transfer without reference -> 400 | Confirm BANK_TRANSFER with blank reference | 400 "Reference code is required ..."; the payment is not read | Unit `confirm_BankTransferWithoutReference_BadRequest`, Controller `confirm_MissingReference_Returns400` |
-| TC-BE18-09 | MEMBER and COACH get 403 | Call list, confirm and fail as MEMBER, then as COACH | 403 for each call; service never called | Controller `nonStaff_Returns403` (MEMBER, COACH) |
-| TC-BE18-10 | Unit and Testcontainers tests pass | `mvn test` locally, CI for integration tests | All green | Section 2 |
+| TC-BE18-01 | Confirm with the right amount (package) | PENDING payment 380000 for a registration requested 3 days ago (original 400000, 5% discount); confirm BANK_TRANSFER, reference, 380000 | Payment SUCCESS, payment_time set, reference stored, confirmed_by_user_id = receptionist; registration ACTIVE, start = today, end = today + 29; one invoice PAID, subtotal 400000, discount 20000, tax 0, total 380000; one line SPORT_PACKAGE, unit price and line total 400000; one PAYMENT_CONFIRMED (no amountReceived in details) | Unit `confirm_ExactAmount_Registration_ActivatesAndIssuesInvoice`, IT `confirmRegistration_ExactAmount` |
+| TC-BE18-02 | Confirm with the right amount (card) | PENDING card request 1200000; confirm 1200000.00 | Card ACTIVE, start = today, end = today + 12 months - 1 day; invoice discount 0, total 1200000; line MEMBERSHIP_CARD | IT `confirmCard_ExactAmount` |
+| TC-BE18-03 | Card upgrade invoice | Upgrade request paying 1500000 for a 2000000 tier; confirm CASH 1500000 without reference | Line unit price 2000000, discount 500000, total 1500000, description ends with "upgrade, credit for the current card applied" | Unit `confirm_ExactAmount_CardUpgrade_InvoiceShowsCredit` |
+| TC-BE18-04 | Wrong amount -> 409 PAYMENT_AMOUNT_MISMATCH, nothing else changes | Confirm 350000 for a 380000 payment | 409 PAYMENT_AMOUNT_MISMATCH; payment PENDING, payment_time, reference and confirmed_by null; note appended; registration PENDING_PAYMENT with the same dates, activated_at null; no invoice; exactly one PAYMENT_AMOUNT_MISMATCH row (amount, amountReceived, method, referenceCode, note); no PAYMENT_CONFIRMED; a later confirm with 380000 succeeds | Unit `confirm_AmountMismatch_KeepsPendingAndRecordsTrace`, Controller `confirm_Mismatch_Returns409WithCode`, IT `confirm_AmountMismatch_CommitsNoteOnly` |
+| TC-BE18-05 | Confirming twice -> 409 | Confirm, then confirm again | 409 PAYMENT_NOT_PENDING; one invoice | Unit `confirm_NotPending_Conflict`, Controller `confirm_NotPending_Returns409`, IT `confirm_Twice_Conflict` |
+| TC-BE18-06 | Two receptionists confirm at once | Two threads confirm the same payment | One succeeds; the other gets ConflictException PAYMENT_NOT_PENDING (no other exception accepted); one invoice | IT `concurrentConfirm_OnlyOneSucceeds` |
+| TC-BE18-07 | Confirm and fail at once | One thread confirms, one fails the same card payment | One succeeds, the other gets ConflictException PAYMENT_NOT_PENDING; the data matches the winner (SUCCESS, ACTIVE, one invoice) or (FAILED, CANCELLED, no invoice) | IT `concurrentConfirmAndFail_OnlyOneSucceeds` |
+| TC-BE18-08 | @Version backstop | Stale copy saved after another confirmation; flush failure inside the service | ObjectOptimisticLockingFailureException for the stale save; inside the service 409 PAYMENT_CONCURRENT_UPDATE | IT `staleVersion_IsRejected`, Unit `fail_OptimisticLockOnFlush_ConcurrentUpdateCode`, Controller `confirm_ConcurrentUpdate_Returns409WithCode` |
+| TC-BE18-09 | Bank transfer without reference -> 400 | Confirm BANK_TRANSFER with blank reference | 400; the payment is not read | Unit `confirm_BankTransferWithoutReference_BadRequest`, Controller `confirm_MissingReference_Returns400` |
+| TC-BE18-10 | MEMBER and COACH get 403 | List, confirm, fail as MEMBER and as COACH; member actor reaching the service | 403; service refuses with AccessDeniedException | Controller `nonStaff_Returns403`, `confirm_ServiceDenies_Returns403`; Unit `confirm_MemberActor_Refused`, `fail_MemberActor_Refused` |
+| TC-BE18-11 | Unit and Testcontainers tests pass | `mvn -B test` locally, CI for integration tests | All green, no skipped tests | Section 2 |
 
-### 3.2 Validation and edge cases
-
-| ID | Case | Expected | Covered by |
-|---|---|---|---|
-| TC-BE18-11 | CASH without reference | Passes the reference rule | Unit `confirm_CashWithoutReference_PassesReferenceCheck` |
-| TC-BE18-12 | Missing method, amountReceived 0 | 400 Validation Error with `details.method` and `details.amountReceived` | Controller `confirm_InvalidBody_Returns400` |
-| TC-BE18-13 | FE-12 field names `paymentMethod`, `paymentReference` | Accepted, bound to method and referenceCode | Controller `confirm_AcceptsAliasFieldNames` |
-| TC-BE18-14 | Payment linked to nothing | 400, payment stays PENDING | Unit `confirm_NoLinkedItem_BadRequest` |
-| TC-BE18-15 | Member actor reaching the service | Refused before any read | Unit `confirm_MemberActor_Refused` |
-| TC-BE18-16 | Without token | 401 | Controller `confirm_Anonymous_Returns401` |
-| TC-BE18-17 | Response field `paymentReference` | Same value as `referenceCode` | Controller `confirm_AsStaff_Returns200` |
-
-### 3.3 Fail
+### 3.2 One confirmation path (review round 1)
 
 | ID | Case | Expected | Covered by |
 |---|---|---|---|
-| TC-BE18-18 | Fail a pending card payment | Card CANCELLED, payment FAILED, notes end with "Payment failed, checked by user id N: No transfer found", activity_log PAYMENT_FAILED with the reason | Unit `fail_PendingCard_CancelsCardAndRecordsReason`, IT `failCard_CancelsRequest` |
-| TC-BE18-19 | Fail a payment that is not PENDING | 409 PAYMENT_NOT_PENDING, nothing cancelled | Unit `fail_NotPending_Conflict` |
-| TC-BE18-20 | Blank reason | 400 with `details.reason` | Controller `fail_BlankReason_Returns400` |
-| TC-BE18-21 | Fail as receptionist | 200 with status FAILED | Controller `fail_AsStaff_Returns200` |
+| TC-BE18-12 | FE-05 card activate endpoint | `PUT /membership-cards/{id}/activate` with `{"paymentMethod":"CASH"}` -> 200 ACTIVE; payment SUCCESS by CASH; one PAID invoice with one MEMBERSHIP_CARD line; one PAYMENT_CONFIRMED | IT `activateCardEndpoint_IssuesReceipt`, Unit `activateCard_WithPendingPayment_CallsMarkPaymentSuccess` |
+| TC-BE18-13 | FE-05 package activate endpoint | Same for `PUT /packages/registrations/{id}/activate`; `GET /invoices/by-payment/{id}` -> 200 with one line | IT `activateRegistrationEndpoint_IssuesReceipt`, Unit `activateRegistration_WithPendingPayment_CallsMarkPaymentSuccess` |
+| TC-BE18-14 | Confirm does not issue the receipt twice | Activation variant used by confirm does not call recordPaymentConfirmed | Unit `activateCardForPaymentConfirmation_ActivatesWithoutIssuingTheReceipt`, `activateRegistrationForPaymentConfirmation_ActivatesWithoutIssuingTheReceipt` |
+| TC-BE18-15 | Second invoice refused | recordPaymentConfirmed with an invoice already present | 409 INVOICE_ALREADY_ISSUED, nothing saved | Unit `recordPaymentConfirmed_InvoiceAlreadyIssued_Conflict` |
+| TC-BE18-16 | Receipt only for SUCCESS | recordPaymentConfirmed on a PENDING payment | IllegalStateException | Unit `recordPaymentConfirmed_NotSuccess_IllegalState` |
 
-### 3.4 List and receipt
+### 3.3 Validation and edge cases
 
 | ID | Case | Expected | Covered by |
 |---|---|---|---|
-| TC-BE18-22 | PENDING first | No PENDING row after the first non-PENDING row | IT `list_PendingFirst` |
-| TC-BE18-23 | Search by member code with status and dates | Finds the member's PENDING payment with member name and item type | IT `list_PendingFirst`, Controller `list_PassesFilters` |
-| TC-BE18-24 | Row mapping | Member name and code, item type, code and name, original price 400000, discount 20000, no invoice yet | Unit `list_MapsRows` |
-| TC-BE18-25 | Defaults | page 0, size 20 | Controller `list_Defaults` |
-| TC-BE18-26 | Size 101, from after to, unknown status | 400 | Unit `list_InvalidParameters_BadRequest`, Controller `list_UnknownStatus_Returns400` |
-| TC-BE18-27 | Invoice by payment | Staff read it with its line; another member gets 404 | Unit `invoiceByPayment_Visibility` |
+| TC-BE18-17 | CASH without reference | Passes the reference rule | Unit `confirm_CashWithoutReference_PassesReferenceCheck` |
+| TC-BE18-18 | Missing method, amountReceived 0 | 400 with `details.method` and `details.amountReceived` | Controller `confirm_InvalidBody_Returns400` |
+| TC-BE18-19 | FE-12 field names | `paymentMethod`, `paymentReference` accepted | Controller `confirm_AcceptsAliasFieldNames` |
+| TC-BE18-20 | Payment linked to nothing | 400, payment stays PENDING | Unit `confirm_NoLinkedItem_BadRequest` |
+| TC-BE18-21 | Without token | 401 | Controller `confirm_Anonymous_Returns401` |
+| TC-BE18-22 | Response field `paymentReference` | Same value as `referenceCode` | Controller `confirm_AsStaff_Returns200` |
+
+### 3.4 Fail
+
+| ID | Case | Expected | Covered by |
+|---|---|---|---|
+| TC-BE18-23 | Fail a pending card payment | Card CANCELLED, payment FAILED, notes end with the reason, PAYMENT_FAILED log | Unit `fail_PendingCard_CancelsCardAndRecordsReason`, IT `failCard_CancelsRequest` |
+| TC-BE18-24 | Fail a pending registration payment | Reason stored in `cancel_reason`, registration CANCELLED, payment FAILED | Unit `fail_PendingRegistration_PassesReasonToCancel`, `cancelRegistration_WithReason_StoresTheReasonAsCancelReason`, IT `failRegistration_StoresReason` |
+| TC-BE18-25 | Old cancel signature | Blank or no reason keeps "Cancelled by staff user id N" | Unit `cancelRegistration_WithBlankReason_KeepsTheDefaultReason`, existing cancel tests |
+| TC-BE18-26 | Fail a payment that is not PENDING | 409 PAYMENT_NOT_PENDING, nothing cancelled | Unit `fail_NotPending_Conflict` |
+| TC-BE18-27 | Blank reason | 400 with `details.reason` | Controller `fail_BlankReason_Returns400` |
+| TC-BE18-28 | Fail as receptionist | 200 FAILED | Controller `fail_AsStaff_Returns200` |
+
+### 3.5 List, pricing and receipt
+
+| ID | Case | Expected | Covered by |
+|---|---|---|---|
+| TC-BE18-29 | PENDING first | No PENDING row after the first non-PENDING row | IT `list_PendingFirst` |
+| TC-BE18-30 | Search by member code with status and dates | Finds the member's PENDING payment with name and item type | IT `list_PendingFirst`, Controller `list_PassesFilters` |
+| TC-BE18-31 | Row mapping | Name, code, item, original price 400000, discount 20000 | Unit `list_MapsRows` |
+| TC-BE18-32 | Same pricing on both screens | `GET /payments/{id}` and `GET /payments` agree on name, original price and discount | `PaymentPricingConsistencyTest` (3 tests) |
+| TC-BE18-33 | Defaults | page 0, size 20 | Controller `list_Defaults` |
+| TC-BE18-34 | Size 101, from after to, unknown status | 400 | Unit `list_InvalidParameters_BadRequest`, Controller `list_UnknownStatus_Returns400` |
+| TC-BE18-35 | Invoice by payment | Staff read it; another member 404 | Unit `invoiceByPayment_Visibility` |
 
 ---
 
@@ -124,18 +145,18 @@ Answer: `id, invoiceNumber, status, issueDate, paymentId, paymentCode, paymentMe
 
 1. Log in as a member, request a package online (`POST /api/v1/packages/registrations`), note the `paymentId`.
 2. Log in as receptionist, `GET /api/v1/payments?status=PENDING` -> the request is on top with member name and item code.
-3. `PUT /api/v1/payments/{id}/confirm` with an amount 10000 lower -> 409 `PAYMENT_AMOUNT_MISMATCH`; `GET /api/v1/payments/{id}` -> still PENDING, notes show the mismatch.
-4. Confirm again with the right amount and a reference -> 200, `invoiceNumber` set; the member's package is ACTIVE.
-5. `GET /api/v1/invoices/by-payment/{id}` -> subtotal, discount and total add up; one line.
+3. `PUT /api/v1/payments/{id}/confirm` with an amount 10000 lower -> 409 `PAYMENT_AMOUNT_MISMATCH`; the payment is still PENDING, its notes show the mismatch and `activity_log` has one PAYMENT_AMOUNT_MISMATCH row.
+4. Confirm again with the right amount and a reference -> 200, `invoiceNumber` set; the package is ACTIVE.
+5. `GET /api/v1/invoices/by-payment/{id}` -> subtotal - discount = total; one line.
 6. Confirm again -> 409 `PAYMENT_NOT_PENDING`.
-7. `activity_log` has one PAYMENT_CONFIRMED row for the payment code.
+7. Request a card online, then activate it from the FE-05 counter screen (`PUT /membership-cards/{id}/activate`) -> `GET /api/v1/invoices/by-payment/{paymentId}` answers 200.
 
 ## 5. How to Run
 
 ```powershell
 cd backend
-mvn -B "-Dtest=PaymentVerification*Test,PaymentServiceImplTest,PaymentControllerTest,GlobalExceptionHandlerTest" test
+mvn -B "-Dtest=PaymentVerification*Test,PaymentPricingConsistencyTest,PaymentServiceImplTest,PaymentServiceTransactionMandatoryTest,PaymentControllerTest,MembershipCardServiceImplTest,SportPackageServiceImplTest,MembershipCardControllerTest,RefreshedCatalogAuthorizationTest,GlobalExceptionHandlerTest" test
 mvn -B test
 ```
 
-The integration tests skip themselves without Docker (`@Testcontainers(disabledWithoutDocker = true)`); CI runs them.
+Without Docker the Testcontainers classes are skipped locally (`@Testcontainers(disabledWithoutDocker = true)`), so a local run shows skipped tests. CI has Docker, runs them, and `scripts/ci/check-no-skipped-tests.sh` fails the build if any test is skipped there.
