@@ -2,6 +2,7 @@ package com.sportify.payment.repository;
 
 import com.sportify.payment.dto.finance.FinanceTransactionResponse;
 import com.sportify.payment.dto.finance.RevenueGroupBy;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -15,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Consumer;
 
 /**
  * Read-only SQL for the manager finance reports (BE-22). Every revenue figure comes from the view vw_paid_payment
@@ -72,17 +74,28 @@ public class FinanceReportRepository {
     }
 
     /**
-     * COMPLETED refund requests in the range. refund_request has no completed_at column, so the time of the last
-     * change (updated_at, which completion sets) is used, falling back to reviewed_at and created_at.
+     * COMPLETED refund requests whose completion time falls in the range. refund_request has no completed_at column.
+     * The completion time is the REFUND_COMPLETED activity_log row, written once in the same transaction that sets
+     * the refund to COMPLETED (BE-21) and never changed afterwards. A refund without that row (legacy or seeded data)
+     * falls back to updated_at (set by the completing save), then reviewed_at, then created_at. updated_at alone is
+     * not trusted: any later change to the row would move the refund into another month.
      * The amount is what was approved, or what was requested when nothing was approved.
      */
     public Totals refundedTotals(LocalDateTime from, LocalDateTime toExclusive) {
         return totals("""
-                SELECT COALESCE(SUM(COALESCE(amount_approved, amount_requested)), 0) AS total, COUNT(*) AS cnt
-                FROM refund_request
-                WHERE status = 'COMPLETED'
-                  AND COALESCE(updated_at, reviewed_at, created_at) >= :from
-                  AND COALESCE(updated_at, reviewed_at, created_at) < :to
+                SELECT COALESCE(SUM(COALESCE(rr.amount_approved, rr.amount_requested)), 0) AS total, COUNT(*) AS cnt
+                FROM refund_request rr
+                OUTER APPLY (
+                    SELECT MIN(al.created_at) AS logged_at
+                    FROM activity_log al
+                    WHERE al.entity_type = 'REFUND_REQUEST' AND al.entity_id = rr.id AND al.action = 'REFUND_COMPLETED'
+                ) done
+                CROSS APPLY (
+                    SELECT COALESCE(done.logged_at, rr.updated_at, rr.reviewed_at, rr.created_at) AS completed_at
+                ) t
+                WHERE rr.status = 'COMPLETED'
+                  AND t.completed_at >= :from
+                  AND t.completed_at < :to
                 """, from, toExclusive);
     }
 
@@ -146,19 +159,22 @@ public class FinanceReportRepository {
         return jdbc.query(sql, params, LEDGER_ROW);
     }
 
-    /** Paid payments of the range, oldest first, for the CSV export. */
-    public List<ExportRow> paidRows(LocalDateTime from, LocalDateTime toExclusive) {
-        return jdbc.query("""
+    /**
+     * Streams the paid payments of the range, oldest first, to the consumer one row at a time (CSV export).
+     * Rows are not collected into a list, so the export holds only the CSV bytes in memory.
+     */
+    public void forEachPaidRow(LocalDateTime from, LocalDateTime toExclusive, Consumer<ExportRow> consumer) {
+        jdbc.query("""
                 SELECT payment_code, payment_time, invoice_number, member_code, member_name,
                        item_type, item_code, item_name, sport_name, payment_method, amount
                 FROM vw_paid_payment
                 WHERE payment_time >= :from AND payment_time < :to
                 ORDER BY payment_time, payment_id
-                """, range(from, toExclusive), (rs, i) -> new ExportRow(
+                """, range(from, toExclusive), (RowCallbackHandler) rs -> consumer.accept(new ExportRow(
                 rs.getString("payment_code"), toLocalDateTime(rs.getTimestamp("payment_time")),
                 rs.getString("invoice_number"), rs.getString("member_code"), rs.getString("member_name"),
                 rs.getString("item_type"), rs.getString("item_code"), rs.getString("item_name"),
-                rs.getString("sport_name"), rs.getString("payment_method"), rs.getBigDecimal("amount")));
+                rs.getString("sport_name"), rs.getString("payment_method"), rs.getBigDecimal("amount"))));
     }
 
     private Totals totals(String sql, LocalDateTime from, LocalDateTime toExclusive) {

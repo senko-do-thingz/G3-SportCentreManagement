@@ -72,6 +72,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * P4 PENDING 700000  BANK_TRANSFER package (sport A)   requested 2001-03-15
  * P5 FAILED  250000  CASH                              requested 2001-03-16
  * P7 REFUNDED 400000 VNPAY                             paid 2001-03-12, refund 200000 completed 2001-03-25
+ *                                                      (REFUND_COMPLETED log 2001-03-25; updated_at changed later to
+ *                                                      2001-04-02, so the log time must win)
+ * P9 REFUNDED 150000 VNPAY   package (sport A)         paid 2001-02-20, legacy refund 50000 without a log row,
+ *                                                      updated_at 2001-03-28 (fallback)
  * P6 SUCCESS 100000  CASH (February)                   paid 2001-02-14
  * P8 SUCCESS 999000  CASH (April, boundary)            paid 2001-04-01 00:00:00
  */
@@ -290,6 +294,9 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
             Payment p7 = payment("P7", bich, "400000.00", PaymentMethod.VNPAY, PaymentStatus.REFUNDED,
                     LocalDateTime.of(2001, 3, 12, 8, 0));
             SportPackageRegistration refundedReg = registration(bich, pkgB, p7, PackageRegistrationStatus.REFUNDED);
+            Payment p9 = payment("P9", anh, "150000.00", PaymentMethod.VNPAY, PaymentStatus.REFUNDED,
+                    LocalDateTime.of(2001, 2, 20, 10, 0));
+            SportPackageRegistration legacyRefundedReg = registration(anh, pkgA, p9, PackageRegistrationStatus.REFUNDED);
             payment("P6", anh, "100000.00", PaymentMethod.CASH, PaymentStatus.SUCCESS, LocalDateTime.of(2001, 2, 14, 12, 0));
             payment("P8", anh, "999000.00", PaymentMethod.CASH, PaymentStatus.SUCCESS, LocalDateTime.of(2001, 4, 1, 0, 0));
 
@@ -299,7 +306,24 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
                     VALUES (?, ?, ?, ?, 400000.00, 200000.00, N'Chuy\u1ec3n nh\u00e0', 'COMPLETED', ?, ?, ?)
                     """, "RF-" + codePrefix.substring(3), p7.getId(), refundedReg.getId(), bich.getId(),
                     bich.getId(), Timestamp.valueOf(LocalDateTime.of(2001, 3, 13, 9, 0)),
+                    Timestamp.valueOf(LocalDateTime.of(2001, 4, 2, 9, 0)));
+            // P7 was completed on 2001-03-25 (REFUND_COMPLETED log, as BE-21 writes it); updated_at above stands for a
+            // later change to the row, which must not move the refund into April.
+            Long p7RefundId = jdbc.queryForObject("SELECT id FROM refund_request WHERE refund_code = ?", Long.class,
+                    "RF-" + codePrefix.substring(3));
+            jdbc.update("""
+                    INSERT INTO activity_log (actor_user_id, action, entity_type, entity_id, entity_code, summary, created_at)
+                    VALUES (?, 'REFUND_COMPLETED', 'REFUND_REQUEST', ?, ?, N'Refund completed', ?)
+                    """, manager.getId(), p7RefundId, "RF-" + codePrefix.substring(3),
                     Timestamp.valueOf(LocalDateTime.of(2001, 3, 25, 9, 0)));
+            // P9: legacy COMPLETED refund without a log row; its updated_at (2001-03-28) is the completion time.
+            jdbc.update("""
+                    INSERT INTO refund_request (refund_code, payment_id, package_registration_id, member_id, amount_requested,
+                        amount_approved, reason, status, requested_by, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, 150000.00, 50000.00, N'Legacy refund', 'COMPLETED', ?, ?, ?)
+                    """, "RL-" + codePrefix.substring(3), p9.getId(), legacyRefundedReg.getId(), anh.getId(),
+                    anh.getId(), Timestamp.valueOf(LocalDateTime.of(2001, 2, 21, 9, 0)),
+                    Timestamp.valueOf(LocalDateTime.of(2001, 3, 28, 9, 0)));
 
             invoiceNumber = "INV-" + codePrefix.substring(3);
             jdbc.update("""
@@ -317,6 +341,7 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
         setCreatedAt("P3", LocalDateTime.of(2001, 3, 20, 17, 0));
         setCreatedAt("P7", LocalDateTime.of(2001, 3, 12, 7, 0));
         setCreatedAt("P6", LocalDateTime.of(2001, 2, 14, 11, 0));
+        setCreatedAt("P9", LocalDateTime.of(2001, 2, 20, 9, 0));
         setCreatedAt("P8", LocalDateTime.of(2001, 3, 31, 23, 0));
     }
 
@@ -341,8 +366,9 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
         assertThat(dec(o, "averagePayment")).isEqualByComparingTo("666666.67");
         assertThat(dec(o, "pendingAmount")).isEqualByComparingTo("700000");
         assertThat(o.get("pendingTransactions").asLong()).isEqualTo(1);
-        assertThat(dec(o, "refundedAmount")).isEqualByComparingTo("200000");
-        assertThat(o.get("refundedTransactions").asLong()).isEqualTo(1);
+        // P7 (log time 2001-03-25, updated_at later moved to April) and P9 (legacy, updated_at 2001-03-28).
+        assertThat(dec(o, "refundedAmount")).isEqualByComparingTo("250000");
+        assertThat(o.get("refundedTransactions").asLong()).isEqualTo(2);
         assertThat(o.get("previousMonth").asText()).isEqualTo("2001-02");
         assertThat(dec(o, "previousPaidRevenue")).isEqualByComparingTo("100000");
         assertThat(o.get("previousPaidTransactions").asLong()).isEqualTo(1);
@@ -352,6 +378,12 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
         JsonNode april = getJson("/api/v1/manager/finance/overview?month=2001-04");
         assertThat(dec(april, "paidRevenue")).isEqualByComparingTo("999000");
         assertThat(dec(april, "averagePayment")).isEqualByComparingTo("999000");
+        assertThat(dec(april, "refundedAmount")).isEqualByComparingTo("0");
+        assertThat(april.get("refundedTransactions").asLong()).isZero();
+
+        JsonNode february = getJson("/api/v1/manager/finance/overview?month=2001-02");
+        assertThat(dec(february, "paidRevenue")).isEqualByComparingTo("100000");
+        assertThat(dec(february, "refundedAmount")).isEqualByComparingTo("0");
     }
 
     @Test
@@ -414,19 +446,19 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
         String base = "/api/v1/manager/finance/transactions?from=2001-02-01&to=2001-04-30&search=" + codePrefix;
 
         JsonNode all = getJson(base + "&size=100");
-        assertThat(all.get("totalElements").asLong()).isEqualTo(8);
+        assertThat(all.get("totalElements").asLong()).isEqualTo(9);
         List<Long> order = new ArrayList<>();
         all.get("content").forEach(r -> order.add(r.get("id").asLong()));
         assertThat(order).containsExactly(payments.get("P8"), payments.get("P3"), payments.get("P5"), payments.get("P4"),
-                payments.get("P7"), payments.get("P2"), payments.get("P1"), payments.get("P6"));
+                payments.get("P7"), payments.get("P2"), payments.get("P1"), payments.get("P9"), payments.get("P6"));
 
         assertThat(getJson(base + "&status=PENDING").get("totalElements").asLong()).isEqualTo(1);
         assertThat(getJson(base + "&status=FAILED").get("totalElements").asLong()).isEqualTo(1);
-        assertThat(getJson(base + "&status=REFUNDED").get("totalElements").asLong()).isEqualTo(1);
+        assertThat(getJson(base + "&status=REFUNDED").get("totalElements").asLong()).isEqualTo(2);
         JsonNode cards = getJson(base + "&type=MEMBERSHIP_CARD");
         assertThat(cards.get("totalElements").asLong()).isEqualTo(1);
         assertThat(cards.get("content").get(0).get("id").asLong()).isEqualTo(payments.get("P3"));
-        assertThat(getJson(base + "&type=SPORT_PACKAGE").get("totalElements").asLong()).isEqualTo(4);
+        assertThat(getJson(base + "&type=SPORT_PACKAGE").get("totalElements").asLong()).isEqualTo(5);
         assertThat(getJson(base + "&method=CASH").get("totalElements").asLong()).isEqualTo(4);
 
         JsonNode p1 = getJson("/api/v1/manager/finance/transactions?search=" + invoiceNumber).get("content").get(0);
@@ -462,9 +494,52 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
                 .contains(sportAName).contains("BANK_TRANSFER").endsWith(",300000");
         assertThat(lines.get(2)).contains("\"Tr\u1ea7n Th\u1ecb B\u00edch, \"\"VIP\"\"\"").endsWith(",500000");
         assertThat(lines.get(3)).contains("MEMBERSHIP_CARD").contains("MOMO").endsWith(",1200000");
-        // The PENDING (P4), FAILED (P5) and REFUNDED (P7) payments and the April payment (P8) are not exported.
+        // The PENDING (P4), FAILED (P5) and REFUNDED (P7, P9) payments and the April payment (P8) are not exported.
         assertThat(lines.stream().noneMatch(l -> l.endsWith(",700000") || l.endsWith(",250000")
-                || l.endsWith(",400000") || l.endsWith(",999000"))).isTrue();
+                || l.endsWith(",400000") || l.endsWith(",150000") || l.endsWith(",999000"))).isTrue();
+    }
+
+    @Test
+    @DisplayName("Supported dates: 9999-12-30 reaches SQL Server DATETIME2 and inclusive bounds hold; later or earlier dates are 400, not 500")
+    void dateBoundaries() throws Exception {
+        String ledger = "/api/v1/manager/finance/transactions?search=" + codePrefix;
+
+        // The last supported date: its exclusive bound 9999-12-31 00:00 is a valid DATETIME2 value.
+        assertThat(getJson(ledger + "&from=1900-01-01&to=9999-12-30").get("totalElements").asLong()).isEqualTo(9);
+        JsonNode farRevenue = getJson("/api/v1/manager/finance/revenue?from=9999-01-01&to=9999-12-30&groupBy=METHOD");
+        assertThat(dec(farRevenue, "totalRevenue")).isEqualByComparingTo("0");
+        assertThat(farRevenue.get("rows").size()).isZero();
+        MvcResult farExport = mockMvc.perform(get("/api/v1/manager/finance/revenue/export?from=9999-12-30&to=9999-12-30")
+                        .with(user(new CustomUserDetails(manager))))
+                .andExpect(status().isOk()).andReturn();
+        byte[] farBody = farExport.getResponse().getContentAsByteArray();
+        assertThat(new String(farBody, 3, farBody.length - 3, StandardCharsets.UTF_8))
+                .isEqualTo("Payment code,Paid at,Invoice number,Member code,Member name,Item type,Item code,Item,Sport,Method,Amount\r\n");
+        assertThat(dec(getJson("/api/v1/manager/finance/overview?month=9999-11"), "paidRevenue")).isEqualByComparingTo("0");
+
+        // Inclusive dates on SQL Server: P8 paid exactly 2001-04-01 00:00 belongs to to=2001-04-01, not to to=2001-03-31.
+        JsonNode aprilFirst = getJson(ledger + "&from=2001-04-01&to=2001-04-01");
+        assertThat(aprilFirst.get("totalElements").asLong()).isEqualTo(1);
+        assertThat(aprilFirst.get("content").get(0).get("id").asLong()).isEqualTo(payments.get("P8"));
+        assertThat(getJson(ledger + "&from=2001-03-31&to=2001-03-31").get("totalElements").asLong()).isZero();
+
+        // Unsupported dates: 400 with the range message, never 500.
+        for (String url : List.of(
+                ledger + "&to=9999-12-31",
+                ledger + "&to=%2B10000-01-01",
+                ledger + "&to=%2B999999999-12-31",
+                ledger + "&from=1899-12-31",
+                "/api/v1/manager/finance/revenue?from=9999-12-31&to=9999-12-31",
+                "/api/v1/manager/finance/revenue?to=%2B999999999-12-31",
+                "/api/v1/manager/finance/revenue/export?from=9999-12-31&to=9999-12-31",
+                "/api/v1/manager/finance/revenue/export?from=%2B999999999-12-31&to=%2B999999999-12-31",
+                "/api/v1/manager/finance/overview?month=9999-12",
+                "/api/v1/manager/finance/overview?month=1899-12")) {
+            MvcResult result = mockMvc.perform(get(java.net.URI.create(url)).with(user(new CustomUserDetails(manager))))
+                    .andExpect(status().isBadRequest()).andReturn();
+            assertThat(result.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                    .as(url).containsPattern("between (1900-01-01 and 9999-12-30|1900-01 and 9999-11)");
+        }
     }
 
     @Test

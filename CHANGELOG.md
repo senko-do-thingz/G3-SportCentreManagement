@@ -2,7 +2,7 @@
 
 ## 2026-10-15 - Financial overview, transactions and revenue reports (BE-22, Flow 3)
 
-Branch `feat/f3-revenue-reports`, based on `feat/f3-confirm-payment` (BE-18). Owner: Truc. Priority: P2. Depends on BE-18. Screens F3-08, F3-09, F3-10 and S3-Export.
+Branch `feat/f3-revenue-reports`, based on `feat/f3-confirm-payment` (BE-18 to BE-21). Owner: Truc. Priority: P2. Depends on BE-18. Screens F3-08, F3-09, F3-10 and S3-Export.
 
 ### Added
 - Migration `V25__create_finance_report_views.sql`: views `vw_payment_ledger` (every payment with member, invoice, item and sport) and `vw_paid_payment` (SUCCESS only, the revenue source), index `ix_payment_status_time`. V23 and V24 are taken by `feat/f2-sessions-schedule` and `feat/f3-refund-payment-link`.
@@ -25,6 +25,15 @@ Branch `feat/f3-revenue-reports`, based on `feat/f3-confirm-payment` (BE-18). Ow
 
 ### CI fix 1
 - "Project conventions and workflow lint" failed: `scripts/ci/check-conventions.sh` rejects accented characters in added Java lines, and the tests held Vietnamese names as plain text. The Vietnamese test data in `FinanceReportIntegrationTest`, `FinanceReportServiceImplTest` and `ManagerFinanceControllerTest` is now written with Unicode escapes; the values and the assertions are unchanged. No production code changed.
+
+### Review round 1
+- Merged the updated `feat/f3-confirm-payment` (BE-18 round 4, BE-19, BE-20, BE-21) into this branch, so the PR no longer shows their files as deleted. Conflicts in `CHANGELOG.md` and `docs/database/04` resolved by keeping both sides.
+- P1-01: every date parameter and the overview month must lie between 1900-01-01 and 9999-12-30 (month 1900-01 to 9999-11), otherwise 400. Before, 9999-12-31 built the bound 10000-01-01 (rejected by DATETIME2) and `LocalDate.MAX.plusDays(1)` threw; both ended as 500. Inclusive date filtering and response bodies are unchanged.
+- P2-01: `docs/database/04` keeps the `refund_request` table and the BE-21 refund rules; BE-22 only adds its view and endpoint text.
+- P2-02: the CSV export is bounded to 50,000 payments (400 above, checked with a count before any row is read) and rows are written one at a time from the result set (`FinanceReportRepository.forEachPaidRow`) instead of a row list plus a full CSV string. Measured: 50,000 rows hold about 21 MB instead of 64 MB.
+- P2-03: refunded amounts are dated by the `REFUND_COMPLETED` activity log row (written once with the completion), falling back to `updated_at`, `reviewed_at`, `created_at`. No refund lifecycle code changed.
+- Tests: `FinanceReportServiceImplTest` 26 methods (42 runs), `ManagerFinanceControllerTest` 13 (22 runs), `FinanceReportIntegrationTest` 7 (new date boundary test, refund timing data P7 and P9); the integration suite is listed in `scripts/ci/required-integration-tests.txt`.
+- Not executed with Maven in the authoring environment (Maven Central and Docker blocked); the production classes were compiled with plain javac against stubs and checked by a 39-check harness, all passed. Run `mvn -B test` locally and let CI run the integration tests before merging.
 ## 2026-10-15 - Refunds linked to payments (BE-21, Flow 3)
 
 Branch `feat/f3-refund-payment-link`, based on `feat/f3-confirm-payment` (BE-18). Owner: Truc. Priority: P2. Depends on BE-18. Screens F3-07, F3-09 (refund part), S3-RefundSubmitted, S3-RefundReview, S3-RefundApproved, S3-RefundRejected, S3-RefundDone.

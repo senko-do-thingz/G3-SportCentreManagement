@@ -49,6 +49,10 @@ public class FinanceReportServiceImpl implements FinanceReportService {
     private static final DateTimeFormatter CSV_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
     private static final BigDecimal CENT = new BigDecimal("0.01");
+    /** Typical CSV line length in bytes, used only to size the export buffer. */
+    private static final long CSV_ROW_ESTIMATE = 200;
+    /** Upper bound of the initial export buffer (the buffer still grows if the rows are longer). */
+    private static final long EXPORT_BUFFER_CAP = 16L * 1024 * 1024;
 
     private final FinanceReportRepository repository;
     private final Clock clock;
@@ -57,6 +61,10 @@ public class FinanceReportServiceImpl implements FinanceReportService {
     @Transactional(readOnly = true)
     public FinanceOverviewResponse overview(String month) {
         YearMonth current = parseMonth(month);
+        if (current.atDay(1).isBefore(MIN_REPORT_DATE) || current.atEndOfMonth().isAfter(MAX_REPORT_DATE)) {
+            throw new BusinessRuleException("Month must be between " + YearMonth.from(MIN_REPORT_DATE).format(MONTH)
+                    + " and " + YearMonth.from(MAX_REPORT_DATE).minusMonths(1).format(MONTH));
+        }
         YearMonth previous = current.minusMonths(1);
         LocalDateTime start = current.atDay(1).atStartOfDay();
         LocalDateTime end = current.plusMonths(1).atDay(1).atStartOfDay();
@@ -127,6 +135,8 @@ public class FinanceReportServiceImpl implements FinanceReportService {
         if (size < 1 || size > MAX_PAGE_SIZE) {
             throw new BusinessRuleException("Size must be between 1 and " + MAX_PAGE_SIZE);
         }
+        requireSupportedDate("from", from);
+        requireSupportedDate("to", to);
         if (from != null && to != null && from.isAfter(to)) {
             throw new BusinessRuleException("The from date must not be after the to date");
         }
@@ -170,29 +180,40 @@ public class FinanceReportServiceImpl implements FinanceReportService {
     @Transactional(readOnly = true)
     public CsvExport exportRevenue(LocalDate from, LocalDate to) {
         LocalDate[] range = range(from, to);
-        List<ExportRow> rows = repository.paidRows(range[0].atStartOfDay(), range[1].plusDays(1).atStartOfDay());
+        LocalDateTime start = range[0].atStartOfDay();
+        LocalDateTime end = range[1].plusDays(1).atStartOfDay();
 
-        StringBuilder csv = new StringBuilder(CSV_HEADER).append("\r\n");
-        for (ExportRow row : rows) {
-            csv.append(String.join(",",
-                    text(row.paymentCode()),
-                    row.paymentTime() != null ? row.paymentTime().format(CSV_TIME) : "",
-                    text(row.invoiceNumber()),
-                    text(row.memberCode()),
-                    text(row.memberName()),
-                    text(row.itemType()),
-                    text(row.itemCode()),
-                    text(row.itemName()),
-                    text(row.sportName()),
-                    text(row.method()),
-                    row.amount() != null ? plainAmount(row.amount()) : ""))
-                    .append("\r\n");
+        // Bounded export: count first, so a range with too many payments is refused before any row is read.
+        long rowCount = repository.paidTotals(start, end).count();
+        if (rowCount > MAX_EXPORT_ROWS) {
+            throw new BusinessRuleException("The export would hold " + rowCount + " payments, more than the limit of "
+                    + MAX_EXPORT_ROWS + "; choose a shorter range");
         }
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        // Rows are written one at a time straight into the byte buffer: no row list and no full CSV string.
+        ByteArrayOutputStream out = new ByteArrayOutputStream(
+                (int) Math.min(EXPORT_BUFFER_CAP, CSV_ROW_ESTIMATE * (rowCount + 1)));
         out.writeBytes(UTF8_BOM);
-        out.writeBytes(csv.toString().getBytes(StandardCharsets.UTF_8));
+        out.writeBytes((CSV_HEADER + "\r\n").getBytes(StandardCharsets.UTF_8));
+        repository.forEachPaidRow(start, end, row -> out.writeBytes(csvLine(row).getBytes(StandardCharsets.UTF_8)));
         String fileName = "revenue_" + range[0] + "_" + range[1] + ".csv";
         return new CsvExport(fileName, out.toByteArray());
+    }
+
+    /** One CSV line with its CRLF ending. */
+    static String csvLine(ExportRow row) {
+        return String.join(",",
+                text(row.paymentCode()),
+                row.paymentTime() != null ? row.paymentTime().format(CSV_TIME) : "",
+                text(row.invoiceNumber()),
+                text(row.memberCode()),
+                text(row.memberName()),
+                text(row.itemType()),
+                text(row.itemCode()),
+                text(row.itemName()),
+                text(row.sportName()),
+                text(row.method()),
+                row.amount() != null ? plainAmount(row.amount()) : "") + "\r\n";
     }
 
     /**
@@ -286,6 +307,8 @@ public class FinanceReportServiceImpl implements FinanceReportService {
 
     /** Inclusive date range with defaults (first day of the current month to today) and the length limit. */
     private LocalDate[] range(LocalDate from, LocalDate to) {
+        requireSupportedDate("from", from);
+        requireSupportedDate("to", to);
         LocalDate today = LocalDate.now(clock);
         LocalDate start = from != null ? from : today.withDayOfMonth(1);
         LocalDate end = to != null ? to : today;
@@ -296,6 +319,18 @@ public class FinanceReportServiceImpl implements FinanceReportService {
             throw new BusinessRuleException("The range can cover at most " + MAX_RANGE_DAYS + " days");
         }
         return new LocalDate[]{start, end};
+    }
+
+    /**
+     * 400 for a date outside MIN_REPORT_DATE to MAX_REPORT_DATE. Checked before any plusDays(1) or SQL bound is built:
+     * LocalDate.MAX.plusDays(1) throws DateTimeException, and a bound after 9999-12-31 is rejected by SQL Server
+     * DATETIME2; both would otherwise end as HTTP 500.
+     */
+    static void requireSupportedDate(String name, LocalDate date) {
+        if (date != null && (date.isBefore(MIN_REPORT_DATE) || date.isAfter(MAX_REPORT_DATE))) {
+            throw new BusinessRuleException("The " + name + " date must be between " + MIN_REPORT_DATE + " and "
+                    + MAX_REPORT_DATE);
+        }
     }
 
     private static BigDecimal average(BigDecimal revenue, long count) {

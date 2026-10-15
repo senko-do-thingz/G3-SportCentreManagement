@@ -16,12 +16,14 @@ import com.sportify.payment.repository.FinanceReportRepository.GroupTotal;
 import com.sportify.payment.repository.FinanceReportRepository.LedgerFilter;
 import com.sportify.payment.repository.FinanceReportRepository.MonthTotal;
 import com.sportify.payment.repository.FinanceReportRepository.Totals;
+import com.sportify.payment.service.FinanceReportService;
 import com.sportify.payment.service.FinanceReportService.CsvExport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -36,12 +38,14 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -290,7 +294,7 @@ class FinanceReportServiceImplTest {
     @Test
     @DisplayName("CSV: BOM, header, CRLF, Vietnamese text in UTF-8, comma and quotes escaped, formula neutralised, plain amounts")
     void export_Format() {
-        when(repository.paidRows(OCT, LocalDateTime.of(2026, 10, 16, 0, 0))).thenReturn(List.of(
+        stubExportRows(OCT, LocalDateTime.of(2026, 10, 16, 0, 0), List.of(
                 new ExportRow("PAY-0001", LocalDateTime.of(2026, 10, 5, 10, 0), "INV-0001", "MEM-0001",
                         "Nguy\u1ec5n V\u0103n \u00c1nh", "SPORT_PACKAGE", "REG-PKG-0001", "B\u01a1i l\u1ed9i 30 ng\u00e0y", "B\u01a1i l\u1ed9i",
                         "BANK_TRANSFER", new BigDecimal("300000.00")),
@@ -314,11 +318,135 @@ class FinanceReportServiceImplTest {
     @Test
     @DisplayName("CSV with no rows still has the BOM and the header")
     void export_Empty() {
-        when(repository.paidRows(any(), any())).thenReturn(List.of());
+        stubExportRows(SEP, OCT, List.of());
 
         byte[] bytes = service.exportRevenue(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)).content();
 
         assertThat(new String(bytes, StandardCharsets.UTF_8)).isEqualTo("\ufeff" + FinanceReportServiceImpl.CSV_HEADER + "\r\n");
+    }
+
+    /** The repository count says rows.size() payments, then streams the rows to the consumer. */
+    @SuppressWarnings("unchecked")
+    private void stubExportRows(LocalDateTime from, LocalDateTime to, List<ExportRow> rows) {
+        when(repository.paidTotals(from, to)).thenReturn(new Totals(BigDecimal.ZERO, rows.size()));
+        doAnswer(invocation -> {
+            Consumer<ExportRow> consumer = invocation.getArgument(2);
+            rows.forEach(consumer);
+            return null;
+        }).when(repository).forEachPaidRow(eq(from), eq(to), any(Consumer.class));
+    }
+
+    @Test
+    @DisplayName("CSV: more payments than MAX_EXPORT_ROWS is 400 and no row is read")
+    void export_OverLimit() {
+        when(repository.paidTotals(OCT, LocalDateTime.of(2026, 10, 16, 0, 0)))
+                .thenReturn(new Totals(BigDecimal.ZERO, FinanceReportService.MAX_EXPORT_ROWS + 1L));
+
+        assertThatThrownBy(() -> service.exportRevenue(null, null))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining(String.valueOf(FinanceReportService.MAX_EXPORT_ROWS));
+        verify(repository, never()).forEachPaidRow(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("CSV: exactly MAX_EXPORT_ROWS payments is still exported")
+    void export_AtLimit() {
+        when(repository.paidTotals(any(), any()))
+                .thenReturn(new Totals(BigDecimal.ZERO, FinanceReportService.MAX_EXPORT_ROWS));
+
+        CsvExport export = service.exportRevenue(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30));
+
+        assertThat(export.fileName()).isEqualTo("revenue_2026-09-01_2026-09-30.csv");
+        verify(repository).forEachPaidRow(eq(SEP), eq(OCT), any());
+    }
+
+    // ---------------------------------------------------------------- supported dates (review P1-01)
+
+    @Test
+    @DisplayName("Ledger: to = 9999-12-30 is accepted and becomes the exclusive bound 9999-12-31 00:00")
+    void transactions_LastSupportedDate() {
+        when(repository.countLedger(any())).thenReturn(0L);
+
+        service.transactions(null, null, null, LocalDate.of(1900, 1, 1), LocalDate.of(9999, 12, 30), null, 0, 20);
+
+        ArgumentCaptor<LedgerFilter> filter = ArgumentCaptor.forClass(LedgerFilter.class);
+        verify(repository).countLedger(filter.capture());
+        assertThat(filter.getValue().from()).isEqualTo(LocalDateTime.of(1900, 1, 1, 0, 0));
+        assertThat(filter.getValue().toExclusive()).isEqualTo(LocalDateTime.of(9999, 12, 31, 0, 0));
+    }
+
+    @ParameterizedTest(name = "from={0} to={1}")
+    @CsvSource({
+            ", 9999-12-31",
+            ", +10000-01-01",
+            ", +999999999-12-31",
+            "1899-12-31, ",
+            "0001-01-01, 2026-10-01",
+            "-999999999-01-01, 2026-10-01",
+            "+999999999-12-31, +999999999-12-31"
+    })
+    @DisplayName("Ledger: a date outside 1900-01-01 to 9999-12-30 is 400 and the repository is not called")
+    void transactions_UnsupportedDate(String from, String to) {
+        assertThatThrownBy(() -> service.transactions(null, null, null, date(from), date(to), null, 0, 20))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("between 1900-01-01 and 9999-12-30");
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    @DisplayName("Revenue and export: 9999-01-01 to 9999-12-30 is accepted with the bound 9999-12-31 00:00")
+    void revenueAndExport_LastSupportedDate() {
+        LocalDateTime start = LocalDateTime.of(9999, 1, 1, 0, 0);
+        LocalDateTime end = LocalDateTime.of(9999, 12, 31, 0, 0);
+        when(repository.revenueBy(RevenueGroupBy.METHOD, start, end)).thenReturn(List.of());
+        when(repository.paidTotals(start, end)).thenReturn(new Totals(BigDecimal.ZERO, 0));
+
+        assertThat(service.revenue(LocalDate.of(9999, 1, 1), LocalDate.of(9999, 12, 30), RevenueGroupBy.METHOD).rows())
+                .isEmpty();
+        assertThat(service.exportRevenue(LocalDate.of(9999, 1, 1), LocalDate.of(9999, 12, 30)).fileName())
+                .isEqualTo("revenue_9999-01-01_9999-12-30.csv");
+        verify(repository).forEachPaidRow(eq(start), eq(end), any());
+    }
+
+    @ParameterizedTest(name = "from={0} to={1}")
+    @CsvSource({
+            "9999-12-31, 9999-12-31",
+            "9999-12-30, 9999-12-31",
+            "+999999999-12-31, +999999999-12-31",
+            ", +999999999-12-31",
+            "1899-12-31, 1900-01-01",
+            "-999999999-01-01, "
+    })
+    @DisplayName("Revenue and export: a date outside 1900-01-01 to 9999-12-30 is 400 before any query")
+    void revenueAndExport_UnsupportedDate(String from, String to) {
+        assertThatThrownBy(() -> service.revenue(date(from), date(to), RevenueGroupBy.ITEM_TYPE))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("between 1900-01-01 and 9999-12-30");
+        assertThatThrownBy(() -> service.exportRevenue(date(from), date(to)))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("between 1900-01-01 and 9999-12-30");
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    @DisplayName("Overview: 1900-01 and 9999-11 are accepted, 1899-12 and 9999-12 are 400")
+    void overview_SupportedMonths() {
+        when(repository.paidTotals(any(), any())).thenReturn(totals("0", 0));
+        when(repository.pendingTotals(any(), any())).thenReturn(totals("0", 0));
+        when(repository.refundedTotals(any(), any())).thenReturn(totals("0", 0));
+
+        assertThat(service.overview("1900-01").month()).isEqualTo("1900-01");
+        assertThat(service.overview("9999-11").to()).isEqualTo(LocalDate.of(9999, 11, 30));
+        verify(repository).paidTotals(LocalDateTime.of(9999, 11, 1, 0, 0), LocalDateTime.of(9999, 12, 1, 0, 0));
+
+        assertThatThrownBy(() -> service.overview("1899-12")).isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("between 1900-01 and 9999-11");
+        assertThatThrownBy(() -> service.overview("9999-12")).isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("between 1900-01 and 9999-11");
+    }
+
+    private static LocalDate date(String value) {
+        return value == null ? null : LocalDate.parse(value);
     }
 
     @Test

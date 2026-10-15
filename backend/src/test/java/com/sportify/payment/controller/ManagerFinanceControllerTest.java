@@ -197,6 +197,43 @@ class ManagerFinanceControllerTest {
     }
 
     @Test
+    @DisplayName("Dates up to LocalDate.MAX reach the service; its date range error is 400, not 500")
+    void unsupportedDates_Are400() throws Exception {
+        String rangeError = "The to date must be between 1900-01-01 and 9999-12-30";
+        when(financeReportService.transactions(isNull(), isNull(), isNull(), isNull(), eq(LocalDate.MAX), isNull(),
+                eq(0), eq(20))).thenThrow(new BusinessRuleException(rangeError));
+        when(financeReportService.revenue(isNull(), eq(LocalDate.of(9999, 12, 31)), eq(RevenueGroupBy.ITEM_TYPE)))
+                .thenThrow(new BusinessRuleException(rangeError));
+        when(financeReportService.exportRevenue(isNull(), eq(LocalDate.of(10000, 1, 1))))
+                .thenThrow(new BusinessRuleException(rangeError));
+
+        mockMvc.perform(get("/api/v1/manager/finance/transactions").param("to", "+999999999-12-31")
+                        .with(user(userWithRole("MANAGER"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(rangeError));
+        mockMvc.perform(get("/api/v1/manager/finance/revenue").param("to", "9999-12-31")
+                        .with(user(userWithRole("MANAGER"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(rangeError));
+        mockMvc.perform(get("/api/v1/manager/finance/revenue/export").param("to", "+10000-01-01")
+                        .with(user(userWithRole("MANAGER"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(rangeError));
+    }
+
+    @Test
+    @DisplayName("A year beyond LocalDate.MAX cannot be parsed and is 400; the service is never called")
+    void unparsableYear_Is400() throws Exception {
+        mockMvc.perform(get("/api/v1/manager/finance/transactions").param("to", "+1000000000-01-01")
+                        .with(user(userWithRole("MANAGER"))))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/v1/manager/finance/revenue/export").param("from", "+1000000000-01-01")
+                        .with(user(userWithRole("MANAGER"))))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(financeReportService);
+    }
+
+    @Test
     @DisplayName("GET /revenue/export with a bad date is 400")
     void export_BadDate() throws Exception {
         mockMvc.perform(get("/api/v1/manager/finance/revenue/export?from=2026-15-01").with(user(userWithRole("MANAGER"))))
