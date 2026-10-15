@@ -1097,3 +1097,9 @@
   color: inherit;
   font-weight: var(--weight-semibold);
 }
+
+/* TextArea (FE-12) */
+.textarea {
+  min-height: 72px;
+  resize: vertical;
+}

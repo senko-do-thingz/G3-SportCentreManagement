@@ -14,8 +14,8 @@ import type { PageResponse, SpringPage } from './types'
  *
  * Contract notes:
  * - On main: GET /members, GET /membership-cards/tiers, POST /membership-cards/purchase,
- *   POST /packages/registrations, PUT /membership-cards/{id}/activate,
- *   PUT /packages/registrations/{id}/activate, POST /check-ins.
+ *   POST /packages/registrations, POST /check-ins. Payments are confirmed through
+ *   PUT /payments/{id}/confirm since FE-12 (receptionPaymentsApi.ts).
  * - Planned in BE-05: GET /members/{id}/overview, POST /members, GET /membership-cards/pending,
  *   GET /packages/registrations/pending and the date filter of GET /check-ins.
  * - Planned in BE-19: the desk sale fields paymentReference and amountReceived on the card purchase
@@ -225,18 +225,6 @@ export const receptionApi = {
   /** Every package registration of a member (SportPackageController, staff only). */
   memberRegistrations(memberId: number, options: RequestSignal = {}): Promise<PackageRegistration[]> {
     return api.get<unknown>(`/packages/registrations/member/${memberId}`, options).then(asIdList<PackageRegistration>)
-  },
-
-  /** Confirms the payment of an online card request: PENDING_PAYMENT -> ACTIVE. */
-  activateCard(cardId: number, paymentMethod: PaymentMethod): Promise<MemberCard> {
-    return api.put<unknown>(`/membership-cards/${cardId}/activate`, { paymentMethod }).then(asObjectWithId<MemberCard>)
-  },
-
-  /** Confirms the payment of an online package registration: PENDING_PAYMENT -> ACTIVE. */
-  activateRegistration(registrationId: number, paymentMethod: PaymentMethod): Promise<PackageRegistration> {
-    return api
-      .put<unknown>(`/packages/registrations/${registrationId}/activate`, { paymentMethod })
-      .then(asObjectWithId<PackageRegistration>)
   },
 
   recordCheckIn(request: CheckInRequest): Promise<CheckInRecord> {

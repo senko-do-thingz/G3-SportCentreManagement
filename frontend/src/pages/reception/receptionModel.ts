@@ -55,20 +55,12 @@ export function checkInPath(memberCode?: string | null): string {
 export type PaymentItemKind = 'card' | 'package'
 
 /**
- * Payment confirmation and receipt screen (F3-05, F3-07). The item kind and id tell the screen which
- * activation endpoint confirms the payment; memberId is used for the way back to the profile.
+ * Verify and Record Payment and receipt screen (F3-05, F3-06). The backend confirms by payment id,
+ * so only memberId travels in the URL, for the way back to the profile.
  */
-export function receptionPaymentPath(
-  paymentId: number,
-  item?: { kind: PaymentItemKind; id: number; memberId?: number | null },
-): string {
+export function receptionPaymentPath(paymentId: number, memberId?: number | null): string {
   const base = `/reception/payments/${paymentId}`
-  if (!item) {
-    return base
-  }
-  const params = new URLSearchParams({ item: item.kind, itemId: String(item.id) })
-  if (item.memberId) params.set('memberId', String(item.memberId))
-  return `${base}?${params.toString()}`
+  return memberId ? `${base}?memberId=${memberId}` : base
 }
 
 /** Reads a positive integer from a URL parameter; anything else is null. */
@@ -280,20 +272,6 @@ export function saleOutcome(item: { status: string; paymentId: number | null }):
     return item.paymentId !== null ? 'paid' : 'unrecorded'
   }
   return item.status === 'PENDING_PAYMENT' ? 'pending' : 'other'
-}
-
-/* Payment confirmation */
-
-export type ConfirmCheck = 'ok' | 'not-found' | 'other-payment' | 'not-pending'
-
-/** The item opened from the URL must belong to the payment and still wait for it. */
-export function confirmCheck(
-  item: { paymentId: number | null; status: string } | undefined,
-  paymentId: number,
-): ConfirmCheck {
-  if (!item) return 'not-found'
-  if (item.paymentId !== paymentId) return 'other-payment'
-  return item.status === 'PENDING_PAYMENT' ? 'ok' : 'not-pending'
 }
 
 /* Pending online requests (F1-14 tab) */

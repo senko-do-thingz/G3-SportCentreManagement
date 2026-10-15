@@ -1,5 +1,30 @@
 # Changelog
 
+
+
+## 2026-10-14 - Receptionist payments, receipts and refunds (FE-12, Flow 3)
+
+Branch `feat/f3-reception-payments`. Review round 3 verified against main `5176017` on 2026-10-15. BE-18 and BE-21 are already merged. Staff-wide refund discovery remains a backend dependency; no publishing or history changes were made.
+
+### Added
+- Payment Requests (F3-04), Verify and Record Payment (F3-05), mismatch review, Payment Confirmed and Receipt (F3-06), printable receipt, Refund Requests (F3-07) and submitted/approved/completed/rejected states.
+- Payment filters, search and paging remain in the URL. Refund detail links retain `memberId` so every status can be reloaded from the supported member-refunds endpoint.
+- Fresh card/registration reads show the actual service status after payment; the success description does not claim activation before that evidence loads.
+
+### Review round 3
+- P1-01 confirmed: BE-18 confirmation now requires the exact amount for CASH and all non-cash methods. Under/overpayment blocks confirmation and opens mismatch review with correct amounts; return preserves values and resets verification. FE-05/BE-19 cash change rules are unchanged.
+- P1-02 rejected: `ConfirmPaymentRequest` explicitly accepts `paymentMethod` and `paymentReference` aliases. Existing JSON names are retained and serialized bodies are tested for cash, transfer, card, references, notes and decimal precision.
+- P1-03 confirmed: there is no global approved-refund endpoint and the pending endpoint is MANAGER-only. Reception now splits one supported member-refunds response into approved, pending and history queues, with errors, Retry and empty states. No unsupported global request or fake empty fallback remains.
+- Quotes use the actual `paymentAmount` cap and `unusedSessions` guard; the picker offers only paid ACTIVE registrations. Completion sends no body, requires payout confirmation and reloads the authoritative status. The UI does not collect or claim a payout reference that the backend cannot store.
+- Confirmation note/failure reason limits match the backend's 255-character constraints; canonical validation field names map to the correct inputs. Two-decimal input/display preserves backend amounts without changing shared FE-05/FE-11 formatting.
+- Tests: 496 frontend tests in 24 files passed, no failures/skips; 70 existing backend unit/MVC contract tests passed, no failures/errors/skips. Lint with zero warnings, TypeScript and production build passed. SQL Server and deployed end-to-end flows were not run.
+- Receipt print rules hide staff identity/navigation, notifications and adjacent service panels; Print stays disabled until the invoice loads. Browser print pagination is not verified.
+- Test specifications: `docs/tests/FE-12_test_cases.md`; local remediation report contains exact commands, evidence and pending approvals. The existing FE-12 audit file was not found; its location is required before that log can be updated.
+
+### Remaining dependency
+- A staff-wide approved/pending refund queue and discovery by refund id without member context require an approved backend contract. Their implementation is paused; member-scoped payment/refund functionality remains available.
+- Refund payout-reference persistence is not supported by the current backend. No backend API, authorization or database migration was changed.
+
 ## 2026-10-15 - Refunds linked to payments (BE-21, Flow 3)
 
 Branch `feat/f3-confirm-payment`, based on `main`. Owner: Truc. Priority: P2. Depends on BE-18. Screens F3-07, F3-09 (refund part), S3-RefundSubmitted, S3-RefundReview, S3-RefundApproved, S3-RefundRejected, S3-RefundDone.
@@ -134,6 +159,7 @@ Branch `feat/f3-confirm-payment`. Owner: Truc. Priority: P1. Depends on BE-17 (m
 - Future-session cancellation with manager/reason metadata, bulk booking cancellation, capped session-credit restoration only to ACTIVE package registrations and per-registration package booking counts in one audited transaction. Package consumption uses a conditional database decrement across different sessions; individual and manager cancellation restore credits atomically within the purchased cap. Existing registration balances cannot be overwritten by stale JPA entity saves. The manager calendar requires both date bounds and returns the existing 400 envelope for missing or malformed bounds.
 - V23 cancellation metadata and resource/date and booking/session indexes, SQL Server integration coverage registered in the required-suite manifest, and test cases in `docs/tests/BE-10_test_cases.md`.
 
+
 ## 2026-10-13 - Sport Packages & Pricing and Manager Catalog (BE-03, Flow 1)
 
 Branch `feat/f1-manager-catalog`. Owner: Dat (Senko). Priority: P1. Depends on: none. Rebased on `origin/main` (commit 6e82388). Execution counts and current validation status are recorded per run and revision in `docs/tests/PR40_remediation_test_cases.md`; revised SQL Server coverage still requires Docker.
@@ -158,6 +184,7 @@ PR40 remediation adds mapped `tierRank`, `upgradeRequest` and `replacesCardId` f
   - If a legacy card's upgrade chain cannot be resolved, automated upgrade fails closed (HTTP 400 with a message directing the member to the front desk).
   - Open PO questions: free upgrade policy, refund policy, proration, and optimistic concurrency locking for manager catalog edits.
   - Frontend `planCard` in `src/pages/member/cardsModel.ts` should be updated to mirror this contract by using cumulative base price from the active card's payment history, comparing explicit tier ranks rather than live catalog prices, and directing fee <= 0 requests to the front desk.
+
 
 ## 2026-10-13 - Receptionist Member Search, Register and Renew, Check-in (FE-05, Flow 1)
 

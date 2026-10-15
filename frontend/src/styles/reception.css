@@ -266,6 +266,26 @@
   }
 }
 
+/* Limit FE-12 printouts to the receipt, without staff identity, navigation or service details. */
+@media print {
+  body:has(.payment-print-receipt) .sidebar,
+  body:has(.payment-print-receipt) .staff-topbar,
+  body:has(.payment-print-receipt) .toast-region,
+  body:has(.payment-print-receipt) .staff-content > :not(:has(.payment-print-receipt)),
+  .reception-grid:has(> .payment-print-receipt) > :not(.payment-print-receipt) {
+    display: none;
+  }
+
+  .staff-layout:has(.payment-print-receipt),
+  .reception-grid:has(> .payment-print-receipt) {
+    display: block;
+  }
+
+  .staff-layout:has(.payment-print-receipt) .staff-content {
+    padding: 0;
+  }
+}
+
 @media (max-width: 640px) {
   .reception-form__grid {
     grid-template-columns: 1fr;
@@ -296,4 +316,120 @@
   margin: var(--space-3) 0 0;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+}
+
+/* Receptionist payments and refunds (FE-12): F3-04 to F3-07 */
+
+.payment-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.payment-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  align-items: end;
+  margin-bottom: var(--space-4);
+}
+
+.payment-row-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.payment-note {
+  margin-top: var(--space-4);
+}
+
+.payment-rows {
+  margin: var(--space-3) 0 var(--space-4);
+}
+
+.payment-rows--narrow {
+  max-width: 860px;
+}
+
+.payment-check {
+  margin-top: var(--space-4);
+}
+
+.payment-hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.payment-invoice-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/*
+ * The search button lines up with the input, whatever is shown above or below it. The field
+ * wrapper is flattened (display: contents) so its label, input and message become rows of this
+ * grid: label in row 1, input and button in row 2, error or hint in row 3.
+ */
+.payment-picker-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-3);
+  row-gap: 6px;
+  align-items: center;
+}
+
+.payment-picker-form > .field {
+  display: contents;
+}
+
+.payment-picker-form > .field > * {
+  grid-column: 1;
+}
+
+.payment-picker-form .field__label-row {
+  grid-row: 1;
+}
+
+.payment-picker-form .input {
+  grid-row: 2;
+}
+
+.payment-picker-form .field__error,
+.payment-picker-form .field__hint {
+  grid-row: 3;
+}
+
+.payment-picker-form > .btn {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.payment-member-results {
+  margin-top: var(--space-4);
+}
+
+.payment-member-results__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.payment-receipt .card__title {
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 960px) {
+  .payment-stats,
+  .payment-filters {
+    grid-template-columns: 1fr;
+  }
 }
