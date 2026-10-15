@@ -137,14 +137,20 @@ class DeskSaleRollbackIntegrationTest extends AbstractIntegrationTest {
         });
     }
 
+    /**
+     * The profile shares its key with the user account (@MapsId), so both are saved in one transaction: the account
+     * must still be managed when the profile is persisted. newUser joins this transaction.
+     */
     private MemberProfile newMember() {
-        UserAccount user = newUser("MEMBER");
-        return tx().execute(st -> memberProfileRepository.saveAndFlush(MemberProfile.builder()
-                .userAccount(user)
-                .memberCode("BE19-RB-" + SEQUENCE.incrementAndGet())
-                .currentLevel("BEGINNER")
-                .joinedOn(LocalDate.now(clock))
-                .build()));
+        return tx().execute(st -> {
+            UserAccount user = newUser("MEMBER");
+            return memberProfileRepository.saveAndFlush(MemberProfile.builder()
+                    .userAccount(user)
+                    .memberCode("BE19-RB-" + SEQUENCE.incrementAndGet())
+                    .currentLevel("BEGINNER")
+                    .joinedOn(LocalDate.now(clock))
+                    .build());
+        });
     }
 
     private Long newPackage() {

@@ -8,6 +8,7 @@
 - **Depends on**: BE-18 (receipt step `PaymentVerificationService.recordPaymentConfirmed`)
 - **Objective**: When RECEPTIONIST or MANAGER sells a membership card or a package at the desk (channel RECEPTION), record the money at once: a SUCCESS payment linked to the item, the item ACTIVE, one PAID invoice, and the payment id and invoice id in the response, all in one transaction. The BE-17 and BE-18 visibility contract is unchanged: another member's payment or invoice answers 404.
 - **Environment Note**: Maven Central is blocked in the authoring environment, so these tests run in GitHub Actions CI on the pull request (unit tests without Docker, integration tests with Testcontainers SQL Server 2022). Update the Execution Status column after the CI run.
+- **CI history**: run on PR #62 for `80dee35`: unit 837/837 passed; integration 190 run, 187 passed, 3 failed (TC-BE19-021 to 023 failed in test setup: `detached entity passed to persist: UserAccount` in `DeskSaleRollbackIntegrationTest.newMember`). Fixed in the next commit; statuses below stay Pending CI until the new run.
 
 ---
 

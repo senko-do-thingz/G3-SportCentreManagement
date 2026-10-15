@@ -21,6 +21,7 @@ Branch `feat/f3-desk-payment`. Owner: Truc. Priority: P1. Depends on BE-18 (merg
 - P2-01: HTTP integration tests for a non-cash desk sale with a different amount (bank transfer with more for a package, credit card with less for a card): 409 `PAYMENT_AMOUNT_MISMATCH` and no item, payment, invoice, invoice line or activity_log row.
 - `PaymentVerificationIntegrationTest` and `DeskSaleRollbackIntegrationTest` are added to `scripts/ci/required-integration-tests.txt`, so CI fails if they do not run.
 - Merged main (final BE-18 from PR #60 and BE-10 from PR #51); the BE-19 change set is applied unchanged on top of it.
+- CI fix (PR #62): the three `DeskSaleRollbackIntegrationTest` tests failed in their setup with `detached entity passed to persist: UserAccount`, because `newMember` saved the account and the `@MapsId` profile in two transactions. Both are now saved in one transaction, as in `PaymentVerificationIntegrationTest`. Test helper only; no production code or assertion changed.
 
 ## 2026-10-14 - Receptionist verifies and confirms payments (BE-18, Flow 3)
 
