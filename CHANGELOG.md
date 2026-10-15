@@ -1,3 +1,8 @@
+## 2026-10-16 - Demo Account SQL Replay Error Propagation (BE-07, Round 2)
+
+- Replaced the test-only execute-and-close replay path with a JdbcTemplate StatementCallback that consumes all result sets and update counts. SQL Server validation errors after an intermediate result now propagate before the existing rollback-only transaction callback returns. The migration SQL/version/checksum, production configuration and approved demo profile architecture are unchanged.
+- Preserved all 59 original demo integration executions and their exception/snapshot assertions. Added expected SQL vendor error checks to the ten rejection cases and one SQL Server late-THROW/rollback regression, for 60 demo integration executions. Added 11 non-Docker JDBC protocol regression executions, including the legacy omission and same-connection rollback. The SQL Server rerun remains pending CI; original artifacts showed 338 integration cases with 10 failures and no skips. Exact remediation verification is exported in the Round 2 review package.
+
 ## 2026-10-15 - Isolated Demonstration Accounts (BE-07, Shared)
 
 Branch `feat/demo-accounts`, based on main `56f28c5`. Added opt-in `demo` profile and `db/demo/V28__seed_demo_accounts.sql` for one receptionist, three coaches with distinct primary sports and coach-sport links, and three members with GOLD, physical STANDARD and no-card scenarios.

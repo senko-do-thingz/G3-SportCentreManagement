@@ -52,11 +52,13 @@ GOLD: ACTIVE, start 2026-10-01, inclusive end 2027-09-30, price snapshot 300000 
 
 The profile tests use a controlled Flyway initializer callback without a database; they prove startup ordering and discovery, not execution of T-SQL. The BCrypt checks use the actual encoder bean factory rather than a prefix check alone.
 
+`com.sportify.core.config.SqlServerScriptReplayTest` adds 11 Round 2 JDBC protocol regressions: a control reproducing the legacy execute-only omission, three delayed SQL errors (51071/51072/51073), mixed result sets/update counts including zero, final no-result termination, errors after a result set, streaming/immediate/update-count errors, and propagation through an actual rollback-only Spring transaction manager. These use the real JdbcTemplate with mocked JDBC transport; they do not execute SQL Server or replace the integration cases.
+
 ## SQL Server integration coverage - CI required
 
 Required suite: `com.sportify.core.config.DemoAccountsIntegrationTest`, registered in `scripts/ci/required-integration-tests.txt`. It extends `AbstractIntegrationTest`, inherits the integration tag, enables dev/demo/test, and creates a unique disposable catalog inside the Testcontainers SQL Server instance. Hikari selects that catalog before Flyway and Hibernate initialize. No production database is contacted. Other integration suites retain their original data. The test context is closed after the suite; container lifecycle removes the disposable catalog. Destructive fixture setup is limited to rollback transactions in that catalog, never shared cleanup.
 
-The suite defines 59 test executions:
+The suite defines 60 test executions after Round 2: all original 59 plus one real SQL Server late-error/rollback regression.
 
 | Case group | Executions | Actual verification |
 |---|---:|---|
@@ -77,15 +79,26 @@ The suite defines 59 test executions:
 | Concurrent replay | 1 | Two independent transactions execute actual SQL and serialize with sp_getapplock; snapshots unchanged |
 | Standalone replay | 1 | SQL opens its own transaction and remains idempotent |
 | Database constraints | 5 | Real unique email/member-code/coach-sport/card-code constraints and sport FK reject invalid writes |
+| Late SQL Server error | 1 | UPDATE emits an intermediate count before THROW 51074; replay must surface the real SQL exception and rollback must restore the full snapshot |
 
 Assertions avoid logging plaintext credentials, stored hash values, or complete JWTs. Snapshot comparisons use digests. Account identifiers in test names are public demo emails only.
+
+## Round 2 - JDBC replay error propagation
+
+The supplied CI artifacts contain 338 integration executions: 328 passed, 10 failed, zero errors/skips. All 10 failures were missing expected exceptions in the demo suite's eight conflicts, inactive required sport and occupied next member-code cases. The same artifacts contain 1138 passing unit tests and confirm Flyway applied V28 successfully. This is historical evidence from the original implementation, not a post-remediation pass.
+
+The former replay helper called JdbcTemplate.execute(String), whose callback calls Statement.execute once and then closes the statement. A multi-statement SQL Server batch can return an intermediate update count before its validation error. Omitting getMoreResults leaves that later exception unobserved; a rollback-only callback can then return normally. The SQL was submitted, not skipped. The script's account-table INSERT precedes its validations and can produce such a count. Flyway uses its own result-draining executor, so this finding does not require changing V28 or an applied checksum.
+
+SqlServerScriptReplay now submits the actual unchanged SQL through a StatementCallback on the same transaction-bound connection. It consumes result-set rows, advances with getMoreResults(CLOSE_CURRENT_RESULT), and terminates only when there is no result set and getUpdateCount is -1. A zero update count is not termination. SQLExceptions propagate through JdbcTemplate's existing translation before the callback completes; the existing TransactionTemplate rollback restores fixtures. No separate connection, manual commit, SQL splitting, dependency repair or exception suppression is introduced.
+
+All original exception type/message and preservation assertions remain. The ten rejection cases additionally require a real SQLException with the expected vendor error: 51071 for missing sport/tier terms, 51072 for identity/profile/card conflicts, 51073 for the sequence collision. The added SQL Server regression uses error 51074. All 60 database cases still require an actual CI rerun. The migration, demo profile, production security configuration and required-suite manifest are unchanged.
 
 ## Commands and acceptance gates
 
 Run from `backend/` in PowerShell:
 
 ```powershell
-mvn -B -ntp '-Dtest=DemoAccountsMigrationTest,DemoProfileSafetyConfigurationTest' test
+mvn -B -ntp '-Dtest=SqlServerScriptReplayTest,DemoAccountsMigrationTest,DemoProfileSafetyConfigurationTest' test
 mvn -B -ntp clean test
 mvn -B -ntp -DskipTests test-compile
 ```
@@ -104,6 +117,6 @@ Then run from repository root:
 python scripts/ci/check-test-reports.py integration backend/target/failsafe-reports
 ```
 
-The new required suite must have 59 executed test cases, zero failures/errors/skips, and actual login cases for all seven emails. Review Failsafe XML, not just a green Maven exit. All existing required SQL Server suites, migrations, frontend checks, security checks and applicable Compose smoke tests must remain green. Compose ordinary startup counts only migrations under the ordinary location; the new opt-in location does not change its expected count.
+The required demo suite must have 60 executed test cases, zero failures/errors/skips, and actual login cases for all seven emails. Review Failsafe XML, not just a green Maven exit. All existing required SQL Server suites, migrations, frontend checks, security checks and applicable Compose smoke tests must remain green. Compose ordinary startup counts only migrations under the ordinary location; the new opt-in location does not change its expected count.
 
 Exact local command results and environment limitations are exported in the BE-07 report directory. Compilation does not prove SQL syntax, database relationships, locking, transaction behavior or authentication against SQL Server. Those acceptance items remain unverified until the CI integration job actually executes.

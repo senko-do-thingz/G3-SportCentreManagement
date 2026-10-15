@@ -35,6 +35,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -269,7 +270,8 @@ class DemoAccountsIntegrationTest extends AbstractIntegrationTest {
                 default -> throw new AssertionError(conflict);
             }
             replay();
-        })).isInstanceOf(DataAccessException.class).hasStackTraceContaining("BE-07");
+        })).isInstanceOf(DataAccessException.class).hasStackTraceContaining("BE-07")
+                .satisfies(failure -> assertSeedError(failure, conflict.equals("tier-terms") ? 51071 : 51072));
         assertThat(snapshot()).isEqualTo(original);
     }
 
@@ -279,7 +281,8 @@ class DemoAccountsIntegrationTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> rollback(() -> {
             jdbc.update("UPDATE sport SET is_active = 0 WHERE code = 'BADMINTON'");
             replay();
-        })).isInstanceOf(DataAccessException.class).hasStackTraceContaining("BE-07 requires active");
+        })).isInstanceOf(DataAccessException.class).hasStackTraceContaining("BE-07 requires active")
+                .satisfies(failure -> assertSeedError(failure, 51071));
         assertThat(snapshot()).isEqualTo(original);
     }
 
@@ -304,7 +307,23 @@ class DemoAccountsIntegrationTest extends AbstractIntegrationTest {
                     new CodeFormatter().formatMemberCode(allocated + 1), id("unrelated.be07@example.org"));
             jdbc.update("DELETE FROM member_profile WHERE user_id = ?", id("bao.nocard@example.com"));
             replay();
-        })).isInstanceOf(DataAccessException.class).hasStackTraceContaining("BE-07 member sequence conflicts");
+        })).isInstanceOf(DataAccessException.class).hasStackTraceContaining("BE-07 member sequence conflicts")
+                .satisfies(failure -> assertSeedError(failure, 51073));
+        assertThat(snapshot()).isEqualTo(original);
+    }
+
+    @Test
+    void replaySurfacesLateSqlServerThrowAndRollsBackTheEarlierWrite() {
+        String original = snapshot();
+        assertThatThrownBy(() -> rollback(() -> SqlServerScriptReplay.execute(jdbc, """
+                SET NOCOUNT OFF;
+                UPDATE user_account SET full_name = 'Before late failure'
+                WHERE email = 'lan.reception@example.com';
+                THROW 51074, 'BE-07 late-error replay regression', 1;
+                """)))
+                .isInstanceOf(DataAccessException.class)
+                .hasStackTraceContaining("BE-07 late-error replay regression")
+                .satisfies(failure -> assertSeedError(failure, 51074));
         assertThat(snapshot()).isEqualTo(original);
     }
 
@@ -393,7 +412,12 @@ class DemoAccountsIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void replay() {
-        jdbc.execute(SQL);
+        SqlServerScriptReplay.execute(jdbc, SQL);
+    }
+
+    private void assertSeedError(Throwable failure, int code) {
+        assertThat(((DataAccessException) failure).getMostSpecificCause())
+                .isInstanceOfSatisfying(SQLException.class, sql -> assertThat(sql.getErrorCode()).isEqualTo(code));
     }
 
     private String snapshot() {
