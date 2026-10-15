@@ -296,8 +296,7 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         // MemberProfile shares its primary key with UserAccount (@MapsId user_id), so member id equals user id by design.
         boolean isOwner = payment.getMember() != null && payment.getMember().getId().equals(actor.getId());
         if (!isOwner && !SecurityUtils.isStaff(actor)) {
-            // BE-19: a member sees only the invoices of their own payments; anyone else's answers 403.
-            throw new AccessDeniedException("You can only access the invoices of your own payments");
+            throw new ResourceNotFoundException("Payment not found for id: " + paymentId);
         }
         Invoice invoice = invoiceRepository.findByPaymentId(paymentId).stream()
                 .min(Comparator.comparing(Invoice::getId, Comparator.nullsLast(Comparator.naturalOrder())))

@@ -22,7 +22,6 @@ import com.sportify.payment.entity.PaymentStatus;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -198,8 +197,7 @@ public class PaymentServiceImpl implements PaymentService {
         boolean isStaffUser = SecurityUtils.isStaff(actor);
 
         if (!isOwner && !isStaffUser) {
-            // BE-19: a member sees only their own payments; another member's payment answers 403.
-            throw new AccessDeniedException("You can only access your own payments");
+            throw new ResourceNotFoundException("Payment not found for id: " + id);
         }
 
         PaymentResponse response = mapToPaymentResponse(payment);
@@ -223,8 +221,7 @@ public class PaymentServiceImpl implements PaymentService {
         boolean isStaffUser = SecurityUtils.isStaff(actor);
 
         if (!isOwner && !isStaffUser) {
-            // BE-19: a member sees only their own payments; another member's payment answers 403.
-            throw new AccessDeniedException("You can only access your own payments");
+            throw new ResourceNotFoundException("Payment not found for id: " + id);
         }
 
         if (payment.getPaymentStatus() != PaymentStatus.PENDING) {

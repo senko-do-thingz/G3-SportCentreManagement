@@ -29,7 +29,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -457,13 +456,13 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    @DisplayName("GET payment by other non-owner member throws 403 AccessDeniedException (BE-19)")
-    void getPayment_OtherMember_ThrowsAccessDenied() {
+    @DisplayName("GET payment by other non-owner member throws 404 ResourceNotFoundException")
+    void getPayment_OtherMember_ThrowsResourceNotFoundException() {
         when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
 
         assertThatThrownBy(() -> paymentService.getPayment(10L, otherUser))
-                .isInstanceOf(AccessDeniedException.class)
-                .hasMessageContaining("your own payments");
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Payment not found for id: 10");
     }
 
     @Test
@@ -523,8 +522,8 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    @DisplayName("PUT payment method by non-owner member throws 403 AccessDeniedException (BE-19)")
-    void updatePaymentMethod_OtherMember_ThrowsAccessDenied() {
+    @DisplayName("PUT payment method by non-owner member throws 404 ResourceNotFoundException")
+    void updatePaymentMethod_OtherMember_ThrowsResourceNotFoundException() {
         when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
 
         UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
@@ -532,8 +531,8 @@ class PaymentServiceImplTest {
                 .build();
 
         assertThatThrownBy(() -> paymentService.updatePaymentMethod(10L, request, otherUser))
-                .isInstanceOf(AccessDeniedException.class)
-                .hasMessageContaining("your own payments");
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Payment not found for id: 10");
     }
 
     @Test

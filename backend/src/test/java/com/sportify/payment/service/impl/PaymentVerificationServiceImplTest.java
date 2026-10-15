@@ -579,7 +579,7 @@ class PaymentVerificationServiceImplTest {
         UserAccount otherMember = UserAccount.builder().id(999L)
                 .role(Role.builder().code("MEMBER").name("Member").build()).build();
         assertThatThrownBy(() -> service.getInvoiceByPayment(1L, otherMember))
-                .isInstanceOf(AccessDeniedException.class);
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
