@@ -1,21 +1,26 @@
 # BE 05 verification cases
 
-Base branch: origin/main at 89ee7dd. Feature branch: feat/f1-front-desk-queues.
+Feature branch: feat/f1-front-desk-queues.
 API examples and decisions: [Front desk API contract](../api/BE-05-front-desk.md).
 
 ## Local unit and MVC coverage
 
 | Suite | Verified behavior |
 | --- | --- |
-| MemberSearchServiceImplTest | Trim/blank normalization; literal wildcard escaping; max page size; sort allowlist and stable ties; MapStruct projection of tier and status |
-| FrontDeskMemberServiceImplTest | Normalized email/phone duplicate pre-checks; sequence codes; encoded passwords; transactional flush conflicts; mapped overview with/without pending items and two check-ins; unknown member |
+| MemberSearchPagingTest | First sort wins per mapped column; id/userId aliases; repeated fields; unpaged defaults and sort; unknown fields; size cap |
+| FrontDeskQueuePagingTest | Forced oldest-first order; ignored client sort; size cap and unpaged defaults |
+| MemberSearchServiceImplTest | Trim/blank normalization; literal wildcard escaping; bounded paging; sort allowlist; MapStruct tier and status projection |
+| FrontDeskMemberServiceImplTest | Duplicate pre-checks; sequence codes; encoded passwords; unique vendor errors and nested/chained causes; unchanged propagation of other integrity errors; safe staff accountability log |
+| FrontDeskMemberOverviewServiceImplTest | Overview assembly with/without pending items and two check-ins; unknown member; MapStruct response composition |
 | TemporaryPasswordGeneratorTest | Twenty-character passwords with all character classes and distinct outputs across repeated calls |
-| FrontDeskQueueServiceImplTest | Only PENDING_PAYMENT requested; immutable oldest-first queue order; page cap; member/item/amount mapping |
-| MemberControllerTest | 401 without authentication; 403 for MEMBER/COACH; success for MANAGER/RECEPTIONIST; field errors; duplicate and database 409; unknown-member 404; no password hash; no-store on creation |
+| FrontDeskQueueServiceImplTest | PENDING_PAYMENT only; immutable queue order; page cap; member/item/amount mapping |
+| MemberControllerTest | Search/create 401; MEMBER/COACH 403; staff success; field errors; duplicate 409; Location and no-store on creation |
+| FrontDeskMemberOverviewControllerTest | Overview 401; MEMBER/COACH 403; staff 200 with unchanged JSON; unknown-member 404 |
 | FrontDeskQueueControllerTest | Both pending endpoints: 401, role-specific 403 and staff 200 |
 
-The previous MemberSearchServiceTest was replaced by MemberSearchServiceImplTest in the implementation
-package, mirroring the class under test. All new tests mirror the owning production package.
+Paging helpers belong to identity.service and catalog.service. Creation remains in identity; overview
+aggregation, its DTO and endpoint controller belong to catalog. Tests mirror each owning package.
+The BE-05 identity implementation does not import catalog classes.
 
 Run from backend in PowerShell:
 
@@ -23,29 +28,43 @@ Run from backend in PowerShell:
 mvn clean verify
 ```
 
+Real sort validation is checked in paging/service unit tests. Controller tests do not pretend that
+mocking a validation exception exercises the validation implementation.
+
 ## SQL Server integration coverage
 
-MemberProfileRepositoryIntegrationTest inherits AbstractIntegrationTest, its integration tag and
-Testcontainers disabledWithoutDocker behavior. It is registered in scripts/ci/required-integration-tests.txt.
+Each suite extends AbstractIntegrationTest directly, inheriting its integration tag and Testcontainers
+disabledWithoutDocker behavior. All four fully qualified names are required by the CI report guard.
 
-| Case | Expected result |
+| Suite | Cases |
 | --- | --- |
-| Search by member code, phone, email, partial full name | The matching member; case-insensitive text search |
-| Search for percent, underscore, opening bracket and backslash | Literal matches only; no wildcard broadening |
-| Search with several active/future/expired/pending cards | One row per member; highest current tier; correct count and page boundary |
-| Search returning a full page of members | Exactly two statements, including count |
-| Pending queues with every request status present | Only PENDING_PAYMENT, createdAt ASC and id ASC, including ties and page boundaries |
-| Overview with cards, packages and seven check-ins | Current and pending cards, eligible and pending packages, five latest arrivals; exactly five statements |
-| Overview without related rows | Null cards and empty arrays |
-| Create duplicate email or phone through HTTP | Standard 409 body after normalization |
-| Bypass service pre-check and insert duplicate email/phone | SQL Server unique constraint violation |
-| Create a valid member | Existing code format, stored hash verifies the returned temporary password |
-| Concurrent member creation | Distinct sequence-generated member codes |
+| com.sportify.identity.service.impl.MemberSearchIntegrationTest | Code/phone/email/name search; case-insensitive matches; literal percent/underscore/bracket/backslash; current tier with legacy multiple cards; correct count/pages; duplicate id/userId sorts via HTTP; two-statement search budget |
+| com.sportify.catalog.service.impl.FrontDeskQueueIntegrationTest | Only PENDING_PAYMENT across every request status; stable oldest-first ties; page boundaries; member, item, amount and requested-at values |
+| com.sportify.catalog.service.impl.FrontDeskMemberOverviewIntegrationTest | Cards, eligible/pending packages and seven arrival records; five latest check-ins; exactly five statements; null/empty overview |
+| com.sportify.identity.service.impl.MemberCreationIntegrationTest | Normalized duplicate pre-check HTTP 409; direct DB email/phone unique constraints; persisted password hash and member code; concurrent sequence allocation |
 
-Transactional integration fixtures roll back automatically. The concurrent test runs outside the
-test transaction and cleans its own generated accounts and profiles. Fixture codes/emails have a
-random per-test marker; phones are random numeric strings.
+The statement-count assertions explicitly guard against N+1 queries. Overview package lists remain
+unbounded; tests do not imply a response-size limit for package registrations.
 
-Local machines without Docker skip the SQL Server suites. Compilation and local unit/MVC results
-do not establish that these integration assertions passed; see the implementation report for the
-actual run results.
+FrontDeskFixtures in com.sportify.testsupport creates isolated records with a random marker and numeric
+phones. Transactional cases roll back automatically. The concurrent creation case runs outside the
+test transaction and cleans its generated users/profiles in a finally block.
+
+Local machines without Docker skip the SQL Server suites. Compilation and unit/MVC success do not
+establish integration success. Check GitHub Actions on the current commit before claiming these
+SQL Server cases passed.
+
+## Repository checks
+
+Run the repository PowerShell conventions check, the migration guard with Git Bash, and the unit
+report guard from the repository root:
+
+```powershell
+powershell -NoProfile -File scripts/ci/check-conventions.ps1 origin/main
+& 'C:/Program Files/Git/bin/bash.exe' scripts/ci/check-migrations.sh origin/main
+python scripts/ci/check-test-reports.py unit backend/target/surefire-reports
+git diff --check
+```
+
+V26 is unmerged and may be edited in place. It contains only unfiltered queue indexes on
+(status, created_at, id), without INCLUDE columns. The existing V5 recent check-in index is reused.

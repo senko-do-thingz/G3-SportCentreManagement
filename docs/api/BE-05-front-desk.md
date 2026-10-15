@@ -17,6 +17,9 @@ backslash are escaped, with an explicit LIKE ESCAPE clause. SQL parameters are b
 Page numbers are zero-based. Default size is 20 and the service caps size at 100, including internal
 callers. Supported sort fields: id, userId, memberCode, fullName, phone, email, status.
 Default order is id ASC; an id ASC tie-breaker is appended unless id is already included.
+Repeated sort fields and aliases for the same column are deduplicated; the first direction wins.
+For example, sort=id,asc&sort=userId,desc produces a single id ASC order.
+Internal Pageable.unpaged() callers use page 0 and size 20, while preserving allowed sort fields.
 Unsupported sort fields return 400. Spring Pageable applies its normal defaults to invalid page/size
 values. Existing userId, memberCode, fullName, email, phone and currentLevel fields remain available.
 
@@ -199,8 +202,9 @@ requestedAt is the existing created_at column. Card amount comes from price_paid
 comes from paid_amount, preserving the request's price snapshot rather than recalculating catalog prices.
 
 Queues use a fetch graph for member/account and tier or package, with at most two SQL statements per
-page including count. V26 adds covering status/created_at/id queue indexes and a deterministic recent
-check-in index. Contains searches still require scans; existing unique email/phone/member-code indexes
+page including count. V26 adds key-only status/created_at/id indexes for both queues. Recent check-ins
+reuse V5's ix_check_in_member(member_id, checked_in_at), which supports a backward scan for one member.
+No duplicate recent check-in index is added. Contains searches still require scans; existing unique email/phone/member-code indexes
 cannot make a leading-wildcard substring predicate seekable. No measured production query-cost claim
 is made without a representative SQL Server execution plan and data volume.
 
@@ -221,8 +225,10 @@ Request:
 All fields are required. Full name is trimmed and limited to 100 characters; email is trimmed,
 lowercased, validated and limited to 255 characters. Phone is trimmed and must contain 8-15 digits
 with an optional leading +, consistent with existing staff creation validation.
+Only whitespace is trimmed from phone values. No country-code normalization is performed:
+0901234567 and +84901234567 are treated as different values.
 
-201 body, with Cache-Control: no-store:
+201 body, with Cache-Control: no-store and Location: /api/v1/members/42/overview:
 
 ```json
 {
@@ -246,10 +252,24 @@ The member uses role MEMBER, level BEGINNER and today's joinedOn. seq_member_cod
 generate MEM-0001-style codes; sequence gaps after failed requests are expected. User and profile are
 saved atomically. Both email and phone are checked before creating credentials. Existing DB unique
 constraints remain authoritative for concurrent requests; flush-time conflicts map to standard 409.
+Only unique violations, identified by SQL Server error 2601 or 2627 through the exception chain,
+are translated by the creation service. Other integrity failures propagate unchanged to the existing
+global exception handler.
 
-The identity module has no must-change-password-on-first-login mechanism. This task does not introduce
-one. The generated password remains usable under the existing login rules until changed by an
-existing password-management flow.
+Successful creation emits one INFO log containing the acting staff identifier, new member id and
+member code. Passwords, hashes, email addresses and phone numbers are never included in that log.
+The JWT principal uses email as its username, so the log uses staff-{userId} from that authenticated
+principal instead. A non-contact username from another security context can be recorded directly.
+
+## Known limitations
+
+The generated temporary password stays valid until changed. The identity module has no mandatory
+first-login password change and this API has no password recovery endpoint. Losing the creation
+response cannot recover the plaintext password.
+
+Overview activePackageRegistrations and pendingPackageRegistrations remain unbounded lists. The
+five-statement query budget prevents N+1 reads but does not cap response size for members with many
+registrations. Only recentCheckIns has a fixed limit of five; global pending queues are paginated.
 
 ## Errors
 
