@@ -30,6 +30,7 @@ function tier(overrides: Partial<CardTier> = {}): CardTier {
   return {
     id: 3,
     code: 'VIP',
+    tierRank: 4,
     name: 'VIP',
     price: 600000,
     durationMonths: 12,
@@ -40,8 +41,8 @@ function tier(overrides: Partial<CardTier> = {}): CardTier {
   }
 }
 
-const STANDARD = tier({ id: 1, code: 'STANDARD', name: 'Standard', price: 0, durationMonths: null, discountPercentage: 0 })
-const GOLD = tier({ id: 2, code: 'GOLD', name: 'Gold', price: 300000, discountPercentage: 5 })
+const STANDARD = tier({ id: 1, code: 'STANDARD', tierRank: 1, name: 'Standard', price: 0, durationMonths: null, discountPercentage: 0 })
+const GOLD = tier({ id: 2, code: 'GOLD', tierRank: 3, name: 'Gold', price: 300000, discountPercentage: 5 })
 const VIP = tier()
 const TIERS = [STANDARD, GOLD, VIP]
 
@@ -146,7 +147,7 @@ describe('FE-05 receptionModel - membership card at the desk (FE-04 planCard)', 
   })
 
   it('TC-FE05-010 a dearer tier upgrades today for the difference and keeps the end date', () => {
-    const gold = card({ tierId: 2, tierCode: 'GOLD', tierName: 'Gold', startDate: '2026-07-05', endDate: '2027-07-04' })
+    const gold = card({ tierId: 2, tierCode: 'GOLD', tierRank: 3, tierName: 'Gold', pricePaid: 300000, startDate: '2026-07-05', endDate: '2027-07-04' })
     expect(deskCardPlan(VIP, [gold], TIERS, TODAY)).toMatchObject({
       sellable: true,
       plan: { kind: 'upgrade', startDate: TODAY, endDate: '2027-07-04', price: 300000 },
@@ -167,7 +168,7 @@ describe('FE-05 receptionModel - membership card at the desk (FE-04 planCard)', 
   })
 
   it('TC-FE05-017 an ACTIVE card of a tier that is no longer listed is never treated as no card', () => {
-    const retired = card({ tierId: 8, tierCode: 'PLATINUM', tierName: 'Platinum', startDate: '2026-07-05', endDate: '2027-07-04' })
+    const retired = card({ tierId: 8, tierCode: 'PLATINUM', tierRank: null, tierName: 'Platinum', startDate: '2026-07-05', endDate: '2027-07-04' })
     const desk = deskCardPlan(VIP, [retired], TIERS, TODAY)
     expect(desk.plan.kind).toBe('unknown')
     expect(desk.plan.startDate).not.toBe(TODAY)

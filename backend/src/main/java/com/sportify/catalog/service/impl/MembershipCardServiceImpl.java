@@ -3,16 +3,20 @@ package com.sportify.catalog.service.impl;
 import com.sportify.catalog.dto.CardTierResponse;
 import com.sportify.catalog.dto.MemberCardPurchaseRequest;
 import com.sportify.catalog.dto.MemberCardResponse;
+import com.sportify.catalog.dto.MembershipCardTierUpdateRequest;
 import com.sportify.catalog.entity.CardStatus;
 import com.sportify.catalog.entity.MemberCard;
 import com.sportify.catalog.entity.MembershipCardTier;
 import com.sportify.catalog.repository.MemberCardRepository;
 import com.sportify.catalog.repository.MembershipCardTierRepository;
 import com.sportify.catalog.service.MembershipCardService;
+import com.sportify.core.audit.AuditAction;
+import com.sportify.core.audit.AuditEvent;
+import com.sportify.core.audit.AuditService;
 import com.sportify.core.common.CodeFormatter;
+import com.sportify.core.common.SecurityUtils;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ResourceNotFoundException;
-import com.sportify.core.common.SecurityUtils;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
@@ -21,20 +25,36 @@ import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.sql.SQLException;
+import java.util.ArrayDeque;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.regex.Pattern;
 import java.time.Clock;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MembershipCardServiceImpl implements MembershipCardService {
+
+    public static final String STANDARD_TIER_CODE = "STANDARD";
+    private static final int MAX_CHAIN_DEPTH = 20;
 
     private final MembershipCardTierRepository tierRepository;
     private final MemberCardRepository memberCardRepository;
@@ -42,7 +62,18 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     private final UserRepository userRepository;
     private final PaymentService paymentService;
     private final CodeFormatter codeFormatter;
+    private final AuditService auditService;
     private final Clock clock;
+
+    /**
+     * Determines whether the given tier is the STANDARD tier.
+     * Note: Specific SQL Server database collation is unknown (not explicitly configured in migrations),
+     * but case-insensitive comparison (equalsIgnoreCase) defensively treats codes like "standard" and "STANDARD"
+     * identically, matching case-insensitive database behavior verified by integration tests.
+     */
+    public static boolean isStandard(MembershipCardTier tier) {
+        return tier != null && STANDARD_TIER_CODE.equalsIgnoreCase(tier.getCode());
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -50,6 +81,135 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         return tierRepository.findByIsActiveTrue().stream()
                 .map(this::mapToTierResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CardTierResponse> getAllTiersForManager() {
+        return tierRepository.findAll(Sort.by(Sort.Direction.ASC, "id")).stream()
+                .map(this::mapToTierResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public CardTierResponse updateTier(Long id, MembershipCardTierUpdateRequest request, UserAccount actor) {
+        if (request == null) {
+            throw new IllegalArgumentException("Request must not be null");
+        }
+        // Basic request checks that require no database state (fail fast with HTTP 400 before lock acquisition)
+        if (request.getPrice() == null) {
+            throw new BusinessRuleException("Price is required");
+        }
+        if (request.getPrice().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BusinessRuleException("Price cannot be negative");
+        }
+        if (request.getDurationMonths() == null) {
+            throw new BusinessRuleException("Duration in months is required");
+        }
+        if (request.getDurationMonths() < 0) {
+            throw new BusinessRuleException("Duration in months must be non-negative");
+        }
+        if (request.getDiscountPercentage() == null) {
+            throw new BusinessRuleException("Discount percentage is required");
+        }
+        if (request.getDiscountPercentage() < 0 || request.getDiscountPercentage() > 100) {
+            throw new BusinessRuleException("Discount percentage must be between 0 and 100");
+        }
+        if (request.getActive() == null) {
+            throw new BusinessRuleException("Active flag is required");
+        }
+
+        // Concurrency decision (Option 2): deterministic row locking via findAllForUpdate() (ORDER BY id).
+        // In SQL Server, the dialect supports NOWAIT (which fails immediately) but does not support a per-query bounded wait.
+        // Sequential serialization (unbounded wait) was kept because a fail-fast response was not requested.
+        // A second concurrent transaction waits until the first transaction ends.
+        // Catching PessimisticLockingFailureException maps database or driver-level lock failures (such as deadlock victim selection)
+        // and does not imply a timeout. Known limitation: unbounded wait holds a database connection while waiting.
+        List<MembershipCardTier> lockedTiers;
+        try {
+            lockedTiers = tierRepository.findAllForUpdate();
+        } catch (PessimisticLockingFailureException ex) {
+            throw new BusinessRuleException("Membership tiers are currently being updated by another operation. Please retry in a few moments.", ex);
+        }
+
+        // The target tier is resolved from lockedTiers AFTER the lock is held.
+        // This ensures the entity state in the persistence context is fresh and reflects any prior commits,
+        // preventing stale state in the activity_log 'before' snapshot.
+        // Evaluating 404 after lock acquisition is acceptable for this low-traffic manager-only catalog endpoint.
+        MembershipCardTier tier = lockedTiers.stream()
+                .filter(t -> t.getId().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Card tier not found for id: " + id));
+
+        boolean standard = isStandard(tier);
+
+        // Database-dependent validations
+        if (standard) {
+            if (request.getPrice().compareTo(BigDecimal.ZERO) != 0) {
+                throw new BusinessRuleException("The STANDARD tier price cannot be changed");
+            }
+            if (!request.getActive()) {
+                throw new BusinessRuleException("The STANDARD tier cannot be deactivated");
+            }
+            if (request.getDiscountPercentage() != 0) {
+                throw new BusinessRuleException("The STANDARD tier discount percentage must be 0");
+            }
+            if (request.getDurationMonths() != 0) {
+                throw new BusinessRuleException("The STANDARD tier duration must be 0 months");
+            }
+        } else {
+            if (request.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BusinessRuleException("Price must be greater than zero for paid tiers");
+            }
+            if (request.getDurationMonths() < 1) {
+                throw new BusinessRuleException("Duration in months must be at least 1 for paid tiers");
+            }
+        }
+
+        if (!standard && Boolean.TRUE.equals(request.getActive())) {
+            validateTierPriceMonotonicity(tier, request.getPrice());
+        }
+
+        Map<String, Object> before = snapshotTier(tier);
+
+        if (!standard) {
+            tier.setPrice(request.getPrice());
+            tier.setIsActive(request.getActive());
+        }
+        tier.setDurationMonths(request.getDurationMonths());
+        tier.setDiscountPercentage(request.getDiscountPercentage());
+        // Full-replace semantics: a null or blank value clears the description.
+        String cleanedDescription = (request.getDescription() == null || request.getDescription().isBlank())
+                ? null
+                : request.getDescription().trim();
+        tier.setDescription(cleanedDescription);
+
+        MembershipCardTier saved = tierRepository.saveAndFlush(tier);
+        Map<String, Object> after = snapshotTier(saved);
+
+        auditService.record(AuditEvent.builder()
+                .actor(actor)
+                .action(AuditAction.CARD_TIER_UPDATED)
+                .entityType("MEMBERSHIP_CARD_TIER")
+                .entityId(saved.getId())
+                .entityCode(saved.getCode())
+                .summary("Membership card tier '" + saved.getName() + "' updated")
+                .details(Map.of("before", before, "after", after))
+                .build());
+
+        return mapToTierResponse(saved);
+    }
+
+    private Map<String, Object> snapshotTier(MembershipCardTier t) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("name", t.getName());
+        map.put("price", t.getPrice());
+        map.put("durationMonths", t.getDurationMonths());
+        map.put("discountPercentage", t.getDiscountPercentage());
+        map.put("description", t.getDescription());
+        map.put("isActive", t.getIsActive());
+        return map;
     }
 
     @Override
@@ -89,9 +249,10 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         LocalDate today = LocalDate.now(clock);
         boolean paidAtDesk = SecurityUtils.isStaff(actor);
 
-        // Standard: free and permanent, nothing to pay
-        if (tier.getDurationMonths() == null || tier.getDurationMonths() <= 0) {
-            return mapToCardResponse(memberCardRepository.save(newCard(member, tier, today, null, CardStatus.ACTIVE, tier.getPrice())));
+        // Standard: free and permanent, nothing to pay.
+        // Invariant: STANDARD always has durationMonths 0 and price 0; every paid tier has durationMonths >= 1.
+        if (isStandard(tier)) {
+            return mapToCardResponse(memberCardRepository.save(newCard(member, tier, today, null, CardStatus.ACTIVE, BigDecimal.ZERO, false, null)));
         }
 
         // One card per member: a second request cannot be made while one is waiting for payment
@@ -102,19 +263,39 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         }
 
         CardPlan plan = planCard(member.getId(), tier, today);
-        if (!paidAtDesk && plan.price().compareTo(BigDecimal.ZERO) <= 0) {
+        boolean isUpgrade = plan.replaces() != null;
+        if (!isUpgrade && !paidAtDesk && plan.price().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessRuleException("Payment amount must be greater than zero. Attempted card price: " + plan.price());
         }
-
+        validateUpgradeFeeForActor(isUpgrade, plan.price(), paidAtDesk);
         CardStatus status = paidAtDesk ? CardStatus.ACTIVE : CardStatus.PENDING_PAYMENT;
-        MemberCard card = newCard(member, tier, plan.startDate(), plan.endDate(), status, plan.price());
+        MemberCard card = newCard(member, tier, plan.startDate(), plan.endDate(), status, plan.price(), isUpgrade, plan.replaces());
         if (status == CardStatus.PENDING_PAYMENT) {
             Payment payment = paymentService.createPendingPayment(member, plan.price(), request.getPaymentMethod());
             card.setPayment(payment);
         }
-        card = memberCardRepository.save(card);
-        if (paidAtDesk && plan.replaces() != null) {
-            replace(plan.replaces());
+        try {
+            card = memberCardRepository.save(card);
+            memberCardRepository.flush();
+            if (status == CardStatus.ACTIVE && plan.replaces() != null) {
+                replace(plan.replaces());
+            }
+        } catch (DataIntegrityViolationException ex) {
+            if (isUpgrade) {
+                if (isIndexViolation(ex, "ux_member_card_replaces_in_force")) {
+                    log.warn("Concurrent upgrade conflict for memberId={} replacing cardId={}: {}",
+                            member.getId(), plan.replaces().getId(), ex.getMessage());
+                    throw new BusinessRuleException("A concurrent upgrade is already in progress for this membership card.", ex);
+                }
+            }
+            throw ex;
+        } catch (PessimisticLockingFailureException ex) {
+            if (isUpgrade) {
+                log.warn("Lock acquisition failure during upgrade for memberId={} replacing cardId={}: {}",
+                        member.getId(), plan.replaces().getId(), ex.getMessage());
+                throw new BusinessRuleException("The upgrade could not be processed due to a concurrent conflict. Please retry.", ex);
+            }
+            throw ex;
         }
         return mapToCardResponse(card);
     }
@@ -142,10 +323,19 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             throw new BusinessRuleException("Cannot specify payment method for a card with no linked payment");
         }
 
+        // Honor a previously requested card after tier deactivation, retaining its requested price.
+        // Revalidate the member baseline and payment through the existing activation path.
         LocalDate today = LocalDate.now(clock);
         CardPlan plan = planCard(card.getMember().getId(), card.getTier(), today);
-        boolean requestedAsUpgrade = isUpgradePrice(card);
-        if (requestedAsUpgrade != (plan.replaces() != null)) {
+        boolean requestedAsUpgrade = card.isUpgradeRequest();
+        if (requestedAsUpgrade) {
+            if (card.getReplacesCard() == null) {
+                throw new BusinessRuleException("Cannot determine upgrade baseline for this membership card. Please contact the front desk.");
+            }
+            if (plan.replaces() == null || !plan.replaces().getId().equals(card.getReplacesCard().getId())) {
+                throw new BusinessRuleException("The member's card has changed since this request. Cancel it and request the card again.");
+            }
+        } else if (plan.replaces() != null) {
             throw new BusinessRuleException("The member's card has changed since this request. Cancel it and request the card again.");
         }
 
@@ -184,18 +374,93 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         return mapToCardResponse(memberCardRepository.save(card));
     }
 
+    private boolean isIndexViolation(Throwable throwable, String indexName) {
+        Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        ArrayDeque<Throwable> pending = new ArrayDeque<>();
+        pending.add(throwable);
+        Pattern indexEvidence = Pattern.compile("(?i)(?:unique\\s+(?:key\\s+)?(?:index|constraint)|constraint)\\s+['\\\"\\[]"
+                + Pattern.quote(indexName) + "['\\\"\\]]");
+        while (!pending.isEmpty()) {
+            Throwable current = pending.removeFirst();
+            if (!visited.add(current)) {
+                continue;
+            }
+            // Error codes alone cannot identify which unique constraint failed.
+            boolean uniqueCode = !(current instanceof SQLException sql)
+                    || sql.getErrorCode() == 2601 || sql.getErrorCode() == 2627;
+            if (uniqueCode && current.getMessage() != null
+                    && indexEvidence.matcher(current.getMessage()).find()) {
+                return true;
+            }
+            if (current.getCause() != null) {
+                pending.add(current.getCause());
+            }
+            if (current instanceof SQLException sql && sql.getNextException() != null) {
+                pending.add(sql.getNextException());
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Calculates the baseline price paid for the active term.
+     * If the current card was created via an upgrade, the member only paid the price difference for that card,
+     * so we sum pricePaid across the replacement chain.
+     * Legacy rows with unresolved replaces_card_id fail closed (throws BusinessRuleException), requiring front desk assistance.
+     * Traversal is bounded to prevent infinite cycles.
+     */
+    private BigDecimal calculateTermBasePrice(MemberCard card) {
+        if (card == null || card.getPricePaid() == null) {
+            throw new BusinessRuleException("Cannot determine upgrade baseline for this membership card. Please contact the front desk.");
+        }
+        if (card.isUpgradeRequest() && card.getReplacesCard() == null) {
+            // Fail closed: legacy upgrade rows where replaces_card_id could not be resolved
+            // cannot safely determine baseline price. Automated upgrade is rejected and member is directed to the front desk.
+            throw new BusinessRuleException("Cannot determine upgrade baseline for this membership card. Please contact the front desk.");
+        }
+        BigDecimal total = card.getPricePaid();
+        MemberCard replaced = card.getReplacesCard();
+        int depth = 0;
+        Set<Long> visited = new HashSet<>();
+        if (card.getId() != null) {
+            visited.add(card.getId());
+        }
+        while (replaced != null) {
+            if (++depth > MAX_CHAIN_DEPTH || (replaced.getId() != null && !visited.add(replaced.getId()))) {
+                throw new BusinessRuleException("Membership card upgrade chain exceeds maximum allowed depth or contains cycle. Please contact the front desk.");
+            }
+            if (replaced.getPricePaid() == null
+                    || replaced.getMember() == null || card.getMember() == null
+                    || !replaced.getMember().getId().equals(card.getMember().getId())
+                    || replaced.getStatus() != CardStatus.REPLACED
+                    || !java.util.Objects.equals(replaced.getEndDate(), card.getEndDate())
+                    || (replaced.isUpgradeRequest() && replaced.getReplacesCard() == null)) {
+                throw new BusinessRuleException("Cannot determine upgrade baseline for this membership card. Please contact the front desk.");
+            }
+            total = total.add(replaced.getPricePaid());
+            replaced = replaced.getReplacesCard();
+        }
+        return total;
+    }
+
     /**
      * What buying {@code tier} means today for this member:
      * <ul>
      *   <li>no paid card: a new card from today;</li>
      *   <li>the same tier: a renewal from the day after the last card ends;</li>
-     *   <li>a dearer tier while a card is valid: an upgrade from today that keeps the current end date;
-     *       the member pays only the price difference and the current card is replaced;</li>
-     *   <li>a cheaper tier: it starts the day after the last card ends, full price.</li>
+     *   <li>a higher-ranked tier while a card is valid (rank defined by tier_rank):
+     *       an upgrade from today that keeps the current card's end date.
+     *       The fee is max(0, targetTier.price - calculateTermBasePrice(current)), where the base is what the member
+     *       actually paid toward the active term. If fee is 0, the upgrade is immediately ACTIVE with 0 fee.
+     *       The current card is replaced upon activation;</li>
+     *   <li>an equal or lower ranked tier: it starts the day after the last card ends, at full price.</li>
      * </ul>
      * A card lasts {@code durationMonths} months: it ends the day before the same date {@code durationMonths} later.
      */
     private CardPlan planCard(Long memberId, MembershipCardTier tier, LocalDate today) {
+        if (!isStandard(tier) && tier.getEffectiveRank() <= 0) {
+            throw new BusinessRuleException("Tier ranking is not configured for this tier");
+        }
         int months = tier.getDurationMonths();
         List<MemberCard> paid = memberCardRepository.findActiveCardsForMember(memberId, CardStatus.ACTIVE, today).stream()
                 .filter(c -> c.getTier().getDurationMonths() != null && c.getTier().getDurationMonths() > 0 && c.getEndDate() != null)
@@ -213,14 +478,26 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             LocalDate from = last.getEndDate().plusDays(1);
             return new CardPlan(from, cardEnd(from, months), tier.getPrice(), null);
         }
-        if (current != null && tier.getPrice().compareTo(current.getTier().getPrice()) > 0) {
+
+        // Rank rule: an upgrade is strictly determined by tier ranking,
+        // decoupled from live catalog price edits.
+        boolean isUpgradeRank = (current != null
+                && current.getTier() != null
+                && tier.getEffectiveRank() > 0
+                && tier.getEffectiveRank() > current.getTier().getEffectiveRank());
+
+        if (isUpgradeRank) {
             if (last != current) {
                 throw new BusinessRuleException("The current card is already renewed from " + last.getStartDate()
                         + ". The card can be upgraded once that term has started.");
             }
-            BigDecimal difference = tier.getPrice().subtract(current.getTier().getPrice());
-            return new CardPlan(today, current.getEndDate(), difference, current);
+            BigDecimal currentBasePrice = calculateTermBasePrice(current);
+            BigDecimal diff = tier.getPrice().subtract(currentBasePrice);
+            BigDecimal fee = diff.compareTo(BigDecimal.ZERO) > 0 ? diff : BigDecimal.ZERO;
+            return new CardPlan(today, current.getEndDate(), fee, current);
         }
+
+        // Equal or lower rank keeps the existing path that queues the new card after the last card ends at full price.
         LocalDate from = last.getEndDate().plusDays(1);
         return new CardPlan(from, cardEnd(from, months), tier.getPrice(), null);
     }
@@ -229,18 +506,67 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         return start.plusMonths(months).minusDays(1);
     }
 
-    /** A card request priced below its tier was requested as an upgrade (the member pays only the difference). */
-    private static boolean isUpgradePrice(MemberCard card) {
-        return card.getPricePaid() != null && card.getPricePaid().compareTo(card.getTier().getPrice()) < 0;
-    }
-
     private void replace(MemberCard old) {
         old.setStatus(CardStatus.REPLACED);
         memberCardRepository.save(old);
     }
 
+    /**
+     * Temporary fail-closed policy pending Product Owner decision:
+     * Self-service members cannot execute zero-fee upgrades online.
+     * When computed upgrade fee is <= 0, non-staff actors are directed to the front desk.
+     * Staff-assisted purchases at the desk remain permitted to process zero-fee upgrades immediately.
+     */
+    private void validateUpgradeFeeForActor(boolean isUpgrade, BigDecimal fee, boolean paidAtDesk) {
+        if (isUpgrade && !paidAtDesk && fee.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessRuleException("Zero-fee upgrades cannot be completed online. Please contact the front desk.");
+        }
+    }
+
+    /**
+     * Enforces price monotonicity for active paid tiers:
+     * When ordered by tier_rank, active paid tier prices must be strictly increasing.
+     * Compares the proposed price against the nearest active lower-ranked and nearest active higher-ranked paid tier.
+     * Decision on inactive tiers: Inactive tiers are excluded from active price monotonicity enforcement
+     * because they are not on sale to members. When an inactive tier is edited or reactivated, its price is validated
+     * if request.getActive() is true. STANDARD tier is excluded from this rule.
+     */
+    private void validateTierPriceMonotonicity(MembershipCardTier tierBeingUpdated, BigDecimal newPrice) {
+        int targetRank = tierBeingUpdated.getEffectiveRank();
+        if (targetRank <= 0) {
+            return;
+        }
+        List<MembershipCardTier> activeTiers = tierRepository.findByIsActiveTrue().stream()
+                .filter(t -> !isStandard(t))
+                .filter(t -> !t.getId().equals(tierBeingUpdated.getId()))
+                .filter(t -> t.getEffectiveRank() > 0)
+                .collect(Collectors.toList());
+
+        // Nearest lower-ranked active paid tier
+        activeTiers.stream()
+                .filter(t -> t.getEffectiveRank() < targetRank)
+                .max(Comparator.comparingInt(MembershipCardTier::getEffectiveRank))
+                .ifPresent(lowerTier -> {
+                    if (newPrice.compareTo(lowerTier.getPrice()) <= 0) {
+                        throw new BusinessRuleException("Tier price must be strictly greater than lower-ranked tier '"
+                                + lowerTier.getName() + "' (" + lowerTier.getPrice() + ")");
+                    }
+                });
+
+        // Nearest higher-ranked active paid tier
+        activeTiers.stream()
+                .filter(t -> t.getEffectiveRank() > targetRank)
+                .min(Comparator.comparingInt(MembershipCardTier::getEffectiveRank))
+                .ifPresent(higherTier -> {
+                    if (newPrice.compareTo(higherTier.getPrice()) >= 0) {
+                        throw new BusinessRuleException("Tier price must be strictly less than higher-ranked tier '"
+                                + higherTier.getName() + "' (" + higherTier.getPrice() + ")");
+                    }
+                });
+    }
+
     private MemberCard newCard(MemberProfile member, MembershipCardTier tier, LocalDate start, LocalDate end,
-                               CardStatus status, BigDecimal price) {
+                               CardStatus status, BigDecimal price, boolean isUpgrade, MemberCard replacesCard) {
         long seq = memberCardRepository.getNextCardCodeSequence();
         return MemberCard.builder()
                 .cardCode(codeFormatter.formatCardCode(seq))
@@ -250,6 +576,8 @@ public class MembershipCardServiceImpl implements MembershipCardService {
                 .endDate(end)
                 .status(status)
                 .pricePaid(price)
+                .upgradeRequest(isUpgrade)
+                .replacesCard(replacesCard)
                 .build();
     }
 
@@ -270,6 +598,12 @@ public class MembershipCardServiceImpl implements MembershipCardService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Decision: benefits follow the tier. Existing active cards use the CURRENT discountPercentage
+     * of their tier (live tier benefits). We do not snapshot discount on member_card.
+     * When package registrations occur, they snapshot originalPrice, discountPercentage, and paidAmount
+     * at registration time, which must never be recomputed.
+     */
     @Override
     @Transactional(readOnly = true)
     public int getApplicableDiscountPercentage(Long memberId, int packageDurationDays) {
@@ -298,6 +632,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
                 .discountPercentage(tier.getDiscountPercentage())
                 .description(tier.getDescription())
                 .isActive(tier.getIsActive())
+                .tierRank(tier.getEffectiveRank())
                 .build();
     }
 
@@ -311,6 +646,9 @@ public class MembershipCardServiceImpl implements MembershipCardService {
                 .tierId(card.getTier().getId())
                 .tierCode(card.getTier().getCode())
                 .tierName(card.getTier().getName())
+                .tierRank(card.getTier().getEffectiveRank())
+                .upgradeRequest(card.isUpgradeRequest())
+                .replacesCardId(card.getReplacesCard() == null ? null : card.getReplacesCard().getId())
                 .discountPercentage(card.getTier().getDiscountPercentage())
                 .startDate(card.getStartDate())
                 .endDate(card.getEndDate())

@@ -8,6 +8,7 @@ import { UNEXPECTED_RESPONSE_MESSAGE, type MemberCard, type RequestSignal } from
 
 /** Mirrors com.sportify.catalog.dto.CardTierResponse (GET /membership-cards/tiers, public, active tiers only). */
 export interface CardTier {
+  tierRank: number | null
   id: number
   code: string
   name: string

@@ -42,17 +42,24 @@ import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.entity.PaymentStatus;
 import com.sportify.payment.service.PaymentService;
-import org.springframework.security.access.AccessDeniedException;
+import com.sportify.catalog.dto.SportPackageUpdateRequest;
+import com.sportify.core.audit.AuditAction;
+import com.sportify.core.audit.AuditEvent;
+import com.sportify.core.audit.AuditService;
+import org.mockito.ArgumentCaptor;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -74,6 +81,8 @@ public class SportPackageServiceImplTest {
     private PaymentService paymentService;
     @Mock
     private CodeFormatter codeFormatter;
+    @Mock
+    private AuditService auditService;
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-10-06T00:00:00Z"), ZoneId.of("UTC"));
 
@@ -726,4 +735,256 @@ public class SportPackageServiceImplTest {
         assertThrows(BusinessRuleException.class,
                 () -> sportPackageService.activateRegistration(91L, receptionistUser, PaymentMethod.CASH));
     }
+
+    @Test
+    void updatePackage_success_recordsAuditLog() {
+        SportPackage pkg = SportPackage.builder()
+                .id(10L)
+                .code("PKG-10")
+                .name("Old Name")
+                .sport(sport)
+                .trainingFormat(TrainingFormat.SELF_TRAINING)
+                .durationDays(30)
+                .sessionCount(12)
+                .sessionMinutes(60)
+                .priceAmount(BigDecimal.valueOf(200000.00))
+                .isActive(true)
+                .build();
+
+        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(pkg));
+        when(sportPackageRepository.saveAndFlush(any(SportPackage.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SportPackageUpdateRequest updateReq = SportPackageUpdateRequest.builder()
+                .name("New Yoga Flow")
+                .price(BigDecimal.valueOf(250000.00))
+                .sessionCount(15)
+                .durationDays(30)
+                .sessionMinutes(90)
+                .active(true)
+                .build();
+
+        UserAccount manager = UserAccount.builder().id(99L).email("mgr@sportify.com").fullName("Manager").build();
+        SportPackageResponse res = sportPackageService.updatePackage(10L, updateReq, manager);
+
+        assertNotNull(res);
+        assertEquals("New Yoga Flow", res.getName());
+        assertEquals(BigDecimal.valueOf(250000.00), res.getPriceAmount());
+        assertEquals(90, res.getSessionMinutes());
+        assertEquals(15, res.getSessionCount());
+
+        ArgumentCaptor<AuditEvent> eventCaptor = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService).record(eventCaptor.capture());
+        AuditEvent event = eventCaptor.getValue();
+        assertEquals(AuditAction.PACKAGE_UPDATED, event.getAction());
+        assertEquals("SPORT_PACKAGE", event.getEntityType());
+        assertEquals(10L, event.getEntityId());
+        assertEquals("PKG-10", event.getEntityCode());
+        assertEquals(manager, event.getActor());
+        assertNotNull(event.getDetails());
+        assertTrue(event.getDetails().containsKey("before"));
+        assertTrue(event.getDetails().containsKey("after"));
+    }
+
+    @Test
+    void updatePackage_invalidSessionMinutes_throwsBusinessRuleException() {
+        SportPackage pkg = SportPackage.builder()
+                .id(10L)
+                .code("PKG-10")
+                .name("Old Name")
+                .sport(sport)
+                .trainingFormat(TrainingFormat.SELF_TRAINING)
+                .durationDays(30)
+                .sessionCount(12)
+                .sessionMinutes(60)
+                .priceAmount(BigDecimal.valueOf(200000.00))
+                .isActive(true)
+                .build();
+
+        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(pkg));
+
+        SportPackageUpdateRequest req45 = SportPackageUpdateRequest.builder()
+                .name("New Name")
+                .price(BigDecimal.valueOf(250000.00))
+                .sessionCount(15)
+                .durationDays(30)
+                .sessionMinutes(45)
+                .active(true)
+                .build();
+
+        assertThrows(BusinessRuleException.class, () -> sportPackageService.updatePackage(10L, req45, null));
+        verify(sportPackageRepository, never()).saveAndFlush(any());
+        verify(auditService, never()).record(any());
+    }
+
+
+    @Test
+    void updatePackage_preservesExistingDescription() {
+        SportPackage pkg = SportPackage.builder()
+                .id(10L)
+                .code("PKG-10")
+                .name("Yoga Flow")
+                .sport(sport)
+                .trainingFormat(TrainingFormat.SELF_TRAINING)
+                .durationDays(30)
+                .sessionCount(10)
+                .sessionMinutes(60)
+                .priceAmount(BigDecimal.valueOf(200000.00))
+                .description("Initial description")
+                .isActive(true)
+                .build();
+
+        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(pkg));
+        when(sportPackageRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        SportPackageUpdateRequest req = SportPackageUpdateRequest.builder()
+                .name("Yoga Flow Updated")
+                .price(BigDecimal.valueOf(220000.00))
+                .sessionCount(12)
+                .durationDays(30)
+                .sessionMinutes(60)
+                .active(true)
+                .build();
+
+        SportPackageResponse res = sportPackageService.updatePackage(10L, req, null);
+        assertEquals("Initial description", res.getDescription());
+        assertEquals("Initial description", pkg.getDescription());
+    }
+
+    @Test
+    void updatePackage_unknownId_throwsResourceNotFoundException() {
+        when(sportPackageRepository.findById(999L)).thenReturn(Optional.empty());
+
+        SportPackageUpdateRequest req = SportPackageUpdateRequest.builder()
+                .name("New Name")
+                .price(BigDecimal.valueOf(250000.00))
+                .sessionCount(15)
+                .durationDays(30)
+                .sessionMinutes(60)
+                .active(true)
+                .build();
+
+        assertThrows(ResourceNotFoundException.class, () -> sportPackageService.updatePackage(999L, req, null));
+    }
+
+    @Test
+    void updatePackage_existingRegistrationsRetainSnapshotPrice() {
+        SportPackage pkg = SportPackage.builder()
+                .id(10L)
+                .code("PKG-10")
+                .name("Yoga Basic")
+                .sport(sport)
+                .trainingFormat(TrainingFormat.SELF_TRAINING)
+                .durationDays(30)
+                .sessionCount(10)
+                .sessionMinutes(60)
+                .priceAmount(BigDecimal.valueOf(100000.00))
+                .isActive(true)
+                .build();
+
+        SportPackageRegistration existingRegistration = SportPackageRegistration.builder()
+                .id(50L)
+                .registrationCode("REG-PKG-0050")
+                .member(memberProfile)
+                .sportPackage(pkg)
+                .channel(RegistrationChannel.ONLINE)
+                .originalPrice(BigDecimal.valueOf(100000.00))
+                .discountPercentage(0)
+                .paidAmount(BigDecimal.valueOf(100000.00))
+                .status(PackageRegistrationStatus.ACTIVE)
+                .build();
+
+        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(pkg));
+        when(sportPackageRepository.saveAndFlush(any(SportPackage.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Manager increases package price from 100,000 to 200,000
+        SportPackageUpdateRequest updateReq = SportPackageUpdateRequest.builder()
+                .name("Yoga Basic Updated")
+                .price(BigDecimal.valueOf(200000.00))
+                .sessionCount(10)
+                .durationDays(30)
+                .sessionMinutes(60)
+                .active(true)
+                .build();
+
+        sportPackageService.updatePackage(10L, updateReq, null);
+
+        // Verify package price is updated
+        assertEquals(BigDecimal.valueOf(200000.00), pkg.getPriceAmount());
+
+        // Verify the existing registration keeps its original snapshot price
+        assertEquals(BigDecimal.valueOf(100000.00), existingRegistration.getOriginalPrice());
+        assertEquals(BigDecimal.valueOf(100000.00), existingRegistration.getPaidAmount());
+        assertEquals(0, existingRegistration.getDiscountPercentage());
+        verifyNoInteractions(registrationRepository);
+    }
+
+    @Test
+    void memberImmediatelySeesNewPrice() {
+        SportPackage pkg = SportPackage.builder()
+                .id(10L)
+                .code("PKG-10")
+                .name("Yoga Basic")
+                .sport(sport)
+                .trainingFormat(TrainingFormat.SELF_TRAINING)
+                .durationDays(30)
+                .sessionCount(10)
+                .sessionMinutes(60)
+                .priceAmount(BigDecimal.valueOf(100000.00))
+                .isActive(true)
+                .build();
+
+        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(pkg));
+        when(sportPackageRepository.saveAndFlush(any(SportPackage.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Manager updates price
+        SportPackageUpdateRequest updateReq = SportPackageUpdateRequest.builder()
+                .name("Yoga Basic")
+                .price(BigDecimal.valueOf(180000.00))
+                .sessionCount(10)
+                .durationDays(30)
+                .sessionMinutes(60)
+                .active(true)
+                .build();
+
+        sportPackageService.updatePackage(10L, updateReq, null);
+
+        // Active catalog queries immediately reflect the updated package price
+        when(sportPackageRepository.findByIsActiveTrue()).thenReturn(List.of(pkg));
+        when(sportPackageRepository.findBySportIdAndIsActiveTrue(1L)).thenReturn(List.of(pkg));
+
+        List<SportPackageResponse> activePackages = sportPackageService.getAllActivePackages();
+        assertEquals(1, activePackages.size());
+        assertEquals(BigDecimal.valueOf(180000.00), activePackages.get(0).getPriceAmount());
+
+        List<SportPackageResponse> sportPackages = sportPackageService.getPackagesBySport(1L);
+        assertEquals(1, sportPackages.size());
+        assertEquals(BigDecimal.valueOf(180000.00), sportPackages.get(0).getPriceAmount());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getManagerPackages_queriesWithFilters() {
+        SportPackage pkg1 = SportPackage.builder()
+                .id(10L)
+                .code("PKG-1")
+                .name("Package 1")
+                .sport(sport)
+                .trainingFormat(TrainingFormat.COACH_LED)
+                .durationDays(60)
+                .sessionCount(20)
+                .sessionMinutes(90)
+                .priceAmount(BigDecimal.valueOf(500000.00))
+                .isActive(false)
+                .build();
+
+        when(sportPackageRepository.findAll(any(Specification.class), any(Sort.class)))
+                .thenReturn(List.of(pkg1));
+
+        List<SportPackageResponse> result = sportPackageService.getManagerPackages(1L, TrainingFormat.COACH_LED, false);
+
+        assertEquals(1, result.size());
+        assertEquals("PKG-1", result.get(0).getCode());
+        assertEquals(false, result.get(0).getIsActive());
+    }
 }
+

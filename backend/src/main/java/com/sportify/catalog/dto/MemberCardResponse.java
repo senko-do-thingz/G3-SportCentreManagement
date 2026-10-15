@@ -21,6 +21,9 @@ public class MemberCardResponse {
     private Long tierId;
     private String tierCode;
     private String tierName;
+    private Integer tierRank;
+    private boolean upgradeRequest;
+    private Long replacesCardId;
     private Integer discountPercentage;
     private LocalDate startDate;
     private LocalDate endDate;

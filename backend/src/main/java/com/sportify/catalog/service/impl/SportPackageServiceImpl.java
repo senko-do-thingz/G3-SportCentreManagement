@@ -4,6 +4,7 @@ import com.sportify.catalog.dto.PackageRegistrationRequest;
 import com.sportify.catalog.dto.PackageRegistrationResponse;
 import com.sportify.catalog.dto.SportPackageCreateRequest;
 import com.sportify.catalog.dto.SportPackageResponse;
+import com.sportify.catalog.dto.SportPackageUpdateRequest;
 import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.entity.RegistrationChannel;
 import com.sportify.catalog.entity.Sport;
@@ -12,13 +13,17 @@ import com.sportify.catalog.entity.SportPackageRegistration;
 import com.sportify.catalog.entity.TrainingFormat;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.repository.SportPackageRepository;
+import com.sportify.catalog.repository.SportPackageSpecifications;
 import com.sportify.catalog.repository.SportRepository;
 import com.sportify.catalog.service.MembershipCardService;
 import com.sportify.catalog.service.SportPackageService;
+import com.sportify.core.audit.AuditAction;
+import com.sportify.core.audit.AuditEvent;
+import com.sportify.core.audit.AuditService;
 import com.sportify.core.common.CodeFormatter;
+import com.sportify.core.common.SecurityUtils;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ResourceNotFoundException;
-import com.sportify.core.common.SecurityUtils;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
@@ -27,6 +32,7 @@ import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,12 +41,17 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class SportPackageServiceImpl implements SportPackageService {
+
+    public static final int SESSION_MINUTES_60 = 60;
+    public static final int SESSION_MINUTES_90 = 90;
 
     private final SportPackageRepository sportPackageRepository;
     private final SportPackageRegistrationRepository registrationRepository;
@@ -50,6 +61,7 @@ public class SportPackageServiceImpl implements SportPackageService {
     private final MembershipCardService membershipCardService;
     private final PaymentService paymentService;
     private final CodeFormatter codeFormatter;
+    private final AuditService auditService;
     private final Clock clock;
 
     @Override
@@ -66,6 +78,62 @@ public class SportPackageServiceImpl implements SportPackageService {
         return sportPackageRepository.findBySportIdAndIsActiveTrue(sportId).stream()
                 .map(this::mapToPackageResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SportPackageResponse> getManagerPackages(Long sportId, TrainingFormat format, Boolean active) {
+        return sportPackageRepository.findAll(SportPackageSpecifications.withFilters(sportId, format, active), Sort.by(Sort.Direction.ASC, "id"))
+                .stream()
+                .map(this::mapToPackageResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public SportPackageResponse updatePackage(Long id, SportPackageUpdateRequest request, UserAccount actor) {
+        SportPackage pkg = sportPackageRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Sport package not found for id: " + id));
+
+        if (request.getSessionMinutes() != SESSION_MINUTES_60 && request.getSessionMinutes() != SESSION_MINUTES_90) {
+            throw new BusinessRuleException("Session minutes must be either 60 or 90");
+        }
+
+        Map<String, Object> before = snapshotPackage(pkg);
+
+        pkg.setName(request.getName().trim());
+        pkg.setPriceAmount(request.getPrice());
+        pkg.setSessionCount(request.getSessionCount());
+        pkg.setDurationDays(request.getDurationDays());
+        pkg.setSessionMinutes(request.getSessionMinutes());
+        pkg.setIsActive(request.getActive());
+
+        SportPackage saved = sportPackageRepository.saveAndFlush(pkg);
+        Map<String, Object> after = snapshotPackage(saved);
+
+        auditService.record(AuditEvent.builder()
+                .actor(actor)
+                .action(AuditAction.PACKAGE_UPDATED)
+                .entityType("SPORT_PACKAGE")
+                .entityId(saved.getId())
+                .entityCode(saved.getCode())
+                .summary("Sport package '" + saved.getName() + "' updated")
+                .details(Map.of("before", before, "after", after))
+                .build());
+
+        return mapToPackageResponse(saved);
+    }
+
+    private Map<String, Object> snapshotPackage(SportPackage p) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("name", p.getName());
+        map.put("priceAmount", p.getPriceAmount());
+        map.put("sessionCount", p.getSessionCount());
+        map.put("durationDays", p.getDurationDays());
+        map.put("sessionMinutes", p.getSessionMinutes());
+        map.put("isActive", p.getIsActive());
+        map.put("description", p.getDescription());
+        return map;
     }
 
     @Override

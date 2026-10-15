@@ -154,16 +154,19 @@ Check constraints:
 | 8 | is_active | BIT | No | 1 | - | V10 | - |
 | 9 | created_at | DATETIME2(0) | No | SYSDATETIME() | - | V10 | - |
 | 10 | updated_at | DATETIME2(0) | Yes | - | - | V10 | - |
+| 11 | tier_rank | INT | No | 0 | - | V22 | Explicit hierarchy rank (STANDARD=1, SILVER=2, GOLD=3, VIP=4) |
 
-Unique constraints:
+Unique constraints and filtered indexes:
 
 - `uq_membership_card_tier_code`: (code)
+- `ux_membership_card_tier_rank`: (tier_rank) WHERE tier_rank > 0 (V22, enforces unique rank across active and inactive tiers)
 
 Check constraints:
 
 - `ck_membership_card_tier_price`: `(price >= 0)`
 - `ck_membership_card_tier_duration`: `(duration_months >= 0)`
 - `ck_membership_card_tier_discount`: `(discount_percentage >= 0 AND discount_percentage <= 100)`
+- `chk_membership_card_tier_rank`: `(tier_rank >= 0)` (V22)
 
 ## `member_card`
 
@@ -183,17 +186,21 @@ Check constraints:
 | 8 | price_paid | DECIMAL(14,2) | No | 0 | - | V10 | - |
 | 9 | created_at | DATETIME2(0) | No | SYSDATETIME() | - | V10 | - |
 | 10 | updated_at | DATETIME2(0) | Yes | - | - | V10 | - |
-| 11 | payment_id | BIGINT | Yes | - | FK -> payment.id | V14 | Not mapped in the entity yet; Added in V14 |
+| 11 | payment_id | BIGINT | Yes | - | FK -> payment.id | V14 | Mapped in entity |
+| 12 | upgrade_request | BIT | No | 0 | - | V22 | Legacy backfill requires price_paid < tier.price and an eligible same-member predecessor. No-predecessor purchases remain unmarked |
+| 13 | replaces_card_id | BIGINT | Yes | - | FK -> member_card.id | V22 | Replaced card in upgrade chain. Deterministically backfilled for ACTIVE upgrades via matching REPLACED end_date and PENDING_PAYMENT upgrades via active started card. Legacy rows with unresolved replaces_card_id fail closed during upgrade pricing |
 
 Foreign keys:
 
 - `fk_member_card_member`: (member_id) -> member_profile(user_id)
 - `fk_member_card_tier`: (tier_id) -> membership_card_tier(id)
 - `fk_member_card_payment`: (payment_id) -> payment(id)
+- `fk_member_card_replaces_card`: (replaces_card_id) -> member_card(id)
 
 Unique constraints:
 
 - `uq_member_card_code`: (card_code)
+- `ux_member_card_replaces_in_force`: (replaces_card_id) WHERE status IN ('ACTIVE', 'PENDING_PAYMENT') AND replaces_card_id IS NOT NULL (V22)
 
 Check constraints:
 

@@ -15,6 +15,9 @@ export function card(overrides: Partial<MemberCard> = {}): MemberCard {
     tierId: 3,
     tierCode: 'VIP',
     tierName: 'VIP',
+    tierRank: 4,
+    upgradeRequest: false,
+    replacesCardId: null,
     discountPercentage: 10,
     startDate: '2026-07-05',
     endDate: '2027-07-04',
@@ -138,6 +141,7 @@ export function cardTier(overrides: Partial<CardTier> = {}): CardTier {
   return {
     id: 3,
     code: 'VIP',
+    tierRank: 4,
     name: 'VIP Member',
     price: 600000,
     durationMonths: 12,
@@ -151,6 +155,7 @@ export function cardTier(overrides: Partial<CardTier> = {}): CardTier {
 export const STANDARD_TIER = cardTier({
   id: 1,
   code: 'STANDARD',
+  tierRank: 1,
   name: 'Standard',
   price: 0,
   durationMonths: 0,
@@ -160,6 +165,7 @@ export const STANDARD_TIER = cardTier({
 export const GOLD_TIER = cardTier({
   id: 2,
   code: 'GOLD',
+  tierRank: 3,
   name: 'Gold Member',
   price: 300000,
   durationMonths: 12,

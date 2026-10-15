@@ -92,6 +92,13 @@ jobs:
         if: always()
         run: bash scripts/ci/check-no-skipped-tests.sh backend/target/surefire-reports
 
+      - name: Verify unit tag isolation and report counts
+        if: always()
+        run: python3 scripts/ci/check-test-reports.py unit backend/target/surefire-reports
+
+      - name: Test shared report guard
+        run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
+
       - name: Publish test report
         if: always()
         uses: mikepenz/action-junit-report@v6
@@ -139,6 +146,10 @@ jobs:
       - name: Run integration tests
         working-directory: backend
         run: mvn -B -ntp verify -DskipUnitTests=true
+
+      - name: Verify executed integration suites and report counts
+        if: always()
+        run: python3 scripts/ci/check-test-reports.py integration backend/target/failsafe-reports
 
       - name: Fail on skipped tests
         if: always()

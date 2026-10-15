@@ -85,6 +85,7 @@ Defines the membership card discount tiers (Standard, Gold, VIP).
 | discount_percentage | INT | No | CHECK >= 0 | 0% for Standard, 5% for Gold, 10% for VIP |
 | description | NVARCHAR(500) | Yes | | Tier benefits description |
 | is_active | BIT | No | 1 | |
+| tier_rank | INT | No | 0 | Explicit hierarchy rank (STANDARD=1, SILVER=2, GOLD=3, VIP=4) (V22) |
 | created_at, updated_at | DATETIME2(0) | | | Audit |
 
 ### `member_card`
@@ -101,7 +102,9 @@ Member's card holding record.
 | end_date | DATE | Yes | | Null for permanent Standard, date for Gold/VIP |
 | status | NVARCHAR(20) | No | `ACTIVE` | `PENDING_PAYMENT`, `ACTIVE`, `EXPIRED`, `CANCELLED`, `REPLACED` (V20). `PENDING_PAYMENT` = online request not paid yet, `REPLACED` = old card after an upgrade |
 | price_paid | DECIMAL(14,2) | No | CHECK >= 0 | Snapshot of fee paid |
-| payment_id | BIGINT | Yes | FK -> payment.id | Associated payment (V14). Not mapped by the entity yet |
+| payment_id | BIGINT | Yes | FK -> payment.id | Associated payment (V14) |
+| upgrade_request | BIT | No | 0 | Explicit marker for upgrade requests (V22). Legacy backfill requires price_paid < tier.price and an eligible same-member predecessor |
+| replaces_card_id | BIGINT | Yes | FK -> member_card.id | Replaced card in upgrade chain (V22). Deterministically backfilled for ACTIVE upgrades via matching REPLACED card end_date, and PENDING_PAYMENT upgrades via active started card. Legacy rows with unresolved replaces_card_id fail closed during upgrade pricing. Enforced unique across in-force cards via filtered index ux_member_card_replaces_in_force |
 | created_at, updated_at | DATETIME2(0) | | | Audit |
 
 ### `sport_package`
@@ -170,3 +173,79 @@ Front desk arrival record (F1-15).
 - `plan_feature`: Monolithic plan feature bullet points.
 - `membership`: Monolithic membership registration periods.
 - `membership_sport`: Sports chosen under monolithic membership.
+
+## Operator Runbook: Migration V22 Upgrade Chain Verification and Unresolved Rows
+
+### Overview
+Migration V22 introduces upgrade chain tracking (`upgrade_request` and `replaces_card_id` on `member_card`) and explicit tier ranking (`tier_rank` on `membership_card_tier`). The discounted-price heuristic now also requires an eligible same-member predecessor. Purchases without that evidence retain `upgrade_request = 0`. Ambiguous predecessors or duplicate in-force targets leave an upgrade marker with a NULL link and fail closed on later upgrade attempts. Deterministic chains retain their historical `price_paid` snapshots.
+
+### Pre-Deployment Dry-Run Queries (Production Copy)
+> [!IMPORTANT]
+Run V22 on a disposable staging copy first, then run the following post-migration queries and record the results in the deployment change log. These queries reference columns that do not exist at V21. No production-copy counts or persistent-environment deployment history were available for the 2026-10-14 remediation. Before deployment, confirm that V22 has not been applied in a persistent environment. If it has, preserve its applied checksum and move the revised backfill into a successor migration.
+
+**Query 1: Dry-run count of unresolved cards grouped by status:**
+```sql
+SELECT 
+    status,
+    COUNT(*) AS unresolved_count
+FROM member_card
+WHERE upgrade_request = 1 
+  AND replaces_card_id IS NULL
+GROUP BY status;
+```
+
+**Query 2: Detailed list of affected cards with pricing comparison:**
+```sql
+SELECT 
+    mc.id AS card_id,
+    mc.card_code,
+    mc.member_id,
+    u.full_name AS member_name,
+    u.email AS member_email,
+    mct.code AS tier_code,
+    mct.name AS tier_name,
+    mc.price_paid,
+    mct.price AS live_tier_price,
+    mc.status,
+    mc.start_date,
+    mc.end_date,
+    mc.created_at
+FROM member_card mc
+JOIN membership_card_tier mct ON mc.tier_id = mct.id
+JOIN member_profile mp ON mc.member_id = mp.user_id
+JOIN user_account u ON mp.user_id = u.id
+WHERE mc.upgrade_request = 1
+  AND mc.replaces_card_id IS NULL
+  AND mc.status IN ('ACTIVE', 'PENDING_PAYMENT')
+ORDER BY mc.member_id, mc.created_at DESC;
+```
+
+### Operational Notes & Constraints
+
+#### 1. Promotional and Pre-Price-Increase Cards
+Cards bought during a promotion or before a catalog price increase may have `price_paid < tier.price`. Without an eligible predecessor, V22 leaves `upgrade_request = 0` and `replaces_card_id = NULL`. Their historical paid amount remains the baseline for future upgrades. A price difference alone is not evidence of an upgrade. The narrowed rule is still a heuristic: rows with coincidentally matching predecessor dates require operator review.
+
+#### 2. SQL Server `SET QUOTED_IDENTIFIER ON;` Requirement
+Table `member_card` contains a filtered unique index:
+`ux_member_card_replaces_in_force ON member_card(replaces_card_id) WHERE status IN ('ACTIVE', 'PENDING_PAYMENT') AND replaces_card_id IS NOT NULL;`
+SQL Server requires `QUOTED_IDENTIFIER` to be `ON` for any session executing DML statements (`INSERT`, `UPDATE`, `DELETE`) against tables with filtered indexes.
+When running ad-hoc SQL maintenance or scripts through command-line tools like `sqlcmd`, operators MUST explicitly issue:
+```sql
+SET QUOTED_IDENTIFIER ON;
+```
+Failure to set this will cause DML operations to abort with SQL Server error 1934 (`UPDATE failed because SET options have incorrect settings 'QUOTED_IDENTIFIER'`).
+
+#### 3. Tier Rank Rules and Inactive Tiers
+- Non-STANDARD tiers configured with `tier_rank = 0` cannot be purchased (backend rejects with HTTP 400: `Tier ranking is not configured for this tier`).
+- Currently, no public or manager API modifies `tier_rank`; it is initialized via schema migration seeds (STANDARD=1, SILVER=2, GOLD=3, VIP=4).
+- The filtered unique index `ux_membership_card_tier_rank` enforces rank uniqueness across all tiers where `tier_rank > 0`, including inactive tiers (`is_active = 0`). This ensures that deactivating a tier does not permit re-using its rank for another active tier, maintaining strict upgrade hierarchy invariants.
+
+### Front-Desk Handling Procedure
+When a member receives the error message "Cannot determine upgrade baseline for this membership card. Please contact the front desk.", staff should follow this resolution procedure:
+1. Lookup Member: Search member in Reception Member Search (F1-12) by email, phone, or member code.
+2. Review Card History: Open member overview to view all historical cards (`GET /members/{id}/overview`), identifying original card purchases and intermediate upgrades.
+3. Determine Baseline Credit: Sum the actual payments (`price_paid`) made by the member toward the current active period.
+4. Escalate Ambiguous Links: The normal desk sale also rejects unverifiable chains. No manual credit-adjustment API is implemented here. A maintainer must approve a data repair using verified payment evidence before another sale is attempted.
+5. Record the Repair: Preserve the reviewed predecessor links, original paid snapshots, approval and deployment record.
+
+
