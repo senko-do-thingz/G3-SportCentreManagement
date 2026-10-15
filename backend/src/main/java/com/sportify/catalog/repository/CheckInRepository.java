@@ -9,6 +9,7 @@ import java.util.List;
 
 @Repository
 public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
+    List<CheckIn> findTop5ByMemberIdOrderByCheckedInAtDescIdDesc(Long memberId);
     List<CheckIn> findByMemberIdOrderByCheckedInAtDesc(Long memberId);
     boolean existsByBookingIdAndResult(Long bookingId, CheckInResult result);
 }

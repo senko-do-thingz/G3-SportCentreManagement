@@ -12,4 +12,6 @@ public class MemberSearchResponse {
     private String email;
     private String phone;
     private String currentLevel;
+    private String cardTier;
+    private String status;
 }
