@@ -41,6 +41,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
@@ -69,6 +71,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -258,6 +261,18 @@ class RefundPaymentLinkTest {
         stubQuoteReads(List.of());
 
         assertThat(service.quoteRefund(50L, memberUser).getSuggestedAmount()).isEqualByComparingTo("33333.33");
+    }
+
+    @Test
+    void quote_ExactHalfCentTie_RoundsUp() {
+        registration.setTotalSessions(8);
+        registration.setRemainingSessions(1);
+        registration.setPaidAmount(new BigDecimal("1.00"));
+        payment.setAmount(new BigDecimal("1.00"));
+        stubQuoteReads(List.of());
+
+        // 1.00 / 8 = 0.125 exactly; HALF_EVEN would return 0.12.
+        assertThat(service.quoteRefund(50L, memberUser).getSuggestedAmount()).isEqualTo(new BigDecimal("0.13"));
     }
 
     @Test
@@ -458,6 +473,107 @@ class RefundPaymentLinkTest {
     }
 
     // ---------------------------------------------------------------- complete
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0.001", "100.005"})
+    void review_ExcessPrecision_RejectsExplicitAndFallbackAmount(String amount) {
+        RefundRequest refund = pendingRefund();
+        when(refundRequestRepository.findPaymentIdById(10L)).thenReturn(Optional.of(70L));
+        when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(payment));
+        when(refundRequestRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(refund));
+
+        assertThatThrownBy(() -> service.reviewRefund(10L, RefundReviewRequest.builder().approved(true)
+                .amountApproved(new BigDecimal(amount)).build(), manager))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("Amount approved must have at most 2 decimal places");
+        refund.setAmountRequested(new BigDecimal(amount));
+        assertThatThrownBy(() -> service.reviewRefund(10L, RefundReviewRequest.builder().approved(true).build(), manager))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("Amount approved must have at most 2 decimal places");
+        assertThat(refund.getStatus()).isEqualTo(RefundStatus.PENDING);
+        verify(refundRequestRepository, never()).save(any());
+        verify(registrationRepository, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"100", "100.00", "100.000"})
+    void review_NormalizesApprovedAmountWithoutRounding(String amount) {
+        when(refundRequestRepository.findPaymentIdById(10L)).thenReturn(Optional.of(70L));
+        when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(payment));
+        when(refundRequestRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingRefund()));
+        when(refundRequestRepository.save(any(RefundRequest.class))).thenAnswer(i -> i.getArgument(0));
+
+        RefundResponse response = service.reviewRefund(10L, RefundReviewRequest.builder().approved(true)
+                .amountApproved(new BigDecimal(amount)).build(), manager);
+
+        assertThat(response.getAmountApproved()).isEqualTo(new BigDecimal("100.00"));
+    }
+
+    @Test
+    void review_LegacyWithoutPayment_CapsExplicitAndFallbackAmountAtPaidAmount() {
+        RefundRequest refund = pendingRefund();
+        refund.setPayment(null);
+        registration.setPaidAmount(new BigDecimal("100.00"));
+        when(refundRequestRepository.findPaymentIdById(10L)).thenReturn(Optional.empty());
+        when(refundRequestRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(refund));
+
+        assertThatThrownBy(() -> service.reviewRefund(10L, RefundReviewRequest.builder().approved(true)
+                .amountApproved(new BigDecimal("100.01")).build(), manager))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("cannot exceed the registration paid amount");
+        assertThatThrownBy(() -> service.reviewRefund(10L, RefundReviewRequest.builder().approved(true).build(), manager))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("cannot exceed the registration paid amount");
+        assertThat(registration.getStatus()).isEqualTo(PackageRegistrationStatus.ACTIVE);
+        verify(refundRequestRepository, never()).save(any());
+        verify(registrationRepository, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"100.00"})
+    void review_LegacyAtPaidAmountOrWithoutKnownPaidAmount_Accepts(String paidAmount) {
+        RefundRequest refund = pendingRefund();
+        refund.setPayment(null);
+        registration.setPaidAmount(paidAmount == null ? null : new BigDecimal(paidAmount));
+        when(refundRequestRepository.findPaymentIdById(10L)).thenReturn(Optional.empty());
+        when(refundRequestRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(refund));
+        when(refundRequestRepository.save(any(RefundRequest.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertThat(service.reviewRefund(10L, RefundReviewRequest.builder().approved(true)
+                .amountApproved(new BigDecimal("100")).build(), manager).getStatus()).isEqualTo(RefundStatus.APPROVED);
+    }
+
+    @Test
+    void review_LinkedRefund_StillCapsAtPaymentRatherThanRegistrationPaidAmount() {
+        registration.setPaidAmount(new BigDecimal("100.00"));
+        when(refundRequestRepository.findPaymentIdById(10L)).thenReturn(Optional.of(70L));
+        when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(payment));
+        when(refundRequestRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingRefund()));
+        when(refundRequestRepository.save(any(RefundRequest.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertThat(service.reviewRefund(10L, RefundReviewRequest.builder().approved(true).build(), manager)
+                .getAmountApproved()).isEqualTo(new BigDecimal("450000.00"));
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"0", "-1", "0.001", "100.005"})
+    void complete_InvalidResolvedAmount_RejectsLinkedAndLegacyRefunds(String value) {
+        RefundRequest refund = approvedRefund();
+        BigDecimal amount = value == null ? null : new BigDecimal(value);
+        refund.setAmountApproved(amount);
+        refund.setAmountRequested(amount);
+        stubCompleteLocks(refund);
+
+        assertThatThrownBy(() -> service.completeRefund(10L, receptionist)).isInstanceOf(BusinessRuleException.class)
+                .hasMessage(value != null && amount.signum() > 0
+                        ? "Amount refunded must have at most 2 decimal places" : "Amount refunded must be greater than zero");
+        refund.setPayment(null);
+        when(refundRequestRepository.findPaymentIdById(10L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.completeRefund(10L, receptionist)).isInstanceOf(BusinessRuleException.class);
+        assertThat(refund.getStatus()).isEqualTo(RefundStatus.APPROVED);
+        verifyNoInteractions(paymentRefundService, bookingRepository, sessionRepository, auditService);
+        verify(refundRequestRepository, never()).save(any());
+    }
 
     private RefundRequest approvedRefund() {
         RefundRequest refund = pendingRefund();

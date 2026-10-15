@@ -1,5 +1,6 @@
 package com.sportify.payment.service.impl;
 
+import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ConflictException;
 import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.payment.entity.Invoice;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -27,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -97,5 +100,31 @@ class PaymentRefundServiceImplTest {
 
         assertThatThrownBy(() -> service.markRefunded(99L, "RFD-0004", BigDecimal.ONE))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "-1", "-0.01"})
+    void markRefunded_NonPositiveAmount_RejectsBeforeMutation(String amount) {
+        assertThatThrownBy(() -> service.markRefunded(70L, "RFD-0001", new BigDecimal(amount)))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("Amount refunded must be greater than zero");
+        assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        verifyNoInteractions(paymentRepository, invoiceRepository);
+    }
+
+    @Test
+    void markRefunded_IssuedInvoice_RefundedAndCancelledUnchanged() {
+        Invoice issued = Invoice.builder().id(1L).status(InvoiceStatus.ISSUED).build();
+        Invoice cancelled = Invoice.builder().id(2L).status(InvoiceStatus.CANCELLED).build();
+        when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(payment));
+        when(invoiceRepository.findByPaymentId(70L)).thenReturn(List.of(issued, cancelled));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertThat(service.markRefunded(70L, "RFD-0001", BigDecimal.ONE).getPaymentStatus())
+                .isEqualTo(PaymentStatus.REFUNDED);
+        assertThat(issued.getStatus()).isEqualTo(InvoiceStatus.REFUNDED);
+        assertThat(cancelled.getStatus()).isEqualTo(InvoiceStatus.CANCELLED);
+        verify(invoiceRepository).save(issued);
+        verify(invoiceRepository, never()).save(cancelled);
     }
 }

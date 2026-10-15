@@ -2,6 +2,7 @@ package com.sportify.catalog.controller;
 
 import com.sportify.catalog.dto.RefundQuoteResponse;
 import com.sportify.catalog.dto.RefundResponse;
+import com.sportify.catalog.dto.RefundReviewRequest;
 import com.sportify.catalog.entity.RefundStatus;
 import com.sportify.catalog.service.RefundService;
 import com.sportify.core.exception.BusinessRuleException;
@@ -35,6 +36,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -170,5 +172,30 @@ class RefundQuoteControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.cancelledBookings").value(2));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0.001", "100.005", "0", "-1"})
+    void review_InvalidAmount_Returns400BeforeService(String amount) throws Exception {
+        mockMvc.perform(put("/api/v1/refunds/10/review").with(user(userWithRole("MANAGER")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"approved\":true,\"amountApproved\":" + amount + "}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(refundService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"100.00", "100"})
+    void review_ValidAmount_ReachesService(String amount) throws Exception {
+        when(refundService.reviewRefund(eq(10L), any(), any())).thenReturn(RefundResponse.builder()
+                .id(10L).amountApproved(new BigDecimal(amount)).status(RefundStatus.APPROVED).build());
+
+        mockMvc.perform(put("/api/v1/refunds/10/review").with(user(userWithRole("MANAGER")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"approved\":true,\"amountApproved\":" + amount + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APPROVED"))
+                .andExpect(jsonPath("$.amountApproved").value(100));
+        verify(refundService).reviewRefund(eq(10L), any(RefundReviewRequest.class), any());
     }
 }

@@ -2,6 +2,7 @@ package com.sportify.catalog;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.microsoft.sqlserver.jdbc.SQLServerException;
 import com.sportify.AbstractIntegrationTest;
 import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.entity.RegistrationChannel;
@@ -35,6 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -357,11 +359,21 @@ class RefundPaymentLinkIntegrationTest extends AbstractIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"approved\":true}"), status().isOk());
 
         // The booking update comes after the payment and invoice updates; make the database refuse it.
+        String registrationStatusBefore = dbValue("sport_package_registration", regId, "status");
+        List<java.util.Map<String, Object>> auditRowsBefore = jdbc.queryForList(
+                "SELECT * FROM activity_log WHERE actor_user_id IN (?, ?, ?) ORDER BY id",
+                owner.getId(), receptionist.getId(), manager.getId());
         jdbc.execute("CREATE TRIGGER " + FAIL_TRIGGER + " ON booking AFTER UPDATE AS "
                 + "IF EXISTS (SELECT 1 FROM inserted WHERE id = " + futureBooking + ") "
                 + "THROW 50021, 'BE21 forced booking failure', 1;");
 
-        assertThatThrownBy(() -> refundService.completeRefund(refundId, receptionist)).isInstanceOf(Exception.class);
+        assertThatThrownBy(() -> refundService.completeRefund(refundId, receptionist))
+                .isInstanceOf(DataAccessException.class)
+                .hasRootCauseInstanceOf(SQLServerException.class)
+                .rootCause().isInstanceOfSatisfying(SQLServerException.class, ex -> {
+                    assertThat(ex.getErrorCode()).isEqualTo(50021);
+                    assertThat(ex.getMessage()).contains("BE21 forced booking failure");
+                });
 
         assertThat(dbValue("payment", paymentId, "payment_status")).isEqualTo("SUCCESS");
         assertThat(jdbc.queryForObject("SELECT status FROM invoice WHERE payment_id = ?", String.class, paymentId))
@@ -370,6 +382,9 @@ class RefundPaymentLinkIntegrationTest extends AbstractIntegrationTest {
         assertThat(dbValue("booking", futureBooking, "status")).isEqualTo("CONFIRMED");
         assertThat(jdbc.queryForObject("SELECT booked_count FROM class_session WHERE id = ?", Integer.class, futureSession))
                 .isEqualTo(1);
+        assertThat(dbValue("sport_package_registration", regId, "status")).isEqualTo(registrationStatusBefore);
+        assertThat(jdbc.queryForList("SELECT * FROM activity_log WHERE actor_user_id IN (?, ?, ?) ORDER BY id",
+                owner.getId(), receptionist.getId(), manager.getId())).isEqualTo(auditRowsBefore);
     }
 
     @Test
