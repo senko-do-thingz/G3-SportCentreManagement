@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-10-15 - My payments and receipts (BE-20, Flow 3)
+
+Branch `feat/f3-my-payments-r1`, based on main (`5075010`, BE-18 from PR #60 and BE-19 from PR #62). Replaces PR #56, whose branch carried the superseded BE-18 commits. Owner: Truc. Priority: P1. Depends on BE-18. Screens F3-03, S3-PaidHistory, S3-CardReceipt, S3-MemberReceipt and S3-SingleReceipt. Provides the BE-20 endpoints FE-11 (`feat/f3-member-payments`) already calls; the response shapes match the contract FE-11 assumed.
+
+### Added
+- `GET /api/v1/payments/my?status=&page=&size=` (MEMBER only): the signed-in member's payments, newest first (`created_at`, then `id`), page size 1 to 100 (default 20). Each row: id, code, status, amount, method, item type, reference id, code and description, original price, discount, `time` (payment time once confirmed, otherwise request time), `paymentTime`, `createdAt`, member id and code, `invoiceId` and `invoiceNumber` (null until the receipt is issued). Staff get 403.
+- `GET /api/v1/invoices/{id}` (MEMBER, RECEPTIONIST, MANAGER): invoice header (number, issue date, status, member name and code, payment code, method, reference and time, subtotal, discount, tax, total) and lines in insert order.
+- `ReceiptService` / `ReceiptServiceImpl`, `MemberPaymentController`, `MemberPaymentResponse`, `InvoiceResponseMapper`; `PaymentRepository.findByMemberId` and `findByMemberIdAndPaymentStatus` with paging.
+- Tests: `ReceiptServiceImplTest` (19 tests, 22 runs), `ReceiptControllerTest` (12 tests, 16 runs), `ReceiptIntegrationTest` (4, Testcontainers); test cases in `docs/tests/BE-20_test_cases.md`.
+
+### Changed
+- `GET /api/v1/invoices/by-payment/{paymentId}` moved from `PaymentVerificationService` to `ReceiptService`. A member asking for the invoice of another member's payment, or for another member's invoice by id, gets 403 (BE-18 answered 404), as the approved BE-20 acceptance criterion requires. Staff and owner answers are unchanged. `GET /api/v1/payments/{id}` and `PUT /api/v1/payments/{id}/method` still answer 404 for another member (BE-17, not changed). The moved BE-18 unit test lives in `ReceiptServiceImplTest`.
+- Reading a receipt re-checks total = sum of line totals - discount + tax (and subtotal = sum of line totals). Invoices are already validated when issued (BE-18), so a stored invoice that breaks the rule is returned as recorded and logged as a warning.
+- `docs/database/04`: BE-20 endpoints; Visibility now separates payments (404) from invoices (403); the BE-18 pricing rules from PR #60 are kept as they are. `docs/database/09`: the desk sale visibility row is split the same way.
+
+### Review round 1 (PR #56)
+- Rebased: the branch starts from the latest main and carries only the BE-20 change of `eb5609e`; every BE-18 and BE-19 change on main is kept.
+- `PaymentVerificationIntegrationTest.memberSeesOnlyOwnPaymentAndInvoice` (BE-19) now expects 403 for another member on `/invoices/by-payment/{paymentId}`; its 404 check for `/payments/{id}` is unchanged.
+- `com.sportify.payment.ReceiptIntegrationTest` added to `scripts/ci/required-integration-tests.txt`, so CI fails if it does not run.
+- `ReceiptServiceImplTest`: two tests for the totals check on read (a stored invoice that does not add up is returned unchanged and logs one warning; one that adds up logs none).
+
+### Notes
+- No migration.
+- Maven Central and the SQL Server image are blocked in the authoring environment; unit tests are run locally with `mvn -B test` and the Testcontainers tests in GitHub Actions CI. Expected against main `5075010`: unit 874 (837 - 1 moved + 38), integration 194 (190 + 4).
+
 ## 2026-10-14 - Payment at the desk (BE-19, Flow 3)
 
 Branch `feat/f3-desk-payment`. Owner: Truc. Priority: P1. Depends on BE-18 (merged in PR #60; main is merged into this branch). Screens F1-13 Payment Handoff and F1-14 Register and Renew. Provides the BE-19 contract FE-05 already sends.

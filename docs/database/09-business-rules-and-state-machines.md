@@ -92,7 +92,8 @@ Desk sale rules (BE-19, F1-13 and F1-14), for a card purchase or a `RECEPTION` p
 | `amountReceived` less than the price, or a non-cash amount that differs | 409 `PAYMENT_AMOUNT_MISMATCH`, nothing saved |
 | Nothing to pay (STANDARD tier, zero fee upgrade, full discount) | Item `ACTIVE`, no payment, no invoice |
 | Price to pay above zero | `SUCCESS` payment linked by `payment_id`, item `ACTIVE`, one `PAID` invoice, `activity_log` `PAYMENT_CONFIRMED`; the response has `paymentId` and `invoiceId` |
-| A member reads another member's payment or invoice | 404 (BE-17 and BE-18 contract, unchanged) |
+| A member reads another member's payment | 404 (BE-17 contract, unchanged) |
+| A member reads another member's invoice (`/invoices/{id}`, `/invoices/by-payment/{paymentId}`) | 403 (BE-20 acceptance criterion) |
 | The receipt step fails after the payment was written | Whole sale rolled back: no payment, item, invoice, invoice line or `activity_log` row |
 
 ### Booking (`booking.status`)
