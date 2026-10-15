@@ -47,6 +47,7 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
     @Autowired private BookingService bookingService;
     @Autowired private ClassSessionRepository sessions;
     @Autowired private BookingRepository bookingRepository;
+    @Autowired private SportPackageRegistrationRepository registrations;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private SportClassRepository classes;
     @Autowired private SportRepository sports;
@@ -130,7 +131,10 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
     }
 
     private long registration(long memberId, int total, int remaining, String status) {
-        Long packageId = jdbc.queryForObject("SELECT TOP (1) id FROM sport_package WHERE sport_id = ? ORDER BY id", Long.class, sport.getId());
+        Long packageId = jdbc.queryForObject("""
+                SELECT TOP (1) id FROM sport_package
+                WHERE sport_id = ? AND training_format = 'COACH_LED' ORDER BY id
+                """, Long.class, sport.getId());
         return jdbc.queryForObject("""
                 INSERT INTO sport_package_registration(registration_code, member_id, package_id, channel,
                     original_price, paid_amount, total_sessions, remaining_sessions, start_date, end_date, status, created_by_user_id)
@@ -163,6 +167,202 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
 
     private int count(String sql, Object... args) {
         return Objects.requireNonNull(jdbc.queryForObject(sql, Integer.class, args));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {2, 1})
+    void sharedRegistration_parallelBookingsOnDifferentSessionsConsumeEachAvailableUnitExactlyOnce(int available) throws Exception {
+        long firstId = service.createSessions(sportClass.getId(), single(), manager).getFirst().id();
+        long secondId = service.createSessions(sportClass.getId(), single(date.plusDays(1), LocalTime.of(10, 0),
+                LocalTime.of(11, 0), coachId, facilityId), manager).getFirst().id();
+        long memberId = member();
+        long registrationId = registration(memberId, available, available, "ACTIVE");
+        var firstRequest = packageBooking(firstId, memberId, registrationId);
+        var secondRequest = packageBooking(secondId, memberId, registrationId);
+        CountDownLatch snapshotsRead = new CountDownLatch(2);
+        CountDownLatch firstBooked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger firstSpid = new AtomicInteger();
+        AtomicInteger secondSpid = new AtomicInteger();
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> first = executor.submit(() -> writerTransaction().execute(status -> {
+                firstSpid.set(count("SELECT @@SPID"));
+                assertEquals(available, registrations.findById(registrationId).orElseThrow().getRemainingSessions());
+                snapshotsRead.countDown();
+                await(snapshotsRead);
+                var result = bookingService.createBooking(firstRequest, manager);
+                firstBooked.countDown();
+                await(release);
+                return result;
+            }));
+            Future<?> second = executor.submit(() -> writerTransaction().execute(status -> {
+                secondSpid.set(count("SELECT @@SPID"));
+                assertEquals(available, registrations.findById(registrationId).orElseThrow().getRemainingSessions());
+                snapshotsRead.countDown();
+                await(firstBooked);
+                return bookingService.createBooking(secondRequest, manager);
+            }));
+            assertTrue(firstBooked.await(20, TimeUnit.SECONDS), "Both snapshots precede the first conditional debit");
+            awaitRegistrationUpdateBlocked(secondSpid.get(), firstSpid.get());
+            release.countDown();
+            assertNotNull(first.get(20, TimeUnit.SECONDS));
+            if (available == 2) {
+                assertNotNull(second.get(20, TimeUnit.SECONDS));
+            } else {
+                var error = assertThrows(ExecutionException.class, () -> second.get(20, TimeUnit.SECONDS));
+                assertEquals("Selected package registration has zero remaining sessions",
+                        assertInstanceOf(BusinessRuleException.class, error.getCause()).getMessage());
+            }
+            assertEquals(0, count("SELECT remaining_sessions FROM sport_package_registration WHERE id = ?", registrationId));
+            assertEquals(available, count("SELECT COUNT(*) FROM booking WHERE package_registration_id = ? AND status = 'CONFIRMED'", registrationId));
+            assertEquals(1, count("SELECT booked_count FROM class_session WHERE id = ?", firstId));
+            assertEquals(available - 1, count("SELECT booked_count FROM class_session WHERE id = ?", secondId));
+            assertEquals(available, count("SELECT COUNT(*) FROM booking WHERE package_registration_id = ?", registrationId));
+        } finally {
+            release.countDown();
+            stopWriters(executor);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ACTIVE", "CAPPED", "PENDING_PAYMENT", "EXPIRED", "CANCELLED", "REFUNDED"})
+    void individualCancellation_restoresAtMostOneActiveUnitWithinCapAndRejectsDuplicateRefund(String scenario) {
+        long id = service.createSessions(sportClass.getId(), single(), manager).getFirst().id();
+        long memberId = member();
+        int remaining = scenario.equals("CAPPED") ? 2 : 1;
+        String status = scenario.equals("CAPPED") ? "ACTIVE" : scenario;
+        long registrationId = registration(memberId, 2, remaining, status);
+        long bookingId = booking(id, memberId, registrationId, "CONFIRMED");
+        jdbc.update("UPDATE class_session SET booked_count = 1 WHERE id = ?", id);
+
+        assertEquals(BookingStatus.CANCELLED, bookingService.cancelBooking(bookingId, manager).getStatus());
+
+        int expected = status.equals("ACTIVE") ? 2 : 1;
+        assertEquals(expected, count("SELECT remaining_sessions FROM sport_package_registration WHERE id = ?", registrationId));
+        assertEquals(0, count("SELECT booked_count FROM class_session WHERE id = ?", id));
+        var error = assertThrows(BusinessRuleException.class, () -> bookingService.cancelBooking(bookingId, manager));
+        assertEquals("Booking is already cancelled", error.getMessage());
+        assertEquals(expected, count("SELECT remaining_sessions FROM sport_package_registration WHERE id = ?", registrationId));
+        assertEquals(status, jdbc.queryForObject("SELECT status FROM sport_package_registration WHERE id = ?", String.class, registrationId));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"BOOKING", "SESSION"})
+    void sharedRegistration_consumptionWaitsForIndividualOrManagerRefundWithoutLosingEitherChange(String refundType) throws Exception {
+        long refundSessionId = service.createSessions(sportClass.getId(), single(), manager).getFirst().id();
+        long newSessionId = service.createSessions(sportClass.getId(), single(date.plusDays(1), LocalTime.of(10, 0),
+                LocalTime.of(11, 0), coachId, facilityId), manager).getFirst().id();
+        long memberId = member();
+        long registrationId = registration(memberId, 2, 1, "ACTIVE");
+        long bookingId = booking(refundSessionId, memberId, registrationId, "CONFIRMED");
+        jdbc.update("UPDATE class_session SET booked_count = 1 WHERE id = ?", refundSessionId);
+        var request = packageBooking(newSessionId, memberId, registrationId);
+        CountDownLatch snapshotRead = new CountDownLatch(1);
+        CountDownLatch refunded = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger refundSpid = new AtomicInteger();
+        AtomicInteger bookingSpid = new AtomicInteger();
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> consumption = executor.submit(() -> writerTransaction().execute(status -> {
+                bookingSpid.set(count("SELECT @@SPID"));
+                assertEquals(1, registrations.findById(registrationId).orElseThrow().getRemainingSessions());
+                snapshotRead.countDown();
+                await(refunded);
+                return bookingService.createBooking(request, manager);
+            }));
+            Future<?> refund = executor.submit(() -> writerTransaction().execute(status -> {
+                refundSpid.set(count("SELECT @@SPID"));
+                await(snapshotRead);
+                if (refundType.equals("BOOKING")) {
+                    bookingService.cancelBooking(bookingId, manager);
+                } else {
+                    service.cancelSession(refundSessionId, new SessionCancelRequest("Refund race"), manager);
+                }
+                refunded.countDown();
+                await(release);
+                return true;
+            }));
+            assertTrue(refunded.await(20, TimeUnit.SECONDS));
+            awaitRegistrationUpdateBlocked(bookingSpid.get(), refundSpid.get());
+            release.countDown();
+            assertNotNull(refund.get(20, TimeUnit.SECONDS));
+            assertNotNull(consumption.get(20, TimeUnit.SECONDS));
+            assertEquals(1, count("SELECT remaining_sessions FROM sport_package_registration WHERE id = ?", registrationId));
+            assertEquals(1, count("SELECT COUNT(*) FROM booking WHERE package_registration_id = ? AND status = 'CONFIRMED'", registrationId));
+            assertEquals("CANCELLED", jdbc.queryForObject("SELECT status FROM booking WHERE id = ?", String.class, bookingId));
+            assertEquals(0, count("SELECT booked_count FROM class_session WHERE id = ?", refundSessionId));
+            assertEquals(1, count("SELECT booked_count FROM class_session WHERE id = ?", newSessionId));
+        } finally {
+            release.countDown();
+            stopWriters(executor);
+        }
+    }
+
+    @Test
+    void sharedRegistration_staleManagedEntitySaveCannotOverwriteAnAtomicDebit() {
+        long id = service.createSessions(sportClass.getId(), single(), manager).getFirst().id();
+        long memberId = member();
+        long registrationId = registration(memberId, 2, 2, "ACTIVE");
+        writerTransaction().executeWithoutResult(status -> {
+            var stale = registrations.findById(registrationId).orElseThrow();
+            bookingService.createBooking(packageBooking(id, memberId, registrationId), manager);
+            assertEquals(2, stale.getRemainingSessions(), "The managed balance remains a snapshot after native SQL");
+            stale.setCancelReason("Exercise an unrelated entity update");
+            registrations.saveAndFlush(stale);
+            assertEquals(1, count("SELECT remaining_sessions FROM sport_package_registration WHERE id = ?", registrationId));
+        });
+        assertEquals(1, count("SELECT remaining_sessions FROM sport_package_registration WHERE id = ?", registrationId));
+        assertEquals(1, count("SELECT COUNT(*) FROM booking WHERE package_registration_id = ? AND status = 'CONFIRMED'", registrationId));
+    }
+
+    @Test
+    void sharedRegistration_transactionFailureRollsBackDebitBookingAndSessionCounter() {
+        long id = service.createSessions(sportClass.getId(), single(), manager).getFirst().id();
+        long memberId = member();
+        long registrationId = registration(memberId, 2, 2, "ACTIVE");
+        assertThrows(IllegalStateException.class, () -> writerTransaction().executeWithoutResult(status -> {
+            bookingService.createBooking(packageBooking(id, memberId, registrationId), manager);
+            throw new IllegalStateException("Force rollback after the booking and debit are written");
+        }));
+        assertEquals(2, count("SELECT remaining_sessions FROM sport_package_registration WHERE id = ?", registrationId));
+        assertEquals(0, count("SELECT COUNT(*) FROM booking WHERE package_registration_id = ?", registrationId));
+        assertEquals(0, count("SELECT booked_count FROM class_session WHERE id = ?", id));
+    }
+
+    private BookingCreateRequest packageBooking(long sessionId, long memberId, long registrationId) {
+        return BookingCreateRequest.builder().sessionId(sessionId).memberId(memberId).packageRegistrationId(registrationId).build();
+    }
+
+    private TransactionTemplate writerTransaction() {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        transaction.setTimeout(25);
+        return transaction;
+    }
+
+    private void awaitRegistrationUpdateBlocked(int waitingSpid, int blockingSpid) {
+        assertEquals(1, count("SELECT IS_SRVROLEMEMBER('sysadmin')"), "CI uses the container sa login for DMV visibility");
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        do {
+            if (count("""
+                    SELECT COUNT(*) FROM sys.dm_exec_requests r
+                    CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) t
+                    WHERE r.session_id = ? AND r.blocking_session_id = ?
+                        AND t.text LIKE '%UPDATE sport_package_registration%'
+                    """, waitingSpid, blockingSpid) > 0) {
+                return;
+            }
+        } while (System.nanoTime() < deadline);
+        fail("SQL Server must report the conditional registration UPDATE waiting for the other transaction");
+    }
+
+    private static void stopWriters(ExecutorService executor) throws InterruptedException {
+        executor.shutdown();
+        if (!executor.awaitTermination(35, TimeUnit.SECONDS)) {
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS), "Test transactions must finish before fixture cleanup");
+        }
     }
 
     @ParameterizedTest

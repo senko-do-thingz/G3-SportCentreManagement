@@ -70,7 +70,7 @@
 - Method: `cancelBooking_AsMember_SetsCancelledByAndReturnsActorNameAndRole`
 - Type: Unit Test (Service Layer)
 - Description: Cancelling a confirmed booking as the booking owner sets cancelledBy to the member and returns cancelledByName and cancelledByRole ("MEMBER").
-- Preconditions: The scalar booking session id and locked session are stubbed before loading the booking. Booking belongs to memberUser (role MEMBER, fullName "Member User").
+- Preconditions: The scalar booking session id and locked session are stubbed before loading the booking. Package restoration uses an ACTIVE-only capped SQL command instead of saving the managed balance. Booking belongs to memberUser (role MEMBER, fullName "Member User").
 - Steps:
   1. Invoke `bookingService.cancelBooking(1L, memberUser)`.
   2. Verify booking status changed to CANCELLED.
@@ -86,7 +86,7 @@
 - Method: `cancelBooking_AsReceptionist_SetsCancelledByAndReturnsActorNameAndRole`
 - Type: Unit Test (Service Layer)
 - Description: Cancelling a confirmed booking as a receptionist sets cancelledBy to the receptionist and returns name and role ("RECEPTIONIST").
-- Preconditions: The scalar booking session id and locked session are stubbed before loading the booking. Actor has role RECEPTIONIST, fullName "Receptionist Staff".
+- Preconditions: The scalar booking session id and locked session are stubbed before loading the booking. Package restoration uses an ACTIVE-only capped SQL command instead of saving the managed balance. Actor has role RECEPTIONIST, fullName "Receptionist Staff".
 - Steps:
   1. Invoke `bookingService.cancelBooking(1L, receptionist)`.
   2. Verify booking status changed to CANCELLED.
@@ -102,7 +102,7 @@
 - Method: `cancelBooking_AsManager_SetsCancelledByAndReturnsActorNameAndRole`
 - Type: Unit Test (Service Layer)
 - Description: Cancelling a confirmed booking as a manager sets cancelledBy to the manager and returns name and role ("MANAGER").
-- Preconditions: The scalar booking session id and locked session are stubbed before loading the booking. Actor has role MANAGER, fullName "Center Manager".
+- Preconditions: The scalar booking session id and locked session are stubbed before loading the booking. Package restoration uses an ACTIVE-only capped SQL command instead of saving the managed balance. Actor has role MANAGER, fullName "Center Manager".
 - Steps:
   1. Invoke `bookingService.cancelBooking(1L, manager)`.
   2. Verify booking status changed to CANCELLED.
@@ -146,11 +146,12 @@
 - Method: `createBooking_WhenDataIntegrityViolationUxBookingActive_ThrowsConflictException`
 - Type: Unit Test (Service Layer)
 - Description: Concurrent booking attempt causes DataIntegrityViolationException on index ux_booking_active; service catches it and translates to ConflictException.
-- Preconditions: sessionRepository.findForUpdate returns the published session before booking checks. bookingRepository.save throws DataIntegrityViolationException containing "ux_booking_active".
+- Preconditions: The conditional consumeSession command returns one affected row. sessionRepository.findForUpdate returns the published session before booking checks. bookingRepository.save throws DataIntegrityViolationException containing "ux_booking_active".
 - Steps:
   1. Invoke `bookingService.createBooking(req, memberUser)`.
   2. Catch thrown exception.
 - Expected Result: Throws ConflictException with message "Member already has a confirmed booking for this session".
+- Validation: The debit command is called once; no entity balance save or compensating restore is attempted. Unit mocks verify exception propagation, not database rollback.
 - Status: PASSED
 
 ---
@@ -160,10 +161,11 @@
 - Method: `createBooking_WhenDataIntegrityViolationOther_RethrowsException`
 - Type: Unit Test (Service Layer)
 - Description: Other database constraint violations are not masked as booking duplicate conflicts.
-- Preconditions: sessionRepository.findForUpdate returns the published session before booking checks. bookingRepository.save throws DataIntegrityViolationException without "ux_booking_active".
+- Preconditions: The conditional consumeSession command returns one affected row. sessionRepository.findForUpdate returns the published session before booking checks. bookingRepository.save throws DataIntegrityViolationException without "ux_booking_active".
 - Steps:
   1. Invoke `bookingService.createBooking(req, memberUser)`.
 - Expected Result: Rethrows original DataIntegrityViolationException.
+- Validation: The debit command is called once; no entity balance save or compensating restore is attempted. Unit mocks verify exception propagation, not database rollback.
 - Status: PASSED
 
 ---
