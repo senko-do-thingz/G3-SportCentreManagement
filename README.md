@@ -185,6 +185,37 @@ Open `http://localhost:5173`. The backend must be running. CORS for `http://loca
 
 Migrations seed the four roles, sports, membership plans, sport packages, card tiers and one manager account (`manager@sportify.com`, created in `V4__seed_manager_account.sql`). Change that account password before using the system outside local development.
 
+## Demo Accounts
+
+These seven accounts are for isolated local demonstrations only. Never enable the `demo` profile against a production or shared database. The profile guard rejects simultaneous `prod` and `demo` activation before Flyway initializes; it cannot determine whether a connection points to a production database.
+
+Common demo password: `SportifyDemo2026!`
+
+| Display name | Email | Role | Demo password | Scenario |
+|---|---|---|---|---|
+| Nguyen Thi Lan | lan.reception@example.com | RECEPTIONIST | SportifyDemo2026! | Front desk |
+| Tran Minh Quan | quan.coach@example.com | COACH | SportifyDemo2026! | BADMINTON primary sport |
+| Le Hoang Nam | nam.coach@example.com | COACH | SportifyDemo2026! | SWIMMING primary sport |
+| Pham Thu Ha | ha.coach@example.com | COACH | SportifyDemo2026! | BASKETBALL primary sport |
+| Nguyen Van An | an.gold@example.com | MEMBER | SportifyDemo2026! | GOLD physical card, 5% multi-day package discount |
+| Tran Thi Mai | mai.standard@example.com | MEMBER | SportifyDemo2026! | STANDARD physical card, free and permanent, 0% discount |
+| Le Quoc Bao | bao.nocard@example.com | MEMBER | SportifyDemo2026! | Member profile with no physical card, 0% discount |
+
+To enable the seed, create a fresh isolated SQL Server demonstration database and point the backend's existing database environment settings to it. In PowerShell, from `backend/`:
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE = 'dev,demo'
+mvn spring-boot:run
+```
+
+The explicit `demo` profile adds `classpath:db/demo` after the ordinary identity/catalog locations. `V28__seed_demo_accounts.sql` creates the accounts and profiles. Ordinary startup, including `dev` and `prod`, does not discover this migration. Keep demonstration databases on the demo configuration and never repurpose them as production databases. Removing a previously used migration location can fail Flyway validation. Use a fresh demo database when enabling the seed after newer shared migrations: `out-of-order=false` is preserved, and V28 cannot be retroactively inserted into a later migration history. Existing applied migrations and the production profile configuration are unchanged.
+
+The GOLD term is fixed at **2026-10-01 through 2027-09-30**, inclusive. After that window it no longer grants benefits even if its stored status remains ACTIVE. STANDARD starts on 2026-10-01 and has no end date. Before these start dates, neither card grants benefits. The two cards are imported demo entitlement snapshots (`DEMO-CARD-GOLD`, `DEMO-CARD-STANDARD`) with prices 300000 VND and 0 VND, respectively, and nullable `payment_id`; they are not sales and have no payment, receipt, or invoice. Purchase/confirmation behavior is unchanged. Single-visit packages never receive card discounts.
+
+Member codes use the existing `seq_member_code` and `MEM-%04d` convention (MEM-0001, MEM-0002, MEM-0003 on a completely fresh database); existing profiles keep their codes. Card codes use a separate namespace and do not consume or reset `seq_card_code`. SQL replay inserts only missing records and rejects conflicting demo identities, disabled accounts, primary sports, tier terms or card scenarios. It preserves existing hashes, personal/profile fields, certifications, payments and unrelated cards. If a demo account's password was previously changed, the existing password remains in effect. Flyway applies V28 once; independent SQL replay joins a caller transaction or opens its own transaction and is covered by the CI integration suite. SQL Server sequence allocations are not rolled back, so failed attempts can leave harmless code gaps.
+
+See [BE-07 test cases](docs/tests/BE-07_test_cases.md) for verification and lifecycle limits.
+
 ## API Overview
 
 All paths start with `/api/v1`. Send the access token as `Authorization: Bearer <token>`. Access tokens last 15 minutes and refresh tokens last 7 days.

@@ -6,6 +6,8 @@ on:
       - "deploy/**"
       - "backend/Dockerfile"
       - "backend/src/main/resources/**"
+      - "scripts/ci/compose-smoke.sh"
+      - "scripts/ci/test_compose_smoke.py"
       - ".github/workflows/compose-smoke-test.yml"
   push:
     branches: ["main"]
@@ -13,6 +15,8 @@ on:
       - "deploy/**"
       - "backend/Dockerfile"
       - "backend/src/main/resources/**"
+      - "scripts/ci/compose-smoke.sh"
+      - "scripts/ci/test_compose_smoke.py"
       - ".github/workflows/compose-smoke-test.yml"
   schedule:
     - cron: "0 0 * * 0"
@@ -36,37 +40,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Create temporary test .env
+        run: bash scripts/ci/compose-smoke.sh prepare
+
       - name: Assert compose config requires IMAGE_TAG
         run: |
           echo "Testing that compose config fails when IMAGE_TAG is missing..."
-          cp deploy/.env.example deploy/.env
-          sed -i 's/<REPLACE_WITH_STRONG_SA_PASSWORD>/TestPass1234!StrongSA/g' deploy/.env
-          sed -i 's/<REPLACE_WITH_BASE64_SECRET_MIN_32_BYTES>/dGhpcy1pcy1hLXZlcnktc2VjdXJlLW1vY2stc2VjcmV0LWtleS1mb3ItdGVzdGluZy1vbmx5LWdoYWN0aW9ucw==/g' deploy/.env
-          if env -u IMAGE_TAG docker compose -f deploy/compose.yaml config >/dev/null 2>&1; then
+          CONFIG_LOG="$(mktemp)"
+          trap 'rm -f "$CONFIG_LOG"' EXIT
+          if env -u IMAGE_TAG docker compose -f deploy/compose.yaml config >"$CONFIG_LOG" 2>&1; then
             echo "Error: docker compose config unexpectedly succeeded without IMAGE_TAG"
-            rm -f deploy/.env
+            exit 1
+          fi
+          if ! grep -Fq 'IMAGE_TAG is required' "$CONFIG_LOG"; then
+            echo "Error: compose config failed for a reason other than missing IMAGE_TAG"
             exit 1
           fi
           echo "Verified: docker compose config fails when IMAGE_TAG is not provided"
-          rm -f deploy/.env
 
       - name: Assert password policy violation makes sqlserver exit
-        run: |
-          echo "Testing that invalid password policy causes sqlserver to exit with policy message..."
-          OUTPUT="$(timeout 30s docker run --rm -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD=weak mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04 2>&1 || true)"
-          echo "$OUTPUT"
-          if echo "$OUTPUT" | grep -qi "password policy"; then
-            echo "Verified: sqlserver failed startup due to password policy requirements as expected"
-          else
-            echo "Error: Expected password policy message in sqlserver output, but was not found"
-            exit 1
-          fi
-
-      - name: Create temporary test .env
-        run: |
-          cp deploy/.env.example deploy/.env
-          sed -i 's/<REPLACE_WITH_STRONG_SA_PASSWORD>/TestPass1234!StrongSA/g' deploy/.env
-          sed -i 's/<REPLACE_WITH_BASE64_SECRET_MIN_32_BYTES>/dGhpcy1pcy1hLXZlcnktc2VjdXJlLW1vY2stc2VjcmV0LWtleS1mb3ItdGVzdGluZy1vbmx5LWdoYWN0aW9ucw==/g' deploy/.env
+        run: bash scripts/ci/compose-smoke.sh password-policy
 
       - name: Build backend container image
         run: |
@@ -86,11 +79,11 @@ jobs:
         run: |
           echo "Verifying database sportify exists via sys.databases..."
           docker compose -f deploy/compose.yaml --profile with-db exec -T sqlserver \
-            /opt/mssql-tools18/bin/sqlcmd -C -b -U sa -P "TestPass1234!StrongSA" -Q "IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'sportify') THROW 50000, 'Database sportify does not exist', 1;"
+            /opt/mssql-tools18/bin/sqlcmd -C -b -U sa -P "$DB_PASSWORD" -Q "IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'sportify') THROW 50000, 'Database sportify does not exist', 1;"
 
           echo "Verifying sa login and DB_NAME() against database sportify..."
           DB_NAME="$(docker compose -f deploy/compose.yaml --profile with-db exec -T sqlserver \
-            /opt/mssql-tools18/bin/sqlcmd -C -b -U sa -P "TestPass1234!StrongSA" -d sportify -h -1 -W -Q "SET NOCOUNT ON; SELECT DB_NAME();" | head -n 1 | tr -d '\r\n ')"
+            /opt/mssql-tools18/bin/sqlcmd -C -b -U sa -P "$DB_PASSWORD" -d sportify -h -1 -W -Q "SET NOCOUNT ON; SELECT DB_NAME();" | head -n 1 | tr -d '\r\n ')"
           if [ "$DB_NAME" != "sportify" ]; then
             echo "Error: Expected DB_NAME to be 'sportify', got '$DB_NAME'"
             exit 1
@@ -172,9 +165,9 @@ jobs:
           fi
 
           TOTAL_ROWS="$(docker compose -f deploy/compose.yaml --profile with-db exec -T sqlserver \
-            /opt/mssql-tools18/bin/sqlcmd -C -b -U sa -P "TestPass1234!StrongSA" -d sportify -h -1 -W -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM flyway_schema_history;" | head -n 1 | tr -d '\r\n ')"
+            /opt/mssql-tools18/bin/sqlcmd -C -b -U sa -P "$DB_PASSWORD" -d sportify -h -1 -W -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM flyway_schema_history;" | head -n 1 | tr -d '\r\n ')"
           SUCCESS_ROWS="$(docker compose -f deploy/compose.yaml --profile with-db exec -T sqlserver \
-            /opt/mssql-tools18/bin/sqlcmd -C -b -U sa -P "TestPass1234!StrongSA" -d sportify -h -1 -W -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1;" | head -n 1 | tr -d '\r\n ')"
+            /opt/mssql-tools18/bin/sqlcmd -C -b -U sa -P "$DB_PASSWORD" -d sportify -h -1 -W -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1;" | head -n 1 | tr -d '\r\n ')"
 
           echo "Flyway total rows: $TOTAL_ROWS, success rows: $SUCCESS_ROWS"
 
@@ -192,11 +185,8 @@ jobs:
 
       - name: Dump compose logs on failure
         if: failure()
-        run: |
-          docker compose -f deploy/compose.yaml --profile with-db logs
+        run: bash scripts/ci/compose-smoke.sh diagnostics
 
       - name: Cleanup compose stack
         if: always()
-        run: |
-          docker compose -f deploy/compose.yaml --profile with-db down -v || true
-          rm -f deploy/.env
+        run: bash scripts/ci/compose-smoke.sh cleanup

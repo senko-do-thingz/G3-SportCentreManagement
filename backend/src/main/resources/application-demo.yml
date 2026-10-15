@@ -1,0 +1,5 @@
+# Explicit opt-in only. Point this process at an isolated demonstration database.
+# DemoProfileSafetyConfiguration rejects prod + demo before Flyway initialization.
+spring:
+  flyway:
+    locations: classpath:db/migration/identity,classpath:db/migration/catalog,classpath:db/demo
