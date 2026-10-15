@@ -120,3 +120,23 @@ python scripts/ci/check-test-reports.py integration backend/target/failsafe-repo
 The required demo suite must have 60 executed test cases, zero failures/errors/skips, and actual login cases for all seven emails. Review Failsafe XML, not just a green Maven exit. All existing required SQL Server suites, migrations, frontend checks, security checks and applicable Compose smoke tests must remain green. Compose ordinary startup counts only migrations under the ordinary location; the new opt-in location does not change its expected count.
 
 Exact local command results and environment limitations are exported in the BE-07 report directory. Compilation does not prove SQL syntax, database relationships, locking, transaction behavior or authentication against SQL Server. Those acceptance items remain unverified until the CI integration job actually executes.
+
+## Round 3 - Compose smoke control flow
+
+The public GitHub job metadata for commit a37847fe12fc6adb3921149f93bfc85aed71b61c records a successful SQL Server integration job and a failed Compose password-policy assertion (run 38777966978). Normal Compose startup was skipped. Its failed diagnostic step is distinct from the original raw-Docker assertion. Raw primary-step logs were unavailable during remediation, so no specific Docker/SQL Server runtime trigger is asserted as proven.
+
+The Compose workflow now prepares generated, masked CI credentials first and retains the environment through both negative checks. The IMAGE_TAG check requires its specific interpolation error. A separate disposable SQL Server container must exit nonzero with an explicit password validation failure; pull/start/wait/inspect errors, timeout, OOM, signal exit, successful exit or unrelated logs cannot satisfy it. Image pulling precedes the runtime deadline. Container removal runs on success and failure, and cleanup failure remains a failure.
+
+Failure diagnostics and stack cleanup provide CI-only parsing defaults when IMAGE_TAG, DB_PASSWORD or deploy/.env is absent. They never start services. Raw password-policy output stays in RUNNER_TEMP until failure diagnostics print it with the deliberately invalid candidate redacted. Generated database/JWT credentials are registered with GitHub masking before use. Existing environment files survive diagnostics; temporary files are removed, and final cleanup removes the disposable test environment.
+
+Run from repository root:
+
+```powershell
+python -m unittest discover -s scripts/ci -p 'test_*.py' -v
+bash -n scripts/ci/compose-smoke.sh
+git diff --check
+```
+
+`test_compose_smoke.py` executes the real helper and the workflow's IMAGE_TAG shell block with fake Docker/timeout transports in temporary directories. It exercises negative failure classifications, large logs, credential preparation/masking, missing/invalid environment values, diagnostic failures and cleanup. The existing CI Python discovery automatically runs it. These tests require Bash, Python and OpenSSL; they do not use or validate a Docker daemon, Compose interpolation, image startup or SQL Server policy enforcement.
+
+GitHub Actions must still execute the full Compose job successfully: invalid-password rejection, valid-password SQL Server health, db-init creation/idempotency, sa login, no published port 1433, non-sa rejection, invalid JWT rejection, backend health and ordinary-location Flyway counts. Production Compose and all BE-07 SQL/profile files are unchanged. Re-run the two focused demo configuration suites locally to check profile safety; do not report Docker integration as locally passed.

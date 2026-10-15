@@ -1,3 +1,9 @@
+## 2026-10-16 - Compose Smoke Test Environment and Failure Handling (BE-07, Round 3)
+
+- Prepare and mask disposable CI credentials before negative checks. Missing IMAGE_TAG must fail for its intended reason, while failure logs and cleanup can parse Compose even if the test environment is absent.
+- Verify SQL Server password rejection with an explicit validation diagnostic, a nonzero container exit, and no engine/OOM failure. Preserve Docker/timeout/cleanup errors, separate image retrieval from the runtime deadline, and search saved logs without a pipefail/SIGPIPE hazard.
+- Add fake-command shell regression coverage to the existing CI Python discovery. Deployment configuration, BE-07 migrations, backend tests and demo isolation are unchanged. Local static/unit validation does not establish a successful real Compose run; that remains a GitHub Actions gate.
+
 ## 2026-10-16 - Demo Account SQL Replay Error Propagation (BE-07, Round 2)
 
 - Replaced the test-only execute-and-close replay path with a JdbcTemplate StatementCallback that consumes all result sets and update counts. SQL Server validation errors after an intermediate result now propagate before the existing rollback-only transaction callback returns. The migration SQL/version/checksum, production configuration and approved demo profile architecture are unchanged.
