@@ -76,7 +76,8 @@ Payment confirmation rules (BE-18, F3-05):
 | Another receptionist confirms or fails the same payment at the same moment | The row lock makes the second call wait, then 409 `PAYMENT_NOT_PENDING` |
 | Version check fails inside confirm or fail (backstop) | 409 `PAYMENT_CONCURRENT_UPDATE` |
 | Item price snapshot (`paid_amount`, `price_paid`) differs from `payment.amount` (corrupted data) | 409 `PAYMENT_ITEM_AMOUNT_MISMATCH`, nothing written |
-| Tier price lowered by a manager after the card request | Confirm succeeds; invoice original price = `price_paid`, discount 0 |
+| Tier price lowered or raised by a manager after the card request | Confirm succeeds; invoice original price = `price_paid` (+ stored upgrade credit for an upgrade); no discount is derived from the current tier price |
+| Package price changed after the registration request | Confirm succeeds; invoice keeps the registration `original_price` and `paid_amount` snapshots |
 | Amount matches | `SUCCESS`, item `ACTIVE`, one `PAID` invoice, `activity_log` `PAYMENT_CONFIRMED` |
 | Card or package activate endpoint (FE-05) | Same receipt: one `PAID` invoice and one `PAYMENT_CONFIRMED` row; no reference needed, amount received = amount |
 
