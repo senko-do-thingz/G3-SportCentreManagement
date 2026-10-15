@@ -231,7 +231,7 @@ export const CARD_PLAN_LABELS: Record<CardPlanKind, string> = {
 }
 
 export const UNKNOWN_PLAN_MESSAGE =
-  "The tier of the member's current card is no longer on sale, so this sale cannot be priced here. Ask a manager."
+  "The card rank or upgrade baseline cannot be verified, so this sale cannot be priced here. Ask a manager."
 
 export interface DeskCardPlan {
   plan: CardPlan

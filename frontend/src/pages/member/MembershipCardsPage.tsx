@@ -181,7 +181,7 @@ function TierCard({
           <Link className={buttonClassName('secondary', 'md', true)} to={MEMBER_PATHS.packages}>
             Explore sport packages
           </Link>
-        ) : plan.kind === 'blocked' ? (
+        ) : plan.kind === 'blocked' || plan.kind === 'unknown' ? (
           <p className="notice notice--info">{plan.reason}</p>
         ) : (
           <>
@@ -248,7 +248,7 @@ function ConfirmCardModal({
   const baseTierName = plan.baseCard?.tierName ?? 'current'
 
   const confirm = async () => {
-    if (sendingRef.current || plan.kind === 'blocked') {
+    if (sendingRef.current || plan.kind === 'blocked' || plan.kind === 'unknown' || plan.price === null) {
       return
     }
     sendingRef.current = true
@@ -288,7 +288,7 @@ function ConfirmCardModal({
       description="Your sport packages are purchased separately."
       footer={
         <>
-          <Button onClick={confirm} loading={submitting} disabled={plan.kind === 'blocked'}>
+          <Button onClick={confirm} loading={submitting} disabled={plan.kind === 'blocked' || plan.kind === 'unknown' || plan.price === null}>
             Confirm and continue
           </Button>
           <Button variant="secondary" onClick={onClose} disabled={submitting}>

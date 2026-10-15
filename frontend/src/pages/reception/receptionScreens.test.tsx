@@ -52,9 +52,9 @@ const VIP_CARD = card({ tierId: 3 })
 const OVERVIEW = { member: { ...TAYLOR, status: 'ACTIVE' }, cards: [VIP_CARD], registrations: [ACTIVE_BADMINTON, PENDING_FOOTBALL] }
 
 const TIERS = [
-  { id: 1, code: 'STANDARD', name: 'Standard', price: 0, durationMonths: null, discountPercentage: 0, description: null, isActive: true },
-  { id: 2, code: 'GOLD', name: 'Gold', price: 300000, durationMonths: 12, discountPercentage: 5, description: null, isActive: true },
-  { id: 3, code: 'VIP', name: 'VIP', price: 600000, durationMonths: 12, discountPercentage: 10, description: null, isActive: true },
+  { id: 1, code: 'STANDARD', tierRank: 1, name: 'Standard', price: 0, durationMonths: null, discountPercentage: 0, description: null, isActive: true },
+  { id: 2, code: 'GOLD', tierRank: 3, name: 'Gold', price: 300000, durationMonths: 12, discountPercentage: 5, description: null, isActive: true },
+  { id: 3, code: 'VIP', tierRank: 4, name: 'VIP', price: 600000, durationMonths: 12, discountPercentage: 10, description: null, isActive: true },
 ]
 
 const PACKAGES = [
