@@ -1,3 +1,8 @@
+## 2026-10-16 - Container Exit Classification and Safe Evidence (BE-07, Round 4)
+
+- Separate Docker command failure from the process status printed by docker wait. Nonzero application status 255 is no longer rejected as a Docker infrastructure code; zero, invalid and signal-range statuses still fail. Success also requires matching exited state, no OOM/engine error, the exact intended SA candidate and an explicit SA complexity rejection.
+- Collect state, exit, OOM, engine-error, wait/timeout and signature diagnostics before exit classification. Redact database, JWT and invalid-candidate values as literal strings in error fields and saved logs. Add focused failure/credential regressions without changing deployment, migrations or authentication. The original runner's exact exit remains unobserved unless its raw evidence is provided or the instrumented workflow is rerun; local tests use fake command transports.
+
 ## 2026-10-16 - Compose Smoke Test Environment and Failure Handling (BE-07, Round 3)
 
 - Prepare and mask disposable CI credentials before negative checks. Missing IMAGE_TAG must fail for its intended reason, while failure logs and cleanup can parse Compose even if the test environment is absent.

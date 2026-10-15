@@ -18,6 +18,8 @@ import json, os, sys
 from pathlib import Path
 args=sys.argv[1:]
 case=os.environ.get('FAKE_CASE','policy')
+exit_code={'policy-255':'255','zero':'0','signal':'137','term':'143','abort':'134','oom':'137',
+           'invalid-exit':'invalid','negative-exit':'-1','out-of-range':'256','exit-mismatch':'255'}.get(case,'1')
 with open(os.environ['FAKE_CALLS'],'a') as out:
     out.write(json.dumps(args)+'\n')
 cmd=args[0]
@@ -32,20 +34,33 @@ if cmd in ('pull','create','start'):
         print('fixture-container')
 elif cmd == 'wait':
     if case == 'wait-failure': sys.exit(125)
-    print({'zero':'0','signal':'137','invalid-exit':'invalid'}.get(case,'1'))
+    print(exit_code)
 elif cmd == 'logs':
     if case == 'logs-failure': sys.exit(6)
     if case == 'unrelated-exit': print('A filesystem error terminated SQL Server')
     elif case == 'generic-policy': print('Checking password policy settings')
+    elif case == 'policy-infrastructure': print('Unable to set system administrator password: Password validation failed with an infrastructure error')
+    elif case == 'policy-without-sa': print('Password validation failed. The password does not meet SQL Server password policy requirements because it is too short')
     else:
         print('ERROR: Unable to set system administrator password: Password validation failed. '
-              'The password does not meet SQL Server password policy requirements.')
+              'The password does not meet SQL Server password policy requirements because it is not complex enough.')
         if case == 'large-log': print('tail diagnostics\n'*30000)
 elif cmd == 'inspect':
+    failure_format={'inspect-failure':True,'state-inspect-failure':'.State.Status' in args[2],
+                    'error-inspect-failure':'.State.Error' in args[2],
+                    'env-inspect-failure':'.Config.Env' in args[2]}.get(case,False)
+    if failure_format:
+        print('inspect failure: weak '+os.environ['DB_PASSWORD']+' '+os.environ['JWT_SECRET'],file=sys.stderr)
+        sys.exit(5)
     if '.State.Error' in args[2]:
-        print('engine failure' if case == 'engine-error' else '')
+        print('engine failure: weak '+os.environ['DB_PASSWORD']+' '+os.environ['JWT_SECRET'] if case == 'engine-error' else '')
+    elif '.Config.Env' in args[2]:
+        print('DB_PASSWORD='+os.environ['DB_PASSWORD'])
+        print('MSSQL_SA_PASSWORD='+('different' if case == 'wrong-candidate' else 'weak'))
+        if case == 'duplicate-candidate': print('MSSQL_SA_PASSWORD=weak')
     else:
-        print({'oom':'exited 1 true','running':'running 1 false'}.get(case,'exited 1 false'))
+        print({'oom':'exited 137 true','running':'running 0 false','timeout':'running 0 false',
+               'wait-killed':'running 0 false','exit-mismatch':'exited 1 false'}.get(case,'exited '+exit_code+' false'))
 elif cmd == 'rm':
     if case == 'remove-failure': sys.exit(7)
 elif cmd == 'compose':
@@ -79,7 +94,7 @@ class ComposeSmokeTest(unittest.TestCase):
         fake.write_text(FAKE_DOCKER, encoding='ascii')
         (self.bin / 'docker').write_text('#!/usr/bin/env bash\nexec "$FAKE_PYTHON" "$FAKE_DOCKER_SCRIPT" "$@"\n', encoding='ascii', newline='\n')
         (self.bin / 'timeout').write_text(
-            '#!/usr/bin/env bash\nif [ "$FAKE_CASE" = timeout ]; then exit 124; fi\nshift\nexec "$@"\n', encoding='ascii', newline='\n')
+            '#!/usr/bin/env bash\nif [ "$FAKE_CASE" = timeout ]; then exit 124; fi\nif [ "$FAKE_CASE" = wait-killed ]; then exit 137; fi\nshift\nexec "$@"\n', encoding='ascii', newline='\n')
         for path in self.bin.iterdir():
             path.chmod(0o755)
         self.env = dict(os.environ, GITHUB_ACTIONS='true', RUNNER_TEMP=self.root.as_posix(),
@@ -113,12 +128,76 @@ class ComposeSmokeTest(unittest.TestCase):
         self.assertIn('Verified:', self.output)
         self.assertNotIn('weak', self.output)
         commands = self.commands()
-        self.assertEqual(['pull','create','start','wait','logs','inspect','inspect','rm'], [c[0] for c in commands])
+        self.assertEqual(['pull','create','start','wait','logs','inspect','inspect','inspect','rm'], [c[0] for c in commands])
         self.assertNotIn('run', [c[0] for c in commands])
 
     def test_large_logs_do_not_trigger_echo_grep_sigpipe(self):
         self.assertEqual(0, self.run_helper('password-policy','large-log').returncode, self.output)
-        self.assertLess(len(self.output), 200)
+        self.assertLess(len(self.output), 1000)
+
+    def test_application_exit_255_with_confirmed_policy_rejection_is_not_a_docker_cli_failure(self):
+        self.assertEqual(0,self.run_helper('password-policy','policy-255').returncode,self.output)
+        for field in ('wait_status=0','timeout=none','state=exited','state_exit=255','oom_killed=false',
+                      'wait_exit=255','policy_signature=matched','candidate_matches=1'):
+            self.assertIn(field,self.output)
+
+    def test_zero_exit_still_fails_even_with_a_policy_rejection_signature(self):
+        self.assertNotEqual(0,self.run_helper('password-policy','zero').returncode)
+        self.assertIn('wait_exit=0',self.output)
+        self.assertIn('policy_signature=matched',self.output)
+
+    def test_timeout_and_killed_wait_cannot_be_hidden_by_policy_logs(self):
+        for case,classification in (('timeout','deadline-exceeded'),('wait-killed','wait-killed')):
+            with self.subTest(case=case):
+                self.assertNotEqual(0,self.run_helper('password-policy',case).returncode)
+                self.assertIn('timeout='+classification,self.output)
+                self.assertIn('policy_signature=matched',self.output)
+                self.assertEqual('rm',self.commands()[-1][0])
+
+    def test_oom_and_signal_termination_fail_even_with_policy_logs(self):
+        for case in ('oom','signal','term','abort'):
+            with self.subTest(case=case):
+                self.assertNotEqual(0,self.run_helper('password-policy',case).returncode)
+                self.assertIn('policy_signature=matched',self.output)
+                if case == 'oom': self.assertIn('oom_killed=true',self.output)
+
+    def test_each_inspect_failure_is_reported_redacted_and_never_passes(self):
+        for case in ('inspect-failure','state-inspect-failure','error-inspect-failure','env-inspect-failure'):
+            with self.subTest(case=case):
+                self.assertNotEqual(0,self.run_helper('password-policy',case).returncode)
+                self.assertIn('inspect failure:',self.output)
+                self.assertIn('[REDACTED]',self.output)
+                self.assertNotIn('weak',self.output)
+                self.assertNotIn('unit-only',self.output)
+                self.assertEqual('rm',self.commands()[-1][0])
+
+    def test_only_explicit_sa_complexity_rejection_satisfies_the_signature(self):
+        for case in ('unrelated-exit','generic-policy','policy-infrastructure','policy-without-sa'):
+            with self.subTest(case=case):
+                self.assertNotEqual(0,self.run_helper('password-policy',case).returncode)
+                self.assertIn('policy_signature=missing',self.output)
+
+    def test_wrong_or_duplicate_candidate_and_mismatching_exit_evidence_fail(self):
+        for case in ('wrong-candidate','duplicate-candidate','exit-mismatch','negative-exit','out-of-range'):
+            with self.subTest(case=case):
+                self.assertNotEqual(0,self.run_helper('password-policy',case).returncode)
+                self.assertNotIn('weak',self.output)
+
+    def test_engine_error_field_is_redacted_before_failure_output(self):
+        self.assertNotEqual(0,self.run_helper('password-policy','engine-error').returncode)
+        self.assertIn('engine_error=engine',self.output)
+        self.assertNotIn('weak',self.output)
+        self.assertNotIn('unit-only',self.output)
+
+    def test_diagnostic_redaction_handles_all_credentials_as_literal_strings(self):
+        password='fixture[.*]/&$!9'
+        jwt='jwt[.*]/&$!9'
+        (self.root/'sportify-password-policy.log').write_text('weak '+password+' '+jwt+'\n',encoding='ascii')
+        self.assertEqual(0,self.run_helper('diagnostics',DB_PASSWORD=password,JWT_SECRET=jwt).returncode,self.output)
+        self.assertNotIn(password,self.output)
+        self.assertNotIn(jwt,self.output)
+        self.assertNotIn('weak',self.output)
+        self.assertIn('[REDACTED] [REDACTED] [REDACTED]',self.output)
 
     def test_infrastructure_timeout_and_unrelated_failures_never_count_as_policy_success(self):
         cases=('pull-failure','create-failure','start-failure','wait-failure','timeout','zero','signal',
