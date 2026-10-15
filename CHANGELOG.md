@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-10-14 - Payment at the desk (BE-19, Flow 3)
+
+Branch `feat/f3-desk-payment`. Owner: Truc. Priority: P1. Depends on BE-18 (merged in PR #60; main is merged into this branch). Screens F1-13 Payment Handoff and F1-14 Register and Renew. Provides the BE-19 contract FE-05 already sends.
+
+### Added
+- Desk sale records the money at once: `POST /api/v1/membership-cards/purchase` and `POST /api/v1/packages/registrations` (channel `RECEPTION`) by RECEPTIONIST or MANAGER accept `paymentMethod` (alias `method`, `CASH` when omitted), `referenceCode` (aliases `paymentReference`, `reference`; required except for `CASH`) and `amountReceived` (the price when omitted). A `SUCCESS` payment is created and linked, the item is `ACTIVE`, and the BE-18 receipt step `PaymentVerificationService.recordPaymentConfirmed` issues the `PAID` invoice and writes `PAYMENT_CONFIRMED`.
+- Cash may be more than the price (the change is written in the payment notes); less money, or a non-cash amount that differs, answers 409 `PAYMENT_AMOUNT_MISMATCH` and nothing is saved. Nothing to pay (STANDARD tier, zero fee upgrade, full discount) creates no payment.
+- `MemberCardResponse` and `PackageRegistrationResponse` carry `invoiceId` and `invoiceNumber` (with the existing `paymentId`) after a desk sale or an activation, so the screen opens the receipt (F1-13 State After Payment).
+- `PaymentService.recordDeskPayment` and `PaymentVerificationService.recordDeskPayment`; tests in `PaymentVerificationServiceImplTest` (+7), `MembershipCardServiceImplTest` (+2), `SportPackageServiceImplTest` (+2) and `PaymentVerificationIntegrationTest` (+4); test cases in `docs/tests/BE-19_test_cases.md`.
+
+### Changed
+- Reference validation of confirm and desk sale shares one helper; payment amount validation of online and desk payments shares one helper.
+- `docs/database/04` and `09`: desk sale rules, visibility, invoice totals rule.
+- CI fix: the desk sale integration tests expect 201 Created (the purchase and registration endpoints answer 201), and the test cleanup deletes every row of the members it created, so a failing test can no longer leave sports, packages or tiers behind for other test classes.
+
+### Review round 1
+- P1-01: `DeskSaleRollbackIntegrationTest` (SQL Server) forces the receipt step to fail after the payment and the card or registration were written (invoice save for a package and a card sale, and the PAYMENT_CONFIRMED audit write after the invoice and its line were saved) and checks that no payment, card, registration, invoice, invoice line or activity_log row is left.
+- P1-02: the 403 change for another member's payment, payment method change and invoice is reverted. No approved specification asked for it, and BE-17 and BE-18 document 404 (the resource is not revealed); the responses are 404 again and the BE-17 and BE-18 tests are restored unchanged.
+- P2-01: HTTP integration tests for a non-cash desk sale with a different amount (bank transfer with more for a package, credit card with less for a card): 409 `PAYMENT_AMOUNT_MISMATCH` and no item, payment, invoice, invoice line or activity_log row.
+- `PaymentVerificationIntegrationTest` and `DeskSaleRollbackIntegrationTest` are added to `scripts/ci/required-integration-tests.txt`, so CI fails if they do not run.
+- Merged main (final BE-18 from PR #60 and BE-10 from PR #51); the BE-19 change set is applied unchanged on top of it.
+- CI fix (PR #62): the three `DeskSaleRollbackIntegrationTest` tests failed in their setup with `detached entity passed to persist: UserAccount`, because `newMember` saved the account and the `@MapsId` profile in two transactions. Both are now saved in one transaction, as in `PaymentVerificationIntegrationTest`. Test helper only; no production code or assertion changed.
+
 ## 2026-10-14 - Receptionist verifies and confirms payments (BE-18, Flow 3)
 
 Branch `feat/f3-confirm-payment`. Owner: Truc. Priority: P1. Depends on BE-17 (merged). Screens F3-04, F3-05, F3-06 and S3-Mismatch. Provides the BE-18 part of what FE-12 (`feat/f3-reception-payments`) needs; FE-12 is also blocked by BE-21.

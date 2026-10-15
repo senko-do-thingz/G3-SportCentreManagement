@@ -76,7 +76,7 @@ class PaymentPricingConsistencyTest {
         paymentService = new PaymentServiceImpl(paymentRepository, memberCardRepository, registrationRepository,
                 resolver, bankProperties, formatter, clock);
         verificationService = new PaymentVerificationServiceImpl(paymentRepository, invoiceRepository, resolver,
-                membershipCardService, sportPackageService, auditService, formatter, clock);
+                paymentService, membershipCardService, sportPackageService, auditService, formatter, clock);
 
         receptionist = UserAccount.builder().id(7L).fullName("Rita Reception")
                 .role(Role.builder().code("RECEPTIONIST").name("Receptionist").build()).build();

@@ -21,6 +21,7 @@ import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
+import com.sportify.payment.config.BankTransferProperties;
 import com.sportify.payment.dto.ConfirmPaymentRequest;
 import com.sportify.payment.dto.FailPaymentRequest;
 import com.sportify.payment.dto.InvoiceResponse;
@@ -83,6 +84,10 @@ class PaymentVerificationServiceImplTest {
     private SportPackageService sportPackageService;
     @Mock
     private AuditService auditService;
+    @Mock
+    private BankTransferProperties bankProperties;
+
+    private PaymentServiceImpl paymentService;
 
     private PaymentVerificationServiceImpl service;
     private UserAccount receptionist;
@@ -94,8 +99,10 @@ class PaymentVerificationServiceImplTest {
     void setUp() {
         Clock clock = Clock.fixed(Instant.parse("2026-10-14T03:00:00Z"), ZoneId.of("Asia/Ho_Chi_Minh"));
         PaymentItemResolver resolver = new PaymentItemResolver(memberCardRepository, registrationRepository, invoiceRepository);
+        paymentService = new PaymentServiceImpl(paymentRepository, memberCardRepository, registrationRepository,
+                resolver, bankProperties, new CodeFormatter(), clock);
         service = new PaymentVerificationServiceImpl(paymentRepository, invoiceRepository, resolver,
-                membershipCardService, sportPackageService, auditService, new CodeFormatter(), clock);
+                paymentService, membershipCardService, sportPackageService, auditService, new CodeFormatter(), clock);
 
         receptionist = UserAccount.builder().id(7L).fullName("Rita Reception")
                 .role(Role.builder().code("RECEPTIONIST").name("Receptionist").build()).build();
@@ -762,5 +769,99 @@ class PaymentVerificationServiceImplTest {
         assertThatThrownBy(() -> service.listPayments(null, null, null, LocalDate.of(0, 12, 31), null, 0, 10))
                 .isInstanceOf(BusinessRuleException.class);
         verifyNoInteractions(paymentRepository);
+    }
+
+    // ---------- BE-19: payment at the desk ----------
+
+    private void stubNewDeskPayment() {
+        when(paymentRepository.getNextPaymentCodeSequence()).thenReturn(1200L);
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> {
+            Payment saved = i.getArgument(0);
+            saved.setId(12L);
+            return saved;
+        });
+    }
+
+    @Test
+    @DisplayName("Desk sale by bank transfer with the exact amount: SUCCESS payment with reference, time and staff")
+    void recordDeskPayment_BankTransferExact_CreatesSuccessPayment() {
+        stubNewDeskPayment();
+
+        Payment created = service.recordDeskPayment(member, new BigDecimal("400000.00"), PaymentMethod.BANK_TRANSFER,
+                " FT2610140002 ", new BigDecimal("400000"), receptionist);
+
+        assertThat(created.getId()).isEqualTo(12L);
+        assertThat(created.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(created.getPaymentMethod()).isEqualTo(PaymentMethod.BANK_TRANSFER);
+        assertThat(created.getReferenceCode()).isEqualTo("FT2610140002");
+        assertThat(created.getAmount()).isEqualByComparingTo("400000");
+        assertThat(created.getPaymentTime()).isNotNull();
+        assertThat(created.getConfirmedByUser()).isEqualTo(receptionist);
+        assertThat(created.getMember()).isEqualTo(member);
+        assertThat(created.getNotes()).contains("Paid at the desk").doesNotContain("change");
+    }
+
+    @Test
+    @DisplayName("Desk sale in cash with more money: the change is written in the notes")
+    void recordDeskPayment_CashMore_NotesTheChange() {
+        stubNewDeskPayment();
+
+        Payment created = service.recordDeskPayment(member, new BigDecimal("380000.00"), PaymentMethod.CASH,
+                null, new BigDecimal("500000"), receptionist);
+
+        assertThat(created.getPaymentMethod()).isEqualTo(PaymentMethod.CASH);
+        assertThat(created.getAmount()).isEqualByComparingTo("380000");
+        assertThat(created.getReferenceCode()).isNull();
+        assertThat(created.getNotes()).contains("Cash received 500000, change 120000.00");
+    }
+
+    @Test
+    @DisplayName("Desk sale without method and amount received: CASH and the exact amount")
+    void recordDeskPayment_Defaults_CashAndExactAmount() {
+        stubNewDeskPayment();
+
+        Payment created = service.recordDeskPayment(member, new BigDecimal("380000.00"), null, null, null, receptionist);
+
+        assertThat(created.getPaymentMethod()).isEqualTo(PaymentMethod.CASH);
+        assertThat(created.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+    }
+
+    @Test
+    @DisplayName("Desk sale with less cash than the amount: 409 PAYMENT_AMOUNT_MISMATCH, nothing saved")
+    void recordDeskPayment_CashShort_MismatchAndNothingSaved() {
+        assertThatThrownBy(() -> service.recordDeskPayment(member, new BigDecimal("380000.00"), PaymentMethod.CASH,
+                null, new BigDecimal("300000"), receptionist))
+                .isInstanceOf(PaymentAmountMismatchException.class)
+                .satisfies(ex -> assertThat(((ConflictException) ex).getCode()).isEqualTo("PAYMENT_AMOUNT_MISMATCH"));
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    @DisplayName("Desk sale by card with a different amount: 409, only cash may be more")
+    void recordDeskPayment_NonCashDifferent_Mismatch() {
+        assertThatThrownBy(() -> service.recordDeskPayment(member, new BigDecimal("380000.00"), PaymentMethod.CREDIT_CARD,
+                "SLIP-1", new BigDecimal("400000"), receptionist))
+                .isInstanceOf(PaymentAmountMismatchException.class)
+                .hasMessageContaining("only cash can be more");
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    @DisplayName("Desk sale by bank transfer without a reference: 400")
+    void recordDeskPayment_TransferWithoutReference_BadRequest() {
+        assertThatThrownBy(() -> service.recordDeskPayment(member, new BigDecimal("380000.00"), PaymentMethod.BANK_TRANSFER,
+                "  ", new BigDecimal("380000"), receptionist))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Reference code is required");
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    @DisplayName("Desk payment by a member: 403")
+    void recordDeskPayment_MemberActor_Forbidden() {
+        assertThatThrownBy(() -> service.recordDeskPayment(member, new BigDecimal("380000.00"), PaymentMethod.CASH,
+                null, null, memberUser))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(paymentRepository, never()).save(any(Payment.class));
     }
 }

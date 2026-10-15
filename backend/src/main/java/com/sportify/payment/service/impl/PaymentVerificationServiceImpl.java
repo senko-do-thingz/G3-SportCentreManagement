@@ -29,6 +29,7 @@ import com.sportify.payment.exception.PaymentAmountMismatchException;
 import com.sportify.payment.repository.InvoiceRepository;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.repository.PaymentSpecifications;
+import com.sportify.payment.service.PaymentService;
 import com.sportify.payment.service.PaymentVerificationService;
 import com.sportify.payment.service.impl.PaymentItemResolver.PaymentItem;
 import com.sportify.payment.service.impl.PaymentItemResolver.PaymentItemSummary;
@@ -69,6 +70,7 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
     private final PaymentRepository paymentRepository;
     private final InvoiceRepository invoiceRepository;
     private final PaymentItemResolver itemResolver;
+    private final PaymentService paymentService;
     private final MembershipCardService membershipCardService;
     private final SportPackageService sportPackageService;
     private final AuditService auditService;
@@ -125,10 +127,7 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
             throw new BusinessRuleException("Amount received must be greater than zero");
         }
         PaymentMethod method = request.getMethod();
-        String reference = trimToNull(request.getReferenceCode());
-        if (method != PaymentMethod.CASH && reference == null) {
-            throw new BusinessRuleException("Reference code is required for payment method " + method);
-        }
+        String reference = requireReference(method, request.getReferenceCode());
         String note = trimToNull(request.getNote());
 
         Payment payment = lockPayment(paymentId);
@@ -163,6 +162,38 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
 
         PaymentItem refreshed = itemResolver.findItem(payment).orElse(item);
         return toResponse(payment, refreshed, invoice);
+    }
+
+    /**
+     * BE-19 desk sale: the same evidence rules as the confirmation (a reference for every method except CASH), then a
+     * SUCCESS payment. Cash may be more than the amount (the change is written in the payment notes); any other
+     * method must match it exactly. A short amount answers 409 PAYMENT_AMOUNT_MISMATCH and nothing is saved.
+     */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Payment recordDeskPayment(MemberProfile member, BigDecimal amount, PaymentMethod method, String referenceCode,
+                                     BigDecimal amountReceived, UserAccount actor) {
+        requireStaff(actor);
+        PaymentMethod chosen = method != null ? method : PaymentMethod.CASH;
+        String reference = requireReference(chosen, referenceCode);
+        BigDecimal received = amountReceived != null ? amountReceived : amount;
+        if (received == null || received.signum() <= 0) {
+            throw new BusinessRuleException("Amount received must be greater than zero");
+        }
+        int compared = received.compareTo(amount);
+        if (compared < 0 || (compared > 0 && chosen != PaymentMethod.CASH)) {
+            throw new PaymentAmountMismatchException("Amount received " + received.toPlainString()
+                    + " does not match the amount to pay " + amount.toPlainString()
+                    + (chosen == PaymentMethod.CASH ? "" : " (only cash can be more than the amount)")
+                    + ". Nothing was recorded.");
+        }
+
+        Payment payment = paymentService.recordDeskPayment(member, amount, chosen, reference, actor);
+        if (compared > 0) {
+            payment.setNotes(PaymentNotes.append(payment.getNotes(), "Cash received " + received.toPlainString()
+                    + ", change " + received.subtract(amount).toPlainString()));
+        }
+        return payment;
     }
 
     @Override
@@ -480,6 +511,15 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         if (!SecurityUtils.isStaff(actor)) {
             throw new AccessDeniedException("Only staff users can verify payments");
         }
+    }
+
+    /** Every method except CASH needs the bank, card slip or e-wallet reference. Returns the trimmed reference. */
+    private static String requireReference(PaymentMethod method, String referenceCode) {
+        String reference = trimToNull(referenceCode);
+        if (method != PaymentMethod.CASH && reference == null) {
+            throw new BusinessRuleException("Reference code is required for payment method " + method);
+        }
+        return reference;
     }
 
     private static String trimToNull(String value) {
