@@ -9,4 +9,3 @@ com.sportify.payment.DeskSaleRollbackIntegrationTest
 com.sportify.payment.PaymentVerificationIntegrationTest
 com.sportify.payment.ReceiptIntegrationTest
 com.sportify.catalog.RefundPaymentLinkIntegrationTest
-com.sportify.payment.FinanceReportIntegrationTest

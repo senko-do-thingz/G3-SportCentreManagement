@@ -30,7 +30,7 @@ and added `confirmed_by_user_id` (BE-17).
 - **Card discount on invoices.** A Gold (5%) or VIP (10%) discount is computed at package registration and shown in `invoice.discount_amount` and the invoice lines. Single visits get no discount.
 - **Refund Request Workflow (F3-07, F3-09).** Receptionist or member files a request, the Center Manager approves or rejects it with a note, approved refunds become `COMPLETED` on payout, and the payment becomes `REFUNDED` (rules under `refund_request`, BE-21).
 - **Invoice = snapshot.** An invoice is issued for a successful payment. `invoice.payment_id` is indexed but not unique.
-- **Revenue is computed, not stored.** Reports read `vw_paid_payment` (created by V25, BE-22) filtered by `payment_time`. `PENDING` and `FAILED` rows stay in the ledger but are not revenue.
+- **Revenue is computed, not stored.** Reports read `vw_paid_payment` (planned view) filtered by `payment_time`. `PENDING` and `FAILED` rows stay in the ledger but are not revenue.
 - **Front desk verification (BE-18).** `GET /api/v1/payments` lists payment requests for RECEPTIONIST and MANAGER, `PENDING` first (oldest first), then the rest newest first; filters `status`, `method`, `search` (member name, member code, payment code, reference code; `query` is accepted as another name), `from` and `to` (inclusive dates on `created_at`), `page`, `size` (1 to 100, default 20).
 - **Confirm (F3-05, F3-06).** `PUT /api/v1/payments/{id}/confirm` with `method`, `referenceCode` (required for every method except `CASH`, otherwise 400), `amountReceived`, `note`. In one transaction that starts by locking the payment row (`PaymentRepository.findByIdForUpdate`, PESSIMISTIC_WRITE): `reference_code` is stored, the linked card (`MembershipCardService.activateCard`) or registration (`SportPackageService.activateRegistration`) becomes `ACTIVE` with dates recomputed from the confirmation day, the payment becomes `SUCCESS` with `payment_time` now and `confirmed_by_user_id`, then `PaymentVerificationService.recordPaymentConfirmed` issues an `invoice` (`PAID`) with one `invoice_line` and writes `activity_log` `PAYMENT_CONFIRMED`. The receipt is read with `GET /api/v1/invoices/by-payment/{paymentId}` or `GET /api/v1/invoices/{id}` (staff, or the member who owns the payment; see BE-20 below).
 - **Invoice amounts.** The line is written at the price before discount, from `PaymentItemResolver`, using only values stored when the payment request was made, never the current catalog price: `sport_package_registration.original_price` for a package; for a card, `member_card.price_paid` plus, for an upgrade (`upgrade_request = 1`), the upgrade credit = the `price_paid` of the replaced card (`replaces_card_id`) and of every card it replaced in turn, which is the base BE-17 subtracted from the tier price. A new card or renewal has no discount. When an upgrade's chain cannot be read (no `replaces_card_id`, a missing price, a chain longer than the BE-17 limit), no credit is claimed. A tier or package price edited after the request changes nothing on the invoice. `subtotal_amount` is that price, `discount_amount` is the card discount (package) or the upgrade credit (card upgrade, the line description says so), `tax_amount` is 0 and `total_amount` equals `payment.amount`. If `subtotal - discount` does not equal `payment.amount` (the item's `paid_amount` or `price_paid` differs from the payment: corrupted data), the API answers 409 `PAYMENT_ITEM_AMOUNT_MISMATCH` and nothing is written.
@@ -104,15 +104,24 @@ Index: `ix_invoice_line_invoice_id`.
 
 ## Reporting View
 
-### `vw_payment_ledger` and `vw_paid_payment` (V25, BE-22)
+### `vw_paid_payment` (planned, not in any migration)
 
-The planned view is now real, built in two layers so the item and sport rule lives in one place:
+Single source for the revenue screens.
 
-- `vw_payment_ledger`: one row per payment, every status. Columns: `payment_id`, `payment_code`, `payment_status`, `payment_method`, `amount`, `reference_code`, `payment_time`, `created_at`, `ledger_time` (= `payment_time`, else `created_at`), `member_id`, `member_code`, `member_name`, `invoice_id`, `invoice_number` (first invoice of the payment), `item_type`, `item_code`, `item_name`, `sport_id`, `sport_name`. The item is the package registration that points to the payment (`SPORT_PACKAGE`, with its package and sport), else the membership card (`MEMBERSHIP_CARD`, no sport), else the first invoice line.
-- `vw_paid_payment`: `vw_payment_ledger` where `payment_status = 'SUCCESS'`, with the columns of the original plan (`payment_id`, `payment_code`, `payment_time`, `paid_on`, `amount`, `payment_method`, `member_id`, `invoice_number`) plus member, item and sport.
-- Index `ix_payment_status_time` on `payment(payment_status, payment_time)` for the revenue filters.
-
-The application reads both views with native SQL (`FinanceReportRepository`, NamedParameterJdbcTemplate); JPQL cannot map aggregations over views.
+```sql
+CREATE VIEW vw_paid_payment AS
+SELECT p.id           AS payment_id,
+       p.payment_code,
+       p.payment_time,
+       CAST(p.payment_time AS DATE) AS paid_on,
+       p.amount,
+       p.payment_method,
+       p.member_id,
+       i.invoice_number
+FROM payment p
+LEFT JOIN invoice i ON i.payment_id = p.id AND i.status IN ('ISSUED', 'PAID')
+WHERE p.payment_status = 'SUCCESS';
+```
 
 ### `refund_request`
 
@@ -205,17 +214,3 @@ OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
 ```
 
 CSV export and "Print / Save PDF" are generated by the application from these queries; no table is required.
-
-Manager endpoints (BE-22, MANAGER only, other roles 403):
-
-- `GET /api/v1/manager/finance/overview?month=yyyy-MM` (default current month): `paidRevenue`, `paidTransactions`, `averagePayment` (half up, 2 decimals), `pendingAmount` / `pendingTransactions` (PENDING payments created in the month), `refundedAmount` / `refundedTransactions` (COMPLETED refund requests, approved amount, by completion time; see Refund completion time below), the previous month's revenue and count, `revenueChange` and `revenueChangePercent` (null when the previous month had no revenue).
-- `GET /api/v1/manager/finance/trend?months=6` (1 to 24): one point per month ending with the current month, zero months included.
-- `GET /api/v1/manager/finance/transactions?status=&method=&type=&from=&to=&search=&page=&size=`: `vw_payment_ledger`, every status, newest `ledger_time` first; `from` and `to` are inclusive dates on `ledger_time`; `search` matches payment code, member name, member code, invoice number and reference code (wildcards escaped); size 1 to 100.
-- `GET /api/v1/manager/finance/revenue?from=&to=&groupBy=ITEM_TYPE|METHOD|SPORT` (default this month to today, at most 366 days): groups with `revenue`, `transactions` and `sharePercent` (2 decimals, largest remainder method so the shares add up to exactly 100.00). Payments without a sport form one group with key null.
-- `GET /api/v1/manager/finance/revenue/export?from=&to=`: CSV of the paid payments, UTF-8 with a byte order mark (Excel then shows Vietnamese names correctly), header row, comma separated, CRLF; amounts written without grouping or trailing zeros; text that starts with `=`, `+`, `-` or `@` is prefixed with `'` so Excel does not run it as a formula. Bounded: at most 50,000 payments per export (`MAX_EXPORT_ROWS`), otherwise 400 and the manager picks a shorter range; rows are written one at a time from the result set (no row list, no full CSV string), so one export holds about 2 x the CSV size (about 21 MB at the limit).
-
-Supported dates (every date parameter and the overview month): 1900-01-01 to 9999-12-30, otherwise 400. An inclusive date `d` is sent as the exclusive bound `d + 1 day 00:00`; `DATETIME2` ends at 9999-12-31, so 9999-12-30 is the last date whose bound fits. 9999-12-31, `+10000-01-01` and `LocalDate.MAX` (`+999999999-12-31`) answer 400 instead of 500; the overview month must be 1900-01 to 9999-11.
-
-Refund completion time: `refund_request` has no `completed_at`. The report uses the `activity_log` row `REFUND_COMPLETED` (`entity_type = 'REFUND_REQUEST'`, `entity_id` = refund id), written once in the transaction that completes the refund (BE-21) and never updated. A refund without that row (legacy or seeded data) falls back to `updated_at`, then `reviewed_at`, then `created_at`. Today no code changes a `COMPLETED` refund (review needs `PENDING`, complete needs `APPROVED`), so `updated_at` equals the completion time; the log is preferred so a later change to the row (a note, a data fix) cannot move the refund into another month.
-
-Deviation from the revenue-by-item-type query above: revenue is summed from `payment.amount`, not `invoice_line.line_total`. Since BE-18 a line holds the price before the card discount, so line totals would overstate revenue and would not match the overview.
