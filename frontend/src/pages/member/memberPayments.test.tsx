@@ -11,7 +11,7 @@ import { POLL_INTERVAL_MS } from './paymentsModel'
 /**
  * FE-11: Payment Summary (F3-01, S3-Single), Payment Instructions and Status (F3-02), My Payments
  * and Receipts (F3-03, S3-PaidHistory) and the receipts (S3-CardReceipt, S3-MemberReceipt,
- * S3-SingleReceipt). GET /payments/my and GET /invoices/{id} follow the assumed BE-20 contract.
+ * S3-SingleReceipt). History and receipts follow the verified BE-20 contract on main.
  */
 
 const PENDING_REGISTRATION = registration({
@@ -51,7 +51,7 @@ function paymentsBackend(options: Options = {}) {
         ? options.onMethod(call)
         : json(200, payment({ method: (call.body as { paymentMethod: string }).paymentMethod }))
     }
-    if (call.path.startsWith('/payments/my')) return options.myPayments ? options.myPayments(call) : json(200, [])
+    if (call.path.startsWith('/payments/my')) return options.myPayments ? options.myPayments(call) : json(200, historyPage())
     if (call.path === '/invoices/7') return options.invoice ?? json(200, invoice())
     return backendError(404, 'Resource not found')
   })
@@ -59,6 +59,10 @@ function paymentsBackend(options: Options = {}) {
 
 function signIn() {
   tokenStorage.startSession({ accessToken: 'member-access', refreshToken: 'member-refresh' })
+}
+
+function historyPage(rows: Payment[] = [], page = 0, size = 20) {
+  return { content: rows, page, size, totalElements: rows.length, totalPages: Math.ceil(rows.length / size) }
 }
 
 function paymentGets(calls: RecordedCall[]) {
@@ -216,6 +220,23 @@ describe('FE-11 Payment Summary (F3-01, S3-Single)', () => {
     expect(within(order).getByTestId('payment-amount')).toHaveTextContent('810.000 VND')
     await waitFor(() => expect(screen.queryByText('Loading the item details')).not.toBeInTheDocument())
     expect(screen.queryByText('Registration')).not.toBeInTheDocument()
+  })
+
+  it.each([403, 404])('does not display payment details when the backend rejects access with %s', async status => {
+    paymentsBackend({ payments: [backendError(status, 'Payment unavailable')] })
+    renderApp('/member/payments/52')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Payment unavailable')
+    expect(screen.queryByRole('region', { name: 'Payment details' })).not.toBeInTheDocument()
+    expect(screen.queryByText('MEM-0002')).not.toBeInTheDocument()
+  })
+
+  it('retains backend fractional original price, discount and total', async () => {
+    paymentsBackend({ payments: [payment({ originalPrice: '0.25', discount: '0.12', amount: '0.13' })] })
+    renderApp('/member/payments/52')
+    const order = await screen.findByRole('region', { name: 'Order summary' })
+    expect(within(order).getByText('Original price').nextSibling).toHaveTextContent('0,25 VND')
+    expect(within(order).getByText('Discount (48%)').nextSibling).toHaveTextContent('-0,12 VND')
+    expect(within(order).getByText('Total due').nextSibling).toHaveTextContent('0,13 VND')
   })
 })
 
@@ -451,6 +472,66 @@ describe('FE-11 Payment Instructions and Status (F3-02)', () => {
     expect(await screen.findByText('The payment link is not valid.')).toBeInTheDocument()
     expect(calls.some((call) => call.path.startsWith('/payments'))).toBe(false)
   })
+
+  it('copies a supported fractional amount without rounding or grouping', async () => {
+    const user = userEvent.setup()
+    paymentsBackend({ payments: [payment({ amount: '810000.25' })] })
+    renderApp('/member/payments/52/status')
+    const bank = await screen.findByRole('region', { name: 'Bank transfer' })
+    const writeText = stubClipboard()
+    expect(bank).toHaveTextContent('810.000,25 VND')
+    await user.click(within(bank).getByRole('button', { name: 'Copy amount' }))
+    expect(writeText).toHaveBeenCalledWith('810000.25')
+  })
+
+  it.each(['FAILED', 'REFUNDED'])('stops automatic polling after PENDING becomes %s', async status => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const { calls } = paymentsBackend({ payments: [payment(), payment({ status, bankTransferInstructions: null })] })
+    renderApp('/member/payments/52/status')
+    await screen.findByRole('region', { name: 'Payment status' })
+    await act(async () => { await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS) })
+    await waitFor(() => expect(paymentGets(calls)).toHaveLength(2))
+    expect(screen.queryByRole('button', { name: 'Refresh status' })).not.toBeInTheDocument()
+    await act(async () => { await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 3) })
+    expect(paymentGets(calls)).toHaveLength(2)
+  })
+
+  it('aborts an in-flight request on unmount', async () => {
+    let release: (response: Response) => void = () => undefined
+    const { calls, fetchMock } = installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER) :
+      new Promise<Response>(resolve => { release = resolve }))
+    const view = renderApp('/member/payments/52/status')
+    await waitFor(() => expect(paymentGets(calls)).toHaveLength(1))
+    const signal = fetchMock.mock.calls.find(([input]) => String(input).endsWith('/payments/52'))?.[1]?.signal
+    view.unmount()
+    expect(signal?.aborted).toBe(true)
+    await act(async () => release(json(200, payment())))
+    expect(screen.queryByText('PAY-0052')).not.toBeInTheDocument()
+  })
+
+  it('drops an old account payment response after another tab switches members', async () => {
+    let release: (response: Response) => void = () => undefined
+    const { calls } = installFakeFetch(call => {
+      if (call.path === '/users/me') return json(200, call.authorization === 'Bearer second-member' ?
+        { ...MEMBER, id: 3, fullName: 'Second member' } : MEMBER)
+      if (call.path === '/payments/52') return new Promise<Response>(resolve => { release = resolve })
+      return json(200, [])
+    })
+    renderApp('/member/payments/52/status')
+    await waitFor(() => expect(paymentGets(calls)).toHaveLength(1))
+    const oldSession = tokenStorage.getSessionId()
+    await act(async () => {
+      localStorage.setItem(tokenStorage.accessKey, 'second-member')
+      localStorage.setItem(tokenStorage.refreshKey, 'second-refresh')
+      localStorage.setItem(tokenStorage.sessionKey, 'second-session')
+      window.dispatchEvent(new StorageEvent('storage', { key: tokenStorage.sessionKey, oldValue: oldSession, newValue: 'second-session' }))
+    })
+    expect(await screen.findByRole('heading', { name: 'Member Dashboard' })).toBeInTheDocument()
+    expect(screen.getByRole('status', { name: 'Account switched' })).toHaveTextContent('Second member')
+    await act(async () => release(json(200, payment({ code: 'PRIVATE-OLD-ACCOUNT' }))))
+    expect(screen.queryByText('PRIVATE-OLD-ACCOUNT')).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Bank transfer' })).not.toBeInTheDocument()
+  })
 })
 
 describe('FE-11 My Payments and Receipts (F3-03, S3-PaidHistory)', () => {
@@ -477,7 +558,7 @@ describe('FE-11 My Payments and Receipts (F3-03, S3-PaidHistory)', () => {
   }
 
   it('TC-FE11-024 lists payments newest first with Check status, View receipt and View details', async () => {
-    paymentsBackend({ myPayments: () => json(200, [HISTORY[2], HISTORY[0], HISTORY[1]]) })
+    paymentsBackend({ myPayments: () => json(200, historyPage(HISTORY)) })
     renderApp('/member/payments')
     await screen.findByText('PAY-0052')
     const rows = historyRows()
@@ -492,37 +573,39 @@ describe('FE-11 My Payments and Receipts (F3-03, S3-PaidHistory)', () => {
 
   it('TC-FE11-025 the status filter asks the backend with ?status= and shows only that status', async () => {
     const user = userEvent.setup()
-    // A backend that ignores the filter: the screen still shows only the chosen status.
-    const { calls } = paymentsBackend({ myPayments: () => json(200, HISTORY) })
+    const { calls } = paymentsBackend({ myPayments: (call) => {
+      const status = new URL(call.path, 'http://api.test').searchParams.get('status')
+      return json(200, historyPage(status ? HISTORY.filter(row => row.status === status) : HISTORY))
+    } })
     renderApp('/member/payments')
     await screen.findByText('PAY-0052')
     await user.selectOptions(screen.getByRole('combobox', { name: 'Status' }), 'PENDING')
-    await waitFor(() => expect(calls.some((call) => call.path === '/payments/my?status=PENDING')).toBe(true))
+    await waitFor(() => expect(calls.some((call) => call.path === '/payments/my?status=PENDING&page=0&size=20')).toBe(true))
     await waitFor(() => expect(historyRows()).toHaveLength(1))
     expect(historyRows()[0]).toHaveTextContent('PAY-0052')
 
     await user.selectOptions(screen.getByRole('combobox', { name: 'Status' }), '')
     await waitFor(() => expect(historyRows()).toHaveLength(3))
-    expect(calls.filter((call) => call.path === '/payments/my')).toHaveLength(2)
+    expect(calls.filter((call) => call.path === '/payments/my?page=0&size=20')).toHaveLength(2)
   })
 
   it('TC-FE11-026 the status filter is read from the URL', async () => {
-    const { calls } = paymentsBackend({ myPayments: () => json(200, [HISTORY[1]]) })
+    const { calls } = paymentsBackend({ myPayments: () => json(200, historyPage([HISTORY[1]])) })
     renderApp('/member/payments?status=success')
     await screen.findByText('INV-0007')
     expect(screen.getByRole('combobox', { name: 'Status' })).toHaveValue('SUCCESS')
-    expect(calls.some((call) => call.path === '/payments/my?status=SUCCESS')).toBe(true)
+    expect(calls.some((call) => call.path === '/payments/my?status=SUCCESS&page=0&size=20')).toBe(true)
   })
 
   it('TC-FE11-027 shows an empty state when the member has no payments', async () => {
-    paymentsBackend({ myPayments: () => json(200, []) })
+    paymentsBackend({ myPayments: () => json(200, historyPage()) })
     renderApp('/member/payments')
     expect(await screen.findByRole('heading', { name: 'No payments yet' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Browse sport packages' })).toHaveAttribute('href', '/member/packages')
   })
 
   it('TC-FE11-028 a filter with no match shows its own empty state', async () => {
-    paymentsBackend({ myPayments: () => json(200, []) })
+    paymentsBackend({ myPayments: () => json(200, historyPage()) })
     renderApp('/member/payments?status=REFUNDED')
     expect(await screen.findByRole('heading', { name: 'No refunded payments' })).toBeInTheDocument()
   })
@@ -540,7 +623,7 @@ describe('FE-11 My Payments and Receipts (F3-03, S3-PaidHistory)', () => {
   })
 
   it('TC-FE11-031 the My Payments menu item opens the real screen', async () => {
-    paymentsBackend({ myPayments: () => json(200, []) })
+    paymentsBackend({ myPayments: () => json(200, historyPage()) })
     renderApp('/member/payments')
     expect(await screen.findByRole('heading', { level: 1, name: 'My Payments and Receipts' })).toBeInTheDocument()
     const nav = screen.getByRole('navigation', { name: 'Member navigation' })
@@ -625,5 +708,28 @@ describe('FE-11 Receipts (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt)', 
     renderApp('/member/payments/receipts/x1')
     expect(await screen.findByText('The receipt link is not valid.')).toBeInTheDocument()
     expect(calls.some((call) => call.path.startsWith('/invoices'))).toBe(false)
+  })
+
+  it('shows the complete payment reference and fractional invoice totals without repeating item descriptions', async () => {
+    paymentsBackend({ invoice: json(200, invoice({ paymentReference: 'BANK-REFERENCE-123', subtotalAmount: '0.25',
+      discountAmount: '0.12', taxAmount: '0.05', totalAmount: '0.18', lines: [
+        { id: 1, itemType: 'SPORT_PACKAGE', description: 'First invoice line', quantity: 2, unitPrice: '0.10', lineTotal: '0.20' },
+        { id: 2, itemType: 'CLASS_DROP_IN', description: 'Second invoice line', quantity: 1, unitPrice: '0.05', lineTotal: '0.05' },
+      ] })) })
+    renderApp('/member/payments/receipts/7')
+    const receipt = await screen.findByRole('region', { name: 'Receipt INV-0007' })
+    expect(within(receipt).getByText('Payment reference').nextSibling).toHaveTextContent('BANK-REFERENCE-123')
+    expect(within(receipt).getByTestId('receipt-total')).toHaveTextContent('0,18 VND')
+    expect(within(receipt).getByText('Tax').nextSibling).toHaveTextContent('0,05 VND')
+    expect(within(receipt).getAllByText(/First invoice line/)).toHaveLength(1)
+    expect(within(receipt).getByRole('list', { name: 'Receipt items' })).toHaveTextContent('x 2')
+  })
+
+  it('does not render another member receipt after the backend returns 403', async () => {
+    paymentsBackend({ invoice: backendError(403, 'This invoice belongs to another member') })
+    renderApp('/member/payments/receipts/7')
+    expect(await screen.findByRole('alert')).toHaveTextContent('This invoice belongs to another member')
+    expect(screen.queryByTestId('receipt-total')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Print receipt' })).not.toBeInTheDocument()
   })
 })

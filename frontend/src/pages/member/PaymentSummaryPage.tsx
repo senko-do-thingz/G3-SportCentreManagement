@@ -6,12 +6,13 @@ import { ONLINE_PAYMENT_METHODS, paymentsApi, type Payment } from '../../api/pay
 import { Button, Card, EmptyState, ErrorState, PageHeader, StatusBadge } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
-import { formatDate, formatDateTime, formatMoney } from '../../utils/format'
+import { formatDate, formatDateTime } from '../../utils/format'
 import { MEMBER_PATHS, trainingFormatLabel } from './dashboardModel'
 import { PaymentNav } from './PaymentNav'
 import {
   cardForPayment,
   discountPercent,
+  formatPaymentMoney as formatMoney,
   isPending,
   DEFAULT_PAYMENT_METHOD,
   isMethodAvailable,

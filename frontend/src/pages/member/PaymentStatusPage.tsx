@@ -6,12 +6,13 @@ import { Button, Card, EmptyState, ErrorState, PageHeader, StatusBadge, useToast
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { copyText } from '../../utils/clipboard'
-import { formatMoney, formatTime } from '../../utils/format'
+import { formatTime } from '../../utils/format'
 import { MEMBER_PATHS } from './dashboardModel'
 import { PaymentNav } from './PaymentNav'
 import {
   accountNumberToCopy,
   amountToCopy,
+  formatPaymentMoney as formatMoney,
   methodLabel,
   parseIdParam,
   PAYMENT_PATHS,

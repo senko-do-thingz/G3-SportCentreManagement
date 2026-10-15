@@ -6,7 +6,9 @@ import {
   amountToCopy,
   DEFAULT_PAYMENT_METHOD,
   discountPercent,
-  filterAndSortPayments,
+  formatPaymentMoney,
+  historyPageFromParam,
+  historySizeFromParam,
   isMethodAvailable,
   isPollingStatus,
   isSingleVisitRegistration,
@@ -53,20 +55,18 @@ describe('FE-11 paymentsModel', () => {
     expect(statusFilterFromParam(null)).toBe('')
   })
 
-  it('TC-FE11-M05 filter keeps the chosen status and sorts newest first (id breaks ties)', () => {
-    const rows = [
-      payment({ id: 1, status: 'SUCCESS', createdAt: '2026-10-01T09:00:00' }),
-      payment({ id: 2, status: 'PENDING', createdAt: '2026-10-12T09:00:00' }),
-      payment({ id: 3, status: 'PENDING', createdAt: '2026-10-12T09:00:00' }),
-      payment({ id: 4, status: 'FAILED', createdAt: null }),
-    ]
-    expect(filterAndSortPayments(rows, '').map((row) => row.id)).toEqual([3, 2, 1, 4])
-    expect(filterAndSortPayments(rows, 'PENDING').map((row) => row.id)).toEqual([3, 2])
-    expect(filterAndSortPayments(rows, 'REFUNDED')).toEqual([])
-    expect(rows.map((row) => row.id)).toEqual([1, 2, 3, 4])
+  it('TC-FE11-M05 page and size URL values stay within BE-20 limits', () => {
+    expect(historyPageFromParam('2')).toBe(2)
+    expect(historySizeFromParam('50')).toBe(50)
+    for (const invalid of [null, '-1', '1.5', '1e2', 'abc', '2147483648']) {
+      expect(historyPageFromParam(invalid)).toBe(0)
+    }
+    for (const invalid of [null, '0', '-1', '101', '1e2', 'abc']) {
+      expect(historySizeFromParam(invalid)).toBe(20)
+    }
   })
 
-  it('TC-FE11-M06 copy values: account number without spaces, transfer content, whole amount', () => {
+  it('TC-FE11-M06 copy values retain account digits, transfer content and decimal amounts', () => {
     expect(accountNumberToCopy('0000 1041 2460')).toBe('000010412460')
     expect(accountNumberToCopy(null)).toBe('')
     expect(transferContentToCopy(payment())).toBe('PAY-0052')
@@ -74,6 +74,13 @@ describe('FE-11 paymentsModel', () => {
     expect(amountToCopy(810000)).toBe('810000')
     expect(amountToCopy('810000.00')).toBe('810000')
     expect(amountToCopy('abc')).toBe('')
+    expect(amountToCopy('810000.25')).toBe('810000.25')
+    expect(amountToCopy(0.13)).toBe('0.13')
+    expect(amountToCopy(null)).toBe('')
+    expect(amountToCopy('')).toBe('')
+    expect(formatPaymentMoney('810000.25')).toBe('810.000,25 VND')
+    expect(formatPaymentMoney('0.13')).toBe('0,13 VND')
+    expect(formatPaymentMoney(null)).toBe('-')
   })
 
   it('TC-FE11-M07 a one day registration is a single visit', () => {

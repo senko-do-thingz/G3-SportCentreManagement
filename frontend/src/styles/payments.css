@@ -232,6 +232,8 @@
 
 .receipt__number {
   margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-weight: var(--weight-semibold);
   color: var(--color-text-muted);
 }
@@ -249,6 +251,28 @@
   display: flex;
   justify-content: space-between;
   gap: var(--space-4);
+}
+
+.receipt .summary-list dt {
+  flex: 0 0 25%;
+}
+
+.receipt .summary-list dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.receipt__lines li > :first-child {
+  min-width: 0;
+}
+
+.receipt__lines li > :last-child {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.receipt-page .page-header__title {
+  overflow-wrap: anywhere;
 }
 
 .receipt__footer {
@@ -296,6 +320,10 @@
 }
 
 @media print {
+  body:has(.receipt-page) {
+    background: #fff;
+  }
+
   .member-layout:has(.receipt-page) > .member-header,
   .member-layout:has(.receipt-page) .member-nav,
   .member-layout:has(.receipt-page) .account-switch-notice,
@@ -311,32 +339,67 @@
   }
 
   .receipt-page {
-    gap: var(--space-3);
+    display: block;
+    width: 100%;
+    min-width: 0;
   }
 
-  .receipt-page .page-header__description,
-  .receipt-page .eyebrow {
+  /* The receipt itself includes the complete invoice identity; avoid repeating it above. */
+  .receipt-page .page-header {
     display: none;
   }
 
-  .receipt-page .page-header__title {
-    font-size: 18pt;
-    color: #000;
+  .receipt__head {
+    align-items: flex-start;
+    margin-bottom: 2mm;
+  }
+
+  .receipt__brand {
+    font-size: 12pt;
+  }
+
+  /* Receipt / date below retains the full number once, including when it is very long. */
+  .receipt__number {
+    display: none;
   }
 
   .receipt {
     border: 1px solid #999;
     box-shadow: none;
-    padding: 8mm;
-    break-inside: avoid;
-    page-break-inside: avoid;
+    padding: 5mm;
+    min-width: 0;
   }
 
   .receipt .summary-list > div {
-    padding: 2.5mm 0;
+    padding: 1.25mm 0;
     border-color: #ccc;
     font-size: 10.5pt;
+    line-height: 1.2;
     break-inside: avoid;
+  }
+
+  .receipt .receipt__lines-row {
+    display: block;
+    break-inside: auto;
+  }
+
+  .receipt__lines-row dt {
+    margin-bottom: 2mm;
+  }
+
+  .receipt__lines-row dd {
+    text-align: left;
+  }
+
+  .receipt__lines li {
+    gap: 3mm;
+    break-inside: avoid;
+  }
+
+  .receipt__footer {
+    margin-top: 3mm;
+    font-size: 10pt;
+    line-height: 1.2;
   }
 
   .receipt .summary-list dt,

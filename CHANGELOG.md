@@ -30,8 +30,14 @@ Branch `feat/f3-member-payments`, rebased on main after PR #41 (FE-05, merge 6e8
 - Receipt "Issued to" uses only the invoice member name and code, never the signed in account.
 - 7 new tests (4xx stop, unmount, refresh in flight, failed method label, issued to, available methods, retryable errors); screen test IDs renumbered TC-FE11-001 to 036 with no gaps.
 
+### Review round 2 (2026-10-15)
+- Verified BE-20 on origin/main d79a879: history now retains PageResponse metadata and uses server-side status/page/size, shared pagination, canonical URLs, filter page reset, back/forward, out-of-range correction and existing abort protection. Server ordering is preserved.
+- Receipt print wraps long identifiers, shows the actual payment reference, avoids duplicate multi-line descriptions and uses compact readable A4 rules. Browser PDF evidence and limitations are in the exported Round 2 review package.
+- Member payment display and copy retain BE-17's supported two decimal places. Shared money formatting and reception code are unchanged.
+- Added 25 regression cases across the existing member screen tests and the new pagination/API test file; FE-11 targeted total is 72. The feature branch still requires an authorized main update for BE-20 and FE-12 integration. No Git history operation was performed during remediation.
+
 ### Open Questions
-- BE-20 contract assumed by the frontend: `GET /payments/my?status=` returns a JSON array of `PaymentResponse` (a page `{content}` is accepted too); `PaymentResponse` gains `invoiceId` and `invoiceNumber`; `GET /invoices/{id}` returns `id, invoiceNumber, paymentId, paymentCode, paymentMethod, paymentTime, memberId, memberCode, memberFullName, subtotalAmount, discountAmount, taxAmount, totalAmount, status, issueDate, lines[{id, itemType, description, quantity, unitPrice, lineTotal}]`. Without `invoiceId` a paid payment shows "View details" instead of "View receipt".
+- BE-20 is now on origin/main, but not in this feature branch's backend. `GET /payments/my?status=&page=0&size=20` returns PageResponse<MemberPaymentResponse>; only history contains `invoiceId` and `invoiceNumber`. GET `/payments/{id}` does not gain those fields, so summary/status preserve their history fallback. InvoiceResponse includes `paymentReference`. Integration with current main and GitHub CI remain required after an approved update.
 - MoMo, VNPay and ZaloPay have no online checkout in the backend; the status screen tells the member to pay at reception with the reference.
 
 

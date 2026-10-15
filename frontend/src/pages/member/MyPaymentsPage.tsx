@@ -1,12 +1,14 @@
-import { useCallback, type ChangeEvent } from 'react'
+import { useCallback, useEffect, type ChangeEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { paymentsApi, type Payment } from '../../api/paymentsApi'
 import { Card, EmptyState, PageHeader, Select, StatusBadge, Table, type TableColumn } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
-import { formatDate, formatMoney } from '../../utils/format'
+import { formatDate } from '../../utils/format'
 import { MEMBER_PATHS } from './dashboardModel'
 import {
-  filterAndSortPayments,
+  formatPaymentMoney,
+  historyPageFromParam,
+  historySizeFromParam,
   methodLabel,
   PAYMENT_PATHS,
   paymentStatusLabel,
@@ -28,7 +30,7 @@ const COLUMNS: TableColumn<Payment>[] = [
     ),
   },
   { key: 'date', header: 'Date', render: (payment) => formatDate(payment.paymentTime ?? payment.createdAt) },
-  { key: 'amount', header: 'Amount', render: (payment) => formatMoney(payment.amount) },
+  { key: 'amount', header: 'Amount', render: (payment) => formatPaymentMoney(payment.amount) },
   { key: 'method', header: 'Method', render: (payment) => methodLabel(payment.method) },
   {
     key: 'status',
@@ -73,15 +75,29 @@ function PaymentAction({ payment }: { payment: Payment }) {
 }
 
 /**
- * My Payments and Receipts (Figma F3-03, S3-PaidHistory): GET /payments/my with a status filter
- * kept in the URL (?status=PENDING), newest first, with an empty state for each filter.
+ * Server-paged history. Status, zero-based page and size survive reload and back/forward.
  */
 export function MyPaymentsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const status = statusFilterFromParam(searchParams.get('status'))
-  // Stable per status, as useMemberResource requires; a new status loads again.
-  const load = useCallback((signal: AbortSignal) => paymentsApi.myPayments({ status, signal }), [status])
+  const page = historyPageFromParam(searchParams.get('page'))
+  const size = historySizeFromParam(searchParams.get('size'))
+  const load = useCallback((signal: AbortSignal) => paymentsApi.myPayments({ status, page, size, signal }), [status, page, size])
   const [payments, reload] = useMemberResource(load)
+  const data = payments.status === 'ready' ? payments.data : null
+  const lastPage = data ? Math.max(0, data.totalPages - 1) : page
+  const correctedPage = Math.min(page, lastPage)
+  const correctingPage = correctedPage !== page
+
+  // Replace malformed links and pages removed since the last visit without adding a history entry.
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams)
+    if (status) next.set('status', status)
+    else next.delete('status')
+    next.set('page', String(correctedPage))
+    next.set('size', String(size))
+    if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams, status, correctedPage, size])
 
   function handleStatusChange(event: ChangeEvent<HTMLSelectElement>) {
     const next = new URLSearchParams(searchParams)
@@ -90,10 +106,18 @@ export function MyPaymentsPage() {
     } else {
       next.delete('status')
     }
-    setSearchParams(next, { replace: true })
+    next.set('page', '0')
+    setSearchParams(next)
   }
 
-  const rows = payments.status === 'ready' ? filterAndSortPayments(payments.data, status) : []
+  function handlePageChange(nextPage: number) {
+    const next = new URLSearchParams(searchParams)
+    next.set('page', String(nextPage))
+    setSearchParams(next)
+  }
+
+  // Filtering and ordering belong to BE-20; changing one page locally invalidates its totals.
+  const rows = data && !correctingPage ? data.content : []
   const filtered = status !== ''
 
   return (
@@ -117,7 +141,7 @@ export function MyPaymentsPage() {
           />
         }
       >
-        {payments.status === 'ready' && payments.data.length === 0 && !filtered ? (
+        {data && !correctingPage && data.totalElements === 0 && !filtered ? (
           <EmptyState
             title="No payments yet"
             description="Payments appear here after you request a membership card or a sport package."
@@ -133,11 +157,17 @@ export function MyPaymentsPage() {
             columns={COLUMNS}
             rows={rows}
             rowKey={(payment) => payment.id}
-            loading={payments.status === 'loading'}
+            loading={payments.status === 'loading' || correctingPage}
             error={payments.status === 'error' ? payments.error : undefined}
             onRetry={reload}
             emptyTitle={`No ${paymentStatusLabel(status).toLowerCase()} payments`}
             emptyDescription="Choose another status to see more payments."
+            pagination={data && !correctingPage ? {
+              page: data.page,
+              pageSize: data.size,
+              totalItems: data.totalElements,
+              onPageChange: handlePageChange,
+            } : undefined}
           />
         )}
         <div className="notice notice--info payment-summary__note">

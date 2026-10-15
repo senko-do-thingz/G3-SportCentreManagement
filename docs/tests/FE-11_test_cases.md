@@ -6,7 +6,7 @@
 - Branch: feat/f3-member-payments, rebased on main after PR #41 (FE-05, merge 6e82388)
 - Owner: Phat
 - Priority: P1
-- Depends on: FE-00 (main), BE-17 (main), BE-20 (not on main yet, see 1.1)
+- Depends on: FE-00, BE-17, BE-20 (all on origin/main; this feature branch still needs an approved main update)
 - Figma: folder `context/Flow 3 - Payment and report managmen/Flow 3 - Member/`, screens F3-01 (Payment Summary), S3-Single (Single Visit Payment Summary), F3-02 (Payment Instructions and Status), F3-03 (My Payments and Receipts), S3-PaidHistory, S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt
 - Acceptance criteria:
   - AC1: the pending payment page updates by itself when the receptionist confirms.
@@ -20,20 +20,34 @@
 | `GET /api/v1/payments/{id}` | main (BE-17) | Summary, status page, polling every 15 seconds while PENDING |
 | `PUT /api/v1/payments/{id}/method` body `{paymentMethod}` | main (BE-17) | Switches a wallet payment to BANK_TRANSFER; 400 when the payment is not PENDING |
 | `GET /api/v1/packages/registrations/my`, `GET /api/v1/membership-cards/my` | main | Item details on the summary (registration code, format, validity, card tier); a failure only hides these rows |
-| `GET /api/v1/payments/my?status=` | BE-20, assumed | History list; a JSON array or a page `{content: [...]}`; `status` left out for All |
-| `GET /api/v1/invoices/{id}` | BE-20, assumed | Receipt: `invoiceNumber`, `issueDate`, `memberFullName`, `memberCode`, `subtotalAmount`, `discountAmount`, `taxAmount`, `totalAmount`, `status`, `paymentCode`, `paymentMethod`, `paymentTime`, `lines[]` |
-| `PaymentResponse.invoiceId`, `invoiceNumber` | BE-20, assumed | "View receipt" links; without them a paid payment shows "View details" |
+| `GET /api/v1/payments/my?status=&page=0&size=20` | BE-20, verified on origin/main | `PageResponse<MemberPaymentResponse>`: `content`, `page`, `size`, `totalElements`, `totalPages`; status omitted for All; zero-based page; size 1..100; order `createdAt DESC, id DESC` |
+| `GET /api/v1/invoices/{id}` | BE-20, verified on origin/main | Receipt: `invoiceNumber`, `issueDate`, `memberFullName`, `memberCode`, `subtotalAmount`, `discountAmount`, `taxAmount`, `totalAmount`, `status`, `paymentCode`, `paymentMethod`, `paymentReference`, `paymentTime`, `lines[]` |
+| `MemberPaymentResponse.invoiceId`, `invoiceNumber` | BE-20 history only | Authoritative history receipt links; GET `/payments/{id}` does not contain these fields, so summary/status use their existing history fallback when absent |
 
 Bank transfer instructions are only sent while the payment is PENDING and the method is BANK_TRANSFER (`PaymentServiceImpl.mapToPaymentResponse`); the transfer content is the payment code. MoMo, VNPay and ZaloPay are accepted by the backend but have no online checkout, so the summary shows them disabled with "Not available yet" and Bank transfer is always preselected. Figma F3-01 has no method list at all.
 
 ### 1.2 How to run (PowerShell)
 ```powershell
 cd frontend
+npm ci
 npm run lint -- --max-warnings 0
 npx tsc -b
 npm test
 npm run build
 ```
+
+### 1.4 Round 2 remediation (2026-10-15)
+
+Verified against origin/main `d79a879f78f7663b8c6df3efaef9bf524aeb04de`, especially BE-20 `MemberPaymentController`, `ReceiptServiceImpl`, `MemberPaymentResponse` and `InvoiceResponse`, and BE-17 `PaymentServiceImpl`.
+
+- P1-01 confirmed and fixed: keep page metadata, send status/page/size to the backend, use shared Table/Pagination, and preserve backend order. URL parameters survive reload and back/forward. Filter changes push a history entry and reset page to zero. Invalid links are replaced with canonical values; removed pages are replaced by the last valid page. Existing abort/loader tagging prevents late responses from replacing the current page.
+- P2-01 rejected as an existing defect: only bank transfer is enabled. Wallet methods remain disabled with an explanation, with no simulated checkout.
+- P2-02 confirmed for long content: original print output clipped long identifiers and silently reduced essential text to 7 pt. Wrap identifiers, omit duplicate descriptions and invoice headings in print, retain the payment reference, and use readable 10.5 pt rows. Multi-line receipts use the full width for items. A4 portrait and 15 mm margins remain scoped to member receipts.
+- Additional confirmed amount defect: BE-17 accepts two decimals, while member payment formatting/copy rounded them away. All four member payment screens now retain up to two decimals; shared FE-05/FE-12 formatters are unchanged.
+- Round 2 automated coverage: 72 FE-11 tests in three files (57 screen/rules tests plus 15 pagination/API cases). See the exported Round 2 Test Results for full-suite counts, command exits and browser evidence.
+- Final frontend validation: 491 tests passed in 23 files, zero skipped; lint with zero warnings, TypeScript and production build passed. Edge 155.0.4283.45 printed all three final fixtures (normal, long single-line, six long invoice lines) as one A4 page each with complete text and 10.5 pt essential rows. Native browser history navigation and reload also passed with mocked BE-20 responses.
+- Browser print verification: Edge headless, synthetic BE-20 responses, browser PDF output and rendered-page inspection. This does not verify a physical printer, Firefox, or an interactive system print dialog. Finite A4 space cannot guarantee a single sheet for an unbounded number of invoice lines; overflow must remain readable and retain all content.
+- No backend changes. The checked-out branch does not contain BE-20 or FE-12; a later approved main update and integration review are required. No main merge/rebase was performed.
 
 ### 1.3 Result summary (2026-10-13, after review round 1)
 | Group | Cases | Result |
@@ -53,8 +67,8 @@ Total: 446 tests in 22 files. No flaky test was seen in this run.
 | TC-FE11-M02 | Status label and badge tone | SUCCESS reads "Paid" with the green tone; unknown code kept |
 | TC-FE11-M03 | Method labels | BANK_TRANSFER -> Bank transfer, MOMO -> MoMo, null -> Not chosen |
 | TC-FE11-M04 | Status filter from URL | `pending` -> PENDING; `paid` or missing -> All |
-| TC-FE11-M05 | Filter and sort | Only the chosen status; newest first, id breaks ties; input not mutated |
-| TC-FE11-M06 | Copy values | "0000 1041 2460" -> "000010412460"; the transfer content is the payment code; 810000.00 -> "810000" |
+| TC-FE11-M05 | Page and size parsing | Nonnegative backend int page; size 1..100; invalid values -> page 0, size 20 |
+| TC-FE11-M06 | Copy values and money | Account whitespace removed, transfer content preserved, 810000.00 -> "810000", 810000.25 -> "810000.25", fractional display retained |
 | TC-FE11-M07 | Single visit | Registration of one day is a single visit |
 | TC-FE11-M08 | Discount percent | 900000 and 90000 -> 10; no discount -> none |
 | TC-FE11-M09 | Route ids and paths | Only positive whole numbers; status and receipt paths |
@@ -95,35 +109,43 @@ Total: 446 tests in 22 files. No flaky test was seen in this run.
 ## 5. Automated - My Payments and Receipts (F3-03, S3-PaidHistory) and receipts
 | ID | AC | Case | Expected |
 |---|---|---|---|
-| TC-FE11-024 | - | History list | Newest first; Pending -> Check status; paid with invoice -> INV-0007 and View receipt; failed -> View details |
-| TC-FE11-025 | AC4 | Choose Pending in the filter | Request `/payments/my?status=PENDING`; only the pending row even if the backend ignores the filter; All brings back 3 rows |
-| TC-FE11-026 | AC4 | `?status=success` in the URL | Select shows Paid (SUCCESS); request with `status=SUCCESS` |
+| TC-FE11-024 | - | History list | Preserve backend order; Pending -> Check status; paid with invoice -> INV-0007 and View receipt; failed -> View details |
+| TC-FE11-025 | AC4 | Choose Pending in the filter | Request `/payments/my?status=PENDING&page=0&size=20`; server-filtered content and totals; All brings back 3 rows |
+| TC-FE11-026 | AC4 | `?status=success` in the URL | Select shows Paid (SUCCESS); canonical URL; request with `status=SUCCESS`, page and size |
 | TC-FE11-027 | AC4 | No payments | Empty state "No payments yet" with Browse sport packages |
 | TC-FE11-028 | AC4 | Filter with no match | "No refunded payments" |
-| TC-FE11-029 | - | Page answer `{content: [...]}` | Rows shown |
+| TC-FE11-029 | - | Complete PageResponse | Rows and metadata retained; incomplete metadata rejected by new API cases |
 | TC-FE11-030 | - | List error | Alert with the backend message and Retry |
 | TC-FE11-031 | - | Menu | My Payments is active and shows "My Payments and Receipts" |
 | TC-FE11-032 | AC3 | Receipt INV-0007 | Receipt / date, Issued to, Service, Base price, Discount, Paid total, Payment, Status; Print receipt calls window.print once; button and sub navigation are marked no-print |
 | TC-FE11-033 | - | Issued to without a member name (new) | Only the member code; never the signed in account name; "-" when both are missing |
-| TC-FE11-034 | - | Two invoice lines | Items list with type labels (Membership card, Single visit) |
+| TC-FE11-034 | - | Two invoice lines | Every item appears once with type, quantity and total; no duplicate Service summary |
 | TC-FE11-035 | - | Invoice 404 | "We could not load the receipt" with the message |
 | TC-FE11-036 | - | `/member/payments/receipts/x1` | "The receipt link is not valid."; no request |
 
 ### 5.1 Changed existing test
 - TC-FE03-036 (`sportPackages.test.tsx`): the summary has a "Payment details" region (reference, status) and an "Order summary" region (amount, method choice) as in Figma F3-01; the bank transfer details are on the status screen (F3-02).
 
-## 6. Manual E2E against the real backend (after BE-20 is merged)
+### 5.2 Round 2 regression coverage
+
+`paymentHistory.test.tsx` adds 15 cases: 45 payments across first/middle/last pages; filter resets; back/forward; status/page/size bookmarks; four invalid query combinations; out-of-range and empty correction; error/retry/loading; abort and late response; exact server order and invoice association; three malformed metadata responses. Each request fetches only one page.
+
+`memberPayments.test.tsx` adds 10 cases: summary 403/404 privacy, fractional summary/copy, FAILED/REFUNDED polling stops, in-flight abort, cross-tab member switch with a late private response, exact invoice reference/decimals/items, and receipt ownership 403. Existing 36 screen tests remain in place. `paymentsModel.test.ts` retains 11 cases and replaces obsolete client sorting coverage with backend URL limits.
+
+## 6. Manual E2E against a deployed backend with BE-20
 Precondition: backend with seed data, a member and a receptionist account, Chrome at the member area.
+
+These 13 live-backend/manual cases were not executed in Round 2. Browser PDF checks used synthetic responses; backend contracts were inspected at the exact origin/main revision above.
 
 | ID | AC | Steps | Expected |
 |---|---|---|---|
 | TC-FE11-E01 | - | Register a 30 day package, Continue to payment | Summary shows original price, card discount and total from the backend |
 | TC-FE11-E02 | - | Bank transfer is preselected, wallets are greyed out with "Not available yet"; Continue to payment | Status page: bank, account name, account number, transfer content (the payment code), amount |
-| TC-FE11-E03 | AC2 | Click each Copy button, paste into Notepad | Account number without spaces, payment code, amount as digits only |
+| TC-FE11-E03 | AC2 | Click each Copy button, paste into Notepad | Account number without spaces, exact payment code, plain ungrouped amount retaining any decimal part |
 | TC-FE11-E04 | AC1 | Leave the status page open; receptionist confirms the payment (`PUT /payments/{id}/confirm`) | Within 15 seconds the page shows Payment confirmed and a toast, without reloading |
 | TC-FE11-E05 | AC1 | DevTools Network after E04 | No more `GET /payments/{id}` calls |
 | TC-FE11-E06 | AC1 | Sign in as another member and open the first member's status URL | 404 shown once, automatic checks stopped, no repeated requests |
-| TC-FE11-E07 | AC4 | My Payments, filter Pending, Paid, Failed, All | Only rows of that status; URL keeps the status query |
+| TC-FE11-E07 | AC4 | More than 20 payments; navigate pages, filter Pending, Paid, Failed, All; browser back/forward and reload | Server-filtered pages; URL keeps status/page/size; status changes reset page |
 | TC-FE11-E08 | AC4 | Member with no payments opens My Payments | Empty state "No payments yet" |
 | TC-FE11-E09 | AC3 | Open a receipt, Print receipt, print preview | One A4 page, no header, menu, payment tabs or buttons; receipt fully visible |
 | TC-FE11-E10 | AC3 | Ctrl+P on the receipt (browser print) | Same result as E09 |

@@ -4,9 +4,9 @@ import { paymentsApi, type Invoice } from '../../api/paymentsApi'
 import { Button, Card, EmptyState, ErrorState, PageHeader, StatusBadge } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
-import { formatDate, formatDateTime, formatMoney, humanizeCode } from '../../utils/format'
+import { formatDate, formatDateTime, humanizeCode } from '../../utils/format'
 import { PaymentNav } from './PaymentNav'
-import { methodLabel, parseIdParam, PAYMENT_PATHS } from './paymentsModel'
+import { formatPaymentMoney as formatMoney, methodLabel, parseIdParam, PAYMENT_PATHS } from './paymentsModel'
 import { useMemberResource } from './useMemberResource'
 
 const ITEM_TYPE_LABELS: Record<string, string> = {
@@ -20,7 +20,7 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
  * Receipt (Figma S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt): GET /invoices/{id} (BE-20).
  * One layout for the three kinds; the lines say what was bought. "Print receipt" calls
  * window.print(); the print stylesheet in styles/payments.css hides the navigation and the
- * buttons and fits the receipt on one A4 page.
+ * buttons and wraps receipt content at a readable print size on A4.
  */
 export function ReceiptPage() {
   const { invoiceId } = useParams()
@@ -67,7 +67,7 @@ function ReceiptContent({ invoice }: { invoice: Invoice }) {
   const lines = invoice.lines ?? []
   // Only the invoice decides who it was issued to; the signed in account is never used here.
   const issuedTo = [invoice.memberFullName, invoice.memberCode].filter(Boolean).join(' / ') || '-'
-  const service = lines.length > 0 ? lines.map((line) => line.description).join(', ') : '-'
+  const service = lines[0]?.description ?? '-'
   const discount = Number(invoice.discountAmount ?? 0)
   const tax = Number(invoice.taxAmount ?? 0)
 
@@ -95,10 +95,10 @@ function ReceiptContent({ invoice }: { invoice: Invoice }) {
             <dt>Issued to</dt>
             <dd>{issuedTo}</dd>
           </div>
-          <div>
+          {lines.length <= 1 && <div>
             <dt>Service</dt>
-            <dd>{service}</dd>
-          </div>
+            <dd>{service}{lines[0]?.quantity && lines[0].quantity > 1 ? ` x ${lines[0].quantity}` : ''}</dd>
+          </div>}
           {lines.length > 1 && (
             <div className="receipt__lines-row">
               <dt>Items</dt>
@@ -144,6 +144,12 @@ function ReceiptContent({ invoice }: { invoice: Invoice }) {
                 .join(' / ') || '-'}
             </dd>
           </div>
+          {invoice.paymentReference && (
+            <div>
+              <dt>Payment reference</dt>
+              <dd>{invoice.paymentReference}</dd>
+            </div>
+          )}
           {invoice.paymentTime && (
             <div>
               <dt>Paid at</dt>

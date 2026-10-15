@@ -1,13 +1,13 @@
 import { api } from './client'
 import { UNEXPECTED_RESPONSE_MESSAGE, type RequestSignal } from './memberApi'
+import type { PageResponse } from './types'
 
 /**
  * Payment and invoice endpoints for the member payment screens (F3-01, F3-02, F3-03 and the
  * receipts, FE-11).
  * - GET /payments/{id} and PUT /payments/{id}/method exist on main (PaymentController, BE-17).
- * - GET /payments/my and GET /invoices/{id} are task BE-20 and are not on main yet. The shapes
- *   below are the contract the frontend assumes; the parsers accept a plain array or a page for the
- *   list and ignore unknown fields, so small differences in BE-20 do not break the screens.
+ * - GET /payments/my and GET /invoices/{id} match BE-20 on main. History is a PageResponse,
+ *   including server ordering and totals; a bare array cannot represent the full history.
  */
 
 /** Payment statuses of com.sportify.payment.entity.PaymentStatus. */
@@ -49,12 +49,12 @@ export interface Payment {
   notes?: string | null
   createdAt: string | null
   updatedAt?: string | null
-  /** Assumed BE-20 fields: the invoice issued when the payment was confirmed, null before. */
+  /** BE-20 history fields; GET /payments/{id} does not include an invoice association. */
   invoiceId?: number | null
   invoiceNumber?: string | null
 }
 
-/** Assumed BE-20 shape of one invoice_line row. */
+/** BE-20 InvoiceLineResponse. */
 export interface InvoiceLine {
   id: number
   /** SPORT_PACKAGE, MEMBERSHIP_CARD, CLASS_DROP_IN or PENALTY_FEE. */
@@ -65,13 +65,14 @@ export interface InvoiceLine {
   lineTotal: number | string | null
 }
 
-/** Assumed BE-20 shape of GET /invoices/{id}, built from the V14 invoice columns. */
+/** BE-20 InvoiceResponse from GET /invoices/{id}. */
 export interface Invoice {
   id: number
   invoiceNumber: string
   paymentId: number | null
   paymentCode?: string | null
   paymentMethod?: string | null
+  paymentReference?: string | null
   paymentTime?: string | null
   memberId: number | null
   memberCode?: string | null
@@ -97,13 +98,22 @@ function asPayment(value: unknown): Payment {
   return value as unknown as Payment
 }
 
-/** Accepts a JSON array or a page ({content: [...]}) and checks every row. */
-function asPaymentList(value: unknown): Payment[] {
-  const rows = Array.isArray(value) ? value : isObject(value) && Array.isArray(value.content) ? value.content : null
-  if (!rows) {
+/** Require pagination metadata rather than silently treating a partial result as all payments. */
+function asPaymentPage(value: unknown): PageResponse<Payment> {
+  if (!isObject(value) || !Array.isArray(value.content)) {
     throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
   }
-  return rows.map(asPayment)
+  const { page, size, totalElements, totalPages } = value
+  if (
+    typeof page !== 'number' || !Number.isSafeInteger(page) || page < 0 ||
+    typeof size !== 'number' || !Number.isSafeInteger(size) || size < 1 || size > 100 ||
+    typeof totalElements !== 'number' || !Number.isSafeInteger(totalElements) || totalElements < 0 ||
+    typeof totalPages !== 'number' || !Number.isSafeInteger(totalPages) || totalPages < 0 ||
+    totalPages !== Math.ceil(totalElements / size) || value.content.length > size
+  ) {
+    throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
+  }
+  return { content: value.content.map(asPayment), page, size, totalElements, totalPages }
 }
 
 function asInvoice(value: unknown): Invoice {
@@ -116,6 +126,8 @@ function asInvoice(value: unknown): Invoice {
 export interface MyPaymentsQuery extends RequestSignal {
   /** One of PAYMENT_STATUSES; empty or missing means every status. */
   status?: string | null
+  page?: number
+  size?: number
 }
 
 export const paymentsApi = {
@@ -128,11 +140,11 @@ export const paymentsApi = {
     return api.put<unknown>(`/payments/${paymentId}/method`, { paymentMethod }).then(asPayment)
   },
 
-  /** GET /payments/my?status= (BE-20). The status is left out of the URL when it is empty. */
-  myPayments({ status, signal }: MyPaymentsQuery = {}): Promise<Payment[]> {
+  /** BE-20: zero-based page, size 1..100; omit status for All. */
+  myPayments({ status, page = 0, size = 20, signal }: MyPaymentsQuery = {}): Promise<PageResponse<Payment>> {
     return api
-      .get<unknown>('/payments/my', { signal, query: status ? { status } : undefined })
-      .then(asPaymentList)
+      .get<unknown>('/payments/my', { signal, query: { status: status || undefined, page, size } })
+      .then(asPaymentPage)
   },
 
   /** GET /invoices/{id} (BE-20). */

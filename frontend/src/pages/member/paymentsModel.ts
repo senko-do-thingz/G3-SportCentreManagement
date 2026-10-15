@@ -113,20 +113,17 @@ export function statusFilterFromParam(value: string | null): string {
   return (PAYMENT_STATUSES as readonly string[]).includes(upper) ? upper : ''
 }
 
-/**
- * Keeps only the rows of the chosen status and puts the newest first. The backend filters too;
- * this keeps the list right if it ever ignores the status parameter.
- */
-export function filterAndSortPayments(payments: Payment[], status: string): Payment[] {
-  const rows = status ? payments.filter((payment) => payment.status === status) : [...payments]
-  return rows.sort((a, b) => {
-    const left = a.createdAt ?? ''
-    const right = b.createdAt ?? ''
-    if (left === right) {
-      return b.id - a.id
-    }
-    return left < right ? 1 : -1
-  })
+/** URL values must fit the backend's int page and its size limit (ReceiptService). */
+export function historyPageFromParam(value: string | null): number {
+  if (!value || !/^\d+$/.test(value)) return 0
+  const page = Number(value)
+  return Number.isSafeInteger(page) && page <= 2147483647 ? page : 0
+}
+
+export function historySizeFromParam(value: string | null): number {
+  if (!value || !/^\d+$/.test(value)) return 20
+  const size = Number(value)
+  return Number.isSafeInteger(size) && size >= 1 && size <= 100 ? size : 20
 }
 
 /** Text put on the clipboard for the account number: digits and letters only, no spaces. */
@@ -139,10 +136,19 @@ export function transferContentToCopy(payment: Pick<Payment, 'code' | 'bankTrans
   return (payment.bankTransferInstructions?.transferContent ?? payment.code).trim()
 }
 
-/** The amount for a banking app: whole VND as plain digits, "810000". */
+/** Plain banking amount, retaining the backend's supported fractional VND. */
 export function amountToCopy(amount: number | string | null | undefined): string {
+  if (amount === null || amount === undefined || amount === '') return ''
   const value = typeof amount === 'number' ? amount : Number(amount)
-  return Number.isFinite(value) ? String(Math.round(value)) : ''
+  return Number.isFinite(value) ? String(value) : ''
+}
+
+const PAYMENT_MONEY_FORMAT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 })
+
+/** BE-17 accepts up to two decimal places; keep them on member payment screens. */
+export function formatPaymentMoney(amount: number | string | null | undefined): string {
+  const plain = amountToCopy(amount)
+  return plain === '' ? '-' : `${PAYMENT_MONEY_FORMAT.format(Number(plain))} VND`
 }
 
 /** The registration paid by this payment, if the member has one. */
