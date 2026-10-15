@@ -76,7 +76,7 @@ class PaymentPricingConsistencyTest {
         paymentService = new PaymentServiceImpl(paymentRepository, memberCardRepository, registrationRepository,
                 resolver, bankProperties, formatter, clock);
         verificationService = new PaymentVerificationServiceImpl(paymentRepository, invoiceRepository, resolver,
-                membershipCardService, sportPackageService, auditService, formatter, clock);
+                paymentService, membershipCardService, sportPackageService, auditService, formatter, clock);
 
         receptionist = UserAccount.builder().id(7L).fullName("Rita Reception")
                 .role(Role.builder().code("RECEPTIONIST").name("Receptionist").build()).build();
@@ -139,13 +139,16 @@ class PaymentPricingConsistencyTest {
     }
 
     @Test
-    @DisplayName("Card upgrade: both views show the tier price and the upgrade credit")
+    @DisplayName("Card upgrade: both views show price_paid plus the stored credit, and the credit as the discount")
     void cardUpgrade_SameValues() {
         Payment payment = payment("1500000.00");
+        MemberCard replaced = MemberCard.builder().id(29L).cardCode("CARD-1029").member(member)
+                .status(CardStatus.ACTIVE).pricePaid(new BigDecimal("500000.00")).build();
         MemberCard card = MemberCard.builder().id(30L).cardCode("CARD-1030").member(member)
                 .tier(MembershipCardTier.builder().id(3L).code("VIP").name("VIP Member")
                         .price(new BigDecimal("2000000.00")).durationMonths(12).discountPercentage(10).build())
-                .status(CardStatus.PENDING_PAYMENT).pricePaid(new BigDecimal("1500000.00")).payment(payment).build();
+                .status(CardStatus.PENDING_PAYMENT).pricePaid(new BigDecimal("1500000.00")).payment(payment)
+                .upgradeRequest(true).replacesCard(replaced).build();
         when(registrationRepository.findByPaymentId(1L)).thenReturn(Optional.empty());
         when(memberCardRepository.findByPaymentId(1L)).thenReturn(Optional.of(card));
         when(registrationRepository.findByPaymentIdIn(anyCollection())).thenReturn(List.of());
@@ -161,6 +164,22 @@ class PaymentPricingConsistencyTest {
         MemberCard card = MemberCard.builder().id(30L).cardCode("CARD-1030").member(member)
                 .tier(MembershipCardTier.builder().id(3L).code("VIP").name("VIP Member")
                         .price(new BigDecimal("1000000.00")).durationMonths(12).discountPercentage(10).build())
+                .status(CardStatus.PENDING_PAYMENT).pricePaid(new BigDecimal("1200000.00")).payment(payment).build();
+        when(registrationRepository.findByPaymentId(1L)).thenReturn(Optional.empty());
+        when(memberCardRepository.findByPaymentId(1L)).thenReturn(Optional.of(card));
+        when(registrationRepository.findByPaymentIdIn(anyCollection())).thenReturn(List.of());
+        when(memberCardRepository.findByPaymentIdIn(anyCollection())).thenReturn(List.of(card));
+
+        assertBothViewsAgree(payment, "VIP Member Card", "1200000", "0");
+    }
+
+    @Test
+    @DisplayName("Tier price raised after the request: both views show price_paid as the original price, no discount")
+    void tierPriceRaisedAfterRequest_SameValues() {
+        Payment payment = payment("1200000.00");
+        MemberCard card = MemberCard.builder().id(30L).cardCode("CARD-1030").member(member)
+                .tier(MembershipCardTier.builder().id(3L).code("VIP").name("VIP Member")
+                        .price(new BigDecimal("1500000.00")).durationMonths(12).discountPercentage(10).build())
                 .status(CardStatus.PENDING_PAYMENT).pricePaid(new BigDecimal("1200000.00")).payment(payment).build();
         when(registrationRepository.findByPaymentId(1L)).thenReturn(Optional.empty());
         when(memberCardRepository.findByPaymentId(1L)).thenReturn(Optional.of(card));

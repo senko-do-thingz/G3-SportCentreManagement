@@ -15,8 +15,6 @@ import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.payment.dto.ConfirmPaymentRequest;
 import com.sportify.payment.dto.FailPaymentRequest;
-import com.sportify.payment.dto.InvoiceLineResponse;
-import com.sportify.payment.dto.InvoiceResponse;
 import com.sportify.payment.dto.StaffPaymentResponse;
 import com.sportify.payment.entity.Invoice;
 import com.sportify.payment.entity.InvoiceItemType;
@@ -29,6 +27,7 @@ import com.sportify.payment.exception.PaymentAmountMismatchException;
 import com.sportify.payment.repository.InvoiceRepository;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.repository.PaymentSpecifications;
+import com.sportify.payment.service.PaymentService;
 import com.sportify.payment.service.PaymentVerificationService;
 import com.sportify.payment.service.impl.PaymentItemResolver.PaymentItem;
 import com.sportify.payment.service.impl.PaymentItemResolver.PaymentItemSummary;
@@ -45,7 +44,6 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,12 +58,16 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
     static final String CODE_PAYMENT_CONCURRENT_UPDATE = "PAYMENT_CONCURRENT_UPDATE";
     static final String CODE_PAYMENT_ITEM_AMOUNT_MISMATCH = "PAYMENT_ITEM_AMOUNT_MISMATCH";
     static final String ENTITY_TYPE = "PAYMENT";
+    /** Range of the created_at column (SQL Server datetime2); date filters outside it answer 400. */
+    static final LocalDate MIN_FILTER_DATE = LocalDate.of(1, 1, 1);
+    static final LocalDate MAX_FILTER_DATE = LocalDate.of(9999, 12, 31);
     private static final int DESCRIPTION_MAX = 255;
     private static final int SUMMARY_MAX = 255;
 
     private final PaymentRepository paymentRepository;
     private final InvoiceRepository invoiceRepository;
     private final PaymentItemResolver itemResolver;
+    private final PaymentService paymentService;
     private final MembershipCardService membershipCardService;
     private final SportPackageService sportPackageService;
     private final AuditService auditService;
@@ -82,11 +84,13 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         if (size < 1 || size > MAX_PAGE_SIZE) {
             throw new BusinessRuleException("Size must be between 1 and " + MAX_PAGE_SIZE);
         }
+        requireSupportedDate("from", from);
+        requireSupportedDate("to", to);
         if (from != null && to != null && from.isAfter(to)) {
             throw new BusinessRuleException("The from date must not be after the to date");
         }
         LocalDateTime createdFrom = from != null ? from.atStartOfDay() : null;
-        LocalDateTime createdBefore = to != null ? to.plusDays(1).atStartOfDay() : null;
+        LocalDateTime createdBefore = createdBeforeOf(to);
 
         // The specification sets the order (PENDING first), so the page request carries no sort.
         Page<Payment> result = paymentRepository.findAll(
@@ -120,10 +124,7 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
             throw new BusinessRuleException("Amount received must be greater than zero");
         }
         PaymentMethod method = request.getMethod();
-        String reference = trimToNull(request.getReferenceCode());
-        if (method != PaymentMethod.CASH && reference == null) {
-            throw new BusinessRuleException("Reference code is required for payment method " + method);
-        }
+        String reference = requireReference(method, request.getReferenceCode());
         String note = trimToNull(request.getNote());
 
         Payment payment = lockPayment(paymentId);
@@ -158,6 +159,38 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
 
         PaymentItem refreshed = itemResolver.findItem(payment).orElse(item);
         return toResponse(payment, refreshed, invoice);
+    }
+
+    /**
+     * BE-19 desk sale: the same evidence rules as the confirmation (a reference for every method except CASH), then a
+     * SUCCESS payment. Cash may be more than the amount (the change is written in the payment notes); any other
+     * method must match it exactly. A short amount answers 409 PAYMENT_AMOUNT_MISMATCH and nothing is saved.
+     */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Payment recordDeskPayment(MemberProfile member, BigDecimal amount, PaymentMethod method, String referenceCode,
+                                     BigDecimal amountReceived, UserAccount actor) {
+        requireStaff(actor);
+        PaymentMethod chosen = method != null ? method : PaymentMethod.CASH;
+        String reference = requireReference(chosen, referenceCode);
+        BigDecimal received = amountReceived != null ? amountReceived : amount;
+        if (received == null || received.signum() <= 0) {
+            throw new BusinessRuleException("Amount received must be greater than zero");
+        }
+        int compared = received.compareTo(amount);
+        if (compared < 0 || (compared > 0 && chosen != PaymentMethod.CASH)) {
+            throw new PaymentAmountMismatchException("Amount received " + received.toPlainString()
+                    + " does not match the amount to pay " + amount.toPlainString()
+                    + (chosen == PaymentMethod.CASH ? "" : " (only cash can be more than the amount)")
+                    + ". Nothing was recorded.");
+        }
+
+        Payment payment = paymentService.recordDeskPayment(member, amount, chosen, reference, actor);
+        if (compared > 0) {
+            payment.setNotes(PaymentNotes.append(payment.getNotes(), "Cash received " + received.toPlainString()
+                    + ", change " + received.subtract(amount).toPlainString()));
+        }
+        return payment;
     }
 
     @Override
@@ -250,24 +283,6 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         return toResponse(payment, refreshed, null);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public InvoiceResponse getInvoiceByPayment(Long paymentId, UserAccount actor) {
-        if (actor == null) {
-            throw new IllegalArgumentException("Actor cannot be null");
-        }
-        Payment payment = findPayment(paymentId);
-        // MemberProfile shares its primary key with UserAccount (@MapsId user_id), so member id equals user id by design.
-        boolean isOwner = payment.getMember() != null && payment.getMember().getId().equals(actor.getId());
-        if (!isOwner && !SecurityUtils.isStaff(actor)) {
-            throw new ResourceNotFoundException("Payment not found for id: " + paymentId);
-        }
-        Invoice invoice = invoiceRepository.findByPaymentId(paymentId).stream()
-                .min(Comparator.comparing(Invoice::getId, Comparator.nullsLast(Comparator.naturalOrder())))
-                .orElseThrow(() -> new ResourceNotFoundException("No invoice has been issued for payment id: " + paymentId));
-        return toInvoiceResponse(invoice, payment);
-    }
-
     /**
      * S3-Mismatch: keeps the payment PENDING and records what the front desk saw, as a note on the payment and a
      * PAYMENT_AMOUNT_MISMATCH activity log row, both committed with the 409 answer.
@@ -298,6 +313,26 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
                         + amountReceived.toPlainString() + ", expected " + payment.getAmount().toPlainString(), SUMMARY_MAX))
                 .details(details)
                 .build());
+    }
+
+    /**
+     * Exclusive upper bound on created_at for an inclusive {@code to} date: the start of the next day. The last
+     * supported day has no next day in the column range, and no row can be created after it, so it leaves the upper
+     * bound open (null) instead of sending an out of range value to the database.
+     */
+    static LocalDateTime createdBeforeOf(LocalDate to) {
+        if (to == null || !to.isBefore(MAX_FILTER_DATE)) {
+            return null;
+        }
+        return to.plusDays(1).atStartOfDay();
+    }
+
+    /** A date filter must fit the created_at column range (datetime2: years 0001 to 9999); otherwise 400. */
+    private static void requireSupportedDate(String name, LocalDate date) {
+        if (date != null && (date.isBefore(MIN_FILTER_DATE) || date.isAfter(MAX_FILTER_DATE))) {
+            throw new BusinessRuleException("The " + name + " date must be between " + MIN_FILTER_DATE + " and "
+                    + MAX_FILTER_DATE);
+        }
     }
 
     /**
@@ -391,42 +426,6 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
                 .build();
     }
 
-    private InvoiceResponse toInvoiceResponse(Invoice invoice, Payment payment) {
-        MemberProfile member = invoice.getMember();
-        UserAccount account = member != null ? member.getUserAccount() : null;
-        List<InvoiceLineResponse> lines = invoice.getLines().stream()
-                .sorted(Comparator.comparing(InvoiceLine::getId, Comparator.nullsLast(Comparator.naturalOrder())))
-                .map(line -> InvoiceLineResponse.builder()
-                        .id(line.getId())
-                        .itemType(line.getItemType())
-                        .itemReferenceId(line.getItemReferenceId())
-                        .description(line.getDescription())
-                        .quantity(line.getQuantity())
-                        .unitPrice(line.getUnitPrice())
-                        .lineTotal(line.getLineTotal())
-                        .build())
-                .toList();
-        return InvoiceResponse.builder()
-                .id(invoice.getId())
-                .invoiceNumber(invoice.getInvoiceNumber())
-                .status(invoice.getStatus())
-                .issueDate(invoice.getIssueDate())
-                .paymentId(payment.getId())
-                .paymentCode(payment.getPaymentCode())
-                .paymentMethod(payment.getPaymentMethod())
-                .paymentReference(payment.getReferenceCode())
-                .paymentTime(payment.getPaymentTime())
-                .memberId(member != null ? member.getId() : null)
-                .memberCode(member != null ? member.getMemberCode() : null)
-                .memberFullName(account != null ? account.getFullName() : null)
-                .subtotalAmount(invoice.getSubtotalAmount())
-                .discountAmount(invoice.getDiscountAmount())
-                .taxAmount(invoice.getTaxAmount())
-                .totalAmount(invoice.getTotalAmount())
-                .lines(lines)
-                .build();
-    }
-
     private Payment lockPayment(Long paymentId) {
         if (paymentId == null) {
             throw new BusinessRuleException("Payment ID cannot be null");
@@ -455,6 +454,15 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         if (!SecurityUtils.isStaff(actor)) {
             throw new AccessDeniedException("Only staff users can verify payments");
         }
+    }
+
+    /** Every method except CASH needs the bank, card slip or e-wallet reference. Returns the trimmed reference. */
+    private static String requireReference(PaymentMethod method, String referenceCode) {
+        String reference = trimToNull(referenceCode);
+        if (method != PaymentMethod.CASH && reference == null) {
+            throw new BusinessRuleException("Reference code is required for payment method " + method);
+        }
+        return reference;
     }
 
     private static String trimToNull(String value) {

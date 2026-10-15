@@ -1,6 +1,7 @@
 package com.sportify.catalog.controller;
 
 import com.sportify.catalog.dto.RefundCreateRequest;
+import com.sportify.catalog.dto.RefundQuoteResponse;
 import com.sportify.catalog.dto.RefundResponse;
 import com.sportify.catalog.dto.RefundReviewRequest;
 import com.sportify.catalog.service.RefundService;
@@ -20,6 +21,19 @@ import java.util.List;
 public class RefundController {
 
     private final RefundService refundService;
+
+    /**
+     * Suggested pro-rated refund of a package registration (F3-07). Owner member or staff; a member asking for
+     * another member's registration gets 403. 409 when the registration has no SUCCESS payment or the payment
+     * already has a refund. A missing registrationId is a 400 from the service.
+     */
+    @GetMapping("/quote")
+    @PreAuthorize("hasAnyRole('MEMBER', 'RECEPTIONIST', 'MANAGER')")
+    public RefundQuoteResponse quoteRefund(
+            @RequestParam(required = false) Long registrationId,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return refundService.quoteRefund(registrationId, userDetails.getUserAccount());
+    }
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MEMBER', 'RECEPTIONIST', 'MANAGER')")
