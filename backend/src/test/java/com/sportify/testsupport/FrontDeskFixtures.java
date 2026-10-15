@@ -2,14 +2,16 @@ package com.sportify.testsupport;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 
 /** Isolated SQL fixtures shared by the front desk feature suites. */
 public final class FrontDeskFixtures {
+    // Use secure randomness for fixture values persisted as account identifiers.
+    private static final SecureRandom RANDOM = new SecureRandom();
     private final JdbcTemplate jdbc;
     private int serial;
     public final String marker = "be05" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
@@ -27,7 +29,7 @@ public final class FrontDeskFixtures {
     }
 
     public String randomPhone() {
-        return Long.toString(ThreadLocalRandom.current().nextLong(100_000_000_000L, 999_999_999_999L));
+        return Long.toString(RANDOM.nextLong(100_000_000_000L, 1_000_000_000_000L));
     }
 
     public long account(String email, String accountPhone, String name) {

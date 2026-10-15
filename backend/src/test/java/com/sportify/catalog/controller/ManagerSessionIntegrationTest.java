@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.security.SecureRandom;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -43,6 +44,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @TestPropertySource(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
+    // Use secure randomness for fixture values persisted as account identifiers.
+    private static final SecureRandom RANDOM = new SecureRandom();
     @Autowired private ManagerSessionService service;
     @Autowired private BookingService bookingService;
     @Autowired private ClassSessionRepository sessions;
@@ -100,8 +103,7 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
 
     private UserAccount account(String role) {
         String name = code();
-        // UUID-derived numeric phones avoid collisions with seeded and other suite accounts.
-        String phone = Long.toString(ThreadLocalRandom.current().nextLong(100_000_000_000L, 999_999_999_999L));
+        String phone = Long.toString(RANDOM.nextLong(100_000_000_000L, 1_000_000_000_000L));
         return users.saveAndFlush(UserAccount.builder().fullName(name).email(name + "@sportify.test").phone(phone)
                 .passwordHash("test-password-hash").status("ACTIVE").role(roles.findByCode(role).orElseThrow()).build());
     }
