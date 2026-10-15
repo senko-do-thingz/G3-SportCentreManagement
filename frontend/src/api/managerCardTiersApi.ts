@@ -1,17 +1,15 @@
 import { api } from './client'
-import { ApiError } from './errors'
-import { isManagerPreviewSession } from './managerPreviewSession'
+import { UNEXPECTED_RESPONSE_MESSAGE } from './memberApi'
 import type { CardTierUpdateDraft, ManagerCardTier } from '../types/manager'
-
-export const CARD_DEPENDENCY = 'Card management is waiting for the BE-03 manager API contract. Try again after the service is available.'
 
 export const managerCardTiersApi = {
   list(signal?: AbortSignal): Promise<ManagerCardTier[]> {
-    if (!isManagerPreviewSession()) return Promise.reject(new ApiError(503, CARD_DEPENDENCY))
-    return api.get('/manager/card-tiers', { signal })
+    return api.get<ManagerCardTier[]>('/manager/card-tiers', { signal }).then((items) => {
+      if (!Array.isArray(items)) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
+      return items
+    })
   },
   update(id: number, request: CardTierUpdateDraft): Promise<ManagerCardTier> {
-    if (!isManagerPreviewSession()) return Promise.reject(new ApiError(503, CARD_DEPENDENCY))
     return api.put(`/membership-cards/tiers/${id}`, request)
   },
 }

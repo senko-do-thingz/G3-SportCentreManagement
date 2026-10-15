@@ -14,14 +14,17 @@ export function validateStaff(request: StaffAccountRequest): Record<string, stri
   return errors
 }
 
-export function numericError(value: string, label: string, minimum: number, integer = false): string | undefined {
+export function numericError(value: string, label: string, minimum: number, integer = false, maximum = Infinity): string | undefined {
   const parsed = Number(value)
   if (!value.trim() || !Number.isFinite(parsed) || parsed < minimum || (integer && !Number.isInteger(parsed))) {
     return `${label} must be ${integer ? 'a whole number' : 'a number'} of at least ${minimum}.`
   }
+  if (parsed > maximum) return `${label} must not exceed ${maximum}.`
   return undefined
 }
 
 export function positivePriceError(value: string): string | undefined {
-  return !value.trim() || !Number.isFinite(Number(value)) || Number(value) <= 0 ? 'Enter a price greater than 0 VND.' : undefined
+  if (!value.trim() || !Number.isFinite(Number(value)) || Number(value) <= 0) return 'Enter a price greater than 0 VND.'
+  if (!/^\d{1,12}(?:\.\d{1,2})?$/.test(value.trim()) || Number(value) < 0.01) return 'Price must have at most 12 integer digits and 2 decimal places.'
+  return undefined
 }

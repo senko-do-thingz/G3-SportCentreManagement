@@ -1,7 +1,7 @@
 import type { CardTier } from '../api/cardsApi'
 import type { MemberBooking, MemberCard, PackageRegistration } from '../api/memberApi'
 import type { Sport, SportPackage } from '../api/packagesApi'
-import type { Payment } from '../api/paymentsApi'
+import type { Invoice, Payment } from '../api/paymentsApi'
 
 /** Sample backend answers for the member screens (FE-02). Override any field per test. */
 
@@ -15,6 +15,9 @@ export function card(overrides: Partial<MemberCard> = {}): MemberCard {
     tierId: 3,
     tierCode: 'VIP',
     tierName: 'VIP',
+    tierRank: 4,
+    upgradeRequest: false,
+    replacesCardId: null,
     discountPercentage: 10,
     startDate: '2026-07-05',
     endDate: '2027-07-04',
@@ -138,6 +141,7 @@ export function cardTier(overrides: Partial<CardTier> = {}): CardTier {
   return {
     id: 3,
     code: 'VIP',
+    tierRank: 4,
     name: 'VIP Member',
     price: 600000,
     durationMonths: 12,
@@ -151,6 +155,7 @@ export function cardTier(overrides: Partial<CardTier> = {}): CardTier {
 export const STANDARD_TIER = cardTier({
   id: 1,
   code: 'STANDARD',
+  tierRank: 1,
   name: 'Standard',
   price: 0,
   durationMonths: 0,
@@ -160,6 +165,7 @@ export const STANDARD_TIER = cardTier({
 export const GOLD_TIER = cardTier({
   id: 2,
   code: 'GOLD',
+  tierRank: 3,
   name: 'Gold Member',
   price: 300000,
   durationMonths: 12,
@@ -168,3 +174,35 @@ export const GOLD_TIER = cardTier({
 })
 export const VIP_TIER = cardTier()
 export const CARD_TIERS = [STANDARD_TIER, GOLD_TIER, VIP_TIER]
+
+/** Assumed BE-20 answer of GET /invoices/{id} for a confirmed package payment (FE-11). */
+export function invoice(overrides: Partial<Invoice> = {}): Invoice {
+  return {
+    id: 7,
+    invoiceNumber: 'INV-0007',
+    paymentId: 41,
+    paymentCode: 'PAY-0041',
+    paymentMethod: 'BANK_TRANSFER',
+    paymentTime: '2026-10-02T10:15:00',
+    memberId: 2,
+    memberCode: 'MEM-0002',
+    memberFullName: 'Taylor Nguyen',
+    subtotalAmount: 900000,
+    discountAmount: 90000,
+    taxAmount: 0,
+    totalAmount: 810000,
+    status: 'PAID',
+    issueDate: '2026-10-02T10:15:00',
+    lines: [
+      {
+        id: 1,
+        itemType: 'SPORT_PACKAGE',
+        description: 'Football - Coach-led - 30 days',
+        quantity: 1,
+        unitPrice: 810000,
+        lineTotal: 810000,
+      },
+    ],
+    ...overrides,
+  }
+}

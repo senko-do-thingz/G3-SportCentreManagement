@@ -1,0 +1,33 @@
+# Trivy vulnerability suppression file for Sportify Center
+# Each entry is preceded by justification and has an explicit expiry date (format: CVE-ID exp:YYYY-MM-DD).
+
+# CVE-2026-47884: Spring Framework 6.2 XsltView remote code execution.
+# Reason: Not exploitable because Sportify backend uses pure @RestController endpoints returning JSON.
+# No XsltView, XsltViewResolver, or view rendering engines are present in the codebase.
+# No backport exists in the Spring 6.2 line; revisit upon upgrading to Spring Boot 4.
+CVE-2026-47884 exp:2026-12-31
+
+# CVE-2026-47890: Spring Framework 6.2 SSE stream corruption with views.
+# Reason: Not exploitable because Sportify backend does not use SseEmitter or Server-Sent Events with views.
+# All responses are standard JSON. No backport exists in the Spring 6.2 line; revisit upon upgrading to Spring Boot 4.
+CVE-2026-47890 exp:2026-12-31
+
+# CVE-2025-59250: Version parsing false positive in mssql-jdbc.
+# Reason: Trivy parses the resolved artifact mssql-jdbc 12.10.2.jre11 as 12.10.2 without the .jre11 suffix.
+# The artifact 12.10.2.jre11 already contains the upstream security fix.
+CVE-2025-59250 exp:2026-12-31
+
+# CVE-2026-78667: Base image bundled binary /usr/bin/pebble built with Go stdlib v1.26.7.
+# Reason: Pebble is only the in-container process supervisor provided by the base image.
+# It does not expose ports, handle network traffic, or process untrusted inputs. Revisit when base image updates.
+CVE-2026-78667 exp:2026-12-31
+
+# CVE-2026-78669: Base image bundled binary /usr/bin/pebble built with Go stdlib v1.26.7.
+# Reason: Pebble is only the in-container process supervisor provided by the base image.
+# It does not expose ports, handle network traffic, or process untrusted inputs. Revisit when base image updates.
+CVE-2026-78669 exp:2026-12-31
+
+# CVE-2026-97031: Base image bundled binary /usr/bin/pebble built with Go stdlib v1.26.7.
+# Reason: Pebble is only the in-container process supervisor provided by the base image.
+# It does not expose ports, handle network traffic, or process untrusted inputs. Revisit when base image updates.
+CVE-2026-97031 exp:2026-12-31

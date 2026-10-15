@@ -10,10 +10,9 @@ export const env = {
   apiBaseUrl: normalizeBaseUrl(import.meta.env.VITE_API_BASE_URL),
 } as const
 
-/** Preview fixtures are opt-in and can never run in a production build. */
+/** Preview fixtures are opt-in and excluded from production builds. */
 export function managerPreviewEnabled(): boolean {
-  // return import.meta.env.DEV && import.meta.env.VITE_MANAGER_PREVIEW === 'true'
-  return import.meta.env.DEV
+  return import.meta.env.DEV && import.meta.env.VITE_MANAGER_PREVIEW === 'true'
 }
 
 export interface SampleAccount {

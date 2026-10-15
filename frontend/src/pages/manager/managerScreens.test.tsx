@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
 import { ApiError } from '../../api/errors'
 import { managerUsersApi } from '../../api/managerUsersApi'
-import { managerPackagesApi, PACKAGE_DEPENDENCY } from '../../api/managerPackagesApi'
-import { managerCardTiersApi, CARD_DEPENDENCY } from '../../api/managerCardTiersApi'
+import { managerPackagesApi } from '../../api/managerPackagesApi'
+import { managerCardTiersApi } from '../../api/managerCardTiersApi'
 import { managerActivityLogsApi, ACTIVITY_DEPENDENCY } from '../../api/managerActivityLogsApi'
 import { packagesApi, type Sport } from '../../api/packagesApi'
 import { renderApp } from '../../test/renderApp'
@@ -16,8 +16,8 @@ import { formatManagerDateTime } from './managerFormat'
 const staff: ManagerUser = { id: 3, fullName: 'Daniel Smith', email: 'daniel@sportify.demo', phone: '0901234568', role: 'COACH', status: 'ACTIVE', createdAt: '2026-10-14T09:00:00' }
 const sports: Sport[] = [ { id: 1, name: 'Football', code: 'FOOTBALL', venueType: 'FIELD', description: null, imageUrl: null, displayOrder: 1 }, { id: 2, name: 'Basketball', code: 'BASKETBALL', venueType: 'COURT', description: null, imageUrl: null, displayOrder: 2 } ]
 const sportPackage: ManagerPackage = { id: 1, code: 'PK-001', name: 'Football 30-day package', sportId: 1, sportName: 'Football', sportCode: 'FOOTBALL', trainingFormat: 'COACH_LED', durationDays: 30, sessionCount: 8, sessionMinutes: 90, priceAmount: 900000, description: null, isActive: true }
-const standard: ManagerCardTier = { id: 1, code: 'STANDARD', name: 'Standard', price: 0, durationMonths: null, discountPercentage: 0, description: null, isActive: true }
-const vip: ManagerCardTier = { id: 3, code: 'VIP', name: 'VIP', price: 600000, durationMonths: 12, discountPercentage: 10, description: null, isActive: true }
+const standard: ManagerCardTier = { id: 1, tierRank: 0, code: 'STANDARD', name: 'Standard', price: 0, durationMonths: 0, discountPercentage: 0, description: null, isActive: true }
+const vip: ManagerCardTier = { id: 3, tierRank: 2, code: 'VIP', name: 'VIP', price: 600000, durationMonths: 12, discountPercentage: 10, description: null, isActive: true }
 const activity: ActivityLog = { id: 1, createdAt: '2026-10-14T09:30:00', actorId: 1, actorName: 'Morgan Lee', actorRole: 'MANAGER', action: 'PACKAGE_CREATED', entityType: 'SPORT_PACKAGE', entityId: 1, entityCode: 'PK-001', summary: 'Created a package', details: '8 sessions' }
 function paged<T>(content: T[], page = 0, totalElements = content.length) { return { content, page, size: 20, totalElements, totalPages: Math.ceil(totalElements / 20) } }
 function session() { tokenStorage.startSession({ accessToken: 'manager-test', refreshToken: 'refresh-test' }) }
@@ -171,14 +171,31 @@ describe('FE-06 manager access and accounts', () => {
 })
 
 describe('FE-06 packages and membership cards', () => {
-  it('keeps proposed contracts disabled for real accounts even when preview is enabled', async () => {
+  it('keeps only the unreleased activity contract disabled for real accounts even when preview is enabled', async () => {
     vi.stubEnv('VITE_MANAGER_PREVIEW', 'true')
     const backend = authOnly()
-    await expect(managerPackagesApi.list({})).rejects.toThrow(PACKAGE_DEPENDENCY)
-    await expect(managerPackagesApi.update(1, { name: 'Example', durationDays: 30, sessionCount: 8, sessionMinutes: 60, priceAmount: 1, isActive: true })).rejects.toThrow(PACKAGE_DEPENDENCY)
-    await expect(managerCardTiersApi.list()).rejects.toThrow(CARD_DEPENDENCY)
     await expect(managerActivityLogsApi.list({ page: 0, size: 20 })).rejects.toThrow(ACTIVITY_DEPENDENCY)
     expect(backend.calls).toHaveLength(0)
+  })
+  it('uses the released BE-03 live catalog endpoints with authenticated requests and exact wire fields', async () => {
+    vi.stubEnv('VITE_MANAGER_PREVIEW', 'true')
+    const backend = installFakeFetch((call) => {
+      if (call.path.startsWith('/manager/packages')) return json(200, [sportPackage])
+      if (call.path === '/manager/card-tiers') return json(200, [standard, vip])
+      if (call.path === '/packages/1') return json(200, sportPackage)
+      if (call.path === '/membership-cards/tiers/3') return json(200, vip)
+      return backendError(404, 'Unexpected request')
+    })
+    const packageUpdate = { name: sportPackage.name, durationDays: 30, sessionCount: 8, sessionMinutes: 90, price: 950000.25, active: false }
+    const tierUpdate = { price: 650000, durationMonths: 12, discountPercentage: 15, description: '', active: true }
+    expect(await managerPackagesApi.list({ sportId: '1', format: 'COACH_LED', active: 'false' })).toEqual([sportPackage])
+    expect(await managerCardTiersApi.list()).toEqual([standard, vip])
+    await managerPackagesApi.update(1, packageUpdate)
+    await managerCardTiersApi.update(3, tierUpdate)
+    expect(backend.calls[0].path).toBe('/manager/packages?sportId=1&format=COACH_LED&active=false')
+    expect(backend.calls[2]).toMatchObject({ path: '/packages/1', method: 'PUT', body: packageUpdate })
+    expect(backend.calls[3]).toMatchObject({ path: '/membership-cards/tiers/3', method: 'PUT', body: tierUpdate })
+    expect(backend.calls.every((call) => call.authorization === 'Bearer manager-test')).toBe(true)
   })
   it('uses the complete manager catalog, filters it, and validates package edits', async () => {
     authOnly()
@@ -204,7 +221,7 @@ describe('FE-06 packages and membership cards', () => {
     await user.clear(dialog.getByLabelText(/Price/))
     await user.type(dialog.getByLabelText(/Price/), '950000')
     await user.click(dialog.getByRole('button', { name: 'Save package' }))
-    await waitFor(() => expect(update).toHaveBeenCalledExactlyOnceWith(1, { name: sportPackage.name, durationDays: 30, sessionCount: 8, sessionMinutes: 90, priceAmount: 950000, isActive: true }))
+    await waitFor(() => expect(update).toHaveBeenCalledExactlyOnceWith(1, { name: sportPackage.name, durationDays: 30, sessionCount: 8, sessionMinutes: 90, price: 950000, active: true }))
   })
   it('creates a package with verified fields and does not add an invented active field', async () => {
     authOnly()
@@ -230,6 +247,48 @@ describe('FE-06 packages and membership cards', () => {
     await user.click(dialog.getByRole('button', { name: 'Save package' }))
     await waitFor(() => expect(create).toHaveBeenCalledExactlyOnceWith({ code: 'PK-NEW', name: 'New package', sportId: 1, trainingFormat: 'SELF_TRAINING', durationDays: 30, sessionCount: 8, sessionMinutes: 60, priceAmount: 500000 }))
   })
+  it('rejects BE-03 package limits and maps price and active server errors to the displayed fields', async () => {
+    authOnly()
+    vi.spyOn(packagesApi, 'sports').mockResolvedValue(sports)
+    vi.spyOn(managerPackagesApi, 'list').mockResolvedValue([sportPackage])
+    const update = vi.spyOn(managerPackagesApi, 'update').mockRejectedValue(new ApiError(400, 'Invalid package', { price: 'Price rejected by the service.', active: 'Status rejected by the service.' }))
+    const user = userEvent.setup()
+    renderApp('/manager/packages')
+    await user.click(await screen.findByRole('button', { name: 'Edit' }))
+    const dialog = within(screen.getByRole('dialog'))
+    fireEvent.change(dialog.getByLabelText(/Duration/), { target: { value: '3651' } })
+    fireEvent.change(dialog.getByLabelText(/Included sessions/), { target: { value: '1001' } })
+    fireEvent.change(dialog.getByLabelText(/Price/), { target: { value: '100.123' } })
+    await user.click(dialog.getByRole('button', { name: 'Save package' }))
+    expect(dialog.getByText('Duration must not exceed 3650.')).toBeInTheDocument()
+    expect(dialog.getByText('Session count must not exceed 1000.')).toBeInTheDocument()
+    expect(dialog.getByText('Price must have at most 12 integer digits and 2 decimal places.')).toBeInTheDocument()
+    expect(update).not.toHaveBeenCalled()
+    fireEvent.change(dialog.getByLabelText(/Duration/), { target: { value: '3650' } })
+    fireEvent.change(dialog.getByLabelText(/Included sessions/), { target: { value: '1000' } })
+    fireEvent.change(dialog.getByLabelText(/Price/), { target: { value: '100.12' } })
+    await user.click(dialog.getByRole('button', { name: 'Save package' }))
+    expect(await dialog.findByText('Price rejected by the service.')).toBeInTheDocument()
+    expect(dialog.getByText('Status rejected by the service.')).toBeInTheDocument()
+    expect(dialog.getByLabelText(/Price/)).toHaveValue(100.12)
+  })
+  it('rejects fractional discounts, excessive validity and long card descriptions before a live update', async () => {
+    authOnly()
+    vi.spyOn(managerCardTiersApi, 'list').mockResolvedValue([standard, vip])
+    const update = vi.spyOn(managerCardTiersApi, 'update').mockResolvedValue(vip)
+    const user = userEvent.setup()
+    renderApp('/manager/cards')
+    await user.click(await screen.findByRole('button', { name: 'Edit card benefits' }))
+    const dialog = within(screen.getByRole('dialog'))
+    fireEvent.change(dialog.getByLabelText(/Package discount/), { target: { value: '5.5' } })
+    fireEvent.change(dialog.getByLabelText(/Validity/), { target: { value: '121' } })
+    fireEvent.change(dialog.getByLabelText('Description'), { target: { value: 'x'.repeat(501) } })
+    await user.click(dialog.getByRole('button', { name: 'Save benefits' }))
+    expect(dialog.getByText('Discount must be a whole number from 0 to 100.')).toBeInTheDocument()
+    expect(dialog.getByText('Validity must not exceed 120.')).toBeInTheDocument()
+    expect(dialog.getByText('Description must be at most 500 characters.')).toBeInTheDocument()
+    expect(update).not.toHaveBeenCalled()
+  })
   it('shows protected Standard and additional inactive tiers and validates discount bounds', async () => {
     authOnly()
     vi.spyOn(managerCardTiersApi, 'list').mockResolvedValue([standard, { ...vip, name: 'Platinum', code: 'PLATINUM', isActive: false }])
@@ -246,12 +305,12 @@ describe('FE-06 packages and membership cards', () => {
     await user.clear(dialog.getByLabelText(/Package discount/))
     await user.type(dialog.getByLabelText(/Package discount/), '101')
     await user.click(dialog.getByRole('button', { name: 'Save benefits' }))
-    expect(await dialog.findByText('Discount must be a number from 0 to 100.')).toBeInTheDocument()
+    expect(await dialog.findByText('Discount must be a whole number from 0 to 100.')).toBeInTheDocument()
     expect(update).not.toHaveBeenCalled()
     await user.clear(dialog.getByLabelText(/Package discount/))
     await user.type(dialog.getByLabelText(/Package discount/), '100')
     await user.click(dialog.getByRole('button', { name: 'Save benefits' }))
-    await waitFor(() => expect(update).toHaveBeenCalledWith(3, expect.objectContaining({ discountPercentage: 100, isActive: false })))
+    await waitFor(() => expect(update).toHaveBeenCalledWith(3, expect.objectContaining({ discountPercentage: 100, active: false })))
   })
   it('leaves the card catalog unchanged when an editor is cancelled', async () => {
     authOnly()

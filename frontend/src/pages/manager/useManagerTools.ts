@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'rea
 import { ApiError, getErrorMessage, splitFieldErrors } from '../../api/errors'
 import { useFocusFirstInvalid } from '../../utils/useFocusFirstInvalid'
 
-export { useMemberResource as useResource } from '../member/useMemberResource'
+export { useResource } from '../../hooks/useResource'
 
 export function useDebounced(value: string, delay = 300): string {
   const [settled, setSettled] = useState(value)

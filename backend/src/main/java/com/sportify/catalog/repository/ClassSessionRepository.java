@@ -1,0 +1,116 @@
+package com.sportify.catalog.repository;
+
+import com.sportify.catalog.entity.ClassSession;
+import com.sportify.catalog.entity.SessionStatus;
+import com.sportify.catalog.entity.TrainingFormat;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface ClassSessionRepository extends JpaRepository<ClassSession, Long>, JpaSpecificationExecutor<ClassSession> {
+    // To-one joins only: page/count queries cannot multiply sessions. Keep detail and list visibility identical.
+    String VISIBLE_FROM = " FROM ClassSession s LEFT JOIN s.sportClass c JOIN s.facility f "
+            + "LEFT JOIN s.coach co LEFT JOIN co.userAccount u LEFT JOIN u.role accountRole ";
+    String VISIBLE_WHERE = " WHERE s.status = com.sportify.catalog.entity.SessionStatus.PUBLISHED "
+            + "AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime > cast(:now as time))) "
+            + "AND s.endTime > s.startTime AND (c.id IS NULL OR c.isActive = true) AND f.isActive = true "
+            + "AND ((co.id IS NULL AND s.trainingType = com.sportify.catalog.entity.TrainingFormat.SELF_TRAINING) "
+            + "OR (co.id IS NOT NULL AND u.status = 'ACTIVE' AND accountRole.code = 'COACH' "
+            + "AND EXISTS (SELECT cs.id.coachId FROM CoachSport cs "
+            + "WHERE cs.id.coachId = co.id AND cs.id.sportId = s.sport.id))) ";
+    String SEARCH_FILTERS = "AND (:sportId IS NULL OR s.sport.id = :sportId) "
+            + "AND (:from IS NULL OR s.sessionDate >= :from) AND (:to IS NULL OR s.sessionDate <= :to) "
+            + "AND (:format IS NULL OR s.trainingType = :format) "
+            + "AND (:level IS NULL OR c.level = :level) AND (:coachId IS NULL OR co.id = :coachId)";
+
+    @EntityGraph(attributePaths = {"sport", "sportClass", "facility", "coach", "coach.userAccount"})
+    @Query(value = "SELECT s" + VISIBLE_FROM + VISIBLE_WHERE + SEARCH_FILTERS,
+            countQuery = "SELECT COUNT(s)" + VISIBLE_FROM + VISIBLE_WHERE + SEARCH_FILTERS)
+    Page<ClassSession> searchVisible(@Param("sportId") Long sportId,
+            @Param("from") LocalDate from, @Param("to") LocalDate to,
+            @Param("format") TrainingFormat format, @Param("level") String level,
+            @Param("coachId") Long coachId, @Param("today") LocalDate today, @Param("now") LocalTime now,
+            Pageable pageable);
+
+    @EntityGraph(attributePaths = {"sport", "sportClass", "facility", "coach", "coach.userAccount"})
+    @Query("SELECT s" + VISIBLE_FROM + VISIBLE_WHERE + "AND s.id = :id")
+    Optional<ClassSession> findVisibleById(@Param("id") Long id,
+            @Param("today") LocalDate today, @Param("now") LocalTime now);
+
+    List<ClassSession> findBySessionDateAndStatus(LocalDate sessionDate, SessionStatus status);
+    List<ClassSession> findBySportIdAndSessionDateAndStatus(Long sportId, LocalDate sessionDate, SessionStatus status);
+
+    @Override
+    @EntityGraph(attributePaths = {"sportClass", "coach", "coach.userAccount", "facility"})
+    List<ClassSession> findAll(Specification<ClassSession> specification, Sort sort);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM ClassSession s WHERE s.id = :id")
+    Optional<ClassSession> findForUpdate(@Param("id") Long id);
+
+    /**
+     * Releases seats in one atomic UPDATE (never below zero). The caller must hold the session row lock taken with
+     * {@link #findForUpdate}, so no booking or cancellation path can write booked_count in between (BE-21 P1-02).
+     */
+    @Modifying(flushAutomatically = true)
+    @Query(value = "UPDATE class_session SET booked_count = CASE WHEN booked_count > :seats THEN booked_count - :seats "
+            + "ELSE 0 END, updated_at = :now WHERE id = :id", nativeQuery = true)
+    int releaseSeats(@Param("id") Long id, @Param("seats") int seats, @Param("now") LocalDateTime now);
+
+    /** Separate resource queries keep both resource/date indexes usable without an OR predicate. */
+    @EntityGraph(attributePaths = {"sportClass", "coach", "coach.userAccount", "facility"})
+    @Query("SELECT s FROM ClassSession s WHERE s.coach.id = :coachId AND s.sessionDate IN :dates "
+            + "AND s.status IN :statuses AND s.startTime < cast(:endTime as time) "
+            + "AND s.endTime > cast(:startTime as time) AND (:excludedId IS NULL OR s.id <> :excludedId)")
+    List<ClassSession> findCoachConflicts(@Param("coachId") Long coachId, @Param("dates") Collection<LocalDate> dates,
+            @Param("startTime") LocalTime startTime, @Param("endTime") LocalTime endTime,
+            @Param("statuses") Collection<SessionStatus> statuses, @Param("excludedId") Long excludedId);
+
+    @EntityGraph(attributePaths = {"sportClass", "coach", "coach.userAccount", "facility"})
+    @Query("SELECT s FROM ClassSession s WHERE s.facility.id = :facilityId AND s.sessionDate IN :dates "
+            + "AND s.status IN :statuses AND s.startTime < cast(:endTime as time) "
+            + "AND s.endTime > cast(:startTime as time) AND (:excludedId IS NULL OR s.id <> :excludedId)")
+    List<ClassSession> findFacilityConflicts(@Param("facilityId") Long facilityId, @Param("dates") Collection<LocalDate> dates,
+            @Param("startTime") LocalTime startTime, @Param("endTime") LocalTime endTime,
+            @Param("statuses") Collection<SessionStatus> statuses, @Param("excludedId") Long excludedId);
+
+    /**
+     * Number of sessions per class that have not started yet (session date after today, or today
+     * with a start time after now) and whose status is one of the given statuses.
+     * Classes without such sessions are absent from the result.
+     */
+    @Query("SELECT s.sportClass.id AS classId, COUNT(s) AS sessionCount FROM ClassSession s "
+            + "WHERE s.sportClass.id IN :classIds "
+            + "AND s.status IN :statuses "
+            + "AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime > cast(:now as time))) "
+            + "GROUP BY s.sportClass.id")
+    List<ClassSessionCount> countUpcomingByClassIds(@Param("classIds") Collection<Long> classIds,
+                                                    @Param("statuses") Collection<SessionStatus> statuses,
+                                                    @Param("today") LocalDate today,
+                                                    @Param("now") LocalTime now);
+
+    /** Projection row of {@link #countUpcomingByClassIds}. */
+    interface ClassSessionCount {
+        Long getClassId();
+
+        Long getSessionCount();
+    }
+}

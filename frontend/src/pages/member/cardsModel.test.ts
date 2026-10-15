@@ -100,14 +100,76 @@ describe('FE-04 planCard', () => {
   })
 
   it('TC-FE04-011 current tier not on sale any more: price unknown, backend decides', () => {
-    const oldTierCard = card({ tierId: 99, tierName: 'Legacy' })
+    const oldTierCard = card({ tierId: 99, tierName: 'Legacy', tierRank: null })
     expect(planCard(GOLD_TIER, [oldTierCard], CARD_TIERS, TODAY)).toMatchObject({ kind: 'unknown', price: null })
   })
 
   it('TC-FE04-012 price difference is exact for decimal prices', () => {
-    const tiers = [cardTier({ id: 2, price: '300000.10' }), cardTier({ id: 3, price: '600000.30' })]
-    const plan = planCard(tiers[1], [card({ tierId: 2 })], tiers, TODAY)
+    const tiers = [cardTier({ id: 2, code: 'GOLD', tierRank: 3, price: '300000.10' }), cardTier({ id: 3, code: 'VIP', tierRank: 4, price: '600000.30' })]
+    const plan = planCard(tiers[1], [card({ tierId: 2, tierCode: 'GOLD', tierRank: 3, pricePaid: '300000.10' })], tiers, TODAY)
     expect(plan.price).toBe(300000.2)
+  })
+})
+
+describe('PR40 authoritative replacement history', () => {
+  const silver = cardTier({ id: 4, code: 'SILVER', tierRank: 2, price: 550000 })
+  const gold = cardTier({ id: 2, code: 'GOLD', tierRank: 3, price: 500000 })
+  const vip = cardTier({ price: 1000000 })
+  const tiers = [silver, gold, vip]
+  const predecessor = card({ id: 1, tierId: 4, tierCode: 'SILVER', tierRank: 2, status: 'REPLACED', pricePaid: 200000 })
+  const active = card({ id: 3, tierId: 2, tierCode: 'GOLD', tierRank: 3, pricePaid: 300000, upgradeRequest: true, replacesCardId: 1 })
+
+  it('RV40-FE-01 uses the actual 200000 plus 300000 chain', () => {
+    expect(planCard(vip, [active, predecessor], tiers, TODAY)).toMatchObject({ kind: 'upgrade', price: 500000 })
+  })
+
+  it('RV40-FE-02 excludes unrelated REPLACED history with the same end date', () => {
+    const unrelated = card({ id: 2, status: 'REPLACED', pricePaid: 100000 })
+    expect(planCard(vip, [unrelated, active, predecessor], tiers, TODAY)).toMatchObject({ kind: 'upgrade', price: 500000 })
+  })
+
+  it.each([
+    ['orphan upgrade', [card({ ...active, replacesCardId: null })]],
+    ['missing predecessor', [active]],
+    ['cycle', [active, card({ ...predecessor, upgradeRequest: true, replacesCardId: 3 })]],
+    ['missing metadata', [card({ ...active, upgradeRequest: undefined }), predecessor]],
+    ['missing paid snapshot', [active, card({ ...predecessor, pricePaid: null })]],
+    ['another member', [active, card({ ...predecessor, memberId: 999 })]],
+    ['another term', [active, card({ ...predecessor, endDate: '2027-08-01' })]],
+    ['duplicate predecessor id', [active, predecessor, predecessor]],
+  ])('RV40-FE-03 fails closed for %s', (_name, history) => {
+    for (const audience of ['member', 'desk'] as const) {
+      expect(planCard(vip, history, tiers, TODAY, audience)).toMatchObject({ kind: 'unknown', price: null })
+    }
+  })
+
+  it('RV40-FE-04 accepts 20 predecessor edges and rejects 21', () => {
+    const history = Array.from({ length: 22 }, (_, index) => card({
+      id: 100 + index, tierId: 2, status: index === 0 ? 'ACTIVE' : 'REPLACED', pricePaid: 100,
+      upgradeRequest: index < 21, replacesCardId: index < 21 ? 101 + index : null,
+    }))
+    expect(planCard(vip, history, tiers, TODAY)).toMatchObject({ kind: 'unknown', price: null })
+    history[20] = card({ ...history[20], upgradeRequest: false, replacesCardId: null })
+    expect(planCard(vip, history, tiers, TODAY)).toMatchObject({ kind: 'upgrade', price: 997900 })
+  })
+
+  it('TC-BE03-72 RV40-FE-05 uses rank and blocks zero fee for members while allowing staff', () => {
+    const paidSilver = card({ tierId: 4, tierCode: 'SILVER', tierRank: 2, pricePaid: 550000 })
+    expect(planCard(gold, [paidSilver], tiers, TODAY)).toMatchObject({ kind: 'blocked', price: 0 })
+    expect(planCard(gold, [paidSilver], tiers, TODAY, 'desk')).toMatchObject({ kind: 'upgrade', price: 0 })
+  })
+
+  it('RV40-FE-06 preserves historical payments after catalog price changes', () => {
+    const changedGold = cardTier({ ...gold, price: 850000 })
+    expect(planCard(vip, [active, predecessor], [silver, changedGold, vip], TODAY).price).toBe(500000)
+  })
+
+  it.each([null, 0, -1, 2.5, NaN])('RV40-FE-07 rejects invalid target rank %s', (tierRank) => {
+    expect(planCard(cardTier({ ...vip, tierRank }), [active, predecessor], tiers, TODAY)).toMatchObject({ kind: 'unknown', price: null })
+  })
+
+  it('RV40-FE-08 uses the mapped rank of a deactivated tier absent from the catalog', () => {
+    expect(planCard(vip, [active, predecessor], [vip], TODAY)).toMatchObject({ kind: 'upgrade', price: 500000 })
   })
 })
 

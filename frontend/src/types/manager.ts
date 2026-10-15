@@ -35,7 +35,7 @@ export interface UsersQuery {
   search?: string
 }
 
-/** Verified create payload; updates are preview-only until BE-03 is published. */
+/** SportPackageCreateRequest on main uses priceAmount, unlike the update DTO. */
 export interface PackageCreateRequest {
   code: string
   name: string
@@ -51,23 +51,23 @@ export interface PackageCreateRequest {
 export type ManagerPackage = SportPackage
 export type ManagerCardTier = CardTier
 
-/** Proposed BE-03 payload used exclusively by explicit development previews. */
+/** Mirrors the published BE-03 SportPackageUpdateRequest. */
 export interface PackageUpdateDraft {
   name: string
   durationDays: number
   sessionCount: number
   sessionMinutes: number
-  priceAmount: number
-  isActive: boolean
+  price: number
+  active: boolean
 }
 
-/** Proposed BE-03 payload used exclusively by explicit development previews. */
+/** Mirrors the published BE-03 MembershipCardTierUpdateRequest. */
 export interface CardTierUpdateDraft {
   price: number
-  durationMonths: number | null
+  durationMonths: number
   discountPercentage: number
   description: string
-  isActive: boolean
+  active: boolean
 }
 
 /** Preview schema only; BE-04 field names and date semantics remain unverified. */

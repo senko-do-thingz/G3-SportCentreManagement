@@ -3,4 +3,6 @@
 @import './styles/components.css';
 @import './styles/layouts.css';
 @import './styles/member.css';
+@import './styles/payments.css';
+@import './styles/reception.css';
 @import './styles/manager.css';

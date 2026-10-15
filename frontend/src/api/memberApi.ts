@@ -18,6 +18,9 @@ export interface MemberCard {
   /** member_card.tier_id is NOT NULL, so null only appears if the tier mapping is broken. */
   tierCode: string | null
   tierName: string
+  tierRank: number | null
+  upgradeRequest: boolean
+  replacesCardId: number | null
   discountPercentage: number | null
   startDate: string | null
   endDate: string | null

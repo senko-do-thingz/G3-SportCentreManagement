@@ -1,4 +1,4 @@
-import { act, screen, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../api/tokenStorage'
@@ -29,9 +29,6 @@ function backendWith(accounts: Record<string, { password: string; profile: Accou
       const token = call.authorization?.replace('Bearer ', '') ?? ''
       const profile = tokens.get(token)
       return profile ? json(200, profile) : backendError(401, 'Unauthorized')
-    }
-    if (call.path.startsWith('/manager/users?')) {
-      return json(200, { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 })
     }
     return backendError(404, 'Resource not found')
   }
@@ -149,7 +146,7 @@ describe('auth flow', () => {
     renderApp('/manager')
 
     expect(await screen.findByRole('heading', { name: 'User Management' })).toBeInTheDocument()
-    expect(calls.map((call) => call.path)).toEqual(['/users/me', '/auth/refresh', '/users/me', '/manager/users?page=0&size=20'])
+    await waitFor(() => expect(calls.map((call) => call.path)).toEqual(['/users/me', '/auth/refresh', '/users/me', '/manager/users?page=0&size=20']))
     expect(calls.at(-1)?.authorization).toBe('Bearer fresh')
     expect(tokenStorage.getRefreshToken()).toBe('refresh-new')
   })

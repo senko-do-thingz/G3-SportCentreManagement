@@ -1,7 +1,7 @@
 import { managerPreviewEnabled } from '../config/env'
 import { tokenStorage } from './tokenStorage'
 
-/** Proposed API payloads must never be sent using a real authenticated account. */
+/** Only synthetic manager sessions can use the unreleased activity-log contract. */
 export function isManagerPreviewSession(): boolean {
   return managerPreviewEnabled() && tokenStorage.getAccessToken() === 'preview-MANAGER'
 }

@@ -38,9 +38,9 @@ let packages: ManagerPackage[] = sports.flatMap((sport, sportIndex) => priceSets
   priceAmount, description: null, isActive: true,
 })))
 const tiers: ManagerCardTier[] = [
-  { id: 1, code: 'STANDARD', name: 'Standard', price: 0, durationMonths: null, discountPercentage: 0, description: 'Pay standard sport prices. No expiry for account access.', isActive: true },
-  { id: 2, code: 'GOLD', name: 'Gold', price: 300000, durationMonths: 12, discountPercentage: 5, description: 'Self-training and coach-led packages. Single sessions excluded.', isActive: true },
-  { id: 3, code: 'VIP', name: 'VIP', price: 600000, durationMonths: 12, discountPercentage: 10, description: 'Self-training and coach-led packages. Single sessions excluded.', isActive: true },
+  { id: 1, tierRank: 0, code: 'STANDARD', name: 'Standard', price: 0, durationMonths: 0, discountPercentage: 0, description: 'Pay standard sport prices. No expiry for account access.', isActive: true },
+  { id: 2, tierRank: 1, code: 'GOLD', name: 'Gold', price: 300000, durationMonths: 12, discountPercentage: 5, description: 'Self-training and coach-led packages. Single sessions excluded.', isActive: true },
+  { id: 3, tierRank: 2, code: 'VIP', name: 'VIP', price: 600000, durationMonths: 12, discountPercentage: 10, description: 'Self-training and coach-led packages. Single sessions excluded.', isActive: true },
 ]
 let logs: ActivityLog[] = [
   { id: 3, createdAt: '2026-10-14T09:30:00', actorId: 1, actorName: 'Morgan Lee', actorRole: 'MANAGER', action: 'PACKAGE_CREATED', entityType: 'SPORT_PACKAGE', entityId: 5, entityCode: 'PK-005', summary: 'Created Football coach-led 30-day package.', details: '8 sessions, 90 minutes each. Price: 900.000 VND.' },
@@ -131,7 +131,8 @@ export async function previewResponse(path: string, options: RequestOptions, tok
   if (packageUpdate && method === 'PUT') {
     const item = packages.find((item) => item.id === Number(packageUpdate[1]))
     if (!item) return failure(404, 'Package not found.')
-    Object.assign(item, options.body as PackageUpdateDraft)
+    const request = options.body as PackageUpdateDraft
+    Object.assign(item, { name: request.name, durationDays: request.durationDays, sessionCount: request.sessionCount, sessionMinutes: request.sessionMinutes, priceAmount: request.price, isActive: request.active })
     record('PACKAGE_UPDATED', 'SPORT_PACKAGE', item.id, item.code, `Updated ${item.name}.`)
     return json(200, item)
   }
@@ -141,7 +142,9 @@ export async function previewResponse(path: string, options: RequestOptions, tok
     const tier = tiers.find((item) => item.id === Number(tierUpdate[1]))
     if (!tier) return failure(404, 'Membership tier not found.')
     if (tier.code === 'STANDARD') return failure(400, 'Standard is a protected free account tier.')
-    Object.assign(tier, options.body as CardTierUpdateDraft)
+    const request = options.body as CardTierUpdateDraft
+    if (request.active && tiers.some((other) => other.id !== tier.id && other.isActive && other.tierRank !== null && tier.tierRank !== null && (other.tierRank < tier.tierRank ? Number(other.price) >= request.price : other.tierRank > tier.tierRank && Number(other.price) <= request.price))) return failure(400, 'Active card fees must increase with the tier rank.')
+    Object.assign(tier, { price: request.price, durationMonths: request.durationMonths, discountPercentage: request.discountPercentage, description: request.description || null, isActive: request.active })
     record('CARD_TIER_UPDATED', 'CARD_TIER', tier.id, tier.code, `Updated ${tier.name} benefits.`)
     return json(200, tier)
   }

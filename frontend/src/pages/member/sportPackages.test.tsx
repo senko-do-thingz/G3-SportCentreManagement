@@ -273,11 +273,14 @@ describe('FE-03 Package Detail and Registration (F1-10)', () => {
 
     await user.click(within(dialog).getByRole('link', { name: 'Continue to payment' }))
     expect(await screen.findByRole('heading', { name: 'Payment Summary' })).toBeInTheDocument()
-    const summary = await screen.findByRole('region', { name: 'Payment summary' })
-    expect(within(summary).getByText('PAY-0052')).toBeInTheDocument()
-    expect(within(summary).getByTestId('payment-amount')).toHaveTextContent('810.000 VND')
-    expect(within(summary).getByText('Pending')).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Bank transfer' })).toHaveTextContent('0123456789')
+    // FE-11: details on the left, prices and the payment method on the right (Figma F3-01); the
+    // bank transfer details moved to the status screen (F3-02).
+    const details = await screen.findByRole('region', { name: 'Payment details' })
+    expect(within(details).getByText('PAY-0052')).toBeInTheDocument()
+    expect(within(details).getByText('Pending')).toBeInTheDocument()
+    const order = screen.getByRole('region', { name: 'Order summary' })
+    expect(within(order).getByTestId('payment-amount')).toHaveTextContent('810.000 VND')
+    expect(within(order).getByRole('radio', { name: 'Bank transfer' })).toBeChecked()
   })
 
   it('TC-FE03-037 a second submit while sending sends one request; the form locks after success', async () => {

@@ -8,12 +8,27 @@
 export class ApiError extends Error {
   readonly status: number
   readonly fieldErrors: Record<string, string>
+  /**
+   * Machine readable error code when the body carries one ({code: "PAYMENT_AMOUNT_MISMATCH"}),
+   * null otherwise. Screens match on it instead of on the message text.
+   */
+  readonly code: string | null
+  /** The raw details value of the body, for errors whose details are not field messages. */
+  readonly details: unknown
 
-  constructor(status: number, message: string, fieldErrors: Record<string, string> = {}) {
+  constructor(
+    status: number,
+    message: string,
+    fieldErrors: Record<string, string> = {},
+    code: string | null = null,
+    details: unknown = undefined,
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.fieldErrors = fieldErrors
+    this.code = code
+    this.details = details
   }
 
   /** True when the request never reached the server (offline, DNS, CORS, server down). */
@@ -82,7 +97,8 @@ export function apiErrorFromBody(status: number, body: unknown): ApiError {
       typeof record.message === 'string' && record.message.trim().length > 0
         ? record.message
         : defaultMessage(status)
-    return new ApiError(status, message, toFieldErrors(record.details))
+    const code = typeof record.code === 'string' && record.code.trim().length > 0 ? record.code : null
+    return new ApiError(status, message, toFieldErrors(record.details), code, record.details)
   }
   return new ApiError(status, defaultMessage(status))
 }

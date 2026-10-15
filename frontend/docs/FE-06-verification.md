@@ -2,28 +2,32 @@
 
 Implementation branch: feat/f1-manager-screens.
 
+Working project: E:/SWP391_SS2/Project/V1/G3-SportCentreManagement-main. Integrated origin/main at 56f28c5 on 2026-10-15. The feature snapshot had an unrelated root history, so integration preserves both histories through a merge. Local files from before the update are recoverable at E:/SWP391_SS2/Project/V1/G3-SportCentreManagement-recovery-20261015-234415. Local-only backend files remain untracked and were not included in the merge.
+
 ## Run locally
 
 From this repository's frontend folder, run npm ci, then npm run dev:preview. Open http://localhost:5173/login and choose Open manager preview. The preview does not require a backend or a real account. For an IP-bound server, use npm run dev:preview -- --host 127.0.0.1 and open http://127.0.0.1:5173/login.
 
 Use npm run dev for live mode. The default API URL is http://localhost:8080/api/v1. Preview is off by default, available only in development and requires VITE_MANAGER_PREVIEW=true or the manager-preview Vite mode. Its sign-in controls and fixture adapter are excluded from production builds. Preview tokens are synthetic and use the existing auth provider and role guards; they never grant access to the real backend.
 
-All preview data and simulated writes are in src/api/mock/managerPreview.ts. Changes are held in memory, reset on a full reload and never written to the backend. The preview covers manager users, sports, all 36 packages across six sports, three card tiers and activity records. Preview-only authentication uses reserved @preview.sportify.local accounts. Real account tokens cannot invoke unverified mutations even when the preview flag is enabled.
+All preview data and simulated writes are in src/api/mock/managerPreview.ts. Changes are held in memory, reset on a full reload and never written to the backend. The preview covers manager users, sports, all 36 packages across six sports, three card tiers and activity records. Preview-only authentication uses reserved @preview.sportify.local accounts. Real account tokens use the released user/package/card endpoints even when the preview flag is enabled; the unpublished activity contract remains blocked for real accounts.
 
 ## Integration status
 
 | Screen | Live contract | Current limitation |
 | --- | --- | --- |
-| User Management | GET/POST /manager/users; PATCH /manager/users/{id}/status; GET /sports | Verified against V1 ManagerUserController and DTOs. The active backend checkout does not contain BE-01, so live availability was not verified. |
-| Packages | POST /packages creation verified against V1 DTO | GET /manager/packages and PUT /packages/{id} are proposed BE-03 contracts. Manager listing and updates are gated until released fields are verified. |
-| Cards | Existing public CardTierResponse reused for the preview | GET /manager/card-tiers and PUT /membership-cards/tiers/{id} require BE-03 confirmation. They are gated for real accounts. |
+| User Management | GET/POST /manager/users; PATCH /manager/users/{id}/status; GET /sports | Verified against ManagerUserController and DTOs on main. Real-service smoke testing still requires a running backend and manager session. |
+| Packages | GET /manager/packages?sportId=&format=&active=; POST /packages; PUT /packages/{id} | Released BE-03 contract. Create uses priceAmount; update uses price and active. Responses use priceAmount and isActive. No invented pagination or public active-only fallback. |
+| Cards | GET /manager/card-tiers; PUT /membership-cards/tiers/{id} | Released BE-03 contract. Update uses price, durationMonths, integer discountPercentage, description and active. Responses retain isActive and tierRank. |
 | Activity | Actor lookup reuses verified GET /manager/users | GET /manager/activity-logs requires BE-04 confirmation of response fields, action enum and calendar/date inclusivity. Date strings are used only in preview; live requests are gated. |
 
-No production fallback substitutes the public active-only package/tier list for a manager catalog. No backend file has been changed. No real account creation or catalog mutation was used during browser review.
+No production fallback substitutes the public active-only package/tier list for a manager catalog. Tracked backend files match origin/main exactly; no custom backend edits were made. Browser review uses only the synthetic preview. Real-service mutation testing was not performed.
+
+BE-03 validation: package name at most 100 characters, sessions 1-1000, duration 1-3650 days, 60/90 minutes, and positive prices with at most 12 integer digits and 2 decimals. Paid card validity is 1-120 months, discount is a whole number 0-100, and description is at most 500 characters. Standard stays read-only. Active card fees must increase by tier rank; backend business-rule errors remain visible in the editor. Price/active server field errors map to the corresponding package/card inputs.
 
 ## Design references and intentional adjustments
 
-All nine images were opened before implementation from the plan's reference folder: ../V1/G3-SportCentreManagement-main/context/Flow 1 - User and membership management/Flow 1 - Manager.
+All nine images were opened before implementation from context/Flow 1 - User and membership management/Flow 1 - Manager in the working project.
 
 - User Management and Add Staff overlay: preserve the shared blue/white shell, filters and account columns. Omit unsupported global role counts and arbitrary profile edits. Add the required temporary password and ordered coach sports instead of unsupported skills/certificate fields. Status confirmation replaces arbitrary Edit.
 - Packages: one catalog implements all three screenshot segments, with sport, training type and status filters. Twenty-row pagination is explicitly local. Code, sport and training type remain immutable during edits.
@@ -36,16 +40,20 @@ All nine images were opened before implementation from the plan's reference fold
 1. Access: log out and open each /manager route. Expect login. Use Check member access on the preview login screen. Expect 403 without manager data. Return to login and choose Open manager preview.
 2. Loading: open /manager?previewState=slow, /manager/packages?previewState=slow, /manager/cards?previewState=slow and /manager/activity?previewState=slow. Expect a visible loading state and no stale rows under changed filters.
 3. Empty: use the same routes with previewState=empty. Expect a distinct empty state. Search for a nonexistent account/package/action in normal preview and expect no matching results, then clear filters.
-4. Error and retry: use previewState=error. Expect a service error rather than a successful empty list. Try again preserves filters. Remove the parameter and reload for normal data. In live mode, verify missing BE-03/BE-04 contracts show a dependency error.
+4. Error and retry: use previewState=error. Expect a service error rather than a successful empty list. Try again preserves filters. Remove the parameter and reload for normal data. In live mode, users/packages/cards call the backend and report real errors; activity still shows the BE-04 dependency error.
 5. User filters: combine role/status/search, inspect the changed rows, move to page 2, then change a filter and expect page 1. Rapidly change filters and expect only the newest response.
 6. Staff form: submit blank fields and verify focus on the first invalid input. Validate email/phone/password. Choose Coach, select Basketball then Football and verify Basketball is primary. Change to Receptionist and verify sports are cleared. Duplicate an existing email/phone and expect inline server messages with entered fields retained. Press Enter twice and expect one creation. Cancel/Escape sends no mutation and clears the temporary password by unmounting the editor.
 7. User status: verify your own Deactivate is disabled. Confirm another account's status change; cancel first and verify no change. Successful confirmation refreshes the current query. A failed refresh must report the refresh error without reopening the successful creation form.
 8. Packages: filter every sport, both training types and inactive status. Create a package with a unique code, a positive numeric price, whole duration/session counts and 60 or 90 minutes. Edit price and status; code/sport/type stay read-only. Reject zero/negative prices, fractional counts and blank numeric fields. Cancel leaves data unchanged. Confirm deactivation, then find the item under inactive packages.
-9. Cards: Standard has a default-tier badge and no editor. Edit Gold/VIP; check positive fee, whole-month validity and discount bounds including 0 and 100. Reject 101/-1 and blank numbers. Cancel keeps the old fee. Save an inactive tier and verify its label. Discount policy remains visible.
+9. Cards: Standard has a default-tier badge and no editor. Edit Gold/VIP; check positive fee, validity 1-120 months and integer discounts including 0 and 100. Reject 101/-1/fractional discounts, blank numbers and descriptions longer than 500 characters. Cancel keeps the old fee. Try a VIP fee below Gold and expect the rank-price error with input preserved. Save an inactive tier and verify its label. Discount policy remains visible.
 10. Activity: filter actor by searching the paginated picker, then combine action/search/from/to. Enter a reversed range and expect an inline error with no log request. Check that a local calendar day is not shifted. Open details and expect no additional endpoint, then Refresh. History has no edit/delete controls.
 11. Responsive: inspect each page and editor at 375px and desktop. Filters/forms/cards stack, the navigation menu remains usable, and tables scroll inside their panels without making the whole page wider. Verify visible focus, modal Tab/Shift+Tab trapping and Escape dismissal.
 12. Developer checks: run npm run test, npm run lint and npm run build. Inspect the browser console in preview. Production dist must not contain a managerPreview chunk or reserved preview account addresses.
 
 ## Automated coverage
 
-The manager suite exercises role denial, live request authentication, pagination/query encoding, loading/error/retry/empty states, stale response protection, staff validation and ordered coach sports, duplicate submissions, server field errors, self-deactivation, confirmation cancellation, failed refresh after a successful write, proposed-contract gates, package numeric validation/payloads, Standard protection, extra inactive tiers, cancelled edits, local-day filtering and immutable activity details. The full inherited frontend suite is also run.
+Latest integration verification: 591 tests passed in 29 files; lint and production build passed. Production output contains neither a managerPreview chunk nor reserved preview account addresses. Vite reports a non-blocking warning for the 509.87 kB shared application chunk. Browser checks confirmed package/card saves, updated values after refresh, a usable mobile menu and package editor, no page-wide horizontal overflow at 375px, and no captured application console errors. The preview remains running at http://127.0.0.1:5174/manager/packages.
+
+The audit update preserved all 35 main audit rows, restored the prior FE-06 row and appended the integration row. DOCX structural validation passed; packaged visual rendering could not run because LibreOffice soffice.exe is unavailable.
+
+The manager suite exercises role denial, live request authentication, pagination/query encoding, loading/error/retry/empty states, stale response protection, staff validation and ordered coach sports, duplicate submissions, server field errors, self-deactivation, confirmation cancellation, failed refresh after a successful write, the remaining activity-contract gate, exact BE-03 wire payloads, DTO numeric limits, Standard protection, tier ranks, preview response mapping, malformed catalog errors, cancelled edits, local-day filtering and immutable activity details. The inherited frontend suite covers reception and member payment screens as well as the shared session behavior.
