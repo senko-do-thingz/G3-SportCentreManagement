@@ -86,11 +86,14 @@ Dated class occurrence or self-training slot (migrated in V10).
 | capacity | INT | No | 20, CHECK > 0 | Maximum participants |
 | booked_count | INT | No | 0, CHECK 0..capacity | Confirmed bookings |
 | status | NVARCHAR(20) | No | `PUBLISHED` | `DRAFT`, `PUBLISHED`, `CANCELLED`, `COMPLETED` |
+| cancel_reason | NVARCHAR(255) | Yes | | Manager cancellation reason, trimmed (V23) |
+| cancelled_at | DATETIME2(0) | Yes | | Manager cancellation time from the application Clock (V23) |
+| cancelled_by_user_id | BIGINT | Yes | FK -> user_account.id | Manager who cancelled the session (V23) |
 | created_at, updated_at | DATETIME2(0) | | | Audit timestamps |
 
-*(Note: Columns `published_at`, `published_by`, `cancelled_at`, `cancel_reason`, `attendance_status`, `attendance_submitted_at`, `attendance_submitted_by`, `version` are planned extensions not in V10).*
+*(Note: Columns `published_at`, `published_by`, `attendance_status`, `attendance_submitted_at`, `attendance_submitted_by`, `version` remain planned extensions. Cancellation metadata is implemented in V23).*
 
-Indexes: `ix_class_session_date_status (session_date, status)`.
+Indexes: `ix_class_session_date_status (session_date, status)`; V23 adds `(coach_id, session_date)` and `(facility_id, session_date)` with `start_time`, `end_time`, `status` included, unless equivalent unfiltered leading-key indexes already exist. Separate coach and facility overlap queries use these access paths. SQL Server chooses the actual execution plan.
 
 `sport_class` index (V20): `ix_sport_class_coach (coach_id)`.
 
@@ -116,6 +119,31 @@ Session reservation by a member (migrated in V10).
 *(Note: Columns `source`, `fee_amount`, `cancel_type`, `version` from earlier drafts are not present. `cancelled_by` was added in V20 as `cancelled_by_user_id`).*
 
 Indexes: `ix_booking_member_session (member_id, session_id, status)`, `ux_booking_active (member_id, session_id) WHERE status = 'CONFIRMED'` (V20, unique: one confirmed booking per member and session).
+
+V23 adds `(session_id, status) INCLUDE (package_registration_id)` unless an equivalent leading-key index exists. This supports grouped calendar booking counts and cancellation locks/refunds without scanning unrelated members.
+
+## Manager Session API BE-10
+
+All endpoints require MANAGER. Existing error envelopes retain `timestamp`, `status`, `message` and optional `details`.
+
+| Method and path | Request | Result |
+|---|---|---|
+| GET `/api/v1/manager/sessions` | Required `from`, `to`; optional `classId`, `coachId`, `facilityId` | Array ordered by date, start time, id; inclusive range of at most 62 days; cancelled sessions included |
+| POST `/api/v1/manager/classes/{classId}/sessions` | Single `date`, or weekly `daysOfWeek`, `fromDate`, `toDate`; common `startTime`, `endTime`, `facilityId`, `coachId`, `capacity`, `trainingType`; optional `status` | 201 array, including for a single session; PUBLISHED by default, DRAFT also allowed; at most 100 generated sessions |
+| PUT `/api/v1/manager/sessions/{id}` | `date`, `startTime`, `endTime`, `facilityId`, `coachId`, `capacity` | Updated session; class, sport, training type and status are preserved |
+| PUT `/api/v1/manager/sessions/{id}/cancel` | Required trimmed `reason`, at most 255 characters | Cancelled session; all confirmed bookings cancelled and consumed package sessions restored only to ACTIVE registrations in the same transaction |
+
+Dates use ISO `YYYY-MM-DD`; times use ISO local time with whole seconds and cannot cross midnight. Weekly days use the names MONDAY through SUNDAY. Both interval bounds are inclusive. A repeat with no matching day is rejected. A date and weekly fields cannot be combined. Duplicate selected weekdays collapse into one occurrence per date. Session starts must be strictly after the application Clock in Asia/Ho_Chi_Minh, including today.
+
+Responses contain `id`, `date`, `startTime`, `endTime`, `class` (`id`, `code`, `name`), `coach` (`id`, `name`), `facility` (`id`, `name`), `capacity`, `bookedCount`, `trainingType`, `status` and cancellation metadata. Booked counts come from CONFIRMED booking rows in one grouped query, independently of the cached `booked_count`. Calendar counts use date/resource filters instead of an unbounded IN list.
+
+Every create and edit requires an active linked class and active facility. COACH_LED requires an active, qualified coach; SELF_TRAINING permits a null coach. A supplied coach must have role COACH and a matching `coach_sport` row. DRAFT uses the same required fields as PUBLISHED. Capacity is 1 through the class maximum and cannot go below the confirmed bookings counted at update time. When confirmed bookings exist, one set-based count query rejects a proposed date outside any linked registration's inclusive start_date/end_date validity; null registration links are ignored. Time-only and coach changes remain allowed, pending product owner confirmation of this assumption. Updates do not repair the cached `booked_count`; response counts still come from confirmed booking rows. Facility sport/capacity limits and incomplete draft saving have no additional rules in this task. Legacy sessions without a class can be viewed and cancelled but cannot be edited through this API.
+
+Overlap means the same date, a shared coach or facility, and `existingStart < requestedEnd AND existingEnd > requestedStart`. DRAFT and PUBLISHED occupy resources. CANCELLED and COMPLETED do not. A touching boundary is allowed. Edits exclude their own session. Weekly conflicts are collected for the entire batch before any insertion. HTTP 409 has `details.conflicts`, with `sessionId`, `requestedDate`, `date`, `startTime`, `endTime`, `class`, `coach`, `facility`, `conflictType` (COACH, FACILITY or BOTH). A session that conflicts on both resources appears once.
+
+Scheduling creates lock the assigned coach then facility with PESSIMISTIC_WRITE, holding locks through conflict checks, writes and commit. Edits first lock the session, then coach, then facility. Manager cancellation locks the session, then the confirmed booking range, then package registrations. Booking creation also locks the session before eligibility checks and later booking/registration writes. Individual cancellation resolves only the scalar session id, locks the session, then loads and checks the booking before any refund or counter change. This serializes scheduling writers sharing resources and booking writers sharing a session. Pessimistic lock failures inside the manager service method body receive a retryable 409; a failure raised by the transaction interceptor at commit time can still become 500. Lock waits remain unbounded. After the session lock and booking checks, a conditional database UPDATE consumes one package unit only while the registration is ACTIVE, valid for the session date and has a positive balance. It serializes with other consumption and capped refund UPDATEs on that registration, including operations on different sessions. JPA may insert the initial remaining_sessions value, but subsequent entity saves cannot write that column. Managed balance values remain snapshots until refreshed or reloaded. Booking inserts/updates belong to the already locked session; no booking path takes another session lock after modifying a registration. This does not guarantee freedom from SQL Server deadlocks or lock escalation; see database document 09.
+
+Each created session has a SESSION_CREATED activity entry. Edits always record SESSION_UPDATED with before/after values, including identical-value requests. Cancellation records SESSION_CANCELLED with before/after values, reason, bookingsCancelled and a registrations list of registrationId/packageBookings. A grouped booking SELECT uses UPDLOCK/HOLDLOCK before either bulk UPDATE; null package links are excluded from the list. packageBookings counts linked confirmed bookings, not credits actually restored, which can be lower because of the cap or a non-ACTIVE registration. The total cancelled count still includes bookings without a package link. Audit writes join the business transaction.
 
 ### `waitlist_entry` (Implemented - Migration V15)
 
