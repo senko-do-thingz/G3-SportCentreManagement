@@ -2,13 +2,23 @@ package com.sportify.identity.service.impl;
 
 import com.sportify.core.common.CodeFormatter;
 import com.sportify.core.exception.ConflictException;
-import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.dto.MemberCreateRequest;
 import com.sportify.identity.entity.*;
 import com.sportify.identity.mapper.FrontDeskMemberMapper;
 import com.sportify.identity.repository.*;
 import com.sportify.identity.service.TemporaryPasswordGenerator;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import com.sportify.identity.security.CustomUserDetails;
+import org.hibernate.exception.ConstraintViolationException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.LoggerFactory;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mapstruct.factory.Mappers;
@@ -17,7 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.math.BigDecimal;
+import java.sql.SQLException;
 import java.time.*;
 import java.util.*;
 
@@ -100,10 +110,11 @@ class FrontDeskMemberServiceImplTest {
         assertEquals("BEGINNER", member.getValue().getCurrentLevel());
     }
 
-    @Test
-    void create_whenConcurrentAccountConstraintFails_returnsConflict() {
+    @ParameterizedTest
+    @ValueSource(ints = {2601, 2627})
+    void create_whenConcurrentAccountUniqueConstraintFails_returnsConflict(int errorCode) {
         stubCreation();
-        when(users.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("unique email or phone"));
+        when(users.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("unique identity", new SQLException("duplicate", "23000", errorCode)));
         assertThrows(ConflictException.class, () -> service.create(request));
         verify(members, never()).saveAndFlush(any());
     }
@@ -112,8 +123,89 @@ class FrontDeskMemberServiceImplTest {
     void create_whenMemberConstraintFails_returnsConflict() {
         stubCreation();
         when(users.saveAndFlush(any())).thenReturn(profile.getUserAccount());
-        when(members.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("unique member code"));
+        when(members.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("unique member code",
+                new ConstraintViolationException("duplicate", new SQLException("duplicate", "23000", 2627), "uq_member_code")));
         assertThrows(ConflictException.class, () -> service.create(request));
     }
 
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {515, 547, 2628})
+    void create_whenIntegrityFailureIsNotUnique_propagatesOriginalException(int errorCode) {
+        stubCreation();
+        var failure = new DataIntegrityViolationException("invalid member data",
+                new ConstraintViolationException("constraint", new SQLException("invalid data", "23000", errorCode), "constraint"));
+        when(users.saveAndFlush(any())).thenThrow(failure);
+        assertSame(failure, assertThrows(DataIntegrityViolationException.class, () -> service.create(request)));
+    }
+
+    @Test
+    void create_whenIntegrityFailureHasNoVendorEvidence_propagatesOriginalException() {
+        stubCreation();
+        var failure = new DataIntegrityViolationException("unclassified integrity failure");
+        when(users.saveAndFlush(any())).thenThrow(failure);
+        assertSame(failure, assertThrows(DataIntegrityViolationException.class, () -> service.create(request)));
+    }
+
+    @Test
+    void create_whenUniqueViolationIsInSqlExceptionChain_returnsConflict() {
+        stubCreation();
+        var batchFailure = new SQLException("batch failure");
+        batchFailure.setNextException(new SQLException("duplicate", "23000", 2601));
+        when(users.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("batch", batchFailure));
+        assertThrows(ConflictException.class, () -> service.create(request));
+    }
+
+    @Test
+    void create_whenStaffUsesJwt_logsStaffIdAndMemberIdentityWithoutSecretsOrContacts() {
+        var staff = UserAccount.builder().id(42L).email("staff@example.com").phone("0909999999")
+                .role(Role.builder().code("RECEPTIONIST").build()).build();
+        var principal = new CustomUserDetails(staff);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
+        assertSafeCreationLog("staff-42");
+    }
+
+    @Test
+    void create_whenStaffHasNonContactUsername_logsActingUsername() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("receptionist", null, List.of()));
+        assertSafeCreationLog("receptionist");
+    }
+
+    @Test
+    void create_whenFallbackUsernameIsAnEmail_redactsItFromLog() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("staff@example.com", null, List.of()));
+        assertSafeCreationLog("authenticated-staff");
+    }
+
+    private void assertSafeCreationLog(String expectedActor) {
+        stubCreation();
+        when(users.saveAndFlush(any())).thenReturn(profile.getUserAccount());
+        when(members.saveAndFlush(any())).thenReturn(profile);
+        Logger logger = (Logger) LoggerFactory.getLogger(FrontDeskMemberServiceImpl.class);
+        var appender = new ListAppender<ILoggingEvent>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            var response = service.create(request);
+            assertEquals(1, appender.list.size());
+            String message = appender.list.getFirst().getFormattedMessage();
+            assertEquals("Staff " + expectedActor + " created member id=7 code=MEM-0007", message);
+            for (String secret : List.of(response.temporaryPassword(), "encoded-password", "never-return-this-hash",
+                    "staff@example.com", "0909999999", request.email(), request.phone())) {
+                assertFalse(message.contains(secret));
+                assertFalse(response.toString().contains(secret));
+            }
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
 }
