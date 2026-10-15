@@ -3,10 +3,10 @@
 ## Overview
 - **Task ID**: BE-19
 - **Feature Flow**: Flow 3 (payments), used by Flow 1 screens F1-13 Payment Handoff and F1-14 Register and Renew
-- **Branch**: `feat/f3-desk-payment` (built on BE-18, `feat/f3-confirm-payment`)
+- **Branch**: `feat/f3-desk-payment` (main merged in, with BE-18 from PR #60 and BE-10)
 - **Priority**: P1 (core flow demo)
 - **Depends on**: BE-18 (receipt step `PaymentVerificationService.recordPaymentConfirmed`)
-- **Objective**: When RECEPTIONIST or MANAGER sells a membership card or a package at the desk (channel RECEPTION), record the money at once: a SUCCESS payment linked to the item, the item ACTIVE, one PAID invoice, and the payment id and invoice id in the response. A member sees only their own payments and invoices; another member gets 403.
+- **Objective**: When RECEPTIONIST or MANAGER sells a membership card or a package at the desk (channel RECEPTION), record the money at once: a SUCCESS payment linked to the item, the item ACTIVE, one PAID invoice, and the payment id and invoice id in the response, all in one transaction. The BE-17 and BE-18 visibility contract is unchanged: another member's payment or invoice answers 404.
 - **Environment Note**: Maven Central is blocked in the authoring environment, so these tests run in GitHub Actions CI on the pull request (unit tests without Docker, integration tests with Testcontainers SQL Server 2022). Update the Execution Status column after the CI run.
 
 ---
@@ -39,7 +39,8 @@ Body: `{"memberId": 100, "tierId": 2, "paymentMethod": "CASH", "amountReceived":
 |---|---|---|
 | Reference missing for a non-cash method | 400 | `message: Reference code is required for payment method ...` |
 | Less money than the price, or a non-cash amount that differs | 409 | `code: PAYMENT_AMOUNT_MISMATCH`, nothing saved |
-| Member reads another member's payment or invoice | 403 | `Access Denied` |
+| Member reads another member's payment or invoice | 404 | Unchanged BE-17 and BE-18 contract |
+| Receipt step fails after the payment was written | 500 | Whole sale rolled back |
 
 ---
 
@@ -58,15 +59,20 @@ Body: `{"memberId": 100, "tierId": 2, "paymentMethod": "CASH", "amountReceived":
 | TC-BE19-009 | Online unchanged | Member requests a card | tier 2 | PENDING_PAYMENT, no desk payment, no invoice | Unit (`purchaseCard_Online_TakesNoDeskPayment`) | Pending CI |
 | TC-BE19-010 | Package desk sale wiring | Receptionist sells a package in cash | package 10, CASH, 400.000 | ACTIVE, paymentId 900, invoiceId 71, invoiceNumber INV-0071 | Unit (`registerPackage_AtDesk_TakesTheMoneyAndReturnsTheReceipt`) | Pending CI |
 | TC-BE19-011 | Staff online request | Receptionist, channel ONLINE | package 10 | PENDING_PAYMENT, no desk payment | Unit (`registerPackage_ByStaffForOnlineChannel_TakesNoDeskPayment`) | Pending CI |
-| TC-BE19-012 | 403 payment | Other member reads a payment | GET /payments/10 | AccessDeniedException | Unit (`PaymentServiceImplTest.getPayment_OtherMember_ThrowsAccessDenied`) | Pending CI |
-| TC-BE19-013 | 403 payment method | Other member changes a payment method | PUT /payments/10/method | AccessDeniedException | Unit (`PaymentServiceImplTest.updatePaymentMethod_OtherMember_ThrowsAccessDenied`) | Pending CI |
-| TC-BE19-014 | 403 HTTP | Other member, controller | GET /payments/1, PUT /payments/1/method | 403 Forbidden | WebMvc (`PaymentControllerTest`) | Pending CI |
-| TC-BE19-015 | 403 invoice | Other member reads an invoice | GET /invoices/by-payment/1 | AccessDeniedException | Unit (`PaymentVerificationServiceImplTest.invoiceByPayment_Visibility`) | Pending CI |
+| TC-BE19-012 | 404 payment (unchanged) | Other member reads a payment | GET /payments/10 | ResourceNotFoundException | Unit (`PaymentServiceImplTest.getPayment_OtherMember_ThrowsResourceNotFoundException`) | Pending CI |
+| TC-BE19-013 | 404 payment method (unchanged) | Other member changes a payment method | PUT /payments/10/method | ResourceNotFoundException | Unit (`PaymentServiceImplTest.updatePaymentMethod_OtherMember_ThrowsResourceNotFoundException`) | Pending CI |
+| TC-BE19-014 | 404 HTTP (unchanged) | Other member, controller | GET /payments/1, PUT /payments/1/method | 404 Not Found | WebMvc (`PaymentControllerTest.getPayment_AsOtherMember_Returns404NotFound`, `updatePaymentMethod_AsOtherMember_Returns404NotFound`) | Pending CI |
+| TC-BE19-015 | 404 invoice (unchanged) | Other member reads an invoice | GET /invoices/by-payment/1 | ResourceNotFoundException | Unit (`PaymentVerificationServiceImplTest.invoiceByPayment_Visibility`) | Pending CI |
 | TC-BE19-016 | End to end, package | Desk package sale by transfer through the API | POST /packages/registrations with paymentReference alias | 201 ACTIVE; payment SUCCESS with reference, time, confirmed by; registration linked; one invoice; one PAYMENT_CONFIRMED; totals add up | Integration (`deskPackageSale_ByTransfer_RecordsPaymentAndReceipt`) | Pending CI |
 | TC-BE19-017 | End to end, card | Desk card sale in cash with change, `method` alias | POST /membership-cards/purchase, 1.500.000 for 1.200.000 | 201 ACTIVE; SUCCESS 1.200.000; note with change 300000.00; totals add up | Integration (`deskCardSale_CashWithChange_RecordsPaymentAndReceipt`) | Pending CI |
 | TC-BE19-018 | End to end, short cash | 300.000 cash for a 400.000 package | POST /packages/registrations | 409 PAYMENT_AMOUNT_MISMATCH; no registration and no payment for the member | Integration (`deskSale_ShortCash_ConflictAndNothingCreated`) | Pending CI |
-| TC-BE19-019 | End to end, visibility | Owner and other member read the payment and invoice | GET /payments/{id}, GET /invoices/by-payment/{id} | Owner 200 for both (status SUCCESS, one line); other member 403 for both | Integration (`memberSeesOnlyOwnPaymentAndInvoice`) | Pending CI |
+| TC-BE19-019 | End to end, visibility | Owner and other member read the payment and invoice | GET /payments/{id}, GET /invoices/by-payment/{id} | Owner 200 for both (status SUCCESS, one line); other member 404 for both | Integration (`memberSeesOnlyOwnPaymentAndInvoice`) | Pending CI |
 | TC-BE19-020 | Invoice totals | Every desk sale invoice | invoice and its lines | subtotal = sum of line totals; total = subtotal - discount + tax | Integration (`assertInvoiceTotalsAddUp` in TC-BE19-016 and 017) | Pending CI |
+| TC-BE19-021 | Rollback, package (P1-01) | Invoice save fails after the payment and registration were written | Desk package sale by transfer, `InvoiceRepository.save` forced to throw | 500; no payment, registration, invoice, invoice line or activity_log row for the member; global invoice, invoice_line and PAYMENT_CONFIRMED counts unchanged | Integration (`DeskSaleRollbackIntegrationTest.deskPackageSale_InvoiceFails_EverythingRollsBack`) | Pending CI |
+| TC-BE19-022 | Rollback, card (P1-01) | Invoice save fails after the payment and card were written | Desk card sale in cash, `InvoiceRepository.save` forced to throw | Same as TC-BE19-021 for the card | Integration (`DeskSaleRollbackIntegrationTest.deskCardSale_InvoiceFails_EverythingRollsBack`) | Pending CI |
+| TC-BE19-023 | Rollback after the invoice and audit (P1-01) | The PAYMENT_CONFIRMED audit write fails after the invoice and its line were saved | Desk package sale in cash, `ActivityLogRepository.save` forced to throw for PAYMENT_CONFIRMED | 500; invoice save was called; nothing of the sale is left, counts unchanged | Integration (`DeskSaleRollbackIntegrationTest.deskPackageSale_AuditFailsAfterInvoice_EverythingRollsBack`) | Pending CI |
+| TC-BE19-024 | Non-cash mismatch, package (P2-01) | Bank transfer with more than the price | 450.000 for a 400.000 package, reference given | 409 PAYMENT_AMOUNT_MISMATCH; no registration, card, payment, invoice, invoice line or activity_log row | Integration (`deskPackageSale_NonCashAmountDiffers_ConflictAndNothingCreated`) | Pending CI |
+| TC-BE19-025 | Non-cash mismatch, card (P2-01) | Credit card with less than the price | 1.100.000 for a 1.200.000 card, slip reference given | Same as TC-BE19-024 for the card | Integration (`deskCardSale_NonCashAmountDiffers_ConflictAndNothingCreated`) | Pending CI |
 
 ---
 

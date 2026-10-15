@@ -2,7 +2,7 @@
 
 ## 2026-10-14 - Payment at the desk (BE-19, Flow 3)
 
-Branch `feat/f3-desk-payment`. Owner: Truc. Priority: P1. Depends on BE-18 (PR #49, not merged yet; this branch is built on it). Screens F1-13 Payment Handoff and F1-14 Register and Renew. Provides the BE-19 contract FE-05 already sends.
+Branch `feat/f3-desk-payment`. Owner: Truc. Priority: P1. Depends on BE-18 (merged in PR #60; main is merged into this branch). Screens F1-13 Payment Handoff and F1-14 Register and Renew. Provides the BE-19 contract FE-05 already sends.
 
 ### Added
 - Desk sale records the money at once: `POST /api/v1/membership-cards/purchase` and `POST /api/v1/packages/registrations` (channel `RECEPTION`) by RECEPTIONIST or MANAGER accept `paymentMethod` (alias `method`, `CASH` when omitted), `referenceCode` (aliases `paymentReference`, `reference`; required except for `CASH`) and `amountReceived` (the price when omitted). A `SUCCESS` payment is created and linked, the item is `ACTIVE`, and the BE-18 receipt step `PaymentVerificationService.recordPaymentConfirmed` issues the `PAID` invoice and writes `PAYMENT_CONFIRMED`.
@@ -11,10 +11,16 @@ Branch `feat/f3-desk-payment`. Owner: Truc. Priority: P1. Depends on BE-18 (PR #
 - `PaymentService.recordDeskPayment` and `PaymentVerificationService.recordDeskPayment`; tests in `PaymentVerificationServiceImplTest` (+7), `MembershipCardServiceImplTest` (+2), `SportPackageServiceImplTest` (+2) and `PaymentVerificationIntegrationTest` (+4); test cases in `docs/tests/BE-19_test_cases.md`.
 
 ### Changed
-- A member who reads another member's payment (`GET /api/v1/payments/{id}`, `PUT /api/v1/payments/{id}/method`) or invoice (`GET /api/v1/invoices/by-payment/{paymentId}`) now gets 403 instead of 404 (acceptance criterion); four tests updated.
 - Reference validation of confirm and desk sale shares one helper; payment amount validation of online and desk payments shares one helper.
 - `docs/database/04` and `09`: desk sale rules, visibility, invoice totals rule.
 - CI fix: the desk sale integration tests expect 201 Created (the purchase and registration endpoints answer 201), and the test cleanup deletes every row of the members it created, so a failing test can no longer leave sports, packages or tiers behind for other test classes.
+
+### Review round 1
+- P1-01: `DeskSaleRollbackIntegrationTest` (SQL Server) forces the receipt step to fail after the payment and the card or registration were written (invoice save for a package and a card sale, and the PAYMENT_CONFIRMED audit write after the invoice and its line were saved) and checks that no payment, card, registration, invoice, invoice line or activity_log row is left.
+- P1-02: the 403 change for another member's payment, payment method change and invoice is reverted. No approved specification asked for it, and BE-17 and BE-18 document 404 (the resource is not revealed); the responses are 404 again and the BE-17 and BE-18 tests are restored unchanged.
+- P2-01: HTTP integration tests for a non-cash desk sale with a different amount (bank transfer with more for a package, credit card with less for a card): 409 `PAYMENT_AMOUNT_MISMATCH` and no item, payment, invoice, invoice line or activity_log row.
+- `PaymentVerificationIntegrationTest` and `DeskSaleRollbackIntegrationTest` are added to `scripts/ci/required-integration-tests.txt`, so CI fails if they do not run.
+- Merged main (final BE-18 from PR #60 and BE-10 from PR #51); the BE-19 change set is applied unchanged on top of it.
 
 ## 2026-10-14 - Receptionist verifies and confirms payments (BE-18, Flow 3)
 

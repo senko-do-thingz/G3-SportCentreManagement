@@ -5,3 +5,5 @@ com.sportify.FlywayMigrationTest
 com.sportify.identity.repository.PermissionRepositoryTest
 com.sportify.identity.repository.RoleRepositoryTest
 com.sportify.identity.repository.UserAccountRepositoryTest
+com.sportify.payment.DeskSaleRollbackIntegrationTest
+com.sportify.payment.PaymentVerificationIntegrationTest

@@ -1024,7 +1024,7 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("BE-19: a member reads their own payment and invoice; another member gets 403 for both")
+    @DisplayName("BE-19: a member reads their own payment and invoice; another member gets 404 for both (BE-17 and BE-18 contract)")
     void memberSeesOnlyOwnPaymentAndInvoice() throws Exception {
         MemberProfile owner = tx().execute(st -> newMember());
         MemberProfile other = tx().execute(st -> newMember());
@@ -1051,8 +1051,63 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.lines.length()").value(1));
         mockMvc.perform(get("/api/v1/payments/" + paymentId).with(user(otherLogin)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/v1/invoices/by-payment/" + paymentId).with(user(otherLogin)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound());
+    }
+
+    /** No row of a refused desk sale exists: item, payment, invoice, invoice line or activity log. */
+    private void assertNoDeskSaleRows(MemberProfile member, UserAccount receptionist) {
+        Long memberId = member.getId();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM sport_package_registration WHERE member_id = ?",
+                Integer.class, memberId)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM member_card WHERE member_id = ?",
+                Integer.class, memberId)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM payment WHERE member_id = ?",
+                Integer.class, memberId)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM invoice WHERE member_id = ?",
+                Integer.class, memberId)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM invoice_line WHERE invoice_id IN "
+                + "(SELECT id FROM invoice WHERE member_id = ?)", Integer.class, memberId)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM activity_log WHERE actor_user_id = ?",
+                Integer.class, receptionist.getId())).isZero();
+    }
+
+    @Test
+    @DisplayName("BE-19: desk package sale by bank transfer with more than the price answers 409 and creates nothing")
+    void deskPackageSale_NonCashAmountDiffers_ConflictAndNothingCreated() throws Exception {
+        MemberProfile member = tx().execute(st -> newMember());
+        Long packageId = newPackage();
+        UserAccount receptionist = tx().execute(st -> newUser("RECEPTIONIST"));
+
+        mockMvc.perform(post("/api/v1/packages/registrations")
+                        .with(user(new CustomUserDetails(receptionist)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":" + member.getId() + ",\"packageId\":" + packageId
+                                + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"BANK_TRANSFER\""
+                                + ",\"paymentReference\":\"FT-BE19-MISMATCH\",\"amountReceived\":450000}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PAYMENT_AMOUNT_MISMATCH"));
+
+        assertNoDeskSaleRows(member, receptionist);
+    }
+
+    @Test
+    @DisplayName("BE-19: desk card sale by credit card with less than the price answers 409 and creates nothing")
+    void deskCardSale_NonCashAmountDiffers_ConflictAndNothingCreated() throws Exception {
+        MemberProfile member = tx().execute(st -> newMember());
+        Long tierId = newTier();
+        UserAccount receptionist = tx().execute(st -> newUser("RECEPTIONIST"));
+
+        mockMvc.perform(post("/api/v1/membership-cards/purchase")
+                        .with(user(new CustomUserDetails(receptionist)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":" + member.getId() + ",\"tierId\":" + tierId
+                                + ",\"paymentMethod\":\"CREDIT_CARD\",\"referenceCode\":\"SLIP-BE19-1\""
+                                + ",\"amountReceived\":1100000}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PAYMENT_AMOUNT_MISMATCH"));
+
+        assertNoDeskSaleRows(member, receptionist);
     }
 }
