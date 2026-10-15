@@ -4,6 +4,7 @@ import com.sportify.AbstractIntegrationTest;
 import com.sportify.catalog.dto.*;
 import com.sportify.catalog.repository.CheckInRepository;
 import com.sportify.catalog.service.FrontDeskQueueService;
+import com.sportify.catalog.service.FrontDeskMemberOverviewService;
 import com.sportify.identity.dto.*;
 import com.sportify.identity.service.FrontDeskMemberService;
 import com.sportify.identity.service.MemberSearchService;
@@ -42,6 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class MemberProfileRepositoryIntegrationTest extends AbstractIntegrationTest {
     @Autowired private MemberSearchService search;
     @Autowired private FrontDeskMemberService members;
+    @Autowired private FrontDeskMemberOverviewService overviews;
     @Autowired private FrontDeskQueueService queues;
     @Autowired private CheckInRepository checkIns;
     @Autowired private JdbcTemplate jdbc;
@@ -207,7 +209,7 @@ class MemberProfileRepositoryIntegrationTest extends AbstractIntegrationTest {
         entityManager.clear();
         var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
         statistics.clear();
-        var overview = members.overview(memberId);
+        var overview = overviews.overview(memberId);
         assertEquals(current, overview.currentCard().id());
         assertEquals("GOLD", overview.profile().getCardTier());
         assertEquals(pending, overview.pendingCardRequest().id());
@@ -220,7 +222,7 @@ class MemberProfileRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void overview_whenNoRelatedRows_returnsNullCardsAndEmptyLists() {
-        var result = members.overview(memberId);
+        var result = overviews.overview(memberId);
         assertNull(result.currentCard());
         assertNull(result.pendingCardRequest());
         assertTrue(result.activePackageRegistrations().isEmpty());
@@ -257,7 +259,7 @@ class MemberProfileRepositoryIntegrationTest extends AbstractIntegrationTest {
         String stored = jdbc.queryForObject("SELECT password_hash FROM user_account WHERE id = ?", String.class, response.userId());
         assertNotEquals(response.temporaryPassword(), stored);
         assertTrue(encoder.matches(response.temporaryPassword(), stored));
-        assertEquals("New Member", members.overview(response.userId()).profile().getFullName());
+        assertEquals("New Member", overviews.overview(response.userId()).profile().getFullName());
     }
 
     @Test

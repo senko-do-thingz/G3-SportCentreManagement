@@ -3,7 +3,6 @@ package com.sportify.identity.controller;
 import com.sportify.identity.dto.MemberSearchResponse;
 import com.sportify.identity.dto.MemberCreateRequest;
 import com.sportify.identity.dto.MemberCreateResponse;
-import com.sportify.identity.dto.MemberOverviewResponse;
 import com.sportify.identity.service.FrontDeskMemberService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -30,12 +29,6 @@ public class MemberController {
             @org.springframework.data.web.PageableDefault(size = 20, sort = "id") Pageable pageable) {
         
         return memberSearchService.searchMembers(query, pageable);
-    }
-
-    @GetMapping("/{id}/overview")
-    @PreAuthorize("hasAnyRole('MANAGER', 'RECEPTIONIST')")
-    public MemberOverviewResponse overview(@PathVariable Long id) {
-        return frontDeskMemberService.overview(id);
     }
 
     @PostMapping

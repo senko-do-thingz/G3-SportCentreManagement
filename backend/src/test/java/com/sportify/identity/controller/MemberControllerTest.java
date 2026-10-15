@@ -42,7 +42,6 @@ class MemberControllerTest {
     @Test
     void endpoints_whenUnauthenticated_return401() throws Exception {
         mvc.perform(get("/api/v1/members")).andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/v1/members/7/overview")).andExpect(status().isUnauthorized());
         mvc.perform(post("/api/v1/members").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isUnauthorized());
         verifyNoInteractions(search, members);
@@ -52,7 +51,6 @@ class MemberControllerTest {
     @ValueSource(strings = {"MEMBER", "COACH"})
     void endpoints_whenRoleIsNotFrontDesk_return403(String role) throws Exception {
         mvc.perform(get("/api/v1/members").with(user("user").roles(role))).andExpect(status().isForbidden());
-        mvc.perform(get("/api/v1/members/7/overview").with(user("user").roles(role))).andExpect(status().isForbidden());
         mvc.perform(post("/api/v1/members").with(user("user").roles(role))
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isForbidden());
@@ -63,18 +61,10 @@ class MemberControllerTest {
     @ValueSource(strings = {"MANAGER", "RECEPTIONIST"})
     void endpoints_whenRoleIsFrontDesk_returnSuccessWithoutHashes(String role) throws Exception {
         when(search.searchMembers(any(), any())).thenReturn(Page.empty());
-        when(members.overview(7L)).thenReturn(new MemberOverviewResponse(
-                MemberSearchResponse.builder().userId(7L).fullName("Alice").status("ACTIVE").build(),
-                null, null, List.of(), List.of(), List.of()));
         when(members.create(any())).thenReturn(new MemberCreateResponse(7L, "MEM-0007", "Alice Smith",
                 "0901234567", "alice@example.com", "ACTIVE", "OneTime123!"));
         mvc.perform(get("/api/v1/members").with(user("desk").roles(role)).param("query", "Alice"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content").isArray());
-        mvc.perform(get("/api/v1/members/7/overview").with(user("desk").roles(role)))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.profile.fullName").value("Alice"))
-                .andExpect(jsonPath("$.profile.passwordHash").doesNotExist())
-                .andExpect(jsonPath("$.temporaryPassword").doesNotExist())
-                .andExpect(jsonPath("$.recentCheckIns").isArray());
         mvc.perform(post("/api/v1/members").with(user("desk").roles(role))
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isCreated()).andExpect(header().string("Cache-Control", "no-store"))
@@ -118,13 +108,6 @@ class MemberControllerTest {
         mvc.perform(post("/api/v1/members").with(user("desk").roles("MANAGER"))
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.status").value(409));
-    }
-
-    @Test
-    void overview_whenUnknownMember_returns404() throws Exception {
-        when(members.overview(99L)).thenThrow(new ResourceNotFoundException("Member not found"));
-        mvc.perform(get("/api/v1/members/99/overview").with(user("desk").roles("RECEPTIONIST")))
-                .andExpect(status().isNotFound()).andExpect(jsonPath("$.message").value("Member not found"));
     }
 
     @Test

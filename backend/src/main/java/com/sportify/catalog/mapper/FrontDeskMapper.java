@@ -1,9 +1,17 @@
 package com.sportify.catalog.mapper;
 
-import com.sportify.catalog.dto.*;
-import com.sportify.catalog.entity.*;
+import com.sportify.catalog.dto.FrontDeskCardResponse;
+import com.sportify.catalog.dto.FrontDeskCheckInResponse;
+import com.sportify.catalog.dto.FrontDeskPackageResponse;
+import com.sportify.catalog.dto.MemberOverviewResponse;
+import com.sportify.identity.dto.MemberSearchResponse;
+import com.sportify.catalog.entity.CheckIn;
+import com.sportify.catalog.entity.MemberCard;
+import com.sportify.catalog.entity.SportPackageRegistration;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+
+import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface FrontDeskMapper {
@@ -26,4 +34,8 @@ public interface FrontDeskMapper {
     FrontDeskPackageResponse toPackage(SportPackageRegistration registration);
 
     FrontDeskCheckInResponse toCheckIn(CheckIn checkIn);
+
+    MemberOverviewResponse toOverview(MemberSearchResponse profile, FrontDeskCardResponse currentCard,
+            FrontDeskCardResponse pendingCardRequest, List<FrontDeskPackageResponse> activePackageRegistrations,
+            List<FrontDeskPackageResponse> pendingPackageRegistrations, List<FrontDeskCheckInResponse> recentCheckIns);
 }

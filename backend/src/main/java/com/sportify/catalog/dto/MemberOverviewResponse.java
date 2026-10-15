@@ -1,8 +1,6 @@
-package com.sportify.identity.dto;
+package com.sportify.catalog.dto;
 
-import com.sportify.catalog.dto.FrontDeskCardResponse;
-import com.sportify.catalog.dto.FrontDeskPackageResponse;
-import com.sportify.catalog.dto.FrontDeskCheckInResponse;
+import com.sportify.identity.dto.MemberSearchResponse;
 import java.util.List;
 
 public record MemberOverviewResponse(MemberSearchResponse profile, FrontDeskCardResponse currentCard,
