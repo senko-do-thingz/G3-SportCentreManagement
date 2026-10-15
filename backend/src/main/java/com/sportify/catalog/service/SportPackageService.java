@@ -21,6 +21,20 @@ public interface SportPackageService {
     PackageRegistrationResponse activateRegistration(Long registrationId, UserAccount actor);
     PackageRegistrationResponse activateRegistration(Long registrationId, UserAccount actor, PaymentMethod actualMethod);
     PackageRegistrationResponse cancelRegistration(Long registrationId, UserAccount actor);
+
+    /**
+     * Same as {@link #cancelRegistration(Long, UserAccount)}, but stores {@code reason} as the registration
+     * cancel reason when it is not blank (used when the front desk marks the payment FAILED).
+     */
+    PackageRegistrationResponse cancelRegistration(Long registrationId, UserAccount actor, String reason);
+
+    /**
+     * Activation step only: PENDING_PAYMENT -> ACTIVE and the payment SUCCESS, without the invoice and the
+     * PAYMENT_CONFIRMED log. Must run inside a transaction whose caller then calls
+     * PaymentVerificationService.recordPaymentConfirmed. {@link #activateRegistration} does both.
+     */
+    PackageRegistrationResponse activateRegistrationForPaymentConfirmation(Long registrationId, UserAccount actor,
+                                                                           PaymentMethod actualMethod);
     List<PackageRegistrationResponse> getMyRegistrations(UserAccount currentUser);
     List<PackageRegistrationResponse> getMemberRegistrations(Long memberId);
 }

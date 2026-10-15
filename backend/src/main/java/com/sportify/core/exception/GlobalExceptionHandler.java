@@ -72,7 +72,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<Map<String, Object>> handleConflictException(ConflictException ex) {
-        return buildErrorResponse(HttpStatus.CONFLICT, ex.getMessage(), ex.getDetails());
+        ResponseEntity<Map<String, Object>> response =
+                buildErrorResponse(HttpStatus.CONFLICT, ex.getMessage(), ex.getDetails());
+        if (ex.getCode() != null && response.getBody() != null) {
+            response.getBody().put("code", ex.getCode());
+        }
+        return response;
     }
 
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)

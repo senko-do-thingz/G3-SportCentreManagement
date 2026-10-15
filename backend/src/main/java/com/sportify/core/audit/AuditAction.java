@@ -42,4 +42,8 @@ public final class AuditAction {
     public static final String SESSION_CREATED = "SESSION_CREATED";
     public static final String SESSION_UPDATED = "SESSION_UPDATED";
     public static final String SESSION_CANCELLED = "SESSION_CANCELLED";
+
+    public static final String PAYMENT_CONFIRMED = "PAYMENT_CONFIRMED";
+    public static final String PAYMENT_FAILED = "PAYMENT_FAILED";
+    public static final String PAYMENT_AMOUNT_MISMATCH = "PAYMENT_AMOUNT_MISMATCH";
 }

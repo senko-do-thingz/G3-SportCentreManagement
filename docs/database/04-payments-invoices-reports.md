@@ -20,7 +20,8 @@ erDiagram
 
 Implemented in migration V14 (payment, invoice, invoice_line, payment_id on member_card,
 sport_package_registration and refund_request). `refund_request` is from V10/V11.
-No JPA entity maps `payment`, `invoice` or `invoice_line` yet.
+JPA entities `Payment`, `Invoice` and `InvoiceLine` map these tables (BE-16). V21 made `payment_time` nullable
+and added `confirmed_by_user_id` (BE-17).
 
 ## Design Decisions
 
@@ -30,7 +31,16 @@ No JPA entity maps `payment`, `invoice` or `invoice_line` yet.
 - **Refund Request Workflow (F3-07, F3-09).** Receptionist or member files a request, the Center Manager approves or rejects it with a note, approved refunds become `COMPLETED` on payout, and the payment becomes `REFUNDED`.
 - **Invoice = snapshot.** An invoice is issued for a successful payment. `invoice.payment_id` is indexed but not unique.
 - **Revenue is computed, not stored.** Reports read `vw_paid_payment` (planned view) filtered by `payment_time`. `PENDING` and `FAILED` rows stay in the ledger but are not revenue.
-- **Not in V14 (left out on purpose or later):** who recorded or confirmed a payment, amount received (cash change), failure reason. Add them in a later migration if F3-05 needs them.
+- **Front desk verification (BE-18).** `GET /api/v1/payments` lists payment requests for RECEPTIONIST and MANAGER, `PENDING` first (oldest first), then the rest newest first; filters `status`, `method`, `search` (member name, member code, payment code, reference code; `query` is accepted as another name), `from` and `to` (inclusive dates on `created_at`), `page`, `size` (1 to 100, default 20).
+- **Confirm (F3-05, F3-06).** `PUT /api/v1/payments/{id}/confirm` with `method`, `referenceCode` (required for every method except `CASH`, otherwise 400), `amountReceived`, `note`. In one transaction that starts by locking the payment row (`PaymentRepository.findByIdForUpdate`, PESSIMISTIC_WRITE): `reference_code` is stored, the linked card (`MembershipCardService.activateCard`) or registration (`SportPackageService.activateRegistration`) becomes `ACTIVE` with dates recomputed from the confirmation day, the payment becomes `SUCCESS` with `payment_time` now and `confirmed_by_user_id`, then `PaymentVerificationService.recordPaymentConfirmed` issues an `invoice` (`PAID`) with one `invoice_line` and writes `activity_log` `PAYMENT_CONFIRMED`. The receipt is read with `GET /api/v1/invoices/by-payment/{paymentId}` (staff, or the member who owns the payment).
+- **Invoice amounts.** The line is written at the price before discount, from `PaymentItemResolver`, using only values stored when the payment request was made, never the current catalog price: `sport_package_registration.original_price` for a package; for a card, `member_card.price_paid` plus, for an upgrade (`upgrade_request = 1`), the upgrade credit = the `price_paid` of the replaced card (`replaces_card_id`) and of every card it replaced in turn, which is the base BE-17 subtracted from the tier price. A new card or renewal has no discount. When an upgrade's chain cannot be read (no `replaces_card_id`, a missing price, a chain longer than the BE-17 limit), no credit is claimed. A tier or package price edited after the request changes nothing on the invoice. `subtotal_amount` is that price, `discount_amount` is the card discount (package) or the upgrade credit (card upgrade, the line description says so), `tax_amount` is 0 and `total_amount` equals `payment.amount`. If `subtotal - discount` does not equal `payment.amount` (the item's `paid_amount` or `price_paid` differs from the payment: corrupted data), the API answers 409 `PAYMENT_ITEM_AMOUNT_MISMATCH` and nothing is written.
+- **Counter activation (FE-05).** `PUT /api/v1/membership-cards/{id}/activate` and `PUT /api/v1/packages/registrations/{id}/activate` keep their request (`paymentMethod` only, no reference needed; the amount received is the payment amount) and call the same `recordPaymentConfirmed` after activation, so a payment confirmed through either path has exactly one invoice and one `PAYMENT_CONFIRMED` row.
+- **Amount mismatch (S3-Mismatch).** When `amountReceived` differs from `payment.amount` the API answers 409 with `code: PAYMENT_AMOUNT_MISMATCH`. The payment stays `PENDING`; a note with both amounts, the method, the reference and the staff user id is appended to `payment.notes` and an `activity_log` row `PAYMENT_AMOUNT_MISMATCH` is written (details: `amount`, `amountReceived`, `method`, `referenceCode`, `note`), both in the transaction that answers 409 and is committed. No activation, no invoice, no `PAYMENT_CONFIRMED` row. The same payment can be confirmed later with the right amount.
+- **Double confirmation.** Confirm, fail and the card and package activate and cancel endpoints all lock the payment row before the card or registration (lock order rule in docs/database/09), so a second call waits for the first to commit and then sees the current state: confirm and fail answer 409 `PAYMENT_NOT_PENDING`, activate and cancel answer 400 because the item is no longer PENDING_PAYMENT. `payment.version` stays as a backstop for a write that skips the lock: a failed version check inside confirm or fail answers 409 `PAYMENT_CONCURRENT_UPDATE`. At most one invoice is issued per payment (`INVOICE_ALREADY_ISSUED` otherwise).
+- **Fail.** `PUT /api/v1/payments/{id}/fail` with `reason` (required, up to 255 characters): the linked card or registration request is cancelled (`CANCELLED`, the reason is also stored in `sport_package_registration.cancel_reason`), the payment becomes `FAILED` with the reason appended to `notes`, and `activity_log` gets `PAYMENT_FAILED`. Cancelling the item on fail is pending team confirmation. The member requests the item again, which creates a new payment row.
+- **Not stored:** the amount received is not a column. A confirmed payment always received exactly `amount`, so `PAYMENT_CONFIRMED` details hold the amount, method, reference, item and invoice number; a different amount received is kept only in the `PAYMENT_AMOUNT_MISMATCH` details.
+- **One pricing rule.** `PaymentItemResolver` gives the item name, original price and discount for `GET /api/v1/payments/{id}`, `GET /api/v1/payments` and the invoice: original price = registration `original_price`, or card `price_paid` + upgrade credit (see Invoice amounts); discount = original price - registration `paid_amount` or card `price_paid`, never below zero.
+- **List date filters.** `from` and `to` are inclusive days on `payment.created_at`. Dates outside 0001-01-01 to 9999-12-31 (the `datetime2` range) answer 400; `to = 9999-12-31` leaves the upper bound open instead of sending an out of range value.
 
 ## Tables
 
@@ -44,10 +54,11 @@ No JPA entity maps `payment`, `invoice` or `invoice_line` yet.
 | amount | DECIMAL(12,2) | No | CHECK > 0 | Amount to pay |
 | payment_method | VARCHAR(30) | No | CHECK | `CASH`, `CREDIT_CARD`, `BANK_TRANSFER`, `MOMO`, `VNPAY`, `ZALOPAY` |
 | payment_status | VARCHAR(20) | No | CHECK | `PENDING`, `SUCCESS`, `FAILED`, `REFUNDED` |
-| reference_code | VARCHAR(100) | Yes | | Bank or e-wallet transaction reference |
-| notes | NVARCHAR(500) | Yes | | |
-| payment_time | DATETIME2(0) | No | SYSDATETIME() | Payment time, drives the revenue period |
-| version | INT | No | 0 | Optimistic lock |
+| reference_code | VARCHAR(100) | Yes | | Bank, card slip or e-wallet reference, recorded at confirmation (BE-18) |
+| notes | NVARCHAR(500) | Yes | | Staff notes joined with " \| ", oldest dropped first; holds mismatch and failure notes |
+| payment_time | DATETIME2(0) | Yes (V21) | | Set when the payment becomes `SUCCESS` (`ck_payment_success_time`), drives the revenue period |
+| confirmed_by_user_id | BIGINT | Yes (V21) | FK -> user_account.id | Staff user who confirmed the payment |
+| version | INT | No | 0 | Optimistic lock, stops a double confirmation |
 | created_at, updated_at | DATETIME2(0) | No | SYSDATETIME() | Audit |
 
 Indexes: `ix_payment_member_id (member_id)`, `ix_payment_payment_time (payment_time)`, `ix_payment_status (payment_status)`.
