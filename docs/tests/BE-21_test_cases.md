@@ -132,7 +132,7 @@ Before mutation, the resolved completion amount must be non-null, positive and h
 
 ## 8. Review Round 1 (PR #58)
 
-Historical review: session-first locking and atomic seat updates replaced an unsafe counter write; payment ownership checks reject mixed items; the upcoming-booking query includes the check-in filter. V24 is unchanged in this review. Deployment state of retained databases is not verified.
+Historical review: session-first locking and atomic seat updates replaced an unsafe counter write; payment ownership checks reject mixed items; the upcoming-booking query includes the check-in filter. V27 preserves the original migration SQL after renumbering. Deployment state of retained databases is not verified.
 
 Lock order of completion: payment, refund_request, class_session rows in ascending id order, their booking rows, sport_package_registration.
 

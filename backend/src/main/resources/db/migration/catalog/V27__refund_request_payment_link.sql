@@ -1,10 +1,10 @@
 -- ==========================================
--- V24: BE-21 refunds linked to payments (F3-07, F3-09 refund part)
+-- V27: BE-21 refunds linked to payments (F3-07, F3-09 refund part)
 -- One live refund per payment: a payment can have at most one refund request that is
 -- PENDING, APPROVED or COMPLETED. A REJECTED request does not count, so the member may ask again.
 -- The service checks this first and answers 409 PAYMENT_ALREADY_REFUNDED; this index is the
 -- backstop for two requests that race (DataIntegrityViolationException, also 409).
--- V23 is used by feat/f2-sessions-schedule, so this migration starts at V24.
+-- Renumbered from V24 because main already contained V26.
 -- ==========================================
 
 -- Step 1: guard against existing duplicates before the unique index is created

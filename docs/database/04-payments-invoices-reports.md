@@ -131,7 +131,7 @@ Front desk refund filing and Manager review/approval workflow (F3-07, F3-09).
 |---|---|---|---|---|
 | id | BIGINT | No | PK, IDENTITY | |
 | refund_code | NVARCHAR(30) | No | UQ | `REF-1000` |
-| payment_id | BIGINT | Yes | FK -> payment.id, UQ filtered (V24) | Original payment (added in V14, set on every new refund since BE-21). `ux_refund_request_payment_live`: one row per payment with status `PENDING`, `APPROVED` or `COMPLETED` |
+| payment_id | BIGINT | Yes | FK -> payment.id, UQ filtered (V27) | Original payment (added in V14, set on every new refund since BE-21). `ux_refund_request_payment_live`: one row per payment with status `PENDING`, `APPROVED` or `COMPLETED` |
 | package_registration_id | BIGINT | No | FK -> sport_package_registration.id | Package being refunded |
 | member_id | BIGINT | No | FK -> member_profile.user_id | Member receiving refund |
 | amount_requested | DECIMAL(14,2) | No | CHECK > 0 | Amount requested |

@@ -8,7 +8,7 @@ Branch `feat/f3-confirm-payment`, based on `main`. Owner: Truc. Priority: P2. De
 - `GET /api/v1/refunds/quote?registrationId=` (owner MEMBER, RECEPTIONIST, MANAGER): suggested amount = paid amount * unused sessions / total sessions (half up, 2 decimals, never above the payment amount). Unused sessions = remaining sessions + upcoming CONFIRMED bookings of the registration without an allowed check-in. Every session used gives 0.00.
 - `POST /api/v1/refunds` accepts an optional `amountRequested` (default: the quote), validated above 0, at most 2 decimals and not above the payment amount.
 - `PaymentRefundService.markRefunded`: payment SUCCESS -> REFUNDED with a note, PAID or ISSUED invoices -> REFUNDED. 409 codes `PAYMENT_ALREADY_REFUNDED` and `PAYMENT_NOT_REFUNDABLE`.
-- Migration `V24__refund_request_payment_link.sql`: filtered unique index `ux_refund_request_payment_live` (one PENDING, APPROVED or COMPLETED refund per payment) with a duplicate guard, and an index on `package_registration_id`.
+- Migration `V27__refund_request_payment_link.sql`: filtered unique index `ux_refund_request_payment_live` (one PENDING, APPROVED or COMPLETED refund per payment) with a duplicate guard, and an index on `package_registration_id`.
 - Audit action `REFUND_COMPLETED`; `RefundResponse` gains `paymentId`, `paymentCode` and, on complete, `cancelledBookings`.
 - Tests: refund service and payment service unit tests, refund MockMvc validation tests and SQL Server integration regressions; test cases in `docs/tests/BE-21_test_cases.md`.
 
@@ -29,12 +29,12 @@ Branch `feat/f3-confirm-payment`, based on `main`. Owner: Truc. Priority: P2. De
 - Completion locks payment, refund, sessions in ascending id order, bookings, then registration; it re-reads bookings under the session locks and uses conditional cancellation plus atomic seat release. Changed bookings return 409 `REFUND_BOOKINGS_CHANGED` and roll back.
 - Quote, submit, approve and complete check payment ownership and that no card or invoice line bills another item; mismatches return 409 `PAYMENT_REGISTRATION_MISMATCH`.
 - Upcoming bookings and their ALLOWED check-in filter are read in one set-based query.
-- Merge order: BE-21 with V24 -> BE-22 with V25 (separate PR) -> PR #61 with V26; Flyway out-of-order is disabled.
+- BE-21 (V27) is merged before BE-22 (V28); PR #61 (V26) is already on main. Flyway out-of-order is disabled.
 
 ### Known limitations
 - Check-in does not take the session lock, so a check-in in flight during refund completion can still record ALLOWED on a booking that completion cancels; tracked as a follow-up.
 - A partial refund marks the whole payment and its invoices REFUNDED and blocks a second refund; legacy NULL-payment refunds are not backfilled.
-- V24 aborts if duplicate live refunds already exist; repeating completion returns 400.
+- V27 aborts if duplicate live refunds already exist; repeating completion returns 400.
 
 ## 2026-10-15 - My payments and receipts (BE-20, Flow 3)
 
