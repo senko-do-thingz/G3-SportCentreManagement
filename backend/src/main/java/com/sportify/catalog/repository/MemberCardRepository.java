@@ -21,6 +21,9 @@ public interface MemberCardRepository extends JpaRepository<MemberCard, Long> {
 
     Optional<MemberCard> findByPaymentId(Long paymentId);
 
+    /** True when a membership card is paid by this payment (BE-21: such a payment is not a package payment). */
+    boolean existsByPaymentId(Long paymentId);
+
     /**
      * The payment id of a card, read as a single value so that no card entity is loaded before the payment row
      * is locked (lock order: payment first, then the card). Empty when the card does not exist or has no payment.

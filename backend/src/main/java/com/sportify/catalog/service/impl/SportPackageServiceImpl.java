@@ -28,6 +28,7 @@ import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.UserRepository;
+import com.sportify.payment.entity.Invoice;
 import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.service.PaymentService;
@@ -271,9 +272,20 @@ public class SportPackageServiceImpl implements SportPackageService {
             Payment payment = paymentService.createPendingPayment(member, paidAmount, request.getPaymentMethod());
             registration.setPayment(payment);
         }
+        // BE-19: a desk sale records the money at once (SUCCESS payment, then the invoice). Nothing to pay: no payment.
+        boolean paidAtDesk = initialStatus == PackageRegistrationStatus.ACTIVE && paidAmount.signum() > 0;
+        if (paidAtDesk) {
+            registration.setPayment(paymentVerificationService.getObject().recordDeskPayment(member, paidAmount,
+                    request.getPaymentMethod(), request.getReferenceCode(), request.getAmountReceived(), actor));
+        }
 
         registration = registrationRepository.save(registration);
-        return mapToRegistrationResponse(registration);
+        PackageRegistrationResponse response = mapToRegistrationResponse(registration);
+        if (paidAtDesk) {
+            withInvoice(response, paymentVerificationService.getObject()
+                    .recordPaymentConfirmed(registration.getPayment().getId(), actor, null));
+        }
+        return response;
     }
 
     @Override
@@ -286,11 +298,13 @@ public class SportPackageServiceImpl implements SportPackageService {
     @Transactional
     public PackageRegistrationResponse activateRegistration(Long registrationId, UserAccount actor, PaymentMethod actualMethod) {
         SportPackageRegistration registration = activatePending(registrationId, actor, actualMethod);
+        PackageRegistrationResponse response = mapToRegistrationResponse(registration);
         if (registration.getPayment() != null) {
             // Same receipt as PUT /payments/{id}/confirm: one PAID invoice and one PAYMENT_CONFIRMED row.
-            paymentVerificationService.getObject().recordPaymentConfirmed(registration.getPayment().getId(), actor, null);
+            withInvoice(response, paymentVerificationService.getObject()
+                    .recordPaymentConfirmed(registration.getPayment().getId(), actor, null));
         }
-        return mapToRegistrationResponse(registration);
+        return response;
     }
 
     @Override
@@ -442,6 +456,15 @@ public class SportPackageServiceImpl implements SportPackageService {
      */
     private void lockLinkedPayment(Long registrationId) {
         registrationRepository.findPaymentIdById(registrationId).ifPresent(paymentService::lockPayment);
+    }
+
+    /** Adds the receipt to the response so the desk screen can open it (F1-13 State After Payment). */
+    private static PackageRegistrationResponse withInvoice(PackageRegistrationResponse response, Invoice invoice) {
+        if (invoice != null) {
+            response.setInvoiceId(invoice.getId());
+            response.setInvoiceNumber(invoice.getInvoiceNumber());
+        }
+        return response;
     }
 
     private static String truncate(String value, int max) {
