@@ -8,7 +8,7 @@ import com.sportify.catalog.mapper.FrontDeskMapper;
 import com.sportify.catalog.repository.MemberCardRepository;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.FrontDeskQueueService;
-import com.sportify.core.common.FrontDeskPaging;
+import com.sportify.catalog.service.FrontDeskQueuePaging;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,12 +25,12 @@ public class FrontDeskQueueServiceImpl implements FrontDeskQueueService {
 
     @Override
     public Page<FrontDeskCardResponse> pendingCards(Pageable pageable) {
-        return cards.findByStatus(CardStatus.PENDING_PAYMENT, FrontDeskPaging.queue(pageable)).map(mapper::toCard);
+        return cards.findByStatus(CardStatus.PENDING_PAYMENT, FrontDeskQueuePaging.bounded(pageable)).map(mapper::toCard);
     }
 
     @Override
     public Page<FrontDeskPackageResponse> pendingPackages(Pageable pageable) {
-        return registrations.findByStatus(PackageRegistrationStatus.PENDING_PAYMENT, FrontDeskPaging.queue(pageable))
+        return registrations.findByStatus(PackageRegistrationStatus.PENDING_PAYMENT, FrontDeskQueuePaging.bounded(pageable))
                 .map(mapper::toPackage);
     }
 }

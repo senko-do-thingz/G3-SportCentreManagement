@@ -1,7 +1,7 @@
 package com.sportify.identity.service.impl;
 
 import com.sportify.identity.dto.MemberSearchResponse;
-import com.sportify.core.common.FrontDeskPaging;
+import com.sportify.identity.service.MemberSearchPaging;
 import com.sportify.core.common.SearchUtils;
 import com.sportify.identity.mapper.MemberSearchMapper;
 import java.time.Clock;
@@ -26,7 +26,7 @@ public class MemberSearchServiceImpl implements MemberSearchService {
     @Transactional(readOnly = true)
     public Page<MemberSearchResponse> searchMembers(String query, Pageable pageable) {
         String pattern = query == null || query.isBlank() ? null : "%" + SearchUtils.escapeLike(query.trim()) + "%";
-        return memberProfileRepository.searchFrontDesk(pattern, LocalDate.now(clock), FrontDeskPaging.search(pageable))
+        return memberProfileRepository.searchFrontDesk(pattern, LocalDate.now(clock), MemberSearchPaging.bounded(pageable))
                 .map(mapper::toResponse);
     }
 }

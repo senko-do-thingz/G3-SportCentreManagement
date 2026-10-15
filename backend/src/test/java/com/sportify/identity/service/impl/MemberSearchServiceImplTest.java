@@ -1,6 +1,6 @@
 package com.sportify.identity.service.impl;
 
-import com.sportify.core.common.FrontDeskPaging;
+import com.sportify.identity.service.MemberSearchPaging;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.identity.mapper.MemberSearchMapper;
 import com.sportify.identity.repository.MemberProfileRepository;
@@ -34,7 +34,7 @@ class MemberSearchServiceImplTest {
         when(members.searchFrontDesk(any(), any(), any())).thenReturn(Page.empty());
         service().searchMembers("  A%_[\\  ", pageable);
         verify(members).searchFrontDesk(eq("%A\\%\\_\\[\\\\%"), eq(LocalDate.now(clock)),
-                eq(FrontDeskPaging.search(pageable)));
+                eq(MemberSearchPaging.bounded(pageable)));
     }
 
     @Test
