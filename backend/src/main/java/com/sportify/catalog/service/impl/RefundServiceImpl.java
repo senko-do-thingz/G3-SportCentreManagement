@@ -160,6 +160,9 @@ public class RefundServiceImpl implements RefundService {
             if (approvedAmount == null || approvedAmount.signum() <= 0) {
                 throw new BusinessRuleException("Amount approved must be greater than zero");
             }
+            if (approvedAmount.stripTrailingZeros().scale() > 2) {
+                throw new BusinessRuleException("Amount approved must have at most 2 decimal places");
+            }
             if (payment != null) {
                 requirePaymentOfRegistration(payment, refund.getPackageRegistration());
             }
@@ -167,7 +170,12 @@ public class RefundServiceImpl implements RefundService {
                 throw new BusinessRuleException("Amount approved " + approvedAmount.toPlainString()
                         + " cannot exceed the payment amount " + payment.getAmount().toPlainString());
             }
-            refund.setAmountApproved(approvedAmount);
+            BigDecimal paidAmount = refund.getPackageRegistration().getPaidAmount();
+            if (payment == null && paidAmount != null && approvedAmount.compareTo(paidAmount) > 0) {
+                throw new BusinessRuleException("Amount approved " + approvedAmount.toPlainString()
+                        + " cannot exceed the registration paid amount " + paidAmount.toPlainString());
+            }
+            refund.setAmountApproved(approvedAmount.setScale(2, RoundingMode.UNNECESSARY));
             refund.setStatus(RefundStatus.APPROVED);
 
             // Mark the package registration as REFUNDED upon refund approval
@@ -205,6 +213,12 @@ public class RefundServiceImpl implements RefundService {
         }
 
         BigDecimal amount = refund.getAmountApproved() != null ? refund.getAmountApproved() : refund.getAmountRequested();
+        if (amount == null || amount.signum() <= 0) {
+            throw new BusinessRuleException("Amount refunded must be greater than zero");
+        }
+        if (amount.stripTrailingZeros().scale() > 2) {
+            throw new BusinessRuleException("Amount refunded must have at most 2 decimal places");
+        }
         Payment payment = null;
         if (paymentId != null) {
             payment = paymentRefundService.markRefunded(paymentId, refund.getRefundCode(), amount);

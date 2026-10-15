@@ -30,6 +30,9 @@ public class PaymentRefundServiceImpl implements PaymentRefundService {
         if (paymentId == null) {
             throw new BusinessRuleException("Payment ID cannot be null");
         }
+        if (amountRefunded != null && amountRefunded.signum() <= 0) {
+            throw new BusinessRuleException("Amount refunded must be greater than zero");
+        }
         // Returns the row the caller already locked (same transaction, same persistence context).
         Payment payment = paymentRepository.findByIdForUpdate(paymentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found for id: " + paymentId));
