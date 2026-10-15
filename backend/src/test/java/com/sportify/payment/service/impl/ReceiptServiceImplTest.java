@@ -1,5 +1,9 @@
 package com.sportify.payment.service.impl;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.sportify.catalog.dto.PageResponse;
 import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.entity.SportPackage;
@@ -32,6 +36,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -300,6 +305,58 @@ class ReceiptServiceImplTest {
                 .map(InvoiceLineResponse::getLineTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
         assertThat(linesTotal.subtract(response.getDiscountAmount()).add(response.getTaxAmount()))
                 .isEqualByComparingTo(response.getTotalAmount());
+    }
+
+    @Test
+    @DisplayName("Invoice by id: a stored invoice whose totals do not add up is returned as recorded and logged as a warning")
+    void getInvoice_TotalsMismatch_ReturnedAsStoredAndLogged() {
+        Invoice broken = Invoice.builder()
+                .id(57L).invoiceNumber("INV-1003").payment(confirmedPayment).member(member)
+                .subtotalAmount(new BigDecimal("400000.00")).discountAmount(new BigDecimal("20000.00"))
+                .taxAmount(BigDecimal.ZERO).totalAmount(new BigDecimal("390000.00"))
+                .status(InvoiceStatus.PAID).build();
+        broken.addLine(InvoiceLine.builder().id(1L).itemType(InvoiceItemType.SPORT_PACKAGE).itemReferenceId(20L)
+                .description("Swimming 30 Days (REG-PKG-1020)").quantity(1)
+                .unitPrice(new BigDecimal("400000.00")).lineTotal(new BigDecimal("400000.00")).build());
+        when(invoiceRepository.findById(57L)).thenReturn(Optional.of(broken));
+
+        Logger logger = (Logger) LoggerFactory.getLogger(ReceiptServiceImpl.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            InvoiceResponse response = service.getInvoice(57L, memberUser);
+
+            assertThat(response.getTotalAmount()).isEqualByComparingTo("390000");
+            assertThat(response.getSubtotalAmount()).isEqualByComparingTo("400000");
+            assertThat(response.getDiscountAmount()).isEqualByComparingTo("20000");
+            assertThat(response.getLines()).hasSize(1);
+            assertThat(appender.list)
+                    .filteredOn(event -> event.getLevel() == Level.WARN)
+                    .singleElement()
+                    .satisfies(event -> assertThat(event.getFormattedMessage())
+                            .contains("INV-1003").contains("do not add up"));
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
+
+    @Test
+    @DisplayName("Invoice by id: totals that add up produce no warning")
+    void getInvoice_TotalsMatch_NoWarning() {
+        when(invoiceRepository.findById(55L)).thenReturn(Optional.of(invoice));
+
+        Logger logger = (Logger) LoggerFactory.getLogger(ReceiptServiceImpl.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            service.getInvoice(55L, memberUser);
+
+            assertThat(appender.list).noneMatch(event -> event.getLevel() == Level.WARN);
+        } finally {
+            logger.detachAppender(appender);
+        }
     }
 
     @Test

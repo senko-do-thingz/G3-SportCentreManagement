@@ -1024,7 +1024,7 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("BE-19: a member reads their own payment and invoice; another member gets 404 for both (BE-17 and BE-18 contract)")
+    @DisplayName("BE-19: a member reads their own payment and invoice; another member gets 404 for the payment (BE-17) and 403 for the invoice (BE-20)")
     void memberSeesOnlyOwnPaymentAndInvoice() throws Exception {
         MemberProfile owner = tx().execute(st -> newMember());
         MemberProfile other = tx().execute(st -> newMember());
@@ -1053,7 +1053,7 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/payments/" + paymentId).with(user(otherLogin)))
                 .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/v1/invoices/by-payment/" + paymentId).with(user(otherLogin)))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden());
     }
 
     /** No row of a refused desk sale exists: item, payment, invoice, invoice line or activity log. */
