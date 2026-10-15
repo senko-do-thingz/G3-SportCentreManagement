@@ -159,23 +159,6 @@ class FrontDeskMemberServiceImplTest {
     }
 
     @Test
-    void create_whenIntegrityFailureHasNoVendorEvidence_propagatesOriginalException() {
-        stubCreation();
-        var failure = new DataIntegrityViolationException("unclassified integrity failure");
-        when(users.saveAndFlush(any())).thenThrow(failure);
-        assertSame(failure, assertThrows(DataIntegrityViolationException.class, () -> service.create(request)));
-    }
-
-    @Test
-    void create_whenUniqueViolationIsInSqlExceptionChain_returnsConflict() {
-        stubCreation();
-        var batchFailure = new SQLException("batch failure");
-        batchFailure.setNextException(new SQLException("duplicate", "23000", 2601));
-        when(users.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("batch", batchFailure));
-        assertThrows(ConflictException.class, () -> service.create(request));
-    }
-
-    @Test
     void create_whenStaffUsesJwt_logsStaffIdAndMemberIdentityWithoutSecretsOrContacts() {
         var staff = UserAccount.builder().id(42L).email("staff@example.com").phone("0909999999")
                 .role(Role.builder().code("RECEPTIONIST").build()).build();

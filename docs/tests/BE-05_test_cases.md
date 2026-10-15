@@ -10,7 +10,8 @@ API examples and decisions: [Front desk API contract](../api/BE-05-front-desk.md
 | MemberSearchPagingTest | First sort wins per mapped column; id/userId aliases; repeated fields; unpaged defaults and sort; unknown fields; size cap |
 | FrontDeskQueuePagingTest | Forced oldest-first order; ignored client sort; size cap and unpaged defaults |
 | MemberSearchServiceImplTest | Trim/blank normalization; literal wildcard escaping; bounded paging; sort allowlist; MapStruct tier and status projection |
-| FrontDeskMemberServiceImplTest | Duplicate pre-checks; sequence codes; encoded passwords; unique vendor errors and nested/chained causes; unchanged propagation of other integrity errors; safe staff accountability log |
+| FrontDeskMemberServiceImplTest | Duplicate pre-checks; sequence codes; encoded passwords; unique account/profile conflict handling; unchanged propagation of other integrity errors; safe staff accountability log |
+| UniqueViolationClassifierTest | SQL Server unique error numbers; nested Hibernate/Spring causes; chained SQL exceptions; other integrity failures; absent vendor evidence; cyclic exception chains |
 | FrontDeskMemberOverviewServiceImplTest | Overview assembly with/without pending items and two check-ins; unknown member; MapStruct response composition |
 | TemporaryPasswordGeneratorTest | Twenty-character passwords with all character classes and distinct outputs across repeated calls |
 | FrontDeskQueueServiceImplTest | PENDING_PAYMENT only; immutable queue order; page cap; member/item/amount mapping |
@@ -21,6 +22,8 @@ API examples and decisions: [Front desk API contract](../api/BE-05-front-desk.md
 Paging helpers belong to identity.service and catalog.service. Creation remains in identity; overview
 aggregation, its DTO and endpoint controller belong to catalog. Tests mirror each owning package.
 The BE-05 identity implementation does not import catalog classes.
+Both paging helpers share the module-independent core.common.PagingDefaults constants (20 and 100).
+Account fixture phone values use SecureRandom, including the existing session integration fixtures.
 
 Run from backend in PowerShell:
 

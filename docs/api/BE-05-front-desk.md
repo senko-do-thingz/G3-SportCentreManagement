@@ -204,6 +204,9 @@ comes from paid_amount, preserving the request's price snapshot rather than reca
 Queues use a fetch graph for member/account and tier or package, with at most two SQL statements per
 page including count. V26 adds key-only status/created_at/id indexes for both queues. Recent check-ins
 reuse V5's ix_check_in_member(member_id, checked_in_at), which supports a backward scan for one member.
+The nonunique index implicitly appends the clustered primary key id, so for a fixed member_id that
+backward scan also provides the id DESC tie-breaker. See Microsoft's
+[index design guide](https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-index-design-guide?view=sql-server-ver16).
 No duplicate recent check-in index is added. Contains searches still require scans; existing unique email/phone/member-code indexes
 cannot make a leading-wildcard substring predicate seekable. No measured production query-cost claim
 is made without a representative SQL Server execution plan and data volume.
@@ -261,6 +264,7 @@ behavior. The MVC regression test preserves this finding; a global policy change
 
 Successful creation emits one INFO log containing the acting staff identifier, new member id and
 member code. Passwords, hashes, email addresses and phone numbers are never included in that log.
+The log runs after both writes have been flushed and before the transaction commits.
 The JWT principal uses email as its username, so the log uses staff-{userId} from that authenticated
 principal instead. A non-contact username from another security context can be recorded directly.
 

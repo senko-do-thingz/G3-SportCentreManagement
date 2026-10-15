@@ -117,5 +117,4 @@ class MemberSearchIntegrationTest extends AbstractIntegrationTest {
                         .param("query", fixtures.marker).param("sort", "id,asc", "userId,desc"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].userId").value(fixtures.memberId));
     }
-
 }
