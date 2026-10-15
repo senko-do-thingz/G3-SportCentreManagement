@@ -35,6 +35,11 @@ Branch `feat/f3-confirm-payment`. Owner: Truc. Priority: P1. Depends on BE-17 (m
 - Rebased on main after PR #40 (manager catalog, BE-03) as one commit: conflicts in `MembershipCardServiceImpl`, `SportPackageServiceImpl` and their unit tests resolved by keeping the PR #40 upgrade rules (rank based, `upgradeRequest`) and the BE-18 lock order and receipt step; the integration test tier now gets a unique `tierRank`, and `ManagerCatalogIntegrationTest` cleanup deletes the invoices that card activation now issues before their payments.
 - CI fix 2: `PaymentVerificationIntegrationTest` deletes the rows it creates after each test (the SQL Server container is shared, and its leftover sports, packages, ranked tiers and the member code MEM-0001 broke 9 catalog and member tests); its member codes now use the `BE18-MEM-` prefix.
 
+### Review round 4
+- Invoice pricing uses only values stored at request time: a card's original price is `price_paid` plus, for an upgrade, the `price_paid` of the replaced card chain (the credit BE-17 priced it with); the current tier price is no longer read, so a tier price edited after the request cannot create a discount. Packages keep their registration snapshots. Applies to the invoice, `GET /payments` and `GET /payments/{id}`.
+- `GET /payments`: `from` and `to` outside 0001-01-01 to 9999-12-31 answer 400; `to=9999-12-31` leaves the upper bound open instead of failing with 500.
+- Merged main (BE-10, PR #51): `ConflictException` keeps both the optional `code` and the optional `details`.
+
 ## 2026-10-14 - Manager Session Schedule and Coach Assignment (BE-10, Flow 2)
 
 ### Added
