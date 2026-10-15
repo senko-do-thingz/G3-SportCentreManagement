@@ -255,6 +255,9 @@ constraints remain authoritative for concurrent requests; flush-time conflicts m
 Only unique violations, identified by SQL Server error 2601 or 2627 through the exception chain,
 are translated by the creation service. Other integrity failures propagate unchanged to the existing
 global exception handler.
+That handler currently returns HTTP 409 for every raw DataIntegrityViolationException, including
+NOT NULL, foreign-key and truncation failures. Narrowing the service catch does not change that HTTP
+behavior. The MVC regression test preserves this finding; a global policy change is separate work.
 
 Successful creation emits one INFO log containing the acting staff identifier, new member id and
 member code. Passwords, hashes, email addresses and phone numbers are never included in that log.

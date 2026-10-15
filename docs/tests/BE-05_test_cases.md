@@ -14,7 +14,7 @@ API examples and decisions: [Front desk API contract](../api/BE-05-front-desk.md
 | FrontDeskMemberOverviewServiceImplTest | Overview assembly with/without pending items and two check-ins; unknown member; MapStruct response composition |
 | TemporaryPasswordGeneratorTest | Twenty-character passwords with all character classes and distinct outputs across repeated calls |
 | FrontDeskQueueServiceImplTest | PENDING_PAYMENT only; immutable queue order; page cap; member/item/amount mapping |
-| MemberControllerTest | Search/create 401; MEMBER/COACH 403; staff success; field errors; duplicate 409; Location and no-store on creation |
+| MemberControllerTest | Search/create 401; MEMBER/COACH 403; staff success; field errors; duplicate 409; raw integrity errors still mapped to 409 by the real global handler; Location and no-store on creation |
 | FrontDeskMemberOverviewControllerTest | Overview 401; MEMBER/COACH 403; staff 200 with unchanged JSON; unknown-member 404 |
 | FrontDeskQueueControllerTest | Both pending endpoints: 401, role-specific 403 and staff 200 |
 

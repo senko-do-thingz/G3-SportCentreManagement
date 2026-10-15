@@ -17,12 +17,15 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.sql.SQLException;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -119,4 +122,18 @@ class MemberControllerTest {
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.status").value(409));
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = {2601, 515, 547, 2628})
+    void create_whenRawIntegrityViolationEscapesService_globalHandlerReturns409(int errorCode) throws Exception {
+        when(members.create(any())).thenThrow(new DataIntegrityViolationException("raw integrity violation",
+                new SQLException("Constraint rejected the test account", "23000", errorCode)));
+
+        mvc.perform(post("/api/v1/members").with(user("desk").roles("MANAGER"))
+                        .contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.message").value("The request conflicts with existing data"))
+                .andExpect(jsonPath("$.timestamp").exists());
+        verify(members).create(new MemberCreateRequest("Alice Smith", "0901234567", "alice@example.com"));
+    }
 }
