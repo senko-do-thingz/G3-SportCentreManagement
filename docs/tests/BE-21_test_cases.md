@@ -4,7 +4,7 @@
 - **Task ID**: BE-21
 - **Feature Flow**: Flow 3 (Payments, Invoices, Refunds and Reports)
 - **Screens**: F3-07 Refund Requests, F3-09 refund part, S3-RefundSubmitted, S3-RefundReview, S3-RefundApproved, S3-RefundRejected, S3-RefundDone
-- **Branch**: `feat/f3-refund-payment-link` (based on `feat/f3-confirm-payment`, BE-18)
+- **Branch**: `feat/f3-refund-payment-link` (based on `feat/f3-confirm-payment`, BE-18; origin/main merged in review round 1, so the PR base should be `main`)
 - **Priority**: P2
 - **Depends on**: BE-18
 - **Objective**: Every new refund is linked to the SUCCESS payment that bought the package registration; a payment can be refunded only once (409); the amount cannot exceed the payment amount; a pro-rated quote is available; completing a refund updates payment, invoice, registration and upcoming bookings in one transaction.
@@ -30,6 +30,7 @@ Answer `RefundQuoteResponse`:
 | Member who does not own the registration, or COACH | 403 |
 | Unknown registration | 404 |
 | No payment, or payment not SUCCESS | 409 `PAYMENT_NOT_REFUNDABLE` |
+| Payment does not pay only for this registration (another member, also pays a membership card, or an invoice line bills another item) | 409 `PAYMENT_REGISTRATION_MISMATCH` |
 | Payment REFUNDED or with a PENDING, APPROVED or COMPLETED refund | 409 `PAYMENT_ALREADY_REFUNDED` |
 | Registration not ACTIVE (and no refund on the payment) | 400 |
 
@@ -55,7 +56,7 @@ One transaction: payment REFUNDED, invoices REFUNDED, registration REFUNDED, upc
 | BE21-U01 | Quote, 0 of 10 sessions used, paid 900000 | 900000.00, used 0 | Not run |
 | BE21-U02 | Quote, 5 of 10 used | 450000.00, used 5 | Not run |
 | BE21-U03 | Quote, all 10 used | 0.00, used 10 | Not run |
-| BE21-U04 | Quote, remaining 3, two upcoming bookings, one checked in | upcoming 1, unused 4, 360000.00 | Not run |
+| BE21-U04 | Quote, remaining 3, the query returns one upcoming booking (checked-in ones are filtered in SQL, see BE21-I07) | upcoming 1, unused 4, 360000.00 | Not run |
 | BE21-U05 | Quote, 1 of 3 unused, paid 100000 | 33333.33 (half up) | Not run |
 | BE21-U06 | Quote, paid amount above payment amount | Capped at 900000.00 | Not run |
 | BE21-U07 | Quote, other member | 403 | Not run |
@@ -71,7 +72,7 @@ One transaction: payment REFUNDED, invoices REFUNDED, registration REFUNDED, upc
 | BE21-U17 | Submit, all sessions used | 400 | Not run |
 | BE21-U18 | Review, approve above the payment | 400 | Not run |
 | BE21-U19 | Review, approve | Payment locked, then refund locked; registration REFUNDED; approved = requested | Not run |
-| BE21-U20 | Complete | markRefunded called, registration REFUNDED, upcoming booking CANCELLED by the actor with reason, seat 5 to 4, sessions not returned, REFUND_COMPLETED logged, order payment lock, refund lock, payment update, booking update | Not run |
+| BE21-U20 | Complete | markRefunded called, registration REFUNDED, upcoming booking cancelled by the actor with reason (one conditional UPDATE), one seat released atomically, sessions not returned, REFUND_COMPLETED logged with the booking id, order payment lock, refund lock, payment update, session lock, booking update, seat release | Not run |
 | BE21-U21 | Complete, registration still ACTIVE | Becomes REFUNDED with reason | Not run |
 | BE21-U22 | Complete, payment already REFUNDED | 409, refund stays APPROVED, no booking change, no log | Not run |
 | BE21-U23 | Complete, refund not APPROVED | 400, payment untouched | Not run |
@@ -128,3 +129,39 @@ One transaction: payment REFUNDED, invoices REFUNDED, registration REFUNDED, upc
 5. As manager, PUT /api/v1/refunds/{id}/review with `{"approved": true}`.
 6. As receptionist, PUT /api/v1/refunds/{id}/complete -> COMPLETED, cancelledBookings 1.
 7. GET /api/v1/payments/{paymentId} -> REFUNDED; GET /api/v1/invoices/by-payment/{paymentId} -> REFUNDED; GET /api/v1/bookings/my -> the upcoming booking is CANCELLED.
+
+## 8. Review Round 1 (PR #58)
+
+Findings verified before any change: P0-01 not confirmed (V24 has one BEGIN and one END, the same IF ... BEGIN THROW END; block as the applied V21, and V24 has never been on main or deployed, so no applied migration is touched); P1-02 confirmed (completion wrote booked_count from a value read without the session lock and locked bookings before sessions, the reverse of BE-08 and BE-10); P1-03 partly confirmed (the payment is reached through `sport_package_registration.payment_id`, but the payment member, a membership card on the same payment and the invoice lines were not checked); P2-01 confirmed (one check-in query per booking).
+
+Lock order of completion: payment, refund_request, class_session rows in ascending id order, their booking rows, sport_package_registration.
+
+### 8.1 Unit Tests - `RefundPaymentLinkTest`
+
+| ID | Test | Expected | Execution Status |
+|---|---|---|---|
+| BE21-R1-U01 | P2-01: quote with three upcoming bookings | One booking query (`findRefundableUpcomingBookings`), no other booking repository call | Not run |
+| BE21-R1-U02 | P1-02: complete with bookings on sessions 305, 301, 305 and an ACTIVE registration | Sessions locked 301 then 305; per session one cancel UPDATE then one seat release (1 and 2); registration saved last; bookings read twice (before and after the locks) | Not run |
+| BE21-R1-U03 | P1-02: a booking cancelled by its member before the session lock | Skipped on the re-read; 1 booking cancelled, 1 seat released | Not run |
+| BE21-R1-U04 | P1-02: the cancel UPDATE changes fewer rows than read (check-in in between) | 409 `REFUND_BOOKINGS_CHANGED`, no seat released, no log, refund stays APPROVED | Not run |
+| BE21-R1-U05 | P1-02: re-read shows a booking on a session that was not locked | 409 `REFUND_BOOKINGS_CHANGED`, that session not locked, nothing cancelled | Not run |
+| BE21-R1-U06 | P1-03: complete when the registration is paid by another payment | 409 `PAYMENT_REGISTRATION_MISMATCH`, payment not refunded, bookings not read | Not run |
+| BE21-R1-U07 | P1-03: quote when the payment belongs to another member | 409 `PAYMENT_REGISTRATION_MISMATCH` | Not run |
+| BE21-R1-U08 | P1-03: submit when the payment also pays a membership card | 409 `PAYMENT_REGISTRATION_MISMATCH`, nothing saved | Not run |
+| BE21-R1-U09 | P1-03: submit when an invoice line of the payment bills another item | 409 `PAYMENT_REGISTRATION_MISMATCH`, nothing saved | Not run |
+| BE21-R1-U10 | P1-03: submit checks the card link and the invoice lines with this registration id and SPORT_PACKAGE | Both checks called with payment 70 and registration 50 | Not run |
+| BE21-R1-U11 | P1-03: approve when the payment also pays a membership card | 409 `PAYMENT_REGISTRATION_MISMATCH`, registration stays ACTIVE and is not saved | Not run |
+
+`RefundServiceImplTest`: fixtures only (new repository mocks, the payment gets its member); assertions unchanged.
+
+### 8.2 Integration Tests - `RefundPaymentLinkIntegrationTest` (SQL Server, Testcontainers)
+
+| ID | Test | Expected | Execution Status |
+|---|---|---|---|
+| BE21-I05 | P1-02 regression: another transaction holds the session lock (UPDLOCK, HOLDLOCK) and takes a seat while the refund completes | The refund waits for the session lock (seen in sys.dm_exec_requests); booked_count 5 + 1 - 1 = 5; booking CANCELLED | Not run |
+| BE21-I06 | P1-02 regression: another transaction plays BE-08 cancelBooking on the same booking (session lock, booking update, seat release) while the refund completes | No deadlock and no error; refund COMPLETED with 0 cancelled bookings; booked_count 5 to 4 (released once); the booking keeps the member's cancel reason | Not run |
+| BE21-I07 | P2-01: one upcoming booking with an ALLOWED check-in and one with a DENIED check-in | Quote upcoming 1, unused 9; complete cancels only the DENIED one; its seat 3 to 2, the other seat unchanged | Not run |
+| BE21-I08 | P1-03: an extra invoice line on the payment bills a membership card | Quote and submit 409 `PAYMENT_REGISTRATION_MISMATCH`; no refund row; payment SUCCESS | Not run |
+| BE21-I09 | P1-03: the linked payment belongs to another member | Quote 409 `PAYMENT_REGISTRATION_MISMATCH` | Not run |
+
+`RefundPaymentLinkIntegrationTest` is added to `scripts/ci/required-integration-tests.txt`, so CI fails if it does not run. The migration itself is executed on SQL Server by `FlywayMigrationTest` and by every integration test class (Flyway runs at context start).

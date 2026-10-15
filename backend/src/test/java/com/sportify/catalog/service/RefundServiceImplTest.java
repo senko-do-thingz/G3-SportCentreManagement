@@ -8,7 +8,8 @@ import com.sportify.catalog.entity.RefundRequest;
 import com.sportify.catalog.entity.RefundStatus;
 import com.sportify.catalog.entity.SportPackageRegistration;
 import com.sportify.catalog.repository.BookingRepository;
-import com.sportify.catalog.repository.CheckInRepository;
+import com.sportify.catalog.repository.ClassSessionRepository;
+import com.sportify.catalog.repository.MemberCardRepository;
 import com.sportify.catalog.repository.RefundRequestRepository;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.impl.RefundServiceImpl;
@@ -21,6 +22,7 @@ import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentStatus;
+import com.sportify.payment.repository.InvoiceLineRepository;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.service.PaymentRefundService;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,8 +65,13 @@ public class RefundServiceImplTest {
     private PaymentRefundService paymentRefundService;
     @Mock
     private BookingRepository bookingRepository;
+    // BE-21 review: session locks (P1-02) and payment-to-item checks (P1-03).
     @Mock
-    private CheckInRepository checkInRepository;
+    private ClassSessionRepository sessionRepository;
+    @Mock
+    private MemberCardRepository memberCardRepository;
+    @Mock
+    private InvoiceLineRepository invoiceLineRepository;
     @Mock
     private AuditService auditService;
     @Spy
@@ -92,6 +99,7 @@ public class RefundServiceImplTest {
         successPayment = Payment.builder()
                 .id(70L)
                 .paymentCode("PAY-0070")
+                .member(memberProfile)
                 .amount(BigDecimal.valueOf(1000000.00))
                 .paymentStatus(PaymentStatus.SUCCESS)
                 .build();
@@ -118,7 +126,7 @@ public class RefundServiceImplTest {
         when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(successPayment));
         when(registrationRepository.findById(50L)).thenReturn(Optional.of(activeRegistration));
         when(refundRequestRepository.existsByPaymentIdAndStatusIn(eq(70L), anyCollection())).thenReturn(false);
-        when(bookingRepository.findUpcomingByPackageRegistration(eq(50L), any(), any(), any())).thenReturn(List.of());
+        when(bookingRepository.findRefundableUpcomingBookings(eq(50L), any(), any(), any(), any())).thenReturn(List.of());
         when(refundRequestRepository.getNextRefundCodeSequence()).thenReturn(1L);
         when(codeFormatter.formatRefundCode(1L)).thenReturn("RFD-001");
         when(refundRequestRepository.saveAndFlush(any(RefundRequest.class))).thenAnswer(i -> {

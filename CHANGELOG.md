@@ -25,6 +25,15 @@ Branch `feat/f3-refund-payment-link`, based on `feat/f3-confirm-payment` (BE-18)
 - Not verified in the authoring environment (Maven Central and the SQL Server image were blocked there). Run `mvn -B test` before merging; integration tests run in CI.
 - Existing `refund_request` rows keep `payment_id` NULL (no backfill), so the one-refund rule applies to refunds created from now on.
 
+### Review round 1 (PR #58)
+- Merged origin/main into the branch (BE-18 final, BE-19, BE-20 and BE-10 with V23); conflicts were only BE-18 files already on main, resolved to main, and the BE-21 change set was applied unchanged on top. The PR base should be `main`.
+- P0-01 (V24 extra END): not confirmed. V24 has one BEGIN and one END in the same IF ... BEGIN THROW END; form as the applied V21; it was never merged or deployed. V24 is unchanged; `FlywayMigrationTest` runs it on SQL Server in CI.
+- P1-02: refund completion now follows the BE-08 and BE-10 lock order. It locks the sessions of the upcoming bookings in ascending id order with `ClassSessionRepository.findForUpdate`, re-reads the bookings under those locks, cancels each session's bookings with one conditional UPDATE (`BookingRepository.cancelConfirmedSessionBookings`) and releases the seats with one atomic UPDATE (`ClassSessionRepository.releaseSeats`, never below 0). The registration is written after the sessions and bookings. If the bookings change between the read and the update, the call answers 409 `REFUND_BOOKINGS_CHANGED` and rolls back.
+- P1-03: quote, submit, approve and complete check that the payment pays only for the registration: it is the registration's `payment_id`, it belongs to the same member, no membership card uses it, and every invoice line of the payment bills this registration (SPORT_PACKAGE). Otherwise 409 `PAYMENT_REGISTRATION_MISMATCH`. No schema change.
+- P2-01: `BookingRepository.findRefundableUpcomingBookings` returns booking and session ids of the upcoming bookings with the ALLOWED check-in filter as NOT EXISTS, in one query; the per-booking `CheckInRepository` call is gone from the refund service.
+- Tests: `RefundPaymentLinkTest` +11 tests (R1-U01 to R1-U11, with U04 and U20 rewritten for the set-based query and the bulk updates), `RefundPaymentLinkIntegrationTest` +5 SQL Server tests (I05 to I09, including two concurrency regressions); the class is added to `scripts/ci/required-integration-tests.txt`. `RefundServiceImplTest` fixtures adapted, assertions unchanged.
+- Not executed in the authoring environment (Maven Central blocked there): counts must come from `mvn -B test` and the GitHub Actions run.
+
 ## 2026-10-15 - My payments and receipts (BE-20, Flow 3)
 
 Branch `feat/f3-my-payments-r1`, based on main (`5075010`, BE-18 from PR #60 and BE-19 from PR #62). Replaces PR #56, whose branch carried the superseded BE-18 commits. Owner: Truc. Priority: P1. Depends on BE-18. Screens F3-03, S3-PaidHistory, S3-CardReceipt, S3-MemberReceipt and S3-SingleReceipt. Provides the BE-20 endpoints FE-11 (`feat/f3-member-payments`) already calls; the response shapes match the contract FE-11 assumed.

@@ -12,6 +12,7 @@ import com.sportify.catalog.entity.TrainingFormat;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.repository.SportPackageRepository;
 import com.sportify.catalog.repository.SportRepository;
+import com.sportify.catalog.dto.RefundResponse;
 import com.sportify.catalog.service.RefundService;
 import com.sportify.catalog.test.SportTestData;
 import com.sportify.core.common.CodeFormatter;
@@ -46,6 +47,11 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -61,6 +67,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * BE-21 against a real SQL Server (Testcontainers): quote, submit with the payment link, 409 on a second refund,
  * and completion updating payment, invoice, registration and upcoming bookings in one transaction.
  * The registration is bought through the real BE-18 confirm flow, so the payment is SUCCESS with a PAID invoice.
+ * Review round 1: session lock coordination and seat counter under concurrency (P1-02), payment-to-registration
+ * checks (P1-03) and the set-based check-in filter (P2-01).
  */
 @AutoConfigureMockMvc
 class RefundPaymentLinkIntegrationTest extends AbstractIntegrationTest {
@@ -104,6 +112,8 @@ class RefundPaymentLinkIntegrationTest extends AbstractIntegrationTest {
             jdbc.update("DELETE FROM activity_log WHERE entity_type = 'REFUND_REQUEST' AND entity_id IN "
                     + "(SELECT id FROM refund_request WHERE package_registration_id IN (" + regs + "))");
             jdbc.update("DELETE FROM refund_request WHERE package_registration_id IN (" + regs + ")");
+            jdbc.update("DELETE FROM check_in WHERE booking_id IN (SELECT id FROM booking WHERE package_registration_id IN ("
+                    + regs + "))");
             jdbc.update("DELETE FROM booking WHERE package_registration_id IN (" + regs + ")");
         }
         if (!sportIds.isEmpty()) {
@@ -346,7 +356,7 @@ class RefundPaymentLinkIntegrationTest extends AbstractIntegrationTest {
         call(put("/api/v1/refunds/" + refundId + "/review").with(user(new CustomUserDetails(manager)))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"approved\":true}"), status().isOk());
 
-        // The booking update is the last write of completion; make the database refuse it.
+        // The booking update comes after the payment and invoice updates; make the database refuse it.
         jdbc.execute("CREATE TRIGGER " + FAIL_TRIGGER + " ON booking AFTER UPDATE AS "
                 + "IF EXISTS (SELECT 1 FROM inserted WHERE id = " + futureBooking + ") "
                 + "THROW 50021, 'BE21 forced booking failure', 1;");
@@ -378,5 +388,224 @@ class RefundPaymentLinkIntegrationTest extends AbstractIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"packageRegistrationId\":" + regId + ",\"reason\":\"x\",\"amountRequested\":380000.01}"),
                 status().isBadRequest());
+    }
+
+    // ---------------------------------------------------------------- review round 1 helpers
+
+    private long approvedRefund(UserAccount owner, UserAccount manager, Long regId) throws Exception {
+        JsonNode refund = call(post("/api/v1/refunds").with(user(new CustomUserDetails(owner)))
+                .contentType(MediaType.APPLICATION_JSON).content(submitBody(regId)), status().isCreated());
+        long refundId = refund.get("id").asLong();
+        call(put("/api/v1/refunds/" + refundId + "/review").with(user(new CustomUserDetails(manager)))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"approved\":true}"), status().isOk());
+        return refundId;
+    }
+
+    private void insertCheckIn(long bookingId, long memberId, long recordedBy, String result) {
+        jdbc.update("INSERT INTO check_in (member_id, booking_id, result, recorded_by) VALUES (?, ?, ?, ?)",
+                memberId, bookingId, result, recordedBy);
+    }
+
+    private int bookedCount(long sessionId) {
+        return jdbc.queryForObject("SELECT booked_count FROM class_session WHERE id = ?", Integer.class, sessionId);
+    }
+
+    /** A transaction on another thread that holds the session row lock until released, then runs its statements. */
+    private record SessionLockHolder(Future<?> done, CountDownLatch release, AtomicInteger spid) {
+    }
+
+    /**
+     * Opens a transaction that takes the class_session row lock the same way BE-08 booking, booking cancellation and
+     * BE-10 session cancellation do (UPDLOCK, HOLDLOCK, ROWLOCK, the SQL Server form of PESSIMISTIC_WRITE), keeps it
+     * until {@link SessionLockHolder#release} is counted down, then runs the given statements and commits.
+     */
+    private SessionLockHolder holdSessionLock(ExecutorService pool, long sessionId, List<String> statements)
+            throws InterruptedException {
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger spid = new AtomicInteger();
+        Future<?> done = pool.submit(() -> tx().executeWithoutResult(txStatus -> {
+            jdbc.queryForObject("SELECT id FROM class_session WITH (UPDLOCK, HOLDLOCK, ROWLOCK) WHERE id = ?",
+                    Long.class, sessionId);
+            spid.set(jdbc.queryForObject("SELECT @@SPID", Integer.class));
+            locked.countDown();
+            try {
+                if (!release.await(60, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("Session lock holder was never released");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+            for (String sql : statements) {
+                jdbc.update(sql);
+            }
+        }));
+        assertThat(locked.await(60, TimeUnit.SECONDS)).as("session lock taken").isTrue();
+        return new SessionLockHolder(done, release, spid);
+    }
+
+    /** Waits until a request of another session is blocked by the holder's session (sys.dm_exec_requests). */
+    private void awaitBlockedBy(int holderSpid, Future<?> waiter) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+        while (System.nanoTime() < deadline) {
+            Integer blocked = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM sys.dm_exec_requests WHERE blocking_session_id = ?", Integer.class, holderSpid);
+            if (blocked != null && blocked > 0) {
+                return;
+            }
+            if (waiter.isDone()) {
+                waiter.get();
+                throw new AssertionError("The refund finished without waiting for the session lock");
+            }
+            Thread.sleep(50);
+        }
+        throw new AssertionError("The refund never waited for the session lock held by session " + holderSpid);
+    }
+
+    // ---------------------------------------------------------------- P1-02 concurrency (SQL Server)
+
+    @Test
+    @DisplayName("P1-02 regression: a seat taken while a refund completes is not lost; the refund waits for the session lock")
+    void complete_ConcurrentSeatTaken_NoLostUpdate() throws Exception {
+        UserAccount owner = newMember();
+        UserAccount receptionist = newUser("RECEPTIONIST");
+        UserAccount manager = newUser("MANAGER");
+        Long[] ids = activeRegistration(owner, receptionist);
+        Long regId = ids[1];
+        long session = createSession(ids[2], LocalDate.now(clock).plusDays(4), 5);
+        long booking = insertBooking(session, owner.getId(), regId);
+        long refundId = approvedRefund(owner, manager, regId);
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            // Plays a booking of another member: it holds the session lock and takes one seat (5 -> 6).
+            SessionLockHolder holder = holdSessionLock(pool, session,
+                    List.of("UPDATE class_session SET booked_count = booked_count + 1 WHERE id = " + session));
+            Future<RefundResponse> refund = pool.submit(() -> refundService.completeRefund(refundId, receptionist));
+
+            awaitBlockedBy(holder.spid().get(), refund);
+            holder.release().countDown();
+            holder.done().get(60, TimeUnit.SECONDS);
+            RefundResponse response = refund.get(60, TimeUnit.SECONDS);
+
+            assertThat(response.getStatus().name()).isEqualTo("COMPLETED");
+            assertThat(response.getCancelledBookings()).isEqualTo(1);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        // 5 seats + 1 taken by the other booking - 1 released by the refund.
+        assertThat(bookedCount(session)).isEqualTo(5);
+        assertThat(dbValue("booking", booking, "status")).isEqualTo("CANCELLED");
+    }
+
+    @Test
+    @DisplayName("P1-02 regression: a member cancelling the same booking while a refund completes neither deadlocks nor releases the seat twice")
+    void complete_ConcurrentMemberCancel_NoDeadlockNoDoubleRelease() throws Exception {
+        UserAccount owner = newMember();
+        UserAccount receptionist = newUser("RECEPTIONIST");
+        UserAccount manager = newUser("MANAGER");
+        Long[] ids = activeRegistration(owner, receptionist);
+        Long regId = ids[1];
+        long session = createSession(ids[2], LocalDate.now(clock).plusDays(4), 5);
+        long booking = insertBooking(session, owner.getId(), regId);
+        long refundId = approvedRefund(owner, manager, regId);
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            // Plays BE-08 cancelBooking: session lock first, then the booking row, then the seat.
+            SessionLockHolder holder = holdSessionLock(pool, session, List.of(
+                    "UPDATE booking SET status = 'CANCELLED', cancel_reason = 'Cancelled by member' WHERE id = " + booking,
+                    "UPDATE class_session SET booked_count = booked_count - 1 WHERE id = " + session));
+            Future<RefundResponse> refund = pool.submit(() -> refundService.completeRefund(refundId, receptionist));
+
+            awaitBlockedBy(holder.spid().get(), refund);
+            holder.release().countDown();
+            holder.done().get(60, TimeUnit.SECONDS);
+            RefundResponse response = refund.get(60, TimeUnit.SECONDS);
+
+            assertThat(response.getStatus().name()).isEqualTo("COMPLETED");
+            assertThat(response.getCancelledBookings()).isZero();
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(bookedCount(session)).isEqualTo(4);
+        assertThat(dbValue("booking", booking, "cancel_reason")).isEqualTo("Cancelled by member");
+        assertThat(dbValue("refund_request", refundId, "status")).isEqualTo("COMPLETED");
+    }
+
+    // ---------------------------------------------------------------- P2-01 set-based check-in filter (SQL Server)
+
+    @Test
+    @DisplayName("P2-01: an upcoming booking with an ALLOWED check-in is used; one with a DENIED check-in is unused and is cancelled")
+    void quoteAndComplete_CheckInFilter() throws Exception {
+        UserAccount owner = newMember();
+        UserAccount receptionist = newUser("RECEPTIONIST");
+        UserAccount manager = newUser("MANAGER");
+        Long[] ids = activeRegistration(owner, receptionist);
+        Long regId = ids[1];
+        LocalDate later = LocalDate.now(clock).plusDays(6);
+        long allowedSession = createSession(ids[2], later, 3);
+        long deniedSession = createSession(ids[2], later.plusDays(1), 3);
+        long allowedBooking = insertBooking(allowedSession, owner.getId(), regId);
+        long deniedBooking = insertBooking(deniedSession, owner.getId(), regId);
+        insertCheckIn(allowedBooking, owner.getId(), receptionist.getId(), "ALLOWED");
+        insertCheckIn(deniedBooking, owner.getId(), receptionist.getId(), "DENIED");
+        jdbc.update("UPDATE sport_package_registration SET remaining_sessions = 8 WHERE id = ?", regId);
+
+        JsonNode quote = call(get("/api/v1/refunds/quote?registrationId=" + regId)
+                .with(user(new CustomUserDetails(receptionist))), status().isOk());
+        assertThat(quote.get("upcomingBookings").asInt()).isEqualTo(1);
+        assertThat(quote.get("unusedSessions").asInt()).isEqualTo(9);
+
+        long refundId = approvedRefund(owner, manager, regId);
+        JsonNode done = call(put("/api/v1/refunds/" + refundId + "/complete")
+                .with(user(new CustomUserDetails(receptionist))), status().isOk());
+        assertThat(done.get("cancelledBookings").asInt()).isEqualTo(1);
+        assertThat(dbValue("booking", allowedBooking, "status")).isEqualTo("CONFIRMED");
+        assertThat(dbValue("booking", deniedBooking, "status")).isEqualTo("CANCELLED");
+        assertThat(bookedCount(allowedSession)).isEqualTo(3);
+        assertThat(bookedCount(deniedSession)).isEqualTo(2);
+    }
+
+    // ---------------------------------------------------------------- P1-03 payment ownership (SQL Server)
+
+    @Test
+    @DisplayName("P1-03: an invoice line of the payment that bills another item makes quote and submit 409 PAYMENT_REGISTRATION_MISMATCH")
+    void invoiceLineForOtherItem_Conflict() throws Exception {
+        UserAccount owner = newMember();
+        UserAccount receptionist = newUser("RECEPTIONIST");
+        Long[] ids = activeRegistration(owner, receptionist);
+        Long paymentId = ids[0];
+        Long regId = ids[1];
+        Long invoiceId = jdbc.queryForObject("SELECT MIN(id) FROM invoice WHERE payment_id = ?", Long.class, paymentId);
+        jdbc.update("INSERT INTO invoice_line (invoice_id, item_type, item_reference_id, description, unit_price, line_total) "
+                + "VALUES (?, 'MEMBERSHIP_CARD', ?, 'BE21 other item', 1000.00, 1000.00)", invoiceId, regId + 100000L);
+
+        JsonNode quote = call(get("/api/v1/refunds/quote?registrationId=" + regId)
+                .with(user(new CustomUserDetails(receptionist))), status().isConflict());
+        assertThat(quote.get("code").asText()).isEqualTo("PAYMENT_REGISTRATION_MISMATCH");
+        JsonNode submit = call(post("/api/v1/refunds").with(user(new CustomUserDetails(owner)))
+                .contentType(MediaType.APPLICATION_JSON).content(submitBody(regId)), status().isConflict());
+        assertThat(submit.get("code").asText()).isEqualTo("PAYMENT_REGISTRATION_MISMATCH");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM refund_request WHERE package_registration_id = ?",
+                Integer.class, regId)).isZero();
+        assertThat(dbValue("payment", paymentId, "payment_status")).isEqualTo("SUCCESS");
+    }
+
+    @Test
+    @DisplayName("P1-03: a payment of another member linked to the registration is 409 PAYMENT_REGISTRATION_MISMATCH")
+    void paymentOfAnotherMember_Conflict() throws Exception {
+        UserAccount owner = newMember();
+        UserAccount other = newMember();
+        UserAccount receptionist = newUser("RECEPTIONIST");
+        Long[] ids = activeRegistration(owner, receptionist);
+        jdbc.update("UPDATE payment SET member_id = ? WHERE id = ?", other.getId(), ids[0]);
+
+        JsonNode quote = call(get("/api/v1/refunds/quote?registrationId=" + ids[1])
+                .with(user(new CustomUserDetails(receptionist))), status().isConflict());
+        assertThat(quote.get("code").asText()).isEqualTo("PAYMENT_REGISTRATION_MISMATCH");
     }
 }

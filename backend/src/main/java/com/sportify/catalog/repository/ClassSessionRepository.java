@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import jakarta.persistence.LockModeType;
@@ -14,6 +15,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Collection;
 import java.util.List;
@@ -31,6 +33,15 @@ public interface ClassSessionRepository extends JpaRepository<ClassSession, Long
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM ClassSession s WHERE s.id = :id")
     Optional<ClassSession> findForUpdate(@Param("id") Long id);
+
+    /**
+     * Releases seats in one atomic UPDATE (never below zero). The caller must hold the session row lock taken with
+     * {@link #findForUpdate}, so no booking or cancellation path can write booked_count in between (BE-21 P1-02).
+     */
+    @Modifying(flushAutomatically = true)
+    @Query(value = "UPDATE class_session SET booked_count = CASE WHEN booked_count > :seats THEN booked_count - :seats "
+            + "ELSE 0 END, updated_at = :now WHERE id = :id", nativeQuery = true)
+    int releaseSeats(@Param("id") Long id, @Param("seats") int seats, @Param("now") LocalDateTime now);
 
     /** Separate resource queries keep both resource/date indexes usable without an OR predicate. */
     @EntityGraph(attributePaths = {"sportClass", "coach", "coach.userAccount", "facility"})

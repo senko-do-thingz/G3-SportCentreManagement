@@ -4,16 +4,16 @@ import com.sportify.catalog.dto.RefundCreateRequest;
 import com.sportify.catalog.dto.RefundQuoteResponse;
 import com.sportify.catalog.dto.RefundResponse;
 import com.sportify.catalog.dto.RefundReviewRequest;
-import com.sportify.catalog.entity.Booking;
 import com.sportify.catalog.entity.BookingStatus;
 import com.sportify.catalog.entity.CheckInResult;
-import com.sportify.catalog.entity.ClassSession;
 import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.entity.RefundRequest;
 import com.sportify.catalog.entity.RefundStatus;
 import com.sportify.catalog.entity.SportPackageRegistration;
 import com.sportify.catalog.repository.BookingRepository;
-import com.sportify.catalog.repository.CheckInRepository;
+import com.sportify.catalog.repository.BookingRepository.RefundableBookingRow;
+import com.sportify.catalog.repository.ClassSessionRepository;
+import com.sportify.catalog.repository.MemberCardRepository;
 import com.sportify.catalog.repository.RefundRequestRepository;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.RefundService;
@@ -26,8 +26,10 @@ import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ConflictException;
 import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.UserAccount;
+import com.sportify.payment.entity.InvoiceItemType;
 import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentStatus;
+import com.sportify.payment.repository.InvoiceLineRepository;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.service.PaymentRefundService;
 import lombok.RequiredArgsConstructor;
@@ -41,10 +43,15 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
@@ -52,6 +59,12 @@ import java.util.stream.Collectors;
  * payment row first ({@link PaymentRepository#findByIdForUpdate}) and only then reads the registration. The payment id
  * is read as a single value ({@link SportPackageRegistrationRepository#findPaymentIdById}) so no registration entity is
  * loaded before the lock.
+ *
+ * Refund completion also cancels bookings and releases seats, so it joins the BE-08 and BE-10 order for sessions
+ * (session, then its bookings, then the package registration). The full order of completion is:
+ * payment, refund_request, class_session rows in ascending id order, their booking rows, sport_package_registration.
+ * No booking, session or check-in path locks a payment or a refund request, so the two orders cannot form a cycle.
+ * booked_count is changed only by an atomic UPDATE while the session row lock is held (BE-21 review P1-02).
  */
 @Service
 @RequiredArgsConstructor
@@ -67,14 +80,16 @@ public class RefundServiceImpl implements RefundService {
     private final PaymentRepository paymentRepository;
     private final PaymentRefundService paymentRefundService;
     private final BookingRepository bookingRepository;
-    private final CheckInRepository checkInRepository;
+    private final ClassSessionRepository sessionRepository;
+    private final MemberCardRepository memberCardRepository;
+    private final InvoiceLineRepository invoiceLineRepository;
     private final AuditService auditService;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
 
     /** What a refund of one registration would be, computed by {@link #prepare}. */
-    private record RefundBasis(SportPackageRegistration registration, Payment payment, List<Booking> upcomingBookings,
-                               RefundQuoteResponse quote) {
+    private record RefundBasis(SportPackageRegistration registration, Payment payment,
+                               List<RefundableBookingRow> upcomingBookings, RefundQuoteResponse quote) {
     }
 
     @Override
@@ -145,6 +160,9 @@ public class RefundServiceImpl implements RefundService {
             if (approvedAmount == null || approvedAmount.signum() <= 0) {
                 throw new BusinessRuleException("Amount approved must be greater than zero");
             }
+            if (payment != null) {
+                requirePaymentOfRegistration(payment, refund.getPackageRegistration());
+            }
             if (payment != null && approvedAmount.compareTo(payment.getAmount()) > 0) {
                 throw new BusinessRuleException("Amount approved " + approvedAmount.toPlainString()
                         + " cannot exceed the payment amount " + payment.getAmount().toPlainString());
@@ -175,13 +193,15 @@ public class RefundServiceImpl implements RefundService {
     @Transactional
     public RefundResponse completeRefund(Long refundId, UserAccount actor) {
         Long paymentId = refundRequestRepository.findPaymentIdById(refundId).orElse(null);
-        if (paymentId != null) {
-            lockPayment(paymentId);
-        }
+        Payment lockedPayment = paymentId != null ? lockPayment(paymentId) : null;
         RefundRequest refund = lockRefund(refundId);
 
         if (refund.getStatus() != RefundStatus.APPROVED) {
             throw new BusinessRuleException("Only approved refunds can be completed");
+        }
+        SportPackageRegistration reg = refund.getPackageRegistration();
+        if (lockedPayment != null) {
+            requirePaymentOfRegistration(lockedPayment, reg);
         }
 
         BigDecimal amount = refund.getAmountApproved() != null ? refund.getAmountApproved() : refund.getAmountRequested();
@@ -191,7 +211,9 @@ public class RefundServiceImpl implements RefundService {
         }
 
         LocalDateTime now = LocalDateTime.now(clock);
-        SportPackageRegistration reg = refund.getPackageRegistration();
+        // Sessions and bookings before the registration row: same order as BE-08 and BE-10.
+        List<Long> cancelled = cancelUpcomingBookings(reg, refund.getRefundCode(), actor, now);
+
         if (reg.getStatus() != PackageRegistrationStatus.REFUNDED) {
             reg.setStatus(PackageRegistrationStatus.REFUNDED);
             if (reg.getCancelledAt() == null) {
@@ -203,8 +225,6 @@ public class RefundServiceImpl implements RefundService {
             registrationRepository.save(reg);
         }
 
-        List<Booking> cancelled = cancelUpcomingBookings(reg, refund.getRefundCode(), actor, now);
-
         refund.setStatus(RefundStatus.COMPLETED);
         refund = refundRequestRepository.save(refund);
 
@@ -214,7 +234,7 @@ public class RefundServiceImpl implements RefundService {
         details.put("paymentCode", payment != null ? payment.getPaymentCode() : null);
         details.put("registrationId", reg.getId());
         details.put("registrationCode", reg.getRegistrationCode());
-        details.put("cancelledBookingIds", cancelled.stream().map(Booking::getId).toList());
+        details.put("cancelledBookingIds", cancelled);
         auditService.record(AuditEvent.builder()
                 .actor(actor)
                 .action(AuditAction.REFUND_COMPLETED)
@@ -256,7 +276,8 @@ public class RefundServiceImpl implements RefundService {
 
     /**
      * Checks shared by quote and submit, in this order: registration exists (404), a member owns it (403), it has a
-     * payment (409 PAYMENT_NOT_REFUNDABLE), the payment has no live refund and is not REFUNDED (409
+     * payment (409 PAYMENT_NOT_REFUNDABLE), the payment pays only for this registration (409
+     * PAYMENT_REGISTRATION_MISMATCH, see {@link #requirePaymentOfRegistration}), the payment has no live refund and is not REFUNDED (409
      * PAYMENT_ALREADY_REFUNDED), the payment is SUCCESS (409 PAYMENT_NOT_REFUNDABLE) and the registration is ACTIVE
      * (400). The already-refunded check comes before the registration status check, because approving a refund already
      * moves the registration to REFUNDED. With every session used the quote answers 0.00; submit then refuses (400).
@@ -284,6 +305,7 @@ public class RefundServiceImpl implements RefundService {
             throw new ConflictException("Package registration " + reg.getRegistrationCode()
                     + " has no payment, so it cannot be refunded", PaymentRefundService.CODE_PAYMENT_NOT_REFUNDABLE);
         }
+        requirePaymentOfRegistration(payment, reg);
         if (payment.getPaymentStatus() == PaymentStatus.REFUNDED
                 || refundRequestRepository.existsByPaymentIdAndStatusIn(payment.getId(), LIVE_STATUSES)) {
             throw new ConflictException("Payment " + payment.getPaymentCode()
@@ -303,7 +325,7 @@ public class RefundServiceImpl implements RefundService {
         if (total <= 0) {
             throw new BusinessRuleException("Package registration " + reg.getRegistrationCode() + " has no sessions to refund");
         }
-        List<Booking> upcoming = findUpcomingBookings(reg);
+        List<RefundableBookingRow> upcoming = findUpcomingBookings(reg.getId());
         int remaining = reg.getRemainingSessions() != null ? Math.max(reg.getRemainingSessions(), 0) : 0;
         int unused = Math.min(remaining + upcoming.size(), total);
 
@@ -335,35 +357,94 @@ public class RefundServiceImpl implements RefundService {
                 .divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP);
     }
 
-    /** CONFIRMED bookings of the registration on sessions not started yet, without an allowed check-in. */
-    private List<Booking> findUpcomingBookings(SportPackageRegistration reg) {
-        LocalDate today = LocalDate.now(clock);
-        LocalTime now = LocalTime.now(clock);
-        return bookingRepository.findUpcomingByPackageRegistration(reg.getId(), BookingStatus.CONFIRMED, today, now)
-                .stream()
-                .filter(b -> !checkInRepository.existsByBookingIdAndResult(b.getId(), CheckInResult.ALLOWED))
-                .toList();
+    /**
+     * BE-21 review P1-03. The refund reaches the payment through sport_package_registration.payment_id, the only
+     * supported link from a package registration to its payment. This also checks the other links a payment can have
+     * (member_card.payment_id and the invoice lines of the payment, whose item_type and item_reference_id name what
+     * they bill), so that a payment is never refunded, and its invoices marked REFUNDED, through a registration it
+     * does not pay for alone. 409 PAYMENT_REGISTRATION_MISMATCH when: the registration's payment_id is not this
+     * payment; the payment belongs to another member; a membership card is paid by the same payment; or an invoice
+     * line of the payment bills something other than this registration.
+     */
+    private void requirePaymentOfRegistration(Payment payment, SportPackageRegistration reg) {
+        Long paymentMemberId = payment.getMember() != null ? payment.getMember().getId() : null;
+        Long registrationMemberId = reg.getMember() != null ? reg.getMember().getId() : null;
+        boolean linked = reg.getPayment() != null && Objects.equals(reg.getPayment().getId(), payment.getId());
+        if (!linked
+                || paymentMemberId == null
+                || !paymentMemberId.equals(registrationMemberId)
+                || memberCardRepository.existsByPaymentId(payment.getId())
+                || invoiceLineRepository.countPaymentLinesForOtherItems(payment.getId(),
+                        InvoiceItemType.SPORT_PACKAGE, reg.getId()) > 0) {
+            throw new ConflictException("Payment " + payment.getPaymentCode()
+                    + " does not pay only for package registration " + reg.getRegistrationCode()
+                    + ", so it cannot be refunded through it",
+                    PaymentRefundService.CODE_PAYMENT_REGISTRATION_MISMATCH);
+        }
+    }
+
+    /** CONFIRMED bookings of the registration on sessions not started yet, without an allowed check-in. One query. */
+    private List<RefundableBookingRow> findUpcomingBookings(Long registrationId) {
+        return bookingRepository.findRefundableUpcomingBookings(registrationId, BookingStatus.CONFIRMED,
+                CheckInResult.ALLOWED, LocalDate.now(clock), LocalTime.now(clock));
     }
 
     /**
-     * Cancels the upcoming bookings paid by a refunded registration and releases their seats. Sessions are not given
-     * back to the registration: it is REFUNDED, and the refund amount already counts these bookings as unused.
+     * Cancels the upcoming bookings paid by a refunded registration and releases their seats (BE-21 review P1-02).
+     * Sessions are not given back to the registration: it is REFUNDED, and the refund amount already counts these
+     * bookings as unused.
+     *
+     * Lock order (BE-08, BE-10): the session rows are locked first, in ascending id order, with the same
+     * {@link ClassSessionRepository#findForUpdate} used by booking, booking cancellation and session cancellation.
+     * The bookings are then read again under those locks, so a booking cancelled meanwhile is skipped, and each
+     * session's bookings are cancelled with one conditional UPDATE. booked_count is released with one atomic UPDATE
+     * per session, never by writing back a value read earlier, so no seat change is lost.
+     *
+     * @return ids of the cancelled bookings
      */
-    private List<Booking> cancelUpcomingBookings(SportPackageRegistration reg, String refundCode, UserAccount actor,
-                                                 LocalDateTime now) {
-        List<Booking> upcoming = findUpcomingBookings(reg);
-        for (Booking booking : upcoming) {
-            booking.setStatus(BookingStatus.CANCELLED);
-            booking.setCancelledAt(now);
-            booking.setCancelledBy(actor);
-            booking.setCancelReason(truncate("Refund completed: " + refundCode));
-            ClassSession session = booking.getSession();
-            if (session != null && session.getBookedCount() != null && session.getBookedCount() > 0) {
-                session.setBookedCount(session.getBookedCount() - 1);
-            }
-            bookingRepository.save(booking);
+    private List<Long> cancelUpcomingBookings(SportPackageRegistration reg, String refundCode, UserAccount actor,
+                                              LocalDateTime now) {
+        List<RefundableBookingRow> candidates = findUpcomingBookings(reg.getId());
+        if (candidates.isEmpty()) {
+            return List.of();
         }
-        return upcoming;
+        SortedSet<Long> sessionIds = new TreeSet<>();
+        candidates.forEach(row -> sessionIds.add(row.getSessionId()));
+        for (Long sessionId : sessionIds) {
+            sessionRepository.findForUpdate(sessionId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Class session not found for id: " + sessionId));
+        }
+
+        TreeMap<Long, List<Long>> bookingsBySession = new TreeMap<>();
+        for (RefundableBookingRow row : findUpcomingBookings(reg.getId())) {
+            if (!sessionIds.contains(row.getSessionId())) {
+                // A new booking on a session that is not locked; locking it now would break the ascending order.
+                throw bookingsChanged(reg);
+            }
+            bookingsBySession.computeIfAbsent(row.getSessionId(), id -> new ArrayList<>()).add(row.getBookingId());
+        }
+
+        String reason = truncate("Refund completed: " + refundCode);
+        List<Long> cancelled = new ArrayList<>();
+        for (Map.Entry<Long, List<Long>> entry : bookingsBySession.entrySet()) {
+            Long sessionId = entry.getKey();
+            List<Long> bookingIds = entry.getValue();
+            int count = bookingRepository.cancelConfirmedSessionBookings(bookingIds, sessionId,
+                    actor != null ? actor.getId() : null, reason, now);
+            if (count != bookingIds.size()) {
+                // Only a check-in recorded between the read and the update can get here; roll everything back.
+                throw bookingsChanged(reg);
+            }
+            sessionRepository.releaseSeats(sessionId, count, now);
+            cancelled.addAll(bookingIds);
+        }
+        return cancelled;
+    }
+
+    private static ConflictException bookingsChanged(SportPackageRegistration reg) {
+        return new ConflictException("The upcoming bookings of package registration " + reg.getRegistrationCode()
+                + " changed while the refund was being completed; please try again",
+                PaymentRefundService.CODE_REFUND_BOOKINGS_CHANGED);
     }
 
     private Payment lockPayment(Long paymentId) {
