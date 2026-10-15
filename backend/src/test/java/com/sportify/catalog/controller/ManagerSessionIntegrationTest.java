@@ -1,18 +1,36 @@
 package com.sportify.catalog.controller;
 
 import com.sportify.AbstractIntegrationTest;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sportify.catalog.dto.*;
-import com.sportify.catalog.entity.*;
+import com.sportify.catalog.dto.BookingCreateRequest;
+import com.sportify.catalog.dto.ManagerSessionResponse;
+import com.sportify.catalog.dto.SessionCancelRequest;
+import com.sportify.catalog.dto.SessionConflictResponse;
+import com.sportify.catalog.dto.SessionCreateRequest;
+import com.sportify.catalog.dto.SessionUpdateRequest;
+import com.sportify.catalog.entity.Booking;
+import com.sportify.catalog.entity.BookingStatus;
+import com.sportify.catalog.entity.Facility;
+import com.sportify.catalog.entity.FacilityType;
+import com.sportify.catalog.entity.SessionStatus;
+import com.sportify.catalog.entity.Sport;
+import com.sportify.catalog.entity.SportClass;
+import com.sportify.catalog.entity.TrainingFormat;
 import com.sportify.catalog.exception.ScheduleConflictException;
-import com.sportify.catalog.repository.*;
-import com.sportify.catalog.service.ManagerSessionService;
+import com.sportify.catalog.repository.BookingRepository;
+import com.sportify.catalog.repository.ClassSessionRepository;
+import com.sportify.catalog.repository.FacilityRepository;
+import com.sportify.catalog.repository.SportClassRepository;
+import com.sportify.catalog.repository.SportPackageRegistrationRepository;
+import com.sportify.catalog.repository.SportRepository;
 import com.sportify.catalog.service.BookingService;
+import com.sportify.catalog.service.ManagerSessionService;
 import com.sportify.core.exception.BusinessRuleException;
-import com.sportify.identity.entity.*;
+import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.RoleRepository;
 import com.sportify.identity.repository.UserRepository;
 import com.sportify.identity.security.CustomUserDetails;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.AfterEach;
@@ -29,20 +47,44 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.*;
-import java.util.*;
-import java.util.concurrent.*;
+import java.security.SecureRandom;
+import java.time.Clock;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** Real SQL Server coverage. Registered for CI; requires Docker and is not executed locally. */
 @AutoConfigureMockMvc
 @TestPropertySource(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
+    // Use secure randomness for fixture values persisted as account identifiers.
+    private static final SecureRandom RANDOM = new SecureRandom();
     @Autowired private ManagerSessionService service;
     @Autowired private BookingService bookingService;
     @Autowired private ClassSessionRepository sessions;
@@ -100,8 +142,7 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
 
     private UserAccount account(String role) {
         String name = code();
-        // UUID-derived numeric phones avoid collisions with seeded and other suite accounts.
-        String phone = Long.toString(ThreadLocalRandom.current().nextLong(100_000_000_000L, 999_999_999_999L));
+        String phone = Long.toString(RANDOM.nextLong(100_000_000_000L, 1_000_000_000_000L));
         return users.saveAndFlush(UserAccount.builder().fullName(name).email(name + "@sportify.test").phone(phone)
                 .passwordHash("test-password-hash").status("ACTIVE").role(roles.findByCode(role).orElseThrow()).build());
     }

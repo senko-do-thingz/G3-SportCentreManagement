@@ -2,6 +2,10 @@ package com.sportify.catalog.repository;
 
 import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.entity.SportPackageRegistration;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -18,6 +22,18 @@ import java.util.Optional;
 
 @Repository
 public interface SportPackageRegistrationRepository extends JpaRepository<SportPackageRegistration, Long> {
+    @EntityGraph(attributePaths = {"sportPackage", "member", "member.userAccount"})
+    Page<SportPackageRegistration> findByStatus(PackageRegistrationStatus status,
+            Pageable pageable);
+
+    @Query("SELECT r FROM SportPackageRegistration r JOIN FETCH r.sportPackage JOIN FETCH r.member m "
+            + "JOIN FETCH m.userAccount WHERE m.id = :memberId AND "
+            + "(r.status = com.sportify.catalog.entity.PackageRegistrationStatus.PENDING_PAYMENT OR "
+            + "(r.status = com.sportify.catalog.entity.PackageRegistrationStatus.ACTIVE "
+            + "AND r.startDate <= :today AND r.endDate >= :today AND r.remainingSessions > 0)) "
+            + "ORDER BY r.createdAt ASC, r.id ASC")
+    List<SportPackageRegistration> findForOverview(@Param("memberId") Long memberId, @Param("today") LocalDate today);
+
     Optional<SportPackageRegistration> findByRegistrationCode(String registrationCode);
     List<SportPackageRegistration> findByMemberIdOrderByStartDateDesc(Long memberId);
     Optional<SportPackageRegistration> findByPaymentId(Long paymentId);
