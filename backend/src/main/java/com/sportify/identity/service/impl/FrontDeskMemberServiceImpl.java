@@ -11,9 +11,10 @@ import com.sportify.identity.mapper.FrontDeskMemberMapper;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.RoleRepository;
 import com.sportify.identity.repository.UserRepository;
+import com.sportify.identity.security.CustomUserDetails;
 import com.sportify.identity.service.FrontDeskMemberService;
 import com.sportify.identity.service.TemporaryPasswordGenerator;
-import com.sportify.identity.security.CustomUserDetails;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -23,9 +24,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.LocalDate;
-import java.sql.SQLException;
 import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.IdentityHashMap;

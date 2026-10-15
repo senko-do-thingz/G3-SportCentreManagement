@@ -2,6 +2,7 @@ package com.sportify.catalog.controller;
 
 import com.sportify.catalog.dto.MemberOverviewResponse;
 import com.sportify.catalog.service.FrontDeskMemberOverviewService;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;

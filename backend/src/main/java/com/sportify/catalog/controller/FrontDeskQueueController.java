@@ -3,6 +3,7 @@ package com.sportify.catalog.controller;
 import com.sportify.catalog.dto.FrontDeskCardResponse;
 import com.sportify.catalog.dto.FrontDeskPackageResponse;
 import com.sportify.catalog.service.FrontDeskQueueService;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

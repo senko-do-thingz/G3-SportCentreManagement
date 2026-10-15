@@ -7,8 +7,9 @@ import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.mapper.FrontDeskMapper;
 import com.sportify.catalog.repository.MemberCardRepository;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
-import com.sportify.catalog.service.FrontDeskQueueService;
 import com.sportify.catalog.service.FrontDeskQueuePaging;
+import com.sportify.catalog.service.FrontDeskQueueService;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

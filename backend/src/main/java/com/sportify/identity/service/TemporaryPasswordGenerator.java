@@ -1,6 +1,7 @@
 package com.sportify.identity.service;
 
 import org.springframework.stereotype.Component;
+
 import java.security.SecureRandom;
 
 @Component

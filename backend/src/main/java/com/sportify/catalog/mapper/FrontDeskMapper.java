@@ -4,10 +4,11 @@ import com.sportify.catalog.dto.FrontDeskCardResponse;
 import com.sportify.catalog.dto.FrontDeskCheckInResponse;
 import com.sportify.catalog.dto.FrontDeskPackageResponse;
 import com.sportify.catalog.dto.MemberOverviewResponse;
-import com.sportify.identity.dto.MemberSearchResponse;
 import com.sportify.catalog.entity.CheckIn;
 import com.sportify.catalog.entity.MemberCard;
 import com.sportify.catalog.entity.SportPackageRegistration;
+import com.sportify.identity.dto.MemberSearchResponse;
+
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

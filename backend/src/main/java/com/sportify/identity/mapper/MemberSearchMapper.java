@@ -3,6 +3,7 @@ package com.sportify.identity.mapper;
 import com.sportify.identity.dto.MemberSearchResponse;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.repository.MemberSearchRow;
+
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

@@ -2,6 +2,7 @@ package com.sportify.catalog.repository;
 
 import com.sportify.catalog.entity.CheckIn;
 import com.sportify.catalog.entity.CheckInResult;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

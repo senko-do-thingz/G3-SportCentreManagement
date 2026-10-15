@@ -1,6 +1,7 @@
 package com.sportify.catalog.dto;
 
 import com.sportify.catalog.entity.PackageRegistrationStatus;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;

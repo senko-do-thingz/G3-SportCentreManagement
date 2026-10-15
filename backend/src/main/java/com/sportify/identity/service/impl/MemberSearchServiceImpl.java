@@ -1,18 +1,20 @@
 package com.sportify.identity.service.impl;
 
-import com.sportify.identity.dto.MemberSearchResponse;
-import com.sportify.identity.service.MemberSearchPaging;
 import com.sportify.core.common.SearchUtils;
+import com.sportify.identity.dto.MemberSearchResponse;
 import com.sportify.identity.mapper.MemberSearchMapper;
-import java.time.Clock;
-import java.time.LocalDate;
 import com.sportify.identity.repository.MemberProfileRepository;
+import com.sportify.identity.service.MemberSearchPaging;
 import com.sportify.identity.service.MemberSearchService;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDate;
 
 @Service
 @RequiredArgsConstructor

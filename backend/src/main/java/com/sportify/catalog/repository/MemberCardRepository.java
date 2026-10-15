@@ -2,6 +2,10 @@ package com.sportify.catalog.repository;
 
 import com.sportify.catalog.entity.CardStatus;
 import com.sportify.catalog.entity.MemberCard;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,17 +17,17 @@ import java.util.Optional;
 
 @Repository
 public interface MemberCardRepository extends JpaRepository<MemberCard, Long> {
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"tier", "member", "member.userAccount"})
-    org.springframework.data.domain.Page<MemberCard> findByStatus(CardStatus status, org.springframework.data.domain.Pageable pageable);
+    @EntityGraph(attributePaths = {"tier", "member", "member.userAccount"})
+    Page<MemberCard> findByStatus(CardStatus status, Pageable pageable);
 
     @Query("SELECT c FROM MemberCard c JOIN FETCH c.tier JOIN FETCH c.member m JOIN FETCH m.userAccount "
             + "WHERE m.id = :memberId AND c.status = com.sportify.catalog.entity.CardStatus.ACTIVE "
             + "AND c.startDate <= :today AND (c.endDate IS NULL OR c.endDate >= :today) "
             + "ORDER BY c.tier.tierRank DESC, c.id DESC")
     List<MemberCard> findCurrentForOverview(@Param("memberId") Long memberId, @Param("today") LocalDate today,
-            org.springframework.data.domain.Pageable pageable);
+            Pageable pageable);
 
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"tier", "member", "member.userAccount"})
+    @EntityGraph(attributePaths = {"tier", "member", "member.userAccount"})
     Optional<MemberCard> findFirstByMemberIdAndStatusOrderByCreatedAtAscIdAsc(Long memberId, CardStatus status);
 
     Optional<MemberCard> findByCardCode(String cardCode);

@@ -6,9 +6,11 @@ import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.entity.UserStatus;
+
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+
 import java.time.LocalDate;
 
 @Mapper(componentModel = "spring", imports = UserStatus.class)

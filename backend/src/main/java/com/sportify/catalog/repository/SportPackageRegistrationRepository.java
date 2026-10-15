@@ -2,6 +2,10 @@ package com.sportify.catalog.repository;
 
 import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.entity.SportPackageRegistration;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -17,9 +21,9 @@ import java.util.Optional;
 
 @Repository
 public interface SportPackageRegistrationRepository extends JpaRepository<SportPackageRegistration, Long> {
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"sportPackage", "member", "member.userAccount"})
-    org.springframework.data.domain.Page<SportPackageRegistration> findByStatus(PackageRegistrationStatus status,
-            org.springframework.data.domain.Pageable pageable);
+    @EntityGraph(attributePaths = {"sportPackage", "member", "member.userAccount"})
+    Page<SportPackageRegistration> findByStatus(PackageRegistrationStatus status,
+            Pageable pageable);
 
     @Query("SELECT r FROM SportPackageRegistration r JOIN FETCH r.sportPackage JOIN FETCH r.member m "
             + "JOIN FETCH m.userAccount WHERE m.id = :memberId AND "
