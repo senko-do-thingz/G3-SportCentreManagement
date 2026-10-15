@@ -16,11 +16,9 @@ import com.sportify.payment.config.BankTransferProperties;
 import com.sportify.payment.dto.BankTransferInstructions;
 import com.sportify.payment.dto.PaymentResponse;
 import com.sportify.payment.dto.UpdatePaymentMethodRequest;
-import com.sportify.payment.entity.Invoice;
 import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.entity.PaymentStatus;
-import com.sportify.payment.repository.InvoiceRepository;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
@@ -31,9 +29,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -42,7 +37,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final MemberCardRepository memberCardRepository;
     private final SportPackageRegistrationRepository sportPackageRegistrationRepository;
-    private final InvoiceRepository invoiceRepository;
+    private final PaymentItemResolver itemResolver;
     private final BankTransferProperties bankProperties;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
@@ -50,18 +45,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public Payment createPendingPayment(MemberProfile member, BigDecimal amount, PaymentMethod method) {
-        if (member == null) {
-            throw new BusinessRuleException("Member cannot be null when creating a payment");
-        }
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BusinessRuleException("Payment amount must be greater than zero. Attempted amount: " + amount);
-        }
-        if (amount.scale() > 2 && amount.stripTrailingZeros().scale() > 2) {
-            throw new BusinessRuleException("Payment amount cannot have more than 2 decimal places. Attempted amount: " + amount);
-        }
-        if (amount.toBigInteger().toString().length() > 10) {
-            throw new BusinessRuleException("Payment amount cannot have more than 10 integer digits. Attempted amount: " + amount);
-        }
+        validateNewPayment(member, amount);
 
         PaymentMethod chosenMethod = (method != null) ? method : PaymentMethod.BANK_TRANSFER;
         if (!ONLINE_ALLOWED_PAYMENT_METHODS.contains(chosenMethod)) {
@@ -82,6 +66,51 @@ public class PaymentServiceImpl implements PaymentService {
                 .build();
 
         return paymentRepository.save(payment);
+    }
+
+    /**
+     * Money taken at the desk (BE-19): the payment is created already SUCCESS, with payment_time now, the method and
+     * reference the receptionist recorded and confirmed_by_user_id. Any method is allowed at the desk, cash included.
+     */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Payment recordDeskPayment(MemberProfile member, BigDecimal amount, PaymentMethod method, String referenceCode,
+                                     UserAccount confirmedBy) {
+        validateNewPayment(member, amount);
+        if (method == null) {
+            throw new BusinessRuleException("Payment method is required for a desk payment");
+        }
+        if (confirmedBy == null || !SecurityUtils.isStaff(confirmedBy)) {
+            throw new BusinessRuleException("Only staff users can record a desk payment");
+        }
+
+        Payment payment = Payment.builder()
+                .paymentCode(codeFormatter.formatPaymentCode(paymentRepository.getNextPaymentCodeSequence()))
+                .member(member)
+                .amount(amount)
+                .paymentMethod(method)
+                .paymentStatus(PaymentStatus.SUCCESS)
+                .paymentTime(LocalDateTime.now(clock))
+                .referenceCode(referenceCode)
+                .confirmedByUser(confirmedBy)
+                .notes("Paid at the desk, confirmed by user id " + confirmedBy.getId())
+                .build();
+        return paymentRepository.save(payment);
+    }
+
+    private static void validateNewPayment(MemberProfile member, BigDecimal amount) {
+        if (member == null) {
+            throw new BusinessRuleException("Member cannot be null when creating a payment");
+        }
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessRuleException("Payment amount must be greater than zero. Attempted amount: " + amount);
+        }
+        if (amount.scale() > 2 && amount.stripTrailingZeros().scale() > 2) {
+            throw new BusinessRuleException("Payment amount cannot have more than 2 decimal places. Attempted amount: " + amount);
+        }
+        if (amount.toBigInteger().toString().length() > 10) {
+            throw new BusinessRuleException("Payment amount cannot have more than 10 integer digits. Attempted amount: " + amount);
+        }
     }
 
     @Override
@@ -118,7 +147,7 @@ public class PaymentServiceImpl implements PaymentService {
         if (confirmedBy != null) {
             payment.setConfirmedByUser(confirmedBy);
             String staffNote = "Confirmed by user id " + confirmedBy.getId();
-            payment.setNotes(appendNote(payment.getNotes(), staffNote));
+            payment.setNotes(PaymentNotes.append(payment.getNotes(), staffNote));
         }
 
         return paymentRepository.save(payment);
@@ -139,9 +168,19 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         payment.setPaymentStatus(PaymentStatus.FAILED);
-        payment.setNotes(appendNote(payment.getNotes(), reason));
+        payment.setNotes(PaymentNotes.append(payment.getNotes(), reason));
 
         return paymentRepository.save(payment);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Payment lockPayment(Long paymentId) {
+        if (paymentId == null) {
+            throw new BusinessRuleException("Payment ID cannot be null");
+        }
+        return paymentRepository.findByIdForUpdate(paymentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment not found for id: " + paymentId));
     }
 
     @Override
@@ -234,7 +273,7 @@ public class PaymentServiceImpl implements PaymentService {
                     .build();
         }
 
-        PaymentItemSummary summary = resolveItemSummary(payment);
+        PaymentItemResolver.PaymentItemSummary summary = itemResolver.summarize(payment);
 
         return PaymentResponse.builder()
                 .id(payment.getId())
@@ -253,139 +292,5 @@ public class PaymentServiceImpl implements PaymentService {
                 .createdAt(payment.getCreatedAt())
                 .updatedAt(payment.getUpdatedAt())
                 .build();
-    }
-
-    private String appendNote(String existing, String append) {
-        if (append == null || append.isBlank()) {
-            return truncateSingleNote(existing);
-        }
-        if (existing == null || existing.isBlank()) {
-            return truncateSingleNote(append);
-        }
-
-        // If append alone exceeds 500 characters, cut append to 500 safely and drop existing.
-        if (append.length() > 500) {
-            return truncateSingleNote(append);
-        }
-
-        // Here append is <= 500 characters and must be preserved intact.
-        String candidate = existing + " | " + append;
-        if (candidate.length() <= 500) {
-            return candidate;
-        }
-
-        // Drop oldest segments separated by " | " until candidate length fits or no more separators.
-        String curExisting = existing;
-        while (curExisting.contains(" | ") && (curExisting.length() + 3 + append.length() > 500)) {
-            int firstSep = curExisting.indexOf(" | ");
-            curExisting = curExisting.substring(firstSep + 3);
-        }
-
-        if (curExisting.length() + 3 + append.length() <= 500) {
-            return curExisting + " | " + append;
-        }
-
-        // If even the remaining single segment is too long to fit with " | " + append:
-        int remainingBudget = 500 - 3 - append.length();
-        if (remainingBudget <= 0) {
-            return append;
-        }
-
-        // Cut oldest characters from curExisting (keep tail) to fit remainingBudget
-        int start = curExisting.length() - remainingBudget;
-        if (Character.isLowSurrogate(curExisting.charAt(start))) {
-            start++;
-        }
-        String trimmedExisting = curExisting.substring(start);
-        if (trimmedExisting.isEmpty()) {
-            return append;
-        }
-        return trimmedExisting + " | " + append;
-    }
-
-    private String truncateSingleNote(String note) {
-        if (note == null) {
-            return null;
-        }
-        if (note.length() <= 500) {
-            return note;
-        }
-        int cutoff = 500;
-        if (Character.isHighSurrogate(note.charAt(cutoff - 1))) {
-            cutoff--;
-        }
-        return note.substring(0, cutoff);
-    }
-
-    private record PaymentItemSummary(String description, BigDecimal originalPrice, BigDecimal discount) {}
-
-    private PaymentItemSummary resolveItemSummary(Payment payment) {
-        Long paymentId = payment.getId();
-        BigDecimal amount = payment.getAmount();
-
-        Optional<PaymentItemSummary> pkgSummary = resolvePackageSummary(paymentId, amount);
-        if (pkgSummary.isPresent()) {
-            return pkgSummary.get();
-        }
-
-        Optional<PaymentItemSummary> cardSummary = resolveCardSummary(paymentId, amount);
-        if (cardSummary.isPresent()) {
-            return cardSummary.get();
-        }
-
-        Optional<PaymentItemSummary> invSummary = resolveInvoiceSummary(paymentId, amount);
-        if (invSummary.isPresent()) {
-            return invSummary.get();
-        }
-
-        return defaultItemSummary(payment);
-    }
-
-    private Optional<PaymentItemSummary> resolvePackageSummary(Long paymentId, BigDecimal fallbackAmount) {
-        return sportPackageRegistrationRepository.findByPaymentId(paymentId)
-                .map(reg -> {
-                    String description = reg.getSportPackage() != null
-                            ? reg.getSportPackage().getName()
-                            : "Sport Package Registration";
-                    BigDecimal original = reg.getOriginalPrice() != null ? reg.getOriginalPrice() : fallbackAmount;
-                    BigDecimal paid = reg.getPaidAmount() != null ? reg.getPaidAmount() : fallbackAmount;
-                    BigDecimal diff = original.subtract(paid);
-                    BigDecimal discount = diff.compareTo(BigDecimal.ZERO) > 0 ? diff : BigDecimal.ZERO;
-                    return new PaymentItemSummary(description, original, discount);
-                });
-    }
-
-    private Optional<PaymentItemSummary> resolveCardSummary(Long paymentId, BigDecimal fallbackAmount) {
-        return memberCardRepository.findByPaymentId(paymentId)
-                .map(card -> {
-                    String description = card.getTier() != null
-                            ? card.getTier().getName() + " Card"
-                            : "Membership Card";
-                    BigDecimal original = card.getTier() != null && card.getTier().getPrice() != null
-                            ? card.getTier().getPrice()
-                            : fallbackAmount;
-                    BigDecimal paid = card.getPricePaid() != null ? card.getPricePaid() : fallbackAmount;
-                    BigDecimal diff = original.subtract(paid);
-                    BigDecimal discount = diff.compareTo(BigDecimal.ZERO) > 0 ? diff : BigDecimal.ZERO;
-                    return new PaymentItemSummary(description, original, discount);
-                });
-    }
-
-    private Optional<PaymentItemSummary> resolveInvoiceSummary(Long paymentId, BigDecimal fallbackAmount) {
-        List<Invoice> invoices = invoiceRepository.findByPaymentId(paymentId);
-        if (invoices.isEmpty()) {
-            return Optional.empty();
-        }
-        Invoice invoice = invoices.stream()
-                .min(Comparator.comparing(Invoice::getId, Comparator.nullsLast(Comparator.naturalOrder())))
-                .orElseThrow();
-        String description = "Invoice " + invoice.getInvoiceNumber();
-        BigDecimal original = invoice.getSubtotalAmount() != null ? invoice.getSubtotalAmount() : fallbackAmount;
-        BigDecimal discount = invoice.getDiscountAmount() != null ? invoice.getDiscountAmount() : BigDecimal.ZERO;
-        return Optional.of(new PaymentItemSummary(description, original, discount));
-    }
-
-    private PaymentItemSummary defaultItemSummary(Payment payment) {
-        return new PaymentItemSummary("Payment " + payment.getPaymentCode(), payment.getAmount(), BigDecimal.ZERO);
     }
 }

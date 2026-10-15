@@ -25,6 +25,14 @@ public interface PaymentService {
     @Transactional(propagation = Propagation.MANDATORY)
     Payment createPendingPayment(MemberProfile member, BigDecimal amount, PaymentMethod method);
 
+    /**
+     * Creates a SUCCESS payment for money taken at the desk (BE-19), with payment_time now, the method, the reference
+     * and the staff user who took it. The caller links it to the card or registration and issues the receipt.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    Payment recordDeskPayment(MemberProfile member, BigDecimal amount, PaymentMethod method, String referenceCode,
+                              UserAccount confirmedBy);
+
     @Transactional(propagation = Propagation.MANDATORY)
     Payment markPaymentSuccess(Long paymentId, UserAccount confirmedBy);
 
@@ -33,6 +41,13 @@ public interface PaymentService {
 
     @Transactional(propagation = Propagation.MANDATORY)
     Payment markPaymentFailed(Long paymentId, String reason);
+
+    /**
+     * Locks the payment row (pessimistic write) for the rest of the caller's transaction. Card and package
+     * activation and cancellation call it before they read the card or registration (lock order: payment first).
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    Payment lockPayment(Long paymentId);
 
     PaymentResponse getPayment(Long id, UserAccount actor);
 

@@ -2,6 +2,10 @@ package com.sportify.catalog.repository;
 
 import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.entity.SportPackageRegistration;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -12,14 +16,38 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface SportPackageRegistrationRepository extends JpaRepository<SportPackageRegistration, Long> {
+    @EntityGraph(attributePaths = {"sportPackage", "member", "member.userAccount"})
+    Page<SportPackageRegistration> findByStatus(PackageRegistrationStatus status,
+            Pageable pageable);
+
+    @Query("SELECT r FROM SportPackageRegistration r JOIN FETCH r.sportPackage JOIN FETCH r.member m "
+            + "JOIN FETCH m.userAccount WHERE m.id = :memberId AND "
+            + "(r.status = com.sportify.catalog.entity.PackageRegistrationStatus.PENDING_PAYMENT OR "
+            + "(r.status = com.sportify.catalog.entity.PackageRegistrationStatus.ACTIVE "
+            + "AND r.startDate <= :today AND r.endDate >= :today AND r.remainingSessions > 0)) "
+            + "ORDER BY r.createdAt ASC, r.id ASC")
+    List<SportPackageRegistration> findForOverview(@Param("memberId") Long memberId, @Param("today") LocalDate today);
+
     Optional<SportPackageRegistration> findByRegistrationCode(String registrationCode);
     List<SportPackageRegistration> findByMemberIdOrderByStartDateDesc(Long memberId);
     Optional<SportPackageRegistration> findByPaymentId(Long paymentId);
+
+    /**
+     * The payment id of a registration, read as a single value so that no registration entity is loaded before the
+     * payment row is locked (lock order: payment first, then the registration). Empty when there is none.
+     */
+    @Query("SELECT r.payment.id FROM SportPackageRegistration r WHERE r.id = :registrationId")
+    Optional<Long> findPaymentIdById(@Param("registrationId") Long registrationId);
+
+    /** Registrations paid by the given payments, with their package, for the front desk payment list. */
+    @Query("SELECT r FROM SportPackageRegistration r JOIN FETCH r.sportPackage WHERE r.payment.id IN :paymentIds")
+    List<SportPackageRegistration> findByPaymentIdIn(@Param("paymentIds") Collection<Long> paymentIds);
 
     /** Call only after locking the session and checking its booking state. */
     @Modifying

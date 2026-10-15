@@ -28,12 +28,16 @@ import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.UserRepository;
+import com.sportify.payment.entity.Invoice;
 import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.service.PaymentService;
+import com.sportify.payment.service.PaymentVerificationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -53,6 +57,9 @@ public class SportPackageServiceImpl implements SportPackageService {
     public static final int SESSION_MINUTES_60 = 60;
     public static final int SESSION_MINUTES_90 = 90;
 
+    /** Length of sport_package_registration.cancel_reason. */
+    private static final int CANCEL_REASON_MAX = 255;
+
     private final SportPackageRepository sportPackageRepository;
     private final SportPackageRegistrationRepository registrationRepository;
     private final SportRepository sportRepository;
@@ -63,6 +70,8 @@ public class SportPackageServiceImpl implements SportPackageService {
     private final CodeFormatter codeFormatter;
     private final AuditService auditService;
     private final Clock clock;
+    /** Resolved on use: PaymentVerificationService itself depends on this service. */
+    private final ObjectProvider<PaymentVerificationService> paymentVerificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -263,9 +272,20 @@ public class SportPackageServiceImpl implements SportPackageService {
             Payment payment = paymentService.createPendingPayment(member, paidAmount, request.getPaymentMethod());
             registration.setPayment(payment);
         }
+        // BE-19: a desk sale records the money at once (SUCCESS payment, then the invoice). Nothing to pay: no payment.
+        boolean paidAtDesk = initialStatus == PackageRegistrationStatus.ACTIVE && paidAmount.signum() > 0;
+        if (paidAtDesk) {
+            registration.setPayment(paymentVerificationService.getObject().recordDeskPayment(member, paidAmount,
+                    request.getPaymentMethod(), request.getReferenceCode(), request.getAmountReceived(), actor));
+        }
 
         registration = registrationRepository.save(registration);
-        return mapToRegistrationResponse(registration);
+        PackageRegistrationResponse response = mapToRegistrationResponse(registration);
+        if (paidAtDesk) {
+            withInvoice(response, paymentVerificationService.getObject()
+                    .recordPaymentConfirmed(registration.getPayment().getId(), actor, null));
+        }
+        return response;
     }
 
     @Override
@@ -277,6 +297,25 @@ public class SportPackageServiceImpl implements SportPackageService {
     @Override
     @Transactional
     public PackageRegistrationResponse activateRegistration(Long registrationId, UserAccount actor, PaymentMethod actualMethod) {
+        SportPackageRegistration registration = activatePending(registrationId, actor, actualMethod);
+        PackageRegistrationResponse response = mapToRegistrationResponse(registration);
+        if (registration.getPayment() != null) {
+            // Same receipt as PUT /payments/{id}/confirm: one PAID invoice and one PAYMENT_CONFIRMED row.
+            withInvoice(response, paymentVerificationService.getObject()
+                    .recordPaymentConfirmed(registration.getPayment().getId(), actor, null));
+        }
+        return response;
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public PackageRegistrationResponse activateRegistrationForPaymentConfirmation(Long registrationId, UserAccount actor,
+                                                                                  PaymentMethod actualMethod) {
+        return mapToRegistrationResponse(activatePending(registrationId, actor, actualMethod));
+    }
+
+    private SportPackageRegistration activatePending(Long registrationId, UserAccount actor, PaymentMethod actualMethod) {
+        lockLinkedPayment(registrationId);
         SportPackageRegistration registration = registrationRepository.findById(registrationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Package registration not found for id: " + registrationId));
 
@@ -299,12 +338,19 @@ public class SportPackageServiceImpl implements SportPackageService {
         if (registration.getPayment() != null) {
             paymentService.markPaymentSuccess(registration.getPayment().getId(), actor, actualMethod);
         }
-        return mapToRegistrationResponse(registration);
+        return registration;
     }
 
     @Override
     @Transactional
     public PackageRegistrationResponse cancelRegistration(Long registrationId, UserAccount actor) {
+        return cancelRegistration(registrationId, actor, null);
+    }
+
+    @Override
+    @Transactional
+    public PackageRegistrationResponse cancelRegistration(Long registrationId, UserAccount actor, String reason) {
+        lockLinkedPayment(registrationId);
         SportPackageRegistration registration = registrationRepository.findById(registrationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Package registration not found for id: " + registrationId));
 
@@ -319,7 +365,9 @@ public class SportPackageServiceImpl implements SportPackageService {
         }
 
         String actorDescription = isStaff ? "staff user id " + actor.getId() : "member user id " + actor.getId();
-        String cancelReason = "Cancelled by " + actorDescription;
+        String cancelReason = reason != null && !reason.isBlank()
+                ? truncate(reason.trim(), CANCEL_REASON_MAX)
+                : "Cancelled by " + actorDescription;
         registration.setStatus(PackageRegistrationStatus.CANCELLED);
         registration.setCancelledAt(LocalDateTime.now(clock));
         registration.setCancelReason(cancelReason);
@@ -399,5 +447,27 @@ public class SportPackageServiceImpl implements SportPackageService {
 
     static LocalDate packageEnd(LocalDate startDate, int durationDays) {
         return startDate.plusDays(durationDays - 1L);
+    }
+
+    /**
+     * Lock order rule (docs/database/09): lock the payment row before the registration is read or written. Only the
+     * payment id is read before the lock (a single value, no registration entity), so the registration is first
+     * loaded after the lock and every check runs on its current state. A registration with no payment is unchanged.
+     */
+    private void lockLinkedPayment(Long registrationId) {
+        registrationRepository.findPaymentIdById(registrationId).ifPresent(paymentService::lockPayment);
+    }
+
+    /** Adds the receipt to the response so the desk screen can open it (F1-13 State After Payment). */
+    private static PackageRegistrationResponse withInvoice(PackageRegistrationResponse response, Invoice invoice) {
+        if (invoice != null) {
+            response.setInvoiceId(invoice.getId());
+            response.setInvoiceNumber(invoice.getInvoiceNumber());
+        }
+        return response;
+    }
+
+    private static String truncate(String value, int max) {
+        return value.length() <= max ? value : value.substring(0, max);
     }
 }

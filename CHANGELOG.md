@@ -33,6 +33,129 @@ Branch `feat/f3-reception-payments`, from main (6e82388). Owner: Phat. Priority:
 - `receptionPaymentPath(paymentId, memberId)` without `item` and `itemId`. `TextArea` moved to the UI kit (`src/components/ui/TextArea.tsx`); refund table columns built once; no fixed pixel margin.
 - Verified with lint (0 warnings), `tsc -b`, `npm test` (442 tests in 23 files) and `npm run build`.
 - Review round 2: a failed refund queue now shows its error with Try again instead of "Refund not found" when the refund is not in the queue that answered; the Find member button stays aligned with the input when the field shows an error (grid layout). 443 tests pass.
+## 2026-10-15 - Refunds linked to payments (BE-21, Flow 3)
+
+Branch `feat/f3-confirm-payment`, based on `main`. Owner: Truc. Priority: P2. Depends on BE-18. Screens F3-07, F3-09 (refund part), S3-RefundSubmitted, S3-RefundReview, S3-RefundApproved, S3-RefundRejected, S3-RefundDone.
+
+### Added
+- `GET /api/v1/refunds/quote?registrationId=` (owner MEMBER, RECEPTIONIST, MANAGER): suggested amount = paid amount * unused sessions / total sessions (half up, 2 decimals, never above the payment amount). Unused sessions = remaining sessions + upcoming CONFIRMED bookings of the registration without an allowed check-in. Every session used gives 0.00.
+- `POST /api/v1/refunds` accepts an optional `amountRequested` (default: the quote), validated above 0, at most 2 decimals and not above the payment amount.
+- `PaymentRefundService.markRefunded`: payment SUCCESS -> REFUNDED with a note, PAID or ISSUED invoices -> REFUNDED. 409 codes `PAYMENT_ALREADY_REFUNDED` and `PAYMENT_NOT_REFUNDABLE`.
+- Migration `V27__refund_request_payment_link.sql`: filtered unique index `ux_refund_request_payment_live` (one PENDING, APPROVED or COMPLETED refund per payment) with a duplicate guard, and an index on `package_registration_id`.
+- Audit action `REFUND_COMPLETED`; `RefundResponse` gains `paymentId`, `paymentCode` and, on complete, `cancelledBookings`.
+- Tests: refund service and payment service unit tests, refund MockMvc validation tests and SQL Server integration regressions; test cases in `docs/tests/BE-21_test_cases.md`.
+
+### Changed
+- Submitting a refund requires a SUCCESS payment linked to the registration and stores `refund_request.payment_id`. A second refund on the same payment answers 409 `PAYMENT_ALREADY_REFUNDED`, also after approval when the registration is already REFUNDED; a REJECTED request does not block a new one. A race on the same payment is caught by the unique index and mapped to the same 409.
+- Review: the resolved `amountApproved` must be above 0, have at most 2 decimal places after trailing zeros are removed and not exceed the payment amount; it is stored at scale 2 without rounding. HTTP validation also limits it to 12 integer digits and 2 fractional digits. Legacy refunds without a payment are capped at the registration paid amount when known. Approval still moves the registration to REFUNDED.
+- Completion rejects a missing, non-positive or over-precision resolved amount before changing payment state. Complete runs in one transaction: payment REFUNDED, invoices REFUNDED, registration REFUNDED (if not already), upcoming CONFIRMED bookings of the registration CANCELLED with the seat released (sessions are not returned to the refunded registration), refund COMPLETED, REFUND_COMPLETED activity log. Legacy refunds without a payment complete without the payment step.
+- Lock order follows BE-18: submit locks the payment before reading the registration; review and complete lock the payment, then the refund row.
+- The pro-rated amount multiplies before dividing (the old code rounded the fraction to 4 decimals first, which could be off by a few dong).
+- `RefundServiceImplTest`: fixtures give the registration a SUCCESS payment and stub the new locked reads; assertions are unchanged.
+- `docs/database/04`: refund rules.
+
+### Notes
+- Unit and integration tests run in GitHub Actions.
+- Existing `refund_request` rows keep `payment_id` NULL (no backfill), so the one-refund rule applies to refunds created from now on.
+
+### Behavior notes
+- Completion locks payment, refund, sessions in ascending id order, bookings, then registration; it re-reads bookings under the session locks and uses conditional cancellation plus atomic seat release. Changed bookings return 409 `REFUND_BOOKINGS_CHANGED` and roll back.
+- Quote, submit, approve and complete check payment ownership and that no card or invoice line bills another item; mismatches return 409 `PAYMENT_REGISTRATION_MISMATCH`.
+- Upcoming bookings and their ALLOWED check-in filter are read in one set-based query.
+- BE-21 (V27) is merged before BE-22 (V28); PR #61 (V26) is already on main. Flyway out-of-order is disabled.
+
+### Known limitations
+- Check-in does not take the session lock, so a check-in in flight during refund completion can still record ALLOWED on a booking that completion cancels; tracked as a follow-up.
+- A partial refund marks the whole payment and its invoices REFUNDED and blocks a second refund; legacy NULL-payment refunds are not backfilled.
+- V27 aborts if duplicate live refunds already exist; repeating completion returns 400.
+
+## 2026-10-15 - My payments and receipts (BE-20, Flow 3)
+
+Branch `feat/f3-my-payments-r1`, based on main (`5075010`, BE-18 from PR #60 and BE-19 from PR #62). Replaces PR #56, whose branch carried the superseded BE-18 commits. Owner: Truc. Priority: P1. Depends on BE-18. Screens F3-03, S3-PaidHistory, S3-CardReceipt, S3-MemberReceipt and S3-SingleReceipt. Provides the BE-20 endpoints FE-11 (`feat/f3-member-payments`) already calls; the response shapes match the contract FE-11 assumed.
+
+### Added
+- `GET /api/v1/payments/my?status=&page=&size=` (MEMBER only): the signed-in member's payments, newest first (`created_at`, then `id`), page size 1 to 100 (default 20). Each row: id, code, status, amount, method, item type, reference id, code and description, original price, discount, `time` (payment time once confirmed, otherwise request time), `paymentTime`, `createdAt`, member id and code, `invoiceId` and `invoiceNumber` (null until the receipt is issued). Staff get 403.
+- `GET /api/v1/invoices/{id}` (MEMBER, RECEPTIONIST, MANAGER): invoice header (number, issue date, status, member name and code, payment code, method, reference and time, subtotal, discount, tax, total) and lines in insert order.
+- `ReceiptService` / `ReceiptServiceImpl`, `MemberPaymentController`, `MemberPaymentResponse`, `InvoiceResponseMapper`; `PaymentRepository.findByMemberId` and `findByMemberIdAndPaymentStatus` with paging.
+- Tests: `ReceiptServiceImplTest` (19 tests, 22 runs), `ReceiptControllerTest` (12 tests, 16 runs), `ReceiptIntegrationTest` (4, Testcontainers); test cases in `docs/tests/BE-20_test_cases.md`.
+
+### Changed
+- `GET /api/v1/invoices/by-payment/{paymentId}` moved from `PaymentVerificationService` to `ReceiptService`. A member asking for the invoice of another member's payment, or for another member's invoice by id, gets 403 (BE-18 answered 404), as the approved BE-20 acceptance criterion requires. Staff and owner answers are unchanged. `GET /api/v1/payments/{id}` and `PUT /api/v1/payments/{id}/method` still answer 404 for another member (BE-17, not changed). The moved BE-18 unit test lives in `ReceiptServiceImplTest`.
+- Reading a receipt re-checks total = sum of line totals - discount + tax (and subtotal = sum of line totals). Invoices are already validated when issued (BE-18), so a stored invoice that breaks the rule is returned as recorded and logged as a warning.
+- `docs/database/04`: BE-20 endpoints; Visibility now separates payments (404) from invoices (403); the BE-18 pricing rules from PR #60 are kept as they are. `docs/database/09`: the desk sale visibility row is split the same way.
+
+### Review round 1 (PR #56)
+- Rebased: the branch starts from the latest main and carries only the BE-20 change of `eb5609e`; every BE-18 and BE-19 change on main is kept.
+- `PaymentVerificationIntegrationTest.memberSeesOnlyOwnPaymentAndInvoice` (BE-19) now expects 403 for another member on `/invoices/by-payment/{paymentId}`; its 404 check for `/payments/{id}` is unchanged.
+- `com.sportify.payment.ReceiptIntegrationTest` added to `scripts/ci/required-integration-tests.txt`, so CI fails if it does not run.
+- `ReceiptServiceImplTest`: two tests for the totals check on read (a stored invoice that does not add up is returned unchanged and logs one warning; one that adds up logs none).
+
+### Notes
+- No migration.
+- Maven Central and the SQL Server image are blocked in the authoring environment; unit tests are run locally with `mvn -B test` and the Testcontainers tests in GitHub Actions CI. Expected against main `5075010`: unit 874 (837 - 1 moved + 38), integration 194 (190 + 4).
+
+## 2026-10-14 - Payment at the desk (BE-19, Flow 3)
+
+Branch `feat/f3-desk-payment`. Owner: Truc. Priority: P1. Depends on BE-18 (merged in PR #60; main is merged into this branch). Screens F1-13 Payment Handoff and F1-14 Register and Renew. Provides the BE-19 contract FE-05 already sends.
+
+### Added
+- Desk sale records the money at once: `POST /api/v1/membership-cards/purchase` and `POST /api/v1/packages/registrations` (channel `RECEPTION`) by RECEPTIONIST or MANAGER accept `paymentMethod` (alias `method`, `CASH` when omitted), `referenceCode` (aliases `paymentReference`, `reference`; required except for `CASH`) and `amountReceived` (the price when omitted). A `SUCCESS` payment is created and linked, the item is `ACTIVE`, and the BE-18 receipt step `PaymentVerificationService.recordPaymentConfirmed` issues the `PAID` invoice and writes `PAYMENT_CONFIRMED`.
+- Cash may be more than the price (the change is written in the payment notes); less money, or a non-cash amount that differs, answers 409 `PAYMENT_AMOUNT_MISMATCH` and nothing is saved. Nothing to pay (STANDARD tier, zero fee upgrade, full discount) creates no payment.
+- `MemberCardResponse` and `PackageRegistrationResponse` carry `invoiceId` and `invoiceNumber` (with the existing `paymentId`) after a desk sale or an activation, so the screen opens the receipt (F1-13 State After Payment).
+- `PaymentService.recordDeskPayment` and `PaymentVerificationService.recordDeskPayment`; tests in `PaymentVerificationServiceImplTest` (+7), `MembershipCardServiceImplTest` (+2), `SportPackageServiceImplTest` (+2) and `PaymentVerificationIntegrationTest` (+4); test cases in `docs/tests/BE-19_test_cases.md`.
+
+### Changed
+- Reference validation of confirm and desk sale shares one helper; payment amount validation of online and desk payments shares one helper.
+- `docs/database/04` and `09`: desk sale rules, visibility, invoice totals rule.
+- CI fix: the desk sale integration tests expect 201 Created (the purchase and registration endpoints answer 201), and the test cleanup deletes every row of the members it created, so a failing test can no longer leave sports, packages or tiers behind for other test classes.
+
+### Review round 1
+- P1-01: `DeskSaleRollbackIntegrationTest` (SQL Server) forces the receipt step to fail after the payment and the card or registration were written (invoice save for a package and a card sale, and the PAYMENT_CONFIRMED audit write after the invoice and its line were saved) and checks that no payment, card, registration, invoice, invoice line or activity_log row is left.
+- P1-02: the 403 change for another member's payment, payment method change and invoice is reverted. No approved specification asked for it, and BE-17 and BE-18 document 404 (the resource is not revealed); the responses are 404 again and the BE-17 and BE-18 tests are restored unchanged.
+- P2-01: HTTP integration tests for a non-cash desk sale with a different amount (bank transfer with more for a package, credit card with less for a card): 409 `PAYMENT_AMOUNT_MISMATCH` and no item, payment, invoice, invoice line or activity_log row.
+- `PaymentVerificationIntegrationTest` and `DeskSaleRollbackIntegrationTest` are added to `scripts/ci/required-integration-tests.txt`, so CI fails if they do not run.
+- Merged main (final BE-18 from PR #60 and BE-10 from PR #51); the BE-19 change set is applied unchanged on top of it.
+- CI fix (PR #62): the three `DeskSaleRollbackIntegrationTest` tests failed in their setup with `detached entity passed to persist: UserAccount`, because `newMember` saved the account and the `@MapsId` profile in two transactions. Both are now saved in one transaction, as in `PaymentVerificationIntegrationTest`. Test helper only; no production code or assertion changed.
+
+## 2026-10-14 - Receptionist verifies and confirms payments (BE-18, Flow 3)
+
+Branch `feat/f3-confirm-payment`. Owner: Truc. Priority: P1. Depends on BE-17 (merged). Screens F3-04, F3-05, F3-06 and S3-Mismatch. Provides the BE-18 part of what FE-12 (`feat/f3-reception-payments`) needs; FE-12 is also blocked by BE-21.
+
+### Added
+- `GET /api/v1/payments` (RECEPTIONIST, MANAGER): payment requests with filters `status`, `method`, `search` (`query` also accepted), `from`, `to`, `page`, `size` (max 100); PENDING first, oldest first, then newest first; each row has member name and code, item type, code and status, original price, discount and invoice number.
+- `PUT /api/v1/payments/{id}/confirm`: `method`, `referenceCode` (required except for CASH, 400 otherwise), `amountReceived`, `note`. Matching amount -> payment SUCCESS with payment_time, card or registration ACTIVE with dates recomputed from today, one PAID invoice with one line (price before discount, card discount or upgrade credit as `discount_amount`, total = payment amount), activity_log PAYMENT_CONFIRMED. Different amount -> 409 `PAYMENT_AMOUNT_MISMATCH`, payment stays PENDING, only a note is committed. Not PENDING -> 409 `PAYMENT_NOT_PENDING`; a concurrent second confirmation fails on the payment `@Version` (409).
+- `PUT /api/v1/payments/{id}/fail` with `reason`: cancels the linked card or package request, payment FAILED with the reason in the notes, activity_log PAYMENT_FAILED.
+- `GET /api/v1/invoices/by-payment/{paymentId}`: receipt with lines, for staff or the member who owns the payment.
+- `PaymentVerificationService`, `PaymentVerificationController`, `InvoiceController`, `PaymentSpecifications`, DTOs `ConfirmPaymentRequest`, `FailPaymentRequest`, `StaffPaymentResponse`, `InvoiceResponse`, `InvoiceLineResponse`, `PaymentAmountMismatchException`; audit actions `PAYMENT_CONFIRMED`, `PAYMENT_FAILED`.
+- Tests: `PaymentVerificationServiceImplTest` (13), `PaymentVerificationControllerTest` (15), `PaymentVerificationIntegrationTest` (8, Testcontainers); test cases in `docs/tests/BE-18_test_cases.md`.
+
+### Changed
+- `ConflictException` takes an optional `code`; the 409 body includes `code` only when one is set (existing 409 bodies are unchanged).
+- Note appending moved from `PaymentServiceImpl` to `PaymentNotes` so both services keep the same 500 character rule; behaviour unchanged.
+- `PaymentRepository` is a `JpaSpecificationExecutor`; `MemberCardRepository`, `SportPackageRegistrationRepository` and `InvoiceRepository` get batch `findByPaymentIdIn` lookups for the list.
+- `docs/database/04` and `09`: verification endpoints, invoice amount rule, mismatch and double confirmation rules, payment state machine, V21 columns of `payment`.
+
+### Notes
+- No migration: `amount_received` is not a column (a confirmed payment always received exactly its amount); a different amount is kept only in the PAYMENT_AMOUNT_MISMATCH log details.
+- Not verified in the authoring environment (Maven Central and Docker images were blocked there). Run `mvn -B test` before merging; integration tests run in CI.
+- Failing a payment cancels the request it paid for, so the member asks again and a new payment row is created (state machine "Retry (creates new row)").
+
+### Review round 1
+- The card and package activate endpoints (FE-05) now issue the same receipt as confirm through `PaymentVerificationService.recordPaymentConfirmed`: one PAID invoice and one PAYMENT_CONFIRMED row per confirmed payment; their request is unchanged.
+- Confirm and fail lock the payment row first (`findByIdForUpdate`), so the second caller always gets 409 `PAYMENT_NOT_PENDING`; a version check failure inside them answers 409 `PAYMENT_CONCURRENT_UPDATE`. Non-staff actors in the service get 403.
+- Mismatch also writes an activity_log row PAYMENT_AMOUNT_MISMATCH. One `PaymentItemResolver` gives the item name, original price and discount for `GET /payments/{id}`, `GET /payments` and the invoice. The fail reason is stored in `sport_package_registration.cancel_reason`.
+
+### Review round 2
+- The card and package activate and cancel endpoints also lock the payment row before the card or registration, so every path uses one lock order and cannot deadlock with confirm or fail. Invoice amounts come from `PaymentItemResolver` and must satisfy subtotal - discount = total.
+- Review round 3: a card's original price is never below its `price_paid` snapshot, so a tier price lowered after the request no longer blocks confirmation; an item price that differs from the payment answers 409 `PAYMENT_ITEM_AMOUNT_MISMATCH` instead of 500.
+- CI fix: `PaymentVerificationIntegrationTest` failed to compile (ambiguous `assertThat` on `tx().execute(...)`); the invoice count is read through an `int` helper `invoiceCount`.
+- Rebased on main after PR #40 (manager catalog, BE-03) as one commit: conflicts in `MembershipCardServiceImpl`, `SportPackageServiceImpl` and their unit tests resolved by keeping the PR #40 upgrade rules (rank based, `upgradeRequest`) and the BE-18 lock order and receipt step; the integration test tier now gets a unique `tierRank`, and `ManagerCatalogIntegrationTest` cleanup deletes the invoices that card activation now issues before their payments.
+- CI fix 2: `PaymentVerificationIntegrationTest` deletes the rows it creates after each test (the SQL Server container is shared, and its leftover sports, packages, ranked tiers and the member code MEM-0001 broke 9 catalog and member tests); its member codes now use the `BE18-MEM-` prefix.
+
+### Review round 4
+- Invoice pricing uses only values stored at request time: a card's original price is `price_paid` plus, for an upgrade, the `price_paid` of the replaced card chain (the credit BE-17 priced it with); the current tier price is no longer read, so a tier price edited after the request cannot create a discount. Packages keep their registration snapshots. Applies to the invoice, `GET /payments` and `GET /payments/{id}`.
+- `GET /payments`: `from` and `to` outside 0001-01-01 to 9999-12-31 answer 400; `to=9999-12-31` leaves the upper bound open instead of failing with 500.
+- Merged main (BE-10, PR #51): `ConflictException` keeps both the optional `code` and the optional `details`.
 
 ## 2026-10-14 - Manager Session Schedule and Coach Assignment (BE-10, Flow 2)
 

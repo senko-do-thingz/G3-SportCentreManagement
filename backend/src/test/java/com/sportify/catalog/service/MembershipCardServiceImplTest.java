@@ -23,7 +23,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.api.extension.ExtendWith;
+import com.sportify.payment.service.PaymentVerificationService;
 import org.mockito.InjectMocks;
+import org.springframework.beans.factory.ObjectProvider;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -42,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import com.sportify.payment.entity.Invoice;
 import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.entity.PaymentStatus;
@@ -179,6 +182,11 @@ public class MembershipCardServiceImplTest {
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-10-06T00:00:00Z"), ZoneId.of("UTC"));
 
+    @Mock
+    private ObjectProvider<PaymentVerificationService> paymentVerificationProvider;
+    @Mock
+    private PaymentVerificationService paymentVerificationService;
+
     @InjectMocks
     private MembershipCardServiceImpl membershipCardService;
 
@@ -190,6 +198,16 @@ public class MembershipCardServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(paymentVerificationProvider.getObject()).thenReturn(paymentVerificationService);
+        // BE-19: a desk sale takes the money through PaymentVerificationService; answer with a SUCCESS payment.
+        lenient().when(paymentVerificationService.recordDeskPayment(any(), any(), any(), any(), any(), any()))
+                .thenAnswer(i -> Payment.builder()
+                        .id(900L)
+                        .paymentCode("PAY-0900")
+                        .amount(i.getArgument(1))
+                        .paymentMethod(i.getArgument(2) != null ? i.getArgument(2) : PaymentMethod.CASH)
+                        .paymentStatus(PaymentStatus.SUCCESS)
+                        .build());
         lenient().when(paymentService.createPendingPayment(any(MemberProfile.class), any(BigDecimal.class), any()))
                 .thenAnswer(i -> Payment.builder()
                         .id(50L)
@@ -730,6 +748,7 @@ public class MembershipCardServiceImplTest {
 
         assertEquals(CardStatus.ACTIVE, res.getStatus());
         verify(paymentService).markPaymentSuccess(99L, receptionistUser, null);
+        verify(paymentVerificationService).recordPaymentConfirmed(99L, receptionistUser, null);
     }
 
     @Test
@@ -756,6 +775,33 @@ public class MembershipCardServiceImplTest {
 
         assertEquals(CardStatus.ACTIVE, res.getStatus());
         verify(paymentService).markPaymentSuccess(99L, receptionistUser, PaymentMethod.CASH);
+    }
+
+    @Test
+    void activateCardForPaymentConfirmation_ActivatesWithoutIssuingTheReceipt() {
+        Payment payment = Payment.builder()
+                .id(99L)
+                .paymentCode("PAY-0099")
+                .paymentStatus(PaymentStatus.PENDING)
+                .build();
+        MemberCard pending = MemberCard.builder()
+                .id(42L)
+                .cardCode("CARD-42")
+                .member(memberProfile)
+                .tier(goldTier)
+                .status(CardStatus.PENDING_PAYMENT)
+                .payment(payment)
+                .pricePaid(goldTier.getPrice())
+                .build();
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of());
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
+
+        MemberCardResponse res = membershipCardService.activateCardForPaymentConfirmation(42L, receptionistUser, PaymentMethod.BANK_TRANSFER);
+
+        assertEquals(CardStatus.ACTIVE, res.getStatus());
+        verify(paymentService).markPaymentSuccess(99L, receptionistUser, PaymentMethod.BANK_TRANSFER);
+        org.mockito.Mockito.verifyNoInteractions(paymentVerificationService);
     }
 
     @Test
@@ -2214,5 +2260,108 @@ public class MembershipCardServiceImplTest {
 
         verify(tierRepository, never()).findAllForUpdate();
     }
-}
 
+    private MemberCard pendingCardWithPayment() {
+        Payment payment = Payment.builder()
+                .id(99L)
+                .paymentCode("PAY-0099")
+                .paymentStatus(PaymentStatus.PENDING)
+                .build();
+        return MemberCard.builder()
+                .id(42L)
+                .cardCode("CARD-42")
+                .member(memberProfile)
+                .tier(goldTier)
+                .status(CardStatus.PENDING_PAYMENT)
+                .payment(payment)
+                .pricePaid(goldTier.getPrice())
+                .build();
+    }
+
+    @Test
+    void activateCard_LocksThePaymentBeforeReadingTheCard() {
+        MemberCard pending = pendingCardWithPayment();
+        when(memberCardRepository.findPaymentIdById(42L)).thenReturn(Optional.of(99L));
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of());
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
+
+        membershipCardService.activateCard(42L, receptionistUser, PaymentMethod.CASH);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(memberCardRepository, paymentService);
+        order.verify(memberCardRepository).findPaymentIdById(42L);
+        order.verify(paymentService).lockPayment(99L);
+        order.verify(memberCardRepository).findById(42L);
+        order.verify(paymentService).markPaymentSuccess(99L, receptionistUser, PaymentMethod.CASH);
+    }
+
+    @Test
+    void cancelCard_LocksThePaymentBeforeReadingTheCard() {
+        MemberCard pending = pendingCardWithPayment();
+        when(memberCardRepository.findPaymentIdById(42L)).thenReturn(Optional.of(99L));
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
+
+        MemberCardResponse res = membershipCardService.cancelCard(42L, memberUser);
+
+        assertEquals(CardStatus.CANCELLED, res.getStatus());
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(memberCardRepository, paymentService);
+        order.verify(memberCardRepository).findPaymentIdById(42L);
+        order.verify(paymentService).lockPayment(99L);
+        order.verify(memberCardRepository).findById(42L);
+        order.verify(paymentService).markPaymentFailed(eq(99L), any());
+    }
+
+    @Test
+    void cancelCard_WithoutPayment_TakesNoPaymentLock() {
+        MemberCard pending = pendingCardWithPayment();
+        pending.setPayment(null);
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+        when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
+
+        membershipCardService.cancelCard(42L, memberUser);
+
+        org.mockito.Mockito.verify(paymentService, org.mockito.Mockito.never()).lockPayment(anyLong());
+    }
+
+    // ---------- BE-19: payment at the desk ----------
+
+    @Test
+    void purchaseCard_AtDesk_TakesTheMoneyAndReturnsTheReceipt() {
+        MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder().memberId(100L).tierId(2L)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER).referenceCode("FT123").amountReceived(BigDecimal.valueOf(200000.00))
+                .build();
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(2L)).thenReturn(Optional.of(goldTier));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of());
+        stubNewCard(23L);
+        when(paymentVerificationService.recordPaymentConfirmed(900L, receptionistUser, null))
+                .thenReturn(Invoice.builder().id(70L).invoiceNumber("INV-0070").build());
+
+        MemberCardResponse res = membershipCardService.purchaseCard(req, receptionistUser);
+
+        assertEquals(CardStatus.ACTIVE, res.getStatus());
+        assertEquals(900L, res.getPaymentId());
+        assertEquals(70L, res.getInvoiceId());
+        assertEquals("INV-0070", res.getInvoiceNumber());
+        verify(paymentVerificationService).recordDeskPayment(memberProfile, BigDecimal.valueOf(200000.00),
+                PaymentMethod.BANK_TRANSFER, "FT123", BigDecimal.valueOf(200000.00), receptionistUser);
+        verify(paymentService, never()).createPendingPayment(any(), any(), any());
+    }
+
+    @Test
+    void purchaseCard_Online_TakesNoDeskPayment() {
+        MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder().tierId(2L).build();
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(2L)).thenReturn(Optional.of(goldTier));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of());
+        stubNewCard(24L);
+
+        MemberCardResponse res = membershipCardService.purchaseCard(req, memberUser);
+
+        assertEquals(CardStatus.PENDING_PAYMENT, res.getStatus());
+        assertNull(res.getInvoiceId());
+        verify(paymentVerificationService, never()).recordDeskPayment(any(), any(), any(), any(), any(), any());
+        verify(paymentVerificationService, never()).recordPaymentConfirmed(anyLong(), any(), any());
+    }
+}
