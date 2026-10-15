@@ -180,7 +180,7 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
         var firstRequest = packageBooking(firstId, memberId, registrationId);
         var secondRequest = packageBooking(secondId, memberId, registrationId);
         CountDownLatch snapshotsRead = new CountDownLatch(2);
-        CountDownLatch firstBooked = new CountDownLatch(1);
+        CountDownLatch registrationLocked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         AtomicInteger firstSpid = new AtomicInteger();
         AtomicInteger secondSpid = new AtomicInteger();
@@ -191,19 +191,20 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
                 assertEquals(available, registrations.findById(registrationId).orElseThrow().getRemainingSessions());
                 snapshotsRead.countDown();
                 await(snapshotsRead);
-                var result = bookingService.createBooking(firstRequest, manager);
-                firstBooked.countDown();
+                sessions.findForUpdate(firstId).orElseThrow();
+                holdRegistrationForRace(registrationId);
+                registrationLocked.countDown();
                 await(release);
-                return result;
+                return bookingService.createBooking(firstRequest, manager);
             }));
             Future<?> second = executor.submit(() -> writerTransaction().execute(status -> {
                 secondSpid.set(count("SELECT @@SPID"));
                 assertEquals(available, registrations.findById(registrationId).orElseThrow().getRemainingSessions());
                 snapshotsRead.countDown();
-                await(firstBooked);
+                await(registrationLocked);
                 return bookingService.createBooking(secondRequest, manager);
             }));
-            assertTrue(firstBooked.await(20, TimeUnit.SECONDS), "Both snapshots precede the first conditional debit");
+            assertTrue(registrationLocked.await(20, TimeUnit.SECONDS), "Both snapshots precede the shared registration lock");
             awaitRegistrationUpdateBlocked(secondSpid.get(), firstSpid.get());
             release.countDown();
             assertNotNull(first.get(20, TimeUnit.SECONDS));
@@ -259,7 +260,7 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
         jdbc.update("UPDATE class_session SET booked_count = 1 WHERE id = ?", refundSessionId);
         var request = packageBooking(newSessionId, memberId, registrationId);
         CountDownLatch snapshotRead = new CountDownLatch(1);
-        CountDownLatch refunded = new CountDownLatch(1);
+        CountDownLatch registrationLocked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         AtomicInteger refundSpid = new AtomicInteger();
         AtomicInteger bookingSpid = new AtomicInteger();
@@ -269,22 +270,27 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
                 bookingSpid.set(count("SELECT @@SPID"));
                 assertEquals(1, registrations.findById(registrationId).orElseThrow().getRemainingSessions());
                 snapshotRead.countDown();
-                await(refunded);
+                await(registrationLocked);
                 return bookingService.createBooking(request, manager);
             }));
             Future<?> refund = executor.submit(() -> writerTransaction().execute(status -> {
                 refundSpid.set(count("SELECT @@SPID"));
                 await(snapshotRead);
+                sessions.findForUpdate(refundSessionId).orElseThrow();
+                // Match production dependencies before holding the contested registration for the test.
+                jdbc.queryForList("SELECT id FROM booking WITH (UPDLOCK, HOLDLOCK) WHERE session_id = ?",
+                        Long.class, refundSessionId);
+                holdRegistrationForRace(registrationId);
+                registrationLocked.countDown();
+                await(release);
                 if (refundType.equals("BOOKING")) {
                     bookingService.cancelBooking(bookingId, manager);
                 } else {
                     service.cancelSession(refundSessionId, new SessionCancelRequest("Refund race"), manager);
                 }
-                refunded.countDown();
-                await(release);
                 return true;
             }));
-            assertTrue(refunded.await(20, TimeUnit.SECONDS));
+            assertTrue(registrationLocked.await(20, TimeUnit.SECONDS));
             awaitRegistrationUpdateBlocked(bookingSpid.get(), refundSpid.get());
             release.countDown();
             assertNotNull(refund.get(20, TimeUnit.SECONDS));
@@ -341,6 +347,13 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
         return transaction;
     }
 
+    private void holdRegistrationForRace(long registrationId) {
+        // Test-only no-op UPDATE holds the row before any booking write can obscure the contested resource.
+        assertEquals(1, jdbc.update("""
+                UPDATE sport_package_registration SET remaining_sessions = remaining_sessions WHERE id = ?
+                """, registrationId));
+    }
+
     private void awaitRegistrationUpdateBlocked(int waitingSpid, int blockingSpid) {
         assertEquals(1, count("SELECT IS_SRVROLEMEMBER('sysadmin')"), "CI uses the container sa login for DMV visibility");
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
@@ -354,7 +367,12 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
                 return;
             }
         } while (System.nanoTime() < deadline);
-        fail("SQL Server must report the conditional registration UPDATE waiting for the other transaction");
+        var requests = jdbc.queryForList("""
+                SELECT r.blocking_session_id, r.wait_type, t.text
+                FROM sys.dm_exec_requests r CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) t
+                WHERE r.session_id = ?
+                """, waitingSpid);
+        fail("SQL Server must report the conditional registration UPDATE waiting for the other transaction; observed " + requests);
     }
 
     private static void stopWriters(ExecutorService executor) throws InterruptedException {
