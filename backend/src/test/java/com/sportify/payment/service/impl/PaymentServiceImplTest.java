@@ -626,10 +626,14 @@ class PaymentServiceImplTest {
         when(sportPackageRegistrationRepository.findByPaymentId(10L)).thenReturn(Optional.empty());
 
         MembershipCardTier tier = MembershipCardTier.builder().id(3L).name("Gold").price(BigDecimal.valueOf(1000000.00)).build();
+        // An upgrade: the price_paid of the replaced card is the credit, so original = 810000 + 190000.
+        MemberCard replaced = MemberCard.builder().id(29L).pricePaid(BigDecimal.valueOf(190000.00)).build();
         MemberCard card = MemberCard.builder()
                 .id(30L)
                 .tier(tier)
                 .pricePaid(BigDecimal.valueOf(810000.00))
+                .upgradeRequest(true)
+                .replacesCard(replaced)
                 .build();
         when(memberCardRepository.findByPaymentId(10L)).thenReturn(Optional.of(card));
 

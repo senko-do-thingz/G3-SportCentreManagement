@@ -75,6 +75,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -276,6 +277,63 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
             tierIds.add(tier.getId());
             cardIds.add(card.getId());
             return new Long[]{payment.getId(), card.getId()};
+        });
+    }
+
+    /**
+     * An upgrade request: the member holds an ACTIVE Silver card bought for 500000, and asked for Gold (1200000)
+     * at 1200000 - 500000 = 700000, the way BE-17 prices it. Returns payment id, upgrade card id, Gold tier id.
+     */
+    private Long[] pendingUpgrade() {
+        return tx().execute(status -> {
+            MemberProfile member = newMember();
+            MembershipCardTier silver = tierRepository.save(MembershipCardTier.builder()
+                    .code("BE18-S-" + System.nanoTime())
+                    .name("BE18 Silver")
+                    .price(new BigDecimal("500000.00"))
+                    .durationMonths(12)
+                    .discountPercentage(3)
+                    .tierRank(nextTierRank())
+                    .isActive(true)
+                    .build());
+            MembershipCardTier gold = tierRepository.save(MembershipCardTier.builder()
+                    .code("BE18-G-" + System.nanoTime())
+                    .name("BE18 Gold")
+                    .price(new BigDecimal("1200000.00"))
+                    .durationMonths(12)
+                    .discountPercentage(5)
+                    .tierRank(nextTierRank())
+                    .isActive(true)
+                    .build());
+            LocalDate start = LocalDate.now(clock).minusDays(30);
+            LocalDate end = start.plusMonths(12).minusDays(1);
+            MemberCard current = memberCardRepository.save(MemberCard.builder()
+                    .cardCode(codeFormatter.formatCardCode(memberCardRepository.getNextCardCodeSequence()))
+                    .member(member)
+                    .tier(silver)
+                    .startDate(start)
+                    .endDate(end)
+                    .status(CardStatus.ACTIVE)
+                    .pricePaid(new BigDecimal("500000.00"))
+                    .build());
+            Payment payment = newPendingPayment(member, new BigDecimal("700000.00"));
+            MemberCard upgrade = memberCardRepository.save(MemberCard.builder()
+                    .cardCode(codeFormatter.formatCardCode(memberCardRepository.getNextCardCodeSequence()))
+                    .member(member)
+                    .tier(gold)
+                    .startDate(LocalDate.now(clock))
+                    .endDate(end)
+                    .status(CardStatus.PENDING_PAYMENT)
+                    .pricePaid(new BigDecimal("700000.00"))
+                    .upgradeRequest(true)
+                    .replacesCard(current)
+                    .payment(payment)
+                    .build());
+            tierIds.add(silver.getId());
+            tierIds.add(gold.getId());
+            cardIds.add(current.getId());
+            cardIds.add(upgrade.getId());
+            return new Long[]{payment.getId(), upgrade.getId(), gold.getId()};
         });
     }
 
@@ -753,6 +811,65 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
         DefaultTransactionDefinition definition = new DefaultTransactionDefinition();
         definition.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         return definition;
+    }
+
+    @Test
+    @DisplayName("R1-1: tier price raised after a card request: invoice at price_paid with no invented discount")
+    void confirmCard_TierPriceRaisedAfterRequest_NoInventedDiscount() {
+        Long[] ids = pendingCard();
+        jdbcTemplate.update("UPDATE membership_card_tier SET price = 1500000.00 WHERE id = "
+                + "(SELECT tier_id FROM member_card WHERE id = ?)", ids[1]);
+        UserAccount receptionist = tx().execute(s -> newUser("RECEPTIONIST"));
+
+        verificationService.confirmPayment(ids[0], confirm("1200000.00"), receptionist);
+
+        assertThat(invoiceCount(ids[0])).isEqualTo(1);
+        tx().executeWithoutResult(s -> {
+            Invoice invoice = invoiceRepository.findByPaymentId(ids[0]).get(0);
+            assertThat(invoice.getSubtotalAmount()).isEqualByComparingTo("1200000");
+            assertThat(invoice.getDiscountAmount()).isEqualByComparingTo("0");
+            assertThat(invoice.getTotalAmount()).isEqualByComparingTo("1200000");
+            assertThat(invoiceLineRepository.findByInvoiceId(invoice.getId()).get(0).getUnitPrice())
+                    .isEqualByComparingTo("1200000");
+        });
+    }
+
+    @Test
+    @DisplayName("R1-1: upgrade confirmed after a tier price edit: credit from the stored replaced card, one invoice")
+    void confirmUpgrade_TierPriceEdited_CreditFromStoredChain() {
+        Long[] ids = pendingUpgrade();
+        jdbcTemplate.update("UPDATE membership_card_tier SET price = 2000000.00 WHERE id = ?", ids[2]);
+        UserAccount receptionist = tx().execute(s -> newUser("RECEPTIONIST"));
+
+        StaffPaymentResponse response = verificationService.confirmPayment(ids[0], confirm("700000.00"), receptionist);
+
+        assertThat(response.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(invoiceCount(ids[0])).isEqualTo(1);
+        tx().executeWithoutResult(s -> {
+            assertThat(memberCardRepository.findById(ids[1]).orElseThrow().getStatus()).isEqualTo(CardStatus.ACTIVE);
+            Invoice invoice = invoiceRepository.findByPaymentId(ids[0]).get(0);
+            assertThat(invoice.getSubtotalAmount()).isEqualByComparingTo("1200000");
+            assertThat(invoice.getDiscountAmount()).isEqualByComparingTo("500000");
+            assertThat(invoice.getTotalAmount()).isEqualByComparingTo("700000");
+            assertThat(invoiceLineRepository.findByInvoiceId(invoice.getId()).get(0).getDescription())
+                    .endsWith("- upgrade, credit for the current card applied");
+        });
+    }
+
+    @Test
+    @DisplayName("R1-2: GET /payments with to=9999-12-31 answers 200 on SQL Server and includes today's rows")
+    void list_LastSupportedToDate_Returns200() throws Exception {
+        Long[] ids = pendingRegistration();
+        UserAccount receptionist = tx().execute(s -> newUser("RECEPTIONIST"));
+        String memberCode = tx().execute(s -> paymentRepository.findById(ids[0]).orElseThrow().getMember().getMemberCode());
+
+        mockMvc.perform(get("/api/v1/payments")
+                        .with(user(new CustomUserDetails(receptionist)))
+                        .param("search", memberCode)
+                        .param("from", LocalDate.now(clock).minusDays(1).toString())
+                        .param("to", "9999-12-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].id").value(hasItem(ids[0].intValue())));
     }
 
     // ---------- BE-19: payment at the desk (F1-13, F1-14) ----------

@@ -61,6 +61,9 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
     static final String CODE_PAYMENT_CONCURRENT_UPDATE = "PAYMENT_CONCURRENT_UPDATE";
     static final String CODE_PAYMENT_ITEM_AMOUNT_MISMATCH = "PAYMENT_ITEM_AMOUNT_MISMATCH";
     static final String ENTITY_TYPE = "PAYMENT";
+    /** Range of the created_at column (SQL Server datetime2); date filters outside it answer 400. */
+    static final LocalDate MIN_FILTER_DATE = LocalDate.of(1, 1, 1);
+    static final LocalDate MAX_FILTER_DATE = LocalDate.of(9999, 12, 31);
     private static final int DESCRIPTION_MAX = 255;
     private static final int SUMMARY_MAX = 255;
 
@@ -84,11 +87,13 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         if (size < 1 || size > MAX_PAGE_SIZE) {
             throw new BusinessRuleException("Size must be between 1 and " + MAX_PAGE_SIZE);
         }
+        requireSupportedDate("from", from);
+        requireSupportedDate("to", to);
         if (from != null && to != null && from.isAfter(to)) {
             throw new BusinessRuleException("The from date must not be after the to date");
         }
         LocalDateTime createdFrom = from != null ? from.atStartOfDay() : null;
-        LocalDateTime createdBefore = to != null ? to.plusDays(1).atStartOfDay() : null;
+        LocalDateTime createdBefore = createdBeforeOf(to);
 
         // The specification sets the order (PENDING first), so the page request carries no sort.
         Page<Payment> result = paymentRepository.findAll(
@@ -330,6 +335,26 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
                         + amountReceived.toPlainString() + ", expected " + payment.getAmount().toPlainString(), SUMMARY_MAX))
                 .details(details)
                 .build());
+    }
+
+    /**
+     * Exclusive upper bound on created_at for an inclusive {@code to} date: the start of the next day. The last
+     * supported day has no next day in the column range, and no row can be created after it, so it leaves the upper
+     * bound open (null) instead of sending an out of range value to the database.
+     */
+    static LocalDateTime createdBeforeOf(LocalDate to) {
+        if (to == null || !to.isBefore(MAX_FILTER_DATE)) {
+            return null;
+        }
+        return to.plusDays(1).atStartOfDay();
+    }
+
+    /** A date filter must fit the created_at column range (datetime2: years 0001 to 9999); otherwise 400. */
+    private static void requireSupportedDate(String name, LocalDate date) {
+        if (date != null && (date.isBefore(MIN_FILTER_DATE) || date.isAfter(MAX_FILTER_DATE))) {
+            throw new BusinessRuleException("The " + name + " date must be between " + MIN_FILTER_DATE + " and "
+                    + MAX_FILTER_DATE);
+        }
     }
 
     /**
