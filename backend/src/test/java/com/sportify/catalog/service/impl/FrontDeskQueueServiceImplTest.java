@@ -1,21 +1,35 @@
 package com.sportify.catalog.service.impl;
 
-import com.sportify.catalog.entity.*;
+import com.sportify.catalog.entity.CardStatus;
+import com.sportify.catalog.entity.MemberCard;
+import com.sportify.catalog.entity.MembershipCardTier;
+import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.mapper.FrontDeskMapper;
-import com.sportify.catalog.repository.*;
-import com.sportify.identity.entity.*;
+import com.sportify.catalog.repository.MemberCardRepository;
+import com.sportify.catalog.repository.SportPackageRegistrationRepository;
+import com.sportify.identity.entity.MemberProfile;
+import com.sportify.identity.entity.UserAccount;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class FrontDeskQueueServiceImplTest {

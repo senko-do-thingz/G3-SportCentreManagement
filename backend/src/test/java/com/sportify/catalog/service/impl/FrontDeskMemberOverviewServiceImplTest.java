@@ -1,12 +1,23 @@
 package com.sportify.catalog.service.impl;
 
-import com.sportify.catalog.entity.*;
+import com.sportify.catalog.entity.CardStatus;
+import com.sportify.catalog.entity.CheckIn;
+import com.sportify.catalog.entity.CheckInResult;
+import com.sportify.catalog.entity.MemberCard;
+import com.sportify.catalog.entity.MembershipCardTier;
+import com.sportify.catalog.entity.PackageRegistrationStatus;
+import com.sportify.catalog.entity.SportPackage;
+import com.sportify.catalog.entity.SportPackageRegistration;
 import com.sportify.catalog.mapper.FrontDeskMapper;
-import com.sportify.catalog.repository.*;
+import com.sportify.catalog.repository.CheckInRepository;
+import com.sportify.catalog.repository.MemberCardRepository;
+import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.core.exception.ResourceNotFoundException;
-import com.sportify.identity.entity.*;
+import com.sportify.identity.entity.MemberProfile;
+import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.mapper.MemberSearchMapper;
 import com.sportify.identity.repository.MemberProfileRepository;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,12 +26,20 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.*;
-import java.util.*;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class FrontDeskMemberOverviewServiceImplTest {

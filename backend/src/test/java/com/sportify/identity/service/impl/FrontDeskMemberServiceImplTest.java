@@ -3,37 +3,52 @@ package com.sportify.identity.service.impl;
 import com.sportify.core.common.CodeFormatter;
 import com.sportify.core.exception.ConflictException;
 import com.sportify.identity.dto.MemberCreateRequest;
-import com.sportify.identity.entity.*;
+import com.sportify.identity.entity.MemberProfile;
+import com.sportify.identity.entity.Role;
+import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.mapper.FrontDeskMemberMapper;
-import com.sportify.identity.repository.*;
+import com.sportify.identity.repository.MemberProfileRepository;
+import com.sportify.identity.repository.RoleRepository;
+import com.sportify.identity.repository.UserRepository;
+import com.sportify.identity.security.CustomUserDetails;
 import com.sportify.identity.service.TemporaryPasswordGenerator;
+
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import com.sportify.identity.security.CustomUserDetails;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.slf4j.LoggerFactory;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mapstruct.factory.Mappers;
-import org.mockito.*;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.sql.SQLException;
-import java.time.*;
-import java.util.*;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class FrontDeskMemberServiceImplTest {
@@ -127,7 +142,6 @@ class FrontDeskMemberServiceImplTest {
                 new ConstraintViolationException("duplicate", new SQLException("duplicate", "23000", 2627), "uq_member_code")));
         assertThrows(ConflictException.class, () -> service.create(request));
     }
-
 
     @AfterEach
     void clearSecurityContext() {

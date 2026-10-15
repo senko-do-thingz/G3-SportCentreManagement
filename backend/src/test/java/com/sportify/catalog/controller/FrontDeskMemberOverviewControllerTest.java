@@ -9,6 +9,7 @@ import com.sportify.identity.security.CustomAuthenticationEntryPoint;
 import com.sportify.identity.security.JwtAuthenticationFilter;
 import com.sportify.identity.security.JwtService;
 import com.sportify.identity.security.SecurityConfig;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
