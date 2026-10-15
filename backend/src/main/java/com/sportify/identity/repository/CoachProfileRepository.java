@@ -1,8 +1,10 @@
 package com.sportify.identity.repository;
 
 import com.sportify.identity.entity.CoachProfile;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -12,6 +14,10 @@ import java.util.Optional;
 
 @Repository
 public interface CoachProfileRepository extends JpaRepository<CoachProfile, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM CoachProfile c WHERE c.id = :id")
+    Optional<CoachProfile> findForScheduleUpdate(@Param("id") Long id);
 
     /**
      * Loads a coach profile with its account and role, used to validate a coach assignment.

@@ -21,6 +21,7 @@ import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.UserRepository;
+import com.sportify.payment.entity.Invoice;
 import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.service.PaymentService;
@@ -279,6 +280,13 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             Payment payment = paymentService.createPendingPayment(member, plan.price(), request.getPaymentMethod());
             card.setPayment(payment);
         }
+        // BE-19: a desk sale records the money at once (SUCCESS payment, then the invoice). A zero fee upgrade has
+        // nothing to pay and gets no payment.
+        boolean takesMoneyAtDesk = status == CardStatus.ACTIVE && plan.price().signum() > 0;
+        if (takesMoneyAtDesk) {
+            card.setPayment(paymentVerificationService.getObject().recordDeskPayment(member, plan.price(),
+                    request.getPaymentMethod(), request.getReferenceCode(), request.getAmountReceived(), actor));
+        }
         try {
             card = memberCardRepository.save(card);
             memberCardRepository.flush();
@@ -302,7 +310,12 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             }
             throw ex;
         }
-        return mapToCardResponse(card);
+        MemberCardResponse response = mapToCardResponse(card);
+        if (takesMoneyAtDesk) {
+            withInvoice(response, paymentVerificationService.getObject()
+                    .recordPaymentConfirmed(card.getPayment().getId(), actor, null));
+        }
+        return response;
     }
 
     /**
@@ -319,11 +332,13 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     @Transactional
     public MemberCardResponse activateCard(Long cardId, UserAccount actor, PaymentMethod actualMethod) {
         MemberCard card = activatePending(cardId, actor, actualMethod);
+        MemberCardResponse response = mapToCardResponse(card);
         if (card.getPayment() != null) {
             // Same receipt as PUT /payments/{id}/confirm: one PAID invoice and one PAYMENT_CONFIRMED row.
-            paymentVerificationService.getObject().recordPaymentConfirmed(card.getPayment().getId(), actor, null);
+            withInvoice(response, paymentVerificationService.getObject()
+                    .recordPaymentConfirmed(card.getPayment().getId(), actor, null));
         }
-        return mapToCardResponse(card);
+        return response;
     }
 
     @Override
@@ -535,6 +550,15 @@ public class MembershipCardServiceImpl implements MembershipCardService {
      */
     private void lockLinkedPayment(Long cardId) {
         memberCardRepository.findPaymentIdById(cardId).ifPresent(paymentService::lockPayment);
+    }
+
+    /** Adds the receipt to the response so the desk screen can open it (F1-13 State After Payment). */
+    private static MemberCardResponse withInvoice(MemberCardResponse response, Invoice invoice) {
+        if (invoice != null) {
+            response.setInvoiceId(invoice.getId());
+            response.setInvoiceNumber(invoice.getInvoiceNumber());
+        }
+        return response;
     }
 
     private void replace(MemberCard old) {

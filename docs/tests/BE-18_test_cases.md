@@ -8,7 +8,7 @@
 - **Priority**: P1 (core flow demo)
 - **Depends on**: BE-17 (pending payments, merged)
 - **Objective**: Let RECEPTIONIST and MANAGER list payment requests (PENDING first), confirm a payment when the amount received matches (payment SUCCESS, card or package ACTIVE with recomputed dates, one PAID invoice with its line, activity log), answer 409 PAYMENT_AMOUNT_MISMATCH without changing anything but a note and a PAYMENT_AMOUNT_MISMATCH log, refuse a second confirm or fail with 409 PAYMENT_NOT_PENDING, and mark a payment FAILED with a reason. Review round 1: the FE-05 card and package activate endpoints issue the same receipt. Review round 2: every path that changes a payment and its card or registration locks the payment row first.
-- **Environment Note**: Maven Central and the SQL Server image could not be downloaded in the environment that wrote this change (initial commit, review rounds 1 to 3), so nothing below was executed there. The unit and MockMvc tests run with `mvn test` on a developer machine; the Testcontainers tests need Docker and run in GitHub Actions CI. Update the Execution Status column after the first run.
+- **Environment Note**: Maven Central and the SQL Server image could not be downloaded in the environment that wrote this change (initial commit, review rounds 1 to 3), so nothing below was executed there. The same applies to review round 4 (R1-1, R1-2). The unit and MockMvc tests run with `mvn test` on a developer machine; the Testcontainers tests need Docker and run in GitHub Actions CI. Update the Execution Status column after the first run.
 
 ---
 
@@ -21,7 +21,7 @@
 | status | PENDING, SUCCESS, FAILED, REFUNDED | all | Unknown value -> 400 |
 | method | CASH, CREDIT_CARD, BANK_TRANSFER, MOMO, VNPAY, ZALOPAY | all | Unknown value -> 400 |
 | search | text | none | Member full name, member code, payment code, reference code (contains, case-insensitive). `query` is accepted as another name (FE-12) |
-| from, to | ISO date | none | Inclusive dates on `created_at`; from after to -> 400 |
+| from, to | ISO date | none | Inclusive dates on `created_at`; from after to -> 400; malformed -> 400; outside 0001-01-01 to 9999-12-31 -> 400; to = 9999-12-31 leaves the upper bound open |
 | page | int | 0 | Below 0 -> 400 |
 | size | int | 20 | 1 to 100, otherwise 400 |
 
@@ -66,10 +66,10 @@ Request unchanged: `{"paymentMethod": "CASH"}` or no body. No reference is requi
 
 | Test Class | Category | Tests | Execution Status | Description |
 |---|---|---|---|---|
-| `PaymentVerificationServiceImplTest` | Service unit test (Mockito) | 20 | Not run yet | Row lock, invoice amounts and line, activation per item type without receipt duplication, invoice invariant subtotal - discount = total (409 PAYMENT_ITEM_AMOUNT_MISMATCH), tier price lowered after the request, mismatch note and log, 409 codes (NOT_PENDING, CONCURRENT_UPDATE, INVOICE_ALREADY_ISSUED), 403 for non-staff on confirm and fail, reason passed to cancelRegistration, list mapping, invoice visibility |
-| `PaymentPricingConsistencyTest` | Service unit test (Mockito) | 4 | Not run yet | `GET /payments/{id}` and `GET /payments` show the same item name, original price and discount (package, package with a paid amount different from the payment, card upgrade, tier price lowered after the request) |
-| `PaymentVerificationControllerTest` | WebMvc MockMvc test | 15 methods, 17 runs | Not run yet | Roles 200/403/401, service AccessDeniedException as 403, JSON aliases, 409 body codes, bean validation 400, list parameters and defaults |
-| `PaymentVerificationIntegrationTest` | Testcontainers integration test | 14 | Not run yet (CI only) | Real SQL Server: activation dates, invoice rows, committed mismatch note and log, double confirm, confirm vs confirm, confirm vs fail, activate endpoint vs confirm and member cancel vs confirm races, version check, fail reasons, FE-05 activate endpoints issue the receipt, list order and search |
+| `PaymentVerificationServiceImplTest` | Service unit test (Mockito) | 28 | Not run yet | Row lock, invoice pricing from stored snapshots only (tier or package price edited after the request, upgrade credit from the replaced card chain, unreadable chain), list date bounds (R1-2), invoice amounts and line, activation per item type without receipt duplication, invoice invariant subtotal - discount = total (409 PAYMENT_ITEM_AMOUNT_MISMATCH), tier price lowered after the request, mismatch note and log, 409 codes (NOT_PENDING, CONCURRENT_UPDATE, INVOICE_ALREADY_ISSUED), 403 for non-staff on confirm and fail, reason passed to cancelRegistration, list mapping, invoice visibility |
+| `PaymentPricingConsistencyTest` | Service unit test (Mockito) | 5 | Not run yet | `GET /payments/{id}` and `GET /payments` show the same item name, original price and discount (package, package with a paid amount different from the payment, card upgrade with a stored replaced card, tier price lowered or raised after the request) |
+| `PaymentVerificationControllerTest` | WebMvc MockMvc test | 17 methods, 19 runs | Not run yet | Roles 200/403/401, service AccessDeniedException as 403, JSON aliases, 409 body codes, bean validation 400, list parameters and defaults |
+| `PaymentVerificationIntegrationTest` | Testcontainers integration test | 17 | Not run yet (CI only) | Real SQL Server: invoice after a tier price edit (new card and upgrade), `to=9999-12-31` over HTTP, activation dates, invoice rows, committed mismatch note and log, double confirm, confirm vs confirm, confirm vs fail, activate endpoint vs confirm and member cancel vs confirm races, version check, fail reasons, FE-05 activate endpoints issue the receipt, list order and search |
 | `MembershipCardServiceImplTest` (existing, changed) | Service unit test | +4 new (1 in round 1, 3 in round 2), 1 assertion added | Not run yet | activateCard calls recordPaymentConfirmed; activateCardForPaymentConfirmation does not; activate and cancel lock the payment before reading the card; no lock without a payment |
 | `SportPackageServiceImplTest` (existing, changed) | Service unit test | +5 new (3 in round 1, 2 in round 2), 1 assertion added | Not run yet | activateRegistration calls recordPaymentConfirmed; the confirmation variant does not; cancel reason stored or defaulted; activate and cancel lock the payment before reading the registration |
 | `PaymentServiceImplTest`, `PaymentServiceTransactionMandatoryTest` (existing) | Service unit test | 40 and 4 | Not run yet | Constructor takes `PaymentItemResolver`; new `lockPayment` (found, not found, MANDATORY outside a transaction) |
@@ -146,10 +146,25 @@ Request unchanged: `{"paymentMethod": "CASH"}` or no body. No reference is requi
 | TC-BE18-29 | PENDING first | No PENDING row after the first non-PENDING row | IT `list_PendingFirst` |
 | TC-BE18-30 | Search by member code with status and dates | Finds the member's PENDING payment with name and item type | IT `list_PendingFirst`, Controller `list_PassesFilters` |
 | TC-BE18-31 | Row mapping | Name, code, item, original price 400000, discount 20000 | Unit `list_MapsRows` |
-| TC-BE18-32 | Same pricing on both screens | `GET /payments/{id}` and `GET /payments` agree on name, original price and discount | `PaymentPricingConsistencyTest` (3 tests) |
+| TC-BE18-32 | Same pricing on both screens | `GET /payments/{id}` and `GET /payments` agree on name, original price and discount | `PaymentPricingConsistencyTest` (5 tests) |
 | TC-BE18-33 | Defaults | page 0, size 20 | Controller `list_Defaults` |
 | TC-BE18-34 | Size 101, from after to, unknown status | 400 | Unit `list_InvalidParameters_BadRequest`, Controller `list_UnknownStatus_Returns400` |
 | TC-BE18-35 | Invoice by payment | Staff read it; another member 404 | Unit `invoiceByPayment_Visibility` |
+
+
+### 3.6 Review round 4: invoice pricing snapshots (R1-1) and list date bounds (R1-2)
+
+| ID | Scenario | Steps and expected result | Automated test |
+|---|---|---|---|
+| TC-BE18-43 | Tier price raised after a new card request (R1-1) | Card requested at 1200000, tier raised to 1500000, confirm 1200000 -> invoice subtotal 1200000, discount 0, total 1200000, one line at 1200000; both payment screens show 1200000 and 0 | Unit `confirm_TierPriceRaisedAfterRequest_NoInventedDiscount`, `tierPriceRaisedAfterRequest_SameValues`; IT `confirmCard_TierPriceRaisedAfterRequest_NoInventedDiscount` |
+| TC-BE18-44 | Upgrade confirmed after a tier price edit (R1-1) | Silver card bought for 500000, Gold upgrade requested at 700000, Gold price edited to 2000000 (IT) or 2500000 (unit), confirm 700000 -> card ACTIVE, one invoice: subtotal 1200000 (price_paid + replaced card price_paid), discount 500000, total 700000, upgrade text on the line | Unit `confirm_ExactAmount_CardUpgrade_InvoiceShowsCredit`; IT `confirmUpgrade_TierPriceEdited_CreditFromStoredChain` |
+| TC-BE18-45 | Upgrade of a card that was itself an upgrade (R1-1) | Credit = price_paid of every card in the replaced chain (500000 + 400000); subtotal 2000000, discount 900000, total 1100000 | Unit `confirm_UpgradeOfUpgradedCard_CreditIsWholeChain` |
+| TC-BE18-46 | Upgrade whose chain cannot be read (R1-1) | No replaced card stored -> subtotal = price_paid, discount 0, line text "- upgrade" only; missing price, cycle or chain longer than the BE-17 limit -> credit 0 | Unit `confirm_LegacyUpgradeWithoutChain_NoCreditClaimed`, `upgradeCredit_UnreadableChain_IsZero` |
+| TC-BE18-47 | Package price changed after the request (R1-1) | Package price edited to 900000, confirm 380000 -> invoice 400000 / 20000 / 380000 from the registration snapshot | Unit `confirm_PackagePriceChangedAfterRequest_InvoiceKeepsSnapshot` |
+| TC-BE18-48 | to = 9999-12-31 (R1-2) | 200, never 500; the upper bound is left open; on SQL Server today's PENDING row is listed | Unit `list_LastSupportedToDate_DoesNotFail`; Controller `list_LastSupportedDate_Returns200`; IT `list_LastSupportedToDate_Returns200` |
+| TC-BE18-49 | Inclusive to date (R1-2) | to = 2026-10-14 -> exclusive bound 2026-10-15T00:00; a row created today is listed with to = today; no to date -> no bound | Unit `createdBeforeOf_InclusiveDay`; IT `list_PendingFirst` |
+| TC-BE18-50 | Date outside the column range (R1-2) | from = 10000-01-01, from = 0000-12-31 or to = LocalDate.MAX -> 400 "The from/to date must be between 0001-01-01 and 9999-12-31", no query | Unit `list_DateOutsideColumnRange_BadRequest` |
+| TC-BE18-51 | Malformed date (R1-2) | to = 2026-13-40 -> 400 `{"status":400,"message":"Invalid value for parameter 'to'"}`, service not called | Controller `list_MalformedDate_Returns400` |
 
 ---
 

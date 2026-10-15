@@ -3,6 +3,8 @@ package com.sportify.payment.repository;
 import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentStatus;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
@@ -34,6 +36,12 @@ public interface PaymentRepository extends JpaRepository<Payment, Long>, JpaSpec
     Optional<Payment> findByIdForUpdate(@Param("id") Long id);
 
     List<Payment> findByMemberIdOrderByCreatedAtDesc(Long memberId);
+
+    /** Payments of one member (GET /payments/my). The caller passes the sort in the Pageable. */
+    Page<Payment> findByMemberId(Long memberId, Pageable pageable);
+
+    /** Payments of one member with one status (GET /payments/my?status=). */
+    Page<Payment> findByMemberIdAndPaymentStatus(Long memberId, PaymentStatus paymentStatus, Pageable pageable);
 
     List<Payment> findByPaymentStatus(PaymentStatus paymentStatus);
 

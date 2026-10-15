@@ -292,6 +292,28 @@ class PaymentVerificationControllerTest {
     }
 
     @Test
+    @DisplayName("GET /payments with a malformed date returns 400 in the standard error body")
+    void list_MalformedDate_Returns400() throws Exception {
+        mockMvc.perform(get("/api/v1/payments").with(user(userWithRole("RECEPTIONIST"))).param("to", "2026-13-40"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Invalid value for parameter 'to'"));
+        verifyNoInteractions(paymentVerificationService);
+    }
+
+    @Test
+    @DisplayName("GET /payments with to=9999-12-31 reaches the service and returns 200")
+    void list_LastSupportedDate_Returns200() throws Exception {
+        when(paymentVerificationService.listPayments(any(), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(new PageResponse<>(List.of(), 0, 20, 0, 0));
+
+        mockMvc.perform(get("/api/v1/payments").with(user(userWithRole("RECEPTIONIST"))).param("to", "9999-12-31"))
+                .andExpect(status().isOk());
+
+        verify(paymentVerificationService).listPayments(null, null, null, null, LocalDate.of(9999, 12, 31), 0, 20);
+    }
+
+    @Test
     @DisplayName("An unknown status value returns 400")
     void list_UnknownStatus_Returns400() throws Exception {
         mockMvc.perform(get("/api/v1/payments").with(user(userWithRole("RECEPTIONIST"))).param("status", "PAID"))

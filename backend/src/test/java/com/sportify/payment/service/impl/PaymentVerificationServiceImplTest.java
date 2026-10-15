@@ -21,9 +21,9 @@ import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
+import com.sportify.payment.config.BankTransferProperties;
 import com.sportify.payment.dto.ConfirmPaymentRequest;
 import com.sportify.payment.dto.FailPaymentRequest;
-import com.sportify.payment.dto.InvoiceResponse;
 import com.sportify.payment.dto.StaffPaymentResponse;
 import com.sportify.payment.entity.Invoice;
 import com.sportify.payment.entity.InvoiceItemType;
@@ -83,6 +83,10 @@ class PaymentVerificationServiceImplTest {
     private SportPackageService sportPackageService;
     @Mock
     private AuditService auditService;
+    @Mock
+    private BankTransferProperties bankProperties;
+
+    private PaymentServiceImpl paymentService;
 
     private PaymentVerificationServiceImpl service;
     private UserAccount receptionist;
@@ -94,8 +98,10 @@ class PaymentVerificationServiceImplTest {
     void setUp() {
         Clock clock = Clock.fixed(Instant.parse("2026-10-14T03:00:00Z"), ZoneId.of("Asia/Ho_Chi_Minh"));
         PaymentItemResolver resolver = new PaymentItemResolver(memberCardRepository, registrationRepository, invoiceRepository);
+        paymentService = new PaymentServiceImpl(paymentRepository, memberCardRepository, registrationRepository,
+                resolver, bankProperties, new CodeFormatter(), clock);
         service = new PaymentVerificationServiceImpl(paymentRepository, invoiceRepository, resolver,
-                membershipCardService, sportPackageService, auditService, new CodeFormatter(), clock);
+                paymentService, membershipCardService, sportPackageService, auditService, new CodeFormatter(), clock);
 
         receptionist = UserAccount.builder().id(7L).fullName("Rita Reception")
                 .role(Role.builder().code("RECEPTIONIST").name("Receptionist").build()).build();
@@ -140,6 +146,49 @@ class PaymentVerificationServiceImplTest {
                 .pricePaid(pricePaid)
                 .payment(payment)
                 .build();
+    }
+
+    /** The member's current card, the one an upgrade replaces. */
+    private MemberCard currentCard(Long id, BigDecimal pricePaid) {
+        MembershipCardTier silver = MembershipCardTier.builder().id(2L).code("SILVER").name("Silver Member")
+                .price(new BigDecimal("900000.00")).durationMonths(12).build();
+        return MemberCard.builder()
+                .id(id)
+                .cardCode("CARD-10" + id)
+                .member(member)
+                .tier(silver)
+                .status(CardStatus.ACTIVE)
+                .pricePaid(pricePaid)
+                .build();
+    }
+
+    /** An upgrade request priced at tier price - credit, where the credit is the replaced card's price_paid. */
+    private MemberCard pendingUpgrade(BigDecimal pricePaid, MemberCard replaces) {
+        MemberCard card = pendingCard(pricePaid);
+        card.setUpgradeRequest(true);
+        card.setReplacesCard(replaces);
+        return card;
+    }
+
+    private void stubConfirmCard(MemberCard card) {
+        stubLockedPayment();
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(registrationRepository.findByPaymentId(1L)).thenReturn(Optional.empty());
+        when(memberCardRepository.findByPaymentId(1L)).thenReturn(Optional.of(card));
+        when(membershipCardService.activateCardForPaymentConfirmation(eq(30L), eq(receptionist), eq(PaymentMethod.CASH)))
+                .thenAnswer(inv -> {
+                    markSuccessOnActivation();
+                    card.setStatus(CardStatus.ACTIVE);
+                    return null;
+                });
+        stubInvoiceSave();
+    }
+
+    private Invoice confirmAndCaptureInvoice(String amount) {
+        service.confirmPayment(1L, confirmRequest(PaymentMethod.CASH, null, amount), receptionist);
+        ArgumentCaptor<Invoice> invoiceCaptor = ArgumentCaptor.forClass(Invoice.class);
+        verify(invoiceRepository).save(invoiceCaptor.capture());
+        return invoiceCaptor.getValue();
     }
 
     private ConfirmPaymentRequest confirmRequest(PaymentMethod method, String reference, String amount) {
@@ -234,10 +283,12 @@ class PaymentVerificationServiceImplTest {
     }
 
     @Test
-    @DisplayName("Confirm a card upgrade: line at the tier price, the upgrade credit as the invoice discount")
+    @DisplayName("Confirm a card upgrade: credit from the stored replaced card, not from the current tier price")
     void confirm_ExactAmount_CardUpgrade_InvoiceShowsCredit() {
         payment.setAmount(new BigDecimal("1500000.00"));
-        MemberCard card = pendingCard(new BigDecimal("1500000.00"));
+        MemberCard card = pendingUpgrade(new BigDecimal("1500000.00"), currentCard(41L, new BigDecimal("500000.00")));
+        // A manager edits the tier price after the request; the invoice must not follow it.
+        card.getTier().setPrice(new BigDecimal("2500000.00"));
         stubLockedPayment();
         when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
         when(registrationRepository.findByPaymentId(1L)).thenReturn(Optional.empty());
@@ -507,30 +558,6 @@ class PaymentVerificationServiceImplTest {
     }
 
     @Test
-    @DisplayName("Invoice by payment: staff read it, another member gets 404")
-    void invoiceByPayment_Visibility() {
-        Invoice invoice = Invoice.builder().id(55L).invoiceNumber("INV-1001").payment(payment).member(member)
-                .subtotalAmount(new BigDecimal("400000")).discountAmount(new BigDecimal("20000"))
-                .taxAmount(BigDecimal.ZERO).totalAmount(new BigDecimal("380000")).status(InvoiceStatus.PAID).build();
-        invoice.addLine(InvoiceLine.builder().id(1L).itemType(InvoiceItemType.SPORT_PACKAGE).itemReferenceId(20L)
-                .description("Swimming 30 Days (REG-PKG-1020)").quantity(1)
-                .unitPrice(new BigDecimal("400000")).lineTotal(new BigDecimal("400000")).build());
-        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
-        when(invoiceRepository.findByPaymentId(1L)).thenReturn(List.of(invoice));
-
-        InvoiceResponse response = service.getInvoiceByPayment(1L, receptionist);
-        assertThat(response.getInvoiceNumber()).isEqualTo("INV-1001");
-        assertThat(response.getMemberFullName()).isEqualTo("Minh Member");
-        assertThat(response.getLines()).hasSize(1);
-        assertThat(response.getTotalAmount()).isEqualByComparingTo("380000");
-
-        UserAccount otherMember = UserAccount.builder().id(999L)
-                .role(Role.builder().code("MEMBER").name("Member").build()).build();
-        assertThatThrownBy(() -> service.getInvoiceByPayment(1L, otherMember))
-                .isInstanceOf(ResourceNotFoundException.class);
-    }
-
-    @Test
     @DisplayName("Stored item price differs from the payment amount: 409 PAYMENT_ITEM_AMOUNT_MISMATCH, no invoice saved")
     void recordPaymentConfirmed_ItemPriceDiffersFromPayment_ConflictAndNoInvoice() {
         payment.setPaymentStatus(PaymentStatus.SUCCESS);
@@ -579,5 +606,237 @@ class PaymentVerificationServiceImplTest {
         assertThat(response.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
         assertThat(response.getOriginalPrice()).isEqualByComparingTo("1200000");
         assertThat(response.getDiscount()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    @DisplayName("R1-1: tier price raised after a new card request: invoice at price_paid, no invented discount")
+    void confirm_TierPriceRaisedAfterRequest_NoInventedDiscount() {
+        payment.setAmount(new BigDecimal("1200000.00"));
+        MemberCard card = pendingCard(new BigDecimal("1200000.00"));
+        card.getTier().setPrice(new BigDecimal("1500000.00"));
+        stubConfirmCard(card);
+
+        Invoice invoice = confirmAndCaptureInvoice("1200000");
+
+        assertThat(invoice.getSubtotalAmount()).isEqualByComparingTo("1200000");
+        assertThat(invoice.getDiscountAmount()).isEqualByComparingTo("0");
+        assertThat(invoice.getTotalAmount()).isEqualByComparingTo("1200000");
+        assertThat(invoice.getLines()).hasSize(1);
+        assertThat(invoice.getLines().get(0).getUnitPrice()).isEqualByComparingTo("1200000");
+        assertThat(invoice.getLines().get(0).getDescription()).isEqualTo("VIP Member Card (CARD-1030)");
+    }
+
+    @Test
+    @DisplayName("R1-1: upgrade of an upgraded card: credit is the price_paid of the whole replaced chain")
+    void confirm_UpgradeOfUpgradedCard_CreditIsWholeChain() {
+        MemberCard first = currentCard(41L, new BigDecimal("500000.00"));
+        first.setStatus(CardStatus.REPLACED);
+        MemberCard second = currentCard(42L, new BigDecimal("400000.00"));
+        second.setUpgradeRequest(true);
+        second.setReplacesCard(first);
+        payment.setAmount(new BigDecimal("1100000.00"));
+        MemberCard card = pendingUpgrade(new BigDecimal("1100000.00"), second);
+        stubConfirmCard(card);
+
+        Invoice invoice = confirmAndCaptureInvoice("1100000");
+
+        assertThat(invoice.getSubtotalAmount()).isEqualByComparingTo("2000000");
+        assertThat(invoice.getDiscountAmount()).isEqualByComparingTo("900000");
+        assertThat(invoice.getTotalAmount()).isEqualByComparingTo("1100000");
+        assertThat(invoice.getLines().get(0).getDescription())
+                .isEqualTo("VIP Member Card (CARD-1030) - upgrade, credit for the current card applied");
+    }
+
+    @Test
+    @DisplayName("R1-1: legacy upgrade without a stored replaced card: no credit is claimed")
+    void confirm_LegacyUpgradeWithoutChain_NoCreditClaimed() {
+        payment.setAmount(new BigDecimal("1500000.00"));
+        MemberCard card = pendingUpgrade(new BigDecimal("1500000.00"), null);
+        stubConfirmCard(card);
+
+        Invoice invoice = confirmAndCaptureInvoice("1500000");
+
+        assertThat(invoice.getSubtotalAmount()).isEqualByComparingTo("1500000");
+        assertThat(invoice.getDiscountAmount()).isEqualByComparingTo("0");
+        assertThat(invoice.getLines().get(0).getDescription()).isEqualTo("VIP Member Card (CARD-1030) - upgrade");
+    }
+
+    @Test
+    @DisplayName("R1-1: upgradeCredit stops and claims nothing on a missing price, a cycle or a chain that is too long")
+    void upgradeCredit_UnreadableChain_IsZero() {
+        MemberCard noPrice = currentCard(41L, null);
+        assertThat(PaymentItemResolver.upgradeCredit(pendingUpgrade(BigDecimal.TEN, noPrice))).isEqualByComparingTo("0");
+
+        MemberCard a = currentCard(41L, new BigDecimal("100"));
+        MemberCard b = currentCard(42L, new BigDecimal("100"));
+        a.setUpgradeRequest(true);
+        a.setReplacesCard(b);
+        b.setUpgradeRequest(true);
+        b.setReplacesCard(a);
+        assertThat(PaymentItemResolver.upgradeCredit(pendingUpgrade(BigDecimal.TEN, a))).isEqualByComparingTo("0");
+
+        MemberCard tail = currentCard(100L, new BigDecimal("1"));
+        for (long id = 101; id <= 101 + PaymentItemResolver.MAX_CHAIN_DEPTH; id++) {
+            MemberCard next = currentCard(id, new BigDecimal("1"));
+            next.setUpgradeRequest(true);
+            next.setReplacesCard(tail);
+            tail = next;
+        }
+        assertThat(PaymentItemResolver.upgradeCredit(pendingUpgrade(BigDecimal.TEN, tail))).isEqualByComparingTo("0");
+    }
+
+    @Test
+    @DisplayName("R1-1: package price changed after the request: invoice keeps the registration snapshot")
+    void confirm_PackagePriceChangedAfterRequest_InvoiceKeepsSnapshot() {
+        SportPackageRegistration reg = pendingRegistration();
+        reg.getSportPackage().setPriceAmount(new BigDecimal("900000.00"));
+        stubLockedPayment();
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(registrationRepository.findByPaymentId(1L)).thenReturn(Optional.of(reg));
+        when(sportPackageService.activateRegistrationForPaymentConfirmation(eq(20L), eq(receptionist), eq(PaymentMethod.CASH)))
+                .thenAnswer(inv -> {
+                    markSuccessOnActivation();
+                    reg.setStatus(PackageRegistrationStatus.ACTIVE);
+                    return null;
+                });
+        stubInvoiceSave();
+
+        Invoice invoice = confirmAndCaptureInvoice("380000");
+
+        assertThat(invoice.getSubtotalAmount()).isEqualByComparingTo("400000");
+        assertThat(invoice.getDiscountAmount()).isEqualByComparingTo("20000");
+        assertThat(invoice.getTotalAmount()).isEqualByComparingTo("380000");
+    }
+
+    @Test
+    @DisplayName("R1-2: to=9999-12-31 lists with an open upper bound instead of failing")
+    @SuppressWarnings("unchecked")
+    void list_LastSupportedToDate_DoesNotFail() {
+        when(paymentRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+
+        PageResponse<StaffPaymentResponse> page = service.listPayments(null, null, null,
+                LocalDate.of(2026, 10, 1), LocalDate.of(9999, 12, 31), 0, 10);
+
+        assertThat(page.totalElements()).isZero();
+        assertThat(PaymentVerificationServiceImpl.createdBeforeOf(LocalDate.of(9999, 12, 31))).isNull();
+    }
+
+    @Test
+    @DisplayName("R1-2: the to date is inclusive: the bound is the start of the next day; no to date means no bound")
+    void createdBeforeOf_InclusiveDay() {
+        assertThat(PaymentVerificationServiceImpl.createdBeforeOf(LocalDate.of(2026, 10, 14)))
+                .isEqualTo(LocalDateTime.of(2026, 10, 15, 0, 0));
+        assertThat(PaymentVerificationServiceImpl.createdBeforeOf(LocalDate.of(9999, 12, 30)))
+                .isEqualTo(LocalDateTime.of(9999, 12, 31, 0, 0));
+        assertThat(PaymentVerificationServiceImpl.createdBeforeOf(null)).isNull();
+    }
+
+    @Test
+    @DisplayName("R1-2: dates outside years 0001 to 9999 answer 400 before any query")
+    void list_DateOutsideColumnRange_BadRequest() {
+        assertThatThrownBy(() -> service.listPayments(null, null, null, null, LocalDate.MAX, 0, 10))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("The to date must be between 0001-01-01 and 9999-12-31");
+        assertThatThrownBy(() -> service.listPayments(null, null, null, LocalDate.of(10000, 1, 1), null, 0, 10))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("The from date must be between 0001-01-01 and 9999-12-31");
+        assertThatThrownBy(() -> service.listPayments(null, null, null, LocalDate.of(0, 12, 31), null, 0, 10))
+                .isInstanceOf(BusinessRuleException.class);
+        verifyNoInteractions(paymentRepository);
+    }
+
+    // ---------- BE-19: payment at the desk ----------
+
+    private void stubNewDeskPayment() {
+        when(paymentRepository.getNextPaymentCodeSequence()).thenReturn(1200L);
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> {
+            Payment saved = i.getArgument(0);
+            saved.setId(12L);
+            return saved;
+        });
+    }
+
+    @Test
+    @DisplayName("Desk sale by bank transfer with the exact amount: SUCCESS payment with reference, time and staff")
+    void recordDeskPayment_BankTransferExact_CreatesSuccessPayment() {
+        stubNewDeskPayment();
+
+        Payment created = service.recordDeskPayment(member, new BigDecimal("400000.00"), PaymentMethod.BANK_TRANSFER,
+                " FT2610140002 ", new BigDecimal("400000"), receptionist);
+
+        assertThat(created.getId()).isEqualTo(12L);
+        assertThat(created.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(created.getPaymentMethod()).isEqualTo(PaymentMethod.BANK_TRANSFER);
+        assertThat(created.getReferenceCode()).isEqualTo("FT2610140002");
+        assertThat(created.getAmount()).isEqualByComparingTo("400000");
+        assertThat(created.getPaymentTime()).isNotNull();
+        assertThat(created.getConfirmedByUser()).isEqualTo(receptionist);
+        assertThat(created.getMember()).isEqualTo(member);
+        assertThat(created.getNotes()).contains("Paid at the desk").doesNotContain("change");
+    }
+
+    @Test
+    @DisplayName("Desk sale in cash with more money: the change is written in the notes")
+    void recordDeskPayment_CashMore_NotesTheChange() {
+        stubNewDeskPayment();
+
+        Payment created = service.recordDeskPayment(member, new BigDecimal("380000.00"), PaymentMethod.CASH,
+                null, new BigDecimal("500000"), receptionist);
+
+        assertThat(created.getPaymentMethod()).isEqualTo(PaymentMethod.CASH);
+        assertThat(created.getAmount()).isEqualByComparingTo("380000");
+        assertThat(created.getReferenceCode()).isNull();
+        assertThat(created.getNotes()).contains("Cash received 500000, change 120000.00");
+    }
+
+    @Test
+    @DisplayName("Desk sale without method and amount received: CASH and the exact amount")
+    void recordDeskPayment_Defaults_CashAndExactAmount() {
+        stubNewDeskPayment();
+
+        Payment created = service.recordDeskPayment(member, new BigDecimal("380000.00"), null, null, null, receptionist);
+
+        assertThat(created.getPaymentMethod()).isEqualTo(PaymentMethod.CASH);
+        assertThat(created.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+    }
+
+    @Test
+    @DisplayName("Desk sale with less cash than the amount: 409 PAYMENT_AMOUNT_MISMATCH, nothing saved")
+    void recordDeskPayment_CashShort_MismatchAndNothingSaved() {
+        assertThatThrownBy(() -> service.recordDeskPayment(member, new BigDecimal("380000.00"), PaymentMethod.CASH,
+                null, new BigDecimal("300000"), receptionist))
+                .isInstanceOf(PaymentAmountMismatchException.class)
+                .satisfies(ex -> assertThat(((ConflictException) ex).getCode()).isEqualTo("PAYMENT_AMOUNT_MISMATCH"));
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    @DisplayName("Desk sale by card with a different amount: 409, only cash may be more")
+    void recordDeskPayment_NonCashDifferent_Mismatch() {
+        assertThatThrownBy(() -> service.recordDeskPayment(member, new BigDecimal("380000.00"), PaymentMethod.CREDIT_CARD,
+                "SLIP-1", new BigDecimal("400000"), receptionist))
+                .isInstanceOf(PaymentAmountMismatchException.class)
+                .hasMessageContaining("only cash can be more");
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    @DisplayName("Desk sale by bank transfer without a reference: 400")
+    void recordDeskPayment_TransferWithoutReference_BadRequest() {
+        assertThatThrownBy(() -> service.recordDeskPayment(member, new BigDecimal("380000.00"), PaymentMethod.BANK_TRANSFER,
+                "  ", new BigDecimal("380000"), receptionist))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Reference code is required");
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    @DisplayName("Desk payment by a member: 403")
+    void recordDeskPayment_MemberActor_Forbidden() {
+        assertThatThrownBy(() -> service.recordDeskPayment(member, new BigDecimal("380000.00"), PaymentMethod.CASH,
+                null, null, memberUser))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(paymentRepository, never()).save(any(Payment.class));
     }
 }
