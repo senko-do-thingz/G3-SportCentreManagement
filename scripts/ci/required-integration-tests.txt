@@ -7,6 +7,7 @@ com.sportify.catalog.service.impl.FrontDeskQueueIntegrationTest
 com.sportify.catalog.service.impl.FrontDeskMemberOverviewIntegrationTest
 com.sportify.identity.service.impl.MemberCreationIntegrationTest
 com.sportify.FlywayMigrationTest
+com.sportify.core.config.DemoAccountsIntegrationTest
 com.sportify.identity.repository.PermissionRepositoryTest
 com.sportify.identity.repository.RoleRepositoryTest
 com.sportify.identity.repository.UserAccountRepositoryTest

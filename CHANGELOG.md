@@ -1,3 +1,11 @@
+## 2026-10-15 - Isolated Demonstration Accounts (BE-07, Shared)
+
+Branch `feat/demo-accounts`, based on main `56f28c5`. Added opt-in `demo` profile and `db/demo/V28__seed_demo_accounts.sql` for one receptionist, three coaches with distinct primary sports and coach-sport links, and three members with GOLD, physical STANDARD and no-card scenarios.
+
+- Demo migration discovery is restricted to the explicitly enabled profile. A static bean factory guard rejects combined prod/demo profiles before Flyway initialization. Existing production configuration, migration checksums, authentication rules and out-of-order policy are unchanged.
+- The seed uses stable email/role/sport/tier lookups, shared-key profiles, the existing member-code sequence, transaction-scoped application locking, insert-only repair and explicit conflict failures. Existing hashes, personal/profile information, certifications, payments and unrelated cards are preserved. Imported demo card entitlements do not fabricate payments or receipts; GOLD has a documented finite term ending 2027-09-30.
+- Added 18 unit/configuration checks and 59 dedicated SQL Server integration cases, registered in the required CI suite manifest. Extended migration protection and review ownership to the new location. README documents credentials, enablement and isolated-database lifecycle requirements; `docs/tests/BE-07_test_cases.md` describes the verification contract. SQL Server execution remains pending GitHub CI because Docker is unavailable locally; exact local results are exported in the BE-07 review package.
+
 ## 2026-10-15 - Member Schedule, Class Search, Session Detail and Coach Profile (BE-11, Flow 2)
 
 Branch `feat/f2-member-schedule`, based on updated main `efd5346` including BE-10. Added authenticated MEMBER/RECEPTIONIST/MANAGER reads for `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}` and `GET /api/v1/coaches/{id}`.

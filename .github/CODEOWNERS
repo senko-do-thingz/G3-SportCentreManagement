@@ -4,4 +4,5 @@
 # Critical infrastructure, database migrations, and financial payment flows
 /.github/ @senko-do-thingz
 /backend/src/main/resources/db/migration/ @senko-do-thingz
+/backend/src/main/resources/db/demo/ @senko-do-thingz
 /backend/src/main/java/com/sportify/payment/ @senko-do-thingz
