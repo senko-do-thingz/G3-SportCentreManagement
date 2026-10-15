@@ -1,5 +1,41 @@
 # Changelog
 
+## 2026-10-15 - Refunds linked to payments (BE-21, Flow 3)
+
+Branch `feat/f3-confirm-payment`, based on `main`. Owner: Truc. Priority: P2. Depends on BE-18. Screens F3-07, F3-09 (refund part), S3-RefundSubmitted, S3-RefundReview, S3-RefundApproved, S3-RefundRejected, S3-RefundDone.
+
+### Added
+- `GET /api/v1/refunds/quote?registrationId=` (owner MEMBER, RECEPTIONIST, MANAGER): suggested amount = paid amount * unused sessions / total sessions (half up, 2 decimals, never above the payment amount). Unused sessions = remaining sessions + upcoming CONFIRMED bookings of the registration without an allowed check-in. Every session used gives 0.00.
+- `POST /api/v1/refunds` accepts an optional `amountRequested` (default: the quote), validated above 0, at most 2 decimals and not above the payment amount.
+- `PaymentRefundService.markRefunded`: payment SUCCESS -> REFUNDED with a note, PAID or ISSUED invoices -> REFUNDED. 409 codes `PAYMENT_ALREADY_REFUNDED` and `PAYMENT_NOT_REFUNDABLE`.
+- Migration `V27__refund_request_payment_link.sql`: filtered unique index `ux_refund_request_payment_live` (one PENDING, APPROVED or COMPLETED refund per payment) with a duplicate guard, and an index on `package_registration_id`.
+- Audit action `REFUND_COMPLETED`; `RefundResponse` gains `paymentId`, `paymentCode` and, on complete, `cancelledBookings`.
+- Tests: refund service and payment service unit tests, refund MockMvc validation tests and SQL Server integration regressions; test cases in `docs/tests/BE-21_test_cases.md`.
+
+### Changed
+- Submitting a refund requires a SUCCESS payment linked to the registration and stores `refund_request.payment_id`. A second refund on the same payment answers 409 `PAYMENT_ALREADY_REFUNDED`, also after approval when the registration is already REFUNDED; a REJECTED request does not block a new one. A race on the same payment is caught by the unique index and mapped to the same 409.
+- Review: the resolved `amountApproved` must be above 0, have at most 2 decimal places after trailing zeros are removed and not exceed the payment amount; it is stored at scale 2 without rounding. HTTP validation also limits it to 12 integer digits and 2 fractional digits. Legacy refunds without a payment are capped at the registration paid amount when known. Approval still moves the registration to REFUNDED.
+- Completion rejects a missing, non-positive or over-precision resolved amount before changing payment state. Complete runs in one transaction: payment REFUNDED, invoices REFUNDED, registration REFUNDED (if not already), upcoming CONFIRMED bookings of the registration CANCELLED with the seat released (sessions are not returned to the refunded registration), refund COMPLETED, REFUND_COMPLETED activity log. Legacy refunds without a payment complete without the payment step.
+- Lock order follows BE-18: submit locks the payment before reading the registration; review and complete lock the payment, then the refund row.
+- The pro-rated amount multiplies before dividing (the old code rounded the fraction to 4 decimals first, which could be off by a few dong).
+- `RefundServiceImplTest`: fixtures give the registration a SUCCESS payment and stub the new locked reads; assertions are unchanged.
+- `docs/database/04`: refund rules.
+
+### Notes
+- Unit and integration tests run in GitHub Actions.
+- Existing `refund_request` rows keep `payment_id` NULL (no backfill), so the one-refund rule applies to refunds created from now on.
+
+### Behavior notes
+- Completion locks payment, refund, sessions in ascending id order, bookings, then registration; it re-reads bookings under the session locks and uses conditional cancellation plus atomic seat release. Changed bookings return 409 `REFUND_BOOKINGS_CHANGED` and roll back.
+- Quote, submit, approve and complete check payment ownership and that no card or invoice line bills another item; mismatches return 409 `PAYMENT_REGISTRATION_MISMATCH`.
+- Upcoming bookings and their ALLOWED check-in filter are read in one set-based query.
+- BE-21 (V27) is merged before BE-22 (V28); PR #61 (V26) is already on main. Flyway out-of-order is disabled.
+
+### Known limitations
+- Check-in does not take the session lock, so a check-in in flight during refund completion can still record ALLOWED on a booking that completion cancels; tracked as a follow-up.
+- A partial refund marks the whole payment and its invoices REFUNDED and blocks a second refund; legacy NULL-payment refunds are not backfilled.
+- V27 aborts if duplicate live refunds already exist; repeating completion returns 400.
+
 ## 2026-10-15 - My payments and receipts (BE-20, Flow 3)
 
 Branch `feat/f3-my-payments-r1`, based on main (`5075010`, BE-18 from PR #60 and BE-19 from PR #62). Replaces PR #56, whose branch carried the superseded BE-18 commits. Owner: Truc. Priority: P1. Depends on BE-18. Screens F3-03, S3-PaidHistory, S3-CardReceipt, S3-MemberReceipt and S3-SingleReceipt. Provides the BE-20 endpoints FE-11 (`feat/f3-member-payments`) already calls; the response shapes match the contract FE-11 assumed.
