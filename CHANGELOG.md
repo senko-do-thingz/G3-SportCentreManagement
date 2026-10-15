@@ -35,6 +35,16 @@ Branch `feat/f3-confirm-payment`. Owner: Truc. Priority: P1. Depends on BE-17 (m
 - Rebased on main after PR #40 (manager catalog, BE-03) as one commit: conflicts in `MembershipCardServiceImpl`, `SportPackageServiceImpl` and their unit tests resolved by keeping the PR #40 upgrade rules (rank based, `upgradeRequest`) and the BE-18 lock order and receipt step; the integration test tier now gets a unique `tierRank`, and `ManagerCatalogIntegrationTest` cleanup deletes the invoices that card activation now issues before their payments.
 - CI fix 2: `PaymentVerificationIntegrationTest` deletes the rows it creates after each test (the SQL Server container is shared, and its leftover sports, packages, ranked tiers and the member code MEM-0001 broke 9 catalog and member tests); its member codes now use the `BE18-MEM-` prefix.
 
+## 2026-10-14 - Manager Session Schedule and Coach Assignment (BE-10, Flow 2)
+
+### Added
+
+- Manager session calendar with inclusive date ranges, class/coach/facility filters, deterministic ordering and grouped confirmed booking counts.
+- Single and weekly DRAFT or PUBLISHED session creation, coach qualification checks, class capacity bounds and complete coach/facility conflict details in the existing 409 error envelope. Weekly batches reject every insertion if any requested date conflicts.
+- Pessimistic coach/facility resource locks for concurrent scheduling, booking creation and cancellation that lock the session row before booking checks, and session updates that exclude themselves from overlap checks, preserve the cached booking counter and check a new date against booked package validity.
+- Future-session cancellation with manager/reason metadata, bulk booking cancellation, capped session-credit restoration only to ACTIVE package registrations and per-registration package booking counts in one audited transaction. Package consumption uses a conditional database decrement across different sessions; individual and manager cancellation restore credits atomically within the purchased cap. Existing registration balances cannot be overwritten by stale JPA entity saves. The manager calendar requires both date bounds and returns the existing 400 envelope for missing or malformed bounds.
+- V23 cancellation metadata and resource/date and booking/session indexes, SQL Server integration coverage registered in the required-suite manifest, and test cases in `docs/tests/BE-10_test_cases.md`.
+
 ## 2026-10-13 - Sport Packages & Pricing and Manager Catalog (BE-03, Flow 1)
 
 Branch `feat/f1-manager-catalog`. Owner: Dat (Senko). Priority: P1. Depends on: none. Rebased on `origin/main` (commit 6e82388). Execution counts and current validation status are recorded per run and revision in `docs/tests/PR40_remediation_test_cases.md`; revised SQL Server coverage still requires Docker.

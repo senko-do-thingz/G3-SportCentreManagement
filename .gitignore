@@ -92,3 +92,6 @@ REVIEW_RESOLUTION_REPORT.md
 # AI Audit Logs are kept locally only
 docs/audit/*_AI_Audit_Log.docx
 docs/audit/*_AI_Audit_Log.md
+
+# Local task instructions
+/tasks/

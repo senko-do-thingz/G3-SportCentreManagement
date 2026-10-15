@@ -64,7 +64,8 @@ public class BookingServiceImpl implements BookingService {
         MemberProfile member = memberProfileRepository.findById(targetMemberId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member profile not found for id: " + targetMemberId));
 
-        ClassSession session = sessionRepository.findById(request.getSessionId())
+        // Lock order: session first, then bookings and package registrations.
+        ClassSession session = sessionRepository.findForUpdate(request.getSessionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Class session not found for id: " + request.getSessionId()));
 
         LocalDate today = LocalDate.now(clock);
@@ -135,9 +136,21 @@ public class BookingServiceImpl implements BookingService {
             throw new BusinessRuleException("Selected package registration has zero remaining sessions");
         }
 
-        // Reserve 1 session from package
-        packageReg.setRemainingSessions(packageReg.getRemainingSessions() - 1);
-        registrationRepository.save(packageReg);
+        // Lock order: session first, booking checks next, then the shared registration update.
+        if (registrationRepository.consumeSession(packageReg.getId(), PackageRegistrationStatus.ACTIVE.name(),
+                session.getSessionDate(), LocalDateTime.now(clock)) != 1) {
+            var state = registrationRepository.findBookingStateById(packageReg.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Package registration not found for id: " + packageReg.getId()));
+            if (state.getStatus() != PackageRegistrationStatus.ACTIVE) {
+                throw new BusinessRuleException("Package registration is not active: " + state.getStatus());
+            }
+            if (session.getSessionDate().isBefore(state.getStartDate())
+                    || session.getSessionDate().isAfter(state.getEndDate())) {
+                throw new BusinessRuleException("Session date " + session.getSessionDate() + " is outside package validity period ("
+                        + state.getStartDate() + " to " + state.getEndDate() + ")");
+            }
+            throw new BusinessRuleException("Selected package registration has zero remaining sessions");
+        }
 
         // Atomically increment booked count
         session.setBookedCount(session.getBookedCount() + 1);
@@ -169,6 +182,11 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional
     public BookingResponse cancelBooking(Long bookingId, UserAccount actor) {
+        Long sessionId = bookingRepository.findSessionIdByBookingId(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found for id: " + bookingId));
+        // Lock order: session first, then bookings and package registrations.
+        ClassSession session = sessionRepository.findForUpdate(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Class session not found for id: " + sessionId));
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found for id: " + bookingId));
 
@@ -205,17 +223,15 @@ public class BookingServiceImpl implements BookingService {
         booking.setCancelledBy(actor);
 
         // Restore session seat
-        ClassSession session = booking.getSession();
         if (session.getBookedCount() > 0) {
             session.setBookedCount(session.getBookedCount() - 1);
             sessionRepository.save(session);
         }
 
-        // Restore 1 session to package registration only if registration is ACTIVE
-        if (booking.getPackageRegistration() != null && booking.getPackageRegistration().getStatus() == PackageRegistrationStatus.ACTIVE) {
-            SportPackageRegistration pkg = booking.getPackageRegistration();
-            pkg.setRemainingSessions(pkg.getRemainingSessions() + 1);
-            registrationRepository.save(pkg);
+        // Lock order: session first, booking checks next, then the shared registration update.
+        if (booking.getPackageRegistration() != null) {
+            registrationRepository.restoreSession(booking.getPackageRegistration().getId(),
+                    PackageRegistrationStatus.ACTIVE.name(), LocalDateTime.now(clock));
         }
 
         booking = bookingRepository.save(booking);
