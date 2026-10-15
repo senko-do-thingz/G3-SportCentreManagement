@@ -295,7 +295,7 @@ function PaymentHandoffModal({
   const discount = Math.max(0, Number(original ?? 0) - Number(amount ?? 0))
   const target =
     item.paymentId !== null
-      ? receptionPaymentPath(item.paymentId, { kind: card ? 'card' : 'package', id: item.id, memberId: member.userId })
+      ? receptionPaymentPath(item.paymentId, member.userId)
       : null
 
   return (

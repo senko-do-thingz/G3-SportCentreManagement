@@ -7,7 +7,6 @@ import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.payment.config.BankTransferProperties;
 import com.sportify.payment.entity.PaymentMethod;
-import com.sportify.payment.repository.InvoiceRepository;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.service.PaymentService;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,7 +57,7 @@ class PaymentServiceTransactionMandatoryTest {
                 mock(PaymentRepository.class),
                 mock(MemberCardRepository.class),
                 mock(SportPackageRegistrationRepository.class),
-                mock(InvoiceRepository.class),
+                mock(PaymentItemResolver.class),
                 mock(BankTransferProperties.class),
                 mock(CodeFormatter.class),
                 Clock.systemUTC()
@@ -95,6 +94,14 @@ class PaymentServiceTransactionMandatoryTest {
     @DisplayName("markPaymentFailed with Propagation.MANDATORY throws IllegalTransactionStateException outside a transaction")
     void markPaymentFailed_OutsideTransaction_ThrowsIllegalTransactionStateException() {
         assertThatThrownBy(() -> proxy.markPaymentFailed(10L, "Failed reason"))
+                .isInstanceOf(IllegalTransactionStateException.class)
+                .hasMessageContaining("No existing transaction found for transaction marked with propagation 'mandatory'");
+    }
+
+    @Test
+    @DisplayName("lockPayment with Propagation.MANDATORY throws IllegalTransactionStateException outside a transaction")
+    void lockPayment_OutsideTransaction_ThrowsIllegalTransactionStateException() {
+        assertThatThrownBy(() -> proxy.lockPayment(10L))
                 .isInstanceOf(IllegalTransactionStateException.class)
                 .hasMessageContaining("No existing transaction found for transaction marked with propagation 'mandatory'");
     }

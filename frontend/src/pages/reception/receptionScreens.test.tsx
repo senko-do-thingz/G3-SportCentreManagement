@@ -117,9 +117,12 @@ function receptionBackend(options: Options = {}) {
       return json(200, [card({ id: 5, cardCode: 'CARD-0005', tierName: 'Gold', status: 'PENDING_PAYMENT', paymentId: 45, paymentCode: 'PAY-0045', pricePaid: 300000, createdAt: '2026-10-12T09:00:00' })])
     }
     if (call.path === '/packages/registrations/pending') return json(200, [PENDING_FOOTBALL])
-    if (call.path === '/packages/registrations/11/activate' && call.method === 'PUT') {
+    if (call.path === '/payments/41/confirm' && call.method === 'PUT') {
       payments[41] = payment({ id: 41, code: 'PAY-0041', status: 'SUCCESS', method: 'CASH', amount: 810000, paymentTime: '2026-10-13T09:40:00' })
-      return json(200, { ...PENDING_FOOTBALL, status: 'ACTIVE' })
+      return json(200, payments[41])
+    }
+    if (call.path === '/invoices/by-payment/41') {
+      return json(200, { id: 1041, invoiceNumber: 'INV-1041', paymentId: 41, memberId: 2, subtotalAmount: 900000, discountAmount: 90000, totalAmount: 810000, status: 'PAID', issueDate: '2026-10-13' })
     }
     if (call.path === '/check-ins' && call.method === 'POST') {
       return options.onCheckIn
@@ -262,14 +265,16 @@ describe('FE-05 Member Search and Profile (F1-13)', () => {
     expect(within(dialog).getByText('90.000 VND')).toBeInTheDocument()
     await user.click(within(dialog).getByRole('link', { name: 'Open payment confirmation' }))
 
-    expect(await screen.findByRole('heading', { name: 'Payment confirmation' })).toBeInTheDocument()
-    const confirm = screen.getByRole('region', { name: 'Confirm payment' })
-    await user.selectOptions(within(confirm).getByLabelText('Method actually used'), 'CASH')
+    expect(await screen.findByRole('heading', { name: 'Verify and Record Payment' })).toBeInTheDocument()
+    const confirm = screen.getByRole('form', { name: 'Verify and record payment' })
+    await user.selectOptions(within(confirm).getByLabelText(/Payment method/), 'CASH')
+    await user.type(within(confirm).getByLabelText(/Amount received/), '810000')
+    await user.click(within(confirm).getByRole('checkbox', { name: 'I have verified the full amount was received' }))
     await user.click(within(confirm).getByRole('button', { name: 'Confirm payment' }))
-    expect(await screen.findByRole('heading', { name: 'Payment receipt' })).toBeInTheDocument()
-    const activate = calls.find((call) => call.path === '/packages/registrations/11/activate')
-    expect(activate?.method).toBe('PUT')
-    expect(activate?.body).toEqual({ paymentMethod: 'CASH' })
+    expect(await screen.findByRole('heading', { name: 'Payment Confirmed and Receipt' })).toBeInTheDocument()
+    const confirmCall = calls.find((call) => call.path === '/payments/41/confirm')
+    expect(confirmCall?.method).toBe('PUT')
+    expect(confirmCall?.body).toEqual({ paymentMethod: 'CASH', paymentReference: null, amountReceived: 810000, note: null })
 
     await user.click(screen.getByRole('link', { name: 'Back to member profile' }))
     expect(await screen.findByText(/Payment PAY-0041 is confirmed and the request is active/)).toBeInTheDocument()
@@ -291,15 +296,6 @@ describe('FE-05 Member Search and Profile (F1-13)', () => {
     document.body.innerHTML = ''
     await open('/reception?memberId=2', { overviewError: backendError(404, 'Member not found') })
     expect(await screen.findByRole('heading', { name: 'Member not found' })).toBeInTheDocument()
-  })
-
-  it('TC-FE05-038 a confirmation opened with an item of another payment keeps Confirm disabled', async () => {
-    const { calls } = await open('/reception/payments/41?item=package&itemId=10&memberId=2')
-    const confirm = await screen.findByRole('region', { name: 'Confirm payment' })
-    expect(await within(confirm).findByText(/belongs to another payment/)).toBeInTheDocument()
-    expect(within(confirm).getByRole('button', { name: 'Confirm payment' })).toBeDisabled()
-    await userEvent.setup().click(within(confirm).getByRole('button', { name: 'Confirm payment' }))
-    expect(calls.some((call) => call.method === 'PUT')).toBe(false)
   })
 })
 
@@ -412,7 +408,7 @@ describe('FE-05 Register and Renew (F1-14)', () => {
     expect(within(receipt).getByText(/saved as pending payment/)).toBeInTheDocument()
     expect(within(receipt).getByRole('link', { name: 'Confirm payment' })).toHaveAttribute(
       'href',
-      '/reception/payments/61?item=package&itemId=61&memberId=2',
+      '/reception/payments/61?memberId=2',
     )
   })
 
@@ -461,8 +457,8 @@ describe('FE-05 Register and Renew (F1-14)', () => {
     expect(calls.some((call) => call.path === '/membership-cards/pending')).toBe(true)
     expect(calls.some((call) => call.path === '/packages/registrations/pending')).toBe(true)
     await user.click(within(rows[1]).getByRole('link', { name: 'Confirm payment for REG-ONLINE-001' }))
-    expect(await screen.findByRole('heading', { name: 'Payment confirmation' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Confirm payment' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Verify and Record Payment' })).toBeInTheDocument()
+    expect(screen.getByRole('form', { name: 'Verify and record payment' })).toBeInTheDocument()
   })
 })
 

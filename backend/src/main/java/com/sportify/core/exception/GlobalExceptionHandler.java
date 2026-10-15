@@ -9,6 +9,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -26,6 +27,9 @@ public class GlobalExceptionHandler {
 
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final String DUPLICATE_BOOKING_MESSAGE = "Member already has a confirmed booking for this session";
+    private static final String DUPLICATE_REFUND_MESSAGE = "This payment already has a refund; a payment can be refunded only once";
+    /** Same value as PaymentRefundService.CODE_PAYMENT_ALREADY_REFUNDED; core does not depend on the payment module. */
+    private static final String DUPLICATE_REFUND_CODE = "PAYMENT_ALREADY_REFUNDED";
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidationExceptions(MethodArgumentNotValidException ex) {
@@ -71,7 +75,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<Map<String, Object>> handleConflictException(ConflictException ex) {
-        return buildErrorResponse(HttpStatus.CONFLICT, ex.getMessage(), null);
+        ResponseEntity<Map<String, Object>> response =
+                buildErrorResponse(HttpStatus.CONFLICT, ex.getMessage(), ex.getDetails());
+        if (ex.getCode() != null && response.getBody() != null) {
+            response.getBody().put("code", ex.getCode());
+        }
+        return response;
     }
 
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
@@ -88,6 +97,14 @@ public class GlobalExceptionHandler {
         logger.warn("Data integrity violation: {}", rootMsg);
         if (rootMsg != null && rootMsg.toLowerCase(Locale.ROOT).contains("ux_booking_active")) {
             return buildErrorResponse(HttpStatus.CONFLICT, DUPLICATE_BOOKING_MESSAGE, null);
+        }
+        if (rootMsg != null && rootMsg.toLowerCase(Locale.ROOT).contains("ux_refund_request_payment_live")) {
+            ResponseEntity<Map<String, Object>> response = buildErrorResponse(HttpStatus.CONFLICT,
+                    DUPLICATE_REFUND_MESSAGE, null);
+            if (response.getBody() != null) {
+                response.getBody().put("code", DUPLICATE_REFUND_CODE);
+            }
+            return response;
         }
         return buildErrorResponse(HttpStatus.CONFLICT, "The request conflicts with existing data", null);
     }
@@ -109,6 +126,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Map<String, Object>> handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException ex) {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, "Invalid value for parameter '" + ex.getName() + "'", null);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingRequestParameter(MissingServletRequestParameterException ex) {
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Required parameter '" + ex.getParameterName() + "' is missing", null);
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)

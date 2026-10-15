@@ -52,7 +52,8 @@ public class SportPackageRegistration {
     @Column(name = "total_sessions", nullable = false)
     private Integer totalSessions;
 
-    @Column(name = "remaining_sessions", nullable = false)
+    // Existing balances are changed only by atomic SQL, never by a stale entity save.
+    @Column(name = "remaining_sessions", nullable = false, updatable = false)
     private Integer remainingSessions;
 
     @Column(name = "start_date", nullable = false)

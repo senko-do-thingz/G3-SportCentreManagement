@@ -25,7 +25,9 @@ import com.sportify.identity.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import com.sportify.payment.service.PaymentVerificationService;
 import org.mockito.InjectMocks;
+import org.springframework.beans.factory.ObjectProvider;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -38,6 +40,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
+import com.sportify.payment.entity.Invoice;
 import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.entity.PaymentStatus;
@@ -86,6 +89,11 @@ public class SportPackageServiceImplTest {
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-10-06T00:00:00Z"), ZoneId.of("UTC"));
 
+    @Mock
+    private ObjectProvider<PaymentVerificationService> paymentVerificationProvider;
+    @Mock
+    private PaymentVerificationService paymentVerificationService;
+
     @InjectMocks
     private SportPackageServiceImpl sportPackageService;
 
@@ -98,6 +106,16 @@ public class SportPackageServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(paymentVerificationProvider.getObject()).thenReturn(paymentVerificationService);
+        // BE-19: a desk sale takes the money through PaymentVerificationService; answer with a SUCCESS payment.
+        lenient().when(paymentVerificationService.recordDeskPayment(any(), any(), any(), any(), any(), any()))
+                .thenAnswer(i -> Payment.builder()
+                        .id(900L)
+                        .paymentCode("PAY-0900")
+                        .amount(i.getArgument(1))
+                        .paymentMethod(i.getArgument(2) != null ? i.getArgument(2) : PaymentMethod.CASH)
+                        .paymentStatus(PaymentStatus.SUCCESS)
+                        .build());
         lenient().when(paymentService.createPendingPayment(any(MemberProfile.class), any(BigDecimal.class), any()))
                 .thenAnswer(i -> Payment.builder()
                         .id(777L)
@@ -607,6 +625,7 @@ public class SportPackageServiceImplTest {
 
         assertEquals(PackageRegistrationStatus.ACTIVE, res.getStatus());
         verify(paymentService).markPaymentSuccess(88L, receptionistUser, null);
+        verify(paymentVerificationService).recordPaymentConfirmed(88L, receptionistUser, null);
     }
 
     @Test
@@ -634,6 +653,34 @@ public class SportPackageServiceImplTest {
 
         assertEquals(PackageRegistrationStatus.ACTIVE, res.getStatus());
         verify(paymentService).markPaymentSuccess(88L, receptionistUser, PaymentMethod.CASH);
+    }
+
+    @Test
+    void activateRegistrationForPaymentConfirmation_ActivatesWithoutIssuingTheReceipt() {
+        Payment payment = Payment.builder()
+                .id(88L)
+                .paymentCode("PAY-0088")
+                .paymentStatus(PaymentStatus.PENDING)
+                .build();
+        SportPackageRegistration reg = SportPackageRegistration.builder()
+                .id(88L)
+                .registrationCode("REG-PKG-0088")
+                .member(memberProfile)
+                .sportPackage(sportPackage)
+                .status(PackageRegistrationStatus.PENDING_PAYMENT)
+                .payment(payment)
+                .startDate(LocalDate.now(clock))
+                .endDate(LocalDate.now(clock).plusDays(29))
+                .build();
+        when(registrationRepository.findById(88L)).thenReturn(Optional.of(reg));
+        when(registrationRepository.save(any(SportPackageRegistration.class))).thenAnswer(i -> i.getArgument(0));
+
+        PackageRegistrationResponse res = sportPackageService.activateRegistrationForPaymentConfirmation(
+                88L, receptionistUser, PaymentMethod.BANK_TRANSFER);
+
+        assertEquals(PackageRegistrationStatus.ACTIVE, res.getStatus());
+        verify(paymentService).markPaymentSuccess(88L, receptionistUser, PaymentMethod.BANK_TRANSFER);
+        org.mockito.Mockito.verifyNoInteractions(paymentVerificationService);
     }
 
     @Test
@@ -689,6 +736,52 @@ public class SportPackageServiceImplTest {
 
         assertEquals(PackageRegistrationStatus.CANCELLED, res.getStatus());
         verify(paymentService).markPaymentFailed(eq(88L), org.mockito.ArgumentMatchers.contains("staff user id 200"));
+    }
+
+    @Test
+    void cancelRegistration_WithReason_StoresTheReasonAsCancelReason() {
+        Payment payment = Payment.builder()
+                .id(88L)
+                .paymentCode("PAY-0088")
+                .paymentStatus(PaymentStatus.PENDING)
+                .build();
+        SportPackageRegistration reg = SportPackageRegistration.builder()
+                .id(88L)
+                .registrationCode("REG-PKG-0088")
+                .member(memberProfile)
+                .sportPackage(sportPackage)
+                .status(PackageRegistrationStatus.PENDING_PAYMENT)
+                .payment(payment)
+                .originalPrice(sportPackage.getPriceAmount())
+                .paidAmount(sportPackage.getPriceAmount())
+                .build();
+        when(registrationRepository.findById(88L)).thenReturn(Optional.of(reg));
+        when(registrationRepository.save(any(SportPackageRegistration.class))).thenAnswer(i -> i.getArgument(0));
+
+        PackageRegistrationResponse res = sportPackageService.cancelRegistration(88L, receptionistUser, "  No transfer found ");
+
+        assertEquals(PackageRegistrationStatus.CANCELLED, res.getStatus());
+        assertEquals("No transfer found", reg.getCancelReason());
+        verify(paymentService).markPaymentFailed(eq(88L), org.mockito.ArgumentMatchers.contains("No transfer found"));
+    }
+
+    @Test
+    void cancelRegistration_WithBlankReason_KeepsTheDefaultReason() {
+        SportPackageRegistration reg = SportPackageRegistration.builder()
+                .id(88L)
+                .registrationCode("REG-PKG-0088")
+                .member(memberProfile)
+                .sportPackage(sportPackage)
+                .status(PackageRegistrationStatus.PENDING_PAYMENT)
+                .originalPrice(sportPackage.getPriceAmount())
+                .paidAmount(sportPackage.getPriceAmount())
+                .build();
+        when(registrationRepository.findById(88L)).thenReturn(Optional.of(reg));
+        when(registrationRepository.save(any(SportPackageRegistration.class))).thenAnswer(i -> i.getArgument(0));
+
+        sportPackageService.cancelRegistration(88L, receptionistUser, "   ");
+
+        assertEquals("Cancelled by staff user id 200", reg.getCancelReason());
     }
 
     @Test
@@ -986,5 +1079,111 @@ public class SportPackageServiceImplTest {
         assertEquals("PKG-1", result.get(0).getCode());
         assertEquals(false, result.get(0).getIsActive());
     }
-}
 
+    private SportPackageRegistration pendingRegistrationWithPayment() {
+        Payment payment = Payment.builder()
+                .id(88L)
+                .paymentCode("PAY-0088")
+                .paymentStatus(PaymentStatus.PENDING)
+                .build();
+        return SportPackageRegistration.builder()
+                .id(88L)
+                .registrationCode("REG-PKG-0088")
+                .member(memberProfile)
+                .sportPackage(sportPackage)
+                .status(PackageRegistrationStatus.PENDING_PAYMENT)
+                .payment(payment)
+                .originalPrice(sportPackage.getPriceAmount())
+                .paidAmount(sportPackage.getPriceAmount())
+                .startDate(LocalDate.now(clock))
+                .endDate(LocalDate.now(clock).plusDays(29))
+                .build();
+    }
+
+    @Test
+    void activateRegistration_LocksThePaymentBeforeReadingTheRegistration() {
+        SportPackageRegistration reg = pendingRegistrationWithPayment();
+        when(registrationRepository.findPaymentIdById(88L)).thenReturn(Optional.of(88L));
+        when(registrationRepository.findById(88L)).thenReturn(Optional.of(reg));
+        when(registrationRepository.save(any(SportPackageRegistration.class))).thenAnswer(i -> i.getArgument(0));
+
+        sportPackageService.activateRegistration(88L, receptionistUser, PaymentMethod.CASH);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(registrationRepository, paymentService);
+        order.verify(registrationRepository).findPaymentIdById(88L);
+        order.verify(paymentService).lockPayment(88L);
+        order.verify(registrationRepository).findById(88L);
+        order.verify(paymentService).markPaymentSuccess(88L, receptionistUser, PaymentMethod.CASH);
+    }
+
+    @Test
+    void cancelRegistration_LocksThePaymentBeforeReadingTheRegistration() {
+        SportPackageRegistration reg = pendingRegistrationWithPayment();
+        when(registrationRepository.findPaymentIdById(88L)).thenReturn(Optional.of(88L));
+        when(registrationRepository.findById(88L)).thenReturn(Optional.of(reg));
+        when(registrationRepository.save(any(SportPackageRegistration.class))).thenAnswer(i -> i.getArgument(0));
+
+        sportPackageService.cancelRegistration(88L, memberUser);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(registrationRepository, paymentService);
+        order.verify(registrationRepository).findPaymentIdById(88L);
+        order.verify(paymentService).lockPayment(88L);
+        order.verify(registrationRepository).findById(88L);
+        order.verify(paymentService).markPaymentFailed(eq(88L), any());
+    }
+
+    // ---------- BE-19: payment at the desk ----------
+
+    @Test
+    void registerPackage_AtDesk_TakesTheMoneyAndReturnsTheReceipt() {
+        PackageRegistrationRequest req = PackageRegistrationRequest.builder()
+                .memberId(100L)
+                .packageId(10L)
+                .channel(RegistrationChannel.RECEPTION)
+                .paymentMethod(PaymentMethod.CASH)
+                .amountReceived(BigDecimal.valueOf(400000.00))
+                .build();
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(sportPackage));
+        when(membershipCardService.getApplicableDiscountPercentage(eq(100L), eq(30))).thenReturn(0);
+        when(registrationRepository.getNextRegistrationCodeSequence()).thenReturn(110L);
+        when(codeFormatter.formatPackageRegCode(110L)).thenReturn("REG-PKG-110");
+        when(registrationRepository.save(any(SportPackageRegistration.class))).thenAnswer(i -> {
+            SportPackageRegistration r = i.getArgument(0);
+            r.setId(510L);
+            return r;
+        });
+        when(paymentVerificationService.recordPaymentConfirmed(900L, receptionistUser, null))
+                .thenReturn(Invoice.builder().id(71L).invoiceNumber("INV-0071").build());
+
+        PackageRegistrationResponse res = sportPackageService.registerPackage(req, receptionistUser);
+
+        assertEquals(PackageRegistrationStatus.ACTIVE, res.getStatus());
+        assertEquals(900L, res.getPaymentId());
+        assertEquals(71L, res.getInvoiceId());
+        assertEquals("INV-0071", res.getInvoiceNumber());
+        verify(paymentVerificationService).recordDeskPayment(memberProfile, res.getPaidAmount(),
+                PaymentMethod.CASH, null, BigDecimal.valueOf(400000.00), receptionistUser);
+        verify(paymentService, never()).createPendingPayment(any(), any(), any());
+    }
+
+    @Test
+    void registerPackage_ByStaffForOnlineChannel_TakesNoDeskPayment() {
+        PackageRegistrationRequest req = PackageRegistrationRequest.builder()
+                .memberId(100L)
+                .packageId(10L)
+                .channel(RegistrationChannel.ONLINE)
+                .build();
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(sportPackage));
+        when(membershipCardService.getApplicableDiscountPercentage(eq(100L), eq(30))).thenReturn(0);
+        when(registrationRepository.getNextRegistrationCodeSequence()).thenReturn(111L);
+        when(codeFormatter.formatPackageRegCode(111L)).thenReturn("REG-PKG-111");
+        when(registrationRepository.save(any(SportPackageRegistration.class))).thenAnswer(i -> i.getArgument(0));
+
+        PackageRegistrationResponse res = sportPackageService.registerPackage(req, receptionistUser);
+
+        assertEquals(PackageRegistrationStatus.PENDING_PAYMENT, res.getStatus());
+        verify(paymentVerificationService, never()).recordDeskPayment(any(), any(), any(), any(), any(), any());
+    }
+}

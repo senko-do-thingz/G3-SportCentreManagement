@@ -6,7 +6,6 @@ import { card, registration } from '../../test/memberFixtures'
 import {
   afterPaymentReference,
   changeDue,
-  confirmCheck,
   deskCardPlan,
   UNKNOWN_PLAN_MESSAGE,
   checkInVerdict,
@@ -176,19 +175,12 @@ describe('FE-05 receptionModel - membership card at the desk (FE-04 planCard)', 
   })
 })
 
-describe('FE-05 receptionModel - sale outcome and confirmation check', () => {
+describe('FE-05 receptionModel - sale outcome', () => {
   it('TC-FE05-018 the outcome comes from the payment, not only from the item status', () => {
     expect(saleOutcome({ status: 'ACTIVE', paymentId: 60 })).toBe('paid')
     expect(saleOutcome({ status: 'ACTIVE', paymentId: null })).toBe('unrecorded')
     expect(saleOutcome({ status: 'PENDING_PAYMENT', paymentId: 61 })).toBe('pending')
     expect(saleOutcome({ status: 'CANCELLED', paymentId: null })).toBe('other')
-  })
-
-  it('TC-FE05-019 the item to activate must carry the payment and still wait for it', () => {
-    expect(confirmCheck({ paymentId: 41, status: 'PENDING_PAYMENT' }, 41)).toBe('ok')
-    expect(confirmCheck(undefined, 41)).toBe('not-found')
-    expect(confirmCheck({ paymentId: 99, status: 'PENDING_PAYMENT' }, 41)).toBe('other-payment')
-    expect(confirmCheck({ paymentId: 41, status: 'ACTIVE' }, 41)).toBe('not-pending')
   })
 })
 
@@ -214,9 +206,8 @@ describe('FE-05 receptionModel - lists, paths and readers', () => {
 
   it('TC-FE05-015 paths, ids, verdicts and the identifier check', () => {
     expect(registerPath({ memberId: 2, packageId: 4 })).toBe('/reception/register?memberId=2&packageId=4')
-    expect(receptionPaymentPath(52, { kind: 'package', id: 40, memberId: 2 })).toBe(
-      '/reception/payments/52?item=package&itemId=40&memberId=2',
-    )
+    expect(receptionPaymentPath(52, 2)).toBe('/reception/payments/52?memberId=2')
+    expect(receptionPaymentPath(52)).toBe('/reception/payments/52')
     expect(positiveId('12')).toBe(12)
     expect(positiveId('0')).toBeNull()
     expect(positiveId('1e3')).toBeNull()

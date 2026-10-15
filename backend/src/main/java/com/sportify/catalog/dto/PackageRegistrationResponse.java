@@ -36,6 +36,9 @@ public class PackageRegistrationResponse {
     private PackageRegistrationStatus status;
     private Long paymentId;
     private String paymentCode;
+    /** Invoice of the payment, set when the response comes from a sale or an activation that issued it (BE-19). */
+    private Long invoiceId;
+    private String invoiceNumber;
     private LocalDateTime activatedAt;
     private LocalDateTime createdAt;
 }

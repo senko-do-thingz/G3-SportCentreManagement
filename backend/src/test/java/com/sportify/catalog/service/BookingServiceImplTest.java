@@ -31,6 +31,8 @@ import com.sportify.identity.repository.MemberProfileRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -39,6 +41,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -50,6 +53,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -120,10 +125,11 @@ public class BookingServiceImplTest {
                 .build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
         when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
                 .thenReturn(Optional.empty());
         when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
+        when(registrationRepository.consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class))).thenReturn(1);
         when(bookingRepository.getNextBookingCodeSequence()).thenReturn(1L);
         when(codeFormatter.formatBookingCode(1L)).thenReturn("BKG-001");
         when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> {
@@ -136,10 +142,167 @@ public class BookingServiceImplTest {
 
         assertNotNull(res);
         assertEquals(BookingStatus.CONFIRMED, res.getStatus());
-        assertEquals(4, packageReg.getRemainingSessions()); // Remaining sessions decremented from 5 to 4
+        assertEquals(5, packageReg.getRemainingSessions()); // SQL owns the balance; the managed snapshot is not changed.
         assertEquals(3, session.getBookedCount()); // Session booked count incremented from 2 to 3
-        verify(registrationRepository).save(packageReg);
+        verify(registrationRepository).consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class));
+        verify(registrationRepository, never()).save(any());
         verify(sessionRepository).save(session);
+        var order = inOrder(sessionRepository, bookingRepository, registrationRepository);
+        order.verify(sessionRepository).findForUpdate(20L);
+        order.verify(bookingRepository).findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED);
+        order.verify(registrationRepository).findById(50L);
+        order.verify(registrationRepository).consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class));
+        order.verify(sessionRepository).save(session);
+        order.verify(bookingRepository).save(any(Booking.class));
+    }
+
+    @Test
+    void createBooking_ZeroRemainingSessionsRejectsBeforeDebitOrBookingWrites() {
+        stubExplicitRegistration();
+        packageReg.setRemainingSessions(0);
+
+        var error = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(explicitRequest(), memberUser));
+
+        assertEquals("Selected package registration has zero remaining sessions", error.getMessage());
+        assertNoBookingWrites();
+        verify(registrationRepository, never()).consumeSession(any(), any(), any(), any());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = PackageRegistrationStatus.class, names = "ACTIVE", mode = EnumSource.Mode.EXCLUDE)
+    void createBooking_IneligibleRegistrationRejectsBeforeDebitOrBookingWrites(PackageRegistrationStatus status) {
+        stubExplicitRegistration();
+        packageReg.setStatus(status);
+
+        var error = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(explicitRequest(), memberUser));
+
+        assertEquals("Package registration is not active: " + status, error.getMessage());
+        assertNoBookingWrites();
+        verify(registrationRepository, never()).consumeSession(any(), any(), any(), any());
+    }
+
+    @Test
+    void createBooking_ConditionalDebitLosesLastUnitRejectsBeforeCounterOrBookingWrites() {
+        stubExplicitRegistration();
+        var state = mock(SportPackageRegistrationRepository.BookingState.class);
+        when(state.getStatus()).thenReturn(PackageRegistrationStatus.ACTIVE);
+        when(state.getStartDate()).thenReturn(packageReg.getStartDate());
+        when(state.getEndDate()).thenReturn(packageReg.getEndDate());
+        when(registrationRepository.findBookingStateById(50L)).thenReturn(Optional.of(state));
+
+        var error = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(explicitRequest(), memberUser));
+
+        assertEquals("Selected package registration has zero remaining sessions", error.getMessage());
+        assertNoBookingWrites();
+        verify(registrationRepository).consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class));
+    }
+
+    @Test
+    void createBooking_ConditionalDebitSeesNewInactiveStatusReturnsExistingStatusError() {
+        stubExplicitRegistration();
+        var state = mock(SportPackageRegistrationRepository.BookingState.class);
+        when(state.getStatus()).thenReturn(PackageRegistrationStatus.REFUNDED);
+        when(registrationRepository.findBookingStateById(50L)).thenReturn(Optional.of(state));
+
+        var error = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(explicitRequest(), memberUser));
+
+        assertEquals("Package registration is not active: REFUNDED", error.getMessage());
+        assertNoBookingWrites();
+    }
+
+    @Test
+    void createBooking_ConditionalDebitSeesChangedValidityReturnsExistingDateError() {
+        stubExplicitRegistration();
+        var state = mock(SportPackageRegistrationRepository.BookingState.class);
+        when(state.getStatus()).thenReturn(PackageRegistrationStatus.ACTIVE);
+        when(state.getStartDate()).thenReturn(session.getSessionDate().plusDays(1));
+        when(state.getEndDate()).thenReturn(packageReg.getEndDate());
+        when(registrationRepository.findBookingStateById(50L)).thenReturn(Optional.of(state));
+
+        var error = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(explicitRequest(), memberUser));
+
+        assertEquals("Session date 2026-10-06 is outside package validity period (2026-10-07 to 2026-10-31)", error.getMessage());
+        assertNoBookingWrites();
+    }
+
+    @Test
+    void createBooking_AutomaticSelectionConsumesThroughTheSameConditionalCommand() {
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
+        when(registrationRepository.findActiveRegistrationsForSport(100L, 1L, PackageRegistrationStatus.ACTIVE, session.getSessionDate()))
+                .thenReturn(List.of(packageReg));
+        when(registrationRepository.consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class))).thenReturn(1);
+        when(bookingRepository.getNextBookingCodeSequence()).thenReturn(12L);
+        when(codeFormatter.formatBookingCode(12L)).thenReturn("BKG-012");
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertEquals(BookingStatus.CONFIRMED, bookingService.createBooking(
+                BookingCreateRequest.builder().sessionId(20L).build(), memberUser).getStatus());
+
+        verify(registrationRepository).consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class));
+        verify(registrationRepository, never()).save(any());
+    }
+
+    private BookingCreateRequest explicitRequest() {
+        return BookingCreateRequest.builder().sessionId(20L).packageRegistrationId(50L).build();
+    }
+
+    private void stubExplicitRegistration() {
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
+        when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
+    }
+
+    private void assertNoBookingWrites() {
+        assertEquals(2, session.getBookedCount());
+        verify(sessionRepository, never()).save(any());
+        verify(bookingRepository, never()).save(any());
+        verify(registrationRepository, never()).save(any());
+    }
+
+    @Test
+    void createBooking_CancelledSession_RejectsWithoutConsumingPackageOrChangingCounter() {
+        session.setStatus(SessionStatus.CANCELLED);
+        session.setCancelReason("Weather");
+        session.setBookedCount(0);
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(
+                BookingCreateRequest.builder().sessionId(20L).build(), memberUser));
+
+        assertEquals("Session is not published for booking", ex.getMessage());
+        assertEquals(SessionStatus.CANCELLED, session.getStatus());
+        assertEquals("Weather", session.getCancelReason());
+        assertEquals(0, session.getBookedCount());
+        assertEquals(5, packageReg.getRemainingSessions());
+        verify(sessionRepository, never()).save(any());
+        verifyNoInteractions(bookingRepository, registrationRepository);
+    }
+
+    @Test
+    void cancelBooking_AlreadyCancelledAfterSessionLock_RejectsWithoutRefundOrCounterChanges() {
+        session.setStatus(SessionStatus.CANCELLED);
+        session.setBookedCount(0);
+        Booking booking = Booking.builder().id(1L).session(session).member(memberProfile)
+                .packageRegistration(packageReg).status(BookingStatus.CANCELLED).build();
+        when(bookingRepository.findSessionIdByBookingId(1L)).thenReturn(Optional.of(20L));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> bookingService.cancelBooking(1L, memberUser));
+
+        assertEquals("Booking is already cancelled", ex.getMessage());
+        var order = inOrder(bookingRepository, sessionRepository);
+        order.verify(bookingRepository).findSessionIdByBookingId(1L);
+        order.verify(sessionRepository).findForUpdate(20L);
+        order.verify(bookingRepository).findById(1L);
+        assertEquals(0, session.getBookedCount());
+        assertEquals(5, packageReg.getRemainingSessions());
+        verify(sessionRepository, never()).save(any());
+        verify(bookingRepository, never()).save(any());
+        verifyNoInteractions(registrationRepository, checkInRepository);
     }
 
     @Test
@@ -151,10 +314,11 @@ public class BookingServiceImplTest {
                 .build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
         when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
                 .thenReturn(Optional.empty());
         when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
+        when(registrationRepository.consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class))).thenReturn(1);
         when(bookingRepository.getNextBookingCodeSequence()).thenReturn(2L);
         when(codeFormatter.formatBookingCode(2L)).thenReturn("BKG-002");
         when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> {
@@ -176,7 +340,7 @@ public class BookingServiceImplTest {
         BookingCreateRequest req = BookingCreateRequest.builder().sessionId(20L).build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
 
         BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
         assertEquals("Session is fully booked", ex.getMessage());
@@ -190,7 +354,7 @@ public class BookingServiceImplTest {
         Booking existing = Booking.builder().id(10L).status(BookingStatus.CONFIRMED).build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
         when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
                 .thenReturn(Optional.of(existing));
 
@@ -206,7 +370,7 @@ public class BookingServiceImplTest {
         Booking existing = Booking.builder().id(10L).status(BookingStatus.CONFIRMED).build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
         when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
                 .thenReturn(Optional.of(existing));
 
@@ -225,6 +389,8 @@ public class BookingServiceImplTest {
                 .status(BookingStatus.CONFIRMED)
                 .build();
 
+        when(bookingRepository.findSessionIdByBookingId(1L)).thenReturn(Optional.of(booking.getSession().getId()));
+        when(sessionRepository.findForUpdate(booking.getSession().getId())).thenReturn(Optional.of(booking.getSession()));
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
         when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
 
@@ -233,7 +399,9 @@ public class BookingServiceImplTest {
         assertNotNull(res);
         assertEquals(BookingStatus.CANCELLED, res.getStatus());
         assertEquals(1, session.getBookedCount()); // Decremented session booked count (seat restored)
-        assertEquals(6, packageReg.getRemainingSessions()); // Incremented package remaining sessions (session restored)
+        assertEquals(5, packageReg.getRemainingSessions()); // Restoration is database arithmetic, not a stale entity save.
+        verify(registrationRepository).restoreSession(eq(50L), eq("ACTIVE"), any(LocalDateTime.class));
+        verify(registrationRepository, never()).save(any());
     }
 
     @Test
@@ -248,6 +416,8 @@ public class BookingServiceImplTest {
                 .status(BookingStatus.CONFIRMED)
                 .build();
 
+        when(bookingRepository.findSessionIdByBookingId(1L)).thenReturn(Optional.of(booking.getSession().getId()));
+        when(sessionRepository.findForUpdate(booking.getSession().getId())).thenReturn(Optional.of(booking.getSession()));
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
 
         assertThrows(AccessDeniedException.class, () -> bookingService.cancelBooking(1L, otherMember));
@@ -268,7 +438,7 @@ public class BookingServiceImplTest {
                 .build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
         when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
                 .thenReturn(Optional.empty());
         when(registrationRepository.findById(51L)).thenReturn(Optional.of(otherReg));
@@ -286,7 +456,7 @@ public class BookingServiceImplTest {
                 .build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
         when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
                 .thenReturn(Optional.empty());
         when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
@@ -304,7 +474,7 @@ public class BookingServiceImplTest {
                 .build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
         when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
                 .thenReturn(Optional.empty());
         when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
@@ -322,7 +492,7 @@ public class BookingServiceImplTest {
                 .build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
         when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
                 .thenReturn(Optional.empty());
         when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
@@ -341,7 +511,7 @@ public class BookingServiceImplTest {
                 .build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
         when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
                 .thenReturn(Optional.empty());
         when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
@@ -366,7 +536,7 @@ public class BookingServiceImplTest {
                 .build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
         when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
                 .thenReturn(Optional.empty());
         when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
@@ -384,10 +554,11 @@ public class BookingServiceImplTest {
                 .build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
         when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
                 .thenReturn(Optional.empty());
         when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
+        when(registrationRepository.consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class))).thenReturn(1);
         when(bookingRepository.getNextBookingCodeSequence()).thenReturn(10L);
         when(codeFormatter.formatBookingCode(10L)).thenReturn("BKG-010");
         when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> {
@@ -401,7 +572,8 @@ public class BookingServiceImplTest {
         assertNotNull(res);
         assertEquals(BookingStatus.CONFIRMED, res.getStatus());
         assertEquals(50L, res.getPackageRegistrationId());
-        verify(registrationRepository).save(packageReg);
+        verify(registrationRepository).consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class));
+        verify(registrationRepository, never()).save(any());
     }
 
     @Test
@@ -420,7 +592,7 @@ public class BookingServiceImplTest {
                 .build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
         when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
                 .thenReturn(Optional.empty());
         when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
@@ -449,7 +621,7 @@ public class BookingServiceImplTest {
                 .build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
         when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
                 .thenReturn(Optional.empty());
         when(registrationRepository.findById(51L)).thenReturn(Optional.of(otherReg));
@@ -466,7 +638,7 @@ public class BookingServiceImplTest {
         BookingCreateRequest req = BookingCreateRequest.builder().sessionId(20L).build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
 
         BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
         assertEquals("Session is not published for booking", ex.getMessage());
@@ -481,7 +653,7 @@ public class BookingServiceImplTest {
         BookingCreateRequest req = BookingCreateRequest.builder().sessionId(20L).build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
 
         BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
         assertEquals("Cannot book a session in the past", ex.getMessage());
@@ -498,6 +670,8 @@ public class BookingServiceImplTest {
                 .status(BookingStatus.CONFIRMED)
                 .build();
 
+        when(bookingRepository.findSessionIdByBookingId(1L)).thenReturn(Optional.of(booking.getSession().getId()));
+        when(sessionRepository.findForUpdate(booking.getSession().getId())).thenReturn(Optional.of(booking.getSession()));
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
         when(checkInRepository.existsByBookingIdAndResult(eq(1L), eq(CheckInResult.ALLOWED))).thenReturn(true);
 
@@ -520,6 +694,8 @@ public class BookingServiceImplTest {
                 .status(BookingStatus.CONFIRMED)
                 .build();
 
+        when(bookingRepository.findSessionIdByBookingId(1L)).thenReturn(Optional.of(booking.getSession().getId()));
+        when(sessionRepository.findForUpdate(booking.getSession().getId())).thenReturn(Optional.of(booking.getSession()));
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
         when(checkInRepository.existsByBookingIdAndResult(eq(1L), eq(CheckInResult.ALLOWED))).thenReturn(false);
 
@@ -538,6 +714,8 @@ public class BookingServiceImplTest {
                 .status(BookingStatus.CONFIRMED)
                 .build();
 
+        when(bookingRepository.findSessionIdByBookingId(1L)).thenReturn(Optional.of(booking.getSession().getId()));
+        when(sessionRepository.findForUpdate(booking.getSession().getId())).thenReturn(Optional.of(booking.getSession()));
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
         when(checkInRepository.existsByBookingIdAndResult(eq(1L), eq(CheckInResult.ALLOWED))).thenReturn(false);
         when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
@@ -548,7 +726,8 @@ public class BookingServiceImplTest {
         assertEquals(BookingStatus.CANCELLED, res.getStatus());
         assertEquals(1, session.getBookedCount()); // Decremented session seat
         assertEquals(5, packageReg.getRemainingSessions()); // Remaining sessions NOT incremented (remains 5)
-        verify(registrationRepository, never()).save(packageReg);
+        verify(registrationRepository).restoreSession(eq(50L), eq("ACTIVE"), any(LocalDateTime.class));
+        verify(registrationRepository, never()).save(any());
     }
 
     @Test
@@ -607,7 +786,7 @@ public class BookingServiceImplTest {
                 .packageRegistrationId(50L)
                 .build();
 
-        when(sessionRepository.findById(23L)).thenReturn(Optional.of(startedSession));
+        when(sessionRepository.findForUpdate(23L)).thenReturn(Optional.of(startedSession));
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
 
         BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(req, memberUser));
@@ -624,10 +803,11 @@ public class BookingServiceImplTest {
                 .packageRegistrationId(50L)
                 .build();
 
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
         when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
         when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED)).thenReturn(Optional.empty());
+        when(registrationRepository.consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class))).thenReturn(1);
         when(bookingRepository.getNextBookingCodeSequence()).thenReturn(10L);
         when(codeFormatter.formatBookingCode(10L)).thenReturn("BK-000010");
         when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> {
@@ -642,7 +822,8 @@ public class BookingServiceImplTest {
         assertEquals(200L, res.getId());
         assertEquals(BookingStatus.CONFIRMED, res.getStatus());
         verify(sessionRepository).save(session);
-        verify(registrationRepository).save(packageReg);
+        verify(registrationRepository).consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class));
+        verify(registrationRepository, never()).save(any());
         verify(bookingRepository).save(any(Booking.class));
     }
 
@@ -665,6 +846,8 @@ public class BookingServiceImplTest {
                 .status(BookingStatus.CONFIRMED)
                 .build();
 
+        when(bookingRepository.findSessionIdByBookingId(1L)).thenReturn(Optional.of(booking.getSession().getId()));
+        when(sessionRepository.findForUpdate(booking.getSession().getId())).thenReturn(Optional.of(booking.getSession()));
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
         when(checkInRepository.existsByBookingIdAndResult(eq(1L), eq(CheckInResult.ALLOWED))).thenReturn(false);
 
@@ -701,6 +884,8 @@ public class BookingServiceImplTest {
                 .email("receptionist@sportify.com")
                 .build();
 
+        when(bookingRepository.findSessionIdByBookingId(1L)).thenReturn(Optional.of(booking.getSession().getId()));
+        when(sessionRepository.findForUpdate(booking.getSession().getId())).thenReturn(Optional.of(booking.getSession()));
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
         when(checkInRepository.existsByBookingIdAndResult(eq(1L), eq(CheckInResult.ALLOWED))).thenReturn(false);
         when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
@@ -711,7 +896,8 @@ public class BookingServiceImplTest {
         assertEquals(BookingStatus.CANCELLED, res.getStatus());
         verify(bookingRepository).save(any(Booking.class));
         verify(sessionRepository).save(startedSession);
-        verify(registrationRepository).save(packageReg);
+        verify(registrationRepository).restoreSession(eq(50L), eq("ACTIVE"), any(LocalDateTime.class));
+        verify(registrationRepository, never()).save(any());
     }
 
     @Test
@@ -724,6 +910,8 @@ public class BookingServiceImplTest {
                 .status(BookingStatus.CONFIRMED)
                 .build();
 
+        when(bookingRepository.findSessionIdByBookingId(1L)).thenReturn(Optional.of(booking.getSession().getId()));
+        when(sessionRepository.findForUpdate(booking.getSession().getId())).thenReturn(Optional.of(booking.getSession()));
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
         when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
 
@@ -753,6 +941,8 @@ public class BookingServiceImplTest {
                 .email("rec@sportify.com")
                 .build();
 
+        when(bookingRepository.findSessionIdByBookingId(1L)).thenReturn(Optional.of(booking.getSession().getId()));
+        when(sessionRepository.findForUpdate(booking.getSession().getId())).thenReturn(Optional.of(booking.getSession()));
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
         when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
 
@@ -782,6 +972,8 @@ public class BookingServiceImplTest {
                 .email("manager@sportify.com")
                 .build();
 
+        when(bookingRepository.findSessionIdByBookingId(1L)).thenReturn(Optional.of(booking.getSession().getId()));
+        when(sessionRepository.findForUpdate(booking.getSession().getId())).thenReturn(Optional.of(booking.getSession()));
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
         when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
 
@@ -802,10 +994,11 @@ public class BookingServiceImplTest {
                 .build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
         when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
                 .thenReturn(Optional.empty());
         when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
+        when(registrationRepository.consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class))).thenReturn(1);
         when(bookingRepository.getNextBookingCodeSequence()).thenReturn(1L);
         when(codeFormatter.formatBookingCode(1L)).thenReturn("BKG-001");
         when(bookingRepository.save(any(Booking.class))).thenThrow(
@@ -813,6 +1006,9 @@ public class BookingServiceImplTest {
 
         ConflictException ex = assertThrows(ConflictException.class, () -> bookingService.createBooking(req, memberUser));
         assertEquals("Member already has a confirmed booking for this session", ex.getMessage());
+        verify(registrationRepository).consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class));
+        verify(registrationRepository, never()).restoreSession(any(), any(), any());
+        verify(registrationRepository, never()).save(any());
     }
 
     @Test
@@ -823,15 +1019,19 @@ public class BookingServiceImplTest {
                 .build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findById(20L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
         when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
                 .thenReturn(Optional.empty());
         when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
+        when(registrationRepository.consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class))).thenReturn(1);
         when(bookingRepository.getNextBookingCodeSequence()).thenReturn(1L);
         when(codeFormatter.formatBookingCode(1L)).thenReturn("BKG-001");
         when(bookingRepository.save(any(Booking.class))).thenThrow(
                 new DataIntegrityViolationException("Cannot insert null into column 'status'."));
 
         assertThrows(DataIntegrityViolationException.class, () -> bookingService.createBooking(req, memberUser));
+        verify(registrationRepository).consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class));
+        verify(registrationRepository, never()).restoreSession(any(), any(), any());
+        verify(registrationRepository, never()).save(any());
     }
 }
