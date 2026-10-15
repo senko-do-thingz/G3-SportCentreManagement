@@ -22,6 +22,15 @@ import java.util.Optional;
 
 @Repository
 public interface SportPackageRegistrationRepository extends JpaRepository<SportPackageRegistration, Long> {
+    /** Owned matching registrations, including EXPIRED only to explain ineligibility. No per-row lookups. */
+    @Query("SELECT r FROM SportPackageRegistration r JOIN FETCH r.sportPackage p JOIN FETCH p.sport "
+            + "WHERE r.member.id = :memberId AND p.sport.id = :sportId AND p.trainingFormat = :format "
+            + "AND r.status IN (com.sportify.catalog.entity.PackageRegistrationStatus.ACTIVE, "
+            + "com.sportify.catalog.entity.PackageRegistrationStatus.EXPIRED) "
+            + "ORDER BY r.endDate ASC, r.startDate ASC, r.id ASC")
+    List<SportPackageRegistration> findForSessionEligibility(@Param("memberId") Long memberId,
+            @Param("sportId") Long sportId, @Param("format") com.sportify.catalog.entity.TrainingFormat format);
+
     @EntityGraph(attributePaths = {"sportPackage", "member", "member.userAccount"})
     Page<SportPackageRegistration> findByStatus(PackageRegistrationStatus status,
             Pageable pageable);

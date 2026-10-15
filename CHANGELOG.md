@@ -1,3 +1,11 @@
+## 2026-10-15 - Member Schedule, Class Search, Session Detail and Coach Profile (BE-11, Flow 2)
+
+Branch `feat/f2-member-schedule`, based on updated main `efd5346` including BE-10. Added authenticated MEMBER/RECEPTIONIST/MANAGER reads for `GET /api/v1/sessions`, `GET /api/v1/sessions/{id}` and `GET /api/v1/coaches/{id}`.
+
+- Session search applies server-side AND filters for sport, inclusive dates, session format, class level and assigned coach, with bounded PageResponse pagination and deterministic date/start/id ordering. List/detail share strict future-PUBLISHED visibility and active assignment checks; coachless self-training is supported. Grouped CONFIRMED booking counts provide clamped free seats without changing cached counters.
+- Member detail derives ownership from the principal and returns typed eligibility, current booking state and deterministically ordered usable ACTIVE registrations. ALREADY_BOOKED precedes FULL; CAPACITY_UNAVAILABLE preserves the existing write guard when a stale cache blocks booking despite real free seats. Date/credit/package reasons include PACKAGE_NOT_STARTED_BY_THEN for a future package start. Staff receive explicit no-member context. Eligibility reserves no seat or credit and does not change existing booking/locking rules.
+- Coach public detail exposes public biography, sports and certification metadata only, plus the first 20 upcoming visible sessions with pagination metadata. Account contacts, authentication fields, document URLs and audit metadata are excluded. Existing staff coach dropdown is unchanged.
+- Added 106 unit/controller/query-metadata cases and 56 SQL Server integration cases registered in the required CI suite manifest. The clean full backend unit suite passed 1120 tests with zero failures/errors/skips. SQL Server execution remains pending CI because Docker is unavailable locally. Exact commands, contracts and limitations are in `docs/tests/BE-11_test_cases.md` and the exported review package. No schema migration or frontend change.
 
 ## 2026-10-13 - Member Payments: Summary, Instructions and Status, My Payments, Receipts (FE-11, Flow 3)
 
