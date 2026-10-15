@@ -1,6 +1,7 @@
 package com.sportify.catalog.entity;
 
 import com.sportify.identity.entity.CoachProfile;
+import com.sportify.identity.entity.UserAccount;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -63,6 +64,16 @@ public class ClassSession {
     @Column(nullable = false, length = 20)
     @Builder.Default
     private SessionStatus status = SessionStatus.PUBLISHED;
+
+    @Column(name = "cancel_reason", length = 255)
+    private String cancelReason;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cancelled_by_user_id")
+    private UserAccount cancelledBy;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

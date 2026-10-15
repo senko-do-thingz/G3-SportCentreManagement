@@ -1,6 +1,7 @@
 # Changelog
 
 
+
 ## 2026-10-14 - Receptionist payments, receipts and refunds (FE-12, Flow 3)
 
 **Blocked by BE-18 and BE-21, do not merge.** Draft PR. origin/main (6e82388, checked with `git fetch` on 2026-10-14) has none of the BE-18 or BE-21 endpoints, so on main the FE-05 confirmation and the desk sale receipt would answer 404.
@@ -32,6 +33,17 @@ Branch `feat/f3-reception-payments`, from main (6e82388). Owner: Phat. Priority:
 - `receptionPaymentPath(paymentId, memberId)` without `item` and `itemId`. `TextArea` moved to the UI kit (`src/components/ui/TextArea.tsx`); refund table columns built once; no fixed pixel margin.
 - Verified with lint (0 warnings), `tsc -b`, `npm test` (442 tests in 23 files) and `npm run build`.
 - Review round 2: a failed refund queue now shows its error with Try again instead of "Refund not found" when the refund is not in the queue that answered; the Find member button stays aligned with the input when the field shows an error (grid layout). 443 tests pass.
+
+## 2026-10-14 - Manager Session Schedule and Coach Assignment (BE-10, Flow 2)
+
+### Added
+
+- Manager session calendar with inclusive date ranges, class/coach/facility filters, deterministic ordering and grouped confirmed booking counts.
+- Single and weekly DRAFT or PUBLISHED session creation, coach qualification checks, class capacity bounds and complete coach/facility conflict details in the existing 409 error envelope. Weekly batches reject every insertion if any requested date conflicts.
+- Pessimistic coach/facility resource locks for concurrent scheduling, booking creation and cancellation that lock the session row before booking checks, and session updates that exclude themselves from overlap checks, preserve the cached booking counter and check a new date against booked package validity.
+- Future-session cancellation with manager/reason metadata, bulk booking cancellation, capped session-credit restoration only to ACTIVE package registrations and per-registration package booking counts in one audited transaction. Package consumption uses a conditional database decrement across different sessions; individual and manager cancellation restore credits atomically within the purchased cap. Existing registration balances cannot be overwritten by stale JPA entity saves. The manager calendar requires both date bounds and returns the existing 400 envelope for missing or malformed bounds.
+- V23 cancellation metadata and resource/date and booking/session indexes, SQL Server integration coverage registered in the required-suite manifest, and test cases in `docs/tests/BE-10_test_cases.md`.
+
 
 ## 2026-10-13 - Sport Packages & Pricing and Manager Catalog (BE-03, Flow 1)
 
