@@ -5,6 +5,8 @@ import { card, registration } from '../../test/memberFixtures'
 import {
   amountCheck,
   amountDifference,
+  formatPaymentMoney,
+  parsePaymentAmount,
   apiStatus,
   canConfirm,
   findPaidItem,
@@ -27,7 +29,6 @@ import {
   toConfirmRequest,
   validateConfirmForm,
   validateRefundForm,
-  validateRefundReference,
   validAmountDue,
   writePaymentListParams,
   type ConfirmForm,
@@ -80,8 +81,8 @@ describe('FE-12 receptionPaymentsModel - verify and confirm', () => {
       reference: 'Reference code is required for this method',
       amountReceived: 'Amount received is required',
     })
-    expect(validateConfirmForm({ ...VALID_TRANSFER, amountReceived: '810000.50' }, DUE).amountReceived).toMatch(/whole number/)
-    expect(validateConfirmForm({ ...VALID_TRANSFER, note: 'x'.repeat(501) }, DUE).note).toMatch(/at most 500/)
+    expect(validateConfirmForm({ ...VALID_TRANSFER, amountReceived: '810000.50' }, DUE).amountReceived).toMatch(/must equal/)
+    expect(validateConfirmForm({ ...VALID_TRANSFER, note: 'x'.repeat(256) }, DUE).note).toMatch(/at most 255/)
     expect(validateConfirmForm({ ...VALID_TRANSFER, reference: 'x'.repeat(101) }, DUE).reference).toMatch(/at most 100/)
     expect(validateConfirmForm({ ...VALID_TRANSFER, method: 'CHEQUE' }, DUE).method).toBe('Choose a payment method')
   })
@@ -96,19 +97,19 @@ describe('FE-12 receptionPaymentsModel - verify and confirm', () => {
     expect(initialConfirmForm(null).method).toBe('BANK_TRANSFER')
   })
 
-  it('TC-FE12-015 amount rule of the FE-05 desk sale: non-cash exact, cash equal or above', () => {
+  it('TC-FE12-015 BE-18 exact-amount rules apply to cash and non-cash alike', () => {
     const shortTransfer = { ...VALID_TRANSFER, amountReceived: '800000' }
     const overTransfer = { ...VALID_TRANSFER, amountReceived: '900000' }
-    expect(validateConfirmForm(shortTransfer, DUE).amountReceived).toBe('Amount received is less than the amount payable')
-    expect(validateConfirmForm(overTransfer, DUE).amountReceived).toBe('Amount received must equal the amount payable for this method')
+    expect(validateConfirmForm(shortTransfer, DUE).amountReceived).toMatch(/must equal the amount due/)
+    expect(validateConfirmForm(overTransfer, DUE).amountReceived).toMatch(/must equal the amount due/)
     expect(canConfirm(shortTransfer, DUE)).toBe(false)
     expect(canConfirm(overTransfer, DUE)).toBe(false)
     expect(isAmountToReview(shortTransfer, DUE)).toBe(true)
     expect(isAmountToReview(overTransfer, DUE)).toBe(true)
 
     const cashOver: ConfirmForm = { ...VALID_TRANSFER, method: 'CASH', reference: '', amountReceived: '1.000.000' }
-    expect(canConfirm(cashOver, DUE)).toBe(true)
-    expect(isAmountToReview(cashOver, DUE)).toBe(false)
+    expect(canConfirm(cashOver, DUE)).toBe(false)
+    expect(isAmountToReview(cashOver, DUE)).toBe(true)
     expect(toConfirmRequest(cashOver).amountReceived).toBe(1000000)
     const cashShort = { ...cashOver, amountReceived: '800000' }
     expect(canConfirm(cashShort, DUE)).toBe(false)
@@ -169,7 +170,7 @@ describe('FE-12 receptionPaymentsModel - verify and confirm', () => {
       details: { amountDue: 810000, amountReceived: '790000' },
     })
     expect(error.code).toBe('PAYMENT_AMOUNT_MISMATCH')
-    expect(mismatchAmounts(810000, '800000', error)).toEqual({ amountDue: 810000, amountReceived: 790000, outstanding: 20000 })
+    expect(mismatchAmounts(810000, '800000', error)).toEqual({ amountDue: 810000, amountReceived: 790000, outstanding: 20000, message: 'Amount received does not match' })
     expect(mismatchAmounts(810000, '900000').outstanding).toBe(-90000)
   })
 
@@ -198,7 +199,7 @@ const REFUND: Refund = {
 }
 
 describe('FE-12 receptionPaymentsModel - refunds', () => {
-  it('TC-FE12-010 refund amount is required, whole, above 0 and within the refundable balance', () => {
+  it('TC-FE12-010 refund amount is required, above 0 and within the payment amount', () => {
     expect(validateRefundForm({ amount: '150.000', reason: 'Cancelled' }, 150000)).toEqual({})
     expect(validateRefundForm({ amount: '', reason: '' }, 150000)).toEqual({
       amount: 'Refund amount is required',
@@ -228,30 +229,28 @@ describe('FE-12 receptionPaymentsModel - refunds', () => {
     expect(refundDetailPath(7)).toBe('/reception/refunds/7')
   })
 
-  it('TC-FE12-012 reference rules, refundable registrations and newest-first order', () => {
-    expect(validateRefundReference('  ')).toBe('Refund transaction reference is required')
-    expect(validateRefundReference('x'.repeat(101))).toMatch(/at most 100/)
-    expect(validateRefundReference('REF-1040-20261003')).toBeNull()
+  it('TC-FE12-012 only paid ACTIVE registrations qualify; pending and approved are outside history', () => {
     const rows = [
       registration({ id: 1, status: 'ACTIVE', paymentId: 41 }),
       registration({ id: 2, status: 'PENDING_PAYMENT', paymentId: 42 }),
       registration({ id: 3, status: 'EXPIRED', paymentId: 43 }),
       registration({ id: 4, status: 'ACTIVE', paymentId: null }),
     ]
-    expect(refundableRegistrations(rows).map((row) => row.id)).toEqual([1, 3])
+    expect(refundableRegistrations(rows).map((row) => row.id)).toEqual([1])
     const older = { ...REFUND, id: 1, createdAt: '2026-10-01T10:00:00' }
     expect(sortRefunds([older, REFUND]).map((row) => row.id)).toEqual([7, 1])
     const approved = { ...REFUND, id: 3, status: 'APPROVED' }
-    expect(memberRefundHistory([REFUND, older, approved]).map((row) => row.id)).toEqual([3])
+    const completed = { ...REFUND, id: 4, status: 'COMPLETED' }
+    expect(memberRefundHistory([REFUND, older, approved, completed]).map((row) => row.id)).toEqual([4])
   })
 
   it('TC-FE12-013 the refund quote reader fills defaults and refuses a quote without an amount', () => {
-    const quote = toRefundQuote({ registrationId: 11, packageName: 'Football - 30 days', suggestedAmount: '150000.00' })
+    const quote = toRefundQuote({ registrationId: 11, packageName: 'Football - 30 days', suggestedAmount: '150000.00', paymentAmount: '200000.00' })
     expect(quote.suggestedAmount).toBe(150000)
-    expect(quote.maxRefundable).toBe(150000)
+    expect(quote.maxRefundable).toBe(200000)
     expect(quote.eligible).toBe(true)
     expect(quote.serviceName).toBe('Football - 30 days')
-    expect(toRefundQuote({ registrationId: 11, suggestedAmount: 100, maxRefundable: 200, eligible: false }).eligible).toBe(false)
+    expect(() => toRefundQuote({ registrationId: 11, suggestedAmount: 100 })).toThrow()
     expect(() => toRefundQuote({ registrationId: 11 })).toThrow()
     expect(() => toRefundQuote({ suggestedAmount: 100 })).toThrow()
   })
@@ -261,5 +260,32 @@ describe('FE-12 receptionPaymentsModel - refunds', () => {
     expect(error.code).toBeNull()
     expect(error.fieldErrors).toEqual({ paymentReference: 'Reference is required' })
     expect(error.details).toEqual({ paymentReference: 'Reference is required' })
+  })
+})
+
+describe('FE-12 round 3 backend amount contract', () => {
+  it.each(['CASH', 'BANK_TRANSFER', 'CREDIT_CARD', 'MOMO', 'VNPAY', 'ZALOPAY'])(
+    '%s confirms only the exact amount and requires verification', (method) => {
+      const form = { ...VALID_TRANSFER, method, reference: method === 'CASH' ? '' : 'TEST-REFERENCE' }
+      expect(canConfirm(form, DUE)).toBe(true)
+      for (const amountReceived of ['800000', '820000', '0', '-1', 'abc', '', '810000.001', '10000000000']) {
+        expect(canConfirm({ ...form, amountReceived }, DUE)).toBe(false)
+      }
+      expect(canConfirm({ ...form, verified: false }, DUE)).toBe(false)
+    },
+  )
+
+  it('preserves two decimals, existing whole-VND grouping and the refund payment cap', () => {
+    expect(parsePaymentAmount('810000.50')).toBe(810000.5)
+    expect(parsePaymentAmount('810.000')).toBe(810000)
+    expect(parsePaymentAmount('1,000,000')).toBe(1000000)
+    expect(parsePaymentAmount('0.001')).toBeNull()
+    expect(canConfirm({ ...VALID_TRANSFER, amountReceived: '810000.50' }, 810000.5)).toBe(true)
+    expect(toConfirmRequest({ ...VALID_TRANSFER, amountReceived: '810000.50' }).amountReceived).toBe(810000.5)
+    expect(amountDifference(0.3, '0.20')).toBe(-0.1)
+    expect(formatPaymentMoney(0.13)).toBe('0,13 VND')
+    expect(validateRefundForm({ amount: '150000.13', reason: 'Unused sessions' }, 200000)).toEqual({})
+    expect(validateRefundForm({ amount: '0.001', reason: 'Unused sessions' }, 200000).amount).toBeDefined()
+    expect(() => toRefundQuote({ registrationId: 11, suggestedAmount: 150, paymentAmount: 100 })).toThrow()
   })
 })

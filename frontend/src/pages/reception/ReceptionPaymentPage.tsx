@@ -21,10 +21,9 @@ import {
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { useResource } from '../../hooks/useResource'
-import { formatDate, formatDateTime, formatMoney, humanizeCode } from '../../utils/format'
+import { formatDate, formatDateTime, humanizeCode } from '../../utils/format'
 import {
   memberSearchPath,
-  parseAmount,
   PAYMENT_METHOD_LABELS,
   PAYMENT_METHOD_OPTIONS,
   positiveId,
@@ -33,6 +32,9 @@ import {
 import {
   amountCheck,
   amountDifference,
+  FAIL_REASON_MAX,
+  formatPaymentMoney as formatMoney,
+  parsePaymentAmount,
   canConfirm,
   findPaidItem,
   initialConfirmForm,
@@ -46,7 +48,6 @@ import {
   paymentReceiptPath,
   paymentStatusLabel,
   paymentStatusTone,
-  REASON_MAX,
   REFERENCE_MAX,
   referenceRequired,
   toConfirmRequest,
@@ -70,8 +71,8 @@ function methodName(method: string | null | undefined): string {
  * confirmation). GET /payments/{id}, then by status:
  * - PENDING: Verify and Record Payment (F3-05). PUT /payments/{id}/confirm (BE-18) with method,
  *   reference (required except for cash), amount received and note, only after the checkbox is
- *   ticked. Amount rule of the FE-05 desk sale: a non-cash method must equal the amount due, cash
- *   may be equal or above; any other amount goes to "Amount does not match". A 409 PAYMENT_AMOUNT_MISMATCH shows Payment Needs Review (S3-Mismatch) and the
+ *   ticked. Every payment method requires the exact amount due. A 409 PAYMENT_AMOUNT_MISMATCH
+ *   shows Payment Needs Review (S3-Mismatch) and the
  *   payment stays PENDING. Mark as failed calls PUT /payments/{id}/fail with a reason.
  * - SUCCESS or REFUNDED: Payment Confirmed and Receipt (F3-06) with the invoice of
  *   GET /invoices/by-payment/{id} and the card or package the payment activated.
@@ -144,6 +145,8 @@ export function ReceptionPaymentPage() {
 type Touched = Partial<Record<keyof ConfirmErrors, boolean>>
 
 const SERVER_FIELDS: Record<string, keyof ConfirmErrors> = {
+  method: 'method',
+  referenceCode: 'reference',
   paymentMethod: 'method',
   paymentReference: 'reference',
   amountReceived: 'amountReceived',
@@ -167,7 +170,7 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
   const ready = canConfirm(form, amountDue)
   const check = amountCheck(amountDue, form.amountReceived)
   const difference = amountDifference(amountDue, form.amountReceived)
-  const received = parseAmount(form.amountReceived)
+  const received = parsePaymentAmount(form.amountReceived)
   const toReview = isAmountToReview(form, amountDue)
   const discount = Number(payment.discount ?? 0)
 
@@ -239,8 +242,9 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
               <dd data-testid="outstanding">{formatMoney(Math.abs(mismatch.outstanding))}</dd>
             </div>
           </dl>
+          {mismatch.message && <p className="notice notice--warning" role="alert">{mismatch.message}</p>}
           <p className="notice notice--info" role="status">
-            Registration remains Pending payment. Confirm only when the full amount is verified.
+            Payment remains Pending payment. Confirm only when the exact amount is verified.
           </p>
           <div className="reception-actions">
             <Button onClick={backToVerification}>Return to verification</Button>
@@ -280,12 +284,12 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
               <Input
                 label="Amount received"
                 required
-                inputMode="numeric"
+                inputMode="decimal"
                 placeholder={amountDue !== null ? String(amountDue) : undefined}
                 value={form.amountReceived}
                 disabled={saving}
                 error={fieldError('amountReceived')}
-                hint="Whole VND, for example 810000 or 810.000"
+                hint="Up to 2 decimals, for example 810000.50; whole VND may use grouping such as 810.000."
                 onChange={(event) => change('amountReceived', event.target.value)}
                 onBlur={() => touch('amountReceived')}
               />
@@ -327,9 +331,7 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
             {!ready && amountDue !== null && (
               <p className="payment-hint" id="confirm-hint">
                 {toReview
-                  ? form.method === 'CASH'
-                    ? 'Cash received is less than the amount due. Use Amount does not match to review the payment.'
-                    : 'For this method the amount received must equal the amount due. Use Amount does not match to review the payment.'
+                  ? 'For every method the amount received must equal the amount due. Use Amount does not match to review the payment.'
                   : 'Tick the checkbox and fill the required fields to confirm.'}
               </p>
             )}
@@ -394,7 +396,7 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
             </div>
           </dl>
           <div className="payment-check" role="status">
-            <AmountCheckBadge check={check} method={form.method} difference={difference} />
+            <AmountCheckBadge check={check} />
           </div>
         </Card>
       </div>
@@ -411,15 +413,11 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
   )
 }
 
-/** Same rule as validateConfirmForm: cash above the amount due is change, any other gap is a mismatch. */
+/** Same exact-amount rule as validateConfirmForm, including cash. */
 function AmountCheckBadge({
   check,
-  method,
-  difference,
 }: {
   check: ReturnType<typeof amountCheck>
-  method: string
-  difference: number | null
 }) {
   switch (check) {
     case 'match':
@@ -427,11 +425,7 @@ function AmountCheckBadge({
     case 'short':
       return <Badge tone="warning">Amount is short - review needed</Badge>
     case 'over':
-      return method === 'CASH' ? (
-        <Badge tone="info">Ready to confirm - give {formatMoney(difference)} change</Badge>
-      ) : (
-        <Badge tone="warning">Amount is above the amount due - review needed</Badge>
-      )
+      return <Badge tone="warning">Amount is above the amount due - review needed</Badge>
     default:
       return <Badge tone="neutral">Waiting for the amount received</Badge>
   }
@@ -454,7 +448,7 @@ function FailPaymentDialog({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const trimmed = reason.trim()
-  const reasonError = !trimmed ? 'Reason is required' : trimmed.length > REASON_MAX ? `Reason must be at most ${REASON_MAX} characters` : null
+  const reasonError = !trimmed ? 'Reason is required' : trimmed.length > FAIL_REASON_MAX ? `Reason must be at most ${FAIL_REASON_MAX} characters` : null
 
   const close = () => {
     if (saving) return
@@ -502,7 +496,7 @@ function FailPaymentDialog({
       <TextArea
         label="Reason"
         required
-        maxLength={REASON_MAX}
+        maxLength={FAIL_REASON_MAX}
         value={reason}
         disabled={saving}
         error={touched && reasonError ? reasonError : undefined}
@@ -535,13 +529,14 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
       <PageHeader
         eyebrow={EYEBROW}
         title={refunded ? 'Payment Refunded' : 'Payment Confirmed and Receipt'}
-        description={refunded ? 'This payment was refunded to the member.' : 'Payment has been recorded and the request is active.'}
+        description={refunded ? 'This payment was refunded to the member.' : 'Payment has been recorded. Check the service status below.'}
         actions={actions}
       />
       <div className="reception-grid">
         <Card
           title={invoiceData ? `Receipt ${invoiceData.invoiceNumber}` : 'Receipt'}
           aria-label="Payment receipt"
+          className="payment-print-receipt"
         >
           <StatusBadge status={paymentStatusTone(payment.status)} label={paymentStatusLabel(payment.status)} />
           <dl className="summary-list payment-rows">
@@ -590,7 +585,7 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
             </div>
           )}
           <div className="reception-actions reception-print-hidden">
-            <Button onClick={() => window.print()}>Print receipt</Button>
+            <Button onClick={() => window.print()} disabled={invoice.status !== 'ready'}>Print receipt</Button>
             <Link className={buttonClassName('secondary', 'md')} to={paymentReceiptPath(payment.id)}>
               Open receipt
             </Link>

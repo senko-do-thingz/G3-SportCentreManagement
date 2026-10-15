@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
@@ -63,7 +63,8 @@ const INVOICE = {
   totalAmount: 810000,
   status: 'PAID',
   issueDate: '2026-10-02',
-  lines: [{ id: 1, itemType: 'SPORT_PACKAGE', description: 'Football / Coach-led / 30 days', quantity: 1, unitPrice: 810000, lineTotal: 810000 }],
+  taxAmount: 0,
+  lines: [{ id: 1, itemType: 'SPORT_PACKAGE', description: 'Football / Coach-led / 30 days', quantity: 1, unitPrice: 900000, lineTotal: 900000 }],
 }
 
 function refund(overrides = {}) {
@@ -80,7 +81,8 @@ function refund(overrides = {}) {
     reason: 'Cancelled before 24-hour deadline',
     status: 'PENDING',
     createdAt: '2026-10-03T10:00:00',
-    invoiceNumber: 'INV-1040',
+    paymentId: 40,
+    paymentCode: 'PAY-0040',
     ...overrides,
   }
 }
@@ -88,14 +90,16 @@ function refund(overrides = {}) {
 interface Options {
   me?: unknown
   list?: (url: URL) => Response
-  onConfirm?: (call: RecordedCall) => Response
+  onConfirm?: (call: RecordedCall) => Response | Promise<Response>
   onFail?: (call: RecordedCall) => Response
   onCreateRefund?: (call: RecordedCall) => Response
-  onComplete?: (call: RecordedCall) => Response
+  onComplete?: (call: RecordedCall) => Response | Promise<Response>
   quote?: unknown
-  memberRefunds?: unknown[]
+  memberRefunds?: unknown[] | Response
+  onMemberRefunds?: (call: RecordedCall) => Response | Promise<Response>
+  invoice?: Response
+  onInvoice?: () => Response
   pendingRefunds?: unknown[] | Response
-  approvedRefunds?: unknown[] | Response
   payments?: Record<number, unknown>
 }
 
@@ -123,51 +127,46 @@ function backend(options: Options = {}) {
     }
     const paymentMatch = /^\/payments\/(\d+)$/.exec(url.pathname)
     if (paymentMatch && payments[Number(paymentMatch[1])]) return json(200, payments[Number(paymentMatch[1])])
-    if (call.path === '/invoices/by-payment/41') return json(200, INVOICE)
+    if (call.path === '/invoices/by-payment/41') return options.onInvoice?.() ?? options.invoice?.clone() ?? json(200, INVOICE)
     if (call.path === '/membership-cards/member/2') return json(200, [card()])
     if (call.path === '/packages/registrations/member/2') return json(200, registrations)
     if (url.pathname === '/members' && call.method === 'GET') {
       return json(200, { content: [TAYLOR], number: 0, size: 10, totalElements: 1, totalPages: 1 })
     }
     if (url.pathname === '/refunds/quote') {
+      if (options.quote instanceof Response) return options.quote.clone()
       return json(200, options.quote ?? {
         registrationId: Number(url.searchParams.get('registrationId')),
         registrationCode: 'REG-1040',
-        memberId: 2,
-        memberCode: 'MB-0246',
-        memberFullName: 'Taylor Nguyen',
-        serviceName: 'Football / Coach-led / Single visit',
-        invoiceNumber: 'INV-1040',
-        paymentStatus: 'SUCCESS',
+        packageName: 'Football / Coach-led / Single visit',
+        paymentCode: 'PAY-0040',
+        paymentAmount: 150000,
         paidAmount: 150000,
-        priorRefundAmount: 0,
         suggestedAmount: 150000,
-        maxRefundable: 150000,
-        eligible: true,
       })
     }
     if (call.path === '/refunds' && call.method === 'POST') {
       if (options.onCreateRefund) return options.onCreateRefund(call)
       const created = refund({ id: 8, refundCode: 'RF-1041', amountRequested: (call.body as { amountRequested: number }).amountRequested })
-      memberRefunds = [created, ...memberRefunds]
+      memberRefunds = [created, ...(Array.isArray(memberRefunds) ? memberRefunds : [])]
       return json(201, created)
     }
-    if (call.path === '/refunds?status=APPROVED') {
-      const approved = options.approvedRefunds ?? []
-      return approved instanceof Response ? approved.clone() : json(200, approved)
-    }
     if (call.path === '/refunds/pending') {
+      if ((options.me ?? RECEPTIONIST) === RECEPTIONIST) return backendError(403, 'Access Denied')
       const pending = options.pendingRefunds ?? [refund()]
       return pending instanceof Response ? pending.clone() : json(200, pending)
     }
-    if (call.path === '/refunds/member/2') return json(200, memberRefunds)
+    if (call.path === '/refunds/member/2') {
+      if (options.onMemberRefunds) return options.onMemberRefunds(call)
+      return memberRefunds instanceof Response ? memberRefunds.clone() : json(200, memberRefunds)
+    }
     const complete = /^\/refunds\/(\d+)\/complete$/.exec(url.pathname)
     if (complete && call.method === 'PUT') {
       if (options.onComplete) return options.onComplete(call)
       const id = Number(complete[1])
-      memberRefunds = memberRefunds.map((item) =>
+      memberRefunds = (Array.isArray(memberRefunds) ? memberRefunds : []).map((item) =>
         (item as { id: number }).id === id
-          ? { ...(item as object), status: 'COMPLETED', refundReference: (call.body as { refundReference: string }).refundReference }
+          ? { ...(item as object), status: 'COMPLETED' }
           : item,
       )
       return json(200, memberRefunds.find((item) => (item as { id: number }).id === id))
@@ -220,7 +219,8 @@ describe('FE-12 Payment Requests (F3-04)', () => {
     expect(within(rows[1]).getAllByRole('link', { name: 'Review payment REG-1041' })[0]).toHaveAttribute('href', '/reception/payments/41')
     expect(screen.getByText('Pending requests').nextElementSibling).toHaveTextContent('12')
     expect(screen.getByText('Amount due on this page').nextElementSibling).toHaveTextContent('1.310.000 VND')
-    await waitFor(() => expect(screen.getByText('Refund requests', { selector: 'p' }).nextElementSibling).toHaveTextContent('1'))
+    expect(screen.getByText('Refund requests', { selector: 'p' }).nextElementSibling).toHaveTextContent('-')
+    expect(calls.some((call) => call.path === '/refunds/pending')).toBe(false)
     expect(screen.getByText('Showing 1-10 of 12')).toBeInTheDocument()
   })
 
@@ -318,7 +318,8 @@ describe('FE-12 Verify and Record Payment (F3-05)', () => {
     expect(within(review).getByText('810.000 VND')).toBeInTheDocument()
     expect(within(review).getByText('800.000 VND')).toBeInTheDocument()
     expect(within(review).getByTestId('outstanding')).toHaveTextContent('10.000 VND')
-    expect(within(review).getByText(/Registration remains Pending payment/)).toBeInTheDocument()
+    expect(within(review).getByText(/Payment remains Pending payment/)).toBeInTheDocument()
+    expect(within(review).getByRole('alert')).toHaveTextContent('Amount received does not match the amount due')
     expect(calls.filter((call) => call.method === 'PUT').map((call) => call.path)).toEqual(['/payments/41/confirm'])
 
     await user.click(within(review).getByRole('button', { name: 'Return to verification' }))
@@ -399,7 +400,7 @@ describe('FE-12 Verify and Record Payment - review round 1 amount rules', () => 
     expect(screen.getByRole('region', { name: 'Amount verification' })).toHaveTextContent('Amount is above the amount due - review needed')
   })
 
-  it('TC-FE12-039 cash above the amount due is allowed and sends the cash handed over', async () => {
+  it('TC-FE12-039 cash above the amount due blocks confirmation and opens review without a PUT', async () => {
     const { calls } = await open('/reception/payments/41')
     const user = userEvent.setup()
     const form = await verifyForm()
@@ -407,17 +408,16 @@ describe('FE-12 Verify and Record Payment - review round 1 amount rules', () => 
     await user.type(within(form).getByLabelText(/Amount received/), '1.000.000')
     const panel = screen.getByRole('region', { name: 'Amount verification' })
     expect(within(panel).getByTestId('received')).toHaveTextContent('1.000.000 VND')
-    expect(panel).toHaveTextContent('Ready to confirm - give 190.000 VND change')
-    expect(within(form).getByRole('button', { name: 'Amount does not match' })).toBeDisabled()
+    expect(panel).toHaveTextContent('Amount is above the amount due - review needed')
+    expect(within(form).getByRole('button', { name: 'Amount does not match' })).toBeEnabled()
     await user.click(within(form).getByRole('checkbox', { name: 'I have verified the full amount was received' }))
-    await user.click(within(form).getByRole('button', { name: 'Confirm payment' }))
-    expect(await screen.findByRole('heading', { name: 'Payment Confirmed and Receipt' })).toBeInTheDocument()
-    expect(calls.find((call) => call.path === '/payments/41/confirm')?.body).toEqual({
-      paymentMethod: 'CASH',
-      paymentReference: null,
-      amountReceived: 1000000,
-      note: null,
-    })
+    expect(within(form).getByRole('button', { name: 'Confirm payment' })).toBeDisabled()
+    await user.click(within(form).getByRole('button', { name: 'Amount does not match' }))
+    expect(screen.getByTestId('outstanding')).toHaveTextContent('190.000 VND')
+    expect(calls.some((call) => call.method === 'PUT')).toBe(false)
+    await user.click(screen.getByRole('button', { name: 'Return to verification' }))
+    expect(screen.getByLabelText(/Amount received/)).toHaveValue('1.000.000')
+    expect(screen.getByRole('checkbox', { name: 'I have verified the full amount was received' })).not.toBeChecked()
   })
 
   it('TC-FE12-048 an amount due that is not a number shows an error and blocks both actions', async () => {
@@ -465,7 +465,7 @@ describe('FE-12 Refund Requests (F3-07)', () => {
     })
     const detail = screen.getByRole('region', { name: 'Refund' })
     expect(within(detail).getByRole('heading', { name: 'RF-1041 / Awaiting approval' })).toBeInTheDocument()
-    expect(within(detail).getByText('INV-1040')).toBeInTheDocument()
+    expect(within(detail).getByText('PAY-0040')).toBeInTheDocument()
     expect(within(detail).getByText('Pending approval')).toBeInTheDocument()
   })
 
@@ -484,15 +484,13 @@ describe('FE-12 Refund Requests (F3-07)', () => {
     vi.unstubAllGlobals()
     document.body.innerHTML = ''
     await open('/reception/refunds?memberId=2&registrationId=10', {
-      quote: { registrationId: 10, suggestedAmount: 0, eligible: false, ineligibleReason: 'Cancelled less than 24 hours before the session' },
+      quote: backendError(400, 'Only active package registrations can be refunded'),
     })
-    const blocked = await screen.findByRole('form', { name: 'Submit refund' })
-    expect(within(blocked).getByRole('button', { name: 'Submit for approval' })).toBeDisabled()
-    expect(screen.getByText('Cancelled less than 24 hours before the session')).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Eligibility check' })).toHaveTextContent('Not eligible')
+    expect(await screen.findByText('Only active package registrations can be refunded')).toBeInTheDocument()
+    expect(screen.queryByRole('form', { name: 'Submit refund' })).not.toBeInTheDocument()
   })
 
-  it('TC-FE12-042 an approved refund is recorded with its reference and shows Refund Completed', async () => {
+  it('TC-FE12-042 approved payout needs confirmation, sends no body and reloads the completed state', async () => {
     const { calls } = await open('/reception/refunds/7?memberId=2', {
       memberRefunds: [refund({ status: 'APPROVED', amountApproved: 150000 })],
     })
@@ -501,13 +499,14 @@ describe('FE-12 Refund Requests (F3-07)', () => {
     const form = screen.getByRole('form', { name: 'Record completed refund' })
     const record = within(form).getByRole('button', { name: 'Record completed refund' })
     expect(record).toBeDisabled()
-    await user.type(within(form).getByLabelText(/Refund transaction reference/), 'REF-1040-20261003')
+    await user.click(within(form).getByRole('checkbox', { name: 'I have returned the approved amount' }))
     await user.click(record)
     expect(await screen.findByRole('heading', { name: 'Refund Completed' })).toBeInTheDocument()
-    expect(calls.find((call) => call.path === '/refunds/7/complete')?.body).toEqual({ refundReference: 'REF-1040-20261003' })
+    expect(calls.filter((call) => call.path === '/refunds/7/complete')).toHaveLength(1)
+    expect(calls.find((call) => call.path === '/refunds/7/complete')?.body).toBeUndefined()
     const detail = screen.getByRole('region', { name: 'Refund' })
     expect(within(detail).getByRole('heading', { name: 'Refund receipt / RF-1040' })).toBeInTheDocument()
-    expect(within(detail).getByText('REF-1040-20261003')).toBeInTheDocument()
+    expect(within(detail).queryByText('Refund reference')).not.toBeInTheDocument()
     expect(within(detail).getByText('Refunded')).toBeInTheDocument()
     expect(screen.queryByText(/notified/i)).not.toBeInTheDocument()
   })
@@ -519,7 +518,7 @@ describe('FE-12 Refund Requests (F3-07)', () => {
     })
     const user = userEvent.setup()
     const form = await screen.findByRole('form', { name: 'Record completed refund' })
-    await user.type(within(form).getByLabelText(/Refund transaction reference/), 'REF-1')
+    await user.click(within(form).getByRole('checkbox', { name: 'I have returned the approved amount' }))
     await user.click(within(form).getByRole('button', { name: 'Record completed refund' }))
     expect(await within(form).findByText('Only approved refunds can be completed')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Refund Approved' })).toBeInTheDocument()
@@ -539,7 +538,6 @@ describe('FE-12 Refund Requests (F3-07)', () => {
 
   it('TC-FE12-045 queues: approved first, member history without PENDING, pending once', async () => {
     const { calls } = await open('/reception/refunds?memberId=2', {
-      approvedRefunds: [refund({ status: 'APPROVED', amountApproved: 150000 })],
       memberRefunds: [
         refund({ status: 'APPROVED', amountApproved: 150000 }),
         refund({ id: 6, refundCode: 'RF-1039', status: 'COMPLETED', createdAt: '2026-09-01T10:00:00' }),
@@ -547,7 +545,7 @@ describe('FE-12 Refund Requests (F3-07)', () => {
       ],
       pendingRefunds: [refund({ id: 9, refundCode: 'RF-1042', status: 'PENDING' })],
     })
-    expect(calls.some((call) => call.path === '/refunds?status=APPROVED')).toBe(true)
+    expect(calls.some((call) => call.path === '/refunds?status=APPROVED' || call.path === '/refunds/pending')).toBe(false)
     const tables = await screen.findAllByRole('table')
     expect(tables[0]).toHaveAccessibleName('Approved refunds waiting to be refunded')
     const approved = tables[0]
@@ -556,7 +554,7 @@ describe('FE-12 Refund Requests (F3-07)', () => {
     expect(within(approved).getByRole('link', { name: 'Open refund RF-1040' })).toHaveAttribute('href', '/reception/refunds/7?memberId=2')
 
     const member = screen.getByRole('table', { name: 'Refunds of this member' })
-    await waitFor(() => expect(within(member).getAllByRole('row')).toHaveLength(3))
+    await waitFor(() => expect(within(member).getAllByRole('row')).toHaveLength(2))
     expect(within(member).getByText('Refunded')).toBeInTheDocument()
     expect(within(member).queryByText('RF-1042')).not.toBeInTheDocument()
     const pending = screen.getByRole('table', { name: 'Refunds waiting for approval' })
@@ -564,41 +562,53 @@ describe('FE-12 Refund Requests (F3-07)', () => {
     expect(screen.getAllByText('RF-1042')).toHaveLength(1)
   })
 
-  it('TC-FE12-046 without memberId an APPROVED refund is found in the approved queue', async () => {
-    const { calls } = await open('/reception/refunds/7', {
-      approvedRefunds: [refund({ status: 'APPROVED', amountApproved: 150000 })],
-      pendingRefunds: [],
-    })
-    expect(await screen.findByRole('heading', { name: 'Refund Approved' })).toBeInTheDocument()
-    expect(calls.some((call) => call.path.startsWith('/refunds/member/'))).toBe(false)
+  it('TC-FE12-046 a link without memberId explains how to recover context without unsupported calls', async () => {
+    const { calls } = await open('/reception/refunds/7')
+    expect(await screen.findByRole('heading', { name: 'Member context required' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to refund requests' })).toHaveAttribute('href', '/reception/refunds')
+    expect(calls.some((call) => call.path.startsWith('/refunds'))).toBe(false)
   })
 
-  it('TC-FE12-047 without memberId a PENDING refund is found even when the approved queue fails', async () => {
-    await open('/reception/refunds/7', {
-      approvedRefunds: backendError(404, 'Resource not found'),
-      pendingRefunds: [refund()],
+  it('TC-FE12-047 a member refund failure shows the error and Retry recovers', async () => {
+    let attempt = 0
+    const { calls } = await open('/reception/refunds?memberId=2', {
+      onMemberRefunds: () => ++attempt === 1 ? backendError(500, 'Refund service unavailable') : json(200, [refund({ status: 'APPROVED' })]),
     })
-    expect(await screen.findByRole('heading', { name: 'Refund Request Submitted' })).toBeInTheDocument()
-    vi.unstubAllGlobals()
-    document.body.innerHTML = ''
-    await open('/reception/refunds/7', {
-      approvedRefunds: backendError(404, 'Resource not found'),
-      pendingRefunds: backendError(403, 'Access Denied'),
-    })
-    expect(await screen.findByRole('heading', { name: 'We could not load the refund' })).toBeInTheDocument()
-    expect(screen.getByText('Resource not found')).toBeInTheDocument()
+    expect(await screen.findByText('Refund service unavailable')).toBeInTheDocument()
+    expect(screen.queryByText('No approved refund is waiting')).not.toBeInTheDocument()
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByRole('table', { name: 'Approved refunds waiting to be refunded' })).toHaveTextContent('RF-1040')
+    expect(calls.filter((call) => call.path === '/refunds/member/2')).toHaveLength(2)
   })
 
-  it('TC-FE12-049 a queue error with the refund missing elsewhere is an error, not "Refund not found"', async () => {
-    await open('/reception/refunds/7', {
-      approvedRefunds: backendError(404, 'Resource not found'),
-      pendingRefunds: [refund({ id: 9, refundCode: 'RF-1042' })],
+  it('TC-FE12-049 a detail API failure is an error, not Refund not found', async () => {
+    await open('/reception/refunds/7?memberId=2', {
+      memberRefunds: backendError(403, 'Access Denied'),
     })
     expect(await screen.findByRole('heading', { name: 'We could not load the refund' })).toBeInTheDocument()
-    expect(screen.getByText('Resource not found')).toBeInTheDocument()
+    expect(screen.getByText('Access Denied')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Refund not found' })).not.toBeInTheDocument()
   })
+
+  it('TC-FE12-R3-01 empty member queues show empty states and no global queue is fabricated', async () => {
+    const { calls } = await open('/reception/refunds?memberId=2', { memberRefunds: [] })
+    expect(await screen.findByText('No approved refund is waiting')).toBeInTheDocument()
+    expect(screen.getByText('No refund history to show')).toBeInTheDocument()
+    expect(screen.getByText('No refund is waiting')).toBeInTheDocument()
+    expect(calls.filter((call) => call.path === '/refunds/member/2')).toHaveLength(1)
+    expect(calls.some((call) => call.path === '/refunds?status=APPROVED' || call.path === '/refunds/pending')).toBe(false)
+  })
+
+  it.each(['PENDING', 'APPROVED', 'REJECTED', 'COMPLETED'])(
+    'TC-FE12-R3-02 reload resolves %s from memberId in the URL', async (status) => {
+      const { calls } = await open('/reception/refunds/7?memberId=2', { memberRefunds: [refund({ status })] })
+      const headings: Record<string, string> = { PENDING: 'Refund Request Submitted', APPROVED: 'Refund Approved', REJECTED: 'Refund Rejected', COMPLETED: 'Refund Completed' }
+      expect(await screen.findByRole('heading', { name: headings[status] })).toBeInTheDocument()
+      expect(calls.filter((call) => call.path === '/refunds/member/2')).toHaveLength(1)
+      expect(calls.some((call) => call.path === '/refunds?status=APPROVED' || call.path === '/refunds/pending')).toBe(false)
+    },
+  )
 })
 
 describe('FE-12 access', () => {
@@ -610,4 +620,126 @@ describe('FE-12 access', () => {
       expect(calls.some((call) => call.path.startsWith('/payments') || call.path.startsWith('/refunds') || call.path.startsWith('/invoices'))).toBe(false)
     },
   )
+})
+
+describe('FE-12 round 3 integration regressions', () => {
+  it.each([['CASH', '800000'], ['CREDIT_CARD', '800000'], ['CREDIT_CARD', '820000']])(
+    '%s amount %s cannot submit a mismatch', async (method, amount) => {
+      const { calls } = await open('/reception/payments/41')
+      const { user, form } = await fillTransfer(amount, method === 'CASH' ? '' : 'TEST-REFERENCE')
+      await user.selectOptions(within(form).getByLabelText(/Payment method/), method)
+      await user.click(within(form).getByRole('checkbox'))
+      await user.click(within(form).getByRole('button', { name: 'Confirm payment' }))
+      expect(calls.some((call) => call.method === 'PUT')).toBe(false)
+      await user.click(within(form).getByRole('button', { name: 'Amount does not match' }))
+      expect(screen.getByTestId('outstanding')).toHaveTextContent('10.000 VND')
+    },
+  )
+
+  it('an unrelated 409 remains a form error, not an amount mismatch', async () => {
+    await open('/reception/payments/41', { onConfirm: () => json(409, { message: 'Payment changed; reload', code: 'PAYMENT_NOT_PENDING' }) })
+    const { user, form } = await fillTransfer()
+    await user.click(within(form).getByRole('checkbox'))
+    await user.click(within(form).getByRole('button', { name: 'Confirm payment' }))
+    expect(await within(form).findByText('Payment changed; reload')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Payment Needs Review' })).not.toBeInTheDocument()
+  })
+
+  it('backend canonical referenceCode validation maps to the reference input', async () => {
+    await open('/reception/payments/41', { onConfirm: () => backendError(400, 'Validation Error', { referenceCode: 'Reference is not valid' }) })
+    const { user, form } = await fillTransfer()
+    await user.click(within(form).getByRole('checkbox'))
+    await user.click(within(form).getByRole('button', { name: 'Confirm payment' }))
+    expect(await within(form).findByText('Reference is not valid')).toBeInTheDocument()
+    expect(within(form).getByLabelText(/Reference code/)).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('duplicate confirm clicks send only one in-flight PUT', async () => {
+    let finish!: (response: Response) => void
+    const answer = new Promise<Response>((resolve) => { finish = resolve })
+    const { calls } = await open('/reception/payments/41', { onConfirm: () => answer })
+    const { user, form } = await fillTransfer()
+    await user.click(within(form).getByRole('checkbox'))
+    await user.dblClick(within(form).getByRole('button', { name: 'Confirm payment' }))
+    expect(calls.filter((call) => call.path === '/payments/41/confirm')).toHaveLength(1)
+    expect(within(form).getByLabelText(/Amount received/)).toBeDisabled()
+    await act(async () => finish(backendError(409, 'Payment changed; reload')))
+    expect(await within(form).findByText('Payment changed; reload')).toBeInTheDocument()
+  })
+
+  it('leaving member context ignores a late member-refund response', async () => {
+    let finish!: (response: Response) => void
+    const answer = new Promise<Response>((resolve) => { finish = resolve })
+    await open('/reception/refunds?memberId=2', { onMemberRefunds: () => answer })
+    const changeMember = await screen.findByRole('button', { name: 'Change member' })
+    await userEvent.setup().click(changeMember)
+    await act(async () => finish(json(200, [refund({ status: 'APPROVED' })])))
+    expect(screen.getByLabelText('Member')).toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'Approved refunds waiting to be refunded' })).not.toBeInTheDocument()
+    expect(screen.queryByText('RF-1040')).not.toBeInTheDocument()
+  })
+
+  it('receipt errors are shown and retry loads the invoice', async () => {
+    let attempt = 0
+    const fake = backend({ onInvoice: () => ++attempt === 1 ? backendError(500, 'Invoice unavailable') : json(200, INVOICE) })
+    tokenStorage.startSession({ accessToken: 'desk-access', refreshToken: 'desk-refresh' })
+    const view = renderApp('/reception/payments/41/receipt')
+    expect(await screen.findByText('Invoice unavailable')).toBeInTheDocument()
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByRole('heading', { name: 'Receipt INV-1041' })).toBeInTheDocument()
+    view.unmount()
+    // A fresh page load has no receipt router state and must fetch the invoice again.
+    renderApp('/reception/payments/41/receipt')
+    expect(await screen.findByRole('heading', { name: 'Receipt INV-1041' })).toBeInTheDocument()
+    expect(fake.calls.filter((call) => call.path === '/invoices/by-payment/41')).toHaveLength(3)
+  })
+
+  it('duplicate completion clicks send one PUT and a rejection never claims completion', async () => {
+    let finish!: (response: Response) => void
+    const answer = new Promise<Response>((resolve) => { finish = resolve })
+    const { calls } = await open('/reception/refunds/7?memberId=2', {
+      memberRefunds: [refund({ status: 'APPROVED', amountApproved: 150000 })], onComplete: () => answer,
+    })
+    const form = await screen.findByRole('form', { name: 'Record completed refund' })
+    const user = userEvent.setup()
+    await user.click(within(form).getByRole('checkbox'))
+    await user.dblClick(within(form).getByRole('button', { name: 'Record completed refund' }))
+    expect(calls.filter((call) => call.path === '/refunds/7/complete')).toHaveLength(1)
+    await act(async () => finish(backendError(400, 'Only approved refunds can be completed')))
+    expect(await within(form).findByText('Only approved refunds can be completed')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Refund Completed' })).not.toBeInTheDocument()
+  })
+
+  it('the actual BE-17 payment detail shape works without staff-list enrichment', async () => {
+    await open('/reception/payments/41', { payments: { 41: pendingPayment({ memberFullName: undefined, itemCode: undefined }) } })
+    const form = await verifyForm()
+    expect(within(form).getByDisplayValue('PAY-0041 / MB-0246')).toBeInTheDocument()
+  })
+
+  it('a quote with zero unused sessions disables submission using the actual BE-21 field', async () => {
+    const { calls } = await open('/reception/refunds?memberId=2&registrationId=10', {
+      quote: { registrationId: 10, paymentAmount: 150000, suggestedAmount: 0, unusedSessions: 0 },
+    })
+    const form = await screen.findByRole('form', { name: 'Submit refund' })
+    expect(within(form).getByRole('button', { name: 'Submit for approval' })).toBeDisabled()
+    expect(screen.getByText('Cannot refund package with zero remaining sessions')).toBeInTheDocument()
+    expect(calls.some((call) => call.path === '/refunds' && call.method === 'POST')).toBe(false)
+  })
+
+  it('a failed invoice cannot be printed; Retry must load the real invoice first', async () => {
+    let attempt = 0
+    await open('/reception/payments/41', {
+      payments: { 41: pendingPayment({ status: 'SUCCESS' }) },
+      onInvoice: () => ++attempt === 1 ? backendError(500, 'Invoice unavailable') : json(200, INVOICE),
+    })
+    expect(await screen.findByText(/The invoice could not be loaded/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Print receipt' })).toBeDisabled()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Print receipt' })).toBeEnabled())
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {})
+    await user.click(screen.getByRole('button', { name: 'Print receipt' }))
+    expect(print).toHaveBeenCalledTimes(1)
+    print.mockRestore()
+  })
 })

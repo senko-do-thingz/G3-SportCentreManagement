@@ -2,32 +2,30 @@ import { useCallback, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { getErrorMessage } from '../../api/errors'
 import { receptionPaymentsApi, type Refund } from '../../api/receptionPaymentsApi'
-import { Button, Card, EmptyState, ErrorState, Input, PageHeader, useToast } from '../../components/ui'
+import { Button, Card, Checkbox, EmptyState, ErrorState, PageHeader, useToast } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { useResource } from '../../hooks/useResource'
-import { formatDateTime, formatMoney } from '../../utils/format'
 import { positiveId } from './receptionModel'
 import {
   REFUND_LIST_PATH,
-  REFUND_REFERENCE_MAX,
+  formatPaymentMoney as formatMoney,
   refundAmount,
   refundCreatePath,
   refundOriginal,
   refundStage,
   refundStatusLabel,
-  validateRefundReference,
 } from './receptionPaymentsModel'
 
 const EYEBROW = 'Receptionist / Payments and reports'
 
 /**
  * One refund at /reception/refunds/:refundId?memberId= (FE-12). There is no GET /refunds/{id}, so
- * the refund is read from GET /refunds/member/{memberId} (all statuses) or, without a member,
- * from GET /refunds?status=APPROVED (BE-21) and then GET /refunds/pending. The status picks the
+ * the refund is read from GET /refunds/member/{memberId} (all statuses). A link without member
+ * context needs member selection; there is no global approved queue. The status picks the
  * Figma state:
  * - PENDING: Refund Request Submitted (S3-RefundSubmitted), the payment stays paid.
- * - APPROVED: Refund Approved (S3-RefundApproved) with the refund transaction reference and
+ * - APPROVED: Refund Approved (S3-RefundApproved) with payout confirmation and
  *   Record completed refund (PUT /refunds/{id}/complete).
  * - COMPLETED: Refund Completed (S3-RefundDone).
  * - REJECTED: the manager decision and note.
@@ -45,7 +43,7 @@ export function RefundDetailPage() {
         const refunds = await receptionPaymentsApi.memberRefunds(memberId, { signal })
         return refunds.find((refund) => refund.id === id) ?? null
       }
-      return findInQueues(id, signal)
+      return null
     },
     [id, memberId],
   )
@@ -56,6 +54,15 @@ export function RefundDetailPage() {
       Back to refund requests
     </Link>
   )
+
+  if (id !== null && memberId === null) {
+    return (
+      <div className="page">
+        <PageHeader eyebrow={EYEBROW} title="Select the refund member" />
+        <EmptyState title="Member context required" description="Select the member in Refund requests, then reopen this refund. Keep the memberId in the link to reload any refund status." action={back} />
+      </div>
+    )
+  }
 
   if (refund.status === 'loading') {
     return (
@@ -114,8 +121,6 @@ export function RefundDetailPage() {
           back={back}
         >
           <Row label="Amount returned" value={formatMoney(refundAmount(data))} />
-          <Row label="Refund reference" value={data.refundReference ?? '-'} />
-          {data.completedAt && <Row label="Completed at" value={formatDateTime(data.completedAt)} />}
           <Row label="Status" value="Refunded" />
         </RefundState>
       )
@@ -139,30 +144,6 @@ export function RefundDetailPage() {
         </RefundState>
       )
   }
-}
-
-/**
- * Without a member, the refund is looked up in the APPROVED queue first (the one the desk acts
- * on), then in the PENDING queue. A refund found in a queue that answered is shown even when the
- * other queue failed. When it is not found and any queue failed, the first error is thrown, so a
- * 403 or 404 is shown with Try again and never read as "Refund not found".
- */
-async function findInQueues(id: number, signal: AbortSignal): Promise<Refund | null> {
-  const queues = [
-    () => receptionPaymentsApi.approvedRefunds({ signal }),
-    () => receptionPaymentsApi.pendingRefunds({ signal }),
-  ]
-  let firstError: unknown = null
-  for (const queue of queues) {
-    try {
-      const found = (await queue()).find((refund) => refund.id === id)
-      if (found) return found
-    } catch (error) {
-      firstError ??= error
-    }
-  }
-  if (firstError !== null) throw firstError
-  return null
 }
 
 function Row({ label, value }: { label: string; value: ReactNode }) {
@@ -200,20 +181,17 @@ function RefundState({
 
 function RefundApproved({ refund, back, onCompleted }: { refund: Refund; back: ReactNode; onCompleted: () => void }) {
   const toast = useToast()
-  const [reference, setReference] = useState('')
-  const [touched, setTouched] = useState(false)
+  const [verified, setVerified] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const referenceError = validateRefundReference(reference)
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    setTouched(true)
-    if (referenceError || saving) return
+    if (!verified || saving) return
     setSaving(true)
     setError(null)
     try {
-      await receptionPaymentsApi.completeRefund(refund.id, reference.trim())
+      await receptionPaymentsApi.completeRefund(refund.id)
       toast.success('Refund recorded', `${refund.refundCode} is completed.`)
       onCompleted()
     } catch (failure) {
@@ -227,28 +205,23 @@ function RefundApproved({ refund, back, onCompleted }: { refund: Refund; back: R
       <PageHeader
         eyebrow={EYEBROW}
         title="Refund Approved"
-        description="Return the approved amount and record the transfer evidence."
+        description="Return the approved amount before recording completion."
       />
       <Card title={`${refund.refundCode} / Approved - not yet refunded`} aria-label="Refund">
         <dl className="summary-list payment-rows payment-rows--narrow">
           <Row label="Approved amount" value={formatMoney(refundAmount(refund))} />
           <Row label="Original receipt" value={refundOriginal(refund)} />
-          <Row label="Return method" value="Original payment method" />
           {refund.managerNote && <Row label="Manager note" value={refund.managerNote} />}
         </dl>
         <form className="reception-form" aria-label="Record completed refund" noValidate onSubmit={submit}>
-          <Input
-            label="Refund transaction reference"
-            required
-            maxLength={REFUND_REFERENCE_MAX}
-            value={reference}
+          <Checkbox
+            label="I have returned the approved amount"
+            checked={verified}
             disabled={saving}
-            error={touched && referenceError ? referenceError : undefined}
             onChange={(event) => {
-              setReference(event.target.value)
+              setVerified(event.target.checked)
               setError(null)
             }}
-            onBlur={() => setTouched(true)}
           />
           <p className="notice notice--info">Record the refund only after the money has actually been returned.</p>
           {error && (
@@ -257,7 +230,7 @@ function RefundApproved({ refund, back, onCompleted }: { refund: Refund; back: R
             </p>
           )}
           <div className="reception-form__actions">
-            <Button type="submit" loading={saving} disabled={referenceError !== null}>
+            <Button type="submit" loading={saving} disabled={!verified}>
               Record completed refund
             </Button>
             {back}

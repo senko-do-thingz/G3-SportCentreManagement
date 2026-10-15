@@ -266,6 +266,26 @@
   }
 }
 
+/* Limit FE-12 printouts to the receipt, without staff identity, navigation or service details. */
+@media print {
+  body:has(.payment-print-receipt) .sidebar,
+  body:has(.payment-print-receipt) .staff-topbar,
+  body:has(.payment-print-receipt) .toast-region,
+  body:has(.payment-print-receipt) .staff-content > :not(:has(.payment-print-receipt)),
+  .reception-grid:has(> .payment-print-receipt) > :not(.payment-print-receipt) {
+    display: none;
+  }
+
+  .staff-layout:has(.payment-print-receipt),
+  .reception-grid:has(> .payment-print-receipt) {
+    display: block;
+  }
+
+  .staff-layout:has(.payment-print-receipt) .staff-content {
+    padding: 0;
+  }
+}
+
 @media (max-width: 640px) {
   .reception-form__grid {
     grid-template-columns: 1fr;

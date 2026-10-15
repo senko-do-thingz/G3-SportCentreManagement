@@ -14,10 +14,11 @@ import {
 } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { useResource } from '../../hooks/useResource'
-import { formatDateTime, formatMoney } from '../../utils/format'
+import { formatDateTime } from '../../utils/format'
 import { receptionPaymentPath } from './receptionModel'
 import {
   apiStatus,
+  formatPaymentMoney as formatMoney,
   PAYMENT_PAGE_SIZE,
   PAYMENT_STATUS_FILTER_OPTIONS,
   paymentStatusLabel,
@@ -53,11 +54,6 @@ export function PaymentRequestsPage() {
     [status, query, page],
   )
   const [payments, reloadPayments] = useResource(loadPayments)
-  const loadRefundCount = useCallback(
-    (signal: AbortSignal) => receptionPaymentsApi.pendingRefunds({ signal }).then((refunds) => refunds.length),
-    [],
-  )
-  const [refundCount] = useResource(loadRefundCount)
 
   const update = (next: Partial<PaymentListParams>) => {
     setParams(writePaymentListParams({ ...filters, ...next }))
@@ -138,8 +134,8 @@ export function PaymentRequestsPage() {
         <StatCard label="Amount due on this page" value={formatMoney(pendingTotal(rows))} />
         <StatCard
           label="Refund requests"
-          value={refundCount.status === 'ready' ? refundCount.data : '-'}
-          hint={refundCount.status === 'error' ? 'Not available' : undefined}
+          value="-"
+          hint="Select a member in Refund requests to view their refunds."
         />
       </div>
       <Card title="Registrations awaiting payment">

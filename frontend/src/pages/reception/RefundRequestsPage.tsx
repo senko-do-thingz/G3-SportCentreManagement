@@ -20,10 +20,12 @@ import {
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { useResource } from '../../hooks/useResource'
-import { formatDate, formatDateTime, formatMoney } from '../../utils/format'
-import { parseAmount, positiveId } from './receptionModel'
+import { formatDate, formatDateTime } from '../../utils/format'
+import { positiveId } from './receptionModel'
 import {
   memberLine,
+  formatPaymentMoney as formatMoney,
+  parsePaymentAmount,
   PAYMENT_LIST_PATH,
   paymentStatusLabel,
   QUERY_MAX,
@@ -47,10 +49,8 @@ const EYEBROW = 'Receptionist / Payments and reports'
  * - Find the member (GET /members) and one of their paid registrations, then
  *   GET /refunds/quote?registrationId= (BE-21) fills the refund amount with the suggested value and
  *   the eligibility check. Submit for approval sends POST /refunds and opens S3-RefundSubmitted.
- * - Queues: first the APPROVED refunds waiting to be paid back (GET /refunds?status=APPROVED,
- *   BE-21), which open S3-RefundApproved; then, for the chosen member, GET /refunds/member/{id}
- *   without PENDING rows; last the PENDING refunds of GET /refunds/pending. A PENDING refund is
- *   therefore shown in one table only.
+ * - The selected member's refunds come from GET /refunds/member/{id}, split into approved,
+ *   pending and history queues. The backend has no staff-wide approved queue; pending is manager-only.
  * The member and registration are kept in the URL (?memberId=&registrationId=).
  */
 export function RefundRequestsPage() {
@@ -74,14 +74,16 @@ export function RefundRequestsPage() {
           </Link>
         }
       />
-      <ApprovedRefunds />
+      {memberId !== null ? <MemberRefundQueues memberId={memberId} /> : (
+        <Card title="Approved - waiting to be refunded">
+          <p role="status">Select a member below to view their approved and pending refunds.</p>
+        </Card>
+      )}
       {memberId !== null && registrationId !== null ? (
         <RefundFormSection key={registrationId} memberId={memberId} registrationId={registrationId} />
       ) : (
         <RegistrationPicker memberId={memberId} onMember={chooseMember} />
       )}
-      {memberId !== null && <MemberRefunds memberId={memberId} />}
-      <PendingRefunds />
     </div>
   )
 }
@@ -268,7 +270,7 @@ function RefundFormCards({ memberId, quote }: { memberId: number; quote: RefundQ
     try {
       const refund = await receptionPaymentsApi.createRefund({
         packageRegistrationId: quote.registrationId,
-        amountRequested: parseAmount(form.amount) ?? 0,
+        amountRequested: parsePaymentAmount(form.amount) ?? 0,
         reason: form.reason.trim(),
       })
       toast.success('Refund submitted', `${refund.refundCode} waits for manager approval.`)
@@ -316,7 +318,7 @@ function RefundFormCards({ memberId, quote }: { memberId: number; quote: RefundQ
             <Input
               label="Refund amount"
               required
-              inputMode="numeric"
+              inputMode="decimal"
               value={form.amount}
               disabled={saving || !quote.eligible}
               error={fieldError('amount')}
@@ -336,7 +338,7 @@ function RefundFormCards({ memberId, quote }: { memberId: number; quote: RefundQ
               onBlur={() => setTouched((current) => ({ ...current, reason: true }))}
             />
           </div>
-          <p className="payment-hint">The refund is returned with the original payment method after approval.</p>
+          <p className="payment-hint">A manager must approve the request before the money is returned.</p>
           {formError && (
             <p className="notice notice--danger" role="alert">
               {formError}
@@ -360,7 +362,7 @@ function RefundFormCards({ memberId, quote }: { memberId: number; quote: RefundQ
           </div>
           <div>
             <dt>Prior refund</dt>
-            <dd>{quote.priorRefundAmount ? formatMoney(quote.priorRefundAmount) : 'None'}</dd>
+            <dd>{quote.priorRefundAmount === null ? '-' : formatMoney(quote.priorRefundAmount)}</dd>
           </div>
           <div>
             <dt>Refundable balance</dt>
@@ -416,77 +418,28 @@ const REFUND_COLUMNS: TableColumn<Refund>[] = [
   },
 ]
 
-function RefundQueue({
-  title,
-  caption,
-  load,
-  emptyTitle,
-  hint,
-}: {
-  title: string
-  caption: string
-  load: (signal: AbortSignal) => Promise<Refund[]>
-  emptyTitle: string
-  hint?: string
-}) {
-  const [refunds, reload] = useResource(load)
-  return (
-    <Card title={title}>
-      <Table
-        caption={caption}
-        columns={REFUND_COLUMNS}
-        rows={refunds.status === 'ready' ? refunds.data : []}
-        rowKey={(row) => row.id}
-        loading={refunds.status === 'loading'}
-        error={refunds.status === 'error' ? refunds.error : undefined}
-        onRetry={reload}
-        emptyTitle={emptyTitle}
-      />
-      {hint && <p className="payment-hint">{hint}</p>}
-    </Card>
-  )
-}
-
-const loadApproved = (signal: AbortSignal) => receptionPaymentsApi.approvedRefunds({ signal }).then(sortRefunds)
-const loadPending = (signal: AbortSignal) => receptionPaymentsApi.pendingRefunds({ signal }).then(sortRefunds)
-
-/** APPROVED refunds, the only ones the desk acts on (S3-RefundApproved). GET /refunds?status=APPROVED (BE-21). */
-function ApprovedRefunds() {
-  return (
-    <RefundQueue
-      title="Approved - waiting to be refunded"
-      caption="Approved refunds waiting to be refunded"
-      load={loadApproved}
-      emptyTitle="No approved refund is waiting"
-      hint="Return the money first, then open the refund and record the transaction reference."
-    />
-  )
-}
-
-function PendingRefunds() {
-  return (
-    <RefundQueue
-      title="Waiting for manager approval"
-      caption="Refunds waiting for approval"
-      load={loadPending}
-      emptyTitle="No refund is waiting"
-    />
-  )
-}
-
-/** Refund history of the chosen member, without PENDING ones (they are in the approval queue). */
-function MemberRefunds({ memberId }: { memberId: number }) {
+/** One supported request; each status appears in exactly one queue for the selected member. */
+function MemberRefundQueues({ memberId }: { memberId: number }) {
   const load = useCallback(
-    (signal: AbortSignal) => receptionPaymentsApi.memberRefunds(memberId, { signal }).then(memberRefundHistory),
+    (signal: AbortSignal) => receptionPaymentsApi.memberRefunds(memberId, { signal }).then(sortRefunds),
     [memberId],
   )
+  const [refunds, reload] = useResource(load)
+  if (refunds.status === 'loading') return <Spinner label="Loading member refunds" />
+  if (refunds.status === 'error') return <ErrorState title="We could not load member refunds" error={refunds.error} onRetry={reload} />
+  const queues = [
+    { title: 'Approved - waiting to be refunded', caption: 'Approved refunds waiting to be refunded', emptyTitle: 'No approved refund is waiting', rows: refunds.data.filter((row) => row.status === 'APPROVED') },
+    { title: 'Refunds of this member', caption: 'Refunds of this member', emptyTitle: 'No refund history to show', rows: memberRefundHistory(refunds.data) },
+    { title: 'Waiting for manager approval', caption: 'Refunds waiting for approval', emptyTitle: 'No refund is waiting', rows: refunds.data.filter((row) => row.status === 'PENDING') },
+  ]
   return (
-    <RefundQueue
-      title="Refunds of this member"
-      caption="Refunds of this member"
-      load={load}
-      emptyTitle="No refund to show"
-      hint="Pending refunds of this member are listed under Waiting for manager approval."
-    />
+    <>
+      <p className="notice notice--info">Refund queues show only the selected member.</p>
+      {queues.map((queue) => (
+        <Card key={queue.caption} title={queue.title}>
+          <Table caption={queue.caption} columns={REFUND_COLUMNS} rows={queue.rows} rowKey={(row) => row.id} emptyTitle={queue.emptyTitle} />
+        </Card>
+      ))}
+    </>
   )
 }

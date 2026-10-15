@@ -5,9 +5,9 @@ import { Button, Card, EmptyState, ErrorState, PageHeader } from '../../componen
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { useResource } from '../../hooks/useResource'
-import { formatDate, formatMoney, humanizeCode } from '../../utils/format'
+import { formatDate, humanizeCode } from '../../utils/format'
 import { positiveId, receptionPaymentPath } from './receptionModel'
-import { memberLine } from './receptionPaymentsModel'
+import { formatPaymentMoney as formatMoney, memberLine } from './receptionPaymentsModel'
 
 const EYEBROW = 'Receptionist / Payments and reports'
 
@@ -63,7 +63,7 @@ export function ReceptionReceiptPage() {
   return (
     <div className="page">
       <PageHeader eyebrow={EYEBROW} title={`Receipt ${data.invoiceNumber}`} description="Confirmed payment record." />
-      <Card title="Sportify / Payment receipt" aria-label="Receipt" className="payment-receipt">
+      <Card title="Sportify / Payment receipt" aria-label="Receipt" className="payment-receipt payment-print-receipt">
         <dl className="summary-list payment-rows">
           <div>
             <dt>Receipt / date</dt>

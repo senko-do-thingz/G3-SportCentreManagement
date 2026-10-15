@@ -4,35 +4,27 @@
 
 ## 2026-10-14 - Receptionist payments, receipts and refunds (FE-12, Flow 3)
 
-**Blocked by BE-18 and BE-21, do not merge.** Draft PR. origin/main (6e82388, checked with `git fetch` on 2026-10-14) has none of the BE-18 or BE-21 endpoints, so on main the FE-05 confirmation and the desk sale receipt would answer 404.
-
-Branch `feat/f3-reception-payments`, from main (6e82388). Owner: Phat. Priority: P1. Depends on FE-00 (merged), BE-18 and BE-21 (not merged yet, see Notes). Verified with `npm run lint -- --max-warnings 0`, `tsc -b`, `npm test` (432 tests in 22 files: 35 new for FE-12, 2 FE-05 cases updated, 2 retired) and `npm run build`.
+Branch `feat/f3-reception-payments`. Review round 3 verified against main `5176017` on 2026-10-15. BE-18 and BE-21 are already merged. Staff-wide refund discovery remains a backend dependency; no publishing or history changes were made.
 
 ### Added
-- Payment Requests (F3-04) at `/reception/payments`: `GET /payments?status=&query=&page=&size=` with status filter (Pending payment by default, Paid, Failed, Refunded, All), member or reference search and paging kept in the URL; stat cards for requests found, amount due on the page and pending refunds; Review payment for pending rows.
-- Verify and Record Payment (F3-05) at `/reception/payments/:paymentId`: payment method, reference code (required except for cash), amount received, note and the checkbox "I have verified the full amount was received"; Confirm stays disabled until the checkbox and the required fields are valid; amount verification panel with difference and status; `PUT /payments/{id}/confirm`. Mark as failed with a reason through `PUT /payments/{id}/fail`.
-- Payment Needs Review (S3-Mismatch) on a 409 `PAYMENT_AMOUNT_MISMATCH` or the "Amount does not match" button: amount due, received and outstanding balance; the payment stays pending; Return to verification keeps the values and unticks the checkbox.
-- Payment Confirmed and Receipt (F3-06): receipt from `GET /invoices/by-payment/{id}` and "Service updated" read again from the member's cards and registrations, so the ACTIVE status shown is the real one. Printable receipt page (S3-Receipt) at `/reception/payments/:paymentId/receipt`.
-- Refund Requests (F3-07) at `/reception/refunds`: find the member and a paid registration, `GET /refunds/quote?registrationId=` prefills the suggested amount and the eligibility check, `POST /refunds`; queues from `GET /refunds/pending` and `GET /refunds/member/{id}`.
-- Refund states at `/reception/refunds/:refundId?memberId=`: Refund Request Submitted, Refund Approved with the refund transaction reference and `PUT /refunds/{id}/complete`, Refund Completed, Refund Rejected.
-- `src/api/receptionPaymentsApi.ts`, `src/pages/reception/receptionPaymentsModel.ts`, the new pages, nav item "Refund requests", styles in `src/styles/reception.css`; `ApiError` now keeps the body `code` and raw `details`.
+- Payment Requests (F3-04), Verify and Record Payment (F3-05), mismatch review, Payment Confirmed and Receipt (F3-06), printable receipt, Refund Requests (F3-07) and submitted/approved/completed/rejected states.
+- Payment filters, search and paging remain in the URL. Refund detail links retain `memberId` so every status can be reloaded from the supported member-refunds endpoint.
+- Fresh card/registration reads show the actual service status after payment; the success description does not claim activation before that evidence loads.
 
-### Changed
-- The FE-05 confirmation screen is replaced by Verify and Record Payment; `receptionApi.activateCard`, `receptionApi.activateRegistration` and `confirmCheck` are removed. The FE-05 links (member profile, pending tab, desk sale) open this screen, which needs BE-18 to work.
+### Review round 3
+- P1-01 confirmed: BE-18 confirmation now requires the exact amount for CASH and all non-cash methods. Under/overpayment blocks confirmation and opens mismatch review with correct amounts; return preserves values and resets verification. FE-05/BE-19 cash change rules are unchanged.
+- P1-02 rejected: `ConfirmPaymentRequest` explicitly accepts `paymentMethod` and `paymentReference` aliases. Existing JSON names are retained and serialized bodies are tested for cash, transfer, card, references, notes and decimal precision.
+- P1-03 confirmed: there is no global approved-refund endpoint and the pending endpoint is MANAGER-only. Reception now splits one supported member-refunds response into approved, pending and history queues, with errors, Retry and empty states. No unsupported global request or fake empty fallback remains.
+- Quotes use the actual `paymentAmount` cap and `unusedSessions` guard; the picker offers only paid ACTIVE registrations. Completion sends no body, requires payout confirmation and reloads the authoritative status. The UI does not collect or claim a payout reference that the backend cannot store.
+- Confirmation note/failure reason limits match the backend's 255-character constraints; canonical validation field names map to the correct inputs. Two-decimal input/display preserves backend amounts without changing shared FE-05/FE-11 formatting.
+- Tests: 496 frontend tests in 24 files passed, no failures/skips; 70 existing backend unit/MVC contract tests passed, no failures/errors/skips. Lint with zero warnings, TypeScript and production build passed. SQL Server and deployed end-to-end flows were not run.
+- Receipt print rules hide staff identity/navigation, notifications and adjacent service panels; Print stays disabled until the invoice loads. Browser print pagination is not verified.
+- Test specifications: `docs/tests/FE-12_test_cases.md`; local remediation report contains exact commands, evidence and pending approvals. The existing FE-12 audit file was not found; its location is required before that log can be updated.
 
-### Notes
-- BE-18 and BE-21 are not on main. The contract assumed by the frontend is in `docs/tests/FE-12_test_cases.md` section 1.1, including the 409 body `{code: "PAYMENT_AMOUNT_MISMATCH", details: {amountDue, amountReceived}}`. On main `GET /refunds/pending` is MANAGER only, so the refund queue shows an error for a receptionist until BE-21.
-- There is no `GET /refunds/{id}`; a refund is opened from the member's refunds or found in the approved and pending queues.
-- Merge with FE-11 (`feat/f3-member-payments`) conflicts in `CHANGELOG.md` and `frontend/src/routes/AppRoutes.tsx` (route doc comment), both ways; `Invoice` and `InvoiceLine` are defined in both branches. Resolution and type plan in `docs/tests/FE-12_test_cases.md` section 5.
+### Remaining dependency
+- A staff-wide approved/pending refund queue and discovery by refund id without member context require an approved backend contract. Their implementation is paused; member-scoped payment/refund functionality remains available.
+- Refund payout-reference persistence is not supported by the current backend. No backend API, authorization or database migration was changed.
 
-### Review round 1
-- Confirm amount rule reuses FE-05 `validateDeskPayment`: non-cash must equal the amount due, cash may be equal or above (sends the cash handed over, to confirm with Truc); badge, hint, Amount does not match and the body agree. Mismatch is matched on 409 plus `code` only.
-- Amount due that is not a number shows an error and blocks both actions; Received row uses the parsed amount.
-- "Approved - waiting to be refunded" queue first (`GET /refunds?status=APPROVED`, BE-21 contract request); refund detail found in the approved or pending queue without `?memberId=`; PENDING refunds shown in one table only.
-- "Refunded" instead of "Refunded / Member notified"; confirm toast no longer claims the item is active.
-- `receptionPaymentPath(paymentId, memberId)` without `item` and `itemId`. `TextArea` moved to the UI kit (`src/components/ui/TextArea.tsx`); refund table columns built once; no fixed pixel margin.
-- Verified with lint (0 warnings), `tsc -b`, `npm test` (442 tests in 23 files) and `npm run build`.
-- Review round 2: a failed refund queue now shows its error with Try again instead of "Refund not found" when the refund is not in the queue that answered; the Find member button stays aligned with the input when the field shows an error (grid layout). 443 tests pass.
 ## 2026-10-15 - Refunds linked to payments (BE-21, Flow 3)
 
 Branch `feat/f3-confirm-payment`, based on `main`. Owner: Truc. Priority: P2. Depends on BE-18. Screens F3-07, F3-09 (refund part), S3-RefundSubmitted, S3-RefundReview, S3-RefundApproved, S3-RefundRejected, S3-RefundDone.
