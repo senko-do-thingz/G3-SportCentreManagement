@@ -44,6 +44,7 @@ import { FindClassesPage } from '../pages/member/FindClassesPage'
 import { SessionDetailPage } from '../pages/member/SessionDetailPage'
 import { BookingConfirmedPage, BookingOptionsPage, BookingReviewPage } from '../pages/member/BookingCreationPages'
 import { BookingCancelledPage, BookingCancellationPage, MemberBookingsPage } from '../pages/member/MemberBookingsPages'
+import { ReceptionBookingConfirmedPage, ReceptionBookingsPage, ReceptionAssistedBookingPage } from '../pages/reception/ReceptionBookingsPage'
 
 /**
  * Real screens by full path. Later tasks register their page here, for example
@@ -63,6 +64,7 @@ const SCREENS: Record<string, ReactNode> = {
   '/member/payments': <MyPaymentsPage />,
   '/member/schedule': <MemberSchedulePage />,
   '/reception': <MemberSearchPage />,
+  '/reception/bookings': <ReceptionBookingsPage />,
   '/reception/register': <RegisterRenewPage />,
   '/reception/check-in': <CheckInPage />,
   '/reception/payments': <PaymentRequestsPage />,
@@ -108,6 +110,8 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
     { path: 'payments/receipts/:invoiceId', element: <ReceiptPage /> },
   ],
   '/reception': [
+    { path: 'bookings/new', element: <ReceptionAssistedBookingPage /> },
+    { path: 'bookings/confirmed/:bookingId', element: <ReceptionBookingConfirmedPage /> },
     { path: 'payments/:paymentId', element: <ReceptionPaymentPage /> },
     { path: 'payments/:paymentId/receipt', element: <ReceptionReceiptPage /> },
     { path: 'refunds/:refundId', element: <RefundDetailPage /> },

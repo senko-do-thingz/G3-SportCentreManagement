@@ -1,3 +1,9 @@
+## 2026-10-17 - Receptionist Booking Workflow (FE-10)
+
+- Add receptionist member search, paginated upcoming/past booking history, backend-confirmed cancellation, assisted session/package booking with member-specific eligibility, and booking confirmation routes.
+- Keep the member, selected session, package registration and return context explicit; prevent repeat booking submissions and preserve backend error messages.
+- Add responsive receptionist screens and integration coverage for history, cancellation, eligibility, confirmation, empty and retry states. No backend files or endpoints were changed.
+
 ## 2026-10-17 - Receptionist and Coach API Foundation (FE-10)
 
 - Add validated receptionist member booking history, member-specific eligibility and explicit assisted booking requests.
