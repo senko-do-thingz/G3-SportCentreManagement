@@ -69,6 +69,7 @@ __pycache__/
 *.py
 !scripts/ci/check-test-reports.py
 !scripts/ci/test_report_guard.py
+!scripts/ci/test_compose_smoke.py
 *.py[cod]
 *$py.class
 venv/

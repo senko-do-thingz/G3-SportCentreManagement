@@ -1,17 +1,26 @@
-## 2026-10-15 - FE-06 manager screens integrated with latest main
+## 2026-10-16 - Container Exit Classification and Safe Evidence (BE-07, Round 4)
 
-Branch `feat/f1-manager-screens`. Integrated main `56f28c5`, preserving the manager user, package, card and activity screens alongside the current member payments and reception screens. Kept main's session synchronization and structured API errors. The original feature snapshot and main had unrelated roots; both histories are retained. Local overlapping files were preserved in a recovery directory before integration; backend source now matches main with no custom backend edits.
+- Separate Docker command failure from the process status printed by docker wait. Nonzero application status 255 is no longer rejected as a Docker infrastructure code; zero, invalid and signal-range statuses still fail. Success also requires matching exited state, no OOM/engine error, the exact intended SA candidate and an explicit SA complexity rejection.
+- Collect state, exit, OOM, engine-error, wait/timeout and signature diagnostics before exit classification. Redact database, JWT and invalid-candidate values as literal strings in error fields and saved logs. Add focused failure/credential regressions without changing deployment, migrations or authentication. The original runner's exact exit remains unobserved unless its raw evidence is provided or the instrumented workflow is rerun; local tests use fake command transports.
 
-- Enabled the published BE-03 manager package and card catalogs and update endpoints. Package creation keeps `priceAmount`; updates send `price` and `active`. Card updates send `active`; tier responses include `tierRank`.
-- Matched the released name, duration, session, money, integer-discount and description limits; mapped wire-level price/active errors into the existing forms. Standard stays protected. Preview writes now return the same response fields and reproduce active-tier price ordering errors.
-- Reused main's shared resource loader, retained all manager routes and styles, and restored the explicitly enabled development preview. The BE-04 activity endpoint is still absent on main and remains gated for real accounts.
-- Expanded catalog integration regressions and updated the auth restore assertion for the real manager screen. Manual checks and the remaining live-service limitation are documented in `frontend/docs/FE-06-verification.md`.
+## 2026-10-16 - Compose Smoke Test Environment and Failure Handling (BE-07, Round 3)
 
-Verification: all 591 frontend tests passed in 29 files; lint and production build passed. Confirmed preview controls/fixtures are absent from production, preview package/card saves work, mobile layout has no page-wide overflow, and no application console errors were captured. The build reports a non-blocking shared-chunk size warning. Audit rows were preserved and appended; DOCX visual QA requires the unavailable LibreOffice renderer.
+- Prepare and mask disposable CI credentials before negative checks. Missing IMAGE_TAG must fail for its intended reason, while failure logs and cleanup can parse Compose even if the test environment is absent.
+- Verify SQL Server password rejection with an explicit validation diagnostic, a nonzero container exit, and no engine/OOM failure. Preserve Docker/timeout/cleanup errors, separate image retrieval from the runtime deadline, and search saved logs without a pipefail/SIGPIPE hazard.
+- Add fake-command shell regression coverage to the existing CI Python discovery. Deployment configuration, BE-07 migrations, backend tests and demo isolation are unchanged. Local static/unit validation does not establish a successful real Compose run; that remains a GitHub Actions gate.
 
-## 2026-10-15 - Manager screens initial implementation (FE-06, Flow 1)
+## 2026-10-16 - Demo Account SQL Replay Error Propagation (BE-07, Round 2)
 
-Added the four Figma-based manager screens with responsive layouts, role guards, validation, state handling and a synthetic preview. The initial frontend suite passed 369 tests. At that point BE-03/BE-04 contracts were unconfirmed; the integration entry above supersedes the catalog limitation. Original local documentation and audit entries were preserved during the main update.
+- Replaced the test-only execute-and-close replay path with a JdbcTemplate StatementCallback that consumes all result sets and update counts. SQL Server validation errors after an intermediate result now propagate before the existing rollback-only transaction callback returns. The migration SQL/version/checksum, production configuration and approved demo profile architecture are unchanged.
+- Preserved all 59 original demo integration executions and their exception/snapshot assertions. Added expected SQL vendor error checks to the ten rejection cases and one SQL Server late-THROW/rollback regression, for 60 demo integration executions. Added 11 non-Docker JDBC protocol regression executions, including the legacy omission and same-connection rollback. The SQL Server rerun remains pending CI; original artifacts showed 338 integration cases with 10 failures and no skips. Exact remediation verification is exported in the Round 2 review package.
+
+## 2026-10-15 - Isolated Demonstration Accounts (BE-07, Shared)
+
+Branch `feat/demo-accounts`, based on main `56f28c5`. Added opt-in `demo` profile and `db/demo/V28__seed_demo_accounts.sql` for one receptionist, three coaches with distinct primary sports and coach-sport links, and three members with GOLD, physical STANDARD and no-card scenarios.
+
+- Demo migration discovery is restricted to the explicitly enabled profile. A static bean factory guard rejects combined prod/demo profiles before Flyway initialization. Existing production configuration, migration checksums, authentication rules and out-of-order policy are unchanged.
+- The seed uses stable email/role/sport/tier lookups, shared-key profiles, the existing member-code sequence, transaction-scoped application locking, insert-only repair and explicit conflict failures. Existing hashes, personal/profile information, certifications, payments and unrelated cards are preserved. Imported demo card entitlements do not fabricate payments or receipts; GOLD has a documented finite term ending 2027-09-30.
+- Added 18 unit/configuration checks and 59 dedicated SQL Server integration cases, registered in the required CI suite manifest. Extended migration protection and review ownership to the new location. README documents credentials, enablement and isolated-database lifecycle requirements; `docs/tests/BE-07_test_cases.md` describes the verification contract. SQL Server execution remains pending GitHub CI because Docker is unavailable locally; exact local results are exported in the BE-07 review package.
 
 ## 2026-10-15 - Member Schedule, Class Search, Session Detail and Coach Profile (BE-11, Flow 2)
 
