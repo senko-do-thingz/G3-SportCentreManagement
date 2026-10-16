@@ -20,6 +20,16 @@ npm run dev
 
 Open http://localhost:5173. The backend must be running (`cd backend`, then `mvn spring-boot:run`). CORS for `http://localhost:5173` is enabled by default in the `dev` profile; other origins go in `CORS_ALLOWED_ORIGINS` in `backend/.env`.
 
+### Manager screen preview (FE-06)
+
+To review the manager screens without a backend or a real account, run:
+
+```bash
+npm run dev:preview
+```
+
+Open http://localhost:5173/login and choose **Open manager preview**. Changes use synthetic data held in memory and reset on a full reload. The screens are `/manager`, `/manager/packages`, `/manager/cards`, and `/manager/activity`. See [FE-06 verification](docs/FE-06-verification.md) for manual checks and the released API contracts. Use `npm run dev` for normal backend integration; preview is disabled unless explicitly enabled in development.
+
 ### Port 5173 is fixed
 
 `vite.config.ts` sets `server.port = 5173` with `strictPort: true`, so `npm run dev` stops with "Port 5173 is already in use" instead of moving to another port that the backend CORS config would reject. When that happens, close the other dev server, or find and stop the process in PowerShell:
