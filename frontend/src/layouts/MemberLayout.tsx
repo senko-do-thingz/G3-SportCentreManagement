@@ -8,7 +8,7 @@ import { UserMenu } from './UserMenu'
 export function MemberLayout() {
   return (
     <div className="member-layout">
-      <header className="member-header">
+      <header className="member-layout__header">
         <div className="member-header__bar container">
           <Brand to={MEMBER_AREA.basePath} />
           <UserMenu />

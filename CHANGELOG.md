@@ -1,5 +1,6 @@
 ## 2026-10-17 - Frontend Authentication Maintenance (FE-00)
 
+- Header follow-up: isolate the authenticated member header from the receptionist member-summary CSS collision, restoring left-aligned navigation and the user section at the right of its bar. Preserve responsive navigation and receipt-print hiding. Add two style regressions; lint, all 617 tests in 31 files and production build pass. Desktop browser verification remains pending because browser automation is unavailable.
 - Fix the observed local bare-origin API setting sending login outside /api/v1, where the backend returns 401 even for valid credentials. Normalize supported origins to /api/v1 once and reject invalid configuration without echoing its value.
 - Distinguish credential rejection from profile initialization failures. Preserve recoverable sessions behind Retry, retain remember-me behavior, and keep profile and login diagnostics safe.
 - Validate authentication responses and prevent late login/profile/response-body work from publishing stale data, clearing a newer session, or retrying an older operation with another account's token. Preserve existing refresh coordination and role guards.
