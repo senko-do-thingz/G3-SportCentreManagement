@@ -216,6 +216,112 @@ Member codes use the existing `seq_member_code` and `MEM-%04d` convention (MEM-0
 
 See [BE-07 test cases](docs/tests/BE-07_test_cases.md) for verification and lifecycle limits.
 
+## Demo Classes and Sessions (BE-15)
+
+The same explicit `dev,demo` opt-in also applies
+`db/demo/V29__seed_demo_classes_and_sessions.sql`, after BE-07 V28. Use a fresh
+isolated demonstration database with all migrations in order. Ordinary `dev`
+and `prod` startup excludes both demo migrations. Never point the demo profile at
+a production/shared database; the existing prod/demo guard remains enabled.
+
+V29 creates six adult classes across three sports, three levels and all three
+BE-07 demo coaches. Each class has four weekly coach-led sessions (90 minutes)
+and four weekly self-training sessions (60 minutes, null session coach):
+
+| Class identity | Class name | Sport/level | Class and coach-led coach | Facility | First day offset | Coach-led / self-training times |
+| --- | --- | --- | --- | --- | --- | --- |
+| DEMO-CL-BAD-BEG | Badminton Foundations - Small Group | BADMINTON / BEGINNER | quan.coach@example.com | DEMO-BADMINTON | 2 | 09:00-10:30 / 11:00-12:00 |
+| DEMO-CL-BAD-INT | Badminton Rally and Footwork | BADMINTON / INTERMEDIATE | quan.coach@example.com | DEMO-BADMINTON | 4 | 18:00-19:30 / 20:00-21:00 |
+| DEMO-CL-SWIM-BEG | Swimming Water Confidence | SWIMMING / BEGINNER | nam.coach@example.com | INDOOR_POOL | 3 | 07:00-08:30 / 10:00-11:00 |
+| DEMO-CL-SWIM-ADV | Swimming Endurance and Technique | SWIMMING / ADVANCED | nam.coach@example.com | INDOOR_POOL | 6 | 09:00-10:30 / 11:00-12:00 |
+| DEMO-CL-BB-INT | Basketball Passing and Team Play | BASKETBALL / INTERMEDIATE | ha.coach@example.com | BB_COURT_A | 1 | 17:00-18:30 / 19:00-20:00 |
+| DEMO-CL-BB-ADV | Basketball Advanced Game Skills | BASKETBALL / ADVANCED | ha.coach@example.com | BB_COURT_B | 7 | 09:00-10:30 / 11:00-12:00 |
+
+There are **48 PUBLISHED sessions: 24 coach-led and 24 self-training**, spread over
+days 1-28 from the SQL Server date at first application. Each listed offset repeats
+at +7, +14 and +21 days. The seed reuses the three existing pool/basketball facilities
+and creates one sport-specific `DEMO-BADMINTON` court. BE-10 has no additional
+operating-hour or coach-availability calendar; this plan uses 07:00-21:00 slots and
+checks strict overlaps against DRAFT/PUBLISHED sessions. Conflicts fail the entire
+seed with a BE-15 error; dates are never silently shifted.
+
+The first coach-led `DEMO-CL-BAD-BEG` session is full (capacity 3, three confirmed
+bookings, zero free seats). The first coach-led `DEMO-CL-BAD-INT` session is nearly
+full (capacity 3, two confirmed bookings, one free seat). The other 46 sessions
+initially have no bookings. An, Mai and Bao occupy the full session; An and Mai
+occupy the nearly full session, so Bao can demonstrate booking its last seat.
+
+Two clearly named, demo-only complimentary packages (`DEMO-PKG-BAD-COACH` and
+`DEMO-PKG-BAD-SELF`) provide eight credits over 30 inclusive days. Four ACTIVE
+RECEPTION registrations are created by the BE-07 receptionist: coached packages
+for all three members and a self-training package for Bao. Initial coached
+balances are An 6, Mai 6 and Bao 7; Bao's self-training balance is 8. This follows
+the existing supported free staff-registration path: all prices are zero and
+there are no fake payments, invoices, receipts or payment audit records. Existing
+paid catalog packages, demo membership cards and account credentials are preserved.
+
+Flyway applies V29 once. Restarting the app does **not move** dates forward or
+recreate the full badges after teacher interactions. Logical SQL replay preserves
+the original anchor and consistent existing bookings/credits. It repairs only
+unambiguous missing fixtures and rejects conflicting metadata, unexplained credit
+or counter changes, and missing past/today sessions. Regenerating a future window
+requires a **fresh isolated demonstration database**; do not delete migration
+history, enable out-of-order migration or replay the SQL as a recurring startup job.
+
+Start from `backend/` using the BE-07 environment setup above:
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE = 'dev,demo'
+mvn spring-boot:run
+```
+
+Sign in using an existing BE-07 demo member/receptionist account. In the frontend,
+open the member schedule, filter by sport, level, format, coach and date, and inspect
+the two small-group badminton sessions. For direct API verification with an access
+token already stored in a task-specific environment variable:
+
+```powershell
+$demoHeaders = @{ Authorization = "Bearer $env:DEMO_ACCESS_TOKEN" }
+$demoSessions = Invoke-RestMethod 'http://localhost:8080/api/v1/sessions?size=100' -Headers $demoHeaders
+$demoSessions.content | Select-Object className, sessionDate, trainingFormat, coachName, capacity, bookedCount, freeSeats, full
+```
+
+`GET /api/v1/sessions` requires MEMBER, RECEPTIONIST or MANAGER, not COACH. Standard
+BE-11 filters and zero-based pagination are unchanged. Read-only SQL inspection and
+the complete test/CI plan are in [BE-15 test cases](docs/tests/BE-15_test_cases.md).
+The original V28-only account replay suite remains targeted to V28; the new full-demo
+suite validates V28 + V29 together, including all seven account logins. SQL Server
+integration execution is required in GitHub CI and is not claimed from local compilation.
+
+## Manager Activity Log (BE-04)
+
+`GET /api/v1/manager/activity-logs` is a read-only MANAGER endpoint. Optional
+`actorId`, `action`, `from`, `to` and `search` filters combine with AND before
+zero-based database pagination (`page=0`, `size=20`, maximum 100). Results sort
+by `createdAt DESC, id DESC` and use the existing PageResponse shape.
+
+Dates accept `YYYY-MM-DD` or local `YYYY-MM-DDTHH:mm:ss` without an offset;
+calendar end dates include the complete final day. Actor names and roles reflect
+current accounts. Responses contain a safe action-derived short detail; free-form
+summary/JSON metadata are neither returned nor searchable. The audit table,
+AuditService and existing writers are unchanged. See the full contract, clock
+limitations, examples and CI test plan in [BE-04 test cases](docs/tests/BE-04_test_cases.md).
+
+## Coach Teaching Schedule and Roster (BE-14)
+
+`GET /api/v1/coach/sessions?from=YYYY-MM-DD&to=YYYY-MM-DD` is available to
+COACH and MANAGER. Both inclusive dates are required, with a 62-day maximum;
+the complete array retains past/all statuses and sorts by date/start/id.
+Coaches see their own assignments. Managers can filter by `coachId`, or omit it
+to view all coach-assigned sessions. Counts use actual CONFIRMED bookings.
+
+`GET /api/v1/coach/sessions/{id}/roster` returns only CONFIRMED bookings with
+member code/name/phone, the selected package registration and booking time.
+Coaches require session ownership; managers may also read coachless rosters.
+No scheduling, credit or profile state changes on either read. See the complete
+[BE-14 contract and test cases](docs/tests/BE-14_test_cases.md) for privacy,
+nullable fields, validation and pending SQL Server CI requirements.
+
 ## API Overview
 
 All paths start with `/api/v1`. Send the access token as `Authorization: Bearer <token>`. Access tokens last 15 minutes and refresh tokens last 7 days.
@@ -304,3 +410,9 @@ Tracked in [CHANGELOG.md](CHANGELOG.md) and [TODO.md](TODO.md):
 
 - **Author:** Senko ([@senko-do-thingz](https://github.com/senko-do-thingz))
 - **Contributors:** see the [contributors graph](https://github.com/senko-do-thingz/G3-SportCentreManagement/graphs/contributors)
+
+## Local-only AI Audit Log documents
+
+AI Audit Log documents are private local working files. Keep `docs/AI_Audit_Log.docx`, `docs/AI_Audit_Log.md`, and `docs/audit/*_AI_Audit_Log.docx` / `docs/audit/*_AI_Audit_Log.md` out of the Git index. Their precise .gitignore rules preserve unrelated business audit documentation, Java sources, tests and database migrations. Do not use force-add for these documents. When removing existing tracking, verify local existence and checksums, then use `git rm --cached -- "exact/path"`; preserve the working-tree copy. Inspect staged paths/status only and exclude confidential deletion bodies from exported implementation patches and reports. Historical Git revisions are outside this policy's approved cleanup scope.
+
+BE-06 reuses the existing midnight Vietnam maintenance trigger for four guarded bulk lifecycle updates. See [scheduled-job rules](docs/database/09-business-rules-and-state-machines.md#scheduled-jobs) and [BE-06 verification](docs/tests/BE-06_test_cases.md). Round 2 applies the owner-approved activation safeguard: payment first, then locked item refresh before status validation. SQL Server verification remains required in CI.

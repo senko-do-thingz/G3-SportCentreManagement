@@ -53,7 +53,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Real Flyway, authentication and logical SQL replay in an isolated database in the CI container. */
 @ActiveProfiles(value = {"dev", "demo", "test"}, inheritProfiles = false)
-@TestPropertySource(properties = {"spring.jpa.show-sql=false", "spring.jpa.properties.hibernate.format_sql=false"})
+// This suite reconstructs V28-only partial account states; later demo fixtures have their own isolated suite.
+@TestPropertySource(properties = {"spring.jpa.show-sql=false", "spring.jpa.properties.hibernate.format_sql=false",
+        "spring.flyway.target=28"})
 @Import(DemoAccountsIntegrationTest.FixedClock.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class DemoAccountsIntegrationTest extends AbstractIntegrationTest {

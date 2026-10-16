@@ -1,9 +1,13 @@
 package com.sportify.identity.dto;
 
+import com.sportify.catalog.dto.SportSummaryResponse;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.time.LocalDate;
+import java.util.List;
 
 @Data
 @Builder
@@ -16,4 +20,11 @@ public class UserProfileResponse {
     private String phone;
     private String role;
     private String status;
+    private LocalDate dateOfBirth;
+    private String address;
+    private String mainGoal;
+    private String currentLevel;
+    private String memberCode;
+    private ProfileCardResponse membershipCard;
+    private List<SportSummaryResponse> sports;
 }

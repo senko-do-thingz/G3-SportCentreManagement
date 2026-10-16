@@ -97,6 +97,7 @@ describe('FE-02 profile validation', () => {
     expect(toChangePasswordRequest({ currentPassword: ' a ', newPassword: 'b', confirmPassword: 'b' })).toEqual({
       currentPassword: ' a ',
       newPassword: 'b',
+      confirmPassword: 'b',
     })
   })
 

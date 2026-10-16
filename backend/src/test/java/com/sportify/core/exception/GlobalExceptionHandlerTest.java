@@ -44,4 +44,25 @@ class GlobalExceptionHandlerTest {
         assertEquals("Internal server error", response.getBody().get("message"));
         org.junit.jupiter.api.Assertions.assertFalse(response.getBody().containsValue("Internal secret message"));
     }
+
+    @Test
+    void legacyBusinessRuleKeepsCauseAndExistingEnvelopeWithoutCode() {
+        var cause = new IllegalStateException("internal cause");
+        var error = new BusinessRuleException("Existing business message", cause);
+        var response = handler.handleBusinessRuleException(error);
+        assertEquals(cause, error.getCause());
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("Existing business message", response.getBody().get("message"));
+        org.junit.jupiter.api.Assertions.assertFalse(response.getBody().containsKey("code"));
+        org.junit.jupiter.api.Assertions.assertFalse(response.getBody().containsKey("details"));
+    }
+
+    @Test
+    void optionalBusinessCodeIsAddedWithoutReplacingTheExistingEnvelope() {
+        var response = handler.handleBusinessRuleException(new BusinessRuleException("No credits", "NO_SESSIONS_LEFT"));
+        assertEquals(400, response.getBody().get("status"));
+        assertEquals("No credits", response.getBody().get("message"));
+        assertEquals("NO_SESSIONS_LEFT", response.getBody().get("code"));
+        assertNotNull(response.getBody().get("timestamp"));
+    }
 }

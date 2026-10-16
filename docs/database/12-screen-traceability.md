@@ -19,7 +19,7 @@ Status Legend:
 | Flow 1 - User and membership management/Flow 1 - Manager/F1-02 Overlay - Edit Sport Package.png | F1-02 Overlay - Edit Sport Package | Manager | `sport_package`, `sport`, `sport_package_registration` | Planned: `PUT /api/v1/packages/{id}` | PARTIAL |
 | Flow 1 - User and membership management/Flow 1 - Manager/F1-03 - Membership Cards & Benefits.png | Membership Cards & Benefits | Manager | `membership_card_tier`, `member_card` | `GET /api/v1/membership-cards/tiers`, Planned: `POST /api/v1/membership-cards/tiers`, `PUT /api/v1/membership-cards/tiers/{id}` | PARTIAL |
 | Flow 1 - User and membership management/Flow 1 - Manager/F1-03 Overlay - Edit Membership Card.png | F1-03 Overlay - Edit Membership Card | Manager | `membership_card_tier`, `member_card` | Planned: `PUT /api/v1/membership-cards/tiers/{id}` | PARTIAL |
-| Flow 1 - User and membership management/Flow 1 - Manager/F1-04 - Activity Log.png | Activity Log | Manager | `activity_log`, `user_account` | Audit log query (Planned: `GET /api/v1/activity-logs`) | PARTIAL |
+| Flow 1 - User and membership management/Flow 1 - Manager/F1-04 - Activity Log.png | Activity Log | Manager | `activity_log`, `user_account` | Manager-only audit query (`GET /api/v1/manager/activity-logs`; see BE-04 test cases) | IMPLEMENTED |
 
 ## Flow 1 - User and membership management > Flow 1 - Member
 
@@ -62,8 +62,8 @@ Status Legend:
 
 | Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
 |---|---|---|---|---|---|
-| Flow 2 - Class booking and schedule management/Flow 2 - Coach/F2-13 - My Teaching Schedule.png | My Teaching Schedule | Coach | `class_session`, `sport_class`, `facility` | Schedule session management (Planned: `GET /api/v1/sessions`) | PARTIAL |
-| Flow 2 - Class booking and schedule management/Flow 2 - Coach/F2-14 - Class Roster.png | Class Roster | Coach | `sport_class`, `sport`, `coach_profile` | Class management (Planned: `GET /api/v1/classes`) | PARTIAL |
+| Flow 2 - Class booking and schedule management/Flow 2 - Coach/F2-13 - My Teaching Schedule.png | My Teaching Schedule | Coach | `class_session`, `sport_class`, `sport`, `facility`, `coach_profile` | Coach-owned/manager calendar (`GET /api/v1/coach/sessions`; BE-14) | IMPLEMENTED |
+| Flow 2 - Class booking and schedule management/Flow 2 - Coach/F2-14 - Class Roster.png | Class Roster | Coach | `booking`, `class_session`, `member_profile`, `user_account`, `sport_package_registration`, `sport_package` | Authorized CONFIRMED roster (`GET /api/v1/coach/sessions/{id}/roster`; BE-14) | IMPLEMENTED |
 
 ## Flow 2 - Class booking and schedule management > Flow 2 - Manager
 
