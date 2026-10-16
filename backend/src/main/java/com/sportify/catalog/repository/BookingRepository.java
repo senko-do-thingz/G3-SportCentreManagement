@@ -6,6 +6,9 @@ import com.sportify.catalog.entity.CheckInResult;
 import com.sportify.catalog.entity.SessionStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -19,6 +22,22 @@ import java.util.Optional;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
+    String MY_FROM = " FROM Booking b JOIN b.session s ";
+    String MY_WHERE = " WHERE b.member.id = :memberId AND (:period IS NULL "
+            + "OR (:period = 'UPCOMING' AND b.status = com.sportify.catalog.entity.BookingStatus.CONFIRMED "
+            + "AND s.status IN (com.sportify.catalog.entity.SessionStatus.DRAFT, com.sportify.catalog.entity.SessionStatus.PUBLISHED) "
+            + "AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime > cast(:now as time)))) "
+            + "OR (:period = 'PAST' AND (b.status = com.sportify.catalog.entity.BookingStatus.CANCELLED "
+            + "OR s.status IN (com.sportify.catalog.entity.SessionStatus.CANCELLED, com.sportify.catalog.entity.SessionStatus.COMPLETED) "
+            + "OR s.sessionDate < :today OR (s.sessionDate = :today AND s.startTime <= cast(:now as time)))))";
+
+    @EntityGraph(attributePaths = {"session.sport", "session.sportClass", "session.coach.userAccount", "session.facility",
+            "member.userAccount", "packageRegistration.sportPackage", "cancelledBy.role"})
+    @Query(value = "SELECT b" + MY_FROM + MY_WHERE, countQuery = "SELECT COUNT(b)" + MY_FROM + MY_WHERE)
+    Page<Booking> findMyBookings(@Param("memberId") Long memberId, @Param("period") String period,
+            @Param("today") LocalDate today, @Param("now") LocalTime now, Pageable pageable);
+
+    long countBySessionIdAndStatus(Long sessionId, BookingStatus status);
 
     /** Scalar lookup keeps Booking out of the persistence context until its session is locked. */
     @Query("SELECT b.session.id FROM Booking b WHERE b.id = :bookingId")
@@ -50,7 +69,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         long getBookingCount();
     }
     Optional<Booking> findByBookingCode(String bookingCode);
-    List<Booking> findByMemberIdOrderByBookedAtDesc(Long memberId);
+    @EntityGraph(attributePaths = {"session.sport", "session.sportClass", "session.coach.userAccount", "session.facility",
+            "member.userAccount", "packageRegistration.sportPackage", "cancelledBy.role"})
+    @Query("SELECT b FROM Booking b WHERE b.member.id = :memberId ORDER BY b.bookedAt DESC, b.id DESC")
+    List<Booking> findByMemberIdOrderByBookedAtDesc(@Param("memberId") Long memberId);
     
     @Query("SELECT b FROM Booking b JOIN FETCH b.session s WHERE b.member.id = :memberId AND s.sessionDate = :today AND b.status = :status")
     List<Booking> findTodayBookingsForMember(@Param("memberId") Long memberId, @Param("today") LocalDate today, @Param("status") BookingStatus status);
