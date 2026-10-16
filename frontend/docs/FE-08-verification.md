@@ -1,7 +1,7 @@
 # FE-08 - Member browsing verification
 
 Date: 2026-10-17. Working project: `E:\SWP391_SS2\Project\V1\G3-SportCentreManagement-main`.
-Branch: `feat/f2-member-browse`. Latest `origin/main` (`91c1f29`) is an ancestor through the FE-06 integration merge `26a2895`; updated FE-06 and FE-07 work is then merged through `6094342`. Backend files match `origin/main`; all follow-up changes are frontend-only. No SQL writes or new live data were performed.
+Branch: `feat/f2-member-browse`. Latest `origin/main` (`2d197cd`) is integrated through the published FE-08 merge `3c70ca3`; the updated FE-06/FE-07 stack is integrated through `b84d101`. Backend files match `origin/main`; all feature changes in this work are frontend-only. No SQL writes or new live data were performed.
 
 ## Delivered screens
 
