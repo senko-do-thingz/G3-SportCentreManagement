@@ -74,7 +74,7 @@ describe('FE-10 receptionist booking screens', () => {
   it('shows an empty booking history and keeps backend read failures retryable', async () => {
     const empty = setup((call) => call.path.startsWith('/bookings/member/2')
       ? json(200, { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }) : undefined)
-    renderApp('/reception/bookings?memberId=2')
+    renderApp('/reception/bookings?memberId=2&q=Taylor')
     expect(await screen.findByText('No upcoming bookings')).toBeInTheDocument()
     expect(empty.calls.some((call) => call.path.includes('/bookings/member/2'))).toBe(true)
   })
@@ -88,7 +88,7 @@ describe('FE-10 receptionist booking screens', () => {
         : json(200, { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 })
     })
     const user = userEvent.setup()
-    renderApp('/reception/bookings?memberId=2')
+    renderApp('/reception/bookings?memberId=2&q=Taylor')
     expect(await screen.findByText('Booking history is temporarily unavailable')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByText('No upcoming bookings')).toBeInTheDocument()
@@ -98,7 +98,7 @@ describe('FE-10 receptionist booking screens', () => {
   it('creates a booking with explicit member and eligible package, then shows the confirmation', async () => {
     const user = userEvent.setup()
     const { calls } = setup()
-    renderApp('/reception/bookings/new?memberId=2&week=2026-10-19')
+    renderApp('/reception/bookings/new?memberId=2&q=Taylor&week=2026-10-19')
 
     const sessionChoice = await screen.findByRole('radio', { name: /Basketball Foundations/ })
     await user.click(sessionChoice)
@@ -117,7 +117,7 @@ describe('FE-10 receptionist booking screens', () => {
     const { calls } = setup((call) => call.path === '/sessions/5/eligibility?memberId=2'
       ? json(200, { ...eligibility, eligible: false, reason: 'NO_PACKAGE', suitableRegistrations: [] }) : undefined)
     const user = userEvent.setup()
-    renderApp('/reception/bookings/new?memberId=2&week=2026-10-19')
+    renderApp('/reception/bookings/new?memberId=2&q=Taylor&week=2026-10-19')
     await user.click(await screen.findByRole('radio', { name: /Basketball Foundations/ }))
     expect(await screen.findByText(/No paid sport package covers/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Confirm booking' })).toBeDisabled()

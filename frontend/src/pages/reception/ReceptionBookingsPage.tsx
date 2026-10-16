@@ -42,6 +42,14 @@ function safeBooking(value: unknown, id: number): MemberBookingRecord | null {
   }
 }
 
+async function findMemberSummary(query: string, memberId: number, signal?: AbortSignal): Promise<MemberSummary> {
+  if (!query.trim()) throw new Error('Search for a member before opening their booking history.')
+  const page = await receptionApi.searchMembers({ query: query.trim(), page: 0, size: 10, signal })
+  const member = page.content.find((item) => item.userId === memberId)
+  if (!member) throw new ApiError(404, 'The selected member is not in these search results. Search again and select the member.')
+  return member
+}
+
 export function ReceptionBookingsPage() {
   const [params, setParams] = useSearchParams()
   const memberId = positiveId(params.get('memberId'))
@@ -52,12 +60,12 @@ export function ReceptionBookingsPage() {
   const page = positiveId(params.get('page')) ?? 0
   const loader = useCallback(async (signal: AbortSignal) => {
     if (!memberId) throw new Error('Choose a member to view booking history.')
-    const [overview, bookings] = await Promise.all([
-      receptionApi.memberOverview(memberId, { signal }),
+    const [member, bookings] = await Promise.all([
+      findMemberSummary(query, memberId, signal),
       receptionBookingsApi.forMember({ memberId, when, status, page, size: PAGE_SIZE, signal }),
     ])
-    return { overview, bookings }
-  }, [memberId, when, status, page])
+    return { member, bookings }
+  }, [memberId, query, when, status, page])
   const [resource, reloadResource] = useResource(loader)
   const [cancelTarget, setCancelTarget] = useState<MemberBookingRecord | null>(null)
   const [cancelling, setCancelling] = useState(false)
@@ -97,10 +105,10 @@ export function ReceptionBookingsPage() {
       />
     </Card>
 
-    {memberId && <Card title="Member bookings" actions={resource.status === 'ready' ? <Link className="btn btn--primary" to={`/reception/bookings/new?memberId=${memberId}`}>Book for member</Link> : undefined}>
+    {memberId && <Card title="Member bookings" actions={resource.status === 'ready' ? <Link className="btn btn--primary" to={`/reception/bookings/new?${new URLSearchParams({ memberId: String(memberId), q: query })}`}>Book for member</Link> : undefined}>
       {resource.status === 'loading' ? <PageLoader label="Loading member bookings" /> : resource.status === 'error' ? <ErrorState title="We could not load this member's bookings" error={resource.error} onRetry={reloadResource} /> : <>
         <section className="reception-booking-member" aria-label="Selected member">
-          <MemberHeader member={resource.data.overview.member} />
+          <MemberHeader member={resource.data.member} />
         </section>
         <div className="booking-tabs" role="tablist" aria-label="Member booking period">
           <button type="button" role="tab" aria-selected={when === 'UPCOMING'} className={`booking-tab${when === 'UPCOMING' ? ' booking-tab--active' : ''}`} onClick={() => setParams((current) => withQuery(current, { when: 'UPCOMING', page: null }))}>Upcoming</button>
@@ -110,7 +118,7 @@ export function ReceptionBookingsPage() {
           <Select label="Booking status" placeholder="All statuses" value={status ?? ''} options={[{ value: 'CONFIRMED', label: 'Confirmed' }, { value: 'CANCELLED', label: 'Cancelled' }]} onChange={(event) => setParams((current) => withQuery(current, { status: event.target.value || null, page: null }))} />
           <Button variant="ghost" onClick={reloadResource}>Refresh bookings</Button>
         </div>
-        {resource.data.bookings.content.length === 0 ? <EmptyState title={`No ${when.toLowerCase()} bookings`} description="Bookings for this member will appear here." action={<Link className="btn btn--secondary" to={`/reception/bookings/new?memberId=${memberId}`}>Book a session</Link>} /> : <div className="booking-list">
+        {resource.data.bookings.content.length === 0 ? <EmptyState title={`No ${when.toLowerCase()} bookings`} description="Bookings for this member will appear here." action={<Link className="btn btn--secondary" to={`/reception/bookings/new?${new URLSearchParams({ memberId: String(memberId), q: query })}`}>Book a session</Link>} /> : <div className="booking-list">
           {resource.data.bookings.content.map((booking) => <article className="booking-history-card" key={booking.id}>
             <div className="booking-history-card__heading">
               <div><p className="booking-history-card__date">{bookingDate(booking.sessionDate)} / {bookingTime(booking.startTime)} - {bookingTime(booking.endTime)}</p><h2>{bookingTitle(booking)}</h2></div>
@@ -132,7 +140,7 @@ export function ReceptionBookingsPage() {
   </div>
 }
 
-function ReceptionEligibilityCard({ memberId, session, memberStatus }: { memberId: number; session: BrowseSession; memberStatus: string | null }) {
+function ReceptionEligibilityCard({ memberId, query, session }: { memberId: number; query: string; session: BrowseSession }) {
   const navigate = useNavigate()
   const sessionId = session.id
   const [selectedRegistrationId, setSelectedRegistrationId] = useState<number | null>(null)
@@ -150,7 +158,8 @@ function ReceptionEligibilityCard({ memberId, session, memberStatus }: { memberI
     try {
       const booking = await receptionBookingsApi.createForMember({ memberId, sessionId, packageRegistrationId: registrationId })
       if (booking.status !== 'CONFIRMED') throw new ApiError(0, 'The server did not confirm this booking.')
-      navigate(`/reception/bookings/confirmed/${booking.id}?memberId=${memberId}`, { replace: true, state: { booking, returnTo: `/reception/bookings?memberId=${memberId}` } })
+      const search = new URLSearchParams({ memberId: String(memberId), q: query }).toString()
+      navigate(`/reception/bookings/confirmed/${booking.id}?${search}`, { replace: true, state: { booking, returnTo: `/reception/bookings?${search}` } })
     } catch (error) {
       setSubmitError(getErrorMessage(error))
       submitted.current = false
@@ -165,7 +174,7 @@ function ReceptionEligibilityCard({ memberId, session, memberStatus }: { memberI
       const state = resolveSessionDetailState(detail)
       const registrations = eligibleRegistrations(detail)
       const selected = registrations.find((item) => item.registrationId === selectedRegistrationId) ?? registrations[0]
-      const canBook = state === 'ELIGIBLE' && Boolean(selected) && (!memberStatus || memberStatus === 'ACTIVE')
+      const canBook = state === 'ELIGIBLE' && Boolean(selected)
       return <>
         <div className="browse-eligibility" role="status"><Badge tone={state === 'ELIGIBLE' ? 'success' : 'warning'}>{state === 'ELIGIBLE' ? 'Eligible' : ELIGIBILITY_COPY[state].title}</Badge><p>{state === 'ELIGIBLE' ? 'A suitable paid package is available. The booking request will recheck seat and credit availability.' : ELIGIBILITY_COPY[state].message}</p></div>
         {registrations.length ? <fieldset className="booking-package-options"><legend className="visually-hidden">Eligible package registrations</legend>{registrations.map((registration) => <label className={`booking-package${selected?.registrationId === registration.registrationId ? ' booking-package--selected' : ''}`} key={registration.registrationId}><input type="radio" name="packageRegistrationId" value={registration.registrationId} checked={selected?.registrationId === registration.registrationId} onChange={() => setSelectedRegistrationId(registration.registrationId)} /><span className="booking-package__body"><strong>{registration.packageName}</strong><span>Registration {registration.registrationCode}</span><span>{registration.remainingSessions} sessions before booking / {registration.remainingSessions - 1} after</span><span>Valid {bookingDate(registration.startDate)} - {bookingDate(registration.endDate)}</span></span></label>)}</fieldset> : <p className="notice notice--info">A paid eligible package is required. Single-visit checkout is not part of the available booking API.</p>}
@@ -179,18 +188,19 @@ function ReceptionEligibilityCard({ memberId, session, memberStatus }: { memberI
 export function ReceptionAssistedBookingPage() {
   const [params, setParams] = useSearchParams()
   const memberId = positiveId(params.get('memberId'))
+  const query = params.get('q') ?? ''
   const dateValue = params.get('week') ?? browseToday()
   const week = validBrowseDate(dateValue) ? browseMonday(dateValue) : browseMonday(browseToday())
   const weekEnd = browseAddDays(week, 6)
   const requestedSessionId = positiveId(params.get('sessionId'))
   const baseLoader = useCallback(async (signal: AbortSignal) => {
     if (!memberId) throw new Error('Choose a member before booking.')
-    const [overview, sessions] = await Promise.all([
-      receptionApi.memberOverview(memberId, { signal }),
+    const [member, sessions] = await Promise.all([
+      findMemberSummary(query, memberId, signal),
       memberSessionsApi.all({ from: week, to: weekEnd }, signal),
     ])
-    return { overview, sessions }
-  }, [memberId, week, weekEnd])
+    return { member, sessions }
+  }, [memberId, query, week, weekEnd])
   const [base, reloadBase] = useResource(baseLoader)
   const chosenSession = base.status === 'ready' ? base.data.sessions.find((session) => session.id === requestedSessionId) ?? null : null
   function changeWeek(date: string) {
@@ -199,10 +209,9 @@ export function ReceptionAssistedBookingPage() {
 
   if (!memberId) return <div className="page reception-bookings-page"><PageHeader eyebrow="Front desk / Flow 2" title="Book for member" /><Card><ErrorState title="Choose a member first" message="Search for a member before creating a booking." /><Link className="btn btn--primary" to="/reception/bookings">Member booking search</Link></Card></div>
   return <div className="page reception-bookings-page">
-    <PageHeader eyebrow="Front desk / Flow 2" title="Book for Member" description="Choose an available session and a package that covers it. Booking uses Vietnam time (UTC+7)." actions={<Link className="btn btn--secondary" to={`/reception/bookings?memberId=${memberId}`}>Back to bookings</Link>} />
+    <PageHeader eyebrow="Front desk / Flow 2" title="Book for Member" description="Choose an available session and a package that covers it. Booking uses Vietnam time (UTC+7)." actions={<Link className="btn btn--secondary" to={`/reception/bookings?${new URLSearchParams({ memberId: String(memberId), q: query })}`}>Back to bookings</Link>} />
       {base.status === 'loading' ? <PageLoader label="Loading member and session options" /> : base.status === 'error' ? <ErrorState title="We could not load booking options" error={base.error} onRetry={reloadBase} /> : <>
-      <Card title="Member"><MemberHeader member={base.data.overview.member} /><p className="browse-muted">The selected member is attached to the booking request. Package credits are checked again when the booking is submitted.</p></Card>
-      {base.data.overview.member.status && base.data.overview.member.status !== 'ACTIVE' && <div className="booking-error" role="alert">This member account is {base.data.overview.member.status.toLowerCase()}. Booking is available only for active members.</div>}
+      <Card title="Member"><MemberHeader member={base.data.member} /><p className="browse-muted">The selected member is attached to the booking request. Package credits are checked again when the booking is submitted.</p></Card>
       <Card title="Choose a session">
         <div className="browse-actions reception-booking-week"><Button variant="secondary" onClick={() => changeWeek(browseAddDays(week, -7))}>Previous week</Button><Button variant="secondary" onClick={() => changeWeek(browseMonday(browseToday()))}>This week</Button><Button variant="secondary" onClick={() => changeWeek(browseAddDays(week, 7))}>Next week</Button><strong>{browseDate(week)} - {browseDate(weekEnd)}</strong></div>
         {base.data.sessions.length === 0 ? <EmptyState title="No sessions this week" description="Try another week to find a published session." /> : <div className="reception-session-list" role="radiogroup" aria-label="Available sessions">
@@ -216,7 +225,7 @@ export function ReceptionAssistedBookingPage() {
           })}
         </div>}
       </Card>
-      {chosenSession && memberId && <ReceptionEligibilityCard key={chosenSession.id} memberId={memberId} session={chosenSession} memberStatus={base.data.overview.member.status} />}
+      {chosenSession && memberId && <ReceptionEligibilityCard key={chosenSession.id} memberId={memberId} query={query} session={chosenSession} />}
     </>}
   </div>
 }
@@ -240,7 +249,7 @@ export function ReceptionBookingConfirmedPage() {
   const [resource] = useResource(confirmationLoader)
 
   const returnTo = typeof stateValue.returnTo === 'string' && stateValue.returnTo.startsWith('/reception/bookings')
-    ? stateValue.returnTo : memberId ? `/reception/bookings?memberId=${memberId}` : '/reception/bookings'
+    ? stateValue.returnTo : memberId ? `/reception/bookings?${new URLSearchParams({ memberId: String(memberId), q: params.get('q') ?? '' })}` : '/reception/bookings'
   if (resource.status === 'loading') return <div className="page reception-bookings-page"><PageLoader label="Loading booking confirmation" /></div>
   if (resource.status === 'error') return <div className="page reception-bookings-page"><PageHeader title="Booking confirmation" /><ErrorState title="We could not load the booking confirmation" error={resource.error} /><Link className="btn btn--primary" to={returnTo}>Back to member bookings</Link></div>
   if (!resource.data) return <div className="page reception-bookings-page"><PageHeader title="Booking confirmation" /><Card><EmptyState title="Booking not found" description="The booking is not in this member's current history. Refresh the booking list before confirming with the member." /><Link className="btn btn--primary" to={returnTo}>Back to member bookings</Link></Card></div>
