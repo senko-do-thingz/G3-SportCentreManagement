@@ -6,7 +6,7 @@ import { ApiError } from '../../api/errors'
 import { managerUsersApi } from '../../api/managerUsersApi'
 import { managerPackagesApi } from '../../api/managerPackagesApi'
 import { managerCardTiersApi } from '../../api/managerCardTiersApi'
-import { managerActivityLogsApi, ACTIVITY_DEPENDENCY } from '../../api/managerActivityLogsApi'
+import { ACTIVITY_ACTIONS, managerActivityLogsApi } from '../../api/managerActivityLogsApi'
 import { packagesApi, type Sport } from '../../api/packagesApi'
 import { renderApp } from '../../test/renderApp'
 import { backendError, installFakeFetch, json, MANAGER, MEMBER } from '../../test/fakeBackend'
@@ -18,7 +18,8 @@ const sports: Sport[] = [ { id: 1, name: 'Football', code: 'FOOTBALL', venueType
 const sportPackage: ManagerPackage = { id: 1, code: 'PK-001', name: 'Football 30-day package', sportId: 1, sportName: 'Football', sportCode: 'FOOTBALL', trainingFormat: 'COACH_LED', durationDays: 30, sessionCount: 8, sessionMinutes: 90, priceAmount: 900000, description: null, isActive: true }
 const standard: ManagerCardTier = { id: 1, tierRank: 0, code: 'STANDARD', name: 'Standard', price: 0, durationMonths: 0, discountPercentage: 0, description: null, isActive: true }
 const vip: ManagerCardTier = { id: 3, tierRank: 2, code: 'VIP', name: 'VIP', price: 600000, durationMonths: 12, discountPercentage: 10, description: null, isActive: true }
-const activity: ActivityLog = { id: 1, createdAt: '2026-10-14T09:30:00', actorId: 1, actorName: 'Morgan Lee', actorRole: 'MANAGER', action: 'PACKAGE_CREATED', entityType: 'SPORT_PACKAGE', entityId: 1, entityCode: 'PK-001', summary: 'Created a package', details: '8 sessions' }
+const activity: ActivityLog = { id: 1, createdAt: '2026-10-14T09:30:00', actorId: 1, actorName: 'Morgan Lee', actorRole: 'MANAGER', action: 'PACKAGE_CREATED', entityType: 'SPORT_PACKAGE', entityId: 1, shortDetail: 'Package created' }
+const systemActivity: ActivityLog = { ...activity, actorId: null, actorName: 'System / unavailable actor', actorRole: null, entityId: null }
 function paged<T>(content: T[], page = 0, totalElements = content.length) { return { content, page, size: 20, totalElements, totalPages: Math.ceil(totalElements / 20) } }
 function session() { tokenStorage.startSession({ accessToken: 'manager-test', refreshToken: 'refresh-test' }) }
 function authOnly(profile = MANAGER) {
@@ -58,6 +59,14 @@ describe('FE-06 manager access and accounts', () => {
     await user.type(screen.getByLabelText('Search accounts'), 'Daniel +')
     await waitFor(() => expect(backend.calls.some((call) => call.path.includes('page=0') && call.path.includes('role=COACH') && call.path.includes('status=ACTIVE') && call.path.includes('search=Daniel+%2B'))).toBe(true))
     expect(backend.calls.find((call) => call.path.startsWith('/manager/users'))?.authorization).toBe('Bearer manager-test')
+  })
+  it('offers only account statuses supported by the backend', async () => {
+    authOnly()
+    vi.spyOn(managerUsersApi, 'list').mockResolvedValue(paged([]))
+    renderApp('/manager')
+    const status = await screen.findByLabelText('Account status')
+    expect(Array.from(status.querySelectorAll('option')).map((option) => option.value)).toEqual(['', 'ACTIVE', 'INACTIVE'])
+    expect(screen.queryByRole('option', { name: 'Locked' })).not.toBeInTheDocument()
   })
   it('distinguishes loading, server errors with retry, and an empty list', async () => {
     authOnly()
@@ -103,7 +112,7 @@ describe('FE-06 manager access and accounts', () => {
     await user.type(dialog.getByLabelText(/Full name/), 'Coach Example')
     await user.type(dialog.getByLabelText(/Email address/), 'coach@example.com')
     await user.type(dialog.getByLabelText(/Phone number/), '+84987654321')
-    await user.type(dialog.getByLabelText(/Temporary password/), 'MậtKhẩu123')
+    await user.type(dialog.getByLabelText(/Temporary password/), 'M\u1EADtKh\u1EA9u123')
     await user.selectOptions(dialog.getByLabelText(/Role/), 'COACH')
     await user.click(await dialog.findByLabelText('Basketball'))
     await user.click(dialog.getByLabelText('Football'))
@@ -112,7 +121,7 @@ describe('FE-06 manager access and accounts', () => {
     fireEvent.submit(form)
     fireEvent.submit(form)
     await waitFor(() => expect(create).toHaveBeenCalledTimes(1))
-    expect(create).toHaveBeenCalledWith({ fullName: 'Coach Example', email: 'coach@example.com', phone: '+84987654321', temporaryPassword: 'MậtKhẩu123', role: 'COACH', sportIds: [2, 1] })
+    expect(create).toHaveBeenCalledWith({ fullName: 'Coach Example', email: 'coach@example.com', phone: '+84987654321', temporaryPassword: 'M\u1EADtKh\u1EA9u123', role: 'COACH', sportIds: [2, 1] })
     await screen.findByText('Staff account created')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
@@ -171,11 +180,12 @@ describe('FE-06 manager access and accounts', () => {
 })
 
 describe('FE-06 packages and membership cards', () => {
-  it('keeps only the unreleased activity contract disabled for real accounts even when preview is enabled', async () => {
+  it('uses the released BE-04 endpoint and exact response shape for a real manager', async () => {
     vi.stubEnv('VITE_MANAGER_PREVIEW', 'true')
-    const backend = authOnly()
-    await expect(managerActivityLogsApi.list({ page: 0, size: 20 })).rejects.toThrow(ACTIVITY_DEPENDENCY)
-    expect(backend.calls).toHaveLength(0)
+    const backend = installFakeFetch((call) => call.path.startsWith('/manager/activity-logs') ? json(200, paged([systemActivity])) : backendError(404, 'Unexpected request'))
+    const response = await managerActivityLogsApi.list({ page: 0, size: 20, action: 'PACKAGE_CREATED' })
+    expect(response).toEqual(paged([systemActivity]))
+    expect(backend.calls[0]).toMatchObject({ path: '/manager/activity-logs?page=0&size=20&action=PACKAGE_CREATED', method: 'GET', authorization: 'Bearer manager-test' })
   })
   it('uses the released BE-03 live catalog endpoints with authenticated requests and exact wire fields', async () => {
     vi.stubEnv('VITE_MANAGER_PREVIEW', 'true')
@@ -340,7 +350,9 @@ describe('FE-06 read-only activity', () => {
     await user.click(await screen.findByRole('button', { name: 'Use Daniel Smith' }))
     fireEvent.change(screen.getByLabelText('From date'), { target: { value: '2026-10-14' } })
     fireEvent.change(screen.getByLabelText('To date'), { target: { value: '2026-10-14' } })
-    await user.type(screen.getByLabelText('Action code'), 'PACKAGE_CREATED')
+    const actionSelect = screen.getByLabelText('Action')
+    expect(Array.from(actionSelect.querySelectorAll('option')).map((option) => option.value).filter(Boolean)).toEqual(ACTIVITY_ACTIONS)
+    await user.selectOptions(actionSelect, 'PACKAGE_CREATED')
     await user.type(screen.getByLabelText('Search activity'), 'PK-001')
     await waitFor(() => expect(list).toHaveBeenLastCalledWith({ page: 0, size: 20, actorId: '3', action: 'PACKAGE_CREATED', from: '2026-10-14', to: '2026-10-14', search: 'PK-001' }, expect.any(AbortSignal)))
     const callsBefore = list.mock.calls.length
@@ -350,12 +362,13 @@ describe('FE-06 read-only activity', () => {
   })
   it('opens row details without another request and safely displays absent values', async () => {
     authOnly()
-    const list = vi.spyOn(managerActivityLogsApi, 'list').mockResolvedValue(paged([{ ...activity, actorId: null, actorName: null, actorRole: null, entityId: null, entityCode: null, details: null }]))
+    const list = vi.spyOn(managerActivityLogsApi, 'list').mockResolvedValue(paged([systemActivity]))
     const user = userEvent.setup()
     renderApp('/manager/activity')
-    expect(await screen.findByText('Not provided')).toBeInTheDocument()
+    expect(await screen.findByText('System / unavailable actor')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'View details' }))
     expect(within(screen.getByRole('dialog')).getByText('PACKAGE_CREATED')).toBeInTheDocument()
+    expect(within(screen.getByRole('dialog')).getByText('Package created')).toBeInTheDocument()
     expect(list).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('button', { name: /Delete|Edit/ })).not.toBeInTheDocument()
   })

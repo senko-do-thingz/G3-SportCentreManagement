@@ -80,4 +80,4 @@ All four PNGs in `context/Flow 2 - Class booking and schedule management/Flow 2 
 - Unsupported class description, goals, training-format fields and aggregate stat cards are omitted. Class code is server-generated and status is active/inactive, not an invented class draft state.
 - Training type is supplied on session creation because the backend requires it. No session `status` is sent: the backend publishes new sessions, and there is no publish-later endpoint.
 - No speculative availability endpoint or advisory availability button is added. Conflict decisions come from the save response.
-- The calendar loads every page of class options rather than silently limiting selection to the first 100 classes.
+- The schedule selector loads all class pages at 100 rows per request, forwards the screen abort signal and stops between pages when the view unmounts or reloads. It supports up to 100 pages (10,000 classes); a larger result shows an error instead of silently omitting classes. A failed page request reaches the existing retry state. A lightweight filtered lookup remains a backend improvement.

@@ -45,9 +45,9 @@ const tiers: ManagerCardTier[] = [
   { id: 3, tierRank: 2, code: 'VIP', name: 'VIP', price: 600000, durationMonths: 12, discountPercentage: 10, description: 'Self-training and coach-led packages. Single sessions excluded.', isActive: true },
 ]
 let logs: ActivityLog[] = [
-  { id: 3, createdAt: '2026-10-14T09:30:00', actorId: 1, actorName: 'Morgan Lee', actorRole: 'MANAGER', action: 'PACKAGE_CREATED', entityType: 'SPORT_PACKAGE', entityId: 5, entityCode: 'PK-005', summary: 'Created Football coach-led 30-day package.', details: '8 sessions, 90 minutes each. Price: 900.000 VND.' },
-  { id: 2, createdAt: '2026-10-14T09:15:00', actorId: 1, actorName: 'Morgan Lee', actorRole: 'MANAGER', action: 'CARD_TIER_UPDATED', entityType: 'CARD_TIER', entityId: 3, entityCode: 'VIP', summary: 'Updated VIP benefits.', details: '12-month validity and 10% off eligible duration packages.' },
-  { id: 1, createdAt: '2026-10-13T16:40:00', actorId: 5, actorName: 'Jamie Tran', actorRole: 'RECEPTIONIST', action: 'PAYMENT_RECORDED', entityType: 'PAYMENT', entityId: 1038, entityCode: 'PAY-1038', summary: 'Recorded a membership payment.', details: 'Payment received at the front desk.' },
+  { id: 3, createdAt: '2026-10-14T09:30:00', actorId: 1, actorName: 'Morgan Lee', actorRole: 'MANAGER', action: 'PACKAGE_CREATED', entityType: 'SPORT_PACKAGE', entityId: 5, shortDetail: 'Created Football coach-led 30-day package.' },
+  { id: 2, createdAt: '2026-10-14T09:15:00', actorId: 1, actorName: 'Morgan Lee', actorRole: 'MANAGER', action: 'CARD_TIER_UPDATED', entityType: 'CARD_TIER', entityId: 3, shortDetail: 'Updated VIP benefits.' },
+  { id: 1, createdAt: '2026-10-13T16:40:00', actorId: 5, actorName: 'Jamie Tran', actorRole: 'RECEPTIONIST', action: 'PAYMENT_CONFIRMED', entityType: 'PAYMENT', entityId: 1038, shortDetail: 'Payment confirmed.' },
 ]
 
 function json(status: number, body: unknown) {
@@ -61,8 +61,8 @@ function page<T>(rows: T[], options: RequestOptions): PageResponse<T> {
   const size = Math.max(1, Number(options.query?.size ?? 20))
   return { content: rows.slice(current * size, (current + 1) * size), page: current, size, totalElements: rows.length, totalPages: Math.ceil(rows.length / size) }
 }
-function record(action: string, entityType: string, entityId: number, entityCode: string, summary: string) {
-  logs = [{ id: Math.max(0, ...logs.map((log) => log.id)) + 1, createdAt: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).replace(' ', 'T'), actorId: manager.id, actorName: manager.fullName, actorRole: manager.role, action, entityType, entityId, entityCode, summary, details: 'Created in the frontend preview. No backend data changed.' }, ...logs]
+function record(action: string, entityType: string, entityId: number, shortDetail: string) {
+  logs = [{ id: Math.max(0, ...logs.map((log) => log.id)) + 1, createdAt: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).replace(' ', 'T'), actorId: manager.id, actorName: manager.fullName, actorRole: manager.role, action, entityType, entityId, shortDetail }, ...logs]
 }
 function delay(signal: AbortSignal | undefined, ms: number): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -107,7 +107,7 @@ export async function previewResponse(path: string, options: RequestOptions, tok
     if (users.some((user) => user.phone === request.phone)) return failure(400, 'Phone is already in use.', { phone: 'Use a different phone number.' })
     const user: ManagerUser = { id: Math.max(...users.map((item) => item.id)) + 1, fullName: request.fullName, email: request.email, phone: request.phone, role: request.role, status: 'ACTIVE', createdAt: new Date().toISOString() }
     users = [user, ...users]
-    record('USER_CREATED', 'USER_ACCOUNT', user.id, user.email, `Created ${user.fullName}'s staff account.`)
+    record('USER_CREATED', 'USER_ACCOUNT', user.id, `Created ${user.fullName}'s staff account.`)
     return json(201, user)
   }
   const userStatus = /^\/manager\/users\/(\d+)\/status$/.exec(path)
@@ -116,7 +116,7 @@ export async function previewResponse(path: string, options: RequestOptions, tok
     if (!user) return failure(404, 'Account not found.')
     if (user.id === manager.id && body?.status === 'INACTIVE') return failure(400, 'You cannot deactivate your own account.')
     user.status = String(body?.status)
-    record('USER_STATUS_CHANGED', 'USER_ACCOUNT', user.id, user.email, `Changed ${user.fullName}'s account status to ${user.status.toLowerCase()}.`)
+    record('USER_STATUS_CHANGED', 'USER_ACCOUNT', user.id, `Changed ${user.fullName}'s account status to ${user.status.toLowerCase()}.`)
     return json(200, user)
   }
   if (path === '/manager/packages' && method === 'GET') {
@@ -130,7 +130,7 @@ export async function previewResponse(path: string, options: RequestOptions, tok
     if (!sport) return failure(400, 'Choose a valid sport.', { sportId: 'Sport is not available.' })
     const item: ManagerPackage = { ...request, id: Math.max(...packages.map((item) => item.id)) + 1, sportName: sport.name, sportCode: sport.code, isActive: true, description: request.description ?? null }
     packages = [item, ...packages]
-    record('PACKAGE_CREATED', 'SPORT_PACKAGE', item.id, item.code, `Created ${item.name}.`)
+    record('PACKAGE_CREATED', 'SPORT_PACKAGE', item.id, `Created ${item.name}.`)
     return json(201, item)
   }
   const packageUpdate = /^\/packages\/(\d+)$/.exec(path)
@@ -139,7 +139,7 @@ export async function previewResponse(path: string, options: RequestOptions, tok
     if (!item) return failure(404, 'Package not found.')
     const request = options.body as PackageUpdateDraft
     Object.assign(item, { name: request.name, durationDays: request.durationDays, sessionCount: request.sessionCount, sessionMinutes: request.sessionMinutes, priceAmount: request.price, isActive: request.active })
-    record('PACKAGE_UPDATED', 'SPORT_PACKAGE', item.id, item.code, `Updated ${item.name}.`)
+    record('PACKAGE_UPDATED', 'SPORT_PACKAGE', item.id, `Updated ${item.name}.`)
     return json(200, item)
   }
   if (path === '/manager/card-tiers' && method === 'GET') return json(200, empty ? [] : tiers)
@@ -151,13 +151,13 @@ export async function previewResponse(path: string, options: RequestOptions, tok
     const request = options.body as CardTierUpdateDraft
     if (request.active && tiers.some((other) => other.id !== tier.id && other.isActive && other.tierRank !== null && tier.tierRank !== null && (other.tierRank < tier.tierRank ? Number(other.price) >= request.price : other.tierRank > tier.tierRank && Number(other.price) <= request.price))) return failure(400, 'Active card fees must increase with the tier rank.')
     Object.assign(tier, { price: request.price, durationMonths: request.durationMonths, discountPercentage: request.discountPercentage, description: request.description || null, isActive: request.active })
-    record('CARD_TIER_UPDATED', 'CARD_TIER', tier.id, tier.code, `Updated ${tier.name} benefits.`)
+    record('CARD_TIER_UPDATED', 'CARD_TIER', tier.id, `Updated ${tier.name} benefits.`)
     return json(200, tier)
   }
   if (path === '/manager/activity-logs' && method === 'GET') {
     const query = options.query ?? {}
     const search = String(query.search ?? '').toLowerCase()
-    const filtered = logs.filter((log) => (!query.actorId || log.actorId === Number(query.actorId)) && (!query.action || log.action === query.action) && (!query.from || log.createdAt.slice(0, 10) >= String(query.from)) && (!query.to || log.createdAt.slice(0, 10) <= String(query.to)) && (!search || `${log.actorName} ${log.action} ${log.entityCode} ${log.summary}`.toLowerCase().includes(search)))
+    const filtered = logs.filter((log) => (!query.actorId || log.actorId === Number(query.actorId)) && (!query.action || log.action === query.action) && (!query.from || log.createdAt.slice(0, 10) >= String(query.from)) && (!query.to || log.createdAt.slice(0, 10) <= String(query.to)) && (!search || `${log.actorName} ${log.action} ${log.entityType} ${log.entityId} ${log.shortDetail}`.toLowerCase().includes(search)))
     return json(200, page(empty ? [] : filtered, options))
   }
   return failure(404, 'This service is outside the FE-06 preview.')

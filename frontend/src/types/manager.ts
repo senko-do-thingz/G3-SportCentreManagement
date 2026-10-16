@@ -70,19 +70,17 @@ export interface CardTierUpdateDraft {
   active: boolean
 }
 
-/** Preview schema only; BE-04 field names and date semantics remain unverified. */
+/** Mirrors the scalar projection returned by BE-04 ActivityLogResponse. */
 export interface ActivityLog {
   id: number
   createdAt: string
   actorId: number | null
-  actorName: string | null
+  actorName: string
   actorRole: string | null
   action: string
   entityType: string | null
   entityId: number | null
-  entityCode: string | null
-  summary: string | null
-  details: string | null
+  shortDetail: string
 }
 
 export interface ActivityQuery {

@@ -15,6 +15,27 @@
 - Add manager-only class search, filters, server pagination, create/edit, qualified coach details and confirmed status changes. Preserve FE-06 manager features.
 - Add a Vietnam-time weekly calendar, single/weekly session creation, exact conflict dialogs with retained drafts, booked-capacity validation, session editing and reason-required cancellation.
 - Extend the opt-in frontend preview without backend writes; add API/date/access/workflow tests and verification documentation. The missing facility-list API is handled by the follow-up known-ID entry fallback. Browser visual checks remain pending due to a local automation launcher failure.
+
+## 2026-10-17 - FE-06 Activity Log Review Fixes
+
+- Connect real manager activity history to the merged BE-04 endpoint and align the frontend response model with ActivityLogResponse, including null-actor fallback and shortDetail.
+- Restrict activity filtering to the backend-supported action codes and update the preview fixture to the same response shape.
+- Refresh FE-06 verification steps for the released API and add authenticated fake-fetch coverage for the real wire contract.
+
+## 2026-10-17 - FE-06 Account Status Filter
+
+- Limit the manager account status filter to ACTIVE and INACTIVE, the only values supported by the backend.
+- Add screen coverage to prevent unsupported status values from returning to the filter.
+
+## 2026-10-17 - FE-06 ASCII Test Sources
+
+- Express accented Latin, Arabic-Indic digit and Vietnamese password test inputs with Unicode escapes so the Unicode behavior remains covered in ASCII-only test source.
+
+## 2026-10-17 - FE-07 Bounded Schedule Class Lookup
+
+- Load schedule class options in cancellable 100-row pages, stop when the view aborts, surface page errors through retry, and reject results above the documented 10,000-class limit.
+- Add pagination, cancellation, page-failure and upper-bound regression coverage.
+
 ## 2026-10-16 - Scheduled Maintenance and Local Document Policy (BE-06)
 
 - Add four daily, Clock-based Vietnam maintenance transitions: overdue pending cards/registrations to CANCELLED and expired ACTIVE cards/registrations to EXPIRED, using guarded bulk updates, committed row counts and idempotency.

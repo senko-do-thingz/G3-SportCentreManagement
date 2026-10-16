@@ -41,7 +41,7 @@ export function UserManagementPage() {
       <div className="manager-filters">
         <Input label="Search accounts" type="search" placeholder="Search name, email or phone" value={search} onChange={(event) => { setSearch(event.target.value); setPage(0) }} />
         <Select label="Role" placeholder="All roles" options={Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }))} value={role} onChange={(event) => { setRole(event.target.value); setPage(0) }} />
-        <Select label="Account status" placeholder="All statuses" options={[{ value: 'ACTIVE', label: 'Active' }, { value: 'INACTIVE', label: 'Inactive' }, { value: 'LOCKED', label: 'Locked' }]} value={status} onChange={(event) => { setStatus(event.target.value); setPage(0) }} />
+        <Select label="Account status" placeholder="All statuses" options={[{ value: 'ACTIVE', label: 'Active' }, { value: 'INACTIVE', label: 'Inactive' }]} value={status} onChange={(event) => { setStatus(event.target.value); setPage(0) }} />
         <Button variant="ghost" onClick={() => { setSearch(''); setRole(''); setStatus(''); setPage(0) }}>Clear filters</Button>
       </div>
       {resource.status === 'error' ? <ManagerError error={resource.error} onRetry={reload} /> : <Table columns={columns} rows={ready ? resource.data.content : []} rowKey={(row) => row.id} loading={!ready} caption="Center accounts" emptyTitle={search || role || status ? 'No matching accounts' : 'No accounts yet'} emptyDescription="Try a different search or add a staff account." pagination={ready ? { page, pageSize: 20, totalItems: resource.data.totalElements, onPageChange: setPage } : undefined} />}
