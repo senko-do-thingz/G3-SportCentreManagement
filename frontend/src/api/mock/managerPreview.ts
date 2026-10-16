@@ -1,5 +1,6 @@
 import type { RequestOptions } from '../client'
 import { schedulePreviewResponse } from './managerSchedulePreview'
+import { memberBrowsePreview } from './memberBrowsePreview'
 import type { Sport } from '../packagesApi'
 import type { PageResponse, UserProfile } from '../types'
 import type { ActivityLog, CardTierUpdateDraft, ManagerCardTier, ManagerPackage, ManagerUser, PackageCreateRequest, PackageUpdateDraft, StaffAccountRequest } from '../../types/manager'
@@ -89,6 +90,8 @@ export async function previewResponse(path: string, options: RequestOptions, tok
   await delay(options.signal, scenario === 'slow' ? 2500 : 250)
   if (method === 'GET' && path.startsWith('/manager/') && scenario === 'error') return failure(503, 'The preview service is temporarily unavailable. Change the preview state or retry.')
   const empty = scenario === 'empty'
+  const browse = token === 'preview-MEMBER' ? memberBrowsePreview(path, options, sports, scenario) : undefined
+  if (browse) return browse
   const schedule = schedulePreviewResponse(path, options, sports, empty)
   if (schedule) return schedule
   if (path === '/sports') return json(200, sports)
