@@ -8,7 +8,7 @@ import { addDays, centerNow, displayDate, repeatDates, validDate, WEEKDAYS } fro
 import { useManagerForm, useResource } from './useManagerTools'
 
 const FIELDS = ['classId', 'date', 'startTime', 'endTime', 'facilityId', 'coachId', 'capacity', 'trainingType', 'daysOfWeek', 'fromDate', 'toDate'] as const
-export function SessionEditorModal({ item, classes, facilities, classId, onClose, onSuccess }: { item?: ManagerSession; classes: ManagerClass[]; facilities: Facility[]; classId?: number; onClose: () => void; onSuccess: () => void }) {
+export function SessionEditorModal({ item, classes, facilities, manualFacility = false, classId, onClose, onSuccess }: { item?: ManagerSession; classes: ManagerClass[]; facilities: Facility[]; manualFacility?: boolean; classId?: number; onClose: () => void; onSuccess: () => void }) {
   const ref = useRef<HTMLFormElement>(null)
   const today = centerNow().date
   const initialClass = classes.find((entry) => entry.id === (item?.class?.id ?? classId))
@@ -33,7 +33,7 @@ export function SessionEditorModal({ item, classes, facilities, classId, onClose
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(draft.startTime)) errors.startTime = 'Choose a valid start time.'
     else if (dates.includes(now.date) && `${draft.startTime}:00` <= now.time) errors.startTime = 'Session must start in the future (Vietnam time).'
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(draft.endTime) || draft.endTime <= draft.startTime) errors.endTime = 'End time must be after the start time on the same day.'
-    if (!facilities.some((entry) => entry.id === Number(draft.facilityId) && entry.active !== false)) errors.facilityId = 'Choose an available facility.'
+    if (manualFacility ? !/^\d+$/.test(draft.facilityId) || !Number.isSafeInteger(Number(draft.facilityId)) || Number(draft.facilityId) < 1 : !facilities.some((entry) => entry.id === Number(draft.facilityId) && entry.active !== false)) errors.facilityId = manualFacility ? 'Enter a valid existing facility ID.' : 'Choose an available facility.'
     if (draft.trainingType === 'COACH_LED' && (coaches.status !== 'ready' || !coaches.data.some((entry) => entry.id === Number(draft.coachId)))) errors.coachId = 'Choose a coach qualified for this sport.'
     const capacity = Number(draft.capacity)
     if (!Number.isInteger(capacity) || capacity < Math.max(1, item?.bookedCount ?? 0) || capacity > (selectedClass?.maxMembers ?? 100)) errors.capacity = `Capacity must be a whole number from ${Math.max(1, item?.bookedCount ?? 0)} to ${selectedClass?.maxMembers ?? 100}.`
@@ -66,7 +66,7 @@ export function SessionEditorModal({ item, classes, facilities, classId, onClose
           {!weekly && <Input label="Date" name="date" type="date" min={today} value={draft.date} onChange={(event) => change('date', event.target.value)} error={form.errors.date} required />}
           <Input label="Start time" name="startTime" type="time" value={draft.startTime} onChange={(event) => change('startTime', event.target.value)} error={form.errors.startTime} required />
           <Input label="End time" name="endTime" type="time" value={draft.endTime} onChange={(event) => change('endTime', event.target.value)} error={form.errors.endTime} required />
-          <Select label="Facility" name="facilityId" placeholder="Choose a facility" value={draft.facilityId} options={facilities.filter((entry) => entry.active !== false).map((entry) => ({ value: String(entry.id), label: entry.name }))} onChange={(event) => change('facilityId', event.target.value)} error={form.errors.facilityId} required />
+          {manualFacility ? <Input label="Facility ID" name="facilityId" type="number" min="1" step="1" value={draft.facilityId} onChange={(event) => change('facilityId', event.target.value)} error={form.errors.facilityId} hint={item?.facility ? `Current facility: ${item.facility.name}. The backend validates availability.` : 'Enter a known facility ID from your center. The backend validates availability.'} required /> : <Select label="Facility" name="facilityId" placeholder="Choose a facility" value={draft.facilityId} options={facilities.filter((entry) => entry.active !== false).map((entry) => ({ value: String(entry.id), label: entry.name }))} onChange={(event) => change('facilityId', event.target.value)} error={form.errors.facilityId} required />}
           <Select label="Coach" name="coachId" placeholder="Choose a qualified coach" disabled={draft.trainingType !== 'COACH_LED' || coaches.status !== 'ready'} value={draft.trainingType === 'COACH_LED' ? draft.coachId : ''} options={coaches.status === 'ready' ? coaches.data.map((entry) => ({ value: String(entry.id), label: entry.fullName })) : []} onChange={(event) => change('coachId', event.target.value)} error={form.errors.coachId} required={draft.trainingType === 'COACH_LED'} />
           <Input label="Capacity" name="capacity" type="number" min={Math.max(1, item?.bookedCount ?? 0)} max={selectedClass?.maxMembers} step="1" value={draft.capacity} onChange={(event) => change('capacity', event.target.value)} error={form.errors.capacity} required />
           {!item && <Checkbox label="Repeat weekly" checked={weekly} onChange={(event) => setWeekly(event.target.checked)} />}
