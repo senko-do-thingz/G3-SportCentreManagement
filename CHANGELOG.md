@@ -1,3 +1,10 @@
+## 2026-10-16 - Coach Teaching Schedule and Class Roster (BE-14)
+
+- Add GET /api/v1/coach/sessions with authenticated coach ownership, optional manager coachId filtering, all assigned sessions for a manager without that filter, and the existing inclusive 62-day calendar policy. Preserve past and all session statuses, stable date/start/id ordering, and actual CONFIRMED booked counts without cache repairs.
+- Add GET /api/v1/coach/sessions/{id}/roster with authorization before member queries and an owner restriction repeated in the SQL read. Return only CONFIRMED bookings and the minimal member code/name/phone, actual selected package and bookedAt fields; retain nullable/historical package links and suppress inconsistent foreign-member registrations.
+- Enforce COACH/MANAGER at controller and service, resolve identity from the security context, revalidate current account/profile mappings, and prevent coachId/header overrides. Keep manager access to coachless rosters and preserve existing authentication, scheduling, discovery, booking/cancellation, profile and audit-writing behavior.
+- Add local validation, real security-chain/controller and SQL Server-dialect HQL tests, plus required SQL Server integration coverage for privacy, mapping, bounded query counts, read-only snapshots and BE-10/11/12 interoperability. No migration or dependency change. SQL Server execution remains a GitHub CI gate; see docs/tests/BE-14_test_cases.md.
+
 ## 2026-10-16 - Manager Activity Log (BE-04)
 
 - Add GET /api/v1/manager/activity-logs with MANAGER checks at controller and service, combined actor/action/date/search filters, database pagination and deterministic createdAt/id descending order.
