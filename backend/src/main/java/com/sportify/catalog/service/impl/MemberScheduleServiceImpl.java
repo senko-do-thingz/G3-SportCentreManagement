@@ -73,7 +73,32 @@ public class MemberScheduleServiceImpl implements MemberScheduleService {
         var member = members.findById(actor.getId())
                 .orElseThrow(() -> new AccessDeniedException("A member profile is required"));
         if (!Objects.equals(member.getId(), actor.getId())) throw new AccessDeniedException("Invalid member context");
-        boolean alreadyBooked = bookings.findBySessionIdAndMemberIdAndStatus(id, member.getId(), BookingStatus.CONFIRMED).isPresent();
+        return eligibility(session, common, member.getId());
+    }
+
+    @Override
+    public SessionDetailResponse getMemberEligibility(Long id, Long memberId, UserAccount actor) {
+        requireReader(actor);
+        if (!SecurityUtils.isStaff(actor)) throw new AccessDeniedException("Staff access is required");
+        requirePositiveId(id, "Session id");
+        requirePositiveId(memberId, "Member id");
+        var member = members.findById(memberId)
+                .orElseThrow(() -> new ResourceNotFoundException("Member profile not found for id: " + memberId));
+        if (!Objects.equals(member.getId(), memberId) || member.getUserAccount() == null
+                || !Objects.equals(member.getUserAccount().getId(), memberId)
+                || !SecurityUtils.isMember(member.getUserAccount())) {
+            throw new ResourceNotFoundException("Member profile not found for id: " + memberId);
+        }
+        requireReader(member.getUserAccount());
+        LocalDateTime now = LocalDateTime.now(clock);
+        ClassSession session = sessions.findVisibleById(id, now.toLocalDate(), now.toLocalTime())
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + id));
+        return eligibility(session, response(session, counts(List.of(session)).getOrDefault(id, 0L)), memberId);
+    }
+
+    private SessionDetailResponse eligibility(ClassSession session, SessionResponse common, Long memberId) {
+        Long id = session.getId();
+        boolean alreadyBooked = bookings.findBySessionIdAndMemberIdAndStatus(id, memberId, BookingStatus.CONFIRMED).isPresent();
         if (alreadyBooked) return rejected(common, true, ALREADY_BOOKED);
         if (common.full()) return rejected(common, false, FULL);
         // The existing write path checks the cache. Do not promise eligibility when it already blocks booking.
@@ -81,8 +106,8 @@ public class MemberScheduleServiceImpl implements MemberScheduleService {
         if (session.getBookedCount() >= session.getCapacity()) return rejected(common, false, CAPACITY_UNAVAILABLE);
 
         List<SportPackageRegistration> matching = PackageBookingEligibility.matching(
-                registrations.findForSessionEligibility(member.getId(), session.getSport().getId(), session.getTrainingType()),
-                session, member.getId());
+                registrations.findForSessionEligibility(memberId, session.getSport().getId(), session.getTrainingType()),
+                session, memberId);
         LocalDate date = session.getSessionDate();
         var usable = PackageBookingEligibility.usable(matching, date).stream()
                 .map(MemberScheduleServiceImpl::registrationResponse).toList();
