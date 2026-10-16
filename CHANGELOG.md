@@ -25,6 +25,11 @@
 
 - Express accented Latin, Arabic-Indic digit and Vietnamese password test inputs with Unicode escapes so the Unicode behavior remains covered in ASCII-only test source.
 
+## 2026-10-17 - FE-07 Bounded Schedule Class Lookup
+
+- Load schedule class options in cancellable 100-row pages, stop when the view aborts, surface page errors through retry, and reject results above the documented 10,000-class limit.
+- Add pagination, cancellation, page-failure and upper-bound regression coverage.
+
 ## 2026-10-16 - Scheduled Maintenance and Local Document Policy (BE-06)
 
 - Add four daily, Clock-based Vietnam maintenance transitions: overdue pending cards/registrations to CANCELLED and expired ACTIVE cards/registrations to EXPIRED, using guarded bulk updates, committed row counts and idempotency.

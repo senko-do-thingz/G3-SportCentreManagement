@@ -7,16 +7,11 @@ import { facilitiesApi } from '../../api/facilitiesApi'
 import { Button, Card, EmptyState, Input, PageHeader, PageLoader, Select, StatusBadge, useToast } from '../../components/ui'
 import { ManagerError, PreviewNotice } from './ManagerShared'
 import { useResource } from './useManagerTools'
+import { loadScheduleClasses } from './loadScheduleClasses'
 import { addDays, canManageSession, centerNow, displayDate, monday, WEEKDAYS } from './scheduleModel'
 import { SessionEditorModal } from './SessionEditorModal'
 import { CancelSessionModal } from './CancelSessionModal'
 
-const loadClasses = async (signal: AbortSignal) => {
-  const first = await managerClassesApi.list({ size: 100 }, signal)
-  const items = [...first.content]
-  for (let page = 1; page < first.totalPages; page++) items.push(...(await managerClassesApi.list({ size: 100, page }, signal)).content)
-  return items
-}
 const loadCoaches = (signal: AbortSignal) => managerClassesApi.coaches(undefined, signal)
 const loadFacilities = (signal: AbortSignal) => facilitiesApi.list(signal)
 const id = (value: string | null) => value && /^\d+$/.test(value) && Number(value) > 0 ? Number(value) : undefined
@@ -27,7 +22,7 @@ export function ManagerSchedulePage() {
   const classId = id(params.get('classId'))
   const coachId = id(params.get('coachId'))
   const facilityId = id(params.get('facilityId'))
-  const [classes, retryClasses] = useResource(loadClasses)
+  const [classes, retryClasses] = useResource(loadScheduleClasses)
   const [coaches, retryCoaches] = useResource(loadCoaches)
   const [facilities, retryFacilities] = useResource(loadFacilities)
   const loader = useCallback((signal: AbortSignal) => managerSessionsApi.list({ from: week, to: addDays(week, 6), classId, coachId, facilityId }, signal), [week, classId, coachId, facilityId])
