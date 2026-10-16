@@ -11,7 +11,8 @@
 | AC2 conflict | Every exact conflict is displayed, including missing-resource fallback, and editor values survive dismissal | `managerSchedule.test.tsx`, `managerSessionsApi.test.ts` |
 | AC3 cancellation | Cancelled reason is visible and cancelled cards have no management actions; reason is required | `managerSchedule.test.tsx` |
 | Edit safety | Capacity cannot fall below booked count; class/training type remain immutable | `managerSchedule.test.tsx` |
-| Missing API | Facility lookup failure disables create/edit but does not hide existing sessions | `managerSchedule.test.tsx` |
+| Missing API | A facility 404 enables explicit known-ID entry; 403/500 never trigger fallback; existing sessions remain visible | `managerSchedule.test.tsx` |
+| Coach discovery | All active coaches load before sport selection; selecting sport filters qualification; refresh reloads directory | `managerClasses.test.tsx` |
 | Dates | Vietnam midnight, Monday normalization, year rollover, inclusive repetitions, batch cap and future guards | `scheduleModel.test.ts` |
 | Preview atomicity | Overlapping save returns exact conflict without adding a duplicate session | `managerSchedulePreview.test.ts` |
 | FE-06 preservation | Existing account, package, card and activity tests still pass | `managerScreens.test.tsx` |

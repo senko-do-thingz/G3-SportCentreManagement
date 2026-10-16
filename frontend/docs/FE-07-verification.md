@@ -21,7 +21,9 @@ All paths are relative to the existing API base URL.
 | Implied/reused | GET `/sports`; GET `/coaches/{id}` for qualification details |
 | Extra, missing on main | GET `/facilities` for the facility selector |
 
-The missing facility lookup is an integration dependency, not implemented in this frontend task. Live lookup failure shows an explicit notice and retry, disables create/edit, and still renders existing sessions and permits valid cancellation. No guessed facility IDs are sent to the real backend. Once the backend owner exposes this contract, confirm its response shape against `facilitiesApi.ts`.
+The missing facility lookup is an integration dependency, not implemented in this frontend task. A 404 shows an explicit notice and retry and enables manual entry of a known facility ID in create/edit. Existing session facility IDs are prefilled on edit. Positive integer validation runs locally; the scheduling API remains authoritative for existence, active state and conflicts. A 403 or server error does not trigger this fallback. No guessed facility IDs or fixture IDs are substituted. Once the backend owner exposes this contract, confirm its response shape against `facilitiesApi.ts`.
+
+The class editor now loads all active coaches before sport selection, filters them after sport selection, explains qualification filtering and offers Refresh coaches for newly created accounts. Changing sport clears the previous coach selection.
 
 Unlike the initial plan's separate facility mock flag, facilities are mocked only inside the existing fully isolated manager preview. This avoids combining fixture IDs with live writes. No automatic fallback to fixtures exists.
 
@@ -38,7 +40,7 @@ Preview-only data and simulated writes are in `src/api/mock/managerSchedulePrevi
 
 Commands: `npm run lint`, `npm run test`, `npm run build`.
 
-- Final full regression run passed 616 tests across 34 test files, including the existing FE-06 suite.
+- Final follow-up regression run passed 619 tests across 34 test files, including the existing FE-06 suite. Follow-up coverage adds coach refresh and 404-only facility fallback behavior, including rejection of 403/500 fallback. Lint and production build also pass.
 - Focused follow-up tests cover all four routes for anonymous/member access, weekly wire fields without draft status, edit capacity limits, missing facility integration, conflict draft preservation and atomic preview writes.
 - Production build passes with the existing non-blocking bundle-size warning (main chunk above 500 kB).
 - Date-model tests use explicit UTC instants and Vietnam formatting, date-only UTC calendar arithmetic, inclusive weekly range counts and a 100-session limit.
@@ -56,7 +58,18 @@ Browser automation could not initialize because the local process-security launc
 5. At 375px, confirm filters/forms stack and the calendar becomes a day list without page-level horizontal overflow. Only the table may scroll horizontally.
 6. Keyboard: tab order, visible focus, topmost-only Escape handling, focus containment/restoration, and conflict return to start time.
 7. Change browser timezone to Tokyo and confirm dates/weekdays do not shift. Verify future-action hints near Vietnam midnight; backend validation remains authoritative.
-8. Live mode: verify `/facilities` dependency state. Real create/edit and end-to-end backend scheduling remain unverified until that lookup is available. Do not enable a demo database profile or seed data as part of frontend verification.
+8. Live mode: verify `/facilities` returns 404 and the editor offers Facility ID entry. Create with a verified local facility ID, and confirm invalid/unavailable IDs preserve the draft and display backend errors. Do not enable a demo database profile or modify migrations.
+
+## Live local data verification (2026-10-16 follow-up)
+
+At the user's request, created two clearly named demo classes and eight published sessions through the existing manager APIs, not SQL writes or backend code. Both use the user's existing active coach, something Nguyen (ID 3), verified by GET `/coaches` and GET `/coaches?sportId=3`.
+
+| Class ID | Name | Weekly sessions | Facility |
+| --- | --- | --- | --- |
+| 1 | FE-07 Demo - Basketball Basics | Fridays 16:00-17:00, 16/10/2026 through 06/11/2026 | ID 1, Basketball Court A |
+| 2 | FE-07 Demo - Swimming Technique | Saturdays 10:00-11:00, 17/10/2026 through 07/11/2026 | ID 3, Indoor Pool |
+
+Facility IDs were verified with a read-only query against the local development database. ID 2 is Basketball Court B. These are local instance values, not production constants. No new accounts, migrations or demo profiles were added. A duplicate Basketball request returned HTTP 409 with the exact conflicting session; no duplicate session was created. The live frontend at `http://localhost:5173/manager/schedule` returned HTTP 200. Browser automation remains unavailable, so this is API and server evidence, not visual verification.
 
 ## Intentional Figma adaptations
 

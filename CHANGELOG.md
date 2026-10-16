@@ -1,8 +1,14 @@
+## 2026-10-16 - Live Scheduling and Coach Discovery Fixes (FE-07)
+
+- Show active coaches before sport selection, explain qualification filtering and add a coach-directory refresh action.
+- Allow explicit known facility IDs when the facility dropdown API returns 404, so the completed scheduling endpoints remain usable. Keep authorization/server failures blocking, retain backend validation and prefill the current facility on edit.
+- Verify real API scheduling with two requested local sample classes, eight published sessions and an exact HTTP 409 overlap response. No backend code, migrations, account creation or SQL writes.
+
 ## 2026-10-16 - Manager Class and Schedule Screens (FE-07)
 
 - Add manager-only class search, filters, server pagination, create/edit, qualified coach details and confirmed status changes. Preserve FE-06 manager features.
 - Add a Vietnam-time weekly calendar, single/weekly session creation, exact conflict dialogs with retained drafts, booked-capacity validation, session editing and reason-required cancellation.
-- Extend the opt-in frontend preview without backend writes; add API/date/access/workflow tests and verification documentation. Live create/edit awaits the missing facility-list API. Browser visual checks remain pending due to a local automation launcher failure.
+- Extend the opt-in frontend preview without backend writes; add API/date/access/workflow tests and verification documentation. The missing facility-list API is handled by the follow-up known-ID entry fallback. Browser visual checks remain pending due to a local automation launcher failure.
 
 ## 2026-10-16 - Container Exit Classification and Safe Evidence (BE-07, Round 4)
 
