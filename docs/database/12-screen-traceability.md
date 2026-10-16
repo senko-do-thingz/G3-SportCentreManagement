@@ -62,8 +62,8 @@ Status Legend:
 
 | Screen File | Screen Title | Flow / Role | Primary Tables | Backend Endpoint / Interaction | Status |
 |---|---|---|---|---|---|
-| Flow 2 - Class booking and schedule management/Flow 2 - Coach/F2-13 - My Teaching Schedule.png | My Teaching Schedule | Coach | `class_session`, `sport_class`, `facility` | Schedule session management (Planned: `GET /api/v1/sessions`) | PARTIAL |
-| Flow 2 - Class booking and schedule management/Flow 2 - Coach/F2-14 - Class Roster.png | Class Roster | Coach | `sport_class`, `sport`, `coach_profile` | Class management (Planned: `GET /api/v1/classes`) | PARTIAL |
+| Flow 2 - Class booking and schedule management/Flow 2 - Coach/F2-13 - My Teaching Schedule.png | My Teaching Schedule | Coach | `class_session`, `sport_class`, `sport`, `facility`, `coach_profile` | Coach-owned/manager calendar (`GET /api/v1/coach/sessions`; BE-14) | IMPLEMENTED |
+| Flow 2 - Class booking and schedule management/Flow 2 - Coach/F2-14 - Class Roster.png | Class Roster | Coach | `booking`, `class_session`, `member_profile`, `user_account`, `sport_package_registration`, `sport_package` | Authorized CONFIRMED roster (`GET /api/v1/coach/sessions/{id}/roster`; BE-14) | IMPLEMENTED |
 
 ## Flow 2 - Class booking and schedule management > Flow 2 - Manager
 

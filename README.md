@@ -307,6 +307,21 @@ summary/JSON metadata are neither returned nor searchable. The audit table,
 AuditService and existing writers are unchanged. See the full contract, clock
 limitations, examples and CI test plan in [BE-04 test cases](docs/tests/BE-04_test_cases.md).
 
+## Coach Teaching Schedule and Roster (BE-14)
+
+`GET /api/v1/coach/sessions?from=YYYY-MM-DD&to=YYYY-MM-DD` is available to
+COACH and MANAGER. Both inclusive dates are required, with a 62-day maximum;
+the complete array retains past/all statuses and sorts by date/start/id.
+Coaches see their own assignments. Managers can filter by `coachId`, or omit it
+to view all coach-assigned sessions. Counts use actual CONFIRMED bookings.
+
+`GET /api/v1/coach/sessions/{id}/roster` returns only CONFIRMED bookings with
+member code/name/phone, the selected package registration and booking time.
+Coaches require session ownership; managers may also read coachless rosters.
+No scheduling, credit or profile state changes on either read. See the complete
+[BE-14 contract and test cases](docs/tests/BE-14_test_cases.md) for privacy,
+nullable fields, validation and pending SQL Server CI requirements.
+
 ## API Overview
 
 All paths start with `/api/v1`. Send the access token as `Authorization: Bearer <token>`. Access tokens last 15 minutes and refresh tokens last 7 days.
