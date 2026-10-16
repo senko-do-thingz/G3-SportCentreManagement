@@ -42,7 +42,7 @@ erDiagram
 - **One active booking per member per session** via filtered unique index. A member may re-book after cancelling.
 - **Booking covers sessions via sport package.** `package_registration_id` links the booking to the active package.
   Each confirmed booking reserves 1 session from `remaining_sessions`. The legacy `membership_id` is retained as nullable for backward compatibility.
-- **Receptionist assisted booking (F2-11, F2-12).** Receptionists can search members and book confirmed sessions on their behalf (creates a standard `booking` row with `status = 'CONFIRMED'`; source channel is not stored in V10 schema).
+- **Receptionist assisted booking (F2-11, F2-12, BE-13).** RECEPTIONIST and MANAGER can select a member profile and package registration, inspect filtered booking history and advisory BE-11 eligibility, and create a standard CONFIRMED booking through the existing BE-12 transaction. The member remains the beneficiary; the authenticated staff actor is stored in the existing BOOKING_CREATED activity_log event with member/session/package identifiers. There is no booked_by_user_id column and no new migration. Staff attribution, seat reservation and credit consumption commit or roll back together. MEMBER requests with another beneficiary id return 403.
 - **Waitlist does not reserve a seat (Planned).** When a seat opens, the first `WAITING` entry gets an `OFFERED` status with an expiry; accepting creates a booking.
 - **My Bookings tabs** (Upcoming / Past / Cancelled) are derived: `status` plus `session_date` compared to today.
 - **Roster** (F2-15, F2-16) is `booking` rows with `status = 'CONFIRMED'` for a session.

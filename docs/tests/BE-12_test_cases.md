@@ -16,7 +16,7 @@ Local final verification on 2026-10-16: 1,227 backend unit/controller/query test
 | DELETE /api/v1/bookings/{id} | Own booking, member cutoff | Existing staff cancellation permission retained | 403 / 401 |
 | GET /api/v1/bookings/my | Own bookings only | 403 | 403 / 401 |
 
-Existing `/bookings/member/{memberId}`, `/bookings/today/{memberId}` and `/bookings/self-training/attendance` remain staff-only with their original behavior. Attendance acknowledgement still documents its pre-existing Flow 4 persistence limitation. No new staff permission is granted. Inactive or unauthorized actors are rejected by create/cancel/own-list service guards as well as normal HTTP security.
+BE-13 extends `/bookings/member/{memberId}` with staff-only filtering and pagination. Existing `/bookings/today/{memberId}` and `/bookings/self-training/attendance` retain their original staff-only behavior. Attendance acknowledgement still documents its pre-existing Flow 4 persistence limitation. Inactive or unauthorized actors are rejected by create/cancel/own-list service guards as well as normal HTTP security.
 
 Create request:
 
@@ -24,7 +24,7 @@ Create request:
 {"sessionId": 401, "packageRegistrationId": 901}
 ```
 
-`sessionId` is required and positive. A supplied `packageRegistrationId` must be positive. It remains optional for established callers; omission uses deterministic eligible package selection. Existing `memberId` is retained for staff requests. A MEMBER-supplied memberId is ignored and never changes ownership. A foreign selected registration or cancellation returns 403 for a member, without other member details. Staff selecting a registration for the wrong target member receives 400 NO_PACKAGE. Missing session, booking, registration or target profile retains the 404 policy.
+`sessionId` is required and positive. A supplied `packageRegistrationId` must be positive. It remains optional for established member callers; omission uses deterministic eligible package selection. BE-13 requires staff to select both memberId and packageRegistrationId. A MEMBER may omit memberId or supply their own id; BE-13 rejects a different id with 403 before target lookup. A foreign selected registration or cancellation returns 403 for a member, without other member details. Staff selecting a registration for the wrong target member receives 400 NO_PACKAGE. Missing session, booking, registration or target profile retains the 404 policy. See BE-13_test_cases.md for staff history filtering and selected-member eligibility.
 
 POST succeeds with HTTP 201, DELETE with HTTP 200, both returning BookingResponse. GET succeeds with HTTP 200. Existing response fields remain. Added fields: sportId, classId/className, coachId/coachName, facilityId/facilityName, packageId/packageName, cancelledAt, cancelReason and cancelledById. Existing cancelledByName/cancelledByRole remain. No account email, phone, password or private coach metadata is serialized. The historical generated `Cancelled by user: <email>` reason is normalized to `Cancelled by user` in responses.
 

@@ -48,6 +48,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -75,10 +76,22 @@ public class BookingServiceImpl implements BookingService {
         if (request == null) throw rule("Booking request is required", "INVALID_REQUEST");
         requirePositiveId(request.getSessionId(), "Session ID");
         if (request.getPackageRegistrationId() != null) requirePositiveId(request.getPackageRegistrationId(), "Package registration ID");
-        Long targetMemberId = SecurityUtils.isMember(actor) ? actor.getId()
-                : request.getMemberId() != null ? request.getMemberId() : actor.getId();
+        if (SecurityUtils.isMember(actor) && request.getMemberId() != null
+                && !Objects.equals(request.getMemberId(), actor.getId())) {
+            throw new AccessDeniedException("Cannot book for another member");
+        }
+        boolean staff = SecurityUtils.isStaff(actor);
+        if (staff) {
+            requirePositiveId(request.getMemberId(), "Member ID for staff booking");
+            requirePositiveId(request.getPackageRegistrationId(), "Package registration ID for staff booking");
+        }
+        Long targetMemberId = staff ? request.getMemberId() : actor.getId();
         MemberProfile member = memberProfileRepository.findById(targetMemberId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member profile not found for id: " + targetMemberId));
+        if (staff) {
+            validateTargetMember(member, targetMemberId);
+            requireActor(member.getUserAccount(), true);
+        }
 
         // Preserve BE-10/BE-21: session first, booking checks next, then registration mutation.
         ClassSession session = sessionRepository.findForUpdate(request.getSessionId())
@@ -223,7 +236,8 @@ public class BookingServiceImpl implements BookingService {
     @Transactional(readOnly = true)
     public List<BookingResponse> getMyBookings(UserAccount currentUser) {
         requireActor(currentUser, true);
-        return getMemberBookings(currentUser.getId());
+        return bookingRepository.findByMemberIdOrderByBookedAtDesc(currentUser.getId()).stream()
+                .map(this::mapToBookingResponse).collect(Collectors.toList());
     }
 
     @Override
@@ -240,9 +254,7 @@ public class BookingServiceImpl implements BookingService {
     @Transactional(readOnly = true)
     public PageResponse<BookingResponse> getMyBookings(UserAccount actor, BookingWhen when, int page, int size) {
         requireActor(actor, true);
-        if (page < 0 || size < 1 || size > PagingDefaults.MAX_PAGE_SIZE || (long) page * size > Integer.MAX_VALUE) {
-            throw rule("Page must be nonnegative, size between 1 and 100, and page offset within 2147483647", "INVALID_PAGINATION");
-        }
+        validatePage(page, size);
         LocalDateTime now = LocalDateTime.now(clock);
         return PageResponse.from(bookingRepository.findMyBookings(actor.getId(), when == null ? null : when.name(),
                 now.toLocalDate(), now.toLocalTime(), PageRequest.of(page, size, historySort(when))).map(this::mapToBookingResponse));
@@ -256,10 +268,49 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<BookingResponse> getMemberBookings(Long memberId) {
-        return bookingRepository.findByMemberIdOrderByBookedAtDesc(memberId).stream()
-                .map(this::mapToBookingResponse)
-                .collect(Collectors.toList());
+    public List<BookingResponse> getMemberBookings(Long memberId, BookingWhen when, BookingStatus status, UserAccount actor) {
+        requireStaffMember(memberId, actor);
+        LocalDateTime now = LocalDateTime.now(clock);
+        return bookingRepository.findMemberBookings(memberId, when == null ? null : when.name(), status,
+                now.toLocalDate(), now.toLocalTime(), Pageable.unpaged(historySort(when)))
+                .map(this::mapToBookingResponse).getContent();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<BookingResponse> getMemberBookings(Long memberId, BookingWhen when, BookingStatus status,
+            int page, int size, UserAccount actor) {
+        requireActor(actor, false);
+        if (!SecurityUtils.isStaff(actor)) throw new AccessDeniedException("Staff access is required");
+        validatePage(page, size);
+        requireStaffMember(memberId, actor);
+        LocalDateTime now = LocalDateTime.now(clock);
+        return PageResponse.from(bookingRepository.findMemberBookings(memberId, when == null ? null : when.name(), status,
+                now.toLocalDate(), now.toLocalTime(), PageRequest.of(page, size, historySort(when)))
+                .map(this::mapToBookingResponse));
+    }
+
+    private void requireStaffMember(Long memberId, UserAccount actor) {
+        requireActor(actor, false);
+        if (!SecurityUtils.isStaff(actor)) throw new AccessDeniedException("Staff access is required");
+        requirePositiveId(memberId, "Member ID");
+        MemberProfile member = memberProfileRepository.findById(memberId)
+                .orElseThrow(() -> new ResourceNotFoundException("Member profile not found for id: " + memberId));
+        validateTargetMember(member, memberId);
+    }
+
+    private static void validateTargetMember(MemberProfile member, Long memberId) {
+        if (!Objects.equals(member.getId(), memberId) || member.getUserAccount() == null
+                || !Objects.equals(member.getUserAccount().getId(), memberId)
+                || !SecurityUtils.isMember(member.getUserAccount())) {
+            throw new ResourceNotFoundException("Member profile not found for id: " + memberId);
+        }
+    }
+
+    private static void validatePage(int page, int size) {
+        if (page < 0 || size < 1 || size > PagingDefaults.MAX_PAGE_SIZE || (long) page * size > Integer.MAX_VALUE) {
+            throw rule("Page must be nonnegative, size between 1 and 100, and page offset within 2147483647", "INVALID_PAGINATION");
+        }
     }
 
     @Override

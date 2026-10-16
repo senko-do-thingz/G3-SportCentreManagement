@@ -1,4 +1,5 @@
 # Critical SQL Server suites. Use fully qualified project class names.
+com.sportify.catalog.controller.ReceptionBookingIntegrationTest
 com.sportify.catalog.repository.CatalogSchemaIntegrationTest
 com.sportify.catalog.repository.SportPackageSeedMigrationIntegrationTest
 com.sportify.identity.controller.MemberSearchIntegrationTest
