@@ -14,6 +14,7 @@ const STATUS_TONES: Record<string, BadgeTone> = {
   ATTENDED: 'success',
   OPEN: 'info',
   SCHEDULED: 'info',
+  PUBLISHED: 'info',
   REFUNDED: 'info',
   PENDING: 'warning',
   PENDING_PAYMENT: 'warning',

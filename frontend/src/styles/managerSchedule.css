@@ -1,0 +1,13 @@
+.f2-editor-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 24px; align-items: start; }
+.f2-calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; margin-top: 20px; }
+.f2-day { min-width: 0; background: var(--color-surface, #fff); border: 1px solid #dce5ef; border-radius: 12px; padding: 10px; min-height: 220px; }
+.f2-day h3 { font-size: 14px; margin: 0 0 14px; }
+.f2-session { border: 1px solid #bbd9f8; border-left: 4px solid #287ac7; border-radius: 8px; background: #f2f8ff; padding: 10px; margin-bottom: 10px; overflow-wrap: anywhere; }
+.f2-session p { font-size: 12px; margin: 7px 0; }
+.f2-session--cancelled { border-color: #edc5c5; background: #fff7f7; color: #6c5252; }
+.f2-session--cancelled strong { text-decoration: line-through; }
+.f2-session--completed { border-color: #d3d9e2; background: #f6f7f9; }
+.f2-weekdays { display: flex; flex-wrap: wrap; gap: 14px; padding: 12px 0; }
+.f2-conflict { border: 1px solid #efd1b0; border-left: 4px solid #bd671e; border-radius: 8px; padding: 14px; margin: 12px 0; background: #fffaf3; }
+@media (max-width: 1100px) { .f2-calendar { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .f2-calendar, .f2-editor-layout { grid-template-columns: minmax(0, 1fr); } .f2-day { min-height: 100px; } }

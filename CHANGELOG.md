@@ -1,10 +1,65 @@
+## 2026-10-17 - Member Booking and Cancellation Screens (FE-09)
+
+- Add member-only package selection, booking review and confirmation with eligibility revalidation, single-submit protection and calendar export.
+- Add upcoming and past booking history, cancellation cutoff messaging, backend-authoritative cancellation and confirmed cancelled results.
+- Cover coach-led and self-training variants, package credit counts, access guards, empty/error states, duplicate/full conflicts and cutoff failures.
+- Keep FE-06, FE-07 and FE-08 intact. No backend files or endpoints were changed.
+
+## 2026-10-17 - Member Booking API (FE-09)
+
+- Add a typed member booking API client for eligible-package booking, upcoming/past history, and cancellation.
+- Validate booking response shapes and cover endpoint paths, payloads, filters, aborts, and malformed data.
+
+## 2026-10-17 - FE-08 Booking Handoff and Profile Guards
+
+- Route eligible members to FE-09 Booking Options with the selected session ID and validated return path; ineligible and unknown states have no booking link, and FE-08 makes no booking request.
+- Guard the public coach profile against null sports, certifications and upcoming-session collections.
+- Record the user's mobile-layout waiver in the FE-08 verification notes.
+
+## 2026-10-16 - Member Schedule, Search and Session Detail (FE-08)
+
+- Add member-only week/day browsing, server-filtered class-session results with URL state, complete calendar pagination and contextual coach options without staff-only lookups.
+- Add every backend eligibility state, self-training detail without coach requests, safe package recovery links and a lazy public coach-profile modal. Booking remains an explicit later-task boundary; no booking or payment writes.
+- Add isolated read-only member preview scenarios, tests and verification docs. Preserve FE-06/FE-07 and scope receptionist header styles to the staff layout. Desktop review completed; additional mobile work waived by the user, live member API verification pending a running backend.
+
+## 2026-10-16 - Live Scheduling and Coach Discovery Fixes (FE-07)
+
+- Show active coaches before sport selection, explain qualification filtering and add a coach-directory refresh action.
+- Allow explicit known facility IDs when the facility dropdown API returns 404, so the completed scheduling endpoints remain usable. Keep authorization/server failures blocking, retain backend validation and prefill the current facility on edit.
+- Verify real API scheduling with two requested local sample classes, eight published sessions and an exact HTTP 409 overlap response. No backend code, migrations, account creation or SQL writes.
+
+## 2026-10-16 - Manager Class and Schedule Screens (FE-07)
+
+- Add manager-only class search, filters, server pagination, create/edit, qualified coach details and confirmed status changes. Preserve FE-06 manager features.
+- Add a Vietnam-time weekly calendar, single/weekly session creation, exact conflict dialogs with retained drafts, booked-capacity validation, session editing and reason-required cancellation.
+- Extend the opt-in frontend preview without backend writes; add API/date/access/workflow tests and verification documentation. The missing facility-list API is handled by the follow-up known-ID entry fallback. Browser visual checks remain pending due to a local automation launcher failure.
+
+## 2026-10-17 - FE-06 Activity Log Review Fixes
+
+- Connect real manager activity history to the merged BE-04 endpoint and align the frontend response model with ActivityLogResponse, including null-actor fallback and shortDetail.
+- Restrict activity filtering to the backend-supported action codes and update the preview fixture to the same response shape.
+- Refresh FE-06 verification steps for the released API and add authenticated fake-fetch coverage for the real wire contract.
+
+## 2026-10-17 - FE-06 Account Status Filter
+
+- Limit the manager account status filter to ACTIVE and INACTIVE, the only values supported by the backend.
+- Add screen coverage to prevent unsupported status values from returning to the filter.
+
+## 2026-10-17 - FE-06 ASCII Test Sources
+
+- Express accented Latin, Arabic-Indic digit and Vietnamese password test inputs with Unicode escapes so the Unicode behavior remains covered in ASCII-only test source.
+
+## 2026-10-17 - FE-07 Bounded Schedule Class Lookup
+
+- Load schedule class options in cancellable 100-row pages, stop when the view aborts, surface page errors through retry, and reject results above the documented 10,000-class limit.
+- Add pagination, cancellation, page-failure and upper-bound regression coverage.
+
 ## 2026-10-16 - Receptionist Booking for Members (BE-13)
 
 - Extend staff member history with combined when/status filters, SQL pagination, stable ordering and the existing array/PageResponse compatibility. Validate the selected member after staff authorization.
 - Add staff-only selected-member eligibility through the same BE-11 calculation and response, without reserving seats, consuming credits or writing routine audits.
 - Require explicit member/package selection for staff, reject cross-member MEMBER requests with 403, and preserve BE-12 session-first locks, atomic capacity/credit updates and transactional BOOKING_CREATED actor attribution. No migration or new actor field is introduced.
 - Add unit, real security-chain controller, SQL Server-dialect query and dedicated isolated SQL Server integration coverage. Actual SQL Server execution remains required in GitHub CI; see docs/tests/BE-13_test_cases.md.
-
 ## 2026-10-16 - Scheduled Maintenance and Local Document Policy (BE-06)
 
 - Add four daily, Clock-based Vietnam maintenance transitions: overdue pending cards/registrations to CANCELLED and expired ACTIVE cards/registrations to EXPIRED, using guarded bulk updates, committed row counts and idempotency.
