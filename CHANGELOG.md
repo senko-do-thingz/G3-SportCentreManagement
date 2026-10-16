@@ -1,3 +1,10 @@
+## 2026-10-16 - Manager Activity Log (BE-04)
+
+- Add GET /api/v1/manager/activity-logs with MANAGER checks at controller and service, combined actor/action/date/search filters, database pagination and deterministic createdAt/id descending order.
+- Reuse the existing audit schema and writing service unchanged. Project only scalar actor/target/action fields through LEFT joins, with current account name/role, a missing-actor fallback and safe bounded action-derived short detail. Raw summary, JSON metadata, credentials, contacts and IP addresses are not selected, searched or returned.
+- Validate paging, action, literal search and local date/timestamp ranges, including inclusive calendar end dates and overflow-safe year 9999 handling. Document existing offsetless audit clock limitations.
+- Add unit, real security-chain HTTP and required SQL Server integration coverage for filtering/counts, dates, ties, null history, sensitive metadata, bounded queries and audit-write regression. SQL Server execution remains a GitHub CI gate; see docs/tests/BE-04_test_cases.md.
+
 ## 2026-10-16 - Demo Classes and Sessions (BE-15)
 
 - Add opt-in demo V29 after BE-07 V28: six active adult classes covering BADMINTON, SWIMMING, BASKETBALL and all three supported levels, with the existing qualified demo coaches and four appropriate facilities.
