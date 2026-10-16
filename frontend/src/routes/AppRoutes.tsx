@@ -39,6 +39,7 @@ import { ActivityLogPage } from '../pages/manager/ActivityLogPage'
 import { ManagerClassesPage } from '../pages/manager/ManagerClassesPage'
 import { ClassEditorPage } from '../pages/manager/ClassEditorPage'
 import { ManagerSchedulePage } from '../pages/manager/ManagerSchedulePage'
+import { MemberSchedulePage } from '../pages/member/MemberSchedulePage'
 
 /**
  * Real screens by full path. Later tasks register their page here, for example
@@ -56,6 +57,7 @@ const SCREENS: Record<string, ReactNode> = {
   '/member/packages': <SportPackagesPage />,
   '/member/membership': <MyMembershipPage />,
   '/member/payments': <MyPaymentsPage />,
+  '/member/schedule': <MemberSchedulePage />,
   '/reception': <MemberSearchPage />,
   '/reception/register': <RegisterRenewPage />,
   '/reception/check-in': <CheckInPage />,
