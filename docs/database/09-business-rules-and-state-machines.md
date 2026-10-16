@@ -10,8 +10,8 @@ Screens covered: Global logic and flows across all flows.
 stateDiagram-v2
     [*] --> PENDING_PAYMENT : Register Package
     PENDING_PAYMENT --> ACTIVE : Payment Confirmed / Receptionist Activates
-    PENDING_PAYMENT --> CANCELLED : Cancel
-    ACTIVE --> EXPIRED : Daily Job (end_date < TODAY OR remaining_sessions = 0) (Planned)
+    PENDING_PAYMENT --> CANCELLED : Cancel or daily job (creation date more than 7 days old)
+    ACTIVE --> EXPIRED : Daily Job (end_date < business date)
     ACTIVE --> REFUNDED : Manager Approves Refund
     ACTIVE --> CANCELLED : Cancel
 ```
@@ -23,7 +23,7 @@ stateDiagram-v2
     [*] --> ACTIVE : Free STANDARD card / purchase at the desk
     [*] --> PENDING_PAYMENT : Member requests GOLD or VIP online
     PENDING_PAYMENT --> ACTIVE : Receptionist confirms payment
-    PENDING_PAYMENT --> CANCELLED : Member or staff cancels
+    PENDING_PAYMENT --> CANCELLED : Member or staff cancels, or overdue pending daily job
     ACTIVE --> REPLACED : Upgrade to a dearer tier is paid
     ACTIVE --> EXPIRED : Daily Job (end_date < TODAY for Gold/VIP)
 ```
@@ -201,7 +201,10 @@ Front desk check-in validates member arrival at the center:
 | Upgrade pays the difference, old card `REPLACED` | Done |
 | Card and package end date = start + duration - 1 day | Done |
 | One confirmed booking per member and session (`ux_booking_active`) | Done (database) |
-| Cancel unpaid card requests after 7 days | Not done |
+| Cancel unpaid card requests after more than seven calendar days | Done (BE-06; SQL Server CI execution required) |
+| Cancel unpaid package registrations after more than seven calendar days | Done (BE-06; SQL Server CI execution required) |
+| Expire ACTIVE member cards with end_date before the business date | Done (BE-06; null end dates retained) |
+| Expire ACTIVE package registrations with end_date before the business date | Done (BE-06; credits unchanged) |
 | Map `sport_class.coach_id`, `booking.cancelled_by_user_id`, `member_card.payment_id` in entities | Not done |
 | Front desk confirms a card or package payment with the exact amount, invoice issued (BE-18) | Done |
 | Desk sale records a SUCCESS payment and issues the invoice at once (BE-19) | Done |
@@ -297,9 +300,25 @@ BE-12 implements the booking seat increment and guarded seat release in the same
 
 ## Scheduled Jobs
 
-1. **Package Expiration:** Daily at midnight, set packages to `EXPIRED` if `end_date < TODAY` or `remaining_sessions = 0` (Planned). Note: The remaining_sessions = 0 condition conflicts with strict check-in and must be decided before the job is built.
-2. **Card Expiration:** Daily at midnight, set member cards to `EXPIRED` if `end_date < TODAY` (Planned).
-5. **Unpaid Card Requests:** Daily, cancel `PENDING_PAYMENT` member cards older than 7 days (Planned).
-3. **Session Completion:** Hourly, mark sessions as `COMPLETED` when session date and time have passed (Planned).
-4. **Waitlist Expiry:** Hourly, expire offered waitlist entries that exceeded the acceptance window (Planned).
-*(Note: Active scheduled job `MembershipScheduledJobs` currently processes legacy `membership` table transitions only).*
+BE-06 adds four database bulk transitions to the existing `MembershipScheduledJobs.processDailyMemberships` trigger. Implementation and local unit verification are complete; actual SQL Server execution remains required in CI. Round 2 applies the owner-approved lock-and-refresh activation safeguard described below; SQL Server concurrency execution remains a CI requirement.
+
+| Operation | Source | Target | Exclusive condition |
+|---|---|---|---|
+| Unpaid card cancellation | PENDING_PAYMENT | CANCELLED | created_at < start of business day D - 7 |
+| Card expiration | ACTIVE | EXPIRED | end_date < D |
+| Unpaid package registration cancellation | PENDING_PAYMENT | CANCELLED | created_at < start of business day D - 7 |
+| Package registration expiration | ACTIVE | EXPIRED | end_date < D |
+
+- Frequency: daily at midnight, preserving cron `0 0 0 * * ?` and scheduling zone `Asia/Ho_Chi_Minh`. Scheduling is already enabled; there is no second trigger.
+- `ScheduledMaintenanceService` reads the injected Clock instant once and explicitly converts it with `ZoneId.of("Asia/Ho_Chi_Minh")`, even if the supplied Clock has another zone. The resulting local date D and timestamp are shared by all four updates and both legacy membership delegates.
+- Seven days means calendar days. On 2026-10-16, every request created on 2026-10-09 stays pending, including midnight; every request created on 2026-10-08 is cancelled. The exclusive cutoff is 2026-10-09T00:00:00. A rolling 168-hour cutoff is incorrect.
+- Expiration is strict: yesterday expires, today and tomorrow stay ACTIVE. Null card end dates are naturally excluded, including permanent STANDARD cards. A member with no physical STANDARD card stays unchanged. REPLACED cards and EXPIRED/CANCELLED/REFUNDED registrations are excluded by source status. Registration end_date is NOT NULL in the actual schema; no schema change is made.
+- An ACTIVE package with zero credits and an end date today or later remains ACTIVE. Credits alone do not expire it. Updates change only status and updated_at; prices, ownership, validity dates, payments, invoices, bookings, attendance and cancellation history are retained.
+- Each repository method returns the database affected-row count and uses `@Modifying(flushAutomatically=true, clearAutomatically=true)` plus a mandatory transaction. All four execute in one `REQUIRES_NEW` service transaction, in card-cancel, card-expire, registration-cancel, registration-expire order. Failure rolls back all four; no success result escapes a failed commit. The private persistence context avoids clearing a caller's managed entities. Callers' existing snapshots still need refresh before later lifecycle writes.
+- The trigger logs the four returned counts only after the service proxy commits, without member data. BE-06 creates no activity_log rows. The two pre-existing legacy membership delegates retain their separate transactions and existing business audit events; their failure cannot roll back already committed BE-06 maintenance. These legacy events are not BE-06 events.
+- Conditional source-status checks make a second run update zero rows for unchanged input/date. Overlapping application instances rely on SQL Server transaction locks and predicates; no leader election or distributed scheduler lock exists. Lock waits, escalation and deadlock rollback remain possible; database failures propagate, and the next daily trigger retries eligible rows. Manual retries use the same service without changing the clock.
+- Payment integration: confirmation retains its existing payment-first lock. Before checking PENDING_PAYMENT, each card/package activation path now calls EntityManager.refresh(item, PESSIMISTIC_WRITE), reloading even an item already cached by PaymentItemResolver and retaining its write lock through commit. Maintenance-first makes refresh observe CANCELLED and activation reject before financial effects; activation-lock-first makes the waiting maintenance UPDATE recheck its source predicate after ACTIVE commits. A cancellation leaves its payment PENDING; rejected confirmation rolls back without invoice or SUCCESS. The owner explicitly approved this safeguard in BE-06 round two. No payment rules, receipts, prices or audit behavior change. SQL Server interleaving tests remain required and have not run locally.
+- Booking and refund operations retain their existing lock ordering and guarded credit arithmetic. BE-06 never locks sessions, bookings or payments and never restores/debits credits. REFUNDED is outside both update source statuses. Maintenance acquires no payment or session lock after an item update, retaining the existing partial lock orders. Multiple-item locks and escalation can still deadlock; no general deadlock-freedom claim is made.
+- Storage: DATETIME2(0) fields hold offset-free local wall times and DATE fields hold calendar dates. The pending cutoff follows existing local date-filter conventions; maintenance does not cast columns or use database-server time. Historical entity callbacks use JVM local time and SQL defaults use SYSDATETIME; deployment must keep writers on Vietnam wall time. No JVM/database timezone pin is present in the inspected config, and historical offsets cannot be inferred or corrected here.
+
+Session completion and waitlist-offer expiry remain planned, outside BE-06. See [BE-06 tests](../tests/BE-06_test_cases.md) for local evidence and required SQL Server scenarios.

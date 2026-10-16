@@ -22,6 +22,22 @@ import java.util.Optional;
 
 @Repository
 public interface SportPackageRegistrationRepository extends JpaRepository<SportPackageRegistration, Long> {
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Transactional(propagation = Propagation.MANDATORY)
+    @Query("UPDATE SportPackageRegistration r SET r.status = "
+            + "com.sportify.catalog.entity.PackageRegistrationStatus.CANCELLED, r.updatedAt = :now "
+            + "WHERE r.status = com.sportify.catalog.entity.PackageRegistrationStatus.PENDING_PAYMENT "
+            + "AND r.createdAt < :cutoff")
+    int cancelOverduePending(@Param("cutoff") LocalDateTime cutoff, @Param("now") LocalDateTime now);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Transactional(propagation = Propagation.MANDATORY)
+    @Query("UPDATE SportPackageRegistration r SET r.status = "
+            + "com.sportify.catalog.entity.PackageRegistrationStatus.EXPIRED, r.updatedAt = :now "
+            + "WHERE r.status = com.sportify.catalog.entity.PackageRegistrationStatus.ACTIVE "
+            + "AND r.endDate < :today")
+    int expireActive(@Param("today") LocalDate today, @Param("now") LocalDateTime now);
+
     /** Owned matching registrations, including EXPIRED only to explain ineligibility. No per-row lookups. */
     @Query("SELECT r FROM SportPackageRegistration r JOIN FETCH r.sportPackage p JOIN FETCH p.sport "
             + "WHERE r.member.id = :memberId AND p.sport.id = :sportId AND p.trainingFormat = :format "

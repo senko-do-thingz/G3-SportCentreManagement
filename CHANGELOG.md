@@ -1,3 +1,10 @@
+## 2026-10-16 - Scheduled Maintenance and Local Document Policy (BE-06)
+
+- Add four daily, Clock-based Vietnam maintenance transitions: overdue pending cards/registrations to CANCELLED and expired ACTIVE cards/registrations to EXPIRED, using guarded bulk updates, committed row counts and idempotency.
+- Preserve credits, payments, bookings and existing legacy membership processing. Add boundary, scheduler and HQL unit coverage plus SQL Server rollback/concurrency/regression coverage required in CI.
+- Keep AI Audit Log documents local only; remove verified current index entries while preserving local bytes, and ignore their precise naming conventions. Historical revisions are outside scope.
+- Apply the owner-approved activation safeguard: retain the payment-first order, then lock and refresh the card/registration before checking its status. Add stale-state and lock-failure regressions; preserve pricing, receipts and audit behavior. SQL Server execution remains pending CI.
+
 ## 2026-10-16 - Coach Teaching Schedule and Class Roster (BE-14)
 
 - Add GET /api/v1/coach/sessions with authenticated coach ownership, optional manager coachId filtering, all assigned sessions for a manager without that filter, and the existing inclusive 62-day calendar policy. Preserve past and all session statuses, stable date/start/id ordering, and actual CONFIRMED booked counts without cache repairs.
