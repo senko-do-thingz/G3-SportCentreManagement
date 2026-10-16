@@ -19,7 +19,7 @@ Status Legend:
 | Flow 1 - User and membership management/Flow 1 - Manager/F1-02 Overlay - Edit Sport Package.png | F1-02 Overlay - Edit Sport Package | Manager | `sport_package`, `sport`, `sport_package_registration` | Planned: `PUT /api/v1/packages/{id}` | PARTIAL |
 | Flow 1 - User and membership management/Flow 1 - Manager/F1-03 - Membership Cards & Benefits.png | Membership Cards & Benefits | Manager | `membership_card_tier`, `member_card` | `GET /api/v1/membership-cards/tiers`, Planned: `POST /api/v1/membership-cards/tiers`, `PUT /api/v1/membership-cards/tiers/{id}` | PARTIAL |
 | Flow 1 - User and membership management/Flow 1 - Manager/F1-03 Overlay - Edit Membership Card.png | F1-03 Overlay - Edit Membership Card | Manager | `membership_card_tier`, `member_card` | Planned: `PUT /api/v1/membership-cards/tiers/{id}` | PARTIAL |
-| Flow 1 - User and membership management/Flow 1 - Manager/F1-04 - Activity Log.png | Activity Log | Manager | `activity_log`, `user_account` | Audit log query (Planned: `GET /api/v1/activity-logs`) | PARTIAL |
+| Flow 1 - User and membership management/Flow 1 - Manager/F1-04 - Activity Log.png | Activity Log | Manager | `activity_log`, `user_account` | Manager-only audit query (`GET /api/v1/manager/activity-logs`; see BE-04 test cases) | IMPLEMENTED |
 
 ## Flow 1 - User and membership management > Flow 1 - Member
 

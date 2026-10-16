@@ -293,6 +293,20 @@ The original V28-only account replay suite remains targeted to V28; the new full
 suite validates V28 + V29 together, including all seven account logins. SQL Server
 integration execution is required in GitHub CI and is not claimed from local compilation.
 
+## Manager Activity Log (BE-04)
+
+`GET /api/v1/manager/activity-logs` is a read-only MANAGER endpoint. Optional
+`actorId`, `action`, `from`, `to` and `search` filters combine with AND before
+zero-based database pagination (`page=0`, `size=20`, maximum 100). Results sort
+by `createdAt DESC, id DESC` and use the existing PageResponse shape.
+
+Dates accept `YYYY-MM-DD` or local `YYYY-MM-DDTHH:mm:ss` without an offset;
+calendar end dates include the complete final day. Actor names and roles reflect
+current accounts. Responses contain a safe action-derived short detail; free-form
+summary/JSON metadata are neither returned nor searchable. The audit table,
+AuditService and existing writers are unchanged. See the full contract, clock
+limitations, examples and CI test plan in [BE-04 test cases](docs/tests/BE-04_test_cases.md).
+
 ## API Overview
 
 All paths start with `/api/v1`. Send the access token as `Authorization: Bearer <token>`. Access tokens last 15 minutes and refresh tokens last 7 days.
