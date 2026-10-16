@@ -60,6 +60,18 @@ describe('FE-00 login integration', () => {
     expect(tokenStorage.hasSession()).toBe(false)
   })
 
+  it('reports a session change during login without calling it a network failure', async () => {
+    const pending = deferred<Response>()
+    installFakeFetch(() => pending.promise)
+    renderApp('/login')
+    await submitLogin()
+    act(() => tokenStorage.markExternalSessionChange())
+    await act(async () => pending.resolve(json(200, PAIR)))
+    expect(await screen.findByRole('alert')).toHaveTextContent('The signed in account changed')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('Cannot reach the server')
+    expect(tokenStorage.hasSession()).toBe(false)
+  })
+
   it.each([
     [401, 'Your session has expired'],
     [403, 'access to your account profile was denied'],

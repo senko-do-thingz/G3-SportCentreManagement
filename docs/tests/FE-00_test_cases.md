@@ -14,7 +14,7 @@ New deterministic coverage:
 | src/auth/auth.maintenance.test.tsx | All four role layouts and Bearer profile requests, credential versus profile rejection, recoverable profile failures and Retry, safe diagnostics, malformed token/profile JSON, late login and profile ownership |
 | src/api/client.maintenance.test.ts | Response-body ownership, preventing retry under a new account, recoverable network/server/malformed refresh responses |
 
-Executed from frontend on Windows PowerShell: npm ci (exit 0, 0 reported vulnerabilities), npm run lint (exit 0), npm test (614 passed in 30 files, including 46 new tests), and npm run build (exit 0). Existing guard, reload, logout, remember-me, registration, single-flight refresh, bounded retry, refresh rejection and cross-tab suites remain passing.
+Executed from frontend on Windows PowerShell: npm ci (exit 0, 0 reported vulnerabilities), npm run lint (exit 0), npm test (615 passed in 30 files, including 47 new tests), and npm run build (exit 0). The final review adds a stale-login diagnostic regression. Existing guard, reload, logout, remember-me, registration, single-flight refresh, bounded retry, refresh rejection and cross-tab suites remain passing.
 
 Real-browser checks were not executed: the browser inventory was empty, and both iab and chrome creation reported that the browser was unavailable. A PowerShell OPTIONS request to /api/v1/users/me returned 200 with the allowed localhost:5173 origin and authorization header; this is API evidence, not proof of a browser CORS or login pass. Before acceptance, use the manual checks below with the real frontend and backend and record actual Network and Console results. Keep the task In progress until those checks pass.
 

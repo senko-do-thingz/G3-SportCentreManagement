@@ -49,7 +49,7 @@ function loginErrorMessage(error: unknown): string {
     if (error.status === 403) {
       return ACCOUNT_DISABLED_MESSAGE
     }
-    if (error.status === 0) {
+    if (error.isNetworkError) {
       return 'Cannot reach the server. Check your connection and API URL; a browser CORS restriction may also block the request.'
     }
     if (error.status >= 500) {
