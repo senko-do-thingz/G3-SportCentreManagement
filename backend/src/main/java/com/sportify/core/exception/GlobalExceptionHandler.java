@@ -31,6 +31,11 @@ public class GlobalExceptionHandler {
     /** Same value as PaymentRefundService.CODE_PAYMENT_ALREADY_REFUNDED; core does not depend on the payment module. */
     private static final String DUPLICATE_REFUND_CODE = "PAYMENT_ALREADY_REFUNDED";
 
+    @ExceptionHandler(FieldValidationException.class)
+    public ResponseEntity<Map<String, Object>> handleFieldValidation(FieldValidationException ex) {
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), ex.getDetails());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();
