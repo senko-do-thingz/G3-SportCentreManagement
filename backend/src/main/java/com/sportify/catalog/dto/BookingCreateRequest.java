@@ -11,6 +11,7 @@ import lombok.*;
 @Builder
 public class BookingCreateRequest {
 
+    @Positive(message = "Member ID must be positive")
     private Long memberId;
 
     @NotNull(message = "Session ID is required")

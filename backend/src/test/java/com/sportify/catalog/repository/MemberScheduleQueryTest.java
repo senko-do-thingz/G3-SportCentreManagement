@@ -107,4 +107,23 @@ class MemberScheduleQueryTest {
             }
         }
     }
+
+    @Test void staffHistoryContentAndCountBindIdenticalCombinedFilters() throws Exception {
+        var annotation = BookingRepository.class.getMethod("findMemberBookings", Long.class, String.class,
+                com.sportify.catalog.entity.BookingStatus.class, LocalDate.class, java.time.LocalTime.class,
+                org.springframework.data.domain.Pageable.class).getAnnotation(Query.class);
+        try (var session = factory.openSession()) {
+            for (String period : new String[]{null, "UPCOMING", "PAST"}) {
+                for (var status : new com.sportify.catalog.entity.BookingStatus[]{null,
+                        com.sportify.catalog.entity.BookingStatus.CONFIRMED, com.sportify.catalog.entity.BookingStatus.CANCELLED}) {
+                    for (String hql : new String[]{annotation.value(), annotation.countQuery()}) {
+                        var query = session.createQuery(hql);
+                        query.setParameter("memberId", 2L).setParameter("period", period).setParameter("status", status)
+                                .setParameter("today", TODAY).setParameter("now", NOW);
+                        assertThat(query.getParameters()).hasSize(5);
+                    }
+                }
+            }
+        }
+    }
 }
