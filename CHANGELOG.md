@@ -9,6 +9,10 @@
 - Limit the manager account status filter to ACTIVE and INACTIVE, the only values supported by the backend.
 - Add screen coverage to prevent unsupported status values from returning to the filter.
 
+## 2026-10-17 - FE-06 ASCII Test Sources
+
+- Express accented Latin, Arabic-Indic digit and Vietnamese password test inputs with Unicode escapes so the Unicode behavior remains covered in ASCII-only test source.
+
 ## 2026-10-16 - Scheduled Maintenance and Local Document Policy (BE-06)
 
 - Add four daily, Clock-based Vietnam maintenance transitions: overdue pending cards/registrations to CANCELLED and expired ACTIVE cards/registrations to EXPIRED, using guarded bulk updates, committed row counts and idempotency.
