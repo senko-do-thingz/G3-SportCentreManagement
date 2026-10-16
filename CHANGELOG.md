@@ -1,3 +1,9 @@
+## 2026-10-17 - Coach Teaching Schedule and Roster (FE-10)
+
+- Add a coach-only weekly teaching schedule, assigned-session roster selection and printable confirmed-member list.
+- Restrict roster lookup to sessions returned by the signed-in coach's schedule and omit member phone numbers from the UI.
+- Show only fields available from the BE-14 response; member level and goal are not provided by that API. No backend files or endpoints were changed.
+
 ## 2026-10-17 - Receptionist Booking Workflow (FE-10)
 
 - Add receptionist member search, paginated upcoming/past booking history, backend-confirmed cancellation, assisted session/package booking with member-specific eligibility, and booking confirmation routes.

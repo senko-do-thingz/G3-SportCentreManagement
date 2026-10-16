@@ -45,6 +45,7 @@ import { SessionDetailPage } from '../pages/member/SessionDetailPage'
 import { BookingConfirmedPage, BookingOptionsPage, BookingReviewPage } from '../pages/member/BookingCreationPages'
 import { BookingCancelledPage, BookingCancellationPage, MemberBookingsPage } from '../pages/member/MemberBookingsPages'
 import { ReceptionBookingConfirmedPage, ReceptionBookingsPage, ReceptionAssistedBookingPage } from '../pages/reception/ReceptionBookingsPage'
+import { CoachRosterPage, CoachTeachingSchedulePage } from '../pages/coach/CoachSchedulePages'
 
 /**
  * Real screens by full path. Later tasks register their page here, for example
@@ -69,6 +70,8 @@ const SCREENS: Record<string, ReactNode> = {
   '/reception/check-in': <CheckInPage />,
   '/reception/payments': <PaymentRequestsPage />,
   '/reception/refunds': <RefundRequestsPage />,
+  '/coach': <CoachTeachingSchedulePage />,
+  '/coach/roster': <CoachRosterPage />,
 }
 
 /**
