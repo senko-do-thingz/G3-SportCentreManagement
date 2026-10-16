@@ -403,12 +403,14 @@ class BookingRulesIntegrationTest extends AbstractIntegrationTest {
         assertThat(balance(usable)).isEqualTo(2);
     }
 
-    @Test void foreignRegistrationAndCancellationAre403AndClientMemberIdNeverChangesOwnership() throws Exception {
+    @Test void foreignRegistrationBeneficiaryAndCancellationAre403WithoutChangingOwnership() throws Exception {
         long session = session(), regA = registration(memberA), regB = registration(memberB);
         var foreign = postBooking(memberA, session, regB);
         assertThat(foreign.status()).isEqualTo(403); assertThat(seats(session)).isZero(); assertThat(balance(regB)).isEqualTo(3);
         var spoofed = request(session, regA); spoofed.setMemberId(memberB.getId());
-        var created = http(post("/api/v1/bookings").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(spoofed)), memberA);
+        var denied = http(post("/api/v1/bookings").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(spoofed)), memberA);
+        assertThat(denied.status()).isEqualTo(403); assertThat(seats(session)).isZero(); assertThat(balance(regA)).isEqualTo(3);
+        var created = postBooking(memberA, session, regA);
         assertThat(created.status()).isEqualTo(201); assertThat(created.body().path("memberId").asLong()).isEqualTo(memberA.getId());
         long booking = created.body().path("id").asLong();
         assertThat(http(delete("/api/v1/bookings/" + booking), memberB).status()).isEqualTo(403);
