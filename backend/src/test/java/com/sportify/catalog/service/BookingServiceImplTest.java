@@ -314,31 +314,15 @@ public class BookingServiceImplTest {
     }
 
     @Test
-    void createBooking_AsMember_IgnoresSpoofedMemberIdAndEnforcesActorId() {
+    void createBooking_AsMember_RejectsSpoofedMemberIdBeforeLoadingTarget() {
         BookingCreateRequest req = BookingCreateRequest.builder()
                 .memberId(999L) // Spoofed member ID
                 .sessionId(20L)
                 .packageRegistrationId(50L)
                 .build();
 
-        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
-        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
-        when(bookingRepository.findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED))
-                .thenReturn(Optional.empty());
-        when(registrationRepository.findById(50L)).thenReturn(Optional.of(packageReg));
-        when(registrationRepository.consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class))).thenReturn(1);
-        when(bookingRepository.getNextBookingCodeSequence()).thenReturn(2L);
-        when(codeFormatter.formatBookingCode(2L)).thenReturn("BKG-002");
-        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> {
-            Booking b = i.getArgument(0);
-            b.setId(2L);
-            return b;
-        });
-
-        BookingResponse res = bookingService.createBooking(req, memberUser);
-
-        assertNotNull(res);
-        assertEquals(100L, res.getMemberId()); // Enforced 100L
+        assertThrows(AccessDeniedException.class, () -> bookingService.createBooking(req, memberUser));
+        verifyNoInteractions(memberProfileRepository, sessionRepository, registrationRepository, bookingRepository, auditService);
     }
 
     @Test
