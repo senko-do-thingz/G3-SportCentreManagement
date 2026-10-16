@@ -1,3 +1,9 @@
+## 2026-10-17 - Receptionist and Coach API Foundation (FE-10)
+
+- Add validated receptionist member booking history, member-specific eligibility and explicit assisted booking requests.
+- Add owner-scoped coach schedule and confirmed roster readers with the backend date-range limit; retain roster phone data only in the typed response and never render it.
+- Add focused API contract tests. No backend files or endpoints were changed.
+
 ## 2026-10-17 - Member Booking and Cancellation Screens (FE-09)
 
 - Add member-only package selection, booking review and confirmation with eligibility revalidation, single-submit protection and calendar export.

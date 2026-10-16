@@ -77,12 +77,33 @@ async function all(query: Omit<SessionQuery, 'page' | 'size'>, signal?: AbortSig
 }
 
 async function detail(id: number, signal?: AbortSignal): Promise<SessionDetail> {
-  const value = await api.get<SessionDetail>(`/sessions/${id}`, { signal })
-  const session = value?.session
-  if (!session || !Number.isSafeInteger(session.id) || session.id <= 0
+  const value = await api.get<unknown>(`/sessions/${id}`, { signal })
+  return asSessionDetail(value)
+}
+
+async function eligibilityForMember(id: number, memberId: number, signal?: AbortSignal): Promise<SessionDetail> {
+  if (!Number.isSafeInteger(id) || id <= 0 || !Number.isSafeInteger(memberId) || memberId <= 0) {
+    throw new ApiError(0, 'Choose a valid member and session.')
+  }
+  const value = await api.get<unknown>(`/sessions/${id}/eligibility`, { query: { memberId }, signal })
+  const detail = asSessionDetail(value)
+  if (detail.memberContext !== true) throw new ApiError(0, 'Member eligibility could not be confirmed. Refresh and try again.')
+  return detail
+}
+
+function asSessionDetail(value: unknown): SessionDetail {
+  const detail = value as SessionDetail | null
+  const session = detail?.session
+  if (!detail || typeof detail !== 'object' || !session || !Number.isSafeInteger(session.id) || session.id <= 0
+    || typeof detail.memberContext !== 'boolean'
+    || ![null, true, false].includes(detail.alreadyBooked)
+    || ![null, true, false].includes(detail.eligible)
+    || !(detail.bookingStatus === null || typeof detail.bookingStatus === 'string')
+    || !(detail.reason === null || typeof detail.reason === 'string')
+    || !Array.isArray(detail.suitableRegistrations)
     || !['sportName', 'sessionDate', 'startTime', 'endTime'].every((key) => typeof session[key as keyof BrowseSession] === 'string')
     || !['COACH_LED', 'SELF_TRAINING'].includes(session.trainingFormat)
     || ![session.capacity, session.bookedCount, session.freeSeats].every((number) => Number.isFinite(number))) throw new ApiError(0, 'Session details could not be read. Refresh availability and try again.')
-  return value
+  return detail as SessionDetail
 }
-export const memberSessionsApi = { list, all, detail }
+export const memberSessionsApi = { list, all, detail, eligibilityForMember }

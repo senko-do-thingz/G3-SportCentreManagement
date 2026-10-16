@@ -15,9 +15,22 @@ describe('member session read API', () => {
   })
   it('gets eligibility from detail and propagates abort signals', async () => {
     const signal = new AbortController().signal
-    vi.mocked(api.get).mockResolvedValueOnce({ session: { id: 5, sportName: 'Basketball', sessionDate: '2026-10-16', startTime: '09:00', endTime: '10:00', trainingFormat: 'COACH_LED', capacity: 20, bookedCount: 0, freeSeats: 20 } })
+    vi.mocked(api.get).mockResolvedValueOnce({ session: { id: 5, sportName: 'Basketball', sessionDate: '2026-10-16', startTime: '09:00', endTime: '10:00', trainingFormat: 'COACH_LED', capacity: 20, bookedCount: 0, freeSeats: 20 }, memberContext: false, bookingStatus: null, alreadyBooked: null, eligible: null, reason: null, suitableRegistrations: [] })
     await memberSessionsApi.detail(5, signal)
     expect(api.get).toHaveBeenCalledWith('/sessions/5', { signal })
+  })
+  it('checks eligibility for the selected member and rejects a non-member response', async () => {
+    const signal = new AbortController().signal
+    vi.mocked(api.get).mockResolvedValueOnce({ session: { id: 5, sportName: 'Basketball', sessionDate: '2026-10-16', startTime: '09:00', endTime: '10:00', trainingFormat: 'COACH_LED', capacity: 20, bookedCount: 0, freeSeats: 20 }, memberContext: true, bookingStatus: null, alreadyBooked: false, eligible: false, reason: 'NO_PACKAGE', suitableRegistrations: [] })
+    await expect(memberSessionsApi.eligibilityForMember(5, 8, signal)).resolves.toMatchObject({ memberContext: true, eligible: false })
+    expect(api.get).toHaveBeenCalledWith('/sessions/5/eligibility', { query: { memberId: 8 }, signal })
+    vi.mocked(api.get).mockResolvedValueOnce({ session: { id: 5, sportName: 'Basketball', sessionDate: '2026-10-16', startTime: '09:00', endTime: '10:00', trainingFormat: 'COACH_LED', capacity: 20, bookedCount: 0, freeSeats: 20 }, memberContext: false, bookingStatus: null, alreadyBooked: null, eligible: null, reason: null, suitableRegistrations: [] })
+    await expect(memberSessionsApi.eligibilityForMember(5, 8)).rejects.toThrow('Member eligibility could not be confirmed')
+  })
+  it('does not issue eligibility requests for invalid member or session IDs', async () => {
+    await expect(memberSessionsApi.eligibilityForMember(0, 8)).rejects.toThrow('valid member and session')
+    await expect(memberSessionsApi.eligibilityForMember(5, 0)).rejects.toThrow('valid member and session')
+    expect(api.get).not.toHaveBeenCalled()
   })
   it('rejects incomplete detail payloads instead of crashing the screen', async () => {
     vi.mocked(api.get).mockResolvedValueOnce({ eligible: true })

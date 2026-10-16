@@ -47,7 +47,7 @@ function isNullableString(value: unknown): value is string | null {
   return value === null || typeof value === 'string'
 }
 
-function asBooking(value: unknown): MemberBookingRecord {
+export function parseMemberBooking(value: unknown): MemberBookingRecord {
   if (!value || typeof value !== 'object') throw new ApiError(0, UNEXPECTED_BOOKING_RESPONSE)
   const booking = value as Partial<MemberBookingRecord>
   if (!Number.isSafeInteger(booking.id) || (booking.id ?? 0) <= 0
@@ -60,22 +60,22 @@ function asBooking(value: unknown): MemberBookingRecord {
   return booking as MemberBookingRecord
 }
 
-function asBookings(value: unknown): MemberBookingRecord[] {
+export function parseMemberBookings(value: unknown): MemberBookingRecord[] {
   if (!Array.isArray(value)) throw new ApiError(0, UNEXPECTED_BOOKING_RESPONSE)
-  return value.map(asBooking)
+  return value.map(parseMemberBooking)
 }
 
 async function my(when: BookingWhen, signal?: AbortSignal): Promise<MemberBookingRecord[]> {
-  return asBookings(await api.get<unknown>('/bookings/my', { query: { when }, signal }))
+  return parseMemberBookings(await api.get<unknown>('/bookings/my', { query: { when }, signal }))
 }
 
 async function create(request: CreateMemberBookingRequest): Promise<MemberBookingRecord> {
-  return asBooking(await api.post<unknown>('/bookings', request))
+  return parseMemberBooking(await api.post<unknown>('/bookings', request))
 }
 
 async function cancel(id: number): Promise<MemberBookingRecord> {
   if (!Number.isSafeInteger(id) || id <= 0) throw new ApiError(0, 'Choose a valid booking.')
-  return asBooking(await api.delete<unknown>(`/bookings/${id}`))
+  return parseMemberBooking(await api.delete<unknown>(`/bookings/${id}`))
 }
 
 export const memberBookingsApi = { my, create, cancel }
