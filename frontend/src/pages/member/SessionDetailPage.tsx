@@ -39,6 +39,7 @@ function SessionDetailContent({ id, returnTo }: { id: number; returnTo: string }
   const self = session.trainingFormat === 'SELF_TRAINING'
   const packageState = ['NO_PACKAGE', 'NO_SESSIONS_LEFT', 'PACKAGE_EXPIRED_BY_THEN', 'PACKAGE_NOT_STARTED_BY_THEN'].includes(state)
   const packageLink = `/member/packages?${new URLSearchParams({ sport: String(session.sportId), format: session.trainingFormat })}`
+  const bookingLink = `/member/bookings/new?${new URLSearchParams({ sessionId: String(session.id), returnTo })}`
   return <div className="page browse-page">
     <MemberScheduleNav />
     <PageHeader eyebrow="Member / Classes & schedule" title={state === 'ELIGIBLE' && self ? 'Session Detail - Self-training' : copy.title} description="Choose a session before selecting your sport package. Times use Vietnam time (UTC+7)." />
@@ -53,7 +54,7 @@ function SessionDetailContent({ id, returnTo }: { id: number; returnTo: string }
         {self ? <><dl className="browse-facts"><div><dt>Sport</dt><dd>{session.sportName}</dd></div><div><dt>Format</dt><dd>Self-training</dd></div><div><dt>Facility</dt><dd>{session.facilityName || 'Not provided'}</dd></div></dl><p className="browse-callout">Practice independently using a self-training sport package. Coach-led sessions need a separate matching package.</p></> : <><div className="browse-avatar" aria-hidden="true">{(session.coachName || '?').split(' ').filter(Boolean).slice(0, 2).map((name) => name[0]).join('')}</div><h3>{session.coachName || 'Coach not provided'}</h3>{session.coachId && <Button variant="secondary" onClick={() => setProfileOpen(true)}>View coach profile</Button>}</>}
         <div className="browse-eligibility" role="status"><Badge tone={state === 'ELIGIBLE' ? 'success' : state === 'FULL' ? 'warning' : 'info'}>{state === 'ELIGIBLE' ? 'Eligible' : state === 'FULL' ? 'Fully booked' : copy.title}</Badge><p>{copy.message}</p>
           {packageState && <Link className={buttonClassName()} to={packageLink}>View suitable sport packages</Link>}
-          {state === 'ELIGIBLE' && <><p className="notice notice--info">Booking options are coming in the next booking task. No booking has been created.</p><Button disabled>Book session (coming soon)</Button></>}
+          {state === 'ELIGIBLE' && <><p className="notice notice--info">Continue to choose an eligible package and review this booking. No booking has been created yet.</p><Link className={buttonClassName()} to={bookingLink}>Book session</Link></>}
           <Link className={buttonClassName('secondary')} to={returnTo}>Find another class</Link>
         </div>
       </Card>

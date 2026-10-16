@@ -1,3 +1,9 @@
+## 2026-10-17 - FE-08 Booking Handoff and Profile Guards
+
+- Route eligible members to FE-09 Booking Options with the selected session ID and validated return path; ineligible and unknown states have no booking link, and FE-08 makes no booking request.
+- Guard the public coach profile against null sports, certifications and upcoming-session collections.
+- Record the user's mobile-layout waiver in the FE-08 verification notes.
+
 ## 2026-10-16 - Member Schedule, Search and Session Detail (FE-08)
 
 - Add member-only week/day browsing, server-filtered class-session results with URL state, complete calendar pagination and contextual coach options without staff-only lookups.

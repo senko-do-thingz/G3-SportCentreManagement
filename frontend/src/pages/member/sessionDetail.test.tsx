@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BrowseSession, EligibilityReason, SessionDetail } from '../../api/memberSessionsApi'
-import { coachProfilesApi } from '../../api/coachProfilesApi'
+import { coachProfilesApi, type CoachProfile } from '../../api/coachProfilesApi'
 import { ApiError } from '../../api/errors'
 import { tokenStorage } from '../../api/tokenStorage'
 import { renderApp } from '../../test/renderApp'
@@ -25,17 +25,24 @@ describe('FE-08 session detail', () => {
     const api = backend({ ...detail, eligible: false, reason, suitableRegistrations: [] })
     renderApp('/member/sessions/5?returnTo=%2Fmember%2Fclasses%3Flevel%3DBEGINNER')
     expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Book session/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Book session' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to results' })).toHaveAttribute('href', '/member/classes?level=BEGINNER')
     if (reason === 'NO_PACKAGE' || reason === 'NO_SESSIONS_LEFT') expect(screen.getByRole('link', { name: 'View suitable sport packages' })).toHaveAttribute('href', '/member/packages?sport=3&format=COACH_LED')
     expect(api.calls.every((call) => call.method === 'GET')).toBe(true)
   })
-  it('provides an honest booking boundary rather than a dead link or booking mutation', async () => {
+  it('routes eligible members to FE-09 with session and return context without creating a booking', async () => {
     const api = backend()
-    renderApp('/member/sessions/5')
-    expect(await screen.findByRole('button', { name: 'Book session (coming soon)' })).toBeDisabled()
+    renderApp('/member/sessions/5?returnTo=%2Fmember%2Fclasses%3Flevel%3DBEGINNER')
+    expect(await screen.findByRole('link', { name: 'Book session' })).toHaveAttribute('href', '/member/bookings/new?sessionId=5&returnTo=%2Fmember%2Fclasses%3Flevel%3DBEGINNER')
     expect(screen.getByText(/No booking has been created/)).toBeInTheDocument()
-    expect(api.calls.some((call) => call.path.startsWith('/coaches'))).toBe(false)
+    expect(api.calls.every((call) => call.method === 'GET')).toBe(true)
+    expect(api.calls.some((call) => call.path.startsWith('/bookings'))).toBe(false)
+  })
+  it('does not offer a booking handoff when eligibility is unknown', async () => {
+    backend({ ...detail, memberContext: false })
+    renderApp('/member/sessions/5')
+    expect(await screen.findByRole('heading', { name: 'Eligibility Cannot Be Confirmed' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Book session' })).not.toBeInTheDocument()
   })
   it('hides coach UI and never requests a profile for self-training even with a coach ID', async () => {
     const api = backend({ ...detail, session: { ...session, trainingFormat: 'SELF_TRAINING' }, suitableRegistrations: [{ ...detail.suitableRegistrations[0], trainingFormat: 'SELF_TRAINING' }] })
@@ -77,6 +84,18 @@ describe('FE-08 session detail', () => {
     expect(await screen.findByText('Coach profile is unavailable')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Close profile' }))
     expect(screen.getByRole('heading', { name: 'Basketball Foundations' })).toBeInTheDocument()
+  })
+  it('renders the public profile when optional collection fields are null', async () => {
+    backend()
+    const nullCollections = { id: 3, name: 'Quan Coach', headline: null, bio: null, yearsExperience: null, specialties: null, sports: null, certifications: null, upcomingSessions: null } as unknown as CoachProfile
+    vi.spyOn(coachProfilesApi, 'get').mockResolvedValueOnce(nullCollections)
+    const user = userEvent.setup()
+    renderApp('/member/sessions/5')
+    await user.click(await screen.findByRole('button', { name: 'View coach profile' }))
+    const modal = screen.getByRole('dialog', { name: 'Coach Profile' })
+    expect(await within(modal).findByText('Sports: Not provided')).toBeInTheDocument()
+    expect(within(modal).getByText('No certifications listed.')).toBeInTheDocument()
+    expect(within(modal).getByText('No upcoming sessions.')).toBeInTheDocument()
   })
   it.each(['/member/schedule', '/member/classes', '/member/sessions/5'])('guards %s from anonymous users', async (path) => {
     tokenStorage.clear()

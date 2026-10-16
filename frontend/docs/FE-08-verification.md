@@ -1,7 +1,7 @@
 # FE-08 - Member browsing verification
 
-Date: 2026-10-16. Working project: `E:\SWP391_SS2\Project\V1\G3-SportCentreManagement-main`.
-Branch: `feat/f2-member-browse`, based on FE-07 commit `72f5649` because FE-06/FE-07 are not merged into main. No main merge, backend code/config/migration changes, SQL writes or new live data were performed.
+Date: 2026-10-17. Working project: `E:\SWP391_SS2\Project\V1\G3-SportCentreManagement-main`.
+Branch: `feat/f2-member-browse`. Latest `origin/main` (`91c1f29`) is merged through `c77b831`; updated FE-06 and FE-07 work is merged through `6094342`. Backend files match `origin/main`; all follow-up changes are frontend-only. No SQL writes or new live data were performed.
 
 ## Delivered screens
 
@@ -16,9 +16,9 @@ All routes use the existing MEMBER role guard and member layout. Anonymous users
 
 ## Explicit scope boundaries
 
-- Booking creation/review/confirmation and My Bookings are not FE-08. There is no implemented F2-07 frontend route in this checkout. Eligible detail shows a disabled `Book session (coming soon)` action and explains that no booking was created. It does not link to a nonexistent route or POST a booking.
+- FE-08 does not create or review bookings. For an eligible member only, `Book session` navigates to the FE-09 Booking Options route `/member/bookings/new?sessionId={id}&returnTo={path}`. The validated return context is preserved. FE-09 owns that route and all booking requests; FE-08 never calls `POST /bookings`.
 - Package recovery links use the existing catalog query keys, for example `/member/packages?sport=3&format=COACH_LED`. They do not create registrations or payments. Returning through a later purchase flow is not implemented here.
-- The user explicitly waived further mobile-layout work during this task. Desktop is the final verification target. A pre-waiver 375px check identified and fixed a shared header overflow, but this is not a full mobile acceptance sign-off.
+- Owner waiver recorded in this task thread on 2026-10-17: the user explicitly said to skip the mobile layout. No 375px visual acceptance check is claimed. A pre-waiver viewport check identified and fixed a shared header overflow, but that was not full mobile QA.
 
 ## API use and contracts
 
@@ -43,7 +43,7 @@ Date-only values use UTC calendar arithmetic, while today is derived explicitly 
 | PACKAGE_NOT_STARTED_BY_THEN | Package starts after this session |
 | ALREADY_BOOKED | Already booked, no duplicate booking action |
 | CAPACITY_UNAVAILABLE | Availability cannot be confirmed, not a false full badge |
-| Eligible member snapshot | Normal detail and explicit booking-task boundary |
+| Eligible member snapshot | `Book session` handoff to FE-09 with session ID and safe return path; no booking is submitted |
 | Unknown/incomplete eligibility or staff context | Cannot confirm eligibility; no Book |
 | HTTP 404 | Session unavailable, not an invented package reason |
 
@@ -112,6 +112,6 @@ Manual follow-up for a running backend:
 2. Confirm a real member's eligible/no-package/full/already-booked responses select the expected view; do not alter migrations or fabricate eligibility in live mode.
 3. Open/close a public coach profile with keyboard. Check unavailable profile handling and that self-training has no profile request.
 4. Change the browser timezone to a zone ahead of Vietnam and confirm date-only labels remain unchanged. Automated date tests already cover center midnight and year rollover; full browser timezone testing is still pending.
-5. Integrate the Book handoff only when the later booking task supplies a real route and revalidates at submit.
+5. When FE-09 is integrated, confirm it registers `/member/bookings/new`, reads `sessionId` and `returnTo`, and revalidates eligibility at submit. Booking writes remain exclusively in FE-09.
 
 Plans and the local audit row remain ignored. No force-add, push or PR creation is part of this implementation turn.
