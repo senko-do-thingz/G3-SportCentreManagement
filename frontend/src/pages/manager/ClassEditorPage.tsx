@@ -32,7 +32,7 @@ function ClassForm({ item, lookups }: { item: ManagerClass | null; lookups: Awai
   const ref = useRef<HTMLFormElement>(null)
   const savedId = useRef<number | null>(null)
   const [draft, setDraft] = useState({ name: item?.name ?? '', sportId: item ? String(item.sportId) : '', ageGroupId: item ? String(item.ageGroupId) : '', level: item?.level ?? 'BEGINNER', coachId: item ? String(item.coachId) : '', maxMembers: String(item?.maxMembers ?? 20) })
-  const coachLoader = useCallback((signal: AbortSignal) => draft.sportId ? managerClassesApi.coaches(Number(draft.sportId), signal) : Promise.resolve([]), [draft.sportId])
+  const coachLoader = useCallback((signal: AbortSignal) => managerClassesApi.coaches(draft.sportId ? Number(draft.sportId) : undefined, signal), [draft.sportId])
   const [coaches, retryCoaches] = useResource(coachLoader)
   const profileLoader = useCallback((signal: AbortSignal) => draft.coachId ? api.get<CoachProfile>(`/coaches/${draft.coachId}`, { signal }) : Promise.resolve(null), [draft.coachId])
   const [profile, retryProfile] = useResource(profileLoader)
@@ -61,10 +61,11 @@ function ClassForm({ item, lookups }: { item: ManagerClass | null; lookups: Awai
             <Select label="Sport" name="sportId" placeholder="Choose a sport" value={draft.sportId} options={lookups.sports.map((sport) => ({ value: String(sport.id), label: sport.name }))} onChange={(event) => change('sportId', event.target.value)} disabled={Boolean(item?.upcomingSessions)} error={form.errors.sportId} hint={item?.upcomingSessions ? 'Sport cannot change while upcoming sessions exist.' : undefined} required />
             <Select label="Age group" name="ageGroupId" placeholder="Choose an age group" value={draft.ageGroupId} options={lookups.ages.map((age) => ({ value: String(age.id), label: age.label }))} onChange={(event) => change('ageGroupId', event.target.value)} error={form.errors.ageGroupId} required />
             <Select label="Level" name="level" value={draft.level} options={levelOptions} onChange={(event) => change('level', event.target.value)} error={form.errors.level} required />
-            <Select label="Coach" name="coachId" placeholder={coaches.status === 'loading' ? 'Loading coaches...' : 'Choose a qualified coach'} value={draft.coachId} options={coaches.status === 'ready' ? coaches.data.map((coach) => ({ value: String(coach.id), label: coach.fullName })) : []} onChange={(event) => change('coachId', event.target.value)} error={form.errors.coachId} disabled={coaches.status !== 'ready'} required />
+            <Select label="Coach" name="coachId" placeholder={coaches.status === 'loading' ? 'Loading coaches...' : coaches.status === 'ready' && !coaches.data.length ? 'No qualified coaches available' : draft.sportId ? 'Choose a qualified coach' : 'Choose a coach'} value={draft.coachId} options={coaches.status === 'ready' ? coaches.data.map((coach) => ({ value: String(coach.id), label: coach.fullName })) : []} onChange={(event) => change('coachId', event.target.value)} error={form.errors.coachId} hint={draft.sportId ? 'Only active coaches qualified for the selected sport are listed.' : 'Choose a sport to filter coaches by qualification.'} disabled={coaches.status !== 'ready'} required />
             <Input label="Maximum members" name="maxMembers" type="number" min="1" max="100" step="1" value={draft.maxMembers} onChange={(event) => change('maxMembers', event.target.value)} error={form.errors.maxMembers} required />
           </fieldset>
           {coaches.status === 'error' && <ManagerError error={coaches.error} onRetry={retryCoaches} />}
+          <Button variant="ghost" disabled={form.saving || coaches.status === 'loading'} onClick={retryCoaches}>Refresh coaches</Button>
           {draft.sportId && coaches.status === 'ready' && !coaches.data.length && <p className="notice notice--info">No qualified coaches are available. Check coach assignments in <Link to="/manager">User Management</Link>.</p>}
           <div className="manager-form-actions"><Button type="submit" loading={form.saving}>{item ? 'Save class' : 'Save & schedule'}</Button><Button variant="secondary" disabled={form.saving} onClick={() => navigate('/manager/classes')}>Cancel</Button></div>
         </form>

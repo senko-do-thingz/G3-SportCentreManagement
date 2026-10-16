@@ -25,6 +25,18 @@ function backend(profile = MANAGER) {
 beforeEach(() => { vi.stubEnv('VITE_MANAGER_PREVIEW', 'false'); tokenStorage.startSession({ accessToken: 'manager-test', refreshToken: 'refresh-test' }) })
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 describe('FE-07 class management', () => {
+  it('lists active coaches before sport selection and allows refreshing newly added coaches', async () => {
+    const api = backend()
+    const user = userEvent.setup()
+    renderApp('/manager/classes/new')
+    expect(await screen.findByRole('option', { name: 'Quan Coach' })).toBeInTheDocument()
+    expect(screen.getByText('Choose a sport to filter coaches by qualification.')).toBeInTheDocument()
+    const before = api.calls.filter((call) => call.path === '/coaches').length
+    await user.click(screen.getByRole('button', { name: 'Refresh coaches' }))
+    await waitFor(() => expect(api.calls.filter((call) => call.path === '/coaches').length).toBe(before + 1))
+    await user.selectOptions(screen.getByRole('combobox', { name: /^Sport/ }), '1')
+    await waitFor(() => expect(api.calls.some((call) => call.path === '/coaches?sportId=1')).toBe(true))
+  })
   it('loads classes and sends combined server filters', async () => {
     const api = backend()
     const user = userEvent.setup()
