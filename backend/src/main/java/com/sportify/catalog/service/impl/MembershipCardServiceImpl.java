@@ -26,6 +26,8 @@ import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.service.PaymentService;
 import com.sportify.payment.service.PaymentVerificationService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -68,6 +70,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     private final CodeFormatter codeFormatter;
     private final AuditService auditService;
     private final Clock clock;
+    private final EntityManager entityManager;
     /** Resolved on use: PaymentVerificationService itself depends on this service. */
     private final ObjectProvider<PaymentVerificationService> paymentVerificationService;
 
@@ -351,6 +354,8 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         lockLinkedPayment(cardId);
         MemberCard card = memberCardRepository.findById(cardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member card not found for id: " + cardId));
+        // Payment first, then lock and reload the item before checking its current status.
+        entityManager.refresh(card, LockModeType.PESSIMISTIC_WRITE);
         if (card.getStatus() != CardStatus.PENDING_PAYMENT) {
             throw new BusinessRuleException("Cannot activate membership card with status: " + card.getStatus()
                     + ". Only PENDING_PAYMENT cards can be activated.");
@@ -544,9 +549,9 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     }
 
     /**
-     * Lock order rule (docs/database/09): lock the payment row before the card is read or written. Only the payment
-     * id is read before the lock (a single value, no card entity), so the card is first loaded after the lock and
-     * every check runs on its current state. A card with no payment keeps the old behaviour.
+     * Read only the scalar payment id, then lock payment before accessing the card.
+     * Activation additionally locks and refreshes its item because a caller may have cached it already.
+     * With no linked payment there is no payment lock; activation still locks and refreshes the item.
      */
     private void lockLinkedPayment(Long cardId) {
         memberCardRepository.findPaymentIdById(cardId).ifPresent(paymentService::lockPayment);

@@ -22,8 +22,14 @@ import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.PessimisticLockException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import com.sportify.payment.service.PaymentVerificationService;
 import org.mockito.InjectMocks;
@@ -86,6 +92,8 @@ public class SportPackageServiceImplTest {
     private CodeFormatter codeFormatter;
     @Mock
     private AuditService auditService;
+    @Mock
+    private EntityManager entityManager;
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-10-06T00:00:00Z"), ZoneId.of("UTC"));
 
@@ -1109,11 +1117,14 @@ public class SportPackageServiceImplTest {
 
         sportPackageService.activateRegistration(88L, receptionistUser, PaymentMethod.CASH);
 
-        org.mockito.InOrder order = org.mockito.Mockito.inOrder(registrationRepository, paymentService);
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(registrationRepository, paymentService, entityManager, paymentVerificationService);
         order.verify(registrationRepository).findPaymentIdById(88L);
         order.verify(paymentService).lockPayment(88L);
         order.verify(registrationRepository).findById(88L);
+        order.verify(entityManager).refresh(reg, LockModeType.PESSIMISTIC_WRITE);
+        order.verify(registrationRepository).save(reg);
         order.verify(paymentService).markPaymentSuccess(88L, receptionistUser, PaymentMethod.CASH);
+        order.verify(paymentVerificationService).recordPaymentConfirmed(88L, receptionistUser, null);
     }
 
     @Test
@@ -1186,4 +1197,84 @@ public class SportPackageServiceImplTest {
         assertEquals(PackageRegistrationStatus.PENDING_PAYMENT, res.getStatus());
         verify(paymentVerificationService, never()).recordDeskPayment(any(), any(), any(), any(), any(), any());
     }
+    // BE-06 Round 2: model an item cached before maintenance commits a terminal status.
+    @ParameterizedTest
+    @CsvSource({
+            "CANCELLED,false",
+            "CANCELLED,true",
+            "EXPIRED,false",
+            "EXPIRED,true",
+            "ACTIVE,false",
+            "ACTIVE,true",
+            "REFUNDED,false",
+            "REFUNDED,true"
+    })
+    void activateRegistration_UsesLockedRefreshedStatusBeforeAnySideEffect(PackageRegistrationStatus currentStatus, boolean viaPayment) {
+        SportPackageRegistration pending = pendingRegistrationWithPayment();
+        var originalStart = pending.getStartDate();
+        var originalEnd = pending.getEndDate();
+        when(registrationRepository.findPaymentIdById(88L)).thenReturn(Optional.of(88L));
+        when(registrationRepository.findById(88L)).thenReturn(Optional.of(pending));
+        org.mockito.Mockito.doAnswer(call -> { pending.setStatus(currentStatus); return null; })
+                .when(entityManager).refresh(pending, LockModeType.PESSIMISTIC_WRITE);
+
+        BusinessRuleException failure = assertThrows(BusinessRuleException.class, () -> {
+            if (viaPayment) sportPackageService.activateRegistrationForPaymentConfirmation(88L, receptionistUser, PaymentMethod.CASH);
+            else sportPackageService.activateRegistration(88L, receptionistUser, PaymentMethod.CASH);
+        });
+
+        assertTrue(failure.getMessage().contains("status: " + currentStatus));
+        assertEquals(currentStatus, pending.getStatus());
+        assertEquals(originalStart, pending.getStartDate());
+        assertEquals(originalEnd, pending.getEndDate());
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(registrationRepository, paymentService, entityManager);
+        order.verify(registrationRepository).findPaymentIdById(88L);
+        order.verify(paymentService).lockPayment(88L);
+        order.verify(registrationRepository).findById(88L);
+        order.verify(entityManager).refresh(pending, LockModeType.PESSIMISTIC_WRITE);
+        verify(registrationRepository, never()).save(any());
+        verify(paymentService, never()).markPaymentSuccess(any(), any(), any());
+        verifyNoInteractions(paymentVerificationService, auditService);
+    }
+
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void activateRegistration_WithoutPaymentStillReloadsCancelledStatus(boolean viaPayment) {
+        SportPackageRegistration pending = pendingRegistrationWithPayment();
+        pending.setPayment(null);
+        when(registrationRepository.findById(88L)).thenReturn(Optional.of(pending));
+        org.mockito.Mockito.doAnswer(call -> { pending.setStatus(PackageRegistrationStatus.CANCELLED); return null; })
+                .when(entityManager).refresh(pending, LockModeType.PESSIMISTIC_WRITE);
+
+        BusinessRuleException failure = assertThrows(BusinessRuleException.class, () -> {
+            if (viaPayment) sportPackageService.activateRegistrationForPaymentConfirmation(88L, receptionistUser, null);
+            else sportPackageService.activateRegistration(88L, receptionistUser);
+        });
+
+        assertTrue(failure.getMessage().contains("CANCELLED"));
+        verify(entityManager).refresh(pending, LockModeType.PESSIMISTIC_WRITE);
+        verify(registrationRepository, never()).save(any());
+        verifyNoInteractions(paymentService, paymentVerificationService, auditService);
+    }
+
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void activateRegistration_RefreshFailurePropagatesWithoutPaymentOrReceipt(boolean viaPayment) {
+        SportPackageRegistration pending = pendingRegistrationWithPayment();
+        when(registrationRepository.findPaymentIdById(88L)).thenReturn(Optional.of(88L));
+        when(registrationRepository.findById(88L)).thenReturn(Optional.of(pending));
+        PessimisticLockException unavailable = new PessimisticLockException("Synthetic item lock failure");
+        org.mockito.Mockito.doThrow(unavailable).when(entityManager).refresh(pending, LockModeType.PESSIMISTIC_WRITE);
+
+        PessimisticLockException failure = assertThrows(PessimisticLockException.class, () -> {
+            if (viaPayment) sportPackageService.activateRegistrationForPaymentConfirmation(88L, receptionistUser, PaymentMethod.CASH);
+            else sportPackageService.activateRegistration(88L, receptionistUser, PaymentMethod.CASH);
+        });
+
+        org.junit.jupiter.api.Assertions.assertSame(unavailable, failure);
+        assertEquals(PackageRegistrationStatus.PENDING_PAYMENT, pending.getStatus());
+        verify(paymentService).lockPayment(88L);
+        verify(registrationRepository, never()).save(any());
+        verify(paymentService, never()).markPaymentSuccess(any(), any(), any());
+        verifyNoInteractions(paymentVerificationService, auditService);
+    }
+
 }

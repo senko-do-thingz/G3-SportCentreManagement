@@ -9,6 +9,8 @@ import com.sportify.catalog.entity.CheckInResult;
 import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.entity.SportPackageRegistration;
 import com.sportify.catalog.repository.BookingRepository;
+import com.sportify.catalog.repository.ClassSessionRepository;
+import jakarta.persistence.EntityManager;
 import com.sportify.catalog.repository.CheckInRepository;
 import com.sportify.catalog.service.CheckInService;
 import com.sportify.core.audit.AuditAction;
@@ -38,6 +40,8 @@ public class CheckInServiceImpl implements CheckInService {
     private final MemberProfileRepository memberProfileRepository;
     private final AuditService auditService;
     private final Clock clock;
+    private final ClassSessionRepository sessionRepository;
+    private final EntityManager entityManager;
 
     @Override
     @Transactional
@@ -53,7 +57,8 @@ public class CheckInServiceImpl implements CheckInService {
 
         MemberProfile profile = profileOpt.orElseThrow(() -> new ResourceNotFoundException("Member not found"));
 
-        LocalDate today = LocalDate.now(clock);
+        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDate today = now.toLocalDate();
         List<Booking> todayBookings = bookingRepository.findTodayBookingsForMember(profile.getId(), today, BookingStatus.CONFIRMED);
 
         Booking targetBooking = null;
@@ -85,13 +90,21 @@ public class CheckInServiceImpl implements CheckInService {
             }
 
             if (targetBooking != null) {
+                // Join the booking/cancellation lock order before checking mutable state or inserting ALLOWED.
+                var lockedSession = sessionRepository.findForUpdate(targetBooking.getSession().getId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Class session not found"));
+                entityManager.refresh(lockedSession);
+                entityManager.refresh(targetBooking);
                 // Check if already checked in for this booking today
                 boolean alreadyCheckedIn = checkInRepository.existsByBookingIdAndResult(targetBooking.getId(), CheckInResult.ALLOWED);
-                if (alreadyCheckedIn) {
+                if (targetBooking.getStatus() != BookingStatus.CONFIRMED || !targetBooking.getSession().getSessionDate().equals(today)) {
+                    denialReason = "Specified booking is not scheduled for today or is not confirmed";
+                } else if (alreadyCheckedIn) {
                     denialReason = "Already checked in for this session";
                 } else {
                     // Check package coverage directly from booking
                     SportPackageRegistration pkg = targetBooking.getPackageRegistration();
+                    if (pkg != null) entityManager.refresh(pkg);
                     if (pkg == null) {
                         denialReason = "Booking is not linked to a sport package registration";
                     } else if (pkg.getStatus() != PackageRegistrationStatus.ACTIVE) {
@@ -110,7 +123,7 @@ public class CheckInServiceImpl implements CheckInService {
                 .member(profile)
                 .booking(targetBooking)
                 .packageRegistration(targetPackage)
-                .checkedInAt(LocalDateTime.now(clock))
+                .checkedInAt(now)
                 .result(result)
                 .denialReason(denialReason)
                 .recordedBy(receptionist)

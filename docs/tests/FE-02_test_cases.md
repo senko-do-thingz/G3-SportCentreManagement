@@ -1,5 +1,12 @@
 # Test Cases - Task FE-02 (Flow 1): Member Dashboard (F1-07) and My Profile (F1-08)
 
+BE-02 integration update (2026-10-16): the implemented password endpoint requires
+`confirmPassword` in addition to `currentPassword` and `newPassword`. The adapter
+now transmits the confirmation already collected by the form. TC-FE02-060 and
+TC-FE02-077 assert this three-field request; historical results below describe
+the original FE-02 run. Current contracts and verification are documented in
+`docs/tests/BE-02_test_cases.md` and the exported BE-02 reports.
+
 ## 1. Overview
 - Task ID: FE-02
 - Flow: Flow 1 - User and membership management (Member)

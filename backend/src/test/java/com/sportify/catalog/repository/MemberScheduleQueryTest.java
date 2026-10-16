@@ -90,4 +90,21 @@ class MemberScheduleQueryTest {
             assertThat(query.getParameters()).hasSize(3);
         }
     }
+
+    @Test void bookingHistoryAndCountParseAndBindAllPeriodsWithActualSqlServerMappings() throws Exception {
+        var queryAnnotation = BookingRepository.class.getMethod("findMyBookings", Long.class, String.class,
+                LocalDate.class, java.time.LocalTime.class, org.springframework.data.domain.Pageable.class).getAnnotation(Query.class);
+        try (var session = factory.openSession()) {
+            var legacy = BookingRepository.class.getMethod("findByMemberIdOrderByBookedAtDesc", Long.class).getAnnotation(Query.class);
+            assertThat(session.createQuery(legacy.value()).setParameter("memberId", 30L).getParameters()).hasSize(1);
+            for (String period : new String[]{null, "UPCOMING", "PAST"}) {
+                for (String hql : new String[]{queryAnnotation.value(), queryAnnotation.countQuery()}) {
+                    var query = session.createQuery(hql);
+                    query.setParameter("memberId", 30L).setParameter("period", period)
+                            .setParameter("today", TODAY).setParameter("now", NOW);
+                    assertThat(query.getParameters()).hasSize(4);
+                }
+            }
+        }
+    }
 }

@@ -172,5 +172,5 @@ export function validatePasswordChange(form: PasswordForm): Record<string, strin
 }
 
 export function toChangePasswordRequest(form: PasswordForm): ChangePasswordRequest {
-  return { currentPassword: form.currentPassword, newPassword: form.newPassword }
+  return { currentPassword: form.currentPassword, newPassword: form.newPassword, confirmPassword: form.confirmPassword }
 }

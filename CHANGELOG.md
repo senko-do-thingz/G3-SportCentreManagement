@@ -15,6 +15,49 @@
 - Add manager-only class search, filters, server pagination, create/edit, qualified coach details and confirmed status changes. Preserve FE-06 manager features.
 - Add a Vietnam-time weekly calendar, single/weekly session creation, exact conflict dialogs with retained drafts, booked-capacity validation, session editing and reason-required cancellation.
 - Extend the opt-in frontend preview without backend writes; add API/date/access/workflow tests and verification documentation. The missing facility-list API is handled by the follow-up known-ID entry fallback. Browser visual checks remain pending due to a local automation launcher failure.
+## 2026-10-16 - Scheduled Maintenance and Local Document Policy (BE-06)
+
+- Add four daily, Clock-based Vietnam maintenance transitions: overdue pending cards/registrations to CANCELLED and expired ACTIVE cards/registrations to EXPIRED, using guarded bulk updates, committed row counts and idempotency.
+- Preserve credits, payments, bookings and existing legacy membership processing. Add boundary, scheduler and HQL unit coverage plus SQL Server rollback/concurrency/regression coverage required in CI.
+- Keep AI Audit Log documents local only; remove verified current index entries while preserving local bytes, and ignore their precise naming conventions. Historical revisions are outside scope.
+- Apply the owner-approved activation safeguard: retain the payment-first order, then lock and refresh the card/registration before checking its status. Add stale-state and lock-failure regressions; preserve pricing, receipts and audit behavior. SQL Server execution remains pending CI.
+- Round 3 repairs integration-test isolation and orchestration: private migrated database, tracked committed fixture cleanup with worker shutdown, real cached-state transaction coordination, and SQL-trigger rollback injection. Preserve strict catalog/member assertions and require all four previously failing suites in CI; add local proxy/teardown regressions. Production jobs and activation safeguards are unchanged.
+
+## 2026-10-16 - Coach Teaching Schedule and Class Roster (BE-14)
+
+- Add GET /api/v1/coach/sessions with authenticated coach ownership, optional manager coachId filtering, all assigned sessions for a manager without that filter, and the existing inclusive 62-day calendar policy. Preserve past and all session statuses, stable date/start/id ordering, and actual CONFIRMED booked counts without cache repairs.
+- Add GET /api/v1/coach/sessions/{id}/roster with authorization before member queries and an owner restriction repeated in the SQL read. Return only CONFIRMED bookings and the minimal member code/name/phone, actual selected package and bookedAt fields; retain nullable/historical package links and suppress inconsistent foreign-member registrations.
+- Enforce COACH/MANAGER at controller and service, resolve identity from the security context, revalidate current account/profile mappings, and prevent coachId/header overrides. Keep manager access to coachless rosters and preserve existing authentication, scheduling, discovery, booking/cancellation, profile and audit-writing behavior.
+- Add local validation, real security-chain/controller and SQL Server-dialect HQL tests, plus required SQL Server integration coverage for privacy, mapping, bounded query counts, read-only snapshots and BE-10/11/12 interoperability. No migration or dependency change. SQL Server execution remains a GitHub CI gate; see docs/tests/BE-14_test_cases.md.
+
+## 2026-10-16 - Manager Activity Log (BE-04)
+
+- Add GET /api/v1/manager/activity-logs with MANAGER checks at controller and service, combined actor/action/date/search filters, database pagination and deterministic createdAt/id descending order.
+- Reuse the existing audit schema and writing service unchanged. Project only scalar actor/target/action fields through LEFT joins, with current account name/role, a missing-actor fallback and safe bounded action-derived short detail. Raw summary, JSON metadata, credentials, contacts and IP addresses are not selected, searched or returned.
+- Validate paging, action, literal search and local date/timestamp ranges, including inclusive calendar end dates and overflow-safe year 9999 handling. Document existing offsetless audit clock limitations.
+- Add unit, real security-chain HTTP and required SQL Server integration coverage for filtering/counts, dates, ties, null history, sensitive metadata, bounded queries and audit-write regression. SQL Server execution remains a GitHub CI gate; see docs/tests/BE-04_test_cases.md.
+
+## 2026-10-16 - Demo Classes and Sessions (BE-15)
+
+- Add opt-in demo V29 after BE-07 V28: six active adult classes covering BADMINTON, SWIMMING, BASKETBALL and all three supported levels, with the existing qualified demo coaches and four appropriate facilities.
+- Seed 48 PUBLISHED future sessions over SQL Server-relative days 1-28 (24 coach-led, 24 coachless self-training). Preserve strict BE-10 overlap rules against planned and existing DRAFT/PUBLISHED rows, with deterministic schedules and atomic conflict failure.
+- Add two explicit complimentary demo packages, four free staff-created entitlements and five valid confirmed bookings for full/one-seat-left small-group scenarios. Derive counters from actual bookings, reconcile only missing fixture credit deltas, and fabricate no payments, receipts or monetary audits.
+- Keep the persisted original date anchor on logical replay, preserve consistent teacher interactions, and reject ambiguous/expired partial reconstruction. Reuse the approved demo location, profile guard and transaction-owned application-lock pattern; existing migrations, production security and business APIs are unchanged.
+- Add source/parser/profile-isolation checks and a required SQL Server integration suite for migration, replay, rollback, overlaps, capacity, discovery and booking/scheduling regressions. Preserve the original V28-only account fixture with an explicit test target; validate combined V28/V29 behavior in the new suite. SQL Server execution remains a GitHub CI requirement.
+
+## 2026-10-16 - My Profile and Change Password (BE-02)
+
+- Extend GET /api/v1/users/me with existing account/member fields, a bounded current-card summary using the approved date/rank precedence, and ordered coach_sport projections. Preserve default STANDARD without creating cards and keep credentials/private profile fields out of responses.
+- Add authenticated principal-owned profile updates with an explicit field allowlist, presence-aware omission/null semantics, existing validation limits and atomic account/member persistence. Preserve account version checks, including member-only edits.
+- Add BCrypt current-password verification, StrongPassword validation, confirmation/reuse checks, HTTP 400 field errors and atomic PASSWORD_CHANGED auditing. Existing account versions reject concurrent stale changes; stateless access/refresh token lifetimes remain unchanged.
+- Correct the FE-02 adapter to send the confirmation already collected by the form. Add unit/controller/security coverage and a required SQL Server integration suite for persistence, login, card precedence, isolation, audit rollback and contention. Local results and pending CI database verification are recorded in the BE-02 report package.
+
+## 2026-10-16 - Booking and Cancellation Rules (BE-12)
+
+- Complete transactional booking checks against BE-11 visibility and shared package eligibility. Respect explicit package selection; automatic selection now matches format and uses deterministic expiry/start/id order. Return coded eligibility errors and 409 for actual full sessions or existing confirmed bookings.
+- Reserve seats with guarded SQL updates before the existing atomic credit debit, refresh managed counters, and commit booking plus success audit together. Serialize cancellation and check-in on the session lock; cancel only one confirmed unchecked-in booking, release its seat once, and preserve ACTIVE-only capped credit restoration and BE-21 refund semantics.
+- Apply a 120-minute member cancellation cutoff with equality allowed; retain authorized staff cancellation until session end subject to check-in and terminal-state guards. Add cancellation actor/time and class/coach/facility/package response metadata, including null coaches for self-training.
+- Add SQL-filtered UPCOMING/PAST history and explicit page/size pagination while preserving the array contract used by existing dashboard requests. Add unit/controller coverage and required SQL Server contention, rollback and regression tests. Local unit results and pending CI database execution are documented in docs/tests/BE-12_test_cases.md.
 
 ## 2026-10-16 - Container Exit Classification and Safe Evidence (BE-07, Round 4)
 
