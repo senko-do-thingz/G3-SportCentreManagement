@@ -83,7 +83,7 @@ export interface MemberBooking {
 }
 
 /**
- * Body of PUT /users/me (planned in BE-02). Email is not part of it: the login email is changed
+ * Body of PUT /users/me. Email is not part of it: the login email is changed
  * by the front desk only. Empty optional values are sent as null.
  */
 export interface UpdateProfileRequest {
@@ -95,10 +95,11 @@ export interface UpdateProfileRequest {
   currentLevel: string | null
 }
 
-/** Body of PUT /users/me/password (planned in BE-02). */
+/** Body of PUT /users/me/password. Confirmation is also checked by the server. */
 export interface ChangePasswordRequest {
   currentPassword: string
   newPassword: string
+  confirmPassword: string
 }
 
 export const UNEXPECTED_RESPONSE_MESSAGE = 'The server returned an unexpected response. Please try again later.'

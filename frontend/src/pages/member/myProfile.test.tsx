@@ -358,7 +358,7 @@ describe('FE-02 My Profile (F1-08) - change password', () => {
     await expectSingleAnnouncement(PASSWORD_CHANGED_MESSAGE)
     const put = calls.find((call) => call.path === '/users/me/password')
     expect(put?.method).toBe('PUT')
-    expect(put?.body).toEqual({ currentPassword: 'Demo123!', newPassword: 'NewPass2026' })
+    expect(put?.body).toEqual({ currentPassword: 'Demo123!', newPassword: 'NewPass2026', confirmPassword: 'NewPass2026' })
     expect(within(form).getByLabelText(/Current password/)).toHaveValue('')
     expect(within(form).getByLabelText(/^New password/)).toHaveValue('')
     expect(within(form).getByLabelText(/Confirm new password/)).toHaveValue('')

@@ -1,3 +1,10 @@
+## 2026-10-16 - My Profile and Change Password (BE-02)
+
+- Extend GET /api/v1/users/me with existing account/member fields, a bounded current-card summary using the approved date/rank precedence, and ordered coach_sport projections. Preserve default STANDARD without creating cards and keep credentials/private profile fields out of responses.
+- Add authenticated principal-owned profile updates with an explicit field allowlist, presence-aware omission/null semantics, existing validation limits and atomic account/member persistence. Preserve account version checks, including member-only edits.
+- Add BCrypt current-password verification, StrongPassword validation, confirmation/reuse checks, HTTP 400 field errors and atomic PASSWORD_CHANGED auditing. Existing account versions reject concurrent stale changes; stateless access/refresh token lifetimes remain unchanged.
+- Correct the FE-02 adapter to send the confirmation already collected by the form. Add unit/controller/security coverage and a required SQL Server integration suite for persistence, login, card precedence, isolation, audit rollback and contention. Local results and pending CI database verification are recorded in the BE-02 report package.
+
 ## 2026-10-16 - Booking and Cancellation Rules (BE-12)
 
 - Complete transactional booking checks against BE-11 visibility and shared package eligibility. Respect explicit package selection; automatic selection now matches format and uses deterministic expiry/start/id order. Return coded eligibility errors and 409 for actual full sessions or existing confirmed bookings.
