@@ -1,4 +1,4 @@
-import { env } from '../config/env'
+import { env, managerPreviewEnabled } from '../config/env'
 import {
   ApiError,
   apiErrorFromBody,
@@ -246,6 +246,11 @@ function expireSession(epoch: number): ApiError {
 }
 
 async function send(path: string, options: RequestOptions, accessToken: string | null): Promise<Response> {
+  if (import.meta.env.DEV && managerPreviewEnabled()) {
+    const { previewResponse } = await import('./mock/managerPreview')
+    const preview = await previewResponse(path, options, accessToken)
+    if (preview) return preview
+  }
   const { method = 'GET', body, query, signal, headers = {} } = options
   const finalHeaders: Record<string, string> = { Accept: 'application/json', ...headers }
   let payload: BodyInit | undefined

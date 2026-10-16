@@ -32,17 +32,34 @@ import { LoginPage } from '../pages/public/LoginPage'
 import { NotFoundPage } from '../pages/public/NotFoundPage'
 import { RegisterPage } from '../pages/public/RegisterPage'
 import { AccountSwitchRedirect } from './AccountSwitchRedirect'
+import { UserManagementPage } from '../pages/manager/UserManagementPage'
+import { ManagerPackagesPage } from '../pages/manager/ManagerPackagesPage'
+import { MembershipCardsManagementPage } from '../pages/manager/MembershipCardsManagementPage'
+import { ActivityLogPage } from '../pages/manager/ActivityLogPage'
+import { ManagerClassesPage } from '../pages/manager/ManagerClassesPage'
+import { ClassEditorPage } from '../pages/manager/ClassEditorPage'
+import { ManagerSchedulePage } from '../pages/manager/ManagerSchedulePage'
+import { MemberSchedulePage } from '../pages/member/MemberSchedulePage'
+import { FindClassesPage } from '../pages/member/FindClassesPage'
+import { SessionDetailPage } from '../pages/member/SessionDetailPage'
 
 /**
  * Real screens by full path. Later tasks register their page here, for example
  * '/member/packages': <SportPackagesPage />. Paths without an entry show a placeholder.
  */
 const SCREENS: Record<string, ReactNode> = {
+  '/manager': <UserManagementPage />,
+  '/manager/packages': <ManagerPackagesPage />,
+  '/manager/cards': <MembershipCardsManagementPage />,
+  '/manager/activity': <ActivityLogPage />,
+  '/manager/classes': <ManagerClassesPage />,
+  '/manager/schedule': <ManagerSchedulePage />,
   '/member': <MemberDashboardPage />,
   '/member/profile': <MyProfilePage />,
   '/member/packages': <SportPackagesPage />,
   '/member/membership': <MyMembershipPage />,
   '/member/payments': <MyPaymentsPage />,
+  '/member/schedule': <MemberSchedulePage />,
   '/reception': <MemberSearchPage />,
   '/reception/register': <RegisterRenewPage />,
   '/reception/check-in': <CheckInPage />,
@@ -69,7 +86,13 @@ const SCREENS: Record<string, ReactNode> = {
  *   (F3-07, FE-12).
  */
 const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
+  '/manager': [
+    { path: 'classes/new', element: <ClassEditorPage /> },
+    { path: 'classes/:classId/edit', element: <ClassEditorPage /> },
+  ],
   '/member': [
+    { path: 'classes', element: <FindClassesPage /> },
+    { path: 'sessions/:sessionId', element: <SessionDetailPage /> },
     { path: 'packages/:packageId', element: <PackageDetailPage /> },
     { path: 'membership/cards', element: <MembershipCardsPage /> },
     { path: 'payments/:paymentId', element: <PaymentSummaryPage /> },

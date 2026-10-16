@@ -9,7 +9,8 @@ import { Button } from '../../components/ui/Button'
 import { Checkbox } from '../../components/ui/Checkbox'
 import { Input } from '../../components/ui/Input'
 import { PasswordInput } from '../../components/ui/PasswordInput'
-import { sampleAccount } from '../../config/env'
+import { managerPreviewEnabled, sampleAccount } from '../../config/env'
+import { ManagerPreviewLogin } from '../../components/ManagerPreviewLogin'
 import { useFocusFirstInvalid } from '../../utils/useFocusFirstInvalid'
 import { AuthShell } from './AuthShell'
 
@@ -136,6 +137,7 @@ export function LoginPage() {
 
   return (
     <AuthShell title="Welcome back" subtitle="Log in to manage your training.">
+      {import.meta.env.DEV && managerPreviewEnabled() && <ManagerPreviewLogin />}
       {sample && (
         <p className="notice notice--info auth-sample">
           Sample account: {sample.email} - {sample.password}
