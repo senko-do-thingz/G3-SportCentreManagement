@@ -27,12 +27,11 @@ function SessionDetailContent({ id, returnTo }: { id: number; returnTo: string }
   const lastRefresh = useRef(0)
   useEffect(() => {
     const refresh = () => {
-      if (document.visibilityState === 'visible' && resource.status !== 'loading' && Date.now() - lastRefresh.current > 1000) { lastRefresh.current = Date.now(); reload() }
+      if (document.visibilityState === 'visible' && !profileOpen && resource.status !== 'loading' && Date.now() - lastRefresh.current > 1000) { lastRefresh.current = Date.now(); reload() }
     }
-    window.addEventListener('focus', refresh)
     document.addEventListener('visibilitychange', refresh)
-    return () => { window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh) }
-  }, [reload, resource.status])
+    return () => { document.removeEventListener('visibilitychange', refresh) }
+  }, [reload, resource.status, profileOpen])
   if (resource.status === 'loading') return <div className="page browse-page"><MemberScheduleNav /><PageLoader label="Loading session detail" /></div>
   if (resource.status === 'error') return <div className="page browse-page"><MemberScheduleNav /><PageHeader title={resource.error instanceof ApiError && resource.error.status === 404 ? 'Session Unavailable' : 'Session Detail'} /><BrowseError error={resource.error} onRetry={reload} /><Link to={returnTo}>Back to results</Link></div>
   const detail = resource.data, session = detail.session
