@@ -70,7 +70,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<Map<String, Object>> handleBusinessRuleException(BusinessRuleException ex) {
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), null);
+        var response = buildErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), null);
+        if (ex.getCode() != null && response.getBody() != null) {
+            response.getBody().put("code", ex.getCode());
+        }
+        return response;
     }
 
     @ExceptionHandler(ConflictException.class)

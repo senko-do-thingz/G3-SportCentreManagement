@@ -2,6 +2,9 @@ package com.sportify.catalog.controller;
 
 import com.sportify.catalog.dto.BookingCreateRequest;
 import com.sportify.catalog.dto.BookingResponse;
+import com.sportify.catalog.dto.BookingWhen;
+import com.sportify.catalog.dto.PageResponse;
+import com.sportify.core.common.PagingDefaults;
 import com.sportify.catalog.dto.SelfTrainingAttendanceRequest;
 import com.sportify.catalog.dto.SelfTrainingAttendanceResponse;
 import com.sportify.catalog.service.BookingService;
@@ -39,11 +42,24 @@ public class BookingController {
         return bookingService.cancelBooking(id, userDetails.getUserAccount());
     }
 
-    @GetMapping("/my")
+    // Existing dashboard clients expect an array, including with when=UPCOMING.
+    @GetMapping(value = "/my", params = {"!page", "!size"})
     @PreAuthorize("hasRole('MEMBER')")
     public List<BookingResponse> getMyBookings(
+            @RequestParam(required = false) BookingWhen when,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return bookingService.getMyBookings(userDetails.getUserAccount());
+        return when == null ? bookingService.getMyBookings(userDetails.getUserAccount())
+                : bookingService.getMyBookings(userDetails.getUserAccount(), when);
+    }
+
+    @GetMapping("/my")
+    @PreAuthorize("hasRole('MEMBER')")
+    public PageResponse<BookingResponse> getMyBookingsPage(
+            @RequestParam(required = false) BookingWhen when,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "" + PagingDefaults.DEFAULT_PAGE_SIZE) int size,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return bookingService.getMyBookings(userDetails.getUserAccount(), when, page, size);
     }
 
     @GetMapping("/member/{memberId}")

@@ -66,6 +66,13 @@ public interface ClassSessionRepository extends JpaRepository<ClassSession, Long
     @Query("SELECT s FROM ClassSession s WHERE s.id = :id")
     Optional<ClassSession> findForUpdate(@Param("id") Long id);
 
+    /** Caller already holds the session lock; refresh its managed snapshot after this native write. */
+    @Modifying(flushAutomatically = true)
+    @Query(value = "UPDATE class_session SET booked_count = booked_count + 1, updated_at = :now "
+            + "WHERE id = :id AND status = 'PUBLISHED' AND booked_count >= 0 AND booked_count < capacity",
+            nativeQuery = true)
+    int reserveSeat(@Param("id") Long id, @Param("now") LocalDateTime now);
+
     /**
      * Releases seats in one atomic UPDATE (never below zero). The caller must hold the session row lock taken with
      * {@link #findForUpdate}, so no booking or cancellation path can write booked_count in between (BE-21 P1-02).

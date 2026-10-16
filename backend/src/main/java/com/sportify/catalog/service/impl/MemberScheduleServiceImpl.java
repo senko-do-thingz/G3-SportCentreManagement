@@ -6,12 +6,12 @@ import com.sportify.catalog.dto.SessionResponse;
 import com.sportify.catalog.dto.SessionSearchQuery;
 import com.sportify.catalog.entity.BookingStatus;
 import com.sportify.catalog.entity.ClassSession;
-import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.entity.SportPackageRegistration;
 import com.sportify.catalog.repository.BookingRepository;
 import com.sportify.catalog.repository.ClassSessionRepository;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.MemberScheduleService;
+import com.sportify.catalog.service.PackageBookingEligibility;
 import com.sportify.core.common.PagingDefaults;
 import com.sportify.core.common.SecurityUtils;
 import com.sportify.core.exception.BusinessRuleException;
@@ -28,7 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -41,9 +40,6 @@ import static com.sportify.catalog.dto.SessionDetailResponse.EligibilityReason.*
 @Transactional(readOnly = true)
 public class MemberScheduleServiceImpl implements MemberScheduleService {
     private static final Sort SESSION_SORT = Sort.by("sessionDate", "startTime", "id");
-    private static final Comparator<SportPackageRegistration> REGISTRATION_SORT = Comparator
-            .comparing(SportPackageRegistration::getEndDate).thenComparing(SportPackageRegistration::getStartDate)
-            .thenComparing(SportPackageRegistration::getId);
     private final ClassSessionRepository sessions;
     private final BookingRepository bookings;
     private final SportPackageRegistrationRepository registrations;
@@ -84,29 +80,14 @@ public class MemberScheduleServiceImpl implements MemberScheduleService {
         // Real confirmed counts still determine full/freeSeats; a stale cache must not be mislabeled FULL.
         if (session.getBookedCount() >= session.getCapacity()) return rejected(common, false, CAPACITY_UNAVAILABLE);
 
-        List<SportPackageRegistration> matching = registrations.findForSessionEligibility(member.getId(),
-                session.getSport().getId(), session.getTrainingType()).stream()
-                .filter(r -> matches(r, session, member.getId())).toList();
+        List<SportPackageRegistration> matching = PackageBookingEligibility.matching(
+                registrations.findForSessionEligibility(member.getId(), session.getSport().getId(), session.getTrainingType()),
+                session, member.getId());
         LocalDate date = session.getSessionDate();
-        var covering = matching.stream().filter(r -> r.getStatus() == PackageRegistrationStatus.ACTIVE)
-                .filter(r -> !date.isBefore(r.getStartDate()) && !date.isAfter(r.getEndDate())).toList();
-        var usable = covering.stream().filter(r -> r.getRemainingSessions() > 0).sorted(REGISTRATION_SORT)
+        var usable = PackageBookingEligibility.usable(matching, date).stream()
                 .map(MemberScheduleServiceImpl::registrationResponse).toList();
         if (!usable.isEmpty()) return new SessionDetailResponse(common, true, null, false, true, null, usable);
-        if (!covering.isEmpty()) return rejected(common, false, NO_SESSIONS_LEFT);
-        if (matching.isEmpty()) return rejected(common, false, NO_PACKAGE);
-        if (matching.stream().anyMatch(r -> r.getStatus() == PackageRegistrationStatus.EXPIRED || r.getEndDate().isBefore(date))) {
-            return rejected(common, false, PACKAGE_EXPIRED_BY_THEN);
-        }
-        return rejected(common, false, PACKAGE_NOT_STARTED_BY_THEN);
-    }
-
-    private static boolean matches(SportPackageRegistration r, ClassSession session, Long memberId) {
-        return r.getMember() != null && Objects.equals(memberId, r.getMember().getId())
-                && (r.getStatus() == PackageRegistrationStatus.ACTIVE || r.getStatus() == PackageRegistrationStatus.EXPIRED)
-                && r.getSportPackage() != null && r.getSportPackage().getSport() != null
-                && Objects.equals(r.getSportPackage().getSport().getId(), session.getSport().getId())
-                && r.getSportPackage().getTrainingFormat() == session.getTrainingType();
+        return rejected(common, false, PackageBookingEligibility.rejection(matching, date));
     }
 
     private static SessionDetailResponse rejected(SessionResponse session, boolean booked,

@@ -2,6 +2,8 @@
 com.sportify.catalog.controller.ManagerCatalogIntegrationTest
 com.sportify.catalog.controller.ManagerSessionIntegrationTest
 com.sportify.catalog.controller.MemberScheduleIntegrationTest
+com.sportify.catalog.controller.BookingRulesIntegrationTest
+com.sportify.catalog.service.BookingV20IntegrationTest
 com.sportify.identity.service.impl.MemberSearchIntegrationTest
 com.sportify.catalog.service.impl.FrontDeskQueueIntegrationTest
 com.sportify.catalog.service.impl.FrontDeskMemberOverviewIntegrationTest

@@ -1,3 +1,10 @@
+## 2026-10-16 - Booking and Cancellation Rules (BE-12)
+
+- Complete transactional booking checks against BE-11 visibility and shared package eligibility. Respect explicit package selection; automatic selection now matches format and uses deterministic expiry/start/id order. Return coded eligibility errors and 409 for actual full sessions or existing confirmed bookings.
+- Reserve seats with guarded SQL updates before the existing atomic credit debit, refresh managed counters, and commit booking plus success audit together. Serialize cancellation and check-in on the session lock; cancel only one confirmed unchecked-in booking, release its seat once, and preserve ACTIVE-only capped credit restoration and BE-21 refund semantics.
+- Apply a 120-minute member cancellation cutoff with equality allowed; retain authorized staff cancellation until session end subject to check-in and terminal-state guards. Add cancellation actor/time and class/coach/facility/package response metadata, including null coaches for self-training.
+- Add SQL-filtered UPCOMING/PAST history and explicit page/size pagination while preserving the array contract used by existing dashboard requests. Add unit/controller coverage and required SQL Server contention, rollback and regression tests. Local unit results and pending CI database execution are documented in docs/tests/BE-12_test_cases.md.
+
 ## 2026-10-16 - Container Exit Classification and Safe Evidence (BE-07, Round 4)
 
 - Separate Docker command failure from the process status printed by docker wait. Nonzero application status 255 is no longer rejected as a Docker infrastructure code; zero, invalid and signal-range statuses still fail. Success also requires matching exited state, no OOM/engine error, the exact intended SA candidate and an explicit SA complexity rejection.

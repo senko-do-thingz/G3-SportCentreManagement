@@ -20,6 +20,8 @@ import com.sportify.catalog.repository.ClassSessionRepository;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.impl.BookingServiceImpl;
 import com.sportify.core.common.CodeFormatter;
+import com.sportify.core.audit.AuditService;
+import jakarta.persistence.EntityManager;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ConflictException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -74,6 +76,8 @@ public class BookingServiceImplTest {
     private CheckInRepository checkInRepository;
     @Mock
     private CodeFormatter codeFormatter;
+    @Mock private EntityManager entityManager;
+    @Mock private AuditService auditService;
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-10-06T00:00:00Z"), ZoneId.of("Asia/Ho_Chi_Minh"));
 
@@ -115,6 +119,10 @@ public class BookingServiceImplTest {
                 .startDate(LocalDate.of(2026, 10, 1))
                 .endDate(LocalDate.of(2026, 10, 31))
                 .build();
+        org.mockito.Mockito.lenient().when(sessionRepository.findVisibleById(eq(20L), any(), any())).thenReturn(Optional.of(session));
+        org.mockito.Mockito.lenient().when(sessionRepository.reserveSeat(any(), any())).thenReturn(1);
+        org.mockito.Mockito.lenient().when(sessionRepository.releaseSeats(any(), eq(1), any())).thenReturn(1);
+        org.mockito.Mockito.lenient().when(bookingRepository.cancelConfirmedSessionBookings(any(), any(), any(), any(), any())).thenReturn(1);
     }
 
     @Test
@@ -143,16 +151,16 @@ public class BookingServiceImplTest {
         assertNotNull(res);
         assertEquals(BookingStatus.CONFIRMED, res.getStatus());
         assertEquals(5, packageReg.getRemainingSessions()); // SQL owns the balance; the managed snapshot is not changed.
-        assertEquals(3, session.getBookedCount()); // Session booked count incremented from 2 to 3
+        assertEquals(2, session.getBookedCount()); // SQL owns the counter; mocked refresh does not simulate JDBC.
         verify(registrationRepository).consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class));
         verify(registrationRepository, never()).save(any());
-        verify(sessionRepository).save(session);
+        verify(sessionRepository).reserveSeat(eq(20L), any(LocalDateTime.class));
         var order = inOrder(sessionRepository, bookingRepository, registrationRepository);
         order.verify(sessionRepository).findForUpdate(20L);
         order.verify(bookingRepository).findBySessionIdAndMemberIdAndStatus(20L, 100L, BookingStatus.CONFIRMED);
         order.verify(registrationRepository).findById(50L);
+        order.verify(sessionRepository).reserveSeat(eq(20L), any(LocalDateTime.class));
         order.verify(registrationRepository).consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class));
-        order.verify(sessionRepository).save(session);
         order.verify(bookingRepository).save(any(Booking.class));
     }
 
@@ -229,7 +237,7 @@ public class BookingServiceImplTest {
     void createBooking_AutomaticSelectionConsumesThroughTheSameConditionalCommand() {
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
         when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
-        when(registrationRepository.findActiveRegistrationsForSport(100L, 1L, PackageRegistrationStatus.ACTIVE, session.getSessionDate()))
+        when(registrationRepository.findForSessionEligibility(100L, 1L, TrainingFormat.COACH_LED))
                 .thenReturn(List.of(packageReg));
         when(registrationRepository.consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class))).thenReturn(1);
         when(bookingRepository.getNextBookingCodeSequence()).thenReturn(12L);
@@ -398,7 +406,8 @@ public class BookingServiceImplTest {
 
         assertNotNull(res);
         assertEquals(BookingStatus.CANCELLED, res.getStatus());
-        assertEquals(1, session.getBookedCount()); // Decremented session booked count (seat restored)
+        assertEquals(2, session.getBookedCount()); // Native release is verified; a mock cannot establish database arithmetic.
+        verify(sessionRepository).releaseSeats(eq(20L), eq(1), any(LocalDateTime.class));
         assertEquals(5, packageReg.getRemainingSessions()); // Restoration is database arithmetic, not a stale entity save.
         verify(registrationRepository).restoreSession(eq(50L), eq("ACTIVE"), any(LocalDateTime.class));
         verify(registrationRepository, never()).save(any());
@@ -724,7 +733,8 @@ public class BookingServiceImplTest {
 
         assertNotNull(res);
         assertEquals(BookingStatus.CANCELLED, res.getStatus());
-        assertEquals(1, session.getBookedCount()); // Decremented session seat
+        assertEquals(2, session.getBookedCount()); // Counter snapshot stays unchanged with a mocked refresh.
+        verify(sessionRepository).releaseSeats(eq(20L), eq(1), any(LocalDateTime.class));
         assertEquals(5, packageReg.getRemainingSessions()); // Remaining sessions NOT incremented (remains 5)
         verify(registrationRepository).restoreSession(eq(50L), eq("ACTIVE"), any(LocalDateTime.class));
         verify(registrationRepository, never()).save(any());
@@ -821,7 +831,7 @@ public class BookingServiceImplTest {
         assertNotNull(res);
         assertEquals(200L, res.getId());
         assertEquals(BookingStatus.CONFIRMED, res.getStatus());
-        verify(sessionRepository).save(session);
+        verify(sessionRepository).reserveSeat(eq(20L), any(LocalDateTime.class));
         verify(registrationRepository).consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class));
         verify(registrationRepository, never()).save(any());
         verify(bookingRepository).save(any(Booking.class));
@@ -895,7 +905,7 @@ public class BookingServiceImplTest {
         assertNotNull(res);
         assertEquals(BookingStatus.CANCELLED, res.getStatus());
         verify(bookingRepository).save(any(Booking.class));
-        verify(sessionRepository).save(startedSession);
+        verify(sessionRepository).releaseSeats(eq(23L), eq(1), any(LocalDateTime.class));
         verify(registrationRepository).restoreSession(eq(50L), eq("ACTIVE"), any(LocalDateTime.class));
         verify(registrationRepository, never()).save(any());
     }
