@@ -1,3 +1,9 @@
+## 2026-10-17 - FE-06 Activity Log Review Fixes
+
+- Connect real manager activity history to the merged BE-04 endpoint and align the frontend response model with ActivityLogResponse, including null-actor fallback and shortDetail.
+- Restrict activity filtering to the backend-supported action codes and update the preview fixture to the same response shape.
+- Refresh FE-06 verification steps for the released API and add authenticated fake-fetch coverage for the real wire contract.
+
 ## 2026-10-16 - Scheduled Maintenance and Local Document Policy (BE-06)
 
 - Add four daily, Clock-based Vietnam maintenance transitions: overdue pending cards/registrations to CANCELLED and expired ACTIVE cards/registrations to EXPIRED, using guarded bulk updates, committed row counts and idempotency.
