@@ -2,6 +2,8 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BrowseSession, EligibilityReason, SessionDetail } from '../../api/memberSessionsApi'
+import { coachProfilesApi } from '../../api/coachProfilesApi'
+import { ApiError } from '../../api/errors'
 import { tokenStorage } from '../../api/tokenStorage'
 import { renderApp } from '../../test/renderApp'
 import { backendError, installFakeFetch, json, MEMBER, MANAGER } from '../../test/fakeBackend'
@@ -66,11 +68,27 @@ describe('FE-08 session detail', () => {
     expect(await screen.findByRole('heading', { name: 'Session Unavailable' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'View suitable sport packages' })).not.toBeInTheDocument()
   })
-  it.each(['/member/schedule', '/member/classes', '/member/sessions/5'])('guards %s from anonymous users and staff', async (path) => {
+  it('keeps session detail usable when the public coach profile is private or unavailable', async () => {
+    backend()
+    vi.spyOn(coachProfilesApi, 'get').mockRejectedValueOnce(new ApiError(404, 'Coach profile is unavailable'))
+    const user = userEvent.setup()
+    renderApp('/member/sessions/5')
+    await user.click(await screen.findByRole('button', { name: 'View coach profile' }))
+    expect(await screen.findByText('Coach profile is unavailable')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Close profile' }))
+    expect(screen.getByRole('heading', { name: 'Basketball Foundations' })).toBeInTheDocument()
+  })
+  it.each(['/member/schedule', '/member/classes', '/member/sessions/5'])('guards %s from anonymous users', async (path) => {
     tokenStorage.clear()
     const api = backend(detail, MANAGER)
     renderApp(path)
     expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
     expect(api.calls).toHaveLength(0)
+  })
+  it.each(['MANAGER', 'RECEPTIONIST', 'COACH'].flatMap((role) => ['/member/schedule', '/member/classes', '/member/sessions/5'].map((path) => [role, path])))('guards %s from %s member route', async (role, path) => {
+    const api = backend(detail, { ...MANAGER, role })
+    renderApp(path)
+    expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
+    expect(api.calls.every((call) => call.path === '/users/me')).toBe(true)
   })
 })

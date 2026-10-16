@@ -71,8 +71,18 @@ async function all(query: Omit<SessionQuery, 'page' | 'size'>, signal?: AbortSig
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
     rows.push(...(await list({ ...query, page, size: 100 }, signal)).content)
   }
-  if (rows.length < first.totalElements) throw new ApiError(0, 'The schedule changed while loading. Refresh to load the complete schedule.')
-  return [...new Map(rows.map((row) => [row.id, row])).values()]
+  const unique = [...new Map(rows.map((row) => [row.id, row])).values()]
+  if (unique.length < first.totalElements) throw new ApiError(0, 'The schedule changed while loading. Refresh to load the complete schedule.')
+  return unique
 }
 
-export const memberSessionsApi = { list, all, detail: (id: number, signal?: AbortSignal) => api.get<SessionDetail>(`/sessions/${id}`, { signal }) }
+async function detail(id: number, signal?: AbortSignal): Promise<SessionDetail> {
+  const value = await api.get<SessionDetail>(`/sessions/${id}`, { signal })
+  const session = value?.session
+  if (!session || !Number.isSafeInteger(session.id) || session.id <= 0
+    || !['sportName', 'sessionDate', 'startTime', 'endTime'].every((key) => typeof session[key as keyof BrowseSession] === 'string')
+    || !['COACH_LED', 'SELF_TRAINING'].includes(session.trainingFormat)
+    || ![session.capacity, session.bookedCount, session.freeSeats].every((number) => Number.isFinite(number))) throw new ApiError(0, 'Session details could not be read. Refresh availability and try again.')
+  return value
+}
+export const memberSessionsApi = { list, all, detail }

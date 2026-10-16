@@ -2,6 +2,8 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
+import { memberSessionsApi } from '../../api/memberSessionsApi'
+import { ApiError } from '../../api/errors'
 import { renderApp } from '../../test/renderApp'
 import { backendError, installFakeFetch, json, MEMBER, MANAGER } from '../../test/fakeBackend'
 
@@ -17,6 +19,16 @@ function backend(profile = MEMBER) {
 beforeEach(() => { vi.stubEnv('VITE_MANAGER_PREVIEW', 'false'); tokenStorage.startSession({ accessToken: 'member-test', refreshToken: 'refresh-test' }) })
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 describe('FE-08 member calendar', () => {
+  it('distinguishes server failure from an empty schedule and supports retry', async () => {
+    backend()
+    vi.spyOn(memberSessionsApi, 'all').mockRejectedValueOnce(new ApiError(503, 'Schedule service unavailable')).mockResolvedValueOnce([])
+    const user = userEvent.setup()
+    renderApp('/member/schedule?date=2026-10-16')
+    expect(await screen.findByText('Schedule service unavailable')).toBeInTheDocument()
+    expect(screen.queryByText('No sessions in this range')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByText('No sessions in this range')).toBeInTheDocument()
+  })
   it('renders all seven days and reads the complete week with member-specific fields', async () => {
     const api = backend()
     renderApp('/member/schedule?date=2026-10-16')

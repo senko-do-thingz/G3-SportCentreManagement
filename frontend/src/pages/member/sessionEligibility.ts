@@ -3,11 +3,11 @@ import type { EligibilityReason, SessionDetail } from '../../api/memberSessionsA
 export type DetailState = EligibilityReason | 'ELIGIBLE' | 'UNKNOWN'
 const reasons: EligibilityReason[] = ['NO_PACKAGE', 'NO_SESSIONS_LEFT', 'PACKAGE_EXPIRED_BY_THEN', 'PACKAGE_NOT_STARTED_BY_THEN', 'FULL', 'ALREADY_BOOKED', 'CAPACITY_UNAVAILABLE']
 export function resolveSessionDetailState(detail: SessionDetail): DetailState {
-  if (detail.memberContext !== true) return 'UNKNOWN'
+  if (!detail?.session || detail.memberContext !== true) return 'UNKNOWN'
   if (detail.alreadyBooked === true || detail.reason === 'ALREADY_BOOKED') return 'ALREADY_BOOKED'
   if (detail.eligible === false && reasons.includes(detail.reason as EligibilityReason)) return detail.reason as EligibilityReason
   if (detail.eligible === true && detail.reason === null && detail.alreadyBooked === false && detail.session.full === false && detail.session.freeSeats > 0
-    && Array.isArray(detail.suitableRegistrations) && detail.suitableRegistrations.some((entry) => Number.isSafeInteger(entry.registrationId) && entry.registrationId > 0 && entry.sportId === detail.session.sportId && entry.trainingFormat === detail.session.trainingFormat && entry.remainingSessions > 0)) return 'ELIGIBLE'
+    && Array.isArray(detail.suitableRegistrations) && detail.suitableRegistrations.some((entry) => entry && Number.isSafeInteger(entry.registrationId) && entry.registrationId > 0 && entry.sportId === detail.session.sportId && entry.trainingFormat === detail.session.trainingFormat && entry.remainingSessions > 0)) return 'ELIGIBLE'
   return 'UNKNOWN'
 }
 export const ELIGIBILITY_COPY: Record<DetailState, { title: string; message: string }> = {
