@@ -42,6 +42,8 @@ import { ManagerSchedulePage } from '../pages/manager/ManagerSchedulePage'
 import { MemberSchedulePage } from '../pages/member/MemberSchedulePage'
 import { FindClassesPage } from '../pages/member/FindClassesPage'
 import { SessionDetailPage } from '../pages/member/SessionDetailPage'
+import { BookingConfirmedPage, BookingOptionsPage, BookingReviewPage } from '../pages/member/BookingCreationPages'
+import { BookingCancelledPage, BookingCancellationPage, MemberBookingsPage } from '../pages/member/MemberBookingsPages'
 
 /**
  * Real screens by full path. Later tasks register their page here, for example
@@ -93,6 +95,12 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
   '/member': [
     { path: 'classes', element: <FindClassesPage /> },
     { path: 'sessions/:sessionId', element: <SessionDetailPage /> },
+    { path: 'bookings', element: <MemberBookingsPage /> },
+    { path: 'bookings/new', element: <BookingOptionsPage /> },
+    { path: 'bookings/review', element: <BookingReviewPage /> },
+    { path: 'bookings/confirmed/:bookingId', element: <BookingConfirmedPage /> },
+    { path: 'bookings/:bookingId/cancel', element: <BookingCancellationPage /> },
+    { path: 'bookings/:bookingId/cancelled', element: <BookingCancelledPage /> },
     { path: 'packages/:packageId', element: <PackageDetailPage /> },
     { path: 'membership/cards', element: <MembershipCardsPage /> },
     { path: 'payments/:paymentId', element: <PaymentSummaryPage /> },

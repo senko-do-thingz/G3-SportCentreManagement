@@ -1,3 +1,10 @@
+## 2026-10-17 - Member Booking and Cancellation Screens (FE-09)
+
+- Add member-only package selection, booking review and confirmation with eligibility revalidation, single-submit protection and calendar export.
+- Add upcoming and past booking history, cancellation cutoff messaging, backend-authoritative cancellation and confirmed cancelled results.
+- Cover coach-led and self-training variants, package credit counts, access guards, empty/error states, duplicate/full conflicts and cutoff failures.
+- Keep FE-06, FE-07 and FE-08 intact. No backend files or endpoints were changed.
+
 ## 2026-10-17 - Member Booking API (FE-09)
 
 - Add a typed member booking API client for eligible-package booking, upcoming/past history, and cancellation.
