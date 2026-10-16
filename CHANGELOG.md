@@ -1,3 +1,11 @@
+## 2026-10-16 - Demo Classes and Sessions (BE-15)
+
+- Add opt-in demo V29 after BE-07 V28: six active adult classes covering BADMINTON, SWIMMING, BASKETBALL and all three supported levels, with the existing qualified demo coaches and four appropriate facilities.
+- Seed 48 PUBLISHED future sessions over SQL Server-relative days 1-28 (24 coach-led, 24 coachless self-training). Preserve strict BE-10 overlap rules against planned and existing DRAFT/PUBLISHED rows, with deterministic schedules and atomic conflict failure.
+- Add two explicit complimentary demo packages, four free staff-created entitlements and five valid confirmed bookings for full/one-seat-left small-group scenarios. Derive counters from actual bookings, reconcile only missing fixture credit deltas, and fabricate no payments, receipts or monetary audits.
+- Keep the persisted original date anchor on logical replay, preserve consistent teacher interactions, and reject ambiguous/expired partial reconstruction. Reuse the approved demo location, profile guard and transaction-owned application-lock pattern; existing migrations, production security and business APIs are unchanged.
+- Add source/parser/profile-isolation checks and a required SQL Server integration suite for migration, replay, rollback, overlaps, capacity, discovery and booking/scheduling regressions. Preserve the original V28-only account fixture with an explicit test target; validate combined V28/V29 behavior in the new suite. SQL Server execution remains a GitHub CI requirement.
+
 ## 2026-10-16 - My Profile and Change Password (BE-02)
 
 - Extend GET /api/v1/users/me with existing account/member fields, a bounded current-card summary using the approved date/rank precedence, and ordered coach_sport projections. Preserve default STANDARD without creating cards and keep credentials/private profile fields out of responses.
