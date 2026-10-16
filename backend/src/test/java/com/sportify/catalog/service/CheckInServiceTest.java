@@ -12,6 +12,8 @@ import com.sportify.catalog.entity.Sport;
 import com.sportify.catalog.entity.SportPackage;
 import com.sportify.catalog.entity.SportPackageRegistration;
 import com.sportify.catalog.repository.BookingRepository;
+import com.sportify.catalog.repository.ClassSessionRepository;
+import jakarta.persistence.EntityManager;
 import com.sportify.catalog.repository.CheckInRepository;
 import com.sportify.catalog.service.impl.CheckInServiceImpl;
 import com.sportify.core.audit.AuditEvent;
@@ -55,6 +57,8 @@ public class CheckInServiceTest {
     private MemberProfileRepository memberProfileRepository;
     @Mock
     private AuditService auditService;
+    @Mock private ClassSessionRepository sessionRepository;
+    @Mock private EntityManager entityManager;
     @org.mockito.Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-10-05T00:00:00Z"), ZoneId.of("UTC"));
 
@@ -84,6 +88,7 @@ public class CheckInServiceTest {
                 .session(classSession)
                 .status(BookingStatus.CONFIRMED)
                 .build();
+        org.mockito.Mockito.lenient().when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(classSession));
     }
 
     @Test
@@ -356,5 +361,32 @@ public class CheckInServiceTest {
         assertEquals(1, history.size());
         assertEquals(200L, history.get(0).getId());
         assertEquals("ALLOWED", history.get(0).getResult());
+    }
+
+    @Test
+    void cancellationWhileWaitingForSessionLockIsObservedBeforeAllowedCheckIn() {
+        var request = new CheckInRequest(); request.setIdentifier("MEM-123"); request.setBookingId(30L);
+        when(memberProfileRepository.findByMemberCode("MEM-123")).thenReturn(Optional.of(memberProfile));
+        when(bookingRepository.findTodayBookingsForMember(eq(1L), any(), eq(BookingStatus.CONFIRMED))).thenReturn(List.of(todayBooking));
+        org.mockito.Mockito.doAnswer(i -> { if (i.getArgument(0) == todayBooking) todayBooking.setStatus(BookingStatus.CANCELLED); return null; })
+                .when(entityManager).refresh(any());
+        when(checkInRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        assertEquals("DENIED", checkInService.recordCheckIn(request, receptionist).getResult());
+        var order = org.mockito.Mockito.inOrder(sessionRepository, entityManager, checkInRepository);
+        order.verify(sessionRepository).findForUpdate(20L);
+        order.verify(entityManager).refresh(classSession);
+        order.verify(entityManager).refresh(todayBooking);
+        order.verify(checkInRepository).save(any());
+    }
+
+    @Test
+    void duplicateCheckInIsRecheckedAfterTheSessionLock() {
+        var request = new CheckInRequest(); request.setIdentifier("MEM-123");
+        when(memberProfileRepository.findByMemberCode("MEM-123")).thenReturn(Optional.of(memberProfile));
+        when(bookingRepository.findTodayBookingsForMember(eq(1L), any(), eq(BookingStatus.CONFIRMED))).thenReturn(List.of(todayBooking));
+        when(checkInRepository.existsByBookingIdAndResult(30L, CheckInResult.ALLOWED)).thenReturn(false, true);
+        when(checkInRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        assertEquals("Already checked in for this session", checkInService.recordCheckIn(request, receptionist).getDenialReason());
+        verify(sessionRepository).findForUpdate(20L);
     }
 }

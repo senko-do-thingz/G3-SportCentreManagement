@@ -1,7 +1,17 @@
 # Critical SQL Server suites. Use fully qualified project class names.
+com.sportify.catalog.repository.CatalogSchemaIntegrationTest
+com.sportify.catalog.repository.SportPackageSeedMigrationIntegrationTest
+com.sportify.identity.controller.MemberSearchIntegrationTest
+com.sportify.catalog.service.impl.ScheduledMaintenanceIntegrationTest
+com.sportify.catalog.controller.CoachScheduleIntegrationTest
+com.sportify.identity.controller.ActivityLogIntegrationTest
+com.sportify.core.config.DemoClassesIntegrationTest
+com.sportify.identity.controller.MyProfileIntegrationTest
 com.sportify.catalog.controller.ManagerCatalogIntegrationTest
 com.sportify.catalog.controller.ManagerSessionIntegrationTest
 com.sportify.catalog.controller.MemberScheduleIntegrationTest
+com.sportify.catalog.controller.BookingRulesIntegrationTest
+com.sportify.catalog.service.BookingV20IntegrationTest
 com.sportify.identity.service.impl.MemberSearchIntegrationTest
 com.sportify.catalog.service.impl.FrontDeskQueueIntegrationTest
 com.sportify.catalog.service.impl.FrontDeskMemberOverviewIntegrationTest

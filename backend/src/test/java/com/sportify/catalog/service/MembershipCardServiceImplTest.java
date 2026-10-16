@@ -17,11 +17,16 @@ import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
 import com.sportify.identity.repository.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.PessimisticLockException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import com.sportify.payment.service.PaymentVerificationService;
 import org.mockito.InjectMocks;
@@ -179,6 +184,8 @@ public class MembershipCardServiceImplTest {
     private CodeFormatter codeFormatter;
     @Mock
     private AuditService auditService;
+    @Mock
+    private EntityManager entityManager;
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-10-06T00:00:00Z"), ZoneId.of("UTC"));
 
@@ -2288,11 +2295,14 @@ public class MembershipCardServiceImplTest {
 
         membershipCardService.activateCard(42L, receptionistUser, PaymentMethod.CASH);
 
-        org.mockito.InOrder order = org.mockito.Mockito.inOrder(memberCardRepository, paymentService);
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(memberCardRepository, paymentService, entityManager, paymentVerificationService);
         order.verify(memberCardRepository).findPaymentIdById(42L);
         order.verify(paymentService).lockPayment(99L);
         order.verify(memberCardRepository).findById(42L);
+        order.verify(entityManager).refresh(pending, LockModeType.PESSIMISTIC_WRITE);
+        order.verify(memberCardRepository).save(pending);
         order.verify(paymentService).markPaymentSuccess(99L, receptionistUser, PaymentMethod.CASH);
+        order.verify(paymentVerificationService).recordPaymentConfirmed(99L, receptionistUser, null);
     }
 
     @Test
@@ -2364,4 +2374,84 @@ public class MembershipCardServiceImplTest {
         verify(paymentVerificationService, never()).recordDeskPayment(any(), any(), any(), any(), any(), any());
         verify(paymentVerificationService, never()).recordPaymentConfirmed(anyLong(), any(), any());
     }
+    // BE-06 Round 2: model an item cached before maintenance commits a terminal status.
+    @ParameterizedTest
+    @CsvSource({
+            "CANCELLED,false",
+            "CANCELLED,true",
+            "EXPIRED,false",
+            "EXPIRED,true",
+            "ACTIVE,false",
+            "ACTIVE,true",
+            "REPLACED,false",
+            "REPLACED,true"
+    })
+    void activateCard_UsesLockedRefreshedStatusBeforeAnySideEffect(CardStatus currentStatus, boolean viaPayment) {
+        MemberCard pending = pendingCardWithPayment();
+        var originalStart = pending.getStartDate();
+        var originalEnd = pending.getEndDate();
+        when(memberCardRepository.findPaymentIdById(42L)).thenReturn(Optional.of(99L));
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+        org.mockito.Mockito.doAnswer(call -> { pending.setStatus(currentStatus); return null; })
+                .when(entityManager).refresh(pending, LockModeType.PESSIMISTIC_WRITE);
+
+        BusinessRuleException failure = assertThrows(BusinessRuleException.class, () -> {
+            if (viaPayment) membershipCardService.activateCardForPaymentConfirmation(42L, receptionistUser, PaymentMethod.CASH);
+            else membershipCardService.activateCard(42L, receptionistUser, PaymentMethod.CASH);
+        });
+
+        assertTrue(failure.getMessage().contains("status: " + currentStatus));
+        assertEquals(currentStatus, pending.getStatus());
+        assertEquals(originalStart, pending.getStartDate());
+        assertEquals(originalEnd, pending.getEndDate());
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(memberCardRepository, paymentService, entityManager);
+        order.verify(memberCardRepository).findPaymentIdById(42L);
+        order.verify(paymentService).lockPayment(99L);
+        order.verify(memberCardRepository).findById(42L);
+        order.verify(entityManager).refresh(pending, LockModeType.PESSIMISTIC_WRITE);
+        verify(memberCardRepository, never()).save(any());
+        verify(paymentService, never()).markPaymentSuccess(any(), any(), any());
+        verifyNoInteractions(paymentVerificationService, auditService);
+    }
+
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void activateCard_WithoutPaymentStillReloadsCancelledStatus(boolean viaPayment) {
+        MemberCard pending = pendingCardWithPayment();
+        pending.setPayment(null);
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+        org.mockito.Mockito.doAnswer(call -> { pending.setStatus(CardStatus.CANCELLED); return null; })
+                .when(entityManager).refresh(pending, LockModeType.PESSIMISTIC_WRITE);
+
+        BusinessRuleException failure = assertThrows(BusinessRuleException.class, () -> {
+            if (viaPayment) membershipCardService.activateCardForPaymentConfirmation(42L, receptionistUser, null);
+            else membershipCardService.activateCard(42L, receptionistUser);
+        });
+
+        assertTrue(failure.getMessage().contains("CANCELLED"));
+        verify(entityManager).refresh(pending, LockModeType.PESSIMISTIC_WRITE);
+        verify(memberCardRepository, never()).save(any());
+        verifyNoInteractions(paymentService, paymentVerificationService, auditService);
+    }
+
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void activateCard_RefreshFailurePropagatesWithoutPaymentOrReceipt(boolean viaPayment) {
+        MemberCard pending = pendingCardWithPayment();
+        when(memberCardRepository.findPaymentIdById(42L)).thenReturn(Optional.of(99L));
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+        PessimisticLockException unavailable = new PessimisticLockException("Synthetic item lock failure");
+        org.mockito.Mockito.doThrow(unavailable).when(entityManager).refresh(pending, LockModeType.PESSIMISTIC_WRITE);
+
+        PessimisticLockException failure = assertThrows(PessimisticLockException.class, () -> {
+            if (viaPayment) membershipCardService.activateCardForPaymentConfirmation(42L, receptionistUser, PaymentMethod.CASH);
+            else membershipCardService.activateCard(42L, receptionistUser, PaymentMethod.CASH);
+        });
+
+        org.junit.jupiter.api.Assertions.assertSame(unavailable, failure);
+        assertEquals(CardStatus.PENDING_PAYMENT, pending.getStatus());
+        verify(paymentService).lockPayment(99L);
+        verify(memberCardRepository, never()).save(any());
+        verify(paymentService, never()).markPaymentSuccess(any(), any(), any());
+        verifyNoInteractions(paymentVerificationService, auditService);
+    }
+
 }

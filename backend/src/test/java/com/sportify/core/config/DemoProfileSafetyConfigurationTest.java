@@ -48,7 +48,7 @@ class DemoProfileSafetyConfigurationTest {
             var properties = context.getBean(FlywayProperties.class);
             assertThat(properties.getLocations()).containsExactly("classpath:db/migration/identity", "classpath:db/migration/catalog");
             assertThat(properties.isOutOfOrder()).isFalse();
-            assertThat(discoveredScripts(properties)).doesNotContain("V28__seed_demo_accounts.sql");
+            assertThat(discoveredScripts(properties)).doesNotContain("V28__seed_demo_accounts.sql", "V29__seed_demo_classes_and_sessions.sql");
             assertThat(created).hasValue(1);
             assertThat(migrated).hasValue(1);
         });
@@ -65,7 +65,8 @@ class DemoProfileSafetyConfigurationTest {
             assertThat(properties.getLocations()).containsExactly("classpath:db/migration/identity",
                     "classpath:db/migration/catalog", "classpath:db/demo");
             assertThat(properties.isOutOfOrder()).isFalse();
-            assertThat(discoveredScripts(properties)).contains("V27__refund_request_payment_link.sql", "V28__seed_demo_accounts.sql");
+            assertThat(discoveredScripts(properties)).contains("V27__refund_request_payment_link.sql", "V28__seed_demo_accounts.sql",
+                    "V29__seed_demo_classes_and_sessions.sql");
             assertThat(migrated).hasValue(1);
         });
     }
