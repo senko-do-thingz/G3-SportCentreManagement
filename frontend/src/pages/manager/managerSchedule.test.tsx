@@ -9,13 +9,13 @@ import { addDays, centerNow, monday } from './scheduleModel'
 const date = addDays(centerNow().date, 7)
 const item = { id: 5, code: 'CL-005', name: 'Badminton foundations', sportId: 1, sportName: 'Badminton', ageGroupId: 1, ageGroupLabel: 'Adults', level: 'BEGINNER', coachId: 3, coachName: 'Quan Coach', maxMembers: 20, upcomingSessions: 1, active: true }
 const session = { id: 7, date, startTime: '09:00:00', endTime: '10:00:00', class: { id: 5, code: item.code, name: item.name }, coach: { id: 3, name: 'Quan Coach' }, facility: { id: 1, name: 'Court A' }, capacity: 20, bookedCount: 2, trainingType: 'COACH_LED', status: 'PUBLISHED', cancelReason: null }
-function backend(conflict = false, facilitiesMissing = false) {
+function backend(conflict = false, facilitiesMissing: boolean | number = false) {
   return installFakeFetch((call) => {
     const path = call.path.split('?')[0]
     if (path === '/users/me') return json(200, MANAGER)
     if (path === '/manager/classes') return json(200, { content: [item], page: 0, size: 100, totalElements: 1, totalPages: 1 })
     if (path === '/coaches') return json(200, [{ id: 3, fullName: 'Quan Coach', sportIds: [1] }])
-    if (path === '/facilities') return facilitiesMissing ? backendError(404, 'Facility endpoint unavailable') : json(200, [{ id: 1, name: 'Court A', active: true }])
+    if (path === '/facilities') return facilitiesMissing ? backendError(typeof facilitiesMissing === 'number' ? facilitiesMissing : 404, 'Facility endpoint unavailable') : json(200, [{ id: 1, name: 'Court A', active: true }])
     if (path === '/manager/sessions') return json(200, [session, { ...session, id: 8, status: 'CANCELLED', cancelReason: 'Maintenance' }])
     if (path === '/manager/classes/5/sessions' && call.method === 'POST') return conflict ? json(409, { status: 409, message: 'Schedule conflict', details: { conflicts: [{ sessionId: 7, requestedDate: date, date, startTime: '09:00:00', endTime: '10:00:00', class: session.class, coach: session.coach, facility: session.facility, conflictType: 'BOTH' }, { sessionId: 9, requestedDate: date, date, startTime: '09:15:00', endTime: '10:15:00', class: null, coach: null, facility: null, conflictType: 'FACILITY' }] } }) : json(201, [session])
     if (path === '/manager/sessions/7/cancel' || path === '/manager/sessions/7') return json(200, session)
@@ -25,6 +25,14 @@ function backend(conflict = false, facilitiesMissing = false) {
 beforeEach(() => { vi.stubEnv('VITE_MANAGER_PREVIEW', 'false'); tokenStorage.startSession({ accessToken: 'manager-test', refreshToken: 'refresh-test' }) })
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 describe('FE-07 schedule', () => {
+  it.each([403, 500])('does not turn a facility %s into a missing-lookup fallback', async (status) => {
+    backend(false, status)
+    renderApp(`/manager/schedule?week=${monday(date)}&classId=5`)
+    await screen.findByText('Reason: Maintenance')
+    await waitFor(() => expect(screen.getByRole('button', { name: '+ Create session' })).toBeDisabled())
+    expect(screen.queryByText(/The facility dropdown API is not available/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled()
+  })
   it('renders exact week, cancelled reason and only valid actions', async () => {
     backend()
     renderApp(`/manager/schedule?week=${monday(date)}`)
