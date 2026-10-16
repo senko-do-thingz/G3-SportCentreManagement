@@ -1,3 +1,8 @@
+## 2026-10-17 - Member Booking API (FE-09)
+
+- Add a typed member booking API client for eligible-package booking, upcoming/past history, and cancellation.
+- Validate booking response shapes and cover endpoint paths, payloads, filters, aborts, and malformed data.
+
 ## 2026-10-17 - FE-08 Booking Handoff and Profile Guards
 
 - Route eligible members to FE-09 Booking Options with the selected session ID and validated return path; ineligible and unknown states have no booking link, and FE-08 makes no booking request.
