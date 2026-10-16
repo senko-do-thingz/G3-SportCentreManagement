@@ -4,6 +4,7 @@ import com.sportify.catalog.dto.BookingCreateRequest;
 import com.sportify.catalog.dto.BookingResponse;
 import com.sportify.catalog.dto.BookingWhen;
 import com.sportify.catalog.dto.PageResponse;
+import com.sportify.catalog.entity.BookingStatus;
 import com.sportify.core.common.PagingDefaults;
 import com.sportify.catalog.dto.SelfTrainingAttendanceRequest;
 import com.sportify.catalog.dto.SelfTrainingAttendanceResponse;
@@ -62,10 +63,24 @@ public class BookingController {
         return bookingService.getMyBookings(userDetails.getUserAccount(), when, page, size);
     }
 
+    @GetMapping(value = "/member/{memberId}", params = {"!page", "!size"})
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'MANAGER')")
+    public List<BookingResponse> getMemberBookings(@PathVariable Long memberId,
+            @RequestParam(required = false) BookingWhen when,
+            @RequestParam(required = false) BookingStatus status,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        return bookingService.getMemberBookings(memberId, when, status, principal.getUserAccount());
+    }
+
     @GetMapping("/member/{memberId}")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'MANAGER')")
-    public List<BookingResponse> getMemberBookings(@PathVariable Long memberId) {
-        return bookingService.getMemberBookings(memberId);
+    public PageResponse<BookingResponse> getMemberBookingsPage(@PathVariable Long memberId,
+            @RequestParam(required = false) BookingWhen when,
+            @RequestParam(required = false) BookingStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "" + PagingDefaults.DEFAULT_PAGE_SIZE) int size,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        return bookingService.getMemberBookings(memberId, when, status, page, size, principal.getUserAccount());
     }
 
     @GetMapping("/today/{memberId}")

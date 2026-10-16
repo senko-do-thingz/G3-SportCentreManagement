@@ -37,6 +37,15 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     Page<Booking> findMyBookings(@Param("memberId") Long memberId, @Param("period") String period,
             @Param("today") LocalDate today, @Param("now") LocalTime now, Pageable pageable);
 
+    String STAFF_WHERE = MY_WHERE + " AND (:status IS NULL OR b.status = :status)";
+
+    @EntityGraph(attributePaths = {"session.sport", "session.sportClass", "session.coach.userAccount", "session.facility",
+            "member.userAccount", "packageRegistration.sportPackage", "cancelledBy.role"})
+    @Query(value = "SELECT b" + MY_FROM + STAFF_WHERE, countQuery = "SELECT COUNT(b)" + MY_FROM + STAFF_WHERE)
+    Page<Booking> findMemberBookings(@Param("memberId") Long memberId, @Param("period") String period,
+            @Param("status") BookingStatus status, @Param("today") LocalDate today,
+            @Param("now") LocalTime now, Pageable pageable);
+
     long countBySessionIdAndStatus(Long sessionId, BookingStatus status);
 
     /** Scalar lookup keeps Booking out of the persistence context until its session is locked. */
