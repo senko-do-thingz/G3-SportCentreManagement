@@ -60,6 +60,14 @@ describe('FE-06 manager access and accounts', () => {
     await waitFor(() => expect(backend.calls.some((call) => call.path.includes('page=0') && call.path.includes('role=COACH') && call.path.includes('status=ACTIVE') && call.path.includes('search=Daniel+%2B'))).toBe(true))
     expect(backend.calls.find((call) => call.path.startsWith('/manager/users'))?.authorization).toBe('Bearer manager-test')
   })
+  it('offers only account statuses supported by the backend', async () => {
+    authOnly()
+    vi.spyOn(managerUsersApi, 'list').mockResolvedValue(paged([]))
+    renderApp('/manager')
+    const status = await screen.findByLabelText('Account status')
+    expect(Array.from(status.querySelectorAll('option')).map((option) => option.value)).toEqual(['', 'ACTIVE', 'INACTIVE'])
+    expect(screen.queryByRole('option', { name: 'Locked' })).not.toBeInTheDocument()
+  })
   it('distinguishes loading, server errors with retry, and an empty list', async () => {
     authOnly()
     let finish: (value: ReturnType<typeof paged<ManagerUser>>) => void = () => {}

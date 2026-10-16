@@ -4,6 +4,11 @@
 - Restrict activity filtering to the backend-supported action codes and update the preview fixture to the same response shape.
 - Refresh FE-06 verification steps for the released API and add authenticated fake-fetch coverage for the real wire contract.
 
+## 2026-10-17 - FE-06 Account Status Filter
+
+- Limit the manager account status filter to ACTIVE and INACTIVE, the only values supported by the backend.
+- Add screen coverage to prevent unsupported status values from returning to the filter.
+
 ## 2026-10-16 - Scheduled Maintenance and Local Document Policy (BE-06)
 
 - Add four daily, Clock-based Vietnam maintenance transitions: overdue pending cards/registrations to CANCELLED and expired ACTIVE cards/registrations to EXPIRED, using guarded bulk updates, committed row counts and idempotency.
