@@ -42,6 +42,12 @@
 - Load schedule class options in cancellable 100-row pages, stop when the view aborts, surface page errors through retry, and reject results above the documented 10,000-class limit.
 - Add pagination, cancellation, page-failure and upper-bound regression coverage.
 
+## 2026-10-16 - Receptionist Booking for Members (BE-13)
+
+- Extend staff member history with combined when/status filters, SQL pagination, stable ordering and the existing array/PageResponse compatibility. Validate the selected member after staff authorization.
+- Add staff-only selected-member eligibility through the same BE-11 calculation and response, without reserving seats, consuming credits or writing routine audits.
+- Require explicit member/package selection for staff, reject cross-member MEMBER requests with 403, and preserve BE-12 session-first locks, atomic capacity/credit updates and transactional BOOKING_CREATED actor attribution. No migration or new actor field is introduced.
+- Add unit, real security-chain controller, SQL Server-dialect query and dedicated isolated SQL Server integration coverage. Actual SQL Server execution remains required in GitHub CI; see docs/tests/BE-13_test_cases.md.
 ## 2026-10-16 - Scheduled Maintenance and Local Document Policy (BE-06)
 
 - Add four daily, Clock-based Vietnam maintenance transitions: overdue pending cards/registrations to CANCELLED and expired ACTIVE cards/registrations to EXPIRED, using guarded bulk updates, committed row counts and idempotency.
