@@ -41,6 +41,7 @@ import { ClassEditorPage } from '../pages/manager/ClassEditorPage'
 import { ManagerSchedulePage } from '../pages/manager/ManagerSchedulePage'
 import { MemberSchedulePage } from '../pages/member/MemberSchedulePage'
 import { FindClassesPage } from '../pages/member/FindClassesPage'
+import { SessionDetailPage } from '../pages/member/SessionDetailPage'
 
 /**
  * Real screens by full path. Later tasks register their page here, for example
@@ -91,6 +92,7 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
   ],
   '/member': [
     { path: 'classes', element: <FindClassesPage /> },
+    { path: 'sessions/:sessionId', element: <SessionDetailPage /> },
     { path: 'packages/:packageId', element: <PackageDetailPage /> },
     { path: 'membership/cards', element: <MembershipCardsPage /> },
     { path: 'payments/:paymentId', element: <PaymentSummaryPage /> },
