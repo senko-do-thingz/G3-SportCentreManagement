@@ -1,29 +1,41 @@
 package com.sportify.catalog.service.impl;
 
-import com.sportify.AbstractIntegrationTest;
+import com.sportify.IsolatedMaintenanceDatabase;
 import com.sportify.catalog.entity.*;
 import com.sportify.catalog.repository.*;
-import com.sportify.catalog.service.MembershipCardService;
-import com.sportify.catalog.service.SportPackageService;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.identity.repository.UserRepository;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.payment.dto.ConfirmPaymentRequest;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.service.PaymentVerificationService;
+import com.sportify.payment.repository.PaymentRepository;
+import com.microsoft.sqlserver.jdbc.SQLServerException;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.slf4j.LoggerFactory;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -32,17 +44,26 @@ import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
-/** Real migrated SQL Server only. All fixtures are unique, committed for worker visibility and removed by owner id. */
+/** Real SQL Server, private migrated database, committed tracked fixtures and independent worker transactions. */
+@Tag("integration")
+@SpringBootTest
+@Testcontainers(disabledWithoutDocker = true)
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.SAME_THREAD)
+@TestPropertySource(properties = {"spring.datasource.hikari.connection-init-sql=SET LOCK_TIMEOUT 5000",
+        "spring.datasource.hikari.maximum-pool-size=4", "spring.datasource.hikari.connection-timeout=10000"})
 @ActiveProfiles(value = {"dev", "test"}, inheritProfiles = false)
 @Import(ScheduledMaintenanceIntegrationTest.TimeConfig.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class ScheduledMaintenanceIntegrationTest extends AbstractIntegrationTest {
+class ScheduledMaintenanceIntegrationTest {
+    @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
+        IsolatedMaintenanceDatabase.register(registry);
+    }
     static final LocalDate TODAY = LocalDate.of(2026, 10, 16);
     static final LocalDateTime NOW = TODAY.atTime(0, 0);
     static final LocalDateTime OLD = TODAY.minusDays(8).atTime(23, 59, 59);
@@ -53,50 +74,72 @@ class ScheduledMaintenanceIntegrationTest extends AbstractIntegrationTest {
         }
     }
     @Autowired ScheduledMaintenanceService maintenance;
-    @Autowired MembershipCardService cardService;
-    @Autowired SportPackageService packageService;
+    @Autowired MembershipScheduledJobs jobs;
+    @Autowired PaymentRepository payments;
+    @Autowired ScheduledAnnotationBeanPostProcessor scheduling;
     @Autowired PaymentVerificationService verification;
     @Autowired UserRepository users;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;
     @Autowired EntityManager em;
-    @MockitoSpyBean MemberCardRepository cards;
-    @MockitoSpyBean SportPackageRegistrationRepository registrations;
-    private final String marker = "be06" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+    @Autowired MemberCardRepository cards;
+    @Autowired SportPackageRegistrationRepository registrations;
+    private final AtomicInteger cases = new AtomicInteger();
+    private String marker;
     private int serial;
     private long member, manager, sport, pack;
-    private final List<ExecutorService> pools = new ArrayList<>();
+    private MaintenanceTestResources resources;
+    private Map<String, Long> baseline;
+
+    private Map<String, Long> counts() {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (String table : MaintenanceTestResources.DELETE_ORDER) {
+            counts.put(table, jdbc.queryForObject("SELECT COUNT_BIG(*) FROM " + table, Long.class));
+        }
+        return counts;
+    }
+
+    @BeforeAll void baseline() {
+        assertThat(jdbc.queryForObject("SELECT DB_NAME()", String.class)).isEqualTo(IsolatedMaintenanceDatabase.name());
+        // Trigger methods remain callable, but wall-clock cron callbacks must not race test fixtures.
+        scheduling.getScheduledTasks().forEach(task -> task.cancel());
+        baseline = counts();
+        assertThat(baseline.get("sport")).isEqualTo(6);
+        assertThat(baseline.get("sport_package")).isEqualTo(36);
+        assertThat(baseline.get("member_card")).isZero();
+        assertThat(baseline.get("sport_package_registration")).isZero();
+    }
 
     @BeforeEach void fixtures() {
+        resources = new MaintenanceTestResources(jdbc);
+        assertThat(counts()).as("Prior invocation must leave the isolated database at its baseline").isEqualTo(baseline);
+        marker = "be06r3_" + cases.incrementAndGet() + "_";
+        serial = 0;
         member = user("MEMBER"); manager = user("MANAGER");
         jdbc.update("INSERT INTO member_profile(user_id,member_code,joined_on) VALUES (?,?,?)", member, code(), TODAY);
+        resources.remember("member_profile", member);
         sport = id("INSERT INTO sport(code,name,venue_type) OUTPUT INSERTED.id VALUES (?,?,'INDOOR')", code(), code());
         pack = id("INSERT INTO sport_package(code,name,sport_id,training_format,duration_days,session_count,"
                 + "price_amount,session_minutes) OUTPUT INSERTED.id VALUES (?,?,?,'SELF_TRAINING',30,10,100,60)",
                 code(), "BE06 package", sport);
     }
-    @AfterEach void cleanup() throws Exception {
-        for (var pool : pools) {
-            pool.shutdownNow();
-            assertThat(pool.awaitTermination(15, TimeUnit.SECONDS)).isTrue();
+
+    @AfterEach void cleanup() {
+        List<Throwable> failures = new ArrayList<>();
+        try { if (resources != null) resources.close(); } catch (Throwable failure) { failures.add(failure); }
+        try { assertThat(counts()).as("Committed fixtures must be removed even after test failure").isEqualTo(baseline); }
+        catch (Throwable failure) { failures.add(failure); }
+        if (!failures.isEmpty()) {
+            AssertionError error = new AssertionError("BE-06 fixture isolation failed");
+            failures.forEach(error::addSuppressed);
+            throw error;
         }
-        reset(cards, registrations);
-        jdbc.update("DELETE FROM activity_log WHERE actor_user_id IN (?,?)", member, manager);
-        jdbc.update("DELETE FROM check_in WHERE member_id=?", member);
-        jdbc.update("DELETE FROM booking WHERE member_id=?", member);
-        jdbc.update("DELETE FROM class_session WHERE sport_id=?", sport);
-        jdbc.update("DELETE FROM invoice_line WHERE invoice_id IN (SELECT id FROM invoice WHERE member_id=?)", member);
-        jdbc.update("DELETE FROM invoice WHERE member_id=?", member);
-        jdbc.update("DELETE FROM member_card WHERE member_id=?", member);
-        jdbc.update("DELETE FROM sport_package_registration WHERE member_id=?", member);
-        jdbc.update("DELETE FROM payment WHERE member_id=?", member);
-        jdbc.update("DELETE FROM sport_package WHERE id=?", pack);
-        jdbc.update("DELETE FROM sport WHERE id=?", sport);
-        jdbc.update("DELETE FROM member_profile WHERE user_id=?", member);
-        jdbc.update("DELETE FROM user_account WHERE id IN (?,?)", member, manager);
     }
     private String code() { return marker + (++serial); }
-    private long id(String sql, Object... args) { return Objects.requireNonNull(jdbc.queryForObject(sql, Long.class, args)); }
+    private long id(String sql, Object... args) {
+        String table = sql.substring("INSERT INTO ".length(), sql.indexOf('(')).trim();
+        return resources.insert(table, sql, args);
+    }
     private long user(String role) {
         return id("INSERT INTO user_account(email,password_hash,full_name,role_id,status,version) "
                 + "OUTPUT INSERTED.id VALUES (?,'test-only-non-credential','BE06 fixture',"
@@ -138,11 +181,12 @@ class ScheduledMaintenanceIntegrationTest extends AbstractIntegrationTest {
     }
     private TransactionTemplate tx() { return new TransactionTemplate(transactions); }
     private ExecutorService pool() {
-        var pool = Executors.newFixedThreadPool(2); pools.add(pool); return pool;
+        return resources.pool();
     }
-    private static void await(CountDownLatch latch) {
-        try { assertThat(latch.await(20, TimeUnit.SECONDS)).as("Worker coordination deadline").isTrue(); }
+    private static void await(CompletableFuture<Void> signal) {
+        try { signal.get(20, TimeUnit.SECONDS); }
         catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
+        catch (ExecutionException | TimeoutException e) { throw new IllegalStateException("BE-06 worker coordination failed", e); }
     }
     private int total(ScheduledMaintenanceService.MaintenanceResult r) {
         return r.cancelledPendingCards() + r.expiredCards() + r.cancelledPendingRegistrations() + r.expiredRegistrations();
@@ -175,6 +219,9 @@ class ScheduledMaintenanceIntegrationTest extends AbstractIntegrationTest {
     void activeCardExpirationIsStrictlyBeforeBusinessDate(int offset, int affected) {
         long item = card("ACTIVE", OLD, TODAY.plusDays(offset), false);
         var before = row("member_card", item);
+        var eligible = jdbc.queryForList("SELECT id FROM member_card WHERE status='ACTIVE' AND end_date < ?", Long.class, TODAY);
+        assertThat(eligible).as("Exact eligible fixture ids before the unfiltered production bulk update")
+                .containsExactlyElementsOf(affected == 1 ? List.of(item) : List.of());
         assertThat(maintenance.runDailyMaintenance().expiredCards()).isEqualTo(affected);
         assertThat(state("member_card", item)).isEqualTo(affected == 1 ? "EXPIRED" : "ACTIVE");
         unchangedExcept(before, row("member_card", item), affected == 1);
@@ -299,10 +346,43 @@ class ScheduledMaintenanceIntegrationTest extends AbstractIntegrationTest {
         long x = registration("ACTIVE", OLD, TODAY.minusDays(1));
         var beforeC=row("member_card",c); var beforeE=row("member_card",e);
         var beforeR=row("sport_package_registration",r); var beforeX=row("sport_package_registration",x);
-        doThrow(new IllegalStateException("Synthetic fourth statement failure")).when(registrations).expireActive(any(),any());
-        assertThatThrownBy(maintenance::runDailyMaintenance).isInstanceOf(IllegalStateException.class);
+        long audits = jdbc.queryForObject("SELECT COUNT_BIG(*) FROM activity_log", Long.class);
+        // The real fourth UPDATE reaches the trigger inside the service transaction. The trigger
+        // proves all three earlier changes are visible before throwing its distinct vendor error.
+        jdbc.execute("""
+                CREATE TRIGGER %s ON sport_package_registration AFTER UPDATE AS
+                BEGIN
+                    SET NOCOUNT ON;
+                    IF EXISTS (SELECT 1 FROM inserted i JOIN deleted d ON d.id=i.id
+                               WHERE i.id=%d AND d.status='ACTIVE' AND i.status='EXPIRED')
+                    BEGIN
+                        IF NOT EXISTS (SELECT 1 FROM member_card WHERE id=%d AND status='CANCELLED')
+                           OR NOT EXISTS (SELECT 1 FROM member_card WHERE id=%d AND status='EXPIRED')
+                           OR NOT EXISTS (SELECT 1 FROM sport_package_registration WHERE id=%d AND status='CANCELLED')
+                            THROW 51007, 'Earlier maintenance operations were not visible', 1;
+                        THROW 51006, 'Synthetic fourth maintenance operation failure', 1;
+                    END;
+                END;
+                """.formatted(MaintenanceTestResources.FAILURE_TRIGGER,x,c,e,r));
+        Logger logger = (Logger) LoggerFactory.getLogger(MembershipScheduledJobs.class);
+        ListAppender<ILoggingEvent> messages = new ListAppender<>();
+        messages.start(); logger.addAppender(messages);
+        try {
+            assertThatThrownBy(jobs::processDailyMemberships).satisfies(failure -> {
+                Throwable cause = failure;
+                while (cause.getCause() != null) cause = cause.getCause();
+                assertThat(cause).isInstanceOf(SQLServerException.class);
+                assertThat(((SQLServerException) cause).getErrorCode()).isEqualTo(51006);
+            });
+            assertThat(messages.list.stream().filter(event -> event.getThreadName().equals(Thread.currentThread().getName()))
+                    .map(ILoggingEvent::getFormattedMessage)).noneMatch(message -> message.contains("Maintenance committed"));
+        } finally {
+            logger.detachAppender(messages); messages.stop();
+            jdbc.execute("DROP TRIGGER " + MaintenanceTestResources.FAILURE_TRIGGER);
+        }
         assertThat(row("member_card",c)).isEqualTo(beforeC); assertThat(row("member_card",e)).isEqualTo(beforeE);
         assertThat(row("sport_package_registration",r)).isEqualTo(beforeR); assertThat(row("sport_package_registration",x)).isEqualTo(beforeX);
+        assertThat(jdbc.queryForObject("SELECT COUNT_BIG(*) FROM activity_log", Long.class)).isEqualTo(audits);
     }
 
     @Test void modifyingQueriesFlushAndClearTheirPersistenceContext() {
@@ -370,29 +450,58 @@ class ScheduledMaintenanceIntegrationTest extends AbstractIntegrationTest {
         long item = card ? card("PENDING_PAYMENT",OLD,TODAY.plusDays(30),false)
                 : registration("PENDING_PAYMENT",OLD,TODAY.plusDays(30));
         long payment = payment(table,item);
-        CountDownLatch read = new CountDownLatch(1), resume = new CountDownLatch(1);
-        AtomicBoolean first = new AtomicBoolean(true);
-        if (card) doAnswer(call -> {
-            Object loaded = call.callRealMethod();
-            if (first.getAndSet(false)) { read.countDown(); await(resume); }
-            return loaded;
-        }).when(cards).findById(item);
-        else doAnswer(call -> {
-            Object loaded = call.callRealMethod();
-            if (first.getAndSet(false)) { read.countDown(); await(resume); }
-            return loaded;
-        }).when(registrations).findById(item);
+        CompletableFuture<Void> read = new CompletableFuture<>();
+        CompletableFuture<Void> resume = resources.releaseGate();
         var activation = pool().submit(() -> {
-            assertThatThrownBy(() -> confirm(payment)).isInstanceOf(BusinessRuleException.class).hasMessageContaining("CANCELLED");
+            try {
+                assertThatThrownBy(() -> tx().executeWithoutResult(status -> {
+                    // Follow the production payment-first order. Complete the read before signaling:
+                    // no repository proxy callback or open result set is parked at the barrier.
+                    payments.findByIdForUpdate(payment).orElseThrow();
+                    Object cached = card ? em.find(MemberCard.class,item) : em.find(SportPackageRegistration.class,item);
+                    assertThat(em.contains(cached)).isTrue();
+                    assertThat(card ? ((MemberCard) cached).getStatus().name()
+                            : ((SportPackageRegistration) cached).getStatus().name()).isEqualTo("PENDING_PAYMENT");
+                    read.complete(null);
+                    await(resume);
+                    // The managed object is deliberately still stale; the real activation must refresh it.
+                    assertThat(card ? ((MemberCard) cached).getStatus().name()
+                            : ((SportPackageRegistration) cached).getStatus().name()).isEqualTo("PENDING_PAYMENT");
+                    confirm(payment);
+                })).isInstanceOf(BusinessRuleException.class).hasMessageContaining("CANCELLED");
+            } catch (Throwable failure) {
+                read.completeExceptionally(failure);
+                throw failure;
+            }
         });
         try {
             await(read);
             assertThat(total(maintenance.runDailyMaintenance())).isEqualTo(1);
-        } finally { resume.countDown(); }
+        } finally { resume.complete(null); }
         activation.get(30,TimeUnit.SECONDS);
+        assertThat(activation.isDone()).isTrue();
         assertThat(state(table,item)).isEqualTo("CANCELLED");
         assertThat(row("payment",payment).get("payment_status")).isEqualTo("PENDING");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM invoice WHERE payment_id=?",Integer.class,payment)).isZero();
+    }
+
+    @Test void committedFixtureCleanupAfterAssertionFailurePreservesCatalogAndMemberBaseline() {
+        var before = counts();
+        var extra = new MaintenanceTestResources(jdbc);
+        assertThatThrownBy(() -> {
+            try {
+                long user = extra.insert("user_account", "INSERT INTO user_account(email,password_hash,full_name,role_id,status,version) "
+                        + "OUTPUT INSERTED.id VALUES (?,'test-only-non-credential','BE06 cleanup',"
+                        + "(SELECT id FROM role WHERE code='MEMBER'),'ACTIVE',0)", code()+"@example.test");
+                jdbc.update("INSERT INTO member_profile(user_id,member_code,joined_on) VALUES (?,?,?)",user,code(),TODAY);
+                extra.remember("member_profile",user);
+                long sport = extra.insert("sport","INSERT INTO sport(code,name,venue_type) OUTPUT INSERTED.id VALUES (?,?,'INDOOR')",code(),code());
+                extra.insert("sport_package","INSERT INTO sport_package(code,name,sport_id,training_format,duration_days,session_count,price_amount,session_minutes) "
+                        + "OUTPUT INSERTED.id VALUES (?,? ,?,'SELF_TRAINING',30,10,100,60)",code(),"BE06 cleanup",sport);
+                throw new AssertionError("Synthetic assertion after committed fixtures");
+            } finally { extra.close(); }
+        }).isInstanceOf(AssertionError.class).hasMessage("Synthetic assertion after committed fixtures");
+        assertThat(counts()).isEqualTo(before);
     }
 
     @Test void expirationAndAtomicCreditDebitNeverModifyBalancesTwice() throws Exception {

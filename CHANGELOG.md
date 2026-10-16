@@ -4,6 +4,7 @@
 - Preserve credits, payments, bookings and existing legacy membership processing. Add boundary, scheduler and HQL unit coverage plus SQL Server rollback/concurrency/regression coverage required in CI.
 - Keep AI Audit Log documents local only; remove verified current index entries while preserving local bytes, and ignore their precise naming conventions. Historical revisions are outside scope.
 - Apply the owner-approved activation safeguard: retain the payment-first order, then lock and refresh the card/registration before checking its status. Add stale-state and lock-failure regressions; preserve pricing, receipts and audit behavior. SQL Server execution remains pending CI.
+- Round 3 repairs integration-test isolation and orchestration: private migrated database, tracked committed fixture cleanup with worker shutdown, real cached-state transaction coordination, and SQL-trigger rollback injection. Preserve strict catalog/member assertions and require all four previously failing suites in CI; add local proxy/teardown regressions. Production jobs and activation safeguards are unchanged.
 
 ## 2026-10-16 - Coach Teaching Schedule and Class Roster (BE-14)
 
