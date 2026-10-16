@@ -2,16 +2,19 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, getErrorMessage, splitFieldErrors } from '../../api/errors'
 import type { LoginRedirectState } from '../../auth/RequireAuth'
+import { LoginProfileError } from '../../auth/authContext'
 import { validateLogin } from '../../auth/loginValidation'
-import { homePathFor, postLoginPath } from '../../auth/roles'
+import { postLoginPath } from '../../auth/roles'
 import { useAuth } from '../../auth/useAuth'
 import { Button } from '../../components/ui/Button'
 import { Checkbox } from '../../components/ui/Checkbox'
 import { Input } from '../../components/ui/Input'
 import { PasswordInput } from '../../components/ui/PasswordInput'
+import { PageLoader } from '../../components/ui/Spinner'
 import { sampleAccount } from '../../config/env'
 import { useFocusFirstInvalid } from '../../utils/useFocusFirstInvalid'
 import { AuthShell } from './AuthShell'
+import { SessionErrorPage } from './SessionErrorPage'
 
 /** Shown for HTTP 403 from POST /auth/login (DisabledException or LockedException on the backend). */
 export const ACCOUNT_DISABLED_MESSAGE =
@@ -46,8 +49,14 @@ function loginErrorMessage(error: unknown): string {
     if (error.status === 403) {
       return ACCOUNT_DISABLED_MESSAGE
     }
+    if (error.status === 0) {
+      return 'Cannot reach the server. Check your connection and API URL; a browser CORS restriction may also block the request.'
+    }
+    if (error.status >= 500) {
+      return 'The login service is unavailable. Please try again later.'
+    }
   }
-  return getErrorMessage(error)
+  return error instanceof ApiError ? getErrorMessage(error) : 'We could not sign you in. Please try again.'
 }
 
 /** Log in screen (Figma F1-05). */
@@ -98,7 +107,13 @@ export function LoginPage() {
   }
 
   if (status === 'authenticated' && user && !submitting) {
-    return <Navigate to={homePathFor(user)} replace />
+    return <Navigate to={postLoginPath(user, requestedPath)} replace />
+  }
+  if (status === 'loading') {
+    return <PageLoader label="Restoring your session" />
+  }
+  if (status === 'error' && !submitting) {
+    return <SessionErrorPage />
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -119,7 +134,9 @@ export function LoginPage() {
       const signedIn = await login({ email, password }, { remember })
       navigate(postLoginPath(signedIn, requestedPath), { replace: true })
     } catch (error) {
-      if (error instanceof ApiError && error.hasFieldErrors) {
+      if (error instanceof LoginProfileError) {
+        setFormError(error.message)
+      } else if (error instanceof ApiError && error.hasFieldErrors) {
         // Backend validation messages take precedence over the client side checks. Keys without
         // an input on this form are shown above it instead of being lost.
         const { fields, formMessage } = splitFieldErrors(error.fieldErrors, LOGIN_FIELDS)

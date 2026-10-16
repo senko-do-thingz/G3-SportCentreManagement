@@ -1,5 +1,23 @@
 # Test Cases - Task FE-00 (Shared): Frontend Foundation - Routing, API Client, Auth, Layouts
 
+## Maintenance validation on 2026-10-17
+
+Branch: fix/fe-00-auth-maintenance. Status: In progress pending real-browser acceptance.
+
+The local frontend environment used a bare backend origin. Before the repair this sent POST /auth/login without /api/v1; a real backend request to that path returned 401. The corrected versioned login and profile endpoints returned 200 with existing seeded Receptionist, Member and Coach accounts. No credential or token value was recorded.
+
+New deterministic coverage:
+
+| File | Coverage |
+| --- | --- |
+| src/config/env.test.ts | Defaults, bare and explicit versioned origins, same-origin base, invalid paths and safe configuration errors, actual endpoint construction |
+| src/auth/auth.maintenance.test.tsx | All four role layouts and Bearer profile requests, credential versus profile rejection, recoverable profile failures and Retry, safe diagnostics, malformed token/profile JSON, late login and profile ownership |
+| src/api/client.maintenance.test.ts | Response-body ownership, preventing retry under a new account, recoverable network/server/malformed refresh responses |
+
+Executed from frontend on Windows PowerShell: npm ci (exit 0, 0 reported vulnerabilities), npm run lint (exit 0), npm test (614 passed in 30 files, including 46 new tests), and npm run build (exit 0). Existing guard, reload, logout, remember-me, registration, single-flight refresh, bounded retry, refresh rejection and cross-tab suites remain passing.
+
+Real-browser checks were not executed: the browser inventory was empty, and both iab and chrome creation reported that the browser was unavailable. A PowerShell OPTIONS request to /api/v1/users/me returned 200 with the allowed localhost:5173 origin and authorization header; this is API evidence, not proof of a browser CORS or login pass. Before acceptance, use the manual checks below with the real frontend and backend and record actual Network and Console results. Keep the task In progress until those checks pass.
+
 ## 1. Overview
 - Task ID: FE-00
 - Flow: Shared (used by every frontend task of Flow 1, 2, 3)

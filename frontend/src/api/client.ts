@@ -7,7 +7,7 @@ import {
   StaleSessionError,
 } from './errors'
 import { tokenStorage } from './tokenStorage'
-import type { AuthTokens } from './types'
+import { isAuthTokens } from './types'
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
@@ -200,16 +200,15 @@ async function performRefresh(failedAccessToken: string | null): Promise<string 
       return null
     }
 
-    const tokens = data as AuthTokens | undefined
-    if (!tokens?.accessToken || !tokens.refreshToken) {
-      return null
+    if (!isAuthTokens(data)) {
+      throw new ApiError(502, 'The authentication service returned an invalid response. Please try again later.')
     }
     if (tokenStorage.getEpoch() !== epoch) {
       // The user logged out or logged in as someone else while the refresh was running.
       return null
     }
-    tokenStorage.rotate(tokens)
-    return tokens.accessToken
+    tokenStorage.rotate(data)
+    return data.accessToken
   })
 }
 
@@ -306,6 +305,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     if (!newAccessToken) {
       throw expireSession(epoch)
     }
+    if (tokenStorage.getEpoch() !== epoch) {
+      throw new StaleSessionError()
+    }
     response = await send(path, options, newAccessToken)
     if (tokenStorage.getEpoch() !== epoch) {
       throw new StaleSessionError()
@@ -318,6 +320,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
 
   const data = await readBody(response)
+  if (useAuth && tokenStorage.getEpoch() !== epoch) {
+    throw new StaleSessionError()
+  }
   if (!response.ok) {
     throw apiErrorFromBody(response.status, data)
   }
