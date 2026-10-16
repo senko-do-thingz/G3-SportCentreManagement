@@ -1,7 +1,7 @@
 # FE-08 - Member browsing verification
 
 Date: 2026-10-17. Working project: `E:\SWP391_SS2\Project\V1\G3-SportCentreManagement-main`.
-Branch: `feat/f2-member-browse`. Latest `origin/main` (`91c1f29`) is merged through `c77b831`; updated FE-06 and FE-07 work is merged through `6094342`. Backend files match `origin/main`; all follow-up changes are frontend-only. No SQL writes or new live data were performed.
+Branch: `feat/f2-member-browse`. Latest `origin/main` (`91c1f29`) is an ancestor through the FE-06 integration merge `26a2895`; updated FE-06 and FE-07 work is then merged through `6094342`. Backend files match `origin/main`; all follow-up changes are frontend-only. No SQL writes or new live data were performed.
 
 ## Delivered screens
 
@@ -99,8 +99,10 @@ Live mode remains `npm run dev -- --host localhost --port 5173`, with the existi
 ## Verification evidence
 
 - Baseline: 619 tests across 34 files passed before FE-08.
-- Full regression: 670 tests across 41 files passed, including existing manager and receptionist suites.
+- Full regression before the FE-09 handoff refinement: 670 tests across 41 files passed, including existing manager and receptionist suites.
 - The final visibility/focus refinement also passed all 24 detail tests, production build and lint.
+- Final combined branch verification on 2026-10-17: 677 tests across 42 files passed; lint and production build passed. Build output has a non-blocking 559.83 kB JavaScript chunk warning.
+- A final browser re-check was attempted, but the computer-use safety layer stopped before interacting because it could not confidently determine Chrome's current URL. The earlier desktop preview observations above are not a re-check of the final combined branch. The local preview server is listening on port 5174.
 - Production build passes with the pre-existing non-blocking main-chunk warning above 500 kB. No package or lockfile changes.
 - Desktop Chrome preview: schedule, complete search results, self-training filtering, source-query return, coach-led detail and coach profile inspected. No new console errors after a clean reload; a transient dependency-array warning during hot reload was resolved by reload and was not reproduced on the clean run.
 - Automated coverage includes each eligibility reason, unknown states, member/staff guards, complete paging, query/date safety, no coach request for self-training, independent profile failure, modal Escape/focus restoration, and no unintended booking writes.
