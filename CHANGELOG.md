@@ -1,3 +1,9 @@
+## 2026-10-16 - Member Schedule, Search and Session Detail (FE-08)
+
+- Add member-only week/day browsing, server-filtered class-session results with URL state, complete calendar pagination and contextual coach options without staff-only lookups.
+- Add every backend eligibility state, self-training detail without coach requests, safe package recovery links and a lazy public coach-profile modal. Booking remains an explicit later-task boundary; no booking or payment writes.
+- Add isolated read-only member preview scenarios, tests and verification docs. Preserve FE-06/FE-07 and scope receptionist header styles to the staff layout. Desktop review completed; additional mobile work waived by the user, live member API verification pending a running backend.
+
 ## 2026-10-16 - Live Scheduling and Coach Discovery Fixes (FE-07)
 
 - Show active coaches before sport selection, explain qualification filtering and add a coach-directory refresh action.
