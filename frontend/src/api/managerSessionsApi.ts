@@ -57,15 +57,16 @@ export interface ScheduleConflict {
 const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
 const resource = (value: unknown): SessionResource | null => record(value) && typeof value.id === 'number' && typeof value.name === 'string'
   ? { id: value.id, name: value.name } : null
+const validDate = (value: unknown): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+  && Number.isFinite(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value
+const validTime = (value: unknown): value is string => typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(value)
 
 /** A generic 409 is not necessarily a scheduling conflict. Keep the original API error otherwise. */
 export function scheduleConflicts(error: unknown): ScheduleConflict[] {
   if (!(error instanceof ApiError) || error.status !== 409 || !record(error.details) || !Array.isArray(error.details.conflicts)) return []
   return error.details.conflicts.flatMap((item: unknown): ScheduleConflict[] => {
     if (!record(item) || typeof item.sessionId !== 'number' || !Number.isSafeInteger(item.sessionId) || item.sessionId <= 0
-      || typeof item.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(item.date)
-      || typeof item.startTime !== 'string' || !/^\d{2}:\d{2}(:\d{2})?$/.test(item.startTime)
-      || typeof item.endTime !== 'string' || !/^\d{2}:\d{2}(:\d{2})?$/.test(item.endTime)
+      || !validDate(item.date) || !validTime(item.startTime) || !validTime(item.endTime)
       || !['COACH', 'FACILITY', 'BOTH'].includes(String(item.conflictType))) return []
     const sessionClass = resource(item.class)
     return [{
