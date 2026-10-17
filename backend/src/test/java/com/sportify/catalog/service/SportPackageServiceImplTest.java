@@ -1277,4 +1277,51 @@ public class SportPackageServiceImplTest {
         verifyNoInteractions(paymentVerificationService, auditService);
     }
 
+    @Test
+    void staleFreeDeskPackageQuoteIsRejectedBeforeRecordingMoney() throws Exception {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper()
+                .disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        var request = mapper.readValue("{\"memberId\":100,\"packageId\":10,\"channel\":\"RECEPTION\",\"expectedAmountDue\":0}", PackageRegistrationRequest.class);
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(sportPackage));
+        when(membershipCardService.getApplicableDiscountPercentage(100L, 30)).thenReturn(0);
+        var failure = assertThrows(com.sportify.core.exception.ConflictException.class,
+                () -> sportPackageService.registerPackage(request, receptionistUser));
+        assertEquals("DESK_SALE_PRICE_CHANGED", failure.getCode());
+        verifyNoInteractions(paymentVerificationService, paymentService, auditService);
+        verify(registrationRepository, never()).save(any());
+    }
+
+    @Test
+    void stableFreePackageReturnsZeroCollectionAndNoPayment() {
+        sportPackage.setPriceAmount(BigDecimal.ZERO);
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(sportPackage));
+        when(membershipCardService.getApplicableDiscountPercentage(100L, 30)).thenReturn(0);
+        when(registrationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        var response = sportPackageService.registerPackage(PackageRegistrationRequest.builder()
+                .memberId(100L).packageId(10L).channel(RegistrationChannel.RECEPTION).expectedAmountDue(BigDecimal.ZERO).build(), receptionistUser);
+        assertEquals(PackageRegistrationStatus.ACTIVE, response.getStatus());
+        assertEquals(BigDecimal.ZERO, response.getAmountReceived());
+        assertEquals(BigDecimal.ZERO, response.getChangeAmount());
+        org.junit.jupiter.api.Assertions.assertNull(response.getPaymentId());
+        org.junit.jupiter.api.Assertions.assertNull(response.getInvoiceId());
+        verifyNoInteractions(paymentVerificationService, paymentService);
+    }
+
+    @Test
+    void changedPackageDiscountConflictsAndDoesNotTreatOldCashQuoteAsOverpayment() {
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(sportPackage));
+        when(membershipCardService.getApplicableDiscountPercentage(100L, 30)).thenReturn(5);
+        var request = PackageRegistrationRequest.builder().memberId(100L).packageId(10L)
+                .expectedAmountDue(new BigDecimal("350000")).amountReceived(new BigDecimal("350000"))
+                .paymentMethod(PaymentMethod.CASH).build();
+        var failure = assertThrows(com.sportify.core.exception.ConflictException.class,
+                () -> sportPackageService.registerPackage(request, managerUser));
+        assertEquals(new BigDecimal("332500.00"), failure.getDetails().get("currentAmountDue"));
+        verify(registrationRepository, never()).save(any());
+        verifyNoInteractions(paymentVerificationService, paymentService, auditService);
+    }
+
 }

@@ -1,13 +1,12 @@
-import { useCallback, useState, type FormEvent } from 'react'
+import { useCallback, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { ApiError, splitFieldErrors } from '../../api/errors'
 import type { MemberCard, PackageRegistration } from '../../api/memberApi'
-import { isMemberNotFound, receptionApi, type MemberOverview, type MemberSummary } from '../../api/receptionApi'
-import { Button, Card, EmptyState, ErrorState, Input, Modal, PageHeader, Select, StatusBadge, useToast } from '../../components/ui'
+import { isMemberNotFound, receptionApi, type CreatedMember, type MemberOverview, type MemberSummary } from '../../api/receptionApi'
+import { Button, Card, EmptyState, ErrorState, Input, Modal, PageHeader, StatusBadge } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { useResource } from '../../hooks/useResource'
-import { toIsoDate } from '../../utils/date'
 import { formatDate, formatMoney, humanizeCode } from '../../utils/format'
 import { currentCard, registrationTitle } from '../member/dashboardModel'
 import { MemberHeader, MemberPicker } from './ReceptionMember'
@@ -15,12 +14,11 @@ import {
   afterPaymentReference,
   checkInPath,
   EMPTY_MEMBER_FORM,
-  GOAL_OPTIONS,
-  LEVEL_OPTIONS,
   MEMBER_FULL_NAME_MAX,
   pendingCards,
   positiveId,
   receptionPaymentPath,
+  receptionDate,
   registerPath,
   sortedRegistrations,
   validateMemberForm,
@@ -91,14 +89,16 @@ export function MemberSearchPage() {
         />
         {memberId !== null && <MemberOverviewPanel key={memberId} memberId={memberId} paidReference={paidReference} />}
       </Card>
-      <CreateMemberModal
-        open={creating}
-        onClose={() => setCreating(false)}
-        onCreated={(member) => {
-          setCreating(false)
-          setParams(new URLSearchParams({ q: member.memberCode ?? member.fullName, memberId: String(member.userId) }))
-        }}
-      />
+      {creating && (
+        <CreateMemberModal
+          open
+          onClose={() => setCreating(false)}
+          onCreated={(member) => {
+            setCreating(false)
+            setParams(new URLSearchParams({ q: member.memberCode ?? member.fullName, memberId: String(member.userId) }))
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -112,8 +112,7 @@ function MemberOverviewPanel({ memberId, paidReference }: { memberId: number; pa
     return <Spinner label="Loading the member profile" />
   }
   if (overview.status === 'error') {
-    // Only the proposed "Member not found" 404 (to confirm with BE-05) means a missing member; any other 404 (for example an
-    // endpoint that is not deployed yet) is shown as an error with Retry.
+    // Only the canonical missing-member 404 means an absent profile.
     if (isMemberNotFound(overview.error)) {
       return <EmptyState title="Member not found" description="This member profile does not exist any more." />
     }
@@ -123,7 +122,7 @@ function MemberOverviewPanel({ memberId, paidReference }: { memberId: number; pa
     <section className="member-overview" aria-label="Member profile">
       {paidReference && (
         <p className="notice notice--success">
-          Payment {paidReference} is confirmed and the request is active. The profile below shows the new status.
+          Returned from payment {paidReference}. Check the current service status below.
         </p>
       )}
       <OverviewBody data={overview.data} onHandoff={setHandoff} />
@@ -139,7 +138,7 @@ function OverviewBody({
   data: MemberOverview
   onHandoff: (item: PackageRegistration | MemberCard) => void
 }) {
-  const today = toIsoDate(new Date())
+  const today = receptionDate(new Date())
   const { member } = data
   const card = currentCard(data.cards, today)
   const waitingCards = pendingCards(data.cards)
@@ -360,7 +359,7 @@ function PaymentHandoffModal({
   )
 }
 
-const MEMBER_FIELDS = ['fullName', 'phone', 'email', 'dateOfBirth', 'mainGoal', 'currentLevel'] as const
+const MEMBER_FIELDS = ['fullName', 'phone', 'email'] as const
 
 /** Create Member overlay (F1-13): POST /members. */
 function CreateMemberModal({
@@ -372,14 +371,24 @@ function CreateMemberModal({
   onClose: () => void
   onCreated: (member: MemberSummary) => void
 }) {
-  const toast = useToast()
   const [form, setForm] = useState<CreateMemberForm>(EMPTY_MEMBER_FORM)
   const [errors, setErrors] = useState<MemberFormErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const inFlight = useRef(false)
+  const [created, setCreated] = useState<CreatedMember | null>(null)
+  const [revealed, setRevealed] = useState(false)
+  const [uncertain, setUncertain] = useState(false)
 
   const close = () => {
     if (saving) return
+    if (created) {
+      const member = created.member
+      setCreated(null)
+      setRevealed(false)
+      onCreated(member)
+      return
+    }
     setForm(EMPTY_MEMBER_FORM)
     setErrors({})
     setFormError(null)
@@ -393,27 +402,23 @@ function CreateMemberModal({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    const today = toIsoDate(new Date())
-    const found = validateMemberForm(form, today)
+    if (inFlight.current || uncertain) return
+    const found = validateMemberForm(form)
     setErrors(found)
     setFormError(null)
     if (Object.keys(found).length > 0) {
       return
     }
     setSaving(true)
+    inFlight.current = true
     try {
-      const member = await receptionApi.createMember({
+      const result = await receptionApi.createMember({
         fullName: form.fullName.trim(),
         phone: form.phone.trim(),
         email: form.email.trim(),
-        dateOfBirth: form.dateOfBirth || null,
-        mainGoal: form.mainGoal || null,
-        currentLevel: form.currentLevel || null,
       })
-      toast.success('Member created', `${member.fullName} ${member.memberCode ?? ''}`.trim())
+      setCreated(result)
       setForm(EMPTY_MEMBER_FORM)
-      setSaving(false)
-      onCreated(member)
     } catch (error) {
       setSaving(false)
       if (error instanceof ApiError && error.hasFieldErrors) {
@@ -422,10 +427,30 @@ function CreateMemberModal({
         setFormError(split.formMessage)
       } else if (error instanceof ApiError && error.status === 409) {
         setFormError(`${error.message} Search for the existing profile instead of creating a second one.`)
+      } else if (error instanceof ApiError && error.status > 0 && error.status < 500) {
+        setFormError(error.message)
       } else {
-        setFormError(error instanceof Error ? error.message : 'Something went wrong. Please try again.')
+        setUncertain(true)
+        setFormError('Creation could not be verified. Close this dialog and search for the member before trying again.')
       }
+    } finally {
+      inFlight.current = false
+      setSaving(false)
     }
+  }
+
+  if (created) {
+    return (
+      <Modal key="created-member" open onClose={close} title="Member created" description="Give the temporary sign-in details to the member securely.">
+        <p>Member code: {created.member.memberCode ?? '-'}</p>
+        <p>The temporary password is available only in this dialog. Ask the member to change it after signing in.</p>
+        <Input label="Temporary password" type={revealed ? 'text' : 'password'} value={created.temporaryPassword} readOnly autoComplete="off" />
+        <Button variant="secondary" onClick={() => setRevealed((value) => !value)}>
+          {revealed ? 'Hide temporary password' : 'Reveal temporary password'}
+        </Button>
+        <Button onClick={close}>Continue to member profile</Button>
+      </Modal>
+    )
   }
 
   return (
@@ -456,7 +481,7 @@ function CreateMemberModal({
             label="Phone number"
             required
             inputMode="tel"
-            maxLength={11}
+            maxLength={16}
             value={form.phone}
             onChange={(event) => update('phone')(event.target.value)}
             error={errors.phone}
@@ -465,36 +490,14 @@ function CreateMemberModal({
             label="Email address"
             required
             type="email"
-            maxLength={150}
+            maxLength={255}
             value={form.email}
             onChange={(event) => update('email')(event.target.value)}
             error={errors.email}
           />
-          <Input
-            label="Date of birth"
-            type="date"
-            value={form.dateOfBirth}
-            max={toIsoDate(new Date())}
-            onChange={(event) => update('dateOfBirth')(event.target.value)}
-            error={errors.dateOfBirth}
-          />
-          <Select
-            label="Training goal"
-            options={GOAL_OPTIONS}
-            value={form.mainGoal}
-            onChange={(event) => update('mainGoal')(event.target.value)}
-            error={errors.mainGoal}
-          />
-          <Select
-            label="Experience level"
-            options={LEVEL_OPTIONS}
-            value={form.currentLevel}
-            onChange={(event) => update('currentLevel')(event.target.value)}
-            error={errors.currentLevel}
-          />
         </div>
         <div className="reception-form__actions">
-          <Button type="submit" loading={saving}>
+          <Button type="submit" loading={saving} disabled={uncertain}>
             Save member
           </Button>
           <Button variant="secondary" onClick={close} disabled={saving}>

@@ -24,6 +24,9 @@ import com.sportify.payment.repository.InvoiceRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.SpyBean;
@@ -49,6 +52,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -228,7 +232,7 @@ class DeskSaleRollbackIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"memberId\":" + member.getId() + ",\"packageId\":" + packageId
                                 + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"BANK_TRANSFER\""
-                                + ",\"paymentReference\":\"FT-BE19-RB-1\",\"amountReceived\":400000}"))
+                                + ",\"paymentReference\":\"FT-BE19-RB-1\",\"amountReceived\":400000,\"expectedAmountDue\":400000}"))
                 .andExpect(status().isInternalServerError());
 
         verify(invoiceRepository).save(any(Invoice.class));
@@ -249,7 +253,7 @@ class DeskSaleRollbackIntegrationTest extends AbstractIntegrationTest {
                         .with(user(new CustomUserDetails(receptionist)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"memberId\":" + member.getId() + ",\"tierId\":" + tierId
-                                + ",\"paymentMethod\":\"CASH\",\"amountReceived\":1200000}"))
+                                + ",\"paymentMethod\":\"CASH\",\"amountReceived\":1200000,\"expectedAmountDue\":1200000}"))
                 .andExpect(status().isInternalServerError());
 
         verify(invoiceRepository).save(any(Invoice.class));
@@ -280,4 +284,165 @@ class DeskSaleRollbackIntegrationTest extends AbstractIntegrationTest {
                 .save(argThat((ActivityLog log) -> log != null && AuditAction.PAYMENT_CONFIRMED.equals(log.getAction())));
         assertNothingLeft(member, receptionist, before);
     }
+    private Map<String, Integer> memberState(long memberId) {
+        return Map.of("cards", count("SELECT COUNT(*) FROM member_card WHERE member_id = ?", memberId),
+                "registrations", count("SELECT COUNT(*) FROM sport_package_registration WHERE member_id = ?", memberId),
+                "payments", count("SELECT COUNT(*) FROM payment WHERE member_id = ?", memberId),
+                "invoices", count("SELECT COUNT(*) FROM invoice WHERE member_id = ?", memberId),
+                "lines", count("SELECT COUNT(*) FROM invoice_line WHERE invoice_id IN (SELECT id FROM invoice WHERE member_id = ?)", memberId));
+    }
+
+    private long existingUpgradeBaseline(MemberProfile member, Long tierId) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO member_card(card_code, member_id, tier_id, start_date, end_date, status, price_paid)
+                OUTPUT INSERTED.id VALUES (?, ?, ?, ?, ?, 'ACTIVE', 1200000)
+                """, Long.class, "BE19-BASE-" + SEQUENCE.incrementAndGet(), member.getId(), tierId,
+                LocalDate.now(clock), LocalDate.now(clock).plusMonths(12).minusDays(1));
+    }
+
+    private String saleBody(long memberId, long itemId, String kind, String extra) {
+        return "{\"memberId\":" + memberId + (kind.equals("package") ? ",\"packageId\":" : ",\"tierId\":")
+                + itemId + ",\"channel\":\"RECEPTION\"," + extra + "}";
+    }
+
+    private String salePath(String kind) {
+        return kind.equals("package") ? "/api/v1/packages/registrations" : "/api/v1/membership-cards/purchase";
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"package", "upgrade"})
+    void zeroQuoteChangedBeforeCheckoutIs409WithNoCommittedSale(String kind) throws Exception {
+        var member = newMember(); var staff = newUser("RECEPTIONIST");
+        Long itemId; Long baseline = null;
+        if (kind.equals("package")) {
+            itemId = newPackage();
+            jdbcTemplate.update("UPDATE sport_package SET price_amount = 0 WHERE id = ?", itemId);
+            assertThat(jdbcTemplate.queryForObject("SELECT price_amount FROM sport_package WHERE id = ?", BigDecimal.class, itemId)).isEqualByComparingTo("0");
+            jdbcTemplate.update("UPDATE sport_package SET price_amount = 400000 WHERE id = ?", itemId);
+        } else {
+            var lower = newTier(); itemId = newTier();
+            baseline = existingUpgradeBaseline(member, lower);
+            // The displayed upgrade was zero because the target matched the paid baseline.
+            assertThat(jdbcTemplate.queryForObject("SELECT price FROM membership_card_tier WHERE id = ?", BigDecimal.class, itemId)).isEqualByComparingTo("1200000");
+            jdbcTemplate.update("UPDATE membership_card_tier SET price = 1250000 WHERE id = ?", itemId);
+        }
+        var state = memberState(member.getId()); var receipts = receiptTableCounts();
+        for (int attempt = 0; attempt < 2; attempt++) {
+            mockMvc.perform(post(salePath(kind)).with(user(new CustomUserDetails(staff))).contentType(MediaType.APPLICATION_JSON)
+                    .content(saleBody(member.getId(), itemId, kind, "\"expectedAmountDue\":0")))
+                    .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("DESK_SALE_PRICE_CHANGED"));
+            assertThat(memberState(member.getId())).isEqualTo(state);
+            assertThat(receiptTableCounts()).isEqualTo(receipts);
+        }
+        if (baseline != null) assertThat(jdbcTemplate.queryForObject("SELECT status FROM member_card WHERE id = ?", String.class, baseline)).isEqualTo("ACTIVE");
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE actor_user_id = ?", staff.getId())).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"package", "upgrade"})
+    void stableZeroSaleCommitsOnlyFreeEntitlementAndNoCollection(String kind) throws Exception {
+        var member = newMember(); var staff = newUser("MANAGER");
+        Long itemId; Long baseline = null;
+        if (kind.equals("package")) {
+            itemId = newPackage(); jdbcTemplate.update("UPDATE sport_package SET price_amount = 0 WHERE id = ?", itemId);
+        } else {
+            var lower = newTier(); itemId = newTier(); baseline = existingUpgradeBaseline(member, lower);
+        }
+        var receipts = receiptTableCounts();
+        mockMvc.perform(post(salePath(kind)).with(user(new CustomUserDetails(staff))).contentType(MediaType.APPLICATION_JSON)
+                .content(saleBody(member.getId(), itemId, kind, "\"expectedAmountDue\":0")))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.paymentId").isEmpty()).andExpect(jsonPath("$.invoiceId").isEmpty())
+                .andExpect(jsonPath("$.amountReceived").value(0)).andExpect(jsonPath("$.changeAmount").value(0));
+        var state = memberState(member.getId());
+        assertThat(state.get("payments")).isZero(); assertThat(state.get("invoices")).isZero(); assertThat(state.get("lines")).isZero();
+        assertThat(state.get(kind.equals("package") ? "registrations" : "cards")).isEqualTo(kind.equals("package") ? 1 : 2);
+        if (kind.equals("package")) {
+            assertThat(jdbcTemplate.queryForObject("SELECT status FROM sport_package_registration WHERE member_id = ?", String.class, member.getId())).isEqualTo("ACTIVE");
+            assertThat(jdbcTemplate.queryForObject("SELECT paid_amount FROM sport_package_registration WHERE member_id = ?", BigDecimal.class, member.getId())).isEqualByComparingTo("0");
+        } else {
+            assertThat(count("SELECT COUNT(*) FROM member_card WHERE member_id = ? AND status = 'ACTIVE'", member.getId())).isEqualTo(1);
+            assertThat(jdbcTemplate.queryForObject("SELECT price_paid FROM member_card WHERE member_id = ? AND status = 'ACTIVE'", BigDecimal.class, member.getId())).isEqualByComparingTo("0");
+            assertThat(jdbcTemplate.queryForObject("SELECT status FROM member_card WHERE id = ?", String.class, baseline)).isEqualTo("REPLACED");
+        }
+        assertThat(receiptTableCounts()).isEqualTo(receipts);
+        if (kind.equals("upgrade")) {
+            mockMvc.perform(post(salePath(kind)).with(user(new CustomUserDetails(staff))).contentType(MediaType.APPLICATION_JSON)
+                    .content(saleBody(member.getId(), itemId, kind, "\"expectedAmountDue\":0")))
+                    .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("DESK_SALE_PRICE_CHANGED"));
+            assertThat(memberState(member.getId())).isEqualTo(state);
+            assertThat(receiptTableCounts()).isEqualTo(receipts);
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"package,0,CASH", "package,100000,CASH", "card,0,CASH", "card,100000,CASH", "package,0,BANK_TRANSFER", "card,0,BANK_TRANSFER"})
+    void guardedPaidExactAndCashOverpaymentHaveRealPaidInvoiceAndChange(String kind, int extra, String method) throws Exception {
+        var member = newMember(); var staff = newUser("RECEPTIONIST");
+        long itemId = kind.equals("package") ? newPackage() : newTier();
+        int due = kind.equals("package") ? 400000 : 1200000;
+        var result = mockMvc.perform(post(salePath(kind)).with(user(new CustomUserDetails(staff))).contentType(MediaType.APPLICATION_JSON)
+                .content(saleBody(member.getId(), itemId, kind, "\"expectedAmountDue\":" + due
+                        + ",\"amountReceived\":" + (due + extra) + ",\"paymentMethod\":\"" + method + "\",\"referenceCode\":\"contract-test\"")))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.amountReceived").value(due + extra))
+                .andExpect(jsonPath("$.changeAmount").value(extra)).andReturn();
+        long paymentId = new com.fasterxml.jackson.databind.ObjectMapper().readTree(result.getResponse().getContentAsString()).get("paymentId").asLong();
+        assertThat(jdbcTemplate.queryForObject("SELECT payment_status FROM payment WHERE id = ?", String.class, paymentId)).isEqualTo("SUCCESS");
+        String table = kind.equals("package") ? "sport_package_registration" : "member_card";
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM " + table + " WHERE payment_id = ?", String.class, paymentId)).isEqualTo("ACTIVE");
+        assertThat(jdbcTemplate.queryForObject("SELECT amount FROM payment WHERE id = ?", BigDecimal.class, paymentId)).isEqualByComparingTo(Integer.toString(due));
+        if (extra > 0) {
+            assertThat(jdbcTemplate.queryForObject("SELECT notes FROM payment WHERE id = ?", String.class, paymentId))
+                    .contains("Cash received " + (due + extra), "change " + extra);
+        }
+        assertThat(memberState(member.getId()).get("invoices")).isEqualTo(1);
+        assertThat(memberState(member.getId()).get("lines")).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM invoice WHERE payment_id = ?", String.class, paymentId)).isEqualTo("PAID");
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE actor_user_id = ? AND action = ?", staff.getId(), AuditAction.PAYMENT_CONFIRMED)).isEqualTo(1);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"package,CASH,-1", "card,CASH,-1", "package,BANK_TRANSFER,1", "card,BANK_TRANSFER,1"})
+    void guardedPaidMismatchLeavesNoRows(String kind, String method, int difference) throws Exception {
+        var member = newMember(); var staff = newUser("RECEPTIONIST");
+        long itemId = kind.equals("package") ? newPackage() : newTier();
+        int due = kind.equals("package") ? 400000 : 1200000;
+        var receipts = receiptTableCounts();
+        mockMvc.perform(post(salePath(kind)).with(user(new CustomUserDetails(staff))).contentType(MediaType.APPLICATION_JSON)
+                .content(saleBody(member.getId(), itemId, kind, "\"expectedAmountDue\":" + due + ",\"amountReceived\":" + (due + difference)
+                        + ",\"paymentMethod\":\"" + method + "\",\"referenceCode\":\"contract-test\"")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PAYMENT_AMOUNT_MISMATCH"));
+        assertNothingLeft(member, staff, receipts);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"package", "card"})
+    void profileWriteBeforeChargeMismatchIsRolledBack(String kind) throws Exception {
+        var memberAccount = newUser("MEMBER"); var staff = newUser("RECEPTIONIST");
+        long itemId = kind.equals("package") ? newPackage() : newTier();
+        var receipts = receiptTableCounts();
+        mockMvc.perform(post(salePath(kind)).with(user(new CustomUserDetails(staff))).contentType(MediaType.APPLICATION_JSON)
+                .content(saleBody(memberAccount.getId(), itemId, kind, "\"expectedAmountDue\":0")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("DESK_SALE_PRICE_CHANGED"));
+        assertThat(count("SELECT COUNT(*) FROM member_profile WHERE user_id = ?", memberAccount.getId())).isZero();
+        assertThat(memberState(memberAccount.getId()).values()).allMatch(value -> value == 0);
+        assertThat(receiptTableCounts()).isEqualTo(receipts);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"package", "card"})
+    void positiveQuoteChangeIsNotSilentlyTreatedAsCashOverpayment(String kind) throws Exception {
+        var member = newMember(); var staff = newUser("RECEPTIONIST");
+        long itemId = kind.equals("package") ? newPackage() : newTier();
+        int due = kind.equals("package") ? 400000 : 1200000;
+        if (kind.equals("package")) jdbcTemplate.update("UPDATE sport_package SET price_amount = ? WHERE id = ?", due + 10, itemId);
+        else jdbcTemplate.update("UPDATE membership_card_tier SET price = ? WHERE id = ?", due + 10, itemId);
+        var receipts = receiptTableCounts();
+        mockMvc.perform(post(salePath(kind)).with(user(new CustomUserDetails(staff))).contentType(MediaType.APPLICATION_JSON)
+                .content(saleBody(member.getId(), itemId, kind, "\"expectedAmountDue\":" + due
+                        + ",\"amountReceived\":" + (due + 100) + ",\"paymentMethod\":\"CASH\"")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("DESK_SALE_PRICE_CHANGED"));
+        assertNothingLeft(member, staff, receipts);
+    }
+
 }

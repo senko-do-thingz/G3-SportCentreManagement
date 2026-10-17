@@ -1,16 +1,16 @@
-import { useCallback, useState, type FormEvent } from 'react'
+import { useCallback, useRef, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiError, getErrorMessage } from '../../api/errors'
 import { isMemberNotFound, MEMBER_NOT_FOUND_MESSAGE, receptionApi, type CheckInRecord } from '../../api/receptionApi'
 import { Badge, Button, Card, Input, PageHeader, Table, type TableColumn } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { useResource } from '../../hooks/useResource'
-import { toIsoDate } from '../../utils/date'
 import { formatTime } from '../../utils/format'
 import {
   CHECK_IN_IDENTIFIER_MAX,
   checkInVerdict,
   memberSearchPath,
+  receptionDate,
   registerPath,
   validateIdentifier,
 } from './receptionModel'
@@ -19,29 +19,14 @@ import {
  * Check-in (Figma F1-15 with the Recorded and Rejected states): the desk types a member code or scans
  * the member card, POST /check-ins records the arrival and the backend decides ALLOWED or DENIED with
  * the reason. An unknown code (404) is shown as Rejected with "Member not found". GET /check-ins?date=
- * lists today's check-ins below. On main that call still requires memberId (the date filter comes
- * with BE-05), so a 400 or 5xx answer shows a neutral notice and the check-ins made on this screen.
+ * lists persisted check-ins for the centre calendar day. Failed loads show an error with Retry.
  */
 const IDENTIFIER_ID = 'check-in-identifier'
 
-export const DATE_FILTER_MISSING_MESSAGE = "Today's list needs the date filter from BE-05."
-
-/**
- * 400 or 5xx from GET /check-ins?date=: the backend has no date filter yet (on main the missing
- * memberId parameter ends in the generic 500 handler).
- * TODO(BE-05): remove the 5xx branch once the date filter is merged, so real server errors are not hidden.
- */
-function isMissingDateFilter(error: unknown): boolean {
-  return error instanceof ApiError && (error.status === 400 || error.status >= 500)
-}
-
-let localRecordSeq = 0
-
-/** A rejected row for a code the backend does not know; negative ids never clash with real ones. */
+/** Client-only feedback for an unknown code; never inserted into the persisted history. */
 function memberNotFoundRecord(code: string): CheckInRecord {
-  localRecordSeq += 1
   return {
-    id: -localRecordSeq,
+    id: -1,
     memberId: null,
     memberName: code,
     bookingId: null,
@@ -65,16 +50,16 @@ export function CheckInPage() {
   const [fieldError, setFieldError] = useState<string | null>(null)
   const [requestError, setRequestError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const inFlight = useRef(false)
   const [last, setLast] = useState<{ record: CheckInRecord; identifier: string } | null>(null)
-  // Check-ins made on this screen, newest first, shown while the backend cannot list today's.
-  const [sessionRecords, setSessionRecords] = useState<CheckInRecord[]>([])
 
-  const today = toIsoDate(new Date())
+  const today = receptionDate(new Date())
   const loadToday = useCallback((signal: AbortSignal) => receptionApi.checkInsOn(today, { signal }), [today])
   const [todayList, reloadToday] = useResource(loadToday)
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
+    if (inFlight.current) return
     const error = validateIdentifier(identifier)
     setFieldError(error)
     setRequestError(null)
@@ -84,10 +69,10 @@ export function CheckInPage() {
     }
     const code = identifier.trim()
     setSaving(true)
+    inFlight.current = true
     try {
       const record = await receptionApi.recordCheckIn({ identifier: code, note: note.trim() || null })
       setLast({ record, identifier: code })
-      setSessionRecords((current) => [record, ...current])
       setIdentifier('')
       setNote('')
       reloadToday()
@@ -98,13 +83,13 @@ export function CheckInPage() {
         // example "Resource not found") is a technical error and goes to the notice below.
         const record = memberNotFoundRecord(code)
         setLast({ record, identifier: code })
-        setSessionRecords((current) => [record, ...current])
       } else if (failure instanceof ApiError && failure.fieldErrors.identifier) {
         setFieldError(failure.fieldErrors.identifier)
       } else {
         setRequestError(getErrorMessage(failure))
       }
     } finally {
+      inFlight.current = false
       setSaving(false)
       // Ready for the next scan.
       focusIdentifier()
@@ -188,34 +173,16 @@ export function CheckInPage() {
             </Button>
           }
         >
-          {todayList.status === 'error' && isMissingDateFilter(todayList.error) ? (
-            <>
-              <div className="notice notice--info reception-notice-row" role="status">
-                <span>{DATE_FILTER_MISSING_MESSAGE} Showing the check-ins recorded on this screen.</span>
-                <Button variant="secondary" size="sm" onClick={reloadToday}>
-                  Retry
-                </Button>
-              </div>
-              <Table
-                caption="Today's check-ins"
-                columns={columns}
-                rows={sessionRecords}
-                rowKey={(row) => row.id}
-                emptyTitle="No check-in on this screen yet"
-              />
-            </>
-          ) : (
-            <Table
-              caption="Today's check-ins"
-              columns={columns}
-              rows={todayList.status === 'ready' ? todayList.data : []}
-              rowKey={(row) => row.id}
-              loading={todayList.status === 'loading'}
-              error={todayList.status === 'error' ? todayList.error : undefined}
-              onRetry={reloadToday}
-              emptyTitle="No check-in yet today"
-            />
-          )}
+          <Table
+            caption="Today's check-ins"
+            columns={columns}
+            rows={todayList.status === 'ready' ? todayList.data : []}
+            rowKey={(row) => row.id}
+            loading={todayList.status === 'loading'}
+            error={todayList.status === 'error' ? todayList.error : undefined}
+            onRetry={reloadToday}
+            emptyTitle="No check-in yet today"
+          />
         </Card>
       </div>
     </div>
@@ -232,6 +199,7 @@ function CheckInResult({ record, identifier }: { record: CheckInRecord; identifi
       aria-label={recorded ? 'Check-in recorded' : 'Check-in rejected'}
     >
       <h3 className="checkin-result__title">{recorded ? 'Check-in recorded' : 'Check-in rejected'}</h3>
+      {record.id < 0 && <p>No check-in was saved for this unknown code.</p>}
       <dl className="summary-list">
         <div>
           <dt>Member</dt>

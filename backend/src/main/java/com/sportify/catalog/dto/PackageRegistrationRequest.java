@@ -42,4 +42,9 @@ public class PackageRegistrationRequest {
     @DecimalMin(value = "0.01", message = "Amount received must be greater than zero")
     @Digits(integer = 10, fraction = 2, message = "Amount received must have at most 10 integer digits and 2 decimals")
     private BigDecimal amountReceived;
+
+    /** Optional desk quote guard. Absent/null preserves legacy behavior; explicit zero means no charge is expected. */
+    @DecimalMin(value = "0.00", message = "Expected amount due must not be negative")
+    @Digits(integer = 10, fraction = 2, message = "Expected amount due must have at most 10 integer digits and 2 decimals")
+    private BigDecimal expectedAmountDue;
 }

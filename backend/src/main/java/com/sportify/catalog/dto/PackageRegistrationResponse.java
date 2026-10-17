@@ -39,6 +39,9 @@ public class PackageRegistrationResponse {
     /** Invoice of the payment, set when the response comes from a sale or an activation that issued it (BE-19). */
     private Long invoiceId;
     private String invoiceNumber;
+    /** Validated collection totals on a desk purchase response; null on other reads. */
+    private BigDecimal amountReceived;
+    private BigDecimal changeAmount;
     private LocalDateTime activatedAt;
     private LocalDateTime createdAt;
 }
