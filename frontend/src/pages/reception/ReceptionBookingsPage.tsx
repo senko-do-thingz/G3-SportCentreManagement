@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiError, getErrorMessage } from '../../api/errors'
 import type { BookingWhen, MemberBookingRecord } from '../../api/memberBookingsApi'
@@ -33,11 +33,22 @@ function bookingTitle(booking: MemberBookingRecord): string {
   return booking.className || `${booking.sportName || 'Sport'} session`
 }
 
+interface CancellationTarget {
+  memberId: number
+  booking: MemberBookingRecord
+}
+
 function isDefinitiveMutationRejection(error: unknown): boolean {
   return error instanceof ApiError && error.status >= 400 && error.status < 500
 }
 
 export function ReceptionBookingsPage() {
+  const [params] = useSearchParams()
+  const memberId = positiveId(params.get('memberId'))
+  return <ReceptionBookingsContent key={memberId ?? 'no-member'} />
+}
+
+function ReceptionBookingsContent() {
   const [params, setParams] = useSearchParams()
   const memberId = positiveId(params.get('memberId'))
   const query = params.get('q') ?? ''
@@ -54,13 +65,19 @@ export function ReceptionBookingsPage() {
     return { member, bookings }
   }, [memberId, when, status, page])
   const [resource, reloadResource] = useResource(loader)
-  const [cancelTarget, setCancelTarget] = useState<MemberBookingRecord | null>(null)
+  const [cancelTarget, setCancelTarget] = useState<CancellationTarget | null>(null)
   const [cancelling, setCancelling] = useState(false)
   const [unverifiedCancellation, setUnverifiedCancellation] = useState<{ memberId: number; bookingId: number } | null>(null)
   const [checkingCancellation, setCheckingCancellation] = useState(false)
   const [cancellationCheckError, setCancellationCheckError] = useState<string | null>(null)
   const cancelSubmitted = useRef(false)
+  const mounted = useRef(true)
   const toast = useToast()
+
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   const selectMember = useCallback((member: MemberSummary) => {
     setParams((current) => withQuery(current, { memberId: String(member.userId), page: null, status: null }))
@@ -75,6 +92,7 @@ export function ReceptionBookingsPage() {
         memberId,
         matches: (item) => item.id === unverifiedCancellation.bookingId,
       })
+      if (!mounted.current) return
       if (!booking || booking.memberId !== memberId) {
         throw new ApiError(0, 'The booking was not found in the selected member history.')
       }
@@ -86,20 +104,28 @@ export function ReceptionBookingsPage() {
       }
       reloadResource()
     } catch (error) {
+      if (!mounted.current) return
       setCancellationCheckError(`The cancellation status is still unverified. Refresh member history before trying another action. ${getErrorMessage(error)}`)
     } finally {
-      setCheckingCancellation(false)
+      if (mounted.current) setCheckingCancellation(false)
     }
   }
 
   async function confirmCancel() {
     if (!cancelTarget || cancelSubmitted.current) return
-    const target = cancelTarget
+    const target = cancelTarget.booking
+    const targetMemberId = cancelTarget.memberId
+    if (!memberId || targetMemberId !== memberId || target.memberId !== memberId) {
+      setCancelTarget(null)
+      toast.error('Selected member changed', 'Refresh member history and select the booking again before cancelling.')
+      return
+    }
     cancelSubmitted.current = true
     setCancelling(true)
     try {
       const result = await receptionBookingsApi.cancel(target.id)
-      if (result.id !== target.id || result.memberId !== memberId || result.status !== 'CANCELLED') {
+      if (!mounted.current) return
+      if (result.id !== target.id || result.memberId !== targetMemberId || result.status !== 'CANCELLED') {
         throw new ApiError(0, 'The server did not confirm this member booking cancellation.')
       }
       setCancelTarget(null)
@@ -107,34 +133,38 @@ export function ReceptionBookingsPage() {
       toast.success('Booking cancelled', `${result.bookingCode} is now cancelled.`)
       reloadResource()
     } catch (error) {
+      if (!mounted.current) return
       if (isDefinitiveMutationRejection(error)) {
         toast.error('Cancellation was rejected', getErrorMessage(error))
       } else {
         let current: MemberBookingRecord | null = null
-        if (memberId) {
+        if (targetMemberId) {
           try {
-            current = await receptionBookingsApi.findForMember({ memberId, matches: (item) => item.id === target.id })
+            current = await receptionBookingsApi.findForMember({ memberId: targetMemberId, matches: (item) => item.id === target.id })
           } catch {
             current = null
           }
         }
-        if (current?.memberId === memberId && current.status === 'CANCELLED') {
+        if (!mounted.current) return
+        if (current?.memberId === targetMemberId && current.status === 'CANCELLED') {
           setCancelTarget(null)
           toast.success('Booking cancelled', `${current.bookingCode} is now cancelled.`)
           reloadResource()
-        } else if (current?.memberId === memberId && current.status === 'CONFIRMED') {
+        } else if (current?.memberId === targetMemberId && current.status === 'CONFIRMED') {
           setCancelTarget(null)
           toast.error('Booking remains confirmed', 'The latest member history still shows this booking as confirmed. Review it before attempting cancellation again.')
           reloadResource()
         } else {
           setCancelTarget(null)
-          setUnverifiedCancellation({ memberId: memberId ?? 0, bookingId: target.id })
+          setUnverifiedCancellation({ memberId: targetMemberId, bookingId: target.id })
           setCancellationCheckError(null)
         }
       }
     } finally {
-      cancelSubmitted.current = false
-      setCancelling(false)
+      if (mounted.current) {
+        cancelSubmitted.current = false
+        setCancelling(false)
+      }
     }
   }
 
@@ -176,15 +206,15 @@ export function ReceptionBookingsPage() {
             <p className="browse-muted">{booking.sportName || 'Sport not provided'}{booking.trainingType !== 'SELF_TRAINING' && ` - ${booking.coachName || 'Coach not provided'}`} - {booking.facilityName || 'Facility not provided'}</p>
             <dl className="browse-facts booking-facts"><div><dt>Booking code</dt><dd>{booking.bookingCode}</dd></div><div><dt>Package</dt><dd>{booking.packageName || 'Not provided'}</dd></div><div><dt>Booked</dt><dd>{booking.bookedAt?.replace('T', ' ').slice(0, 16) || 'Not provided'}</dd></div></dl>
             {booking.status === 'CANCELLED' && <p className="browse-muted">Cancelled {booking.cancelledAt ? `on ${booking.cancelledAt.replace('T', ' ').slice(0, 16)}` : ''}{booking.cancelledByName ? ` by ${booking.cancelledByName}` : ''}</p>}
-            {booking.status === 'CONFIRMED' && when === 'UPCOMING' && booking.id !== unverifiedCancellation?.bookingId && <div className="browse-actions booking-actions"><Button variant="danger" onClick={() => setCancelTarget(booking)}>Cancel booking</Button></div>}
+            {booking.status === 'CONFIRMED' && when === 'UPCOMING' && booking.id !== unverifiedCancellation?.bookingId && <div className="browse-actions booking-actions"><Button variant="danger" onClick={() => setCancelTarget({ memberId, booking })}>Cancel booking</Button></div>}
           </article>)}
         </div>}
         {resource.data.bookings.totalElements > PAGE_SIZE && <Pagination page={resource.data.bookings.page} pageSize={resource.data.bookings.size} totalItems={resource.data.bookings.totalElements} onPageChange={(nextPage) => setParams((current) => withQuery(current, { page: String(nextPage) }))} />}
       </>}
     </Card>}
 
-    <Modal open={Boolean(cancelTarget)} onClose={() => !cancelling && setCancelTarget(null)} title="Cancel member booking" description="The booking can be cancelled only if backend cutoff rules allow it. Package credit restoration depends on the registration's current state and backend rules." footer={<><Button variant="secondary" disabled={cancelling} onClick={() => setCancelTarget(null)}>Keep booking</Button><Button variant="danger" loading={cancelling} onClick={() => void confirmCancel()}>Confirm cancellation</Button></>}>
-      {cancelTarget && <div className="booking-cancel-warning"><strong>{bookingTitle(cancelTarget)}</strong><p>{bookingDate(cancelTarget.sessionDate)} at {bookingTime(cancelTarget.startTime)} Vietnam time</p><p>This action cannot be undone. The backend will confirm whether this booking can still be cancelled.</p></div>}
+    <Modal open={Boolean(cancelTarget)} onClose={() => !cancelling && setCancelTarget(null)} title="Cancel member booking" description="The booking can be cancelled only if backend cutoff rules allow it. Package credit restoration depends on the registration's current state and backend rules." footer={<><Button variant="secondary" disabled={cancelling} onClick={() => setCancelTarget(null)}>Keep booking</Button><Button variant="danger" loading={cancelling} disabled={cancelling} onClick={() => void confirmCancel()}>Confirm cancellation</Button></>}>
+      {cancelTarget && <div className="booking-cancel-warning"><strong>{bookingTitle(cancelTarget.booking)}</strong><p>{bookingDate(cancelTarget.booking.sessionDate)} at {bookingTime(cancelTarget.booking.startTime)} Vietnam time</p><p>This action cannot be undone. The backend will confirm whether this booking can still be cancelled.</p></div>}
     </Modal>
   </div>
 }
@@ -197,8 +227,14 @@ function ReceptionEligibilityCard({ memberId, query, session }: { memberId: numb
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [outcomeUnknown, setOutcomeUnknown] = useState(false)
   const submitted = useRef(false)
+  const mounted = useRef(true)
   const loader = useCallback((signal: AbortSignal) => memberSessionsApi.eligibilityForMember(sessionId, memberId, signal), [sessionId, memberId])
   const [eligibility, reloadEligibility] = useResource(loader)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   function openConfirmation(booking: MemberBookingRecord) {
     const search = new URLSearchParams({ memberId: String(memberId), q: query }).toString()
@@ -213,11 +249,13 @@ function ReceptionEligibilityCard({ memberId, query, session }: { memberId: numb
     setOutcomeUnknown(false)
     try {
       const booking = await receptionBookingsApi.createForMember({ memberId, sessionId, packageRegistrationId: registrationId })
+      if (!mounted.current) return
       if (booking.status !== 'CONFIRMED' || booking.memberId !== memberId || booking.sessionId !== sessionId || booking.packageRegistrationId !== registrationId) {
         throw new ApiError(0, 'The server did not confirm this member booking.')
       }
       openConfirmation(booking)
     } catch (error) {
+      if (!mounted.current) return
       if (isDefinitiveMutationRejection(error)) {
         setSubmitError(getErrorMessage(error))
         submitted.current = false
@@ -230,6 +268,7 @@ function ReceptionEligibilityCard({ memberId, query, session }: { memberId: numb
               && item.packageRegistrationId === registrationId
               && item.status === 'CONFIRMED',
           })
+          if (!mounted.current) return
           if (committedBooking) {
             openConfirmation(committedBooking)
             return
@@ -241,7 +280,7 @@ function ReceptionEligibilityCard({ memberId, query, session }: { memberId: numb
         setSubmitError('The booking outcome could not be verified. Check the member booking history before attempting another booking.')
       }
     } finally {
-      setSubmitting(false)
+      if (mounted.current) setSubmitting(false)
     }
   }
 
@@ -302,7 +341,7 @@ export function ReceptionAssistedBookingPage() {
           })}
         </div>}
       </Card>
-      {chosenSession && memberId && <ReceptionEligibilityCard key={chosenSession.id} memberId={memberId} query={query} session={chosenSession} />}
+      {chosenSession && memberId && <ReceptionEligibilityCard key={`${memberId}-${chosenSession.id}`} memberId={memberId} query={query} session={chosenSession} />}
     </>}
   </div>
 }
@@ -318,12 +357,12 @@ export function ReceptionBookingConfirmedPage() {
     const booking = await receptionBookingsApi.findForMember({ memberId, matches: (item) => item.id === bookingId, signal })
     return booking?.memberId === memberId && booking.status === 'CONFIRMED' ? booking : null
   }, [bookingId, memberId])
-  const [resource] = useResource(confirmationLoader)
+  const [resource, reloadConfirmation] = useResource(confirmationLoader)
 
   const returnTo = typeof stateValue.returnTo === 'string' && stateValue.returnTo.startsWith('/reception/bookings')
     ? stateValue.returnTo : memberId ? `/reception/bookings?${new URLSearchParams({ memberId: String(memberId), q: params.get('q') ?? '' })}` : '/reception/bookings'
   if (resource.status === 'loading') return <div className="page reception-bookings-page"><PageLoader label="Loading booking confirmation" /></div>
-  if (resource.status === 'error') return <div className="page reception-bookings-page"><PageHeader title="Booking confirmation" /><ErrorState title="We could not load the booking confirmation" error={resource.error} /><Link className="btn btn--primary" to={returnTo}>Back to member bookings</Link></div>
+  if (resource.status === 'error') return <div className="page reception-bookings-page"><PageHeader title="Booking confirmation" /><ErrorState title="We could not load the booking confirmation" error={resource.error} onRetry={reloadConfirmation} /><Link className="btn btn--primary" to={returnTo}>Back to member bookings</Link></div>
   if (!resource.data) return <div className="page reception-bookings-page"><PageHeader title="Booking confirmation" /><Card><EmptyState title="Booking not verified" description="We could not verify this booking as confirmed for the selected member. It may have been cancelled or may no longer be listed. Check member history before confirming with them." /><Link className="btn btn--primary" to={returnTo}>Back to member bookings</Link></Card></div>
 
   const booking = resource.data
