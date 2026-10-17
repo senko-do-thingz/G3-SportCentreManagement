@@ -2,7 +2,6 @@ import type { CardTier } from '../../api/cardsApi'
 import type { MemberCard, PackageRegistration } from '../../api/memberApi'
 import type { CheckInRecord, PaymentMethod } from '../../api/receptionApi'
 import { PAYMENT_METHODS } from '../../api/receptionApi'
-import { parseDate } from '../../utils/format'
 import { isFreeTier, planCard, type CardPlan, type CardPlanKind } from '../member/cardsModel'
 
 /** Rules and helpers of the receptionist screens (FE-05). No React here, so everything is unit tested. */
@@ -12,6 +11,13 @@ export const RECEPTION_PATHS = {
   register: '/reception/register',
   checkIn: '/reception/check-in',
 } as const
+
+/** Same calendar zone as ClockConfig, independent of the workstation's time zone. */
+export function receptionDate(moment: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(moment)
+}
 
 export type RegisterTab = 'package' | 'card' | 'pending'
 export const REGISTER_TABS: readonly RegisterTab[] = ['package', 'card', 'pending']
@@ -93,39 +99,21 @@ export interface CreateMemberForm {
   fullName: string
   phone: string
   email: string
-  dateOfBirth: string
-  mainGoal: string
-  currentLevel: string
 }
 
 export const EMPTY_MEMBER_FORM: CreateMemberForm = {
   fullName: '',
   phone: '',
   email: '',
-  dateOfBirth: '',
-  mainGoal: 'IMPROVE_FITNESS',
-  currentLevel: 'BEGINNER',
 }
 
 export const MEMBER_FULL_NAME_MAX = 100
-const PHONE_PATTERN = /^0\d{9,10}$/
+const PHONE_PATTERN = /^\+?\d{8,15}$/
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-export const GOAL_OPTIONS = [
-  { value: 'IMPROVE_FITNESS', label: 'Health and fitness' },
-  { value: 'BUILD_SKILLS', label: 'Build skills' },
-  { value: 'COMPETITION', label: 'Competition' },
-]
-
-export const LEVEL_OPTIONS = [
-  { value: 'BEGINNER', label: 'Beginner' },
-  { value: 'INTERMEDIATE', label: 'Intermediate' },
-  { value: 'ADVANCED', label: 'Advanced' },
-]
 
 export type MemberFormErrors = Partial<Record<keyof CreateMemberForm, string>>
 
-export function validateMemberForm(form: CreateMemberForm, today: string): MemberFormErrors {
+export function validateMemberForm(form: CreateMemberForm): MemberFormErrors {
   const errors: MemberFormErrors = {}
   const fullName = form.fullName.trim()
   if (!fullName) {
@@ -137,20 +125,15 @@ export function validateMemberForm(form: CreateMemberForm, today: string): Membe
   if (!phone) {
     errors.phone = 'Phone number is required'
   } else if (!PHONE_PATTERN.test(phone)) {
-    errors.phone = 'Phone number must start with 0 and have 10 or 11 digits'
+    errors.phone = 'Phone must be 8-15 digits with optional leading +'
   }
   const email = form.email.trim()
   if (!email) {
     errors.email = 'Email is required'
   } else if (!EMAIL_PATTERN.test(email)) {
     errors.email = 'Email is invalid'
-  }
-  if (form.dateOfBirth) {
-    if (!parseDate(form.dateOfBirth)) {
-      errors.dateOfBirth = 'Date of birth is invalid'
-    } else if (form.dateOfBirth >= today) {
-      errors.dateOfBirth = 'Date of birth must be before today'
-    }
+  } else if (email.length > 255) {
+    errors.email = 'Email must be at most 255 characters'
   }
   return errors
 }
@@ -189,6 +172,7 @@ export function parseAmount(value: string): number | null {
  * exactly the amount payable and needs the transaction reference.
  */
 export function validateDeskPayment(form: DeskPaymentForm, amountDue: number): DeskPaymentErrors {
+  if (amountDue === 0) return {}
   const errors: DeskPaymentErrors = {}
   if (!isPaymentMethod(form.method)) {
     errors.method = 'Choose a payment method'
@@ -265,10 +249,11 @@ export function sellableTiers(tiers: CardTier[]): CardTier[] {
  * - unrecorded: the item is ACTIVE but no payment record exists (backend on main without BE-19);
  * - other: any other status.
  */
-export type SaleOutcome = 'paid' | 'pending' | 'unrecorded' | 'other'
+export type SaleOutcome = 'paid' | 'pending' | 'unrecorded' | 'noPayment' | 'other'
 
-export function saleOutcome(item: { status: string; paymentId: number | null }): SaleOutcome {
+export function saleOutcome(item: { status: string; paymentId: number | null; amount?: number | string | null }): SaleOutcome {
   if (item.status === 'ACTIVE') {
+    if (item.paymentId === null && item.amount !== null && item.amount !== undefined && Number(item.amount) === 0) return 'noPayment'
     return item.paymentId !== null ? 'paid' : 'unrecorded'
   }
   return item.status === 'PENDING_PAYMENT' ? 'pending' : 'other'

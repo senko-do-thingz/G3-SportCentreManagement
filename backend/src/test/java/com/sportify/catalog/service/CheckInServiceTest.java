@@ -364,6 +364,33 @@ public class CheckInServiceTest {
     }
 
     @Test
+    void dateHistoryUsesCentreLocalMidnightAndExclusiveNextMidnight() {
+        LocalDate date = LocalDate.of(2026, 10, 17);
+        CheckIn record = CheckIn.builder().id(201L).member(memberProfile).result(CheckInResult.DENIED)
+                .denialReason("No confirmed booking for today").checkedInAt(date.atStartOfDay()).build();
+        when(checkInRepository.findForDay(date.atStartOfDay(), date.plusDays(1).atStartOfDay(), null))
+                .thenReturn(List.of(record));
+        var result = checkInService.getCheckInsOn(date, null);
+        assertEquals(201L, result.getFirst().getId());
+        assertEquals("DENIED", result.getFirst().getResult());
+        assertEquals(date.atStartOfDay(), result.getFirst().getCheckedInAt());
+        verify(checkInRepository).findForDay(date.atStartOfDay(), date.plusDays(1).atStartOfDay(), null);
+    }
+
+    @Test
+    void dateHistoryRetainsMemberFilterAndRejectsDatesOutsideStorageRange() {
+        LocalDate date = LocalDate.of(2026, 10, 17);
+        when(checkInRepository.findForDay(date.atStartOfDay(), date.plusDays(1).atStartOfDay(), 1L)).thenReturn(List.of());
+        assertEquals(List.of(), checkInService.getCheckInsOn(date, 1L));
+        LocalDate lastDay = LocalDate.of(9999, 12, 31);
+        when(checkInRepository.findForDay(lastDay.atStartOfDay(), null, null)).thenReturn(List.of());
+        assertEquals(List.of(), checkInService.getCheckInsOn(lastDay, null));
+        for (LocalDate invalid : List.of(LocalDate.of(0, 1, 1), LocalDate.of(10000, 1, 1))) {
+            assertThrows(com.sportify.core.exception.BusinessRuleException.class, () -> checkInService.getCheckInsOn(invalid, null));
+        }
+    }
+
+    @Test
     void cancellationWhileWaitingForSessionLockIsObservedBeforeAllowedCheckIn() {
         var request = new CheckInRequest(); request.setIdentifier("MEM-123"); request.setBookingId(30L);
         when(memberProfileRepository.findByMemberCode("MEM-123")).thenReturn(Optional.of(memberProfile));

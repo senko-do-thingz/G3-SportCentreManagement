@@ -5,6 +5,8 @@ import com.sportify.catalog.dto.CheckInRequest;
 import com.sportify.catalog.service.CheckInService;
 import com.sportify.identity.security.SecurityConfig;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -19,9 +21,13 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import java.io.IOException;
+import java.time.LocalDate;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -108,5 +114,40 @@ public class CheckInControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "RECEPTIONIST")
+    void dateOnlyQueryIsSupported() throws Exception {
+        mockMvc.perform(get("/api/v1/check-ins").param("date", "2026-10-17"))
+                .andExpect(status().isOk());
+        verify(checkInService).getCheckInsOn(LocalDate.of(2026, 10, 17), null);
+    }
+
+    @Test
+    @WithMockUser(roles = "MANAGER")
+    void dateAndMemberCanBeCombinedAndLegacyMemberHistoryStillWorks() throws Exception {
+        mockMvc.perform(get("/api/v1/check-ins").param("date", "2026-10-17").param("memberId", "2"))
+                .andExpect(status().isOk());
+        verify(checkInService).getCheckInsOn(LocalDate.of(2026, 10, 17), 2L);
+        mockMvc.perform(get("/api/v1/check-ins").param("memberId", "2")).andExpect(status().isOk());
+        verify(checkInService).getCheckInHistory(2L);
+    }
+
+    @Test
+    @WithMockUser(roles = "RECEPTIONIST")
+    void missingFiltersAndInvalidDatesReturn400() throws Exception {
+        mockMvc.perform(get("/api/v1/check-ins")).andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/v1/check-ins").param("date", "invalid")).andExpect(status().isBadRequest());
+        verifyNoInteractions(checkInService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"MEMBER", "COACH"})
+    void memberAndCoachCannotReadDateHistory(String role) throws Exception {
+        mockMvc.perform(get("/api/v1/check-ins").param("date", "2026-10-17")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("test").roles(role)))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(checkInService);
     }
 }

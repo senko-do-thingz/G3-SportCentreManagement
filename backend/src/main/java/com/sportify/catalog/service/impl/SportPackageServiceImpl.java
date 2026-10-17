@@ -17,6 +17,7 @@ import com.sportify.catalog.repository.SportPackageSpecifications;
 import com.sportify.catalog.repository.SportRepository;
 import com.sportify.catalog.service.MembershipCardService;
 import com.sportify.catalog.service.SportPackageService;
+import com.sportify.catalog.service.DeskSaleCharge;
 import com.sportify.core.audit.AuditAction;
 import com.sportify.core.audit.AuditEvent;
 import com.sportify.core.audit.AuditService;
@@ -222,6 +223,11 @@ public class SportPackageServiceImpl implements SportPackageService {
         BigDecimal discountFactor = BigDecimal.valueOf(100 - discountPercentage).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
         BigDecimal paidAmount = originalPrice.multiply(discountFactor).setScale(2, RoundingMode.HALF_UP);
 
+        boolean deskSale = SecurityUtils.isStaff(actor)
+                && (request.getChannel() == null || request.getChannel() == RegistrationChannel.RECEPTION);
+        if (deskSale) DeskSaleCharge.verify(request.getExpectedAmountDue(), paidAmount,
+                request.getAmountReceived(), request.getPaymentMethod());
+
         if (SecurityUtils.isMember(actor) && paidAmount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessRuleException("Payment amount must be greater than zero. Attempted package price: " + paidAmount);
         }
@@ -284,6 +290,11 @@ public class SportPackageServiceImpl implements SportPackageService {
 
         registration = registrationRepository.save(registration);
         PackageRegistrationResponse response = mapToRegistrationResponse(registration);
+        if (deskSale) {
+            var collection = DeskSaleCharge.collection(registration.getPayment(), request.getAmountReceived());
+            response.setAmountReceived(collection.amountReceived());
+            response.setChangeAmount(collection.changeAmount());
+        }
         if (paidAtDesk) {
             withInvoice(response, paymentVerificationService.getObject()
                     .recordPaymentConfirmed(registration.getPayment().getId(), actor, null));

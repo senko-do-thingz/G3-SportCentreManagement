@@ -1,15 +1,15 @@
-import { useCallback, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { cardsApi, type CardTier } from '../../api/cardsApi'
 import { ApiError, getErrorMessage, splitFieldErrors } from '../../api/errors'
-import type { MemberCard, PackageRegistration } from '../../api/memberApi'
+import type { PackageRegistration } from '../../api/memberApi'
 import { packagesApi, type SportPackage } from '../../api/packagesApi'
-import { receptionApi, type MemberOverview, type PaymentMethod } from '../../api/receptionApi'
+import { receptionApi, type DeskSale, type MemberOverview, type PaymentMethod } from '../../api/receptionApi'
+import { receptionPaymentsApi } from '../../api/receptionPaymentsApi'
 import { Button, Card, EmptyState, ErrorState, Input, PageHeader, Select, Table, type TableColumn } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { useResource } from '../../hooks/useResource'
-import { toIsoDate } from '../../utils/date'
 import { formatDate, formatDateTime, formatMoney, humanizeCode } from '../../utils/format'
 import { addDays } from '../member/cardsModel'
 import { currentCard } from '../member/dashboardModel'
@@ -27,6 +27,7 @@ import {
   pendingRequests,
   positiveId,
   receptionPaymentPath,
+  receptionDate,
   registerPath,
   saleOutcome,
   sellableTiers,
@@ -40,8 +41,7 @@ import {
 /**
  * Register and Renew (Figma F1-14 and its Membership Card state): sells a sport package or a
  * membership card at the desk with the payment method, reference and amount received (BE-19), and
- * shows the receipt link after the sale when a payment record exists. On main without BE-19 a staff
- * sale is ACTIVE with no payment record; the screen then says so instead of showing a receipt. The third tab lists the pending online requests
+ * shows the receipt link after verifying the payment. The third tab lists the pending online requests
  * (GET /membership-cards/pending, GET /packages/registrations/pending) and opens the payment
  * confirmation screen (F3-05) for each.
  */
@@ -179,9 +179,9 @@ function SaleWorkspace({ tab, memberId, packageId }: { tab: 'package' | 'card'; 
     </MemberHeader>
   )
   return tab === 'package' ? (
-    <PackageSale key={saleCount} data={data.data} memberBlock={memberBlock} initialPackageId={packageId} onSold={onSold} />
+    <PackageSale key={saleCount} data={data.data} memberBlock={memberBlock} initialPackageId={packageId} onSold={onSold} onRefresh={reload} />
   ) : (
-    <CardSale key={saleCount} data={data.data} memberBlock={memberBlock} onSold={onSold} />
+    <CardSale key={saleCount} data={data.data} memberBlock={memberBlock} onSold={onSold} onRefresh={reload} />
   )
 }
 
@@ -247,15 +247,36 @@ function DeskPaymentFields({
   )
 }
 
-function deskPayload(form: DeskPaymentForm) {
+function deskPayload(form: DeskPaymentForm, amountDue: number) {
+  if (amountDue === 0) return { expectedAmountDue: 0 }
   return {
+    expectedAmountDue: amountDue,
     paymentMethod: form.method as PaymentMethod,
-    paymentReference: form.reference.trim() || null,
+    referenceCode: form.reference.trim() || null,
     amountReceived: parseAmount(form.amountReceived) ?? 0,
   }
 }
 
-const DESK_FIELDS = ['startDate', 'packageId', 'tierId', 'paymentMethod', 'paymentReference', 'amountReceived'] as const
+const DESK_FIELDS = ['startDate', 'packageId', 'tierId', 'paymentMethod', 'referenceCode', 'paymentReference', 'amountReceived'] as const
+const UNCERTAIN_SALE = 'The sale could not be verified. Check the member profile and payment requests before starting another sale.'
+
+async function verifySalePayment(item: DeskSale, expected: number) {
+  const rawAmount = 'cardCode' in item ? item.pricePaid : item.paidAmount
+  const amount = rawAmount == null ? NaN : Number(rawAmount)
+  if (!Number.isFinite(amount) || amount !== expected) throw new Error(UNCERTAIN_SALE)
+  if (item.status === 'ACTIVE' && item.paymentId !== null) {
+    const payment = await receptionPaymentsApi.payment(item.paymentId)
+    if (payment.status !== 'SUCCESS' || payment.memberId !== item.memberId || Number(payment.amount) !== amount) throw new Error(UNCERTAIN_SALE)
+    const received = item.amountReceived == null ? NaN : Number(item.amountReceived)
+    const change = item.changeAmount == null ? NaN : Number(item.changeAmount)
+    const expectedChange = payment.method === 'CASH' ? received - amount : 0
+    if (!Number.isFinite(received) || !Number.isFinite(change) || received < amount || change < 0
+      || Math.round(expectedChange * 100) !== Math.round(change * 100)
+      || (payment.method !== 'CASH' && received !== amount)) throw new Error(UNCERTAIN_SALE)
+    return { received, change }
+  }
+  return { received: 0, change: 0 }
+}
 
 /** Maps backend field errors onto the form; the rest goes above the form. */
 function saleErrors(error: unknown): { payment: DeskPaymentErrors; startDate?: string; message: string | null } {
@@ -265,7 +286,7 @@ function saleErrors(error: unknown): { payment: DeskPaymentErrors; startDate?: s
     return {
       payment: {
         method: split.fields.paymentMethod,
-        reference: split.fields.paymentReference,
+        reference: split.fields.referenceCode ?? split.fields.paymentReference,
         amountReceived: split.fields.amountReceived,
       },
       startDate: split.fields.startDate,
@@ -290,7 +311,7 @@ interface SaleResult {
 }
 
 function SaleReceipt({ result, memberId, onNewSale }: { result: SaleResult; memberId: number; onNewSale: () => void }) {
-  const outcome = saleOutcome({ status: result.status, paymentId: result.paymentId })
+  const outcome = saleOutcome({ status: result.status, paymentId: result.paymentId, amount: result.amount })
   const notice: Record<typeof outcome, { tone: string; text: string }> = {
     paid: { tone: 'success', text: `${result.title} is active. Payment ${result.paymentCode ?? result.paymentId} is recorded.` },
     pending: {
@@ -299,8 +320,9 @@ function SaleReceipt({ result, memberId, onNewSale }: { result: SaleResult; memb
     },
     unrecorded: {
       tone: 'warning',
-      text: `${result.title} is active, but no payment record was created (needs BE-19). Take the money manually and keep a paper slip.`,
+      text: `${result.title} is active, but no payment is linked. Ask a manager to reconcile the sale before collecting money.`,
     },
+    noPayment: { tone: 'success', text: `${result.title} is active. No payment is required.` },
     other: { tone: 'warning', text: `${result.title} was saved as ${humanizeCode(result.status).toLowerCase()}.` },
   }
   return (
@@ -324,10 +346,10 @@ function SaleReceipt({ result, memberId, onNewSale }: { result: SaleResult; memb
           <dd>{result.paymentCode ?? (outcome === 'unrecorded' ? 'No payment record' : '-')}</dd>
         </div>
         <div className="summary-list__total">
-          <dt>{outcome === 'paid' ? 'Amount charged' : 'Amount to collect'}</dt>
+          <dt>{outcome === 'paid' ? 'Amount charged' : outcome === 'noPayment' ? 'Fee' : 'Amount to review'}</dt>
           <dd>{formatMoney(result.amount)}</dd>
         </div>
-        {result.change > 0 && (
+        {outcome === 'paid' && result.change > 0 && (
           <div>
             <dt>Change to give</dt>
             <dd>{formatMoney(result.change)}</dd>
@@ -377,13 +399,15 @@ function PackageSale({
   memberBlock,
   initialPackageId,
   onSold,
+  onRefresh,
 }: {
   data: SaleData
   memberBlock: ReactNode
   initialPackageId: number | null
   onSold: (result: SaleResult) => void
+  onRefresh: () => void
 }) {
-  const today = toIsoDate(new Date())
+  const today = receptionDate(new Date())
   const { overview, packages } = data
   const known = initialPackageId !== null && packages.some((item) => item.id === initialPackageId)
   const [selectedId, setSelectedId] = useState<string>(known ? String(initialPackageId) : '')
@@ -396,10 +420,14 @@ function PackageSale({
   })
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const inFlight = useRef(false)
+  const [uncertain, setUncertain] = useState(false)
+  const [priceChanged, setPriceChanged] = useState(false)
 
   const selected = packages.find((item) => String(item.id) === selectedId) ?? null
   const card = currentCard(overview.cards, today)
   const price = selected ? priceBreakdown(selected, card) : null
+  const amountDue = price?.final ?? 0
   const isRenewal =
     selected !== null && overview.registrations.some(
       (item) => item.packageId === selected.id && (item.status === 'ACTIVE' || item.status === 'EXPIRED'),
@@ -414,7 +442,8 @@ function PackageSale({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    const checkToday = toIsoDate(new Date())
+    if (inFlight.current || uncertain) return
+    const checkToday = receptionDate(new Date())
     const packageError = selected ? undefined : 'Choose a package'
     const dateError = validateStartDate(startDate, checkToday) ?? undefined
     const paymentErrors = price ? validateDeskPayment(payment, price.final) : {}
@@ -424,14 +453,18 @@ function PackageSale({
       return
     }
     setSaving(true)
+    inFlight.current = true
+    let accepted = false
     try {
       const sold = await receptionApi.sellPackage({
         memberId: overview.member.userId,
         packageId: selected.id,
         startDate,
         channel: 'RECEPTION',
-        ...deskPayload(payment),
+        ...deskPayload(payment, amountDue),
       })
+      accepted = true
+      const collection = await verifySalePayment(sold, amountDue)
       onSold({
         kind: 'package',
         itemId: sold.id,
@@ -443,13 +476,18 @@ function PackageSale({
         paymentId: sold.paymentId,
         paymentCode: sold.paymentCode,
         amount: sold.paidAmount ?? price.final,
-        change: changeDue(payment, Number(sold.paidAmount ?? price.final)),
+        change: collection.change,
       })
     } catch (error) {
-      const mapped = saleErrors(error)
+      const ambiguous = accepted || !(error instanceof ApiError) || error.status === 0 || error.status >= 500
+      const stalePrice = error instanceof ApiError && error.code === 'DESK_SALE_PRICE_CHANGED'
+      setPriceChanged(stalePrice)
+      setUncertain(ambiguous || stalePrice)
+      const mapped = ambiguous ? { payment: {}, message: UNCERTAIN_SALE } : saleErrors(error)
       setErrors({ payment: mapped.payment, startDate: mapped.startDate })
       setFormError(mapped.message)
     } finally {
+      inFlight.current = false
       setSaving(false)
     }
   }
@@ -474,11 +512,13 @@ function PackageSale({
                 placeholder="Choose a package"
                 options={options}
                 value={selectedId}
-                disabled={saving}
+                disabled={saving || uncertain}
                 onChange={(event) => {
                   setSelectedId(event.target.value)
                   const id = positiveId(event.target.value)
-                  setStartDate(defaultStartDate(overview.registrations, id, toIsoDate(new Date())))
+                  const nextPackage = packages.find((item) => item.id === id)
+                  if (nextPackage && (amountDue === 0) !== (priceBreakdown(nextPackage, card).final === 0)) setPayment(EMPTY_DESK_PAYMENT)
+                  setStartDate(defaultStartDate(overview.registrations, id, receptionDate(new Date())))
                   setErrors((current) => ({ ...current, packageId: undefined }))
                 }}
                 error={errors.packageId}
@@ -489,7 +529,7 @@ function PackageSale({
                 required
                 min={today}
                 value={startDate}
-                disabled={saving}
+                disabled={saving || uncertain}
                 onChange={(event) => {
                   setStartDate(event.target.value)
                   setErrors((current) => ({ ...current, startDate: undefined }))
@@ -498,12 +538,12 @@ function PackageSale({
               />
             </div>
           )}
-          {price && (
+          {price && amountDue > 0 && (
             <DeskPaymentFields
               form={payment}
               errors={errors.payment}
               amountDue={price.final}
-              disabled={saving}
+              disabled={saving || uncertain}
               onChange={(field, value) => {
                 setPayment((current) => ({ ...current, [field]: value }))
                 setErrors((current) => ({ ...current, payment: { ...current.payment, [field]: undefined } }))
@@ -511,9 +551,10 @@ function PackageSale({
             />
           )}
           <div className="reception-form__actions">
-            <Button type="submit" loading={saving} disabled={packages.length === 0}>
+            <Button type="submit" loading={saving} disabled={uncertain || packages.length === 0}>
               Record payment and register
             </Button>
+            {priceChanged && <Button variant="secondary" onClick={onRefresh}>Refresh prices</Button>}
           </div>
         </form>
       </Card>
@@ -572,12 +613,14 @@ function CardSale({
   data,
   memberBlock,
   onSold,
+  onRefresh,
 }: {
   data: SaleData
   memberBlock: ReactNode
   onSold: (result: SaleResult) => void
+  onRefresh: () => void
 }) {
-  const today = toIsoDate(new Date())
+  const today = receptionDate(new Date())
   const { overview } = data
   const tiers = useMemo(() => sellableTiers(data.tiers), [data.tiers])
   const [tierId, setTierId] = useState('')
@@ -585,6 +628,9 @@ function CardSale({
   const [errors, setErrors] = useState<{ tierId?: string; payment: DeskPaymentErrors }>({ payment: {} })
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const inFlight = useRef(false)
+  const [uncertain, setUncertain] = useState(false)
+  const [priceChanged, setPriceChanged] = useState(false)
 
   const tier = tiers.find((item) => String(item.id) === tierId) ?? null
   const desk = tier ? deskCardPlan(tier, overview.cards, data.tiers, today) : null
@@ -594,6 +640,7 @@ function CardSale({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
+    if (inFlight.current || uncertain) return
     const tierError = tier ? undefined : 'Choose a membership card'
     const paymentErrors = desk?.sellable ? validateDeskPayment(payment, amountDue) : {}
     setErrors({ tierId: tierError, payment: paymentErrors })
@@ -602,12 +649,16 @@ function CardSale({
       return
     }
     setSaving(true)
+    inFlight.current = true
+    let accepted = false
     try {
-      const sold: MemberCard = await receptionApi.sellCard({
+      const sold = await receptionApi.sellCard({
         memberId: overview.member.userId,
         tierId: tier.id,
-        ...deskPayload(payment),
+        ...deskPayload(payment, amountDue),
       })
+      accepted = true
+      const collection = await verifySalePayment(sold, amountDue)
       onSold({
         kind: 'card',
         itemId: sold.id,
@@ -619,13 +670,18 @@ function CardSale({
         paymentId: sold.paymentId,
         paymentCode: sold.paymentCode,
         amount: sold.pricePaid ?? amountDue,
-        change: changeDue(payment, Number(sold.pricePaid ?? amountDue)),
+        change: collection.change,
       })
     } catch (error) {
-      const mapped = saleErrors(error)
+      const ambiguous = accepted || !(error instanceof ApiError) || error.status === 0 || error.status >= 500
+      const stalePrice = error instanceof ApiError && error.code === 'DESK_SALE_PRICE_CHANGED'
+      setPriceChanged(stalePrice)
+      setUncertain(ambiguous || stalePrice)
+      const mapped = ambiguous ? { payment: {}, message: UNCERTAIN_SALE } : saleErrors(error)
       setErrors({ payment: mapped.payment })
       setFormError(mapped.message)
     } finally {
+      inFlight.current = false
       setSaving(false)
     }
   }
@@ -653,8 +709,10 @@ function CardSale({
                   label: `${item.name} - ${item.durationMonths} months - ${formatMoney(item.price)}`,
                 }))}
                 value={tierId}
-                disabled={saving}
+                disabled={saving || uncertain}
                 onChange={(event) => {
+                  const nextTier = tiers.find((item) => String(item.id) === event.target.value)
+                  if (nextTier && (amountDue === 0) !== (deskCardPlan(nextTier, overview.cards, data.tiers, today).plan.price === 0)) setPayment(EMPTY_DESK_PAYMENT)
                   setTierId(event.target.value)
                   setErrors((current) => ({ ...current, tierId: undefined }))
                   setFormError(null)
@@ -669,12 +727,12 @@ function CardSale({
               </div>
             </div>
           )}
-          {desk?.sellable && (
+          {desk?.sellable && amountDue > 0 && (
             <DeskPaymentFields
               form={payment}
               errors={errors.payment}
               amountDue={amountDue}
-              disabled={saving}
+              disabled={saving || uncertain}
               onChange={(field, value) => {
                 setPayment((current) => ({ ...current, [field]: value }))
                 setErrors((current) => ({ ...current, payment: { ...current.payment, [field]: undefined } }))
@@ -687,9 +745,10 @@ function CardSale({
             </p>
           )}
           <div className="reception-form__actions">
-            <Button type="submit" loading={saving} disabled={tiers.length === 0 || (desk !== null && !desk.sellable)}>
+            <Button type="submit" loading={saving} disabled={uncertain || tiers.length === 0 || (desk !== null && !desk.sellable)}>
               Record payment and issue card
             </Button>
+            {priceChanged && <Button variant="secondary" onClick={onRefresh}>Refresh prices</Button>}
           </div>
         </form>
       </Card>
@@ -732,10 +791,7 @@ function CardSale({
 /* Pending online requests */
 
 async function loadPending(signal: AbortSignal): Promise<PendingRequest[]> {
-  const [cards, registrations] = await Promise.all([
-    receptionApi.pendingCards({ signal }),
-    receptionApi.pendingRegistrations({ signal }),
-  ])
+  const { cards, registrations } = await receptionApi.pendingQueue({ signal })
   return pendingRequests(cards, registrations)
 }
 

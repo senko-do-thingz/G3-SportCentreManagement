@@ -17,6 +17,7 @@ import com.sportify.core.audit.AuditAction;
 import com.sportify.core.audit.AuditEvent;
 import com.sportify.core.audit.AuditService;
 import com.sportify.core.exception.ResourceNotFoundException;
+import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
@@ -29,7 +30,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -159,19 +159,34 @@ public class CheckInServiceImpl implements CheckInService {
     @Transactional(readOnly = true)
     public List<CheckInResponse> getCheckInHistory(Long memberId) {
         return checkInRepository.findByMemberIdOrderByCheckedInAtDesc(memberId).stream()
-                .map(ci -> CheckInResponse.builder()
-                        .id(ci.getId())
-                        .memberId(ci.getMember().getId())
-                        .memberName(ci.getMember().getUserAccount().getFullName())
-                        .membershipId(ci.getMembership() != null ? ci.getMembership().getId() : null)
-                        .bookingId(ci.getBooking() != null ? ci.getBooking().getId() : null)
-                        .bookingCode(ci.getBooking() != null ? ci.getBooking().getBookingCode() : null)
-                        .packageRegistrationId(ci.getPackageRegistration() != null ? ci.getPackageRegistration().getId() : null)
-                        .checkedInAt(ci.getCheckedInAt())
-                        .result(ci.getResult().name())
-                        .denialReason(ci.getDenialReason())
-                        .note(ci.getNote())
-                        .build())
-                .collect(Collectors.toList());
+                .map(this::toResponse).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CheckInResponse> getCheckInsOn(LocalDate date, Long memberId) {
+        // checkedInAt is stored as a centre-local LocalDateTime, using the configured Clock.
+        if (date == null || date.getYear() < 1 || date.getYear() > 9999) {
+            throw new BusinessRuleException("Date must be between 0001-01-01 and 9999-12-31");
+        }
+        LocalDateTime end = date.equals(LocalDate.of(9999, 12, 31)) ? null : date.plusDays(1).atStartOfDay();
+        return checkInRepository.findForDay(date.atStartOfDay(), end, memberId)
+                .stream().map(this::toResponse).toList();
+    }
+
+    private CheckInResponse toResponse(CheckIn ci) {
+        return CheckInResponse.builder()
+                .id(ci.getId())
+                .memberId(ci.getMember().getId())
+                .memberName(ci.getMember().getUserAccount().getFullName())
+                .membershipId(ci.getMembership() != null ? ci.getMembership().getId() : null)
+                .bookingId(ci.getBooking() != null ? ci.getBooking().getId() : null)
+                .bookingCode(ci.getBooking() != null ? ci.getBooking().getBookingCode() : null)
+                .packageRegistrationId(ci.getPackageRegistration() != null ? ci.getPackageRegistration().getId() : null)
+                .checkedInAt(ci.getCheckedInAt())
+                .result(ci.getResult().name())
+                .denialReason(ci.getDenialReason())
+                .note(ci.getNote())
+                .build();
     }
 }
