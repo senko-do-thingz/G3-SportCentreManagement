@@ -17,6 +17,21 @@ describe('FE-06 released catalog contracts', () => {
     await expect(managerPackagesApi.list({})).rejects.toThrow('unexpected response')
     await expect(managerCardTiersApi.list()).rejects.toThrow('unexpected response')
   })
+  it('uses authenticated manager APIs with preview mode explicitly disabled', async () => {
+    const backend = installFakeFetch((call) => json(200, call.method === 'GET' ? [] : { id: 4 }))
+    await managerPackagesApi.list({ active: 'true' })
+    await managerCardTiersApi.list()
+    await managerPackagesApi.update(4, { name: 'Updated package', durationDays: 30, sessionCount: 8, sessionMinutes: 60, price: 550000, active: true })
+    await managerCardTiersApi.update(3, { price: 650000, durationMonths: 12, discountPercentage: 10, description: 'Updated tier', active: true })
+
+    expect(backend.calls.map(({ method, path }) => [method, path])).toEqual([
+      ['GET', '/manager/packages?active=true'],
+      ['GET', '/manager/card-tiers'],
+      ['PUT', '/packages/4'],
+      ['PUT', '/membership-cards/tiers/3'],
+    ])
+    expect(backend.calls.every((call) => call.authorization === 'Bearer manager-test')).toBe(true)
+  })
   it('maps preview package wire fields back to the published response fields', async () => {
     const response = await previewResponse('/packages/1', { method: 'PUT', body: { name: 'Updated preview package', durationDays: 30, sessionCount: 8, sessionMinutes: 60, price: 550000.25, active: false } }, 'preview-MANAGER')
     expect(await response?.json()).toMatchObject({ name: 'Updated preview package', priceAmount: 550000.25, isActive: false })
