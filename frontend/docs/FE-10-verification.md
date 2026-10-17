@@ -12,12 +12,12 @@ npm run build
 
 ## Receptionist: member bookings and assisted booking
 
-1. Sign in as RECEPTIONIST and open `/reception/bookings`. Confirm the member search is available and booking-history requests do not run before a member is selected.
-2. Search for a known member. Confirm the selected member and search query remain in the URL. Search for a no-match query and confirm a clear empty state. Make `/members` fail and confirm the error and retry action appear.
+1. Sign in as RECEPTIONIST and open `/reception/bookings`. Confirm the member search is available and booking-history requests do not run before a member is selected. Open `/reception/bookings?memberId=<id>` directly with no `q` value and confirm the authorized member overview and history load without a text search.
+2. Search for a known member. Confirm the selected member and optional search query remain in the URL. Search for a no-match query and confirm a clear empty state. Make `/members` fail and confirm the search error and retry action appear. Make `/members/{id}/overview` return 403, 404 and 5xx responses and confirm those errors remain distinct and no profile is fabricated.
 3. Open the selected member's history. Check upcoming/past, status filters, paging, booking details, and empty results. Confirm changing the member or filters does not show the previous member's bookings.
-4. Cancel a cancellable booking. Confirm the dialog identifies the booking; cancel the dialog and verify no DELETE is sent. Confirm the cancellation and verify the page reports success only after the API returns `CANCELLED`, then refreshes history. Simulate a cutoff/server error and confirm the booking remains visible with the backend message.
-5. Choose “Book for member”. Select a session, check eligibility for the selected member, and select an eligible package. Confirm ineligible/full/already-booked states cannot submit. Submit once and verify the request sends the explicit `memberId`, `sessionId`, and `packageRegistrationId`; double-click and confirm only one request is sent.
-6. Complete a booking and verify the confirmation page uses the returned booking details and the return link preserves member/search context. Simulate 409/400/5xx responses and confirm no success state is shown and entered context is retained.
+4. Cancel a cancellable booking. Confirm the dialog identifies the booking and describes credit restoration as conditional. Cancel the dialog and verify no DELETE is sent. Confirm cancellation and verify success only after the API returns `CANCELLED`, then refresh history. Simulate a cutoff rejection. Simulate a committed DELETE with a lost response and verify member history is checked before showing a result. If the follow-up read also fails, confirm the UI blocks another cancellation until status is checked.
+5. Choose "Book for member". Select a session, check eligibility for the selected member, and select an eligible package. Confirm ineligible/full/already-booked states cannot submit. Submit once and verify the request sends the explicit `memberId`, `sessionId`, and `packageRegistrationId`; double-click and confirm only one request is sent. Simulate a committed POST with a lost response and verify member history is checked; if the follow-up read fails, confirm the UI does not invite a retry.
+6. Complete a booking and verify the confirmation page reads current server-owned member history rather than trusting route state. Check that cancelled, cross-member, fabricated and malformed route-state bookings do not show success. Put the target booking on a later history page beyond the first 100 records and confirm pagination finds it. Confirm the return link preserves member/search context.
 
 ## Coach: teaching schedule and class roster
 
@@ -35,7 +35,7 @@ npm run build
 
 ## Scope notes
 
-- The implementation uses only the FE-10-listed member, session, booking, eligibility, and coach-session/roster APIs. No backend code, endpoint, schema or seed data was changed.
+- The implementation uses only the FE-10-listed member, session, booking, eligibility, and coach-session/roster APIs. The member overview is read by the selected member ID; no backend code, endpoint, schema or seed data was changed.
 - FE-10 does not include a one-time-visit booking endpoint. The assisted booking uses the package-registration contract exposed by BE-13.
 - BE-14 roster records do not include member level or goal; those fields are intentionally omitted rather than fabricated. The response's `memberPhone` is not displayed.
 - The booking API response does not confirm that a notification was sent, so the confirmation screen does not claim notification delivery.
