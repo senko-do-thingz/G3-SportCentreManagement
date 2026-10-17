@@ -86,20 +86,78 @@ describe('FE-09 member booking screens', () => {
     expect(backend.calls.some((call) => call.method === 'POST' && call.path === '/bookings')).toBe(false)
   })
 
-  it.each([
-    ['ALREADY_BOOKED', 'You already have a booking for this session'],
-    ['FULL', 'This session has just filled up'],
-  ])('shows a useful %s response without claiming a booking succeeded', async (code, message) => {
+  it('shows a useful definite FULL rejection without claiming a booking succeeded', async () => {
     api((call) => {
       if (call.path === '/sessions/5') return json(200, detail)
-      if (call.path === '/bookings' && call.method === 'POST') return json(409, { message: 'Conflict', code })
+      if (call.path === '/bookings' && call.method === 'POST') return json(409, { message: 'Conflict', code: 'FULL' })
       return backendError(404, 'Unexpected request')
     })
     const user = userEvent.setup()
     renderApp('/member/bookings/review?sessionId=5&packageRegistrationId=11')
     await user.click(await screen.findByRole('button', { name: 'Confirm booking' }))
-    expect(await screen.findByText(new RegExp(message))).toBeInTheDocument()
+    expect(await screen.findByText(/This session has just filled up/)).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Booking confirmed' })).not.toBeInTheDocument()
+  })
+
+  it('reconciles a server error against Upcoming history before declaring the booking confirmed', async () => {
+    const backend = api((call) => {
+      if (call.path === '/sessions/5') return json(200, detail)
+      if (call.path === '/bookings' && call.method === 'POST') return backendError(500, 'Response lost')
+      if (call.path === '/bookings/my?when=UPCOMING') return json(200, [booking])
+      if (call.path === '/bookings/my?when=PAST') return json(200, [])
+      if (call.path === '/packages/registrations/my') return json(200, [registration])
+      return backendError(404, 'Unexpected request')
+    })
+    const user = userEvent.setup()
+    renderApp('/member/bookings/review?sessionId=5&packageRegistrationId=11')
+    await user.click(await screen.findByRole('button', { name: 'Confirm booking' }))
+    expect(await screen.findByRole('heading', { name: 'Booking confirmed' })).toBeInTheDocument()
+    expect(screen.getByText('BK-1021')).toBeInTheDocument()
+    expect(backend.calls.filter((call) => call.method === 'POST' && call.path === '/bookings')).toHaveLength(1)
+  })
+
+  it('keeps retry disabled until a failed status lookup succeeds and finds no booking', async () => {
+    let upcomingChecks = 0
+    let posts = 0
+    const backend = api((call) => {
+      if (call.path === '/sessions/5') return json(200, detail)
+      if (call.path === '/bookings' && call.method === 'POST') {
+        posts += 1
+        return posts === 1 ? backendError(500, 'Response lost') : json(409, { message: 'Conflict', code: 'FULL' })
+      }
+      if (call.path === '/bookings/my?when=UPCOMING') {
+        upcomingChecks += 1
+        return upcomingChecks === 1 ? backendError(503, 'History unavailable') : json(200, [])
+      }
+      return backendError(404, 'Unexpected request')
+    })
+    const user = userEvent.setup()
+    renderApp('/member/bookings/review?sessionId=5&packageRegistrationId=11')
+    await user.click(await screen.findByRole('button', { name: 'Confirm booking' }))
+    const retry = await screen.findByRole('button', { name: 'Confirm booking' })
+    expect(retry).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Check booking status' }))
+    const retryBooking = await screen.findByRole('button', { name: 'Retry booking' })
+    expect(retryBooking).toBeEnabled()
+    await user.click(retryBooking)
+    expect(await screen.findByText(/This session has just filled up/)).toBeInTheDocument()
+    expect(posts).toBe(2)
+    expect(backend.calls.filter((call) => call.method === 'POST' && call.path === '/bookings')).toHaveLength(2)
+  })
+
+  it('does not enable retry when ALREADY_BOOKED conflicts with a missing history record', async () => {
+    const backend = api((call) => {
+      if (call.path === '/sessions/5') return json(200, detail)
+      if (call.path === '/bookings' && call.method === 'POST') return json(409, { message: 'Conflict', code: 'ALREADY_BOOKED' })
+      if (call.path === '/bookings/my?when=UPCOMING') return json(200, [])
+      return backendError(404, 'Unexpected request')
+    })
+    const user = userEvent.setup()
+    renderApp('/member/bookings/review?sessionId=5&packageRegistrationId=11')
+    await user.click(await screen.findByRole('button', { name: 'Confirm booking' }))
+    expect(await screen.findByText(/reported an existing booking, but it is not visible in Upcoming/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirm booking' })).toBeDisabled()
+    expect(backend.calls.filter((call) => call.method === 'POST' && call.path === '/bookings')).toHaveLength(1)
   })
 
   it('loads Upcoming and Past from the matching backend filter and shows the cancelling actor', async () => {

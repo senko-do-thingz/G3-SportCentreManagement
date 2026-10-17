@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ApiError } from '../../api/errors'
+import { ApiError, StaleSessionError } from '../../api/errors'
 import { memberBookingsApi, type MemberBookingRecord } from '../../api/memberBookingsApi'
 import { memberApi, type PackageRegistration } from '../../api/memberApi'
 import { memberSessionsApi, type SessionDetail } from '../../api/memberSessionsApi'
@@ -105,24 +105,69 @@ export function BookingReviewPage() {
 }
 
 function BookingReviewContent({ sessionId, registrationId, returnTo }: { sessionId: number; registrationId: number; returnTo: string }) {
+  const { user } = useAuth()
+  const memberId = user?.id ?? null
   const navigate = useNavigate()
   const loader = useCallback((signal: AbortSignal) => memberSessionsApi.detail(sessionId, signal), [sessionId])
   const [resource, reload] = useMemberResource(loader)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [outcomeUnknown, setOutcomeUnknown] = useState(false)
+  const [retryAllowed, setRetryAllowed] = useState(false)
+  const [retryAfterMissing, setRetryAfterMissing] = useState(true)
+  const [checkingStatus, setCheckingStatus] = useState(false)
+  const [statusCheckFailed, setStatusCheckFailed] = useState(false)
   const submitted = useRef(false)
+  const statusCheck = useRef(false)
+
+  async function checkBookingStatus(allowRetryIfMissing: boolean) {
+    if (statusCheck.current) return
+    statusCheck.current = true
+    setCheckingStatus(true)
+    setStatusCheckFailed(false)
+    setRetryAllowed(false)
+    try {
+      if (memberId === null) throw new ApiError(0, 'The current member account could not be confirmed.')
+      const existing = await memberBookingsApi.findUpcomingForSession(sessionId, memberId)
+      if (existing) {
+        navigate(`/member/bookings/confirmed/${existing.id}`, { replace: true, state: { returnTo } })
+        return
+      }
+      if (allowRetryIfMissing) setRetryAllowed(true)
+      else setStatusCheckFailed(true)
+    } catch {
+      setStatusCheckFailed(true)
+    } finally {
+      statusCheck.current = false
+      setCheckingStatus(false)
+    }
+  }
 
   async function confirmBooking() {
-    if (submitted.current) return
+    if (submitted.current || checkingStatus || (outcomeUnknown && !retryAllowed)) return
     submitted.current = true
     setSubmitting(true)
     setError(null)
+    setOutcomeUnknown(false)
+    setRetryAllowed(false)
+    setStatusCheckFailed(false)
     try {
       const booking = await memberBookingsApi.create({ sessionId, packageRegistrationId: registrationId })
       navigate(`/member/bookings/confirmed/${booking.id}`, { replace: true, state: { returnTo } })
     } catch (cause) {
       submitted.current = false
-      setError(bookingErrorMessage(cause))
+      const ambiguous = !(cause instanceof ApiError)
+        || cause.status === 0 || cause.status === 408 || cause.status >= 500
+        || (cause instanceof ApiError && cause.code === 'ALREADY_BOOKED')
+      if (ambiguous) {
+        setOutcomeUnknown(true)
+        const allowRetryAfterMissing = !(cause instanceof StaleSessionError)
+          && !(cause instanceof ApiError && cause.code === 'ALREADY_BOOKED')
+        setRetryAfterMissing(allowRetryAfterMissing)
+        await checkBookingStatus(allowRetryAfterMissing)
+      } else {
+        setError(bookingErrorMessage(cause))
+      }
     } finally {
       setSubmitting(false)
     }
@@ -140,8 +185,16 @@ function BookingReviewContent({ sessionId, registrationId, returnTo }: { session
       <Card title={sessionLabel(detail)}><SessionFacts detail={detail} /><div className="booking-summary"><span>Package</span><strong>{selected.packageName}</strong><span>Remaining sessions</span><strong>{selected.remainingSessions} before / {selected.remainingSessions - 1} after</strong><span>Additional payment</span><strong>0 VND</strong><p>Confirming reserves one package session immediately.</p></div></Card>
       <Card title="Confirm your place">
         <p>Review the session information. The booking is subject to the latest seat and package availability when submitted.</p>
-        {error && <div className="booking-error" role="alert"><strong>Booking was not completed</strong><p>{error}</p><p>No confirmation was recorded. You can review availability and try again.</p></div>}
-        <div className="browse-actions booking-actions"><Link className={buttonClassName('secondary')} to={`/member/bookings/new?${new URLSearchParams({ sessionId: String(sessionId), returnTo })}`}>Back to options</Link><Button loading={submitting} disabled={submitting} onClick={() => void confirmBooking()}>Confirm booking</Button></div>
+        {error && <div className="booking-error" role="alert"><strong>Booking was not completed</strong><p>{error}</p></div>}
+        {outcomeUnknown && <div className="booking-error" role="alert">
+          <strong>{statusCheckFailed ? 'Booking status remains unverified' : 'Booking response could not confirm the result'}</strong>
+          {checkingStatus ? <p role="status">Checking your current Upcoming bookings before allowing another attempt.</p> : statusCheckFailed
+            ? <p>{retryAfterMissing ? 'We could not verify your current bookings. Check the status before retrying.' : 'The booking service reported an existing booking, but it is not visible in Upcoming. Check My Bookings and do not submit another request.'}</p>
+            : <p>A fresh Upcoming check found no confirmed booking for this session. Review My Bookings before retrying.</p>}
+          {statusCheckFailed && <Button variant="secondary" disabled={checkingStatus} onClick={() => void checkBookingStatus(retryAfterMissing)}>Check booking status</Button>}
+          <Link className={buttonClassName('secondary')} to="/member/bookings">My Bookings</Link>
+        </div>}
+        <div className="browse-actions booking-actions"><Link className={buttonClassName('secondary')} to={`/member/bookings/new?${new URLSearchParams({ sessionId: String(sessionId), returnTo })}`}>Back to options</Link><Button loading={submitting} disabled={submitting || checkingStatus || (outcomeUnknown && !retryAllowed)} onClick={() => void confirmBooking()}>{outcomeUnknown && retryAllowed ? 'Retry booking' : 'Confirm booking'}</Button></div>
       </Card>
     </div>}
   </div>
