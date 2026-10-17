@@ -70,7 +70,9 @@ async function my(when: BookingWhen, signal?: AbortSignal): Promise<MemberBookin
 }
 
 async function create(request: CreateMemberBookingRequest): Promise<MemberBookingRecord> {
-  return parseMemberBooking(await api.post<unknown>('/bookings', request))
+  const booking = parseMemberBooking(await api.post<unknown>('/bookings', request))
+  if (booking.status !== 'CONFIRMED') throw new ApiError(0, 'The server did not confirm this booking.')
+  return booking
 }
 
 async function cancel(id: number): Promise<MemberBookingRecord> {
@@ -78,4 +80,20 @@ async function cancel(id: number): Promise<MemberBookingRecord> {
   return parseMemberBooking(await api.delete<unknown>(`/bookings/${id}`))
 }
 
-export const memberBookingsApi = { my, create, cancel }
+async function findMine(id: number, memberId: number, signal?: AbortSignal): Promise<MemberBookingRecord | null> {
+  if (!Number.isSafeInteger(id) || id <= 0 || !Number.isSafeInteger(memberId) || memberId <= 0) {
+    throw new ApiError(0, 'Choose a valid member and booking.')
+  }
+  const [upcoming, past] = await Promise.all([my('UPCOMING', signal), my('PAST', signal)])
+  return [...upcoming, ...past].find((booking) => booking.id === id && booking.memberId === memberId) ?? null
+}
+
+async function findUpcomingForSession(sessionId: number, memberId: number, signal?: AbortSignal): Promise<MemberBookingRecord | null> {
+  if (!Number.isSafeInteger(sessionId) || sessionId <= 0 || !Number.isSafeInteger(memberId) || memberId <= 0) {
+    throw new ApiError(0, 'Choose a valid member and session.')
+  }
+  const upcoming = await my('UPCOMING', signal)
+  return upcoming.find((booking) => booking.memberId === memberId && booking.sessionId === sessionId && booking.status === 'CONFIRMED') ?? null
+}
+
+export const memberBookingsApi = { my, create, cancel, findMine, findUpcomingForSession }

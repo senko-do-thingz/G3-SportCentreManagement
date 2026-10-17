@@ -36,6 +36,11 @@ describe('member bookings API', () => {
     expect(api.post).toHaveBeenCalledWith('/bookings', { sessionId: 5, packageRegistrationId: 11 })
   })
 
+  it('rejects a cancelled POST response instead of treating it as a successful booking', async () => {
+    vi.mocked(api.post).mockResolvedValueOnce({ ...booking, status: 'CANCELLED' })
+    await expect(memberBookingsApi.create({ sessionId: 5, packageRegistrationId: 11 })).rejects.toThrow('did not confirm')
+  })
+
   it('deletes the selected booking and validates the response', async () => {
     vi.mocked(api.delete).mockResolvedValueOnce({ ...booking, status: 'CANCELLED', cancelledAt: '2026-10-17T10:30:00', cancelledByName: 'Taylor Nguyen', cancelledByRole: 'MEMBER' })
     await expect(memberBookingsApi.cancel(21)).resolves.toMatchObject({ status: 'CANCELLED', cancelledByRole: 'MEMBER' })
@@ -46,5 +51,21 @@ describe('member bookings API', () => {
   it('rejects malformed booking records instead of rendering them as valid data', async () => {
     vi.mocked(api.post).mockResolvedValueOnce({ ...booking, id: 0 })
     await expect(memberBookingsApi.create({ sessionId: 5, packageRegistrationId: 11 })).rejects.toThrow('unexpected booking response')
+  })
+
+  it('finds an owned record across both lists and rejects a matching id from another member', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce([booking]).mockResolvedValueOnce([])
+    await expect(memberBookingsApi.findMine(21, 2)).resolves.toEqual(booking)
+    vi.mocked(api.get).mockResolvedValueOnce([{ ...booking, memberId: 3 }]).mockResolvedValueOnce([])
+    await expect(memberBookingsApi.findMine(21, 2)).resolves.toBeNull()
+    expect(api.get).toHaveBeenLastCalledWith('/bookings/my', { query: { when: 'PAST' }, signal: undefined })
+  })
+
+  it('only reconciles confirmed upcoming bookings for the current member and session', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce([{ ...booking, memberId: 3 }])
+    await expect(memberBookingsApi.findUpcomingForSession(5, 2)).resolves.toBeNull()
+    vi.mocked(api.get).mockResolvedValueOnce([booking])
+    await expect(memberBookingsApi.findUpcomingForSession(5, 2)).resolves.toEqual(booking)
+    expect(api.get).toHaveBeenLastCalledWith('/bookings/my', { query: { when: 'UPCOMING' }, signal: undefined })
   })
 })
