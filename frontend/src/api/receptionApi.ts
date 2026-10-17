@@ -228,6 +228,17 @@ export interface MemberSearchQuery extends RequestSignal {
   size?: number
 }
 
+function toMemberOverviewSummary(value: unknown, memberId: number): MemberSummary {
+  if (!isObject(value)) {
+    throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
+  }
+  const member = toMemberSummary(value.profile)
+  if (member.userId !== memberId) {
+    throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
+  }
+  return member
+}
+
 export const receptionApi = {
   searchMembers({ query, page = 0, size = 10, signal }: MemberSearchQuery): Promise<PageResponse<MemberSummary>> {
     return api
@@ -249,6 +260,15 @@ export const receptionApi = {
     ])
     if ([...cards, ...registrations].some((item) => item.memberId !== memberId)) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
     return { member: overview.profile, cards, registrations, recentCheckIns: overview.recentCheckIns }
+  },
+
+  /** Reads the selected member identity from the staff-authorized overview without a search-page dependency. */
+  memberSummaryById(memberId: number, options: RequestSignal = {}): Promise<MemberSummary> {
+    if (!Number.isSafeInteger(memberId) || memberId <= 0) {
+      return Promise.reject(new ApiError(0, 'Choose a valid member.'))
+    }
+    return api.get<unknown>(`/members/${memberId}/overview`, options)
+      .then((overview) => toMemberOverviewSummary(overview, memberId))
   },
 
   async createMember(request: CreateMemberRequest): Promise<CreatedMember> {

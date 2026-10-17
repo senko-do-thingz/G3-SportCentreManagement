@@ -292,7 +292,7 @@
   }
 
   .member-picker__form,
-  .member-header {
+  .staff-layout .member-header {
     flex-wrap: wrap;
   }
 }

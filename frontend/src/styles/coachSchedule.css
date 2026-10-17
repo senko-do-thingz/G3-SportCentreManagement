@@ -1,0 +1,38 @@
+/* FE-10 coach teaching schedule and privacy-limited class roster. */
+.coach-schedule-page { gap: var(--space-5); min-width: 0; }
+.coach-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+.coach-week-nav { margin: var(--space-4) 0; }
+.coach-week-nav strong { color: var(--color-text); }
+.coach-calendar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); margin-top: var(--space-4); }
+.coach-day { min-width: 0; padding: var(--space-4); border-radius: var(--radius-md); background: var(--color-surface-muted); }
+.coach-day > h2 { margin: 0 0 var(--space-3); font-size: var(--text-md); }
+.coach-day__sessions { display: grid; gap: var(--space-3); }
+.coach-session { display: grid; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); overflow-wrap: anywhere; }
+.coach-session__heading { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); }
+.coach-session__heading h3 { margin: 0; font-size: var(--text-md); }
+.coach-session > p { margin: 0; font-size: var(--text-sm); color: var(--color-text-muted); }
+.coach-session > .btn { justify-self: start; margin-top: var(--space-2); }
+.coach-roster-facts { margin-top: 0; }
+.coach-privacy-note { margin: var(--space-4) 0; }
+.coach-roster-table-wrap { max-width: 100%; overflow-x: auto; }
+.coach-roster-table { width: 100%; border-collapse: collapse; text-align: left; }
+.coach-roster-table th, .coach-roster-table td { padding: var(--space-3); border-bottom: 1px solid var(--color-border); vertical-align: middle; }
+.coach-roster-table th { color: var(--color-text-muted); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); }
+.coach-roster-table td { overflow-wrap: anywhere; }
+.coach-print-hidden { margin-top: var(--space-4); }
+@media (max-width: 1000px) { .coach-calendar { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .coach-calendar, .coach-stats { grid-template-columns: minmax(0, 1fr); } .coach-session__heading { flex-direction: column; } }
+@media print {
+  body:has(.coach-print) .sidebar,
+  body:has(.coach-print) .staff-topbar,
+  body:has(.coach-print) .toast-region,
+  body:has(.coach-print) .staff-content > :not(:has(.coach-print)),
+  .coach-print > :not(.card__header):not(.browse-facts):not(.coach-privacy-note):not(.coach-roster-table-wrap) {
+    display: none !important;
+  }
+  body:has(.coach-print) .staff-layout,
+  body:has(.coach-print) .staff-content { display: block; padding: 0; }
+  .coach-print-hidden, .coach-schedule-page > .page-header, .coach-schedule-page > .card:not(.coach-print) { display: none !important; }
+  .coach-print { border: 0; box-shadow: none; }
+  .coach-roster-table th, .coach-roster-table td { padding: 8px; }
+}
