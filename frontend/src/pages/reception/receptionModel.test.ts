@@ -3,6 +3,7 @@ import type { CardTier } from '../../api/cardsApi'
 import { ApiError } from '../../api/errors'
 import { isMemberNotFound, toMemberOverview, toMemberSummary } from '../../api/receptionApi'
 import { card, registration } from '../../test/memberFixtures'
+import { deskOverview } from '../../test/receptionFixtures'
 import {
   afterPaymentReference,
   changeDue,
@@ -14,6 +15,7 @@ import {
   pendingRequests,
   positiveId,
   receptionPaymentPath,
+  receptionDate,
   registerPath,
   saleOutcome,
   sellableTiers,
@@ -47,27 +49,19 @@ const TIERS = [STANDARD, GOLD, VIP]
 
 describe('FE-05 receptionModel - create member validation', () => {
   it('TC-FE05-001 requires full name, phone and email', () => {
-    expect(validateMemberForm(EMPTY_MEMBER_FORM, TODAY)).toEqual({
+    expect(validateMemberForm(EMPTY_MEMBER_FORM)).toEqual({
       fullName: 'Full name is required',
       phone: 'Phone number is required',
       email: 'Email is required',
     })
   })
 
-  it('TC-FE05-002 checks phone and email format and the date of birth', () => {
-    const errors = validateMemberForm(
-      { ...EMPTY_MEMBER_FORM, fullName: 'An', phone: '12345', email: 'bad', dateOfBirth: TODAY },
-      TODAY,
-    )
-    expect(errors.phone).toBe('Phone number must start with 0 and have 10 or 11 digits')
+  it('TC-FE05-002 matches BE-05 phone and email constraints', () => {
+    const errors = validateMemberForm({ fullName: 'Test', phone: '12345', email: 'bad' })
+    expect(errors.phone).toBe('Phone must be 8-15 digits with optional leading +')
     expect(errors.email).toBe('Email is invalid')
-    expect(errors.dateOfBirth).toBe('Date of birth must be before today')
-    expect(
-      validateMemberForm(
-        { ...EMPTY_MEMBER_FORM, fullName: 'An Le', phone: '0901234567', email: 'an@sportify.demo', dateOfBirth: '2004-06-15' },
-        TODAY,
-      ),
-    ).toEqual({})
+    expect(validateMemberForm({ fullName: 'Test Member', phone: '+84901234567', email: 'test@example.test' })).toEqual({})
+    expect(validateMemberForm({ fullName: 'Test Member', phone: '12345678', email: 'x'.repeat(250) + '@a.test' }).email).toContain('255')
   })
 })
 
@@ -185,6 +179,10 @@ describe('FE-05 receptionModel - sale outcome', () => {
 })
 
 describe('FE-05 receptionModel - lists, paths and readers', () => {
+  it('uses the centre calendar date across UTC midnight boundaries', () => {
+    expect(receptionDate(new Date('2026-10-16T16:59:59Z'))).toBe('2026-10-16')
+    expect(receptionDate(new Date('2026-10-16T17:00:00Z'))).toBe('2026-10-17')
+  })
   it('TC-FE05-013 pending requests merge cards and packages, oldest first', () => {
     const rows = pendingRequests(
       [card({ id: 5, cardCode: 'CARD-0005', status: 'PENDING_PAYMENT', createdAt: '2026-10-12T09:00:00', memberFullName: 'Taylor Nguyen' })],
@@ -217,20 +215,13 @@ describe('FE-05 receptionModel - lists, paths and readers', () => {
     expect(validateIdentifier('MB-0248')).toBeNull()
   })
 
-  it('TC-FE05-016 the overview reader accepts only the proposed shape and checks list elements', () => {
-    const overview = toMemberOverview({
-      member: { userId: 2, fullName: 'Taylor Nguyen', memberCode: 'MB-0248', status: 'ACTIVE' },
-      cards: [card()],
-      registrations: [registration()],
-    })
-    expect(overview.member).toMatchObject({ userId: 2, status: 'ACTIVE' })
-    expect(overview.cards).toHaveLength(1)
-    expect(overview.registrations).toHaveLength(1)
-    // Former alternatives are refused: flat member, id instead of userId, other list names, bad elements.
-    expect(() => toMemberOverview({ userId: 2, fullName: 'Taylor Nguyen', cards: [], registrations: [] })).toThrow('unexpected response')
-    expect(() => toMemberOverview({ member: { id: 2, fullName: 'Taylor Nguyen' }, cards: [], registrations: [] })).toThrow('unexpected response')
-    expect(() => toMemberOverview({ member: { userId: 2, fullName: 'T' }, activeCard: card(), registrations: [] })).toThrow('unexpected response')
-    expect(() => toMemberOverview({ member: { userId: 2, fullName: 'T' }, cards: [{ cardCode: 'X' }], registrations: [] })).toThrow('unexpected response')
+  it('TC-FE05-016 the overview reader accepts only MemberOverviewResponse', () => {
+    const wire = deskOverview({ userId: 2, fullName: 'Test Member', status: 'ACTIVE' }, [card()], [registration()])
+    expect(toMemberOverview(wire)).toMatchObject({ profile: { userId: 2, status: 'ACTIVE' }, currentCard: { id: 1 } })
+    expect(() => toMemberOverview({ member: wire.profile, cards: [], registrations: [] })).toThrow('unexpected response')
+    expect(() => toMemberOverview({ ...wire, profile: null })).toThrow('unexpected response')
+    expect(() => toMemberOverview({ ...wire, currentCard: {} })).toThrow('unexpected response')
+    expect(() => toMemberOverview({ ...wire, activePackageRegistrations: [null] })).toThrow('unexpected response')
     expect(() => toMemberSummary({ userId: 3 })).toThrow('unexpected response')
   })
 

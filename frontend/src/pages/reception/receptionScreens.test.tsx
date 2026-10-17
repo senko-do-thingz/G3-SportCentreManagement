@@ -1,10 +1,11 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
 import { backendError, installFakeFetch, json, MEMBER, type RecordedCall } from '../../test/fakeBackend'
 import { card, payment, registration, sportPackage } from '../../test/memberFixtures'
 import { renderApp } from '../../test/renderApp'
+import { deskCard, deskOverview, deskPackage } from '../../test/receptionFixtures'
 
 /**
  * FE-05: Member Search and Profile (F1-13), Register and Renew (F1-14), Check-in (F1-15) and the
@@ -66,9 +67,11 @@ interface Options {
   me?: unknown
   search?: (query: string) => unknown[]
   overview?: unknown
-  onCreateMember?: (call: RecordedCall) => Response
-  onSellPackage?: (call: RecordedCall) => Response
-  onSellCard?: (call: RecordedCall) => Response
+  cards?: ReturnType<typeof card>[]
+  tiers?: typeof TIERS
+  onCreateMember?: (call: RecordedCall) => Response | Promise<Response>
+  onSellPackage?: (call: RecordedCall) => Response | Promise<Response>
+  onSellCard?: (call: RecordedCall) => Response | Promise<Response>
   onCheckIn?: (call: RecordedCall) => Response
   checkIns?: unknown[] | Response
   payments?: Record<number, unknown>
@@ -78,10 +81,13 @@ interface Options {
 function receptionBackend(options: Options = {}) {
   const payments: Record<number, unknown> = {
     41: payment({ id: 41, code: 'PAY-0041', amount: 810000, memberCode: 'MB-0248' }),
+    60: payment({ id: 60, status: 'SUCCESS', amount: 810000 }),
+    70: payment({ id: 70, status: 'SUCCESS', amount: 600000 }),
     ...options.payments,
   }
   // Cards of member 2 as the backend holds them; a desk card sale adds the sold card.
-  const cards: unknown[] = [VIP_CARD]
+  const pendingCard = card({ id: 5, cardCode: 'CARD-0005', tierName: 'Gold', status: 'PENDING_PAYMENT', paymentId: 45, paymentCode: 'PAY-0045', pricePaid: 300000, createdAt: '2026-10-12T09:00:00' })
+  const cards = options.cards ?? [VIP_CARD]
   return installFakeFetch((call) => {
     const url = new URL(`http://x${call.path}`)
     if (call.path === '/users/me') return json(200, options.me ?? RECEPTIONIST)
@@ -91,17 +97,17 @@ function receptionBackend(options: Options = {}) {
       return json(200, { content, number: 0, size: 10, totalElements: content.length, totalPages: 1 })
     }
     if (url.pathname === '/members' && call.method === 'POST') {
-      return options.onCreateMember ? options.onCreateMember(call) : json(201, { ...TAYLOR_B, userId: 7, memberCode: 'MB-0007', fullName: 'An Le' })
+      return options.onCreateMember ? options.onCreateMember(call) : json(201, { ...TAYLOR_B, userId: 7, memberCode: 'MB-0007', fullName: 'An Le', status: 'ACTIVE', temporaryPassword: 'unit-test-only' })
     }
     const overview = /^\/members\/(\d+)\/overview$/.exec(url.pathname)
     if (overview) {
       if (options.overviewError) return options.overviewError
-      return json(200, options.overview ?? { ...OVERVIEW, cards, member: { ...OVERVIEW.member, userId: Number(overview[1]) } })
+      return json(200, options.overview ?? deskOverview({ ...OVERVIEW.member, userId: Number(overview[1]) }, cards, OVERVIEW.registrations))
     }
-    if (call.path === '/membership-cards/member/2') return json(200, cards)
-    if (call.path === '/packages/registrations/member/2') return json(200, OVERVIEW.registrations)
+    if (/^\/membership-cards\/member\/\d+$/.test(call.path)) return json(200, cards.map((item) => ({ ...item, memberId: Number(call.path.split('/').pop()) })))
+    if (/^\/packages\/registrations\/member\/\d+$/.test(call.path)) return json(200, OVERVIEW.registrations.map((item) => ({ ...item, memberId: Number(call.path.split('/').pop()) })))
     if (call.path === '/packages') return json(200, PACKAGES)
-    if (call.path === '/membership-cards/tiers') return json(200, TIERS)
+    if (call.path === '/membership-cards/tiers') return json(200, options.tiers ?? TIERS)
     if (call.path === '/packages/registrations' && call.method === 'POST') {
       return options.onSellPackage
         ? options.onSellPackage(call)
@@ -113,10 +119,13 @@ function receptionBackend(options: Options = {}) {
       cards.push(sold)
       return json(201, sold)
     }
-    if (call.path === '/membership-cards/pending') {
-      return json(200, [card({ id: 5, cardCode: 'CARD-0005', tierName: 'Gold', status: 'PENDING_PAYMENT', paymentId: 45, paymentCode: 'PAY-0045', pricePaid: 300000, createdAt: '2026-10-12T09:00:00' })])
+    if (url.pathname === '/membership-cards/pending') {
+      if (!cards.some((item) => item.id === pendingCard.id)) cards.push(pendingCard)
+      return json(200, { content: [deskCard(pendingCard)], number: 0, size: 100, totalElements: 1, totalPages: 1 })
     }
-    if (call.path === '/packages/registrations/pending') return json(200, [PENDING_FOOTBALL])
+    if (url.pathname === '/packages/registrations/pending') {
+      return json(200, { content: [deskPackage(PENDING_FOOTBALL)], number: 0, size: 100, totalElements: 1, totalPages: 1 })
+    }
     if (call.path === '/payments/41/confirm' && call.method === 'PUT') {
       payments[41] = payment({ id: 41, code: 'PAY-0041', status: 'SUCCESS', method: 'CASH', amount: 810000, paymentTime: '2026-10-13T09:40:00' })
       return json(200, payments[41])
@@ -228,22 +237,29 @@ describe('FE-05 Member Search and Profile (F1-13)', () => {
     await user.type(within(dialog).getByLabelText(/Phone number/), '0901234522')
     await user.type(within(dialog).getByLabelText(/Email address/), 'an.le@sportify.demo')
     await user.click(within(dialog).getByRole('button', { name: 'Save member' }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    const credentials = await screen.findByRole('dialog', { name: 'Member created' })
+    const password = within(credentials).getByLabelText('Temporary password')
+    expect(password).toHaveAttribute('type', 'password')
+    await user.click(within(credentials).getByRole('button', { name: 'Reveal temporary password' }))
+    expect(password).toHaveAttribute('type', 'text')
+    expect(password).toHaveValue('unit-test-only')
+    expect(JSON.stringify(localStorage)).not.toContain('unit-test-only')
+    expect(JSON.stringify(sessionStorage)).not.toContain('unit-test-only')
+    expect(calls.some((call) => call.path.includes('unit-test-only') || JSON.stringify(call.body)?.includes('unit-test-only'))).toBe(false)
+    await user.click(within(credentials).getByRole('button', { name: 'Continue to member profile' }))
+    expect(screen.queryByLabelText('Temporary password')).not.toBeInTheDocument()
     const post = calls.find((call) => call.path === '/members' && call.method === 'POST')
     expect(post?.body).toEqual({
       fullName: 'An Le',
       phone: '0901234522',
       email: 'an.le@sportify.demo',
-      dateOfBirth: null,
-      mainGoal: 'IMPROVE_FITNESS',
-      currentLevel: 'BEGINNER',
     })
     await screen.findByRole('region', { name: 'Member profile' })
     expect(calls.some((call) => call.path === '/members/7/overview')).toBe(true)
   })
 
-  it('TC-FE05-034 a duplicate phone or email (409) keeps the form open with the backend message', async () => {
-    await open('/reception', { onCreateMember: () => backendError(409, 'Email is already registered.') })
+  it.each(['Email is already registered.', 'Phone number is already registered.'])('TC-FE05-034 a 409 keeps the form open: %s', async (message) => {
+    await open('/reception', { onCreateMember: () => backendError(409, message) })
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'Create member' }))
     const dialog = await screen.findByRole('dialog', { name: 'Create member' })
@@ -251,7 +267,42 @@ describe('FE-05 Member Search and Profile (F1-13)', () => {
     await user.type(within(dialog).getByLabelText(/Phone number/), '0901234567')
     await user.type(within(dialog).getByLabelText(/Email address/), 'member@sportify.demo')
     await user.click(within(dialog).getByRole('button', { name: 'Save member' }))
-    expect(await within(dialog).findByText(/Email is already registered\. Search for the existing profile/)).toBeInTheDocument()
+    expect(await within(dialog).findByText(`${message} Search for the existing profile instead of creating a second one.`)).toBeInTheDocument()
+  })
+
+  it('clears the credential dialog and previous form data when another staff account signs in', async () => {
+    await open('/reception')
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Create member' }))
+    const form = screen.getByRole('form', { name: 'Create member' })
+    await user.type(within(form).getByLabelText(/Full name/), 'Test Member')
+    await user.type(within(form).getByLabelText(/Phone number/), '+84123456789')
+    await user.type(within(form).getByLabelText(/Email address/), 'test@example.test')
+    await user.click(within(form).getByRole('button', { name: 'Save member' }))
+    await screen.findByRole('dialog', { name: 'Member created' })
+    const oldSession = tokenStorage.getSessionId()
+    installFakeFetch(() => json(200, { ...RECEPTIONIST, id: 10, fullName: 'Other Staff' }))
+    localStorage.setItem('sportify.accessToken', 'other-test-access')
+    localStorage.setItem('sportify.refreshToken', 'other-test-refresh')
+    localStorage.setItem('sportify.sessionId', 'other-test-session')
+    act(() => window.dispatchEvent(new StorageEvent('storage', { key: 'sportify.sessionId', oldValue: oldSession, newValue: 'other-test-session' })))
+    expect(await screen.findByRole('status', { name: 'Account switched' })).toHaveTextContent('Other Staff')
+    expect(screen.queryByLabelText('Temporary password')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Create member' }))
+    expect(screen.getByLabelText(/Full name/)).toHaveValue('')
+  })
+
+  it('maps actual BE-05 validation details to fields without claiming creation succeeded', async () => {
+    await open('/reception', { onCreateMember: () => backendError(400, 'Validation Error', { phone: 'Phone rejected' }) })
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Create member' }))
+    const form = screen.getByRole('form', { name: 'Create member' })
+    await user.type(within(form).getByLabelText(/Full name/), 'Test Member')
+    await user.type(within(form).getByLabelText(/Phone number/), '12345678')
+    await user.type(within(form).getByLabelText(/Email address/), 'test@example.test')
+    await user.click(within(form).getByRole('button', { name: 'Save member' }))
+    expect(await within(form).findByText('Phone rejected')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Temporary password')).not.toBeInTheDocument()
   })
 
   it('TC-FE05-035 Payment Handoff opens the confirmation; confirming returns to the profile in the After Payment state', async () => {
@@ -277,7 +328,7 @@ describe('FE-05 Member Search and Profile (F1-13)', () => {
     expect(confirmCall?.body).toEqual({ paymentMethod: 'CASH', paymentReference: null, amountReceived: 810000, note: null })
 
     await user.click(screen.getByRole('link', { name: 'Back to member profile' }))
-    expect(await screen.findByText(/Payment PAY-0041 is confirmed and the request is active/)).toBeInTheDocument()
+    expect(await screen.findByText(/Returned from payment PAY-0041/)).toBeInTheDocument()
   })
 
   it('TC-FE05-036 a paid reference typed in the URL never shows the After Payment notice', async () => {
@@ -300,6 +351,61 @@ describe('FE-05 Member Search and Profile (F1-13)', () => {
 })
 
 describe('FE-05 Register and Renew (F1-14)', () => {
+  it('guards batched double submits and opens an already-paid receipt without confirmation', async () => {
+    let finish!: (response: Response) => void
+    const { calls } = await open('/reception/register?memberId=2', {
+      onSellPackage: () => new Promise<Response>((resolve) => { finish = resolve }),
+    })
+    const user = userEvent.setup()
+    const form = await screen.findByRole('form', { name: 'Sell a sport package' })
+    await user.selectOptions(within(form).getByLabelText(/^Package/), '4')
+    await user.click(within(form).getByRole('button', { name: 'Use exact amount' }))
+    act(() => { fireEvent.submit(form); fireEvent.submit(form) })
+    await waitFor(() => expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1))
+    await act(async () => finish(json(201, registration({ id: 60, status: 'ACTIVE', paymentId: 60 }))))
+    const receipt = await screen.findByRole('region', { name: 'Sale recorded' })
+    await user.click(within(receipt).getByRole('link', { name: 'View receipt' }))
+    expect(await screen.findByRole('heading', { name: 'Payment Confirmed and Receipt' })).toBeInTheDocument()
+    expect(calls.some((call) => call.method === 'PUT' && call.path.endsWith('/confirm'))).toBe(false)
+  })
+
+  it.each(['network', 'server', 'payment'])('blocks a repeat purchase after an uncertain %s outcome', async (failure) => {
+    const { calls } = await open('/reception/register?memberId=2', {
+      onSellPackage: () => {
+        if (failure === 'network') throw new TypeError('Connection lost')
+        return failure === 'server' ? backendError(500, 'Internal server error')
+          : json(201, registration({ id: 60, status: 'ACTIVE', paymentId: 60 }))
+      },
+      payments: failure === 'payment' ? { 60: payment({ id: 60, status: 'PENDING' }) } : undefined,
+    })
+    const user = userEvent.setup()
+    const form = await screen.findByRole('form', { name: 'Sell a sport package' })
+    await user.selectOptions(within(form).getByLabelText(/^Package/), '4')
+    await user.click(within(form).getByRole('button', { name: 'Use exact amount' }))
+    await user.click(within(form).getByRole('button', { name: 'Record payment and register' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Check the member profile and payment requests')
+    expect(within(form).getByRole('button', { name: 'Record payment and register' })).toBeDisabled()
+    fireEvent.submit(form)
+    expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1)
+    expect(screen.queryByRole('region', { name: 'Sale recorded' })).not.toBeInTheDocument()
+  })
+
+  it('issues a zero-fee upgrade with no amountReceived and never asks staff to collect money', async () => {
+    const { calls } = await open('/reception/register?memberId=2&tab=card', {
+      cards: [card({ tierId: 2, tierCode: 'GOLD', tierName: 'Gold', tierRank: 3, pricePaid: 600000 })],
+      tiers: TIERS.map((item) => ({ ...item, price: item.code === 'GOLD' ? 600000 : item.price })),
+      onSellCard: () => json(201, card({ status: 'ACTIVE', paymentId: null, paymentCode: null, pricePaid: 0 })),
+    })
+    const user = userEvent.setup()
+    const form = await screen.findByRole('form', { name: 'Sell a membership card' })
+    await user.selectOptions(within(form).getByLabelText(/Membership card/), '3')
+    expect(within(form).queryByLabelText(/Amount received/)).not.toBeInTheDocument()
+    await user.click(within(form).getByRole('button', { name: 'Record payment and issue card' }))
+    expect(await screen.findByText(/No payment is required/)).toBeInTheDocument()
+    expect(calls.find((call) => call.method === 'POST')?.body).toEqual({ memberId: 2, tierId: 3, paymentMethod: 'CASH', referenceCode: null })
+    expect(screen.queryByRole('link', { name: 'View receipt' })).not.toBeInTheDocument()
+  })
+
   it('TC-FE05-040 without a member the page asks to choose one first', async () => {
     await open('/reception/register')
     expect(screen.getByRole('heading', { name: 'Register and Renew' })).toBeInTheDocument()
@@ -332,7 +438,7 @@ describe('FE-05 Register and Renew (F1-14)', () => {
       startDate: '2026-10-13',
       channel: 'RECEPTION',
       paymentMethod: 'CASH',
-      paymentReference: null,
+      referenceCode: null,
       amountReceived: 1000000,
     })
     expect(within(receipt).getByText(/is active\. Payment PAY-0060 is recorded/)).toBeInTheDocument()
@@ -390,7 +496,7 @@ describe('FE-05 Register and Renew (F1-14)', () => {
     await user.click(within(form).getByRole('button', { name: 'Record payment and issue card' }))
     const receipt = await screen.findByRole('region', { name: 'Sale recorded' })
     const post = calls.find((call) => call.path === '/membership-cards/purchase')
-    expect(post?.body).toEqual({ memberId: 2, tierId: 3, paymentMethod: 'CREDIT_CARD', paymentReference: 'POS-7781', amountReceived: 600000 })
+    expect(post?.body).toEqual({ memberId: 2, tierId: 3, paymentMethod: 'CREDIT_CARD', referenceCode: 'POS-7781', amountReceived: 600000 })
     expect(within(receipt).getByRole('link', { name: 'View receipt' })).toHaveAttribute('href', '/reception/payments/70')
   })
 
@@ -423,7 +529,7 @@ describe('FE-05 Register and Renew (F1-14)', () => {
     await user.click(within(form).getByRole('button', { name: 'Use exact amount' }))
     await user.click(within(form).getByRole('button', { name: 'Record payment and register' }))
     const receipt = await screen.findByRole('region', { name: 'Sale recorded' })
-    expect(within(receipt).getByText(/is active, but no payment record was created \(needs BE-19\)/)).toBeInTheDocument()
+    expect(within(receipt).getByText(/is active, but no payment is linked/)).toBeInTheDocument()
     expect(within(receipt).getByText('No payment record')).toBeInTheDocument()
     expect(within(receipt).queryByText(/payment is recorded|is recorded\./i)).not.toBeInTheDocument()
     expect(within(receipt).queryByRole('link', { name: 'View receipt' })).not.toBeInTheDocument()
@@ -454,8 +560,8 @@ describe('FE-05 Register and Renew (F1-14)', () => {
     const rows = within(table).getAllByRole('row')
     expect(rows[1]).toHaveTextContent('REG-ONLINE-001')
     expect(rows[2]).toHaveTextContent('CARD-0005')
-    expect(calls.some((call) => call.path === '/membership-cards/pending')).toBe(true)
-    expect(calls.some((call) => call.path === '/packages/registrations/pending')).toBe(true)
+    expect(calls.some((call) => call.path.startsWith('/membership-cards/pending?'))).toBe(true)
+    expect(calls.some((call) => call.path.startsWith('/packages/registrations/pending?'))).toBe(true)
     await user.click(within(rows[1]).getByRole('link', { name: 'Confirm payment for REG-ONLINE-001' }))
     expect(await screen.findByRole('heading', { name: 'Verify and Record Payment' })).toBeInTheDocument()
     expect(screen.getByRole('form', { name: 'Verify and record payment' })).toBeInTheDocument()
@@ -525,39 +631,35 @@ describe('FE-05 Check-in (F1-15)', () => {
     expect(screen.queryByRole('status', { name: 'Check-in rejected' })).not.toBeInTheDocument()
   })
 
-  it('TC-FE05-053 without the BE-05 date filter the list shows a neutral notice and this screen\'s check-ins', async () => {
-    await open('/reception/check-in', {
-      checkIns: backendError(400, "Required request parameter 'memberId' is not present"),
-      onCheckIn: (call) =>
-        (call.body as { identifier: string }).identifier === 'MB-9999'
-          ? backendError(404, 'Member not found')
-          : json(201, { id: 80, memberId: 2, memberName: 'Taylor Nguyen', bookingId: 21, bookingCode: 'BK-0021', packageRegistrationId: 10, checkedInAt: '2026-10-13T17:02:00', result: 'ALLOWED', denialReason: null, note: null }),
+  it.each([400, 500])('TC-FE05-053 HTTP %s is an error with Retry and unknown scans never enter persisted history', async (status) => {
+    let fail = true
+    const { calls } = installFakeFetch((call) => {
+      if (call.path === '/users/me') return json(200, RECEPTIONIST)
+      if (call.method === 'POST') return backendError(404, 'Member not found')
+      return fail ? backendError(status, 'List unavailable') : json(200, [])
     })
+    signIn()
+    renderApp('/reception/check-in')
     const user = userEvent.setup()
-    expect(await screen.findByText(/Today's list needs the date filter from BE-05\./)).toBeInTheDocument()
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('List unavailable')
+    fail = false
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByText('No check-in yet today')).toBeInTheDocument()
     const field = screen.getByLabelText(/Member code or card scan/)
-    await user.type(field, 'MB-0248')
+    await user.type(field, 'UNKNOWN-TEST')
     await user.click(screen.getByRole('button', { name: 'Confirm check-in' }))
-    await screen.findByRole('status', { name: 'Check-in recorded' })
-    await user.type(field, 'MB-9999')
-    await user.click(screen.getByRole('button', { name: 'Confirm check-in' }))
-    await screen.findByRole('status', { name: 'Check-in rejected' })
-    const rows = within(screen.getByRole('table', { name: "Today's check-ins" })).getAllByRole('row')
-    expect(rows).toHaveLength(3)
-    expect(rows[1]).toHaveTextContent('MB-9999')
-    expect(rows[1]).toHaveTextContent('Member not found')
-    expect(rows[2]).toHaveTextContent('Taylor Nguyen')
-    expect(rows[2]).toHaveTextContent('Recorded')
+    expect(await screen.findByText('No check-in was saved for this unknown code.')).toBeInTheDocument()
+    expect(within(screen.getByRole('table', { name: "Today's check-ins" })).queryByText('UNKNOWN-TEST')).not.toBeInTheDocument()
+    expect(field).toHaveFocus()
+    expect(calls.filter((call) => call.path.startsWith('/check-ins?date='))).toHaveLength(2)
   })
 })
 
 describe('FE-05 access', () => {
-  it.each(['/reception', '/reception/register', '/reception/check-in', '/reception/payments/41'])(
-    'TC-FE05-060 a MEMBER cannot open %s',
-    async (path) => {
-      const { calls } = await open(path, { me: MEMBER })
+  it.each(['MEMBER', 'COACH', 'MANAGER'].flatMap((role) => ['/reception', '/reception/register', '/reception/check-in', '/reception/payments/41'].map((path) => [role, path])))(
+    'TC-FE05-060 role %s cannot open the receptionist-only route %s',
+    async (role, path) => {
+      const { calls } = await open(path, { me: { ...MEMBER, role } })
       expect(screen.getByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
       expect(calls.some((call) => call.path.startsWith('/members') || call.path.startsWith('/check-ins') || call.path.startsWith('/payments'))).toBe(false)
     },
