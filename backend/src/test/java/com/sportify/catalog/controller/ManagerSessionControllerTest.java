@@ -5,6 +5,7 @@ import com.sportify.catalog.entity.SessionStatus;
 import com.sportify.catalog.entity.TrainingFormat;
 import com.sportify.catalog.exception.ScheduleConflictException;
 import com.sportify.catalog.service.ManagerSessionService;
+import com.sportify.catalog.service.FacilityService;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.UserAccount;
@@ -35,9 +36,15 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(ManagerSessionController.class)
+@WebMvcTest({ManagerSessionController.class, FacilityController.class})
 @Import({SecurityConfig.class, CustomAuthenticationEntryPoint.class, CustomAccessDeniedHandler.class, JwtAuthenticationFilter.class})
 class ManagerSessionControllerTest {
+    @Test
+    void facilityLookup_managerMustReceiveDirectory() throws Exception {
+        mvc.perform(get("/api/v1/facilities").with(user("manager").roles("MANAGER")))
+                .andExpect(status().isOk());
+    }
+
     private static final String BASE = "/api/v1/manager/sessions";
     private static final String CREATE = "/api/v1/manager/classes/10/sessions";
     private static final String BODY = """
@@ -50,6 +57,7 @@ class ManagerSessionControllerTest {
             """;
     @Autowired private MockMvc mvc;
     @MockitoBean private ManagerSessionService service;
+    @MockitoBean private FacilityService facilityService;
     @MockitoBean private JwtService jwtService;
     @MockitoBean private AuthenticationProvider authenticationProvider;
     @MockitoBean private UserDetailsService userDetailsService;

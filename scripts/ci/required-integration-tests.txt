@@ -10,6 +10,7 @@ com.sportify.core.config.DemoClassesIntegrationTest
 com.sportify.identity.controller.MyProfileIntegrationTest
 com.sportify.catalog.controller.ManagerCatalogIntegrationTest
 com.sportify.catalog.controller.ManagerSessionIntegrationTest
+com.sportify.catalog.controller.FacilityLookupIntegrationTest
 com.sportify.catalog.controller.MemberScheduleIntegrationTest
 com.sportify.catalog.controller.BookingRulesIntegrationTest
 com.sportify.catalog.service.BookingV20IntegrationTest
