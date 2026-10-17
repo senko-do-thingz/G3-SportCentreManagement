@@ -32,12 +32,20 @@ import { LoginPage } from '../pages/public/LoginPage'
 import { NotFoundPage } from '../pages/public/NotFoundPage'
 import { RegisterPage } from '../pages/public/RegisterPage'
 import { AccountSwitchRedirect } from './AccountSwitchRedirect'
+import { UserManagementPage } from '../pages/manager/UserManagementPage'
+import { ManagerPackagesPage } from '../pages/manager/ManagerPackagesPage'
+import { MembershipCardsManagementPage } from '../pages/manager/MembershipCardsManagementPage'
+import { ActivityLogPage } from '../pages/manager/ActivityLogPage'
 
 /**
  * Real screens by full path. Later tasks register their page here, for example
  * '/member/packages': <SportPackagesPage />. Paths without an entry show a placeholder.
  */
 const SCREENS: Record<string, ReactNode> = {
+  '/manager': <UserManagementPage />,
+  '/manager/packages': <ManagerPackagesPage />,
+  '/manager/cards': <MembershipCardsManagementPage />,
+  '/manager/activity': <ActivityLogPage />,
   '/member': <MemberDashboardPage />,
   '/member/profile': <MyProfilePage />,
   '/member/packages': <SportPackagesPage />,

@@ -19,19 +19,19 @@ describe('password rules (same as backend StrongPassword)', () => {
     ['abcdefgh', false, 'letters only'],
     ['12345678', false, 'digits only'],
     ['!!!!!!!a1', true, 'symbols are allowed but do not count'],
-    ['matkhaué1', true, 'an accented letter counts as a letter'],
-    ['١٢٣abcde', true, 'any Unicode decimal digit counts, like Character.isDigit'],
+    ['matkhau\u00E91', true, 'an accented letter counts as a letter'],
+    ['\u0661\u0662\u0663abcde', true, 'any Unicode decimal digit counts, like Character.isDigit'],
   ])('%s -> %s (%s)', (password, expected) => {
     expect(isStrongPassword(password)).toBe(expected)
   })
 
   it('rejects more than 72 UTF-8 bytes even when the length is below 64', () => {
-    const password = `${'é'.repeat(36)}1` // 37 characters, 73 bytes
+    const password = `${'\u00E9'.repeat(36)}1` // 37 characters, 73 bytes
     expect(password.length).toBe(37)
     expect(utf8ByteLength(password)).toBe(73)
     expect(isStrongPassword(password)).toBe(false)
     expect(checkPassword(password).find((rule) => rule.id === 'bytes')?.met).toBe(false)
-    expect(isStrongPassword(`${'é'.repeat(35)}1`)).toBe(true) // 71 bytes
+    expect(isStrongPassword(`${'\u00E9'.repeat(35)}1`)).toBe(true) // 71 bytes
   })
 
   it('counts UTF-16 code units for the length, like Java String.length', () => {

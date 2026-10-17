@@ -1,3 +1,17 @@
+## 2026-10-17 - FE-06 Activity Log Review Fixes
+
+- Connect real manager activity history to the merged BE-04 endpoint and align the frontend response model with ActivityLogResponse, including null-actor fallback and shortDetail.
+- Restrict activity filtering to the backend-supported action codes and update the preview fixture to the same response shape.
+- Refresh FE-06 verification steps for the released API and add authenticated fake-fetch coverage for the real wire contract.
+
+## 2026-10-17 - FE-06 Account Status Filter
+
+- Limit the manager account status filter to ACTIVE and INACTIVE, the only values supported by the backend.
+- Add screen coverage to prevent unsupported status values from returning to the filter.
+
+## 2026-10-17 - FE-06 ASCII Test Sources
+
+- Express accented Latin, Arabic-Indic digit and Vietnamese password test inputs with Unicode escapes so the Unicode behavior remains covered in ASCII-only test source.
 ## 2026-10-17 - Frontend Authentication Maintenance (FE-00)
 
 - Header follow-up: isolate the authenticated member header from the receptionist member-summary CSS collision, restoring left-aligned navigation and the user section at the right of its bar. Preserve responsive navigation and receipt-print hiding. Add two style regressions; lint, all 617 tests in 31 files and production build pass. Desktop browser verification remains pending because browser automation is unavailable.
@@ -13,7 +27,6 @@
 - Add staff-only selected-member eligibility through the same BE-11 calculation and response, without reserving seats, consuming credits or writing routine audits.
 - Require explicit member/package selection for staff, reject cross-member MEMBER requests with 403, and preserve BE-12 session-first locks, atomic capacity/credit updates and transactional BOOKING_CREATED actor attribution. No migration or new actor field is introduced.
 - Add unit, real security-chain controller, SQL Server-dialect query and dedicated isolated SQL Server integration coverage. Actual SQL Server execution remains required in GitHub CI; see docs/tests/BE-13_test_cases.md.
-
 ## 2026-10-16 - Scheduled Maintenance and Local Document Policy (BE-06)
 
 - Add four daily, Clock-based Vietnam maintenance transitions: overdue pending cards/registrations to CANCELLED and expired ACTIVE cards/registrations to EXPIRED, using guarded bulk updates, committed row counts and idempotency.
