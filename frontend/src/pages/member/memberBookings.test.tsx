@@ -19,6 +19,8 @@ const booking: MemberBookingRecord = {
   id: 21, bookingCode: 'BK-1021', sessionId: 5, sessionDate: '2026-11-05', startTime: '17:00:00', endTime: '18:00:00', sportName: 'Basketball', sportId: 3, classId: 7, className: 'Basketball Foundations', coachId: 8, coachName: 'Quan Coach', facilityId: 2, facilityName: 'Court A', trainingType: 'COACH_LED', memberId: 2, memberCode: 'MB-002', memberFullName: 'Taylor Nguyen', packageRegistrationId: 11, packageId: 4, packageName: 'Basketball 10 sessions', status: 'CONFIRMED', bookedAt: '2026-10-17T10:00:00', cancelledAt: null, cancelReason: null, cancelledById: null, cancelledByName: null, cancelledByRole: null,
 }
 const cancelled = { ...booking, status: 'CANCELLED' as const, cancelledAt: '2026-10-17T10:30:00', cancelledByName: 'Taylor Nguyen', cancelledByRole: 'MEMBER' }
+const registration = { id: 11, registrationCode: 'REG-11', memberId: 2, packageId: 4, packageCode: 'PKG-4', packageName: 'Basketball 10 sessions', sportName: 'Basketball', trainingFormat: 'COACH_LED', channel: 'ONLINE', originalPrice: 1000000, discountPercentage: 0, paidAmount: 1000000, totalSessions: 10, remainingSessions: 3, startDate: '2026-10-01', endDate: '2026-12-01', status: 'ACTIVE', paymentId: null, paymentCode: null, activatedAt: null, createdAt: null }
+const OTHER_MEMBER = { ...MEMBER, id: 3, email: 'other-member@sportify.demo', fullName: 'Alex Other' }
 
 function api(handler: Parameters<typeof installFakeFetch>[0], profile = MEMBER) {
   return installFakeFetch((call) => {
@@ -51,6 +53,9 @@ describe('FE-09 member booking screens', () => {
     const backend = api((call) => {
       if (call.path === '/sessions/5') return json(200, detail)
       if (call.method === 'POST' && call.path === '/bookings') return json(201, booking)
+      if (call.path === '/bookings/my?when=UPCOMING') return json(200, [booking])
+      if (call.path === '/bookings/my?when=PAST') return json(200, [])
+      if (call.path === '/packages/registrations/my') return json(200, [registration])
       return backendError(404, 'Unexpected request')
     })
     const user = userEvent.setup()
@@ -65,7 +70,7 @@ describe('FE-09 member booking screens', () => {
     await user.dblClick(confirm)
     expect(await screen.findByRole('heading', { name: 'Booking confirmed' })).toBeInTheDocument()
     expect(screen.getByText('BK-1021')).toBeInTheDocument()
-    expect(screen.getByText('4', { selector: 'dd' })).toBeInTheDocument()
+    expect(screen.getByText('3', { selector: 'dd' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Add to calendar' })).toHaveAttribute('download', 'sportify-BK-1021.ics')
     expect(backend.calls.filter((call) => call.method === 'POST' && call.path === '/bookings')).toHaveLength(1)
     expect(backend.calls.find((call) => call.method === 'POST')?.body).toEqual({ sessionId: 5, packageRegistrationId: 11 })
@@ -113,11 +118,54 @@ describe('FE-09 member booking screens', () => {
     expect(backend.calls.some((call) => call.path === '/bookings/my?when=PAST')).toBe(true)
   })
 
-  it('cancels once, displays the two-hour cutoff and shows the confirmed cancelled result', async () => {
+  it('does not display booking data from navigation state or another member', async () => {
+    const outsiderBooking = { ...booking, memberId: MEMBER.id }
+    const backend = api((call) => {
+      if (call.path === '/bookings/my?when=UPCOMING') return json(200, [outsiderBooking])
+      if (call.path === '/bookings/my?when=PAST') return json(200, [])
+      return backendError(404, 'Unexpected request')
+    }, OTHER_MEMBER)
+    renderApp('/member/bookings/confirmed/21', { booking, remainingAfter: 0 })
+    expect(await screen.findByText('This booking is not in your upcoming list. It may have been cancelled or changed.')).toBeInTheDocument()
+    expect(screen.queryByText('BK-1021')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Basketball Foundations' })).not.toBeInTheDocument()
+    expect(backend.calls.some((call) => call.path === '/bookings/my?when=UPCOMING')).toBe(true)
+  })
+
+  it('does not allow a different member to cancel a booking passed in navigation state', async () => {
     const backend = api((call) => {
       if (call.path === '/bookings/my?when=UPCOMING') return json(200, [booking])
       if (call.path === '/bookings/my?when=PAST') return json(200, [])
-      if (call.path === '/bookings/21' && call.method === 'DELETE') return json(200, cancelled)
+      return backendError(404, 'Unexpected request')
+    }, OTHER_MEMBER)
+    renderApp('/member/bookings/21/cancel', { booking })
+    expect(await screen.findByText('This booking could not be found in your upcoming or past bookings.')).toBeInTheDocument()
+    expect(screen.queryByText('BK-1021')).not.toBeInTheDocument()
+    expect(backend.calls.some((call) => call.method === 'DELETE')).toBe(false)
+  })
+
+  it('does not show a cancellation result from another member navigation state', async () => {
+    const backend = api((call) => {
+      if (call.path === '/bookings/my?when=UPCOMING') return json(200, [])
+      if (call.path === '/bookings/my?when=PAST') return json(200, [cancelled])
+      return backendError(404, 'Unexpected request')
+    }, OTHER_MEMBER)
+    renderApp('/member/bookings/21/cancelled', { booking: cancelled })
+    expect(await screen.findByText('This booking is not listed as cancelled. Refresh My Bookings to confirm its current status.')).toBeInTheDocument()
+    expect(screen.queryByText('BK-1021')).not.toBeInTheDocument()
+    expect(backend.calls.some((call) => call.path === '/packages/registrations/my')).toBe(false)
+  })
+
+  it('cancels once, displays the two-hour cutoff and shows the confirmed cancelled result', async () => {
+    let cancelledOnServer = false
+    const backend = api((call) => {
+      if (call.path === '/bookings/my?when=UPCOMING') return json(200, cancelledOnServer ? [] : [booking])
+      if (call.path === '/bookings/my?when=PAST') return json(200, cancelledOnServer ? [cancelled] : [])
+      if (call.path === '/bookings/21' && call.method === 'DELETE') {
+        cancelledOnServer = true
+        return json(200, cancelled)
+      }
+      if (call.path === '/packages/registrations/my') return json(200, [{ ...registration, remainingSessions: 6 }])
       return backendError(404, 'Unexpected request')
     })
     const user = userEvent.setup()
@@ -126,6 +174,8 @@ describe('FE-09 member booking screens', () => {
     await user.dblClick(screen.getByRole('button', { name: 'Confirm cancellation' }))
     expect(await screen.findByRole('heading', { name: 'Booking cancelled' })).toBeInTheDocument()
     expect(screen.getByText('Cancelled by', { selector: 'dt' })).toBeInTheDocument()
+    expect(screen.getByText('Latest package balance: 6 sessions remaining.')).toBeInTheDocument()
+    expect(backend.calls.some((call) => call.path === '/packages/registrations/my')).toBe(true)
     expect(backend.calls.filter((call) => call.method === 'DELETE' && call.path === '/bookings/21')).toHaveLength(1)
   })
 

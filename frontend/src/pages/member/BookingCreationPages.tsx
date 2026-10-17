@@ -2,7 +2,9 @@ import { useCallback, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../../api/errors'
 import { memberBookingsApi, type MemberBookingRecord } from '../../api/memberBookingsApi'
-import { memberSessionsApi, type SessionDetail, type SuitableRegistration } from '../../api/memberSessionsApi'
+import { memberApi, type PackageRegistration } from '../../api/memberApi'
+import { memberSessionsApi, type SessionDetail } from '../../api/memberSessionsApi'
+import { useAuth } from '../../auth/useAuth'
 import { Badge, Button, Card, PageHeader, PageLoader, buttonClassName } from '../../components/ui'
 import { BrowseError } from './BrowseError'
 import { MemberScheduleNav } from './MemberScheduleNav'
@@ -17,15 +19,13 @@ function routeId(value: string | null): number | null {
   return Number.isSafeInteger(number) && number > 0 ? number : null
 }
 
-function safeBookingState(value: unknown, id: number): MemberBookingRecord | null {
-  if (!value || typeof value !== 'object') return null
-  const booking = value as Partial<MemberBookingRecord>
-  return booking.id === id && typeof booking.bookingCode === 'string' && typeof booking.sessionDate === 'string'
-    ? booking as MemberBookingRecord : null
-}
-
 function sessionLabel(detail: SessionDetail): string {
   return detail.session.className || `${detail.session.sportName} session`
+}
+
+interface VerifiedBooking {
+  booking: MemberBookingRecord
+  registration: PackageRegistration | null
 }
 
 function SessionFacts({ detail }: { detail: SessionDetail }) {
@@ -112,14 +112,14 @@ function BookingReviewContent({ sessionId, registrationId, returnTo }: { session
   const [error, setError] = useState<string | null>(null)
   const submitted = useRef(false)
 
-  async function confirmBooking(selected: SuitableRegistration) {
+  async function confirmBooking() {
     if (submitted.current) return
     submitted.current = true
     setSubmitting(true)
     setError(null)
     try {
       const booking = await memberBookingsApi.create({ sessionId, packageRegistrationId: registrationId })
-      navigate(`/member/bookings/confirmed/${booking.id}`, { replace: true, state: { booking, remainingAfter: selected.remainingSessions - 1, returnTo } })
+      navigate(`/member/bookings/confirmed/${booking.id}`, { replace: true, state: { returnTo } })
     } catch (cause) {
       submitted.current = false
       setError(bookingErrorMessage(cause))
@@ -141,31 +141,41 @@ function BookingReviewContent({ sessionId, registrationId, returnTo }: { session
       <Card title="Confirm your place">
         <p>Review the session information. The booking is subject to the latest seat and package availability when submitted.</p>
         {error && <div className="booking-error" role="alert"><strong>Booking was not completed</strong><p>{error}</p><p>No confirmation was recorded. You can review availability and try again.</p></div>}
-        <div className="browse-actions booking-actions"><Link className={buttonClassName('secondary')} to={`/member/bookings/new?${new URLSearchParams({ sessionId: String(sessionId), returnTo })}`}>Back to options</Link><Button loading={submitting} disabled={submitting} onClick={() => void confirmBooking(selected)}>Confirm booking</Button></div>
+        <div className="browse-actions booking-actions"><Link className={buttonClassName('secondary')} to={`/member/bookings/new?${new URLSearchParams({ sessionId: String(sessionId), returnTo })}`}>Back to options</Link><Button loading={submitting} disabled={submitting} onClick={() => void confirmBooking()}>Confirm booking</Button></div>
       </Card>
     </div>}
   </div>
 }
 
 export function BookingConfirmedPage() {
+  const { user } = useAuth()
+  const memberId = user?.id ?? null
   const { state } = useLocation()
   const { bookingId: rawBookingId } = useParams()
   const bookingId = routeId(rawBookingId ?? null)
-  const stateData = state && typeof state === 'object' ? state as { booking?: unknown; returnTo?: unknown; remainingAfter?: unknown } : {}
-  const bookingFromState = bookingId ? safeBookingState(stateData.booking, bookingId) : null
-  const returnTo = typeof stateData.returnTo === 'string' && (stateData.returnTo.startsWith('/member/classes') || stateData.returnTo.startsWith('/member/schedule')) ? stateData.returnTo : '/member/schedule'
-  const remainingAfter = typeof stateData.remainingAfter === 'number' ? stateData.remainingAfter : null
+  const stateData = state && typeof state === 'object' ? state as { returnTo?: unknown } : {}
+  const returnTo = safeBrowseReturn(typeof stateData.returnTo === 'string' ? stateData.returnTo : '/member/schedule')
   const loader = useCallback(async (signal: AbortSignal) => {
     if (!bookingId) throw new ApiError(0, 'Choose a valid booking confirmation.')
-    if (bookingFromState) return bookingFromState
-    return (await memberBookingsApi.my('UPCOMING', signal)).find((booking) => booking.id === bookingId) ?? null
-  }, [bookingId, bookingFromState])
+    if (memberId === null) return null
+    const booking = await memberBookingsApi.findMine(bookingId, memberId, signal)
+    if (!booking || booking.status !== 'CONFIRMED') return null
+    let registration: PackageRegistration | null = null
+    if (booking.packageRegistrationId !== null) {
+      try {
+        registration = (await memberApi.myRegistrations({ signal })).find((row) => row.id === booking.packageRegistrationId && row.memberId === memberId) ?? null
+      } catch (error) {
+        if (signal.aborted) throw error
+      }
+    }
+    return { booking, registration } satisfies VerifiedBooking
+  }, [bookingId, memberId])
   const [resource] = useMemberResource(loader)
   if (resource.status === 'loading') return <div className="page browse-page"><MemberScheduleNav /><PageLoader label="Loading booking confirmation" /></div>
   if (resource.status === 'error') return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Booking confirmation" /><BrowseError error={resource.error} /><Link className={buttonClassName()} to="/member/bookings">My Bookings</Link></div>
   if (!resource.data) return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Booking confirmation" /><Card><p role="status">This booking is not in your upcoming list. It may have been cancelled or changed.</p><Link className={buttonClassName()} to="/member/bookings?when=UPCOMING">View My Bookings</Link></Card></div>
 
-  const booking = resource.data
+  const { booking, registration } = resource.data
   const self = booking.trainingType === 'SELF_TRAINING'
   const calendarHref = bookingCalendarHref(booking)
   return <div className="page browse-page booking-flow">
@@ -184,12 +194,13 @@ export function BookingConfirmedPage() {
         {!self && <div><dt>Coach</dt><dd>{booking.coachName || 'Not provided'}</dd></div>}
         <div><dt>Facility</dt><dd>{booking.facilityName || 'Not provided'}</dd></div>
         <div><dt>Package</dt><dd>{booking.packageName || 'Sport package'}</dd></div>
-        {remainingAfter !== null && <div><dt>Package sessions remaining</dt><dd>{remainingAfter}</dd></div>}
+        {registration?.totalSessions === null ? <div><dt>Package balance</dt><dd>No session limit</dd></div> : registration && registration.remainingSessions !== null ? <div><dt>Package sessions remaining</dt><dd>{registration.remainingSessions}</dd></div> : <div><dt>Package balance</dt><dd>Latest balance unavailable</dd></div>}
       </dl>
-      <p className="browse-muted">One package session has been reserved for this booking. Cancellation before the displayed cutoff restores the session according to the booking rules.</p>
+      <p className="browse-muted">The booking service confirms the reservation and manages package balance updates. View My sport packages for the current package record.</p>
       <div className="browse-actions booking-actions">
         <Link className={buttonClassName()} to="/member/bookings?when=UPCOMING">View My Bookings</Link>
         <Link className={buttonClassName('secondary')} to={returnTo}>Browse schedule</Link>
+        <Link className={buttonClassName('secondary')} to="/member/membership">My sport packages</Link>
         {calendarHref && <a className={buttonClassName('secondary')} href={calendarHref} download={`sportify-${booking.bookingCode}.ics`}>Add to calendar</a>}
       </div>
     </Card>

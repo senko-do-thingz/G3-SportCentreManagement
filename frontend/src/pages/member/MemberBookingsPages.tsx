@@ -1,8 +1,10 @@
 import { useCallback, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../../api/errors'
 import { memberBookingsApi, type BookingWhen, type MemberBookingRecord } from '../../api/memberBookingsApi'
+import { memberApi, type PackageRegistration } from '../../api/memberApi'
 import { Badge, Button, Card, EmptyState, PageHeader, PageLoader, buttonClassName } from '../../components/ui'
+import { useAuth } from '../../auth/useAuth'
 import { BrowseError } from './BrowseError'
 import { MemberScheduleNav } from './MemberScheduleNav'
 import { useMemberResource } from './useMemberResource'
@@ -12,15 +14,6 @@ function routeId(value: string | undefined): number | null {
   if (!value || !/^\d+$/.test(value)) return null
   const number = Number(value)
   return Number.isSafeInteger(number) && number > 0 ? number : null
-}
-
-function stateBooking(state: unknown, id: number): MemberBookingRecord | null {
-  if (!state || typeof state !== 'object') return null
-  const value = (state as { booking?: unknown }).booking
-  if (!value || typeof value !== 'object') return null
-  const booking = value as Partial<MemberBookingRecord>
-  return booking.id === id && typeof booking.bookingCode === 'string' && typeof booking.sessionDate === 'string'
-    ? booking as MemberBookingRecord : null
 }
 
 function bookingTitle(booking: MemberBookingRecord): string {
@@ -36,9 +29,14 @@ function actorName(booking: MemberBookingRecord): string {
 }
 
 export function MemberBookingsPage() {
+  const { user } = useAuth()
+  const memberId = user?.id ?? null
   const [params, setParams] = useSearchParams()
   const when: BookingWhen = params.get('when') === 'PAST' ? 'PAST' : 'UPCOMING'
-  const loader = useCallback((signal: AbortSignal) => memberBookingsApi.my(when, signal), [when])
+  const loader = useCallback(async (signal: AbortSignal) => {
+    if (memberId === null) return []
+    return (await memberBookingsApi.my(when, signal)).filter((booking) => booking.memberId === memberId)
+  }, [memberId, when])
   const [resource, reload] = useMemberResource(loader)
 
   return <div className="page browse-page booking-flow">
@@ -65,25 +63,25 @@ function BookingHistoryCard({ booking, when }: { booking: MemberBookingRecord; w
     <p className="browse-muted">{booking.sportName || 'Sport not provided'}{!self && ` - ${booking.coachName || 'Coach not provided'}`} - {booking.facilityName || 'Facility not provided'}</p>
     {booking.status === 'CANCELLED' && <div className="booking-cancelled-meta"><span>Cancelled by {actorName(booking)}</span>{booking.cancelledAt && <span>On {booking.cancelledAt.replace('T', ' ').slice(0, 16)}</span>}{booking.cancelReason && <span>Reason: {booking.cancelReason}</span>}</div>}
     <details className="booking-details"><summary>Booking details</summary><dl className="browse-facts"><div><dt>Booking code</dt><dd>{booking.bookingCode}</dd></div><div><dt>Training</dt><dd>{self ? 'Self-training' : 'Coach-led'}</dd></div><div><dt>Package</dt><dd>{booking.packageName || 'Not provided'}</dd></div>{!self && <div><dt>Coach</dt><dd>{booking.coachName || 'Not provided'}</dd></div>}<div><dt>Facility</dt><dd>{booking.facilityName || 'Not provided'}</dd></div></dl></details>
-    <div className="browse-actions booking-actions">{when === 'UPCOMING' && booking.status === 'CONFIRMED' && <Link className={buttonClassName('secondary')} to={cancelHref} state={{ booking }}>Cancel booking</Link>}{when === 'PAST' && booking.status === 'CONFIRMED' && <span className="browse-muted">Session completed</span>}</div>
+    <div className="browse-actions booking-actions">{when === 'UPCOMING' && booking.status === 'CONFIRMED' && <Link className={buttonClassName('secondary')} to={cancelHref}>Cancel booking</Link>}{when === 'PAST' && booking.status === 'CONFIRMED' && <span className="browse-muted">Session completed</span>}</div>
   </article>
 }
 
 export function BookingCancellationPage() {
+  const { user } = useAuth()
+  const memberId = user?.id ?? null
   const { bookingId: rawId } = useParams()
   const id = routeId(rawId)
-  const { state } = useLocation()
   if (!id) return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Booking unavailable" /><Card><p role="alert">Choose a valid booking to cancel.</p><Link className={buttonClassName()} to="/member/bookings">Back to My Bookings</Link></Card></div>
-  return <BookingCancellationContent key={id} id={id} initial={stateBooking(state, id)} />
+  return <BookingCancellationContent key={`${id}-${memberId ?? 'unknown'}`} id={id} memberId={memberId} />
 }
 
-function BookingCancellationContent({ id, initial }: { id: number; initial: MemberBookingRecord | null }) {
+function BookingCancellationContent({ id, memberId }: { id: number; memberId: number | null }) {
   const navigate = useNavigate()
   const loader = useCallback(async (signal: AbortSignal) => {
-    if (initial) return initial
-    const [upcoming, past] = await Promise.all([memberBookingsApi.my('UPCOMING', signal), memberBookingsApi.my('PAST', signal)])
-    return [...upcoming, ...past].find((booking) => booking.id === id) ?? null
-  }, [id, initial])
+    if (memberId === null) return null
+    return memberBookingsApi.findMine(id, memberId, signal)
+  }, [id, memberId])
   const [resource, reload] = useMemberResource(loader)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -97,7 +95,7 @@ function BookingCancellationContent({ id, initial }: { id: number; initial: Memb
     try {
       const cancelled = await memberBookingsApi.cancel(id)
       if (cancelled.status !== 'CANCELLED') throw new ApiError(0, 'The server did not confirm that this booking was cancelled.')
-      navigate(`/member/bookings/${id}/cancelled`, { replace: true, state: { booking: cancelled } })
+      navigate(`/member/bookings/${id}/cancelled`, { replace: true })
     } catch (cause) {
       submitted.current = false
       setError(bookingErrorMessage(cause))
@@ -121,7 +119,7 @@ function BookingCancellationContent({ id, initial }: { id: number; initial: Memb
       <div className="booking-cancel-warning" role="note"><strong>Cancellation deadline</strong><p>{deadline ? `Cancel by ${deadline} Vietnam time. This is two hours before the session starts.` : 'The backend will verify whether this booking is within the cancellation period.'}</p><p>After the cutoff, the booking service will reject the request and the booking will remain confirmed.</p></div>
       <h2>{bookingTitle(booking)}</h2>
       <dl className="browse-facts booking-confirmation__facts"><div><dt>Booking code</dt><dd>{booking.bookingCode}</dd></div><div><dt>Date</dt><dd>{bookingDate(booking.sessionDate)}</dd></div><div><dt>Time</dt><dd>{bookingTime(booking.startTime)} - {bookingTime(booking.endTime)}</dd></div><div><dt>Package</dt><dd>{booking.packageName || 'Sport package'}</dd></div>{booking.trainingType !== 'SELF_TRAINING' && <div><dt>Coach</dt><dd>{booking.coachName || 'Not provided'}</dd></div>}<div><dt>Facility</dt><dd>{booking.facilityName || 'Not provided'}</dd></div></dl>
-      <p>When the cancellation is accepted, the booking is marked cancelled and the booking service restores the reserved package session.</p>
+      <p>After an accepted cancellation, the booking service updates the package balance. The cancellation result will show the latest balance available from your package record.</p>
       {error && <div className="booking-error" role="alert"><strong>Booking not cancelled</strong><p>{error}</p><p>Your booking remains unchanged unless My Bookings shows it as cancelled.</p></div>}
       <div className="browse-actions booking-actions"><Link className={buttonClassName('secondary')} to="/member/bookings?when=UPCOMING">Keep booking</Link><Button variant="danger" loading={submitting} disabled={submitting} onClick={() => void confirmCancel()}>Confirm cancellation</Button></div>
     </Card>
@@ -129,24 +127,40 @@ function BookingCancellationContent({ id, initial }: { id: number; initial: Memb
 }
 
 export function BookingCancelledPage() {
+  const { user } = useAuth()
+  const memberId = user?.id ?? null
   const { bookingId: rawId } = useParams()
   const id = routeId(rawId)
-  const { state } = useLocation()
   if (!id) return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Cancellation unavailable" /><Card><p role="alert">Choose a valid booking.</p><Link className={buttonClassName()} to="/member/bookings">My Bookings</Link></Card></div>
-  return <BookingCancelledContent key={id} id={id} initial={stateBooking(state, id)} />
+  return <BookingCancelledContent key={`${id}-${memberId ?? 'unknown'}`} id={id} memberId={memberId} />
 }
 
-function BookingCancelledContent({ id, initial }: { id: number; initial: MemberBookingRecord | null }) {
+interface VerifiedCancellation {
+  booking: MemberBookingRecord
+  registration: PackageRegistration | null
+}
+
+function BookingCancelledContent({ id, memberId }: { id: number; memberId: number | null }) {
   const loader = useCallback(async (signal: AbortSignal) => {
-    if (initial?.status === 'CANCELLED') return initial
-    return (await memberBookingsApi.my('PAST', signal)).find((booking) => booking.id === id && booking.status === 'CANCELLED') ?? null
-  }, [id, initial])
+    if (memberId === null) return null
+    const booking = await memberBookingsApi.findMine(id, memberId, signal)
+    if (!booking || booking.status !== 'CANCELLED') return null
+    if (booking.packageRegistrationId === null) return { booking, registration: null } satisfies VerifiedCancellation
+    try {
+      const registrations = await memberApi.myRegistrations({ signal })
+      const registration = registrations.find((row) => row.id === booking.packageRegistrationId && row.memberId === memberId) ?? null
+      return { booking, registration } satisfies VerifiedCancellation
+    } catch (error) {
+      if (signal.aborted) throw error
+      return { booking, registration: null } satisfies VerifiedCancellation
+    }
+  }, [id, memberId])
   const [resource, reload] = useMemberResource(loader)
   if (resource.status === 'loading') return <div className="page browse-page"><MemberScheduleNav /><PageLoader label="Loading cancellation result" /></div>
   if (resource.status === 'error') return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Cancellation result" /><BrowseError error={resource.error} onRetry={reload} /></div>
   if (!resource.data) return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Cancellation not confirmed" /><Card><div className="booking-error" role="alert"><p>This booking is not listed as cancelled. Refresh My Bookings to confirm its current status.</p></div><Link className={buttonClassName()} to="/member/bookings">My Bookings</Link></Card></div>
 
-  const booking = resource.data
+  const { booking, registration } = resource.data
   return <div className="page browse-page booking-flow">
     <MemberScheduleNav />
     <PageHeader eyebrow="Member / My Bookings" title="Booking cancelled" description="The booking service confirmed your cancellation." />
@@ -156,8 +170,8 @@ function BookingCancelledContent({ id, initial }: { id: number; initial: MemberB
       <h2>{bookingTitle(booking)}</h2>
       <p className="booking-code">Booking code: <strong>{booking.bookingCode}</strong></p>
       <dl className="browse-facts booking-confirmation__facts"><div><dt>Date</dt><dd>{bookingDate(booking.sessionDate)}</dd></div><div><dt>Time</dt><dd>{bookingTime(booking.startTime)} - {bookingTime(booking.endTime)} (Vietnam time)</dd></div><div><dt>Cancelled by</dt><dd>{actorName(booking)}</dd></div>{booking.cancelledAt && <div><dt>Cancelled at</dt><dd>{booking.cancelledAt.replace('T', ' ').slice(0, 16)}</dd></div>}</dl>
-      <p>The booking service has released your reserved package session. You can review the updated status in Past bookings.</p>
-      <div className="browse-actions booking-actions"><Link className={buttonClassName()} to="/member/bookings?when=PAST">View past bookings</Link><Link className={buttonClassName('secondary')} to="/member/schedule">Browse schedule</Link></div>
+      {registration?.totalSessions === null ? <p>This package has no session limit. You can review its current status in My sport packages.</p> : registration && registration.remainingSessions !== null ? <p>Latest package balance: {registration.remainingSessions} sessions remaining.</p> : <p>The latest package balance is unavailable. Review My sport packages for the current count.</p>}
+      <div className="browse-actions booking-actions"><Link className={buttonClassName()} to="/member/bookings?when=PAST">View past bookings</Link><Link className={buttonClassName('secondary')} to="/member/schedule">Browse schedule</Link><Link className={buttonClassName('secondary')} to="/member/membership">My sport packages</Link></div>
     </Card>
   </div>
 }
