@@ -188,7 +188,7 @@
 }
 
 /* Member layout */
-.member-header {
+.member-layout__header {
   position: sticky;
   top: 0;
   z-index: var(--z-header);
