@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { authApi } from '../api/authApi'
 import { onSessionExpired } from '../api/client'
-import { ApiError } from '../api/errors'
+import { ApiError, StaleSessionError } from '../api/errors'
 import { tokenStorage } from '../api/tokenStorage'
 import type { AuthTokens, LoginRequest, RegisterRequest, UserProfile } from '../api/types'
 import {
   AccountCreatedError,
+  LoginProfileError,
   AuthContext,
   type AuthContextValue,
   type AccountSwitch,
@@ -100,7 +101,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         // Keep the tokens. A signed in screen stays as it is; a restore shows the Retry screen.
         setState((previous) =>
-          previous.status === 'authenticated' ? previous : { ...ANONYMOUS, status: 'error', loadError: error },
+          previous.status === 'authenticated' ? previous : {
+            ...ANONYMOUS,
+            status: 'error',
+            loadError: previous.loadError instanceof LoginProfileError ? new LoginProfileError(error) : error,
+          },
         )
       }
       return null
@@ -156,11 +161,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('storage', handleStorage)
   }, [loadProfile])
 
-  /** Stores a new token pair and loads its profile. A failed profile load drops the tokens again. */
-  const startSession = useCallback(async (tokens: AuthTokens, persistent: boolean) => {
+  /** Only the operation that owns these tokens may publish or end this session. */
+  const startSession = useCallback(async (
+    tokens: AuthTokens, persistent: boolean, requestId: number, keepRecoverableSession = false,
+  ) => {
     tokenStorage.startSession(tokens, { persistent })
+    const epoch = tokenStorage.getEpoch()
+    const isCurrent = () => loadCounter.current === requestId && tokenStorage.getEpoch() === epoch
     try {
       const user = await authApi.me()
+      if (!isCurrent()) {
+        throw new StaleSessionError()
+      }
       setState({
         status: 'authenticated',
         user,
@@ -171,8 +183,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       return user
     } catch (error) {
-      tokenStorage.clear()
-      throw error
+      if (error instanceof StaleSessionError) {
+        throw error
+      }
+      const profileError = new LoginProfileError(error)
+      if (isCurrent()) {
+        if (!keepRecoverableSession || endsSession(error)) {
+          tokenStorage.clear()
+          setState(ANONYMOUS)
+        } else {
+          setState({ ...ANONYMOUS, status: 'error', loadError: profileError })
+        }
+      }
+      throw profileError
     }
   }, [])
 
@@ -180,11 +203,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (credentials: LoginRequest, options: LoginOptions = {}) => {
       // Any profile request still running for an older session must not overwrite this login.
       loadCounter.current += 1
+      const requestId = loadCounter.current
+      const epoch = tokenStorage.getEpoch()
       const tokens = await authApi.login({
         email: credentials.email.trim(),
         password: credentials.password,
       })
-      return startSession(tokens, options.remember !== false)
+      if (loadCounter.current !== requestId || tokenStorage.getEpoch() !== epoch) {
+        throw new StaleSessionError()
+      }
+      return startSession(tokens, options.remember !== false, requestId, true)
     },
     [startSession],
   )
@@ -192,9 +220,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(
     async (request: RegisterRequest) => {
       loadCounter.current += 1
+      const requestId = loadCounter.current
+      const epoch = tokenStorage.getEpoch()
       const tokens = await authApi.register(request)
       try {
-        return await startSession(tokens, true)
+        if (loadCounter.current !== requestId || tokenStorage.getEpoch() !== epoch) {
+          throw new StaleSessionError()
+        }
+        return await startSession(tokens, true, requestId)
       } catch (error) {
         throw new AccountCreatedError(error)
       }

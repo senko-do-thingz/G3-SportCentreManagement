@@ -1,4 +1,5 @@
 import { createContext } from 'react'
+import { ApiError, SESSION_EXPIRED_MESSAGE } from '../api/errors'
 import type { LoginRequest, RegisterRequest, Role, UserProfile } from '../api/types'
 
 /**
@@ -60,6 +61,29 @@ export interface AuthContextValue {
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)
+
+/** A successful credential exchange whose follow-up profile request failed. */
+export class LoginProfileError extends ApiError {
+  constructor(cause: unknown) {
+    const status = cause instanceof ApiError ? cause.status : 0
+    let message = 'Your credentials were accepted, but we could not load your account. Please try again.'
+    if (status === 0) {
+      message = 'Your credentials were accepted, but we could not load your account. Cannot reach the server. Check your connection and API URL; a browser CORS restriction may also block the request.'
+    } else if (status === 401) {
+      message = SESSION_EXPIRED_MESSAGE
+    } else if (status === 403) {
+      message = 'Your credentials were accepted, but access to your account profile was denied. Please contact the front desk.'
+    } else if (status === 429) {
+      message = 'Your credentials were accepted, but the server is busy. Please wait before retrying your account profile.'
+    } else if (status >= 500) {
+      message = 'Your credentials were accepted, but the server could not load your account. Please try again later.'
+    }
+    super(status, message, cause instanceof ApiError ? cause.fieldErrors : {},
+      cause instanceof ApiError ? cause.code : null, cause instanceof ApiError ? cause.details : undefined)
+    this.name = 'LoginProfileError'
+    this.cause = cause
+  }
+}
 
 /**
  * Thrown by register() when POST /auth/register created the account but the follow-up profile

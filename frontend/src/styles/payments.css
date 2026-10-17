@@ -324,7 +324,7 @@
     background: #fff;
   }
 
-  .member-layout:has(.receipt-page) > .member-header,
+  .member-layout:has(.receipt-page) > .member-layout__header,
   .member-layout:has(.receipt-page) .member-nav,
   .member-layout:has(.receipt-page) .account-switch-notice,
   .member-layout:has(.receipt-page) .no-print,

@@ -1,9 +1,27 @@
 const DEFAULT_API_BASE_URL = 'http://localhost:8080/api/v1'
 
-function normalizeBaseUrl(value: string | undefined): string {
+export function normalizeBaseUrl(value: string | undefined): string {
   const raw = value && value.trim().length > 0 ? value.trim() : DEFAULT_API_BASE_URL
-  // Strip trailing slashes so paths like '/auth/login' can be appended safely.
-  return raw.replace(/\/+$/, '')
+  const base = raw.replace(/\/+$/, '')
+  if (base === '/api/v1') {
+    return base
+  }
+  const message =
+    'Invalid VITE_API_BASE_URL. Use an HTTP(S) origin, an origin ending in /api/v1, or /api/v1. Restart Vite after changing the setting.'
+  let url: URL
+  try {
+    url = new URL(base)
+  } catch {
+    throw new Error(message)
+  }
+  if (
+    !['http:', 'https:'].includes(url.protocol) || url.username || url.password ||
+    url.search || url.hash || !['/', '/api/v1'].includes(url.pathname)
+  ) {
+    throw new Error(message)
+  }
+  // A bare origin is supported shorthand; endpoint paths never include the API prefix.
+  return `${url.origin}/api/v1`
 }
 
 export const env = {
