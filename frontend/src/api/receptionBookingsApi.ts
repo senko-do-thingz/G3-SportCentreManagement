@@ -15,6 +15,12 @@ export interface MemberBookingHistoryQuery {
   signal?: AbortSignal
 }
 
+export interface FindMemberBookingQuery {
+  memberId: number
+  matches: (booking: MemberBookingRecord) => boolean
+  signal?: AbortSignal
+}
+
 export interface AssistedBookingRequest {
   memberId: number
   sessionId: number
@@ -22,6 +28,9 @@ export interface AssistedBookingRequest {
 }
 
 const UNEXPECTED_RESPONSE = 'The server returned an unexpected booking response. Please try again later.'
+const LOOKUP_PAGE_SIZE = 100
+const LOOKUP_MAX_PAGES = 100
+const LOOKUP_LIMIT_MESSAGE = 'This booking history is too large to verify automatically. Refresh the member booking history before taking another action.'
 
 function asBookingPage(value: unknown): PageResponse<MemberBookingRecord> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ApiError(0, UNEXPECTED_RESPONSE)
@@ -52,8 +61,28 @@ async function createForMember(request: AssistedBookingRequest): Promise<MemberB
   return parseMemberBooking(await api.post<unknown>('/bookings', request))
 }
 
+async function findForMember({ memberId, matches, signal }: FindMemberBookingQuery): Promise<MemberBookingRecord | null> {
+  if (!Number.isSafeInteger(memberId) || memberId <= 0) throw new ApiError(0, 'Choose a valid member.')
+
+  for (const when of ['UPCOMING', 'PAST'] as const) {
+    const firstPage = await forMember({ memberId, when, page: 0, size: LOOKUP_PAGE_SIZE, signal })
+    const firstMatch = firstPage.content.find(matches)
+    if (firstMatch) return firstMatch
+    if (firstPage.totalPages > LOOKUP_MAX_PAGES) throw new ApiError(0, LOOKUP_LIMIT_MESSAGE)
+
+    for (let page = 1; page < firstPage.totalPages; page += 1) {
+      const nextPage = await forMember({ memberId, when, page, size: LOOKUP_PAGE_SIZE, signal })
+      const match = nextPage.content.find(matches)
+      if (match) return match
+    }
+  }
+
+  return null
+}
+
 export const receptionBookingsApi = {
   forMember,
+  findForMember,
   createForMember,
   cancel: memberBookingsApi.cancel,
 }
