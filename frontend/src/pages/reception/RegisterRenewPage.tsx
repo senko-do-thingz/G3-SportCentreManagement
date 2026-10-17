@@ -2,9 +2,9 @@ import { useCallback, useMemo, useRef, useState, type FormEvent, type ReactNode 
 import { Link, useSearchParams } from 'react-router-dom'
 import { cardsApi, type CardTier } from '../../api/cardsApi'
 import { ApiError, getErrorMessage, splitFieldErrors } from '../../api/errors'
-import type { MemberCard, PackageRegistration } from '../../api/memberApi'
+import type { PackageRegistration } from '../../api/memberApi'
 import { packagesApi, type SportPackage } from '../../api/packagesApi'
-import { receptionApi, type MemberOverview, type PaymentMethod } from '../../api/receptionApi'
+import { receptionApi, type DeskSale, type MemberOverview, type PaymentMethod } from '../../api/receptionApi'
 import { receptionPaymentsApi } from '../../api/receptionPaymentsApi'
 import { Button, Card, EmptyState, ErrorState, Input, PageHeader, Select, Table, type TableColumn } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
@@ -179,9 +179,9 @@ function SaleWorkspace({ tab, memberId, packageId }: { tab: 'package' | 'card'; 
     </MemberHeader>
   )
   return tab === 'package' ? (
-    <PackageSale key={saleCount} data={data.data} memberBlock={memberBlock} initialPackageId={packageId} onSold={onSold} />
+    <PackageSale key={saleCount} data={data.data} memberBlock={memberBlock} initialPackageId={packageId} onSold={onSold} onRefresh={reload} />
   ) : (
-    <CardSale key={saleCount} data={data.data} memberBlock={memberBlock} onSold={onSold} />
+    <CardSale key={saleCount} data={data.data} memberBlock={memberBlock} onSold={onSold} onRefresh={reload} />
   )
 }
 
@@ -248,8 +248,9 @@ function DeskPaymentFields({
 }
 
 function deskPayload(form: DeskPaymentForm, amountDue: number) {
-  if (amountDue === 0) return { paymentMethod: 'CASH' as const, referenceCode: null }
+  if (amountDue === 0) return { expectedAmountDue: 0 }
   return {
+    expectedAmountDue: amountDue,
     paymentMethod: form.method as PaymentMethod,
     referenceCode: form.reference.trim() || null,
     amountReceived: parseAmount(form.amountReceived) ?? 0,
@@ -259,11 +260,22 @@ function deskPayload(form: DeskPaymentForm, amountDue: number) {
 const DESK_FIELDS = ['startDate', 'packageId', 'tierId', 'paymentMethod', 'referenceCode', 'paymentReference', 'amountReceived'] as const
 const UNCERTAIN_SALE = 'The sale could not be verified. Check the member profile and payment requests before starting another sale.'
 
-async function verifySalePayment(item: MemberCard | PackageRegistration) {
+async function verifySalePayment(item: DeskSale, expected: number) {
+  const rawAmount = 'cardCode' in item ? item.pricePaid : item.paidAmount
+  const amount = rawAmount == null ? NaN : Number(rawAmount)
+  if (!Number.isFinite(amount) || amount !== expected) throw new Error(UNCERTAIN_SALE)
   if (item.status === 'ACTIVE' && item.paymentId !== null) {
     const payment = await receptionPaymentsApi.payment(item.paymentId)
-    if (payment.status !== 'SUCCESS' || payment.memberId !== item.memberId) throw new Error(UNCERTAIN_SALE)
+    if (payment.status !== 'SUCCESS' || payment.memberId !== item.memberId || Number(payment.amount) !== amount) throw new Error(UNCERTAIN_SALE)
+    const received = item.amountReceived == null ? NaN : Number(item.amountReceived)
+    const change = item.changeAmount == null ? NaN : Number(item.changeAmount)
+    const expectedChange = payment.method === 'CASH' ? received - amount : 0
+    if (!Number.isFinite(received) || !Number.isFinite(change) || received < amount || change < 0
+      || Math.round(expectedChange * 100) !== Math.round(change * 100)
+      || (payment.method !== 'CASH' && received !== amount)) throw new Error(UNCERTAIN_SALE)
+    return { received, change }
   }
+  return { received: 0, change: 0 }
 }
 
 /** Maps backend field errors onto the form; the rest goes above the form. */
@@ -337,7 +349,7 @@ function SaleReceipt({ result, memberId, onNewSale }: { result: SaleResult; memb
           <dt>{outcome === 'paid' ? 'Amount charged' : outcome === 'noPayment' ? 'Fee' : 'Amount to review'}</dt>
           <dd>{formatMoney(result.amount)}</dd>
         </div>
-        {result.change > 0 && (
+        {outcome === 'paid' && result.change > 0 && (
           <div>
             <dt>Change to give</dt>
             <dd>{formatMoney(result.change)}</dd>
@@ -387,11 +399,13 @@ function PackageSale({
   memberBlock,
   initialPackageId,
   onSold,
+  onRefresh,
 }: {
   data: SaleData
   memberBlock: ReactNode
   initialPackageId: number | null
   onSold: (result: SaleResult) => void
+  onRefresh: () => void
 }) {
   const today = receptionDate(new Date())
   const { overview, packages } = data
@@ -408,6 +422,7 @@ function PackageSale({
   const [saving, setSaving] = useState(false)
   const inFlight = useRef(false)
   const [uncertain, setUncertain] = useState(false)
+  const [priceChanged, setPriceChanged] = useState(false)
 
   const selected = packages.find((item) => String(item.id) === selectedId) ?? null
   const card = currentCard(overview.cards, today)
@@ -449,7 +464,7 @@ function PackageSale({
         ...deskPayload(payment, amountDue),
       })
       accepted = true
-      await verifySalePayment(sold)
+      const collection = await verifySalePayment(sold, amountDue)
       onSold({
         kind: 'package',
         itemId: sold.id,
@@ -461,11 +476,13 @@ function PackageSale({
         paymentId: sold.paymentId,
         paymentCode: sold.paymentCode,
         amount: sold.paidAmount ?? price.final,
-        change: changeDue(payment, Number(sold.paidAmount ?? price.final)),
+        change: collection.change,
       })
     } catch (error) {
       const ambiguous = accepted || !(error instanceof ApiError) || error.status === 0 || error.status >= 500
-      setUncertain(ambiguous)
+      const stalePrice = error instanceof ApiError && error.code === 'DESK_SALE_PRICE_CHANGED'
+      setPriceChanged(stalePrice)
+      setUncertain(ambiguous || stalePrice)
       const mapped = ambiguous ? { payment: {}, message: UNCERTAIN_SALE } : saleErrors(error)
       setErrors({ payment: mapped.payment, startDate: mapped.startDate })
       setFormError(mapped.message)
@@ -499,6 +516,8 @@ function PackageSale({
                 onChange={(event) => {
                   setSelectedId(event.target.value)
                   const id = positiveId(event.target.value)
+                  const nextPackage = packages.find((item) => item.id === id)
+                  if (nextPackage && (amountDue === 0) !== (priceBreakdown(nextPackage, card).final === 0)) setPayment(EMPTY_DESK_PAYMENT)
                   setStartDate(defaultStartDate(overview.registrations, id, receptionDate(new Date())))
                   setErrors((current) => ({ ...current, packageId: undefined }))
                 }}
@@ -535,6 +554,7 @@ function PackageSale({
             <Button type="submit" loading={saving} disabled={uncertain || packages.length === 0}>
               Record payment and register
             </Button>
+            {priceChanged && <Button variant="secondary" onClick={onRefresh}>Refresh prices</Button>}
           </div>
         </form>
       </Card>
@@ -593,10 +613,12 @@ function CardSale({
   data,
   memberBlock,
   onSold,
+  onRefresh,
 }: {
   data: SaleData
   memberBlock: ReactNode
   onSold: (result: SaleResult) => void
+  onRefresh: () => void
 }) {
   const today = receptionDate(new Date())
   const { overview } = data
@@ -608,6 +630,7 @@ function CardSale({
   const [saving, setSaving] = useState(false)
   const inFlight = useRef(false)
   const [uncertain, setUncertain] = useState(false)
+  const [priceChanged, setPriceChanged] = useState(false)
 
   const tier = tiers.find((item) => String(item.id) === tierId) ?? null
   const desk = tier ? deskCardPlan(tier, overview.cards, data.tiers, today) : null
@@ -629,13 +652,13 @@ function CardSale({
     inFlight.current = true
     let accepted = false
     try {
-      const sold: MemberCard = await receptionApi.sellCard({
+      const sold = await receptionApi.sellCard({
         memberId: overview.member.userId,
         tierId: tier.id,
         ...deskPayload(payment, amountDue),
       })
       accepted = true
-      await verifySalePayment(sold)
+      const collection = await verifySalePayment(sold, amountDue)
       onSold({
         kind: 'card',
         itemId: sold.id,
@@ -647,11 +670,13 @@ function CardSale({
         paymentId: sold.paymentId,
         paymentCode: sold.paymentCode,
         amount: sold.pricePaid ?? amountDue,
-        change: changeDue(payment, Number(sold.pricePaid ?? amountDue)),
+        change: collection.change,
       })
     } catch (error) {
       const ambiguous = accepted || !(error instanceof ApiError) || error.status === 0 || error.status >= 500
-      setUncertain(ambiguous)
+      const stalePrice = error instanceof ApiError && error.code === 'DESK_SALE_PRICE_CHANGED'
+      setPriceChanged(stalePrice)
+      setUncertain(ambiguous || stalePrice)
       const mapped = ambiguous ? { payment: {}, message: UNCERTAIN_SALE } : saleErrors(error)
       setErrors({ payment: mapped.payment })
       setFormError(mapped.message)
@@ -686,6 +711,8 @@ function CardSale({
                 value={tierId}
                 disabled={saving || uncertain}
                 onChange={(event) => {
+                  const nextTier = tiers.find((item) => String(item.id) === event.target.value)
+                  if (nextTier && (amountDue === 0) !== (deskCardPlan(nextTier, overview.cards, data.tiers, today).plan.price === 0)) setPayment(EMPTY_DESK_PAYMENT)
                   setTierId(event.target.value)
                   setErrors((current) => ({ ...current, tierId: undefined }))
                   setFormError(null)
@@ -721,6 +748,7 @@ function CardSale({
             <Button type="submit" loading={saving} disabled={uncertain || tiers.length === 0 || (desk !== null && !desk.sellable)}>
               Record payment and issue card
             </Button>
+            {priceChanged && <Button variant="secondary" onClick={onRefresh}>Refresh prices</Button>}
           </div>
         </form>
       </Card>
@@ -763,10 +791,7 @@ function CardSale({
 /* Pending online requests */
 
 async function loadPending(signal: AbortSignal): Promise<PendingRequest[]> {
-  const [cards, registrations] = await Promise.all([
-    receptionApi.pendingCards({ signal }),
-    receptionApi.pendingRegistrations({ signal }),
-  ])
+  const { cards, registrations } = await receptionApi.pendingQueue({ signal })
   return pendingRequests(cards, registrations)
 }
 

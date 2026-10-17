@@ -10,6 +10,7 @@ import com.sportify.catalog.entity.MembershipCardTier;
 import com.sportify.catalog.repository.MemberCardRepository;
 import com.sportify.catalog.repository.MembershipCardTierRepository;
 import com.sportify.catalog.service.MembershipCardService;
+import com.sportify.catalog.service.DeskSaleCharge;
 import com.sportify.core.audit.AuditAction;
 import com.sportify.core.audit.AuditEvent;
 import com.sportify.core.audit.AuditService;
@@ -261,7 +262,14 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         // Standard: free and permanent, nothing to pay.
         // Invariant: STANDARD always has durationMonths 0 and price 0; every paid tier has durationMonths >= 1.
         if (isStandard(tier)) {
-            return mapToCardResponse(memberCardRepository.save(newCard(member, tier, today, null, CardStatus.ACTIVE, BigDecimal.ZERO, false, null)));
+            if (paidAtDesk) DeskSaleCharge.verify(request.getExpectedAmountDue(), BigDecimal.ZERO,
+                    request.getAmountReceived(), request.getPaymentMethod());
+            MemberCardResponse response = mapToCardResponse(memberCardRepository.save(newCard(member, tier, today, null, CardStatus.ACTIVE, BigDecimal.ZERO, false, null)));
+            if (paidAtDesk) {
+                response.setAmountReceived(BigDecimal.ZERO);
+                response.setChangeAmount(BigDecimal.ZERO);
+            }
+            return response;
         }
 
         // One card per member: a second request cannot be made while one is waiting for payment
@@ -272,6 +280,8 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         }
 
         CardPlan plan = planCard(member.getId(), tier, today);
+        if (paidAtDesk) DeskSaleCharge.verify(request.getExpectedAmountDue(), plan.price(),
+                request.getAmountReceived(), request.getPaymentMethod());
         boolean isUpgrade = plan.replaces() != null;
         if (!isUpgrade && !paidAtDesk && plan.price().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessRuleException("Payment amount must be greater than zero. Attempted card price: " + plan.price());
@@ -314,6 +324,11 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             throw ex;
         }
         MemberCardResponse response = mapToCardResponse(card);
+        if (paidAtDesk) {
+            var collection = DeskSaleCharge.collection(card.getPayment(), request.getAmountReceived());
+            response.setAmountReceived(collection.amountReceived());
+            response.setChangeAmount(collection.changeAmount());
+        }
         if (takesMoneyAtDesk) {
             withInvoice(response, paymentVerificationService.getObject()
                     .recordPaymentConfirmed(card.getPayment().getId(), actor, null));

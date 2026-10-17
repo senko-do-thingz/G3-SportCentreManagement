@@ -7,6 +7,7 @@ import {
   type RequestSignal,
 } from './memberApi'
 import { normalizePage } from './page'
+import { loadPendingQueues } from './pendingQueue'
 import type { PageResponse, SpringPage } from './types'
 
 /**
@@ -79,12 +80,22 @@ export interface CreatedMember {
 
 /** Payment fields of a desk sale (BE-19). */
 export interface DeskPayment {
-  paymentMethod: PaymentMethod
+  /** The displayed charge, rechecked against the authoritative amount in the sale transaction. */
+  expectedAmountDue: number
+  paymentMethod?: PaymentMethod
   /** Transfer or card slip reference; null for cash. */
-  referenceCode: string | null
+  referenceCode?: string | null
   /** Omitted for a zero-fee sale: the backend creates no payment in that case. */
   amountReceived?: number
 }
+
+export interface DeskSaleCollection {
+  /** Server-calculated checkout evidence; no collection exists for a free sale. */
+  amountReceived?: number | string | null
+  changeAmount?: number | string | null
+}
+
+export type DeskSale = (MemberCard | PackageRegistration) & DeskSaleCollection
 
 export interface DeskPackageSaleRequest extends DeskPayment {
   memberId: number
@@ -201,33 +212,6 @@ function asDeskList(value: unknown): FrontDeskItem[] {
   return asIdList<unknown>(value).map(asDeskItem)
 }
 
-/** Follow Spring pages in backend order. Detail calls are shared for each member in this load. */
-async function pendingItems<T extends FrontDeskItem>(
-  path: string, details: (id: number, options: RequestSignal) => Promise<T[]>, options: RequestSignal,
-): Promise<T[]> {
-  const rows: FrontDeskItem[] = []
-  let page = 0
-  let totalPages: number
-  do {
-    const answer = await api.get<SpringPage<unknown>>(path, { ...options, query: { page, size: 100 } })
-    if (!isObject(answer) || !Array.isArray(answer.content)) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
-    const normalized = normalizePage(answer)
-    if (!Number.isSafeInteger(normalized.totalPages) || normalized.totalPages < 0) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
-    rows.push(...asDeskList(normalized.content))
-    totalPages = normalized.totalPages
-    page += 1
-  } while (page < totalPages)
-  const byMember = new Map<number, T[]>()
-  await Promise.all([...new Set(rows.map((row) => row.memberId))].map(async (id) => {
-    byMember.set(id, await details(id, options))
-  }))
-  return rows.flatMap((row) => {
-    const item = byMember.get(row.memberId)?.find((item) => item.id === row.id && item.memberId === row.memberId)
-    // A request may have been paid or cancelled between the two reads.
-    return item?.status === 'PENDING_PAYMENT' ? [item] : []
-  })
-}
-
 /**
  * Message of the 404 that means the member itself does not exist (BE-05 and CheckInServiceImpl). Any other 404, for
  * example "Resource not found" for an endpoint that is not deployed, is a technical error.
@@ -273,20 +257,30 @@ export const receptionApi = {
     return { member: toMemberSummary(value), temporaryPassword: value.temporaryPassword as string }
   },
 
-  sellPackage(request: DeskPackageSaleRequest): Promise<PackageRegistration> {
-    return api.post<unknown>('/packages/registrations', request).then(asObjectWithId<PackageRegistration>)
+  sellPackage(request: DeskPackageSaleRequest): Promise<PackageRegistration & DeskSaleCollection> {
+    return api.post<unknown>('/packages/registrations', request).then(asObjectWithId<PackageRegistration & DeskSaleCollection>)
   },
 
-  sellCard(request: DeskCardSaleRequest): Promise<MemberCard> {
-    return api.post<unknown>('/membership-cards/purchase', request).then(asObjectWithId<MemberCard>)
+  sellCard(request: DeskCardSaleRequest): Promise<MemberCard & DeskSaleCollection> {
+    return api.post<unknown>('/membership-cards/purchase', request).then(asObjectWithId<MemberCard & DeskSaleCollection>)
   },
 
-  pendingCards(options: RequestSignal = {}): Promise<MemberCard[]> {
-    return pendingItems('/membership-cards/pending', receptionApi.memberCards, options)
+  async pendingCards(options: RequestSignal = {}): Promise<MemberCard[]> {
+    const [cards] = await loadPendingQueues([{ path: '/membership-cards/pending', details: receptionApi.memberCards, readRows: asDeskList }], options)
+    return cards
   },
 
-  pendingRegistrations(options: RequestSignal = {}): Promise<PackageRegistration[]> {
-    return pendingItems('/packages/registrations/pending', receptionApi.memberRegistrations, options)
+  async pendingRegistrations(options: RequestSignal = {}): Promise<PackageRegistration[]> {
+    const [registrations] = await loadPendingQueues([{ path: '/packages/registrations/pending', details: receptionApi.memberRegistrations, readRows: asDeskList }], options)
+    return registrations
+  },
+
+  async pendingQueue(options: RequestSignal = {}): Promise<{ cards: MemberCard[]; registrations: PackageRegistration[] }> {
+    const [cards, registrations] = await loadPendingQueues<MemberCard | PackageRegistration>([
+      { path: '/membership-cards/pending', details: receptionApi.memberCards, readRows: asDeskList },
+      { path: '/packages/registrations/pending', details: receptionApi.memberRegistrations, readRows: asDeskList },
+    ], options)
+    return { cards: cards as MemberCard[], registrations: registrations as PackageRegistration[] }
   },
 
   /** Every card of a member, newest first (MembershipCardController, staff only). */

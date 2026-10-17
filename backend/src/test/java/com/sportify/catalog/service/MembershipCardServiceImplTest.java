@@ -2454,4 +2454,55 @@ public class MembershipCardServiceImplTest {
         verifyNoInteractions(paymentVerificationService, auditService);
     }
 
+    @Test
+    void staleFreeDeskCardQuoteIsRejectedBeforeRecordingMoney() throws Exception {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper()
+                .disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        var request = mapper.readValue("{\"memberId\":100,\"tierId\":2,\"expectedAmountDue\":0}", MemberCardPurchaseRequest.class);
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(2L)).thenReturn(Optional.of(goldTier));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of());
+        var failure = assertThrows(com.sportify.core.exception.ConflictException.class,
+                () -> membershipCardService.purchaseCard(request, receptionistUser));
+        assertEquals("DESK_SALE_PRICE_CHANGED", failure.getCode());
+        verifyNoInteractions(paymentVerificationService, paymentService, auditService);
+        verify(memberCardRepository, never()).save(any());
+    }
+
+    @Test
+    void staleFreeUpgradeRejectsRecomputedPositiveDifferenceWithoutReplacingCurrentCard() {
+        var active = paidCard(goldTier, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        active.setPricePaid(new BigDecimal("600000"));
+        vipTier.setPrice(new BigDecimal("650000"));
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(3L)).thenReturn(Optional.of(vipTier));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of(active));
+        var request = MemberCardPurchaseRequest.builder().memberId(100L).tierId(3L).expectedAmountDue(BigDecimal.ZERO).build();
+        for (int attempt = 0; attempt < 2; attempt++) {
+            var failure = assertThrows(com.sportify.core.exception.ConflictException.class,
+                    () -> membershipCardService.purchaseCard(request, receptionistUser));
+            assertEquals(new BigDecimal("50000"), failure.getDetails().get("currentAmountDue"));
+        }
+        assertEquals(CardStatus.ACTIVE, active.getStatus());
+        verify(memberCardRepository, never()).save(any());
+        verifyNoInteractions(paymentVerificationService, paymentService, auditService);
+    }
+
+    @Test
+    void stableFreeUpgradeReturnsZeroCollectionAndNoPayment() {
+        var active = paidCard(goldTier, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        active.setPricePaid(vipTier.getPrice());
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(tierRepository.findById(3L)).thenReturn(Optional.of(vipTier));
+        when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of(active));
+        stubNewCard(982L);
+        var response = membershipCardService.purchaseCard(MemberCardPurchaseRequest.builder()
+                .memberId(100L).tierId(3L).expectedAmountDue(BigDecimal.ZERO).build(), receptionistUser);
+        assertEquals(CardStatus.ACTIVE, response.getStatus());
+        assertEquals(BigDecimal.ZERO, response.getAmountReceived());
+        assertEquals(BigDecimal.ZERO, response.getChangeAmount());
+        assertNull(response.getPaymentId()); assertNull(response.getInvoiceId());
+        verifyNoInteractions(paymentVerificationService, paymentService);
+    }
+
 }

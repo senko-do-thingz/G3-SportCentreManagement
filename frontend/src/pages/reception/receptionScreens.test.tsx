@@ -69,6 +69,8 @@ interface Options {
   overview?: unknown
   cards?: ReturnType<typeof card>[]
   tiers?: typeof TIERS
+  packages?: typeof PACKAGES
+  onMemberCards?: () => Response
   onCreateMember?: (call: RecordedCall) => Response | Promise<Response>
   onSellPackage?: (call: RecordedCall) => Response | Promise<Response>
   onSellCard?: (call: RecordedCall) => Response | Promise<Response>
@@ -104,20 +106,24 @@ function receptionBackend(options: Options = {}) {
       if (options.overviewError) return options.overviewError
       return json(200, options.overview ?? deskOverview({ ...OVERVIEW.member, userId: Number(overview[1]) }, cards, OVERVIEW.registrations))
     }
+    if (/^\/membership-cards\/member\/\d+$/.test(call.path) && options.onMemberCards) return options.onMemberCards()
     if (/^\/membership-cards\/member\/\d+$/.test(call.path)) return json(200, cards.map((item) => ({ ...item, memberId: Number(call.path.split('/').pop()) })))
     if (/^\/packages\/registrations\/member\/\d+$/.test(call.path)) return json(200, OVERVIEW.registrations.map((item) => ({ ...item, memberId: Number(call.path.split('/').pop()) })))
-    if (call.path === '/packages') return json(200, PACKAGES)
+    if (call.path === '/packages') return json(200, options.packages ?? PACKAGES)
     if (call.path === '/membership-cards/tiers') return json(200, options.tiers ?? TIERS)
     if (call.path === '/packages/registrations' && call.method === 'POST') {
-      return options.onSellPackage
-        ? options.onSellPackage(call)
-        : json(201, registration({ id: 60, registrationCode: 'REG-0060', status: 'ACTIVE', channel: 'RECEPTION', startDate: '2026-10-13', endDate: '2026-11-11', paymentId: 60, paymentCode: 'PAY-0060', paidAmount: 810000 }))
+      if (options.onSellPackage) return options.onSellPackage(call)
+      const request = call.body as { paymentMethod: string; amountReceived: number }
+      payments[60] = payment({ id: 60, status: 'SUCCESS', amount: 810000, method: request.paymentMethod })
+      return json(201, { ...registration({ id: 60, registrationCode: 'REG-0060', status: 'ACTIVE', channel: 'RECEPTION', startDate: '2026-10-13', endDate: '2026-11-11', paymentId: 60, paymentCode: 'PAY-0060', paidAmount: 810000 }), amountReceived: request.amountReceived, changeAmount: request.paymentMethod === 'CASH' ? request.amountReceived - 810000 : 0 })
     }
     if (call.path === '/membership-cards/purchase' && call.method === 'POST') {
       if (options.onSellCard) return options.onSellCard(call)
+      const request = call.body as { paymentMethod: string; amountReceived: number }
+      payments[70] = payment({ id: 70, status: 'SUCCESS', amount: 600000, method: request.paymentMethod })
       const sold = card({ id: 70, cardCode: 'CARD-0070', tierId: 3, status: 'ACTIVE', startDate: '2027-07-05', endDate: '2028-07-04', paymentId: 70, paymentCode: 'PAY-0070', pricePaid: 600000 })
       cards.push(sold)
-      return json(201, sold)
+      return json(201, { ...sold, amountReceived: request.amountReceived, changeAmount: request.paymentMethod === 'CASH' ? request.amountReceived - 600000 : 0 })
     }
     if (url.pathname === '/membership-cards/pending') {
       if (!cards.some((item) => item.id === pendingCard.id)) cards.push(pendingCard)
@@ -351,6 +357,78 @@ describe('FE-05 Member Search and Profile (F1-13)', () => {
 })
 
 describe('FE-05 Register and Renew (F1-14)', () => {
+  it.each(['package', 'card'])('clears hidden cash when switching paid to free in the %s tab and records no change', async (kind) => {
+    const { calls } = await open(`/reception/register?memberId=2&tab=${kind}`, {
+      cards: [card({ tierId: 2, tierCode: 'GOLD', tierName: 'Gold', tierRank: 3, pricePaid: 600000 })],
+      tiers: TIERS.map((tier) => ({ ...tier, price: tier.code === 'GOLD' ? 600000 : tier.price })),
+      packages: [...PACKAGES, sportPackage({ id: 6, priceAmount: 0 })],
+      onSellPackage: () => json(201, { ...registration({ paidAmount: 0, status: 'ACTIVE', paymentId: null, paymentCode: null }), amountReceived: 0, changeAmount: 0 }),
+      onSellCard: () => json(201, { ...card({ pricePaid: 0, status: 'ACTIVE', paymentId: null, paymentCode: null }), amountReceived: 0, changeAmount: 0 }),
+    })
+    const user = userEvent.setup()
+    const form = await screen.findByRole('form', { name: kind === 'package' ? 'Sell a sport package' : 'Sell a membership card' })
+    const selection = within(form).getByLabelText(kind === 'package' ? /^Package/ : /Membership card/)
+    const paid = kind === 'package' ? '4' : '2'; const free = kind === 'package' ? '6' : '3'
+    await user.selectOptions(selection, paid)
+    await user.type(within(form).getByLabelText(/Amount received/), '1000000')
+    if (kind === 'package') {
+      await user.selectOptions(selection, '2')
+      expect(within(form).getByLabelText(/Amount received/)).toHaveValue('1000000')
+    }
+    await user.selectOptions(selection, free)
+    expect(within(form).queryByLabelText(/Amount received/)).not.toBeInTheDocument()
+    await user.selectOptions(selection, paid)
+    expect(within(form).getByLabelText(/Amount received/)).toHaveValue('')
+    await user.selectOptions(selection, free)
+    await user.click(within(form).getByRole('button', { name: /Record payment and/ }))
+    const receipt = await screen.findByRole('region', { name: 'Sale recorded' })
+    expect(receipt).toHaveTextContent('No payment is required')
+    expect(within(receipt).queryByText('Change to give')).not.toBeInTheDocument()
+    expect(within(receipt).queryByRole('link', { name: 'View receipt' })).not.toBeInTheDocument()
+    const body = calls.find((call) => call.method === 'POST')?.body
+    expect(body).toMatchObject({ expectedAmountDue: 0 })
+    expect(body).not.toHaveProperty('amountReceived')
+    expect(body).not.toHaveProperty('paymentMethod')
+  })
+
+  it.each(['package', 'card'])('requires a fresh price after the %s free quote becomes positive', async (kind) => {
+    const tiers = TIERS.map((tier) => ({ ...tier, price: tier.code === 'GOLD' ? 600000 : tier.price }))
+    const packages = [sportPackage({ id: 6, priceAmount: 0 })]
+    const reject = () => {
+      tiers[2].price = 700000; packages[0].priceAmount = 100000
+      return json(409, { status: 409, code: 'DESK_SALE_PRICE_CHANGED', message: 'The amount due has changed. Refresh the price.', details: { expectedAmountDue: 0, currentAmountDue: 100000 } })
+    }
+    const { calls } = await open(`/reception/register?memberId=2&tab=${kind}`, {
+      cards: [card({ tierId: 2, tierCode: 'GOLD', tierName: 'Gold', tierRank: 3, pricePaid: 600000 })],
+      tiers, packages, onSellPackage: reject, onSellCard: reject,
+    })
+    const user = userEvent.setup()
+    const formName = kind === 'package' ? 'Sell a sport package' : 'Sell a membership card'
+    const form = await screen.findByRole('form', { name: formName })
+    const label = kind === 'package' ? /^Package/ : /Membership card/
+    await user.selectOptions(within(form).getByLabelText(label), kind === 'package' ? '6' : '3')
+    await user.click(within(form).getByRole('button', { name: /Record payment and/ }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('The amount due has changed')
+    expect(within(form).getByRole('button', { name: /Record payment and/ })).toBeDisabled()
+    fireEvent.submit(form)
+    expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1)
+    await user.click(within(form).getByRole('button', { name: 'Refresh prices' }))
+    const fresh = await screen.findByRole('form', { name: formName })
+    await user.selectOptions(within(fresh).getByLabelText(label), kind === 'package' ? '6' : '3')
+    expect(within(fresh).getByLabelText(/Amount received/)).toHaveValue('')
+    expect(screen.queryByRole('region', { name: 'Sale recorded' })).not.toBeInTheDocument()
+  })
+
+  it('shows a queue detail failure with Retry instead of silently losing a pending item', async () => {
+    let missing = true
+    await open('/reception/register?tab=pending', { onMemberCards: () => missing ? backendError(404, 'Detail unavailable')
+      : json(200, [card({ id: 5, cardCode: 'CARD-0005', status: 'PENDING_PAYMENT', paymentId: 45 })]) })
+    expect(await screen.findByRole('alert')).toHaveTextContent('Detail unavailable')
+    missing = false
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByRole('link', { name: 'Confirm payment for CARD-0005' })).toBeInTheDocument()
+  })
+
   it('guards batched double submits and opens an already-paid receipt without confirmation', async () => {
     let finish!: (response: Response) => void
     const { calls } = await open('/reception/register?memberId=2', {
@@ -362,7 +440,7 @@ describe('FE-05 Register and Renew (F1-14)', () => {
     await user.click(within(form).getByRole('button', { name: 'Use exact amount' }))
     act(() => { fireEvent.submit(form); fireEvent.submit(form) })
     await waitFor(() => expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1))
-    await act(async () => finish(json(201, registration({ id: 60, status: 'ACTIVE', paymentId: 60 }))))
+    await act(async () => finish(json(201, { ...registration({ id: 60, status: 'ACTIVE', paymentId: 60 }), amountReceived: 810000, changeAmount: 0 })))
     const receipt = await screen.findByRole('region', { name: 'Sale recorded' })
     await user.click(within(receipt).getByRole('link', { name: 'View receipt' }))
     expect(await screen.findByRole('heading', { name: 'Payment Confirmed and Receipt' })).toBeInTheDocument()
@@ -402,7 +480,7 @@ describe('FE-05 Register and Renew (F1-14)', () => {
     expect(within(form).queryByLabelText(/Amount received/)).not.toBeInTheDocument()
     await user.click(within(form).getByRole('button', { name: 'Record payment and issue card' }))
     expect(await screen.findByText(/No payment is required/)).toBeInTheDocument()
-    expect(calls.find((call) => call.method === 'POST')?.body).toEqual({ memberId: 2, tierId: 3, paymentMethod: 'CASH', referenceCode: null })
+    expect(calls.find((call) => call.method === 'POST')?.body).toEqual({ memberId: 2, tierId: 3, expectedAmountDue: 0 })
     expect(screen.queryByRole('link', { name: 'View receipt' })).not.toBeInTheDocument()
   })
 
@@ -440,6 +518,7 @@ describe('FE-05 Register and Renew (F1-14)', () => {
       paymentMethod: 'CASH',
       referenceCode: null,
       amountReceived: 1000000,
+      expectedAmountDue: 810000,
     })
     expect(within(receipt).getByText(/is active\. Payment PAY-0060 is recorded/)).toBeInTheDocument()
     expect(within(receipt).getByText('190.000 VND')).toBeInTheDocument()
@@ -496,7 +575,7 @@ describe('FE-05 Register and Renew (F1-14)', () => {
     await user.click(within(form).getByRole('button', { name: 'Record payment and issue card' }))
     const receipt = await screen.findByRole('region', { name: 'Sale recorded' })
     const post = calls.find((call) => call.path === '/membership-cards/purchase')
-    expect(post?.body).toEqual({ memberId: 2, tierId: 3, paymentMethod: 'CREDIT_CARD', referenceCode: 'POS-7781', amountReceived: 600000 })
+    expect(post?.body).toEqual({ memberId: 2, tierId: 3, paymentMethod: 'CREDIT_CARD', referenceCode: 'POS-7781', amountReceived: 600000, expectedAmountDue: 600000 })
     expect(within(receipt).getByRole('link', { name: 'View receipt' })).toHaveAttribute('href', '/reception/payments/70')
   })
 
