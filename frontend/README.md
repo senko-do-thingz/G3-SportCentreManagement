@@ -59,6 +59,18 @@ notepad .env   # set VITE_SHOW_SAMPLE_ACCOUNT=true and the two values, then save
 npm run dev
 ```
 
+Use `VITE_API_BASE_URL=http://localhost:8080/api/v1` for local development. A bare HTTP(S) origin such as `http://localhost:8080` is also supported and gains `/api/v1` automatically. An explicit `/api/v1` base keeps that prefix exactly once; `/api/v1` alone uses a same-origin reverse proxy. Other paths, duplicate prefixes, credentials, query strings and fragments are rejected with a configuration error. Endpoint calls must use `/auth/login` and `/users/me`, without adding the prefix themselves.
+
+Vite loads `.env`, `.env.local`, `.env.[mode]` and `.env.[mode].local`; mode-specific files override generic files, and process environment variables have the highest priority. Development normally uses mode `development`; builds use `production`. Restart the Vite process after changing any environment value. A running server can still use an older value. Do not overwrite someone else's local files while troubleshooting.
+
+### Authentication troubleshooting
+
+In the browser Network panel, confirm the frontend origin and the actual requests: `POST http://localhost:8080/api/v1/auth/login` followed by `GET http://localhost:8080/api/v1/users/me`. Login sends JSON fields `email` and `password`; it does not send a Bearer header. The profile request must have an Authorization header with the Bearer scheme. Inspect only whether it is present; never copy passwords, tokens, request bodies or full headers into reports.
+
+Only a 401 from the login endpoint displays the invalid-credentials message. A rejected profile session displays an expired-session message; profile permission failures have their own message. Temporary profile network, server or rate-limit failures retain the tokens behind the existing Retry screen. Retry loads the profile without resubmitting credentials. A rejected refresh ends the session; a transient or malformed refresh response preserves it for recovery.
+
+A failed browser fetch cannot reliably distinguish an offline backend from DNS or CORS restrictions. Confirm that the backend is running and compare the browser origin with its existing allowed origins. `localhost` and `127.0.0.1` are different origins. Do not weaken CORS or route guards to make a request pass. For a database already initialized with demo migrations, use the existing documented `dev,demo` backend profile; do not repair migration history or disable validation to hide a profile mismatch.
+
 | Command | What it does |
 |---|---|
 | `npm run dev` | Dev server with hot reload |
@@ -67,7 +79,7 @@ npm run dev
 | `npm test` | Unit and flow tests once |
 | `npm run test:watch` | Tests in watch mode |
 
-Demo accounts: `manager@sportify.com` / `password` (seeded by V4). Other roles: create them with the manager API (BE-01) or SQL.
+For existing local demo accounts and the required backend profile, see the root README's Demo Accounts section. Do not add credentials to frontend source or diagnostic logs.
 
 ## Folder structure
 

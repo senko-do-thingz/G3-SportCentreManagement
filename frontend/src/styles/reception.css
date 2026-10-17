@@ -1,6 +1,6 @@
 /* Receptionist screens (FE-05): Member Search and Profile, Register and Renew, Check-in, payment confirmation */
 
-.staff-layout .member-header {
+.member-header {
   display: flex;
   align-items: center;
   gap: var(--space-4);

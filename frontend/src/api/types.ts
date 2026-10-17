@@ -13,6 +13,15 @@ export interface AuthTokens {
   refreshToken: string
 }
 
+/** Validate untrusted authentication JSON before storing or attaching token values. */
+export function isAuthTokens(value: unknown): value is AuthTokens {
+  if (!value || typeof value !== 'object') return false
+  const tokens = value as Record<string, unknown>
+  return [tokens.accessToken, tokens.refreshToken].every(
+    (token) => typeof token === 'string' && token.length > 0 && !/\s/.test(token),
+  )
+}
+
 /**
  * Mirrors com.sportify.identity.dto.UserProfileResponse (GET /users/me).
  * The optional fields are the member profile fields planned in BE-02 (date_of_birth and address

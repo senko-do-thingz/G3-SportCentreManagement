@@ -1,3 +1,12 @@
+## 2026-10-17 - Frontend Authentication Maintenance (FE-00)
+
+- Header follow-up: isolate the authenticated member header from the receptionist member-summary CSS collision, restoring left-aligned navigation and the user section at the right of its bar. Preserve responsive navigation and receipt-print hiding. Add two style regressions; lint, all 617 tests in 31 files and production build pass. Desktop browser verification remains pending because browser automation is unavailable.
+- Fix the observed local bare-origin API setting sending login outside /api/v1, where the backend returns 401 even for valid credentials. Normalize supported origins to /api/v1 once and reject invalid configuration without echoing its value.
+- Distinguish credential rejection from profile initialization failures. Preserve recoverable sessions behind Retry, retain remember-me behavior, and keep profile and login diagnostics safe.
+- Validate authentication responses and prevent late login/profile/response-body work from publishing stale data, clearing a newer session, or retrying an older operation with another account's token. Preserve existing refresh coordination and role guards.
+- Add 47 focused regressions, including a final review correction that preserves session-change diagnostics instead of labeling them as network failures. Windows validation: npm ci, lint, all 615 tests in 30 files, and production build pass. Direct seeded Receptionist, Member and Coach login/profile requests return 200; the profile preflight accepts the existing localhost:5173 origin. Real-browser acceptance remains pending because browser automation is unavailable. Tracking status remains In progress.
+- Clarify Vite environment precedence, restart steps, API URL setup and phase-specific diagnostics. Update the local-only AI Audit Log in the isolated maintenance worktree; preserve the original checkout and its audit document.
+
 ## 2026-10-17 - Coach Teaching Schedule and Roster (FE-10)
 
 - Add a coach-only weekly teaching schedule, assigned-session roster selection and printable confirmed-member list.
@@ -72,7 +81,6 @@
 
 - Load schedule class options in cancellable 100-row pages, stop when the view aborts, surface page errors through retry, and reject results above the documented 10,000-class limit.
 - Add pagination, cancellation, page-failure and upper-bound regression coverage.
-
 ## 2026-10-16 - Receptionist Booking for Members (BE-13)
 
 - Extend staff member history with combined when/status filters, SQL pagination, stable ordering and the existing array/PageResponse compatibility. Validate the selected member after staff authorization.
