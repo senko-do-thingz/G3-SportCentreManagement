@@ -3,6 +3,10 @@ import { ApiError } from './errors'
 import { normalizePage } from './page'
 import type { PageResponse, SpringPage } from './types'
 
+const SESSION_PAGE_SIZE = 100
+const MAX_SESSION_PAGES = 100
+const SCHEDULE_CHANGED_MESSAGE = 'The schedule changed while loading. Refresh to load the complete schedule.'
+
 export type BrowseFormat = 'SELF_TRAINING' | 'COACH_LED'
 export type BrowseLevel = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'
 export interface BrowseSession {
@@ -65,14 +69,21 @@ async function list(query: SessionQuery, signal?: AbortSignal): Promise<PageResp
 
 /** Complete a bounded calendar/lookup query. Failure never returns a misleading partial list. */
 async function all(query: Omit<SessionQuery, 'page' | 'size'>, signal?: AbortSignal): Promise<BrowseSession[]> {
-  const first = await list({ ...query, page: 0, size: 100 }, signal)
+  const first = await list({ ...query, page: 0, size: SESSION_PAGE_SIZE }, signal)
+  if (first.totalPages > MAX_SESSION_PAGES) {
+    throw new ApiError(0, 'This date range contains more than 10,000 sessions. Narrow the date range or filters and try again.')
+  }
   const rows = [...first.content]
   for (let page = 1; page < first.totalPages; page++) {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-    rows.push(...(await list({ ...query, page, size: 100 }, signal)).content)
+    const next = await list({ ...query, page, size: SESSION_PAGE_SIZE }, signal)
+    if (next.totalPages !== first.totalPages || next.totalElements !== first.totalElements) {
+      throw new ApiError(0, SCHEDULE_CHANGED_MESSAGE)
+    }
+    rows.push(...next.content)
   }
   const unique = [...new Map(rows.map((row) => [row.id, row])).values()]
-  if (unique.length < first.totalElements) throw new ApiError(0, 'The schedule changed while loading. Refresh to load the complete schedule.')
+  if (unique.length !== first.totalElements) throw new ApiError(0, SCHEDULE_CHANGED_MESSAGE)
   return unique
 }
 

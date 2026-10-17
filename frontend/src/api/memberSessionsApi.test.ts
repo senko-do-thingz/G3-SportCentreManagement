@@ -40,4 +40,14 @@ describe('member session read API', () => {
     vi.mocked(api.get).mockResolvedValueOnce({ content: [{ id: 1 }], page: 0, size: 100, totalElements: 2, totalPages: 2 }).mockResolvedValueOnce({ content: [{ id: 1 }], page: 1, size: 100, totalElements: 2, totalPages: 2 })
     await expect(memberSessionsApi.all({})).rejects.toThrow('schedule changed')
   })
+  it('rejects oversized ranges instead of fetching an unbounded number of pages', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ content: [{ id: 1 }], page: 0, size: 100, totalElements: 10001, totalPages: 101 })
+    await expect(memberSessionsApi.all({})).rejects.toThrow('more than 10,000 sessions')
+    expect(api.get).toHaveBeenCalledTimes(1)
+  })
+  it('rejects pagination metadata that changes while loading', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ content: [{ id: 1 }], page: 0, size: 100, totalElements: 2, totalPages: 2 })
+      .mockResolvedValueOnce({ content: [{ id: 2 }], page: 1, size: 100, totalElements: 3, totalPages: 2 })
+    await expect(memberSessionsApi.all({})).rejects.toThrow('schedule changed')
+  })
 })
