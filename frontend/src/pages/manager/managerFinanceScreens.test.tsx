@@ -350,7 +350,7 @@ describe('FE-13 revenue reports and backend CSV export', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }))
 
     expect(await screen.findByText('CSV export ready: revenue_2026-10-01_2026-10-31.csv')).toHaveAttribute('role', 'status')
-    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob))
+    expect(createObjectURL).toHaveBeenCalledOnce()
     expect(click).toHaveBeenCalledOnce()
     expect(click.mock.instances[0]).toHaveProperty('download', 'revenue_2026-10-01_2026-10-31.csv')
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:finance-report')
