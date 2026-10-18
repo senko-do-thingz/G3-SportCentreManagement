@@ -1,44 +1,58 @@
-import { api } from './client'
+import { api, type ApiDownload } from './client'
 import { UNEXPECTED_RESPONSE_MESSAGE, type RequestSignal } from './memberApi'
 import type { Refund } from './receptionPaymentsApi'
 import type { PageResponse } from './types'
 
-export type RevenueGroup = 'ITEM_TYPE' | 'PAYMENT_METHOD' | 'SPORT'
+export type RevenueGroup = 'ITEM_TYPE' | 'METHOD' | 'SPORT'
 
-export interface FinanceServiceCollection {
-  service: string
-  collected: number
-}
-
+/** Mirrors BE-22 FinanceOverviewResponse. Refunds are reported separately from paid revenue. */
 export interface ManagerFinanceOverview {
-  paymentsCollected: number
-  completedRefunds: number
-  netCollected: number
-  collectedByService: FinanceServiceCollection[]
-  pendingPaymentsCount: number
-  pendingRefundApprovalCount: number
-  approvedNotReturnedCount: number
+  month: string
+  from: string
+  to: string
+  paidRevenue: number
+  paidTransactions: number
+  averagePayment: number
+  pendingAmount: number
+  pendingTransactions: number
+  refundedAmount: number
+  refundedTransactions: number
+  previousMonth: string
+  previousPaidRevenue: number
+  revenueChange: number
+  revenueChangePercent: number | null
 }
 
+/** Mirrors BE-22 RevenueTrendPoint. The endpoint is anchored to the current month. */
 export interface FinanceTrendPoint {
   month: string
   revenue: number
+  transactions: number
 }
 
+/** Mirrors BE-22 FinanceTransactionResponse fields used by the finance screens. */
 export interface FinanceTransaction {
   id: number
-  reference: string
-  memberName: string | null
-  memberCode: string | null
-  service: string | null
-  itemType: string | null
-  amount: number
-  method: string | null
+  code: string
+  time: string | null
+  paymentTime: string | null
+  createdAt: string | null
   status: string
-  occurredAt: string | null
+  method: string | null
+  amount: number
+  referenceCode: string | null
+  memberId: number | null
+  memberCode: string | null
+  memberName: string | null
+  itemType: string | null
+  itemCode: string | null
+  itemName: string | null
+  sportName: string | null
+  invoiceId: number | null
   invoiceNumber: string | null
 }
 
+/** The UI keeps a month and query in the URL; these are translated to BE-22 from/to/search. */
 export interface FinanceTransactionQuery extends RequestSignal {
   month?: string
   query?: string
@@ -47,22 +61,22 @@ export interface FinanceTransactionQuery extends RequestSignal {
   size?: number
 }
 
+/** Mirrors BE-22 RevenueBreakdownRow. */
 export interface FinanceRevenueRow {
-  category: string
-  collected: number
-  refunded: number
-  netCollected: number
+  key: string | null
+  label: string
+  revenue: number
+  transactions: number
+  sharePercent: number
 }
 
+/** Mirrors BE-22 RevenueBreakdownResponse. */
 export interface ManagerRevenueReport {
   from: string
   to: string
   groupBy: RevenueGroup
-  totals: {
-    collected: number
-    refunded: number
-    netCollected: number
-  }
+  totalRevenue: number
+  totalTransactions: number
   rows: FinanceRevenueRow[]
 }
 
@@ -70,7 +84,6 @@ export interface RevenueQuery extends RequestSignal {
   from: string
   to: string
   groupBy: RevenueGroup
-  sportId?: number
 }
 
 export interface ReviewRefundRequest {
@@ -91,20 +104,19 @@ function amount(value: unknown): number {
   return parsed
 }
 
+function signedAmount(value: unknown): number {
+  const parsed = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : Number.NaN
+  if (!Number.isFinite(parsed)) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
+  return parsed
+}
+
+function nullableSignedAmount(value: unknown): number | null {
+  return value === null || value === undefined ? null : signedAmount(value)
+}
+
 function count(value: unknown): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
   return value
-}
-
-function firstValue(source: Json, keys: string[]): unknown {
-  for (const key of keys) {
-    if (source[key] !== undefined && source[key] !== null) return source[key]
-  }
-  return undefined
-}
-
-function optionalText(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() ? value : null
 }
 
 function requiredText(value: unknown): string {
@@ -112,84 +124,80 @@ function requiredText(value: unknown): string {
   return value
 }
 
+function optionalText(value: unknown): string | null {
+  if (value === null || value === undefined) return null
+  if (typeof value !== 'string') throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
+  return value.trim() ? value : null
+}
+
 function asOverview(value: unknown): ManagerFinanceOverview {
   if (!isObject(value)) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
-  const attention = isObject(value.needsAttention) ? value.needsAttention : value
-  const serviceRows = firstValue(value, ['collectedByService', 'serviceBreakdown', 'byService'])
-  if (!Array.isArray(serviceRows)) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
   return {
-    paymentsCollected: amount(firstValue(value, ['paymentsCollected', 'totalCollected'])),
-    completedRefunds: amount(firstValue(value, ['completedRefunds', 'totalRefunded'])),
-    netCollected: amount(firstValue(value, ['netCollected', 'netRevenue'])),
-    collectedByService: serviceRows.map((row) => {
-      if (!isObject(row)) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
-      return {
-        service: requiredText(firstValue(row, ['service', 'serviceName', 'category', 'itemType'])),
-        collected: amount(firstValue(row, ['collected', 'amount', 'total'])),
-      }
-    }),
-    pendingPaymentsCount: count(firstValue(attention, ['pendingPaymentsCount', 'pendingPayments'])),
-    pendingRefundApprovalCount: count(firstValue(attention, ['pendingRefundApprovalCount', 'awaitingRefundApproval', 'pendingRefunds'])),
-    approvedNotReturnedCount: count(firstValue(attention, ['approvedNotReturnedCount', 'approvedNotReturned', 'approvedRefunds'])),
+    month: requiredText(value.month),
+    from: requiredText(value.from),
+    to: requiredText(value.to),
+    paidRevenue: amount(value.paidRevenue),
+    paidTransactions: count(value.paidTransactions),
+    averagePayment: amount(value.averagePayment),
+    pendingAmount: amount(value.pendingAmount),
+    pendingTransactions: count(value.pendingTransactions),
+    refundedAmount: amount(value.refundedAmount),
+    refundedTransactions: count(value.refundedTransactions),
+    previousMonth: requiredText(value.previousMonth),
+    previousPaidRevenue: amount(value.previousPaidRevenue),
+    revenueChange: signedAmount(value.revenueChange),
+    revenueChangePercent: nullableSignedAmount(value.revenueChangePercent),
   }
 }
 
 function asTrendPoint(value: unknown): FinanceTrendPoint {
   if (!isObject(value)) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
   return {
-    month: requiredText(firstValue(value, ['month', 'period', 'label'])),
-    revenue: amount(firstValue(value, ['revenue', 'collected', 'amount', 'total'])),
+    month: requiredText(value.month),
+    revenue: amount(value.revenue),
+    transactions: count(value.transactions),
   }
 }
 
 function asTrend(value: unknown): FinanceTrendPoint[] {
-  const rows = Array.isArray(value) ? value : isObject(value) ? firstValue(value, ['months', 'trend', 'content']) : null
-  if (!Array.isArray(rows)) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
-  return rows.map(asTrendPoint)
+  if (!Array.isArray(value)) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
+  return value.map(asTrendPoint)
 }
 
 function asTransaction(value: unknown): FinanceTransaction {
-  if (!isObject(value) || typeof value.id !== 'number' || typeof value.status !== 'string') {
+  if (!isObject(value) || typeof value.id !== 'number' || !Number.isSafeInteger(value.id) || value.id < 1) {
     throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
   }
-  const reference = requiredText(firstValue(value, ['reference', 'paymentCode', 'code', 'invoiceNumber']))
-  const rawAmount = firstValue(value, ['amount', 'amountCollected', 'totalAmount'])
   return {
     id: value.id,
-    reference,
-    memberName: optionalText(firstValue(value, ['memberName', 'memberFullName'])),
+    code: requiredText(value.code),
+    time: optionalText(value.time),
+    paymentTime: optionalText(value.paymentTime),
+    createdAt: optionalText(value.createdAt),
+    status: requiredText(value.status),
+    method: optionalText(value.method),
+    amount: amount(value.amount),
+    referenceCode: optionalText(value.referenceCode),
+    memberId: value.memberId === null || value.memberId === undefined ? null : count(value.memberId),
     memberCode: optionalText(value.memberCode),
-    service: optionalText(firstValue(value, ['service', 'serviceName', 'itemDescription', 'description'])),
+    memberName: optionalText(value.memberName),
     itemType: optionalText(value.itemType),
-    amount: amount(rawAmount),
-    method: optionalText(firstValue(value, ['method', 'paymentMethod'])),
-    status: value.status,
-    occurredAt: optionalText(firstValue(value, ['occurredAt', 'paymentTime', 'createdAt'])),
+    itemCode: optionalText(value.itemCode),
+    itemName: optionalText(value.itemName),
+    sportName: optionalText(value.sportName),
+    invoiceId: value.invoiceId === null || value.invoiceId === undefined ? null : count(value.invoiceId),
     invoiceNumber: optionalText(value.invoiceNumber),
   }
 }
 
 function asTransactionPage(value: unknown): PageResponse<FinanceTransaction> {
-  if (Array.isArray(value)) {
-    const content = value.map(asTransaction)
-    return { content, page: 0, size: Math.max(content.length, 1), totalElements: content.length, totalPages: content.length ? 1 : 0 }
-  }
   if (!isObject(value) || !Array.isArray(value.content)) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
-  const pageValue = firstValue(value, ['page', 'number']) ?? 0
-  const sizeValue = value.size ?? Math.max(value.content.length, 1)
-  const totalElements = value.totalElements ?? value.content.length
-  const totalPages = value.totalPages ?? (Number(sizeValue) > 0 ? Math.ceil(Number(totalElements) / Number(sizeValue)) : 0)
-  if (![pageValue, sizeValue, totalElements, totalPages].every((item) => typeof item === 'number' && Number.isSafeInteger(item) && item >= 0)
-    || Number(sizeValue) < 1 || value.content.length > Number(sizeValue)) {
-    throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
-  }
-  return {
-    content: value.content.map(asTransaction),
-    page: Number(pageValue),
-    size: Number(sizeValue),
-    totalElements: Number(totalElements),
-    totalPages: Number(totalPages),
-  }
+  const page = count(value.page)
+  const size = count(value.size)
+  const totalElements = count(value.totalElements)
+  const totalPages = count(value.totalPages)
+  if (size < 1 || value.content.length > size) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
+  return { content: value.content.map(asTransaction), page, size, totalElements, totalPages }
 }
 
 function asRefund(value: unknown): Refund {
@@ -207,29 +215,34 @@ function asRefundList(value: unknown): Refund[] {
 function asRevenueRow(value: unknown): FinanceRevenueRow {
   if (!isObject(value)) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
   return {
-    category: requiredText(firstValue(value, ['category', 'label', 'name', 'service'])),
-    collected: amount(firstValue(value, ['collected', 'paymentsCollected', 'gross'])),
-    refunded: amount(firstValue(value, ['refunded', 'completedRefunds', 'refundAmount'])),
-    netCollected: amount(firstValue(value, ['netCollected', 'netRevenue', 'net'])),
+    key: optionalText(value.key),
+    label: requiredText(value.label),
+    revenue: amount(value.revenue),
+    transactions: count(value.transactions),
+    sharePercent: amount(value.sharePercent),
   }
 }
 
 function asRevenue(value: unknown, query: RevenueQuery): ManagerRevenueReport {
-  if (!isObject(value)) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
-  const totals = isObject(value.totals) ? value.totals : value
-  const rows = firstValue(value, ['rows', 'categories', 'content'])
-  if (!Array.isArray(rows)) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
-  return {
-    from: typeof value.from === 'string' ? value.from : query.from,
-    to: typeof value.to === 'string' ? value.to : query.to,
-    groupBy: query.groupBy,
-    totals: {
-      collected: amount(firstValue(totals, ['collected', 'paymentsCollected', 'gross'])),
-      refunded: amount(firstValue(totals, ['refunded', 'completedRefunds', 'refundAmount'])),
-      netCollected: amount(firstValue(totals, ['netCollected', 'netRevenue', 'net'])),
-    },
-    rows: rows.map(asRevenueRow),
+  if (!isObject(value) || value.groupBy !== query.groupBy || !Array.isArray(value.rows)) {
+    throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
   }
+  return {
+    from: requiredText(value.from),
+    to: requiredText(value.to),
+    groupBy: query.groupBy,
+    totalRevenue: amount(value.totalRevenue),
+    totalTransactions: count(value.totalTransactions),
+    rows: value.rows.map(asRevenueRow),
+  }
+}
+
+function datesForMonth(month: string | undefined): { from?: string; to?: string } {
+  if (month === undefined || month === '') return {}
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(month)
+  if (!match) throw new Error('Choose a valid reporting month.')
+  const lastDay = new Date(Date.UTC(Number(match[1]), Number(match[2]), 0)).getUTCDate()
+  return { from: `${month}-01`, to: `${month}-${String(lastDay).padStart(2, '0')}` }
 }
 
 export const managerFinanceApi = {
@@ -237,14 +250,15 @@ export const managerFinanceApi = {
     return api.get<unknown>('/manager/finance/overview', { ...options, query: { month } }).then(asOverview)
   },
 
-  trend(month: string, options: RequestSignal = {}): Promise<FinanceTrendPoint[]> {
-    return api.get<unknown>('/manager/finance/trend', { ...options, query: { month } }).then(asTrend)
+  trend(options: RequestSignal = {}): Promise<FinanceTrendPoint[]> {
+    return api.get<unknown>('/manager/finance/trend', { ...options, query: { months: 6 } }).then(asTrend)
   },
 
   transactions({ month, query, status, page = 0, size = 20, signal }: FinanceTransactionQuery = {}): Promise<PageResponse<FinanceTransaction>> {
+    const dateRange = datesForMonth(month)
     return api.get<unknown>('/manager/finance/transactions', {
       signal,
-      query: { month, query: query || undefined, status: status || undefined, page, size },
+      query: { ...dateRange, search: query?.trim() || undefined, status: status || undefined, page, size },
     }).then(asTransactionPage)
   },
 
@@ -257,10 +271,18 @@ export const managerFinanceApi = {
   },
 
   revenue(query: RevenueQuery): Promise<ManagerRevenueReport> {
-    const { from, to, groupBy, sportId, signal } = query
+    const { from, to, groupBy, signal } = query
     return api.get<unknown>('/manager/finance/revenue', {
       signal,
-      query: { from, to, groupBy, sportId },
+      query: { from, to, groupBy },
     }).then((value) => asRevenue(value, query))
+  },
+
+  exportRevenue(from: string, to: string, options: RequestSignal = {}): Promise<ApiDownload> {
+    return api.getDownload('/manager/finance/revenue/export', {
+      ...options,
+      query: { from, to },
+      headers: { Accept: 'text/csv' },
+    })
   },
 }

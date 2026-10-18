@@ -280,7 +280,7 @@ async function send(path: string, options: RequestOptions, accessToken: string |
 }
 
 /**
- * Sends a request to the Sportify API and returns the parsed JSON body.
+ * Sends a request to the Sportify API and applies shared authentication and session handling.
  *
  * On 401 for an authenticated request the client refreshes the access token once and retries
  * the original request once. If the refresh token is rejected, tokens are cleared, session expired

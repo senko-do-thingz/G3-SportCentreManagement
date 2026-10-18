@@ -50,12 +50,12 @@
 .finance-revenue-chart__grid { stroke: var(--color-border); stroke-dasharray: 4 5; }
 .finance-revenue-chart__axis { fill: var(--color-text-muted); font-size: 12px; }
 .finance-revenue-chart__category { fill: var(--color-text); font-size: 13px; }
-.finance-revenue-chart__bar--collected { fill: var(--color-primary); }
-.finance-revenue-chart__bar--refunded { fill: var(--color-accent); }
-.finance-revenue-chart__bar--net { fill: var(--color-success); }
+.finance-revenue-legend .finance-revenue-chart__bar--revenue { background: var(--color-primary); }
+.finance-revenue-chart__bar--revenue { fill: var(--color-primary); }
 .finance-report-total { display: grid; grid-template-columns: minmax(180px, 1fr) repeat(3, minmax(120px, .6fr)); gap: var(--space-3); padding: var(--space-4); border-top: 1px solid var(--color-border); text-align: right; }
 .finance-report-total > :first-child { text-align: left; font-weight: var(--weight-semibold); }
 .finance-export-status { margin: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--color-success-soft); color: var(--color-success); font-size: var(--text-sm); }
+.finance-export-status--error { background: var(--color-danger-soft); color: var(--color-danger); }
 @media (max-width: 800px) { .finance-overview-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 600px) {
   .finance-kpis { grid-template-columns: minmax(0, 1fr); }

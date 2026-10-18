@@ -1,3 +1,10 @@
+## 2026-10-18 - FE-13 Finance Contract Integration Fixes
+
+- Align manager finance overview, transaction filters, revenue breakdowns, and refund views with the BE-21/BE-22 response DTOs and supported query values.
+- Send transaction date/search filters as `from`, `to`, and `search`; use `METHOD` for payment-method grouping; remove the unsupported sport ID filter.
+- Replace local aggregated CSV generation with the authenticated BE-22 revenue export and server-provided filename.
+- Remove unsupported net-collected and approved-not-paid figures rather than deriving them; document the backend contract decisions still needed. No backend files or endpoints were changed.
+
 ## 2026-10-17 - Frontend Authentication Maintenance (FE-00)
 
 - Header follow-up: isolate the authenticated member header from the receptionist member-summary CSS collision, restoring left-aligned navigation and the user section at the right of its bar. Preserve responsive navigation and receipt-print hiding. Add two style regressions; lint, all 617 tests in 31 files and production build pass. Desktop browser verification remains pending because browser automation is unavailable.

@@ -6,12 +6,6 @@ function shortMoney(value: number): string {
   return String(value)
 }
 
-const SERIES = [
-  { key: 'collected', label: 'Collected', className: 'finance-revenue-chart__bar--collected' },
-  { key: 'refunded', label: 'Refunded', className: 'finance-revenue-chart__bar--refunded' },
-  { key: 'netCollected', label: 'Net collected', className: 'finance-revenue-chart__bar--net' },
-] as const
-
 export function FinanceRevenueChart({ rows }: { rows: FinanceRevenueRow[] }) {
   if (rows.length === 0) return <p className="finance-empty">No revenue categories are available for this range.</p>
 
@@ -22,14 +16,14 @@ export function FinanceRevenueChart({ rows }: { rows: FinanceRevenueRow[] }) {
   const rowHeight = 58
   const height = top + rows.length * rowHeight + 22
   const chartWidth = width - left - right
-  const max = Math.max(1, ...rows.flatMap((row) => [row.collected, row.refunded, row.netCollected]))
+  const max = Math.max(1, ...rows.map((row) => row.revenue))
   const grid = [0, 0.5, 1]
 
   return <div className="finance-revenue-chart-wrap">
     <ul className="finance-revenue-legend" aria-label="Revenue chart legend">
-      {SERIES.map((series) => <li key={series.key}><span className={series.className} />{series.label}</li>)}
+      <li><span className="finance-revenue-chart__bar--revenue" />Revenue</li>
     </ul>
-    <svg className="finance-revenue-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Collected, refunded and net revenue by category for ${rows.length} categories`}>
+    <svg className="finance-revenue-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Revenue by category for ${rows.length} categories`}>
       {grid.map((fraction) => {
         const x = left + fraction * chartWidth
         return <g key={fraction}>
@@ -39,13 +33,11 @@ export function FinanceRevenueChart({ rows }: { rows: FinanceRevenueRow[] }) {
       })}
       {rows.map((row, index) => {
         const y = top + index * rowHeight
-        return <g key={row.category}>
-          <text className="finance-revenue-chart__category" x={left - 12} y={y + 27} textAnchor="end">{row.category}</text>
-          {SERIES.map((series, seriesIndex) => {
-            const value = row[series.key]
-            const barWidth = Math.max(0, value / max * chartWidth)
-            return <rect key={series.key} className={`finance-revenue-chart__bar ${series.className}`} x={left} y={y + seriesIndex * 13} width={barWidth} height="8" rx="4" />
-          })}
+        return <g key={row.key ?? row.label}>
+          <text className="finance-revenue-chart__category" x={left - 12} y={y + 27} textAnchor="end">{row.label}</text>
+          <rect className="finance-revenue-chart__bar finance-revenue-chart__bar--revenue" x={left} y={y + 8} width={Math.max(0, row.revenue / max * chartWidth)} height="12" rx="6">
+            <title>{`${row.label}: ${new Intl.NumberFormat('vi-VN').format(row.revenue)} VND; ${row.transactions} transactions`}</title>
+          </rect>
         </g>
       })}
     </svg>

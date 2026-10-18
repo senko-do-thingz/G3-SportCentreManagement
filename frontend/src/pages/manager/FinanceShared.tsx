@@ -33,9 +33,9 @@ export function FinanceTrendChart({ points }: { points: FinanceTrendPoint[] }) {
   }
 
   return <div className="finance-chart-wrap">
-    <svg className="finance-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Six-month collected revenue" aria-describedby="finance-trend-description">
+    <svg className="finance-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Six-month collected revenue through current month" aria-describedby="finance-trend-description">
       <title id="finance-trend-title">Six-month collected revenue</title>
-      <desc id="finance-trend-description">Monthly collected payments for the six months ending in the selected month.</desc>
+      <desc id="finance-trend-description">Monthly paid revenue for the six months ending in the current month.</desc>
       {[0, 0.5, 1].map((fraction) => {
         const y = top + chartHeight * fraction
         return <g key={fraction}>

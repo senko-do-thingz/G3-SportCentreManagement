@@ -40,13 +40,13 @@ function refundAmount(refund: Refund): number | null {
 }
 
 const TRANSACTION_COLUMNS: TableColumn<FinanceTransaction>[] = [
-  { key: 'reference', header: 'Transaction', render: (row) => <div className="manager-cell"><strong>{row.invoiceNumber ?? row.reference}</strong><span>{row.reference}</span></div> },
+  { key: 'reference', header: 'Transaction', render: (row) => <div className="manager-cell"><strong>{row.invoiceNumber ?? row.code}</strong><span>{row.referenceCode ?? row.code}</span></div> },
   { key: 'member', header: 'Member', render: (row) => <div className="manager-cell"><span className="manager-cell-primary">{row.memberName ?? 'Member not provided'}</span><span>{row.memberCode ?? '-'}</span></div> },
-  { key: 'service', header: 'Service', render: (row) => <div className="manager-cell"><span className="manager-cell-primary">{row.service ?? 'Service not provided'}</span><span>{humanizeCode(row.itemType)}</span></div> },
+  { key: 'service', header: 'Service', render: (row) => <div className="manager-cell"><span className="manager-cell-primary">{row.itemName ?? row.itemCode ?? row.sportName ?? 'Service not provided'}</span><span>{humanizeCode(row.itemType)}</span></div> },
   { key: 'amount', header: 'Amount', align: 'right', render: (row) => <strong className="manager-nowrap">{formatMoney(row.amount)}</strong> },
   { key: 'method', header: 'Method', render: (row) => humanizeCode(row.method) },
   { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} label={humanizeCode(row.status)} /> },
-  { key: 'occurredAt', header: 'Date', render: (row) => formatDateTime(row.occurredAt) },
+  { key: 'time', header: 'Date', render: (row) => formatDateTime(row.time) },
 ]
 
 const REFUND_COLUMNS = (onReview: (refund: Refund) => void): TableColumn<Refund>[] => [
@@ -251,7 +251,7 @@ function RefundReviewModal({
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 409) {
         onConflict(refund)
-      } else if (!(cause instanceof ApiError) || cause.status === 0 || cause.status >= 500) {
+      } else if (!(cause instanceof ApiError) || cause.status === 0 || cause.status === 408 || cause.status >= 500) {
         onUncertain(refund)
       } else {
         setError(getErrorMessage(cause))
