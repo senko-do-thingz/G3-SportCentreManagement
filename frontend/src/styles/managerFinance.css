@@ -27,6 +27,19 @@
 .finance-trend-values strong { color: var(--color-text); font-size: var(--text-xs); overflow-wrap: anywhere; }
 .finance-empty { margin: 0; color: var(--color-text-muted); font-size: var(--text-sm); }
 .finance-open-report { width: fit-content; min-width: 220px; justify-content: center; }
+.finance-review-form { display: grid; gap: var(--space-4); }
+.finance-review-summary { display: grid; gap: var(--space-3); margin: 0; }
+.finance-review-summary > div { display: grid; grid-template-columns: minmax(120px, .7fr) minmax(0, 1.3fr); gap: var(--space-3); }
+.finance-review-summary dt { color: var(--color-text-muted); font-size: var(--text-sm); }
+.finance-review-summary dd { margin: 0; color: var(--color-text); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.finance-review-result { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-4); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.finance-review-result p { margin: 0; color: var(--color-text); font-size: var(--text-sm); }
+.finance-review-result--success { background: var(--color-success-soft); }
+.finance-review-result--success p { color: var(--color-success); }
+.finance-review-result--rejected { background: var(--color-danger-soft); }
+.finance-review-result--rejected p { color: var(--color-danger); }
+.finance-review-result--warning { background: var(--color-warning-soft); }
+.finance-review-result--warning p { color: var(--color-warning); }
 @media (max-width: 800px) { .finance-overview-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 600px) {
   .finance-kpis { grid-template-columns: minmax(0, 1fr); }
@@ -35,4 +48,9 @@
   .finance-chart { min-height: 180px; }
   .finance-trend-values { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .manager-finance-page .table { min-width: 720px; }
+}
+@media (max-width: 640px) {
+  .finance-review-summary > div { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+  .finance-review-result { align-items: flex-start; flex-direction: column; }
+  .finance-review-result .btn { width: 100%; }
 }

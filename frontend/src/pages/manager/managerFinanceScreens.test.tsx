@@ -30,6 +30,20 @@ const recent = {
   totalElements: 1,
   totalPages: 1,
 }
+const pendingRefund = {
+  id: 7,
+  refundCode: 'RF-1040',
+  packageRegistrationId: 10,
+  registrationCode: 'REG-0010',
+  memberId: 2,
+  memberCode: 'MB-0248',
+  memberFullName: 'Taylor Nguyen',
+  amountRequested: '150000',
+  amountApproved: null,
+  reason: 'Cancelled before the deadline',
+  status: 'PENDING',
+  createdAt: '2026-10-17T10:00:00',
+}
 
 function financeApi(user = MANAGER) {
   tokenStorage.startSession({ accessToken: 'finance-manager-token', refreshToken: 'finance-refresh-token' })
@@ -42,6 +56,27 @@ function financeApi(user = MANAGER) {
     if (call.path.startsWith('/manager/finance/transactions')) return json(200, recent)
     return backendError(404, `Unexpected request: ${call.method} ${call.path}`)
   })
+}
+
+function transactionsApi(options: { refundRows?: typeof pendingRefund[]; transactionError?: boolean; uncertainReview?: boolean } = {}) {
+  tokenStorage.startSession({ accessToken: 'finance-manager-token', refreshToken: 'finance-refresh-token' })
+  let pendingRows = options.refundRows ?? [pendingRefund]
+  const { calls } = installFakeFetch((call) => {
+    if (call.path === '/users/me') return json(200, MANAGER)
+    if (call.path.startsWith('/manager/finance/transactions')) {
+      if (options.transactionError) return backendError(404, 'Finance transaction endpoint is not available')
+      return json(200, { ...recent, size: 20 })
+    }
+    if (call.path === '/refunds/pending' && call.method === 'GET') return json(200, pendingRows)
+    if (call.path === '/refunds/7/review' && call.method === 'PUT') {
+      const request = call.body as { approved: boolean; amountApproved: number | null; managerNote: string }
+      pendingRows = []
+      if (options.uncertainReview) return backendError(500, 'The response was lost after the review was applied')
+      return json(200, { ...pendingRefund, status: request.approved ? 'APPROVED' : 'REJECTED', amountApproved: request.amountApproved, managerNote: request.managerNote })
+    }
+    return backendError(404, `Unexpected request: ${call.method} ${call.path}`)
+  })
+  return { calls }
 }
 
 afterEach(() => {
@@ -90,5 +125,80 @@ describe('FE-13 financial overview', () => {
 
     expect(await screen.findByText(/do not have access|access denied|forbidden/i)).toBeInTheDocument()
     expect(screen.queryByText('Payments collected')).not.toBeInTheDocument()
+  })
+})
+
+describe('FE-13 transaction ledger and refund review', () => {
+  it('loads transaction search, status, month and page from the URL and shows the pending refund queue', async () => {
+    const { calls } = transactionsApi()
+    renderApp('/manager/transactions?month=2026-10&query=Taylor&status=SUCCESS&page=1')
+
+    expect(await screen.findByText('INV-1041')).toBeInTheDocument()
+    expect(screen.getByText('RF-1040')).toBeInTheDocument()
+    expect(screen.getByLabelText('Search transactions')).toHaveValue('Taylor')
+    expect(calls.some((call) => call.path === '/manager/finance/transactions?month=2026-10&query=Taylor&status=SUCCESS&page=1&size=20')).toBe(true)
+    expect(calls.some((call) => call.path === '/refunds/pending')).toBe(true)
+  })
+
+  it('approves the requested amount with a manager note and updates the queue without a page reload', async () => {
+    const { calls } = transactionsApi()
+    renderApp('/manager/transactions?month=2026-10')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Review refund RF-1040' }))
+    fireEvent.change(screen.getByLabelText(/Approved amount/), { target: { value: '125000' } })
+    fireEvent.change(screen.getByLabelText(/Manager note/), { target: { value: 'Verified the cancellation timestamp.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Approve refund' }))
+
+    expect(await screen.findByText(/RF-1040 was approved for 125\.000 VND/)).toBeInTheDocument()
+    expect(calls.find((call) => call.method === 'PUT' && call.path === '/refunds/7/review')?.body).toEqual({
+      approved: true,
+      amountApproved: 125000,
+      managerNote: 'Verified the cancellation timestamp.',
+    })
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Review refund RF-1040' })).not.toBeInTheDocument())
+    expect(calls.filter((call) => call.method === 'GET' && call.path === '/refunds/pending')).toHaveLength(2)
+  })
+
+  it('requires a rejection note and renders the rejected outcome', async () => {
+    const { calls } = transactionsApi()
+    renderApp('/manager/transactions')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Review refund RF-1040' }))
+    fireEvent.change(screen.getByLabelText('Decision'), { target: { value: 'REJECT' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Reject refund' }))
+    expect(screen.getByText('Enter a manager note for this decision.')).toBeInTheDocument()
+    expect(calls.some((call) => call.method === 'PUT')).toBe(false)
+
+    fireEvent.change(screen.getByLabelText(/Manager note/), { target: { value: 'Request does not match the cancellation policy.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Reject refund' }))
+
+    expect(await screen.findByText(/RF-1040 was rejected\. Manager note: Request does not match/)).toBeInTheDocument()
+    expect(calls.find((call) => call.method === 'PUT' && call.path === '/refunds/7/review')?.body).toEqual({
+      approved: false,
+      amountApproved: null,
+      managerNote: 'Request does not match the cancellation policy.',
+    })
+  })
+
+  it('does not invite a duplicate decision when the review response is uncertain', async () => {
+    const { calls } = transactionsApi({ uncertainReview: true })
+    renderApp('/manager/transactions')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Review refund RF-1040' }))
+    fireEvent.change(screen.getByLabelText(/Manager note/), { target: { value: 'Verified against the payment record.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Approve refund' }))
+
+    expect(await screen.findByText(/no longer in the pending queue, but its decision could not be confirmed/i)).toBeInTheDocument()
+    expect(calls.filter((call) => call.method === 'PUT' && call.path === '/refunds/7/review')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Review refund RF-1040' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the refund queue usable when the finance transaction endpoint is unavailable', async () => {
+    transactionsApi({ transactionError: true })
+    renderApp('/manager/transactions')
+
+    expect(await screen.findByText('Finance transaction endpoint is not available')).toBeInTheDocument()
+    expect(await screen.findByText('RF-1040')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Refund approval queue' })).toBeInTheDocument()
   })
 })
