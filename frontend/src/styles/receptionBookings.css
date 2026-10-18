@@ -1,0 +1,21 @@
+/* FE-10 receptionist member booking and assisted booking workflow. */
+.reception-bookings-page { gap: var(--space-5); min-width: 0; }
+.reception-booking-member { margin-bottom: var(--space-5); padding-bottom: var(--space-5); border-bottom: 1px solid var(--color-border); }
+.reception-booking-filters { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: var(--space-4); margin: var(--space-4) 0; }
+.reception-booking-filters .field { min-width: min(100%, 240px); }
+.reception-booking-week { margin: var(--space-4) 0; }
+.reception-booking-week strong { color: var(--color-text); }
+.reception-session-list { display: grid; gap: var(--space-3); }
+.reception-session-choice { display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); width: 100%; padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); text-align: left; cursor: pointer; }
+.reception-session-choice:hover:not(:disabled), .reception-session-choice--selected { border-color: var(--color-primary); background: var(--color-primary-soft); }
+.reception-session-choice:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.reception-session-choice:disabled { opacity: .65; cursor: not-allowed; }
+.reception-session-choice > span:first-child { display: grid; gap: var(--space-1); min-width: 0; }
+.reception-session-choice small { color: var(--color-text-muted); overflow-wrap: anywhere; }
+.reception-session-choice .badge { flex-shrink: 0; }
+.reception-bookings-page .booking-confirmation { justify-items: center; text-align: center; }
+.reception-bookings-page .booking-confirmation__facts { text-align: left; }
+@media (max-width: 640px) {
+  .reception-session-choice { align-items: flex-start; flex-direction: column; }
+  .reception-booking-filters { align-items: stretch; }
+}

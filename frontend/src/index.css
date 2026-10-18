@@ -5,3 +5,8 @@
 @import './styles/member.css';
 @import './styles/payments.css';
 @import './styles/reception.css';
+@import './styles/receptionBookings.css';
+@import './styles/coachSchedule.css';
+@import './styles/manager.css';
+@import './styles/managerSchedule.css';
+@import './styles/memberSchedule.css';

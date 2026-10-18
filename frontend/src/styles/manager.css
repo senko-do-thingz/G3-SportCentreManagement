@@ -1,0 +1,48 @@
+/* FE-06 uses the existing staff shell and Figma's blue and white panels. */
+.manager-page { gap: var(--space-5); }
+.manager-page .page-header { margin-bottom: var(--space-2); }
+.manager-page .page-header__title { letter-spacing: -0.035em; }
+.manager-preview { font-size: var(--text-sm); }
+.manager-preview strong { margin-right: var(--space-2); }
+.manager-filters { display: grid; grid-template-columns: minmax(200px, 2fr) repeat(2, minmax(130px, 1fr)) auto; align-items: end; gap: var(--space-3); margin-bottom: var(--space-6); }
+.manager-filters--activity { grid-template-columns: minmax(200px, 1.5fr) minmax(150px, 1fr) minmax(140px, 1fr); }
+.manager-filters .field { min-width: 0; }
+.manager-filters .field > .btn { width: 100%; justify-content: flex-start; white-space: normal; min-height: 42px; }
+.manager-cell { display: flex; flex-direction: column; gap: var(--space-1); overflow-wrap: anywhere; }
+.manager-cell strong, .manager-cell-primary { color: var(--color-text); font-size: var(--text-sm); }
+.manager-cell > span:not(.manager-cell-primary) { color: var(--color-text-muted); font-size: var(--text-xs); }
+.manager-row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.manager-row-actions .btn { white-space: nowrap; }
+.manager-row-actions .btn--danger { background: var(--color-danger-soft); color: var(--color-danger); border-color: transparent; }
+.manager-row-actions .btn--danger:hover:not(:disabled) { background: var(--color-danger); color: var(--color-text-inverse); }
+.manager-price, .manager-nowrap { white-space: nowrap; }
+.manager-price { font-size: var(--text-sm); }
+.manager-footnote { margin-top: var(--space-5); color: var(--color-text-muted); font-size: var(--text-xs); }
+.manager-form { display: flex; flex-direction: column; gap: var(--space-5); }
+.manager-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); border: 0; padding: 0; margin: 0; min-width: 0; }
+.manager-form-full { grid-column: 1 / -1; }
+.manager-form-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); padding-top: var(--space-2); }
+.manager-muted { color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.6; }
+.manager-sports { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-4); min-width: 0; }
+.manager-sports legend { font-size: var(--text-sm); font-weight: var(--weight-semibold); padding: 0 var(--space-2); }
+.manager-sport-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin-top: var(--space-3); }
+.manager-primary-sport { margin-left: var(--space-2); color: var(--color-primary); font-size: var(--text-xs); font-weight: var(--weight-semibold); }
+.manager-form input[readonly] { background: var(--color-surface-muted); color: var(--color-text-muted); }
+.manager-details { margin: 0; }
+.manager-details > div { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-5); padding: var(--space-3) 0; border-bottom: 1px solid var(--color-border); }
+.manager-details dt { color: var(--color-text-muted); font-size: var(--text-sm); flex-shrink: 0; }
+.manager-details dd { margin: 0; font-size: var(--text-sm); font-weight: var(--weight-medium); text-align: right; overflow-wrap: anywhere; min-width: 0; }
+.manager-detail-text { white-space: pre-wrap; overflow-wrap: anywhere; padding-top: var(--space-5); color: var(--color-text-muted); }
+.manager-tier-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+.manager-tier { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; padding: var(--space-6); }
+.manager-tier--featured { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary); }
+.manager-tier > .eyebrow { font-size: 0.625rem; margin-bottom: var(--space-5); }
+.manager-tier-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); width: 100%; margin-bottom: var(--space-5); }
+.manager-tier-heading h2 { font-size: var(--text-lg); }
+.manager-tier-price { font-size: var(--text-xl); font-weight: var(--weight-bold); letter-spacing: -0.025em; margin-bottom: var(--space-1); }
+.manager-benefits { list-style: disc; padding-left: var(--space-4); margin: var(--space-5) 0; display: grid; gap: var(--space-2); color: var(--color-text-muted); font-size: var(--text-xs); }
+.manager-tier-description { margin-bottom: var(--space-5); }
+.manager-tier > .btn, .manager-tier > .badge { margin-top: auto; }
+.manager-preview-login { display: grid; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-primary-soft); }
+@media (max-width: 1100px) { .manager-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .manager-tier-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .manager-filters, .manager-form-grid, .manager-tier-grid { grid-template-columns: minmax(0, 1fr); } .manager-form-full { grid-column: auto; } .manager-page .page-header__title { font-size: var(--text-2xl); } .manager-page .card { padding: var(--space-4); } .manager-details > div { gap: var(--space-3); } .manager-page .table { min-width: 780px; } .manager-sport-options { grid-template-columns: minmax(0, 1fr); } .manager-tier-heading { margin-bottom: var(--space-4); } }
