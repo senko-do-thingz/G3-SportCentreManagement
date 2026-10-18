@@ -47,7 +47,8 @@ public class ActivityLogIntegrationTest extends AbstractIntegrationTest {
     @Autowired AuditService audit;
     @Autowired JwtService jwt;
     @Autowired EntityManager em;
-    final String marker = "BE04_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+    // Reserve 902 for numeric search; non-hex x preserves the marker's uniqueness.
+    final String marker = "BE04_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).replace("902", "9x2");
     UserAccount manager;
     UserAccount member;
     UserAccount coach;
@@ -274,6 +275,18 @@ public class ActivityLogIntegrationTest extends AbstractIntegrationTest {
         assertThat(resultIds(byAction)).containsExactly(ids.get(5), ids.get(1), ids.get(0));
         var numeric = call(get(URL).with(user(new CustomUserDetails(manager))).param("actorId", member.getId().toString()).param("search", "902"), 200);
         assertThat(resultIds(numeric)).containsExactly(ids.get(1));
+    }
+
+    @ParameterizedTest @CsvSource({"BE04_numeric_control,false", "BE04_902_control,true"})
+    void numericSearchCombinesExactTargetIdWithEntityTypeText(String entityType, boolean textMatch) throws Exception {
+        jdbc.update("UPDATE activity_log SET entity_type=? WHERE entity_type=?", entityType, marker);
+        jdbc.update("UPDATE activity_log SET entity_id=1902 WHERE id=?", ids.get(2));
+        em.clear();
+        var result = call(get(URL).with(user(new CustomUserDetails(manager)))
+                .param("actorId", member.getId().toString()).param("search", "902"), 200);
+        var indexes = textMatch ? List.of(5, 2, 1, 0) : List.of(1);
+        assertThat(resultIds(result)).containsExactlyElementsOf(indexes.stream().map(ids::get).toList());
+        assertThat(result.path("totalElements").asInt()).isEqualTo(indexes.size());
     }
 
     @ParameterizedTest @ValueSource(strings = {"%", "_", "[", "\\", "' OR 1=1 --", "999999999999999999999999"})

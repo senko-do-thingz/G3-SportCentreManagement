@@ -1,3 +1,8 @@
+## 2026-10-19 - Activity Log Search Test Reliability (BE-04)
+
+- Exclude the reserved numeric search token from the unique Activity Log test marker. Preserve production search and authorization behavior.
+- Add controlled numeric-ID and entity-type text collision regressions, including a non-exact numeric target. SQL Server execution remains required in CI.
+
 ## 2026-10-17 - Frontend Authentication Maintenance (FE-00)
 
 - Header follow-up: isolate the authenticated member header from the receptionist member-summary CSS collision, restoring left-aligned navigation and the user section at the right of its bar. Preserve responsive navigation and receipt-print hiding. Add two style regressions; lint, all 617 tests in 31 files and production build pass. Desktop browser verification remains pending because browser automation is unavailable.
