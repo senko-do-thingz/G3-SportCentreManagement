@@ -1,6 +1,8 @@
-import { screen } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '../../api/errors'
+import { memberBookingsApi } from '../../api/memberBookingsApi'
 import type { MemberBookingRecord } from '../../api/memberBookingsApi'
 import type { SessionDetail } from '../../api/memberSessionsApi'
 import { tokenStorage } from '../../api/tokenStorage'
@@ -256,5 +258,281 @@ describe('FE-09 member booking screens', () => {
     renderApp('/member/bookings')
     expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
     expect(backend.calls.every((call) => call.path === '/users/me')).toBe(true)
+  })
+})
+
+function deferredResponse() {
+  let resolve!: (response: Response) => void
+  const promise = new Promise<Response>((settle) => { resolve = settle })
+  return { promise, resolve }
+}
+
+// Use the real API client and both history filters, including the result page read.
+function cancellationBackend(outcome: () => Response | Promise<Response>, history?: () => Response | Promise<Response>) {
+  let attempted = false
+  return api((call) => {
+    if (call.method === 'DELETE' && call.path === '/bookings/21') {
+      attempted = true
+      return outcome()
+    }
+    if (call.path === '/bookings/my?when=UPCOMING') return json(200, attempted ? [] : [booking])
+    if (call.path === '/bookings/my?when=PAST') return attempted ? (history?.() ?? json(200, [cancelled])) : json(200, [])
+    if (call.path === '/packages/registrations/my') return json(200, [registration])
+    return backendError(404, 'Unexpected request')
+  })
+}
+
+async function submitCancellation() {
+  const user = userEvent.setup()
+  renderApp('/member/bookings/21/cancel')
+  await user.click(await screen.findByRole('button', { name: 'Confirm cancellation' }))
+  return user
+}
+
+function expectOneDelete(backend: ReturnType<typeof api>) {
+  expect(backend.calls.filter((call) => call.method === 'DELETE')).toHaveLength(1)
+}
+
+describe('FE-09 cancellation reconciliation regressions', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it.each([408, 500, 503])('reconciles committed cancellation after HTTP %i with exactly one DELETE', async (status) => {
+    const backend = cancellationBackend(() => backendError(status, 'Response lost'))
+    await submitCancellation()
+    expect(await screen.findByRole('heading', { name: 'Booking cancelled' })).toBeInTheDocument()
+    expectOneDelete(backend)
+    // Initial ownership lookup, reconciliation and independent result verification.
+    expect(backend.calls.filter((call) => call.path === '/bookings/my?when=PAST')).toHaveLength(3)
+    expect(backend.calls.filter((call) => call.path === '/bookings/my?when=UPCOMING')).toHaveLength(3)
+  })
+
+  it.each(['transport', 'api-zero', 'malformed', 'missing', 'non-cancelled', 'wrong-booking', 'wrong-member', 'plain-error'])(
+    'reconciles %s DELETE responses against authoritative history', async (kind) => {
+      const backend = cancellationBackend(() => {
+        if (kind === 'transport') throw new TypeError('Network response lost')
+        if (kind === 'malformed') return json(200, { status: 'CANCELLED' })
+        if (kind === 'missing') return new Response(null, { status: 204 })
+        if (kind === 'non-cancelled') return json(200, booking)
+        if (kind === 'wrong-booking') return json(200, { ...cancelled, id: 99 })
+        if (kind === 'wrong-member') return json(200, { ...cancelled, memberId: 99 })
+        return json(200, cancelled)
+      })
+      if (kind === 'api-zero' || kind === 'plain-error') {
+        vi.spyOn(memberBookingsApi, 'cancel').mockRejectedValueOnce(kind === 'api-zero' ? new ApiError(0, 'Response lost') : new Error('Transport failed'))
+        // The mock bypasses fetch; use real history requests for reconciliation and verification.
+        vi.spyOn(memberBookingsApi, 'findMine').mockResolvedValueOnce(booking)
+        backend.fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+          const url = String(input)
+          if (url.includes('when=PAST')) return json(200, [cancelled])
+          if (url.includes('when=UPCOMING')) return json(200, [])
+          if (url.includes('/users/me')) return json(200, MEMBER)
+          return json(200, [registration])
+        })
+      }
+      await submitCancellation()
+      expect(await screen.findByRole('heading', { name: 'Booking cancelled' })).toBeInTheDocument()
+      if (kind === 'api-zero' || kind === 'plain-error') expect(memberBookingsApi.cancel).toHaveBeenCalledTimes(1)
+      else {
+        expectOneDelete(backend)
+        expect(backend.calls.filter((call) => call.path === '/bookings/my?when=PAST')).toHaveLength(3)
+      }
+    },
+  )
+
+  it('keeps DELETE locked after a 408 and failed history, prevents overlapping checks, then verifies recovery', async () => {
+    let checks = 0
+    const pending = deferredResponse()
+    const backend = cancellationBackend(() => backendError(408, 'Response lost'), () => {
+      checks += 1
+      if (checks === 1) return backendError(503, 'History unavailable')
+      return checks === 2 ? pending.promise : json(200, [cancelled])
+    })
+    const user = await submitCancellation()
+    expect(await screen.findByText('Cancellation outcome unknown')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirm cancellation' })).toBeDisabled()
+    const check = screen.getByRole('button', { name: 'Check cancellation status' })
+    await user.dblClick(check)
+    expect(check).toBeDisabled()
+    expect(checks).toBe(2)
+    expectOneDelete(backend)
+    await act(async () => pending.resolve(json(200, [cancelled])))
+    expect(await screen.findByRole('heading', { name: 'Booking cancelled' })).toBeInTheDocument()
+    expectOneDelete(backend)
+  })
+
+  it.each(['missing', 'wrong-member', 'wrong-booking', 'malformed'])(
+    'keeps outcome unknown for %s history without enabling a blind DELETE', async (kind) => {
+      const row = kind === 'wrong-member' ? { ...cancelled, memberId: 99 } : { ...cancelled, id: 99 }
+      const backend = cancellationBackend(() => backendError(408, 'Response lost'), () => json(200, kind === 'missing' ? [] : kind === 'malformed' ? [{}] : [row]))
+      await submitCancellation()
+      expect(await screen.findByText('Cancellation outcome unknown')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Confirm cancellation' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Check cancellation status' })).toBeEnabled()
+      expect(screen.queryByText('Booking not cancelled')).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Booking cancelled' })).not.toBeInTheDocument()
+      expectOneDelete(backend)
+    },
+  )
+
+  it.each([false, true])('requires explicit cancellation after a fresh CONFIRMED lookup (manual recovery: %s)', async (manual) => {
+    let checks = 0
+    let deletes = 0
+    const backend = cancellationBackend(() => {
+      deletes += 1
+      return deletes === 1 ? backendError(408, 'Response lost') : json(200, cancelled)
+    }, () => {
+      checks += 1
+      if (manual && checks === 1) return backendError(503, 'History unavailable')
+      return json(200, [deletes === 1 ? { ...booking, facilityName: 'Updated Court' } : cancelled])
+    })
+    const user = await submitCancellation()
+    if (manual) {
+      expect(await screen.findByText('Cancellation outcome unknown')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Check cancellation status' }))
+    }
+    expect(await screen.findByText('Booking currently confirmed')).toBeInTheDocument()
+    expect(screen.getByText('Updated Court')).toBeInTheDocument()
+    expectOneDelete(backend)
+    await user.click(screen.getByRole('button', { name: 'Try cancellation again' }))
+    expect(await screen.findByRole('heading', { name: 'Booking cancelled' })).toBeInTheDocument()
+    expect(deletes).toBe(2)
+  })
+
+  it.each([400, 403, 404, 409, 422])('shows definitive HTTP %i rejection without success or unsupported resubmission', async (status) => {
+    const backend = cancellationBackend(() => backendError(status, 'Cancellation rejected by booking policy'))
+    await submitCancellation()
+    expect(await screen.findByText('Cancellation rejected by booking policy')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirm cancellation' })).toBeDisabled()
+    expect(screen.queryByRole('heading', { name: 'Booking cancelled' })).not.toBeInTheDocument()
+    expect(backend.calls.filter((call) => call.path === '/bookings/my?when=PAST')).toHaveLength(1)
+    expectOneDelete(backend)
+  })
+
+  it.each([true, false])('verifies ALREADY_CANCELLED from BE-12 HTTP 400 (history agrees: %s)', async (agrees) => {
+    const backend = cancellationBackend(() => json(400, { message: 'Booking is already cancelled', code: 'ALREADY_CANCELLED' }), () => json(200, agrees ? [cancelled] : []))
+    await submitCancellation()
+    if (agrees) expect(await screen.findByRole('heading', { name: 'Booking cancelled' })).toBeInTheDocument()
+    else {
+      expect(await screen.findByText('Cancellation outcome unknown')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Confirm cancellation' })).toBeDisabled()
+    }
+    expectOneDelete(backend)
+  })
+
+  it('lets the existing auth client end a rejected session after HTTP 401 without retrying DELETE', async () => {
+    const backend = api((call) => {
+      if (call.path === '/bookings/my?when=UPCOMING') return json(200, [booking])
+      if (call.path === '/bookings/my?when=PAST') return json(200, [])
+      if (call.method === 'DELETE' || call.path === '/auth/refresh') return backendError(401, 'Session rejected')
+      return backendError(404, 'Unexpected request')
+    })
+    await submitCancellation()
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Booking cancelled' })).not.toBeInTheDocument()
+    expectOneDelete(backend)
+  })
+
+  it('does not claim success when the result page cannot verify a normal DELETE response', async () => {
+    const backend = cancellationBackend(() => json(200, cancelled), () => json(200, [booking]))
+    await submitCancellation()
+    expect(await screen.findByRole('heading', { name: 'Cancellation not confirmed' })).toBeInTheDocument()
+    expect(backend.calls.filter((call) => call.path === '/bookings/my?when=PAST')).toHaveLength(2)
+    expectOneDelete(backend)
+  })
+
+  it('blocks rapid double submission while a lost DELETE response is pending', async () => {
+    const pending = deferredResponse()
+    const backend = cancellationBackend(() => pending.promise)
+    const user = userEvent.setup()
+    renderApp('/member/bookings/21/cancel')
+    await user.dblClick(await screen.findByRole('button', { name: 'Confirm cancellation' }))
+    expectOneDelete(backend)
+    await act(async () => pending.resolve(backendError(408, 'Response lost')))
+    expect(await screen.findByRole('heading', { name: 'Booking cancelled' })).toBeInTheDocument()
+    expectOneDelete(backend)
+  })
+
+  it.each(['delete', 'reconciliation'])('ignores old %s results when the booking route changes', async (stage) => {
+    const pending = deferredResponse()
+    const backend = cancellationBackend(() => stage === 'delete' ? pending.promise : backendError(408, 'Response lost'), () => pending.promise)
+    const user = await submitCancellation()
+    if (stage === 'reconciliation') await waitFor(() => expect(backend.calls.filter((call) => call.path.includes('when=PAST'))).toHaveLength(2))
+    await user.click(screen.getByRole('link', { name: 'Keep booking' }))
+    expect(await screen.findByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
+    if (stage === 'reconciliation') {
+      const historyFetch = backend.fetchMock.mock.calls.findLast(([input]) => String(input).includes('when=PAST'))
+      expect(historyFetch?.[1]?.signal?.aborted).toBe(true)
+    }
+    await act(async () => pending.resolve(stage === 'delete' ? json(200, cancelled) : json(200, [cancelled])))
+    expect(screen.getByRole('heading', { name: 'My Bookings' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Booking cancelled' })).not.toBeInTheDocument()
+    expectOneDelete(backend)
+  })
+
+  it('does not navigate to the old success page after opening a different booking cancellation', async () => {
+    const pending = deferredResponse()
+    const otherBooking = { ...booking, id: 22, bookingCode: 'BK-1022', className: 'Other Session' }
+    const backend = api((call) => {
+      if (call.method === 'DELETE') return pending.promise
+      if (call.path === '/bookings/my?when=UPCOMING') return json(200, [booking, otherBooking])
+      if (call.path === '/bookings/my?when=PAST') return json(200, [])
+      return backendError(404, 'Unexpected request')
+    })
+    const user = await submitCancellation()
+    await user.click(screen.getByRole('link', { name: 'Keep booking' }))
+    const links = await screen.findAllByRole('link', { name: 'Cancel booking' })
+    await user.click(links.find((link) => link.getAttribute('href') === '/member/bookings/22/cancel')!)
+    expect(await screen.findByText('BK-1022')).toBeInTheDocument()
+    await act(async () => pending.resolve(json(200, cancelled)))
+    expect(screen.getByRole('heading', { name: 'Cancel booking' })).toBeInTheDocument()
+    expect(screen.getByText('BK-1022')).toBeInTheDocument()
+    expect(screen.queryByText('BK-1021')).not.toBeInTheDocument()
+    expectOneDelete(backend)
+  })
+
+  it.each(['delete', 'reconciliation'])('discards old %s results during a cross-tab account switch with a pending new profile', async (stage) => {
+    const pending = deferredResponse()
+    const profile = deferredResponse()
+    let attempted = false
+    let switched = false
+    const backend = installFakeFetch((call) => {
+      if (call.path === '/users/me') return switched ? profile.promise : json(200, MEMBER)
+      if (call.method === 'DELETE') {
+        attempted = true
+        return stage === 'delete' ? pending.promise : backendError(408, 'Response lost')
+      }
+      if (call.path === '/bookings/my?when=UPCOMING') return json(200, !attempted ? [booking] : [])
+      if (call.path === '/bookings/my?when=PAST') return attempted ? pending.promise : json(200, [])
+      return json(200, [])
+    })
+    await submitCancellation()
+    if (stage === 'reconciliation') await waitFor(() => expect(backend.calls.filter((call) => call.path.includes('when=PAST'))).toHaveLength(2))
+    const oldSession = tokenStorage.getSessionId()
+    switched = true
+    act(() => {
+      localStorage.setItem(tokenStorage.accessKey, 'other-member-test')
+      localStorage.setItem(tokenStorage.refreshKey, 'other-refresh-test')
+      localStorage.setItem(tokenStorage.sessionKey, 'other-session-test')
+      window.dispatchEvent(new StorageEvent('storage', { key: tokenStorage.sessionKey, oldValue: oldSession, newValue: 'other-session-test' }))
+    })
+    const historyBefore = backend.calls.filter((call) => call.path.startsWith('/bookings/my')).length
+    await act(async () => pending.resolve(stage === 'delete' ? json(200, cancelled) : json(200, [cancelled])))
+    expect(backend.calls.filter((call) => call.path.startsWith('/bookings/my'))).toHaveLength(historyBefore)
+    expect(screen.queryByRole('heading', { name: 'Booking cancelled' })).not.toBeInTheDocument()
+    await act(async () => profile.resolve(json(200, OTHER_MEMBER)))
+    expect(await screen.findByRole('status', { name: 'Account switched' })).toHaveTextContent('Alex Other')
+    expect(screen.queryByText('BK-1021')).not.toBeInTheDocument()
+    expectOneDelete(backend)
+  })
+
+  it('prevents same-tick DELETE duplication before React disables the button', async () => {
+    const pending = deferredResponse()
+    const backend = cancellationBackend(() => pending.promise)
+    renderApp('/member/bookings/21/cancel')
+    const button = await screen.findByRole('button', { name: 'Confirm cancellation' })
+    act(() => { fireEvent.click(button); fireEvent.click(button) })
+    expectOneDelete(backend)
+    await act(async () => pending.resolve(json(200, cancelled)))
+    expect(await screen.findByRole('heading', { name: 'Booking cancelled' })).toBeInTheDocument()
   })
 })
