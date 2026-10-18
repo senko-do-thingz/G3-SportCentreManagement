@@ -38,8 +38,14 @@ interface CancellationTarget {
   booking: MemberBookingRecord
 }
 
+/**
+ * True only for 4xx responses that mean the backend definitively rejected the mutation.
+ * HTTP 408 Request Timeout is excluded: the server may have committed the booking or the
+ * cancellation before the timeout was reported, so the caller must reconcile member booking
+ * history instead of announcing a failure or inviting a blind retry of POST or DELETE.
+ */
 function isDefinitiveMutationRejection(error: unknown): boolean {
-  return error instanceof ApiError && error.status >= 400 && error.status < 500
+  return error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 408
 }
 
 export function ReceptionBookingsPage() {

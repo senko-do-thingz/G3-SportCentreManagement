@@ -408,3 +408,287 @@ describe('FE-10 receptionist booking screens', () => {
     expect(calls.every((call) => call.method !== 'POST' || call.path !== '/bookings')).toBe(true)
   })
 })
+
+const RECONCILIATION_READ = '/bookings/member/2?when=UPCOMING&page=0&size=100'
+
+function writes(calls: RecordedCall[], method: 'POST' | 'DELETE') {
+  return calls.filter((call) => call.method === method && call.path.startsWith('/bookings'))
+}
+
+function reconciliationReads(calls: RecordedCall[]) {
+  return calls.filter((call) => call.method === 'GET' && call.path.startsWith('/bookings/member/') && call.path.includes('size=100'))
+}
+
+async function submitAssistedBooking(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('radio', { name: /Basketball Foundations/ }))
+  await user.click(await screen.findByRole('button', { name: 'Confirm booking' }))
+}
+
+async function confirmMemberCancellation(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: 'Cancel booking' }))
+  await user.click(within(screen.getByRole('dialog', { name: 'Cancel member booking' })).getByRole('button', { name: 'Confirm cancellation' }))
+}
+
+async function settle() {
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)) })
+}
+
+describe('FE-10 HTTP 408 mutation reconciliation', () => {
+  it('confirms a booking committed before an HTTP 408 only after member history verifies it', async () => {
+    const { calls } = setup((call, setCurrentBooking) => {
+      if (call.method === 'POST' && call.path === '/bookings') {
+        setCurrentBooking(booking)
+        return backendError(408, 'Request Timeout')
+      }
+      return undefined
+    }, null)
+    const user = userEvent.setup()
+    renderApp('/reception/bookings/new?memberId=2&q=Taylor&week=2026-10-19')
+
+    await submitAssistedBooking(user)
+
+    expect(await screen.findByRole('heading', { name: 'Booking Confirmed' })).toBeInTheDocument()
+    expect(screen.getByText('Taylor Nguyen')).toBeInTheDocument()
+    expect(screen.getByText(/BK-1021/)).toBeInTheDocument()
+    expect(screen.queryByText('Booking not completed')).not.toBeInTheDocument()
+    expect(screen.queryByText('Request Timeout')).not.toBeInTheDocument()
+    expect(writes(calls, 'POST').map((call) => call.body)).toEqual([{ memberId: 2, sessionId: 5, packageRegistrationId: 11 }])
+    expect(calls.some((call) => call.path === RECONCILIATION_READ)).toBe(true)
+    expect(reconciliationReads(calls).every((call) => call.path.startsWith('/bookings/member/2?'))).toBe(true)
+  })
+
+  it.each([
+    ['a 5xx response', () => backendError(503, 'History unavailable')],
+    ['a network failure', () => { throw new Error('Connection lost during reconciliation') }],
+  ])('keeps an HTTP 408 booking unverified and locked when the history read fails with %s', async (_label, historyFailure) => {
+    const { calls } = setup((call) => {
+      if (call.method === 'POST' && call.path === '/bookings') return backendError(408, 'Request Timeout')
+      if (call.method === 'GET' && call.path.startsWith('/bookings/member/2')) return historyFailure()
+      return undefined
+    }, null)
+    const user = userEvent.setup()
+    renderApp('/reception/bookings/new?memberId=2&week=2026-10-19')
+
+    await submitAssistedBooking(user)
+
+    expect(await screen.findByText('Booking outcome not verified')).toBeInTheDocument()
+    expect(screen.getByText(/The booking outcome could not be verified/)).toBeInTheDocument()
+    expect(screen.queryByText('Booking not completed')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Booking Confirmed' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirm booking' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /retry/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Check member bookings' })).toHaveAttribute('href', '/reception/bookings?memberId=2&q=')
+    expect(calls.some((call) => call.path === RECONCILIATION_READ)).toBe(true)
+    await settle()
+    expect(writes(calls, 'POST')).toHaveLength(1)
+  })
+
+  it('does not confirm an HTTP 408 booking when member history has no authoritative match', async () => {
+    const cancelledSameSession = { ...booking, id: 30, bookingCode: 'BK-1030', status: 'CANCELLED' as const }
+    const confirmedOtherSession = { ...booking, id: 31, bookingCode: 'BK-1031', sessionId: 6 }
+    const confirmedOtherPackage = { ...booking, id: 32, bookingCode: 'BK-1032', packageRegistrationId: 12 }
+    const { calls } = setup((call) => {
+      if (call.method === 'POST' && call.path === '/bookings') return backendError(408, 'Request Timeout')
+      if (call.method === 'GET' && call.path.startsWith('/bookings/member/2')) {
+        return json(200, { content: [cancelledSameSession, confirmedOtherSession, confirmedOtherPackage], page: 0, size: 100, totalElements: 3, totalPages: 1 })
+      }
+      return undefined
+    }, null)
+    const user = userEvent.setup()
+    renderApp('/reception/bookings/new?memberId=2&week=2026-10-19')
+
+    await submitAssistedBooking(user)
+
+    expect(await screen.findByText('Booking outcome not verified')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Booking Confirmed' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Booking not completed')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirm booking' })).toBeDisabled()
+    expect(calls.some((call) => call.path === RECONCILIATION_READ)).toBe(true)
+    expect(calls.some((call) => call.path === '/bookings/member/2?when=PAST&page=0&size=100')).toBe(true)
+    await settle()
+    expect(writes(calls, 'POST')).toHaveLength(1)
+  })
+
+  it('reports a cancellation committed before an HTTP 408 only after member history shows CANCELLED', async () => {
+    const { calls } = setup((call, setCurrentBooking) => {
+      if (call.method === 'DELETE' && call.path === '/bookings/21') {
+        setCurrentBooking({ ...booking, status: 'CANCELLED', cancelledAt: '2026-10-17T10:30:00' })
+        return backendError(408, 'Request Timeout')
+      }
+      return undefined
+    })
+    const user = userEvent.setup()
+    renderApp('/reception/bookings?memberId=2')
+
+    await confirmMemberCancellation(user)
+
+    expect(await screen.findByText(/BK-1021 is now cancelled/)).toBeInTheDocument()
+    expect(screen.queryByText('Cancellation was rejected')).not.toBeInTheDocument()
+    expect(screen.queryByText('Request Timeout')).not.toBeInTheDocument()
+    expect(screen.queryByText('Cancellation outcome not verified')).not.toBeInTheDocument()
+    expect(writes(calls, 'DELETE').map((call) => call.path)).toEqual(['/bookings/21'])
+    expect(calls.some((call) => call.path === RECONCILIATION_READ)).toBe(true)
+    expect(reconciliationReads(calls).every((call) => call.path.startsWith('/bookings/member/2?'))).toBe(true)
+  })
+
+  it('keeps an HTTP 408 cancellation unverified when the history read fails and never repeats DELETE', async () => {
+    let failReconciliation = true
+    const { calls } = setup((call, setCurrentBooking) => {
+      if (call.method === 'DELETE' && call.path === '/bookings/21') {
+        setCurrentBooking({ ...booking, status: 'CANCELLED', cancelledAt: '2026-10-17T10:30:00' })
+        return backendError(408, 'Request Timeout')
+      }
+      if (failReconciliation && call.path.startsWith('/bookings/member/2') && call.path.includes('size=100')) {
+        return backendError(503, 'History unavailable')
+      }
+      return undefined
+    })
+    const user = userEvent.setup()
+    renderApp('/reception/bookings?memberId=2')
+
+    await confirmMemberCancellation(user)
+
+    expect(await screen.findByText('Cancellation outcome not verified')).toBeInTheDocument()
+    expect(screen.queryByText('Cancellation was rejected')).not.toBeInTheDocument()
+    expect(screen.queryByText(/is now cancelled/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Cancel member booking' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel booking' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Check booking status' })).toBeEnabled()
+    await settle()
+    expect(writes(calls, 'DELETE')).toHaveLength(1)
+
+    failReconciliation = false
+    await user.click(screen.getByRole('button', { name: 'Check booking status' }))
+    expect(await screen.findByText(/BK-1021 is now cancelled/)).toBeInTheDocument()
+    expect(screen.queryByText('Cancellation outcome not verified')).not.toBeInTheDocument()
+    expect(writes(calls, 'DELETE')).toHaveLength(1)
+  })
+
+  it('reports the observed CONFIRMED status after an HTTP 408 cancellation without claiming a rejection', async () => {
+    const { calls } = setup((call) => call.method === 'DELETE' && call.path === '/bookings/21' ? backendError(408, 'Request Timeout') : undefined)
+    const user = userEvent.setup()
+    renderApp('/reception/bookings?memberId=2')
+
+    await confirmMemberCancellation(user)
+
+    expect(await screen.findByText('Booking remains confirmed')).toBeInTheDocument()
+    expect(screen.getByText(/latest member history still shows this booking as confirmed/)).toBeInTheDocument()
+    expect(screen.queryByText('Cancellation was rejected')).not.toBeInTheDocument()
+    expect(screen.queryByText('Request Timeout')).not.toBeInTheDocument()
+    expect(screen.queryByText(/is now cancelled/)).not.toBeInTheDocument()
+    expect(calls.some((call) => call.path === RECONCILIATION_READ)).toBe(true)
+    await settle()
+    expect(writes(calls, 'DELETE')).toHaveLength(1)
+  })
+
+  it.each([
+    [400, 'Session is no longer bookable', undefined],
+    [403, 'You do not have permission to book for this member', undefined],
+    [404, 'Package registration not found', undefined],
+    [409, 'This session has just filled up.', 'FULL'],
+    [409, 'The member already has a booking for this session.', 'ALREADY_BOOKED'],
+  ])('keeps a definitive HTTP %i booking rejection without reconciliation or success (%s)', async (status, message, code) => {
+    const { calls } = setup((call) => call.method === 'POST' && call.path === '/bookings'
+      ? json(status, { timestamp: '2026-10-12T10:00:00', status, message, ...(code ? { code } : {}) })
+      : undefined, null)
+    const user = userEvent.setup()
+    renderApp('/reception/bookings/new?memberId=2&week=2026-10-19')
+
+    await submitAssistedBooking(user)
+
+    expect(await screen.findByText('Booking not completed')).toBeInTheDocument()
+    expect(screen.getByText(message)).toBeInTheDocument()
+    expect(screen.queryByText('Booking outcome not verified')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Booking Confirmed' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirm booking' })).toBeEnabled()
+    expect(reconciliationReads(calls)).toHaveLength(0)
+    expect(writes(calls, 'POST')).toHaveLength(1)
+  })
+
+  it.each([
+    [400, 'Booking can no longer be cancelled after the cutoff'],
+    [403, 'You do not have permission to cancel this booking'],
+    [404, 'Booking not found'],
+    [409, 'Booking is already cancelled'],
+  ])('keeps a definitive HTTP %i cancellation rejection without reconciliation or success', async (status, message) => {
+    const { calls } = setup((call) => call.method === 'DELETE' && call.path === '/bookings/21' ? backendError(status, message) : undefined)
+    const user = userEvent.setup()
+    renderApp('/reception/bookings?memberId=2')
+
+    await confirmMemberCancellation(user)
+
+    expect(await screen.findByText('Cancellation was rejected')).toBeInTheDocument()
+    expect(screen.getByText(message)).toBeInTheDocument()
+    expect(screen.queryByText(/is now cancelled/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Cancellation outcome not verified')).not.toBeInTheDocument()
+    expect(reconciliationReads(calls)).toHaveLength(0)
+    expect(writes(calls, 'DELETE')).toHaveLength(1)
+  })
+
+  it('ignores member A HTTP 408 booking reconciliation after switching to member B', async () => {
+    let completeMemberAHistory!: (response: Response) => void
+    const pendingMemberAHistory = new Promise<Response>((resolve) => { completeMemberAHistory = resolve })
+    const { calls } = setup((call, setCurrentBooking) => {
+      if (call.method === 'POST' && call.path === '/bookings') {
+        setCurrentBooking(booking)
+        return backendError(408, 'Request Timeout')
+      }
+      if (call.path.startsWith('/bookings/member/2') && call.path.includes('size=100')) return pendingMemberAHistory
+      return undefined
+    }, null)
+    const user = userEvent.setup()
+    renderWithMemberSwitch(
+      '/reception/bookings/new?memberId=2&week=2026-10-19',
+      '/reception/bookings/new?memberId=3&q=Alex&week=2026-10-19&sessionId=5',
+    )
+
+    await submitAssistedBooking(user)
+    await waitFor(() => expect(calls.some((call) => call.path === RECONCILIATION_READ)).toBe(true))
+    await user.click(screen.getByRole('button', { name: 'Switch member' }))
+    expect(await screen.findByText('Alex Tran')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Confirm booking' })).toBeEnabled()
+
+    await act(async () => {
+      completeMemberAHistory(json(200, { content: [booking], page: 0, size: 100, totalElements: 1, totalPages: 1 }))
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+    expect(screen.queryByRole('heading', { name: 'Booking Confirmed' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Booking outcome not verified')).not.toBeInTheDocument()
+    expect(screen.queryByText('Taylor Nguyen')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirm booking' })).toBeEnabled()
+    expect(writes(calls, 'POST').map((call) => call.body)).toEqual([{ memberId: 2, sessionId: 5, packageRegistrationId: 11 }])
+  })
+
+  it('ignores member A HTTP 408 cancellation reconciliation after switching to member B', async () => {
+    let completeMemberAHistory!: (response: Response) => void
+    const pendingMemberAHistory = new Promise<Response>((resolve) => { completeMemberAHistory = resolve })
+    const cancelled = { ...booking, status: 'CANCELLED' as const, cancelledAt: '2026-10-17T10:30:00' }
+    const { calls } = setup((call, setCurrentBooking) => {
+      if (call.method === 'DELETE' && call.path === '/bookings/21') {
+        setCurrentBooking(cancelled)
+        return backendError(408, 'Request Timeout')
+      }
+      if (call.path.startsWith('/bookings/member/2') && call.path.includes('size=100')) return pendingMemberAHistory
+      return undefined
+    })
+    const user = userEvent.setup()
+    renderWithMemberSwitch('/reception/bookings?memberId=2&q=Taylor', '/reception/bookings?memberId=3&q=Alex')
+
+    await confirmMemberCancellation(user)
+    await waitFor(() => expect(calls.some((call) => call.path === RECONCILIATION_READ)).toBe(true))
+    await user.click(screen.getByRole('button', { name: 'Switch member' }))
+    expect(await screen.findByText('Alex Tran')).toBeInTheDocument()
+    expect(await screen.findByText('No upcoming bookings')).toBeInTheDocument()
+
+    await act(async () => {
+      completeMemberAHistory(json(200, { content: [cancelled], page: 0, size: 100, totalElements: 1, totalPages: 1 }))
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+    expect(screen.queryByRole('dialog', { name: 'Cancel member booking' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/is now cancelled/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Booking remains confirmed')).not.toBeInTheDocument()
+    expect(screen.queryByText('Cancellation outcome not verified')).not.toBeInTheDocument()
+    expect(screen.queryByText('Cancellation was rejected')).not.toBeInTheDocument()
+    expect(writes(calls, 'DELETE').map((call) => call.path)).toEqual(['/bookings/21'])
+  })
+})
