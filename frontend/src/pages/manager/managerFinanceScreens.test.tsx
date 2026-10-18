@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { renderApp } from '../../test/renderApp'
 import { backendError, installFakeFetch, json, MANAGER, MEMBER } from '../../test/fakeBackend'
 import { tokenStorage } from '../../api/tokenStorage'
+import { revenueReportToCsv } from './managerRevenueCsv'
 
 const overview = {
   paymentsCollected: 16110000,
@@ -44,6 +45,16 @@ const pendingRefund = {
   status: 'PENDING',
   createdAt: '2026-10-17T10:00:00',
 }
+const revenueReport = {
+  from: '2026-10-01',
+  to: '2026-10-31',
+  groupBy: 'SPORT' as const,
+  totals: { collected: 16110000, refunded: 150000, netCollected: 15960000 },
+  rows: [
+    { category: 'Football', collected: 7200000, refunded: 0, netCollected: 7200000 },
+    { category: 'Tennis', collected: 8900000, refunded: 150000, netCollected: 8750000 },
+  ],
+}
 
 function financeApi(user = MANAGER) {
   tokenStorage.startSession({ accessToken: 'finance-manager-token', refreshToken: 'finance-refresh-token' })
@@ -82,6 +93,7 @@ function transactionsApi(options: { refundRows?: typeof pendingRefund[]; transac
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
+  vi.restoreAllMocks()
 })
 
 describe('FE-13 financial overview', () => {
@@ -200,5 +212,78 @@ describe('FE-13 transaction ledger and refund review', () => {
     expect(await screen.findByText('Finance transaction endpoint is not available')).toBeInTheDocument()
     expect(await screen.findByText('RF-1040')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Refund approval queue' })).toBeInTheDocument()
+  })
+})
+
+describe('FE-13 revenue reports and CSV export', () => {
+  function revenueApi() {
+    tokenStorage.startSession({ accessToken: 'finance-manager-token', refreshToken: 'finance-refresh-token' })
+    return installFakeFetch((call) => {
+      if (call.path === '/users/me') return json(200, MANAGER)
+      if (call.path === '/sports') return json(200, [{ id: 3, code: 'FT', name: 'Football', venueType: 'FIELD', description: null, imageUrl: null, displayOrder: 1 }])
+      if (call.path.startsWith('/manager/finance/revenue')) return json(200, revenueReport)
+      return backendError(404, `Unexpected request: ${call.method} ${call.path}`)
+    })
+  }
+
+  it('loads the grouped report for URL date and sport filters with exact API totals', async () => {
+    const { calls } = revenueApi()
+    renderApp('/manager/reports?from=2026-10-01&to=2026-10-31&groupBy=SPORT&sportId=3')
+
+    const totals = await screen.findByRole('region', { name: 'Revenue report totals' })
+    expect(within(totals).getByText('16.110.000 VND')).toBeInTheDocument()
+    expect(within(totals).getByText('150.000 VND')).toBeInTheDocument()
+    expect(within(totals).getByText('15.960.000 VND')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /revenue by category/i })).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Revenue report by category' })).toBeInTheDocument()
+    expect(calls.some((call) => call.path === '/manager/finance/revenue?from=2026-10-01&to=2026-10-31&groupBy=SPORT&sportId=3')).toBe(true)
+  })
+
+  it('updates the report request when grouping and sport filters change', async () => {
+    const { calls } = revenueApi()
+    renderApp('/manager/reports?from=2026-10-01&to=2026-10-31')
+    await screen.findByRole('table', { name: 'Revenue report by category' })
+
+    fireEvent.change(screen.getByLabelText('Group by'), { target: { value: 'SPORT' } })
+    fireEvent.change(await screen.findByLabelText('Sport'), { target: { value: '3' } })
+
+    await waitFor(() => expect(calls.some((call) => call.path === '/manager/finance/revenue?from=2026-10-01&to=2026-10-31&groupBy=SPORT&sportId=3')).toBe(true))
+  })
+
+  it('downloads a date-named CSV and reports that export is ready', async () => {
+    const { calls } = revenueApi()
+    const NativeURL = URL
+    const createObjectURL = vi.fn((blob: Blob) => {
+      expect(blob.type).toBe('text/csv;charset=utf-8')
+      return 'blob:finance-report'
+    })
+    const revokeObjectURL = vi.fn()
+    class URLWithBlobDownload extends NativeURL {
+      static createObjectURL = createObjectURL
+      static revokeObjectURL = revokeObjectURL
+    }
+    vi.stubGlobal('URL', URLWithBlobDownload)
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    renderApp('/manager/reports?from=2026-10-01&to=2026-10-31&groupBy=SPORT&sportId=3')
+    await screen.findByRole('table', { name: 'Revenue report by category' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('CSV export ready: revenue-2026-10-01-2026-10-31.csv')
+    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob))
+    expect(click).toHaveBeenCalledOnce()
+    expect(click.mock.instances[0]).toHaveProperty('download', 'revenue-2026-10-01-2026-10-31.csv')
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:finance-report')
+    expect(calls.some((call) => call.path.startsWith('/manager/finance/revenue'))).toBe(true)
+  })
+
+  it('quotes CSV values and neutralizes spreadsheet formula prefixes', () => {
+    const csv = revenueReportToCsv({
+      ...revenueReport,
+      rows: [{ category: '=IMPORTXML("bad")', collected: 10, refunded: 0, netCollected: 10 }],
+    })
+    expect(csv).toContain('"\'=IMPORTXML(""bad"")"')
+    expect(csv).toContain('"Total","16110000","150000","15960000"')
+    expect(csv.startsWith('"Date range","2026-10-01 to 2026-10-31"')).toBe(true)
   })
 })

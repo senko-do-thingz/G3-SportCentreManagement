@@ -40,6 +40,22 @@
 .finance-review-result--rejected p { color: var(--color-danger); }
 .finance-review-result--warning { background: var(--color-warning-soft); }
 .finance-review-result--warning p { color: var(--color-warning); }
+.manager-filters--revenue { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.finance-filter-hint { align-self: center; color: var(--color-text-muted); font-size: var(--text-sm); }
+.finance-revenue-chart-wrap { min-width: 0; }
+.finance-revenue-legend { display: flex; flex-wrap: wrap; gap: var(--space-4); margin: 0 0 var(--space-3); padding: 0; list-style: none; }
+.finance-revenue-legend li { display: flex; align-items: center; gap: var(--space-2); color: var(--color-text-muted); font-size: var(--text-xs); }
+.finance-revenue-legend li > span { width: 11px; height: 11px; border-radius: 50%; }
+.finance-revenue-chart { display: block; width: 100%; height: auto; overflow: visible; }
+.finance-revenue-chart__grid { stroke: var(--color-border); stroke-dasharray: 4 5; }
+.finance-revenue-chart__axis { fill: var(--color-text-muted); font-size: 12px; }
+.finance-revenue-chart__category { fill: var(--color-text); font-size: 13px; }
+.finance-revenue-chart__bar--collected { fill: var(--color-primary); }
+.finance-revenue-chart__bar--refunded { fill: var(--color-accent); }
+.finance-revenue-chart__bar--net { fill: var(--color-success); }
+.finance-report-total { display: grid; grid-template-columns: minmax(180px, 1fr) repeat(3, minmax(120px, .6fr)); gap: var(--space-3); padding: var(--space-4); border-top: 1px solid var(--color-border); text-align: right; }
+.finance-report-total > :first-child { text-align: left; font-weight: var(--weight-semibold); }
+.finance-export-status { margin: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--color-success-soft); color: var(--color-success); font-size: var(--text-sm); }
 @media (max-width: 800px) { .finance-overview-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 600px) {
   .finance-kpis { grid-template-columns: minmax(0, 1fr); }
@@ -50,7 +66,10 @@
   .manager-finance-page .table { min-width: 720px; }
 }
 @media (max-width: 640px) {
+  .manager-filters--revenue { grid-template-columns: minmax(0, 1fr); }
   .finance-review-summary > div { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
   .finance-review-result { align-items: flex-start; flex-direction: column; }
   .finance-review-result .btn { width: 100%; }
+  .finance-report-total { grid-template-columns: minmax(115px, 1fr) repeat(3, minmax(90px, auto)); gap: var(--space-2); padding-inline: var(--space-2); font-size: var(--text-xs); }
+  .finance-revenue-chart__category { font-size: 11px; }
 }
