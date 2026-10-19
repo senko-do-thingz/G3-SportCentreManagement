@@ -113,7 +113,7 @@ class DemoClassesIntegrationTest extends AbstractIntegrationTest {
     void freshFlywayAppliesV29AfterV28InItsOwnCatalog() {
         assertThat(jdbc.queryForObject("SELECT DB_NAME()", String.class)).isEqualTo(DATABASE);
         assertThat(jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success = 1 ORDER BY installed_rank DESC", String.class))
-                .startsWith("29", "28", "27");
+                .startsWith("30", "29", "28", "27");
         assertThat(count("SELECT COUNT(*) FROM flyway_schema_history WHERE version = '29' AND script = 'V29__seed_demo_classes_and_sessions.sql' AND success = 1")).isEqualTo(1);
         assertShape();
     }
