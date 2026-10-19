@@ -110,7 +110,7 @@ class RefundPaymentLinkTest {
     void setUp() {
         service = new RefundServiceImpl(refundRequestRepository, registrationRepository, paymentRepository,
                 paymentRefundService, bookingRepository, sessionRepository, memberCardRepository, invoiceLineRepository,
-                auditService, codeFormatter, CLOCK);
+                auditService, codeFormatter, CLOCK, org.mockito.Mockito.mock(com.sportify.payment.service.impl.CashCaptureService.class));
 
         memberUser = account(100L, "MEMBER", "Minh Member");
         receptionist = account(7L, "RECEPTIONIST", "Rita Reception");

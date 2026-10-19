@@ -36,6 +36,11 @@ final class MaintenanceTestResources implements AutoCloseable {
 
     long insert(String table, String sql, Object... args) {
         if (!DELETE_ORDER.contains(table)) throw new IllegalArgumentException("Unknown fixture table: " + table);
+        if (table.equals("payment") && sql.contains("OUTPUT INSERTED.id")) {
+            sql = "SET NOCOUNT ON; DECLARE @cash_fixture_id TABLE(id BIGINT); "
+                    + sql.replace("OUTPUT INSERTED.id", "OUTPUT INSERTED.id INTO @cash_fixture_id")
+                    + "; SELECT id FROM @cash_fixture_id";
+        }
         long id = Objects.requireNonNull(jdbc.queryForObject(sql, Long.class, args));
         remember(table, id);
         return id;

@@ -61,7 +61,7 @@ class PaymentServiceTransactionMandatoryTest {
                 mock(BankTransferProperties.class),
                 mock(CodeFormatter.class),
                 Clock.systemUTC()
-        );
+        , org.mockito.Mockito.mock(com.sportify.payment.service.impl.CashCaptureService.class));
 
         NoTransactionPlatformTransactionManager txManager = new NoTransactionPlatformTransactionManager();
         TransactionInterceptor interceptor = new TransactionInterceptor(txManager, new AnnotationTransactionAttributeSource());

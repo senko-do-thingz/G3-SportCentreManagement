@@ -74,7 +74,7 @@ class PaymentPricingConsistencyTest {
         PaymentItemResolver resolver = new PaymentItemResolver(memberCardRepository, registrationRepository, invoiceRepository);
         CodeFormatter formatter = new CodeFormatter();
         paymentService = new PaymentServiceImpl(paymentRepository, memberCardRepository, registrationRepository,
-                resolver, bankProperties, formatter, clock);
+                resolver, bankProperties, formatter, clock, org.mockito.Mockito.mock(com.sportify.payment.service.impl.CashCaptureService.class));
         verificationService = new PaymentVerificationServiceImpl(paymentRepository, invoiceRepository, resolver,
                 paymentService, membershipCardService, sportPackageService, auditService, formatter, clock);
 

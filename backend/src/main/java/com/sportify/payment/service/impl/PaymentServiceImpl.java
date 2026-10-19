@@ -41,6 +41,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final BankTransferProperties bankProperties;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
+    private final CashCaptureService cashCaptureService;
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
@@ -84,13 +85,14 @@ public class PaymentServiceImpl implements PaymentService {
             throw new BusinessRuleException("Only staff users can record a desk payment");
         }
 
+        var capturedAt = cashCaptureService.prepareCollection(0);
         Payment payment = Payment.builder()
                 .paymentCode(codeFormatter.formatPaymentCode(paymentRepository.getNextPaymentCodeSequence()))
                 .member(member)
                 .amount(amount)
                 .paymentMethod(method)
                 .paymentStatus(PaymentStatus.SUCCESS)
-                .paymentTime(LocalDateTime.now(clock))
+                .paymentTime(capturedAt == null ? LocalDateTime.now(clock) : LocalDateTime.ofInstant(capturedAt, clock.getZone()))
                 .referenceCode(referenceCode)
                 .confirmedByUser(confirmedBy)
                 .notes("Paid at the desk, confirmed by user id " + confirmedBy.getId())
@@ -140,7 +142,8 @@ public class PaymentServiceImpl implements PaymentService {
             payment.setPaymentMethod(actualMethod);
         }
 
-        LocalDateTime now = LocalDateTime.now(clock);
+        var capturedAt = cashCaptureService.prepareCollection(paymentId);
+        LocalDateTime now = capturedAt == null ? LocalDateTime.now(clock) : LocalDateTime.ofInstant(capturedAt, clock.getZone());
         payment.setPaymentStatus(PaymentStatus.SUCCESS);
         payment.setPaymentTime(now);
 

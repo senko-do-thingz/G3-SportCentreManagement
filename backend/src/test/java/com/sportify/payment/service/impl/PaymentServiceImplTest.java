@@ -81,7 +81,7 @@ class PaymentServiceImplTest {
                 bankProperties,
                 codeFormatter,
                 clock
-        );
+        , org.mockito.Mockito.mock(com.sportify.payment.service.impl.CashCaptureService.class));
 
         Role memberRole = Role.builder().id(1L).code("MEMBER").name("Member").build();
         Role recRole = Role.builder().id(2L).code("RECEPTIONIST").name("Receptionist").build();
@@ -161,7 +161,7 @@ class PaymentServiceImplTest {
                 bankProperties,
                 realFormatter,
                 clock
-        );
+        , org.mockito.Mockito.mock(com.sportify.payment.service.impl.CashCaptureService.class));
 
         when(paymentRepository.getNextPaymentCodeSequence()).thenReturn(1000L);
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
