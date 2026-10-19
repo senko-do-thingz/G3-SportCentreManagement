@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getErrorMessage } from '../../api/errors'
 import { managerFinanceApi, type FinanceRevenueRow, type RevenueGroup } from '../../api/managerFinanceApi'
@@ -7,6 +7,7 @@ import { useResource } from './useManagerTools'
 import { ManagerError, PreviewNotice } from './ManagerShared'
 import { FinanceRevenueChart } from './FinanceRevenueChart'
 import { formatMoney } from '../../utils/format'
+import { tokenStorage } from '../../api/tokenStorage'
 import '../../styles/managerFinance.css'
 
 const GROUPS: { value: RevenueGroup; label: string }[] = [
@@ -54,15 +55,16 @@ function exportFilename(contentDisposition: string | null, from: string, to: str
 function downloadReport(blob: Blob, filename: string): void {
   const objectUrl = URL.createObjectURL(blob)
   const link = document.createElement('a')
-  link.href = objectUrl
-  link.download = filename
-  link.style.display = 'none'
-  document.body.appendChild(link)
   try {
+    link.href = objectUrl
+    link.download = filename
+    link.style.display = 'none'
+    document.body.appendChild(link)
     link.click()
   } finally {
     link.remove()
-    URL.revokeObjectURL(objectUrl)
+    // Let the browser start consuming the URL before releasing it on the next task.
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
   }
 }
 
@@ -81,7 +83,10 @@ export function ManagerRevenueReportsPage() {
   const groupBy = selectedGroup(searchParams.get('groupBy'))
   const [exportMessage, setExportMessage] = useState('')
   const [exportFailed, setExportFailed] = useState(false)
-  const [exporting, setExporting] = useState(false)
+  const [activeExport, setActiveExport] = useState<{ controller: AbortController; from: string; to: string } | null>(null)
+  const exporting = activeExport !== null && activeExport.from === from && activeExport.to === to && !activeExport.controller.signal.aborted
+  const exportRequest = useRef<AbortController | null>(null)
+  useEffect(() => () => { exportRequest.current?.abort() }, [from, to])
 
   const reportLoader = useCallback((signal: AbortSignal) => managerFinanceApi.revenue({ from, to, groupBy, signal }), [from, to, groupBy])
   const [report, reloadReport] = useResource(reportLoader)
@@ -107,20 +112,29 @@ export function ManagerRevenueReportsPage() {
   }
 
   const exportCsv = async () => {
-    if (report.status !== 'ready' || exporting) return
-    setExporting(true)
+    if (report.status !== 'ready' || (exportRequest.current && !exportRequest.current.signal.aborted)) return
+    const controller = new AbortController()
+    exportRequest.current = controller
+    const epoch = tokenStorage.getEpoch()
+    const isCurrent = () => !controller.signal.aborted && tokenStorage.getEpoch() === epoch
+    setActiveExport({ controller, from, to })
     setExportFailed(false)
     setExportMessage('')
     try {
-      const result = await managerFinanceApi.exportRevenue(from, to)
+      const result = await managerFinanceApi.exportRevenue(from, to, { signal: controller.signal })
+      if (!isCurrent()) return
       const filename = exportFilename(result.contentDisposition, from, to)
       downloadReport(result.blob, filename)
       setExportMessage(`CSV export ready: ${filename}`)
     } catch (cause) {
+      if (!isCurrent()) return
       setExportFailed(true)
       setExportMessage(`The backend CSV export could not be downloaded. ${getErrorMessage(cause)}`)
     } finally {
-      setExporting(false)
+      if (exportRequest.current === controller) {
+        exportRequest.current = null
+        if (!controller.signal.aborted) setActiveExport(null)
+      }
     }
   }
 

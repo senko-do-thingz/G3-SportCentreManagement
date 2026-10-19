@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { renderApp } from '../../test/renderApp'
 import { backendError, installFakeFetch, json, MANAGER, MEMBER } from '../../test/fakeBackend'
 import { tokenStorage } from '../../api/tokenStorage'
+import { managerFinanceApi } from '../../api/managerFinanceApi'
+import { ApiError } from '../../api/errors'
 
 const overviewDto = {
   month: '2026-10',
@@ -17,6 +19,7 @@ const overviewDto = {
   refundedTransactions: 1,
   previousMonth: '2026-09',
   previousPaidRevenue: '17000000',
+  previousPaidTransactions: 13,
   revenueChange: '-890000',
   revenueChangePercent: '-5.24',
 }
@@ -76,7 +79,7 @@ const pendingRefundDto = {
   reviewedAt: null,
   managerNote: null,
   createdAt: '2026-10-17T10:00:00',
-  cancelledBookings: 1,
+  cancelledBookings: null,
 }
 const serviceBreakdownDto = {
   from: '2026-10-01',
@@ -166,6 +169,19 @@ function revenueApi() {
     }
     return backendError(404, `Unexpected request: ${call.method} ${call.path}`)
   })
+}
+
+function mockFileDownload(url: string) {
+  const NativeURL = URL
+  const create = vi.fn(() => url)
+  const revoke = vi.fn()
+  class URLWithDownload extends NativeURL {
+    static createObjectURL = create
+    static revokeObjectURL = revoke
+  }
+  vi.stubGlobal('URL', URLWithDownload)
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+  return { create, revoke, click }
 }
 
 afterEach(() => {
@@ -361,4 +377,175 @@ describe('FE-13 revenue reports and backend CSV export', () => {
       authorization: 'Bearer finance-manager-token',
     })
   })
+})
+
+describe('FE-13 Round 2 action safety', () => {
+  it('ignores failed reconciliation after the session changes', async () => {
+    transactionsApi()
+    renderApp('/manager/transactions')
+    fireEvent.click(await screen.findByRole('button', { name: 'Review refund RF-1040' }))
+    const rejectLoads: ((cause: unknown) => void)[] = []
+    const pending = vi.spyOn(managerFinanceApi, 'pendingRefunds').mockImplementation(() => new Promise((_resolve, reject) => { rejectLoads.push(reject) }))
+    vi.spyOn(managerFinanceApi, 'reviewRefund').mockRejectedValue(new ApiError(408, 'Outcome unknown'))
+    fireEvent.change(screen.getByLabelText(/Manager note/), { target: { value: 'Verified payment.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Approve refund' }))
+    await waitFor(() => expect(pending).toHaveBeenCalledTimes(2))
+    tokenStorage.startSession({ accessToken: 'new-session', refreshToken: 'new-refresh' })
+    await act(async () => { rejectLoads.forEach((reject) => reject(new ApiError(500, 'Queue unavailable'))) })
+    expect(screen.queryByText(/pending queue could not be refreshed/)).not.toBeInTheDocument()
+  })
+
+  it('cancels an export when its date range changes and permits exporting the new range', async () => {
+    revenueApi()
+    const { click } = mockFileDownload('blob:new-range')
+    const releases: ((value: Awaited<ReturnType<typeof managerFinanceApi.exportRevenue>>) => void)[] = []
+    const exportApi = vi.spyOn(managerFinanceApi, 'exportRevenue').mockImplementation(() => new Promise((resolve) => { releases.push(resolve) }))
+    renderApp('/manager/reports?from=2026-10-01&to=2026-10-31')
+    await screen.findByRole('table', { name: 'Revenue report by category' })
+    fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }))
+    fireEvent.change(screen.getByLabelText('From date'), { target: { value: '2026-10-02' } })
+    await screen.findByRole('table', { name: 'Revenue report by category' })
+    expect(screen.getByRole('button', { name: 'Export CSV' })).toBeEnabled()
+    const result = { blob: new Blob(['Payment code,Amount\r\n']), contentDisposition: null, contentType: 'text/csv' }
+    await act(async () => { releases[0](result) })
+    expect(click).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }))
+    expect(exportApi).toHaveBeenLastCalledWith('2026-10-02', '2026-10-31', expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    await act(async () => { releases[1](result) })
+    expect(click).toHaveBeenCalledOnce()
+    expect(click.mock.instances[0]).toHaveProperty('download', 'revenue_2026-10-02_2026-10-31.csv')
+  })
+
+  it('sends and changes the BE-22 payment method filter and resets pagination', async () => {
+    const { calls } = transactionsApi()
+    renderApp('/manager/transactions?month=2026-10&method=CASH&page=1')
+    await screen.findByText('INV-1041')
+    expect(screen.getByLabelText('Payment method')).toHaveValue('CASH')
+    expect(calls.some((call) => call.path.includes('method=CASH&page=1'))).toBe(true)
+    fireEvent.change(screen.getByLabelText('Payment method'), { target: { value: 'BANK_TRANSFER' } })
+    await waitFor(() => expect(calls.some((call) => call.path.includes('method=BANK_TRANSFER&page=0'))).toBe(true))
+    fireEvent.change(screen.getByLabelText('Reporting month'), { target: { value: '2024-02' } })
+    fireEvent.change(screen.getByLabelText('Payment status'), { target: { value: 'SUCCESS' } })
+    fireEvent.change(screen.getByLabelText('Search transactions'), { target: { value: 'Taylor' } })
+    await waitFor(() => expect(calls.some((call) => call.path === '/manager/finance/transactions?from=2024-02-01&to=2024-02-29&search=Taylor&status=SUCCESS&method=BANK_TRANSFER&page=0&size=20')).toBe(true))
+  })
+
+  it('keeps a newer refund modal open when an older review finishes', async () => {
+    transactionsApi({ refundRows: [pendingRefundDto, { ...pendingRefundDto, id: 8, refundCode: 'RF-1042' }] })
+    let resolveReview!: (refund: Awaited<ReturnType<typeof managerFinanceApi.reviewRefund>>) => void
+    vi.spyOn(managerFinanceApi, 'reviewRefund').mockImplementation(() => new Promise((resolve) => { resolveReview = resolve }))
+    renderApp('/manager/transactions')
+    fireEvent.click(await screen.findByRole('button', { name: 'Review refund RF-1040' }))
+    fireEvent.change(screen.getByLabelText(/Manager note/), { target: { value: 'Verified payment.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Approve refund' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Review refund RF-1042' }))
+    await act(async () => { resolveReview({ ...pendingRefundDto, status: 'APPROVED', amountApproved: 150000 }) })
+    expect(screen.getByRole('dialog', { name: 'Review refund RF-1042' })).toBeInTheDocument()
+    expect(screen.queryByText(/RF-1040 was approved/)).not.toBeInTheDocument()
+  })
+
+  it.each([0, 408, 500])('keeps HTTP/status %i uncertain when reconciliation fails and never retries the decision', async (status) => {
+    transactionsApi()
+    renderApp('/manager/transactions')
+    fireEvent.click(await screen.findByRole('button', { name: 'Review refund RF-1040' }))
+    const pending = vi.spyOn(managerFinanceApi, 'pendingRefunds').mockRejectedValue(new ApiError(500, 'Queue unavailable'))
+    const review = vi.spyOn(managerFinanceApi, 'reviewRefund').mockRejectedValue(new ApiError(status, 'Outcome unknown'))
+    fireEvent.change(screen.getByLabelText(/Manager note/), { target: { value: 'Verified payment.' } })
+    const submit = screen.getByRole('button', { name: 'Approve refund' })
+    fireEvent.click(submit)
+    fireEvent.click(submit)
+    expect(await screen.findByText(/pending queue could not be refreshed\. Do not submit it again/)).toBeInTheDocument()
+    expect(pending).toHaveBeenCalled()
+    expect(review).toHaveBeenCalledOnce()
+    expect(screen.queryByText(/was approved|was rejected/)).not.toBeInTheDocument()
+  })
+
+  it('refreshes a conflict without claiming a final decision', async () => {
+    transactionsApi()
+    renderApp('/manager/transactions')
+    fireEvent.click(await screen.findByRole('button', { name: 'Review refund RF-1040' }))
+    const review = vi.spyOn(managerFinanceApi, 'reviewRefund').mockRejectedValue(new ApiError(409, 'Already reviewed'))
+    fireEvent.change(screen.getByLabelText(/Manager note/), { target: { value: 'Verified payment.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Approve refund' }))
+    expect(await screen.findByText(/may have been reviewed by another manager/)).toBeInTheDocument()
+    expect(review).toHaveBeenCalledOnce()
+  })
+
+  it.each(['MEMBER', 'COACH', 'RECEPTIONIST'])('denies %s access to every finance screen before any finance API call', async (role) => {
+    for (const path of ['/manager/finance', '/manager/transactions', '/manager/reports']) {
+      const { calls } = financeApi({ ...MEMBER, role })
+      const view = renderApp(path)
+      expect(await screen.findByText(/do not have access|access denied|forbidden/i)).toBeInTheDocument()
+      expect(calls.some((call) => call.path.startsWith('/manager/finance') || call.path.startsWith('/refunds'))).toBe(false)
+      view.unmount()
+    }
+  })
+
+  it('allows the manager to request an amount above the requested amount subject to the backend payment cap', async () => {
+    const { calls } = transactionsApi()
+    renderApp('/manager/transactions')
+    fireEvent.click(await screen.findByRole('button', { name: 'Review refund RF-1040' }))
+    fireEvent.change(screen.getByLabelText(/Approved amount/), { target: { value: '160000' } })
+    fireEvent.change(screen.getByLabelText(/Manager note/), { target: { value: 'Verified against the original payment.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Approve refund' }))
+    await waitFor(() => expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(1))
+    expect(await screen.findByText(/approved for 160\.000 VND/)).toBeInTheDocument()
+  })
+
+  it.each(['switch', 'logout', 'unmount'])('does not reconcile a pending review after %s', async (change) => {
+    const { calls } = transactionsApi()
+    let resolveReview!: (response: Response) => void
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'PUT') return new Promise<Response>((resolve) => { resolveReview = resolve })
+      return originalFetch(input, init)
+    }))
+    const view = renderApp('/manager/transactions')
+    fireEvent.click(await screen.findByRole('button', { name: 'Review refund RF-1040' }))
+    fireEvent.change(screen.getByLabelText(/Manager note/), { target: { value: 'Verified payment.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Approve refund' }))
+    const before = calls.filter((call) => call.path === '/refunds/pending').length
+    if (change === 'switch') tokenStorage.startSession({ accessToken: 'new-session', refreshToken: 'new-refresh' })
+    if (change === 'logout') tokenStorage.clear()
+    if (change === 'unmount') view.unmount()
+    await act(async () => { resolveReview(backendError(500, 'Lost review response')) })
+    expect(calls.filter((call) => call.path === '/refunds/pending')).toHaveLength(before)
+    expect(screen.queryByText(/decision.*could not be confirmed/i)).not.toBeInTheDocument()
+  })
+
+  it.each(['unmount', 'switch', 'logout'])('does not download a file after %s', async (change) => {
+    revenueApi()
+    let resolveExport!: (value: Awaited<ReturnType<typeof managerFinanceApi.exportRevenue>>) => void
+    vi.spyOn(managerFinanceApi, 'exportRevenue').mockImplementation(() => new Promise((resolve) => { resolveExport = resolve }))
+    const { click, create } = mockFileDownload('blob:late-export')
+    const view = renderApp('/manager/reports?from=2026-10-01&to=2026-10-31')
+    await screen.findByRole('table', { name: 'Revenue report by category' })
+    fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }))
+    if (change === 'unmount') view.unmount()
+    if (change === 'switch') tokenStorage.startSession({ accessToken: 'new-session', refreshToken: 'new-refresh' })
+    if (change === 'logout') tokenStorage.clear()
+    await act(async () => { resolveExport({ blob: new Blob(['Payment code,Amount\r\n']), contentDisposition: null, contentType: 'text/csv' }) })
+    expect(create).not.toHaveBeenCalled()
+    expect(click).not.toHaveBeenCalled()
+  })
+
+  it.each([null, 'attachment; filename="../../unsafe.csv"', "attachment; filename*=UTF-8''%ZZ.csv"])(
+    'falls back safely when Content-Disposition is %s and releases the URL after a download', async (header) => {
+      revenueApi()
+      const { click, revoke } = mockFileDownload('blob:filename-test')
+      const exportApi = vi.spyOn(managerFinanceApi, 'exportRevenue').mockResolvedValue({
+        blob: new Blob(['Payment code,Amount\r\n']), contentDisposition: header, contentType: 'text/csv',
+      })
+      renderApp('/manager/reports?from=2026-10-01&to=2026-10-31')
+      await screen.findByRole('table', { name: 'Revenue report by category' })
+      const button = screen.getByRole('button', { name: 'Export CSV' })
+      fireEvent.click(button)
+      fireEvent.click(button)
+      await waitFor(() => expect(click).toHaveBeenCalledOnce())
+      expect(exportApi).toHaveBeenCalledOnce()
+      expect(click.mock.instances[0]).toHaveProperty('download', 'revenue_2026-10-01_2026-10-31.csv')
+      await waitFor(() => expect(revoke).toHaveBeenCalledWith('blob:filename-test'))
+      expect(document.querySelector('a[download]')).toBeNull()
+    },
+  )
 })

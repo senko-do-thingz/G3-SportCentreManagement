@@ -1,8 +1,9 @@
-import { useCallback, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ApiError, getErrorMessage } from '../../api/errors'
 import { managerFinanceApi, type FinanceTransaction, type ReviewRefundRequest } from '../../api/managerFinanceApi'
 import type { Refund } from '../../api/receptionPaymentsApi'
+import { tokenStorage } from '../../api/tokenStorage'
 import { Button, Card, Input, Modal, PageHeader, Select, StatusBadge, Table, TextArea, type TableColumn } from '../../components/ui'
 import { useResource, useDebounced } from './useManagerTools'
 import { ManagerError, PreviewNotice } from './ManagerShared'
@@ -17,6 +18,7 @@ const TRANSACTION_STATUSES = [
   { value: 'FAILED', label: 'Failed' },
   { value: 'REFUNDED', label: 'Refunded' },
 ]
+const PAYMENT_METHODS = ['CASH', 'CREDIT_CARD', 'BANK_TRANSFER', 'MOMO', 'VNPAY', 'ZALOPAY'].map((value) => ({ value, label: humanizeCode(value) }))
 
 function currentMonth(): string {
   const now = new Date()
@@ -49,14 +51,13 @@ const TRANSACTION_COLUMNS: TableColumn<FinanceTransaction>[] = [
   { key: 'time', header: 'Date', render: (row) => formatDateTime(row.time) },
 ]
 
-const REFUND_COLUMNS = (onReview: (refund: Refund) => void): TableColumn<Refund>[] => [
+const REFUND_COLUMNS: TableColumn<Refund>[] = [
   { key: 'refundCode', header: 'Refund request', render: (row) => <div className="manager-cell"><strong>{row.refundCode}</strong><span>{row.registrationCode ?? '-'}</span></div> },
   { key: 'member', header: 'Member', render: (row) => <div className="manager-cell"><span className="manager-cell-primary">{row.memberFullName ?? 'Member not provided'}</span><span>{row.memberCode ?? '-'}</span></div> },
   { key: 'reason', header: 'Reason', render: (row) => row.reason || 'No reason provided' },
   { key: 'amount', header: 'Requested', align: 'right', render: (row) => <strong className="manager-nowrap">{formatMoney(refundAmount(row))}</strong> },
   { key: 'createdAt', header: 'Requested', render: (row) => formatDateTime(row.createdAt) },
   { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} label={humanizeCode(row.status)} /> },
-  { key: 'actions', header: 'Action', render: (row) => row.status === 'PENDING' ? <Button size="sm" variant="secondary" onClick={() => onReview(row)} aria-label={`Review refund ${row.refundCode}`}>Review</Button> : <span>Already reviewed</span> },
 ]
 
 export function ManagerTransactionsPage() {
@@ -65,18 +66,36 @@ export function ManagerTransactionsPage() {
   const search = searchParams.get('query') ?? ''
   const debouncedSearch = useDebounced(search, 300)
   const status = searchParams.get('status') ?? ''
+  const method = searchParams.get('method') ?? ''
   const page = validPage(searchParams.get('page'))
   const [selectedRefund, setSelectedRefund] = useState<Refund | null>(null)
   const [decisionNotice, setDecisionNotice] = useState<{ tone: 'success' | 'rejected' | 'warning'; message: string } | null>(null)
+  const mounted = useRef(false)
+  const decisionVersion = useRef(0)
+  const reconciliation = useRef<AbortController | null>(null)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      reconciliation.current?.abort()
+    }
+  }, [])
+
+  const openRefund = (refund: Refund) => {
+    decisionVersion.current += 1
+    reconciliation.current?.abort()
+    setSelectedRefund(refund)
+  }
 
   const transactionsLoader = useCallback((signal: AbortSignal) => managerFinanceApi.transactions({
     month,
     query: debouncedSearch.trim(),
     status,
+    method,
     page,
     size: PAGE_SIZE,
     signal,
-  }), [month, debouncedSearch, status, page])
+  }), [month, debouncedSearch, status, method, page])
   const [transactions, reloadTransactions] = useResource(transactionsLoader)
   const refundsLoader = useCallback((signal: AbortSignal) => managerFinanceApi.pendingRefunds({ signal }), [])
   const [refunds, reloadRefunds] = useResource(refundsLoader)
@@ -104,6 +123,7 @@ export function ManagerTransactionsPage() {
     const next = new URLSearchParams(current)
     next.delete('query')
     next.delete('status')
+    next.delete('method')
     next.delete('page')
     return next
   }, { replace: true })
@@ -126,10 +146,18 @@ export function ManagerTransactionsPage() {
   }
 
   const handleUncertain = async (refund: Refund) => {
+    const epoch = tokenStorage.getEpoch()
+    const version = ++decisionVersion.current
+    reconciliation.current?.abort()
+    const controller = new AbortController()
+    reconciliation.current = controller
+    const isCurrent = () => mounted.current && !controller.signal.aborted && tokenStorage.getEpoch() === epoch && version === decisionVersion.current
     setSelectedRefund(null)
+    setDecisionNotice({ tone: 'warning', message: `The decision for ${refund.refundCode} was not confirmed. Do not submit it again until its current status is verified.` })
     reloadRefunds()
     try {
-      const latest = await managerFinanceApi.pendingRefunds()
+      const latest = await managerFinanceApi.pendingRefunds({ signal: controller.signal })
+      if (!isCurrent()) return
       const stillPending = latest.some((row) => row.id === refund.id && row.status === 'PENDING')
       setDecisionNotice({
         tone: 'warning',
@@ -138,6 +166,7 @@ export function ManagerTransactionsPage() {
           : `${refund.refundCode} is no longer in the pending queue, but its decision could not be confirmed. Check the latest refund status before taking further action.`,
       })
     } catch {
+      if (!isCurrent()) return
       setDecisionNotice({ tone: 'warning', message: `The decision for ${refund.refundCode} could not be confirmed and the pending queue could not be refreshed. Do not submit it again until its current status is verified.` })
     }
   }
@@ -151,7 +180,8 @@ export function ManagerTransactionsPage() {
         <Input label="Search transactions" placeholder="Invoice, member or payment code" value={search} onChange={(event) => updateFilter('query', event.target.value)} />
         <Input label="Reporting month" type="month" value={month} onChange={(event) => updateFilter('month', event.target.value)} />
         <Select label="Payment status" placeholder="All statuses" value={status} options={TRANSACTION_STATUSES} onChange={(event) => updateFilter('status', event.target.value)} />
-        <Button variant="ghost" onClick={clearFilters}>Clear search and status</Button>
+        <Select label="Payment method" placeholder="All methods" value={method} options={PAYMENT_METHODS} onChange={(event) => updateFilter('method', event.target.value)} />
+        <Button variant="ghost" onClick={clearFilters}>Clear search, status and method</Button>
       </div>
       {transactions.status === 'error' ? <ManagerError error={transactions.error} onRetry={reloadTransactions} /> : <Table
         caption="Payment transactions"
@@ -160,7 +190,7 @@ export function ManagerTransactionsPage() {
         rowKey={(row) => row.id}
         loading={transactions.status === 'loading'}
         emptyTitle="No transactions found"
-        emptyDescription="Change the reporting month or clear the search and status filters."
+        emptyDescription="Change the reporting month or clear the search, status and method filters."
         pagination={transactions.status === 'ready' ? { page: transactions.data.page, pageSize: transactions.data.size, totalItems: transactions.data.totalElements, onPageChange: updatePage } : undefined}
       />}
     </Card>
@@ -172,7 +202,7 @@ export function ManagerTransactionsPage() {
       </div>}
       {refunds.status === 'error' ? <ManagerError error={refunds.error} onRetry={reloadRefunds} /> : <Table
         caption="Pending refund requests"
-        columns={REFUND_COLUMNS(setSelectedRefund)}
+        columns={[...REFUND_COLUMNS, { key: 'actions', header: 'Action', render: (row) => row.status === 'PENDING' ? <Button size="sm" variant="secondary" onClick={() => openRefund(row)} aria-label={`Review refund ${row.refundCode}`}>Review</Button> : <span>Already reviewed</span> }]}
         rows={refunds.status === 'ready' ? refunds.data : []}
         rowKey={(row) => row.id}
         loading={refunds.status === 'loading'}
@@ -208,14 +238,17 @@ function RefundReviewModal({
   const formRef = useRef<HTMLFormElement>(null)
   const focusInvalid = useFocusFirstInvalid(formRef)
   const sending = useRef(false)
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
   const [decision, setDecision] = useState<'APPROVE' | 'REJECT'>('APPROVE')
   const [approvedAmount, setApprovedAmount] = useState(refund.amountRequested === null ? '' : String(refund.amountRequested))
   const [managerNote, setManagerNote] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
-  const requestedAmount = Number(refund.amountRequested)
-  const hasRequestedAmount = Number.isFinite(requestedAmount) && requestedAmount > 0
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -227,8 +260,6 @@ function RefundReviewModal({
       const parsed = Number(approvedAmount)
       if (!/^(?:\d+|\d*\.\d{1,2})$/.test(approvedAmount.trim()) || !Number.isFinite(parsed) || parsed <= 0) {
         nextErrors.amountApproved = 'Enter a positive amount with at most two decimal places.'
-      } else if (hasRequestedAmount && parsed > requestedAmount) {
-        nextErrors.amountApproved = `The approved amount cannot exceed the requested ${formatMoney(requestedAmount)}.`
       } else amountValue = parsed
     }
     setFieldErrors(nextErrors)
@@ -245,10 +276,20 @@ function RefundReviewModal({
     }
     sending.current = true
     setSaving(true)
+    const epoch = tokenStorage.getEpoch()
+    const isCurrent = () => mounted.current && tokenStorage.getEpoch() === epoch
     try {
       const updated = await managerFinanceApi.reviewRefund(refund.id, request)
+      if (!isCurrent()) {
+        if (mounted.current) onClose()
+        return
+      }
       onReviewed(updated)
     } catch (cause) {
+      if (!isCurrent()) {
+        if (mounted.current) onClose()
+        return
+      }
       if (cause instanceof ApiError && cause.status === 409) {
         onConflict(refund)
       } else if (!(cause instanceof ApiError) || cause.status === 0 || cause.status === 408 || cause.status >= 500) {
@@ -262,7 +303,7 @@ function RefundReviewModal({
       }
     } finally {
       sending.current = false
-      setSaving(false)
+      if (mounted.current) setSaving(false)
     }
   }
 
@@ -280,12 +321,11 @@ function RefundReviewModal({
         label="Approved amount"
         type="number"
         min="0.01"
-        max={hasRequestedAmount ? requestedAmount : undefined}
         step="0.01"
         value={approvedAmount}
         onChange={(event) => setApprovedAmount(event.target.value)}
         error={fieldErrors.amountApproved}
-        hint={hasRequestedAmount ? `Up to the requested ${formatMoney(requestedAmount)}.` : 'Enter a positive amount.'}
+        hint="The approved amount must not exceed the original paid amount."
         disabled={saving}
         required
       />}

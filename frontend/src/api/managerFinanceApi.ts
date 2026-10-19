@@ -1,4 +1,6 @@
 import { api, type ApiDownload } from './client'
+import { StaleSessionError } from './errors'
+import { tokenStorage } from './tokenStorage'
 import { UNEXPECTED_RESPONSE_MESSAGE, type RequestSignal } from './memberApi'
 import type { Refund } from './receptionPaymentsApi'
 import type { PageResponse } from './types'
@@ -57,6 +59,7 @@ export interface FinanceTransactionQuery extends RequestSignal {
   month?: string
   query?: string
   status?: string
+  method?: string
   page?: number
   size?: number
 }
@@ -201,15 +204,44 @@ function asTransactionPage(value: unknown): PageResponse<FinanceTransaction> {
 }
 
 function asRefund(value: unknown): Refund {
-  if (!isObject(value) || typeof value.id !== 'number' || typeof value.refundCode !== 'string' || typeof value.status !== 'string') {
+  if (!isObject(value) || !['PENDING', 'APPROVED', 'REJECTED', 'COMPLETED'].includes(String(value.status))) {
     throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
   }
-  return value as unknown as Refund
+  const id = count(value.id)
+  const amountRequested = amount(value.amountRequested)
+  const amountApproved = value.amountApproved === null ? null : amount(value.amountApproved)
+  if (id < 1 || amountRequested <= 0 || ((value.status === 'APPROVED' || value.status === 'COMPLETED') && (amountApproved === null || amountApproved <= 0))) {
+    throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
+  }
+  return {
+    id,
+    refundCode: requiredText(value.refundCode),
+    status: requiredText(value.status),
+    packageRegistrationId: count(value.packageRegistrationId),
+    registrationCode: optionalText(value.registrationCode),
+    memberId: count(value.memberId),
+    memberCode: optionalText(value.memberCode),
+    memberFullName: optionalText(value.memberFullName),
+    amountRequested,
+    amountApproved,
+    reason: requiredText(value.reason),
+    requestedByName: optionalText(value.requestedByName),
+    reviewedByName: optionalText(value.reviewedByName),
+    reviewedAt: optionalText(value.reviewedAt),
+    managerNote: optionalText(value.managerNote),
+    createdAt: requiredText(value.createdAt),
+    paymentId: value.paymentId === null || value.paymentId === undefined ? null : count(value.paymentId),
+    paymentCode: optionalText(value.paymentCode),
+  }
 }
 
 function asRefundList(value: unknown): Refund[] {
   if (!Array.isArray(value)) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
-  return value.map(asRefund)
+  return value.map((row) => {
+    const refund = asRefund(row)
+    if (refund.status !== 'PENDING') throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
+    return refund
+  })
 }
 
 function asRevenueRow(value: unknown): FinanceRevenueRow {
@@ -254,11 +286,11 @@ export const managerFinanceApi = {
     return api.get<unknown>('/manager/finance/trend', { ...options, query: { months: 6 } }).then(asTrend)
   },
 
-  transactions({ month, query, status, page = 0, size = 20, signal }: FinanceTransactionQuery = {}): Promise<PageResponse<FinanceTransaction>> {
+  transactions({ month, query, status, method, page = 0, size = 20, signal }: FinanceTransactionQuery = {}): Promise<PageResponse<FinanceTransaction>> {
     const dateRange = datesForMonth(month)
     return api.get<unknown>('/manager/finance/transactions', {
       signal,
-      query: { ...dateRange, search: query?.trim() || undefined, status: status || undefined, page, size },
+      query: { ...dateRange, search: query?.trim() || undefined, status: status || undefined, method: method || undefined, page, size },
     }).then(asTransactionPage)
   },
 
@@ -267,7 +299,13 @@ export const managerFinanceApi = {
   },
 
   reviewRefund(refundId: number, request: ReviewRefundRequest): Promise<Refund> {
-    return api.put<unknown>(`/refunds/${refundId}/review`, request).then(asRefund)
+    return api.put<unknown>(`/refunds/${refundId}/review`, request).then((value) => {
+      const refund = asRefund(value)
+      if (refund.id !== refundId || refund.status !== (request.approved ? 'APPROVED' : 'REJECTED')) {
+        throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
+      }
+      return refund
+    })
   },
 
   revenue(query: RevenueQuery): Promise<ManagerRevenueReport> {
@@ -278,11 +316,20 @@ export const managerFinanceApi = {
     }).then((value) => asRevenue(value, query))
   },
 
-  exportRevenue(from: string, to: string, options: RequestSignal = {}): Promise<ApiDownload> {
-    return api.getDownload('/manager/finance/revenue/export', {
+  async exportRevenue(from: string, to: string, options: RequestSignal = {}): Promise<ApiDownload> {
+    const epoch = tokenStorage.getEpoch()
+    const result = await api.getDownload('/manager/finance/revenue/export', {
       ...options,
       query: { from, to },
       headers: { Accept: 'text/csv' },
     })
+    if (!/^text\/csv(?:\s*;|$)/i.test(result.contentType ?? '') || result.blob.size === 0) {
+      throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
+    }
+    // Inspect a bounded prefix only; keep the original Blob, BOM and file bytes intact.
+    const prefix = (await result.blob.slice(0, 512).text()).trimStart()
+    if (/^[{[<]/.test(prefix)) throw new Error(UNEXPECTED_RESPONSE_MESSAGE)
+    if (tokenStorage.getEpoch() !== epoch) throw new StaleSessionError()
+    return result
   },
 }
