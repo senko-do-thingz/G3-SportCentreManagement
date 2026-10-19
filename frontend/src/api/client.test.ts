@@ -25,6 +25,34 @@ describe('api client', () => {
     expect(calls[0].authorization).toBe('Bearer access-1')
   })
 
+  it('downloads authenticated files and refreshes the token after a 401', async () => {
+    const { calls } = installFakeFetch((call) => {
+      if (call.path === '/auth/refresh') return json(200, { accessToken: 'access-2', refreshToken: 'refresh-2' })
+      if (call.authorization === 'Bearer access-2') {
+        return new Response('Code,Amount\r\nPAY-1,1000\r\n', {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/csv;charset=UTF-8',
+            'Content-Disposition': 'attachment; filename="report.csv"',
+          },
+        })
+      }
+      return backendError(401, 'Unauthorized')
+    })
+
+    const download = await api.getDownload('/manager/finance/revenue/export', { headers: { Accept: 'text/csv' } })
+
+    expect(await download.blob.text()).toBe('Code,Amount\r\nPAY-1,1000\r\n')
+    expect(download.contentType).toBe('text/csv;charset=UTF-8')
+    expect(download.contentDisposition).toBe('attachment; filename="report.csv"')
+    expect(calls.map((call) => call.path)).toEqual([
+      '/manager/finance/revenue/export',
+      '/auth/refresh',
+      '/manager/finance/revenue/export',
+    ])
+    expect(calls[2].authorization).toBe('Bearer access-2')
+  })
+
   it('does not send the access token to /auth endpoints', async () => {
     const { calls } = installFakeFetch(() => json(200, { accessToken: 'a', refreshToken: 'r' }))
     await api.post('/auth/login', { email: 'a@b.c', password: 'x' })

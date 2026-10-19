@@ -39,6 +39,12 @@ export interface RequestOptions {
   headers?: Record<string, string>
 }
 
+export interface ApiDownload {
+  blob: Blob
+  contentDisposition: string | null
+  contentType: string | null
+}
+
 const AUTH_PATH_PREFIX = '/auth/'
 
 type SessionExpiredListener = () => void
@@ -274,7 +280,7 @@ async function send(path: string, options: RequestOptions, accessToken: string |
 }
 
 /**
- * Sends a request to the Sportify API and returns the parsed JSON body.
+ * Sends a request to the Sportify API and applies shared authentication and session handling.
  *
  * On 401 for an authenticated request the client refreshes the access token once and retries
  * the original request once. If the refresh token is rejected, tokens are cleared, session expired
@@ -286,7 +292,7 @@ async function send(path: string, options: RequestOptions, accessToken: string |
  * When the session epoch changes while an authenticated request runs, the request fails with
  * StaleSessionError instead of returning the previous account's answer.
  */
-export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function successfulResponse(path: string, options: RequestOptions): Promise<{ response: Response; useAuth: boolean; epoch: number }> {
   const useAuth = options.auth !== false && !path.startsWith(AUTH_PATH_PREFIX)
   const accessToken = useAuth ? tokenStorage.getAccessToken() : null
   const epoch = tokenStorage.getEpoch()
@@ -324,19 +330,46 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     // ApiError(401): the token is fresh, so the 401 is about the request, not the session.
   }
 
+  if (!response.ok) {
+    const data = await readBody(response)
+    if (useAuth && tokenStorage.getEpoch() !== epoch) {
+      throw new StaleSessionError()
+    }
+    throw apiErrorFromBody(response.status, data)
+  }
+  return { response, useAuth, epoch }
+}
+
+/** Sends an authenticated API request and parses its successful JSON response. */
+export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { response, useAuth, epoch } = await successfulResponse(path, options)
   const data = await readBody(response)
   if (useAuth && tokenStorage.getEpoch() !== epoch) {
     throw new StaleSessionError()
   }
-  if (!response.ok) {
-    throw apiErrorFromBody(response.status, data)
-  }
   return data as T
+}
+
+/** Sends an authenticated API request and returns its successful file response. */
+export async function apiDownloadRequest(path: string, options: RequestOptions = {}): Promise<ApiDownload> {
+  const { response, useAuth, epoch } = await successfulResponse(path, options)
+  const blob = await response.blob()
+  if (useAuth && tokenStorage.getEpoch() !== epoch) {
+    throw new StaleSessionError()
+  }
+  return {
+    blob,
+    contentDisposition: response.headers.get('content-disposition'),
+    contentType: response.headers.get('content-type'),
+  }
 }
 
 export const api = {
   get<T>(path: string, options?: Omit<RequestOptions, 'method' | 'body'>) {
     return apiRequest<T>(path, { ...options, method: 'GET' })
+  },
+  getDownload(path: string, options?: Omit<RequestOptions, 'method' | 'body'>) {
+    return apiDownloadRequest(path, { ...options, method: 'GET' })
   },
   post<T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) {
     return apiRequest<T>(path, { ...options, method: 'POST', body })

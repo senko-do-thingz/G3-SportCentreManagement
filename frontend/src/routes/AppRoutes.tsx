@@ -46,6 +46,9 @@ import { BookingConfirmedPage, BookingOptionsPage, BookingReviewPage } from '../
 import { BookingCancelledPage, BookingCancellationPage, MemberBookingsPage } from '../pages/member/MemberBookingsPages'
 import { ReceptionBookingConfirmedPage, ReceptionBookingsPage, ReceptionAssistedBookingPage } from '../pages/reception/ReceptionBookingsPage'
 import { CoachRosterPage, CoachTeachingSchedulePage } from '../pages/coach/CoachSchedulePages'
+import { ManagerFinancialOverviewPage } from '../pages/manager/ManagerFinancialOverviewPage'
+import { ManagerTransactionsPage } from '../pages/manager/ManagerTransactionsPage'
+import { ManagerRevenueReportsPage } from '../pages/manager/ManagerRevenueReportsPage'
 
 /**
  * Real screens by full path. Later tasks register their page here, for example
@@ -58,6 +61,9 @@ const SCREENS: Record<string, ReactNode> = {
   '/manager/activity': <ActivityLogPage />,
   '/manager/classes': <ManagerClassesPage />,
   '/manager/schedule': <ManagerSchedulePage />,
+  '/manager/finance': <ManagerFinancialOverviewPage />,
+  '/manager/transactions': <ManagerTransactionsPage />,
+  '/manager/reports': <ManagerRevenueReportsPage />,
   '/member': <MemberDashboardPage />,
   '/member/profile': <MyProfilePage />,
   '/member/packages': <SportPackagesPage />,
