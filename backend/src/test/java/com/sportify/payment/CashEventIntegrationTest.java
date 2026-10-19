@@ -91,7 +91,7 @@ class CashEventIntegrationTest {
     UserAccount manager, legacyMember;
     Long[] legacy;
     TransactionTemplate tx() { return new TransactionTemplate(transactions); }
-    static String code() { return "CE-" + UUID.randomUUID().toString().replace("-", "").substring(0,18); }
+    static String code() { return "CE" + UUID.randomUUID().toString().replace("-", "").substring(0,18); }
     UserAccount member() {
         return tx().execute(s -> {
             UserAccount actor = users.saveAndFlush(UserAccount.builder().email(code() + "@example.invalid")
