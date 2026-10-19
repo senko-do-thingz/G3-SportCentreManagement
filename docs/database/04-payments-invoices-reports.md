@@ -30,7 +30,7 @@ and added `confirmed_by_user_id` (BE-17).
 - **Card discount on invoices.** A Gold (5%) or VIP (10%) discount is computed at package registration and shown in `invoice.discount_amount` and the invoice lines. Single visits get no discount.
 - **Refund Request Workflow (F3-07, F3-09).** Receptionist or member files a request, the Center Manager approves or rejects it with a note, approved refunds become `COMPLETED` on payout, and the payment becomes `REFUNDED` (rules under `refund_request`, BE-21).
 - **Invoice = snapshot.** An invoice is issued for a successful payment. `invoice.payment_id` is indexed but not unique.
-- **Revenue is computed, not stored.** Reports read `vw_paid_payment` (planned view) filtered by `payment_time`. `PENDING` and `FAILED` rows stay in the ledger but are not revenue.
+- **Revenue is computed, not stored.** BE-22 reports read `dbo.vw_paid_payment` (V30), filtered by `payment_time` and current `SUCCESS` status. `PENDING`, `FAILED` and `REFUNDED` payments stay in the ledger but are not paid revenue. Completing even a partial BE-21 refund removes the whole original payment from paid revenue; this metric is not gross receipts or net recognized revenue.
 - **Front desk verification (BE-18).** `GET /api/v1/payments` lists payment requests for RECEPTIONIST and MANAGER, `PENDING` first (oldest first), then the rest newest first; filters `status`, `method`, `search` (member name, member code, payment code, reference code; `query` is accepted as another name), `from` and `to` (inclusive dates on `created_at`), `page`, `size` (1 to 100, default 20).
 - **Confirm (F3-05, F3-06).** `PUT /api/v1/payments/{id}/confirm` with `method`, `referenceCode` (required for every method except `CASH`, otherwise 400), `amountReceived`, `note`. In one transaction that starts by locking the payment row (`PaymentRepository.findByIdForUpdate`, PESSIMISTIC_WRITE): `reference_code` is stored, the linked card (`MembershipCardService.activateCard`) or registration (`SportPackageService.activateRegistration`) becomes `ACTIVE` with dates recomputed from the confirmation day, the payment becomes `SUCCESS` with `payment_time` now and `confirmed_by_user_id`, then `PaymentVerificationService.recordPaymentConfirmed` issues an `invoice` (`PAID`) with one `invoice_line` and writes `activity_log` `PAYMENT_CONFIRMED`. The receipt is read with `GET /api/v1/invoices/by-payment/{paymentId}` or `GET /api/v1/invoices/{id}` (staff, or the member who owns the payment; see BE-20 below).
 - **Invoice amounts.** The line is written at the price before discount, from `PaymentItemResolver`, using only values stored when the payment request was made, never the current catalog price: `sport_package_registration.original_price` for a package; for a card, `member_card.price_paid` plus, for an upgrade (`upgrade_request = 1`), the upgrade credit = the `price_paid` of the replaced card (`replaces_card_id`) and of every card it replaced in turn, which is the base BE-17 subtracted from the tier price. A new card or renewal has no discount. When an upgrade's chain cannot be read (no `replaces_card_id`, a missing price, a chain longer than the BE-17 limit), no credit is claimed. A tier or package price edited after the request changes nothing on the invoice. `subtotal_amount` is that price, `discount_amount` is the card discount (package) or the upgrade credit (card upgrade, the line description says so), `tax_amount` is 0 and `total_amount` equals `payment.amount`. If `subtotal - discount` does not equal `payment.amount` (the item's `paid_amount` or `price_paid` differs from the payment: corrupted data), the API answers 409 `PAYMENT_ITEM_AMOUNT_MISMATCH` and nothing is written.
@@ -102,26 +102,27 @@ Indexes: `ix_invoice_payment_id`, `ix_invoice_member_id`, `ix_invoice_issue_date
 
 Index: `ix_invoice_line_invoice_id`.
 
-## Reporting View
+## Reporting Views (BE-22, V30)
 
-### `vw_paid_payment` (planned, not in any migration)
+`V30__create_finance_report_views.sql` is a new forward-only migration after normal V27 and opt-in demo V28/V29. All older migrations remain unchanged. It requires current-main tables in `dbo` and explicitly fails before DDL if either finance view or the named payment index already exists. Historical finance V25/V28 are not added to main. Flyway validation, clean protection and ordered migration remain enabled.
 
-Single source for the revenue screens.
+- `dbo.vw_payment_ledger`: one row per payment, every status; `ledger_time = COALESCE(payment_time, created_at)`. The member comes from the payment's member FK. Unique filtered payment links prevent package/card join fanout. The earliest invoice and its earliest line are chosen with ordered `TOP 1` applies, so multiple invoices/lines do not multiply payment amounts. Item attribution prefers the linked package, then card, then first invoice line. Sport is nullable.
+- `dbo.vw_paid_payment`: the ledger restricted to current `payment_status = 'SUCCESS'`, with payment-time and paid-date columns. Revenue sums payment amounts once, never invoice line totals. The view is a current-state report: refund completion can change previously reported months.
+- `ix_payment_status_time`: `(payment_status, payment_time)` including amount, method and member ID. Each view has its own SQL Server `GO` batch.
 
-```sql
-CREATE VIEW vw_paid_payment AS
-SELECT p.id           AS payment_id,
-       p.payment_code,
-       p.payment_time,
-       CAST(p.payment_time AS DATE) AS paid_on,
-       p.amount,
-       p.payment_method,
-       p.member_id,
-       i.invoice_number
-FROM payment p
-LEFT JOIN invoice i ON i.payment_id = p.id AND i.status IN ('ISSUED', 'PAID')
-WHERE p.payment_status = 'SUCCESS';
-```
+Manager-only endpoints under `/api/v1/manager/finance`:
+
+| GET route | Query and result |
+|---|---|
+| `/overview` | Optional `month=yyyy-MM`; current/previous paid totals, average, pending by created time, completed refunds separately, nullable change percentage when previous paid revenue is zero |
+| `/trend` | `months` 1..24, default 6; ascending calendar months ending now, including zero months |
+| `/transactions` | Optional status/method/type/from/to/search; zero-based page, size 1..100 (default 20); literal escaped contains search; stable ledger-time/id descending order |
+| `/revenue` | Inclusive from/to, default current month through today; at most 366 days; groupBy ITEM_TYPE (default), METHOD or SPORT; rounded shares sum to 100.00 when total is positive |
+| `/revenue/export` | Same date bounds/range; at most 50000 actual rows; UTF-8 BOM, CRLF, quoted text, formula protection, numeric amounts; attachment `revenue_<from>_<to>.csv` |
+
+Finance dates must be 1900-01-01 through 9999-12-30; overview accepts 1900-01 through 9999-11. Inclusive end dates become exclusive next-day bounds without overflowing SQL Server DATETIME2. Application and audit clocks use Vietnam local time. These bounds do not change BE-18's existing list rules.
+
+Completed refund totals use approved amount, or requested amount for legacy rows without approval. Period attribution prefers the earliest `REFUND_COMPLETED` activity log, then legacy updated/reviewed/created timestamps. Approval alone is not payout. Finance never changes payment/refund state. See [BE-22 test cases](../tests/BE-22_test_cases.md) for pending SQL Server execution gates.
 
 ### `refund_request`
 
@@ -154,63 +155,32 @@ Refund rules (BE-21, F3-07, F3-09 refund part, S3-RefundSubmitted to S3-RefundDo
 - **Payment of the registration (review round 1, P1-03).** Quote, submit, approve and complete answer 409 `PAYMENT_REGISTRATION_MISMATCH` unless the payment is the registration's `payment_id`, belongs to the same member, is not also the `payment_id` of a `member_card`, and every `invoice_line` of its invoices is `SPORT_PACKAGE` with `item_reference_id` = the registration id.
 - **Lock order of completion (review round 1, P1-02).** payment, refund_request, class_session rows of the upcoming bookings in ascending id order (same lock as BE-08 booking and BE-10 session cancellation), their booking rows, sport_package_registration. Bookings are re-read under the session locks and cancelled with one conditional UPDATE per session; `booked_count` is released with one atomic UPDATE per session, never below 0. If the bookings change between that read and the update, 409 `REFUND_BOOKINGS_CHANGED` and everything rolls back.
 
-### Report queries
+### Report query examples
 
-Revenue overview KPIs (F3-08) for a month:
-
-```sql
-SELECT SUM(amount) AS paid_revenue,
-       COUNT(*)    AS paid_transactions,
-       AVG(amount) AS average_payment
-FROM vw_paid_payment
-WHERE paid_on >= @monthStart AND paid_on < DATEADD(MONTH, 1, @monthStart);
-```
-
-Revenue trend, last six months:
+These examples follow the actual one-payment reporting grain. Date parameters below are start-inclusive/end-exclusive timestamps, not unescaped user SQL fragments.
 
 ```sql
-SELECT DATEFROMPARTS(YEAR(paid_on), MONTH(paid_on), 1) AS month_start,
-       SUM(amount) AS revenue
-FROM vw_paid_payment
-WHERE paid_on >= DATEADD(MONTH, -5, @currentMonthStart)
-GROUP BY DATEFROMPARTS(YEAR(paid_on), MONTH(paid_on), 1)
-ORDER BY month_start;
-```
+SELECT COALESCE(SUM(amount), 0) AS paid_revenue, COUNT_BIG(*) AS paid_transactions
+FROM dbo.vw_paid_payment
+WHERE payment_time >= @from AND payment_time < @toExclusive;
 
-Revenue by item type (F3-10):
+SELECT YEAR(payment_time) AS year, MONTH(payment_time) AS month,
+       SUM(amount) AS revenue, COUNT_BIG(*) AS paid_count
+FROM dbo.vw_paid_payment
+WHERE payment_time >= @from AND payment_time < @toExclusive
+GROUP BY YEAR(payment_time), MONTH(payment_time)
+ORDER BY year, month;
 
-```sql
-SELECT il.item_type,
-       COUNT(DISTINCT v.payment_id) AS paid_count,
-       SUM(il.line_total)           AS revenue
-FROM vw_paid_payment v
-JOIN invoice i       ON i.payment_id = v.payment_id
-JOIN invoice_line il ON il.invoice_id = i.id
-WHERE v.paid_on BETWEEN @fromDate AND @toDate
-  AND (@method IS NULL OR v.payment_method = @method)
-GROUP BY il.item_type
-ORDER BY revenue DESC;
-```
+SELECT item_type, SUM(amount) AS revenue, COUNT_BIG(*) AS paid_count
+FROM dbo.vw_paid_payment
+WHERE payment_time >= @from AND payment_time < @toExclusive
+GROUP BY item_type
+ORDER BY revenue DESC, item_type;
 
-Paying members:
-
-```sql
-SELECT COUNT(DISTINCT member_id)
-FROM vw_paid_payment
-WHERE paid_on BETWEEN @fromDate AND @toDate;
-```
-
-Payment ledger including PENDING and FAILED (F3-09):
-
-```sql
-SELECT p.payment_time, p.payment_code, i.invoice_number, u.full_name,
-       p.payment_method, p.amount, p.payment_status
-FROM payment p
-JOIN user_account u ON u.id = p.member_id
-LEFT JOIN invoice i ON i.payment_id = p.id
-WHERE (@search IS NULL OR p.payment_code LIKE @search + '%' OR u.full_name LIKE '%' + @search + '%')
-ORDER BY p.payment_time DESC
+SELECT * FROM dbo.vw_payment_ledger
+WHERE ledger_time >= @from AND ledger_time < @toExclusive
+ORDER BY ledger_time DESC, payment_id DESC
 OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
 ```
 
-CSV export and "Print / Save PDF" are generated by the application from these queries; no table is required.
+The repository binds enum/date/search parameters and escapes LIKE wildcards. CSV performs a pre-count, then selects at most 50001 rows and rejects an actual stream beyond 50000 before returning a successful response. This handles committed inserts between count and stream without returning a truncated success. Reports are separate reads and do not promise a single snapshot across concurrent requests. CSV is implemented in BE-22; browser print/save-PDF remains a frontend concern.

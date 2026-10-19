@@ -1,3 +1,9 @@
+## 2026-10-19 - Forward-only manager finance integration (BE-22)
+
+- Restore the five MANAGER finance endpoints and historical SUCCESS-only revenue/ledger contracts using new V30 views and index. Preserve every earlier migration and BE-21 payment/refund behavior.
+- Bound actual CSV output under concurrent inserts and protect formula prefixes after whitespace. Add authorization, migration-path, query, CSV and real partial/full refund regressions.
+- Local unit/build and guard evidence is supplied in the Round 2 review package. SQL Server fresh/upgrade/conflict/concurrency execution remains a mandatory CI gate; this entry does not assert migration success or merge approval.
+
 ## 2026-10-19 - Activity Log Search Test Reliability (BE-04)
 
 - Exclude the reserved numeric search token from the unique Activity Log test marker. Preserve production search and authorization behavior.
