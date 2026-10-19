@@ -29,7 +29,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.MSSQLServerContainer;
-import org.testcontainers.junit.jupiter.*;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
@@ -41,20 +40,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** Own SQL Server lifecycle: all completions and monetary fixtures are synthetic and container-confined. */
-@Tag("integration") @Testcontainers
+@Tag("integration")
 @SpringBootTest(properties = "app.finance.cash-capture-enabled=true")
 @ActiveProfiles({"dev", "test"}) @AutoConfigureMockMvc
 @Import(CashEventIntegrationTest.TimeConfig.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class CashEventIntegrationTest {
-    @Container static final MSSQLServerContainer<?> SQL = new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2022-latest")
-            .acceptLicense().withPassword("Aa1!" + UUID.randomUUID());
-    @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", () -> SQL.getJdbcUrl() + ";encrypt=false;trustServerCertificate=true");
-        registry.add("spring.datasource.username", SQL::getUsername);
-        registry.add("spring.datasource.password", SQL::getPassword);
-    }
     static class TestClock extends Clock {
         volatile Instant value = Instant.parse("2025-12-15T03:00:00Z");
         void set(String value) { this.value = Instant.parse(value); }
@@ -62,7 +54,22 @@ class CashEventIntegrationTest {
         public ZoneId getZone() { return ZoneId.of("Asia/Ho_Chi_Minh"); }
         public Clock withZone(ZoneId zone) { return Clock.fixed(value, zone); }
     }
-    @TestConfiguration static class TimeConfig { @Bean @Primary TestClock cashTestClock() { return new TestClock(); } }
+    @TestConfiguration static class TimeConfig {
+        @Bean @Primary TestClock cashTestClock() { return new TestClock(); }
+        @Bean(initMethod = "start", destroyMethod = "stop")
+        MSSQLServerContainer<?> cashSqlServer() {
+            return new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2022-latest")
+                    .acceptLicense().withPassword("Aa1!" + UUID.randomUUID());
+        }
+        // Spring initializes this dependency before any datasource property can resolve.
+        @Bean DynamicPropertyRegistrar cashDatabaseProperties(MSSQLServerContainer<?> sql) {
+            return registry -> {
+                registry.add("spring.datasource.url", () -> sql.getJdbcUrl() + ";encrypt=false;trustServerCertificate=true");
+                registry.add("spring.datasource.username", sql::getUsername);
+                registry.add("spring.datasource.password", sql::getPassword);
+            };
+        }
+    }
     @Autowired TestClock clock;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;

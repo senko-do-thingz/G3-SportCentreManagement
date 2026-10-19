@@ -7,6 +7,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CashEventMigrationSourceTest {
     @Test
+    void collisionGuardIsAnIndependentTransactionalSqlServerBatch() throws Exception {
+        String sql = Files.readString(Path.of("src/main/resources/db/migration/catalog/V31__cash_event_cutover.sql"));
+        var configuration = org.flywaydb.core.Flyway.configure();
+        assertThat(configuration.isExecuteInTransaction()).isTrue();
+        var parser = new org.flywaydb.database.sqlserver.SQLServerParser(configuration,
+                new org.flywaydb.core.internal.parser.ParsingContext());
+        var batches = new java.util.ArrayList<org.flywaydb.core.internal.sqlscript.SqlStatement>();
+        try (var statements = parser.parse(new org.flywaydb.core.internal.resource.StringResource(sql))) {
+            while (statements.hasNext()) batches.add(statements.next());
+        }
+        assertThat(batches).hasSize(7).allMatch(org.flywaydb.core.internal.sqlscript.SqlStatement::canExecuteInTransaction);
+        assertThat(batches.getFirst().getSql()).contains("IF OBJECT_ID", "51031",
+                "Unexpected cash reporting objects; investigate migration cohort")
+                .doesNotContain("CREATE TABLE", "CREATE INDEX", "CREATE TRIGGER", "COMMIT");
+        assertThat(batches.getFirst().getDelimiter().strip()).isEqualTo("GO");
+        assertThat(batches.get(1).getSql()).contains("CREATE TABLE dbo.cash_coverage", "CREATE TABLE dbo.cash_event",
+                "CREATE TABLE dbo.cash_capture_ticket", "CREATE UNIQUE INDEX ux_cash_collection");
+    }
+
+    @Test
     void prospectiveLedgerHasAtomicGuardsAndDoesNotInventHistory() throws Exception {
         Path migration = Path.of("src/main/resources/db/migration/catalog/V31__cash_event_cutover.sql");
         assertThat(migration).exists();

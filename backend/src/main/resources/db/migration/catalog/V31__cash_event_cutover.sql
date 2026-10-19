@@ -4,6 +4,7 @@ IF OBJECT_ID(N'dbo.cash_coverage') IS NOT NULL OR OBJECT_ID(N'dbo.cash_event') I
 BEGIN
     THROW 51031, 'Unexpected cash reporting objects; investigate migration cohort', 1;
 END;
+GO
 
 CREATE TABLE dbo.cash_coverage (
     id INT NOT NULL CONSTRAINT pk_cash_coverage PRIMARY KEY,
