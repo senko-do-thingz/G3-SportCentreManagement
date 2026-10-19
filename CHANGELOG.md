@@ -4,6 +4,10 @@
 - Send transaction date/search filters as `from`, `to`, and `search`; use `METHOD` for payment-method grouping; remove the unsupported sport ID filter.
 - Replace local aggregated CSV generation with the authenticated BE-22 revenue export and server-provided filename.
 - Remove unsupported net-collected and approved-not-paid figures rather than deriving them; document the backend contract decisions still needed. No backend files or endpoints were changed.
+## 2026-10-19 - Activity Log Search Test Reliability (BE-04)
+
+- Exclude the reserved numeric search token from the unique Activity Log test marker. Preserve production search and authorization behavior.
+- Add controlled numeric-ID and entity-type text collision regressions, including a non-exact numeric target. SQL Server execution remains required in CI.
 
 ## 2026-10-17 - Frontend Authentication Maintenance (FE-00)
 

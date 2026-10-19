@@ -1,8 +1,9 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../../api/errors'
 import { memberBookingsApi, type BookingWhen, type MemberBookingRecord } from '../../api/memberBookingsApi'
 import { memberApi, type PackageRegistration } from '../../api/memberApi'
+import { tokenStorage } from '../../api/tokenStorage'
 import { Badge, Button, Card, EmptyState, PageHeader, PageLoader, buttonClassName } from '../../components/ui'
 import { useAuth } from '../../auth/useAuth'
 import { BrowseError } from './BrowseError'
@@ -76,6 +77,8 @@ export function BookingCancellationPage() {
   return <BookingCancellationContent key={`${id}-${memberId ?? 'unknown'}`} id={id} memberId={memberId} />
 }
 
+type CancellationState = 'ready' | 'submitting' | 'checking' | 'unknown' | 'confirmed' | 'rejected' | 'complete'
+
 function BookingCancellationContent({ id, memberId }: { id: number; memberId: number | null }) {
   const navigate = useNavigate()
   const loader = useCallback(async (signal: AbortSignal) => {
@@ -83,24 +86,92 @@ function BookingCancellationContent({ id, memberId }: { id: number; memberId: nu
     return memberBookingsApi.findMine(id, memberId, signal)
   }, [id, memberId])
   const [resource, reload] = useMemberResource(loader)
-  const [submitting, setSubmitting] = useState(false)
+  const [state, setState] = useState<CancellationState>('ready')
+  const [checkedBooking, setCheckedBooking] = useState<MemberBookingRecord | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [session] = useState(() => ({ epoch: tokenStorage.getEpoch(), id: tokenStorage.getSessionId() }))
+  const mounted = useRef(false)
+  const statusController = useRef<AbortController | null>(null)
   const submitted = useRef(false)
 
-  async function confirmCancel() {
-    if (submitted.current) return
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      statusController.current?.abort()
+    }
+  }, [])
+
+  // Check storage as well as mounting: the new account profile may still be loading.
+  function isCurrent() {
+    return mounted.current && tokenStorage.getEpoch() === session.epoch && tokenStorage.getSessionId() === session.id
+  }
+
+  async function reconcileCancellation() {
+    if (memberId === null || !isCurrent()) return
+    const controller = new AbortController()
+    statusController.current = controller
+    setState('checking')
+    try {
+      const current = await memberBookingsApi.findMine(id, memberId, controller.signal)
+      if (!isCurrent() || controller.signal.aborted) return
+      if (!current || current.id !== id || current.memberId !== memberId) {
+        throw new ApiError(0, 'No matching booking was found in your booking history.')
+      }
+      if (current.status === 'CANCELLED') {
+        setState('complete')
+        navigate(`/member/bookings/${id}/cancelled`, { replace: true })
+      } else if (current.status === 'CONFIRMED') {
+        setCheckedBooking(current)
+        setState('confirmed')
+      } else {
+        throw new ApiError(0, 'The server did not confirm the current booking status.')
+      }
+    } catch (cause) {
+      if (!isCurrent() || controller.signal.aborted) return
+      setError(bookingErrorMessage(cause))
+      setState('unknown')
+    }
+  }
+
+  async function checkCancellationStatus() {
+    if (submitted.current || state !== 'unknown' || !isCurrent()) return
     submitted.current = true
-    setSubmitting(true)
+    setError(null)
+    try {
+      await reconcileCancellation()
+    } finally {
+      submitted.current = false
+    }
+  }
+
+  async function confirmCancel() {
+    const booking = checkedBooking ?? (resource.status === 'ready' ? resource.data : null)
+    if (submitted.current || !isCurrent() || (state !== 'ready' && state !== 'confirmed')
+      || memberId === null || !booking || booking.id !== id || booking.memberId !== memberId || booking.status !== 'CONFIRMED') return
+    submitted.current = true
+    setState('submitting')
     setError(null)
     try {
       const cancelled = await memberBookingsApi.cancel(id)
-      if (cancelled.status !== 'CANCELLED') throw new ApiError(0, 'The server did not confirm that this booking was cancelled.')
+      if (!isCurrent()) return
+      if (cancelled.id !== id || (cancelled.memberId != null && cancelled.memberId !== memberId) || cancelled.status !== 'CANCELLED') {
+        throw new ApiError(0, 'The server did not confirm this booking cancellation.')
+      }
+      setState('complete')
       navigate(`/member/bookings/${id}/cancelled`, { replace: true })
     } catch (cause) {
-      submitted.current = false
-      setError(bookingErrorMessage(cause))
+      if (!isCurrent()) return
+      // Match FE-10: a timeout can follow a committed mutation, even for HTTP 408.
+      const definitive = cause instanceof ApiError && cause.status >= 400 && cause.status < 500 && cause.status !== 408
+      if (definitive && cause.code !== 'ALREADY_CANCELLED') {
+        setError(bookingErrorMessage(cause))
+        setState('rejected')
+      } else {
+        await reconcileCancellation()
+      }
     } finally {
-      setSubmitting(false)
+      submitted.current = false
     }
   }
 
@@ -108,7 +179,7 @@ function BookingCancellationContent({ id, memberId }: { id: number; memberId: nu
   if (resource.status === 'error') return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Cancel booking" /><BrowseError error={resource.error} onRetry={reload} /></div>
   if (!resource.data) return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Booking not found" /><Card><p>This booking could not be found in your upcoming or past bookings.</p><Link className={buttonClassName()} to="/member/bookings">My Bookings</Link></Card></div>
 
-  const booking = resource.data
+  const booking = checkedBooking ?? resource.data
   const deadline = cancellationDeadline(booking)
   if (booking.status !== 'CONFIRMED') return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Booking cannot be cancelled" /><Card><Badge>Cancelled</Badge><p>This booking has already been cancelled.</p><Link className={buttonClassName()} to="/member/bookings?when=PAST">View past bookings</Link></Card></div>
 
@@ -120,8 +191,11 @@ function BookingCancellationContent({ id, memberId }: { id: number; memberId: nu
       <h2>{bookingTitle(booking)}</h2>
       <dl className="browse-facts booking-confirmation__facts"><div><dt>Booking code</dt><dd>{booking.bookingCode}</dd></div><div><dt>Date</dt><dd>{bookingDate(booking.sessionDate)}</dd></div><div><dt>Time</dt><dd>{bookingTime(booking.startTime)} - {bookingTime(booking.endTime)}</dd></div><div><dt>Package</dt><dd>{booking.packageName || 'Sport package'}</dd></div>{booking.trainingType !== 'SELF_TRAINING' && <div><dt>Coach</dt><dd>{booking.coachName || 'Not provided'}</dd></div>}<div><dt>Facility</dt><dd>{booking.facilityName || 'Not provided'}</dd></div></dl>
       <p>After an accepted cancellation, the booking service updates the package balance. The cancellation result will show the latest balance available from your package record.</p>
-      {error && <div className="booking-error" role="alert"><strong>Booking not cancelled</strong><p>{error}</p><p>Your booking remains unchanged unless My Bookings shows it as cancelled.</p></div>}
-      <div className="browse-actions booking-actions"><Link className={buttonClassName('secondary')} to="/member/bookings?when=UPCOMING">Keep booking</Link><Button variant="danger" loading={submitting} disabled={submitting} onClick={() => void confirmCancel()}>Confirm cancellation</Button></div>
+      {state === 'checking' && <p role="status">Checking cancellation status. Do not submit another cancellation.</p>}
+      {state === 'unknown' && <div className="booking-error" role="alert"><strong>Cancellation outcome unknown</strong><p>The cancellation may have been accepted. Check its status or return to My Bookings before taking further action.</p>{error && <p>{error}</p>}</div>}
+      {state === 'confirmed' && <div role="status"><strong>Booking currently confirmed</strong><p>A fresh booking history check shows this booking as confirmed. Review the details before choosing to try cancellation again.</p></div>}
+      {state === 'rejected' && <div className="booking-error" role="alert"><strong>Cancellation request rejected</strong><p>{error}</p><p>Review My Bookings for the current status before taking further action.</p></div>}
+      <div className="browse-actions booking-actions"><Link className={buttonClassName('secondary')} to="/member/bookings?when=UPCOMING">Keep booking</Link>{(state === 'unknown' || state === 'checking') && <Button variant="secondary" disabled={state === 'checking'} onClick={() => void checkCancellationStatus()}>Check cancellation status</Button>}<Button variant="danger" loading={state === 'submitting'} disabled={state !== 'ready' && state !== 'confirmed'} onClick={() => void confirmCancel()}>{state === 'confirmed' ? 'Try cancellation again' : 'Confirm cancellation'}</Button></div>
     </Card>
   </div>
 }
