@@ -595,7 +595,7 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
     void trend() throws Exception {
         JsonNode trend = getJson("/api/v1/manager/finance/trend?months=6");
         assertThat(trend.size()).isEqualTo(6);
-        assertThat(trend.get(5).get("month").asText()).isEqualTo(java.time.YearMonth.now().toString());
+        assertThat(trend.get(5).get("month").asText()).isEqualTo(java.time.YearMonth.now(clock).toString());
     }
 
     @Test
