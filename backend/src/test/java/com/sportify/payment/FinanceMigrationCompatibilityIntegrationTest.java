@@ -111,8 +111,11 @@ class FinanceMigrationCompatibilityIntegrationTest {
         jdbc.update("INSERT INTO dbo.member_profile (user_id, member_code) VALUES (?, ?)", member, "FM-" + UUID.randomUUID().toString().substring(0, 12));
         Timestamp time = Timestamp.valueOf(FROM.atStartOfDay());
         Long first = jdbc.queryForObject("""
+                SET NOCOUNT ON;
+                DECLARE @cash_fixture_id TABLE(id BIGINT);
                 INSERT INTO dbo.payment (payment_code, member_id, amount, payment_method, payment_status, payment_time)
-                OUTPUT INSERTED.id VALUES ('FM-%_[\\', ?, 100.25, 'BANK_TRANSFER', 'SUCCESS', ?)
+                OUTPUT INSERTED.id INTO @cash_fixture_id VALUES ('FM-%_[\\', ?, 100.25, 'BANK_TRANSFER', 'SUCCESS', ?);
+                SELECT id FROM @cash_fixture_id
                 """, Long.class, member, time);
         jdbc.update("""
                 INSERT INTO dbo.payment (payment_code, member_id, amount, payment_method, payment_status, payment_time)
@@ -164,7 +167,7 @@ class FinanceMigrationCompatibilityIntegrationTest {
     void freshNormalAndDemoDatabasesMigrateOnceAndRunFinanceQueries(boolean demo) throws Exception {
         var database = newDatabase();
         var migration = flyway(database, demo, null);
-        assertThat(migration.migrate().migrationsExecuted).isEqualTo(demo ? 26 : 24);
+        assertThat(migration.migrate().migrationsExecuted).isEqualTo(demo ? 27 : 25);
         assertObjects(database);
         seedLedger(database);
         assertQueriesAndUnchangedPayments(database);
@@ -185,7 +188,7 @@ class FinanceMigrationCompatibilityIntegrationTest {
         var rows = database.jdbc().queryForList("SELECT * FROM dbo.payment ORDER BY id");
         assertThat(database.jdbc().queryForObject("SELECT OBJECT_ID(N'dbo.vw_paid_payment')", Long.class)).isNull();
         var upgrade = flyway(database, demo, null);
-        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(2);
         assertThat(history(database).subList(0, previous.size())).isEqualTo(previous);
         assertThat(database.jdbc().queryForList("SELECT * FROM dbo.payment ORDER BY id")).isEqualTo(rows);
         assertObjects(database);

@@ -32,6 +32,7 @@ import com.sportify.payment.entity.PaymentStatus;
 import com.sportify.payment.repository.InvoiceLineRepository;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.service.PaymentRefundService;
+import com.sportify.payment.service.impl.CashCaptureService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -86,6 +87,7 @@ public class RefundServiceImpl implements RefundService {
     private final AuditService auditService;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
+    private final CashCaptureService cashCaptureService;
 
     /** What a refund of one registration would be, computed by {@link #prepare}. */
     private record RefundBasis(SportPackageRegistration registration, Payment payment,
@@ -239,6 +241,7 @@ public class RefundServiceImpl implements RefundService {
             registrationRepository.save(reg);
         }
 
+        cashCaptureService.preparePayout(refund.getId());
         refund.setStatus(RefundStatus.COMPLETED);
         refund = refundRequestRepository.save(refund);
 

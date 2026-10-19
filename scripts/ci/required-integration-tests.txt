@@ -30,3 +30,5 @@ com.sportify.catalog.RefundPaymentLinkIntegrationTest
 com.sportify.catalog.service.CheckInDateIntegrationTest
 com.sportify.payment.FinanceReportIntegrationTest
 com.sportify.payment.FinanceMigrationCompatibilityIntegrationTest
+com.sportify.payment.CashEventIntegrationTest
+com.sportify.payment.CashMigrationIntegrationTest

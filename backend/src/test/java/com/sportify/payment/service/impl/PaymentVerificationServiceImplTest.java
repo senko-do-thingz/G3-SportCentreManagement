@@ -99,7 +99,7 @@ class PaymentVerificationServiceImplTest {
         Clock clock = Clock.fixed(Instant.parse("2026-10-14T03:00:00Z"), ZoneId.of("Asia/Ho_Chi_Minh"));
         PaymentItemResolver resolver = new PaymentItemResolver(memberCardRepository, registrationRepository, invoiceRepository);
         paymentService = new PaymentServiceImpl(paymentRepository, memberCardRepository, registrationRepository,
-                resolver, bankProperties, new CodeFormatter(), clock);
+                resolver, bankProperties, new CodeFormatter(), clock, org.mockito.Mockito.mock(com.sportify.payment.service.impl.CashCaptureService.class));
         service = new PaymentVerificationServiceImpl(paymentRepository, invoiceRepository, resolver,
                 paymentService, membershipCardService, sportPackageService, auditService, new CodeFormatter(), clock);
 

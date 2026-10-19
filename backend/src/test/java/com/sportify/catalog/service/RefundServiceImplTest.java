@@ -51,6 +51,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class RefundServiceImplTest {
+    @Mock private com.sportify.payment.service.impl.CashCaptureService cashCaptureService;
 
     @Mock
     private RefundRequestRepository refundRequestRepository;
