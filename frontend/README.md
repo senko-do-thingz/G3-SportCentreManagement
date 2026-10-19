@@ -18,7 +18,7 @@ cp .env.example .env        # optional, the default API URL is http://localhost:
 npm run dev
 ```
 
-Open http://localhost:5173. The backend must be running (`cd backend`, then `mvn spring-boot:run`). CORS for `http://localhost:5173` is enabled by default in the `dev` profile; other origins go in `CORS_ALLOWED_ORIGINS` in `backend/.env`.
+Open http://localhost:5173. The public Home page renders at `/` for guests and signed-in users. The backend supplies current catalogue data and authenticated features (`cd backend`, then `mvn spring-boot:run`); Home's primary content remains visible when it is unavailable. CORS for `http://localhost:5173` is enabled by default in the `dev` profile; other origins go in `CORS_ALLOWED_ORIGINS` in `backend/.env`.
 
 ### Manager screen preview (FE-06)
 
@@ -147,7 +147,35 @@ await register({ fullName, email, password, phone })  // creates a MEMBER and si
 
 Login and logout in another tab are followed automatically. A token refresh in another tab does not reload the profile.
 
-Roles: `MEMBER`, `RECEPTIONIST`, `MANAGER`, `COACH`. Home pages: `/member`, `/reception`, `/manager`, `/coach`.
+Roles: `MEMBER`, `RECEPTIONIST`, `MANAGER`, `COACH`. Dashboard destinations after login: `/member`, `/reception`, `/manager`, `/coach`. The authentication-state table above describes guarded screens. The public `/` route always renders Home, even during session restoration or an account-loading error. Existing shell brand links return to `/`; dashboard menu links retain their existing paths.
+
+### Public Home and production hosting
+
+`src/pages/public/HomePage.tsx` follows `context/Home/1.png` and `2.png`. The original photographs are extracted into `src/assets/home/` and bundled through Vite imports. Home uses the shared design tokens, controls and account menu; its CSS is scoped under `.home-page`.
+
+Only `/sports`, `/packages` and `/membership-cards/tiers` are loaded on Home, with authentication disabled for these public requests. Package prices and discounts come from the current catalogue. Catalogue errors expose Retry without hiding the page. Class and coach examples are explicitly labelled; they are not live availability or a verified staff directory. Current sessions and profiles require member login under existing backend contracts. The unsupported age selector is disabled with reception guidance. Recommendations, reception messaging and AI Assistant have availability dialogs because no implemented public routes exist. Staff member-booking actions explain the role boundary and link to the existing workspace.
+
+Build and inspect locally:
+
+```bash
+npm run build
+npm run preview -- --host localhost --port 4173
+```
+
+Check `/`, refresh it, and check direct nested routes such as `/member/classes`. Vite uses base `/` and BrowserRouter has no basename. Deploy all of `dist/`, preserving its generated asset filenames. Do not serve the source `frontend/index.html` as the production artifact.
+
+The repository's `deploy/compose.yaml` deploys only the backend. The external frontend host must serve `dist/index.html` for `/` and client document paths such as `/login`, `/member/classes` and `/manager/finance`. Serve existing static files normally; missing `/assets/*` files must return 404, not HTML. If the API shares the origin, handle `/api/*` in a separate backend proxy route before the frontend fallback. Equivalent Nginx location rules (adapt the backend upstream to the actual host):
+
+```nginx
+root /srv/sportify/dist;
+index index.html;
+location ^~ /api/ { proxy_pass http://backend:8080; }
+location ^~ /assets/ { try_files $uri =404; }
+location = /favicon.svg { try_files $uri =404; }
+location / { try_files $uri $uri/ /index.html; }
+```
+
+This example is documentation, not an applied deployment. Vite preview checks the build locally; deployed root serving, nested refresh, API routing and asset 404 behavior must also be checked on the actual frontend host after deployment. No live production domain is configured here.
 
 ### Add a screen
 

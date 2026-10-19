@@ -27,7 +27,7 @@ import { RefundDetailPage } from '../pages/reception/RefundDetailPage'
 import { RefundRequestsPage } from '../pages/reception/RefundRequestsPage'
 import { RegisterRenewPage } from '../pages/reception/RegisterRenewPage'
 import { ForbiddenPage } from '../pages/public/ForbiddenPage'
-import { HomeRedirect } from '../pages/public/HomeRedirect'
+import { HomePage } from '../pages/public/HomePage'
 import { LoginPage } from '../pages/public/LoginPage'
 import { NotFoundPage } from '../pages/public/NotFoundPage'
 import { RegisterPage } from '../pages/public/RegisterPage'
@@ -162,7 +162,7 @@ export function AppRoutes() {
     <>
       <AccountSwitchRedirect />
       <Routes>
-        <Route path="/" element={<HomeRedirect />} />
+        <Route path="/" element={<HomePage />} />
 
         <Route element={<PublicLayout />}>
           <Route path="/login" element={<LoginPage />} />

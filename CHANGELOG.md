@@ -1,3 +1,9 @@
+## 2026-10-19 - Public Home and default root route
+
+- Render the Home design from context/Home at / for guests and every authenticated role, including session restoration errors and cross-tab account changes. Keep protected routes, login returns and role dashboards intact.
+- Add responsive public navigation, local reference imagery, live public package/card data, labelled class/coach examples and accessible availability dialogs for features without public endpoints or implemented screens.
+- Preserve backend contracts. Frontend hosting is external to the backend deployment; document SPA fallback requirements and verify the built frontend locally without claiming deployed production verification.
+
 ## 2026-10-19 - Forward-only manager finance integration (BE-22)
 
 - Restore the five MANAGER finance endpoints and historical SUCCESS-only revenue/ledger contracts using new V30 views and index. Preserve every earlier migration and BE-21 payment/refund behavior.

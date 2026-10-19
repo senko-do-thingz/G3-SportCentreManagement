@@ -874,9 +874,9 @@ describe('FE-01 review fixes (round 3)', () => {
       tokenStorage.startSession({ accessToken: 'x-access', refreshToken: 'x-refresh' })
       let releaseOld: () => void = () => undefined
       let holdOld = false
-      installFakeFetch(async (call) => {
+      const { calls } = installFakeFetch(async (call) => {
         const token = call.authorization?.replace('Bearer ', '') ?? ''
-        if (token === 'x-access' && holdOld) {
+        if (call.path === '/users/me' && token === 'x-access' && holdOld) {
           await new Promise<void>((resolve) => {
             releaseOld = resolve
           })
@@ -906,6 +906,7 @@ describe('FE-01 review fixes (round 3)', () => {
       act(() => {
         oldReload = reloadUser()
       })
+      await waitFor(() => expect(calls.filter((call) => call.path === '/users/me')).toHaveLength(2))
       // ...then another tab switches the browser to account Y.
       otherTabLogsIn('y-access')
       await expectSwitchNotice('Jordan Pham')

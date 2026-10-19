@@ -23,7 +23,7 @@ export function StaffLayout() {
     <div className={`staff-layout${menuOpen ? ' staff-layout--menu-open' : ''}`}>
       <aside className="sidebar" aria-label={area.workspaceLabel}>
         <div className="sidebar__brand">
-          <Brand to={area.basePath} />
+          <Brand />
           <button
             type="button"
             className="sidebar__toggle"
