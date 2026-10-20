@@ -84,7 +84,7 @@ describe('FE-03 packages model', () => {
   it('TC-FE03-007 labels, duration options and URL filters round trip', () => {
     expect(packageSummary(sportPackage())).toBe('30 days - 8 sessions')
     expect(packageSummary(sportPackage({ durationDays: 1, sessionCount: 1 }))).toBe('Single visit - 1 session')
-    expect(packageSummary(sportPackage({ sessionCount: null }))).toBe('30 days - No session limit')
+    expect(packageSummary({ durationDays: 30, sessionCount: null })).toBe('30 days - No session limit')
     expect(durationOptions([sportPackage({ durationDays: 90 }), sportPackage({ durationDays: 1 }), sportPackage()])).toEqual([
       { value: '1', label: 'Single visit' },
       { value: '30', label: '30 days' },
@@ -102,7 +102,7 @@ describe('FE-03 packages model', () => {
     expect(sessionsLabel(undefined)).toBe('No session limit')
     expect(sessionsLabel(1)).toBe('1 session')
     expect(sessionsLabel(8)).toBe('8 sessions')
-    expect(packageSummary(sportPackage({ sessionCount: undefined as unknown as null }))).toBe('30 days - No session limit')
+    expect(packageSummary({ durationDays: 30 })).toBe('30 days - No session limit')
   })
 
   it('TC-FE03-009 discount eligibility follows the backend: every package longer than 1 day', () => {

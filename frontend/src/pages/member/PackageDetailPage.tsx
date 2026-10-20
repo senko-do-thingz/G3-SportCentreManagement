@@ -8,7 +8,8 @@ import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatDate, formatMoney } from '../../utils/format'
 import { useFocusFirstInvalid } from '../../utils/useFocusFirstInvalid'
-import { currentCard, MEMBER_PATHS, paymentSummaryPath, toIsoDate, trainingFormatLabel } from './dashboardModel'
+import { currentCard, MEMBER_PATHS, paymentSummaryPath, trainingFormatLabel } from './dashboardModel'
+import { businessDate } from '../../utils/date'
 import {
   isSingleVisit,
   packageEndDate,
@@ -47,7 +48,7 @@ export function PackageDetailPage() {
   const [packages, reloadPackages] = useMemberResource(loadPackages)
   const [cards] = useMemberResource(loadMyCards)
   const [registrations] = useMemberResource(loadMyRegistrations)
-  const [today] = useState(() => toIsoDate(new Date()))
+  const [today] = useState(() => businessDate())
   const backTo = `${MEMBER_PATHS.packages}${location.search}`
 
   const header = (
@@ -139,8 +140,8 @@ function RegistrationForm({
 }) {
   // "Today" is read again on focus, on change and at submit, so a page left open past midnight
   // never accepts yesterday and the picker minimum follows the date.
-  const [minDate, setMinDate] = useState(() => toIsoDate(new Date()))
-  const refreshMinDate = () => setMinDate(toIsoDate(new Date()))
+  const [minDate, setMinDate] = useState(() => businessDate())
+  const refreshMinDate = () => setMinDate(businessDate())
   const [startDate, setStartDate] = useState(minDate)
   const [fieldError, setFieldError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
@@ -163,7 +164,7 @@ function RegistrationForm({
       return
     }
     setFormError(null)
-    const now = toIsoDate(new Date())
+    const now = businessDate()
     setMinDate(now)
     const error = validateStartDate(startDate, now)
     setFieldError(error)
