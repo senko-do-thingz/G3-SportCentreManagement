@@ -37,7 +37,7 @@ jobs:
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Resolve lowercase image name
         id: image
         run: |
@@ -102,7 +102,7 @@ jobs:
       group: deploy-staging
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Deploy to staging via composite action
         uses: ./.github/actions/deploy-compose
         with:
@@ -129,7 +129,7 @@ jobs:
       group: deploy-production
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Deploy to production via composite action
         uses: ./.github/actions/deploy-compose
         with:

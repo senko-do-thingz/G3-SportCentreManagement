@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -50,7 +50,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -74,7 +74,7 @@ jobs:
       JWT_SECRET: "dGhpcy1pcy1hLXZlcnktc2VjdXJlLW1vY2stc2VjcmV0LWtleS1mb3ItdGVzdGluZy1vbmx5LWdoYWN0aW9ucw=="
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK
         uses: actions/setup-java@v6
@@ -127,7 +127,7 @@ jobs:
       JWT_SECRET: "dGhpcy1pcy1hLXZlcnktc2VjdXJlLW1vY2stc2VjcmV0LWtleS1mb3ItdGVzdGluZy1vbmx5LWdoYWN0aW9ucw=="
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK
         uses: actions/setup-java@v6
@@ -177,7 +177,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK
         uses: actions/setup-java@v6
@@ -205,7 +205,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
