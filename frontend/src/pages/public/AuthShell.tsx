@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Brand } from '../../components/Brand'
+import { AppearanceControl } from '../../theme/AppearanceControl'
 
 export interface AuthShellProps {
   title: string
@@ -25,7 +26,7 @@ export function AuthShell({ title, subtitle, children }: AuthShellProps) {
       </section>
 
       <section className="auth-panel">
-        <Brand />
+        <div className="auth-panel__toolbar"><Brand /><AppearanceControl /></div>
         <div className="auth-panel__heading">
           <h1>{title}</h1>
           <p>{subtitle}</p>

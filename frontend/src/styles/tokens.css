@@ -3,6 +3,7 @@
  * Use these variables instead of raw values so every screen stays consistent.
  */
 :root {
+  color-scheme: light;
   /* Brand */
   --color-primary: #2169ba;
   --color-primary-hover: #1a5698;
@@ -20,9 +21,17 @@
   --color-border: #dde6ef;
   --color-border-strong: #c5d3e1;
   --color-text: #17324e;
-  --color-text-muted: #5d7288;
-  --color-text-subtle: #7c90a4;
+  --color-text-muted: #596e84;
+  --color-text-subtle: #596e84;
   --color-text-inverse: #ffffff;
+  --color-on-primary: #ffffff;
+  --color-on-accent: #102e50;
+  --color-feature-surface: #102e50;
+  --color-on-feature: #ffffff;
+  --color-on-feature-muted: #d1e2f3;
+  --color-control-border: #7d8fa3;
+  --color-table-hover: #fbfcfe;
+  --color-backdrop: rgba(16, 46, 80, 0.45);
 
   /* Status */
   --color-success: #2f7a57;
@@ -35,9 +44,15 @@
   --color-info-soft: #eaf3fd;
   --color-neutral: #4f647a;
   --color-neutral-soft: #eef2f6;
+  --color-danger-fill: #b4473a;
+  --color-danger-fill-hover: #9c3a2e;
+  --color-danger-border: #f5d2cc;
+  --color-warning-border: #f3dcb5;
+  --color-success-border: #a3cdb5;
 
   /* Focus */
-  --focus-ring: 0 0 0 3px rgba(33, 105, 186, 0.28);
+  --focus-ring: 0 0 0 3px var(--color-primary);
+  --focus-ring-danger: 0 0 0 3px var(--color-danger);
 
   /* Typography */
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
@@ -86,4 +101,53 @@
   --z-header: 20;
   --z-modal: 100;
   --z-toast: 200;
+}
+
+/* Screen-only overrides preserve the existing light palette for printed receipts. */
+@media screen {
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --color-primary: #8ac4ff;
+    --color-primary-hover: #acd7ff;
+    --color-primary-active: #64adf6;
+    --color-primary-soft: #203955;
+    --color-primary-soft-hover: #294a6c;
+    --color-bg: #0d1724;
+    --color-surface: #162333;
+    --color-surface-muted: #1b2c40;
+    --color-border: #334b64;
+    --color-border-strong: #6f89a6;
+    --color-control-border: #6f89a6;
+    --color-text: #e7eff9;
+    --color-text-muted: #b4c6da;
+    --color-text-subtle: #9db1c9;
+    --color-on-primary: #0b2138;
+    --color-feature-surface: #152f4c;
+    --color-on-feature: #f1f6ff;
+    --color-on-feature-muted: #c7d9ed;
+    --color-table-hover: #203248;
+    --color-backdrop: rgba(0, 6, 15, 0.74);
+    --color-success: #8cdeb5;
+    --color-success-soft: #173a2e;
+    --color-success-border: #377e60;
+    --color-warning: #f1ce86;
+    --color-warning-soft: #3b3220;
+    --color-warning-border: #8e7949;
+    --color-danger: #ffb4a8;
+    --color-danger-soft: #432a30;
+    --color-danger-border: #a06560;
+    --color-danger-fill: #b74338;
+    --color-danger-fill-hover: #a8362d;
+    --color-info: #8ac4ff;
+    --color-info-soft: #203955;
+    --color-neutral: #bed0e3;
+    --color-neutral-soft: #29384a;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.28);
+    --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.5);
+  }
+}
+
+@media print {
+  :root { color-scheme: light !important; background: var(--color-bg) !important; }
 }

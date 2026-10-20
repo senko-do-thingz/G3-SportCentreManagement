@@ -42,7 +42,7 @@
   height: 40px;
   border-radius: var(--radius-md);
   background: var(--color-primary);
-  color: var(--color-text-inverse);
+  color: var(--color-on-primary);
   font-size: 1.25rem;
   font-weight: var(--weight-bold);
 }
@@ -120,7 +120,7 @@
 
 .btn--primary {
   background: var(--color-primary);
-  color: var(--color-text-inverse);
+  color: var(--color-on-primary);
 }
 
 .btn--primary:hover:not(:disabled) {
@@ -153,7 +153,7 @@
 
 .btn--accent {
   background: var(--color-accent);
-  color: var(--color-navy);
+  color: var(--color-on-accent);
 }
 
 .btn--accent:hover:not(:disabled) {
@@ -161,12 +161,12 @@
 }
 
 .btn--danger {
-  background: var(--color-danger);
+  background: var(--color-danger-fill);
   color: var(--color-text-inverse);
 }
 
 .btn--danger:hover:not(:disabled) {
-  background: #9c3a2e;
+  background: var(--color-danger-fill-hover);
 }
 
 .btn .spinner {
@@ -213,7 +213,7 @@
   width: 100%;
   height: 44px;
   padding: 0 var(--space-3);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-control-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-text);
@@ -228,7 +228,7 @@
 }
 
 .input:hover:not(:disabled) {
-  border-color: var(--color-border-strong);
+  border-color: var(--color-control-border);
 }
 
 .input:focus {
@@ -249,7 +249,7 @@
 
 .input--invalid:focus {
   border-color: var(--color-danger);
-  box-shadow: 0 0 0 3px rgba(180, 71, 58, 0.2);
+  box-shadow: var(--focus-ring-danger);
 }
 
 /* Input with an element inside on the right, for example the password Show or Hide button */
@@ -667,7 +667,7 @@
 }
 
 .state--error {
-  border: 1px solid #f5d2cc;
+  border: 1px solid var(--color-danger-border);
   border-radius: var(--radius-lg);
   background: var(--color-danger-soft);
 }
@@ -743,7 +743,7 @@
 }
 
 .table tbody tr:hover td {
-  background: #fbfcfe;
+  background: var(--color-table-hover);
 }
 
 .table__state-cell {
@@ -805,12 +805,12 @@
 
 .pagination__page--active {
   background: var(--color-primary);
-  color: var(--color-text-inverse);
+  color: var(--color-on-primary);
 }
 
 .pagination__page--active:hover:not(:disabled) {
   background: var(--color-primary-hover);
-  color: var(--color-text-inverse);
+  color: var(--color-on-primary);
 }
 
 .pagination__gap {
@@ -827,7 +827,7 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-4);
-  background: rgba(16, 46, 80, 0.45);
+  background: var(--color-backdrop);
   animation: fade-in 0.15s ease;
 }
 

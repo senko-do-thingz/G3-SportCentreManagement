@@ -1,3 +1,10 @@
+## 2026-10-20 - Global appearance and Home authentication actions
+
+- Add shared System, Light and Dark preferences across Home, authentication and all role layouts, with live OS updates, independent persistence, cross-tab updates and a same-origin bootstrap before React paint.
+- Extend semantic tokens across shared controls, tables, dialogs, alerts, schedules, charts and dashboards. Preserve Home layout/imagery and the light print palette; improve muted text and input boundary contrast.
+- Preserve distinct guest Login and supported Registration flows. Offer Recover session when a saved account cannot be restored. A clean browser did not reproduce an immediate Join now -> Login redirect; retain the legitimate account-created/profile-failure recovery and document the evidence without inventing a cause.
+- Add theme/bootstrap and CTA regressions plus local browser evidence. Preserve public root routing, role guards, authentication/API contracts and backend files. Production host and live-backend acceptance remain separate owner checks.
+
 ## 2026-10-19 - Public Home and default root route
 
 - Render the Home design from context/Home at / for guests and every authenticated role, including session restoration errors and cross-tab account changes. Keep protected routes, login returns and role dashboards intact.

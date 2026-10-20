@@ -256,7 +256,7 @@
 }
 
 .checkin-result .summary-list > div {
-  border-bottom-color: rgb(0 0 0 / 8%);
+  border-bottom-color: var(--color-border);
 }
 
 @media (max-width: 960px) {

@@ -5,6 +5,7 @@ import { useAuth } from '../auth/useAuth'
 import { Brand } from '../components/Brand'
 import { findActiveItem, itemHref, STAFF_AREAS } from './navigation'
 import { UserMenu } from './UserMenu'
+import { AppearanceControl } from '../theme/AppearanceControl'
 
 /**
  * Workspace for RECEPTIONIST, MANAGER and COACH: side navigation with the menu of the signed in
@@ -63,7 +64,7 @@ export function StaffLayout() {
           <p className="staff-topbar__breadcrumb">
             Sportify Center / <span>{activeItem?.title ?? 'Workspace'}</span>
           </p>
-          <UserMenu />
+          <div className="header-actions"><AppearanceControl /><UserMenu /></div>
         </header>
         <main className="staff-content" id="main-content">
           <AccountSwitchNotice />

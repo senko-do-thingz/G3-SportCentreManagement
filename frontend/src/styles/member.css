@@ -17,7 +17,7 @@
   gap: var(--space-6);
   padding: var(--space-8);
   border-radius: var(--radius-xl);
-  background: var(--color-navy);
+  background: var(--color-feature-surface);
   color: var(--color-text-inverse);
 }
 
@@ -74,7 +74,7 @@
 }
 
 .dashboard-pending {
-  border-color: #f3dcb5;
+  border-color: var(--color-warning-border);
 }
 
 .dashboard-pending__intro {
@@ -551,7 +551,7 @@
   margin-top: var(--space-2);
   font-size: var(--text-2xl);
   font-weight: var(--weight-bold);
-  color: var(--color-navy);
+  color: var(--color-text);
 }
 
 .tier-card__validity,

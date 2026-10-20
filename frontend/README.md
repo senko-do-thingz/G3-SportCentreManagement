@@ -177,6 +177,16 @@ location / { try_files $uri $uri/ /index.html; }
 
 This example is documentation, not an applied deployment. Vite preview checks the build locally; deployed root serving, nested refresh, API routing and asset 404 behavior must also be checked on the actual frontend host after deployment. No live production domain is configured here.
 
+### Global appearance
+
+The shared Appearance select is available on Home (including signed-in visits), Login, Register and every role header. Its three choices are System, Light and Dark. A first visit follows the browser's system preference and responds to OS changes while open. An explicit choice overrides the OS until System is chosen again. The preference uses the independent localStorage key `sportify.themePreference`; login, logout and account switches do not change it. Other open tabs follow preference storage events. If storage is blocked, the choice works in memory; unavailable media queries fall back to light.
+
+`public/appearance.js` is a small blocking same-origin head script that applies the root theme and native `color-scheme` before React paints. `ThemeProvider` then maintains one preference across routes. Bootstrap/runtime resolution parity is tested. Deploy `/appearance.js` as a real static JavaScript file alongside `index.html`; do not rewrite a missing script to HTML. Revalidate this stable filename when deploying a new build. It needs no inline-script CSP allowance and was checked with `script-src 'self'`; validate the actual host's CSP and caching policy after deployment.
+
+Use semantic tokens in `styles/tokens.css` when extending screens. In particular, ordinary text, text on primary actions and text on feature panels have separate roles. Dark overrides apply to screens; receipt/roster printing keeps the light palette. Photographs and logos retain their original colors. Layout and imagery continue to follow the light-mode Figma exports. Dark mode extends that design with readable surfaces and focus states.
+
+Home guest actions remain Log in -> `/login` and Join now -> the supported `/register` form. During a retained-session profile error, Home offers Recover session -> `/login`, which exposes the existing recovery actions. Successful registration signs in as a member. If creation succeeds but profile initialization fails, the existing explicit account-created notice and Login recovery remain; do not resubmit registration for that account.
+
 ### Add a screen
 
 1. Build the page under `src/pages/<area>/`.
