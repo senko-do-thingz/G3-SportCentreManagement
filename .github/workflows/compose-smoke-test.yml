@@ -38,7 +38,7 @@ jobs:
       IMAGE_TAG: "ci"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Create temporary test .env
         run: bash scripts/ci/compose-smoke.sh prepare
