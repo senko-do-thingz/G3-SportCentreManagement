@@ -57,7 +57,7 @@ jobs:
             type=semver,pattern={{version}}
             type=sha
       - name: Build image for scanning
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: backend
           push: false
@@ -79,7 +79,7 @@ jobs:
           exit-code: "1"
           trivyignores: .trivyignore
       - name: Push image to GHCR
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: backend
           push: true
