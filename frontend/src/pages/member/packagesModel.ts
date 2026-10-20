@@ -96,7 +96,8 @@ export function sessionsLabel(count: number | null | undefined): string {
 }
 
 /** "30 days - 8 sessions", "Single visit - 1 session" or "30 days - No session limit". */
-export function packageSummary(pkg: Pick<SportPackage, 'durationDays' | 'sessionCount'>): string {
+// Display-only tolerance for incomplete/legacy input does not define the package API contract.
+export function packageSummary(pkg: { durationDays: number; sessionCount?: number | null }): string {
   return `${durationLabel(pkg.durationDays)} - ${sessionsLabel(pkg.sessionCount)}`
 }
 

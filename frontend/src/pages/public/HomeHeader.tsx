@@ -5,6 +5,7 @@ import { useAuth } from '../../auth/useAuth'
 import { Brand } from '../../components/Brand'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { UserMenu } from '../../layouts/UserMenu'
+import { AppearanceControl } from '../../theme/AppearanceControl'
 
 const LINKS = [
   { label: 'Home', href: '/' },
@@ -49,6 +50,7 @@ export function HomeHeader() {
         ))}
       </nav>
       <div className="home-account">
+        <AppearanceControl />
         {status === 'authenticated' ? (
           <>
             <Link className={buttonClassName('secondary', 'sm')} to={homePathFor(user)}>My workspace</Link>
@@ -56,10 +58,12 @@ export function HomeHeader() {
           </>
         ) : status === 'loading' ? (
           <span role="status">Restoring your session...</span>
+        ) : status === 'error' ? (
+          <Link className={buttonClassName('secondary', 'md')} to="/login">Recover session</Link>
         ) : (
           <>
-            <Link className={buttonClassName('secondary', 'md')} to="/login">Log in</Link>
-            <Link className={buttonClassName('primary', 'md')} to="/register">Join now</Link>
+            <Link className={buttonClassName('secondary', 'md')} to="/login" title="Log in to your existing account">Log in</Link>
+            <Link className={buttonClassName('primary', 'md')} to="/register" title="Create a new member account">Join now</Link>
           </>
         )}
       </div>

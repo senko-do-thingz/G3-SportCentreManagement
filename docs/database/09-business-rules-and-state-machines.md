@@ -60,9 +60,11 @@ stateDiagram-v2
     PENDING --> PENDING : Amount mismatch (409, note and PAYMENT_AMOUNT_MISMATCH log)
     PENDING --> SUCCESS : Confirmed (amount received equals amount)
     PENDING --> FAILED : Mark Failed (item request cancelled)
-    SUCCESS --> REFUNDED : Refund approved
+    SUCCESS --> REFUNDED : Refund payout completed
     FAILED --> PENDING : Retry (creates new row)
 ```
+
+Refund approval changes the package registration to REFUNDED. The payment stays SUCCESS until the approved refund payout completes; completion changes the payment to REFUNDED. Approval alone does not establish a cash payout.
 
 Payment confirmation rules (BE-18, F3-05):
 

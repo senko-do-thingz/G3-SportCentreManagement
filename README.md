@@ -1,21 +1,21 @@
 # Sportify Center (G3-SportCentreManagement)
 
-[![CI/CD](https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/workflows/ci-cd.yml)
+[![CI/CD](https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/workflows/ci.yml/badge.svg)](https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/workflows/ci.yml)
 
-Web system for **Sportify Center**, a multi-sport facility. It manages user accounts and roles, sport packages, membership cards, class bookings, check-in and refunds. Payments, training progress, AI workout recommendation, AI support and notifications are designed at database level and will be built next.
+Web system for **Sportify Center**, a multi-sport facility. It manages user accounts and roles, sport packages, membership cards, class bookings, check-in and refunds. Payment, invoice, refund and legacy financial-report workflows are implemented. Training progress, AI workout recommendation, AI support and notifications remain planned workflows.
 
 This is a monorepo with two applications:
 
 - `backend/` - Spring Boot REST API (Java 25, Maven, SQL Server). Secured with JWT. The schema is managed by Flyway and validated by Hibernate on startup.
-- `frontend/` - React web app (Vite, TypeScript, React Router). Created by task FE-00, so for now the folder only holds a README.
+- `frontend/` - React web app (Vite, TypeScript, React Router). Includes public Home, authentication, role dashboards, catalog, scheduling, payments and global appearance preferences.
 
 ## Repository Layout
 
 ```text
 G3-SportCentreManagement/
   backend/                 Spring Boot API. Run every mvn and docker compose command here.
-    src/main/java/com/sportify/      core/, identity/, catalog/ modules
-    src/main/resources/              application*.yml, Flyway migrations (V1 to V20)
+    src/main/java/com/sportify/      core/, identity/, catalog/, payment/ modules
+    src/main/resources/              application*.yml, versioned Flyway migrations
     src/test/java/com/sportify/      mirrors src/main exactly
     scripts/                         smoke test and local helper SQL
     pom.xml
@@ -55,13 +55,13 @@ The Spring Boot project used to live in the repository root. After you pull the 
 |---|---|
 | **Identity & Access** | Implemented - register, login, token refresh, current user, member search, manager user and staff account management, fixed roles (MEMBER, COACH, RECEPTIONIST, MANAGER), strong password validation, audit logging |
 | **Catalog & Membership** | Implemented - sports, sport packages and registrations, membership cards (tiers, purchase, renewal, upgrade, activation, cancellation), check-in, refund requests. The plan-based membership flow (`/api/v1/memberships`) is legacy and deprecated |
-| **Classes & Booking** | Partially implemented - booking create, cancel and list, self-training attendance, capacity and session deduction checks. Class and session management endpoints and the waitlist are not built yet |
-| **Payments & Reports** | Schema only (V14: `payment`, `invoice`, `invoice_line`). No entities or endpoints yet |
+| **Classes & Booking** | Implemented - class/session management, member discovery and schedules, booking create/cancel/list, reception check-in and coach roster reads. Waitlist and coach attendance mutation remain planned |
+| **Payments & Reports** | Implemented - payment confirmation, invoices, refund payout and legacy finance UI/API. Cash-flow reporting endpoints exist; FE-13 cash-flow adaptation is pending |
 | **Training & Progress** | Schema only (V16) |
 | **AI Assistant & Support** | Schema only (V17) |
 | **AI Workout Recommendation** | Schema only (V18) |
 | **Notifications & System** | Schema only (V19) |
-| **Frontend** | Not started. Foundation task FE-00 creates the Vite and React project |
+| **Frontend** | Implemented React/TypeScript app with public Home, auth, four role dashboards and System/Light/Dark preferences in the current working tree |
 
 The open tasks for every flow are listed in [TODO.md](TODO.md).
 
@@ -77,7 +77,7 @@ The open tasks for every flow are listed in [TODO.md](TODO.md).
 - **Utilities:** MapStruct, Lombok
 - **Testing:** JUnit 5, Spring Security Test, Testcontainers (MSSQL), JaCoCo
 
-**Frontend (`frontend/`, after FE-00)**
+**Frontend (`frontend/`)**
 
 - React, TypeScript, Vite, React Router
 
@@ -102,7 +102,7 @@ backend/src/main/resources/
 backend/src/test/java/com/sportify/   mirrors src/main exactly
 ```
 
-Booking code currently lives inside `catalog/`. `docs/architecture/project_structure.md` describes the planned target layout with separate `booking`, `payment`, `training` and other modules.
+Booking code currently lives inside `catalog/`; payment code has its own `payment/` module. `docs/architecture/project_structure.md` describes the planned target layout, including separate `booking` and `training` modules.
 
 ## Documentation
 
@@ -124,7 +124,7 @@ Booking code currently lives inside `catalog/`. `docs/architecture/project_struc
 ### Prerequisites
 
 - JDK 25 and Maven 3.9+ (backend)
-- Node.js 20+ and npm (frontend, after FE-00)
+- Node.js ^22.13.0, ^24.0.0 or >=26.0.0 and npm (see frontend/package.json)
 - Docker and Docker Compose (optional: local database and integration tests)
 
 ### 1. Configure the backend
@@ -171,7 +171,7 @@ The API listens on `http://localhost:8080`. Flyway applies all migrations on sta
 
 The `dev` profile is active by default in `application.yml`. It prints SQL and enables development-only endpoints such as `POST /api/v1/dev/memberships/{id}/activate`. For production set `SPRING_PROFILES_ACTIVE=prod`.
 
-### 4. Run the frontend (after FE-00)
+### 4. Run the frontend
 
 ```bash
 cd frontend
@@ -376,11 +376,11 @@ mvn clean verify
 ```
 
 - Unit and web-layer tests run without any external service.
-- Integration tests use Testcontainers with an isolated MSSQL container. If Docker is not installed or not running, those tests are skipped automatically.
+- Integration tests require Docker and an isolated Testcontainers MSSQL container. Without Docker, use `mvn clean verify -DskipITs` for non-integration tests. CI requires real SQL integration evidence and does not accept skipped mandatory suites.
 - The JaCoCo coverage report is written to `backend/target/site/jacoco/index.html`.
 - `backend/scripts/step2-smoke-test.ps1` is a PowerShell smoke test for a running local instance. Run `backend/scripts/dev/create-orphan-member.sql` first (local development only) so the orphan-member scenario can log in.
 
-CI (`.github/workflows/ci-cd.yml`) runs `mvn clean verify` with JDK 25 inside `backend/` on every push and pull request to `main`, and uploads the Surefire and JaCoCo reports as artifacts. It does not build `frontend/` yet.
+CI (`.github/workflows/ci.yml`) checks conventions and migrations, runs separate non-Docker unit and mandatory SQL Server integration jobs with JDK 25, and runs frontend tests, lint and build. Test reports are uploaded as artifacts. See the workflow for triggers and exact commands.
 
 ## Development Guidelines
 
@@ -399,12 +399,12 @@ CI (`.github/workflows/ci-cd.yml`) runs `mvn clean verify` with JDK 25 inside `b
 
 Tracked in [CHANGELOG.md](CHANGELOG.md) and [TODO.md](TODO.md):
 
-- No scheduled job yet that cancels unpaid card requests after 7 days.
-- `sport_class.coach_id`, `booking.cancelled_by_user_id` and `member_card.payment_id` exist in the database but are not mapped in the entities.
-- Activating a membership card does not create a `payment` row yet (the V14 tables have no entity).
+- Training/progress, AI/support, notifications and waitlist workflows remain planned.
+- Coach roster reads are implemented; coach attendance mutation remains planned.
+- External payment processor callbacks remain planned; current payment confirmation is staff-driven.
 - The legacy membership service still computes `end = start + duration` (deprecated flow).
-- No class or session management API, so members cannot browse sessions yet.
-- CI does not build the frontend yet.
+- Cash-flow backend endpoints exist, but the finance frontend still uses the legacy reporting contract.
+- Uncommitted Home/Theme work requires owner review and exact-source CI before publication.
 
 ## Team
 

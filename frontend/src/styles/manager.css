@@ -14,7 +14,7 @@
 .manager-row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .manager-row-actions .btn { white-space: nowrap; }
 .manager-row-actions .btn--danger { background: var(--color-danger-soft); color: var(--color-danger); border-color: transparent; }
-.manager-row-actions .btn--danger:hover:not(:disabled) { background: var(--color-danger); color: var(--color-text-inverse); }
+.manager-row-actions .btn--danger:hover:not(:disabled) { background: var(--color-danger-fill); color: var(--color-text-inverse); }
 .manager-price, .manager-nowrap { white-space: nowrap; }
 .manager-price { font-size: var(--text-sm); }
 .manager-footnote { margin-top: var(--space-5); color: var(--color-text-muted); font-size: var(--text-xs); }

@@ -1,10 +1,10 @@
+import { businessDate } from '../../utils/date'
+
 export function validBrowseDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && value.slice(0, 4) !== '0000' && Number.isFinite(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value
 }
 export function browseToday(now = new Date()): string {
-  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now)
-  const get = (type: string) => parts.find((part) => part.type === type)!.value
-  return `${get('year')}-${get('month')}-${get('day')}`
+  return businessDate(now)
 }
 export function browseAddDays(date: string, count: number): string {
   const value = new Date(`${date}T00:00:00Z`)

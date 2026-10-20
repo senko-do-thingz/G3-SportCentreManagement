@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ReactNode } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { RequireRole } from '../auth/RequireRole'
+import { ThemeProvider } from '../theme/ThemeProvider'
 import { useAuth } from '../auth/useAuth'
 import { MemberLayout } from '../layouts/MemberLayout'
 import { ALL_AREAS, type RoleArea } from '../layouts/navigation'
@@ -154,6 +155,10 @@ function areaRoutes(area: RoleArea) {
 }
 
 export function AppRoutes() {
+  return <ThemeProvider><ApplicationRoutes /></ThemeProvider>
+}
+
+function ApplicationRoutes() {
   const { user } = useAuth()
   // Keyed by user id: when the signed in account changes, the whole role area (layout, page and
   // any form in it) is mounted again, so nothing typed or loaded for the previous user survives.

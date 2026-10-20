@@ -73,7 +73,7 @@ function finalPrice(name: RegExp): string {
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
-  vi.setSystemTime(new Date(2026, 9, 13, 9, 30))
+  vi.setSystemTime(new Date('2026-10-13T02:30:00Z')) // 09:30 in Asia/Ho_Chi_Minh.
 })
 
 afterEach(() => {
@@ -395,15 +395,17 @@ describe('FE-03 review round 1', () => {
 
   it('TC-FE03-047 a page left open past midnight cannot submit yesterday; the picker minimum follows (B4)', async () => {
     const user = userEvent.setup()
-    vi.setSystemTime(new Date(2026, 9, 13, 23, 59))
+    vi.setSystemTime(new Date('2026-10-13T16:59:00Z')) // 23:59 in Asia/Ho_Chi_Minh.
     const { calls } = await openDetail()
     const input = screen.getByLabelText(/Start date/)
     expect(input).toHaveValue('2026-10-13')
+    expect(input).toHaveAttribute('min', '2026-10-13')
 
-    vi.setSystemTime(new Date(2026, 9, 14, 0, 1))
+    vi.setSystemTime(new Date('2026-10-13T17:01:00Z')) // 00:01 on October 14 in Asia/Ho_Chi_Minh.
     await user.click(screen.getByRole('button', { name: 'Confirm registration' }))
     expect(await screen.findByText('Start date cannot be in the past', { selector: '.field__error' })).toBeInTheDocument()
     expect(calls.some((call) => call.method === 'POST')).toBe(false)
+    expect(input).toHaveValue('2026-10-13')
     expect(input).toHaveAttribute('min', '2026-10-14')
   })
 

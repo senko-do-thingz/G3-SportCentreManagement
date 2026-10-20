@@ -30,7 +30,7 @@
 
 .payment-nav__link--active {
   background: var(--color-primary);
-  color: var(--color-text-inverse);
+  color: var(--color-on-primary);
 }
 
 /* Payment Summary */
@@ -57,7 +57,7 @@
   margin: var(--space-6) 0 var(--space-4);
   font-size: var(--text-3xl);
   font-weight: var(--weight-bold);
-  color: var(--color-navy);
+  color: var(--color-text);
 }
 
 .payment-summary__actions,
@@ -171,13 +171,13 @@
 .payment-status__title {
   margin: var(--space-2) 0 0;
   font-size: var(--text-xl);
-  color: var(--color-navy);
+  color: var(--color-text);
 }
 
 .payment-status__subtitle {
   margin: var(--space-5) 0 0;
   font-size: var(--text-lg);
-  color: var(--color-navy);
+  color: var(--color-text);
 }
 
 .payment-status__text,
@@ -227,7 +227,7 @@
   font-size: var(--text-lg);
   font-weight: var(--weight-bold);
   letter-spacing: 0.02em;
-  color: var(--color-navy);
+  color: var(--color-text);
 }
 
 .receipt__number {

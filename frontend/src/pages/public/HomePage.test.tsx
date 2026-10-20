@@ -69,7 +69,7 @@ describe('public Home', () => {
     session('MEMBER')
     installFakeFetch((call) => call.path === '/users/me' ? backendError(503, 'Unavailable') : catalog(call))
     renderApp('/')
-    await screen.findByRole('link', { name: 'Join now' })
+    await screen.findByRole('link', { name: 'Recover session' })
     expect(screen.getByRole('heading', { name: /Find your sport/ })).toBeInTheDocument()
     expect(tokenStorage.hasSession()).toBe(true)
     expect(screen.queryByRole('heading', { name: 'We could not load your account' })).not.toBeInTheDocument()
