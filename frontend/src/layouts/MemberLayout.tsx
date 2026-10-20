@@ -10,7 +10,7 @@ export function MemberLayout() {
     <div className="member-layout">
       <header className="member-layout__header">
         <div className="member-header__bar container">
-          <Brand to={MEMBER_AREA.basePath} />
+          <Brand />
           <UserMenu />
         </div>
         <nav className="member-nav" aria-label="Member navigation">

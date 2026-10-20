@@ -182,9 +182,11 @@ describe('auth flow', () => {
     expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
   })
 
-  it('redirects / to the login page for anonymous users', async () => {
+  it('renders public Home at / for anonymous users', async () => {
+    installFakeFetch(() => json(200, []))
     renderApp('/')
-    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /Find your sport/ })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Welcome back' })).not.toBeInTheDocument()
   })
   it('keeps the tokens and shows Retry when the backend is unreachable on reload', async () => {
     tokenStorage.startSession({ accessToken: 'access-1', refreshToken: 'refresh-1' })
@@ -225,7 +227,7 @@ describe('auth flow', () => {
       call.path === '/auth/refresh' ? backendError(500, 'Internal server error') : backendError(401, 'Unauthorized'),
     )
 
-    renderApp('/')
+    renderApp('/manager')
 
     expect(await screen.findByRole('heading', { name: 'We could not load your account' })).toBeInTheDocument()
     expect(tokenStorage.getRefreshToken()).toBe('refresh-ok')
