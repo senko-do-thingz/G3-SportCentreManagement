@@ -1,3 +1,12 @@
+## 2026-10-22 - Home redesign (FE-HOME)
+
+- Rebuild public Home from the team-approved design screenshot: photo hero with Facility highlights, sport spotlight strip (previous/next, 01-06 counter, Membership offers), class finder (Sport, Level, Training), features, 3x2 sport photo grid, coaches with All coaches, three package cards with a highlighted Coach-led card, membership strip, FAQ, Ready to play call to action and a four-column footer.
+- Package cards link to the matching live catalogue package when one exists, otherwise to the member packages page. No prices are hard-coded.
+- Add a moon and sun light and dark switch on Home that uses the shared appearance preference; other layouts keep the System, Light, Dark control. Light and dark use the chosen Royal and Gold palette (navy, royal blue, gold highlights), scoped to Home.
+- Photos load from the Unsplash CDN (Unsplash License) and fall back to the bundled images when a request fails, so an offline demo still shows every section.
+- Remove the Age group placeholder from the class finder (replaced by Training format), the Get recommendations button and the stats, steps and example class sections. Add a page meta description and Open Graph tags.
+- Preserve routes, role guards, staff availability dialogs, login returns and the public catalogue calls. Lint, tsc, all 1200 tests in 63 files and production build pass. The remote photos were not visible from the build environment; check them in a browser (test case HOME-09).
+
 ## 2026-10-20 - Global appearance and Home authentication actions
 
 - Add shared System, Light and Dark preferences across Home, authentication and all role layouts, with live OS updates, independent persistence, cross-tab updates and a same-origin bootstrap before React paint.

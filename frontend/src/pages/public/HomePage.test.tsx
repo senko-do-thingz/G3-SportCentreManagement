@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
@@ -29,17 +29,17 @@ describe('public Home', () => {
     const { calls } = installFakeFetch(catalog)
     renderApp('/')
     expect(screen.getByRole('heading', { name: /Find your sport.*Build your skills/ })).toBeInTheDocument()
-    for (const name of ['Find your next class', 'Choose your sport', 'Find a class that fits', 'Not sure where to start?', 'Learn from qualified coaches', 'Choose how you train', 'Membership card benefits']) {
+    for (const name of ['Find your next class', 'Our features', 'Choose your sport', 'Train with the best', 'Choose how you train', 'Membership cards', 'Got questions?', 'Ready to play?']) {
       expect(screen.getByRole('heading', { name })).toBeInTheDocument()
     }
     expect(await screen.findByRole('link', { name: 'View options for Football Independent' })).toHaveAttribute('href', '/member/packages/81')
-    await waitFor(() => expect(screen.getByText(/Gold: 5% off/)).toBeInTheDocument())
+    expect(screen.getByText('Save on every sport package.')).toBeInTheDocument()
     expect(calls.map((call) => call.path).sort()).toEqual(['/membership-cards/tiers', '/packages', '/sports'])
     expect(calls.every((call) => call.method === 'GET' && call.authorization === null)).toBe(true)
     expect(screen.queryByRole('heading', { name: 'Welcome back' })).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Age group')).toBeDisabled()
-    expect(screen.getByText(/Example classes/)).toBeInTheDocument()
-    expect(screen.getByText(/Illustrative profiles/)).toBeInTheDocument()
+    expect(screen.getByLabelText('Training')).toBeEnabled()
+    expect(screen.queryByRole('heading', { name: 'Find a class that fits' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'All coaches' })).toBeInTheDocument()
   })
 
   it.each(['MEMBER', 'MANAGER', 'RECEPTIONIST', 'COACH'] as const)('keeps %s on Home and exposes its workspace', async (role) => {
@@ -113,7 +113,11 @@ describe('public Home', () => {
     expect(await screen.findByRole('link', { name: 'View options for Football Coached' })).toHaveAttribute('href', '/member/packages/82')
     expect(screen.getByRole('link', { name: 'View options for Football Day Visit' })).toHaveAttribute('href', '/member/packages/83')
     expect(screen.queryByRole('link', { name: 'View options for Another self-training package' })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Football - Single visit' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Single visit' })).toBeInTheDocument()
+    const coachCard = screen.getByRole('heading', { name: 'Coach-led' }).closest('article') as HTMLElement
+    expect(within(coachCard).getByText('Popular')).toBeInTheDocument()
+    expect(within(coachCard).getByText('Qualified coach')).toBeInTheDocument()
+    expect(screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent).filter((text) => ['Single visit', 'Coach-led', 'Self-training'].includes(text ?? ''))).toEqual(['Single visit', 'Coach-led', 'Self-training'])
   })
 
   it('preserves selected sport and level through the existing login return flow', async () => {
@@ -145,7 +149,7 @@ describe('public Home', () => {
     expect(screen.getByRole('link', { name: 'Explore Badminton' })).toHaveAttribute('href', '/member/classes?sportId=52')
     expect(screen.getByRole('link', { name: 'View options for Football Independent' })).toHaveAttribute('href', '/member/packages/81')
     expect(screen.getByRole('link', { name: 'View cards' })).toHaveAttribute('href', '/member/membership/cards')
-    expect(screen.getByRole('link', { name: 'Join now' })).toHaveAttribute('href', '/register')
+    expect(within(screen.getByRole('banner')).getByRole('link', { name: 'Join now' })).toHaveAttribute('href', '/register')
   })
 
   it('explains member-only actions to staff without navigating to a forbidden route', async () => {
@@ -160,7 +164,7 @@ describe('public Home', () => {
     expect(screen.queryByRole('heading', { name: 'Access denied' })).not.toBeInTheDocument()
   })
 
-  it.each(['Get recommendations', 'Contact reception', 'AI Assistant', 'View profile of Daniel Smith'])('opens an accessible availability dialog for %s and restores focus', async (name) => {
+  it.each(['All coaches', 'Contact reception', 'AI Assistant', 'View profile of Daniel Smith'])('opens an accessible availability dialog for %s and restores focus', async (name) => {
     installFakeFetch(catalog)
     const user = userEvent.setup()
     renderApp('/')
@@ -170,6 +174,64 @@ describe('public Home', () => {
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(trigger).toHaveFocus()
+  })
+
+  it('rotates the hero sport spotlight forwards and backwards with labelled controls', async () => {
+    installFakeFetch(catalog)
+    const user = userEvent.setup()
+    renderApp('/')
+    const strip = screen.getByRole('button', { name: 'Next sports' }).closest('.home-strip') as HTMLElement
+    expect(within(strip).getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Football', 'Badminton'])
+    await user.click(within(strip).getByRole('button', { name: 'Next sports' }))
+    expect(within(strip).getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Badminton', 'Basketball'])
+    await user.click(within(strip).getByRole('button', { name: 'Previous sports' }))
+    await user.click(within(strip).getByRole('button', { name: 'Previous sports' }))
+    expect(within(strip).getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Tennis', 'Football'])
+  })
+
+  it('shows the FAQ as native disclosure items with only the first answer open', async () => {
+    installFakeFetch(catalog)
+    const user = userEvent.setup()
+    renderApp('/')
+    const faq = screen.getByRole('region', { name: 'Got questions?' })
+    const items = faq.querySelectorAll('details')
+    expect(items).toHaveLength(4)
+    expect(items[0]).toHaveAttribute('open')
+    expect(items[3]).not.toHaveAttribute('open')
+    await user.click(within(faq).getByText('Can I come for a single visit?'))
+    expect(items[3]).toHaveAttribute('open')
+    expect(within(faq).getByText(/membership card discounts do not apply/)).toBeInTheDocument()
+  })
+
+  it('loads high resolution sport photos and falls back to the bundled image when one fails', async () => {
+    installFakeFetch(catalog)
+    renderApp('/')
+    const photo = screen.getByRole('img', { name: 'Swimming training' })
+    expect(photo.getAttribute('src')).toMatch(/^https:\/\/images\.unsplash\.com\/photo-1530549387789/)
+    fireEvent.error(photo)
+    expect(photo.getAttribute('src')).not.toMatch(/unsplash/)
+    expect(screen.getByRole('img', { name: 'Tennis training' }).getAttribute('src')).toMatch(/images\.unsplash\.com/)
+  })
+
+  it('sends the class finder sport, level and training format to Find Classes', async () => {
+    installFakeFetch(catalog)
+    const user = userEvent.setup()
+    renderApp('/')
+    await screen.findByRole('option', { name: 'Football' })
+    await user.selectOptions(screen.getByLabelText('Sport'), '41')
+    await user.selectOptions(screen.getByLabelText('Training'), 'COACH_LED')
+    await user.click(screen.getByRole('button', { name: 'Find classes' }))
+    await screen.findByRole('heading', { name: 'Welcome back' })
+  })
+
+  it('loads high resolution sport photos and falls back to the bundled image when one fails', async () => {
+    installFakeFetch(catalog)
+    renderApp('/')
+    const photo = screen.getByRole('img', { name: 'Swimming training' })
+    expect(photo.getAttribute('src')).toMatch(/^https:\/\/images\.unsplash\.com\/photo-1530549387789/)
+    fireEvent.error(photo)
+    expect(photo.getAttribute('src')).not.toMatch(/unsplash/)
+    expect(screen.getByRole('img', { name: 'Tennis training' }).getAttribute('src')).toMatch(/images\.unsplash\.com/)
   })
 
   it('toggles the mobile navigation with keyboard controls and Escape restores toggle focus', async () => {

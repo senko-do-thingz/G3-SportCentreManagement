@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
@@ -30,7 +30,7 @@ describe('Home account navigation', () => {
     const user = userEvent.setup()
     renderApp('/')
     expect(screen.getByRole('link', { name: 'Log in' })).toHaveAccessibleDescription('Log in to your existing account')
-    expect(screen.getByRole('link', { name: 'Join now' })).toHaveAccessibleDescription('Create a new member account')
+    expect(within(screen.getByRole('banner')).getByRole('link', { name: 'Join now' })).toHaveAccessibleDescription('Create a new member account')
     await user.click(screen.getByRole('link', { name: 'Log in' }))
     await screen.findByRole('heading', { name: 'Welcome back' })
     await user.click(screen.getByRole('link', { name: 'Create an account' }))
@@ -55,8 +55,8 @@ describe('Home account navigation', () => {
     })
     const user = userEvent.setup()
     renderApp('/')
-    await user.selectOptions(screen.getByLabelText('Appearance'), 'dark')
-    await user.click(screen.getByRole('link', { name: 'Join now' }))
+    await user.click(screen.getByRole('button', { name: 'Switch to dark mode' }))
+    await user.click(within(screen.getByRole('banner')).getByRole('link', { name: 'Join now' }))
     await screen.findByRole('heading', { name: 'Create your account' })
     expect(screen.getByLabelText('Appearance')).toHaveValue('dark')
     await fillRegistration(user)
@@ -75,7 +75,7 @@ describe('Home account navigation', () => {
     const { calls } = installFakeFetch((call) => call.path === '/auth/register' ? backendError(409, 'Email is already registered') : catalogue(call))
     const user = userEvent.setup()
     renderApp('/')
-    await user.click(screen.getByRole('link', { name: 'Join now' }))
+    await user.click(within(screen.getByRole('banner')).getByRole('link', { name: 'Join now' }))
     await screen.findByRole('heading', { name: 'Create your account' })
     await user.click(screen.getByRole('button', { name: 'Create account' }))
     expect(calls.some((call) => call.path === '/auth/register')).toBe(false)
@@ -95,7 +95,7 @@ describe('Home account navigation', () => {
     })
     const user = userEvent.setup()
     renderApp('/')
-    await user.click(screen.getByRole('link', { name: 'Join now' }))
+    await user.click(within(screen.getByRole('banner')).getByRole('link', { name: 'Join now' }))
     await screen.findByRole('heading', { name: 'Create your account' })
     await fillRegistration(user)
     await user.click(screen.getByRole('button', { name: 'Create account' }))
@@ -114,7 +114,7 @@ describe('Home account navigation', () => {
     const recover = await screen.findByRole('link', { name: 'Recover session' })
     expect(screen.queryByRole('link', { name: 'Join now' })).not.toBeInTheDocument()
     expect(tokenStorage.hasSession()).toBe(true)
-    await user.selectOptions(screen.getByLabelText('Appearance'), 'dark')
+    await user.click(screen.getByRole('button', { name: 'Switch to dark mode' }))
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('dark'))
     expect(calls.filter((call) => call.path === '/users/me')).toHaveLength(1)
     await user.click(recover)
