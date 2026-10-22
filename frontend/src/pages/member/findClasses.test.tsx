@@ -1,3 +1,5 @@
+/// <reference types="node" />
+import { readFileSync } from 'node:fs'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -5,6 +7,7 @@ import { tokenStorage } from '../../api/tokenStorage'
 import { renderApp } from '../../test/renderApp'
 import { backendError, installFakeFetch, json, MEMBER } from '../../test/fakeBackend'
 
+const browseStyles = readFileSync('src/styles/memberSchedule.css', 'utf8')
 const session = { id: 5, sportId: 3, sportName: 'Basketball', classId: 1, className: 'Basketball Foundations', trainingFormat: 'COACH_LED', level: 'BEGINNER', coachId: 3, coachName: 'Quan Coach', facilityId: 1, facilityName: 'Court A', sessionDate: '2026-10-16', startTime: '16:00:00', endTime: '17:00:00', capacity: 20, bookedCount: 2, freeSeats: 18, full: false, status: 'PUBLISHED' }
 function backend(many = false) {
   return installFakeFetch((call) => {
@@ -18,8 +21,15 @@ function backend(many = false) {
     return backendError(404, 'Unexpected test request')
   })
 }
-beforeEach(() => { vi.stubEnv('VITE_MANAGER_PREVIEW', 'false'); tokenStorage.startSession({ accessToken: 'member-test', refreshToken: 'refresh-test' }) })
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs() })
+let styles: HTMLStyleElement
+beforeEach(() => {
+  vi.stubEnv('VITE_MANAGER_PREVIEW', 'false')
+  tokenStorage.startSession({ accessToken: 'member-test', refreshToken: 'refresh-test' })
+  styles = document.createElement('style')
+  styles.textContent = browseStyles
+  document.head.append(styles)
+})
+afterEach(() => { styles.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 describe('FE-08 find classes', () => {
   it('restores URL filters, combines changes and preserves a local return URL', async () => {
     const api = backend()
@@ -27,7 +37,10 @@ describe('FE-08 find classes', () => {
     renderApp('/member/classes?from=2026-10-16&to=2026-11-15&sportId=3&level=BEGINNER')
     await screen.findByText('Basketball Foundations')
     expect(screen.getByRole('button', { name: 'Beginner' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('img', { name: 'Basketball training session' })).toBeInTheDocument()
+    const photo = screen.getByRole('img', { name: 'Basketball training session' })
+    expect(photo).toBeInTheDocument()
+    expect(getComputedStyle(photo.parentElement!).width).toBe('100%')
+    expect(getComputedStyle(photo.closest('article')!).alignItems).toBe('stretch')
     await user.selectOptions(screen.getByLabelText('Training format'), 'COACH_LED')
     await screen.findByRole('option', { name: 'Quan Coach' })
     await user.selectOptions(screen.getByLabelText('Coach'), '3')

@@ -633,9 +633,9 @@
 .class-discovery__results-heading h2 { margin: 0; color: var(--color-text); font-size: 22px; }
 .class-discovery__results-heading .browse-muted { margin: 0; text-align: right; }
 .class-discovery .browse-grid { margin-top: 16px; }
-.class-session-card { gap: 0; padding: 0; overflow: hidden; border-radius: 15px; box-shadow: 0 8px 22px rgba(11, 23, 54, 0.07); transition: transform 0.18s ease, box-shadow 0.18s ease; }
+.class-session-card { align-items: stretch; gap: 0; padding: 0; overflow: hidden; border-radius: 15px; box-shadow: 0 8px 22px rgba(11, 23, 54, 0.07); transition: transform 0.18s ease, box-shadow 0.18s ease; }
 .class-session-card:hover { transform: translateY(-3px); box-shadow: 0 16px 32px rgba(11, 23, 54, 0.13); }
-.class-session-card__image { position: relative; min-height: 178px; overflow: hidden; background: #102654; }
+.class-session-card__image { position: relative; flex: 0 0 178px; width: 100%; overflow: hidden; background: #102654; }
 .class-session-card__image > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .class-session-card__image-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(5, 13, 31, 0.04) 10%, rgba(5, 13, 31, 0.77) 100%); }
 .class-session-card__sport { position: absolute; top: 14px; left: 14px; max-width: calc(100% - 28px); padding: 7px 10px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 999px; background: rgba(11, 23, 54, 0.54); color: #ffffff; font-size: 11px; font-weight: 800; letter-spacing: 0.07em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; backdrop-filter: blur(8px); }

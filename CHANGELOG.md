@@ -1,3 +1,7 @@
+## 2026-10-23 - Fix member class cover image layout (FE-08)
+
+- Stretch each session image container across the card and add a regression check for its rendered width.
+
 ## 2026-10-23 - Member class discovery refresh (FE-08)
 
 - Add bundled sport photography, visual sport and skill-level filters, and image-led session cards while preserving URL filters, pagination, and session-detail booking links.
