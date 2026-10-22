@@ -1,48 +1,156 @@
 import { useCallback, useState } from 'react'
-import { Link, useLocation, useSearchParams } from 'react-router-dom'
-import { memberSessionsApi } from '../../api/memberSessionsApi'
-import { packagesApi } from '../../api/packagesApi'
-import { Button, Card, EmptyState, Input, PageHeader, PageLoader, Select, buttonClassName } from '../../components/ui'
+import { Link, useSearchParams } from 'react-router-dom'
+import { memberSessionsApi, type BrowseSession } from '../../api/memberSessionsApi'
+import { Badge, Button, Card, EmptyState, Input, PageHeader, PageLoader, buttonClassName } from '../../components/ui'
 import { BrowseError } from './BrowseError'
 import { MemberScheduleNav } from './MemberScheduleNav'
-import { SessionCard } from './SessionCard'
-import { BROWSE_FORMATS, browseFilters, updateBrowseParams } from './scheduleFilters'
-import { browseAddDays, browseDate, browseDay, browseMonday, browseToday, validBrowseDate } from './memberScheduleDates'
+import { browseAddDays, browseDate, browseDay, browseIsoWeek, browseMonday, browseMondayFromIsoWeek, browseToday, validBrowseDate } from './memberScheduleDates'
 import { useMemberResource } from './useMemberResource'
 
-const loadSports = (signal: AbortSignal) => packagesApi.sports({ signal })
 export function MemberSchedulePage() {
   const [params, setParams] = useSearchParams()
-  const location = useLocation()
   const [today] = useState(browseToday)
-  const dateValue = params.get('date') ?? today
-  const date = validBrowseDate(dateValue) ? dateValue : today
-  const daily = params.get('view') === 'day'
-  const from = daily ? date : browseMonday(date)
-  const to = daily ? date : browseAddDays(from, 6)
-  const { sportId, format } = browseFilters(params, today)
-  const [sports, retrySports] = useMemberResource(loadSports)
-  const loader = useCallback((signal: AbortSignal) => memberSessionsApi.all({ from, to, sportId, format }, signal), [from, to, sportId, format])
+  const selectedDate = params.get('date') ?? today
+  const from = browseMonday(validBrowseDate(selectedDate) ? selectedDate : today)
+  const to = browseAddDays(from, 6)
+  const currentWeek = browseMonday(today)
+  const days = Array.from({ length: 7 }, (_, index) => browseAddDays(from, index))
+  const loader = useCallback((signal: AbortSignal) => memberSessionsApi.all({ from, to }, signal), [from, to])
   const [resource, reload] = useMemberResource(loader)
-  const returnTo = location.pathname + location.search
-  const dates = Array.from({ length: daily ? 1 : 7 }, (_, index) => browseAddDays(from, index))
-  function change(key: string, value: string) { setParams((previous) => updateBrowseParams(previous, key, value)) }
-  return <div className="page browse-page">
-    <MemberScheduleNav />
-    <PageHeader eyebrow="Member / Classes & schedule" title="View Schedule" description="Find a session that fits your week. All times are Vietnam time (UTC+7)." actions={<Link className={buttonClassName()} to={`/member/classes?${new URLSearchParams({ from, to, ...(sportId ? { sportId: String(sportId) } : {}), ...(format ? { format } : {}) })}`}>Find classes</Link>} />
-    <Card title={daily ? browseDate(date) : `${browseDate(from)} - ${browseDate(to)}`}>
-      <div className="browse-filters">
-        <Select label="Sport" placeholder="All sports" value={sportId ? String(sportId) : ''} options={sports.status === 'ready' ? sports.data.map((sport) => ({ value: String(sport.id), label: sport.name })) : []} onChange={(event) => change('sportId', event.target.value)} />
-        <Select label="Training format" placeholder="All formats" value={format ?? ''} options={BROWSE_FORMATS} onChange={(event) => change('format', event.target.value)} />
-        <Input label="Selected date" type="date" value={date} onChange={(event) => change('date', event.target.value)} />
-        <Select label="Schedule view" options={[{ value: 'week', label: 'Week' }, { value: 'day', label: 'Day' }]} value={daily ? 'day' : 'week'} onChange={(event) => change('view', event.target.value)} />
+  const returnTo = `/member/schedule?${new URLSearchParams({ date: from })}`
+  const findClassesHref = `/member/classes?${new URLSearchParams({ from, to })}`
+
+  function changeWeek(monday: string) {
+    setParams({ date: monday }, { replace: true })
+  }
+
+  return (
+    <div className="page browse-page">
+      <MemberScheduleNav />
+      <PageHeader
+        eyebrow="Member / Classes & schedule"
+        title="View Schedule"
+        description="Browse the week and choose a session to view or book. All times use Vietnam time (UTC+7)."
+        actions={<Link className={buttonClassName()} to={findClassesHref}>Find classes</Link>}
+      />
+
+      <Card title={`${browseDate(from)} - ${browseDate(to)}`}>
+        <div className="schedule-controls">
+          <Input
+            className="schedule-week-input"
+            label="Choose week"
+            type="week"
+            value={browseIsoWeek(from)}
+            onChange={(event) => {
+              const monday = browseMondayFromIsoWeek(event.target.value)
+              if (monday) changeWeek(monday)
+            }}
+          />
+          <div className="schedule-week-nav" role="group" aria-label="Week navigation">
+            <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, -7))}>Previous week</Button>
+            <Button variant={from === currentWeek ? 'primary' : 'secondary'} disabled={from === currentWeek} onClick={() => changeWeek(currentWeek)}>
+              This week
+            </Button>
+            <Button variant="secondary" onClick={() => changeWeek(browseAddDays(from, 7))}>Next week</Button>
+          </div>
+        </div>
+
+        {resource.status === 'loading' ? (
+          <PageLoader label="Loading schedule" />
+        ) : resource.status === 'error' ? (
+          <BrowseError error={resource.error} onRetry={reload} />
+        ) : resource.data.length === 0 ? (
+          <EmptyState
+            title="No sessions this week"
+            description="Choose another week or look for a class on a different date."
+            action={<Link className={buttonClassName('secondary')} to={findClassesHref}>Find classes</Link>}
+          />
+        ) : (
+          <WeeklyScheduleTable sessions={resource.data} days={days} today={today} returnTo={returnTo} />
+        )}
+      </Card>
+    </div>
+  )
+}
+
+function WeeklyScheduleTable({
+  sessions,
+  days,
+  today,
+  returnTo,
+}: {
+  sessions: BrowseSession[]
+  days: string[]
+  today: string
+  returnTo: string
+}) {
+  const timeSlots = [...new Set(sessions.map((session) => session.startTime.slice(0, 5)))].sort()
+  const sessionsByDayAndTime = new Map<string, BrowseSession[]>()
+  for (const session of sessions) {
+    const key = `${session.sessionDate}|${session.startTime.slice(0, 5)}`
+    sessionsByDayAndTime.set(key, [...(sessionsByDayAndTime.get(key) ?? []), session])
+  }
+
+  return (
+    <>
+      <p className="schedule-scroll-hint">Scroll horizontally to view all seven days.</p>
+      <div className="schedule-table-wrap" role="region" aria-label="Weekly session timetable" tabIndex={0}>
+        <table className="schedule-table" aria-label="Weekly schedule">
+          <thead>
+            <tr>
+              <th className="schedule-table__time-heading" scope="col">Time</th>
+              {days.map((day) => (
+                <th className={day === today ? 'schedule-table__today' : undefined} scope="col" key={day} aria-current={day === today ? 'date' : undefined}>
+                  <span>{browseDay(day)}</span>
+                  <time dateTime={day}>{browseDate(day)}</time>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {timeSlots.map((time) => (
+              <tr key={time}>
+                <th scope="row">{time}</th>
+                {days.map((day) => {
+                  const key = `${day}|${time}`
+                  const daySessions = sessionsByDayAndTime.get(key) ?? []
+                  return (
+                    <td className={day === today ? 'schedule-table__today' : undefined} key={day}>
+                      {daySessions.length > 0 ? (
+                        <div className="schedule-table__entries">
+                          {daySessions.map((session) => (
+                            <ScheduleEntry session={session} returnTo={returnTo} key={session.id} />
+                          ))}
+                        </div>
+                      ) : <span className="schedule-table__empty-cell" aria-label="No sessions">-</span>}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-      {sports.status === 'error' && <BrowseError error={sports.error} onRetry={retrySports} />}
-      <div className="browse-actions"><Button variant="secondary" onClick={() => change('date', browseAddDays(date, daily ? -1 : -7))}>{daily ? 'Previous day' : 'Previous week'}</Button><Button variant="secondary" onClick={() => change('date', today)}>Today</Button><Button variant="secondary" onClick={() => change('date', browseAddDays(date, daily ? 1 : 7))}>{daily ? 'Next day' : 'Next week'}</Button><Button variant="ghost" onClick={reload}>Refresh schedule</Button></div>
-      {resource.status === 'loading' ? <PageLoader label="Loading schedule" /> : resource.status === 'error' ? <BrowseError error={resource.error} onRetry={reload} /> : <>
-        {!resource.data.length && <EmptyState title="No sessions in this range" description="Try another date, clear filters or find classes." action={<Button variant="secondary" onClick={() => { setParams({ date: today, view: daily ? 'day' : 'week' }) }}>Clear filters</Button>} />}
-        <div className={`browse-calendar${daily ? ' browse-calendar--day' : ''}`}>{dates.map((day) => <section className="browse-day" aria-label={`${browseDay(day)} ${browseDate(day)}`} key={day}><h2>{browseDay(day)} {browseDate(day)}</h2>{resource.data.filter((session) => session.sessionDate === day).map((session) => <SessionCard session={session} returnTo={returnTo} key={session.id} />)}{!resource.data.some((session) => session.sessionDate === day) && <p className="browse-muted">No sessions</p>}</section>)}</div>
-      </>}
-    </Card>
-  </div>
+    </>
+  )
+}
+
+function ScheduleEntry({ session, returnTo }: { session: BrowseSession; returnTo: string }) {
+  const selfTraining = session.trainingFormat === 'SELF_TRAINING'
+  const title = session.className || `${session.sportName} ${selfTraining ? 'Self-training' : 'Session'}`
+  const format = selfTraining ? 'Self-training' : 'Coach-led'
+  const details = `/member/sessions/${session.id}?${new URLSearchParams({ returnTo })}`
+
+  return (
+    <article className="schedule-entry">
+      <Link className="schedule-entry__title" to={details}>{title}</Link>
+      <p className="schedule-entry__meta">{session.startTime.slice(0, 5)} - {session.endTime.slice(0, 5)}</p>
+      <p className="schedule-entry__meta">{session.sportName} - {format}{session.level ? ` / ${session.level[0] + session.level.slice(1).toLowerCase()}` : ''}</p>
+      {!selfTraining && <p className="schedule-entry__meta">Coach: {session.coachName || 'Not provided'}</p>}
+      <p className="schedule-entry__meta">{session.facilityName || 'Facility not provided'}</p>
+      <Badge tone={session.full || session.freeSeats <= 0 ? 'warning' : 'success'}>
+        {session.full || session.freeSeats <= 0 ? 'Fully booked' : `${session.freeSeats} ${session.freeSeats === 1 ? 'spot' : 'spots'} left`}
+      </Badge>
+    </article>
+  )
 }

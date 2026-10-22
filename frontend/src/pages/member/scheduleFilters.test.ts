@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { browseFilters, browseRangeError, safeBrowseReturn, updateBrowseParams } from './scheduleFilters'
-import { browseAddDays, browseMonday, browseToday, sessionMinutes, validBrowseDate } from './memberScheduleDates'
+import { browseAddDays, browseIsoWeek, browseMonday, browseMondayFromIsoWeek, browseToday, sessionMinutes, validBrowseDate } from './memberScheduleDates'
 describe('member browse query and dates', () => {
   it('parses supported filters and safe defaults', () => {
     expect(browseFilters(new URLSearchParams('sportId=3&format=COACH_LED&level=BEGINNER&coachId=4&page=2'), '2026-10-16')).toMatchObject({ sportId: 3, coachId: 4, format: 'COACH_LED', level: 'BEGINNER', page: 2, from: '2026-10-16', to: '2026-11-15' })
@@ -18,6 +18,12 @@ describe('member browse query and dates', () => {
     expect(validBrowseDate('0000-01-01')).toBe(false)
     expect(browseRangeError('2026-10-20', '2026-10-19')).toMatch(/From date/)
     expect(browseMonday('2026-10-18')).toBe('2026-10-12')
+    expect(browseIsoWeek('2026-10-16')).toBe('2026-W42')
+    expect(browseMondayFromIsoWeek('2026-W42')).toBe('2026-10-12')
+    expect(browseIsoWeek('2021-01-01')).toBe('2020-W53')
+    expect(browseMondayFromIsoWeek('2021-W53')).toBeNull()
+    expect(browseMondayFromIsoWeek('2026-W00')).toBeNull()
+    expect(browseMondayFromIsoWeek('not-a-week')).toBeNull()
     expect(browseAddDays('2026-12-31', 1)).toBe('2027-01-01')
     expect(browseToday(new Date('2026-10-16T18:00:00Z'))).toBe('2026-10-17')
     expect(sessionMinutes('09:00:00', '10:30:00')).toBe('90 minutes')

@@ -1,3 +1,9 @@
+## 2026-10-22 - Simplified member weekly schedule (FE-08)
+
+- Replace the multi-filter day/week calendar with a week picker and Previous week / This week / Next week navigation.
+- Show sessions in a seven-day timetable grouped by start time, with links to session details and coach, facility, format, and availability information.
+- Keep the existing member session API, route guards, retry and empty states, and return context. No backend changes.
+
 ## 2026-10-20 - Global appearance and Home authentication actions
 
 - Add shared System, Light and Dark preferences across Home, authentication and all role layouts, with live OS updates, independent persistence, cross-tab updates and a same-origin bootstrap before React paint.

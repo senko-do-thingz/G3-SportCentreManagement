@@ -6,10 +6,27 @@
 .browse-tab--disabled { color: var(--color-text-muted); background: var(--color-neutral-soft); }
 .browse-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
 .browse-filters .field { min-width: 0; }
-.browse-calendar { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 12px; margin-top: 24px; }
-.browse-calendar--day { grid-template-columns: minmax(0, 1fr); }
-.browse-day { min-width: 0; background: var(--color-surface-muted); padding: 12px; border-radius: 10px; }
-.browse-day > h2 { font-size: 13px; margin-bottom: 16px; }
+.schedule-controls { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.schedule-week-input { width: min(100%, 260px); }
+.schedule-week-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.schedule-scroll-hint { display: none; margin: 0 0 8px; color: var(--color-text-muted); font-size: 12px; }
+.schedule-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--color-border); border-radius: 10px; overscroll-behavior-x: contain; }
+.schedule-table { width: 100%; min-width: 1080px; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
+.schedule-table th, .schedule-table td { padding: 12px; border-right: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); vertical-align: top; }
+.schedule-table tr > :last-child { border-right: 0; }
+.schedule-table tbody tr:last-child > * { border-bottom: 0; }
+.schedule-table thead th { background: var(--color-surface-muted); color: var(--color-text); font-size: 13px; text-align: center; }
+.schedule-table thead th:first-child, .schedule-table tbody th { width: 88px; }
+.schedule-table thead th > span, .schedule-table thead th > time { display: block; }
+.schedule-table thead th > time { margin-top: 4px; color: var(--color-text-muted); font-size: 12px; font-weight: 400; }
+.schedule-table tbody th { background: var(--color-surface-muted); color: var(--color-text-muted); font-size: 13px; font-weight: 700; text-align: center; }
+.schedule-table__today { background: var(--color-primary-soft); }
+.schedule-table__empty-cell { color: var(--color-text-muted); }
+.schedule-table__entries { display: grid; gap: 8px; }
+.schedule-entry { display: grid; gap: 7px; min-width: 0; padding: 10px; border: 1px solid var(--color-border); border-radius: 9px; background: var(--color-surface); overflow-wrap: anywhere; }
+.schedule-entry__title { color: var(--color-primary); font-size: 13px; font-weight: 700; line-height: 1.4; }
+.schedule-entry__meta { margin: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.45; }
+.schedule-entry > .badge { justify-self: start; }
 .browse-session { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; min-width: 0; overflow-wrap: anywhere; }
 .browse-session h3 { font-size: 16px; line-height: 1.4; }
 .browse-session p { font-size: 13px; margin: 0; }
@@ -68,6 +85,5 @@
 .booking-cancel-warning { padding: 16px; border-radius: 10px; background: var(--color-warning-soft); color: var(--color-warning); line-height: 1.6; }
 .booking-cancel-warning p { margin: 8px 0 0; }
 .booking-cancel-card > h2 { margin: 20px 0 0; }
-@media (max-width: 1300px) { .browse-calendar { grid-template-columns: repeat(3, minmax(0, 1fr)); } .browse-calendar--day { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 900px) { .browse-calendar, .browse-detail { grid-template-columns: minmax(0, 1fr); } .browse-grid, .browse-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 600px) { .browse-grid, .browse-filters { grid-template-columns: minmax(0, 1fr); } .browse-tab { flex: 1 1 130px; padding: 12px; } .browse-facts > div { flex-wrap: wrap; } .browse-facts dd { text-align: left; } .booking-history-card__heading { flex-direction: column; } .booking-tab { flex: 1; padding-inline: 8px; } }
+@media (max-width: 900px) { .browse-detail { grid-template-columns: minmax(0, 1fr); } .browse-grid, .browse-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .schedule-scroll-hint { display: block; } }
+@media (max-width: 600px) { .browse-grid, .browse-filters { grid-template-columns: minmax(0, 1fr); } .browse-tab { flex: 1 1 130px; padding: 12px; } .browse-facts > div { flex-wrap: wrap; } .browse-facts dd { text-align: left; } .booking-history-card__heading { flex-direction: column; } .booking-tab { flex: 1; padding-inline: 8px; } .schedule-week-nav { width: 100%; } .schedule-week-nav > .btn { flex: 1 1 130px; } }

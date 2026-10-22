@@ -13,6 +13,24 @@ export function browseAddDays(date: string, count: number): string {
   return value.toISOString().slice(0, 10)
 }
 export function browseMonday(date: string): string { return browseAddDays(date, -((new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7)) }
+export function browseIsoWeek(date: string): string {
+  if (!validBrowseDate(date)) return ''
+  const monday = browseMonday(date)
+  const thursday = browseAddDays(monday, 3)
+  const year = thursday.slice(0, 4)
+  const firstMonday = browseMonday(`${year}-01-04`)
+  const week = Math.floor((Date.parse(`${monday}T00:00:00Z`) - Date.parse(`${firstMonday}T00:00:00Z`)) / 604800000) + 1
+  return `${year}-W${String(week).padStart(2, '0')}`
+}
+export function browseMondayFromIsoWeek(value: string): string | null {
+  const match = /^(\d{4})-W(\d{1,2})$/.exec(value)
+  if (!match) return null
+  const year = Number(match[1])
+  const week = Number(match[2])
+  if (year < 1 || week < 1 || week > 53) return null
+  const monday = browseAddDays(browseMonday(`${match[1]}-01-04`), (week - 1) * 7)
+  return validBrowseDate(monday) && browseIsoWeek(monday) === `${match[1]}-W${String(week).padStart(2, '0')}` ? monday : null
+}
 export function browseDate(date: string): string { return validBrowseDate(date) ? date.split('-').reverse().join('/') : 'Date unavailable' }
 export function browseDay(date: string): string { return new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${date}T00:00:00Z`)) }
 export function sessionMinutes(start: string, end: string): string {
