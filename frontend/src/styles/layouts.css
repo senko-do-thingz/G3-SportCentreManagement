@@ -250,7 +250,7 @@
   padding-bottom: var(--space-12);
 }
 
-.member-main:has(.schedule-table) {
+.member-main:has(.member-schedule-theme) {
   max-width: 1500px;
 }
 

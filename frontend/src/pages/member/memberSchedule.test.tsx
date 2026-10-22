@@ -27,6 +27,7 @@ describe('FE-08 member calendar', () => {
     expect(screen.queryByText('No sessions this week')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByText('No sessions this week')).toBeInTheDocument()
+    expect(document.querySelector('.member-main:has(.member-schedule-theme)')).toBeInTheDocument()
   })
   it('renders a seven-day timetable and reads the complete week without extra filter lookups', async () => {
     const api = backend()

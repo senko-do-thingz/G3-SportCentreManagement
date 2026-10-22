@@ -1,3 +1,7 @@
+## 2026-10-22 - Keep member schedule width stable for empty weeks (FE-08)
+
+- Apply the schedule's wide member content layout based on the schedule page marker rather than the timetable table, which is absent for empty weeks, errors and initial loading. Add an empty-state regression assertion. No API or backend changes.
+
 ## 2026-10-22 - Smooth member schedule week changes (FE-08)
 
 - Keep the previous timetable visible but non-interactive while a newly selected week loads, with a clear loading overlay and stable schedule-area height. Respect reduced-motion preferences. No API or backend changes.
