@@ -1,3 +1,8 @@
+## 2026-10-22 - Login visual alignment with Home (FE-00)
+
+- Apply the refreshed Home page's navy, Royal Blue, and Gold visual language to the login screen only, including light/dark surface colors, hero treatment, form controls, and primary action.
+- Preserve the shared authentication layout and behavior; registration remains visually unchanged.
+
 ## 2026-10-22 - Home redesign (FE-HOME)
 
 - Rebuild public Home from the team-approved design screenshot: photo hero with Facility highlights, sport spotlight strip (previous/next, 01-06 counter, Membership offers), class finder (Sport, Level, Training), features, 3x2 sport photo grid, coaches with All coaches, three package cards with a highlighted Coach-led card, membership strip, FAQ, Ready to play call to action and a four-column footer.
