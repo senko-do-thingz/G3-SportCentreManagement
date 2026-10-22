@@ -58,7 +58,7 @@ describe('FE-08 member calendar', () => {
     fireEvent.change(screen.getByLabelText('Choose week'), { target: { value: '2026-W44' } })
     await waitFor(() => expect(api.calls.some((call) => call.path.includes('from=2026-10-26') && call.path.includes('to=2026-11-01'))).toBe(true))
   })
-  it('keeps the previous timetable in place while the selected week loads, then swaps it without a blank state', async () => {
+  it('shows a stable loading skeleton instead of stale week content, then reveals the selected week', async () => {
     backend()
     const nextWeekSession = { ...browseSessionFixture, id: 6, sessionDate: '2026-10-23', className: 'Swimming Fundamentals' }
     let resolveNextWeek!: (sessions: BrowseSession[]) => void
@@ -73,11 +73,10 @@ describe('FE-08 member calendar', () => {
     await user.click(screen.getByRole('button', { name: 'Next week' }))
 
     const loadingStatus = await screen.findByRole('status')
-    expect(loadingStatus).toHaveTextContent('Loading selected week')
-    expect(loadingStatus).toHaveTextContent('The previous week stays visible')
-    expect(screen.getByRole('region', { name: 'Weekly session timetable' })).toBeInTheDocument()
+    expect(loadingStatus).toHaveAccessibleName(/Loading schedule for/)
+    expect(document.querySelector('.schedule-skeleton')).toBeInTheDocument()
     expect(document.querySelector('.schedule-content-frame')).toHaveAttribute('aria-busy', 'true')
-    expect(screen.getByText('Basketball Foundations')).toBeInTheDocument()
+    expect(screen.queryByText('Basketball Foundations')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Choose week')).toHaveValue('2026-W43')
 
     await act(async () => { resolveNextWeek([nextWeekSession]) })

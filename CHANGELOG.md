@@ -1,3 +1,7 @@
+## 2026-10-22 - Prevent stale-week flicker in member schedule (FE-08)
+
+- Replace the faded previous-week timetable during navigation with a fixed-height timetable skeleton labeled with the requested date range. Fade in the resolved week briefly; respect reduced-motion preferences. No API or backend changes.
+
 ## 2026-10-22 - Keep member schedule width stable for empty weeks (FE-08)
 
 - Apply the schedule's wide member content layout based on the schedule page marker rather than the timetable table, which is absent for empty weeks, errors and initial loading. Add an empty-state regression assertion. No API or backend changes.

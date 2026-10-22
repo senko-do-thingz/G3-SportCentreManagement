@@ -7,15 +7,6 @@ import { MemberScheduleNav } from './MemberScheduleNav'
 import { browseAddDays, browseDate, browseDay, browseIsoWeek, browseMonday, browseMondayFromIsoWeek, browseToday, validBrowseDate } from './memberScheduleDates'
 import { useMemberResource } from './useMemberResource'
 
-interface ScheduleSnapshot {
-  from: string
-  to: string
-  sessions: BrowseSession[]
-  days: string[]
-  returnTo: string
-  findClassesHref: string
-}
-
 export function MemberSchedulePage() {
   const [params, setParams] = useSearchParams()
   const [today] = useState(browseToday)
@@ -24,25 +15,15 @@ export function MemberSchedulePage() {
   const to = browseAddDays(from, 6)
   const currentWeek = browseMonday(today)
   const days = Array.from({ length: 7 }, (_, index) => browseAddDays(from, index))
-  const [lastSchedule, setLastSchedule] = useState<ScheduleSnapshot | null>(null)
+  const [hasLoadedSchedule, setHasLoadedSchedule] = useState(false)
   const loader = useCallback(async (signal: AbortSignal) => {
     const sessions = await memberSessionsApi.all({ from, to }, signal)
-    if (!signal.aborted) {
-      setLastSchedule({
-        from,
-        to,
-        sessions,
-        days: Array.from({ length: 7 }, (_, index) => browseAddDays(from, index)),
-        returnTo: `/member/schedule?${new URLSearchParams({ date: from })}`,
-        findClassesHref: `/member/classes?${new URLSearchParams({ from, to })}`,
-      })
-    }
+    if (!signal.aborted) setHasLoadedSchedule(true)
     return sessions
   }, [from, to])
   const [resource, reload] = useMemberResource(loader)
   const returnTo = `/member/schedule?${new URLSearchParams({ date: from })}`
   const findClassesHref = `/member/classes?${new URLSearchParams({ from, to })}`
-  const previousSchedule = resource.status === 'loading' ? lastSchedule : null
 
   function changeWeek(monday: string) {
     setParams({ date: monday }, { replace: true })
@@ -81,37 +62,19 @@ export function MemberSchedulePage() {
 
         <div className="schedule-content-frame" aria-busy={resource.status === 'loading'}>
           {resource.status === 'loading' ? (
-            previousSchedule ? (
-              <>
-                <div className="schedule-content-frame__stale" inert>
-                  <ScheduleContents
-                    sessions={previousSchedule.sessions}
-                    days={previousSchedule.days}
-                    today={today}
-                    returnTo={previousSchedule.returnTo}
-                    findClassesHref={previousSchedule.findClassesHref}
-                  />
-                </div>
-                <div className="schedule-content-frame__loading" role="status" aria-live="polite">
-                  <span className="schedule-content-frame__spinner" aria-hidden="true" />
-                  <strong>Loading selected week</strong>
-                  <span>{browseDate(from)} - {browseDate(to)}</span>
-                  <span className="schedule-content-frame__loading-note">
-                    The previous week stays visible until this schedule is ready.
-                  </span>
-                </div>
-              </>
-            ) : <PageLoader label="Loading schedule" />
+            hasLoadedSchedule ? <ScheduleLoadingSkeleton from={from} to={to} /> : <PageLoader label="Loading schedule" />
           ) : resource.status === 'error' ? (
             <BrowseError error={resource.error} onRetry={reload} />
           ) : (
-            <ScheduleContents
-              sessions={resource.data}
-              days={days}
-              today={today}
-              returnTo={returnTo}
-              findClassesHref={findClassesHref}
-            />
+            <div className="schedule-content-frame__ready" key={from}>
+              <ScheduleContents
+                sessions={resource.data}
+                days={days}
+                today={today}
+                returnTo={returnTo}
+                findClassesHref={findClassesHref}
+              />
+            </div>
           )}
         </div>
       </Card>
@@ -140,6 +103,37 @@ function ScheduleContents({
     />
   ) : (
     <WeeklyScheduleTable sessions={sessions} days={days} today={today} returnTo={returnTo} />
+  )
+}
+
+function ScheduleLoadingSkeleton({ from, to }: { from: string; to: string }) {
+  const weekLabel = `${browseDate(from)} - ${browseDate(to)}`
+  return (
+    <div className="schedule-skeleton" role="status" aria-label={`Loading schedule for ${weekLabel}`}>
+      <div className="schedule-skeleton__label" aria-hidden="true">
+        <span className="schedule-skeleton__dot" />
+        <strong>Loading selected week</strong>
+        <span>{weekLabel}</span>
+      </div>
+      <p className="schedule-scroll-hint" aria-hidden="true">Scroll horizontally to view all seven days.</p>
+      <div className="schedule-skeleton__scroll" aria-hidden="true">
+        <div className="schedule-skeleton__grid">
+          <div className="schedule-skeleton__header">
+            {Array.from({ length: 8 }, (_, index) => <span key={index} />)}
+          </div>
+          {Array.from({ length: 3 }, (_, row) => (
+            <div className="schedule-skeleton__row" key={row}>
+              <span className="schedule-skeleton__time" />
+              {Array.from({ length: 7 }, (_, day) => (
+                <span className="schedule-skeleton__cell" key={day}>
+                  {(row + day * 2) % 5 === 0 && <i />}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }
 
