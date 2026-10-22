@@ -128,7 +128,13 @@
   flex-direction: column;
   justify-content: center;
   gap: var(--space-6);
-  padding: var(--space-12) var(--space-10);
+  padding: var(--space-10) var(--space-12);
+}
+
+/* Brand and appearance control sit on one line, separated from the heading by a hairline. */
+.auth-panel__toolbar {
+  padding-bottom: var(--space-5);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .auth-panel__heading h1 {
@@ -145,6 +151,21 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+/* Short related fields share a line (name and phone, password and confirmation). */
+.auth-form__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.auth-form .password-rules {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
 }
 
 .auth-form .btn {
@@ -181,8 +202,11 @@
 
 .auth-panel__footer {
   display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
@@ -585,6 +609,10 @@
 
   .auth-panel {
     padding: var(--space-8) var(--space-5);
+  }
+
+  .auth-form__row {
+    grid-template-columns: 1fr;
   }
 
   .ui-kit__topbar {

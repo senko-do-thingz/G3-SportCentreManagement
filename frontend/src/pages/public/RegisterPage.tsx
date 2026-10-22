@@ -124,30 +124,32 @@ export function RegisterPage() {
 
       <form ref={formRef} className="auth-form" onSubmit={handleSubmit} noValidate aria-busy={submitting}>
         <fieldset className="auth-form__fields" disabled={submitting}>
-          <Input
-            label="Full name"
-            name="fullName"
-            autoComplete="name"
-            placeholder="Taylor Nguyen"
-            maxLength={FULL_NAME_MAX_LENGTH}
-            value={form.fullName}
-            onChange={(event) => update('fullName', event.target.value)}
-            error={fieldErrors.fullName}
-            required
-          />
-          <Input
-            label="Phone number"
-            type="tel"
-            name="phone"
-            autoComplete="tel"
-            inputMode="tel"
-            placeholder="0901234567"
-            maxLength={24}
-            value={form.phone}
-            onChange={(event) => update('phone', event.target.value)}
-            error={fieldErrors.phone}
-            required
-          />
+          <div className="auth-form__row">
+            <Input
+              label="Full name"
+              name="fullName"
+              autoComplete="name"
+              placeholder="Taylor Nguyen"
+              maxLength={FULL_NAME_MAX_LENGTH}
+              value={form.fullName}
+              onChange={(event) => update('fullName', event.target.value)}
+              error={fieldErrors.fullName}
+              required
+            />
+            <Input
+              label="Phone number"
+              type="tel"
+              name="phone"
+              autoComplete="tel"
+              inputMode="tel"
+              placeholder="0901234567"
+              maxLength={24}
+              value={form.phone}
+              onChange={(event) => update('phone', event.target.value)}
+              error={fieldErrors.phone}
+              required
+            />
+          </div>
           <Input
             label="Email address"
             type="email"
@@ -161,28 +163,30 @@ export function RegisterPage() {
             required
           />
           <div className="field-group">
-            <PasswordInput
-              label="Password"
-              name="password"
-              autoComplete="new-password"
-              value={form.password}
-              onChange={(event) => update('password', event.target.value)}
-              error={fieldErrors.password}
-              aria-describedby={rulesId}
-              required
-            />
+            <div className="auth-form__row">
+              <PasswordInput
+                label="Password"
+                name="password"
+                autoComplete="new-password"
+                value={form.password}
+                onChange={(event) => update('password', event.target.value)}
+                error={fieldErrors.password}
+                aria-describedby={rulesId}
+                required
+              />
+              <PasswordInput
+                label="Confirm password"
+                name="confirmPassword"
+                autoComplete="new-password"
+                value={form.confirmPassword}
+                onChange={(event) => update('confirmPassword', event.target.value)}
+                error={fieldErrors.confirmPassword}
+                hint={passwordsMatch ? 'Passwords match' : undefined}
+                required
+              />
+            </div>
             <PasswordRules id={rulesId} password={form.password} />
           </div>
-          <PasswordInput
-            label="Confirm password"
-            name="confirmPassword"
-            autoComplete="new-password"
-            value={form.confirmPassword}
-            onChange={(event) => update('confirmPassword', event.target.value)}
-            error={fieldErrors.confirmPassword}
-            hint={passwordsMatch ? 'Passwords match' : undefined}
-            required
-          />
           <Checkbox
             name="acceptTerms"
             label="I agree to the Sportify Center terms of use and privacy policy"
