@@ -196,6 +196,7 @@ export function LoginPage() {
               clearFieldError('email')
             }}
             error={fieldErrors.email}
+            reserveErrorSpace
             required
           />
           <PasswordInput
@@ -208,6 +209,7 @@ export function LoginPage() {
               clearFieldError('password')
             }}
             error={fieldErrors.password}
+            reserveErrorSpace
             required
           />
           <div className="auth-form__options">
