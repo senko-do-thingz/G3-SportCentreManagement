@@ -1,13 +1,13 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
-import { memberSessionsApi } from '../../api/memberSessionsApi'
+import { memberSessionsApi, type BrowseSession } from '../../api/memberSessionsApi'
 import { ApiError } from '../../api/errors'
 import { renderApp } from '../../test/renderApp'
 import { backendError, installFakeFetch, json, MEMBER, MANAGER } from '../../test/fakeBackend'
 
-export const browseSessionFixture = { id: 5, sportId: 3, sportName: 'Basketball', classId: 1, className: 'Basketball Foundations', trainingFormat: 'COACH_LED', level: 'BEGINNER', coachId: 3, coachName: 'Quan Coach', facilityId: 1, facilityName: 'Court A', sessionDate: '2026-10-16', startTime: '16:00:00', endTime: '17:00:00', capacity: 20, bookedCount: 2, freeSeats: 18, full: false, status: 'PUBLISHED' }
+export const browseSessionFixture: BrowseSession = { id: 5, sportId: 3, sportName: 'Basketball', classId: 1, className: 'Basketball Foundations', trainingFormat: 'COACH_LED', level: 'BEGINNER', coachId: 3, coachName: 'Quan Coach', facilityId: 1, facilityName: 'Court A', sessionDate: '2026-10-16', startTime: '16:00:00', endTime: '17:00:00', capacity: 20, bookedCount: 2, freeSeats: 18, full: false, status: 'PUBLISHED' }
 function backend(profile = MEMBER) {
   return installFakeFetch((call) => {
     if (call.path === '/users/me') return json(200, profile)
@@ -56,6 +56,34 @@ describe('FE-08 member calendar', () => {
     expect(screen.queryByLabelText('Training format')).not.toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('Choose week'), { target: { value: '2026-W44' } })
     await waitFor(() => expect(api.calls.some((call) => call.path.includes('from=2026-10-26') && call.path.includes('to=2026-11-01'))).toBe(true))
+  })
+  it('keeps the previous timetable in place while the selected week loads, then swaps it without a blank state', async () => {
+    backend()
+    const nextWeekSession = { ...browseSessionFixture, id: 6, sessionDate: '2026-10-23', className: 'Swimming Fundamentals' }
+    let resolveNextWeek!: (sessions: BrowseSession[]) => void
+    const nextWeekRequest = new Promise<BrowseSession[]>((resolve) => { resolveNextWeek = resolve })
+    vi.spyOn(memberSessionsApi, 'all')
+      .mockResolvedValueOnce([browseSessionFixture])
+      .mockReturnValueOnce(nextWeekRequest)
+    const user = userEvent.setup()
+    renderApp('/member/schedule?date=2026-10-16')
+
+    expect(await screen.findByText('Basketball Foundations')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Next week' }))
+
+    const loadingStatus = await screen.findByRole('status')
+    expect(loadingStatus).toHaveTextContent('Loading selected week')
+    expect(loadingStatus).toHaveTextContent('The previous week stays visible')
+    expect(screen.getByRole('region', { name: 'Weekly session timetable' })).toBeInTheDocument()
+    expect(document.querySelector('.schedule-content-frame')).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByText('Basketball Foundations')).toBeInTheDocument()
+    expect(screen.getByLabelText('Choose week')).toHaveValue('2026-W43')
+
+    await act(async () => { resolveNextWeek([nextWeekSession]) })
+    expect(await screen.findByText('Swimming Fundamentals')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.queryByText('Basketball Foundations')).not.toBeInTheDocument()
+    expect(document.querySelector('.schedule-content-frame')).toHaveAttribute('aria-busy', 'false')
   })
   it('rejects manager access to member schedule before browse requests', async () => {
     const api = backend(MANAGER)

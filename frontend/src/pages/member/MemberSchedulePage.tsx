@@ -7,6 +7,15 @@ import { MemberScheduleNav } from './MemberScheduleNav'
 import { browseAddDays, browseDate, browseDay, browseIsoWeek, browseMonday, browseMondayFromIsoWeek, browseToday, validBrowseDate } from './memberScheduleDates'
 import { useMemberResource } from './useMemberResource'
 
+interface ScheduleSnapshot {
+  from: string
+  to: string
+  sessions: BrowseSession[]
+  days: string[]
+  returnTo: string
+  findClassesHref: string
+}
+
 export function MemberSchedulePage() {
   const [params, setParams] = useSearchParams()
   const [today] = useState(browseToday)
@@ -15,10 +24,25 @@ export function MemberSchedulePage() {
   const to = browseAddDays(from, 6)
   const currentWeek = browseMonday(today)
   const days = Array.from({ length: 7 }, (_, index) => browseAddDays(from, index))
-  const loader = useCallback((signal: AbortSignal) => memberSessionsApi.all({ from, to }, signal), [from, to])
+  const [lastSchedule, setLastSchedule] = useState<ScheduleSnapshot | null>(null)
+  const loader = useCallback(async (signal: AbortSignal) => {
+    const sessions = await memberSessionsApi.all({ from, to }, signal)
+    if (!signal.aborted) {
+      setLastSchedule({
+        from,
+        to,
+        sessions,
+        days: Array.from({ length: 7 }, (_, index) => browseAddDays(from, index)),
+        returnTo: `/member/schedule?${new URLSearchParams({ date: from })}`,
+        findClassesHref: `/member/classes?${new URLSearchParams({ from, to })}`,
+      })
+    }
+    return sessions
+  }, [from, to])
   const [resource, reload] = useMemberResource(loader)
   const returnTo = `/member/schedule?${new URLSearchParams({ date: from })}`
   const findClassesHref = `/member/classes?${new URLSearchParams({ from, to })}`
+  const previousSchedule = resource.status === 'loading' ? lastSchedule : null
 
   function changeWeek(monday: string) {
     setParams({ date: monday }, { replace: true })
@@ -55,21 +79,67 @@ export function MemberSchedulePage() {
           </div>
         </div>
 
-        {resource.status === 'loading' ? (
-          <PageLoader label="Loading schedule" />
-        ) : resource.status === 'error' ? (
-          <BrowseError error={resource.error} onRetry={reload} />
-        ) : resource.data.length === 0 ? (
-          <EmptyState
-            title="No sessions this week"
-            description="Choose another week or look for a class on a different date."
-            action={<Link className={buttonClassName('secondary')} to={findClassesHref}>Find classes</Link>}
-          />
-        ) : (
-          <WeeklyScheduleTable sessions={resource.data} days={days} today={today} returnTo={returnTo} />
-        )}
+        <div className="schedule-content-frame" aria-busy={resource.status === 'loading'}>
+          {resource.status === 'loading' ? (
+            previousSchedule ? (
+              <>
+                <div className="schedule-content-frame__stale" inert>
+                  <ScheduleContents
+                    sessions={previousSchedule.sessions}
+                    days={previousSchedule.days}
+                    today={today}
+                    returnTo={previousSchedule.returnTo}
+                    findClassesHref={previousSchedule.findClassesHref}
+                  />
+                </div>
+                <div className="schedule-content-frame__loading" role="status" aria-live="polite">
+                  <span className="schedule-content-frame__spinner" aria-hidden="true" />
+                  <strong>Loading selected week</strong>
+                  <span>{browseDate(from)} - {browseDate(to)}</span>
+                  <span className="schedule-content-frame__loading-note">
+                    The previous week stays visible until this schedule is ready.
+                  </span>
+                </div>
+              </>
+            ) : <PageLoader label="Loading schedule" />
+          ) : resource.status === 'error' ? (
+            <BrowseError error={resource.error} onRetry={reload} />
+          ) : (
+            <ScheduleContents
+              sessions={resource.data}
+              days={days}
+              today={today}
+              returnTo={returnTo}
+              findClassesHref={findClassesHref}
+            />
+          )}
+        </div>
       </Card>
     </div>
+  )
+}
+
+function ScheduleContents({
+  sessions,
+  days,
+  today,
+  returnTo,
+  findClassesHref,
+}: {
+  sessions: BrowseSession[]
+  days: string[]
+  today: string
+  returnTo: string
+  findClassesHref: string
+}) {
+  return sessions.length === 0 ? (
+    <EmptyState
+      title="No sessions this week"
+      description="Choose another week or look for a class on a different date."
+      action={<Link className={buttonClassName('secondary')} to={findClassesHref}>Find classes</Link>}
+    />
+  ) : (
+    <WeeklyScheduleTable sessions={sessions} days={days} today={today} returnTo={returnTo} />
   )
 }
 

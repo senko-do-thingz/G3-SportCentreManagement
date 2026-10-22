@@ -1,3 +1,7 @@
+## 2026-10-22 - Smooth member schedule week changes (FE-08)
+
+- Keep the previous timetable visible but non-interactive while a newly selected week loads, with a clear loading overlay and stable schedule-area height. Respect reduced-motion preferences. No API or backend changes.
+
 ## 2026-10-22 - Member schedule visual refresh (FE-08)
 
 - Apply the refreshed Home page's navy, Royal Blue, and Gold visual language to the member weekly schedule.
