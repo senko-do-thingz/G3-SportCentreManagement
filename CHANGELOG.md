@@ -2,6 +2,7 @@
 
 - Replace the multi-filter day/week calendar with a week picker and Previous week / This week / Next week navigation.
 - Show sessions in a seven-day timetable grouped by start time, with links to session details and coach, facility, format, and availability information.
+- Widen only the member schedule container so the full seven-day table fits on typical desktop viewports; retain overflow scrolling for compact screens.
 - Keep the existing member session API, route guards, retry and empty states, and return context. No backend changes.
 
 ## 2026-10-20 - Global appearance and Home authentication actions
