@@ -26,7 +26,8 @@ describe('FE-08 find classes', () => {
     const user = userEvent.setup()
     renderApp('/member/classes?from=2026-10-16&to=2026-11-15&sportId=3&level=BEGINNER')
     await screen.findByText('Basketball Foundations')
-    expect(screen.getByLabelText('Level')).toHaveValue('BEGINNER')
+    expect(screen.getByRole('button', { name: 'Beginner' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('img', { name: 'Basketball training session' })).toBeInTheDocument()
     await user.selectOptions(screen.getByLabelText('Training format'), 'COACH_LED')
     await screen.findByRole('option', { name: 'Quan Coach' })
     await user.selectOptions(screen.getByLabelText('Coach'), '3')
@@ -34,6 +35,17 @@ describe('FE-08 find classes', () => {
     const target = screen.getByRole('link', { name: 'View session' }).getAttribute('href')!
     expect(new URLSearchParams(target.split('?')[1]).get('returnTo')).toContain('coachId=3')
     expect(api.calls.some((call) => call.path.startsWith('/coaches'))).toBe(false)
+  })
+  it('uses sport photography and level tiles as URL-backed filters', async () => {
+    const api = backend()
+    const user = userEvent.setup()
+    renderApp('/member/classes?from=2026-10-16&to=2026-11-15')
+
+    await user.click(await screen.findByRole('button', { name: 'Basketball' }))
+    await waitFor(() => expect(api.calls.some((call) => call.path.includes('sportId=3'))).toBe(true))
+    await user.click(screen.getByRole('button', { name: 'Intermediate' }))
+    await waitFor(() => expect(api.calls.some((call) => call.path.includes('sportId=3') && call.path.includes('level=INTERMEDIATE'))).toBe(true))
+    expect(screen.getByRole('button', { name: 'Intermediate' })).toHaveAttribute('aria-pressed', 'true')
   })
   it('does not request sessions for reversed dates', async () => {
     const api = backend()

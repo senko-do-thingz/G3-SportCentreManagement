@@ -1,3 +1,8 @@
+## 2026-10-23 - Member class discovery refresh (FE-08)
+
+- Add bundled sport photography, visual sport and skill-level filters, and image-led session cards while preserving URL filters, pagination, and session-detail booking links.
+- Age-group labels and age bounds are not present in the member session response; the age-group lookup is staff-only. Do not display guessed age ranges; request a member-readable contract before adding them. No backend changes.
+
 ## 2026-10-23 - Member header theme refresh
 
 - Restyle the member brand/account bar and navigation with the Home page's navy, Royal Blue, and Gold palette in light and dark modes. Keep appearance, account, and navigation behavior unchanged; scope the refresh to the member portal.
