@@ -25,7 +25,7 @@ export function MemberSchedulePage() {
   }
 
   return (
-    <div className="page browse-page">
+    <div className="page browse-page member-schedule-theme">
       <MemberScheduleNav />
       <PageHeader
         eyebrow="Member / Classes & schedule"

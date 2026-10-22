@@ -35,6 +35,7 @@ describe('FE-08 member calendar', () => {
     expect(screen.getByText('18 spots left')).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Weekly session timetable' })).toBeInTheDocument()
     expect(screen.getByRole('table', { name: 'Weekly schedule' })).toBeInTheDocument()
+    expect(document.querySelector('.member-schedule-theme')).toBeInTheDocument()
     expect(screen.getByText('Coach: Quan Coach')).toBeInTheDocument()
     expect(screen.getByText('Court A')).toBeInTheDocument()
     expect(screen.getAllByRole('columnheader')).toHaveLength(8)
