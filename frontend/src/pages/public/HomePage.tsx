@@ -1,21 +1,28 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../../api/client'
 import type { CardTier } from '../../api/cardsApi'
 import type { Sport, SportPackage } from '../../api/packagesApi'
 import { homePathFor } from '../../auth/roles'
 import { useAuth } from '../../auth/useAuth'
-import { Button, Modal, Select } from '../../components/ui'
+import { Button, Modal } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { useResource } from '../../hooks/useResource'
-import { formatMoney } from '../../utils/format'
 import { BROWSE_LEVELS } from '../member/scheduleFilters'
 import { isSingleVisit } from '../member/packagesModel'
 import { HomeHeader } from './HomeHeader'
-import { EXAMPLE_COACHES, HOME_NOTICES, HOME_SPORTS, homeHero } from './homeContent'
+import { HomeIcon } from './HomeIcons'
+import { COACH_PHOTOS, HOME_FAQ, HOME_NOTICES, HOME_PHOTOS, HOME_SPORTS, homeHero } from './homeContent'
+import { HomePhoto } from './HomePhoto'
+import { HomeSelect } from './HomeSelect'
 import '../../styles/home.css'
 
 interface Notice { title: string; text: string }
+
+const FORMAT_OPTIONS = [
+  { value: 'COACH_LED', label: 'Coach-led' },
+  { value: 'SELF_TRAINING', label: 'Self-training' },
+]
 
 /** Only public endpoints, without tokens or authentication refresh side effects. */
 async function publicList<T>(path: string, signal: AbortSignal, valid: (entry: unknown) => boolean): Promise<T[]> {
@@ -34,31 +41,49 @@ const loadPackages = (signal: AbortSignal) => publicList<SportPackage>('/package
   && typeof row.durationDays === 'number' && row.durationDays >= 0
   && (typeof row.priceAmount === 'number' || typeof row.priceAmount === 'string')
   && String(row.priceAmount).trim() !== '' && Number.isFinite(Number(row.priceAmount)) && Number(row.priceAmount) >= 0)
+interface PublicCoach { id: number; fullName: string; headline: string | null; specialties: string | null; yearsExperience: number | null; sportIds: number[] }
+const loadCoaches = (signal: AbortSignal) => publicList<PublicCoach>('/coaches/public', signal, (entry) => {
+  if (!entry || typeof entry !== 'object') return false
+  const row = entry as Record<string, unknown>
+  return Number.isSafeInteger(row.id) && Number(row.id) > 0 && typeof row.fullName === 'string' && row.fullName.trim() !== ''
+    && Array.isArray(row.sportIds) && row.sportIds.every((id) => Number.isSafeInteger(id))
+})
 const loadTiers = (signal: AbortSignal) => publicList<CardTier>('/membership-cards/tiers', signal, (row) => namedRecord(row)
   && (row.discountPercentage === null || typeof row.discountPercentage === 'number' && row.discountPercentage >= 0 && row.discountPercentage <= 100))
 
+/** The three package cards from the approved design. Each links to a live package of that kind when one exists. */
+const PLAN_CARDS = [
+  { kind: 'single', tag: 'Flexible', title: 'Single visit', points: ['Join one session', 'Any sport', 'No commitment'] },
+  { kind: 'coach', tag: 'Most guided', title: 'Coach-led', points: ['Qualified coach', 'Classes by level', 'Card discount'] },
+  { kind: 'self', tag: 'Independent', title: 'Self-training', points: ['Train at your pace', 'Package per sport', 'Card discount'] },
+] as const
+
 export function HomePage() {
-  const { role, user } = useAuth()
+  const { role, status, user } = useAuth()
   const navigate = useNavigate()
   const [sports, retrySports] = useResource(loadSports)
   const [packages, retryPackages] = useResource(loadPackages)
   const [tiers, retryTiers] = useResource(loadTiers)
+  const [coaches, retryCoaches] = useResource(loadCoaches)
   const [sportId, setSportId] = useState('')
   const [level, setLevel] = useState('')
+  const [format, setFormat] = useState('')
   const [notice, setNotice] = useState<Notice | null>(null)
+  const [featured, setFeatured] = useState(0)
+  const spotlight = [HOME_SPORTS[featured], HOME_SPORTS[(featured + 1) % HOME_SPORTS.length]]
   const catalogSports = sports.status === 'ready' ? sports.data : []
   const sportFor = (name: string) => catalogSports.find((sport) => sport.name.toLowerCase() === name.toLowerCase())
-  const classPath = (id = '', format = '') => {
+  const classPath = (id = '', trainingFormat = '') => {
     const params = new URLSearchParams()
     if (id) params.set('sportId', id)
     if (level) params.set('level', level)
-    if (format) params.set('format', format)
+    if (trainingFormat) params.set('format', trainingFormat)
     return `/member/classes${params.size ? `?${params}` : ''}`
   }
+  const staff = Boolean(role && role !== 'MEMBER')
 
-  function memberAction(path: string, children: ReactNode, variant: 'primary' | 'secondary' = 'primary', label?: string) {
-    const className = buttonClassName(variant, 'md')
-    return role && role !== 'MEMBER' ? (
+  function memberAction(path: string, children: ReactNode, variant: 'primary' | 'secondary' = 'primary', label?: string, className = buttonClassName(variant, 'md')) {
+    return staff ? (
       <button type="button" className={className} aria-label={label} onClick={() => setNotice(HOME_NOTICES.member)}>{children}</button>
     ) : (
       <Link className={className} to={path} aria-label={label}>{children}</Link>
@@ -68,111 +93,197 @@ export function HomePage() {
   const availablePackages = packages.status === 'ready' ? packages.data.filter((pkg) => pkg.isActive !== false) : []
   const footballPackages = availablePackages.filter((pkg) => pkg.sportName.toLowerCase() === 'football')
   const packageChoices = footballPackages.length ? footballPackages : availablePackages
-  const featuredPackages = [
-    packageChoices.find((pkg) => pkg.trainingFormat === 'SELF_TRAINING' && !isSingleVisit(pkg)),
-    packageChoices.find((pkg) => pkg.trainingFormat === 'COACH_LED' && !isSingleVisit(pkg)),
-    packageChoices.find(isSingleVisit),
-  ].filter((pkg): pkg is SportPackage => pkg !== undefined)
+  const planPackage = {
+    single: packageChoices.find(isSingleVisit),
+    coach: packageChoices.find((pkg) => pkg.trainingFormat === 'COACH_LED' && !isSingleVisit(pkg)),
+    self: packageChoices.find((pkg) => pkg.trainingFormat === 'SELF_TRAINING' && !isSingleVisit(pkg)),
+  }
 
   return (
     <div className="home-page">
       <a className="home-skip" href="#main-content">Skip to content</a>
       <HomeHeader />
-      <main className="home-container home-main" id="main-content" tabIndex={-1}>
+      <main className="home-main" id="main-content" tabIndex={-1}>
         <section className="home-hero" aria-labelledby="home-title">
-          <div className="home-hero__copy">
-            <span className="home-eyebrow">One center. Six sports.</span>
-            <h1 id="home-title">Find your sport.<br />Build your skills.</h1>
-            <p>Classes for your age, level and goals.</p>
-            <p>Train with a coach or practise at your own pace.</p>
-            <div className="home-actions">
-              <a className={buttonClassName('primary', 'md')} href="#finder">Find a class</a>
-              {memberAction('/member/schedule', 'View schedule', 'secondary')}
+          <HomePhoto className="home-hero__photo" src={HOME_PHOTOS.hero} fallback={homeHero} width="2200" height="1467" fetchPriority="high" />
+          <div className="home-wrap home-hero__body">
+            <div className="home-highlight">
+              <h2>Facility highlights</h2>
+              <p>6 sports. 1 center.</p>
+              <a href="#sports" aria-label="See all sports"><HomeIcon name="arrow" /></a>
             </div>
-            <div className="home-hero__facts"><strong>6 sports</strong><strong>Coach-led & self-training</strong></div>
+            <div className="home-hero__copy">
+              <h1 id="home-title">Find your sport.<br /><em>Build your skills.</em></h1>
+              <p>Coach-led classes or self-training, at every level.</p>
+              <div className="home-hero__actions">
+                {status === 'anonymous'
+                  ? <Link className="home-btn home-btn--light" to="/register">Join now</Link>
+                  : memberAction('/member/classes', 'Browse classes', 'primary', undefined, 'home-btn home-btn--light')}
+                <a className="home-play" href="#finder"><span aria-hidden="true" />Find a class</a>
+              </div>
+            </div>
           </div>
-          <img className="home-hero__image" src={homeHero} width="310" height="228" alt="Players practising football together on an outdoor pitch" fetchPriority="high" />
-        </section>
-
-        <section className="home-finder home-panel" id="finder" aria-labelledby="finder-title">
-          <h2 id="finder-title">Find your next class</h2>
-          <form onSubmit={(event) => {
-            event.preventDefault()
-            if (role && role !== 'MEMBER') setNotice(HOME_NOTICES.member)
-            else navigate(classPath(sportId))
-          }}>
-            <Select label="Sport" placeholder="All sports" value={sportId} options={catalogSports.map((sport) => ({ value: String(sport.id), label: sport.name }))} onChange={(event) => setSportId(event.target.value)} />
-            <Select label="Age group" value="" options={[]} placeholder="All ages" disabled hint="Ask reception for age guidance." />
-            <Select label="Level" placeholder="All levels" value={level} options={BROWSE_LEVELS} onChange={(event) => setLevel(event.target.value)} />
-            <Button type="submit">Find classes</Button>
-          </form>
-          {sports.status === 'error' && <CatalogNotice message="Sport filters are temporarily unavailable. You can still browse classes." retry={retrySports} />}
-        </section>
-
-        <section id="sports" className="home-section" aria-labelledby="sports-title">
-          <div className="home-section__heading"><div><h2 id="sports-title">Choose your sport</h2><p>Six ways to move, learn and improve.</p></div>{memberAction('/member/schedule', 'View schedule', 'secondary')}</div>
-          <div className="home-sports">
-            {HOME_SPORTS.map((sport) => {
-              const record = sportFor(sport.name)
-              const path = record ? classPath(String(record.id)) : '/member/classes'
-              return <article className="home-panel home-sport" key={sport.name}>
-                <img src={sport.image} alt={`${sport.name} training`} width="86" height="66" loading="lazy" />
-                <h3>{sport.name}</h3><p>{sport.description}</p>
-                {record ? memberAction(path, 'Explore', 'secondary', `Explore ${sport.name}`) : <Button variant="secondary" onClick={() => setNotice({ title: sport.name, text: `${sport.description}. Choose from current sports in the class finder when the catalogue is available.` })} aria-label={`Explore ${sport.name}`}>Explore</Button>}
-              </article>
-            })}
+          <div className="home-wrap">
+            <div className="home-strip">
+              <HomePhoto key={spotlight[0].name} className="home-strip__photo" src={spotlight[0].photo} fallback={spotlight[0].image} width="1000" height="667" />
+              <div className="home-strip__sports" aria-live="polite">
+                {spotlight.map((sport) => <div key={sport.name}><span>Sports</span><h3>{sport.name}</h3><p>{sport.description}</p></div>)}
+              </div>
+              <div className="home-strip__side">
+                {memberAction('/member/membership/cards', 'Membership offers', 'primary', undefined, 'home-strip__offer')}
+                <div className="home-strip__count">
+                  <button type="button" aria-label="Previous sports" onClick={() => setFeatured((value) => (value + HOME_SPORTS.length - 1) % HOME_SPORTS.length)}><HomeIcon name="arrow" className="home-icon home-icon--flip" /></button>
+                  <span aria-hidden="true">{String(featured + 1).padStart(2, '0')}</span>
+                  <span className="home-strip__track" aria-hidden="true"><span style={{ width: `${((featured + 1) / HOME_SPORTS.length) * 100}%` }} /></span>
+                  <span aria-hidden="true">{String(HOME_SPORTS.length).padStart(2, '0')}</span>
+                  <button type="button" aria-label="Next sports" onClick={() => setFeatured((value) => (value + 1) % HOME_SPORTS.length)}><HomeIcon name="arrow" /></button>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
-        <section id="classes" className="home-section" aria-labelledby="classes-title">
-          <div className="home-section__heading"><div><h2 id="classes-title">Find a class that fits</h2><p>Example classes. Sign in for current times, coaches and availability.</p></div></div>
-          <div className="home-grid home-grid--two">
-            <article className="home-panel home-session"><h3>Football Fundamentals</h3><p>Beginner - Coach-led</p><p>Build your passing, ball control and confidence.</p><div className="home-session__action"><span className="home-example">Example class</span>{memberAction(classPath(sportFor('Football')?.id.toString(), 'COACH_LED'), 'Find sessions')}</div></article>
-            <article className="home-panel home-session"><h3>Badminton Self-training</h3><p>Self-training - No assigned coach</p><p>Practise independently and improve at your own pace.</p><div className="home-session__action"><span className="home-example">Example class</span>{memberAction(classPath(sportFor('Badminton')?.id.toString(), 'SELF_TRAINING'), 'Find sessions')}</div></article>
+        <div className="home-wrap">
+          <section className="home-finder" id="finder" aria-labelledby="finder-title">
+            <h2 id="finder-title" className="home-sr-only">Find your next class</h2>
+            <form onSubmit={(event) => {
+              event.preventDefault()
+              if (staff) setNotice(HOME_NOTICES.member)
+              else navigate(classPath(sportId, format))
+            }}>
+              <HomeSelect label="Sport" placeholder="All sports" value={sportId} options={catalogSports.map((sport) => ({ value: String(sport.id), label: sport.name }))} onChange={setSportId} />
+              <HomeSelect label="Level" placeholder="All levels" value={level} options={BROWSE_LEVELS} onChange={setLevel} />
+              <HomeSelect label="Training" placeholder="Any format" value={format} options={FORMAT_OPTIONS} onChange={setFormat} />
+              <Button type="submit">Find classes</Button>
+            </form>
+            {sports.status === 'error' && <CatalogNotice message="Sport filters are temporarily unavailable. You can still browse classes." retry={retrySports} />}
+          </section>
+        </div>
+
+        <section className="home-features" aria-labelledby="features-title">
+          <div className="home-wrap">
+            <div className="home-head home-head--center"><span className="home-kicker">Why Sportify</span><h2 id="features-title">Our <span>features</span></h2></div>
+            <ul className="home-features__list">
+              <li><span className="home-features__icon"><HomeIcon name="sports" /></span><h3>Six sports</h3><p>One center, every level</p></li>
+              <li><span className="home-features__icon"><HomeIcon name="coach" /></span><h3>Expert coaches</h3><p>Certified and experienced</p></li>
+              <li><span className="home-features__icon"><HomeIcon name="package" /></span><h3>Flexible packages</h3><p>Per sport or single visit</p></li>
+              <li><span className="home-features__icon"><HomeIcon name="card" /></span><h3>Member discounts</h3><p>Save with membership cards</p></li>
+            </ul>
           </div>
         </section>
 
-        <section className="home-goals" aria-labelledby="goals-title">
-          <div><h2 id="goals-title">Not sure where to start?</h2><p>Tell us your goals. Get suggestions for sports and classes<br className="home-desktop-break" /> that fit your level and free time.</p><Button onClick={() => setNotice(HOME_NOTICES.recommendations)}>Get recommendations</Button></div>
-          <div className="home-goals__list"><span>Your goal</span><strong>Fitness & wellbeing</strong><strong>Build skills</strong><strong>Train for competition</strong></div>
-        </section>
-
-        <section id="coaches" className="home-section" aria-labelledby="coaches-title">
-          <div className="home-section__heading"><div><h2 id="coaches-title">Learn from qualified coaches</h2><p>Explore their sports, skills and certifications. Illustrative profiles.</p></div></div>
-          <div className="home-grid">
-            {EXAMPLE_COACHES.map((coach) => <article className="home-panel home-coach" key={coach.name}>
-              <img src={coach.image} alt={`${coach.sport} coaching example`} width="188" height="92" loading="lazy" />
-              <h3>{coach.name}</h3><p>{coach.sport}</p><p className="home-coach__skills">{coach.skills}</p><p className="home-coach__certificate">{coach.certificate}</p>
-              <Button variant="secondary" aria-label={`View profile of ${coach.name}`} onClick={() => setNotice({ title: coach.name, text: `Illustrative ${coach.sport.toLowerCase()} coach profile: ${coach.skills}. Example qualification: ${coach.certificate}. For current coach profiles and verified certifications, sign in as a member and open a coach-led session.` })}>View profile</Button>
-            </article>)}
+        <section className="home-section" id="sports" aria-labelledby="sports-title">
+          <div className="home-wrap">
+            <div className="home-head"><div><span className="home-kicker">Sports offered</span><h2 id="sports-title">Choose your <span>sport</span></h2></div>{memberAction('/member/schedule', 'View schedule', 'secondary', undefined, 'home-more')}</div>
+            <div className="home-sports">
+              {HOME_SPORTS.map((sport) => {
+                const record = sportFor(sport.name)
+                const content = <><HomePhoto src={sport.photo} fallback={sport.image} alt={`${sport.name} training`} width="1000" height="667" loading="lazy" /><span className="home-sport__label"><h3>{sport.name}</h3><span className="home-sport__go" aria-hidden="true"><HomeIcon name="arrow" /></span></span></>
+                return <article className="home-sport" key={sport.name}>
+                  {record
+                    ? memberAction(classPath(String(record.id)), content, 'secondary', `Explore ${sport.name}`, 'home-sport__link')
+                    : <button type="button" className="home-sport__link" aria-label={`Explore ${sport.name}`} onClick={() => setNotice({ title: sport.name, text: `${sport.description}. Choose from current sports in the class finder when the catalogue is available.` })}>{content}</button>}
+                </article>
+              })}
+            </div>
           </div>
         </section>
 
-        <section id="packages" className="home-section" aria-labelledby="packages-title">
-          <div className="home-section__heading"><div><h2 id="packages-title">Choose how you train</h2><p>Buy a package for each sport. Self-training and coached sessions have separate prices.</p></div></div>
-          {packages.status === 'loading' && <p className="home-panel home-loading" role="status">Loading current packages...</p>}
-          {packages.status === 'error' && <CatalogNotice message="Current packages and prices are temporarily unavailable." retry={retryPackages} />}
-          {packages.status === 'ready' && !featuredPackages.length && <p className="home-panel home-loading">No packages are currently available. Please check again later.</p>}
-          <div className="home-grid">
-            {featuredPackages.map((pkg) => <article className="home-panel home-package" key={pkg.id}>
-              <h3>{pkg.sportName} - {isSingleVisit(pkg) ? 'Single visit' : pkg.trainingFormat === 'SELF_TRAINING' ? 'Self-training' : 'Coach-led'}</h3>
-              <p>{isSingleVisit(pkg) ? 'Join one session' : pkg.trainingFormat === 'SELF_TRAINING' ? 'Practise independently' : 'Learn with a qualified coach'}</p>
-              <strong className="home-package__price">{formatMoney(pkg.priceAmount)}</strong>
-              <p>{isSingleVisit(pkg) ? 'One session - No card discount' : `${pkg.durationDays} days${pkg.sessionCount ? ` - ${pkg.sessionCount} sessions` : ''}`}</p>
-              {memberAction(`/member/packages/${pkg.id}`, 'View options', 'secondary', `View options for ${pkg.name}`)}
-            </article>)}
+        <section className="home-section" id="coaches" aria-labelledby="coaches-title">
+          <div className="home-wrap">
+            <div className="home-head"><div><span className="home-kicker">Our coaches</span><h2 id="coaches-title">Train with the <span>best</span></h2></div><button type="button" className="home-more" onClick={() => setNotice(HOME_NOTICES.coaches)}>All coaches</button></div>
+            {coaches.status === 'loading' && <p className="home-loading" role="status">Loading coaches...</p>}
+            {coaches.status === 'error' && <CatalogNotice message="Coach profiles are temporarily unavailable." retry={retryCoaches} />}
+            {coaches.status === 'ready' && !coaches.data.length && <p className="home-loading">Coach profiles will appear here soon.</p>}
+            {coaches.status === 'ready' && coaches.data.length > 0 && <div className="home-coaches">
+              {coaches.data.slice(0, 6).map((coach) => {
+                const sportNames = coach.sportIds.map((id) => catalogSports.find((sport) => sport.id === id)?.name).filter((name): name is string => Boolean(name))
+                const lead = sportNames[0]?.toLowerCase() ?? ''
+                const sportPhoto = HOME_SPORTS.find((sport) => sport.name.toLowerCase() === lead)
+                const picture = COACH_PHOTOS[lead] ?? (sportPhoto ? { image: sportPhoto.image, photo: sportPhoto.photo } : { image: homeHero, photo: HOME_PHOTOS.hero })
+                const summary = coach.headline || (coach.yearsExperience ? `${coach.yearsExperience} years of coaching` : coach.specialties) || 'Sportify coach'
+                const details = [coach.headline, coach.specialties && `Specialties: ${coach.specialties}`, coach.yearsExperience ? `${coach.yearsExperience} years of experience` : null].filter(Boolean).join('. ')
+                return <article className="home-coach" key={coach.id}>
+                  <button type="button" className="home-coach__photo" aria-label={`View profile of ${coach.fullName}`} onClick={() => setNotice({ title: coach.fullName, text: `${details ? `${details}. ` : ''}Sign in as a member and open a coach-led class to see upcoming sessions and verified certifications.` })}>
+                    <HomePhoto src={picture.photo} fallback={picture.image} alt="" width="800" height="1000" loading="lazy" /><span>{sportNames.join(' - ') || 'Coach'}</span>
+                  </button>
+                  <h3>{coach.fullName}</h3><p>{summary}</p>
+                </article>
+              })}
+            </div>}
           </div>
-          <div className="home-benefits"><div><h3>Membership card benefits</h3>
-            {tiers.status === 'ready' ? <p>{tiers.data.filter((tier) => tier.isActive !== false && (tier.discountPercentage ?? 0) > 0).map((tier) => `${tier.name}: ${tier.discountPercentage}% off eligible sport packages`).join(' - ') || 'Compare current membership card options.'} Card validity is separate from package validity.</p> : <p>Explore membership discounts. Card validity is separate from package validity.</p>}
-            {tiers.status === 'error' && <CatalogNotice message="Current card benefits are temporarily unavailable." retry={retryTiers} />}
-          </div>{memberAction('/member/membership/cards', 'View cards')}</div>
+        </section>
+
+        <section className="home-pricing" id="packages" aria-labelledby="packages-title">
+          <div className="home-wrap">
+            <div className="home-head"><div><span className="home-kicker">Packages</span><h2 id="packages-title">Choose how you <span>train</span></h2></div></div>
+            {packages.status === 'loading' && <p className="home-loading" role="status">Loading current packages...</p>}
+            {packages.status === 'error' && <CatalogNotice message="Current packages and prices are temporarily unavailable." retry={retryPackages} />}
+            {packages.status === 'ready' && !availablePackages.length && <p className="home-loading">No packages are currently available. Please check again later.</p>}
+            <div className="home-plans">
+              {PLAN_CARDS.map((card) => {
+                const pkg = planPackage[card.kind]
+                const main = card.kind === 'coach'
+                return <article className={`home-plan${main ? ' home-plan--main' : ''}`} key={card.kind}>
+                  {main && <span className="home-plan__badge">Popular</span>}
+                  <small>{card.tag}</small>
+                  <h3>{card.title}</h3>
+                  <ul>{card.points.map((point) => <li key={point}>{point}</li>)}</ul>
+                  {pkg
+                    ? memberAction(`/member/packages/${pkg.id}`, 'View options', 'primary', `View options for ${pkg.name}`)
+                    : memberAction('/member/packages', 'View options', 'primary', `View ${card.title.toLowerCase()} options`)}
+                </article>
+              })}
+            </div>
+            <div className="home-cards">
+              <div>
+                <h3>Membership cards</h3>
+                <p>Save on every sport package.</p>
+                {tiers.status === 'error' && <CatalogNotice message="Current card benefits are temporarily unavailable." retry={retryTiers} />}
+              </div>
+              {memberAction('/member/membership/cards', 'View cards', 'primary', undefined, 'home-btn home-btn--light')}
+            </div>
+          </div>
+        </section>
+
+        <section className="home-section" id="faq" aria-labelledby="faq-title">
+          <div className="home-wrap home-faq">
+            <div className="home-faq__intro">
+              <span className="home-kicker">FAQ</span>
+              <h2 id="faq-title">Got <span>questions?</span></h2>
+            </div>
+            <div className="home-faq__list">
+              {HOME_FAQ.map((item, index) => <details key={item.question} open={index === 0}><summary>{item.question}</summary><p>{item.answer}</p></details>)}
+            </div>
+          </div>
+        </section>
+
+        <section className="home-cta" aria-labelledby="cta-title">
+          <HomePhoto className="home-cta__photo" src={HOME_PHOTOS.cta} fallback={homeHero} width="2000" height="1333" loading="lazy" />
+          <div className="home-wrap">
+            <h2 id="cta-title">Ready to <span>play?</span></h2>
+            <div className="home-cta__actions">
+              {status === 'anonymous'
+                ? <Link className="home-btn home-btn--light" to="/register">Join now</Link>
+                : memberAction('/member/classes', 'Browse classes', 'primary', undefined, 'home-btn home-btn--light')}
+              <a className="home-btn home-btn--line" href="#finder">Find a class</a>
+            </div>
+          </div>
         </section>
       </main>
-      <footer className="home-footer"><div className="home-container home-footer__grid">
-        <div><h2>Sportify</h2><p>One center. Multiple sports. More ways to grow.</p><small>2026 Sportify Sports Center</small></div>
-        <div><h3>Explore</h3><div className="home-footer__links"><a href="#sports">Sports</a><a href="#classes">Classes</a><a href="#coaches">Coaches</a></div></div>
-        <div><h3>Need assistance?</h3><Button onClick={() => setNotice(HOME_NOTICES.reception)}>Contact reception</Button><Button onClick={() => setNotice(HOME_NOTICES.assistant)}>AI Assistant</Button></div>
-      </div></footer>
+
+      <footer className="home-footer">
+        <div className="home-wrap home-footer__grid">
+          <div><p className="home-footer__logo">Sportify</p><p>One center. Six sports. More ways to grow.</p></div>
+          <nav aria-label="Footer explore"><h2>Explore</h2><ul><li><a href="#finder">Find a class</a></li><li><a href="#sports">Sports</a></li><li><a href="#coaches">Coaches</a></li><li><a href="#packages">Packages</a></li></ul></nav>
+          <nav aria-label="Footer sports"><h2>Sports</h2><ul>{HOME_SPORTS.map((sport) => <li key={sport.name}><a href="#sports">{sport.name}</a></li>)}</ul></nav>
+          <div className="home-footer__help"><h2>Need help?</h2><Button onClick={() => setNotice(HOME_NOTICES.reception)}>Contact reception</Button><Button variant="secondary" onClick={() => setNotice(HOME_NOTICES.assistant)}>AI Assistant</Button></div>
+        </div>
+        <div className="home-wrap home-footer__bottom"><small>Copyright 2026 Sportify Sports Center</small></div>
+      </footer>
+
+      <BackToTop />
+
       <Modal open={notice !== null} onClose={() => setNotice(null)} title={notice?.title ?? ''} footer={notice === HOME_NOTICES.member && <Link className={buttonClassName('primary', 'md')} to={homePathFor(user)}>Open my workspace</Link>}>
         <p>{notice?.text}</p>
       </Modal>
@@ -182,4 +293,30 @@ export function HomePage() {
 
 function CatalogNotice({ message, retry }: { message: string; retry: () => void }) {
   return <div className="home-catalog-notice" role="status"><p>{message}</p><Button variant="secondary" size="sm" onClick={retry}>Retry</Button></div>
+}
+
+/** Floating button in the bottom right corner, shown after the visitor scrolls past the hero. */
+function BackToTop() {
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const update = () => setVisible(window.scrollY > 600)
+    update()
+    window.addEventListener('scroll', update, { passive: true })
+    return () => window.removeEventListener('scroll', update)
+  }, [])
+  return (
+    <button
+      type="button"
+      className={`home-top${visible ? ' home-top--visible' : ''}`}
+      aria-label="Back to top"
+      tabIndex={visible ? 0 : -1}
+      onClick={() => {
+        const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+        window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' })
+        document.getElementById('main-content')?.focus({ preventScroll: true })
+      }}
+    >
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5" /></svg>
+    </button>
+  )
 }
