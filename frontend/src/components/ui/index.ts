@@ -4,6 +4,7 @@ export { buttonClassName, type ButtonSize, type ButtonVariant } from './buttonCl
 export { Card, StatCard } from './Card'
 export { Checkbox, type CheckboxProps } from './Checkbox'
 export { EmptyState } from './EmptyState'
+export { FilterBar, type FilterBarProps } from './FilterBar'
 export { ErrorState } from './ErrorState'
 export { Input } from './Input'
 export { Modal } from './Modal'

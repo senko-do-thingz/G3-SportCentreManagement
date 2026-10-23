@@ -23,12 +23,24 @@ unless another file is named. Manual cases use the dev-only page `/ui-kit` (`npm
 | UI01-TC-13 | Toast | Call toast.warning | Toast has class toast--warning in the polite region and closes after 6 seconds | Passed |
 | UI01-TC-14 | Demo page | Open /ui-kit (components.test.tsx) | Sections Notices and Tabs are listed with the existing sections | Passed |
 | UI01-TC-15 | Login | Toggle password on Login (authScreens.test.tsx) | Show and Hide names switch, no aria-pressed, aria-controls is the password field | Passed |
+| UI01-TC-16 | FilterBar | Render with fields and a result count | Named search landmark; result text has aria-live polite; no Clear filters button while no filter is set | Passed |
+| UI01-TC-17 | FilterBar | Type a search, pick a role, click Clear filters | Both fields reset, focus returns to the search field, Clear filters disappears | Passed |
+| UI01-TC-18 | Mobile | Read the 640 px rules in components.css | Filters stack to one column; card header, pagination and dialog footer wrap; tables keep horizontal scroll inside their block | Passed |
+| UI01-TC-19 | Motion | Read the reduced-motion rules | Dialog, backdrop and toast animations are off | Passed |
+| UI01-TC-20 | Screenshots | Open /ui-kit in headless Chromium at 1280 and 375 px, light and dark | Four screenshots in frontend/docs/screenshots/ui-01; page horizontal overflow is 0 px in all four | Passed |
+
+## Screenshots
+
+- `frontend/docs/screenshots/ui-01/ui-kit-light-desktop.png`
+- `frontend/docs/screenshots/ui-01/ui-kit-dark-desktop.png`
+- `frontend/docs/screenshots/ui-01/ui-kit-light-mobile.png`
+- `frontend/docs/screenshots/ui-01/ui-kit-dark-mobile.png`
 
 ## Manual (recommended before merge)
 
 | ID | Area | Steps | Expected result | Status |
 |----|------|-------|-----------------|--------|
-| UI01-MC-01 | Theme | Open /ui-kit in light and dark mode | Buttons, links, focus rings and soft fills use royal blue; tab selection shows a gold underline; text stays readable | Not run |
+| UI01-MC-01 | Theme | Open /ui-kit in light and dark mode on your own browser | Buttons, links, focus rings and soft fills use royal blue; tab selection shows a gold underline; text stays readable | Not run |
 | UI01-MC-02 | Keyboard | On /ui-kit, Tab to the Tabs card and use arrow keys, Home, End | Focus ring visible, Locked tab skipped, panel text changes | Not run |
 | UI01-MC-03 | Screen reader | Trigger the danger Notice and the warning toast | Notice read as an error immediately; toast read politely | Not run |
 | UI01-MC-04 | Regression | Open My Membership, Login, Member dashboard, Reception payment requests | Existing notices and tab lists keep their layout; only colors follow the new palette | Not run |
