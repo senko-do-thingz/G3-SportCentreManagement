@@ -1,3 +1,19 @@
+## 2026-10-22 - Prevent stale-week flicker in member schedule (FE-08)
+
+- Replace the faded previous-week timetable during navigation with a fixed-height timetable skeleton labeled with the requested date range. Fade in the resolved week briefly; respect reduced-motion preferences. No API or backend changes.
+
+## 2026-10-22 - Keep member schedule width stable for empty weeks (FE-08)
+
+- Apply the schedule's wide member content layout based on the schedule page marker rather than the timetable table, which is absent for empty weeks, errors and initial loading. Add an empty-state regression assertion. No API or backend changes.
+
+## 2026-10-22 - Smooth member schedule week changes (FE-08)
+
+- Keep the previous timetable visible but non-interactive while a newly selected week loads, with a clear loading overlay and stable schedule-area height. Respect reduced-motion preferences. No API or backend changes.
+
+## 2026-10-22 - Member schedule visual refresh (FE-08)
+
+- Apply the refreshed Home page's navy, Royal Blue, and Gold visual language to the member weekly schedule.
+- Preserve the simplified seven-day timetable, week navigation, session details, availability, empty and error states, and responsive access. No backend or API changes.
 ## 2026-10-22 - Login visual alignment with Home (FE-00)
 
 - Apply the refreshed Home page's navy, Royal Blue, and Gold visual language to the login screen only, including light/dark surface colors, hero treatment, form controls, and primary action.

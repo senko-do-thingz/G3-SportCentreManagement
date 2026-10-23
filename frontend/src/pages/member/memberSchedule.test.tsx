@@ -1,17 +1,16 @@
-import { screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
-import { memberSessionsApi } from '../../api/memberSessionsApi'
+import { memberSessionsApi, type BrowseSession } from '../../api/memberSessionsApi'
 import { ApiError } from '../../api/errors'
 import { renderApp } from '../../test/renderApp'
 import { backendError, installFakeFetch, json, MEMBER, MANAGER } from '../../test/fakeBackend'
 
-export const browseSessionFixture = { id: 5, sportId: 3, sportName: 'Basketball', classId: 1, className: 'Basketball Foundations', trainingFormat: 'COACH_LED', level: 'BEGINNER', coachId: 3, coachName: 'Quan Coach', facilityId: 1, facilityName: 'Court A', sessionDate: '2026-10-16', startTime: '16:00:00', endTime: '17:00:00', capacity: 20, bookedCount: 2, freeSeats: 18, full: false, status: 'PUBLISHED' }
+export const browseSessionFixture: BrowseSession = { id: 5, sportId: 3, sportName: 'Basketball', classId: 1, className: 'Basketball Foundations', trainingFormat: 'COACH_LED', level: 'BEGINNER', coachId: 3, coachName: 'Quan Coach', facilityId: 1, facilityName: 'Court A', sessionDate: '2026-10-16', startTime: '16:00:00', endTime: '17:00:00', capacity: 20, bookedCount: 2, freeSeats: 18, full: false, status: 'PUBLISHED' }
 function backend(profile = MEMBER) {
   return installFakeFetch((call) => {
     if (call.path === '/users/me') return json(200, profile)
-    if (call.path === '/sports') return json(200, [{ id: 3, code: 'BASKETBALL', name: 'Basketball', venueType: 'INDOOR' }])
     if (call.path.startsWith('/sessions?')) return json(200, { content: [browseSessionFixture], page: 0, size: 100, totalElements: 1, totalPages: 1 })
     return backendError(404, 'Unexpected test request')
   })
@@ -25,29 +24,66 @@ describe('FE-08 member calendar', () => {
     const user = userEvent.setup()
     renderApp('/member/schedule?date=2026-10-16')
     expect(await screen.findByText('Schedule service unavailable')).toBeInTheDocument()
-    expect(screen.queryByText('No sessions in this range')).not.toBeInTheDocument()
+    expect(screen.queryByText('No sessions this week')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Try again' }))
-    expect(await screen.findByText('No sessions in this range')).toBeInTheDocument()
+    expect(await screen.findByText('No sessions this week')).toBeInTheDocument()
+    expect(document.querySelector('.member-main:has(.member-schedule-theme)')).toBeInTheDocument()
   })
-  it('renders all seven days and reads the complete week with member-specific fields', async () => {
+  it('renders a seven-day timetable and reads the complete week without extra filter lookups', async () => {
     const api = backend()
     renderApp('/member/schedule?date=2026-10-16')
     expect(await screen.findByText('Basketball Foundations')).toBeInTheDocument()
     expect(screen.getByText('18 spots left')).toBeInTheDocument()
-    expect(screen.getAllByRole('region', { name: /\d{2}\/10\/2026/ })).toHaveLength(7)
+    expect(screen.getByRole('region', { name: 'Weekly session timetable' })).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Weekly schedule' })).toBeInTheDocument()
+    expect(document.querySelector('.member-schedule-theme')).toBeInTheDocument()
+    expect(screen.getByText('Coach: Quan Coach')).toBeInTheDocument()
+    expect(screen.getByText('Court A')).toBeInTheDocument()
+    expect(screen.getAllByRole('columnheader')).toHaveLength(8)
     expect(api.calls.some((call) => call.path.includes('from=2026-10-12') && call.path.includes('to=2026-10-18') && call.path.includes('size=100'))).toBe(true)
+    expect(api.calls.some((call) => call.path === '/sports')).toBe(false)
     expect(api.calls.some((call) => call.path.startsWith('/coaches') || call.path.startsWith('/manager'))).toBe(false)
   })
-  it('switches day/week and filters through URL-driven API queries', async () => {
+  it('navigates by week, updates the URL, and fetches the selected Monday-to-Sunday range', async () => {
     const api = backend()
     const user = userEvent.setup()
     renderApp('/member/schedule?date=2026-10-16')
     await screen.findByText('Basketball Foundations')
-    await user.selectOptions(screen.getByLabelText('Schedule view'), 'day')
-    await waitFor(() => expect(api.calls.some((call) => call.path.includes('from=2026-10-16') && call.path.includes('to=2026-10-16'))).toBe(true))
-    await user.selectOptions(screen.getByLabelText('Sport'), '3')
-    await user.selectOptions(screen.getByLabelText('Training format'), 'SELF_TRAINING')
-    await waitFor(() => expect(api.calls.some((call) => call.path.includes('sportId=3') && call.path.includes('format=SELF_TRAINING'))).toBe(true))
+    expect(screen.getByLabelText('Choose week')).toHaveValue('2026-W42')
+    await user.click(screen.getByRole('button', { name: 'Next week' }))
+    await waitFor(() => expect(api.calls.some((call) => call.path.includes('from=2026-10-19') && call.path.includes('to=2026-10-25'))).toBe(true))
+    expect(screen.getByLabelText('Choose week')).toHaveValue('2026-W43')
+    expect(screen.queryByLabelText('Sport')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Training format')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Choose week'), { target: { value: '2026-W44' } })
+    await waitFor(() => expect(api.calls.some((call) => call.path.includes('from=2026-10-26') && call.path.includes('to=2026-11-01'))).toBe(true))
+  })
+  it('shows a stable loading skeleton instead of stale week content, then reveals the selected week', async () => {
+    backend()
+    const nextWeekSession = { ...browseSessionFixture, id: 6, sessionDate: '2026-10-23', className: 'Swimming Fundamentals' }
+    let resolveNextWeek!: (sessions: BrowseSession[]) => void
+    const nextWeekRequest = new Promise<BrowseSession[]>((resolve) => { resolveNextWeek = resolve })
+    vi.spyOn(memberSessionsApi, 'all')
+      .mockResolvedValueOnce([browseSessionFixture])
+      .mockReturnValueOnce(nextWeekRequest)
+    const user = userEvent.setup()
+    renderApp('/member/schedule?date=2026-10-16')
+
+    expect(await screen.findByText('Basketball Foundations')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Next week' }))
+
+    const loadingStatus = await screen.findByRole('status')
+    expect(loadingStatus).toHaveAccessibleName(/Loading schedule for/)
+    expect(document.querySelector('.schedule-skeleton')).toBeInTheDocument()
+    expect(document.querySelector('.schedule-content-frame')).toHaveAttribute('aria-busy', 'true')
+    expect(screen.queryByText('Basketball Foundations')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Choose week')).toHaveValue('2026-W43')
+
+    await act(async () => { resolveNextWeek([nextWeekSession]) })
+    expect(await screen.findByText('Swimming Fundamentals')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.queryByText('Basketball Foundations')).not.toBeInTheDocument()
+    expect(document.querySelector('.schedule-content-frame')).toHaveAttribute('aria-busy', 'false')
   })
   it('rejects manager access to member schedule before browse requests', async () => {
     const api = backend(MANAGER)
