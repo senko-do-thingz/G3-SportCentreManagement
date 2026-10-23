@@ -32,7 +32,7 @@ export function installFakeFetch(handler: Handler) {
       method: init?.method ?? 'GET',
       path: `${url.pathname.replace('/api/v1', '')}${url.search}`,
       authorization: headers.get('Authorization'),
-      body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
+      body: typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body instanceof FormData ? init.body : undefined,
     }
     calls.push(call)
     return handler(call)

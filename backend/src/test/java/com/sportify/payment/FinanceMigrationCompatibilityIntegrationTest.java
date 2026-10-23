@@ -77,6 +77,12 @@ class FinanceMigrationCompatibilityIntegrationTest {
         return database;
     }
 
+    /**
+     * Last migration of the finance stack (V30 views, V31 cash events). Count assertions migrate only up to this
+     * version so that later, unrelated migrations do not change the expected numbers.
+     */
+    private static final String FINANCE_TARGET = "31";
+
     private Flyway flyway(Database database, boolean demo, String target) {
         var configuration = Flyway.configure().dataSource(database.source())
                 .defaultSchema("dbo").schemas("dbo").outOfOrder(false).validateOnMigrate(true).cleanDisabled(true)
@@ -166,7 +172,7 @@ class FinanceMigrationCompatibilityIntegrationTest {
     @ValueSource(booleans = {false, true})
     void freshNormalAndDemoDatabasesMigrateOnceAndRunFinanceQueries(boolean demo) throws Exception {
         var database = newDatabase();
-        var migration = flyway(database, demo, null);
+        var migration = flyway(database, demo, FINANCE_TARGET);
         assertThat(migration.migrate().migrationsExecuted).isEqualTo(demo ? 27 : 25);
         assertObjects(database);
         seedLedger(database);
@@ -187,7 +193,7 @@ class FinanceMigrationCompatibilityIntegrationTest {
         seedLedger(database);
         var rows = database.jdbc().queryForList("SELECT * FROM dbo.payment ORDER BY id");
         assertThat(database.jdbc().queryForObject("SELECT OBJECT_ID(N'dbo.vw_paid_payment')", Long.class)).isNull();
-        var upgrade = flyway(database, demo, null);
+        var upgrade = flyway(database, demo, FINANCE_TARGET);
         assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(2);
         assertThat(history(database).subList(0, previous.size())).isEqualTo(previous);
         assertThat(database.jdbc().queryForList("SELECT * FROM dbo.payment ORDER BY id")).isEqualTo(rows);

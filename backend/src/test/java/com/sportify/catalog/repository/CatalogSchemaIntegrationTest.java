@@ -74,7 +74,13 @@ class CatalogSchemaIntegrationTest extends AbstractIntegrationTest {
     void seed_shouldContainAgeGroupsAndFacilities() {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM age_group", Integer.class)).isEqualTo(5);
         assertThat(jdbc.queryForList("SELECT code FROM facility", String.class))
-                .containsExactlyInAnyOrder("BB_COURT_A", "BB_COURT_B", "INDOOR_POOL");
+                .containsExactlyInAnyOrder("BB_COURT_A", "BB_COURT_B", "INDOOR_POOL",
+                        "BD_COURT_1", "BD_COURT_2", "FB_FIELD", "VB_COURT", "TN_COURT");
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM sport s
+                WHERE s.code IN ('FOOTBALL', 'BADMINTON', 'BASKETBALL', 'VOLLEYBALL', 'SWIMMING', 'TENNIS')
+                  AND NOT EXISTS (SELECT 1 FROM facility f WHERE f.sport_id = s.id AND f.is_active = 1)
+                """, Integer.class)).isZero();
     }
 
     private int poolSize(String planCode) {

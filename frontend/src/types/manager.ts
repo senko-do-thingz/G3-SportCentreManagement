@@ -17,6 +17,30 @@ export interface ManagerUser {
   createdAt: string | null
 }
 
+/** GET /manager/users/{id}/coach-profile (ManagerCoachProfileResponse). */
+export interface ManagerCoachProfile {
+  userId: number
+  fullName: string
+  avatarUrl: string | null
+  headline: string | null
+  bio: string | null
+  yearsExperience: number | null
+  specialties: string | null
+  isPublic: boolean
+  displayOrder: number
+}
+
+/** PUT /manager/users/{id}/coach-profile (ManagerCoachProfileUpdateRequest). Blank text is stored as null. */
+export interface CoachProfileRequest {
+  avatarUrl: string
+  headline: string
+  bio: string
+  yearsExperience: number | null
+  specialties: string
+  isPublic: boolean
+  displayOrder: number
+}
+
 /** Verified against the V1 StaffAccountCreateRequest DTO. */
 export interface StaffAccountRequest {
   fullName: string
