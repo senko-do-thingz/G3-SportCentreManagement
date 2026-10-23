@@ -46,7 +46,7 @@ public class SecurityConfig {
                                 .requestMatchers(HttpMethod.OPTIONS, "/**")
                                 .permitAll()
                                 // Public catalog (read only)
-                                .requestMatchers(HttpMethod.GET, "/api/v1/sports", "/api/v1/sports/*", "/api/v1/plans", "/api/v1/plans/*", "/api/v1/packages", "/api/v1/packages/*", "/api/v1/packages/sport/*", "/api/v1/membership-cards/tiers", "/api/v1/coaches/public")
+                                .requestMatchers(HttpMethod.GET, "/api/v1/sports", "/api/v1/sports/*", "/api/v1/plans", "/api/v1/plans/*", "/api/v1/packages", "/api/v1/packages/*", "/api/v1/packages/sport/*", "/api/v1/membership-cards/tiers", "/api/v1/coaches/public", "/api/v1/facilities/public", "/api/v1/users/*/avatar")
                                 .permitAll()
                                 // Health endpoint for deployment smoke test
                                 .requestMatchers(HttpMethod.GET, "/actuator/health")

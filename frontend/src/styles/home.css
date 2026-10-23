@@ -27,7 +27,8 @@
   --h-cta-to: #1f4fd8;
   --h-overlay: 11, 23, 54;
   --h-deep: #060d20;
-  --h-display: Arial, 'Helvetica Neue', Helvetica, sans-serif;
+  /* Be Vietnam Pro (self-hosted, OFL) draws Vietnamese diacritics correctly at heavy weights; Arial Black does not. */
+  --h-display: 'Be Vietnam Pro', Arial, 'Helvetica Neue', Helvetica, sans-serif;
   --h-body: 'Segoe UI', Arial, sans-serif;
   background: var(--h-bg);
   color: var(--h-ink);
@@ -108,19 +109,23 @@
 /* Hero */
 .home-hero { position: relative; isolation: isolate; overflow: hidden; background: var(--h-hero); color: #ffffff; }
 .home-hero__photo { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; object-position: 40% 30%; }
+.home-hero__video { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.8s ease; pointer-events: none; }
+.home-hero__video--ready { opacity: 1; }
+.home-hero__video-toggle { position: absolute; bottom: 224px; right: max(20px, calc((100% - 1240px) / 2 + max(20px, 4vw))); z-index: 2; display: grid; place-items: center; width: 40px; height: 40px; border: 1.5px solid rgba(255, 255, 255, 0.7); border-radius: 50%; background: rgba(var(--h-overlay), 0.45); color: #ffffff; cursor: pointer; transition: background-color 0.2s ease; }
+.home-hero__video-toggle:hover { background: rgba(var(--h-overlay), 0.75); }
 .home-hero::before { content: ''; position: absolute; inset: 0; z-index: -1; background:
   radial-gradient(60% 70% at 70% 40%, rgba(61, 108, 240, 0.25), transparent 70%),
-  linear-gradient(90deg, rgba(var(--h-overlay), 0.92) 0%, rgba(var(--h-overlay), 0.35) 42%, rgba(var(--h-overlay), 0.55) 62%, rgba(var(--h-overlay), 0.92) 100%),
+  linear-gradient(90deg, rgba(var(--h-overlay), 0.92) 0%, rgba(var(--h-overlay), 0.6) 30%, rgba(var(--h-overlay), 0.35) 46%, rgba(var(--h-overlay), 0.55) 62%, rgba(var(--h-overlay), 0.92) 100%),
   linear-gradient(180deg, rgba(var(--h-overlay), 0.65) 0%, transparent 28%, transparent 70%, rgba(var(--h-overlay), 0.8) 100%); }
 .home-hero__body { display: grid; grid-template-columns: 1fr 1.15fr; align-items: center; gap: 40px; min-height: 640px; padding-block: 150px 70px; }
-.home-highlight { display: grid; gap: 8px; }
+.home-highlight { display: grid; gap: 8px; align-self: end; margin-bottom: 18px; }
 .home-highlight h2 { font: 600 26px/1.1 var(--h-body); text-transform: none; letter-spacing: 0; }
 .home-highlight p { color: #c9daee; font-size: 18px; }
 .home-highlight a { display: grid; place-items: center; width: 42px; height: 42px; margin-top: 12px; border: 1.5px solid #ffffff; border-radius: 50%; color: #ffffff; transition: background-color 0.2s ease, color 0.2s ease; }
 .home-highlight a:hover { background: #ffffff; color: #0c1b2e; }
 .home-highlight .home-icon { width: 18px; height: 18px; }
 .home-hero__copy { display: grid; justify-items: start; gap: 22px; }
-.home-hero h1 { font-size: clamp(56px, 7.4vw, 104px); }
+.home-hero h1 { font-size: clamp(48px, 6vw, 84px); }
 .home-hero h1 em { font-style: normal; color: var(--h-hero-accent); }
 .home-hero__copy > p { color: var(--h-hero-muted); font-size: 20px; font-weight: 600; }
 .home-hero__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 26px; margin-top: 8px; }
@@ -179,6 +184,7 @@
 
 /* Shared section heading */
 .home-section { margin-top: 110px; }
+.home-head__sub { margin-top: 12px; color: var(--h-muted); font-size: 17px; }
 .home-head { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 40px; }
 .home-head > div, .home-head--center { display: grid; gap: 14px; }
 .home-head--center { justify-content: center; justify-items: center; margin-bottom: 0; text-align: center; }
@@ -198,21 +204,54 @@
 .home-sport img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; }
 .home-sport__link::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, rgba(var(--h-overlay), 0.88)); transition: background 0.3s ease; }
 .home-sport:hover img { transform: scale(1.07); }
+
+/* Facilities mosaic: two rows, wide tiles placed diagonally (top left, bottom right) */
+.home-venues { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 290px; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.home-venue { position: relative; overflow: hidden; background: var(--h-hero); }
+.home-venue--wide { grid-column: span 2; }
+.home-venues--even { grid-template-columns: repeat(3, 1fr); }
+.home-venue img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; }
+.home-venue::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(var(--h-overlay), 0.1) 35%, rgba(var(--h-overlay), 0.9)); pointer-events: none; }
+.home-venue__label { position: absolute; top: 14px; left: 14px; z-index: 1; padding: 5px 9px; background: var(--h-accent); color: #0b1736; font: 800 11px/1 var(--h-display); letter-spacing: 0.08em; text-transform: uppercase; }
+.home-venue__text { position: absolute; left: 20px; right: 20px; bottom: 16px; z-index: 1; color: #ffffff; pointer-events: none; }
+.home-page .home-venue h3 { color: #ffffff; font: 900 20px/1.1 var(--h-display); text-transform: uppercase; }
+.home-venue--wide h3 { font-size: 28px; }
+.home-page .home-venue p { margin-top: 4px; color: #c9daee; font-size: 14px; }
+.home-venue__go { display: block; max-height: 0; overflow: hidden; color: var(--h-accent); font-size: 14px; font-weight: 800; opacity: 0; transition: max-height 0.3s ease, opacity 0.3s ease, margin 0.3s ease; }
+.home-venue__link { position: absolute; inset: 0; z-index: 2; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; }
+.home-venue:hover img, .home-venue:focus-within img { transform: scale(1.06); }
+.home-venue:hover .home-venue__go, .home-venue:focus-within .home-venue__go { max-height: 24px; margin-top: 8px; opacity: 1; }
+.home-venue:hover, .home-venue:focus-within { outline: 3px solid var(--h-accent); outline-offset: -3px; }
+.home-page .home-venue__link:focus-visible { outline: 3px solid #ffffff; outline-offset: -6px; }
 .home-sport:hover .home-sport__link::after { background: linear-gradient(180deg, rgba(31, 79, 216, 0.2) 20%, rgba(var(--h-overlay), 0.92)); }
 .home-sport__label { position: absolute; z-index: 1; inset: auto 0 0; display: flex; align-items: end; justify-content: space-between; padding: 24px 26px; }
 .home-sport h3 { font-size: 34px; }
 .home-sport__go { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: rgba(255, 255, 255, 0.18); transition: background-color 0.2s ease, color 0.2s ease; }
 .home-sport:hover .home-sport__go { background: var(--h-accent); color: var(--h-on-accent); }
 
-/* Coaches */
-.home-coaches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-.home-coach { display: grid; gap: 10px; align-content: start; }
-.home-coach__photo { position: relative; display: block; width: 100%; padding: 0; overflow: hidden; aspect-ratio: 4 / 5; border: 0; background: var(--h-band); cursor: pointer; }
-.home-coach__photo img { width: 100%; height: 100%; object-fit: cover; object-position: center 25%; transition: transform 0.6s ease; }
-.home-coach__photo:hover img { transform: scale(1.05); }
-.home-coach__photo span { position: absolute; left: 0; bottom: 0; padding: 10px 18px; background: var(--h-primary); color: #ffffff; font-size: 13px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
-.home-coach h3 { margin-top: 8px; font-size: 28px; }
-.home-coach p { color: var(--h-muted); }
+/* Coaches: slanted cards in a horizontal rail */
+.home-rail { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 18px; }
+.home-rail__track { display: flex; gap: 24px; margin: 0; padding: 10px 4px 32px; scroll-padding-inline: 4px; overflow-x: auto; list-style: none; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.home-rail__track::-webkit-scrollbar { display: none; }
+.home-rail__arrow { display: grid; place-items: center; width: 48px; height: 48px; border: 1.5px solid var(--h-primary); background: var(--h-surface); color: var(--h-primary-text); cursor: pointer; transition: background-color 0.2s ease, color 0.2s ease, opacity 0.2s ease; }
+.home-rail__arrow:hover:not(:disabled) { background: var(--h-primary); color: #ffffff; }
+.home-rail__arrow:disabled { opacity: 0.35; cursor: default; }
+.home-coach-card { flex: 0 0 calc((100% - 48px) / 3); min-width: 0; scroll-snap-align: start; }
+.home-coach-card__inner { display: flex; flex-direction: column; height: 100%; overflow: hidden; background: var(--h-surface); box-shadow: 0 14px 34px rgba(var(--h-overlay), 0.12); transition: transform 0.25s ease, box-shadow 0.25s ease; }
+.home-coach-card__inner:hover { box-shadow: var(--h-shadow); transform: translateY(-6px); }
+.home-coach-card__media { position: relative; aspect-ratio: 1 / 1; border-bottom: 4px solid var(--h-primary); background: linear-gradient(160deg, #2b5ef0, #0b1736); }
+.home-coach-card__avatar { display: grid; place-items: center; width: 100%; height: 100%; color: #ffffff; font: 900 64px/1 var(--h-display); letter-spacing: 0.04em; }
+.home-coach-card__avatar img { width: 100%; height: 100%; object-fit: cover; }
+.home-coach-card__sport { position: absolute; top: 14px; right: 14px; max-width: calc(100% - 28px); padding: 5px 10px; overflow: hidden; border-radius: var(--radius-pill); background: rgba(11, 23, 54, 0.78); color: #ffffff; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.home-coach-card__years { position: absolute; left: 14px; bottom: 14px; padding: 6px 10px; background: var(--h-accent); color: #0b1736; font: 800 13px/1 var(--h-display); letter-spacing: 0.04em; text-transform: uppercase; }
+.home-coach-card__body { display: flex; flex: 1; flex-direction: column; gap: 8px; padding: 18px 20px 22px; }
+.home-coach-card__body h3 { font-size: 21px; line-height: 1.25; overflow-wrap: break-word; }
+.home-coach-card__body h3 button { padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-align: left; text-transform: inherit; cursor: pointer; }
+.home-coach-card__body h3 button:hover { color: var(--h-primary-text); }
+.home-page .home-coach-card__headline { color: var(--h-primary-text); font-size: 14px; font-weight: 700; line-height: 1.35; }
+.home-page .home-coach-card__text { color: var(--h-muted); font-size: 14px; line-height: 1.55; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.home-coach-card__tags { display: flex; flex-wrap: wrap; gap: 6px; margin: auto 0 0; padding: 4px 0 0; list-style: none; }
+.home-coach-card__tags li { padding: 4px 10px; border-radius: var(--radius-pill); background: var(--h-icon-bg); color: var(--h-primary-text); font-size: 12px; font-weight: 700; }
 
 /* Packages */
 .home-pricing { margin-top: 110px; padding-block: 100px; background: var(--h-band); }
@@ -285,12 +324,15 @@
 
 @media (prefers-reduced-motion: reduce) {
   .home-page *, .home-page *::before, .home-page *::after { transition: none !important; }
-  .home-sport:hover img, .home-coach__photo:hover img { transform: none; }
+  .home-sport:hover img { transform: none; }
+  .home-venue:hover img, .home-venue:focus-within img { transform: none; }
+  .home-coach-card__inner:hover { transform: none; }
   .home-plan:hover, .home-features__list li:hover, .home-top:hover { transform: none; }
   .home-select__list { animation: none; }
 }
 
 @media (max-width: 1100px) {
+  .home-venues { grid-template-columns: repeat(2, 1fr); grid-auto-rows: 240px; }
   .home-header__bar { flex-wrap: wrap; gap: 16px; }
   .home-menu-toggle { display: block; margin-left: auto; min-height: 44px; padding: 8px 16px; border: 1px solid rgba(255, 255, 255, 0.45); background: rgba(255, 255, 255, 0.1); color: #ffffff; font-weight: 700; cursor: pointer; }
   .home-nav { display: none; order: 4; width: 100%; margin: 0 0 0 max(20px, 4vw); padding: 8px 16px; background: rgba(var(--h-overlay), 0.92); }
@@ -300,16 +342,20 @@
   .home-highlight { display: none; }
   .home-strip { grid-template-columns: 1fr; }
   .home-strip { grid-template-rows: auto; }
+  .home-hero__video-toggle { bottom: 280px; }
   .home-strip__photo { display: none; }
   .home-strip__side { grid-template-columns: 1fr 1fr; grid-template-rows: 80px; }
   .home-finder form { grid-template-columns: 1fr 1fr; }
   .home-finder form > .btn { grid-column: 1 / -1; min-height: 60px; }
   .home-features__list { grid-template-columns: 1fr 1fr; }
-  .home-sports, .home-coaches, .home-plans { grid-template-columns: 1fr 1fr; }
+  .home-sports, .home-plans { grid-template-columns: 1fr 1fr; }
+  .home-coach-card { flex-basis: calc((100% - 24px) / 2); }
   .home-faq { grid-template-columns: 1fr; gap: 32px; }
   .home-footer__grid { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 640px) {
+  .home-venues { grid-auto-rows: 190px; }
+  .home-venue--wide h3 { font-size: 22px; }
   .home-header__bar { min-height: 72px; }
   .home-header .brand__mark { width: 72px; height: 72px; font-size: 40px; }
   .home-header .brand__name { font-size: 22px; }
@@ -318,7 +364,11 @@
   .home-hero__actions, .home-hero__actions .home-btn { width: 100%; }
   .home-strip__sports { grid-template-columns: 1fr; gap: 20px; padding: 28px 24px; }
   .home-strip__side { grid-template-columns: 1fr; grid-template-rows: 72px 72px; }
-  .home-finder form, .home-features__list, .home-sports, .home-coaches, .home-plans, .home-footer__grid { grid-template-columns: 1fr; }
+  .home-finder form, .home-features__list, .home-sports, .home-plans, .home-footer__grid { grid-template-columns: 1fr; }
+  .home-rail { grid-template-columns: 1fr; }
+  .home-rail__arrow { display: none; }
+  .home-coach-card { flex-basis: 78%; }
+  .home-rail__track { gap: 16px; }
   .home-select { border-right: 0; border-bottom: 1px solid var(--h-border); }
   .home-section, .home-features, .home-pricing, .home-cta { margin-top: 72px; }
   .home-features, .home-pricing { padding-block: 64px; }
@@ -326,3 +376,24 @@
   .home-cards { flex-direction: column; align-items: start; }
   .home-footer__bottom { flex-direction: column; }
 }
+
+/* Photo credits page */
+.credits-bar { background: var(--h-hero); }
+.credits-bar__inner { display: flex; align-items: center; justify-content: space-between; min-height: 72px; }
+.home-page .credits-bar a { color: #ffffff; text-decoration: none; }
+.credits-bar__brand { font: italic 800 26px/1 var(--h-display); letter-spacing: 0.08em; text-transform: uppercase; }
+.credits-bar__back { font-weight: 700; }
+.credits-main { display: grid; gap: 18px; padding-block: 64px 96px; }
+.credits-main h1 { font-size: clamp(40px, 6vw, 72px); }
+.credits-main h1 span { color: var(--h-primary-text); }
+.credits-intro, .credits-meta { max-width: 760px; color: var(--h-muted); }
+.credits-group { display: grid; gap: 12px; margin-top: 28px; }
+.credits-group h2 { font-size: 28px; }
+.credits-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin: 8px 0 0; padding: 0; list-style: none; }
+.credits-item { display: grid; gap: 10px; padding-bottom: 12px; background: var(--h-surface); box-shadow: 0 8px 22px rgba(var(--h-overlay), 0.08); }
+.credits-item img, .credits-item__placeholder { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: var(--h-icon-bg); }
+.credits-item__placeholder { display: grid; place-items: center; color: var(--h-primary-text); font: 800 24px/1 var(--h-display); }
+.credits-item > div { display: grid; gap: 4px; padding-inline: 14px; }
+.home-page .credits-item__use { font-weight: 700; }
+.credits-item a { color: var(--h-primary-text); font-size: 13px; overflow-wrap: anywhere; }
+.credits-footer { padding-top: 0; }
