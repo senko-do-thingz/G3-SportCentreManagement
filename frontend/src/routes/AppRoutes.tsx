@@ -27,6 +27,7 @@ import { ReceptionReceiptPage } from '../pages/reception/ReceptionReceiptPage'
 import { RefundDetailPage } from '../pages/reception/RefundDetailPage'
 import { RefundRequestsPage } from '../pages/reception/RefundRequestsPage'
 import { RegisterRenewPage } from '../pages/reception/RegisterRenewPage'
+import { CreditsPage } from '../pages/public/CreditsPage'
 import { ForbiddenPage } from '../pages/public/ForbiddenPage'
 import { HomePage } from '../pages/public/HomePage'
 import { LoginPage } from '../pages/public/LoginPage'
@@ -168,6 +169,7 @@ function ApplicationRoutes() {
       <AccountSwitchRedirect />
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/credits" element={<CreditsPage />} />
 
         <Route element={<PublicLayout />}>
           <Route path="/login" element={<LoginPage />} />

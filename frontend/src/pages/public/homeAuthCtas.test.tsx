@@ -9,7 +9,7 @@ import { THEME_STORAGE_KEY } from '../../theme/theme'
 const request = { fullName: 'Taylor Test', phone: '0901234567', email: 'new-member@example.invalid', password: 'Sportify123!' }
 
 function catalogue(call: RecordedCall) {
-  if (['/sports', '/packages', '/membership-cards/tiers', '/coaches/public'].includes(call.path)) return json(200, [])
+  if (['/sports', '/packages', '/membership-cards/tiers', '/coaches/public', '/facilities/public'].includes(call.path)) return json(200, [])
   return backendError(404, 'Not found')
 }
 

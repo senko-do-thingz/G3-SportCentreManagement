@@ -1,6 +1,7 @@
 package com.sportify.identity.service.impl;
 
 import com.sportify.identity.dto.CoachOptionResponse;
+import com.sportify.identity.dto.PublicCoachResponse;
 import com.sportify.identity.entity.CoachProfile;
 import com.sportify.identity.entity.CoachSport;
 import com.sportify.identity.entity.Role;
@@ -17,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -113,5 +115,55 @@ class CoachDirectoryServiceImplTest {
 
         assertTrue(result.isEmpty());
         verifyNoInteractions(coachSportRepository);
+    }
+
+    @Test
+    void getPublicCoaches_shouldAddBioAndAvatarWithSortedSports() {
+        coach1.setBio("Builds passing and game sense for young players.");
+        coach1.getUserAccount().setAvatarUrl("https://cdn.example.test/daniel.jpg");
+        when(coachProfileRepository.findActiveCoaches()).thenReturn(List.of(coach1, coach2));
+        when(coachSportRepository.findByIdCoachIdIn(List.of(10L, 11L))).thenReturn(List.of(
+                CoachSport.of(10L, 2L),
+                CoachSport.of(10L, 1L),
+                CoachSport.of(11L, 3L)
+        ));
+
+        List<PublicCoachResponse> result = coachDirectoryService.getPublicCoaches(null);
+
+        assertEquals(2, result.size());
+        assertEquals("Daniel Smith", result.get(0).fullName());
+        assertEquals("Builds passing and game sense for young players.", result.get(0).bio());
+        assertEquals("https://cdn.example.test/daniel.jpg", result.get(0).avatarUrl());
+        assertEquals(List.of(1L, 2L), result.get(0).sportIds());
+        assertNull(result.get(1).bio());
+        assertNull(result.get(1).avatarUrl());
+    }
+
+    @Test
+    void getPublicCoaches_whenNoneFound_shouldReturnEmptyListWithoutSportQuery() {
+        when(coachProfileRepository.findActiveCoachesBySport(99L)).thenReturn(List.of());
+
+        assertTrue(coachDirectoryService.getPublicCoaches(99L).isEmpty());
+        verifyNoInteractions(coachSportRepository);
+    }
+
+    @Test
+    void getPublicCoaches_shouldSkipPrivateProfilesAndFollowDisplayOrder() {
+        coach1.setDisplayOrder(2);
+        coach2.setDisplayOrder(1);
+        UserAccount hiddenAccount = UserAccount.builder()
+                .id(12L)
+                .fullName("Hidden Coach")
+                .role(Role.builder().code("COACH").build())
+                .status("ACTIVE")
+                .build();
+        CoachProfile hidden = CoachProfile.builder().id(12L).userAccount(hiddenAccount).isPublic(false).build();
+        when(coachProfileRepository.findActiveCoaches()).thenReturn(List.of(coach1, coach2, hidden));
+        when(coachSportRepository.findByIdCoachIdIn(List.of(11L, 10L))).thenReturn(List.of());
+
+        List<PublicCoachResponse> result = coachDirectoryService.getPublicCoaches(null);
+
+        assertEquals(List.of(11L, 10L), result.stream().map(PublicCoachResponse::id).toList());
+        verify(coachSportRepository).findByIdCoachIdIn(List.of(11L, 10L));
     }
 }

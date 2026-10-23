@@ -9,9 +9,14 @@ import { renderApp } from '../../test/renderApp'
 const SPORTS = [{ id: 41, code: 'FOOTBALL', name: 'Football' }, { id: 52, code: 'BADMINTON', name: 'Badminton' }]
 const PACKAGES = [{ id: 81, name: 'Football Independent', sportId: 41, sportName: 'Football', trainingFormat: 'SELF_TRAINING', durationDays: 30, sessionCount: 8, priceAmount: 500000, isActive: true }]
 const COACHES = [
-  { id: 21, fullName: 'Pham Thu Ha', headline: 'Swimming coach', specialties: 'Stroke technique', yearsExperience: 6, sportIds: [52] },
+  { id: 21, fullName: 'Pham Thu Ha', headline: 'Swimming coach', specialties: 'Stroke technique, Water safety', yearsExperience: 6, bio: 'Helps nervous beginners feel safe in deep water.', avatarUrl: 'https://cdn.example.test/ha.jpg', sportIds: [52] },
   { id: 22, fullName: 'Le Hoang Nam', headline: null, specialties: null, yearsExperience: 4, sportIds: [41] },
   { id: 23, fullName: 'Tran Minh Quan', headline: null, specialties: null, yearsExperience: null, sportIds: [] },
+]
+const FACILITIES = [
+  { id: 61, name: 'Badminton Court 1', facilityType: 'COURT', sportId: 52, capacity: 8 },
+  { id: 62, name: 'Badminton Court 2', facilityType: 'COURT', sportId: 52, capacity: 8 },
+  { id: 63, name: 'Football Field', facilityType: 'FIELD', sportId: 41, capacity: 22 },
 ]
 const TIERS = [{ id: 1, name: 'Gold', discountPercentage: 5, isActive: true }]
 
@@ -20,6 +25,7 @@ function catalog(call: RecordedCall) {
   if (call.path === '/packages') return json(200, PACKAGES)
   if (call.path === '/membership-cards/tiers') return json(200, TIERS)
   if (call.path === '/coaches/public') return json(200, COACHES)
+  if (call.path === '/facilities/public') return json(200, FACILITIES)
   return backendError(404, 'Not found')
 }
 
@@ -45,7 +51,7 @@ describe('public Home', () => {
     }
     expect(await screen.findByRole('link', { name: 'View options for Football Independent' })).toHaveAttribute('href', '/member/packages/81')
     expect(screen.getByText('Save on every sport package.')).toBeInTheDocument()
-    expect(calls.map((call) => call.path).sort()).toEqual(['/coaches/public', '/membership-cards/tiers', '/packages', '/sports'])
+    expect(calls.map((call) => call.path).sort()).toEqual(['/coaches/public', '/facilities/public', '/membership-cards/tiers', '/packages', '/sports'])
     expect(calls.every((call) => call.method === 'GET' && call.authorization === null)).toBe(true)
     expect(screen.queryByRole('heading', { name: 'Welcome back' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Training/ })).toHaveAttribute('aria-haspopup', 'listbox')
@@ -245,16 +251,56 @@ describe('public Home', () => {
     act(() => { Object.defineProperty(window, 'scrollY', { value: 0, configurable: true }); window.dispatchEvent(new Event('scroll')) })
   })
 
-  it('shows coaches from the public coach list with their sports and a safe fallback label', async () => {
+  it('builds facility tiles from the public facility list and preselects the sport in the class finder', async () => {
+    installFakeFetch(catalog)
+    const user = userEvent.setup()
+    renderApp('/')
+    const section = screen.getByRole('region', { name: 'Where you play' })
+    await within(section).findByText('2 courts')
+    const tiles = within(section).getAllByRole('listitem')
+    expect(tiles.map((tile) => within(tile).getByRole('heading').textContent)).toEqual(['Badminton', 'Football Field'])
+    expect(within(tiles[1]).getByText('1 field')).toBeInTheDocument()
+    expect(section.querySelector('.home-venues')).toHaveClass('home-venues--even')
+    expect(within(section).getByText('2 courts and 1 field, one membership card.')).toBeInTheDocument()
+    expect(screen.getByText('2 sports. 1 center.')).toBeInTheDocument()
+    await user.click(within(section).getByRole('button', { name: 'Find Badminton classes - Badminton, 2 courts' }))
+    expect(screen.getByRole('button', { name: 'Sport Badminton' })).toHaveFocus()
+  })
+
+  it('keeps the facility photos without counts and offers Retry when the facility list fails', async () => {
+    let fail = true
+    installFakeFetch((call) => call.path === '/facilities/public' && fail ? backendError(503, 'Unavailable') : catalog(call))
+    const user = userEvent.setup()
+    renderApp('/')
+    const section = screen.getByRole('region', { name: 'Where you play' })
+    await within(section).findByText('Court details are temporarily unavailable.')
+    expect(within(section).getAllByRole('heading', { level: 3 })).toHaveLength(6)
+    expect(within(section).queryByText(/courts?$/)).not.toBeInTheDocument()
+    fail = false
+    await user.click(within(section).getByRole('button', { name: 'Retry' }))
+    expect(await within(section).findByText('2 courts')).toBeInTheDocument()
+  })
+
+  it('shows coaches from the public coach list as photo-top cards with photo or initials, sport chip, years badge, name, headline, short bio and specialty tags', async () => {
     installFakeFetch(catalog)
     renderApp('/')
     const section = screen.getByRole('region', { name: 'Train with the best' })
-    expect(await within(section).findByRole('heading', { name: 'Pham Thu Ha' })).toBeInTheDocument()
-    expect(within(section).getByText('Swimming coach')).toBeInTheDocument()
-    expect(within(section).getByText('4 years of coaching')).toBeInTheDocument()
-    await waitFor(() => expect(within(section).getByText('Badminton')).toBeInTheDocument())
-    expect(within(section).getByText('Football')).toBeInTheDocument()
-    expect(within(section).getByRole('button', { name: 'View profile of Tran Minh Quan' })).toHaveTextContent('Coach')
+    const ha = (await within(section).findByRole('heading', { name: 'Pham Thu Ha' })).closest('article') as HTMLElement
+    expect(within(ha).getByText('Swimming coach')).toBeInTheDocument()
+    expect(within(ha).getByText('Helps nervous beginners feel safe in deep water.')).toBeInTheDocument()
+    expect(within(ha).getByText('6 years')).toBeInTheDocument()
+    expect(within(within(ha).getByRole('list', { name: 'Specialties' })).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Stroke technique', 'Water safety'])
+    expect(ha.querySelector('img')).toHaveAttribute('src', 'https://cdn.example.test/ha.jpg')
+    await waitFor(() => expect(within(ha).getByText('Badminton')).toBeInTheDocument())
+    const nam = within(section).getByRole('heading', { name: 'Le Hoang Nam' }).closest('article') as HTMLElement
+    expect(within(nam).getByText('Le coaches Football at Sportify Center.')).toBeInTheDocument()
+    expect(within(nam).getByText('4 years')).toBeInTheDocument()
+    expect(within(nam).queryByRole('list', { name: 'Specialties' })).not.toBeInTheDocument()
+    expect(within(nam).getByText('LN')).toBeInTheDocument()
+    const quan = within(section).getByRole('heading', { name: 'Tran Minh Quan' }).closest('article') as HTMLElement
+    expect(within(quan).getByText('Tran coaches at Sportify Center.')).toBeInTheDocument()
+    expect(within(quan).getByText('Sportify Center coach')).toBeInTheDocument()
+    expect(within(section).getByRole('button', { name: 'Previous coaches' })).toBeDisabled()
     expect(section).not.toHaveTextContent(/Daniel Smith|example\.com/)
   })
 

@@ -73,6 +73,24 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getMessage(), null);
     }
 
+    @ExceptionHandler(org.springframework.web.multipart.support.MissingServletRequestPartException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingPart(org.springframework.web.multipart.support.MissingServletRequestPartException ex) {
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Choose a file to upload", null);
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleMaxUploadSize(org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+        // Applies to every multipart endpoint, so the message names the configured limit instead of one feature.
+        long limit = ex.getMaxUploadSize();
+        String message = limit > 0 ? "File must be at most " + formatMegabytes(limit) + " MB" : "File is too large";
+        return buildErrorResponse(HttpStatus.PAYLOAD_TOO_LARGE, message, null);
+    }
+
+    private static String formatMegabytes(long bytes) {
+        double megabytes = bytes / (1024.0 * 1024.0);
+        return megabytes == Math.rint(megabytes) ? String.valueOf((long) megabytes) : String.format(Locale.ROOT, "%.1f", megabytes);
+    }
+
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<Map<String, Object>> handleBusinessRuleException(BusinessRuleException ex) {
         var response = buildErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), null);

@@ -14,6 +14,21 @@ export function validateStaff(request: StaffAccountRequest): Record<string, stri
   return errors
 }
 
+/** Mirrors ManagerCoachProfileUpdateRequest. Years and display order arrive as text from the form. */
+export function validateCoachProfile(draft: { headline: string; bio: string; yearsExperience: string; specialties: string; displayOrder: string }): Record<string, string> {
+  const errors: Record<string, string> = {}
+  if (draft.headline.trim().length > 150) errors.headline = 'Headline must be at most 150 characters.'
+  if (draft.bio.trim().length > 1000) errors.bio = 'Bio must be at most 1000 characters.'
+  if (draft.specialties.trim().length > 255) errors.specialties = 'Specialties must be at most 255 characters.'
+  if (draft.yearsExperience.trim()) {
+    const years = numericError(draft.yearsExperience, 'Years of coaching', 0, true, 60)
+    if (years) errors.yearsExperience = years
+  }
+  const order = numericError(draft.displayOrder, 'Display order', 0, true, 999)
+  if (order) errors.displayOrder = order
+  return errors
+}
+
 export function numericError(value: string, label: string, minimum: number, integer = false, maximum = Infinity): string | undefined {
   const parsed = Number(value)
   if (!value.trim() || !Number.isFinite(parsed) || parsed < minimum || (integer && !Number.isInteger(parsed))) {

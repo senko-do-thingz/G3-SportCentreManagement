@@ -185,6 +185,13 @@ Open `http://localhost:5173`. The backend must be running. CORS for `http://loca
 
 Migrations seed the four roles, sports, membership plans, sport packages, card tiers and one manager account (`manager@sportify.com`, created in `V4__seed_manager_account.sql`). Change that account password before using the system outside local development.
 
+## Shared coach and receptionist demo data
+
+To give every team member the same six coaches (one per sport, with photos on the Home page) and two
+receptionists on their own local database, run the two scripts in [`scripts/demo-data`](scripts/demo-data/README.md)
+once in SSMS after starting the backend. They are manual scripts, not migrations, so `dev` and `prod` startup never
+adds these accounts on their own. Password: `SportifyDemo2026!`.
+
 ## Demo Accounts
 
 These seven accounts are for isolated local demonstrations only. Never enable the `demo` profile against a production or shared database. The profile guard rejects simultaneous `prod` and `demo` activation before Flyway initializes; it cannot determine whether a connection points to a production database.
