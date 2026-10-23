@@ -63,11 +63,14 @@
 
 .auth-shell {
   display: grid;
-  /* Same split as the Figma card: 519 px photo, 619 px form, 1140 px wide. */
-  grid-template-columns: minmax(0, 519fr) minmax(0, 619fr);
-  width: 100%;
-  max-width: 1140px;
-  min-height: 600px;
+  /*
+   * Fixed size card (Figma: 519 px photo, 619 px form, 1140 px wide). It never grows or shrinks
+   * with the form content or validation messages; it only gives way on narrow windows.
+   */
+  grid-template-columns: 519px minmax(0, 1fr);
+  width: 1140px;
+  max-width: 100%;
+  height: 820px;
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
@@ -126,9 +129,23 @@
 .auth-panel {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: var(--space-6);
-  padding: var(--space-12) var(--space-10);
+  justify-content: safe center;
+  gap: var(--space-4);
+  min-height: 0;
+  padding: var(--space-6) var(--space-12);
+  overflow-y: auto;
+  /* The content is sized to fit; the scrollbar stays hidden if a long message ever overflows. */
+  scrollbar-width: none;
+}
+
+.auth-panel::-webkit-scrollbar {
+  display: none;
+}
+
+/* Brand and appearance control sit on one line, separated from the heading by a hairline. */
+.auth-panel__toolbar {
+  padding-bottom: var(--space-5);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .auth-panel__heading h1 {
@@ -147,6 +164,41 @@
   gap: var(--space-4);
 }
 
+/* Short related fields share a line (name and phone, password and confirmation). */
+.auth-form__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+/*
+ * Every field keeps room for one message line, so errors and hints appear without moving the
+ * fields below. The password strength line has its own reserved spot in the rules card.
+ */
+.auth-form .field,
+.auth-form .checkbox-field {
+  min-height: 90px;
+}
+
+.auth-form .checkbox-field {
+  min-height: 46px;
+}
+
+.auth-form .password-rules__strength {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-4);
+}
+
+.auth-form .password-rules {
+  position: relative;
+  padding: var(--space-6) var(--space-4) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+}
+
 .auth-form .btn {
   margin-top: var(--space-2);
 }
@@ -155,7 +207,7 @@
 .auth-form__fields {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-2);
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -181,8 +233,11 @@
 
 .auth-panel__footer {
   display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
@@ -565,7 +620,12 @@
 
   .auth-shell {
     grid-template-columns: 1fr;
-    min-height: 0;
+    width: 100%;
+    height: auto;
+  }
+
+  .auth-panel {
+    overflow-y: visible;
   }
 
   .auth-hero {
@@ -585,6 +645,10 @@
 
   .auth-panel {
     padding: var(--space-8) var(--space-5);
+  }
+
+  .auth-form__row {
+    grid-template-columns: 1fr;
   }
 
   .ui-kit__topbar {
