@@ -1,3 +1,10 @@
+## 2026-10-23 - Verify guest authentication return navigation (UI-05)
+
+- Re-verify after the Home, coach profile and shared UI merges that every Home action needing a Member session (Membership offers, View schedule, package View options, View cards) returns the guest to that exact destination after Log in or Create account, without sending a registration, purchase or booking.
+- Check that guests browse `/`, `/credits`, `/login` and `/register` without a session request, a write or a sign-in prompt, and that role guards still hold for every role and area (own area renders, others show Access denied, guests go to Log in).
+- Cover browser Back after a return, staff logins with a Member destination (role home instead), unsafe return states, session expiry on a protected page with its query, and a signed-in Member opening Log in. New tests in frontend/src/pages/public/guestReturnMatrix.test.tsx; cases in frontend/docs/UI-05-test-cases.md.
+- No production code change was needed. Lint, tsc, all frontend tests and the build pass.
+
 ## 2026-10-23 - Manager edits coach profiles and uploads coach photos (FE-COACH-PROFILE)
 
 - CI fix: CashMigrationIntegrationTest and FinanceMigrationCompatibilityIntegrationTest migrate to V31 (the last finance migration) where they assert how many migrations ran, so the new V32 and V33 migrations no longer change their expected counts (failure: expected 25 but was 27).
