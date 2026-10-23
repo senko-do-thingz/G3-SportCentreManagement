@@ -457,6 +457,193 @@
   background: var(--color-primary);
 }
 
+/* Member header follows the refreshed Home theme in both appearance modes. */
+.member-layout__header {
+  --member-header-navy: #0b1736;
+  --member-header-middle: #102654;
+  --member-header-blue: #1f4fd8;
+  --member-header-nav: #070f24;
+  --member-header-royal: #1f4fd8;
+  --member-header-muted: #d5def3;
+  --member-header-border: rgba(255, 255, 255, 0.16);
+  --member-header-gold: #ffc83d;
+  background: linear-gradient(112deg, var(--member-header-navy) 0%, var(--member-header-middle) 58%, var(--member-header-blue) 138%);
+  border-bottom: 3px solid var(--member-header-gold);
+  box-shadow: 0 8px 24px rgba(7, 15, 36, 0.2);
+  color: #ffffff;
+}
+
+.member-layout__header .member-header__bar.container,
+.member-layout__header .member-nav__list.container {
+  max-width: 1500px;
+}
+
+.member-layout__header .member-header__bar {
+  min-height: 76px;
+  padding-block: 10px;
+}
+
+.member-layout__header .brand {
+  flex: none;
+  gap: 12px;
+  color: #ffffff;
+}
+
+.member-layout__header .brand__mark {
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255, 200, 61, 0.72);
+  border-radius: 11px;
+  background: linear-gradient(145deg, var(--member-header-royal), #3675ff);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.18);
+  color: #ffffff;
+}
+
+.member-layout__header .brand__name {
+  color: #ffffff;
+  font-size: 1.08rem;
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
+.member-layout__header .brand__tagline {
+  color: var(--member-header-gold);
+  font-size: 0.58rem;
+  letter-spacing: 0.2em;
+}
+
+.member-layout__header .header-actions {
+  gap: 14px;
+}
+
+.member-layout__header .appearance {
+  flex-direction: row;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 6px 8px 6px 12px;
+  border: 1px solid var(--member-header-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.member-layout__header .appearance__label {
+  color: var(--member-header-muted);
+  font-size: 11px;
+  letter-spacing: 0.035em;
+}
+
+.member-layout__header .appearance__select {
+  min-width: 96px;
+  min-height: 36px;
+  border-color: rgba(255, 255, 255, 0.32);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.member-layout__header .appearance__select option {
+  background: #ffffff;
+  color: #0e1a33;
+}
+
+.member-layout__header .user-menu {
+  gap: 10px;
+}
+
+.member-layout__header .user-menu .avatar {
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 200, 61, 0.75);
+  background: var(--member-header-royal);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.member-layout__header .user-menu__text {
+  max-width: 190px;
+}
+
+.member-layout__header .user-menu__name {
+  color: #ffffff;
+}
+
+.member-layout__header .user-menu__role {
+  color: var(--member-header-muted);
+}
+
+.member-layout__header .user-menu__logout {
+  margin-left: 2px;
+  padding: 9px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: var(--radius-pill);
+  color: #ffffff;
+  transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.member-layout__header .user-menu__logout:hover {
+  border-color: var(--member-header-gold);
+  background: var(--member-header-gold);
+  color: #0b1736;
+}
+
+.member-layout__header .member-nav {
+  border-top: 1px solid var(--member-header-border);
+  background: var(--member-header-nav);
+}
+
+.member-layout__header .member-nav__list {
+  align-items: center;
+  gap: 6px;
+  padding-block: 4px 0;
+}
+
+.member-layout__header .member-nav__link {
+  padding: 13px 14px 15px;
+  border-radius: 9px 9px 0 0;
+  color: var(--member-header-muted);
+  font-size: 13px;
+  font-weight: var(--weight-semibold);
+  transition: color 0.18s ease, background-color 0.18s ease;
+}
+
+.member-layout__header .member-nav__link:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.member-layout__header .member-nav__link--active {
+  background: rgba(61, 108, 240, 0.2);
+  color: #ffffff;
+}
+
+.member-layout__header .member-nav__link--active::after {
+  height: 3px;
+  background: var(--member-header-gold);
+}
+
+.member-layout__header a:focus-visible,
+.member-layout__header button:focus-visible,
+.member-layout__header select:focus-visible {
+  outline: 2px solid var(--member-header-gold);
+  outline-offset: 3px;
+}
+
+:root[data-theme='dark'] .member-layout__header {
+  --member-header-navy: #060b18;
+  --member-header-middle: #0a1430;
+  --member-header-blue: #172f70;
+  --member-header-nav: #050913;
+  --member-header-royal: #3d6cf0;
+  --member-header-muted: #b5c0d9;
+  --member-header-border: rgba(255, 255, 255, 0.13);
+  --member-header-gold: #ffd65e;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.36);
+}
+
 .member-main {
   padding-top: var(--space-8);
   padding-bottom: var(--space-12);
@@ -464,6 +651,72 @@
 
 .member-main:has(.member-schedule-theme) {
   max-width: 1500px;
+}
+
+@media (max-width: 640px) {
+  .member-layout__header .member-header__bar {
+    min-height: 0;
+    gap: 12px;
+    padding-block: 12px;
+  }
+
+  .member-layout__header .header-actions {
+    width: 100%;
+    justify-content: space-between;
+    gap: 10px;
+    margin-left: 0;
+  }
+
+  .member-layout__header .user-menu__text {
+    display: flex;
+    max-width: 120px;
+  }
+
+  .member-layout__header .member-nav__list {
+    gap: 3px;
+  }
+
+  .member-layout__header .member-nav__link {
+    padding-inline: 11px;
+  }
+}
+
+@media (max-width: 400px) {
+  .member-layout__header .brand {
+    gap: 8px;
+  }
+
+  .member-layout__header .brand__mark {
+    width: 38px;
+    height: 38px;
+  }
+
+  .member-layout__header .brand__name {
+    font-size: 0.95rem;
+  }
+
+  .member-layout__header .appearance {
+    gap: 6px;
+    padding-inline: 8px 6px;
+  }
+
+  .member-layout__header .appearance__select {
+    min-width: 78px;
+    padding-inline: 7px;
+  }
+
+  .member-layout__header .user-menu {
+    gap: 7px;
+  }
+
+  .member-layout__header .user-menu__text {
+    max-width: 82px;
+  }
+
+  .member-layout__header .user-menu__logout {
+    margin-left: 0;
+    padding-inline: 9px;
+  }
 }
 
 /* Staff layout */

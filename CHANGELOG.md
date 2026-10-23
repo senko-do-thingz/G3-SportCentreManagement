@@ -1,3 +1,7 @@
+## 2026-10-23 - Member header theme refresh
+
+- Restyle the member brand/account bar and navigation with the Home page's navy, Royal Blue, and Gold palette in light and dark modes. Keep appearance, account, and navigation behavior unchanged; scope the refresh to the member portal.
+
 ## 2026-10-22 - Prevent stale-week flicker in member schedule (FE-08)
 
 - Replace the faded previous-week timetable during navigation with a fixed-height timetable skeleton labeled with the requested date range. Fade in the resolved week briefly; respect reduced-motion preferences. No API or backend changes.

@@ -60,4 +60,26 @@ describe('member header style isolation', () => {
     expect(getComputedStyle(container.firstElementChild!).display).toBe('flex')
     expect(screen.getByText(MEMBER.fullName)).toBeInTheDocument()
   })
+
+  it('uses the refreshed Royal, Navy, and Gold member header palette in light and dark modes', () => {
+    const root = document.documentElement
+    const previousTheme = root.getAttribute('data-theme')
+    const header = document.createElement('header')
+    header.className = 'member-layout__header'
+    document.body.append(header)
+
+    try {
+      root.removeAttribute('data-theme')
+      expect(getComputedStyle(header).getPropertyValue('--member-header-navy').trim()).toBe('#0b1736')
+      expect(getComputedStyle(header).getPropertyValue('--member-header-gold').trim()).toBe('#ffc83d')
+
+      root.setAttribute('data-theme', 'dark')
+      expect(getComputedStyle(header).getPropertyValue('--member-header-navy').trim()).toBe('#060b18')
+      expect(getComputedStyle(header).getPropertyValue('--member-header-gold').trim()).toBe('#ffd65e')
+    } finally {
+      header.remove()
+      if (previousTheme) root.setAttribute('data-theme', previousTheme)
+      else root.removeAttribute('data-theme')
+    }
+  })
 })
