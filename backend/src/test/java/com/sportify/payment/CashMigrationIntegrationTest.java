@@ -42,6 +42,8 @@ class CashMigrationIntegrationTest {
         if (migrate) flyway(db, false, null).migrate();
         return db;
     }
+    /** Last finance migration; count assertions stop here so later, unrelated migrations do not change them. */
+    static final String CASH_TARGET = "31";
     Flyway flyway(Database db, boolean demo, String target) {
         var config = Flyway.configure().dataSource(db.source()).defaultSchema("dbo").schemas("dbo")
                 .outOfOrder(false).validateOnMigrate(true).cleanDisabled(true)
@@ -69,7 +71,7 @@ class CashMigrationIntegrationTest {
         });
     }
     @ParameterizedTest @ValueSource(booleans={false,true}) void freshDefaultAndDemoAreInactiveAndIdempotent(boolean demo) throws Exception {
-        var db = database(false); var migration = flyway(db, demo, null);
+        var db = database(false); var migration = flyway(db, demo, CASH_TARGET);
         assertThat(migration.migrate().migrationsExecuted).isEqualTo(demo ? 27 : 25);
         assertThat(db.jdbc().queryForObject("SELECT cutover_utc FROM dbo.cash_coverage", Timestamp.class)).isNull();
         assertThat(db.jdbc().queryForObject("SELECT COUNT_BIG(*) FROM dbo.cash_event", Long.class)).isZero();
@@ -82,7 +84,7 @@ class CashMigrationIntegrationTest {
         db.jdbc().update("INSERT INTO dbo.payment(payment_code,member_id,amount,payment_method,payment_status,payment_time) VALUES('CF-LEGACY',?,500000,'CASH','REFUNDED',NULL)", member);
         var before = db.jdbc().queryForList("SELECT version,checksum FROM dbo.flyway_schema_history ORDER BY installed_rank");
         var rows = db.jdbc().queryForList("SELECT * FROM dbo.payment");
-        var migration = flyway(db, false, null); assertThat(migration.migrate().migrationsExecuted).isEqualTo(1);
+        var migration = flyway(db, false, CASH_TARGET); assertThat(migration.migrate().migrationsExecuted).isEqualTo(1);
         assertThat(db.jdbc().queryForList("SELECT version,checksum FROM dbo.flyway_schema_history ORDER BY installed_rank").subList(0,before.size())).isEqualTo(before);
         assertThat(db.jdbc().queryForList("SELECT * FROM dbo.payment")).isEqualTo(rows);
         assertThat(db.jdbc().queryForObject("SELECT COUNT_BIG(*) FROM dbo.cash_event", Long.class)).isZero();
