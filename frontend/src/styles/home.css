@@ -76,6 +76,13 @@
 .home-btn--line { background: transparent; color: #ffffff; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.55); }
 .home-btn--line:hover { background: rgba(255, 255, 255, 0.12); color: #ffffff; text-decoration: none; }
 
+/* The shared modal is portalled outside Home; keep its actions scoped and responsive. */
+.home-auth-actions { display: flex; flex-wrap: wrap; gap: 12px; width: 100%; }
+.home-auth-actions > .btn { flex: 1 1 130px; min-height: 48px; white-space: normal; }
+.home-auth-actions > button { flex-basis: 100%; }
+.home-auth-actions > .btn--primary { background: #1f4fd8; border-color: #1f4fd8; color: #ffffff; }
+.home-auth-actions > .btn--primary:hover { background: #1a42b5; border-color: #1a42b5; }
+
 /* Header on top of the hero photo */
 .home-header { position: absolute; inset: 0 0 auto; z-index: var(--z-header); color: #ffffff; }
 .home-header__bar { display: flex; align-items: center; gap: 32px; min-height: 96px; padding-left: 0; }

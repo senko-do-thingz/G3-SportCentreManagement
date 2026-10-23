@@ -4,7 +4,7 @@ import { ApiError, getErrorMessage, splitFieldErrors } from '../../api/errors'
 import type { LoginRedirectState } from '../../auth/RequireAuth'
 import { LoginProfileError } from '../../auth/authContext'
 import { validateLogin } from '../../auth/loginValidation'
-import { postLoginPath } from '../../auth/roles'
+import { loginReturnState, postLoginPath } from '../../auth/roles'
 import { useAuth } from '../../auth/useAuth'
 import { Button } from '../../components/ui/Button'
 import { Checkbox } from '../../components/ui/Checkbox'
@@ -35,7 +35,7 @@ export const SIGNED_OUT_ELSEWHERE_MESSAGE =
 const LOGIN_FIELDS = ['email', 'password'] as const
 
 /** State passed by the sign up page when the account exists but the automatic sign in failed. */
-export interface LoginPrefillState {
+export interface LoginPrefillState extends LoginRedirectState {
   email?: string
   notice?: string
 }
@@ -67,7 +67,14 @@ export function LoginPage() {
   const location = useLocation()
   // History state is read once and kept here; the effect below removes the prefill values from
   // the history entry so a reload does not show the notice again.
-  const [initialState] = useState(() => location.state as LoginLocationState)
+  const [initialState] = useState(() => {
+    const state = location.state as LoginLocationState
+    return {
+      ...loginReturnState(state),
+      ...(typeof state?.email === 'string' ? { email: state.email } : {}),
+      ...(typeof state?.notice === 'string' ? { notice: state.notice } : {}),
+    }
+  })
   const requestedPath = initialState?.from ?? null
 
   const [email, setEmail] = useState(initialState?.email ?? '')
@@ -86,7 +93,7 @@ export function LoginPage() {
   useEffect(() => {
     if (initialState?.email !== undefined || initialState?.notice !== undefined) {
       // Keep only the page that asked for the login, which is still needed after the redirect.
-      const remaining: LoginRedirectState | null = initialState.from ? { from: initialState.from } : null
+      const remaining = loginReturnState(initialState)
       // Same address including the query string and hash; only the history state changes.
       navigate(
         { pathname: location.pathname, search: location.search, hash: location.hash },
@@ -238,7 +245,7 @@ export function LoginPage() {
 
       <p className="auth-panel__footer">
         <span>New to Sportify?</span>
-        <Link to="/register">Create an account</Link>
+        <Link to="/register" state={loginReturnState(initialState)}>Create an account</Link>
       </p>
     </AuthShell>
   )

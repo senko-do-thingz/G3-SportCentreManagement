@@ -143,6 +143,7 @@ describe('public Home', () => {
     await pick(user, 'Sport', 'Football')
     await pick(user, 'Level', 'Beginner')
     await user.click(screen.getByRole('button', { name: 'Find classes' }))
+    await user.click(within(screen.getByRole('dialog', { name: 'Sign in to continue' })).getByRole('link', { name: 'Log in' }))
     await screen.findByRole('heading', { name: 'Welcome back' })
     await user.type(screen.getByLabelText(/email address/i), 'member@example.test')
     await user.type(screen.getByLabelText(/^password/i), 'Test-password1!')
@@ -286,7 +287,7 @@ describe('public Home', () => {
     await pick(user, 'Training', 'Coach-led')
     expect(screen.getByRole('button', { name: /^Sport/ })).toHaveTextContent('Football')
     await user.click(screen.getByRole('button', { name: 'Find classes' }))
-    await screen.findByRole('heading', { name: 'Welcome back' })
+    expect(screen.getByRole('dialog', { name: 'Sign in to continue' })).toHaveAccessibleDescription('Sign in to explore current classes with your selected filters.')
   })
 
   it('loads high resolution sport photos and falls back to the bundled image when one fails', async () => {

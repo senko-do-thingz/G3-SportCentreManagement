@@ -1,5 +1,5 @@
 import { useId, useRef, useState, type FormEvent } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, getErrorMessage, splitFieldErrors } from '../../api/errors'
 import { AccountCreatedError } from '../../auth/authContext'
 import {
@@ -14,15 +14,17 @@ import {
   type RegisterForm,
   type RegisterFormState,
 } from '../../auth/registerValidation'
-import { homePathFor } from '../../auth/roles'
+import { loginReturnState, postLoginPath } from '../../auth/roles'
 import { useAuth } from '../../auth/useAuth'
 import { PasswordRules } from '../../components/PasswordRules'
 import { Button } from '../../components/ui/Button'
 import { Checkbox } from '../../components/ui/Checkbox'
 import { Input } from '../../components/ui/Input'
 import { PasswordInput } from '../../components/ui/PasswordInput'
+import { PageLoader } from '../../components/ui/Spinner'
 import { useFocusFirstInvalid } from '../../utils/useFocusFirstInvalid'
 import { AuthShell } from './AuthShell'
+import { SessionErrorPage } from './SessionErrorPage'
 import type { LoginPrefillState } from './LoginPage'
 
 /** Field names of the form. Backend validation keys use the same names. */
@@ -51,10 +53,12 @@ function registerErrors(error: unknown): { fields: Record<string, string>; form:
   return { fields: {}, form: getErrorMessage(error) }
 }
 
-/** Sign up screen (Figma F1-06). A new account is always a MEMBER; it opens the member dashboard. */
+/** Sign up screen (Figma F1-06). Resume a safe member destination or open the dashboard. */
 export function RegisterPage() {
   const { status, user, register } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const returnState = loginReturnState(location.state)
   const rulesId = useId()
 
   const [{ form, fieldErrors }, setFormState] = useState<RegisterFormState>({
@@ -70,8 +74,10 @@ export function RegisterPage() {
   const sendingRef = useRef(false)
 
   if (status === 'authenticated' && user && !submitting) {
-    return <Navigate to={homePathFor(user)} replace />
+    return <Navigate to={postLoginPath(user, returnState?.from)} replace />
   }
+  if (status === 'loading') return <PageLoader label="Restoring your session" />
+  if (status === 'error' && !submitting) return <SessionErrorPage />
 
   // Functional update: every edit starts from the latest form and errors, never from this render.
   const update = <K extends FieldName>(field: K, value: RegisterForm[K]) => {
@@ -94,10 +100,10 @@ export function RegisterPage() {
     setSubmitting(true)
     try {
       const member = await register(toRegisterRequest(form))
-      navigate(homePathFor(member), { replace: true })
+      navigate(postLoginPath(member, returnState?.from), { replace: true })
     } catch (error) {
       if (error instanceof AccountCreatedError) {
-        const state: LoginPrefillState = { email: form.email.trim(), notice: error.message }
+        const state: LoginPrefillState = { ...returnState, email: form.email.trim(), notice: error.message }
         navigate('/login', { replace: true, state })
         return
       }
@@ -202,7 +208,7 @@ export function RegisterPage() {
 
       <p className="auth-panel__footer">
         <span>Already have an account?</span>
-        <Link to="/login">Log in</Link>
+        <Link to="/login" state={returnState}>Log in</Link>
       </p>
     </AuthShell>
   )
