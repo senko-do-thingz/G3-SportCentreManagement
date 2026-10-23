@@ -1,8 +1,10 @@
 # Sportify Center - download the six demo coach photos into the project (run once, then commit the images).
-# Run again after a photo is changed here (it overwrites the files), then commit the images.
-# Usage from the repository root:  powershell -ExecutionPolicy Bypass -File scripts\demo-data\download-coach-photos.ps1
+# Existing photos are always preserved. Explicitly approve demo assets before downloading missing files.
+# Usage: powershell -File scripts\demo-data\download-coach-photos.ps1 -ApprovedDemoAssets
 # Photos: Unsplash License (free to use, no attribution required), cropped to 640 x 640 around the face. Demo only.
+param([switch]$ApprovedDemoAssets)
 $ErrorActionPreference = 'Stop'
+if (-not $ApprovedDemoAssets) { throw 'Explicit approval is required for demo asset downloads.' }
 $target = Join-Path $PSScriptRoot '..\..\frontend\public\images\coaches'
 New-Item -ItemType Directory -Force -Path $target | Out-Null
 $photos = [ordered]@{
@@ -15,7 +17,14 @@ $photos = [ordered]@{
 }
 foreach ($name in $photos.Keys) {
     $file = Join-Path $target $name
-    Invoke-WebRequest -Uri $photos[$name] -OutFile $file -UseBasicParsing
+    if (Test-Path -LiteralPath $file) {
+        Write-Host ("Preserved existing photo: {0}" -f $name)
+        continue
+    }
+    $download = Invoke-WebRequest -Uri $photos[$name] -UseBasicParsing
+    # CreateNew also refuses a file created by another process after the existence check.
+    $output = [IO.File]::Open($file, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    try { $download.RawContentStream.CopyTo($output) } finally { $output.Dispose() }
     $size = [math]::Round((Get-Item $file).Length / 1KB)
     Write-Host ("Saved {0} ({1} KB)" -f $name, $size)
 }

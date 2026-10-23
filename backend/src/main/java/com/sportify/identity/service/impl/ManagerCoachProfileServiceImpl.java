@@ -17,10 +17,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.net.URI;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -50,9 +49,21 @@ public class ManagerCoachProfileServiceImpl implements ManagerCoachProfileServic
         UserAccount account = profile.getUserAccount();
 
         String avatarUrl = clean(request.avatarUrl());
-        if (avatarUrl != null && avatarUrl.startsWith("/api/v1/users/") && !isUploaded(avatarUrl, userId)) {
-            // Another account's uploaded photo would break when that account replaces or removes it.
-            throw new FieldValidationException("avatarUrl", "Use a photo uploaded for this coach");
+        if (avatarUrl != null && !Objects.equals(avatarUrl, account.getAvatarUrl())
+                && (avatarUrl.startsWith("http://") || avatarUrl.startsWith("https://"))) {
+            try {
+                URI uri = URI.create(avatarUrl);
+                if (uri.getHost() == null || uri.getUserInfo() != null || uri.getPort() > 65535) {
+                    throw new IllegalArgumentException("Invalid public photo URL");
+                }
+            } catch (IllegalArgumentException ex) {
+                throw new FieldValidationException("avatarUrl", "Use a valid http(s) photo link without credentials");
+            }
+        }
+        if (avatarUrl != null && avatarUrl.startsWith("/api/v1/users/")
+                && (!isUploaded(avatarUrl, userId) || !Objects.equals(avatarUrl, account.getAvatarUrl()))) {
+            // Reject cross-account, fabricated and stale uploaded links, even when called outside MVC validation.
+            throw new FieldValidationException("avatarUrl", "Use the current photo uploaded for this coach");
         }
         String headline = clean(request.headline());
         String bio = clean(request.bio());
@@ -106,13 +117,10 @@ public class ManagerCoachProfileServiceImpl implements ManagerCoachProfileServic
         if (data.length > MAX_PHOTO_BYTES) {
             throw new BusinessRuleException("Photo must be at most 2 MB");
         }
-        String contentType = detectImageType(data);
-        if (contentType == null) {
-            throw new BusinessRuleException("Photo must be a JPEG, PNG or WebP image");
-        }
+        String contentType = CoachPhotoValidator.validate(data);
 
         avatarStore.save(userId, contentType, data);
-        // A new version parameter per upload, so browsers and the Home page never show a cached older photo.
+        // Keep the FE URL grammar; the serving endpoint also disables caching and rechecks publication.
         String link = "/api/v1/users/" + userId + "/avatar?v=" + clock.millis();
         profile.getUserAccount().setAvatarUrl(link);
         CoachProfile saved = coachProfileRepository.save(profile);
@@ -129,29 +137,14 @@ public class ManagerCoachProfileServiceImpl implements ManagerCoachProfileServic
         return toResponse(saved);
     }
 
-    /** JPEG, PNG or WebP from the file signature, or null. The browser-supplied type is not trusted. */
-    static String detectImageType(byte[] data) {
-        if (data.length >= 3 && (data[0] & 0xFF) == 0xFF && (data[1] & 0xFF) == 0xD8 && (data[2] & 0xFF) == 0xFF) {
-            return "image/jpeg";
-        }
-        byte[] png = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
-        if (data.length >= png.length && Arrays.equals(Arrays.copyOf(data, png.length), png)) {
-            return "image/png";
-        }
-        if (data.length >= 12
-                && "RIFF".equals(new String(data, 0, 4, StandardCharsets.US_ASCII))
-                && "WEBP".equals(new String(data, 8, 4, StandardCharsets.US_ASCII))) {
-            return "image/webp";
-        }
-        return null;
-    }
-
     private static boolean isUploaded(String avatarUrl, Long userId) {
-        return avatarUrl != null && avatarUrl.startsWith("/api/v1/users/" + userId + "/avatar");
+        return avatarUrl != null && avatarUrl.matches("/api/v1/users/" + userId + "/avatar(?:\\?v=\\d+)?");
     }
 
     private CoachProfile find(Long userId) {
-        return coachProfileRepository.findById(userId)
+        return coachProfileRepository.findWithAccountById(userId)
+                .filter(profile -> profile.getUserAccount().getRole() != null
+                        && "COACH".equals(profile.getUserAccount().getRole().getCode()))
                 .orElseThrow(() -> new ResourceNotFoundException("Coach profile not found"));
     }
 

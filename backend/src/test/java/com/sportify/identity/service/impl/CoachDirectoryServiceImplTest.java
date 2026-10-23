@@ -166,4 +166,13 @@ class CoachDirectoryServiceImplTest {
         assertEquals(List.of(11L, 10L), result.stream().map(PublicCoachResponse::id).toList());
         verify(coachSportRepository).findByIdCoachIdIn(List.of(11L, 10L));
     }
+
+    @Test
+    void hiddenCoachRemainsAvailableToTheExistingStaffDropdown() {
+        coach1.setIsPublic(false);
+        when(coachProfileRepository.findActiveCoaches()).thenReturn(List.of(coach1));
+        when(coachSportRepository.findByIdCoachIdIn(List.of(10L))).thenReturn(List.of());
+        assertEquals(List.of(10L), coachDirectoryService.getActiveCoaches(null).stream()
+                .map(CoachOptionResponse::id).toList());
+    }
 }
