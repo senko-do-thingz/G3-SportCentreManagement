@@ -582,3 +582,104 @@
 .booking-cancel-card > h2 { margin: 20px 0 0; }
 @media (max-width: 900px) { .browse-detail { grid-template-columns: minmax(0, 1fr); } .browse-grid, .browse-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .schedule-scroll-hint { display: block; } }
 @media (max-width: 600px) { .browse-grid, .browse-filters { grid-template-columns: minmax(0, 1fr); } .browse-tab { flex: 1 1 130px; padding: 12px; } .browse-facts > div { flex-wrap: wrap; } .browse-facts dd { text-align: left; } .booking-history-card__heading { flex-direction: column; } .booking-tab { flex: 1; padding-inline: 8px; } .schedule-week-nav { width: 100%; } .schedule-week-nav > .btn { flex: 1 1 130px; } }
+
+/* Photo-led member class discovery, aligned with the Home and schedule visual system. */
+.member-main:has(.class-discovery) { max-width: 1400px; }
+.class-discovery { --discovery-navy: #0b1736; --discovery-royal: #1f4fd8; --discovery-gold: #ffc83d; gap: 22px; }
+.class-discovery__hero { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 320px; align-items: center; gap: 24px; min-height: 230px; padding: 32px 38px; overflow: hidden; border: 1px solid rgba(255, 200, 61, 0.52); border-radius: 20px; background: linear-gradient(112deg, #0b1736 0%, #122b60 66%, #1f4fd8 140%); box-shadow: 0 20px 42px rgba(11, 23, 54, 0.2); color: #ffffff; }
+.class-discovery__hero::before, .class-discovery__hero::after { position: absolute; z-index: 0; border: 1px solid rgba(255, 200, 61, 0.22); border-radius: 50%; content: ''; pointer-events: none; }
+.class-discovery__hero::before { top: -150px; right: 65px; width: 420px; height: 420px; box-shadow: 0 0 0 24px rgba(255, 255, 255, 0.025), 0 0 0 52px rgba(255, 255, 255, 0.02); }
+.class-discovery__hero::after { right: 142px; bottom: -185px; width: 240px; height: 240px; }
+.class-discovery__hero-copy, .class-discovery__hero-art { position: relative; z-index: 1; }
+.class-discovery__hero-copy { max-width: 720px; }
+.class-discovery__eyebrow { margin: 0 0 10px; color: #ffc83d; font-size: 12px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; }
+.class-discovery__hero h1 { margin: 0; color: #ffffff; font-size: clamp(32px, 4vw, 46px); font-weight: 850; letter-spacing: 0.02em; line-height: 1.1; text-transform: uppercase; }
+.class-discovery__hero-copy > p:last-child { max-width: 650px; margin: 14px 0 0; color: #e2eaff; font-size: 15px; line-height: 1.65; }
+.class-discovery__hero-art { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 80px 80px; gap: 9px; transform: rotate(3deg); }
+.class-discovery__hero-art img { width: 100%; height: 100%; border: 2px solid rgba(255, 255, 255, 0.72); border-radius: 12px; object-fit: cover; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.22); }
+.class-discovery__hero-art img:first-child { grid-row: span 2; }
+.class-discovery__filter-card { overflow: hidden; }
+.class-discovery__filter-card > .card__header { padding-bottom: 16px; border-bottom: 1px solid var(--color-border); }
+.class-discovery__filters { display: grid; gap: 22px; padding-top: 20px; }
+.class-discovery__picker { min-width: 0; margin: 0; padding: 0; border: 0; }
+.class-discovery__picker legend { margin-bottom: 12px; color: var(--color-text); font-size: 14px; font-weight: 750; }
+.class-discovery__sport-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; }
+.class-discovery__sport-choice { position: relative; display: grid; align-content: end; min-width: 0; min-height: 104px; padding: 0; overflow: hidden; border: 1px solid var(--color-border); border-radius: 12px; background: #102654; color: #ffffff; text-align: left; cursor: pointer; isolation: isolate; transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease; }
+.class-discovery__sport-choice > img { position: absolute; z-index: -2; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.24s ease; }
+.class-discovery__sport-choice::after { position: absolute; z-index: -1; inset: 0; background: linear-gradient(180deg, rgba(5, 13, 31, 0.05) 12%, rgba(5, 13, 31, 0.86) 100%); content: ''; }
+.class-discovery__sport-choice > span:last-child { padding: 12px; font-size: 13px; font-weight: 750; line-height: 1.25; }
+.class-discovery__sport-choice:hover { transform: translateY(-2px); border-color: var(--discovery-gold); }
+.class-discovery__sport-choice:hover > img { transform: scale(1.06); }
+.class-discovery__sport-choice.is-selected { border: 2px solid var(--discovery-gold); box-shadow: 0 0 0 2px rgba(255, 200, 61, 0.2), 0 8px 20px rgba(11, 23, 54, 0.15); }
+.class-discovery__sport-choice:focus-visible, .class-discovery__level-choice:focus-visible { outline: 3px solid var(--discovery-royal); outline-offset: 3px; }
+.class-discovery__sport-choice--all { align-content: center; justify-items: center; gap: 8px; background: linear-gradient(145deg, #0b1736, #1f4fd8); text-align: center; }
+.class-discovery__sport-choice--all::after { background: radial-gradient(circle at 70% 25%, rgba(255, 200, 61, 0.22), transparent 42%); }
+.class-discovery__all-mark { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid rgba(255, 200, 61, 0.7); border-radius: 50%; color: #ffc83d; font-size: 10px; font-weight: 850; letter-spacing: 0.05em; }
+.class-discovery__sport-choice--all > span:last-child { padding: 0 8px 4px; }
+.class-discovery__level-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.class-discovery__level-choice { display: flex; align-items: center; gap: 12px; min-height: 58px; padding: 10px 14px; border: 1px solid var(--color-border); border-radius: 11px; background: var(--color-surface); color: var(--color-text); font-size: 13px; font-weight: 700; text-align: left; cursor: pointer; transition: border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease; }
+.class-discovery__level-choice:hover { border-color: var(--discovery-royal); }
+.class-discovery__level-choice.is-selected { border-color: var(--discovery-royal); background: var(--color-primary-soft); box-shadow: inset 0 -3px var(--discovery-gold); }
+.class-discovery__level-mark { display: flex; align-items: end; gap: 3px; min-width: 34px; height: 24px; color: var(--discovery-royal); }
+.class-discovery__level-mark > span { align-self: center; font-size: 9px; font-weight: 850; letter-spacing: 0.04em; }
+.class-discovery__level-mark i { width: 7px; height: 8px; border-radius: 2px; background: var(--color-border); }
+.class-discovery__level-mark i:nth-child(2) { height: 15px; }
+.class-discovery__level-mark i:nth-child(3) { height: 22px; }
+.class-discovery__level-mark i.is-active { background: var(--discovery-royal); }
+.class-discovery__fields { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 0; }
+.class-discovery > .browse-actions { margin-top: 18px; }
+.class-discovery__results-heading { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin: 28px 0 4px; padding-bottom: 14px; border-bottom: 1px solid var(--color-border); }
+.class-discovery__results-heading .class-discovery__eyebrow { margin-bottom: 5px; color: var(--discovery-royal); }
+.class-discovery__results-heading h2 { margin: 0; color: var(--color-text); font-size: 22px; }
+.class-discovery__results-heading .browse-muted { margin: 0; text-align: right; }
+.class-discovery .browse-grid { margin-top: 16px; }
+.class-session-card { align-items: stretch; gap: 0; padding: 0; overflow: hidden; border-radius: 15px; box-shadow: 0 8px 22px rgba(11, 23, 54, 0.07); transition: transform 0.18s ease, box-shadow 0.18s ease; }
+.class-session-card:hover { transform: translateY(-3px); box-shadow: 0 16px 32px rgba(11, 23, 54, 0.13); }
+.class-session-card__image { position: relative; flex: 0 0 178px; width: 100%; overflow: hidden; background: #102654; }
+.class-session-card__image > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.class-session-card__image-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(5, 13, 31, 0.04) 10%, rgba(5, 13, 31, 0.77) 100%); }
+.class-session-card__sport { position: absolute; top: 14px; left: 14px; max-width: calc(100% - 28px); padding: 7px 10px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 999px; background: rgba(11, 23, 54, 0.54); color: #ffffff; font-size: 11px; font-weight: 800; letter-spacing: 0.07em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; backdrop-filter: blur(8px); }
+.class-session-card__level { position: absolute; right: 12px; bottom: 12px; left: 12px; display: flex; align-items: center; gap: 9px; width: fit-content; max-width: calc(100% - 24px); padding: 8px 11px; border: 1px solid rgba(255, 255, 255, 0.36); border-radius: 999px; background: rgba(11, 23, 54, 0.76); color: #ffffff; font-size: 11px; font-weight: 750; backdrop-filter: blur(8px); }
+.class-session-card__level-bars { display: flex; align-items: end; gap: 2px; height: 13px; }
+.class-session-card__level-bars i { width: 4px; height: 5px; border-radius: 1px; background: rgba(255, 255, 255, 0.34); }
+.class-session-card__level-bars i:nth-child(2) { height: 9px; }
+.class-session-card__level-bars i:nth-child(3) { height: 13px; }
+.class-session-card__level--beginner .class-session-card__level-bars i.is-active { background: #79d6a6; }
+.class-session-card__level--intermediate .class-session-card__level-bars i.is-active { background: #ffc83d; }
+.class-session-card__level--advanced .class-session-card__level-bars i.is-active { background: #ff9d77; }
+.class-session-card__body { display: flex; flex: 1; flex-direction: column; gap: 15px; padding: 18px; }
+.class-session-card__heading { display: grid; gap: 5px; }
+.class-session-card__format { margin: 0; color: var(--discovery-royal); font-size: 10px !important; font-weight: 850; letter-spacing: 0.11em; text-transform: uppercase; }
+.class-session-card__heading h3 { margin: 0; color: var(--color-text); font-size: 17px; line-height: 1.4; }
+.class-session-card__details { display: grid; gap: 10px; }
+.class-session-card__details p { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px; color: var(--color-text); font-size: 12px; line-height: 1.5; }
+.class-session-card__detail-label { color: var(--color-text-muted); font-weight: 650; }
+.class-session-card__footer { display: grid; gap: 12px; margin-top: auto; padding-top: 2px; }
+.class-session-card__footer > .btn { width: 100%; white-space: normal; }
+.class-discovery .browse-muted { color: var(--color-text-muted); }
+:root[data-theme='dark'] .class-discovery { --discovery-navy: #060b18; --discovery-royal: #6f91ff; --discovery-gold: #ffd65e; }
+:root[data-theme='dark'] .class-discovery__level-choice.is-selected { background: rgba(61, 108, 240, 0.16); }
+
+@media (max-width: 1000px) {
+  .class-discovery__sport-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .class-discovery__fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .class-discovery .browse-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 680px) {
+  .member-main:has(.class-discovery) { max-width: 100%; }
+  .class-discovery__hero { grid-template-columns: minmax(0, 1fr); min-height: 0; padding: 27px 22px; }
+  .class-discovery__hero-art { position: absolute; right: -24px; bottom: -28px; width: 190px; opacity: 0.22; }
+  .class-discovery__sport-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .class-discovery__sport-choice { min-height: 88px; }
+  .class-discovery__sport-choice > span:last-child { padding: 9px; font-size: 11px; }
+  .class-discovery__level-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .class-discovery__results-heading { align-items: flex-start; flex-direction: column; }
+  .class-discovery__results-heading .browse-muted { text-align: left; }
+}
+@media (max-width: 600px) {
+  .class-discovery .browse-grid { grid-template-columns: minmax(0, 1fr); }
+  .class-discovery__fields { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .class-discovery__sport-choice, .class-discovery__sport-choice > img, .class-session-card { transition: none; }
+}
