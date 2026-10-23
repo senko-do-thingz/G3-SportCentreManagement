@@ -14,6 +14,8 @@ import com.sportify.identity.security.SecurityConfig;
 import com.sportify.identity.service.ManagerCoachProfileService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -189,6 +191,30 @@ class ManagerCoachProfileControllerTest {
         mockMvc.perform(multipart(URL + "/photo").file(new MockMultipartFile("file", "x.jpg", "image/jpeg", new byte[] {1}))
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + COACH_TOKEN))
                 .andExpect(status().isForbidden());
+        verifyNoInteractions(coachProfileService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"COACH", "MEMBER", "RECEPTIONIST"})
+    void allNonManagerRolesCannotReadUpdateOrUploadEvenTheirOwnProfile(String role) throws Exception {
+        stubAccessToken("other.access.token", 7L, "other@sportify.test", role);
+        String auth = "Bearer other.access.token";
+        mockMvc.perform(get(URL).header(HttpHeaders.AUTHORIZATION, auth)).andExpect(status().isForbidden());
+        mockMvc.perform(put(URL).header(HttpHeaders.AUTHORIZATION, auth)
+                        .contentType(MediaType.APPLICATION_JSON).content(VALID_BODY)).andExpect(status().isForbidden());
+        mockMvc.perform(multipart(URL + "/photo").file(new MockMultipartFile("file", new byte[] {1}))
+                        .header(HttpHeaders.AUTHORIZATION, auth)).andExpect(status().isForbidden());
+        verifyNoInteractions(coachProfileService);
+    }
+
+    @Test
+    void guestsCannotUpdateOrUploadAndInvalidTargetIdsAreRejected() throws Exception {
+        mockMvc.perform(put(URL).contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(multipart(URL + "/photo").file(new MockMultipartFile("file", new byte[] {1})))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/manager/users/invalid/coach-profile")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + MANAGER_TOKEN)).andExpect(status().isBadRequest());
         verifyNoInteractions(coachProfileService);
     }
 }

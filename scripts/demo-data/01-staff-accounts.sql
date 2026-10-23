@@ -1,13 +1,20 @@
 ﻿/*
  * Sportify Center - create six coaches and two receptionists with full coach profiles.
- * Run once in SQL Server Management Studio on database "sportify" (backend migrations already applied).
- * Safe to run again: existing e-mails are not inserted twice; coach profile text is refreshed.
+ * Run only in an explicitly approved isolated sportify_demo database; see README.
+ * Existing matching identities cause a fail-closed stop before any profile is changed.
  *
  * Login password for every account: SportifyDemo2026!  (same BCrypt hash as the README demo accounts)
- * The old test coaches "An Nguyen" and "Be Nguyen" are hidden from the Home page (accounts are kept).
+ * Existing accounts, profiles and publication flags are never refreshed by this script.
  */
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
+-- Fail closed: an explicit session opt-in is required even in the dedicated isolated demo database.
+IF DB_NAME() <> N'sportify_demo'
+   OR ISNULL(TRY_CAST(SESSION_CONTEXT(N'sportify_demo_seed_approved') AS INT), 0) <> 1
+    THROW 51400, 'Demo scripts require sportify_demo and explicit session approval; never use shared data.', 1;
+IF @@TRANCOUNT <> 0
+    THROW 51402, 'Run demo setup outside an existing transaction; caller work must be preserved.', 1;
+
 BEGIN TRANSACTION;
 
 DECLARE @PasswordHash NVARCHAR(100) = '$2a$10$cYcyDrFeL2hdtC4ajymEROOvLbCjeisVq/hVuALJReMtBxPqTXpga';
@@ -24,6 +31,12 @@ INSERT INTO @Staff VALUES
 (N'tung.bui@sportifycenter.vn',    N'Bùi Thanh Tùng',   N'0935481920', N'RECEPTIONIST', NULL);
 
 -- Stop early with a clear message instead of a unique-index error.
+IF EXISTS (SELECT 1 FROM @Staff s JOIN user_account u ON LOWER(u.email) = s.email)
+BEGIN
+    ROLLBACK TRANSACTION;
+    THROW 51401, 'Demo identities already exist; no existing account or profile will be overwritten.', 1;
+END;
+
 IF EXISTS (SELECT 1 FROM @Staff s JOIN user_account u ON u.phone = s.phone WHERE LOWER(u.email) <> s.email)
     THROW 51901, 'A phone number in this script already belongs to another account. Change it in @Staff and run again.', 1;
 IF EXISTS (SELECT 1 FROM @Staff s LEFT JOIN [role] r ON r.code = s.role_code WHERE r.id IS NULL)
@@ -79,11 +92,6 @@ FROM @Certs c JOIN user_account u ON LOWER(u.email) = c.email
 JOIN coach_profile cp ON cp.user_id = u.id
 LEFT JOIN sport sp ON sp.code = c.sport_code
 WHERE NOT EXISTS (SELECT 1 FROM coach_certification x WHERE x.coach_id = u.id AND x.name = c.name);
-
--- Hide the old test coaches from the Home page (set back to 1 to show them again).
-UPDATE cp SET is_public = 0
-FROM coach_profile cp JOIN user_account u ON u.id = cp.user_id
-WHERE u.full_name IN (N'An Nguyen', N'Be Nguyen');
 
 COMMIT TRANSACTION;
 

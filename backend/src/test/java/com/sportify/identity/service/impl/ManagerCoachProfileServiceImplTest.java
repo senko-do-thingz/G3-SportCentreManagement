@@ -9,11 +9,14 @@ import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.dto.ManagerCoachProfileResponse;
 import com.sportify.identity.dto.ManagerCoachProfileUpdateRequest;
 import com.sportify.identity.entity.CoachProfile;
+import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.CoachProfileRepository;
 import com.sportify.identity.repository.UserAvatarStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -50,14 +53,14 @@ class ManagerCoachProfileServiceImplTest {
     private final UserAccount actor = UserAccount.builder().id(1L).email("manager@sportify.com").build();
 
     private static CoachProfile coach() {
-        UserAccount account = UserAccount.builder().id(7L).fullName("Nguyen Minh Khoa").avatarUrl(null).build();
+        UserAccount account = UserAccount.builder().id(7L).fullName("Nguyen Minh Khoa").role(Role.builder().code("COACH").build()).avatarUrl(null).build();
         return CoachProfile.builder().id(7L).userAccount(account).headline("Old").yearsExperience(3)
                 .isPublic(true).displayOrder(0).build();
     }
 
     @Test
     void getProfile_mapsAccountAndProfileFields() {
-        when(coachProfileRepository.findById(7L)).thenReturn(Optional.of(coach()));
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(coach()));
 
         ManagerCoachProfileResponse response = service.getProfile(7L);
 
@@ -67,7 +70,7 @@ class ManagerCoachProfileServiceImplTest {
     @Test
     void updateProfile_trimsTextStoresPhotoOnAccountAndLogsChangedFields() {
         CoachProfile profile = coach();
-        when(coachProfileRepository.findById(7L)).thenReturn(Optional.of(profile));
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(profile));
         when(coachProfileRepository.save(profile)).thenReturn(profile);
 
         ManagerCoachProfileResponse response = service.updateProfile(7L, new ManagerCoachProfileUpdateRequest(
@@ -91,7 +94,7 @@ class ManagerCoachProfileServiceImplTest {
 
     @Test
     void updateProfile_withoutChanges_writesNothing() {
-        when(coachProfileRepository.findById(7L)).thenReturn(Optional.of(coach()));
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(coach()));
 
         service.updateProfile(7L, new ManagerCoachProfileUpdateRequest("", "Old", null, 3, null, true, 0), actor);
 
@@ -101,7 +104,7 @@ class ManagerCoachProfileServiceImplTest {
 
     @Test
     void unknownCoach_throwsNotFound() {
-        when(coachProfileRepository.findById(9L)).thenReturn(Optional.empty());
+        when(coachProfileRepository.findWithAccountById(9L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.getProfile(9L));
         assertThrows(ResourceNotFoundException.class, () -> service.updateProfile(9L,
@@ -109,23 +112,12 @@ class ManagerCoachProfileServiceImplTest {
         verifyNoInteractions(auditService);
     }
 
-    private static final byte[] JPEG = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0, 0x10};
-    private static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0};
-    private static final byte[] WEBP = {'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P', 0};
-
-    @Test
-    void detectImageType_usesFileSignatureNotName() {
-        assertEquals("image/jpeg", ManagerCoachProfileServiceImpl.detectImageType(JPEG));
-        assertEquals("image/png", ManagerCoachProfileServiceImpl.detectImageType(PNG));
-        assertEquals("image/webp", ManagerCoachProfileServiceImpl.detectImageType(WEBP));
-        assertNull(ManagerCoachProfileServiceImpl.detectImageType("<svg onload=alert(1)>".getBytes()));
-        assertNull(ManagerCoachProfileServiceImpl.detectImageType(new byte[] {'G', 'I', 'F', '8', '9', 'a'}));
-    }
+    private static final byte[] JPEG = CoachPhotoValidatorTest.image("jpeg", 2, 2);
 
     @Test
     void uploadPhoto_storesImageVersionsLinkAndLogs() {
         CoachProfile profile = coach();
-        when(coachProfileRepository.findById(7L)).thenReturn(Optional.of(profile));
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(profile));
         when(coachProfileRepository.save(profile)).thenReturn(profile);
         when(clock.millis()).thenReturn(1761200000000L);
 
@@ -141,13 +133,13 @@ class ManagerCoachProfileServiceImplTest {
 
     @Test
     void uploadPhoto_rejectsEmptyOversizedAndNonImageFilesWithoutWrites() {
-        when(coachProfileRepository.findById(7L)).thenReturn(Optional.of(coach()));
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(coach()));
         byte[] oversized = new byte[ManagerCoachProfileServiceImpl.MAX_PHOTO_BYTES + 1];
         System.arraycopy(JPEG, 0, oversized, 0, JPEG.length);
 
         assertEquals("Choose a photo to upload", assertThrows(BusinessRuleException.class, () -> service.uploadPhoto(7L, new byte[0], actor)).getMessage());
         assertEquals("Photo must be at most 2 MB", assertThrows(BusinessRuleException.class, () -> service.uploadPhoto(7L, oversized, actor)).getMessage());
-        assertEquals("Photo must be a JPEG, PNG or WebP image", assertThrows(BusinessRuleException.class, () -> service.uploadPhoto(7L, "text".getBytes(), actor)).getMessage());
+        assertEquals("Photo must be a valid JPEG, PNG or WebP image", assertThrows(BusinessRuleException.class, () -> service.uploadPhoto(7L, "text".getBytes(), actor)).getMessage());
         verifyNoInteractions(avatarStore, auditService);
     }
 
@@ -155,7 +147,7 @@ class ManagerCoachProfileServiceImplTest {
     void updateProfile_removingAnUploadedPhotoDeletesTheStoredImage() {
         CoachProfile profile = coach();
         profile.getUserAccount().setAvatarUrl("/api/v1/users/7/avatar?v=1");
-        when(coachProfileRepository.findById(7L)).thenReturn(Optional.of(profile));
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(profile));
         when(coachProfileRepository.save(profile)).thenReturn(profile);
 
         service.updateProfile(7L, new ManagerCoachProfileUpdateRequest("", "Old", null, 3, null, true, 0), actor);
@@ -168,7 +160,7 @@ class ManagerCoachProfileServiceImplTest {
     void updateProfile_keepingTheUploadedPhotoDoesNotDeleteIt() {
         CoachProfile profile = coach();
         profile.getUserAccount().setAvatarUrl("/api/v1/users/7/avatar?v=1");
-        when(coachProfileRepository.findById(7L)).thenReturn(Optional.of(profile));
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(profile));
         when(coachProfileRepository.save(profile)).thenReturn(profile);
 
         service.updateProfile(7L, new ManagerCoachProfileUpdateRequest("/api/v1/users/7/avatar?v=1", "New", null, 3, null, true, 0), actor);
@@ -178,13 +170,163 @@ class ManagerCoachProfileServiceImplTest {
 
     @Test
     void updateProfile_rejectsAnotherAccountsUploadedPhotoWithoutWrites() {
-        when(coachProfileRepository.findById(7L)).thenReturn(Optional.of(coach()));
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(coach()));
 
         FieldValidationException error = assertThrows(FieldValidationException.class, () -> service.updateProfile(7L,
                 new ManagerCoachProfileUpdateRequest("/api/v1/users/8/avatar?v=1", "Old", null, 3, null, true, 0), actor));
 
-        assertEquals("Use a photo uploaded for this coach", error.getDetails().get("avatarUrl"));
+        assertEquals("Use the current photo uploaded for this coach", error.getDetails().get("avatarUrl"));
         verify(coachProfileRepository, never()).save(any());
         verifyNoInteractions(avatarStore, auditService);
+    }
+    @Test
+    void nonCoachAccountWithLingeringProfileIsNotEditable() {
+        CoachProfile profile = coach();
+        profile.getUserAccount().setRole(Role.builder().code("MEMBER").build());
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(profile));
+        assertThrows(ResourceNotFoundException.class, () -> service.getProfile(7L));
+        assertThrows(ResourceNotFoundException.class, () -> service.uploadPhoto(7L, JPEG, actor));
+        assertThrows(ResourceNotFoundException.class, () -> service.updateProfile(7L,
+                new ManagerCoachProfileUpdateRequest(null, null, null, null, null, true, 0), actor));
+        verifyNoInteractions(avatarStore, auditService);
+    }
+
+    @Test
+    void fabricatedStaleAndPrefixOnlyUploadedLinksAreRejectedWithoutWrites() {
+        CoachProfile profile = coach();
+        profile.getUserAccount().setAvatarUrl("/api/v1/users/7/avatar?v=2");
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(profile));
+        for (String url : List.of("/api/v1/users/7/avatar?v=1", "/api/v1/users/7/avatar-extra", "/api/v1/users/7/avatar?v=999")) {
+            assertThrows(FieldValidationException.class, () -> service.updateProfile(7L,
+                    new ManagerCoachProfileUpdateRequest(url, "Old", null, 3, null, true, 0), actor));
+        }
+        verify(coachProfileRepository, never()).save(any());
+        verifyNoInteractions(avatarStore, auditService);
+    }
+
+    @Test
+    void truncatedImageIsRejectedWithoutPersistenceOrAudit() {
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(coach()));
+        assertThrows(BusinessRuleException.class, () -> service.uploadPhoto(7L,
+                new byte[] {(byte) 0xff, (byte) 0xd8, (byte) 0xff, 0}, actor));
+        verify(coachProfileRepository, never()).save(any());
+        verifyNoInteractions(avatarStore, auditService);
+    }
+
+    @Test
+    void malformedAndCredentialedNewPublicLinksAreRejectedWithoutWrites() {
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(coach()));
+        for (String url : List.of("https:///missing-host.png", "https://private:password@example.test/photo.png", "http://example.test:99999/photo.png")) {
+            assertThrows(FieldValidationException.class, () -> service.updateProfile(7L,
+                    new ManagerCoachProfileUpdateRequest(url, "Old", null, 3, null, true, 0), actor));
+        }
+        verify(coachProfileRepository, never()).save(any());
+        verifyNoInteractions(avatarStore, auditService);
+    }
+
+    @ParameterizedTest(name = "accepts current uploaded URL format {index}")
+    @ValueSource(strings = {
+            "/api/v1/users/7/avatar",
+            "/api/v1/users/7/avatar?v=0",
+            "/api/v1/users/7/avatar?v=1",
+            "/api/v1/users/7/avatar?v=0001",
+            "/api/v1/users/7/avatar?v=1761200000000",
+            "/api/v1/users/7/avatar?v=9999999999999999999999999999999999999999"
+    })
+    void currentUploadedFormatsAreRetainedWithoutDeletingThePhoto(String url) {
+        CoachProfile profile = coach();
+        profile.getUserAccount().setAvatarUrl(url);
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(profile));
+        when(coachProfileRepository.save(profile)).thenReturn(profile);
+
+        ManagerCoachProfileResponse response = service.updateProfile(7L,
+                new ManagerCoachProfileUpdateRequest(url, "New", null, 3, null, true, 0), actor);
+
+        assertEquals(url, response.avatarUrl());
+        verify(coachProfileRepository).save(profile);
+        verifyNoInteractions(avatarStore);
+    }
+
+    @ParameterizedTest(name = "rejects malformed or cross-account uploaded URL {index}")
+    @ValueSource(strings = {
+            "/api/v1/users/8/avatar",
+            "/api/v1/users/8/avatar?v=1",
+            "/api/v1/users/70/avatar?v=1",
+            "/api/v1/users/07/avatar?v=1",
+            "/api/v1/users/7/avatar-extra",
+            "/api/v1/users/7/avatar/",
+            "/api/v1/users/7/avatar?x=1",
+            "/api/v1/users/7/avatar?V=1",
+            "/api/v1/users/7/avatar?v=",
+            "/api/v1/users/7/avatar?v=+1",
+            "/api/v1/users/7/avatar?v=-1",
+            "/api/v1/users/7/avatar?v=1.0",
+            "/api/v1/users/7/avatar?v=1e2",
+            "/api/v1/users/7/avatar?v=%31",
+            "/api/v1/users/7/avatar?v=1&v=2",
+            "/api/v1/users/7/avatar?v=1&other=2",
+            "/api/v1/users/7/avatar?v=1?v=2",
+            "/api/v1/users/7/avatar?v=1#photo",
+            "/api/v1/users/7/avatar#v=1",
+            "/api/v1/users/7/avatar?v=1/2",
+            "/api/v1/users/7/avatar?v=1 2",
+            "/api/v1/users/7/avatar?v=1\t2",
+            "/api/v1/users/7/avatar?v=1\n2",
+            "/api/v1/users/7/avatar?v=1;v=2",
+            "/api/v1/users/7/avatar?v=1+2",
+            "/api/v1/users/7/avatar?v=\u0661",
+            "/api/v1/users/7/avatar?v=\uFF11"
+    })
+    void malformedUploadedLinksAreRejectedEvenWhenStoredMetadataMatches(String url) {
+        CoachProfile profile = coach();
+        // Matching legacy metadata must not bypass the URL grammar or account identity check.
+        profile.getUserAccount().setAvatarUrl(url);
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(profile));
+
+        FieldValidationException error = assertThrows(FieldValidationException.class, () -> service.updateProfile(7L,
+                new ManagerCoachProfileUpdateRequest(url, "New", null, 3, null, true, 0), actor));
+
+        assertEquals("Use the current photo uploaded for this coach", error.getDetails().get("avatarUrl"));
+        assertEquals(url, profile.getUserAccount().getAvatarUrl());
+        verify(coachProfileRepository, never()).save(any());
+        verifyNoInteractions(avatarStore, auditService);
+    }
+
+    @ParameterizedTest(name = "rejects fabricated or stale uploaded version {index}")
+    @ValueSource(strings = {
+            "/api/v1/users/7/avatar",
+            "/api/v1/users/7/avatar?v=1",
+            "/api/v1/users/7/avatar?v=3",
+            "/api/v1/users/7/avatar?v=0002"
+    })
+    void validUploadedGrammarStillRequiresTheExactCurrentLink(String url) {
+        CoachProfile profile = coach();
+        profile.getUserAccount().setAvatarUrl("/api/v1/users/7/avatar?v=2");
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(profile));
+
+        assertThrows(FieldValidationException.class, () -> service.updateProfile(7L,
+                new ManagerCoachProfileUpdateRequest(url, "New", null, 3, null, true, 0), actor));
+
+        assertEquals("/api/v1/users/7/avatar?v=2", profile.getUserAccount().getAvatarUrl());
+        verify(coachProfileRepository, never()).save(any());
+        verifyNoInteractions(avatarStore, auditService);
+    }
+
+    @ParameterizedTest(name = "retains existing non-upload avatar format {index}")
+    @ValueSource(strings = {
+            "http://images.example.test/coach.jpg",
+            "https://images.example.test/coach.jpg",
+            "/images/coaches/demo.jpg"
+    })
+    void externalAndBundledPhotoFormatsRemainAccepted(String url) {
+        CoachProfile profile = coach();
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(profile));
+        when(coachProfileRepository.save(profile)).thenReturn(profile);
+
+        ManagerCoachProfileResponse response = service.updateProfile(7L,
+                new ManagerCoachProfileUpdateRequest(url, "New", null, 3, null, true, 0), actor);
+
+        assertEquals(url, response.avatarUrl());
+        verifyNoInteractions(avatarStore);
     }
 }
