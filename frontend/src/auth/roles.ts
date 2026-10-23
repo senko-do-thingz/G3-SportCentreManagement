@@ -26,15 +26,32 @@ export function homePathFor(user: UserProfile | null): string {
   return role ? ROLE_HOME[role] : '/403'
 }
 
-/**
- * Decides where to go after login: back to the page that required login when it belongs to the
- * user's own area, otherwise the role home. This avoids sending a member to a manager URL that
- * would only show the 403 page.
- */
-export function postLoginPath(user: UserProfile, requestedPath: string | null | undefined): string {
+/** Accept only literal same-app paths, before applying the authenticated role boundary. */
+export function safeReturnPath(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')
+    || [...value].some((char) => char.charCodeAt(0) <= 32 || char.charCodeAt(0) === 127)) return null
+  try {
+    const url = new URL(value, 'https://sportify.invalid')
+    const pathname = value.split(/[?#]/, 1)[0]
+    // Encoded paths and normalization tricks are unnecessary for our role routes.
+    if (url.origin !== 'https://sportify.invalid' || url.pathname !== pathname || pathname.includes('%')) return null
+    return url.pathname + url.search + url.hash
+  } catch { return null }
+}
+
+/** Copy only return intent when switching auth forms, without profile or credential fields. */
+export function loginReturnState(state: unknown): { from: string } | null {
+  const path = safeReturnPath(state && typeof state === 'object' ? (state as { from?: unknown }).from : null)
+  return path ? { from: path } : null
+}
+
+/** Resume only within the signed-in user's area; other destinations fall back to role home. */
+export function postLoginPath(user: UserProfile, requestedPath: unknown): string {
   const home = homePathFor(user)
-  if (requestedPath && home !== '/403' && (requestedPath === home || requestedPath.startsWith(`${home}/`))) {
-    return requestedPath
+  const path = safeReturnPath(requestedPath)
+  const pathname = path?.split(/[?#]/, 1)[0]
+  if (path && pathname && home !== '/403' && (pathname === home || pathname.startsWith(`${home}/`))) {
+    return path
   }
   return home
 }

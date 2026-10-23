@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../../api/client'
 import type { CardTier } from '../../api/cardsApi'
 import type { Sport, SportPackage } from '../../api/packagesApi'
@@ -11,6 +11,7 @@ import { useResource } from '../../hooks/useResource'
 import { BROWSE_LEVELS } from '../member/scheduleFilters'
 import { isSingleVisit } from '../member/packagesModel'
 import { HomeHeader } from './HomeHeader'
+import { HomeAuthDialog } from './HomeAuthDialog'
 import { HomeIcon } from './HomeIcons'
 import { COACH_PHOTOS, HOME_FAQ, HOME_NOTICES, HOME_PHOTOS, HOME_SPORTS, homeHero } from './homeContent'
 import { HomePhoto } from './HomePhoto'
@@ -23,6 +24,15 @@ const FORMAT_OPTIONS = [
   { value: 'COACH_LED', label: 'Coach-led' },
   { value: 'SELF_TRAINING', label: 'Self-training' },
 ]
+
+function restoredFinder(state: unknown) {
+  const saved = (state as { homeFinder?: Record<string, unknown> } | null)?.homeFinder
+  return {
+    sportId: typeof saved?.sportId === 'string' && /^\d+$/.test(saved.sportId) && Number.isSafeInteger(Number(saved.sportId)) && Number(saved.sportId) > 0 ? saved.sportId : '',
+    level: BROWSE_LEVELS.some((option) => option.value === saved?.level) ? String(saved?.level) : '',
+    format: FORMAT_OPTIONS.some((option) => option.value === saved?.format) ? String(saved?.format) : '',
+  }
+}
 
 /** Only public endpoints, without tokens or authentication refresh side effects. */
 async function publicList<T>(path: string, signal: AbortSignal, valid: (entry: unknown) => boolean): Promise<T[]> {
@@ -61,14 +71,21 @@ const PLAN_CARDS = [
 export function HomePage() {
   const { role, status, user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [sports, retrySports] = useResource(loadSports)
   const [packages, retryPackages] = useResource(loadPackages)
   const [tiers, retryTiers] = useResource(loadTiers)
   const [coaches, retryCoaches] = useResource(loadCoaches)
-  const [sportId, setSportId] = useState('')
-  const [level, setLevel] = useState('')
-  const [format, setFormat] = useState('')
+  const [finder, setFinder] = useState(() => restoredFinder(location.state))
+  const { sportId, level, format } = finder
   const [notice, setNotice] = useState<Notice | null>(null)
+  const [authDestination, setAuthDestination] = useState<string | null>(null)
+  const [previousStatus, setPreviousStatus] = useState(status)
+  // Drop a guest prompt immediately when another tab restores or changes the session.
+  if (previousStatus !== status) {
+    setPreviousStatus(status)
+    setAuthDestination(null)
+  }
   const [featured, setFeatured] = useState(0)
   const spotlight = [HOME_SPORTS[featured], HOME_SPORTS[(featured + 1) % HOME_SPORTS.length]]
   const catalogSports = sports.status === 'ready' ? sports.data : []
@@ -82,11 +99,31 @@ export function HomePage() {
   }
   const staff = Boolean(role && role !== 'MEMBER')
 
+  function changeFinder(key: keyof typeof finder, value: string) {
+    const next = { ...finder, [key]: value }
+    setFinder(next)
+    // History state restores public filters when authentication is canceled with Back.
+    navigate(location.pathname + location.search + location.hash, { replace: true, state: { ...location.state, homeFinder: next } })
+  }
+
+  function requestMemberAction(path: string) {
+    if (status === 'loading') return
+    if (staff) setNotice(HOME_NOTICES.member)
+    else if (status === 'anonymous') setAuthDestination(path)
+    else if (status === 'error') navigate('/login', { state: { from: path } })
+    else navigate(path)
+  }
+
   function memberAction(path: string, children: ReactNode, variant: 'primary' | 'secondary' = 'primary', label?: string, className = buttonClassName(variant, 'md')) {
     return staff ? (
       <button type="button" className={className} aria-label={label} onClick={() => setNotice(HOME_NOTICES.member)}>{children}</button>
     ) : (
-      <Link className={className} to={path} aria-label={label}>{children}</Link>
+      <Link className={className} to={path} aria-label={label} aria-disabled={status === 'loading' || undefined} onClick={(event) => {
+        if (status !== 'authenticated') {
+          event.preventDefault()
+          requestMemberAction(path)
+        }
+      }}>{children}</Link>
     )
   }
 
@@ -148,13 +185,12 @@ export function HomePage() {
             <h2 id="finder-title" className="home-sr-only">Find your next class</h2>
             <form onSubmit={(event) => {
               event.preventDefault()
-              if (staff) setNotice(HOME_NOTICES.member)
-              else navigate(classPath(sportId, format))
+              requestMemberAction(classPath(sportId, format))
             }}>
-              <HomeSelect label="Sport" placeholder="All sports" value={sportId} options={catalogSports.map((sport) => ({ value: String(sport.id), label: sport.name }))} onChange={setSportId} />
-              <HomeSelect label="Level" placeholder="All levels" value={level} options={BROWSE_LEVELS} onChange={setLevel} />
-              <HomeSelect label="Training" placeholder="Any format" value={format} options={FORMAT_OPTIONS} onChange={setFormat} />
-              <Button type="submit">Find classes</Button>
+              <HomeSelect label="Sport" placeholder="All sports" value={sportId} options={catalogSports.map((sport) => ({ value: String(sport.id), label: sport.name }))} onChange={(value) => changeFinder('sportId', value)} />
+              <HomeSelect label="Level" placeholder="All levels" value={level} options={BROWSE_LEVELS} onChange={(value) => changeFinder('level', value)} />
+              <HomeSelect label="Training" placeholder="Any format" value={format} options={FORMAT_OPTIONS} onChange={(value) => changeFinder('format', value)} />
+              <Button type="submit" disabled={status === 'loading'}>Find classes</Button>
             </form>
             {sports.status === 'error' && <CatalogNotice message="Sport filters are temporarily unavailable. You can still browse classes." retry={retrySports} />}
           </section>
@@ -283,6 +319,8 @@ export function HomePage() {
       </footer>
 
       <BackToTop />
+
+      <HomeAuthDialog destination={status === 'anonymous' ? authDestination : null} onClose={() => setAuthDestination(null)} />
 
       <Modal open={notice !== null} onClose={() => setNotice(null)} title={notice?.title ?? ''} footer={notice === HOME_NOTICES.member && <Link className={buttonClassName('primary', 'md')} to={homePathFor(user)}>Open my workspace</Link>}>
         <p>{notice?.text}</p>
