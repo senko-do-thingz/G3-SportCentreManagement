@@ -5,9 +5,6 @@ import basketball from '../../assets/home/basketball.jpg'
 import volleyball from '../../assets/home/volleyball.jpg'
 import swimming from '../../assets/home/swimming.jpg'
 import tennis from '../../assets/home/tennis.jpg'
-import daniel from '../../assets/home/coach-football.jpg'
-import chris from '../../assets/home/coach-badminton.jpg'
-import emma from '../../assets/home/coach-swimming.jpg'
 
 export const homeHero = hero
 
@@ -16,6 +13,15 @@ export const homeHero = hero
  * They load from the Unsplash CDN; HomePhoto falls back to the bundled images above when a request fails.
  */
 const unsplash = (id: string, width: number) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${width}&q=75`
+
+/**
+ * Background clips for the Home hero from Mixkit (free for commercial and personal use under the Mixkit License,
+ * no attribution required). Each clip streams from the Mixkit CDN in Full HD (1080p) with 720p as the fallback;
+ * the hero photo shows while they load or when both files fail.
+ */
+const mixkit = (id: number) => [1080, 720].map((size) => `https://assets.mixkit.co/videos/${id}/${id}-${size}.mp4`)
+
+export const HOME_HERO_VIDEOS = [mixkit(44448), mixkit(43499), mixkit(873)] as const
 
 export const HOME_PHOTOS = {
   hero: unsplash('photo-1626224583764-f87db24ac4ea', 2200),
@@ -27,17 +33,25 @@ export const HOME_SPORTS = [
   { name: 'Football', description: 'Fitness & ball control', image: football, photo: unsplash('photo-1574629810360-7efbbe195018', 1000) },
   { name: 'Badminton', description: 'Agility & coordination', image: badminton, photo: unsplash('photo-1722087642932-9b070e9a066e', 1000) },
   { name: 'Basketball', description: 'Teamwork & technique', image: basketball, photo: unsplash('photo-1563506644863-444710df1e03', 1000) },
-  { name: 'Volleyball', description: 'Team play & confidence', image: volleyball, photo: unsplash('photo-1547347298-4074fc3086f0', 1000) },
+  { name: 'Volleyball', description: 'Team play & confidence', image: volleyball, photo: unsplash('photo-1728971124745-423b12df446d', 1000) },
   { name: 'Swimming', description: 'Water skills & endurance', image: swimming, photo: unsplash('photo-1530549387789-4c1017266635', 1000) },
   { name: 'Tennis', description: 'Footwork & precision', image: tennis, photo: unsplash('photo-1554068865-24cecd4e34b8', 1000) },
 ]
 
-/** Coach portraits by sport name. Coaches come from the database; a sport without a portrait uses its sport photo. */
-export const COACH_PHOTOS: Record<string, { image: string; photo: string }> = {
-  football: { image: daniel, photo: unsplash('photo-1585757318177-0570a997dc3a', 800) },
-  badminton: { image: chris, photo: unsplash('photo-1761286753703-570ed91dd90e', 800) },
-  swimming: { image: emma, photo: unsplash('photo-1600965962361-9035dbfd1c50', 800) },
-}
+
+/**
+ * Where you play: tile order, photos and default labels per sport. Names, court counts and which tiles appear come
+ * from GET /api/v1/facilities/public (see buildVenueTiles). Photos show empty venues; the bundled sport photos are
+ * the fallback. Wide tiles take two grid columns.
+ */
+export const HOME_FACILITIES = [
+  { sport: 'Swimming', name: 'Indoor Pool', label: 'Pool', wide: true, image: swimming, photo: unsplash('photo-1782958995190-75701221aab4', 1400) },
+  { sport: 'Basketball', name: 'Basketball', label: 'Indoor', wide: false, image: basketball, photo: unsplash('photo-1649706473901-69f5b7830241', 900) },
+  { sport: 'Badminton', name: 'Badminton', label: 'Indoor', wide: false, image: badminton, photo: unsplash('photo-1775993167393-f2add1f8eec2', 900) },
+  { sport: 'Tennis', name: 'Tennis', label: 'Outdoor', wide: false, image: tennis, photo: unsplash('photo-1635089877059-500eb3720c61', 900) },
+  { sport: 'Volleyball', name: 'Volleyball', label: 'Indoor', wide: false, image: volleyball, photo: unsplash('photo-1791471153826-7f30ebf6b70e', 900) },
+  { sport: 'Football', name: 'Football Field', label: 'Outdoor', wide: true, image: football, photo: unsplash('photo-1546717003-caee5f93a9db', 1400) },
+] as const
 
 export const HOME_NOTICES = {
   coaches: {

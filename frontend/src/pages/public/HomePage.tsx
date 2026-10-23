@@ -13,9 +13,17 @@ import { isSingleVisit } from '../member/packagesModel'
 import { HomeHeader } from './HomeHeader'
 import { HomeAuthDialog } from './HomeAuthDialog'
 import { HomeIcon } from './HomeIcons'
-import { COACH_PHOTOS, HOME_FAQ, HOME_NOTICES, HOME_PHOTOS, HOME_SPORTS, homeHero } from './homeContent'
+import { HOME_FACILITIES, HOME_FAQ, HOME_HERO_VIDEOS, HOME_NOTICES, HOME_PHOTOS, HOME_SPORTS, homeHero } from './homeContent'
 import { HomePhoto } from './HomePhoto'
+import { HomeHeroVideo } from './HomeHeroVideo'
 import { HomeSelect } from './HomeSelect'
+import { HomeCoaches } from './HomeCoaches'
+import type { PublicCoach } from './homeCoachModel'
+import { buildVenueTiles, facilitySummary, isPublicFacility, type PublicFacility } from './homeFacilityModel'
+import '@fontsource/be-vietnam-pro/700.css'
+import '@fontsource/be-vietnam-pro/800.css'
+import '@fontsource/be-vietnam-pro/800-italic.css'
+import '@fontsource/be-vietnam-pro/900.css'
 import '../../styles/home.css'
 
 interface Notice { title: string; text: string }
@@ -51,13 +59,14 @@ const loadPackages = (signal: AbortSignal) => publicList<SportPackage>('/package
   && typeof row.durationDays === 'number' && row.durationDays >= 0
   && (typeof row.priceAmount === 'number' || typeof row.priceAmount === 'string')
   && String(row.priceAmount).trim() !== '' && Number.isFinite(Number(row.priceAmount)) && Number(row.priceAmount) >= 0)
-interface PublicCoach { id: number; fullName: string; headline: string | null; specialties: string | null; yearsExperience: number | null; sportIds: number[] }
 const loadCoaches = (signal: AbortSignal) => publicList<PublicCoach>('/coaches/public', signal, (entry) => {
   if (!entry || typeof entry !== 'object') return false
   const row = entry as Record<string, unknown>
+  const optionalText = (value: unknown) => value === undefined || value === null || typeof value === 'string'
   return Number.isSafeInteger(row.id) && Number(row.id) > 0 && typeof row.fullName === 'string' && row.fullName.trim() !== ''
-    && Array.isArray(row.sportIds) && row.sportIds.every((id) => Number.isSafeInteger(id))
+    && Array.isArray(row.sportIds) && row.sportIds.every((id) => Number.isSafeInteger(id)) && optionalText(row.bio) && optionalText(row.avatarUrl)
 })
+const loadFacilities = (signal: AbortSignal) => publicList<PublicFacility>('/facilities/public', signal, isPublicFacility)
 const loadTiers = (signal: AbortSignal) => publicList<CardTier>('/membership-cards/tiers', signal, (row) => namedRecord(row)
   && (row.discountPercentage === null || typeof row.discountPercentage === 'number' && row.discountPercentage >= 0 && row.discountPercentage <= 100))
 
@@ -74,6 +83,7 @@ export function HomePage() {
   const location = useLocation()
   const [sports, retrySports] = useResource(loadSports)
   const [packages, retryPackages] = useResource(loadPackages)
+  const [facilities, retryFacilities] = useResource(loadFacilities)
   const [tiers, retryTiers] = useResource(loadTiers)
   const [coaches, retryCoaches] = useResource(loadCoaches)
   const [finder, setFinder] = useState(() => restoredFinder(location.state))
@@ -98,6 +108,19 @@ export function HomePage() {
     return `/member/classes${params.size ? `?${params}` : ''}`
   }
   const staff = Boolean(role && role !== 'MEMBER')
+  const facilityRows = facilities.status === 'ready' ? facilities.data : null
+  const venueTiles = buildVenueTiles(HOME_FACILITIES, sports.status === 'ready' ? sports.data : null, facilityRows)
+  const sportCount = sports.status === 'ready' && sports.data.length ? sports.data.length : HOME_SPORTS.length
+
+  /** Facility tiles preselect their sport in the class finder (when the catalogue is loaded) and move to it. */
+  function findSport(name: string) {
+    const record = sportFor(name)
+    if (record) changeFinder('sportId', String(record.id))
+    const section = document.getElementById('finder')
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    section?.scrollIntoView?.({ behavior: reduce ? 'auto' : 'smooth', block: 'center' })
+    section?.querySelector<HTMLButtonElement>('.home-select__button')?.focus({ preventScroll: true })
+  }
 
   function changeFinder(key: keyof typeof finder, value: string) {
     const next = { ...finder, [key]: value }
@@ -143,10 +166,11 @@ export function HomePage() {
       <main className="home-main" id="main-content" tabIndex={-1}>
         <section className="home-hero" aria-labelledby="home-title">
           <HomePhoto className="home-hero__photo" src={HOME_PHOTOS.hero} fallback={homeHero} width="2200" height="1467" fetchPriority="high" />
+          <HomeHeroVideo sources={HOME_HERO_VIDEOS} />
           <div className="home-wrap home-hero__body">
             <div className="home-highlight">
               <h2>Facility highlights</h2>
-              <p>6 sports. 1 center.</p>
+              <p>{sportCount} {sportCount === 1 ? 'sport' : 'sports'}. 1 center.</p>
               <a href="#sports" aria-label="See all sports"><HomeIcon name="arrow" /></a>
             </div>
             <div className="home-hero__copy">
@@ -225,28 +249,35 @@ export function HomePage() {
           </div>
         </section>
 
+        <section className="home-section" id="facilities" aria-labelledby="facilities-title">
+          <div className="home-wrap">
+            <div className="home-head"><div><span className="home-kicker">Our facilities</span><h2 id="facilities-title">Where you <span>play</span></h2><p className="home-head__sub">{facilitySummary(facilityRows)}</p></div><a className="home-more" href="#finder">Book a session</a></div>
+            {facilities.status === 'error' && <CatalogNotice message="Court details are temporarily unavailable." retry={retryFacilities} />}
+            {facilities.status === 'ready' && sports.status === 'ready' && !venueTiles.length && <p className="home-loading">Facility details will appear here soon.</p>}
+            {venueTiles.length > 0 && <ul className={`home-venues${venueTiles.some((venue) => venue.wide) ? '' : ' home-venues--even'}`}>
+              {venueTiles.map((venue) => (
+                <li key={venue.name} className={`home-venue${venue.wide ? ' home-venue--wide' : ''}`}>
+                  <HomePhoto src={venue.photo} fallback={venue.image} alt="" width={venue.wide ? '1400' : '900'} height={venue.wide ? '700' : '600'} loading="lazy" />
+                  <span className="home-venue__label">{venue.label}</span>
+                  <div className="home-venue__text">
+                    <h3>{venue.name}</h3>
+                    {venue.note && <p>{venue.note}</p>}
+                    <span className="home-venue__go" aria-hidden="true">Find classes -&gt;</span>
+                  </div>
+                  <button type="button" className="home-venue__link" aria-label={`Find ${venue.sport} classes - ${venue.name}${venue.note ? `, ${venue.note}` : ''}`} onClick={() => findSport(venue.sport)} />
+                </li>
+              ))}
+            </ul>}
+          </div>
+        </section>
+
         <section className="home-section" id="coaches" aria-labelledby="coaches-title">
           <div className="home-wrap">
             <div className="home-head"><div><span className="home-kicker">Our coaches</span><h2 id="coaches-title">Train with the <span>best</span></h2></div><button type="button" className="home-more" onClick={() => setNotice(HOME_NOTICES.coaches)}>All coaches</button></div>
             {coaches.status === 'loading' && <p className="home-loading" role="status">Loading coaches...</p>}
             {coaches.status === 'error' && <CatalogNotice message="Coach profiles are temporarily unavailable." retry={retryCoaches} />}
             {coaches.status === 'ready' && !coaches.data.length && <p className="home-loading">Coach profiles will appear here soon.</p>}
-            {coaches.status === 'ready' && coaches.data.length > 0 && <div className="home-coaches">
-              {coaches.data.slice(0, 6).map((coach) => {
-                const sportNames = coach.sportIds.map((id) => catalogSports.find((sport) => sport.id === id)?.name).filter((name): name is string => Boolean(name))
-                const lead = sportNames[0]?.toLowerCase() ?? ''
-                const sportPhoto = HOME_SPORTS.find((sport) => sport.name.toLowerCase() === lead)
-                const picture = COACH_PHOTOS[lead] ?? (sportPhoto ? { image: sportPhoto.image, photo: sportPhoto.photo } : { image: homeHero, photo: HOME_PHOTOS.hero })
-                const summary = coach.headline || (coach.yearsExperience ? `${coach.yearsExperience} years of coaching` : coach.specialties) || 'Sportify coach'
-                const details = [coach.headline, coach.specialties && `Specialties: ${coach.specialties}`, coach.yearsExperience ? `${coach.yearsExperience} years of experience` : null].filter(Boolean).join('. ')
-                return <article className="home-coach" key={coach.id}>
-                  <button type="button" className="home-coach__photo" aria-label={`View profile of ${coach.fullName}`} onClick={() => setNotice({ title: coach.fullName, text: `${details ? `${details}. ` : ''}Sign in as a member and open a coach-led class to see upcoming sessions and verified certifications.` })}>
-                    <HomePhoto src={picture.photo} fallback={picture.image} alt="" width="800" height="1000" loading="lazy" /><span>{sportNames.join(' - ') || 'Coach'}</span>
-                  </button>
-                  <h3>{coach.fullName}</h3><p>{summary}</p>
-                </article>
-              })}
-            </div>}
+            {coaches.status === 'ready' && coaches.data.length > 0 && <HomeCoaches coaches={coaches.data} sports={catalogSports} onOpen={setNotice} />}
           </div>
         </section>
 
@@ -311,11 +342,11 @@ export function HomePage() {
       <footer className="home-footer">
         <div className="home-wrap home-footer__grid">
           <div><p className="home-footer__logo">Sportify</p><p>One center. Six sports. More ways to grow.</p></div>
-          <nav aria-label="Footer explore"><h2>Explore</h2><ul><li><a href="#finder">Find a class</a></li><li><a href="#sports">Sports</a></li><li><a href="#coaches">Coaches</a></li><li><a href="#packages">Packages</a></li></ul></nav>
+          <nav aria-label="Footer explore"><h2>Explore</h2><ul><li><a href="#finder">Find a class</a></li><li><a href="#sports">Sports</a></li><li><a href="#facilities">Facilities</a></li><li><a href="#coaches">Coaches</a></li><li><a href="#packages">Packages</a></li></ul></nav>
           <nav aria-label="Footer sports"><h2>Sports</h2><ul>{HOME_SPORTS.map((sport) => <li key={sport.name}><a href="#sports">{sport.name}</a></li>)}</ul></nav>
           <div className="home-footer__help"><h2>Need help?</h2><Button onClick={() => setNotice(HOME_NOTICES.reception)}>Contact reception</Button><Button variant="secondary" onClick={() => setNotice(HOME_NOTICES.assistant)}>AI Assistant</Button></div>
         </div>
-        <div className="home-wrap home-footer__bottom"><small>Copyright 2026 Sportify Sports Center</small></div>
+        <div className="home-wrap home-footer__bottom"><small>Copyright 2026 Sportify Sports Center</small><Link to="/credits">Photo credits</Link></div>
       </footer>
 
       <BackToTop />

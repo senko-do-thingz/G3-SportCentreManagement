@@ -58,6 +58,16 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void oversizedUploadNamesTheConfiguredLimitForAnyFeature() {
+        var response = handler.handleMaxUploadSize(new org.springframework.web.multipart.MaxUploadSizeExceededException(2L * 1024 * 1024));
+        assertEquals(HttpStatus.PAYLOAD_TOO_LARGE, response.getStatusCode());
+        assertEquals("File must be at most 2 MB", response.getBody().get("message"));
+
+        var unknownLimit = handler.handleMaxUploadSize(new org.springframework.web.multipart.MaxUploadSizeExceededException(-1));
+        assertEquals("File is too large", unknownLimit.getBody().get("message"));
+    }
+
+    @Test
     void optionalBusinessCodeIsAddedWithoutReplacingTheExistingEnvelope() {
         var response = handler.handleBusinessRuleException(new BusinessRuleException("No credits", "NO_SESSIONS_LEFT"));
         assertEquals(400, response.getBody().get("status"));

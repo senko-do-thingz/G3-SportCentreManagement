@@ -1,6 +1,6 @@
 package com.sportify.identity.controller;
 
-import com.sportify.identity.dto.CoachOptionResponse;
+import com.sportify.identity.dto.PublicCoachResponse;
 import com.sportify.identity.security.CustomAccessDeniedHandler;
 import com.sportify.identity.security.CustomAuthenticationEntryPoint;
 import com.sportify.identity.security.JwtAuthenticationFilter;
@@ -46,26 +46,30 @@ class PublicCoachControllerTest {
 
     @Test
     void guestReadsActiveCoachesWithoutContactData() throws Exception {
-        when(coachDirectoryService.getActiveCoaches(null)).thenReturn(List.of(
-                new CoachOptionResponse(7L, "Pham Thu Ha", "Swimming coach", "Stroke technique", 6, List.of(5L))));
+        when(coachDirectoryService.getPublicCoaches(null)).thenReturn(List.of(
+                new PublicCoachResponse(7L, "Pham Thu Ha", "Swimming coach", "Stroke technique", 6,
+                        "Teaches beginners to swim with confidence.", "https://cdn.example.test/ha.jpg", List.of(5L))));
 
         mockMvc.perform(get(URL))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(7))
                 .andExpect(jsonPath("$[0].fullName").value("Pham Thu Ha"))
                 .andExpect(jsonPath("$[0].sportIds[0]").value(5))
+                .andExpect(jsonPath("$[0].bio").value("Teaches beginners to swim with confidence."))
+                .andExpect(jsonPath("$[0].avatarUrl").value("https://cdn.example.test/ha.jpg"))
+                .andExpect(jsonPath("$[0].phone").doesNotExist())
                 .andExpect(jsonPath("$[0].email").doesNotExist());
     }
 
     @Test
     void sportFilterIsPassedToTheDirectory() throws Exception {
-        when(coachDirectoryService.getActiveCoaches(2L)).thenReturn(List.of());
+        when(coachDirectoryService.getPublicCoaches(2L)).thenReturn(List.of());
 
         mockMvc.perform(get(URL).param("sportId", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
 
-        verify(coachDirectoryService).getActiveCoaches(2L);
+        verify(coachDirectoryService).getPublicCoaches(2L);
     }
 
     @Test
