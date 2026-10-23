@@ -11,10 +11,12 @@ import { Checkbox } from '../../components/ui/Checkbox'
 import { Input } from '../../components/ui/Input'
 import { PasswordInput } from '../../components/ui/PasswordInput'
 import { Modal } from '../../components/ui/Modal'
+import { Notice } from '../../components/ui/Notice'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Select } from '../../components/ui/Select'
 import { Spinner } from '../../components/ui/Spinner'
 import { Table, type TableColumn } from '../../components/ui/Table'
+import { Tabs } from '../../components/ui/Tabs'
 import { useToast } from '../../components/ui/toastContext'
 import { formatDate, formatDateTime, formatMoney, formatTime, humanizeCode } from '../../utils/format'
 
@@ -60,6 +62,7 @@ const COLOR_TOKENS = [
   '--color-primary-soft',
   '--color-navy',
   '--color-accent',
+  '--color-highlight',
   '--color-bg',
   '--color-surface',
   '--color-border',
@@ -83,6 +86,7 @@ export function ComponentDemoPage() {
   const [role, setRole] = useState('')
   const [saving, setSaving] = useState(false)
   const [paging, setPaging] = useState(false)
+  const [demoTab, setDemoTab] = useState('overview')
 
   // Simulates a server round trip so the loading overlay (previous rows kept, dimmed) is visible.
   const handlePageChange = (nextPage: number) => {
@@ -213,6 +217,32 @@ export function ComponentDemoPage() {
           </Card>
         </div>
 
+        <Card title="Notices">
+          <div className="form-grid">
+            <Notice tone="info" title="Payment instructions">Transfer the exact amount and keep the receipt.</Notice>
+            <Notice tone="success" live="polite">Your profile was saved.</Notice>
+            <Notice tone="warning" title="Package expires soon">Renew before the end date to keep your sessions.</Notice>
+            <Notice tone="danger" action={<Button size="sm" variant="secondary">Try again</Button>}>
+              The payment could not be verified.
+            </Notice>
+          </div>
+        </Card>
+
+        <Card title="Tabs">
+          <Tabs
+            label="Demo tabs"
+            value={demoTab}
+            onChange={setDemoTab}
+            items={[
+              { id: 'overview', label: 'Overview' },
+              { id: 'history', label: 'History' },
+              { id: 'locked', label: 'Locked', disabled: true },
+            ]}
+          >
+            {(id) => <p className="state__description">Selected panel: {id}. Use the arrow keys, Home and End.</p>}
+          </Tabs>
+        </Card>
+
         <Card title="Badges">
           <div className="ui-kit__row">
             <Badge tone="success">Success</Badge>
@@ -275,6 +305,9 @@ export function ComponentDemoPage() {
               </Button>
               <Button variant="secondary" onClick={() => toast.info('Heads up', 'Session starts in 30 minutes.')}>
                 Info toast
+              </Button>
+              <Button variant="secondary" onClick={() => toast.warning('Card expiring', 'Your card ends in 7 days.')}>
+                Warning toast
               </Button>
             </div>
           </Card>

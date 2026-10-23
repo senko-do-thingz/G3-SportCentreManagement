@@ -465,27 +465,133 @@
   gap: var(--space-4);
 }
 
-/* Notices */
+/* Notices: shared Notice component and legacy "notice notice--tone" paragraphs (UI-01) */
 .notice {
+  margin: 0;
   padding: var(--space-3) var(--space-4);
+  border: 1px solid transparent;
+  border-left-width: 4px;
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+/* Flex layout only for the Notice component, so legacy paragraphs keep their inline text flow. */
+.notice--stack {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.notice__content {
+  display: grid;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.notice__title {
+  margin: 0;
+  font-weight: var(--weight-bold);
+}
+
+.notice__message > :first-child { margin-top: 0; }
+.notice__message > :last-child { margin-bottom: 0; }
+
+.notice__action {
+  flex: none;
 }
 
 .notice--info {
   background: var(--color-info-soft);
+  border-color: var(--color-info-soft);
+  border-left-color: var(--color-info);
   color: var(--color-info);
+}
+
+.notice--success {
+  background: var(--color-success-soft);
+  border-color: var(--color-success-soft);
+  border-left-color: var(--color-success);
+  color: var(--color-success);
 }
 
 .notice--warning {
   background: var(--color-warning-soft);
+  border-color: var(--color-warning-border);
+  border-left-color: var(--color-highlight);
   color: var(--color-warning);
 }
 
 .notice--danger {
   background: var(--color-danger-soft);
+  border-color: var(--color-danger-border);
+  border-left-color: var(--color-danger);
   color: var(--color-danger);
 }
+
+@media (max-width: 560px) {
+  .notice--stack { flex-direction: column; }
+}
+
+/* Tabs: shared Tabs component and existing tab lists (UI-01); gold underline marks the selection */
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-lg);
+  background: var(--color-primary-soft);
+}
+
+.tabs__tab {
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.tabs__tab:hover {
+  color: var(--color-primary);
+}
+
+.tabs__tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tabs__tab--active {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-sm), inset 0 -3px 0 var(--color-highlight);
+}
+
+.tabs__tab:disabled {
+  color: var(--color-text-subtle);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.tabs-block {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.tabs__panel:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-md);
+}
+
+@media (max-width: 560px) {
+  .tabs { overflow-x: auto; }
+  .tabs__tab { flex: none; }
+}
+
 
 /* Card */
 .card {

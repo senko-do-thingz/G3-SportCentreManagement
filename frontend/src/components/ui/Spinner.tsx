@@ -4,10 +4,17 @@ export interface SpinnerProps {
   label?: string
   /** Render inside text or a button instead of as a centered block. */
   inline?: boolean
+  /**
+   * Hide the spinner from assistive technology, for example inside a Button that already sets
+   * aria-busy. A decorative spinner is not a live region, so it never adds a second status.
+   */
+  decorative?: boolean
 }
 
-export function Spinner({ size = 'md', label = 'Loading', inline = false }: SpinnerProps) {
-  const spinner = (
+export function Spinner({ size = 'md', label = 'Loading', inline = false, decorative = false }: SpinnerProps) {
+  const spinner = decorative ? (
+    <span className={`spinner spinner--${size}`} aria-hidden="true" />
+  ) : (
     <span className={`spinner spinner--${size}`} role="status" aria-live="polite">
       <span className="visually-hidden">{label}</span>
     </span>
