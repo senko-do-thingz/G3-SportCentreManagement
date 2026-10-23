@@ -138,7 +138,17 @@ public class ManagerCoachProfileServiceImpl implements ManagerCoachProfileServic
     }
 
     private static boolean isUploaded(String avatarUrl, Long userId) {
-        return avatarUrl != null && avatarUrl.matches("/api/v1/users/" + userId + "/avatar(?:\\?v=\\d+)?");
+        if (avatarUrl == null || userId == null) return false;
+        String path = "/api/v1/users/" + userId + "/avatar";
+        if (avatarUrl.equals(path)) return true;
+
+        String versionPrefix = path + "?v=";
+        if (!avatarUrl.startsWith(versionPrefix) || avatarUrl.length() == versionPrefix.length()) return false;
+        for (int index = versionPrefix.length(); index < avatarUrl.length(); index++) {
+            char digit = avatarUrl.charAt(index);
+            if (digit < '0' || digit > '9') return false;
+        }
+        return true;
     }
 
     private CoachProfile find(Long userId) {

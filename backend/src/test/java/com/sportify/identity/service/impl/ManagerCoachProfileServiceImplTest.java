@@ -15,6 +15,8 @@ import com.sportify.identity.repository.CoachProfileRepository;
 import com.sportify.identity.repository.UserAvatarStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -220,5 +222,111 @@ class ManagerCoachProfileServiceImplTest {
         }
         verify(coachProfileRepository, never()).save(any());
         verifyNoInteractions(avatarStore, auditService);
+    }
+
+    @ParameterizedTest(name = "accepts current uploaded URL format {index}")
+    @ValueSource(strings = {
+            "/api/v1/users/7/avatar",
+            "/api/v1/users/7/avatar?v=0",
+            "/api/v1/users/7/avatar?v=1",
+            "/api/v1/users/7/avatar?v=0001",
+            "/api/v1/users/7/avatar?v=1761200000000",
+            "/api/v1/users/7/avatar?v=9999999999999999999999999999999999999999"
+    })
+    void currentUploadedFormatsAreRetainedWithoutDeletingThePhoto(String url) {
+        CoachProfile profile = coach();
+        profile.getUserAccount().setAvatarUrl(url);
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(profile));
+        when(coachProfileRepository.save(profile)).thenReturn(profile);
+
+        ManagerCoachProfileResponse response = service.updateProfile(7L,
+                new ManagerCoachProfileUpdateRequest(url, "New", null, 3, null, true, 0), actor);
+
+        assertEquals(url, response.avatarUrl());
+        verify(coachProfileRepository).save(profile);
+        verifyNoInteractions(avatarStore);
+    }
+
+    @ParameterizedTest(name = "rejects malformed or cross-account uploaded URL {index}")
+    @ValueSource(strings = {
+            "/api/v1/users/8/avatar",
+            "/api/v1/users/8/avatar?v=1",
+            "/api/v1/users/70/avatar?v=1",
+            "/api/v1/users/07/avatar?v=1",
+            "/api/v1/users/7/avatar-extra",
+            "/api/v1/users/7/avatar/",
+            "/api/v1/users/7/avatar?x=1",
+            "/api/v1/users/7/avatar?V=1",
+            "/api/v1/users/7/avatar?v=",
+            "/api/v1/users/7/avatar?v=+1",
+            "/api/v1/users/7/avatar?v=-1",
+            "/api/v1/users/7/avatar?v=1.0",
+            "/api/v1/users/7/avatar?v=1e2",
+            "/api/v1/users/7/avatar?v=%31",
+            "/api/v1/users/7/avatar?v=1&v=2",
+            "/api/v1/users/7/avatar?v=1&other=2",
+            "/api/v1/users/7/avatar?v=1?v=2",
+            "/api/v1/users/7/avatar?v=1#photo",
+            "/api/v1/users/7/avatar#v=1",
+            "/api/v1/users/7/avatar?v=1/2",
+            "/api/v1/users/7/avatar?v=1 2",
+            "/api/v1/users/7/avatar?v=1\t2",
+            "/api/v1/users/7/avatar?v=1\n2",
+            "/api/v1/users/7/avatar?v=1;v=2",
+            "/api/v1/users/7/avatar?v=1+2",
+            "/api/v1/users/7/avatar?v=\u0661",
+            "/api/v1/users/7/avatar?v=\uFF11"
+    })
+    void malformedUploadedLinksAreRejectedEvenWhenStoredMetadataMatches(String url) {
+        CoachProfile profile = coach();
+        // Matching legacy metadata must not bypass the URL grammar or account identity check.
+        profile.getUserAccount().setAvatarUrl(url);
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(profile));
+
+        FieldValidationException error = assertThrows(FieldValidationException.class, () -> service.updateProfile(7L,
+                new ManagerCoachProfileUpdateRequest(url, "New", null, 3, null, true, 0), actor));
+
+        assertEquals("Use the current photo uploaded for this coach", error.getDetails().get("avatarUrl"));
+        assertEquals(url, profile.getUserAccount().getAvatarUrl());
+        verify(coachProfileRepository, never()).save(any());
+        verifyNoInteractions(avatarStore, auditService);
+    }
+
+    @ParameterizedTest(name = "rejects fabricated or stale uploaded version {index}")
+    @ValueSource(strings = {
+            "/api/v1/users/7/avatar",
+            "/api/v1/users/7/avatar?v=1",
+            "/api/v1/users/7/avatar?v=3",
+            "/api/v1/users/7/avatar?v=0002"
+    })
+    void validUploadedGrammarStillRequiresTheExactCurrentLink(String url) {
+        CoachProfile profile = coach();
+        profile.getUserAccount().setAvatarUrl("/api/v1/users/7/avatar?v=2");
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(profile));
+
+        assertThrows(FieldValidationException.class, () -> service.updateProfile(7L,
+                new ManagerCoachProfileUpdateRequest(url, "New", null, 3, null, true, 0), actor));
+
+        assertEquals("/api/v1/users/7/avatar?v=2", profile.getUserAccount().getAvatarUrl());
+        verify(coachProfileRepository, never()).save(any());
+        verifyNoInteractions(avatarStore, auditService);
+    }
+
+    @ParameterizedTest(name = "retains existing non-upload avatar format {index}")
+    @ValueSource(strings = {
+            "http://images.example.test/coach.jpg",
+            "https://images.example.test/coach.jpg",
+            "/images/coaches/demo.jpg"
+    })
+    void externalAndBundledPhotoFormatsRemainAccepted(String url) {
+        CoachProfile profile = coach();
+        when(coachProfileRepository.findWithAccountById(7L)).thenReturn(Optional.of(profile));
+        when(coachProfileRepository.save(profile)).thenReturn(profile);
+
+        ManagerCoachProfileResponse response = service.updateProfile(7L,
+                new ManagerCoachProfileUpdateRequest(url, "New", null, 3, null, true, 0), actor);
+
+        assertEquals(url, response.avatarUrl());
+        verifyNoInteractions(avatarStore);
     }
 }
