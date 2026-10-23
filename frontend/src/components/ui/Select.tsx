@@ -24,13 +24,15 @@ export function Select({
   id,
   className,
   required,
+  'aria-describedby': extraDescribedBy,
   ...rest
 }: SelectProps) {
   const generatedId = useId()
   const selectId = id ?? generatedId
   const hintId = hint ? `${selectId}-hint` : undefined
   const errorId = error ? `${selectId}-error` : undefined
-  const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined
+  // Same rule as Input: the caller's ids and the hint and error ids are all kept.
+  const describedBy = [hintId, errorId, extraDescribedBy].filter(Boolean).join(' ') || undefined
 
   return (
     <div className={['field', className ?? ''].filter(Boolean).join(' ')}>

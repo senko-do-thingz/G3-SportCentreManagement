@@ -15,6 +15,7 @@ export interface ToastApi {
   success(title: string, message?: string): number
   error(title: string, message?: string): number
   info(title: string, message?: string): number
+  warning(title: string, message?: string): number
   dismiss(id: number): void
 }
 
