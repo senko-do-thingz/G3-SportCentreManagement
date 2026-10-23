@@ -21,6 +21,7 @@ describe('shared UI components', () => {
       'Buttons',
       'Inputs',
       'Select',
+      'Filters',
       'Notices',
       'Tabs',
       'Badges',

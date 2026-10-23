@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { Button } from './Button'
+import { FilterBar } from './FilterBar'
+import { Input } from './Input'
 import { Notice } from './Notice'
 import { PasswordInput } from './PasswordInput'
 import { Select } from './Select'
@@ -251,5 +253,65 @@ describe('UI-01 accessibility fixes', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('FilterBar', () => {
+  function Harness() {
+    const [search, setSearch] = useState('')
+    const [role, setRole] = useState('')
+    return (
+      <FilterBar
+        label="Filter accounts"
+        active={Boolean(search || role)}
+        onClear={() => {
+          setSearch('')
+          setRole('')
+        }}
+        resultText={search || role ? '3 accounts' : '20 accounts'}
+      >
+        <Input label="Search accounts" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+        <Select label="Role" placeholder="All roles" options={[{ value: 'COACH', label: 'Coach' }]} value={role} onChange={(event) => setRole(event.target.value)} />
+      </FilterBar>
+    )
+  }
+
+  it('is a named search landmark with a polite result count', () => {
+    render(<Harness />)
+    expect(screen.getByRole('search', { name: 'Filter accounts' })).toBeInTheDocument()
+    expect(screen.getByText('20 accounts')).toHaveAttribute('aria-live', 'polite')
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).not.toBeInTheDocument()
+  })
+
+  it('shows Clear filters only when a filter is set and returns focus to the first field', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.type(screen.getByRole('searchbox', { name: 'Search accounts' }), 'tung')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Role' }), 'COACH')
+    expect(screen.getByText('3 accounts')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+    expect(screen.getByRole('searchbox', { name: 'Search accounts' })).toHaveValue('')
+    expect(screen.getByRole('combobox', { name: 'Role' })).toHaveValue('')
+    expect(screen.getByRole('searchbox', { name: 'Search accounts' })).toHaveFocus()
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).not.toBeInTheDocument()
+  })
+})
+
+describe('UI-01 mobile and motion rules', () => {
+  const mobile = components.slice(components.indexOf('/* Shared mobile breakpoints (UI-01)'))
+
+  it('stacks filters, wraps headers, pagination and dialog actions at 640 px', () => {
+    expect(mobile).toMatch(/@media \(max-width: 640px\)/)
+    expect(mobile).toMatch(/\.filter-bar__fields \{\s*grid-template-columns: minmax\(0, 1fr\);/)
+    expect(mobile).toMatch(/\.card__header \{\s*flex-wrap: wrap;/)
+    expect(mobile).toMatch(/\.pagination__controls \{\s*flex-wrap: wrap;/)
+    expect(mobile).toMatch(/\.modal__footer \{\s*flex-wrap: wrap;/)
+    expect(components).toMatch(/\.table-scroll \{\s*overflow-x: auto;/)
+  })
+
+  it('turns off dialog and toast animations for reduced motion', () => {
+    expect(mobile).toMatch(/@media \(prefers-reduced-motion: reduce\)/)
+    expect(mobile).toMatch(/\.toast \{\s*animation: none;/)
   })
 })

@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button'
 import { Card, StatCard } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { ErrorState } from '../../components/ui/ErrorState'
+import { FilterBar } from '../../components/ui/FilterBar'
 import { Checkbox } from '../../components/ui/Checkbox'
 import { Input } from '../../components/ui/Input'
 import { PasswordInput } from '../../components/ui/PasswordInput'
@@ -87,6 +88,9 @@ export function ComponentDemoPage() {
   const [saving, setSaving] = useState(false)
   const [paging, setPaging] = useState(false)
   const [demoTab, setDemoTab] = useState('overview')
+  const [filterSearch, setFilterSearch] = useState('')
+  const [filterRole, setFilterRole] = useState('')
+  const filteredCount = DEMO_ACCOUNTS.filter((account) => (!filterRole || account.role === filterRole) && (!filterSearch || account.name.toLowerCase().includes(filterSearch.toLowerCase()))).length
 
   // Simulates a server round trip so the loading overlay (previous rows kept, dimmed) is visible.
   const handlePageChange = (nextPage: number) => {
@@ -216,6 +220,18 @@ export function ComponentDemoPage() {
             </div>
           </Card>
         </div>
+
+        <Card title="Filters">
+          <FilterBar
+            label="Filter demo accounts"
+            active={Boolean(filterSearch || filterRole)}
+            onClear={() => { setFilterSearch(''); setFilterRole('') }}
+            resultText={`${filteredCount} of ${DEMO_ACCOUNTS.length} accounts`}
+          >
+            <Input label="Search accounts" type="search" placeholder="Search name" value={filterSearch} onChange={(event) => setFilterSearch(event.target.value)} />
+            <Select label="Role" placeholder="All roles" options={[{ value: 'MEMBER', label: 'Member' }, { value: 'COACH', label: 'Coach' }, { value: 'RECEPTIONIST', label: 'Receptionist' }, { value: 'MANAGER', label: 'Manager' }]} value={filterRole} onChange={(event) => setFilterRole(event.target.value)} />
+          </FilterBar>
+        </Card>
 
         <Card title="Notices">
           <div className="form-grid">

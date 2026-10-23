@@ -3,7 +3,9 @@
 - Move the shared brand tokens to the approved Home Royal and Gold palette (navy, royal blue actions, gold highlights) in light and dark modes, and add --color-highlight. All shared controls pick it up; screen-specific colors are unchanged. Contrast of primary text, primary fills and gold fills meets WCAG 2.2 AA and is covered by token tests.
 - Add a shared Notice component (info, success, warning, danger; assertive, polite or silent; hidden Error or Warning prefix) and a shared Tabs component (arrow keys, Home, End, disabled tabs skipped, linked panels). Existing notice paragraphs and tab lists keep working; their styles move from member.css to components.css.
 - Fix accessibility gaps: Select keeps a caller aria-describedby with its hint and error ids; the password toggle name matches its visible Show or Hide text and points at its field; a loading Button no longer adds a second live region; the toast API gains a warning helper.
-- Screens are not migrated to Notice or Tabs in this change; each screen owner adopts them in their own UI task. No API or backend changes. Lint, tsc, all frontend tests and the production build pass.
+- Add a shared FilterBar (search landmark, Clear filters only when a filter is set with focus returned to the first field, polite result count) standardized from the manager filter rows.
+- Add shared mobile rules at 640 px (filters stack, card headers, pagination and dialog actions wrap, dialogs sit at the bottom) and reduced-motion rules for dialogs and toasts. Component screenshots in light and dark at 1280 and 375 px are in frontend/docs/screenshots/ui-01; none has horizontal page overflow.
+- Screens are not migrated to FilterBar, Notice or Tabs in this change; each screen owner adopts them in their own UI task. No API or backend changes. Lint, tsc, all frontend tests and the production build pass.
 
 ## 2026-10-23 - Fix member class cover image layout (FE-08)
 

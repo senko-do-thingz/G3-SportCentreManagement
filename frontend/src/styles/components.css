@@ -1215,3 +1215,80 @@
   min-height: 72px;
   resize: vertical;
 }
+
+/* Filter bar: shared FilterBar component (UI-01), same grid as the manager filter rows */
+.filter-bar {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.filter-bar__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.filter-bar__fields .field {
+  min-width: 0;
+}
+
+.filter-bar__clear .btn {
+  width: 100%;
+  min-height: 42px;
+}
+
+.filter-bar__result {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* Shared mobile breakpoints (UI-01): controls wrap instead of overflowing on 375 px phones */
+@media (max-width: 640px) {
+  .filter-bar__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .card__header {
+    flex-wrap: wrap;
+  }
+
+  .pagination,
+  .pagination__controls {
+    flex-wrap: wrap;
+  }
+
+  .modal-backdrop {
+    align-items: flex-end;
+    padding: var(--space-2);
+  }
+
+  .modal__footer {
+    flex-wrap: wrap;
+    padding: var(--space-4);
+  }
+
+  .modal__footer > .btn {
+    flex: 1 1 auto;
+  }
+
+  .toast-region {
+    right: var(--space-4);
+    bottom: var(--space-4);
+  }
+}
+
+/* Respect reduced motion for dialogs and toasts; the spinner slows down instead of stopping */
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop,
+  .modal,
+  .toast {
+    animation: none;
+  }
+
+  .spinner {
+    animation-duration: 1.6s;
+  }
+}
