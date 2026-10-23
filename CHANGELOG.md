@@ -14,6 +14,10 @@
 
 - Apply the refreshed Home page's navy, Royal Blue, and Gold visual language to the member weekly schedule.
 - Preserve the simplified seven-day timetable, week navigation, session details, availability, empty and error states, and responsive access. No backend or API changes.
+## 2026-10-22 - Login visual alignment with Home (FE-00)
+
+- Apply the refreshed Home page's navy, Royal Blue, and Gold visual language to the login screen only, including light/dark surface colors, hero treatment, form controls, and primary action.
+- Preserve the shared authentication layout and behavior; registration remains visually unchanged.
 
 ## 2026-10-22 - Home redesign (FE-HOME)
 

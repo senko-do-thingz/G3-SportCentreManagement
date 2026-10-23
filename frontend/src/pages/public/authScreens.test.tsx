@@ -108,6 +108,27 @@ afterEach(() => {
 })
 
 describe('F1-05 Log in', () => {
+  it('reserves inline validation space so invalid input does not shift the login form', async () => {
+    const { calls } = installFakeFetch(authBackend())
+    const user = userEvent.setup()
+    renderApp('/login')
+
+    const email = await screen.findByLabelText(/email address/i)
+    const emailField = email.closest('.field')
+    const feedbackSlot = emailField?.querySelector('.field__feedback--reserved')
+    expect(feedbackSlot).toBeInTheDocument()
+    expect(feedbackSlot).toBeEmptyDOMElement()
+
+    await user.type(email, 'not-an-email')
+    await user.type(screen.getByLabelText(/^password/i), 'some-password')
+    await user.click(screen.getByRole('button', { name: /log in/i }))
+
+    const error = await screen.findByText('Email is invalid')
+    expect(emailField?.querySelector('.field__feedback--reserved')).toBe(feedbackSlot)
+    expect(feedbackSlot).toContainElement(error)
+    expect(calls.filter((call) => call.path === '/auth/login')).toHaveLength(0)
+  })
+
   it('shows and hides the password with the Show button', async () => {
     installFakeFetch(authBackend())
     const user = userEvent.setup()

@@ -5,6 +5,8 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   hint?: ReactNode
   /** Message shown under the field, usually from ApiError.fieldErrors. */
   error?: string
+  /** Reserve one line below the input so an inline validation message does not move the form. */
+  reserveErrorSpace?: boolean
   /** Element shown on the right of the label, for example a "Forgot password?" link. */
   labelAction?: ReactNode
   /** Element shown inside the field on the right, for example the show or hide password button. */
@@ -15,6 +17,7 @@ export function Input({
   label,
   hint,
   error,
+  reserveErrorSpace = false,
   labelAction,
   trailing,
   id,
@@ -61,15 +64,32 @@ export function Input({
       ) : (
         input
       )}
-      {hint && !error && (
-        <p className="field__hint" id={hintId}>
-          {hint}
-        </p>
-      )}
-      {error && (
-        <p className="field__error" id={errorId} role="alert">
-          {error}
-        </p>
+      {reserveErrorSpace ? (
+        <div className="field__feedback field__feedback--reserved">
+          {hint && !error && (
+            <p className="field__hint" id={hintId}>
+              {hint}
+            </p>
+          )}
+          {error && (
+            <p className="field__error" id={errorId} role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+      ) : (
+        <>
+          {hint && !error && (
+            <p className="field__hint" id={hintId}>
+              {hint}
+            </p>
+          )}
+          {error && (
+            <p className="field__error" id={errorId} role="alert">
+              {error}
+            </p>
+          )}
+        </>
       )}
     </div>
   )

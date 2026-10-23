@@ -153,7 +153,7 @@ export function LoginPage() {
   }
 
   return (
-    <AuthShell title="Welcome back" subtitle="Log in to manage your training.">
+    <AuthShell className="auth-shell--login" title="Welcome back" subtitle="Log in to manage your training.">
       {import.meta.env.DEV && managerPreviewEnabled() && <ManagerPreviewLogin />}
       {sample && (
         <p className="notice notice--info auth-sample">
@@ -196,6 +196,7 @@ export function LoginPage() {
               clearFieldError('email')
             }}
             error={fieldErrors.email}
+            reserveErrorSpace
             required
           />
           <PasswordInput
@@ -208,6 +209,7 @@ export function LoginPage() {
               clearFieldError('password')
             }}
             error={fieldErrors.password}
+            reserveErrorSpace
             required
           />
           <div className="auth-form__options">
