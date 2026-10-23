@@ -40,22 +40,41 @@ class UserAvatarControllerTest {
     private UserDetailsService userDetailsService;
 
     @Test
-    void guestReadsUploadedPhotoWithStoredTypeAndLongCache() throws Exception {
+    void guestReadsPublishedCoachPhotoWithStoredTypeAndNoStore() throws Exception {
         byte[] png = {(byte) 0x89, 'P', 'N', 'G'};
-        when(avatarStore.find(7L)).thenReturn(Optional.of(new UserAvatarStore.StoredAvatar("image/png", png)));
+        when(avatarStore.findPublicCoachAvatar(7L)).thenReturn(Optional.of(new UserAvatarStore.StoredAvatar("image/png", png)));
 
         mockMvc.perform(get("/api/v1/users/7/avatar").param("v", "1"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType("image/png"))
                 .andExpect(content().bytes(png))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))
-                .andExpect(header().string("Cache-Control", "max-age=31536000, public"));
+                .andExpect(header().string("Cache-Control", "no-store"));
     }
 
     @Test
     void missingPhotoReturns404() throws Exception {
-        when(avatarStore.find(8L)).thenReturn(Optional.empty());
+        when(avatarStore.findPublicCoachAvatar(8L)).thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/v1/users/8/avatar")).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/users/8/avatar")).andExpect(status().isNotFound())
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")));
+    }
+    @Test
+    void revocationIsRecheckedEvenWithTheSameVersionedUrl() throws Exception {
+        when(avatarStore.findPublicCoachAvatar(7L))
+                .thenReturn(Optional.of(new UserAvatarStore.StoredAvatar("image/jpeg", new byte[] {1})))
+                .thenReturn(Optional.empty());
+        mockMvc.perform(get("/api/v1/users/7/avatar?v=1")).andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"));
+        mockMvc.perform(get("/api/v1/users/7/avatar?v=1")).andExpect(status().isNotFound())
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"));
+    }
+
+    @Test
+    void malformedIdIsBadRequestAndWriteMethodsRequireAuthentication() throws Exception {
+        mockMvc.perform(get("/api/v1/users/not-a-number/avatar")).andExpect(status().isBadRequest());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/users/7/avatar"))
+                .andExpect(status().isUnauthorized());
     }
 }
