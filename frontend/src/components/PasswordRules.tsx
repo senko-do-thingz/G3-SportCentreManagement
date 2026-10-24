@@ -10,6 +10,8 @@ const PROGRESS_LABELS = {
 /**
  * Live checklist of the password rules (same rules as the backend @StrongPassword), shown under
  * a new password field. Used by Sign up (F1-06) and the change password form of My Profile (F1-08).
+ * Only the three rules people need to know are listed (length, a letter, a number), like most sign up forms.
+ * The 72 byte limit (BCrypt) appears only when a password breaks it, as an error line.
  */
 export function PasswordRules({ id, password }: { id: string; password: string }) {
   const rules = checkPassword(password)
@@ -22,10 +24,10 @@ export function PasswordRules({ id, password }: { id: string; password: string }
         </p>
       )}
       <ul className="password-rules__list">
-        {rules.map((rule) => (
+        {rules.filter((rule) => rule.id !== 'bytes' || (password !== '' && !rule.met)).map((rule) => (
           <li
             key={rule.id}
-            className={`password-rules__item${rule.met ? ' password-rules__item--met' : ''}`}
+            className={`password-rules__item${rule.met ? ' password-rules__item--met' : ''}${rule.id === 'bytes' ? ' password-rules__item--error' : ''}`}
             data-rule={rule.id}
             data-met={rule.met}
           >

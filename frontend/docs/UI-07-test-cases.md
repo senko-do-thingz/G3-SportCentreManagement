@@ -30,10 +30,11 @@ Branch: based on `feat/ui-06` (which contains UI-00 and UI-03). Merge order: UI-
 | TC-02 | Home photo, header and switch | Unit | Home hero photo with fallback, Back to Home, shared `ThemeToggle`, no Appearance select | Pass |
 | TC-03 | Old split card retired | Unit | No `.auth-shell`, `.auth-hero` or toolbar rules; `auth-hero.jpg` deleted; no unused asset left | Pass |
 | TC-04 | No local palette, shared tokens | Unit | No `--login-*` or dark block; hero, navy, highlight, display font, focus ring and primary tokens used | Pass |
-| TC-05 | Shapes and widths | Unit | Square fields, button and password rules; Sign up card 560 px; photo band at 960 px | Pass |
+| TC-05 | Shapes and widths | Unit | Square fields and button; password checklist without a box; Sign up card 560 px; photo band at 960 px | Pass |
+| TC-05b | Password checklist like real sign up forms | Unit | Lists only 8 to 64 characters, A letter, A number with a check mark when met; the 72 byte limit shows only as an error line when broken | Pass |
 | TC-06 | No raw colors | Unit (color freeze) | `auth.css` has none; baseline tightened after the split card colors left `layouts.css` | Pass |
-| TC-07 | Existing Sign up and Log in behavior | Unit (existing suites) | Registration, validation, duplicate email, automatic sign in, theme persistence and return navigation unchanged | Pass (1400 tests) |
-| TC-08 | Text contrast as rendered | Browser: 2 themes x 3 widths x 3 states (empty, field errors, email already registered) | Card text, rules, links, button, errors and alerts against their real background; header and slogan against the overlay navy; at least 4.5:1 (3:1 large) | Pass (lowest 4.96:1, password rules) |
+| TC-07 | Existing Sign up and Log in behavior | Unit (existing suites) | Registration, validation, duplicate email, automatic sign in, theme persistence and return navigation unchanged | Pass (1401 tests) |
+| TC-08 | Text contrast as rendered | Browser: 2 themes x 3 widths x 3 states (empty, field errors, email already registered) | Card text, checklist, links, button, errors and alerts against their real background; header and slogan against the overlay navy; at least 4.5:1 (3:1 large) | Pass (lowest 5.2:1, password rules) |
 | TC-09 | No horizontal overflow, card below header | Browser: 390, 768, 1440 px | Page never wider than the window; card starts below the header | Pass |
 | TC-10 | Visible keyboard focus | Browser: theme switch, full name, Show password, terms checkbox, Create account | Each shows a focus ring | Pass |
 | TC-11 | Sign up still works | Browser: valid form, mocked API | Leaves `/register` for `/member` | Pass |

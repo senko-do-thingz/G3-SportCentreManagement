@@ -1028,14 +1028,37 @@ describe('FE-01 review fixes (round 3)', () => {
       renderApp('/register')
       const password = await screen.findByLabelText(/^password/i)
 
-      for (const rule of ['length', 'letter', 'digit', 'bytes']) {
+      for (const rule of ['length', 'letter', 'digit']) {
         expect(document.querySelector(`[data-rule="${rule}"]`)).toHaveAttribute('data-met', 'false')
       }
+      expect(document.querySelector('[data-rule="bytes"]')).toBeNull()
       expect(screen.queryByText(/Password strength|Meets requirements/)).not.toBeInTheDocument()
 
       await user.type(password, 'a')
       await user.clear(password)
-      expect(document.querySelector('[data-rule="bytes"]')).toHaveAttribute('data-met', 'false')
+      expect(document.querySelector('[data-rule="bytes"]')).toBeNull()
+    })
+  })
+
+  describe('N6b byte limit only when broken', () => {
+    it('lists only length, a letter and a number, and shows the byte limit as an error only when the password breaks it', async () => {
+      installFakeFetch(authBackend())
+      const user = userEvent.setup()
+      renderApp('/register')
+      const password = await screen.findByLabelText(/^password/i)
+      await user.type(password, 'abc12345')
+      expect(screen.getByText('8 to 64 characters')).toBeInTheDocument()
+      expect(screen.getByText('A letter')).toBeInTheDocument()
+      expect(screen.getByText('A number')).toBeInTheDocument()
+      expect(screen.queryByText(/bytes|accented/)).not.toBeInTheDocument()
+
+      await user.clear(password)
+      await user.click(password)
+      await user.paste(`${'\u00E9'.repeat(36)}1`)
+      const tooLong = document.querySelector('[data-rule="bytes"]') as HTMLElement
+      expect(tooLong).toHaveAttribute('data-met', 'false')
+      expect(tooLong).toHaveClass('password-rules__item--error')
+      expect(within(tooLong).getByText('Too long: use fewer accented letters or symbols')).toBeInTheDocument()
     })
   })
 

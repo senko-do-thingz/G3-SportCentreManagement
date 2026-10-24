@@ -106,18 +106,9 @@
   min-height: 46px;
 }
 
-.auth-form .password-rules__strength {
-  position: absolute;
-  top: var(--space-2);
-  left: var(--space-4);
-}
-
+/* Password checklist sits under the two password fields as one quiet line, no box. */
 .auth-form .password-rules {
-  position: relative;
-  padding: var(--space-6) var(--space-4) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-muted);
+  margin-top: calc(var(--space-2) * -1);
 }
 
 .auth-form .btn {

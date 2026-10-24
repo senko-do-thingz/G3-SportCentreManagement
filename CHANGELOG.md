@@ -1,11 +1,12 @@
 ## 2026-10-24 - Redesign Sign up to the Home theme (UI-07)
 
-- Sign up moves to the same layout B as Log in: Home hero photo under the Home overlay, compact Home header (brand, Back to Home, sun and moon switch), slogan on the left, form card on the right (560 px for the two-field rows and password rules), photo band on phones. Password rules box is squared to match.
+- Sign up moves to the same layout B as Log in: Home hero photo under the Home overlay, compact Home header (brand, Back to Home, sun and moon switch), slogan on the left, form card on the right (560 px for the two-field rows and password rules), photo band on phones. The password checklist is one quiet line without a box.
 - AuthShell keeps a single layout and loads src/styles/auth.css (renamed from login.css) and the display fonts itself, so Log in and Sign up cannot drift apart.
 - Retire the old split card: .auth-shell, .auth-hero and .auth-panel__toolbar rules leave layouts.css and appearance.css, and the unsourced src/assets/auth-hero.jpg is deleted; the credit now reads Home, Log in and Sign up. Color baseline tightened.
 - Behavior unchanged (POST /auth/register, automatic sign in, validation, password rules, terms, return navigation).
-- Tests: src/styles/auth.test.ts (both screens). Browser check scripts/ui07-signup-check.py (light and dark, 390, 768 and 1440 px, empty, field errors and duplicate email): contrast at least 4.5:1 (lowest 4.96:1), visible focus, no overflow, sign up reaches /member; the Log in check still passes on this build. Sheets and report in frontend/docs/screenshots/ui-07; cases in frontend/docs/UI-07-test-cases.md.
-- Lint, tsc, all frontend tests (1400) and the production build pass.
+- Password checklist reads like a normal sign up form: one quiet line under the password fields (8 to 64 characters, A letter, A number) with check marks, no box. The 72 byte BCrypt limit is still enforced but shows only as an error line when a password breaks it. Applies to My Profile change password too (shared component).
+- Tests: src/styles/auth.test.ts (both screens). Browser check scripts/ui07-signup-check.py (light and dark, 390, 768 and 1440 px, empty, field errors and duplicate email): contrast at least 4.5:1 (lowest 5.2:1), visible focus, no overflow, sign up reaches /member; the Log in check still passes on this build. Sheets and report in frontend/docs/screenshots/ui-07; cases in frontend/docs/UI-07-test-cases.md.
+- Lint, tsc, all frontend tests (1401) and the production build pass.
 
 ## 2026-10-24 - Redesign Log in to the Home theme (UI-06)
 

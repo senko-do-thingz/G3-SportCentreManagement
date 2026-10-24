@@ -58,11 +58,12 @@ export function checkPassword(value: string): PasswordRuleResult[] {
       label: `${PASSWORD_MIN_LENGTH} to ${PASSWORD_MAX_LENGTH} characters`,
       met: value.length >= PASSWORD_MIN_LENGTH && value.length <= PASSWORD_MAX_LENGTH,
     },
-    { id: 'letter', label: 'At least one letter', met: codeUnitMatches(value, LETTER) },
-    { id: 'digit', label: 'At least one digit', met: codeUnitMatches(value, DIGIT) },
+    { id: 'letter', label: 'A letter', met: codeUnitMatches(value, LETTER) },
+    { id: 'digit', label: 'A number', met: codeUnitMatches(value, DIGIT) },
     {
       id: 'bytes',
-      label: `No more than ${PASSWORD_MAX_BYTES} bytes (accented letters count as 2)`,
+      // Only shown when broken (see PasswordRules): the BCrypt byte limit is a technical rule people rarely reach.
+      label: 'Too long: use fewer accented letters or symbols',
       met: !empty && utf8ByteLength(value) <= PASSWORD_MAX_BYTES,
     },
   ]

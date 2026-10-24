@@ -47,10 +47,10 @@ describe('Log in and Sign up theme (layout B)', () => {
     }
   })
 
-  it('squares fields, button and password rules, aligns the Remember me row, widens the Sign up card and folds the photo on narrow screens', () => {
+  it('squares fields and button, keeps the password checklist out of a box, aligns the Remember me row, widens the Sign up card and folds the photo on narrow screens', () => {
     expect(auth).toMatch(/\.auth-stage \.input \{[^}]*border-radius: 0;/)
     expect(auth).toMatch(/\.auth-stage \.auth-form \.btn--primary \{[^}]*border-radius: 0;/)
-    expect(auth).toMatch(/\.auth-stage \.password-rules \{[^}]*border-radius: 0;/)
+    expect(`${auth}\n${layouts}`).not.toMatch(/\.password-rules \{[^}]*(border|background):/)
     expect(auth).toMatch(/\.auth-stage \.auth-form__options \{[^}]*align-items: flex-start;/)
     expect(auth).toMatch(/\.auth-shell--register \.auth-stage__body \{[^}]*grid-template-columns: minmax\(0, 1fr\) 560px;/)
     expect(auth).toMatch(/@media \(max-width: 960px\) \{[\s\S]*?\.auth-stage__photo,\s*\.auth-stage::before \{[^}]*height: 360px;/)
