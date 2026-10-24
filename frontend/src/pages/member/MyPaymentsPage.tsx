@@ -1,7 +1,8 @@
 import { useCallback, useEffect, type ChangeEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { paymentsApi, type Payment } from '../../api/paymentsApi'
-import { Card, EmptyState, PageHeader, Select, StatusBadge, Table, type TableColumn } from '../../components/ui'
+import { PaymentHero } from '../../components/PaymentHero'
+import { Card, EmptyState, Select, StatusBadge, Table, type TableColumn } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { formatDate } from '../../utils/format'
 import { MEMBER_PATHS } from './dashboardModel'
@@ -122,7 +123,7 @@ export function MyPaymentsPage() {
 
   return (
     <div className="page">
-      <PageHeader
+      <PaymentHero
         eyebrow="Member / Payments"
         title="My Payments and Receipts"
         description="Track payments and open receipts for confirmed transactions."
