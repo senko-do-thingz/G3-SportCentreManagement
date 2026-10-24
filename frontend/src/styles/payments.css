@@ -1,5 +1,112 @@
 /* Member payment screens (FE-11): F3-01, S3-Single, F3-02, F3-03, S3-PaidHistory and the receipts. */
 
+/*
+ * Payment and refund page heading in the Home theme (UI-27 to UI-32), shared by member and reception screens.
+ * Same shape as the Find Classes hero, built only from tokens so light and dark follow the theme.
+ */
+.payment-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: 180px;
+  padding: 28px 36px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-highlight) 50%, transparent);
+  border-radius: 20px;
+  background: linear-gradient(112deg, var(--color-feature-surface) 0%, color-mix(in srgb, var(--color-feature-surface) 78%, var(--color-primary)) 70%, color-mix(in srgb, var(--color-feature-surface) 45%, var(--color-primary)) 140%);
+  box-shadow: var(--shadow-md);
+  color: var(--color-on-feature);
+  isolation: isolate;
+}
+
+.payment-hero::before {
+  position: absolute;
+  top: -160px;
+  right: 40px;
+  z-index: -1;
+  width: 380px;
+  height: 380px;
+  border: 1px solid color-mix(in srgb, var(--color-highlight) 22%, transparent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 24px color-mix(in srgb, var(--color-on-feature) 3%, transparent), 0 0 0 52px color-mix(in srgb, var(--color-on-feature) 2%, transparent);
+  content: '';
+  pointer-events: none;
+}
+
+.payment-hero__copy {
+  min-width: 0;
+  max-width: 720px;
+}
+
+.payment-hero__eyebrow {
+  margin: 0 0 10px;
+  color: var(--color-highlight);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.payment-hero__title {
+  margin: 0;
+  color: var(--color-on-feature);
+  font-size: clamp(28px, 3.6vw, 42px);
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.payment-hero__description {
+  max-width: 640px;
+  margin: 12px 0 0;
+  color: var(--color-on-feature-muted);
+  font-size: var(--text-base);
+  line-height: 1.6;
+}
+
+.payment-hero__aside {
+  display: grid;
+  justify-items: end;
+  gap: var(--space-2);
+  min-width: 0;
+  text-align: right;
+}
+
+.payment-hero__aside-label {
+  margin: 0;
+  color: var(--color-on-feature-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.payment-hero__aside-value {
+  margin: 0;
+  color: var(--color-on-feature);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .payment-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+    min-height: 0;
+    padding: 24px 20px;
+  }
+
+  .payment-hero__aside {
+    justify-items: start;
+    text-align: left;
+  }
+}
+
 /* Sub navigation: Payment summary, Payment status, My payments */
 .payment-nav {
   display: flex;

@@ -183,6 +183,50 @@ export function validityRange(startDate: string | null, endDate: string | null):
   return `${formatDate(startDate)} - ${formatDate(endDate)}`
 }
 
+function moneyValue(amount: number | string | null | undefined): number | null {
+  const plain = amountToCopy(amount)
+  return plain === '' ? null : Number(plain)
+}
+
+/**
+ * Original price and discount shown above the total (UI-27). They are shown only when the backend sends an
+ * original price and original - discount equals the amount charged, so the screen never shows a breakdown or a
+ * discount that does not add up to what the member pays. Otherwise only the total due is shown.
+ */
+export function priceBreakdown(
+  payment: Pick<Payment, 'originalPrice' | 'discount' | 'amount'>,
+): { original: number; discount: number } | null {
+  const original = moneyValue(payment.originalPrice)
+  const amount = moneyValue(payment.amount)
+  const discount = moneyValue(payment.discount ?? 0)
+  if (original === null || amount === null || discount === null || discount < 0) {
+    return null
+  }
+  return Math.abs(original - discount - amount) < 0.005 ? { original, discount } : null
+}
+
+/** What the paid item is, from the member's registrations and cards; unknown while they are missing. */
+export type PaymentItemKind = 'single-visit' | 'package' | 'card' | 'unknown'
+
+/**
+ * Note under the payment details. A card discount is mentioned only when this payment has one, and a single
+ * visit never mentions one (S3-Single: single visits do not receive a card discount).
+ */
+export function paymentSummaryNote(kind: PaymentItemKind, discount: number): string | null {
+  switch (kind) {
+    case 'single-visit':
+      return 'Reception must confirm the payment and recheck seat availability before booking.'
+    case 'package':
+      return discount > 0
+        ? 'Your membership card discount is included in the total. The sport package gives session access; buying it does not reserve a class place.'
+        : 'No card discount applies to this payment. The sport package gives session access; buying it does not reserve a class place.'
+    case 'card':
+      return 'The membership card request is completed once this payment is confirmed.'
+    default:
+      return null
+  }
+}
+
 /** Discount percent shown next to the discount line, from the amounts, or null when none. */
 export function discountPercent(
   originalPrice: number | string | null | undefined,

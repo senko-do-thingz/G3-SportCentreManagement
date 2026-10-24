@@ -1,3 +1,10 @@
+## 2026-10-24 - Member payment summary and single visit (UI-27)
+
+- Payment Summary (F3-01) and Single Visit Payment Summary (S3-Single) use a new shared PaymentHero in the Home theme (navy feature surface, gold eyebrow, uppercase title), built only from tokens; it is reused by the other payment and refund screens.
+- Amounts stay bound to GET /payments/{id}: the original price and discount rows are shown only when original - discount equals the amount charged, no original price is invented when the backend sends none, and a payment whose id differs from the link is not shown.
+- No false discount: the note mentions a card discount only when this payment has one, a single visit shows its visit date and never claims a card discount, and nothing is claimed while the paid item is unknown.
+- Tests in memberPayments.test.tsx; cases in frontend/docs/UI-27-test-cases.md. No API or backend changes.
+
 ## 2026-10-23 - Verify guest authentication return navigation (UI-05)
 
 - Re-verify after the Home, coach profile and shared UI merges that every Home action needing a Member session (Membership offers, View schedule, package View options, View cards) returns the guest to that exact destination after Log in or Create account, without sending a registration, purchase or booking.
