@@ -219,9 +219,50 @@ describe('FE-12 Payment Requests (F3-04)', () => {
     expect(within(rows[1]).getAllByRole('link', { name: 'Review payment REG-1041' })[0]).toHaveAttribute('href', '/reception/payments/41')
     expect(screen.getByText('Pending requests').nextElementSibling).toHaveTextContent('12')
     expect(screen.getByText('Amount due on this page').nextElementSibling).toHaveTextContent('1.310.000 VND')
-    expect(screen.getByText('Refund requests', { selector: 'p' }).nextElementSibling).toHaveTextContent('-')
+    expect(screen.getByText('Needs review on this page').nextElementSibling).toHaveTextContent('0')
     expect(calls.some((call) => call.path === '/refunds/pending')).toBe(false)
     expect(screen.getByText('Showing 1-10 of 12')).toBeInTheDocument()
+  })
+
+  it('UI-30 shows the queue under the Home theme hero with the refund link', async () => {
+    await open('/reception/payments')
+    const heading = screen.getByRole('heading', { level: 1, name: 'Payment Requests' })
+    const hero = heading.closest('header') as HTMLElement
+    expect(hero).toHaveClass('payment-hero')
+    expect(within(hero).getByRole('link', { name: 'Refund requests' })).toHaveAttribute('href', '/reception/refunds')
+  })
+
+  it('UI-30 keeps the backend order and gives every row one status badge and exactly one action', async () => {
+    const rows = [
+      pendingPayment({ id: 44, code: 'PAY-0044', itemCode: 'REG-1044', notes: 'Amount mismatch: received 800000, expected 810000 by BANK_TRANSFER' }),
+      pendingPayment(),
+      pendingPayment({ id: 40, code: 'PAY-0040', itemCode: 'REG-1040', status: 'SUCCESS' }),
+      pendingPayment({ id: 39, code: 'PAY-0039', itemCode: 'REG-1039', status: 'FAILED' }),
+    ]
+    await open('/reception/payments?status=ALL', { list: () => json(200, { content: rows, page: 0, size: 10, totalElements: 4, totalPages: 1 }) })
+    const table = await screen.findByRole('table', { name: 'Payment requests' })
+    await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(5))
+    const body = within(table).getAllByRole('row').slice(1)
+    expect(body.map((row) => within(row).getAllByText(/^REG-10\d\d$/)[0].textContent)).toEqual(['REG-1044', 'REG-1041', 'REG-1040', 'REG-1039'])
+    expect(body[0]).toHaveTextContent('Needs review')
+    expect(body[1]).toHaveTextContent('Pending payment')
+    expect(body[2]).toHaveTextContent('Paid')
+    expect(body[3]).toHaveTextContent('Failed')
+    for (const row of body) expect(within(row).getAllByRole('link')).toHaveLength(1)
+    expect(within(body[0]).getByRole('link', { name: 'Review payment REG-1044' })).toHaveAttribute('href', '/reception/payments/44')
+    expect(within(body[2]).getByRole('link', { name: 'Open payment REG-1040' })).toHaveAttribute('href', '/reception/payments/40')
+    expect(within(body[2]).queryByRole('link', { name: /Review payment/ })).not.toBeInTheDocument()
+    expect(screen.getByText('Needs review on this page').nextElementSibling).toHaveTextContent('1')
+    expect(screen.getByText('Amount due on this page').nextElementSibling).toHaveTextContent('1.620.000 VND')
+  })
+
+  it('UI-30 a mismatch note on a payment that is no longer pending does not mark it for review', async () => {
+    const rows = [pendingPayment({ status: 'SUCCESS', notes: 'Amount mismatch: received 800000, expected 810000' })]
+    await open('/reception/payments?status=ALL', { list: () => json(200, { content: rows, page: 0, size: 10, totalElements: 1, totalPages: 1 }) })
+    const table = await screen.findByRole('table', { name: 'Payment requests' })
+    await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(2))
+    expect(within(table).queryByText('Needs review')).not.toBeInTheDocument()
+    expect(within(table).getByText('Paid')).toBeInTheDocument()
   })
 
   it('TC-FE12-021 status filter, search and paging call GET /payments with the matching parameters', async () => {
@@ -620,6 +661,12 @@ describe('FE-12 access', () => {
       expect(calls.some((call) => call.path.startsWith('/payments') || call.path.startsWith('/refunds') || call.path.startsWith('/invoices'))).toBe(false)
     },
   )
+
+  it('UI-30 a COACH cannot open the payment queue and no payment is requested', async () => {
+    const { calls } = await open('/reception/payments', { me: { ...RECEPTIONIST, id: 12, fullName: 'Quan Coach', role: 'COACH' } })
+    expect(screen.getByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
+    expect(calls.some((call) => call.path.startsWith('/payments'))).toBe(false)
+  })
 })
 
 describe('FE-12 round 3 integration regressions', () => {
