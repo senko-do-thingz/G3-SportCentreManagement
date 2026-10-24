@@ -18,7 +18,7 @@ export function SessionCard({ session, returnTo }: { session: BrowseSession; ret
   const levelIndex = LEVELS.indexOf(level)
   return <article className="browse-session class-session-card">
     <div className="class-session-card__image">
-      <Photo {...sportPhotoFor(session.sportName, 720)} alt={`${session.sportName} training session`} sizes="(min-width: 1101px) 380px, (min-width: 641px) 50vw, 100vw" width="720" height="480" loading="lazy" />
+      <Photo {...sportPhotoFor(session.sportName, 1080)} alt={`${session.sportName} training session`} sizes="(min-width: 1101px) 380px, (min-width: 641px) 50vw, 100vw" width="1080" height="720" loading="lazy" />
       <span className="class-session-card__image-shade" aria-hidden="true" />
       <span className="class-session-card__sport">{session.sportName}</span>
       <span className={`class-session-card__level${levelIndex >= 0 ? ` class-session-card__level--${level.toLowerCase()}` : ''}`}>

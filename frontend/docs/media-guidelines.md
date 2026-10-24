@@ -35,4 +35,17 @@ Owner: UI-03 (Phat). Applies to every screen task that shows a photo, video or i
   to the Home theme and should switch the side photo to a credited Unsplash photo through `Photo`.
 - Videos stream from the Mixkit CDN; there is no bundled video fallback, the hero photo stays visible instead.
 
-Guarded by `src/media/media.test.tsx` and `src/pages/public/HomeHeroVideo.test.tsx`.
+## Pick the largest width for the biggest slot
+
+The width passed to `unsplashUrl` or `sportPhotoFor` is the largest file the browser may choose, so it must cover
+the slot on a 3x phone: slot width in CSS px x 3, capped where the photo is already sharp enough (about 75%).
+Session cards (`SessionCard`, full width on phones) use 1080; sport tiles and small art use 480.
+
+## Checks
+
+- Unit: `src/media/media.test.tsx` (helpers, fallback, assets, credits, alt) and
+  `src/pages/public/HomeHeroVideo.test.tsx` (video quality, data saver, deferral).
+- Browser: `scripts/ui03-media-check.py` (Playwright, Chromium) runs main and the branch with placeholder photos
+  of the requested size and records requested widths, upscaled or broken images, the first video file and its
+  timing, offline fallbacks, and before/after screenshots. Evidence for UI-03 is in `docs/screenshots/ui-03`;
+  the solid colored blocks in the screenshots are the placeholders that stand in for photos.

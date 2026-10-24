@@ -6,6 +6,8 @@
 - Hero video: mounts after the page load event, tries the 720p file first unless the screen is at least 1600 px wide on a fast connection; data saver, reduced motion and narrow screens keep the photo only (unchanged).
 - Credits are built from the same helpers; a test fails if a used Unsplash photo is missing from /credits. Remove unused src/assets/home/coach-*.jpg.
 - New frontend/docs/media-guidelines.md (where media lives, rules for new screens, known gaps: the auth side photo has no recorded source and is switched to a credited photo in UI-06 and UI-07). Tests in frontend/src/media/media.test.tsx and HomeHeroVideo.test.tsx; cases in frontend/docs/UI-03-test-cases.md.
+- Browser evidence: scripts/ui03-media-check.py (Playwright, Chromium) compares main and this branch with placeholder photos of the requested size. Home photo area drops 85% at 390 px and 62% at 1440 px with no upscaled image at any viewport; Find Classes goes from 15 of 15 upscaled images to none; the first video file is 720p at 1440 px and 1080p at 1920 px; Home and Find Classes render offline from bundled files; Home and Photo credits screenshots are pixel identical. Report and sheets in frontend/docs/screenshots/ui-03.
+- Fix found by that check: session card photos go up to 1080 px (720 px was upscaled on 3x phones). Test cases state what is unit, browser or manual.
 - No API or backend changes. Lint, tsc, all frontend tests (1384) and the production build pass.
 
 ## 2026-10-23 - Verify guest authentication return navigation (UI-05)
