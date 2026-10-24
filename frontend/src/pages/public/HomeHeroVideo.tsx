@@ -10,10 +10,12 @@ function canPlayHeroVideo(): boolean {
   return !saveData && window.matchMedia('(min-width: 768px)').matches && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-/** Full HD only on large screens with a fast connection; otherwise the lighter file is tried first. */
+/**
+ * Full HD only on large screens with a connection reported as fast (effectiveType 4g). An absent Network Information
+ * API or an unknown type is not proof of a fast network, so the lighter file is tried first.
+ */
 function prefersFullHd(): boolean {
-  const type = connection()?.effectiveType
-  return window.matchMedia('(min-width: 1600px)').matches && (type === undefined || type === '4g')
+  return window.matchMedia('(min-width: 1600px)').matches && connection()?.effectiveType === '4g'
 }
 
 /** Files of one clip in the order the browser should try them (each clip lists best quality first). */
@@ -21,13 +23,17 @@ function orderClipFiles(files: readonly string[], fullHd: boolean): readonly str
   return fullHd ? files : [...files].reverse()
 }
 
-/** True once the page has loaded, so the video does not compete with the hero photo and first paint. */
+/**
+ * True once the page has loaded, so the video does not compete with the hero photo and first paint. The ready state
+ * is checked again after the listener is added: the load event may fire between the first render and the effect.
+ */
 function usePageLoaded(): boolean {
   const [loaded, setLoaded] = useState(() => typeof document === 'undefined' || document.readyState === 'complete')
   useEffect(() => {
     if (loaded) return
     const done = () => setLoaded(true)
     window.addEventListener('load', done, { once: true })
+    if (document.readyState === 'complete') done()
     return () => window.removeEventListener('load', done)
   }, [loaded])
   return loaded
@@ -37,7 +43,7 @@ function usePageLoaded(): boolean {
  * Muted background clips for the Home hero, played one after another.
  * The hero photo stays underneath, so phones, reduced motion, data saver and failed clips all show the photo.
  * Each clip lists its files from best to fallback quality; the browser tries Full HD first only on large screens
- * with a fast connection, and the clip mounts after the page load event so it never delays the hero photo.
+ * with a connection reported as 4g, and the clip mounts after the page load event so it never delays the hero photo.
  * A clip whose files all fail is skipped; when every clip fails the video is removed.
  */
 export function HomeHeroVideo({ sources }: { sources: readonly (readonly string[])[] }) {
