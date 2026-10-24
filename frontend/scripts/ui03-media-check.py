@@ -11,12 +11,17 @@ Remote photos are answered with solid placeholder JPEGs of the requested width (
 layout is real and comparable while the test does not depend on the Unsplash CDN. The API is answered with
 fixed JSON. Videos are recorded and then blocked.
 
-Usage (PowerShell, from frontend/):
-  pip install playwright pillow; python -m playwright install chromium
-  npm run build -- --outDir ../dist-after   (on the UI-03 branch; repeat on main into ../dist-before)
-  npx vite preview --outDir ../dist-before --port 4301   (and ../dist-after on 4302, in two other windows)
+Real photos, dark theme and layout shift are covered by scripts/ui03-real-media-check.mjs (Node, no Python).
+
+Usage (PowerShell, from frontend/ on the PR revision; full steps in docs/UI-03-test-cases.md):
+  python -m pip install -r scripts/requirements-visual-check.txt; python -m playwright install chromium
+  git worktree add ../../ui03-base (git merge-base HEAD origin/main)   (the base build; npm ci there too)
+  $env:VITE_API_BASE_URL='http://localhost:8080/api/v1'
+  npm run build -- --outDir ../../dist-after                   (here; in ../../ui03-base/frontend into ../../dist-before)
+  npx vite preview --outDir ../../dist-before --port 4301 --strictPort   (and ../../dist-after on 4302, two other windows)
   python scripts/ui03-media-check.py --before http://localhost:4301 --after http://localhost:4302 --out docs/screenshots/ui-03
-Exit code 0 when every check passes.
+vite preview is required: it serves index.html for /member/classes and /credits, which a plain static server answers
+with 404. Exit code 0 when every check passes.
 """
 
 import argparse

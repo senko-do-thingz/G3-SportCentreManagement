@@ -27,14 +27,30 @@ Owner: UI-03 (Phat). Applies to every screen task that shows a photo, video or i
 4. Every `<img>` has an `alt`: a description for meaningful photos, `alt=""` for decoration.
 5. A file in `src/assets` that no source file references is removed; a test fails otherwise.
 6. The hero video mounts after the page load event, only on screens at least 768 px wide without reduced motion
-   or data saver, and tries the 720p file first unless the screen is at least 1600 px wide on a fast connection.
+   or data saver, and tries the 720p file first unless the screen is at least 1600 px wide and the browser reports
+   `effectiveType` `4g`. A missing Network Information API (Safari, Firefox) or an unknown type counts as not fast.
+7. A `Photo` whose `src` changes requests the new photo even if the previous one failed; the fallback is used only
+   for the `src` that failed, never retried in a loop, and an `onError` passed by the caller still runs.
 
-## Known gaps (tracked, not blocking)
+## Provenance
 
-- `auth-hero.jpg` and the bundled fallbacks were cut from the team design screenshots; the original photo source
-  is not recorded, so they are not listed on `/credits`. Log in moved to the credited Home hero photo in UI-06;
-  Sign up (UI-07) should do the same, after which `auth-hero.jpg` can be removed.
-- Videos stream from the Mixkit CDN; there is no bundled video fallback, the hero photo stays visible instead.
+| Files | Source | Licence | Proposed disposition |
+|-------|--------|---------|----------------------|
+| Remote photos (`SPORT_PHOTO_IDS`, Home content) | Unsplash, ids in source | Unsplash License, credited on `/credits` (a test enforces it) | No action |
+| Hero videos (`HOME_HERO_VIDEOS`) | Mixkit CDN | Mixkit License (free video), credited on `/credits` | No action |
+| `public/images/coaches/*.jpg` | Committed demo portraits | Credited on `/credits` | No action |
+| `src/assets/home/*.jpg` (low resolution offline fallbacks) | Cut from the team design screenshots; original photo not recorded | Unknown | Keep only as offline fallbacks until replaced by downscaled copies of the credited Unsplash photos; exception to be approved by the UI-03 owner |
+| `src/assets/auth-hero.jpg` (Sign up side photo, `layouts.css`) | Same as above | Unknown | Log in uses the credited Home hero photo since UI-06; UI-07 moves Sign up the same way and deletes this file; no new use |
+
+The two "Unknown" rows need a recorded owner decision on the pull request before merge (accept as a temporary
+exception or replace). Videos have no bundled fallback; the hero photo stays visible instead.
+
+## Performance numbers
+
+Report image savings by name: "requested pixel area" (sum of requested width x height, from
+`ui03-media-check.py`) is a proxy, while "image bytes transferred" (`encodedDataLength`, cache disabled, from
+`ui03-real-media-check.mjs`) is the data actually downloaded. LCP measured on localhost without throttling is
+within run-to-run noise and is not used as a claim.
 
 ## Pick the largest width for the biggest slot
 
@@ -50,3 +66,7 @@ Session cards (`SessionCard`, full width on phones) use 1080; sport tiles and sm
   of the requested size and records requested widths, upscaled or broken images, the first video file and its
   timing, offline fallbacks, and before/after screenshots. Evidence for UI-03 is in `docs/screenshots/ui-03`;
   the solid colored blocks in the screenshots are the placeholders that stand in for photos.
+- Browser: `scripts/ui03-real-media-check.mjs` (Node and Chrome, no packages) adds the real photos over the real
+  network in light and dark, layout shift on load, after scrolling, on a slow network and without the photo CDN,
+  dark-theme before/after parity, and the image bytes transferred. Evidence in `docs/screenshots/ui-03/real`.
+- Steps to reproduce both from the PR revision: `docs/UI-03-test-cases.md`.

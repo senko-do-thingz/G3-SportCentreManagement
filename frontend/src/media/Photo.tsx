@@ -13,10 +13,13 @@ export interface PhotoProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 's
 /**
  * Shared photo element. Remote Unsplash photos get a responsive srcset; when the remote request fails the
  * image swaps once to the bundled fallback and drops the srcset so the browser does not retry the CDN.
+ * The failure is remembered for that src only: a new src (same element, new sport or photo) is requested again,
+ * while a fallback that also fails does not loop. The caller's onError still runs.
  * Images decode off the main thread; callers set loading="lazy" below the fold and fetchPriority="high" for the hero.
  */
-export function Photo({ src, fallback, alt = '', sizes, decoding = 'async', ...rest }: PhotoProps) {
-  const [failed, setFailed] = useState(false)
+export function Photo({ src, fallback, alt = '', sizes, decoding = 'async', onError, ...rest }: PhotoProps) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null)
+  const failed = failedSrc === src
   const srcSet = failed ? undefined : unsplashSrcSet(src)
   return (
     <img
@@ -26,7 +29,10 @@ export function Photo({ src, fallback, alt = '', sizes, decoding = 'async', ...r
       src={failed ? fallback : src}
       srcSet={srcSet}
       sizes={srcSet ? sizes : undefined}
-      onError={() => setFailed(true)}
+      onError={(event) => {
+        if (!failed) setFailedSrc(src)
+        onError?.(event)
+      }}
     />
   )
 }
