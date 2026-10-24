@@ -8,7 +8,7 @@ Owner: UI-03 (Phat). Applies to every screen task that shows a photo, video or i
 |------|----------|-------|
 | Remote photos | Unsplash CDN, built only by `src/media/unsplash.ts` | Responsive sizes, credited on `/credits` |
 | Sport photos | `src/media/sportPhotos.ts` (one photo per sport) | Shared by Home and the member class pages |
-| Offline fallbacks | `src/assets/home/*.jpg` | Low resolution copies shown only when a remote photo fails |
+| Offline fallbacks | `src/assets/home/*.jpg` | Small copies of the credited Unsplash photos (sports 240 x 160, hero 640 x 427), shown only when a remote photo fails |
 | Log in background | Home hero photo (`HOME_PHOTOS.hero`) through `Photo` | Since UI-06; credited on `/credits` |
 | Sign up side photo | `src/assets/auth-hero.jpg` | From the team Figma design, used by `layouts.css` until UI-07 |
 | Demo coach portraits | `public/images/coaches/*.jpg` (640 x 640) | Committed files, credited on `/credits` |
@@ -34,16 +34,15 @@ Owner: UI-03 (Phat). Applies to every screen task that shows a photo, video or i
 
 ## Provenance
 
-| Files | Source | Licence | Proposed disposition |
-|-------|--------|---------|----------------------|
-| Remote photos (`SPORT_PHOTO_IDS`, Home content) | Unsplash, ids in source | Unsplash License, credited on `/credits` (a test enforces it) | No action |
-| Hero videos (`HOME_HERO_VIDEOS`) | Mixkit CDN | Mixkit License (free video), credited on `/credits` | No action |
-| `public/images/coaches/*.jpg` | Committed demo portraits | Credited on `/credits` | No action |
-| `src/assets/home/*.jpg` (low resolution offline fallbacks) | Cut from the team design screenshots; original photo not recorded | Unknown | Keep only as offline fallbacks until replaced by downscaled copies of the credited Unsplash photos; exception to be approved by the UI-03 owner |
-| `src/assets/auth-hero.jpg` (Sign up side photo, `layouts.css`) | Same as above | Unknown | Log in uses the credited Home hero photo since UI-06; UI-07 moves Sign up the same way and deletes this file; no new use |
+| Files | Source | Licence | Owner decision (UI-03) |
+|-------|--------|---------|------------------------|
+| Remote photos (`SPORT_PHOTO_IDS`, Home content) | Unsplash, ids in source | Unsplash License, credited on `/credits` (a test enforces it) | Keep |
+| Hero videos (`HOME_HERO_VIDEOS`) | Mixkit CDN | Mixkit License (free video), credited on `/credits` | Keep |
+| `public/images/coaches/*.jpg` | Committed demo portraits | Credited on `/credits` | Keep |
+| `src/assets/home/*.jpg` (offline fallbacks) | Replaced with small copies of the credited Unsplash photos they stand in for: each sport file is its `SPORT_PHOTO_IDS` photo, `hero.jpg` is the `HOME_PHOTOS.hero` photo | Unsplash License, the same photos credited on `/credits` | Replaced; the old copies cut from the design screenshots are gone |
+| `src/assets/auth-hero.jpg` (Sign up side photo, `layouts.css`) | Cut from the team design screenshots; original photo not recorded | Unknown | Temporary exception, no new use: Log in leaves it in UI-06 and UI-07 deletes the file |
 
-The two "Unknown" rows need a recorded owner decision on the pull request before merge (accept as a temporary
-exception or replace). Videos have no bundled fallback; the hero photo stays visible instead.
+Videos have no bundled fallback; the hero photo stays visible instead.
 
 ## Performance numbers
 
