@@ -100,6 +100,24 @@ export function memberLine(fullName: string | null | undefined, memberCode: stri
   return memberId ? `Member #${memberId}` : '-'
 }
 
+/**
+ * Start of the note BE-18 writes on a payment when the desk enters an amount that does not match
+ * (PaymentVerificationServiceImpl.recordMismatch). The payment stays PENDING.
+ */
+export const AMOUNT_MISMATCH_NOTE = 'Amount mismatch:'
+
+/** A pending payment with a recorded amount mismatch needs review before anyone confirms it (UI-30). */
+export function needsReview(row: { status: string; notes?: string | null }): boolean {
+  return row.status === 'PENDING' && (row.notes ?? '').includes(AMOUNT_MISMATCH_NOTE)
+}
+
+/** Badge of a queue row: Needs review for a pending payment with a mismatch, the payment status otherwise. */
+export function queueStatus(row: { status: string; notes?: string | null }): { code: string | null; label: string } {
+  return needsReview(row)
+    ? { code: 'NEEDS_REVIEW', label: 'Needs review' }
+    : { code: paymentStatusTone(row.status), label: paymentStatusLabel(row.status) }
+}
+
 /** Sum of the amounts of the PENDING rows on the page, for the "Amount due" stat card. */
 export function pendingTotal(rows: { status: string; amount: number | string | null }[]): number {
   return rows.reduce((total, row) => {
