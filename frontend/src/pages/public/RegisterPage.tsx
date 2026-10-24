@@ -121,7 +121,7 @@ export function RegisterPage() {
   const passwordsMatch = form.confirmPassword.length > 0 && form.confirmPassword === form.password
 
   return (
-    <AuthShell title="Create your account" subtitle="Your journey starts here.">
+    <AuthShell className="auth-shell--register" title="Create your account" subtitle="Your journey starts here.">
       {formError && (
         <p className="notice notice--danger" role="alert">
           {formError}

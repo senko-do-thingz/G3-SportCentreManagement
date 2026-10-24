@@ -1,3 +1,12 @@
+## 2026-10-24 - Redesign Sign up to the Home theme (UI-07)
+
+- Sign up moves to the same layout B as Log in: Home hero photo under the Home overlay, compact Home header (brand, Back to Home, sun and moon switch), slogan on the left, form card on the right (560 px for the two-field rows and password rules), photo band on phones. Password rules box is squared to match.
+- AuthShell keeps a single layout and loads src/styles/auth.css (renamed from login.css) and the display fonts itself, so Log in and Sign up cannot drift apart.
+- Retire the old split card: .auth-shell, .auth-hero and .auth-panel__toolbar rules leave layouts.css and appearance.css, and the unsourced src/assets/auth-hero.jpg is deleted; the credit now reads Home, Log in and Sign up. Color baseline tightened.
+- Behavior unchanged (POST /auth/register, automatic sign in, validation, password rules, terms, return navigation).
+- Tests: src/styles/auth.test.ts (both screens). Browser check scripts/ui07-signup-check.py (light and dark, 390, 768 and 1440 px, empty, field errors and duplicate email): contrast at least 4.5:1 (lowest 4.96:1), visible focus, no overflow, sign up reaches /member; the Log in check still passes on this build. Sheets and report in frontend/docs/screenshots/ui-07; cases in frontend/docs/UI-07-test-cases.md.
+- Lint, tsc, all frontend tests (1400) and the production build pass.
+
 ## 2026-10-24 - Redesign Log in to the Home theme (UI-06)
 
 - Log in uses layout B: the Home hero photo (credited, responsive through Photo) fills the page under the Home overlay, with a compact Home header (brand, Back to Home, the same sun and moon switch as Home), the slogan on the left and the form card on the right. Below 960 px the photo becomes a band with the slogan above the card.

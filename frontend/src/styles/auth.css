@@ -1,7 +1,8 @@
 /*
- * Log in (UI-06), layout B: the Home hero photo fills the page, a compact Home header sits on top, the slogan is on
- * the left and the form card floats on the right. Below 960 px the photo becomes a band with the slogan and the card
- * follows. Every color, font and focus style comes from the shared tokens (frontend/docs/design-tokens.md).
+ * Log in (UI-06) and Sign up (UI-07), layout B: the Home hero photo fills the page, a compact Home header sits on top,
+ * the slogan is on the left and the form card floats on the right. Below 960 px the photo becomes a band with the
+ * slogan and the card follows. Every color, font and focus style comes from the shared tokens
+ * (frontend/docs/design-tokens.md). Loaded by AuthShell, so both screens always match.
  */
 
 .public-layout:has(.auth-stage) {
@@ -219,13 +220,28 @@
   color: var(--color-text);
 }
 
+/* Sign up has two fields per row and the password rules, so its card is wider. */
+.auth-shell--register .auth-stage__body {
+  grid-template-columns: minmax(0, 1fr) 560px;
+}
+
+.auth-shell--register .auth-stage__copy__title {
+  font-size: clamp(3rem, 4.4vw, 4.25rem);
+}
+
+.auth-stage .password-rules {
+  border-color: var(--color-border);
+  border-radius: 0;
+  background: var(--color-surface-muted);
+}
+
 /* Card content. */
-.auth-shell--login .auth-panel__heading p,
-.auth-shell--login .auth-panel__footer {
+.auth-stage .auth-panel__heading p,
+.auth-stage .auth-panel__footer {
   color: var(--color-text-muted);
 }
 
-.auth-shell--login .auth-panel__heading h1 {
+.auth-stage .auth-panel__heading h1 {
   color: var(--color-text);
   font-family: var(--font-display);
   font-size: clamp(1.8rem, 3vw, 2.3rem);
@@ -235,7 +251,7 @@
   text-transform: uppercase;
 }
 
-.auth-shell--login .auth-panel__heading h1::after {
+.auth-stage .auth-panel__heading h1::after {
   display: block;
   width: 52px;
   height: 3px;
@@ -244,26 +260,26 @@
   content: '';
 }
 
-.auth-shell--login .field__label {
+.auth-stage .field__label {
   color: var(--color-text);
   font-size: var(--text-xs);
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 
-.auth-shell--login .input {
+.auth-stage .input {
   border-color: var(--color-control-border);
   border-radius: 0;
   background: var(--color-surface);
   color: var(--color-text);
 }
 
-.auth-shell--login .input:focus {
+.auth-stage .input:focus {
   border-color: var(--color-primary);
   box-shadow: var(--focus-ring);
 }
 
-.auth-shell--login .input::placeholder {
+.auth-stage .input::placeholder {
   color: var(--color-text-subtle);
 }
 
@@ -271,15 +287,15 @@
  * Remember me and Forgot password share one text baseline. Both start at the top of the row with the same font and
  * line height; centering pushed the link down because the checkbox field reserves a message line below its label.
  */
-.auth-shell--login .auth-form__options {
+.auth-stage .auth-form__options {
   align-items: flex-start;
 }
 
-.auth-shell--login .auth-form__options .link-button {
+.auth-stage .auth-form__options .link-button {
   line-height: inherit;
 }
 
-.auth-shell--login .auth-form .btn--primary {
+.auth-stage .auth-form .btn--primary {
   min-height: 52px;
   border-radius: 0;
   background: var(--color-primary);
@@ -289,22 +305,22 @@
   letter-spacing: 0.02em;
 }
 
-.auth-shell--login .auth-form .btn--primary:hover:not(:disabled) {
+.auth-stage .auth-form .btn--primary:hover:not(:disabled) {
   background: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
 }
 
-.auth-shell--login .auth-form .btn--primary:focus-visible {
+.auth-stage .auth-form .btn--primary:focus-visible {
   box-shadow: 0 0 0 3px var(--color-surface), 0 0 0 6px var(--color-primary);
 }
 
-.auth-shell--login .link-button,
-.auth-shell--login .auth-panel__footer a {
+.auth-stage .link-button,
+.auth-stage .auth-panel__footer a {
   color: var(--color-primary);
   font-weight: var(--weight-bold);
 }
 
-.auth-shell--login input[type='checkbox'] {
+.auth-stage input[type='checkbox'] {
   accent-color: var(--color-primary);
 }
 
@@ -320,7 +336,8 @@
     height: 360px;
   }
 
-  .auth-stage__body {
+  .auth-stage__body,
+  .auth-shell--register .auth-stage__body {
     grid-template-columns: minmax(0, 1fr);
     gap: 28px;
     max-width: 600px;

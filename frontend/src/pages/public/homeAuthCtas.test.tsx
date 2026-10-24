@@ -61,7 +61,7 @@ describe('Home account navigation', () => {
     await user.click(screen.getByRole('button', { name: 'Switch to dark mode' }))
     await user.click(within(screen.getByRole('banner')).getByRole('link', { name: 'Join now' }))
     await screen.findByRole('heading', { name: 'Create your account' })
-    expect(screen.getByLabelText('Appearance')).toHaveValue('dark')
+    expect(screen.getByRole('button', { name: 'Switch to light mode' })).toBeInTheDocument()
     await fillRegistration(user)
     await user.click(screen.getByRole('button', { name: 'Create account' }))
     await screen.findByRole('heading', { name: 'Member Dashboard' })

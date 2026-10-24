@@ -51,7 +51,7 @@ export function buildCredits(): CreditGroup[] {
       license: UNSPLASH_LICENSE,
       note: 'Free to use, including commercially; attribution is not required but is given here.',
       items: [
-        unsplashItem('Home and Log in - hero background', HOME_PHOTOS.hero),
+        unsplashItem('Home, Log in and Sign up - hero background', HOME_PHOTOS.hero),
         ...HOME_SPORTS.map((sport) => unsplashItem(`Sports - ${sport.name}`, sport.photo)),
         ...HOME_FACILITIES.map((venue) => unsplashItem(`Where you play - ${venue.name}`, venue.photo)),
         unsplashItem('Home - Ready to play banner', HOME_PHOTOS.cta),
