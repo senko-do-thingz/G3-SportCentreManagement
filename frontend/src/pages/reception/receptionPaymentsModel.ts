@@ -392,6 +392,30 @@ export function refundStage(status: string): RefundStage {
   }
 }
 
+export interface RefundStep {
+  label: string
+  state: 'done' | 'current' | 'todo'
+}
+
+/**
+ * Progress shown on a refund (UI-32), so request, approval and payout are never confused:
+ * Requested, Approved, Refunded, or Requested, Rejected. Unknown statuses show none.
+ */
+export function refundSteps(stage: RefundStage): RefundStep[] {
+  switch (stage) {
+    case 'submitted':
+      return [{ label: 'Requested', state: 'current' }, { label: 'Approved', state: 'todo' }, { label: 'Refunded', state: 'todo' }]
+    case 'approved':
+      return [{ label: 'Requested', state: 'done' }, { label: 'Approved', state: 'current' }, { label: 'Refunded', state: 'todo' }]
+    case 'done':
+      return [{ label: 'Requested', state: 'done' }, { label: 'Approved', state: 'done' }, { label: 'Refunded', state: 'current' }]
+    case 'rejected':
+      return [{ label: 'Requested', state: 'done' }, { label: 'Rejected', state: 'current' }]
+    default:
+      return []
+  }
+}
+
 /** History excludes pending/approved refunds, which each have a dedicated queue. */
 export function memberRefundHistory(refunds: Refund[]): Refund[] {
   return sortRefunds(refunds.filter((refund) => refund.status !== 'PENDING' && refund.status !== 'APPROVED'))
