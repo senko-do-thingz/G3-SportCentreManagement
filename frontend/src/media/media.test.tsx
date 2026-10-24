@@ -1,7 +1,7 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { buildCredits } from '../pages/public/creditsContent'
 import { Photo } from './Photo'
 import { sportPhotoUrl } from './sportPhotos'
@@ -46,11 +46,70 @@ describe('UI-03 shared media helpers', () => {
     expect(image).not.toHaveAttribute('sizes')
   })
 
+  it('requests a new src again after the previous one failed on the same element (rerender)', () => {
+    const first = unsplashUrl('photo-1554068865-24cecd4e34b8', 720)
+    const second = unsplashUrl('photo-1530549387789-4c1017266635', 720)
+    const { rerender } = render(<Photo src={first} fallback="/local/tennis.jpg" alt="Sport" sizes="50vw" />)
+    const image = screen.getByRole('img', { name: 'Sport' })
+    fireEvent.error(image)
+    expect(image).toHaveAttribute('src', '/local/tennis.jpg')
+
+    rerender(<Photo src={second} fallback="/local/swimming.jpg" alt="Sport" sizes="50vw" />)
+    expect(screen.getByRole('img', { name: 'Sport' })).toBe(image)
+    expect(image).toHaveAttribute('src', second)
+    expect(image).toHaveAttribute('srcset', unsplashSrcSet(second))
+    expect(image).toHaveAttribute('sizes', '50vw')
+
+    fireEvent.error(image)
+    expect(image).toHaveAttribute('src', '/local/swimming.jpg')
+    rerender(<Photo src={first} fallback="/local/tennis.jpg" alt="Sport" sizes="50vw" />)
+    expect(image).toHaveAttribute('src', first)
+  })
+
+  it('does not loop when the fallback fails too, and forwards onError to the caller', () => {
+    const onError = vi.fn()
+    render(<Photo src={unsplashUrl('photo-1554068865-24cecd4e34b8', 720)} fallback="/local/missing.jpg" alt="Tennis" onError={onError} />)
+    const image = screen.getByRole('img', { name: 'Tennis' })
+    fireEvent.error(image)
+    fireEvent.error(image)
+    fireEvent.error(image)
+    expect(image).toHaveAttribute('src', '/local/missing.jpg')
+    expect(image).not.toHaveAttribute('srcset')
+    expect(onError).toHaveBeenCalledTimes(3)
+  })
+
   it('renders a bundled image without srcset and as decorative when no alt is given', () => {
     const { container } = render(<Photo src="/local/hero.jpg" fallback="/local/hero.jpg" />)
     const image = container.querySelector('img') as HTMLImageElement
     expect(image).toHaveAttribute('alt', '')
     expect(image).not.toHaveAttribute('srcset')
+  })
+})
+
+describe('UI-03 browser check runners', () => {
+  it('are committed, not git-ignored, with pinned Python packages and a Node script that needs no npm package', () => {
+    for (const file of ['scripts/ui03-media-check.py', 'scripts/ui03-real-media-check.mjs']) expect(existsSync(file)).toBe(true)
+    const requirements = readFileSync('scripts/requirements-visual-check.txt', 'utf8').split(/\r?\n/).filter((line) => line.trim() && !line.startsWith('#'))
+    expect(requirements.map((line) => line.split('==')[0])).toEqual(['playwright', 'pillow'])
+    for (const line of requirements) expect(line).toMatch(/^[\w-]+==\d+\.\d+\.\d+$/)
+    expect(readFileSync('../.gitignore', 'utf8')).toMatch(/^!frontend\/scripts\/\*\.py$/m)
+    const imports = [...readFileSync('scripts/ui03-real-media-check.mjs', 'utf8').matchAll(/^import .* from '([^']+)'/gm)].map((match) => match[1])
+    expect(imports.length).toBeGreaterThan(0)
+    expect(imports.filter((name) => !name.startsWith('node:'))).toEqual([])
+  })
+
+  it('document a merge-base build served by vite preview, with the evidence they produce', () => {
+    const python = readFileSync('scripts/ui03-media-check.py', 'utf8')
+    const node = readFileSync('scripts/ui03-real-media-check.mjs', 'utf8')
+    const testCases = readFileSync('docs/UI-03-test-cases.md', 'utf8')
+    for (const text of [python, testCases]) {
+      expect(text).toContain('scripts/requirements-visual-check.txt')
+      expect(text).toContain('git merge-base HEAD origin/main')
+    }
+    for (const text of [python, node, testCases]) expect(text).toContain('vite preview')
+    expect(testCases).toContain('node scripts/ui03-real-media-check.mjs')
+    expect(existsSync('docs/screenshots/ui-03/report.json')).toBe(true)
+    expect(existsSync('docs/screenshots/ui-03/real/report.json')).toBe(true)
   })
 })
 
