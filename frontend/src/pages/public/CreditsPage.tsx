@@ -40,7 +40,7 @@ export function CreditsPage() {
             </ul>
           </section>
         ))}
-        <p className="credits-intro">The project also keeps a few fallback photos that are shown only when an online photo cannot load.</p>
+        <p className="credits-intro">The project also keeps small copies of the credited photos below, shown only when an online photo cannot load.</p>
       </main>
       <footer className="home-footer credits-footer">
         <div className="home-wrap home-footer__bottom"><small>Copyright 2026 Sportify Sports Center</small><Link to="/">Back to Home</Link></div>
