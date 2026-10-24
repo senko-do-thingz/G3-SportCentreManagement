@@ -1,0 +1,755 @@
+{
+  "environment": {
+    "browser": "Chrome/156.0.8078.47",
+    "node": "v22.22.0",
+    "cls_limit": 0.1,
+    "slow_network": {
+      "offline": false,
+      "latency": 150,
+      "downloadThroughput": 209715.2,
+      "uploadThroughput": 96000
+    }
+  },
+  "parity": [
+    {
+      "screen": "home-light-390",
+      "identical": true,
+      "changed_pixels": 0,
+      "size": [
+        390,
+        10410
+      ],
+      "before_size": [
+        390,
+        10410
+      ]
+    },
+    {
+      "screen": "home-light-768",
+      "identical": true,
+      "changed_pixels": 0,
+      "size": [
+        768,
+        8013
+      ],
+      "before_size": [
+        768,
+        8013
+      ]
+    },
+    {
+      "screen": "home-light-1440",
+      "identical": true,
+      "changed_pixels": 0,
+      "size": [
+        1440,
+        6457
+      ],
+      "before_size": [
+        1440,
+        6457
+      ]
+    },
+    {
+      "screen": "credits-light-390",
+      "identical": true,
+      "changed_pixels": 0,
+      "size": [
+        390,
+        8249
+      ],
+      "before_size": [
+        390,
+        8249
+      ]
+    },
+    {
+      "screen": "credits-light-1440",
+      "identical": true,
+      "changed_pixels": 0,
+      "size": [
+        1440,
+        3297
+      ],
+      "before_size": [
+        1440,
+        3297
+      ]
+    },
+    {
+      "screen": "home-dark-390",
+      "identical": true,
+      "changed_pixels": 0,
+      "size": [
+        390,
+        10410
+      ],
+      "before_size": [
+        390,
+        10410
+      ]
+    },
+    {
+      "screen": "home-dark-768",
+      "identical": true,
+      "changed_pixels": 0,
+      "size": [
+        768,
+        8013
+      ],
+      "before_size": [
+        768,
+        8013
+      ]
+    },
+    {
+      "screen": "home-dark-1440",
+      "identical": true,
+      "changed_pixels": 0,
+      "size": [
+        1440,
+        6457
+      ],
+      "before_size": [
+        1440,
+        6457
+      ]
+    },
+    {
+      "screen": "credits-dark-390",
+      "identical": true,
+      "changed_pixels": 0,
+      "size": [
+        390,
+        8249
+      ],
+      "before_size": [
+        390,
+        8249
+      ]
+    },
+    {
+      "screen": "credits-dark-1440",
+      "identical": true,
+      "changed_pixels": 0,
+      "size": [
+        1440,
+        3297
+      ],
+      "before_size": [
+        1440,
+        3297
+      ]
+    }
+  ],
+  "real": [
+    {
+      "screen": "home-light-390",
+      "theme": "light",
+      "images": 14,
+      "broken": [],
+      "upscaled": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 156,
+        "element": "H1",
+        "url": ""
+      },
+      "image_bytes": 423618,
+      "image_requests": 14,
+      "timed_out": false
+    },
+    {
+      "screen": "home-light-768",
+      "theme": "light",
+      "images": 14,
+      "broken": [],
+      "upscaled": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 380,
+        "element": "home-hero__photo",
+        "url": "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea"
+      },
+      "image_bytes": 926561,
+      "image_requests": 15,
+      "timed_out": false
+    },
+    {
+      "screen": "home-light-1440",
+      "theme": "light",
+      "images": 15,
+      "broken": [],
+      "upscaled": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 540,
+        "element": "home-hero__photo",
+        "url": "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea"
+      },
+      "image_bytes": 1054328,
+      "image_requests": 14,
+      "timed_out": false
+    },
+    {
+      "screen": "home-light-390-3x",
+      "theme": "light",
+      "images": 14,
+      "broken": [],
+      "upscaled": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 224,
+        "element": "H1",
+        "url": ""
+      },
+      "image_bytes": 1891709,
+      "image_requests": 14,
+      "timed_out": false
+    },
+    {
+      "screen": "home-dark-390",
+      "theme": "dark",
+      "images": 14,
+      "broken": [],
+      "upscaled": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 224,
+        "element": "H1",
+        "url": ""
+      },
+      "image_bytes": 423611,
+      "image_requests": 14,
+      "timed_out": false
+    },
+    {
+      "screen": "home-dark-768",
+      "theme": "dark",
+      "images": 14,
+      "broken": [],
+      "upscaled": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 1732,
+        "element": "home-hero__photo",
+        "url": "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea"
+      },
+      "image_bytes": 926523,
+      "image_requests": 15,
+      "timed_out": false
+    },
+    {
+      "screen": "home-dark-1440",
+      "theme": "dark",
+      "images": 15,
+      "broken": [],
+      "upscaled": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 460,
+        "element": "home-hero__photo",
+        "url": "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea"
+      },
+      "image_bytes": 1054351,
+      "image_requests": 14,
+      "timed_out": false
+    },
+    {
+      "screen": "home-dark-390-3x",
+      "theme": "dark",
+      "images": 14,
+      "broken": [],
+      "upscaled": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 224,
+        "element": "H1",
+        "url": ""
+      },
+      "image_bytes": 1891706,
+      "image_requests": 14,
+      "timed_out": false
+    },
+    {
+      "screen": "find-classes-light-390",
+      "theme": "light",
+      "images": 15,
+      "broken": [],
+      "upscaled": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 1212,
+        "element": "IMG",
+        "url": "https://images.unsplash.com/photo-1574629810360-7efbbe195018"
+      },
+      "image_bytes": 196603,
+      "image_requests": 7,
+      "timed_out": false
+    },
+    {
+      "screen": "find-classes-light-768",
+      "theme": "light",
+      "images": 15,
+      "broken": [],
+      "upscaled": [],
+      "cls_on_load": 0.0232,
+      "cls_after_scroll": 0.0232,
+      "shifts": [
+        {
+          "value": 0.0232,
+          "at": 231,
+          "sources": [
+            "class-discovery__picker class-discovery__level-picker",
+            "browse-filters class-discovery__fields",
+            "select-wrap"
+          ]
+        }
+      ],
+      "lcp": {
+        "at": 460,
+        "element": "IMG",
+        "url": "https://images.unsplash.com/photo-1574629810360-7efbbe195018"
+      },
+      "image_bytes": 196600,
+      "image_requests": 7,
+      "timed_out": false
+    },
+    {
+      "screen": "find-classes-light-1440",
+      "theme": "light",
+      "images": 15,
+      "broken": [],
+      "upscaled": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 552,
+        "element": "IMG",
+        "url": "https://images.unsplash.com/photo-1574629810360-7efbbe195018"
+      },
+      "image_bytes": 196604,
+      "image_requests": 7,
+      "timed_out": false
+    },
+    {
+      "screen": "find-classes-light-390-3x",
+      "theme": "light",
+      "images": 15,
+      "broken": [],
+      "upscaled": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 432,
+        "element": "IMG",
+        "url": "https://images.unsplash.com/photo-1574629810360-7efbbe195018"
+      },
+      "image_bytes": 1032605,
+      "image_requests": 13,
+      "timed_out": false
+    },
+    {
+      "screen": "find-classes-dark-390",
+      "theme": "dark",
+      "images": 15,
+      "broken": [],
+      "upscaled": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 412,
+        "element": "IMG",
+        "url": "https://images.unsplash.com/photo-1574629810360-7efbbe195018"
+      },
+      "image_bytes": 196604,
+      "image_requests": 7,
+      "timed_out": false
+    },
+    {
+      "screen": "find-classes-dark-768",
+      "theme": "dark",
+      "images": 15,
+      "broken": [],
+      "upscaled": [],
+      "cls_on_load": 0.0232,
+      "cls_after_scroll": 0.0232,
+      "shifts": [
+        {
+          "value": 0.0232,
+          "at": 242,
+          "sources": [
+            "class-discovery__picker class-discovery__level-picker",
+            "browse-filters class-discovery__fields",
+            "select-wrap"
+          ]
+        }
+      ],
+      "lcp": {
+        "at": 404,
+        "element": "IMG",
+        "url": "https://images.unsplash.com/photo-1574629810360-7efbbe195018"
+      },
+      "image_bytes": 196600,
+      "image_requests": 7,
+      "timed_out": false
+    },
+    {
+      "screen": "find-classes-dark-1440",
+      "theme": "dark",
+      "images": 15,
+      "broken": [],
+      "upscaled": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 416,
+        "element": "IMG",
+        "url": "https://images.unsplash.com/photo-1574629810360-7efbbe195018"
+      },
+      "image_bytes": 196600,
+      "image_requests": 7,
+      "timed_out": false
+    },
+    {
+      "screen": "find-classes-dark-390-3x",
+      "theme": "dark",
+      "images": 15,
+      "broken": [],
+      "upscaled": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 404,
+        "element": "IMG",
+        "url": "https://images.unsplash.com/photo-1574629810360-7efbbe195018"
+      },
+      "image_bytes": 1032572,
+      "image_requests": 13,
+      "timed_out": false
+    }
+  ],
+  "bytes": {
+    "390": {
+      "before": {
+        "image_bytes": 2311818,
+        "image_requests": 14,
+        "lcp_ms": 232,
+        "runs": [
+          {
+            "image_bytes": 2311787,
+            "lcp_ms": 224
+          },
+          {
+            "image_bytes": 2311926,
+            "lcp_ms": 232
+          },
+          {
+            "image_bytes": 2311818,
+            "lcp_ms": 236
+          }
+        ]
+      },
+      "after": {
+        "image_bytes": 423610,
+        "image_requests": 14,
+        "lcp_ms": 232,
+        "runs": [
+          {
+            "image_bytes": 423619,
+            "lcp_ms": 232
+          },
+          {
+            "image_bytes": 423604,
+            "lcp_ms": 244
+          },
+          {
+            "image_bytes": 423610,
+            "lcp_ms": 232
+          }
+        ]
+      },
+      "image_bytes_change": "-82%"
+    },
+    "768": {
+      "before": {
+        "image_bytes": 2311681,
+        "image_requests": 14,
+        "lcp_ms": 468,
+        "runs": [
+          {
+            "image_bytes": 2311672,
+            "lcp_ms": 468
+          },
+          {
+            "image_bytes": 2311681,
+            "lcp_ms": 512
+          },
+          {
+            "image_bytes": 2311682,
+            "lcp_ms": 420
+          }
+        ]
+      },
+      "after": {
+        "image_bytes": 926555,
+        "image_requests": 15,
+        "lcp_ms": 432,
+        "runs": [
+          {
+            "image_bytes": 926555,
+            "lcp_ms": 432
+          },
+          {
+            "image_bytes": 926528,
+            "lcp_ms": 436
+          },
+          {
+            "image_bytes": 926613,
+            "lcp_ms": 332
+          }
+        ]
+      },
+      "image_bytes_change": "-60%"
+    },
+    "1440": {
+      "before": {
+        "image_bytes": 2311690,
+        "image_requests": 14,
+        "lcp_ms": 568,
+        "runs": [
+          {
+            "image_bytes": 2311701,
+            "lcp_ms": 604
+          },
+          {
+            "image_bytes": 2311690,
+            "lcp_ms": 568
+          },
+          {
+            "image_bytes": 2311664,
+            "lcp_ms": 440
+          }
+        ]
+      },
+      "after": {
+        "image_bytes": 1054333,
+        "image_requests": 14,
+        "lcp_ms": 432,
+        "runs": [
+          {
+            "image_bytes": 1054364,
+            "lcp_ms": 504
+          },
+          {
+            "image_bytes": 1054333,
+            "lcp_ms": 388
+          },
+          {
+            "image_bytes": 1054328,
+            "lcp_ms": 432
+          }
+        ]
+      },
+      "image_bytes_change": "-54%"
+    },
+    "390-3x": {
+      "before": {
+        "image_bytes": 2311790,
+        "image_requests": 14,
+        "lcp_ms": 236,
+        "runs": [
+          {
+            "image_bytes": 2311786,
+            "lcp_ms": 236
+          },
+          {
+            "image_bytes": 2311797,
+            "lcp_ms": 244
+          },
+          {
+            "image_bytes": 2311790,
+            "lcp_ms": 224
+          }
+        ]
+      },
+      "after": {
+        "image_bytes": 1891693,
+        "image_requests": 14,
+        "lcp_ms": 232,
+        "runs": [
+          {
+            "image_bytes": 1891691,
+            "lcp_ms": 216
+          },
+          {
+            "image_bytes": 1891694,
+            "lcp_ms": 232
+          },
+          {
+            "image_bytes": 1891693,
+            "lcp_ms": 232
+          }
+        ]
+      },
+      "image_bytes_change": "-18%"
+    }
+  },
+  "stress": [
+    {
+      "screen": "home-390-slow",
+      "images": 14,
+      "broken": [],
+      "cls_on_load": 0.001,
+      "cls_after_scroll": 0.001,
+      "shifts": [
+        {
+          "value": 0.001,
+          "at": 2175,
+          "sources": [
+            "#text",
+            "#text"
+          ]
+        }
+      ],
+      "lcp": {
+        "at": 5588,
+        "element": "home-cta__photo",
+        "url": "https://images.unsplash.com/photo-1504450758481-7338eba7524a"
+      },
+      "timed_out": false
+    },
+    {
+      "screen": "home-390-offline",
+      "images": 14,
+      "broken": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 228,
+        "element": "H1",
+        "url": ""
+      },
+      "timed_out": false
+    },
+    {
+      "screen": "home-1440-slow",
+      "images": 15,
+      "broken": [],
+      "cls_on_load": 0.0272,
+      "cls_after_scroll": 0.0272,
+      "shifts": [
+        {
+          "value": 0.0272,
+          "at": 2370,
+          "sources": [
+            "home-wrap",
+            "#text",
+            "#text"
+          ]
+        }
+      ],
+      "lcp": {
+        "at": 1556,
+        "element": "H1",
+        "url": ""
+      },
+      "timed_out": false
+    },
+    {
+      "screen": "home-1440-offline",
+      "images": 15,
+      "broken": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 168,
+        "element": "H1",
+        "url": ""
+      },
+      "timed_out": false
+    },
+    {
+      "screen": "find-classes-390-slow",
+      "images": 15,
+      "broken": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 2540,
+        "element": "IMG",
+        "url": "https://images.unsplash.com/photo-1574629810360-7efbbe195018"
+      },
+      "timed_out": false
+    },
+    {
+      "screen": "find-classes-390-offline",
+      "images": 15,
+      "broken": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 228,
+        "element": "P",
+        "url": ""
+      },
+      "timed_out": false
+    },
+    {
+      "screen": "find-classes-1440-slow",
+      "images": 15,
+      "broken": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 2576,
+        "element": "IMG",
+        "url": "https://images.unsplash.com/photo-1574629810360-7efbbe195018"
+      },
+      "timed_out": false
+    },
+    {
+      "screen": "find-classes-1440-offline",
+      "images": 15,
+      "broken": [],
+      "cls_on_load": 0,
+      "cls_after_scroll": 0,
+      "shifts": [],
+      "lcp": {
+        "at": 232,
+        "element": "H1",
+        "url": ""
+      },
+      "timed_out": false
+    }
+  ],
+  "failures": []
+}

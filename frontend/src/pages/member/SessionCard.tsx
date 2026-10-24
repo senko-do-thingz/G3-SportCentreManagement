@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom'
 import type { BrowseSession } from '../../api/memberSessionsApi'
 import { Badge, buttonClassName } from '../../components/ui'
 import { browseDate } from './memberScheduleDates'
-import { sportImageFor } from './sportImages'
+import { Photo } from '../../media/Photo'
+import { sportPhotoFor } from './sportImages'
 
 const LEVELS = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED']
 
@@ -17,7 +18,7 @@ export function SessionCard({ session, returnTo }: { session: BrowseSession; ret
   const levelIndex = LEVELS.indexOf(level)
   return <article className="browse-session class-session-card">
     <div className="class-session-card__image">
-      <img src={sportImageFor(session.sportName)} alt={`${session.sportName} training session`} loading="lazy" />
+      <Photo {...sportPhotoFor(session.sportName, 1080)} alt={`${session.sportName} training session`} sizes="(min-width: 1101px) 380px, (min-width: 641px) 50vw, 100vw" width="1080" height="720" loading="lazy" />
       <span className="class-session-card__image-shade" aria-hidden="true" />
       <span className="class-session-card__sport">{session.sportName}</span>
       <span className={`class-session-card__level${levelIndex >= 0 ? ` class-session-card__level--${level.toLowerCase()}` : ''}`}>
