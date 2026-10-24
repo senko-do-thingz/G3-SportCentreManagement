@@ -4,6 +4,15 @@
 - Check that guests browse `/`, `/credits`, `/login` and `/register` without a session request, a write or a sign-in prompt, and that role guards still hold for every role and area (own area renders, others show Access denied, guests go to Log in).
 - Cover browser Back after a return, staff logins with a Member destination (role home instead), unsafe return states, session expiry on a protected page with its query, and a signed-in Member opening Log in. New tests in frontend/src/pages/public/guestReturnMatrix.test.tsx; cases in frontend/docs/UI-05-test-cases.md.
 - No production code change was needed. Lint, tsc, all frontend tests and the build pass.
+## 2026-10-23 - Accessible shared UI components (UI-01)
+
+- Move the shared brand tokens to the approved Home Royal and Gold palette (navy, royal blue actions, gold highlights) in light and dark modes, and add --color-highlight. All shared controls pick it up; screen-specific colors are unchanged. Contrast of primary text, primary fills and gold fills meets WCAG 2.2 AA and is covered by token tests.
+- Add a shared Notice component (info, success, warning, danger; assertive, polite or silent; hidden Error or Warning prefix) and a shared Tabs component (arrow keys, Home, End, disabled tabs skipped, linked panels). Existing notice paragraphs and tab lists keep working; their styles move from member.css to components.css.
+- Fix accessibility gaps: Select keeps a caller aria-describedby with its hint and error ids; the password toggle name matches its visible Show or Hide text and points at its field; a loading Button no longer adds a second live region; the toast API gains a warning helper.
+- Add a shared FilterBar (search landmark, Clear filters only when a filter is set with focus returned to the first field, polite result count) standardized from the manager filter rows.
+- Add shared mobile rules at 640 px (filters stack, card headers, pagination and dialog actions wrap, dialogs sit at the bottom) and reduced-motion rules for dialogs and toasts. Component screenshots in light and dark at 1280 and 375 px are in frontend/docs/screenshots/ui-01; none has horizontal page overflow.
+- Review follow-up: document the shared token contract in frontend/docs/design-tokens.md; record keyboard, dialog, FilterBar and mobile browser checks and a main versus UI-01 regression of 15 public, member, receptionist and manager screens at 1280 and 375 px (no overflow, no page errors) in frontend/docs/UI-01-test-cases.md with contact sheets in frontend/docs/screenshots/ui-01/regression.
+- Screens are not migrated to FilterBar, Notice or Tabs in this change; each screen owner adopts them in their own UI task. No API or backend changes. Lint, tsc, all frontend tests and the production build pass.
 
 ## 2026-10-23 - Manager edits coach profiles and uploads coach photos (FE-COACH-PROFILE)
 

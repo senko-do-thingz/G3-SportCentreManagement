@@ -140,7 +140,8 @@ describe('F1-05 Log in', () => {
 
     await user.click(screen.getByRole('button', { name: 'Show password' }))
     expect(password).toHaveAttribute('type', 'text')
-    expect(screen.getByRole('button', { name: 'Hide password' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Hide password' })).not.toHaveAttribute('aria-pressed')
+    expect(screen.getByRole('button', { name: 'Hide password' })).toHaveAttribute('aria-controls', password.id)
 
     await user.click(screen.getByRole('button', { name: 'Hide password' }))
     expect(password).toHaveAttribute('type', 'password')
