@@ -22,7 +22,7 @@
   color: var(--color-on-hero);
 }
 
-/* Dunk photo (flipped so the player is on the left); its dark right side sits behind the card. */
+/* Portrait dunk photo (Unsplash, August Phlieger): the player stays on the left, the dark gym sits behind the card. */
 .auth-stage__photo {
   position: absolute;
   inset: 0;
@@ -30,7 +30,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 20% 25%;
+  object-position: 30% 62%;
 }
 
 /* Light over the player, darker behind the card; the bottom fade keeps the slogan readable. */
@@ -335,6 +335,11 @@
   .auth-stage::before {
     bottom: auto;
     height: 360px;
+  }
+
+  /* The band is short: keep the player's head, arms and ball in it. */
+  .auth-stage__photo {
+    object-position: 30% 47%;
   }
 
   .auth-stage__body,

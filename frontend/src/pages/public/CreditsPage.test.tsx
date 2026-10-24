@@ -12,7 +12,9 @@ describe('Photo credits', () => {
   it('lists every Home photo, coach portrait, video and the font with its source and license', () => {
     const groups = buildCredits()
     const photos = groups.find((group) => group.title === 'Photos')!
-    expect(photos.items).toHaveLength(2 + HOME_SPORTS.length + HOME_FACILITIES.length)
+    // Hero, Log in and Sign up background, Ready to play banner, then the sports and the venues.
+    expect(photos.items).toHaveLength(3 + HOME_SPORTS.length + HOME_FACILITIES.length)
+    expect(photos.items.find((item) => item.usedFor.startsWith('Log in and Sign up'))?.link).toBe('https://images.unsplash.com/photo-1608245449230-4ac19066d2d0')
     expect(photos.items.every((item) => /^https:\/\/images\.unsplash\.com\/photo-[\w-]+$/.test(item.link))).toBe(true)
     expect(groups.find((group) => group.title === 'Demo coach portraits')!.items).toHaveLength(COACH_DEMO_PHOTOS.length)
     expect(groups.find((group) => group.title === 'Background videos')!.items.map((item) => item.link)).toEqual(expect.arrayContaining([expect.stringContaining('-44448/')]))

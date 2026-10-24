@@ -2,10 +2,11 @@ import type { ReactNode } from 'react'
 import '@fontsource/be-vietnam-pro/800.css'
 import '@fontsource/be-vietnam-pro/800-italic.css'
 import { Link } from 'react-router-dom'
-import authPhoto from '../../assets/auth/auth-dunk.jpg'
+import authFallback from '../../assets/auth/auth-dunk.jpg'
 import { Brand } from '../../components/Brand'
 import { Photo } from '../../media/Photo'
 import { ThemeToggle } from '../../theme/ThemeToggle'
+import { HOME_PHOTOS } from './homeContent'
 import '../../styles/auth.css'
 
 export interface AuthShellProps {
@@ -39,7 +40,7 @@ function Slogan() {
 export function AuthShell({ className, title, subtitle, children }: AuthShellProps) {
   return (
     <div className={['auth-stage', className].filter(Boolean).join(' ')}>
-      <Photo className="auth-stage__photo" src={authPhoto} fallback={authPhoto} width="1920" height="1280" fetchPriority="high" />
+      <Photo className="auth-stage__photo" src={HOME_PHOTOS.auth} fallback={authFallback} sizes="100vw" width="2200" height="3300" fetchPriority="high" />
       <div className="auth-stage__header">
         <Brand />
         <div className="auth-stage__actions">
