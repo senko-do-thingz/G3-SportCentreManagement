@@ -56,6 +56,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       success: (title, message) => show({ tone: 'success', title, message }),
       error: (title, message) => show({ tone: 'error', title, message, duration: 6000 }),
       info: (title, message) => show({ tone: 'info', title, message }),
+      warning: (title, message) => show({ tone: 'warning', title, message, duration: 6000 }),
     }),
     [show, dismiss],
   )
