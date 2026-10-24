@@ -9,7 +9,7 @@ Owner: UI-03 (Phat). Applies to every screen task that shows a photo, video or i
 | Remote photos | Unsplash CDN, built only by `src/media/unsplash.ts` | Responsive sizes, credited on `/credits` |
 | Sport photos | `src/media/sportPhotos.ts` (one photo per sport) | Shared by Home and the member class pages |
 | Offline fallbacks | `src/assets/home/*.jpg` | Low resolution copies shown only when a remote photo fails |
-| Log in and Sign up background | Home hero photo (`HOME_PHOTOS.hero`) through `Photo` in `AuthShell` | Since UI-06 and UI-07; credited on `/credits` |
+| Log in and Sign up background | `src/assets/auth/auth-dunk.jpg` (1920 x 1280, flipped so the player is on the left) through `Photo` in `AuthShell` | Replaces the Home hero photo of UI-06; source and licence still to be added to `/credits` (see Provenance) |
 | Demo coach portraits | `public/images/coaches/*.jpg` (640 x 640) | Committed files, credited on `/credits` |
 | Hero background video | Mixkit CDN (`HOME_HERO_VIDEOS` in `homeContent.ts`) | Credited on `/credits` |
 | Display font | `@fontsource/be-vietnam-pro` | Imported only by the pages that use it |

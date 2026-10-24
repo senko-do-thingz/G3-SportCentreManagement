@@ -2,10 +2,10 @@ import type { ReactNode } from 'react'
 import '@fontsource/be-vietnam-pro/800.css'
 import '@fontsource/be-vietnam-pro/800-italic.css'
 import { Link } from 'react-router-dom'
+import authPhoto from '../../assets/auth/auth-dunk.jpg'
 import { Brand } from '../../components/Brand'
 import { Photo } from '../../media/Photo'
 import { ThemeToggle } from '../../theme/ThemeToggle'
-import { HOME_PHOTOS, homeHero } from './homeContent'
 import '../../styles/auth.css'
 
 export interface AuthShellProps {
@@ -31,14 +31,15 @@ function Slogan() {
 }
 
 /**
- * Log in and Sign up (layout B, UI-06 and UI-07): the Home hero photo fills the page under the Home overlay, a compact
- * Home header (brand, Back to Home, sun and moon switch) sits on top, the slogan is on the left and the form card
- * floats on the right. On narrow screens the photo becomes a band with the slogan above the card.
+ * Log in and Sign up (layout B, UI-06 and UI-07): the dunk photo fills the page with the player on the left, a compact
+ * Home header (brand, Back to Home, sun and moon switch) sits on top, the slogan sits low on the left under the player
+ * and the form card floats on the dark right side. On narrow screens the photo becomes a band with the slogan above
+ * the card.
  */
 export function AuthShell({ className, title, subtitle, children }: AuthShellProps) {
   return (
     <div className={['auth-stage', className].filter(Boolean).join(' ')}>
-      <Photo className="auth-stage__photo" src={HOME_PHOTOS.hero} fallback={homeHero} sizes="100vw" width="2200" height="1467" fetchPriority="high" />
+      <Photo className="auth-stage__photo" src={authPhoto} fallback={authPhoto} width="1920" height="1280" fetchPriority="high" />
       <div className="auth-stage__header">
         <Brand />
         <div className="auth-stage__actions">

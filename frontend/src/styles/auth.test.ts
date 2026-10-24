@@ -23,8 +23,10 @@ describe('Log in and Sign up theme (layout B)', () => {
     expect(register).toContain('<AuthShell className="auth-shell--register"')
   })
 
-  it('uses the Home hero photo, Back to Home and the shared sun and moon switch on both screens', () => {
-    expect(shell).toContain('src={HOME_PHOTOS.hero} fallback={homeHero}')
+  it('uses the bundled dunk photo, Back to Home and the shared sun and moon switch on both screens', () => {
+    expect(shell).toContain("import authPhoto from '../../assets/auth/auth-dunk.jpg'")
+    expect(shell).toContain('src={authPhoto} fallback={authPhoto}')
+    expect(existsSync('src/assets/auth/auth-dunk.jpg')).toBe(true)
     expect(shell).toContain('<Link className="auth-stage__home" to="/">Back to Home</Link>')
     expect(shell).toContain('<ThemeToggle className="auth-theme" />')
     expect(shell).not.toContain('AppearanceControl')
