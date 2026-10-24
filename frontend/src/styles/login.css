@@ -1,0 +1,181 @@
+/*
+ * Log in (UI-06): the approved Home theme on the shared auth card. Every color, font and focus style comes from the
+ * shared tokens (frontend/docs/design-tokens.md), so light and dark follow the design system with no local palette.
+ * Home traits carried over: navy hero with gold highlight, uppercase Be Vietnam Pro display type, square corners,
+ * royal blue primary action and a gold rule. Sign up keeps the base auth styles until UI-07.
+ */
+
+/* Page: Home hero navy, deepening towards the footer navy, with a soft royal glow. */
+.public-layout:has(.auth-shell--login) {
+  background:
+    radial-gradient(ellipse at 18% 18%, color-mix(in srgb, var(--color-primary) 30%, transparent), transparent 38%),
+    linear-gradient(135deg, var(--color-footer), var(--color-hero) 58%, color-mix(in srgb, var(--color-hero), var(--color-primary) 18%));
+}
+
+/* Double class: beats the base .auth-shell rules whatever order the stylesheets load in. */
+.auth-shell.auth-shell--login {
+  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  border-radius: 0;
+  box-shadow: var(--shadow-lg);
+}
+
+/* Photo column, same treatment as the Home hero. */
+.auth-shell--login .auth-hero {
+  background: var(--color-hero);
+  color: var(--color-on-hero);
+}
+
+.auth-shell--login .auth-hero::before {
+  background:
+    radial-gradient(ellipse at 78% 22%, color-mix(in srgb, var(--color-primary) 36%, transparent), transparent 48%),
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--color-hero-deep) 10%, transparent) 0%,
+      color-mix(in srgb, var(--color-hero-deep) 42%, transparent) 48%,
+      color-mix(in srgb, var(--color-hero-deep) 94%, transparent) 100%),
+    url('../assets/auth-hero.jpg') center top / cover no-repeat;
+}
+
+.auth-shell--login .auth-hero__eyebrow {
+  color: var(--color-hero-highlight);
+  font-weight: var(--weight-bold);
+  opacity: 1;
+}
+
+.auth-shell--login .auth-hero__title {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 3.6vw, 3.25rem);
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.auth-shell--login .auth-hero__accent {
+  color: var(--color-hero-highlight);
+}
+
+.auth-shell--login .auth-hero__text {
+  color: var(--color-on-hero-muted);
+  opacity: 1;
+}
+
+/* Form column. */
+.auth-shell--login .auth-panel {
+  border-top: 4px solid var(--color-highlight);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.auth-shell--login .brand__mark {
+  border-radius: 0;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 800;
+}
+
+.auth-shell--login .brand__name {
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.auth-shell--login .brand__tagline,
+.auth-shell--login .auth-panel__heading p,
+.auth-shell--login .auth-panel__footer {
+  color: var(--color-text-muted);
+}
+
+.auth-shell--login .auth-panel__heading h1 {
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 3vw, 2.3rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.015em;
+  text-transform: uppercase;
+}
+
+.auth-shell--login .auth-panel__heading h1::after {
+  display: block;
+  width: 52px;
+  height: 3px;
+  margin-top: 12px;
+  background: var(--color-highlight);
+  content: '';
+}
+
+.auth-shell--login .field__label {
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.auth-shell--login .input {
+  border-color: var(--color-control-border);
+  border-radius: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.auth-shell--login .input:focus {
+  border-color: var(--color-primary);
+  box-shadow: var(--focus-ring);
+}
+
+.auth-shell--login .input::placeholder {
+  color: var(--color-text-subtle);
+}
+
+/*
+ * Remember me and Forgot password share one text baseline. Both start at the top of the row with the same font and
+ * line height; centering pushed the link down because the checkbox field reserves a message line below its label.
+ */
+.auth-shell--login .auth-form__options {
+  align-items: flex-start;
+}
+
+.auth-shell--login .auth-form__options .link-button {
+  line-height: inherit;
+}
+
+.auth-shell--login .auth-form .btn--primary {
+  min-height: 52px;
+  border-radius: 0;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.02em;
+}
+
+.auth-shell--login .auth-form .btn--primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+.auth-shell--login .auth-form .btn--primary:focus-visible {
+  box-shadow: 0 0 0 3px var(--color-surface), 0 0 0 6px var(--color-primary);
+}
+
+.auth-shell--login .link-button,
+.auth-shell--login .auth-panel__footer a {
+  color: var(--color-primary);
+  font-weight: var(--weight-bold);
+}
+
+.auth-shell--login input[type='checkbox'] {
+  accent-color: var(--color-primary);
+}
+
+@media (max-width: 960px) {
+  /* Without the photo column, the gold rule and the navy page keep the Home identity on tablets and phones. */
+  .auth-shell.auth-shell--login {
+    max-width: 560px;
+  }
+}

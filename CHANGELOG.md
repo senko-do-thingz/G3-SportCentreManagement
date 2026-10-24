@@ -1,3 +1,12 @@
+## 2026-10-24 - Redesign Log in to the Home theme (UI-06)
+
+- Log in takes the approved Home theme from the shared tokens (UI-00): navy hero with gold highlight, uppercase Be Vietnam Pro display headings and italic brand, square card, fields and button, gold rule, royal blue primary action, shared focus ring.
+- Styles move from layouts.css to src/styles/login.css, imported by the Log in page only. The local --login-* palette and its dark block are removed, so dark mode follows the shared dark tokens; 32 color uses leave layouts.css and the color baseline is tightened.
+- Fix: Remember me and Forgot password now share one text baseline (they were 13 px apart).
+- Behavior unchanged (POST /auth/login, refresh, validation, messages, return navigation). Sign up is not changed (UI-07).
+- Tests: src/styles/login.test.ts. Browser check scripts/ui06-login-check.py (light and dark, 390, 768 and 1440 px, empty, field errors and server error): contrast at least 4.5:1 as rendered (lowest 4.85:1), visible focus, no overflow, fixed card height, login reaches /member. Sheets and report in frontend/docs/screenshots/ui-06; cases in frontend/docs/UI-06-test-cases.md.
+- Lint, tsc, all frontend tests (1386) and the production build pass.
+
 ## 2026-10-24 - Approved UI design system and token freeze (UI-00)
 
 - Audit main: the Royal and Gold brand colors were in tokens.css (from UI-01), but the Home hero, footer, gold-on-navy text and display font existed only as copies inside home.css, and Log in, Member schedule and Manager kept their own raw colors.

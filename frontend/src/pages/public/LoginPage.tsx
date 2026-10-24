@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import '@fontsource/be-vietnam-pro/800.css'
+import '@fontsource/be-vietnam-pro/800-italic.css'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, getErrorMessage, splitFieldErrors } from '../../api/errors'
 import type { LoginRedirectState } from '../../auth/RequireAuth'
@@ -16,6 +18,7 @@ import { ManagerPreviewLogin } from '../../components/ManagerPreviewLogin'
 import { useFocusFirstInvalid } from '../../utils/useFocusFirstInvalid'
 import { AuthShell } from './AuthShell'
 import { SessionErrorPage } from './SessionErrorPage'
+import '../../styles/login.css'
 
 /** Shown for HTTP 403 from POST /auth/login (DisabledException or LockedException on the backend). */
 export const ACCOUNT_DISABLED_MESSAGE =
