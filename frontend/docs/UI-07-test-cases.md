@@ -9,8 +9,11 @@ Structure:
 - `AuthShell` now has a single layout, and loads `src/styles/auth.css` (renamed from `login.css`) and the display fonts itself, so Log in and Sign up cannot drift apart.
 - The old split card is removed: `.auth-shell`, `.auth-hero` and `.auth-panel__toolbar` rules in `layouts.css` and `appearance.css`, and the unsourced `src/assets/auth-hero.jpg`.
 
-Not changed: POST /auth/register, automatic sign in after sign up, validation, password rules, terms, messages,
-return navigation.
+Wording: labels, placeholders, hints and client error messages on Log in and Sign up follow common sign up and log in
+pages (preview: `docs/screenshots/ui-07/form-copy-login-signup.jpg`). Server field errors keep the backend text. My
+Profile keeps its own messages.
+
+Not changed: POST /auth/register, automatic sign in after sign up, validation rules, terms, return navigation.
 
 Branch: based on `feat/ui-06` (which contains UI-00 and UI-03). Merge order: UI-00, UI-03, UI-06, then UI-07.
 
@@ -32,13 +35,14 @@ Branch: based on `feat/ui-06` (which contains UI-00 and UI-03). Merge order: UI-
 | TC-04 | No local palette, shared tokens | Unit | No `--login-*` or dark block; hero, navy, highlight, display font, focus ring and primary tokens used | Pass |
 | TC-05 | Shapes and widths | Unit | Square fields and button; password checklist without a box; Sign up card 560 px; photo band at 960 px | Pass |
 | TC-05b | Password checklist like real sign up forms | Unit | Lists only 8 to 64 characters, A letter, A number with a check mark when met; the 72 byte limit shows only as an error line when broken | Pass |
+| TC-05c | Form wording like real sign up and log in pages | Unit (updated suites) | Sentence case labels without asterisks; placeholders name@example.com and 0901 234 567; errors say what to do (Enter your email, Enter a valid email, like name@example.com, Create a password, Confirm your password, Passwords don't match. Try again., Agree to the Terms of Use and Privacy Policy to continue); duplicate email reads An account with this email already exists. Log in instead.; Log in shows Keep me logged in, Incorrect email or password. Check them and try again. and Don't have an account? Sign up; checklist At least 8 characters, 1 letter, 1 number with no strength label | Pass |
 | TC-06 | No raw colors | Unit (color freeze) | `auth.css` has none; baseline tightened after the split card colors left `layouts.css` | Pass |
 | TC-07 | Existing Sign up and Log in behavior | Unit (existing suites) | Registration, validation, duplicate email, automatic sign in, theme persistence and return navigation unchanged | Pass (1401 tests) |
 | TC-08 | Text contrast as rendered | Browser: 2 themes x 3 widths x 3 states (empty, field errors, email already registered) | Card text, checklist, links, button, errors and alerts against their real background; header and slogan against the overlay navy; at least 4.5:1 (3:1 large) | Pass (lowest 5.2:1, password rules) |
 | TC-09 | No horizontal overflow, card below header | Browser: 390, 768, 1440 px | Page never wider than the window; card starts below the header | Pass |
 | TC-10 | Visible keyboard focus | Browser: theme switch, full name, Show password, terms checkbox, Create account | Each shows a focus ring | Pass |
 | TC-11 | Sign up still works | Browser: valid form, mocked API | Leaves `/register` for `/member` | Pass |
-| TC-12 | Log in unchanged by the shared refactor | Browser: `scripts/ui06-login-check.py` on this build | Same results as UI-06 | Pass (0 failures, lowest 4.85:1, login reaches /member) |
+| TC-12 | Log in after the shared refactor and the new wording | Browser: `scripts/ui06-login-check.py` on this build (`docs/screenshots/ui-07/login-recheck-report.json`) | Same results as UI-06 | Pass (0 failures, lowest 4.85:1, login reaches /member) |
 | TC-13 | Visual review | Before/after sheets in `docs/screenshots/ui-07` | Sign up matches Log in and the Home look in light and dark | For reviewer |
 | TC-14 | Real photo and backend | Manual: open `/register` online and create an account against the dev backend | Sharp Home hero photo; account created and signed in; duplicate email shows the error | To run by reviewer |
 

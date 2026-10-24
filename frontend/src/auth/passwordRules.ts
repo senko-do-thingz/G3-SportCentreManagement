@@ -55,11 +55,12 @@ export function checkPassword(value: string): PasswordRuleResult[] {
   return [
     {
       id: 'length',
-      label: `${PASSWORD_MIN_LENGTH} to ${PASSWORD_MAX_LENGTH} characters`,
+      // Common wording; the upper limit is only mentioned once a password goes past it.
+      label: value.length > PASSWORD_MAX_LENGTH ? `No more than ${PASSWORD_MAX_LENGTH} characters` : `At least ${PASSWORD_MIN_LENGTH} characters`,
       met: value.length >= PASSWORD_MIN_LENGTH && value.length <= PASSWORD_MAX_LENGTH,
     },
-    { id: 'letter', label: 'A letter', met: codeUnitMatches(value, LETTER) },
-    { id: 'digit', label: 'A number', met: codeUnitMatches(value, DIGIT) },
+    { id: 'letter', label: '1 letter', met: codeUnitMatches(value, LETTER) },
+    { id: 'digit', label: '1 number', met: codeUnitMatches(value, DIGIT) },
     {
       id: 'bytes',
       // Only shown when broken (see PasswordRules): the BCrypt byte limit is a technical rule people rarely reach.

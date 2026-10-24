@@ -423,7 +423,7 @@ describe('FE-02 My Profile (F1-08) - change password', () => {
     expect(form.querySelector('[data-rule="letter"]')).toHaveAttribute('data-met', 'true')
     expect(form.querySelector('[data-rule="digit"]')).toHaveAttribute('data-met', 'false')
     await user.type(within(form).getByLabelText(/^New password/), '12345')
-    expect(within(form).getByText('Meets requirements')).toBeInTheDocument()
+    expect([...form.querySelectorAll('[data-rule]')].every((rule) => rule.getAttribute('data-met') === 'true')).toBe(true)
   })
 
   // Review round 1

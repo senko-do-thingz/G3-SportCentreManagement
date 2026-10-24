@@ -19,7 +19,7 @@ async function fillRegistration(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/email address/i), request.email)
   await user.type(screen.getByLabelText(/^password/i), request.password)
   await user.type(screen.getByLabelText(/confirm password/i), request.password)
-  await user.click(screen.getByRole('checkbox', { name: /terms of use/ }))
+  await user.click(screen.getByRole('checkbox', { name: /terms of use/i }))
 }
 
 afterEach(() => { vi.unstubAllGlobals() })
@@ -34,7 +34,7 @@ describe('Home account navigation', () => {
     await user.click(screen.getByRole('link', { name: 'Log in' }))
     await screen.findByRole('heading', { name: 'Welcome back' })
     expect(document.querySelector('.auth-shell--login')).toBeInTheDocument()
-    await user.click(screen.getByRole('link', { name: 'Create an account' }))
+    await user.click(screen.getByRole('link', { name: 'Sign up' }))
     await screen.findByRole('heading', { name: 'Create your account' })
     expect(document.querySelector('.auth-shell--login')).not.toBeInTheDocument()
     expect(screen.getByLabelText(/full name/i)).toBeInTheDocument()
@@ -85,7 +85,7 @@ describe('Home account navigation', () => {
     expect(screen.getByLabelText(/full name/i)).toHaveAttribute('aria-invalid', 'true')
     await fillRegistration(user)
     await user.click(screen.getByRole('button', { name: 'Create account' }))
-    await screen.findByText('Email is already registered')
+    await screen.findByText('An account with this email already exists. Log in instead.')
     expect(screen.getByRole('heading', { name: 'Create your account' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Welcome back' })).not.toBeInTheDocument()
   })

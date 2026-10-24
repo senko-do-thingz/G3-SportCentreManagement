@@ -22,10 +22,10 @@ export const ACCOUNT_DISABLED_MESSAGE =
   'This account is locked or inactive. Please contact the front desk to reactivate it.'
 
 /** Shown for HTTP 401 from POST /auth/login. Same meaning as the backend message, as a sentence. */
-export const INVALID_CREDENTIALS_MESSAGE = 'Invalid email or password. Please try again.'
+export const INVALID_CREDENTIALS_MESSAGE = 'Incorrect email or password. Check them and try again.'
 
 export const FORGOT_PASSWORD_MESSAGE =
-  'Online password reset is not available yet. Please ask the front desk to reset your password.'
+  "Online password reset isn't available yet. Ask the front desk to reset your password."
 
 /** Shown when another tab of this browser logged in or out and this tab lost its session. */
 export const SIGNED_OUT_ELSEWHERE_MESSAGE =
@@ -160,7 +160,7 @@ export function LoginPage() {
   }
 
   return (
-    <AuthShell className="auth-shell--login" title="Welcome back" subtitle="Log in to manage your training.">
+    <AuthShell className="auth-shell--login" title="Welcome back" subtitle="Log in to book classes and manage your packages.">
       {import.meta.env.DEV && managerPreviewEnabled() && <ManagerPreviewLogin />}
       {sample && (
         <p className="notice notice--info auth-sample">
@@ -196,7 +196,7 @@ export function LoginPage() {
             type="email"
             name="email"
             autoComplete="email"
-            placeholder="you@example.com"
+            placeholder="name@example.com"
             value={email}
             onChange={(event) => {
               setEmail(event.target.value)
@@ -221,7 +221,7 @@ export function LoginPage() {
           />
           <div className="auth-form__options">
             <Checkbox
-              label="Remember me"
+              label="Keep me logged in"
               name="remember"
               checked={remember}
               onChange={(event) => setRemember(event.target.checked)}
@@ -244,8 +244,8 @@ export function LoginPage() {
       </form>
 
       <p className="auth-panel__footer">
-        <span>New to Sportify?</span>
-        <Link to="/register" state={loginReturnState(initialState)}>Create an account</Link>
+        <span>Don't have an account?</span>
+        <Link to="/register" state={loginReturnState(initialState)}>Sign up</Link>
       </p>
     </AuthShell>
   )
