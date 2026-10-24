@@ -7,9 +7,10 @@
  * (".hero { color|#ffffff", "@media (max-width: 960px) { .hero { color|#ffffff") so changing a value, moving it to
  * another property or swapping colors between two selectors is a new key.
  * Scripts and HTML: hex and functional colors inside string literals and attribute values, plus named colors where
- * the string is a CSS color value (an inline style string, a style object key such as color or backgroundColor, an
- * SVG fill or stroke attribute, style.color = or setProperty). Anywhere else words like "red" or "tan" are ordinary
- * text. Hex-like link targets and selectors ("#abc" in href, to, id or querySelector, "/page#add") are not colors.
+ * the string is a CSS color value (an inline style string, a style object key such as color, backgroundColor or
+ * textColor, an SVG fill or stroke attribute, style.color = or setProperty, also as a branch of ?:, && or ||).
+ * Anywhere else words like "red" or "tan" are ordinary text. <style> blocks in HTML are scanned as stylesheets.
+ * Hex-like link targets and selectors ("#abc" in href, to, id or querySelector, "/page#add") are not colors.
  */
 
 export type ColorCounts = Record<string, number>
@@ -25,8 +26,14 @@ const COLOR_PROPERTY = /^(?:--[\w-]+|(?:-webkit-)?(?:color|background(?:-color|-
 /* Text right before a string that makes it a link target or a selector, not a color. */
 const LINK_CONTEXT = /(?:\b(?:href|to|hash|id|htmlFor|for|xlinkHref|xlink:href)\s*[=:]\s*\{?|\b(?:querySelector|querySelectorAll|getElementById|closest|matches|navigate|scrollIntoView)\(\s*)$/
 
-/* Text right before a string that makes it the value of a color property; group 1 or 2 is the property. */
-const PROPERTY_CONTEXT = /(?:(?:^|[\s{,;(.])['"]?([A-Za-z-]+)['"]?\s*[:=]\s*\{?|\bsetProperty\(\s*['"]([-\w]+)['"]\s*,\s*)$/
+/*
+ * Text right before a string that makes it the value of a color property; group 1 or 2 is the property. The value may
+ * be one branch of a condition (color: active ? 'red' : 'blue', background: disabled && 'gray', 'x' ?? 'navy').
+ */
+const PROPERTY_CONTEXT = /(?:(?:^|[\s{,;(.])['"]?([A-Za-z-]+)['"]?\s*[:=]\s*\{?\s*(?:(?:[^;{},\n'"`]|'[^'\n]*'|"[^"\n]*")*?(?:\?|:|\|\||&&|\?\?)\s*)?|\bsetProperty\(\s*['"]([-\w]+)['"]\s*,\s*)$/
+
+/* <style> blocks of an HTML file, scanned as stylesheets. */
+const STYLE_BLOCK = /<style\b[^>]*>([\s\S]*?)<\/style>/gi
 
 /* CSS named colors (CSS Color 4), without transparent and currentcolor, which carry no palette value. */
 const NAMED_COLORS = new Set(
@@ -120,7 +127,7 @@ function kebab(property: string): string {
 function isColorValue(before: string): boolean {
   const match = PROPERTY_CONTEXT.exec(before)
   const property = match?.[1] ?? match?.[2]
-  return property !== undefined && COLOR_PROPERTY.test(kebab(property))
+  return property !== undefined && (COLOR_PROPERTY.test(kebab(property)) || /colou?r$/i.test(property))
 }
 
 /** Named colors in the color declarations of an inline style or CSS string such as "color: red; fill: navy". */
@@ -134,9 +141,13 @@ function inlineNamedColors(text: string): string[] {
   return found
 }
 
-/** Color literals inside string literals and attribute values of a script or HTML file. */
-export function scriptColors(source: string): ColorCounts {
+/** Color literals inside string literals and attribute values of a script or HTML file, and its <style> blocks. */
+export function scriptColors(input: string): ColorCounts {
   const counts: ColorCounts = {}
+  for (const block of input.matchAll(STYLE_BLOCK)) {
+    for (const [key, count] of Object.entries(cssColors(block[1]))) counts[`<style> ${key}`] = (counts[`<style> ${key}`] ?? 0) + count
+  }
+  const source = input.replace(STYLE_BLOCK, '<style></style>')
   for (const match of source.matchAll(/(['"`])((?:\\.|(?!\1)[^\\])*)\1/g)) {
     const before = source.slice(Math.max(0, match.index - 80), match.index)
     const text = match[2]

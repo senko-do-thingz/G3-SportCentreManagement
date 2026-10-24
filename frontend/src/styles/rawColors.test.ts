@@ -89,9 +89,22 @@ describe('UI-00 raw color scanner', () => {
     `)).toEqual({ white: 1, navy: 1, teal: 1, red: 1, black: 1, tomato: 1, gold: 1, orange: 1, crimson: 1 })
   })
 
+  it('finds named colors in conditional style values, *Color props and HTML <style> blocks', () => {
+    expect(scriptColors(`
+      <div style={{ color: active ? 'red' : 'blue', background: disabled && 'gray', borderColor: custom ?? 'teal' }} />
+      element.style.color = dark ? 'black' : 'white'
+      <Chip textColor="navy" bgColor={'gold'} />
+    `)).toEqual({ red: 1, blue: 1, gray: 1, teal: 1, black: 1, white: 1, navy: 1, gold: 1 })
+    expect(scriptColors('<head><style>\n  body { color: red; background: #123456 }\n</style></head><a href="#fff">x</a>')).toEqual({
+      '<style> body { color|red': 1,
+      '<style> body { background|#123456': 1,
+    })
+  })
+
   it('keeps named color words that are not CSS color values out of the scan', () => {
     expect(scriptColors(`
       const team = 'red'; const options = { tone: 'green', label: 'Blue', title: 'Gold card' }
+      const badge = { fill: 'x', title: active ? 'red' : 'Silver' }; const mode = theme === 'dark' ? 'black' : 'plain'
       <Badge variant="orange">Silver</Badge>
       const hint = 'Pick a color: white, black or red'
     `)).toEqual({})

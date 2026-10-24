@@ -75,8 +75,9 @@ baseline `src/styles/rawColorBaseline.json`:
 - Syntaxes: hex (3, 4, 6, 8 digits), `rgb`, `rgba`, `hsl`, `hsla`, `hwb`, `lab`, `lch`, `oklab`, `oklch`,
   `color()`, and CSS named colors in stylesheets (`transparent` and `currentColor` are not palette values).
   In scripts, named colors are scanned where the string is a CSS color value: inline style strings, style
-  object keys such as `color` or `backgroundColor`, SVG `fill` and `stroke`, `style.color =` and
-  `setProperty`. Elsewhere words like "red" are ordinary text.
+  object keys such as `color`, `backgroundColor` or `textColor`, SVG `fill` and `stroke`, `style.color =` and
+  `setProperty`, including either branch of `?:`, `&&`, `||` or `??`. Elsewhere words like "red" are ordinary
+  text. `<style>` blocks in `index.html` are scanned as stylesheets.
 - Hex-like link targets and selectors are not colors: `#abc` in `href`, `to`, `id`, `htmlFor`,
   `querySelector`, `closest` or `navigate`, and after a path or query (`/classes#face`).
 - Stylesheet colors are keyed by the enclosing rules, property and color
