@@ -74,9 +74,15 @@ baseline `src/styles/rawColorBaseline.json`:
   canvas colors), `public/*.js` (theme bootstrap) and `index.html`. Test files are excluded.
 - Syntaxes: hex (3, 4, 6, 8 digits), `rgb`, `rgba`, `hsl`, `hsla`, `hwb`, `lab`, `lch`, `oklab`, `oklch`,
   `color()`, and CSS named colors in stylesheets (`transparent` and `currentColor` are not palette values).
-  Named colors are not scanned in scripts, where words like "red" are ordinary text.
-- Stylesheet colors are keyed by property (`color|#ffffff`, `--h-bg|#ffffff`), so changing a value, moving a
-  value to another property, adding one more use or adding a color to a new file all fail. Removing colors passes.
+  In scripts, named colors are scanned where the string is a CSS color value: inline style strings, style
+  object keys such as `color` or `backgroundColor`, SVG `fill` and `stroke`, `style.color =` and
+  `setProperty`. Elsewhere words like "red" are ordinary text.
+- Hex-like link targets and selectors are not colors: `#abc` in `href`, `to`, `id`, `htmlFor`,
+  `querySelector`, `closest` or `navigate`, and after a path or query (`/classes#face`).
+- Stylesheet colors are keyed by the enclosing rules, property and color
+  (`.home-hero { color|#ffffff`, `@media screen { :root[data-theme='dark'] { --color-bg|#0d1724`), so changing a
+  value, moving it to another property or selector, swapping colors between two selectors, adding one more use or
+  adding a color to a new file all fail. Reformatting whitespace or hex case and removing colors pass.
 - `tokens.css` is in the baseline too, so a token value change shows up as a baseline diff in the pull request.
 
 After an approved token change, regenerate the baseline (PowerShell, from `frontend/`):

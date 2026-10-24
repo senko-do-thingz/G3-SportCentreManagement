@@ -8,11 +8,13 @@ takes full-page screenshots, compares them pixel by pixel and reads the values t
 Content is made deterministic so only styling can differ: the public API is answered with fixed JSON,
 remote photos and videos are blocked (Home shows its bundled fallback images) and reduced motion is on.
 
-Usage (PowerShell, from frontend/):
-  pip install playwright pillow; python -m playwright install chromium
-  npm run build -- --outDir ../dist-after          (on the UI-00 branch; repeat on main into ../dist-before)
-  python -m http.server 4301 -d ../dist-before     (and 4302 for ../dist-after, in two other windows)
+Usage (PowerShell, from frontend/ on the PR revision; full steps in docs/UI-00-test-cases.md):
+  python -m pip install -r scripts/requirements-visual-check.txt; python -m playwright install chromium
+  git worktree add ../../ui00-base (git merge-base HEAD origin/main)   (the base build; npm ci there too)
+  npm run build -- --outDir ../../dist-after                   (here; in ../../ui00-base/frontend into ../../dist-before)
+  npx vite preview --outDir ../../dist-before --port 4301 --strictPort   (and ../../dist-after on 4302, two other windows)
   python scripts/ui00-visual-check.py --before http://localhost:4301 --after http://localhost:4302 --out docs/screenshots/ui-00
+vite preview is required: it serves index.html for /login and /register, which a plain static server answers with 404.
 Exit code 0 when every screenshot pair is identical and every rendered value matches the contract.
 """
 
