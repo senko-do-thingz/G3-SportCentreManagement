@@ -63,13 +63,28 @@
       },
       {
         "name": "brand name",
-        "ratio": 13.1,
-        "needed": 3
+        "ratio": 17.65,
+        "needed": 4.5
       },
       {
         "name": "brand mark",
         "ratio": 6.63,
         "needed": 3
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
       }
     ],
     "login-light-390-errors": [
@@ -115,8 +130,8 @@
       },
       {
         "name": "brand name",
-        "ratio": 13.1,
-        "needed": 3
+        "ratio": 17.65,
+        "needed": 4.5
       },
       {
         "name": "brand mark",
@@ -126,6 +141,21 @@
       {
         "name": "field error",
         "ratio": 5.38,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
         "needed": 4.5
       }
     ],
@@ -167,13 +197,13 @@
       },
       {
         "name": "log in button",
-        "ratio": 6.63,
+        "ratio": 8.43,
         "needed": 4.5
       },
       {
         "name": "brand name",
-        "ratio": 13.1,
-        "needed": 3
+        "ratio": 17.65,
+        "needed": 4.5
       },
       {
         "name": "brand mark",
@@ -183,6 +213,21 @@
       {
         "name": "form alert",
         "ratio": 4.85,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
         "needed": 4.5
       }
     ],
@@ -229,13 +274,33 @@
       },
       {
         "name": "brand name",
-        "ratio": 13.1,
+        "ratio": 17.65,
         "needed": 3
       },
       {
         "name": "brand mark",
         "ratio": 6.63,
         "needed": 3
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
+        "needed": 4.5
       }
     ],
     "login-light-768-errors": [
@@ -281,7 +346,7 @@
       },
       {
         "name": "brand name",
-        "ratio": 13.1,
+        "ratio": 17.65,
         "needed": 3
       },
       {
@@ -292,6 +357,26 @@
       {
         "name": "field error",
         "ratio": 5.38,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
         "needed": 4.5
       }
     ],
@@ -338,7 +423,7 @@
       },
       {
         "name": "brand name",
-        "ratio": 13.1,
+        "ratio": 17.65,
         "needed": 3
       },
       {
@@ -349,6 +434,26 @@
       {
         "name": "form alert",
         "ratio": 4.85,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
         "needed": 4.5
       }
     ],
@@ -395,13 +500,33 @@
       },
       {
         "name": "brand name",
-        "ratio": 13.1,
+        "ratio": 17.65,
         "needed": 3
       },
       {
         "name": "brand mark",
         "ratio": 6.63,
         "needed": 3
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
+        "needed": 4.5
       }
     ],
     "login-light-1440-errors": [
@@ -447,7 +572,7 @@
       },
       {
         "name": "brand name",
-        "ratio": 13.1,
+        "ratio": 17.65,
         "needed": 3
       },
       {
@@ -458,6 +583,26 @@
       {
         "name": "field error",
         "ratio": 5.38,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
         "needed": 4.5
       }
     ],
@@ -504,7 +649,7 @@
       },
       {
         "name": "brand name",
-        "ratio": 13.1,
+        "ratio": 17.65,
         "needed": 3
       },
       {
@@ -515,6 +660,26 @@
       {
         "name": "form alert",
         "ratio": 4.85,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
         "needed": 4.5
       }
     ],
@@ -561,13 +726,28 @@
       },
       {
         "name": "brand name",
-        "ratio": 13.7,
-        "needed": 3
+        "ratio": 17.65,
+        "needed": 4.5
       },
       {
         "name": "brand mark",
         "ratio": 7.67,
         "needed": 3
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
       }
     ],
     "login-dark-390-errors": [
@@ -613,8 +793,8 @@
       },
       {
         "name": "brand name",
-        "ratio": 13.7,
-        "needed": 3
+        "ratio": 17.65,
+        "needed": 4.5
       },
       {
         "name": "brand mark",
@@ -624,6 +804,21 @@
       {
         "name": "field error",
         "ratio": 9.34,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
         "needed": 4.5
       }
     ],
@@ -665,13 +860,13 @@
       },
       {
         "name": "log in button",
-        "ratio": 7.67,
+        "ratio": 9.81,
         "needed": 4.5
       },
       {
         "name": "brand name",
-        "ratio": 13.7,
-        "needed": 3
+        "ratio": 17.65,
+        "needed": 4.5
       },
       {
         "name": "brand mark",
@@ -681,6 +876,21 @@
       {
         "name": "form alert",
         "ratio": 7.66,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
         "needed": 4.5
       }
     ],
@@ -727,13 +937,33 @@
       },
       {
         "name": "brand name",
-        "ratio": 13.7,
+        "ratio": 17.65,
         "needed": 3
       },
       {
         "name": "brand mark",
         "ratio": 7.67,
         "needed": 3
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
+        "needed": 4.5
       }
     ],
     "login-dark-768-errors": [
@@ -779,7 +1009,7 @@
       },
       {
         "name": "brand name",
-        "ratio": 13.7,
+        "ratio": 17.65,
         "needed": 3
       },
       {
@@ -790,6 +1020,26 @@
       {
         "name": "field error",
         "ratio": 9.34,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
         "needed": 4.5
       }
     ],
@@ -836,7 +1086,7 @@
       },
       {
         "name": "brand name",
-        "ratio": 13.7,
+        "ratio": 17.65,
         "needed": 3
       },
       {
@@ -847,6 +1097,26 @@
       {
         "name": "form alert",
         "ratio": 7.66,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
         "needed": 4.5
       }
     ],
@@ -893,13 +1163,33 @@
       },
       {
         "name": "brand name",
-        "ratio": 13.7,
+        "ratio": 17.65,
         "needed": 3
       },
       {
         "name": "brand mark",
         "ratio": 7.67,
         "needed": 3
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
+        "needed": 4.5
       }
     ],
     "login-dark-1440-errors": [
@@ -945,7 +1235,7 @@
       },
       {
         "name": "brand name",
-        "ratio": 13.7,
+        "ratio": 17.65,
         "needed": 3
       },
       {
@@ -956,6 +1246,26 @@
       {
         "name": "field error",
         "ratio": 9.34,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
         "needed": 4.5
       }
     ],
@@ -1002,7 +1312,7 @@
       },
       {
         "name": "brand name",
-        "ratio": 13.7,
+        "ratio": 17.65,
         "needed": 3
       },
       {
@@ -1014,132 +1324,170 @@
         "name": "form alert",
         "ratio": 7.66,
         "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
+        "needed": 4.5
       }
     ]
   },
   "layout": {
     "login-light-390-empty": {
       "overflow": 0,
-      "cardHeight": 629,
+      "cardHeight": 507,
+      "pageHeight": 900,
       "baselineGap": 0,
       "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
       "fontLoaded": true
     },
     "login-light-390-errors": {
       "overflow": 0,
-      "cardHeight": 629,
+      "cardHeight": 507,
+      "pageHeight": 900,
       "baselineGap": 0,
       "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
       "fontLoaded": true
     },
     "login-light-390-invalid": {
       "overflow": 0,
-      "cardHeight": 690,
+      "cardHeight": 569,
+      "pageHeight": 900,
       "baselineGap": 0,
       "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
       "fontLoaded": true
     },
     "login-light-768-empty": {
       "overflow": 0,
-      "cardHeight": 613,
+      "cardHeight": 523,
+      "pageHeight": 900,
       "baselineGap": 0,
       "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
       "fontLoaded": true
     },
     "login-light-768-errors": {
       "overflow": 0,
-      "cardHeight": 613,
+      "cardHeight": 523,
+      "pageHeight": 900,
       "baselineGap": 0,
       "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
       "fontLoaded": true
     },
     "login-light-768-invalid": {
       "overflow": 0,
-      "cardHeight": 674,
+      "cardHeight": 585,
+      "pageHeight": 957,
       "baselineGap": 0,
       "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
       "fontLoaded": true
     },
     "login-light-1440-empty": {
       "overflow": 0,
-      "cardHeight": 820,
+      "cardHeight": 531,
+      "pageHeight": 900,
       "baselineGap": 0,
       "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
       "fontLoaded": true
     },
     "login-light-1440-errors": {
       "overflow": 0,
-      "cardHeight": 820,
+      "cardHeight": 531,
+      "pageHeight": 900,
       "baselineGap": 0,
       "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
       "fontLoaded": true
     },
     "login-light-1440-invalid": {
       "overflow": 0,
-      "cardHeight": 820,
+      "cardHeight": 593,
+      "pageHeight": 900,
       "baselineGap": 0,
       "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
       "fontLoaded": true
     },
     "login-dark-390-empty": {
       "overflow": 0,
-      "cardHeight": 629,
+      "cardHeight": 507,
+      "pageHeight": 900,
       "baselineGap": 0,
       "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
       "fontLoaded": true
     },
     "login-dark-390-errors": {
       "overflow": 0,
-      "cardHeight": 629,
+      "cardHeight": 507,
+      "pageHeight": 900,
       "baselineGap": 0,
       "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
       "fontLoaded": true
     },
     "login-dark-390-invalid": {
       "overflow": 0,
-      "cardHeight": 690,
+      "cardHeight": 569,
+      "pageHeight": 900,
       "baselineGap": 0,
       "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
       "fontLoaded": true
     },
     "login-dark-768-empty": {
       "overflow": 0,
-      "cardHeight": 613,
+      "cardHeight": 523,
+      "pageHeight": 900,
       "baselineGap": 0,
       "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
       "fontLoaded": true
     },
     "login-dark-768-errors": {
       "overflow": 0,
-      "cardHeight": 613,
+      "cardHeight": 523,
+      "pageHeight": 900,
       "baselineGap": 0,
       "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
       "fontLoaded": true
     },
     "login-dark-768-invalid": {
       "overflow": 0,
-      "cardHeight": 674,
+      "cardHeight": 585,
+      "pageHeight": 957,
       "baselineGap": 0,
       "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
       "fontLoaded": true
     },
     "login-dark-1440-empty": {
       "overflow": 0,
-      "cardHeight": 820,
+      "cardHeight": 531,
+      "pageHeight": 900,
       "baselineGap": 0,
       "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
       "fontLoaded": true
     },
     "login-dark-1440-errors": {
       "overflow": 0,
-      "cardHeight": 820,
+      "cardHeight": 531,
+      "pageHeight": 900,
       "baselineGap": 0,
       "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
       "fontLoaded": true
     },
     "login-dark-1440-invalid": {
       "overflow": 0,
-      "cardHeight": 820,
+      "cardHeight": 593,
+      "pageHeight": 900,
       "baselineGap": 0,
       "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
       "fontLoaded": true
@@ -1147,31 +1495,37 @@
   },
   "focus": {
     "light-390": {
+      "theme switch": true,
       "email field": true,
       "show password": true,
       "log in button": true
     },
     "light-768": {
+      "theme switch": true,
       "email field": true,
       "show password": true,
       "log in button": true
     },
     "light-1440": {
+      "theme switch": true,
       "email field": true,
       "show password": true,
       "log in button": true
     },
     "dark-390": {
+      "theme switch": true,
       "email field": true,
       "show password": true,
       "log in button": true
     },
     "dark-768": {
+      "theme switch": true,
       "email field": true,
       "show password": true,
       "log in button": true
     },
     "dark-1440": {
+      "theme switch": true,
       "email field": true,
       "show password": true,
       "log in button": true

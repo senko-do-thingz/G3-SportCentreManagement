@@ -9,7 +9,8 @@ Owner: UI-03 (Phat). Applies to every screen task that shows a photo, video or i
 | Remote photos | Unsplash CDN, built only by `src/media/unsplash.ts` | Responsive sizes, credited on `/credits` |
 | Sport photos | `src/media/sportPhotos.ts` (one photo per sport) | Shared by Home and the member class pages |
 | Offline fallbacks | `src/assets/home/*.jpg` | Low resolution copies shown only when a remote photo fails |
-| Log in and Sign up side photo | `src/assets/auth-hero.jpg` | From the team Figma design, used by `layouts.css` |
+| Log in background | Home hero photo (`HOME_PHOTOS.hero`) through `Photo` | Since UI-06; credited on `/credits` |
+| Sign up side photo | `src/assets/auth-hero.jpg` | From the team Figma design, used by `layouts.css` until UI-07 |
 | Demo coach portraits | `public/images/coaches/*.jpg` (640 x 640) | Committed files, credited on `/credits` |
 | Hero background video | Mixkit CDN (`HOME_HERO_VIDEOS` in `homeContent.ts`) | Credited on `/credits` |
 | Display font | `@fontsource/be-vietnam-pro` | Imported only by the pages that use it |
@@ -31,8 +32,8 @@ Owner: UI-03 (Phat). Applies to every screen task that shows a photo, video or i
 ## Known gaps (tracked, not blocking)
 
 - `auth-hero.jpg` and the bundled fallbacks were cut from the team design screenshots; the original photo source
-  is not recorded, so they are not listed on `/credits`. UI-06 (Log in) and UI-07 (Sign up) move the auth screens
-  to the Home theme and should switch the side photo to a credited Unsplash photo through `Photo`.
+  is not recorded, so they are not listed on `/credits`. Log in moved to the credited Home hero photo in UI-06;
+  Sign up (UI-07) should do the same, after which `auth-hero.jpg` can be removed.
 - Videos stream from the Mixkit CDN; there is no bundled video fallback, the hero photo stays visible instead.
 
 ## Pick the largest width for the biggest slot

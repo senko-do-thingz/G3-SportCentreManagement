@@ -1,4 +1,4 @@
-"""UI-06 Log in check in a real browser (before = the base branch, after = the UI-06 branch).
+"""UI-06 Log in check (layout B) in a real browser (before = the base branch, after = the UI-06 branch).
 
 Opens /login of two running builds in Chromium at 390, 768 and 1440 px in light and dark mode, in three states
 (empty, field validation errors, invalid credentials from the server), and takes before and after screenshots.
@@ -6,8 +6,9 @@ On the UI-06 build it also checks what the reviewer asks of a theme change:
   - rendered text contrast against the actual background (WCAG 2.2 AA: 4.5:1, 3:1 for large text);
   - the display font is loaded and used for the headings;
   - Remember me and Forgot password share a text baseline;
-  - no horizontal page overflow, and the desktop card keeps its fixed height when errors appear;
-  - keyboard focus is visible on the email field, the password toggle and the Log in button;
+  - no horizontal page overflow, and on a 1440 x 900 screen the page fits without scrolling (empty and field errors);
+  - text on the photo (slogan, Back to Home) is checked against the hero navy, which the overlay darkens the photo to;
+  - keyboard focus is visible on the sun and moon switch, the email field, the password toggle and the Log in button;
   - a successful login still leaves /login for the member area (POST /auth/login, then GET /users/me).
 
 The API is answered with fixed JSON. Usage (PowerShell, from frontend/):
@@ -41,8 +42,12 @@ CONTRAST = r"""() => {
     const c = [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 })
     return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
   }
+  // Header and slogan sit on the photo under the navy overlay: measure them against --color-navy.
+  const navy = getComputedStyle(document.documentElement).getPropertyValue('--color-navy').trim()
+  const onPhoto = { r: parseInt(navy.slice(1, 3), 16), g: parseInt(navy.slice(3, 5), 16), b: parseInt(navy.slice(5, 7), 16), a: 1 }
   const background = (el) => {
     for (let node = el; node; node = node.parentElement) {
+      if (node.matches('.auth-stage__header, .auth-stage__copy')) return onPhoto
       const bg = parse(getComputedStyle(node).backgroundColor)
       if (bg && bg.a > 0.5) return bg
     }
@@ -54,6 +59,8 @@ CONTRAST = r"""() => {
     ['footer text', '.auth-panel__footer span'], ['create account link', '.auth-panel__footer a'],
     ['log in button', '.auth-form .btn--primary'], ['brand name', '.brand__name'], ['brand mark', '.brand__mark'],
     ['field error', '.field__error'], ['form alert', '.notice'],
+    ['back to home', '.auth-stage__home'], ['slogan title', '.auth-stage__copy__title'], ['slogan eyebrow', '.auth-stage__copy__eyebrow'],
+    ['slogan text', '.auth-stage__copy__text'],
   ]
   return checks.flatMap(([name, selector]) => {
     const el = document.querySelector(selector)
@@ -77,10 +84,11 @@ LAYOUT = r"""() => {
     marker.remove()
     return baseline
   }
-  const card = document.querySelector('.auth-shell').getBoundingClientRect()
+  const card = document.querySelector('.auth-panel').getBoundingClientRect()
   return {
     overflow: document.documentElement.scrollWidth - window.innerWidth,
     cardHeight: Math.round(card.height),
+    pageHeight: document.documentElement.scrollHeight,
     baselineGap: Math.abs(text('.checkbox__label') - text('.auth-form__options .link-button')),
     headingFont: getComputedStyle(document.querySelector('.auth-panel__heading h1')).fontFamily,
     fontLoaded: document.fonts.check('800 32px "Be Vietnam Pro"'),
@@ -131,7 +139,7 @@ def open_login(browser, base_url, theme, width, state):
 def focus_checks(page):
     results = {}
     page.locator("body").click(position={"x": 2, "y": 2})
-    for name, target in (("email field", page.locator("input[name=email]")), ("show password", page.get_by_role("button", name="Show password")),
+    for name, target in (("theme switch", page.locator(".auth-theme")), ("email field", page.locator("input[name=email]")), ("show password", page.get_by_role("button", name="Show password")),
                          ("log in button", page.get_by_role("button", name="Log in", exact=True))):
         target.focus()
         page.keyboard.press("Shift+Tab")
@@ -183,8 +191,11 @@ def main():
                                         fail(f"{name}: no visible focus on {target}")
                         context.close()
                     report["screens"].append(name)
-                if width == 1440 and len(set(heights.values())) != 1:
-                    fail(f"login-{theme}-1440: card height changes with errors {heights}")
+                if width == 1440:
+                    for state in ("empty", "errors"):
+                        page_height = report["layout"][f"login-{theme}-1440-{state}"]["pageHeight"]
+                        if page_height > 900:
+                            fail(f"login-{theme}-1440-{state}: page scrolls on a 1440 x 900 screen ({page_height} px)")
         context, page = open_login(browser, args.after.rstrip("/"), "light", 1440, "success")
         page.wait_for_function("!location.pathname.startsWith('/login')", timeout=10000)
         report["login_flow"] = page.evaluate("location.pathname")

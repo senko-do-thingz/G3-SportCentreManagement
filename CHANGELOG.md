@@ -1,11 +1,12 @@
 ## 2026-10-24 - Redesign Log in to the Home theme (UI-06)
 
-- Log in takes the approved Home theme from the shared tokens (UI-00): navy hero with gold highlight, uppercase Be Vietnam Pro display headings and italic brand, square card, fields and button, gold rule, royal blue primary action, shared focus ring.
-- Styles move from layouts.css to src/styles/login.css, imported by the Log in page only. The local --login-* palette and its dark block are removed, so dark mode follows the shared dark tokens; 32 color uses leave layouts.css and the color baseline is tightened.
-- Fix: Remember me and Forgot password now share one text baseline (they were 13 px apart).
-- Behavior unchanged (POST /auth/login, refresh, validation, messages, return navigation). Sign up is not changed (UI-07).
-- Tests: src/styles/login.test.ts. Browser check scripts/ui06-login-check.py (light and dark, 390, 768 and 1440 px, empty, field errors and server error): contrast at least 4.5:1 as rendered (lowest 4.85:1), visible focus, no overflow, fixed card height, login reaches /member. Sheets and report in frontend/docs/screenshots/ui-06; cases in frontend/docs/UI-06-test-cases.md.
-- Lint, tsc, all frontend tests (1386) and the production build pass.
+- Log in uses layout B: the Home hero photo (credited, responsive through Photo) fills the page under the Home overlay, with a compact Home header (brand, Back to Home, the same sun and moon switch as Home), the slogan on the left and the form card on the right. Below 960 px the photo becomes a band with the slogan above the card.
+- AuthShell gains layout="stage"; Sign up keeps the split card until UI-07. The Home theme switch moves to src/theme/ThemeToggle.tsx and is shared by Home and Log in.
+- Every color, font and focus style comes from the UI-00 tokens: Be Vietnam Pro display headings and italic brand, square fields and button, gold rule, shared focus ring. Styles move from layouts.css to src/styles/login.css; the local --login-* palette and its dark block are removed (32 color uses leave layouts.css, color baseline tightened).
+- Fix: Remember me and Forgot password share one text baseline (they were 13 px apart).
+- Behavior unchanged (POST /auth/login, refresh, validation, messages, return navigation). Branch contains UI-00 and UI-03; merge after them.
+- Tests: src/styles/login.test.ts, src/theme/ThemeToggle.test.tsx. Browser check scripts/ui06-login-check.py (light and dark, 390, 768 and 1440 px, empty, field errors and server error): contrast at least 4.5:1 (lowest 4.85:1), visible focus, no overflow, fits a 1440 x 900 screen, login reaches /member. Sheets and report in frontend/docs/screenshots/ui-06; cases in frontend/docs/UI-06-test-cases.md.
+- Lint, tsc, all frontend tests (1400) and the production build pass.
 
 ## 2026-10-24 - Approved UI design system and token freeze (UI-00)
 
