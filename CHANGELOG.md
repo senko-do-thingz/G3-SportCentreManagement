@@ -1,3 +1,9 @@
+## 2026-10-23 - Verify guest authentication return navigation (UI-05)
+
+- Re-verify after the Home, coach profile and shared UI merges that every Home action needing a Member session (Membership offers, View schedule, package View options, View cards) returns the guest to that exact destination after Log in or Create account, without sending a registration, purchase or booking.
+- Check that guests browse `/`, `/credits`, `/login` and `/register` without a session request, a write or a sign-in prompt, and that role guards still hold for every role and area (own area renders, others show Access denied, guests go to Log in).
+- Cover browser Back after a return, staff logins with a Member destination (role home instead), unsafe return states, session expiry on a protected page with its query, and a signed-in Member opening Log in. New tests in frontend/src/pages/public/guestReturnMatrix.test.tsx; cases in frontend/docs/UI-05-test-cases.md.
+- No production code change was needed. Lint, tsc, all frontend tests and the build pass.
 ## 2026-10-23 - Accessible shared UI components (UI-01)
 
 - Move the shared brand tokens to the approved Home Royal and Gold palette (navy, royal blue actions, gold highlights) in light and dark modes, and add --color-highlight. All shared controls pick it up; screen-specific colors are unchanged. Contrast of primary text, primary fills and gold fills meets WCAG 2.2 AA and is covered by token tests.
