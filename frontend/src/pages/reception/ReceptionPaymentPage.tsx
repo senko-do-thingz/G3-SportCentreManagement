@@ -1,4 +1,4 @@
-import { useCallback, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ApiError, getErrorMessage, splitFieldErrors } from '../../api/errors'
 import { receptionApi, type PaymentMethod } from '../../api/receptionApi'
@@ -12,12 +12,12 @@ import {
   ErrorState,
   Input,
   Modal,
-  PageHeader,
   Select,
   StatusBadge,
   TextArea,
   useToast,
 } from '../../components/ui'
+import { PaymentHero } from '../../components/PaymentHero'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { useResource } from '../../hooks/useResource'
@@ -32,6 +32,7 @@ import {
 import {
   amountCheck,
   amountDifference,
+  confirmedAmountProblem,
   FAIL_REASON_MAX,
   formatPaymentMoney as formatMoney,
   parsePaymentAmount,
@@ -108,7 +109,7 @@ export function ReceptionPaymentPage() {
   if (id === null) {
     return (
       <div className="page">
-        <PageHeader eyebrow={EYEBROW} title="Verify and Record Payment" actions={actions} />
+        <PaymentHero eyebrow={EYEBROW} title="Verify and Record Payment" aside={actions} />
         <EmptyState title="Payment not found" description="The payment link is not valid." />
       </div>
     )
@@ -116,7 +117,7 @@ export function ReceptionPaymentPage() {
   if (payment.status === 'loading') {
     return (
       <div className="page">
-        <PageHeader eyebrow={EYEBROW} title="Verify and Record Payment" actions={actions} />
+        <PaymentHero eyebrow={EYEBROW} title="Verify and Record Payment" aside={actions} />
         <Spinner label="Loading the payment" />
       </div>
     )
@@ -124,7 +125,7 @@ export function ReceptionPaymentPage() {
   if (payment.status === 'error') {
     return (
       <div className="page">
-        <PageHeader eyebrow={EYEBROW} title="Verify and Record Payment" actions={actions} />
+        <PaymentHero eyebrow={EYEBROW} title="Verify and Record Payment" aside={actions} />
         <ErrorState title="We could not load the payment" error={payment.error} onRetry={reload} />
       </div>
     )
@@ -162,6 +163,8 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
   const [saving, setSaving] = useState(false)
   const [mismatch, setMismatch] = useState<MismatchAmounts | null>(null)
   const [failOpen, setFailOpen] = useState(false)
+  // Set synchronously, so a second submit in the same tick (double click, Enter + click) sends nothing.
+  const submitting = useRef(false)
 
   // Null when the backend sent no usable amount: the form shows an error and both actions stay
   // disabled, so NaN never reaches the screen or the request.
@@ -186,14 +189,28 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    if (!ready || saving) return
+    if (!ready || saving || submitting.current) return
+    submitting.current = true
     setSaving(true)
     setFormError(null)
     try {
-      await receptionPaymentsApi.confirm(payment.id, toConfirmRequest(form))
-      toast.success('Payment confirmed', 'The payment is recorded. Check the service status on this page.')
-      onDone()
+      const result = await receptionPaymentsApi.confirm(payment.id, toConfirmRequest(form))
+      // Success is claimed only for the payment asked about, once the backend says SUCCESS with the right
+      // amount. A SUCCESS with an amount problem reloads into the Needs review state, without the toast.
+      if (result.id === payment.id && result.status === 'SUCCESS') {
+        if (confirmedAmountProblem(result) === null) {
+          toast.success('Payment confirmed', 'The payment is recorded. Check the service status on this page.')
+        }
+        onDone()
+        return
+      }
+      submitting.current = false
+      setSaving(false)
+      setFormError(
+        `The payment was not confirmed (status: ${paymentStatusLabel(result.id === payment.id ? result.status : null)}). Reload the payment before trying again.`,
+      )
     } catch (failure) {
+      submitting.current = false
       setSaving(false)
       if (isAmountMismatch(failure) && amountDue !== null) {
         setMismatch(mismatchAmounts(amountDue, form.amountReceived, failure))
@@ -221,11 +238,11 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
   if (mismatch) {
     return (
       <div className="page">
-        <PageHeader
+        <PaymentHero
           eyebrow={EYEBROW}
           title="Payment Needs Review"
           description="The payment cannot be confirmed yet."
-          actions={actions}
+          aside={actions}
         />
         <Card title="Amount mismatch" aria-label="Amount mismatch">
           <dl className="summary-list payment-rows">
@@ -256,11 +273,11 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
 
   return (
     <div className="page">
-      <PageHeader
+      <PaymentHero
         eyebrow={EYEBROW}
         title="Verify and Record Payment"
         description="Confirm only after the full amount has been received."
-        actions={actions}
+        aside={actions}
       />
       <div className="reception-grid">
         <Card title="Payment information">
@@ -523,22 +540,40 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
   const [invoice, reloadInvoice] = useResource(loadInvoice)
   const invoiceData = invoice.status === 'ready' ? invoice.data : null
   const discount = Number(invoiceData?.discountAmount ?? payment.discount ?? 0)
+  // UI-31: a wrong amount is never shown as a success; the receipt cannot be printed until it is resolved.
+  const problem = refunded ? null : confirmedAmountProblem(payment, invoiceData?.totalAmount)
+  const basePrice = invoiceData?.subtotalAmount ?? payment.originalPrice
 
   return (
     <div className="page">
-      <PageHeader
+      <PaymentHero
         eyebrow={EYEBROW}
-        title={refunded ? 'Payment Refunded' : 'Payment Confirmed and Receipt'}
-        description={refunded ? 'This payment was refunded to the member.' : 'Payment has been recorded. Check the service status below.'}
-        actions={actions}
+        title={refunded ? 'Payment Refunded' : problem ? 'Payment Needs Review' : 'Payment Confirmed and Receipt'}
+        description={
+          refunded
+            ? 'This payment was refunded to the member.'
+            : problem
+              ? 'The amounts of this payment do not agree.'
+              : 'Payment has been recorded. Check the service status below.'
+        }
+        aside={actions}
       />
       <div className="reception-grid">
         <Card
           title={invoiceData ? `Receipt ${invoiceData.invoiceNumber}` : 'Receipt'}
           aria-label="Payment receipt"
-          className="payment-print-receipt"
+          className={problem ? undefined : 'payment-print-receipt'}
         >
-          <StatusBadge status={paymentStatusTone(payment.status)} label={paymentStatusLabel(payment.status)} />
+          {problem ? (
+            <>
+              <StatusBadge status="NEEDS_REVIEW" label="Needs review" />
+              <p className="notice notice--danger" role="alert">
+                {problem}
+              </p>
+            </>
+          ) : (
+            <StatusBadge status={paymentStatusTone(payment.status)} label={paymentStatusLabel(payment.status)} />
+          )}
           <dl className="summary-list payment-rows">
             <div>
               <dt>Issued to</dt>
@@ -548,10 +583,12 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
               <dt>Service</dt>
               <dd>{payment.itemDescription ?? '-'}</dd>
             </div>
-            <div>
-              <dt>Base price</dt>
-              <dd>{formatMoney(invoiceData?.subtotalAmount ?? payment.originalPrice ?? payment.amount)}</dd>
-            </div>
+            {basePrice !== null && basePrice !== undefined && (
+              <div>
+                <dt>Base price</dt>
+                <dd>{formatMoney(basePrice)}</dd>
+              </div>
+            )}
             {discount > 0 && (
               <div>
                 <dt>Discount</dt>
@@ -585,10 +622,12 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
             </div>
           )}
           <div className="reception-actions reception-print-hidden">
-            <Button onClick={() => window.print()} disabled={invoice.status !== 'ready'}>Print receipt</Button>
-            <Link className={buttonClassName('secondary', 'md')} to={paymentReceiptPath(payment.id)}>
-              Open receipt
-            </Link>
+            <Button onClick={() => window.print()} disabled={invoice.status !== 'ready' || problem !== null}>Print receipt</Button>
+            {problem === null && (
+              <Link className={buttonClassName('secondary', 'md')} to={paymentReceiptPath(payment.id)}>
+                Open receipt
+              </Link>
+            )}
             <Link className={buttonClassName('secondary', 'md')} to={PAYMENT_LIST_PATH}>
               Back to payment requests
             </Link>
@@ -703,7 +742,7 @@ function ServiceUpdated({ paymentId, memberId }: { paymentId: number; memberId: 
 function PaymentFailed({ payment, actions }: { payment: StaffPayment; actions: ReactNode }) {
   return (
     <div className="page">
-      <PageHeader eyebrow={EYEBROW} title="Payment Failed" description="This payment was closed without being received." actions={actions} />
+      <PaymentHero eyebrow={EYEBROW} title="Payment Failed" description="This payment was closed without being received." aside={actions} />
       <Card title={`Payment ${payment.code}`} aria-label="Failed payment">
         <StatusBadge status={paymentStatusTone(payment.status)} label={paymentStatusLabel(payment.status)} />
         <dl className="summary-list payment-rows">

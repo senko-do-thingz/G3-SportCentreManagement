@@ -1,3 +1,10 @@
+## 2026-10-24 - Verify payment and receipt (UI-31)
+
+- Verify and Record Payment, Payment Needs Review, Payment Confirmed and Receipt, Payment Failed and the desk receipt use the shared PaymentHero in the Home theme; the hero is not printed with a receipt.
+- A wrong amount is never shown as a success: the success message needs a SUCCESS answer for this payment id with the right amount; a paid payment whose amount received or invoice total differs from the amount due shows Payment Needs Review, and its receipt cannot be printed or opened.
+- Double submit is blocked synchronously, so two submits in the same tick send one confirmation. Receipts no longer invent a base price from the total, the desk receipt shows only the invoice of its payment, and a cancelled invoice cannot be printed.
+- Tests in receptionPayments.test.tsx (fail on the previous page); cases in frontend/docs/UI-31-test-cases.md. No API or backend changes.
+
 ## 2026-10-24 - Reception payment requests queue (UI-30)
 
 - Payment Requests (F3-04) uses the shared PaymentHero in the Home theme, with Refund requests in the hero.
