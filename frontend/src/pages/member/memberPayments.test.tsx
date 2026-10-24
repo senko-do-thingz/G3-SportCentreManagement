@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -769,6 +770,13 @@ describe('FE-11 My Payments and Receipts (F3-03, S3-PaidHistory)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Server error')
   })
 
+  it('UI-29 the history heading is the Home theme payment hero', async () => {
+    paymentsBackend()
+    renderApp('/member/payments')
+    const heading = await screen.findByRole('heading', { level: 1, name: 'My Payments and Receipts' })
+    expect(heading.closest('header')).toHaveClass('payment-hero')
+  })
+
   it('TC-FE11-031 the My Payments menu item opens the real screen', async () => {
     paymentsBackend({ myPayments: () => json(200, historyPage()) })
     renderApp('/member/payments')
@@ -870,6 +878,33 @@ describe('FE-11 Receipts (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt)', 
     expect(within(receipt).getByText('Tax').nextSibling).toHaveTextContent('0,05 VND')
     expect(within(receipt).getAllByText(/First invoice line/)).toHaveLength(1)
     expect(within(receipt).getByRole('list', { name: 'Receipt items' })).toHaveTextContent('x 2')
+  })
+
+  it('UI-29 shows no base price, discount or service the invoice does not have', async () => {
+    paymentsBackend({ invoice: json(200, invoice({ subtotalAmount: null, discountAmount: null, lines: [] })) })
+    renderApp('/member/payments/receipts/7')
+    const receipt = await screen.findByRole('region', { name: 'Receipt INV-0007' })
+    expect(within(receipt).queryByText('Base price')).not.toBeInTheDocument()
+    expect(within(receipt).queryByText('Discount')).not.toBeInTheDocument()
+    expect(within(receipt).queryByText('Service')).not.toBeInTheDocument()
+    expect(within(receipt).getByTestId('receipt-total')).toHaveTextContent('810.000 VND')
+  })
+
+  it('UI-29 a zero discount sent by the invoice is still shown as 0 VND', async () => {
+    paymentsBackend({ invoice: json(200, invoice({ subtotalAmount: 810000, discountAmount: 0 })) })
+    renderApp('/member/payments/receipts/7')
+    const receipt = await screen.findByRole('region', { name: 'Receipt INV-0007' })
+    expect(within(receipt).getByText('Discount').nextSibling).toHaveTextContent('0 VND')
+    expect(within(receipt).getByText('Base price').nextSibling).toHaveTextContent('810.000 VND')
+  })
+
+  it('UI-29 receipt and history headings use the Home theme payment hero, hidden when the receipt prints', async () => {
+    paymentsBackend()
+    renderApp('/member/payments/receipts/7')
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Receipt INV-0007' })
+    expect(heading.closest('header')).toHaveClass('payment-hero')
+    const css = readFileSync('src/styles/payments.css', 'utf8')
+    expect(css).toMatch(/@media print \{[\s\S]*\.receipt-page \.page-header,\s*\.receipt-page \.payment-hero \{\s*display: none;/)
   })
 
   it('does not render another member receipt after the backend returns 403', async () => {

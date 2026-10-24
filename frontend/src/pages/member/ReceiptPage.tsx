@@ -1,7 +1,8 @@
 import { useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { paymentsApi, type Invoice } from '../../api/paymentsApi'
-import { Button, Card, EmptyState, ErrorState, PageHeader, StatusBadge } from '../../components/ui'
+import { PaymentHero } from '../../components/PaymentHero'
+import { Button, Card, EmptyState, ErrorState, StatusBadge } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatDate, formatDateTime, humanizeCode } from '../../utils/format'
@@ -28,7 +29,7 @@ export function ReceiptPage() {
   if (id === null) {
     return (
       <div className="page">
-        <PageHeader eyebrow="Member / Payments" title="Receipt" />
+        <PaymentHero eyebrow="Member / Payments" title="Receipt" />
         <EmptyState
           title="Receipt not found"
           description="The receipt link is not valid."
@@ -51,7 +52,7 @@ function ReceiptView({ invoiceId }: { invoiceId: number }) {
   if (invoice.status !== 'ready') {
     return (
       <div className="page">
-        <PageHeader eyebrow="Member / Payments" title="Receipt" />
+        <PaymentHero eyebrow="Member / Payments" title="Receipt" />
         {invoice.status === 'loading' ? (
           <Spinner label="Loading the receipt" />
         ) : (
@@ -67,18 +68,16 @@ function ReceiptContent({ invoice }: { invoice: Invoice }) {
   const lines = invoice.lines ?? []
   // Only the invoice decides who it was issued to; the signed in account is never used here.
   const issuedTo = [invoice.memberFullName, invoice.memberCode].filter(Boolean).join(' / ') || '-'
-  const service = lines[0]?.description ?? '-'
+  // UI-29: no invented invoice fields. Base price, discount and service are shown only when the invoice has them.
+  const hasSubtotal = invoice.subtotalAmount !== null && invoice.subtotalAmount !== undefined && invoice.subtotalAmount !== ''
+  const hasDiscount = invoice.discountAmount !== null && invoice.discountAmount !== undefined && invoice.discountAmount !== ''
   const discount = Number(invoice.discountAmount ?? 0)
   const tax = Number(invoice.taxAmount ?? 0)
 
   return (
     <div className="page receipt-page">
       {invoice.paymentId ? <PaymentNav paymentId={invoice.paymentId} /> : null}
-      <PageHeader
-        eyebrow="Member / Payments"
-        title={`Receipt ${invoice.invoiceNumber}`}
-        description="Your confirmed payment record."
-      />
+      <PaymentHero eyebrow="Member / Payments" title={`Receipt ${invoice.invoiceNumber}`} description="Your confirmed payment record." />
       <Card className="receipt" aria-label={`Receipt ${invoice.invoiceNumber}`}>
         <div className="receipt__head">
           <p className="receipt__brand">SPORTIFY / PAYMENT RECEIPT</p>
@@ -95,9 +94,9 @@ function ReceiptContent({ invoice }: { invoice: Invoice }) {
             <dt>Issued to</dt>
             <dd>{issuedTo}</dd>
           </div>
-          {lines.length <= 1 && <div>
+          {lines.length === 1 && <div>
             <dt>Service</dt>
-            <dd>{service}{lines[0]?.quantity && lines[0].quantity > 1 ? ` x ${lines[0].quantity}` : ''}</dd>
+            <dd>{lines[0].description}{lines[0].quantity && lines[0].quantity > 1 ? ` x ${lines[0].quantity}` : ''}</dd>
           </div>}
           {lines.length > 1 && (
             <div className="receipt__lines-row">
@@ -118,14 +117,18 @@ function ReceiptContent({ invoice }: { invoice: Invoice }) {
               </dd>
             </div>
           )}
-          <div>
-            <dt>Base price</dt>
-            <dd>{formatMoney(invoice.subtotalAmount ?? invoice.totalAmount)}</dd>
-          </div>
-          <div>
-            <dt>Discount</dt>
-            <dd>{discount > 0 ? `-${formatMoney(discount)}` : formatMoney(0)}</dd>
-          </div>
+          {hasSubtotal && (
+            <div>
+              <dt>Base price</dt>
+              <dd>{formatMoney(invoice.subtotalAmount)}</dd>
+            </div>
+          )}
+          {hasDiscount && (
+            <div>
+              <dt>Discount</dt>
+              <dd>{discount > 0 ? `-${formatMoney(discount)}` : formatMoney(0)}</dd>
+            </div>
+          )}
           {tax > 0 && (
             <div>
               <dt>Tax</dt>
