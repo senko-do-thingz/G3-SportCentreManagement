@@ -1,3 +1,13 @@
+## 2026-10-24 - Standardize media, credits and performance (UI-03)
+
+- Audit main: Home photos loaded one full desktop file on every screen (2200 px hero on phones), the member Find Classes and session cards stretched 87 px bundled images, Unsplash URLs were built in two places, the hero video always tried Full HD first and started before the page finished loading, and three bundled coach images were unused.
+- Add src/media: unsplash.ts (the only place that builds Unsplash URLs, responsive srcset helper), Photo.tsx (shared photo with srcset, sizes, async decoding and a one-time bundled fallback that drops the srcset) and sportPhotos.ts (one photo per sport). HomePhoto is replaced by Photo.
+- Home passes sizes for every photo, so phones download 480 or 720 px files instead of 1000 to 2200 px; the sport strip photo in the hero is no longer lazy. Find Classes and session cards show the same sport photos as Home in responsive sizes, with the bundled image as the offline fallback.
+- Hero video: mounts after the page load event, tries the 720p file first unless the screen is at least 1600 px wide on a fast connection; data saver, reduced motion and narrow screens keep the photo only (unchanged).
+- Credits are built from the same helpers; a test fails if a used Unsplash photo is missing from /credits. Remove unused src/assets/home/coach-*.jpg.
+- New frontend/docs/media-guidelines.md (where media lives, rules for new screens, known gaps: the auth side photo has no recorded source and is switched to a credited photo in UI-06 and UI-07). Tests in frontend/src/media/media.test.tsx and HomeHeroVideo.test.tsx; cases in frontend/docs/UI-03-test-cases.md.
+- No API or backend changes. Lint, tsc, all frontend tests (1384) and the production build pass.
+
 ## 2026-10-23 - Verify guest authentication return navigation (UI-05)
 
 - Re-verify after the Home, coach profile and shared UI merges that every Home action needing a Member session (Membership offers, View schedule, package View options, View cards) returns the guest to that exact destination after Log in or Create account, without sending a registration, purchase or booking.
