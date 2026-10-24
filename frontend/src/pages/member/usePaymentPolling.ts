@@ -48,6 +48,9 @@ export function isRetryableError(error: unknown): boolean {
   return error instanceof ApiError && (error.isNetworkError || error.status >= 500)
 }
 
+/** The backend answered with another payment than the one in the link; it is never shown (UI-28). */
+export const PAYMENT_MISMATCH_MESSAGE = 'The payment returned does not match this link. Open it again from My payments.'
+
 /**
  * Loads one payment and checks it again every intervalMs while it is PENDING (Figma F3-02).
  * - At most one request runs at a time: the next check is scheduled only after the previous
@@ -55,6 +58,9 @@ export function isRetryableError(error: unknown): boolean {
  * - Polling stops for good on SUCCESS, FAILED or REFUNDED, and on an error that is not retryable.
  * - A retryable error keeps the last payment and tries again at the next interval.
  * - A failed first load stops until refresh() is called.
+ * - An answer for another payment id is an error and is never kept (no other payment on screen).
+ * - When the tab becomes visible again while the payment is PENDING, it is checked at once: browsers slow
+ *   down timers in background tabs, so a confirmation is not left waiting for the next interval.
  * - Unmounting aborts the running request and clears the timer, so nothing is sent afterwards.
  *
  * Mount the screen with key={paymentId} so a new payment id starts from a clean state.
@@ -75,7 +81,10 @@ export function usePaymentPolling(paymentId: number, intervalMs = POLL_INTERVAL_
 
     function check() {
       inFlight.current = true
-      paymentsApi.payment(paymentId, { signal: controller.signal }).then(
+      paymentsApi.payment(paymentId, { signal: controller.signal }).then((payment) => {
+        if (payment.id !== paymentId) throw new Error(PAYMENT_MISMATCH_MESSAGE)
+        return payment
+      }).then(
         (payment) => {
           if (controller.signal.aborted) {
             return
@@ -130,6 +139,16 @@ export function usePaymentPolling(paymentId: number, intervalMs = POLL_INTERVAL_
     setState((previous) => (hasPayment.current ? { ...previous, refreshing: true } : { ...INITIAL }))
     setCycle((current) => current + 1)
   }, [])
+
+  const pending = isPollingStatus(state.payment?.status)
+  useEffect(() => {
+    if (!pending) return
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [pending, refresh])
 
   return { ...state, refresh }
 }

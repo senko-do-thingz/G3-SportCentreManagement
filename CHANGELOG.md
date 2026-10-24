@@ -1,3 +1,10 @@
+## 2026-10-24 - Payment instructions and status (UI-28)
+
+- Payment Instructions and Status (F3-02) uses the shared PaymentHero in the Home theme.
+- Payment ownership: an answer for another payment id is an error and is never shown; after a correct first answer, a later mismatched one keeps the right payment on screen and stops the automatic checks.
+- A pending payment is checked at once when the tab becomes visible again (browsers slow background timers); a paid payment without an invoice says the receipt appears in My payments once issued.
+- Copy keeps the transfer content exactly as shown. Tests in memberPayments.test.tsx; cases in frontend/docs/UI-28-test-cases.md. S3-Mismatch is a reception screen, covered by UI-31. No API or backend changes.
+
 ## 2026-10-24 - Member payment summary and single visit (UI-27)
 
 - Payment Summary (F3-01) and Single Visit Payment Summary (S3-Single) use a new shared PaymentHero in the Home theme (navy feature surface, gold eyebrow, uppercase title), built only from tokens; it is reused by the other payment and refund screens.
