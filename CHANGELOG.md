@@ -1,3 +1,14 @@
+## 2026-10-24 - Approved UI design system and token freeze (UI-00)
+
+- Audit main: the Royal and Gold brand colors were in tokens.css (from UI-01), but the Home hero, footer, gold-on-navy text and display font existed only as copies inside home.css, and Log in, Member schedule and Manager kept their own raw colors.
+- Add the Home brand surfaces to the shared tokens in light and dark: --color-hero, --color-hero-deep, --color-footer, --color-on-hero, --color-on-hero-muted, --color-hero-highlight, plus --font-display (Be Vietnam Pro). Text on these surfaces meets WCAG 2.2 AA in both modes.
+- Home reads every brand value and its display font from the shared tokens instead of copies; Home-only values (page neutrals, brighter dark buttons, auth dialog buttons) stay scoped and are listed in the contract. The approved Home design does not change in light or dark mode.
+- Freeze the contract: frontend/docs/design-tokens.md gains the brand surfaces, the Home mapping, the raw color freeze and the change rule (later token changes need their own pull request approved by the UI-00 owner; approval of the freeze in QA-00).
+- New test frontend/src/styles/designTokens.test.ts checks the new tokens, their contrast, the Home mapping and that no stylesheet adds raw hex colors beyond the audited baseline (new stylesheets must use tokens only). Cases in frontend/docs/UI-00-test-cases.md.
+- Review fixes (PR #121): the raw color freeze now compares every color literal by value and property against src/styles/rawColorBaseline.json (hex, rgb, hsl, hwb, lab, lch, oklab, oklch, color() and CSS named colors; all stylesheets at any depth, component scripts, public/appearance.js and index.html), so changed, moved or new colors fail; scanner and mutation cases are unit tested.
+- Browser evidence: scripts/ui00-visual-check.py (Playwright, Chromium) compares main and this branch pixel by pixel (Home at 390, 768 and 1440 px, auth dialog, Log in and Sign up, light and dark: 18 of 18 identical) and checks the rendered tokens, dark overrides and CTA gradient; a one-step token change is caught. Sheets and report in frontend/docs/screenshots/ui-00; test cases rewritten to state what is unit, browser or manual.
+- No screen layout, API or backend changes. Lint, tsc, all frontend tests (1381) and the production build pass.
+
 ## 2026-10-23 - Verify guest authentication return navigation (UI-05)
 
 - Re-verify after the Home, coach profile and shared UI merges that every Home action needing a Member session (Membership offers, View schedule, package View options, View cards) returns the guest to that exact destination after Log in or Create account, without sending a registration, purchase or booking.

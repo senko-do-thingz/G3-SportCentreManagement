@@ -11,24 +11,25 @@
   --h-border: #e4e8f0;
   --h-ink: #0e1a33;
   --h-muted: #5a6782;
-  --h-primary: #1f4fd8;
-  --h-primary-hover: #1a42b5;
-  --h-primary-text: #1f4fd8;
-  --h-accent: #f5b301;
-  --h-on-accent: #1a1405;
-  --h-icon-bg: #e9eefc;
+  /* Brand values come from the shared token contract (UI-00); see frontend/docs/design-tokens.md. */
+  --h-primary: var(--color-primary);
+  --h-primary-hover: var(--color-primary-hover);
+  --h-primary-text: var(--color-primary);
+  --h-accent: var(--color-accent);
+  --h-on-accent: var(--color-on-accent);
+  --h-icon-bg: var(--color-primary-soft);
   --h-shadow: 0 18px 40px rgba(14, 26, 51, 0.08);
-  --h-hero: #0b1736;
-  --h-hero-accent: #ffc83d;
-  --h-hero-muted: #e3e9f8;
-  --h-footer: #070f24;
+  --h-hero: var(--color-hero);
+  --h-hero-accent: var(--color-hero-highlight);
+  --h-hero-muted: var(--color-on-hero-muted);
+  --h-footer: var(--color-footer);
   --h-footer-ink: #a3adc6;
-  --h-cta-from: #0b1736;
-  --h-cta-to: #1f4fd8;
+  --h-cta-from: var(--color-navy);
+  --h-cta-to: var(--color-primary);
   --h-overlay: 11, 23, 54;
-  --h-deep: #060d20;
+  --h-deep: var(--color-hero-deep);
   /* Be Vietnam Pro (self-hosted, OFL) draws Vietnamese diacritics correctly at heavy weights; Arial Black does not. */
-  --h-display: 'Be Vietnam Pro', Arial, 'Helvetica Neue', Helvetica, sans-serif;
+  --h-display: var(--font-display);
   --h-body: 'Segoe UI', Arial, sans-serif;
   background: var(--h-bg);
   color: var(--h-ink);
@@ -48,9 +49,6 @@
   --h-primary-text: #8aa8ff;
   --h-icon-bg: rgba(138, 168, 255, 0.12);
   --h-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
-  --h-hero: #060b18;
-  --h-footer: #050913;
-  --h-cta-from: #0b1736;
   --h-cta-to: #2a50c8;
 }
 

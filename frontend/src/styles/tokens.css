@@ -18,6 +18,14 @@
   --color-accent-hover: #e0a300;
   /* Gold highlight for marks and selected states; never use it as text on a light surface. */
   --color-highlight: #f5b301;
+  /* Brand surfaces from the approved Home (hero, footer, call to action). Light text only. */
+  --color-hero: #0b1736;
+  --color-hero-deep: #060d20;
+  --color-footer: #070f24;
+  --color-on-hero: #ffffff;
+  --color-on-hero-muted: #e3e9f8;
+  /* Gold that may be used as text, but only on hero, footer or feature surfaces. */
+  --color-hero-highlight: #ffc83d;
 
   /* Neutrals */
   --color-bg: #f5f8fc;
@@ -61,6 +69,8 @@
 
   /* Typography */
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  /* Display headings (Home, Log in, Sign up). Load @fontsource/be-vietnam-pro weights on the page that uses it. */
+  --font-display: 'Be Vietnam Pro', Arial, 'Helvetica Neue', Helvetica, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', Consolas, monospace;
   --text-xs: 0.75rem;
   --text-sm: 0.8125rem;
@@ -128,6 +138,8 @@
     --color-text-subtle: #9db1c9;
     --color-on-primary: #0b1736;
     --color-highlight: #ffc83d;
+    --color-hero: #060b18;
+    --color-footer: #050913;
     --color-feature-surface: #0e1a3a;
     --color-on-feature: #f1f6ff;
     --color-on-feature-muted: #c7d9ed;
