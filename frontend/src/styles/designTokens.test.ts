@@ -1,31 +1,16 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 /*
  * UI-00 design system contract. Guards the shared tokens frozen in W0 so screen tasks build on one
  * palette: the approved Home brand values live in tokens.css, Home reads them instead of copies,
- * and stylesheets do not grow new raw colors.
+ * and Home reads them instead of copies. The raw color freeze is in rawColors.test.ts; rendered values in a real
+ * browser are checked by scripts/ui00-visual-check.py.
  */
 
 const STYLES_DIR = 'src/styles'
 const tokens = readFileSync(`${STYLES_DIR}/tokens.css`, 'utf8')
 const home = readFileSync(`${STYLES_DIR}/home.css`, 'utf8')
-
-const HEX_COLOR = /#[0-9a-fA-F]{3,8}\b/g
-
-/*
- * Raw hex colors allowed per stylesheet (the audited main baseline). tokens.css is where colors are
- * defined; the others are legacy screen palettes that their UI task owners migrate later. A count may
- * go down, never up, and a stylesheet that is not listed must use tokens only.
- */
-const RAW_COLOR_BASELINE: Record<string, number> = {
-  'tokens.css': Number.POSITIVE_INFINITY,
-  'home.css': 89,
-  'layouts.css': 51,
-  'memberSchedule.css': 66,
-  'manager.css': 4,
-  'payments.css': 6,
-}
 
 /** Relative luminance contrast ratio of two #rrggbb colors (WCAG 2.2). */
 function contrast(first: string, second: string): number {
@@ -96,17 +81,5 @@ describe('UI-00 design system contract', () => {
     expect(homeVariable('--h-cta-from')).toBe('var(--color-navy)')
     expect(homeVariable('--h-cta-to')).toBe('var(--color-primary)')
     expect(homeVariable('--h-display')).toBe('var(--font-display)')
-  })
-
-  it('does not let any stylesheet add raw hex colors beyond the audited baseline', () => {
-    const files = readdirSync(STYLES_DIR).filter((file) => file.endsWith('.css'))
-    expect(files.length).toBeGreaterThan(0)
-    const overBaseline = files
-      .map((file) => {
-        const count = (readFileSync(`${STYLES_DIR}/${file}`, 'utf8').match(HEX_COLOR) ?? []).length
-        return { file, count, allowed: RAW_COLOR_BASELINE[file] ?? 0 }
-      })
-      .filter(({ count, allowed }) => count > allowed)
-    expect(overBaseline).toEqual([])
   })
 })

@@ -67,19 +67,32 @@ which keep the light primary fill in both modes.
 
 ## Raw color freeze
 
-`src/styles/designTokens.test.ts` counts raw hex colors per stylesheet against the audited `main`
-baseline: `home.css` 89, `layouts.css` 51 (Log in and Sign up palette, migrated by UI-06 and UI-07),
-`memberSchedule.css` 66, `manager.css` 4, `payments.css` 6 (print receipt). Counts may only go
-down. Any other stylesheet, including a new one, must use tokens only.
+`src/styles/rawColors.test.ts` scans every color literal in the frontend and compares it with the reviewed
+baseline `src/styles/rawColorBaseline.json`:
 
-## Contrast (WCAG 2.2 AA, checked by `src/components/ui/ui01Components.test.tsx`)
+- Scope: every `.css` file under `src` at any depth, every non-test `.ts` and `.tsx` file (inline styles and
+  canvas colors), `public/*.js` (theme bootstrap) and `index.html`. Test files are excluded.
+- Syntaxes: hex (3, 4, 6, 8 digits), `rgb`, `rgba`, `hsl`, `hsla`, `hwb`, `lab`, `lch`, `oklab`, `oklch`,
+  `color()`, and CSS named colors in stylesheets (`transparent` and `currentColor` are not palette values).
+  Named colors are not scanned in scripts, where words like "red" are ordinary text.
+- Stylesheet colors are keyed by property (`color|#ffffff`, `--h-bg|#ffffff`), so changing a value, moving a
+  value to another property, adding one more use or adding a color to a new file all fail. Removing colors passes.
+- `tokens.css` is in the baseline too, so a token value change shows up as a baseline diff in the pull request.
 
-| Pair | Light | Dark |
-|------|-------|------|
-| Primary text on surface | 6.6:1 | 6.9:1 |
-| Text on primary fill | 6.6:1 | 7.7:1 |
-| Primary text on soft fill | 5.7:1 | 6.1:1 |
-| Text on gold fill | 9.9:1 | 9.9:1 |
+After an approved token change, regenerate the baseline (PowerShell, from `frontend/`):
+
+```powershell
+$env:UPDATE_COLOR_BASELINE='1'; npx vitest run src/styles/rawColors.test.ts; Remove-Item Env:UPDATE_COLOR_BASELINE
+```
+
+## Rendered values (browser check)
+
+`scripts/ui00-visual-check.py` opens `main` and the branch in Chromium (Playwright) with fixed API data and
+compares full-page screenshots of Home at 390, 768 and 1440 px in light and dark, plus the guest auth dialog,
+Log in and Sign up at 390 and 1440 px. It also reads the values the browser renders (resolved `--h-*`
+variables, hero, footer, Membership offers button, CTA gradient, heading font) and checks them against this
+contract. Evidence for UI-00 is in `docs/screenshots/ui-00` (`report.json` and before/after sheets). The suite is
+not in CI yet; UI-04 (shared visual regression suite) is where it moves.
 
 ## Ownership and approval
 
