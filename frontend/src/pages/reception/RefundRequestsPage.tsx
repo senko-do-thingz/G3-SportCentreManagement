@@ -10,13 +10,13 @@ import {
   EmptyState,
   ErrorState,
   Input,
-  PageHeader,
   StatusBadge,
   Table,
   TextArea,
   useToast,
   type TableColumn,
 } from '../../components/ui'
+import { PaymentHero } from '../../components/PaymentHero'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { useResource } from '../../hooks/useResource'
@@ -64,11 +64,11 @@ export function RefundRequestsPage() {
 
   return (
     <div className="page">
-      <PageHeader
+      <PaymentHero
         eyebrow={EYEBROW}
         title="Refund Requests"
         description="Check eligibility and submit a refund for manager approval."
-        actions={
+        aside={
           <Link className={buttonClassName('secondary', 'md')} to={PAYMENT_LIST_PATH}>
             Payment requests
           </Link>
@@ -251,6 +251,9 @@ function RefundFormCards({ memberId, quote }: { memberId: number; quote: RefundQ
   const [serverErrors, setServerErrors] = useState<RefundErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  // Money and eligibility come only from the BE-21 quote (toRefundQuote).
+  const eligible = quote.eligible
+  const ineligibleReason = quote.ineligibleReason ?? 'This registration cannot be refunded.'
 
   const errors = validateRefundForm(form, quote.maxRefundable)
   const valid = Object.keys(errors).length === 0
@@ -264,7 +267,7 @@ function RefundFormCards({ memberId, quote }: { memberId: number; quote: RefundQ
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setTouched({ amount: true, reason: true })
-    if (!valid || !quote.eligible || saving) return
+    if (!valid || !eligible || saving) return
     setSaving(true)
     setFormError(null)
     try {
@@ -320,7 +323,7 @@ function RefundFormCards({ memberId, quote }: { memberId: number; quote: RefundQ
               required
               inputMode="decimal"
               value={form.amount}
-              disabled={saving || !quote.eligible}
+              disabled={saving || !eligible}
               error={fieldError('amount')}
               hint={`Suggested ${formatMoney(quote.suggestedAmount)}, at most ${formatMoney(quote.maxRefundable)}`}
               onChange={(event) => change('amount', event.target.value)}
@@ -332,7 +335,7 @@ function RefundFormCards({ memberId, quote }: { memberId: number; quote: RefundQ
               rows={2}
               maxLength={REASON_MAX}
               value={form.reason}
-              disabled={saving || !quote.eligible}
+              disabled={saving || !eligible}
               error={fieldError('reason')}
               onChange={(event) => change('reason', event.target.value)}
               onBlur={() => setTouched((current) => ({ ...current, reason: true }))}
@@ -345,7 +348,7 @@ function RefundFormCards({ memberId, quote }: { memberId: number; quote: RefundQ
             </p>
           )}
           <div className="reception-form__actions">
-            <Button type="submit" loading={saving} disabled={!quote.eligible}>
+            <Button type="submit" loading={saving} disabled={!eligible}>
               Submit for approval
             </Button>
             <Link className={buttonClassName('ghost', 'md')} to={refundCreatePath(memberId)}>
@@ -370,11 +373,11 @@ function RefundFormCards({ memberId, quote }: { memberId: number; quote: RefundQ
           </div>
         </dl>
         <div className="payment-check" role="status">
-          {quote.eligible ? <Badge tone="success">Eligible for review</Badge> : <Badge tone="danger">Not eligible</Badge>}
+          {eligible ? <Badge tone="success">Eligible for review</Badge> : <Badge tone="danger">Not eligible</Badge>}
         </div>
-        {!quote.eligible && (
+        {!eligible && (
           <p className="notice notice--warning" role="alert">
-            {quote.ineligibleReason ?? 'This registration cannot be refunded.'}
+            {ineligibleReason}
           </p>
         )}
         <p className="notice notice--info">
