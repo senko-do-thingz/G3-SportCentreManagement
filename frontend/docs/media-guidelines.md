@@ -9,8 +9,7 @@ Owner: UI-03 (Phat). Applies to every screen task that shows a photo, video or i
 | Remote photos | Unsplash CDN, built only by `src/media/unsplash.ts` | Responsive sizes, credited on `/credits` |
 | Sport photos | `src/media/sportPhotos.ts` (one photo per sport) | Shared by Home and the member class pages |
 | Offline fallbacks | `src/assets/home/*.jpg` | Small copies of the credited Unsplash photos (sports 240 x 160, hero 640 x 427), shown only when a remote photo fails |
-| Log in background | Home hero photo (`HOME_PHOTOS.hero`) through `Photo` | Since UI-06; credited on `/credits` |
-| Sign up side photo | `src/assets/auth-hero.jpg` | From the team Figma design, used by `layouts.css` until UI-07 |
+| Log in and Sign up background | Unsplash dunk photo by August Phlieger (`AUTH_PHOTO_ID` in `src/media/sportPhotos.ts`) through `Photo` in `AuthShell`, with a small copy in `src/assets/auth/auth-dunk.jpg` as the offline fallback | Player on the left; credited on `/credits` |
 | Demo coach portraits | `public/images/coaches/*.jpg` (640 x 640) | Committed files, credited on `/credits` |
 | Hero background video | Mixkit CDN (`HOME_HERO_VIDEOS` in `homeContent.ts`) | Credited on `/credits` |
 | Display font | `@fontsource/be-vietnam-pro` | Imported only by the pages that use it |
@@ -40,7 +39,8 @@ Owner: UI-03 (Phat). Applies to every screen task that shows a photo, video or i
 | Hero videos (`HOME_HERO_VIDEOS`) | Mixkit CDN | Mixkit License (free video), credited on `/credits` | Keep |
 | `public/images/coaches/*.jpg` | Committed demo portraits | Credited on `/credits` | Keep |
 | `src/assets/home/*.jpg` (offline fallbacks) | Replaced with small copies of the credited Unsplash photos they stand in for: each sport file is its `SPORT_PHOTO_IDS` photo, `hero.jpg` is the `HOME_PHOTOS.hero` photo | Unsplash License, the same photos credited on `/credits` | Replaced; the old copies cut from the design screenshots are gone |
-| `src/assets/auth-hero.jpg` (Sign up side photo, `layouts.css`) | Cut from the team design screenshots; original photo not recorded | Unknown | Temporary exception, no new use: Log in leaves it in UI-06 and UI-07 deletes the file |
+| `src/assets/auth-hero.jpg` | Cut from the team design screenshots; original photo not recorded | Unknown | Deleted in UI-07 |
+| Log in and Sign up background (`AUTH_PHOTO_ID`, fallback `src/assets/auth/auth-dunk.jpg`) | Unsplash, photo by August Phlieger (unsplash.com/photos/CREqtqgBFcU) | Unsplash License, credited on `/credits` | Keep |
 
 Videos have no bundled fallback; the hero photo stays visible instead.
 

@@ -28,6 +28,8 @@ export const HOME_HERO_VIDEOS = [mixkit(44448), mixkit(43499), mixkit(873)] as c
 export const HOME_PHOTOS = {
   hero: unsplash('photo-1626224583764-f87db24ac4ea', 2200),
   cta: unsplash('photo-1504450758481-7338eba7524a', 2000),
+  /** Log in and Sign up background (UI-07): portrait dunk photo, player on the left. */
+  auth: unsplash('photo-1608245449230-4ac19066d2d0', 2200),
 }
 
 /** Copy and photographs from context/Home/1.png and 2.png, not live directory records. */

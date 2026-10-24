@@ -61,91 +61,12 @@
   max-width: 720px;
 }
 
-.auth-shell {
-  display: grid;
-  /*
-   * Fixed size card (Figma: 519 px photo, 619 px form, 1140 px wide). It never grows or shrinks
-   * with the form content or validation messages; it only gives way on narrow windows.
-   */
-  grid-template-columns: 519px minmax(0, 1fr);
-  width: 1140px;
-  max-width: 100%;
-  height: 820px;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-md);
-}
-
-.auth-hero {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: var(--space-3);
-  padding: var(--space-12) var(--space-10);
-  color: var(--color-text-inverse);
-  background: var(--color-navy);
-}
-
-/*
- * Photo from the Figma hero (F1-05, F1-06), covering the full height of the column on both
- * screens like the Figma. The overlay darkens towards the bottom so the white slogan stays readable.
- */
-.auth-hero::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(16, 46, 80, 0.12) 0%, rgba(16, 46, 80, 0.35) 45%, rgba(16, 46, 80, 0.9) 100%),
-    url('../assets/auth-hero.jpg') center top / cover no-repeat;
-}
-
-.auth-hero > * {
-  position: relative;
-}
-
-.auth-hero__eyebrow {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  opacity: 0.85;
-}
-
-.auth-hero__title {
-  font-size: 2.75rem;
-  font-weight: var(--weight-bold);
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-}
-
-.auth-hero__text {
-  max-width: 320px;
-  opacity: 0.85;
-}
-
+/* Form card on the Log in and Sign up stage (layout in auth.css). */
 .auth-panel {
   display: flex;
   flex-direction: column;
-  justify-content: safe center;
   gap: var(--space-4);
-  min-height: 0;
-  padding: var(--space-6) var(--space-12);
-  overflow-y: auto;
-  /* The content is sized to fit; the scrollbar stays hidden if a long message ever overflows. */
-  scrollbar-width: none;
-}
-
-.auth-panel::-webkit-scrollbar {
-  display: none;
-}
-
-/* Brand and appearance control sit on one line, separated from the heading by a hairline. */
-.auth-panel__toolbar {
-  padding-bottom: var(--space-5);
-  border-bottom: 1px solid var(--color-border);
+  min-width: 0;
 }
 
 .auth-panel__heading h1 {
@@ -185,18 +106,9 @@
   min-height: 46px;
 }
 
-.auth-form .password-rules__strength {
-  position: absolute;
-  top: var(--space-2);
-  left: var(--space-4);
-}
-
+/* Password checklist sits under the two password fields as one quiet line, no box. */
 .auth-form .password-rules {
-  position: relative;
-  padding: var(--space-6) var(--space-4) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-muted);
+  margin-top: calc(var(--space-2) * -1);
 }
 
 .auth-form .btn {
@@ -877,20 +789,6 @@
     padding: var(--space-6) var(--space-4);
   }
 
-  .auth-shell {
-    grid-template-columns: 1fr;
-    width: 100%;
-    height: auto;
-  }
-
-  .auth-panel {
-    overflow-y: visible;
-  }
-
-  .auth-hero {
-    display: none;
-  }
-
   .ui-kit__grid,
   .ui-kit__stats {
     grid-template-columns: 1fr;
@@ -900,10 +798,6 @@
 @media (max-width: 640px) {
   .user-menu__text {
     display: none;
-  }
-
-  .auth-panel {
-    padding: var(--space-8) var(--space-5);
   }
 
   .auth-form__row {

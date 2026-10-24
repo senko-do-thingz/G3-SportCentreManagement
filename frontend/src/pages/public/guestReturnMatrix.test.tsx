@@ -67,7 +67,7 @@ async function signUp(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/email address/i), 'fixture@example.invalid')
   await user.type(screen.getByLabelText(/^password/i), 'Sportify123!')
   await user.type(screen.getByLabelText(/confirm password/i), 'Sportify123!')
-  await user.click(screen.getByRole('checkbox', { name: /terms of use/ }))
+  await user.click(screen.getByRole('checkbox', { name: /terms of use/i }))
   await user.click(screen.getByRole('button', { name: 'Create account' }))
 }
 
