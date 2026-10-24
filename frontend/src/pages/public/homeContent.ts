@@ -5,14 +5,16 @@ import basketball from '../../assets/home/basketball.jpg'
 import volleyball from '../../assets/home/volleyball.jpg'
 import swimming from '../../assets/home/swimming.jpg'
 import tennis from '../../assets/home/tennis.jpg'
+import { SPORT_PHOTO_IDS } from '../../media/sportPhotos'
+import { unsplashUrl } from '../../media/unsplash'
 
 export const homeHero = hero
 
 /**
- * High resolution photos from Unsplash (free to use under the Unsplash License, no attribution required).
- * They load from the Unsplash CDN; HomePhoto falls back to the bundled images above when a request fails.
+ * High resolution photos from Unsplash (free to use under the Unsplash License, credited on /credits).
+ * They load from the Unsplash CDN in responsive sizes; Photo falls back to the bundled images above when a request fails.
  */
-const unsplash = (id: string, width: number) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${width}&q=75`
+const unsplash = unsplashUrl
 
 /**
  * Background clips for the Home hero from Mixkit (free for commercial and personal use under the Mixkit License,
@@ -30,12 +32,12 @@ export const HOME_PHOTOS = {
 
 /** Copy and photographs from context/Home/1.png and 2.png, not live directory records. */
 export const HOME_SPORTS = [
-  { name: 'Football', description: 'Fitness & ball control', image: football, photo: unsplash('photo-1574629810360-7efbbe195018', 1000) },
-  { name: 'Badminton', description: 'Agility & coordination', image: badminton, photo: unsplash('photo-1722087642932-9b070e9a066e', 1000) },
-  { name: 'Basketball', description: 'Teamwork & technique', image: basketball, photo: unsplash('photo-1563506644863-444710df1e03', 1000) },
-  { name: 'Volleyball', description: 'Team play & confidence', image: volleyball, photo: unsplash('photo-1728971124745-423b12df446d', 1000) },
-  { name: 'Swimming', description: 'Water skills & endurance', image: swimming, photo: unsplash('photo-1530549387789-4c1017266635', 1000) },
-  { name: 'Tennis', description: 'Footwork & precision', image: tennis, photo: unsplash('photo-1554068865-24cecd4e34b8', 1000) },
+  { name: 'Football', description: 'Fitness & ball control', image: football, photo: unsplash(SPORT_PHOTO_IDS.football, 1000) },
+  { name: 'Badminton', description: 'Agility & coordination', image: badminton, photo: unsplash(SPORT_PHOTO_IDS.badminton, 1000) },
+  { name: 'Basketball', description: 'Teamwork & technique', image: basketball, photo: unsplash(SPORT_PHOTO_IDS.basketball, 1000) },
+  { name: 'Volleyball', description: 'Team play & confidence', image: volleyball, photo: unsplash(SPORT_PHOTO_IDS.volleyball, 1000) },
+  { name: 'Swimming', description: 'Water skills & endurance', image: swimming, photo: unsplash(SPORT_PHOTO_IDS.swimming, 1000) },
+  { name: 'Tennis', description: 'Footwork & precision', image: tennis, photo: unsplash(SPORT_PHOTO_IDS.tennis, 1000) },
 ]
 
 
