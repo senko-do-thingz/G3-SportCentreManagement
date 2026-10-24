@@ -30,7 +30,7 @@ export function CreditsPage() {
             <ul className="credits-grid">
               {group.items.map((item) => (
                 <li key={item.usedFor} className="credits-item">
-                  {item.thumb ? <img src={item.thumb} alt="" width="320" height="200" loading="lazy" /> : <span className="credits-item__placeholder" aria-hidden="true">{group.title === 'Font' ? 'Aa' : 'Video'}</span>}
+                  {item.thumb ? <img src={item.thumb} alt="" width="320" height="200" loading="lazy" decoding="async" /> : <span className="credits-item__placeholder" aria-hidden="true">{group.title === 'Font' ? 'Aa' : 'Video'}</span>}
                   <div>
                     <p className="credits-item__use">{item.usedFor}</p>
                     <a href={item.link} target="_blank" rel="noopener noreferrer" aria-label={`${item.linkLabel} - ${item.usedFor}`}>{item.linkLabel}</a>

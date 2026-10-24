@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HomeHeroVideo } from './HomeHeroVideo'
@@ -65,5 +65,35 @@ describe('HomeHeroVideo', () => {
     media(options)
     const { container } = render(<HomeHeroVideo sources={SOURCES} />)
     expect(container).toBeEmptyDOMElement()
+  })
+
+  it('tries the 720p file first below 1600 px wide and Full HD first on large screens', () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(min-width: 768px)', media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+    const { container } = render(<HomeHeroVideo sources={SOURCES} />)
+    expect(srcs(videoOf(container))).toEqual([...SOURCES[0]].reverse())
+  })
+
+  it('tries the 720p file first on a slow connection even on a large screen', () => {
+    media()
+    vi.stubGlobal('navigator', { ...navigator, connection: { effectiveType: '3g' } })
+    const { container } = render(<HomeHeroVideo sources={SOURCES} />)
+    expect(srcs(videoOf(container))).toEqual([...SOURCES[0]].reverse())
+  })
+
+  it('keeps only the photo when data saver is on', () => {
+    media()
+    vi.stubGlobal('navigator', { ...navigator, connection: { saveData: true } })
+    const { container } = render(<HomeHeroVideo sources={SOURCES} />)
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('waits for the page load event before adding the video', () => {
+    media()
+    const state = vi.spyOn(document, 'readyState', 'get').mockReturnValue('interactive')
+    const { container } = render(<HomeHeroVideo sources={SOURCES} />)
+    expect(container.querySelector('video')).toBeNull()
+    state.mockReturnValue('complete')
+    act(() => { window.dispatchEvent(new Event('load')) })
+    expect(srcs(videoOf(container))).toEqual(SOURCES[0])
   })
 })
