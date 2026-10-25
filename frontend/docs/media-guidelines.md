@@ -9,7 +9,8 @@ Owner: UI-03 (Phat). Applies to every screen task that shows a photo, video or i
 | Remote photos | Unsplash CDN, built only by `src/media/unsplash.ts` | Responsive sizes, credited on `/credits` |
 | Sport photos | `src/media/sportPhotos.ts` (one photo per sport) | Shared by Home and the member class pages |
 | Offline fallbacks | `src/assets/home/*.jpg` | Small copies of the credited Unsplash photos (sports 240 x 160, hero 640 x 427), shown only when a remote photo fails |
-| Log in and Sign up side photo | `src/assets/auth-hero.jpg` | From the team Figma design, used by `layouts.css` |
+| Log in background | Home hero photo (`HOME_PHOTOS.hero`) through `Photo` | Since UI-06; credited on `/credits` |
+| Sign up side photo | `src/assets/auth-hero.jpg` | From the team Figma design, used by `layouts.css` until UI-07 |
 | Demo coach portraits | `public/images/coaches/*.jpg` (640 x 640) | Committed files, credited on `/credits` |
 | Hero background video | Mixkit CDN (`HOME_HERO_VIDEOS` in `homeContent.ts`) | Credited on `/credits` |
 | Display font | `@fontsource/be-vietnam-pro` | Imported only by the pages that use it |
