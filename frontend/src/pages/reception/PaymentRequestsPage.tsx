@@ -1,11 +1,11 @@
 import { useCallback, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { receptionPaymentsApi, type StaffPayment } from '../../api/receptionPaymentsApi'
+import { PaymentHero } from '../../components/PaymentHero'
 import {
   Button,
   Card,
   Input,
-  PageHeader,
   Select,
   StatCard,
   StatusBadge,
@@ -19,12 +19,12 @@ import { receptionPaymentPath } from './receptionModel'
 import {
   apiStatus,
   formatPaymentMoney as formatMoney,
+  needsReview,
   PAYMENT_PAGE_SIZE,
   PAYMENT_STATUS_FILTER_OPTIONS,
-  paymentStatusLabel,
-  paymentStatusTone,
   pendingTotal,
   QUERY_MAX,
+  queueStatus,
   readPaymentListParams,
   REFUND_LIST_PATH,
   writePaymentListParams,
@@ -34,7 +34,9 @@ import {
 /**
  * Payment Requests (Figma F3-04) at /reception/payments: GET /payments?status=&query=&page=&size=
  * (BE-18) with a status filter, a member or reference search and paging, all kept in the URL.
- * A pending row opens Verify and Record Payment (F3-05); any other row opens its result.
+ * The backend sets the order (PENDING first); the page keeps it. Every row has one status badge
+ * (Needs review for a pending payment with a recorded amount mismatch) and exactly one action:
+ * Review payment for a pending row (F3-05), Open for any other row.
  */
 export function PaymentRequestsPage() {
   const [params, setParams] = useSearchParams()
@@ -66,6 +68,7 @@ export function PaymentRequestsPage() {
 
   const rows = payments.status === 'ready' ? payments.data.content : []
   const total = payments.status === 'ready' ? payments.data.totalElements : null
+  const toReview = rows.filter(needsReview).length
 
   const columns: TableColumn<StaffPayment>[] = [
     {
@@ -92,35 +95,44 @@ export function PaymentRequestsPage() {
     { key: 'amount', header: 'Amount due', render: (row) => formatMoney(row.amount) },
     { key: 'createdAt', header: 'Requested', render: (row) => formatDateTime(row.createdAt) },
     {
+      key: 'status',
+      header: 'Status',
+      render: (row) => {
+        const badge = queueStatus(row)
+        return <StatusBadge status={badge.code} label={badge.label} />
+      },
+    },
+    {
       key: 'action',
       header: 'Action',
       render: (row) =>
         row.status === 'PENDING' ? (
           <Link
-            className={buttonClassName('secondary', 'sm')}
+            className={buttonClassName(needsReview(row) ? 'primary' : 'secondary', 'sm')}
             to={receptionPaymentPath(row.id)}
             aria-label={`Review payment ${row.itemCode ?? row.code}`}
           >
             Review payment
           </Link>
         ) : (
-          <span className="payment-row-status">
-            <StatusBadge status={paymentStatusTone(row.status)} label={paymentStatusLabel(row.status)} />
-            <Link to={receptionPaymentPath(row.id)} aria-label={`Open payment ${row.itemCode ?? row.code}`}>
-              Open
-            </Link>
-          </span>
+          <Link
+            className={buttonClassName('ghost', 'sm')}
+            to={receptionPaymentPath(row.id)}
+            aria-label={`Open payment ${row.itemCode ?? row.code}`}
+          >
+            Open
+          </Link>
         ),
     },
   ]
 
   return (
     <div className="page">
-      <PageHeader
+      <PaymentHero
         eyebrow="Receptionist / Payments and reports"
         title="Payment Requests"
         description="Find a registration and match the payment to the correct member."
-        actions={
+        aside={
           <Link className={buttonClassName('secondary', 'md')} to={REFUND_LIST_PATH}>
             Refund requests
           </Link>
@@ -133,9 +145,9 @@ export function PaymentRequestsPage() {
         />
         <StatCard label="Amount due on this page" value={formatMoney(pendingTotal(rows))} />
         <StatCard
-          label="Refund requests"
-          value="-"
-          hint="Select a member in Refund requests to view their refunds."
+          label="Needs review on this page"
+          value={payments.status === 'ready' ? toReview : '-'}
+          hint="Pending payments with a recorded amount mismatch. Confirm only when the full amount is verified."
         />
       </div>
       <Card title="Registrations awaiting payment">

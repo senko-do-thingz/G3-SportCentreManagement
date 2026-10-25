@@ -1,3 +1,10 @@
+## 2026-10-24 - Reception payment requests queue (UI-30)
+
+- Payment Requests (F3-04) uses the shared PaymentHero in the Home theme, with Refund requests in the hero.
+- Every row has one Status badge and exactly one action: Needs review for a pending payment carrying the BE-18 "Amount mismatch:" note, Pending payment, Paid, Failed or Refunded; Review payment for pending rows (primary when it needs review), Open otherwise. Rows keep the backend order (PENDING first).
+- The placeholder "Refund requests -" stat card is replaced by "Needs review on this page". A COACH, like a MEMBER, gets Access denied with no payment request sent.
+- Tests in receptionPayments.test.tsx; cases in frontend/docs/UI-30-test-cases.md. No API or backend changes.
+
 ## 2026-10-24 - My payments, history and receipts (UI-29)
 
 - My Payments and Receipts and the receipt pages use the shared PaymentHero in the Home theme; when a receipt prints, the hero is hidden like the old page header, and other printed payment pages show it as plain text.
