@@ -1560,48 +1560,67 @@
       "create account button": true
     }
   },
-  "zoom200": {
-    "empty": {
-      "overflow": 0,
-      "cardHeight": 612,
-      "noClipping": true
-    },
-    "errors": {
-      "overflow": 0,
-      "cardHeight": 670,
-      "noClipping": true
-    },
-    "invalid": {
-      "overflow": 0,
-      "cardHeight": 690,
-      "noClipping": true
-    },
-    "success": {
-      "status": "success",
-      "flow": "/member",
-      "overflow": 0
-    }
-  },
   "signup_flow": "/member",
   "failures": [],
-  "reflowEquivalenceZoom200_Round3": {
-    "verifiedAt": "2026-10-25T10:10:59.551Z",
-    "viewportEquivalenceNote": "720px viewport equivalence representing 1440px desktop display at 200% browser zoom reflow (WCAG 1.4.10)",
+  "responsiveViewport720": {
+    "verifiedAt": "2026-10-25T11:50:08.503Z",
+    "scope": "720px responsive viewport equivalence (layout only): a 720 CSS px Chromium viewport, the width a 1440px desktop lays out to at 200% zoom. Not a native browser zoom operation; WCAG 1.4.10 conformance is not claimed.",
     "effectiveViewport": {
       "width": 720,
       "height": 900,
-      "breakpointMatched": "max-width: 768px"
+      "matchesMaxWidth768": true,
+      "breakpoint": "max-width: 768px"
     },
     "measuredAssertions": {
       "horizontalScrollbarPresent": false,
       "clippedElementsCount": 0,
       "inputsStackedVertically": true,
-      "keyboardReachabilityVerified": true,
-      "registrationFormFilled": true,
-      "registrationSubmitRedirectPath": "/member",
-      "redirectedToMemberDashboard": true
+      "programmaticFocusabilityVerified": true,
+      "registrationFormFilled": true
     },
-    "statesVerified": [
+    "keyboardTraversal": {
+      "method": "Input.dispatchKeyEvent Tab x 13, then Shift+Tab x 1, from page load",
+      "tabbableControls": [
+        "a:Sportify Center home",
+        "a:Back to Home",
+        "button:Switch to dark mode",
+        "input:fullName",
+        "input:phone",
+        "input:email",
+        "input:password",
+        "button:Show password",
+        "input:confirmPassword",
+        "button:Show password",
+        "input:acceptTerms",
+        "button:Create account",
+        "a:Log in"
+      ],
+      "focusSequence": [
+        "a:Sportify Center home",
+        "a:Back to Home",
+        "button:Switch to dark mode",
+        "input:fullName",
+        "input:phone",
+        "input:email",
+        "input:password",
+        "button:Show password",
+        "input:confirmPassword",
+        "button:Show password",
+        "input:acceptTerms",
+        "button:Create account",
+        "a:Log in"
+      ],
+      "allControlsReachedByTab": true,
+      "tabOrderFollowsDomOrder": true,
+      "shiftTabMovesBack": true
+    },
+    "mockRegistrationRedirect": {
+      "scope": "POST /auth/register and GET /users/me answered by the browser mock; only the client-side redirect is verified",
+      "pathAfterSubmit": "/member",
+      "redirectedToMemberRoute": true,
+      "dashboardVerified": false
+    },
+    "statesCaptured": [
       {
         "state": "empty",
         "file": "signup-zoom200-1440-empty.png",
@@ -1614,7 +1633,7 @@
         "errorCount": 6
       },
       {
-        "state": "duplicate_email_409",
+        "state": "duplicate_email_409_mock",
         "file": "signup-zoom200-1440-invalid.png",
         "route": "/register",
         "duplicateErrorVisible": true
@@ -1625,11 +1644,21 @@
         "route": "/register"
       },
       {
-        "state": "registration_success_post_submit",
+        "state": "mock_registration_success_redirect_to_member",
         "file": "signup-zoom200-1440-success.png",
         "route": "/member"
       }
     ],
-    "tc15Outcome": "PASS"
+    "notRun": {
+      "nativeBrowserZoom200": "NOT_RUN - no run used the browser zoom control (Ctrl +) at 200%",
+      "wcag1410Reflow320CssPx": "NOT_RUN - no run at 320 CSS px width; WCAG 1.4.10 conformance is not claimed",
+      "realBackendRegistration": "NOT_RUN - TC-14 manual check against the dev backend",
+      "memberDashboardAfterSignup": "NOT_RUN - dashboard APIs are not mocked; the /member screenshot may show a dashboard load error"
+    },
+    "supersedes": [
+      "zoom200",
+      "reflowEquivalenceZoom200_Round3"
+    ],
+    "outcome": "PASS"
   }
 }

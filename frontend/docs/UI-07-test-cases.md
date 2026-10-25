@@ -21,8 +21,8 @@ Branch: refreshed on latest `main` (after UI-00, UI-03, UI-06 merges). PR diff s
 
 | Kind | Where | Runs in CI |
 |------|-------|------------|
-| Unit (Vitest) | `src/styles/auth.test.ts` (6 tests, Log in and Sign up), color freeze `src/styles/rawColors.test.ts`, media rules `src/media/media.test.tsx`, existing `authScreens.test.tsx`, `homeAuthCtas.test.tsx`, `homeGuestAuthFlow.test.tsx` | Yes (`npm test`) |
-| Browser (Playwright, Chromium) | `scripts/ui07-signup-check.py` (Sign up), `scripts/ui06-login-check.py` (Log in), evidence in `docs/screenshots/ui-07` | No, run locally (moves to CI with UI-04) |
+| Unit (Vitest) | `src/styles/auth.test.ts` (6 tests, Log in and Sign up), color freeze `src/styles/rawColors.test.ts`, media rules `src/media/media.test.tsx`, existing `authScreens.test.tsx`, `homeAuthCtas.test.tsx`, `homeGuestAuthFlow.test.tsx`, evidence report check `scripts/ui07-report.test.mjs` | Yes (`npm test`) |
+| Browser (Playwright, Chromium) | `scripts/ui07-signup-check.py` (Sign up baseline), `scripts/ui06-login-check.py` (Log in), `scripts/generate-all-evidence.mjs --only ui-07` (720px viewport states), evidence in `docs/screenshots/ui-07` | No, run locally (moves to CI with UI-04) |
 | Manual | Steps below | No |
 
 ## Cases
@@ -45,13 +45,17 @@ Branch: refreshed on latest `main` (after UI-00, UI-03, UI-06 merges). PR diff s
 | TC-12 | Log in after the shared refactor and the new wording | Browser: `scripts/ui06-login-check.py` on this build (`docs/screenshots/ui-07/login-recheck-report.json`) | Same results as UI-06 | Pass (0 failures, lowest 4.85:1, login reaches /member) |
 | TC-13 | Visual review | Before/after sheets in `docs/screenshots/ui-07` | Sign up matches Log in and the Home look in light and dark | For reviewer |
 | TC-14 | Real photo and backend | Manual: open `/register` online and create an account against the dev backend | Sharp Home hero photo; account created and signed in; duplicate email shows the error | To run by reviewer |
-| TC-15 | 200% browser zoom reflow equivalence (720px) and successful registration redirect | Browser (Playwright / Chromium 720px viewport equivalence for 1440px desktop at 200% zoom reflow) | 5 distinct verified states: empty, client validation errors, duplicate email (409), completed valid form (pre-submit snapshot: `signup-zoom200-1440-valid-filled.png`), and successful registration redirecting to `/member` (`signup-zoom200-1440-success.png`). Measured runtime assertions: horizontal scrollbar absent (`false`), zero clipped elements (`0`), inputs stacked vertically at breakpoint (`true`), all form controls keyboard reachable (`true`), and redirect to `/member` verified. Integrated `report.json` retains historical contrast, layout, and focus baseline alongside `reflowEquivalenceZoom200_Round3`. | Pass |
+| TC-15 | 720px responsive viewport equivalence (layout only) | Browser: Chromium viewport fixed at 720 CSS px (the width 1440 px lays out to at 200% zoom), guest session, `generate-all-evidence.mjs --only ui-07` | 5 states: empty, client validation errors, duplicate email (mocked 409), completed form before submit (`signup-zoom200-1440-valid-filled.png`), mocked registration success -> `/member` redirect (`signup-zoom200-1440-success.png`). Measured at runtime: no horizontal scrollbar, 0 clipped elements, inputs stacked inside the 768 px breakpoint. Report section `responsiveViewport720` | Pass |
+| TC-15b | Keyboard traversal at 720px | Browser: real `Tab` key presses (CDP `Input.dispatchKeyEvent`) from page load through all 13 controls, then one `Shift+Tab` | Every control reached by Tab, order follows the visual order, Shift+Tab moves back one control. Programmatic `element.focus()` is recorded separately as `programmaticFocusabilityVerified` | Pass |
+| TC-15c | Native 200% browser zoom and WCAG 1.4.10 reflow at 320 CSS px | Manual: Ctrl + to 200% on a 1440 px window; separate 320 CSS px run | Not exercised by any script; WCAG 1.4.10 conformance is not claimed | NOT_RUN |
 
 Notes for review:
 - The browser run had no access to the Unsplash CDN, so the screenshots show the bundled low resolution fallback photo; online the page loads the sharp Home hero photo.
 - On a 1440 x 900 screen the Sign up page is 940 px tall (the form is long), so it scrolls slightly; Log in still fits one screen.
-- At 200% browser zoom (720px effective width), `.auth-form__row` stacks to 1 column at <=768px, ensuring zero field clipping and clear error readability.
-- Round 3 reflow coverage establishes genuine WCAG 1.4.10 reflow-equivalence with measured runtime DOM assertions (no hardcoded values). Form-filled pre-submit evidence is isolated in `signup-zoom200-1440-valid-filled.png`, while `signup-zoom200-1440-success.png` captures the post-registration member dashboard redirect. Historical contrast and focus data in `report.json` are retained.
+- At a 720 CSS px viewport, `.auth-form__row` stacks to 1 column at <=768px, with zero field clipping and readable errors. This is responsive layout equivalence, not a native browser zoom run (TC-15c stays NOT_RUN).
+- `signup-zoom200-1440-success.png` shows a mocked registration success followed by the client-side redirect to `/member`. Dashboard APIs are not mocked, so the page may show "We could not load your dashboard"; it is not evidence of a working dashboard or of real backend sign up (TC-14).
+- The `signup-zoom200-1440-*` file names are kept from earlier rounds so review links stay valid; they are 720 CSS px viewport captures.
+- `report.json` is built in two steps from the working tree, with no Git history lookup: `ui07-signup-check.py` writes the baseline (`screens`, `contrast`, `layout`, `focus`, `signup_flow`), then `generate-all-evidence.mjs --only ui-07` adds `responsiveViewport720`. The second step stops with an error if any baseline section is missing, and removes the superseded `zoom200` (CSS zoom) and `reflowEquivalenceZoom200_Round3` keys. `scripts/ui07-report.test.mjs` checks this in CI.
 
 Browser environment: Chromium 1243 (Playwright 1.63), device scale 1, reduced motion, fixed API answers. Builds:
 `feat/ui-06` (before) and `feat/ui-07` (after), both with `VITE_API_BASE_URL=http://localhost:8080/api/v1`.

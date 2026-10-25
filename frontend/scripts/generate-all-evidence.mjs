@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { UI07_NOT_RUN, UI07_SUPERSEDED_KEYS, assertUi07Baseline, mergeUi07Report } from './ui07-report.mjs'
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:4310'
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
@@ -637,8 +638,17 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
     await browser.send('Target.disposeBrowserContext', { browserContextId })
   }
 
+  // Real key presses through the browser input pipeline (not element.focus()).
+  const pressTab = async ({ shift = false } = {}) => {
+    const modifiers = shift ? 8 : 0
+    const key = { key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9, modifiers }
+    await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key })
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', ...key })
+    await pause(60)
+  }
+
   return {
-    send, evalJs, setViewport, goto, screenshot, printPdf, cleanup,
+    send, evalJs, setViewport, goto, screenshot, printPdf, cleanup, pressTab,
     getPollCount: () => pollCount,
     setPollStatus: (s) => { pollStatus = s },
     getPutCompleteCount: () => putCompleteCount,
@@ -660,10 +670,20 @@ async function main() {
 
   try {
     // =========================================================================
-    // 1. UI-07: Sign up Reflow & 5 Distinct States at 720px width (PR #131)
+    // 1. UI-07: Sign up at a 720px responsive viewport, 5 states (PR #131)
+    // Scope: layout equivalence of a 720 CSS px viewport (what 1440px at 200% zoom lays out to). This is NOT a
+    // native browser zoom run and does not establish WCAG 1.4.10 (320 CSS px); those stay NOT_RUN in the report.
+    // File names keep the `signup-zoom200-1440-*` prefix used by TC-15 so earlier review links stay valid.
     // =========================================================================
     if (shouldRun('ui-07')) {
-      console.log('\n[1/5] Generating UI-07 (Sign up 720px reflow states)...')
+      console.log('\n[1/5] Generating UI-07 (Sign up 720px responsive viewport states)...')
+      // Baseline comes from the report.json in this working tree, not from Git history. Fail before any work if it
+      // is missing a section, instead of silently writing empty contrast/layout/focus data.
+      const reportPath = join(SCREENSHOTS_DIR, 'ui-07/report.json')
+      if (!existsSync(reportPath)) throw new Error(`UI-07 ${reportPath} not found. Run scripts/ui07-signup-check.py first.`)
+      const baselineReport = JSON.parse(readFileSync(reportPath, 'utf8'))
+      assertUi07Baseline(baselineReport, reportPath)
+
       const session = await runSession(browser, { role: 'GUEST' })
       await session.setViewport(720, 900, 'light')
 
@@ -671,7 +691,64 @@ async function main() {
       await session.goto('/register', 'input[name="fullName"]')
       const path1 = await session.evalJs('window.location.pathname')
       if (path1 !== '/register') throw new Error(`UI-07 Expected /register but got ${path1}`)
+      const effectiveViewport = await session.evalJs(`({
+        width: window.innerWidth,
+        height: window.innerHeight,
+        matchesMaxWidth768: window.matchMedia('(max-width: 768px)').matches,
+      })`)
+      if (effectiveViewport.width !== 720 || !effectiveViewport.matchesMaxWidth768) {
+        throw new Error(`UI-07 Expected a 720px viewport inside the 768px breakpoint, got ${JSON.stringify(effectiveViewport)}`)
+      }
       await session.screenshot(join(SCREENSHOTS_DIR, 'ui-07/signup-zoom200-1440-empty.png'))
+
+      // Keyboard traversal: real Tab presses from the top of a freshly loaded page, then one Shift+Tab.
+      const tabbable = await session.evalJs(`
+        (() => {
+          const visible = (el) => {
+            const s = getComputedStyle(el);
+            return el.getClientRects().length > 0 && s.visibility !== 'hidden' && s.display !== 'none';
+          };
+          const els = Array.from(document.querySelectorAll('a[href], button, input, select, textarea, [tabindex]'))
+            .filter((el) => !el.disabled && el.type !== 'hidden' && el.tabIndex >= 0 && visible(el));
+          els.forEach((el, i) => el.setAttribute('data-tab-probe', String(i)));
+          return els.map((el) => ({
+            tag: el.tagName.toLowerCase(),
+            label: el.getAttribute('name') || el.getAttribute('aria-label') || el.textContent.trim().slice(0, 40),
+            positiveTabIndex: el.tabIndex > 0,
+          }));
+        })()
+      `)
+      const readFocus = `
+        (() => {
+          const el = document.activeElement;
+          const probe = el && el.getAttribute('data-tab-probe');
+          return probe === null || probe === undefined ? null : Number(probe);
+        })()
+      `
+      const tabSequence = []
+      for (let i = 0; i < tabbable.length; i++) {
+        await session.pressTab()
+        tabSequence.push(await session.evalJs(readFocus))
+      }
+      await session.pressTab({ shift: true })
+      const afterShiftTab = await session.evalJs(readFocus)
+      const expectedOrder = tabbable.map((_, i) => i)
+      const keyboard = {
+        method: 'Input.dispatchKeyEvent Tab x ' + tabbable.length + ', then Shift+Tab x 1, from page load',
+        tabbableControls: tabbable.map((t) => `${t.tag}:${t.label}`),
+        focusSequence: tabSequence.map((i) => (i === null ? null : `${tabbable[i].tag}:${tabbable[i].label}`)),
+        allControlsReachedByTab: expectedOrder.every((i) => tabSequence.includes(i)),
+        tabOrderFollowsDomOrder: JSON.stringify(tabSequence) === JSON.stringify(expectedOrder),
+        shiftTabMovesBack: tabbable.length > 1 && afterShiftTab === tabbable.length - 2,
+      }
+      await session.evalJs(`
+        document.activeElement && document.activeElement.blur();
+        document.querySelectorAll('[data-tab-probe]').forEach((el) => el.removeAttribute('data-tab-probe'));
+      `)
+      console.log(`UI-07 Keyboard traversal: ${JSON.stringify(keyboard)}`)
+      if (!keyboard.allControlsReachedByTab) throw new Error('UI-07 Not every control was reached with Tab')
+      if (!keyboard.tabOrderFollowsDomOrder) throw new Error('UI-07 Tab order does not follow the visual (DOM) order')
+      if (!keyboard.shiftTabMovesBack) throw new Error('UI-07 Shift+Tab did not move focus back one control')
 
       // State 2: Validation Errors (click submit empty)
       await session.evalJs(`document.querySelector('button[type="submit"]').click()`)
@@ -768,7 +845,8 @@ async function main() {
           return true;
         })()
       `)
-      const measuredKeyboardReachable = await session.evalJs(`
+      // Programmatic focusability only (element.focus()); keyboard reachability is measured with real Tab presses above.
+      const measuredProgrammaticFocusable = await session.evalJs(`
         (() => {
           const controls = Array.from(document.querySelectorAll('input, button, a[href]'));
           for (const el of controls) {
@@ -779,17 +857,18 @@ async function main() {
         })()
       `)
 
-      console.log(`UI-07 Reflow measurements at 720px: scrollbar=${measuredScrollbar}, clipped=${measuredClippedCount}, stacked=${measuredInputsStacked}, keyboardReachable=${measuredKeyboardReachable}`)
-      if (measuredScrollbar) throw new Error('UI-07 Measured horizontal scrollbar at 720px reflow')
+      console.log(`UI-07 Layout measurements at 720px: scrollbar=${measuredScrollbar}, clipped=${measuredClippedCount}, stacked=${measuredInputsStacked}, programmaticFocusable=${measuredProgrammaticFocusable}`)
+      if (measuredScrollbar) throw new Error('UI-07 Measured horizontal scrollbar at 720px viewport')
       if (measuredClippedCount > 0) throw new Error(`UI-07 Measured ${measuredClippedCount} clipped elements`)
-      if (!measuredInputsStacked) throw new Error('UI-07 Inputs not stacked vertically at 720px reflow')
-      if (!measuredKeyboardReachable) throw new Error('UI-07 Controls not keyboard reachable')
+      if (!measuredInputsStacked) throw new Error('UI-07 Inputs not stacked vertically at 720px viewport')
+      if (!measuredProgrammaticFocusable) throw new Error('UI-07 Controls not programmatically focusable')
 
       // Save pre-submit valid filled snapshot (Finding UI07-R3-01)
       await session.screenshot(join(SCREENSHOTS_DIR, 'ui-07/signup-zoom200-1440-valid-filled.png'))
 
-      // State 5: Submit and verify successful registration redirect to /member
-      console.log('Submitting valid form with mock registration success...')
+      // State 5: Submit against the mocked POST /auth/register and check the client-side redirect to /member.
+      // Only the redirect is verified; dashboard APIs are not mocked, so the member page may show a load error.
+      console.log('Submitting valid form with mocked registration success...')
       session.setRegisterMode('success')
       await session.evalJs(`document.querySelector('button[type="submit"]').click()`)
       await pause(1500)
@@ -799,23 +878,8 @@ async function main() {
       if (!postRegisterPath.startsWith('/member')) {
         throw new Error(`UI-07 Expected navigation to /member, but got ${postRegisterPath}`)
       }
-      // Save post-submit success redirect snapshot
+      // Save post-submit redirect snapshot (mocked registration -> /member)
       await session.screenshot(join(SCREENSHOTS_DIR, 'ui-07/signup-zoom200-1440-success.png'))
-
-      // Integrated report.json preserving historical baseline (Finding UI07-R3-03)
-      const cp = await import('child_process')
-      let integratedReport
-      try {
-        integratedReport = JSON.parse(cp.execSync('git show fc888e0~1:frontend/docs/screenshots/ui-07/report.json', { encoding: 'utf8' }))
-      } catch (e) {
-        console.warn('Could not read fc888e0~1 report.json, using fallback')
-        integratedReport = {
-          screens: [],
-          contrast: {},
-          layout: {},
-          focus: {},
-        }
-      }
 
       const newScreens = [
         'signup-zoom200-1440-empty',
@@ -824,42 +888,46 @@ async function main() {
         'signup-zoom200-1440-valid-filled',
         'signup-zoom200-1440-success',
       ]
-      for (const sc of newScreens) {
-        if (!integratedReport.screens.includes(sc)) {
-          integratedReport.screens.push(sc)
-        }
-      }
+      const redirectedToMember = postRegisterPath.startsWith('/member')
+      const allAssertionsPass =
+        !measuredScrollbar && measuredClippedCount === 0 && measuredInputsStacked && measuredProgrammaticFocusable &&
+        keyboard.allControlsReachedByTab && keyboard.tabOrderFollowsDomOrder && keyboard.shiftTabMovesBack && redirectedToMember
 
-      const allAssertionsPass = !measuredScrollbar && (measuredClippedCount === 0) && measuredInputsStacked && measuredKeyboardReachable && postRegisterPath.startsWith('/member')
-
-      integratedReport.reflowEquivalenceZoom200_Round3 = {
+      const viewportSection = {
         verifiedAt: new Date().toISOString(),
-        viewportEquivalenceNote: '720px viewport equivalence representing 1440px desktop display at 200% browser zoom reflow (WCAG 1.4.10)',
-        effectiveViewport: {
-          width: 720,
-          height: 900,
-          breakpointMatched: 'max-width: 768px',
-        },
+        scope:
+          '720px responsive viewport equivalence (layout only): a 720 CSS px Chromium viewport, the width a 1440px ' +
+          'desktop lays out to at 200% zoom. Not a native browser zoom operation; WCAG 1.4.10 conformance is not claimed.',
+        effectiveViewport: { ...effectiveViewport, breakpoint: 'max-width: 768px' },
         measuredAssertions: {
           horizontalScrollbarPresent: measuredScrollbar,
           clippedElementsCount: measuredClippedCount,
           inputsStackedVertically: measuredInputsStacked,
-          keyboardReachabilityVerified: measuredKeyboardReachable,
+          programmaticFocusabilityVerified: measuredProgrammaticFocusable,
           registrationFormFilled: validEmail === 'taylor.alex@sportify.demo',
-          registrationSubmitRedirectPath: postRegisterPath,
-          redirectedToMemberDashboard: postRegisterPath.startsWith('/member'),
         },
-        statesVerified: [
+        keyboardTraversal: keyboard,
+        mockRegistrationRedirect: {
+          scope: 'POST /auth/register and GET /users/me answered by the browser mock; only the client-side redirect is verified',
+          pathAfterSubmit: postRegisterPath,
+          redirectedToMemberRoute: redirectedToMember,
+          dashboardVerified: false,
+        },
+        statesCaptured: [
           { state: 'empty', file: 'signup-zoom200-1440-empty.png', route: '/register' },
           { state: 'validation_errors', file: 'signup-zoom200-1440-errors.png', route: '/register', errorCount: errCount },
-          { state: 'duplicate_email_409', file: 'signup-zoom200-1440-invalid.png', route: '/register', duplicateErrorVisible: emailErr },
+          { state: 'duplicate_email_409_mock', file: 'signup-zoom200-1440-invalid.png', route: '/register', duplicateErrorVisible: emailErr },
           { state: 'valid_form_filled_pre_submit', file: 'signup-zoom200-1440-valid-filled.png', route: '/register' },
-          { state: 'registration_success_post_submit', file: 'signup-zoom200-1440-success.png', route: postRegisterPath },
+          { state: 'mock_registration_success_redirect_to_member', file: 'signup-zoom200-1440-success.png', route: postRegisterPath },
         ],
-        tc15Outcome: allAssertionsPass ? 'PASS' : 'FAIL',
+        notRun: UI07_NOT_RUN,
+        supersedes: UI07_SUPERSEDED_KEYS,
+        outcome: allAssertionsPass ? 'PASS' : 'FAIL',
       }
 
-      writeFileSync(join(SCREENSHOTS_DIR, 'ui-07/report.json'), JSON.stringify(integratedReport, null, 2))
+      const integratedReport = mergeUi07Report(baselineReport, viewportSection, newScreens)
+      writeFileSync(reportPath, JSON.stringify(integratedReport, null, 2) + '\n')
+      if (!allAssertionsPass) throw new Error('UI-07 720px viewport assertions failed; see report.json')
       await session.cleanup()
       console.log('UI-07 completed successfully!')
     }
