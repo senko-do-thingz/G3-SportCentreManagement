@@ -1,0 +1,303 @@
+{
+  "screens": [
+    {
+      "screen": "home-light-390",
+      "identical": true,
+      "changed_pixels": 0,
+      "total_pixels": 3824730,
+      "size": [
+        390,
+        9807
+      ]
+    },
+    {
+      "screen": "home-light-768",
+      "identical": true,
+      "changed_pixels": 0,
+      "total_pixels": 5596416,
+      "size": [
+        768,
+        7287
+      ]
+    },
+    {
+      "screen": "home-light-1440",
+      "identical": true,
+      "changed_pixels": 0,
+      "total_pixels": 8866080,
+      "size": [
+        1440,
+        6157
+      ]
+    },
+    {
+      "screen": "home-dark-390",
+      "identical": true,
+      "changed_pixels": 0,
+      "total_pixels": 3824730,
+      "size": [
+        390,
+        9807
+      ]
+    },
+    {
+      "screen": "home-dark-768",
+      "identical": true,
+      "changed_pixels": 0,
+      "total_pixels": 5596416,
+      "size": [
+        768,
+        7287
+      ]
+    },
+    {
+      "screen": "home-dark-1440",
+      "identical": true,
+      "changed_pixels": 0,
+      "total_pixels": 8866080,
+      "size": [
+        1440,
+        6157
+      ]
+    },
+    {
+      "screen": "home-auth-dialog-light-390",
+      "identical": true,
+      "changed_pixels": 0,
+      "total_pixels": 3824730,
+      "size": [
+        390,
+        9807
+      ]
+    },
+    {
+      "screen": "login-light-390",
+      "identical": true,
+      "changed_pixels": 0,
+      "total_pixels": 351000,
+      "size": [
+        390,
+        900
+      ]
+    },
+    {
+      "screen": "register-light-390",
+      "identical": true,
+      "changed_pixels": 0,
+      "total_pixels": 456690,
+      "size": [
+        390,
+        1171
+      ]
+    },
+    {
+      "screen": "home-auth-dialog-light-1440",
+      "identical": true,
+      "changed_pixels": 0,
+      "total_pixels": 8866080,
+      "size": [
+        1440,
+        6157
+      ]
+    },
+    {
+      "screen": "login-light-1440",
+      "identical": true,
+      "changed_pixels": 0,
+      "total_pixels": 1296000,
+      "size": [
+        1440,
+        900
+      ]
+    },
+    {
+      "screen": "register-light-1440",
+      "identical": true,
+      "changed_pixels": 0,
+      "total_pixels": 1296000,
+      "size": [
+        1440,
+        900
+      ]
+    },
+    {
+      "screen": "home-auth-dialog-dark-390",
+      "identical": true,
+      "changed_pixels": 0,
+      "total_pixels": 3824730,
+      "size": [
+        390,
+        9807
+      ]
+    },
+    {
+      "screen": "login-dark-390",
+      "identical": true,
+      "changed_pixels": 0,
+      "total_pixels": 351000,
+      "size": [
+        390,
+        900
+      ]
+    },
+    {
+      "screen": "register-dark-390",
+      "identical": true,
+      "changed_pixels": 0,
+      "total_pixels": 456690,
+      "size": [
+        390,
+        1171
+      ]
+    },
+    {
+      "screen": "home-auth-dialog-dark-1440",
+      "identical": true,
+      "changed_pixels": 0,
+      "total_pixels": 8866080,
+      "size": [
+        1440,
+        6157
+      ]
+    },
+    {
+      "screen": "login-dark-1440",
+      "identical": true,
+      "changed_pixels": 0,
+      "total_pixels": 1296000,
+      "size": [
+        1440,
+        900
+      ]
+    },
+    {
+      "screen": "register-dark-1440",
+      "identical": true,
+      "changed_pixels": 0,
+      "total_pixels": 1296000,
+      "size": [
+        1440,
+        900
+      ]
+    }
+  ],
+  "rendered": {
+    "light": {
+      "before": {
+        "root --color-hero": "",
+        "root --color-hero-deep": "",
+        "root --color-footer": "",
+        "root --color-on-hero": "",
+        "root --color-on-hero-muted": "",
+        "root --color-hero-highlight": "",
+        "home --h-primary": "#1f4fd8",
+        "home --h-primary-hover": "#1a42b5",
+        "home --h-primary-text": "#1f4fd8",
+        "home --h-accent": "#f5b301",
+        "home --h-on-accent": "#1a1405",
+        "home --h-icon-bg": "#e9eefc",
+        "home --h-hero": "#0b1736",
+        "home --h-hero-accent": "#ffc83d",
+        "home --h-hero-muted": "#e3e9f8",
+        "home --h-footer": "#070f24",
+        "home --h-deep": "#060d20",
+        "home --h-cta-from": "#0b1736",
+        "home --h-cta-to": "#1f4fd8",
+        "hero background-color": "rgb(11, 23, 54)",
+        "hero title highlight color": "rgb(255, 200, 61)",
+        "footer background-color": "rgb(7, 15, 36)",
+        "membership offer button background-color": "rgb(31, 79, 216)",
+        "cta gradient": "linear-gradient(90deg, rgb(11, 23, 54), color(srgb 0.121569 0.309804 0.847059 / 0.8))",
+        "heading font-family": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+        "data-theme": "light"
+      },
+      "after": {
+        "root --color-hero": "#0b1736",
+        "root --color-hero-deep": "#060d20",
+        "root --color-footer": "#070f24",
+        "root --color-on-hero": "#fff",
+        "root --color-on-hero-muted": "#e3e9f8",
+        "root --color-hero-highlight": "#ffc83d",
+        "home --h-primary": "#1f4fd8",
+        "home --h-primary-hover": "#1a42b5",
+        "home --h-primary-text": "#1f4fd8",
+        "home --h-accent": "#f5b301",
+        "home --h-on-accent": "#1a1405",
+        "home --h-icon-bg": "#e9eefc",
+        "home --h-hero": "#0b1736",
+        "home --h-hero-accent": "#ffc83d",
+        "home --h-hero-muted": "#e3e9f8",
+        "home --h-footer": "#070f24",
+        "home --h-deep": "#060d20",
+        "home --h-cta-from": "#0b1736",
+        "home --h-cta-to": "#1f4fd8",
+        "hero background-color": "rgb(11, 23, 54)",
+        "hero title highlight color": "rgb(255, 200, 61)",
+        "footer background-color": "rgb(7, 15, 36)",
+        "membership offer button background-color": "rgb(31, 79, 216)",
+        "cta gradient": "linear-gradient(90deg, rgb(11, 23, 54), color(srgb 0.121569 0.309804 0.847059 / 0.8))",
+        "heading font-family": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+        "data-theme": "light"
+      }
+    },
+    "dark": {
+      "before": {
+        "root --color-hero": "",
+        "root --color-hero-deep": "",
+        "root --color-footer": "",
+        "root --color-on-hero": "",
+        "root --color-on-hero-muted": "",
+        "root --color-hero-highlight": "",
+        "home --h-primary": "#3d6cf0",
+        "home --h-primary-hover": "#5a83f3",
+        "home --h-primary-text": "#8aa8ff",
+        "home --h-accent": "#f5b301",
+        "home --h-on-accent": "#1a1405",
+        "home --h-icon-bg": "#8aa8ff1f",
+        "home --h-hero": "#060b18",
+        "home --h-hero-accent": "#ffc83d",
+        "home --h-hero-muted": "#e3e9f8",
+        "home --h-footer": "#050913",
+        "home --h-deep": "#060d20",
+        "home --h-cta-from": "#0b1736",
+        "home --h-cta-to": "#2a50c8",
+        "hero background-color": "rgb(6, 11, 24)",
+        "hero title highlight color": "rgb(255, 200, 61)",
+        "footer background-color": "rgb(5, 9, 19)",
+        "membership offer button background-color": "rgb(61, 108, 240)",
+        "cta gradient": "linear-gradient(90deg, rgb(11, 23, 54), color(srgb 0.164706 0.313726 0.784314 / 0.8))",
+        "heading font-family": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+        "data-theme": "dark"
+      },
+      "after": {
+        "root --color-hero": "#060b18",
+        "root --color-hero-deep": "#060d20",
+        "root --color-footer": "#050913",
+        "root --color-on-hero": "#fff",
+        "root --color-on-hero-muted": "#e3e9f8",
+        "root --color-hero-highlight": "#ffc83d",
+        "home --h-primary": "#3d6cf0",
+        "home --h-primary-hover": "#5a83f3",
+        "home --h-primary-text": "#8aa8ff",
+        "home --h-accent": "#f5b301",
+        "home --h-on-accent": "#1a1405",
+        "home --h-icon-bg": "#8aa8ff1f",
+        "home --h-hero": "#060b18",
+        "home --h-hero-accent": "#ffc83d",
+        "home --h-hero-muted": "#e3e9f8",
+        "home --h-footer": "#050913",
+        "home --h-deep": "#060d20",
+        "home --h-cta-from": "#0b1736",
+        "home --h-cta-to": "#2a50c8",
+        "hero background-color": "rgb(6, 11, 24)",
+        "hero title highlight color": "rgb(255, 200, 61)",
+        "footer background-color": "rgb(5, 9, 19)",
+        "membership offer button background-color": "rgb(61, 108, 240)",
+        "cta gradient": "linear-gradient(90deg, rgb(11, 23, 54), color(srgb 0.164706 0.313726 0.784314 / 0.8))",
+        "heading font-family": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+        "data-theme": "dark"
+      }
+    }
+  },
+  "failures": []
+}

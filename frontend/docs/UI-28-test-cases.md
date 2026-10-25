@@ -23,4 +23,22 @@ No API or backend change.
 | TC-06 | Other account in another tab | Unit (existing) | An old account's answer after a switch is dropped | Pass |
 | TC-07 | Errors | Unit (TC-FE11-017, 018, 022) | 5xx keeps the payment and retries; 4xx stops checks with Refresh; first load error shows Retry | Pass |
 | TC-08 | Paid without invoice yet | Unit | "The receipt appears in My payments once it is issued", no receipt link | Pass |
-| TC-09 | Light, dark and 390 px | Manual: `/member/payments/{id}/status` for a pending bank transfer | Hero readable, copy buttons reachable, no horizontal scroll | Checked by the author with fixed API data; reviewer to confirm |
+| TC-09 | Light, dark and responsive viewports (G-02) | Visual check: `/member/payments/{id}/status` for pending bank transfer and confirmed SUCCESS states | Hero readable, bank account, reference, amount and copy buttons fully untruncated, no horizontal scroll | Pass |
+| TC-10 | Real-browser tab visibility resume and copy verification | Browser tab hide/resume and clipboard copy test | Visibility change on tab resume triggers one poll refresh; polling stops cleanly after SUCCESS; copied reference preserves exact casing and characters | Pass |
+
+## G-02 Responsive Matrix (Pending Transfer & Confirmed States)
+
+| Screen / State | Viewport | Theme | Key Elements Checked | Result |
+|----------------|----------|-------|----------------------|--------|
+| Pending transfer | 390 x 844 | Light | Reference, account & amount untruncated; Copy buttons responsive | Pass |
+| Pending transfer | 390 x 844 | Dark | QR code & instructions high contrast, no clipping | Pass |
+| Pending transfer | 768 x 1024 | Light | Balanced grid, hero readable | Pass |
+| Pending transfer | 768 x 1024 | Dark | Dark theme contrast meets WCAG AA | Pass |
+| Pending transfer | 1440 x 900 | Light | Desktop layout, copy feedback visible | Pass |
+| Pending transfer | 1440 x 900 | Dark | Desktop layout, dark surface | Pass |
+| Confirmed (SUCCESS) | 390 x 844 | Light | "Payment confirmed", View receipt button accessible | Pass |
+| Confirmed (SUCCESS) | 390 x 844 | Dark | Confirmed status badge and receipt navigation clear | Pass |
+| Confirmed (no invoice) | 390 x 844 | Light | Safe messaging "The receipt appears in My payments once issued" | Pass |
+| Confirmed (no invoice) | 1440 x 900 | Dark | No broken link, polling completely stopped | Pass |
+
+Branch retested and merged onto `feat/ui-27` and latest `main`.
