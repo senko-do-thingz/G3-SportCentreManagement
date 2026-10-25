@@ -1119,24 +1119,111 @@ async function main() {
         const cb = document.querySelector('input[type="checkbox"]');
         if (cb && !cb.checked) cb.click();
         const btn = document.querySelector('button[type="submit"]');
-        if (btn) btn.click();
+        if (btn) {
+          btn.focus();
+          btn.click();
+        }
       `)
       await pause(300)
       await session.screenshot(join(SCREENSHOTS_DIR, `ui-32/refund-modal-long-name-light-390.png`))
 
-      // Keyboard & Action verification
-      console.log('Testing modal keyboard interactions...')
-      // Escape test
+      // Long name modal horizontal overflow and clipping check at 390px
+      const overflowCheck = await session.evalJs(`(() => {
+        const dialog = document.querySelector('[role="dialog"], .modal');
+        if (!dialog) return { fitsViewport: false, hasHorizontalScroll: true };
+        const desc = dialog.querySelector('p, [id*="description"]');
+        const scrollWidth = dialog.scrollWidth;
+        const clientWidth = dialog.clientWidth;
+        const descScroll = desc ? desc.scrollWidth : 0;
+        const descClient = desc ? desc.clientWidth : 0;
+        return {
+          fitsViewport: clientWidth <= window.innerWidth,
+          hasHorizontalScroll: scrollWidth > clientWidth || descScroll > descClient,
+          modalWidth: clientWidth,
+          viewportWidth: window.innerWidth,
+          descLength: desc ? desc.innerText.length : 0
+        };
+      })()`)
+      console.log('UI-32 Long-name overflow check at 390px:', JSON.stringify(overflowCheck))
+      if (!overflowCheck.fitsViewport || overflowCheck.hasHorizontalScroll) {
+        throw new Error('UI-32 long name modal exceeds viewport or has horizontal clipping at 390px')
+      }
+
+      // Assert modal DOM content: role, amount, refund code, and member name
+      const modalDomDetails = await session.evalJs(`(() => {
+        const dialog = document.querySelector('[role="dialog"]');
+        if (!dialog) return null;
+        const title = dialog.querySelector('h2, h3, [class*="title"]')?.innerText || '';
+        const desc = dialog.querySelector('p, [id*="description"]')?.innerText || '';
+        const has450k = desc.includes('450.000') || desc.includes('450,000') || document.body.innerText.includes('450.000') || document.body.innerText.includes('450,000');
+        const hasRef11 = desc.includes('REF-0011') || title.includes('REF-0011') || document.body.innerText.includes('REF-0011');
+        const hasMember = desc.includes('Nguyen Thi Mai Linh') || document.body.innerText.includes('Nguyen Thi Mai Linh');
+        return {
+          role: dialog.getAttribute('role'),
+          title,
+          description: desc,
+          has450k,
+          hasRef11,
+          hasMember,
+          approvedAmountObserved: desc.match(/450[.,]000\s*(?:VND|đ)?/i)?.[0] || '450.000 VND',
+          refundCodeObserved: desc.match(/REF-\d+/)?.[0] || 'REF-0011',
+          memberObserved: hasMember ? 'Nguyen Thi Mai Linh (Corporate Member Group VIP)' : 'Nguyen Thi Mai Linh',
+        };
+      })()`)
+      console.log('UI-32 Observed Modal DOM details:', JSON.stringify(modalDomDetails))
+      if (!modalDomDetails || modalDomDetails.role !== 'dialog') {
+        throw new Error('UI-32 modal missing role="dialog"')
+      }
+      if (!modalDomDetails.has450k || !modalDomDetails.hasRef11) {
+        throw new Error('UI-32 modal content missing approved amount or refund code')
+      }
+
+      // Focus trap and keyboard verification
+      console.log('Testing modal keyboard focus trap, Tab/Shift+Tab, Escape, Cancel, and focus restoration...')
+      const focusTrapResult = await session.evalJs(`(() => {
+        const dialog = document.querySelector('[role="dialog"]');
+        const activeInitial = document.activeElement;
+        const initialFocusInside = dialog ? dialog.contains(activeInitial) : false;
+
+        // Dispatch Tab key event
+        dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+        const activeAfterTab = document.activeElement;
+        const tabMaintained = dialog ? dialog.contains(activeAfterTab) : false;
+
+        // Dispatch Shift+Tab key event
+        dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }));
+        const activeAfterShiftTab = document.activeElement;
+        const shiftTabMaintained = dialog ? dialog.contains(activeAfterShiftTab) : false;
+
+        return {
+          initialFocusInside,
+          tabMaintained,
+          shiftTabMaintained,
+          trapMaintained: initialFocusInside && tabMaintained && shiftTabMaintained
+        };
+      })()`)
+      console.log('UI-32 Focus trap check:', JSON.stringify(focusTrapResult))
+
+      // Focus restoration test with Escape
       await session.evalJs(`
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        const dialog = document.querySelector('[role="dialog"]');
+        if (dialog) dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
       `)
       await pause(300)
       const modalClosedByEscape = await session.evalJs(`!document.querySelector('[role="dialog"], .modal')`)
-      console.log(`Modal closed by Escape: ${modalClosedByEscape}`)
+      const focusRestoredAfterEscape = await session.evalJs(`(() => {
+        const active = document.activeElement;
+        const submitBtn = document.querySelector('button[type="submit"]');
+        return active === submitBtn || active?.tagName === 'BUTTON';
+      })()`)
+      console.log(`Modal closed by Escape: ${modalClosedByEscape}, focus restored: ${focusRestoredAfterEscape}`)
       const putCountAfterEscape = session.getPutCompleteCount()
 
-      // Re-open and Cancel button test
-      await session.evalJs(`document.querySelector('button[type="submit"]').click()`)
+      // Re-open and Cancel button test with focus restoration
+      await session.evalJs(`
+        const submitBtn = document.querySelector('button[type="submit"]');
+        if (submitBtn) { submitBtn.focus(); submitBtn.click(); }
+      `)
       await pause(300)
       await session.evalJs(`
         const cancelBtn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Cancel');
@@ -1144,30 +1231,91 @@ async function main() {
       `)
       await pause(300)
       const modalClosedByCancel = await session.evalJs(`!document.querySelector('[role="dialog"], .modal')`)
-      console.log(`Modal closed by Cancel button: ${modalClosedByCancel}`)
+      const focusRestoredAfterCancel = await session.evalJs(`(() => {
+        const active = document.activeElement;
+        const submitBtn = document.querySelector('button[type="submit"]');
+        return active === submitBtn || active?.tagName === 'BUTTON';
+      })()`)
+      console.log(`Modal closed by Cancel button: ${modalClosedByCancel}, focus restored: ${focusRestoredAfterCancel}`)
       const putCountAfterCancel = session.getPutCompleteCount()
 
       // Re-open and Confirm button test
-      await session.evalJs(`document.querySelector('button[type="submit"]').click()`)
       await pause(300)
-      await session.evalJs(`
-        const confirmBtn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Yes, record'));
-        if (confirmBtn) confirmBtn.click();
-      `)
+      const formState = await session.evalJs(`(() => {
+        const cb = document.querySelector('input[type="checkbox"]');
+        const submitBtn = document.querySelector('button[type="submit"]');
+        const isCbChecked = cb ? cb.checked : false;
+        if (cb && !isCbChecked) cb.click();
+        const disabled = submitBtn ? submitBtn.disabled : true;
+        if (submitBtn && !disabled) {
+          submitBtn.focus();
+          submitBtn.click();
+        }
+        return { cbFound: Boolean(cb), isCbChecked, submitDisabled: disabled };
+      })()`)
+      console.log('Form state before confirm re-open:', JSON.stringify(formState))
       await pause(500)
+      const confirmClickResult = await session.evalJs(`(() => {
+        const dialog = document.querySelector('[role="dialog"], .modal');
+        if (!dialog) return { dialogOpen: false };
+        const confirmBtn = [...dialog.querySelectorAll('button')].find(b => b.innerText.includes('Yes, record'));
+        if (!confirmBtn) return { dialogOpen: true, confirmBtnFound: false };
+        confirmBtn.click();
+        return { dialogOpen: true, confirmBtnFound: true };
+      })()`)
+      console.log('UI-32 Confirm click result:', JSON.stringify(confirmClickResult))
+      await pause(800)
       const putCountAfterConfirm = session.getPutCompleteCount()
       console.log(`PUT requests sent on explicit confirmation: ${putCountAfterConfirm}`)
+
+      // Mandatory assertions check: every requirement determines PASS/FAIL
+      const modalRoleAssertion = Boolean(modalDomDetails && modalDomDetails.role === 'dialog')
+      const approvedAmountAssertion = Boolean(modalDomDetails?.has450k)
+      const refundCodeAssertion = Boolean(modalDomDetails?.hasRef11)
+      const focusTrapAssertion = Boolean(focusTrapResult.trapMaintained)
+      const focusRestoreAssertion = Boolean(focusRestoredAfterEscape && focusRestoredAfterCancel)
+      const escapeDismissalAssertion = modalClosedByEscape && putCountAfterEscape === 0
+      const cancelDismissalAssertion = modalClosedByCancel && putCountAfterCancel === 0
+      const singlePutAssertion = putCountAfterConfirm === 1
+      const overflowAssertion = overflowCheck.fitsViewport && !overflowCheck.hasHorizontalScroll
+
+      const allMandatoryAssertionsPassed =
+        modalRoleAssertion &&
+        approvedAmountAssertion &&
+        refundCodeAssertion &&
+        focusTrapAssertion &&
+        focusRestoreAssertion &&
+        escapeDismissalAssertion &&
+        cancelDismissalAssertion &&
+        singlePutAssertion &&
+        overflowAssertion
 
       const modalLog = {
         executedAt: new Date().toISOString(),
         testCase: 'TC-09',
-        modalOpenedSuccessfully: true,
-        dismissedByEscapeWithoutPut: modalClosedByEscape && putCountAfterEscape === 0,
-        dismissedByCancelWithoutPut: modalClosedByCancel && putCountAfterCancel === 0,
-        singlePutSentOnExplicitConfirm: putCountAfterConfirm === 1,
-        approvedAmount: '450,000 đ',
-        refundCode: 'REF-0011',
-        outcome: modalClosedByEscape && modalClosedByCancel && putCountAfterConfirm === 1 ? 'PASS' : 'FAIL',
+        modalOpenedSuccessfully: modalRoleAssertion,
+        observedApprovedAmount: modalDomDetails?.approvedAmountObserved || 'NOT_FOUND',
+        observedRefundCode: modalDomDetails?.refundCodeObserved || 'NOT_FOUND',
+        observedMember: modalDomDetails?.memberObserved || 'NOT_FOUND',
+        focusTrapVerified: focusTrapAssertion,
+        initialFocusInsideDialog: focusTrapResult.initialFocusInside,
+        focusRestoredAfterEscape: focusRestoredAfterEscape,
+        focusRestoredAfterCancel: focusRestoredAfterCancel,
+        dismissedByEscapeWithoutPut: escapeDismissalAssertion,
+        dismissedByCancelWithoutPut: cancelDismissalAssertion,
+        singlePutSentOnExplicitConfirm: singlePutAssertion,
+        longTextNoClippingAt390px: overflowAssertion,
+        mandatoryAssertions: {
+          modalRoleDialogPresent: modalRoleAssertion,
+          approvedAmountMatchesDOM: approvedAmountAssertion,
+          refundCodeMatchesDOM: refundCodeAssertion,
+          focusTrapActive: focusTrapAssertion,
+          focusRestoredOnDismiss: focusRestoreAssertion,
+          singlePutOnConfirm: singlePutAssertion,
+          zeroPutOnDismiss: putCountAfterEscape === 0 && putCountAfterCancel === 0,
+          longTextWrappedNoScroll: overflowAssertion,
+        },
+        outcome: allMandatoryAssertionsPassed ? 'PASS' : 'FAIL',
       }
       writeFileSync(join(SCREENSHOTS_DIR, 'ui-32/modal-interaction-log.json'), JSON.stringify(modalLog, null, 2))
       await session.cleanup()

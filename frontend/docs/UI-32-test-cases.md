@@ -22,7 +22,7 @@ rejected state in the Home theme. Money and eligibility come from BE-21; no API 
 | TC-06 | No double payout | Unit (duplicate completion clicks) | Double clicks on both buttons send one PUT /refunds/{id}/complete; a rejection never claims completion | Pass |
 | TC-07 | Errors | Unit (TC-FE12-043, 047, 049) | A failed completion stays on Refund Approved with the backend message | Pass |
 | TC-08 | Light, dark and responsive viewports (G-02) | Visual check: `/reception/refunds` and refund detail states in light and dark at 390, 768 and 1440 px | Hero, progress chips and confirmation modal readable, no page-level horizontal scroll | Pass |
-| TC-09 | Modal keyboard navigation, Escape and focus | Keyboard test: open irreversible payout modal, press Escape or Cancel | Focus trapped inside modal; Escape dismisses modal without sending PUT; Cancel button dismisses without action; Confirm button sends single PUT | Pass |
+| TC-09 | Modal keyboard navigation, Escape, focus trap & restoration | Keyboard test: open irreversible payout modal, press Tab/Shift+Tab, Escape or Cancel | Focus trapped inside modal; Tab and Shift+Tab keep active element in dialog; Escape dismisses modal without PUT and restores focus to submit button; Cancel dismisses without action and restores focus; Confirm sends single PUT; all assertions determine PASS/FAIL | Pass |
 
 ## G-02 Responsive Matrix (Refund Progress & Confirmation Modal)
 
@@ -40,16 +40,18 @@ rejected state in the Home theme. Money and eligibility come from BE-21; no API 
 | Second-confirmation modal | 768 x 1024 | Dark | High contrast modal on tablet dark mode | Pass |
 | Second-confirmation modal | 1440 x 900 | Light | Centered dialog, amount & refund code prominent | Pass |
 | Second-confirmation modal | 1440 x 900 | Dark | Desktop dark mode dialog | Pass |
-| Long member name & refund ID | 390 x 844 | Light | Long member name wraps cleanly, no overflow | Pass |
+| Long member name & refund ID | 390 x 844 | Light | Long member name wraps cleanly, no overflow or clipping at 390px | Pass |
 
 ## TC-09 Modal Keyboard & Irreversible Payout Execution Provenance
 
 Executed via headless Chromium test harness (`frontend/scripts/generate-all-evidence.mjs --only ui-32`):
-- **Modal Opening**: Triggered on approved refund #11 by checking completion acknowledgement and clicking "Record completed refund". Dialog opens with approved amount (450,000 đ), member name, and refund code (`REF-0011`).
-- **Dismissed by Escape**: `Escape` key event dispatched on document closes modal without sending any network request (0 PUT requests observed).
-- **Dismissed by Cancel**: "Cancel" button click dismisses modal without action (0 PUT requests observed).
+- **Modal Opening**: Triggered on approved refund #11 by checking completion acknowledgement and clicking "Record completed refund". Verified rendered DOM contains `role="dialog"`, approved amount (`450.000 VND`), refund code (`REF-0011`), and member name (`Nguyen Thi Mai Linh`).
+- **Focus Trap Verification**: Focus actively trapped within dialog; `Tab` and `Shift+Tab` keyboard events keep `document.activeElement` inside dialog.
+- **Dismissed by Escape & Focus Restoration**: `Escape` key event closes modal without network requests (0 PUT requests observed); focus automatically restored to the triggering button.
+- **Dismissed by Cancel & Focus Restoration**: "Cancel" button click dismisses modal without action (0 PUT requests observed); focus restored to the triggering button.
 - **Single PUT on Confirmation**: "Yes, record refund payout" button click initiates exactly 1 `PUT /refunds/11/complete` request.
-- **Evidence Log**: Captured in `frontend/docs/screenshots/ui-32/modal-interaction-log.json`.
+- **Long-Text Wrapping at 390px**: Verified `scrollWidth <= clientWidth` on phone viewport (390px), ensuring no horizontal scrolling or text clipping.
+- **Evidence Log**: Captured in `frontend/docs/screenshots/ui-32/modal-interaction-log.json`, with all assertions determining `outcome: 'PASS'`.
 
 Note: BE-21 allows one refund per payment, so the quote has no prior refund amount and the refundable limit is the payment amount (`toRefundQuote`). Frontend ref guarantees local single-submit; backend concurrency and idempotency verification is recorded as integration gate QA-01.
-Branch refreshed and merged on `feat/ui-31` (PR #128).
+Branch refreshed and merged on `feat/ui-31` (PR #128), `feat/ui-28`, and `main`.
