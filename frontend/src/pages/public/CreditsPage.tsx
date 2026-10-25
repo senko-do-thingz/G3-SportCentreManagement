@@ -30,7 +30,7 @@ export function CreditsPage() {
             <ul className="credits-grid">
               {group.items.map((item) => (
                 <li key={item.usedFor} className="credits-item">
-                  {item.thumb ? <img src={item.thumb} alt="" width="320" height="200" loading="lazy" /> : <span className="credits-item__placeholder" aria-hidden="true">{group.title === 'Font' ? 'Aa' : 'Video'}</span>}
+                  {item.thumb ? <img src={item.thumb} alt="" width="320" height="200" loading="lazy" decoding="async" /> : <span className="credits-item__placeholder" aria-hidden="true">{group.title === 'Font' ? 'Aa' : 'Video'}</span>}
                   <div>
                     <p className="credits-item__use">{item.usedFor}</p>
                     <a href={item.link} target="_blank" rel="noopener noreferrer" aria-label={`${item.linkLabel} - ${item.usedFor}`}>{item.linkLabel}</a>
@@ -40,7 +40,7 @@ export function CreditsPage() {
             </ul>
           </section>
         ))}
-        <p className="credits-intro">The project also keeps a few fallback photos that are shown only when an online photo cannot load.</p>
+        <p className="credits-intro">The project also keeps small copies of the credited photos below, shown only when an online photo cannot load.</p>
       </main>
       <footer className="home-footer credits-footer">
         <div className="home-wrap home-footer__bottom"><small>Copyright 2026 Sportify Sports Center</small><Link to="/">Back to Home</Link></div>
