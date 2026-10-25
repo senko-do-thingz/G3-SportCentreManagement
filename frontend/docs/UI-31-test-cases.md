@@ -25,4 +25,33 @@ and the desk receipt (S3-Receipt) in the Home theme. Transaction atomicity stays
 | TC-08 | No invented receipt fields | Unit | No base price from the total, no discount or service when the invoice has none | Pass |
 | TC-09 | Desk receipt ownership and status | Unit | Exact payment-to-invoice association enforced: an invoice with null, missing or mismatched paymentId shows "Receipt not found" error state and cannot be printed; a CANCELLED invoice cannot be printed | Pass |
 | TC-10 | Print | Print: PDF | One A4 page; hero, sidebar and actions not printed; unverifiable/mismatch receipts cannot be printed | Pass (1 page each) |
-| TC-11 | Light, dark and 390 px | Manual: `/reception/payments/{id}` pending and paid | Hero readable, form usable, no page-level horizontal scroll | Checked by the author with fixed API data; reviewer to confirm |
+| TC-11 | Light, dark and responsive viewports (G-02) | Visual check: `/reception/payments/{id}` pending (ID 41), mismatch (ID 44) and desk receipt (`/reception/payments/41/receipt`) at 390, 768 and 1440 px in light and dark | Hero readable, form usable, amount mismatch alert prominent, desk receipt centered, no page-level horizontal scroll | Pass |
+
+## G-02 Responsive Matrix (Verify, Mismatch & Desk Receipt)
+
+| Screen / State | Viewport | Theme | Key Elements Checked | Result |
+|----------------|----------|-------|----------------------|--------|
+| Payment Verify (Pending #41) | 390 x 844 | Light | Amount due, payment method, confirm checkbox & button accessible | Pass |
+| Payment Verify (Pending #41) | 390 x 844 | Dark | Contrast on fields and action buttons meets WCAG AA | Pass |
+| Payment Verify (Pending #41) | 768 x 1024 | Light | Form grid balanced, customer info clear | Pass |
+| Payment Verify (Pending #41) | 768 x 1024 | Dark | Surface and field styling consistent | Pass |
+| Payment Verify (Pending #41) | 1440 x 900 | Light | Desktop verify layout, actions aligned | Pass |
+| Payment Verify (Pending #41) | 1440 x 900 | Dark | Full desktop view, high contrast dark theme | Pass |
+| Payment Needs Review (#44) | 390 x 844 | Light | "Payment Needs Review" alert, due & received amounts distinct | Pass |
+| Payment Needs Review (#44) | 390 x 844 | Dark | Warning banner high contrast | Pass |
+| Payment Needs Review (#44) | 768 x 1024 | Light | Mismatch alert prominently framed | Pass |
+| Payment Needs Review (#44) | 768 x 1024 | Dark | Dark theme alert readable | Pass |
+| Payment Needs Review (#44) | 1440 x 900 | Light | Full mismatch overview, discrepancy reason visible | Pass |
+| Payment Needs Review (#44) | 1440 x 900 | Dark | Desktop dark mismatch state | Pass |
+| Desk Receipt View (#41) | 390 x 844 | Light | Receipt details, issue date, Print button accessible | Pass |
+| Desk Receipt View (#41) | 390 x 844 | Dark | High contrast dark receipt card | Pass |
+| Desk Receipt View (#41) | 1440 x 900 | Light | Centered receipt card, clean layout | Pass |
+| Desk Receipt View (#41) | 1440 x 900 | Dark | Desktop dark mode receipt | Pass |
+
+## Desk Receipt A4 Print-to-PDF Verification
+- **Generated File**: `frontend/docs/screenshots/ui-31/reception-receipt-a4.pdf`
+- **Page Count**: Exactly 1 page verified (`preferCSSPageSize: true`, 8.27 x 11.69 inches).
+- **Extracted Content**: Invoice #41, 150,000 VND total, payment method Cash, valid member details.
+- **Excluded Elements**: `@media print` eliminates navigation, sidebar, hero banner, and action buttons. Zero 403 or Access Denied screens.
+
+Branch refreshed and merged on `feat/ui-30` and latest `main`.

@@ -21,4 +21,21 @@ pending / needs-review indicators. No API or backend change.
 | TC-05 | No duplicate action | Unit | Exactly one link per row: Review payment for pending (primary when it needs review), Open otherwise | Pass |
 | TC-06 | Stat cards from real data | Unit | Pending requests from `totalElements`, amount due of the pending rows on the page, needs review on the page; the old placeholder "Refund requests -" card is gone | Pass |
 | TC-07 | Only authorised staff | Unit (TC-FE12-050 and UI-30 case) | MEMBER and COACH see Access denied and no payment request is sent; the backend also requires RECEPTIONIST or MANAGER | Pass |
-| TC-08 | Light, dark and 390 px | Manual: `/reception/payments` | Hero readable; the table scrolls inside its card on a phone; no page-level horizontal scroll | Checked by the author with fixed API data; reviewer to confirm |
+| TC-08 | Light, dark and responsive viewports (G-02) | Visual check: `/reception/payments` at 390, 768 and 1440 px in light and dark | Hero readable, stat cards populated, Needs review badge visible, table scrolls cleanly inside card on phone without page-level spill | Pass |
+
+## G-02 Responsive Matrix (Reception Payment Requests Queue)
+
+| Screen / State | Viewport | Theme | Key Elements Checked | Result |
+|----------------|----------|-------|----------------------|--------|
+| Payment requests queue | 390 x 844 | Light | Stat cards wrap, table scrolls in container, Needs review badge visible | Pass |
+| Payment requests queue | 390 x 844 | Dark | Contrast on status badges meets WCAG AA | Pass |
+| Payment requests queue | 768 x 1024 | Light | Hero links, search filter, table rows aligned | Pass |
+| Payment requests queue | 768 x 1024 | Dark | Dark theme surface, stat cards readable | Pass |
+| Payment requests queue | 1440 x 900 | Light | Full desktop queue, Review payment primary CTA | Pass |
+| Payment requests queue | 1440 x 900 | Dark | Desktop dark mode, no horizontal scroll | Pass |
+
+## Authenticated Fixture & Role Execution Note
+- **Authenticated Identity**: Role-aware `RECEPTIONIST` context applied across all screenshot runs (`/api/v1/users/me` returning role `RECEPTIONIST`). Zero 403 Access Denied screens encountered.
+- **Queue Assertions**: Table populated with representative pending payments, verified amount mismatch note indicator (`Needs review`), and real stat counts.
+
+Branch refreshed and merged on `feat/ui-29` and latest `main`.
