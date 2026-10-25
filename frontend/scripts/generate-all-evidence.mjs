@@ -800,8 +800,28 @@ async function main() {
       if (!copyBtnCheck.exists) throw new Error('Assertion failed: Copy button not found in DOM')
       if (copyBtnCheck.disabled) throw new Error('Assertion failed: Copy button is disabled')
 
-      // Negative control assertion: altered reference code must fail comparison
-      const negativeControlPassed = 'ALTERED_REF_CODE' !== 'SP-52-TAYLOR'
+      // Executed negative controls:
+      // Negative Control 1: Altered reference code must be rejected by exact-match validator
+      const assertClipboardExact = (actual, expected) => actual === expected
+      const alteredRefRejected = !assertClipboardExact('SP-52-ALTERED-REF', 'SP-52-TAYLOR')
+
+      // Negative Control 2: Missing or disabled copy button must be rejected by button validator
+      const assertButtonUsable = (btn) => btn.exists && !btn.disabled
+      const missingButtonRejected = !assertButtonUsable({ exists: false, disabled: false })
+      const disabledButtonRejected = !assertButtonUsable({ exists: true, disabled: true })
+
+      // Negative Control 3: Null/empty clipboard write must be rejected
+      const emptyClipboardRejected = !assertClipboardExact(null, 'SP-52-TAYLOR') && !assertClipboardExact('', 'SP-52-TAYLOR')
+
+      const negativeControlsExecuted = alteredRefRejected && missingButtonRejected && disabledButtonRejected && emptyClipboardRejected
+      console.log('UI-28 Executed negative controls:', {
+        alteredRefRejected,
+        missingButtonRejected,
+        disabledButtonRejected,
+        emptyClipboardRejected,
+        negativeControlsExecuted,
+      })
+      if (!negativeControlsExecuted) throw new Error('Assertion failed: Negative controls validation failed')
 
       // Click copy button
       await session.evalJs(`
@@ -814,7 +834,7 @@ async function main() {
       const clipboardWrites = await session.evalJs(`window.__clipboardWrites || []`)
       const actualCopiedText = clipboardWrites.length > 0 ? clipboardWrites[clipboardWrites.length - 1] : null
       console.log(`Actual copied text: "${actualCopiedText}" (expected: "SP-52-TAYLOR")`)
-      const clipboardExactMatch = actualCopiedText === 'SP-52-TAYLOR'
+      const clipboardExactMatch = assertClipboardExact(actualCopiedText, 'SP-52-TAYLOR')
       if (!clipboardExactMatch) {
         throw new Error(`Assertion failed: Copied text "${actualCopiedText}" did not match expected "SP-52-TAYLOR"`)
       }
@@ -854,9 +874,11 @@ async function main() {
       console.log(`Polling terminated after SUCCESS: ${pollingStopped} (${stopPolls1} == ${stopPolls2})`)
 
       // Mandatory assertions evaluation: every condition must contribute to PASS/FAIL
-      const initialRequestsAssertion = initialPolls >= 1
+      // Reconciled counts: exactly 1 initial poll on load, 0 while hidden, exactly 1 on resume, total exactly 2
+      const initialRequestsAssertion = initialPolls === 1
       const requestsWhileHiddenAssertion = requestsWhileHidden === 0
       const resumeImmediateRequestsAssertion = resumeImmediateRequests === 1
+      const totalRequestsAssertion = stopPolls2 === 2
       const pollingStoppedAssertion = pollingStopped
       const clipboardAssertion = clipboardExactMatch
       const paymentConfirmedAssertion = Boolean(confirmed)
@@ -865,20 +887,31 @@ async function main() {
         initialRequestsAssertion &&
         requestsWhileHiddenAssertion &&
         resumeImmediateRequestsAssertion &&
+        totalRequestsAssertion &&
         pollingStoppedAssertion &&
         clipboardAssertion &&
         paymentConfirmedAssertion &&
-        negativeControlPassed
+        negativeControlsExecuted
 
       const outcome = allMandatoryAssertionsPassed ? 'PASS' : 'FAIL'
       if (outcome !== 'PASS') {
-        throw new Error('Mandatory assertions failed for UI-28 tab resume & clipboard test')
+        throw new Error(`Mandatory assertions failed for UI-28 tab resume & clipboard test: ${JSON.stringify({
+          initialRequestsAssertion,
+          requestsWhileHiddenAssertion,
+          resumeImmediateRequestsAssertion,
+          totalRequestsAssertion,
+          pollingStoppedAssertion,
+          clipboardAssertion,
+          paymentConfirmedAssertion,
+          negativeControlsExecuted,
+        })}`)
       }
 
       const tabResumeLog = {
         executedAt: new Date().toISOString(),
         testCase: 'TC-10',
         testExecutionType: 'synthetic-visibilitychange-event-harness',
+        scopeNote: 'Synthetic visibilitychange event handler execution in DOM. Actual OS/Chromium background tab throttling is marked NOT_RUN.',
         initialRequests: initialPolls,
         requestsWhileHidden: requestsWhileHidden,
         resumeImmediateRequests: resumeImmediateRequests,
@@ -890,18 +923,29 @@ async function main() {
         copyButtonPresent: copyBtnCheck.exists,
         copyButtonEnabled: !copyBtnCheck.disabled,
         paymentConfirmedStatusDisplayed: Boolean(confirmed),
-        negativeControlPassed: negativeControlPassed,
+        negativeControls: {
+          alteredReferenceRejected: alteredRefRejected,
+          missingButtonRejected: missingButtonRejected,
+          disabledButtonRejected: disabledButtonRejected,
+          emptyClipboardRejected: emptyClipboardRejected,
+          allNegativeControlsPassed: negativeControlsExecuted,
+        },
         mandatoryAssertions: {
-          initialRequestObserved: initialRequestsAssertion,
+          exactOneInitialRequestObserved: initialRequestsAssertion,
           zeroRequestsWhileHidden: requestsWhileHiddenAssertion,
           exactOneRequestOnResume: resumeImmediateRequestsAssertion,
+          exactTwoTotalRequestsObserved: totalRequestsAssertion,
           pollingTerminatedAfterSuccess: pollingStoppedAssertion,
           clipboardReferenceExact: clipboardAssertion,
           paymentConfirmedRendered: paymentConfirmedAssertion,
+          negativeControlsPassed: negativeControlsExecuted,
+        },
+        notRun: {
+          nativeBrowserTabLifecycle: 'NOT_RUN - actual Chromium OS/foreground background tab lifecycle is not claimed; test is scoped to synthetic document visibilitychange event handler execution',
         },
         outcome: outcome,
       }
-      writeFileSync(join(SCREENSHOTS_DIR, 'ui-28/tab-resume-log.json'), JSON.stringify(tabResumeLog, null, 2))
+      writeFileSync(join(SCREENSHOTS_DIR, 'ui-28/tab-resume-log.json'), JSON.stringify(tabResumeLog, null, 2) + '\n')
       await session.cleanup()
       console.log('UI-28 tab-resume test completed!')
     }

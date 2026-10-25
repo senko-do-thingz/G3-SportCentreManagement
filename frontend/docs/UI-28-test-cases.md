@@ -44,14 +44,14 @@ No API or backend change.
 ## TC-10 Tab Resume & Clipboard Execution Provenance
 
 Executed via headless Chromium test harness (`frontend/scripts/generate-all-evidence.mjs --only ui-28`):
-- **Execution Mode**: `synthetic-visibilitychange-event-harness` (simulated tab hide/resume via `document.hidden` / `visibilityState` lifecycle events).
-- **Initial Polls**: 1 request observed on initial pending view (`GET /payments/52`).
+- **Execution Mode**: `synthetic-visibilitychange-event-harness` (simulated tab hide/resume via `document.hidden` / `visibilityState` DOM events; native OS/browser background tab throttling is marked `NOT_RUN`).
+- **Initial Polls**: exactly 1 request observed on initial pending view (`GET /payments/52`, `initialRequests: 1`).
 - **Tab Hidden (`visibilityState = 'hidden'`)**: 0 background polling requests sent while tab is hidden (`requestsWhileHidden: 0`).
 - **Tab Resumed (`visibilityState = 'visible'`)**: exactly 1 immediate refresh request sent upon tab foregrounding (`resumeImmediateRequests: 1`).
 - **Status Transition**: Backend response transition to `SUCCESS` updates status to "Payment confirmed".
-- **Polling Termination**: Confirmed halted (0 additional requests across 2000 ms window; final total requests: 2; `pollingTerminatedAfterSuccess: true`).
-- **Clipboard Content & Controls**: Copy button verified present and enabled; `navigator.clipboard.writeText` intercepted; actual copied text matches exact string `SP-52-TAYLOR` (`actualCopiedText: 'SP-52-TAYLOR'`, `clipboardExactMatch: true`). Negative control fails on altered reference.
-- **PASS/FAIL Enforcement**: Every mandatory assertion (initial poll, zero hidden polls, one resume poll, polling termination, exact clipboard content, payment confirmed status, negative control) contributes directly to `outcome: 'PASS'`.
+- **Polling Termination**: Confirmed halted (0 additional requests across 2000 ms window; final total requests observed: 2; `pollingTerminatedAfterSuccess: true`).
+- **Clipboard Content & Executed Negative Controls**: Copy button verified present and enabled; `navigator.clipboard.writeText` intercepted; actual copied text matches exact string `SP-52-TAYLOR` (`actualCopiedText: 'SP-52-TAYLOR'`, `clipboardExactMatch: true`). Real executed negative controls verify that altered reference (`SP-52-ALTERED-REF`), missing copy button, disabled copy button, and empty/null clipboard writes fail validation.
+- **PASS/FAIL Enforcement**: Every mandatory assertion (initial poll count === 1, zero hidden polls, exactly one resume poll, total polls === 2, polling termination, exact clipboard content, payment confirmed status, all negative controls) contributes directly to `outcome: 'PASS'`.
 - **Evidence Log**: Captured in `frontend/docs/screenshots/ui-28/tab-resume-log.json`.
 
 Branch refreshed and merged with latest `main` (including UI-27, UI-29, and UI-30).
