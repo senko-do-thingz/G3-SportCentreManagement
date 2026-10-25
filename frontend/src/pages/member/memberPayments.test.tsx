@@ -230,6 +230,86 @@ describe('FE-11 Payment Summary (F3-01, S3-Single)', () => {
     expect(screen.queryByText('MEM-0002')).not.toBeInTheDocument()
   })
 
+  it('UI-27 shows the summary under the Home theme payment hero', async () => {
+    paymentsBackend()
+    renderApp('/member/payments/52')
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Payment Summary' })
+    const hero = heading.closest('header')
+    expect(hero).toHaveClass('payment-hero')
+    expect(within(hero as HTMLElement).getByText('Member / Payments')).toHaveClass('payment-hero__eyebrow')
+  })
+
+  it('UI-27 hides the original price and discount when they do not add up to the amount charged', async () => {
+    paymentsBackend({ payments: [payment({ originalPrice: 900000, discount: 90000, amount: 850000 })] })
+    renderApp('/member/payments/52')
+    const order = await screen.findByRole('region', { name: 'Order summary' })
+    expect(within(order).queryByText('Original price')).not.toBeInTheDocument()
+    expect(within(order).queryByText(/Discount/)).not.toBeInTheDocument()
+    expect(within(order).getByText('Total due').nextSibling).toHaveTextContent('850.000 VND')
+    expect(within(order).getByTestId('payment-amount')).toHaveTextContent('850.000 VND')
+    expect(within(order).getByText(/Price details are not available/)).toBeInTheDocument()
+  })
+
+  it('UI-27 does not invent an original price when the backend sends none', async () => {
+    paymentsBackend({ payments: [payment({ originalPrice: null, discount: null, amount: 810000 })] })
+    renderApp('/member/payments/52')
+    const order = await screen.findByRole('region', { name: 'Order summary' })
+    expect(within(order).queryByText('Original price')).not.toBeInTheDocument()
+    expect(within(order).getByTestId('payment-amount')).toHaveTextContent('810.000 VND')
+  })
+
+  it('UI-27 mentions a card discount only when this payment has one', async () => {
+    paymentsBackend()
+    renderApp('/member/payments/52')
+    const details = await screen.findByRole('region', { name: 'Payment details' })
+    expect(await within(details).findByText(/Your membership card discount is included in the total/)).toBeInTheDocument()
+  })
+
+  it('UI-27 says no card discount applies to a package paid at full price', async () => {
+    paymentsBackend({ payments: [payment({ originalPrice: 900000, discount: 0, amount: 900000 })] })
+    renderApp('/member/payments/52')
+    const details = await screen.findByRole('region', { name: 'Payment details' })
+    expect(await within(details).findByText(/No card discount applies to this payment/)).toBeInTheDocument()
+    expect(within(details).queryByText(/discount is included/)).not.toBeInTheDocument()
+  })
+
+  it('UI-27 shows a single visit with its visit date and no package validity or card discount claim', async () => {
+    paymentsBackend({
+      payments: [payment({ itemDescription: 'Football single visit', originalPrice: 150000, discount: 0, amount: 150000 })],
+      registrations: [{ ...PENDING_REGISTRATION, startDate: '2026-10-05', endDate: '2026-10-05', totalSessions: 1 }],
+    })
+    renderApp('/member/payments/52')
+    await screen.findByRole('heading', { level: 1, name: 'Single Visit Payment Summary' })
+    const details = screen.getByRole('region', { name: 'Payment details' })
+    expect(within(details).getByText('Visit date').nextSibling).toHaveTextContent('05 Oct 2026')
+    expect(within(details).queryByText('Package validity')).not.toBeInTheDocument()
+    expect(within(details).queryByText(/card discount/i)).not.toBeInTheDocument()
+    expect(within(details).getByText(/Reception must confirm the payment/)).toBeInTheDocument()
+  })
+
+  it('UI-27 makes no discount claim while the paid item is unknown', async () => {
+    installFakeFetch((call) => {
+      if (call.path === '/users/me') return json(200, MEMBER)
+      if (call.path === '/payments/52') return json(200, payment())
+      return backendError(500, 'Server error')
+    })
+    renderApp('/member/payments/52')
+    const details = await screen.findByRole('region', { name: 'Payment details' })
+    await waitFor(() => expect(screen.queryByText('Loading the item details')).not.toBeInTheDocument())
+    expect(within(details).queryByText(/card discount/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Payment Summary' })).toBeInTheDocument()
+  })
+
+  it('UI-27 shows no amount when the backend answers with another payment than the link', async () => {
+    paymentsBackend({ payments: [payment({ id: 53, code: 'PAY-0053' })] })
+    renderApp('/member/payments/52')
+    expect(await screen.findByRole('heading', { name: 'Payment not found' })).toBeInTheDocument()
+    expect(screen.getByText(/does not match this link/)).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Order summary' })).not.toBeInTheDocument()
+    expect(screen.queryByText('PAY-0053')).not.toBeInTheDocument()
+    expect(screen.queryByText(/810\.000 VND/)).not.toBeInTheDocument()
+  })
+
   it('retains backend fractional original price, discount and total', async () => {
     paymentsBackend({ payments: [payment({ originalPrice: '0.25', discount: '0.12', amount: '0.13' })] })
     renderApp('/member/payments/52')

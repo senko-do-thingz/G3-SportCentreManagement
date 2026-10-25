@@ -3,7 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getErrorMessage } from '../../api/errors'
 import { memberApi, type MemberCard, type PackageRegistration } from '../../api/memberApi'
 import { ONLINE_PAYMENT_METHODS, paymentsApi, type Payment } from '../../api/paymentsApi'
-import { Button, Card, EmptyState, ErrorState, PageHeader, StatusBadge } from '../../components/ui'
+import { PaymentHero } from '../../components/PaymentHero'
+import { Button, Card, EmptyState, ErrorState, StatusBadge } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatDate, formatDateTime } from '../../utils/format'
@@ -22,13 +23,18 @@ import {
   PAYMENT_PATHS,
   paymentStatusLabel,
   paymentStatusToneCode,
+  paymentSummaryNote,
+  priceBreakdown,
   registrationForPayment,
   validityRange,
+  type PaymentItemKind,
 } from './paymentsModel'
 import { sessionsLabel } from './packagesModel'
 import { useMemberResource } from './useMemberResource'
 
 const INVALID_LINK_MESSAGE = 'The payment link is not valid.'
+const MISMATCH_MESSAGE = 'The payment returned does not match this link. Open it again from My payments.'
+const EYEBROW = 'Member / Payments'
 
 interface PaymentItems {
   registrations: PackageRegistration[]
@@ -56,7 +62,7 @@ export function PaymentSummaryPage() {
   if (id === null) {
     return (
       <div className="page">
-        <PageHeader eyebrow="Member / Payments" title="Payment Summary" />
+        <PaymentHero eyebrow={EYEBROW} title="Payment Summary" />
         <EmptyState
           title="Payment not found"
           description={INVALID_LINK_MESSAGE}
@@ -82,7 +88,7 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
     return (
       <div className="page">
         <PaymentNav paymentId={paymentId} />
-        <PageHeader eyebrow="Member / Payments" title="Payment Summary" />
+        <PaymentHero eyebrow={EYEBROW} title="Payment Summary" />
         {payment.status === 'loading' ? (
           <Spinner label="Loading the payment" />
         ) : (
@@ -93,17 +99,37 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
   }
 
   const data = payment.data
+  // The amounts shown must belong to the payment in the link, never to another one.
+  if (data.id !== paymentId) {
+    return (
+      <div className="page">
+        <PaymentNav paymentId={paymentId} />
+        <PaymentHero eyebrow={EYEBROW} title="Payment Summary" />
+        <EmptyState
+          title="Payment not found"
+          description={MISMATCH_MESSAGE}
+          action={
+            <Link className={buttonClassName('secondary', 'md')} to={PAYMENT_PATHS.list}>
+              My payments
+            </Link>
+          }
+        />
+      </div>
+    )
+  }
   const registrations = items.status === 'ready' ? items.data.registrations : []
   const cards = items.status === 'ready' ? items.data.cards : []
   const registration = registrationForPayment(registrations, data.id)
   const card = registration ? null : cardForPayment(cards, data.id)
   const singleVisit = isSingleVisitRegistration(registration)
+  const kind: PaymentItemKind = singleVisit ? 'single-visit' : registration ? 'package' : card ? 'card' : 'unknown'
+  const note = paymentSummaryNote(kind, priceBreakdown(data)?.discount ?? 0)
 
   return (
     <div className="page">
       <PaymentNav paymentId={paymentId} />
-      <PageHeader
-        eyebrow="Member / Payments"
+      <PaymentHero
+        eyebrow={EYEBROW}
         title={singleVisit ? 'Single Visit Payment Summary' : 'Payment Summary'}
         description={
           singleVisit
@@ -127,7 +153,7 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
                 <StatusBadge status={paymentStatusToneCode(data.status)} label={paymentStatusLabel(data.status)} />
               </dd>
             </div>
-            {registration && <RegistrationRows registration={registration} />}
+            {registration && <RegistrationRows registration={registration} singleVisit={singleVisit} />}
             {card && <CardRows card={card} />}
             <div>
               <dt>Member</dt>
@@ -139,16 +165,11 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
             </div>
           </dl>
           {items.status === 'loading' && <Spinner label="Loading the item details" inline />}
-          <div className="notice notice--info payment-summary__note">
-            {singleVisit ? (
-              <p>Reception must confirm the payment and recheck seat availability before booking.</p>
-            ) : (
-              <p>
-                Your card gives a discount; the sport package provides session access. Buying a package does not
-                reserve a class place.
-              </p>
-            )}
-          </div>
+          {note && (
+            <div className="notice notice--info payment-summary__note">
+              <p>{note}</p>
+            </div>
+          )}
         </Card>
         <OrderSummary payment={data} singleVisit={singleVisit} onStale={reload} />
       </div>
@@ -156,7 +177,7 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
   )
 }
 
-function RegistrationRows({ registration }: { registration: PackageRegistration }) {
+function RegistrationRows({ registration, singleVisit }: { registration: PackageRegistration; singleVisit: boolean }) {
   return (
     <>
       <div>
@@ -169,14 +190,23 @@ function RegistrationRows({ registration }: { registration: PackageRegistration 
           <dd>{trainingFormatLabel(registration.trainingFormat)}</dd>
         </div>
       )}
-      <div>
-        <dt>Package start date</dt>
-        <dd>{formatDate(registration.startDate)}</dd>
-      </div>
-      <div>
-        <dt>Package validity</dt>
-        <dd>{validityRange(registration.startDate, registration.endDate)}</dd>
-      </div>
+      {singleVisit ? (
+        <div>
+          <dt>Visit date</dt>
+          <dd>{formatDate(registration.startDate)}</dd>
+        </div>
+      ) : (
+        <>
+          <div>
+            <dt>Package start date</dt>
+            <dd>{formatDate(registration.startDate)}</dd>
+          </div>
+          <div>
+            <dt>Package validity</dt>
+            <dd>{validityRange(registration.startDate, registration.endDate)}</dd>
+          </div>
+        </>
+      )}
     </>
   )
 }
@@ -216,8 +246,9 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const discount = Number(payment.discount ?? 0)
-  const percent = discountPercent(payment.originalPrice, payment.discount)
+  const breakdown = priceBreakdown(payment)
+  const discount = breakdown?.discount ?? 0
+  const percent = breakdown ? discountPercent(breakdown.original, breakdown.discount) : null
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -242,21 +273,28 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
   return (
     <Card title="Order summary" aria-label="Order summary">
       <dl className="summary-list">
-        <div>
-          <dt>{singleVisit ? 'Price' : 'Original price'}</dt>
-          <dd>{formatMoney(payment.originalPrice ?? payment.amount)}</dd>
-        </div>
-        <div>
-          <dt>{percent !== null ? `Discount (${percent}%)` : singleVisit ? 'Card discount' : 'Discount'}</dt>
-          <dd>
-            {discount > 0 ? `-${formatMoney(discount)}` : singleVisit ? `${formatMoney(0)} - Single visits excluded` : formatMoney(0)}
-          </dd>
-        </div>
+        {breakdown && (
+          <>
+            <div>
+              <dt>{singleVisit ? 'Price' : 'Original price'}</dt>
+              <dd>{formatMoney(breakdown.original)}</dd>
+            </div>
+            <div>
+              <dt>{percent !== null ? `Discount (${percent}%)` : singleVisit ? 'Card discount' : 'Discount'}</dt>
+              <dd>
+                {discount > 0 ? `-${formatMoney(discount)}` : singleVisit ? `${formatMoney(0)} - Single visits excluded` : formatMoney(0)}
+              </dd>
+            </div>
+          </>
+        )}
         <div className="summary-list__total">
           <dt>Total due</dt>
           <dd>{formatMoney(payment.amount)}</dd>
         </div>
       </dl>
+      {!breakdown && (
+        <p className="payment-methods__hint">Price details are not available for this payment. The total due is the amount to pay.</p>
+      )}
       <p className="payment-summary__amount" data-testid="payment-amount">
         {formatMoney(payment.amount)}
       </p>
