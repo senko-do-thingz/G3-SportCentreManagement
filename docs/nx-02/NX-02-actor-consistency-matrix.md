@@ -1,0 +1,22 @@
+# NX-02 actor consistency matrix
+
+Internal local record. Round 3. Audited origin/main: `f8959749bd2e887d7038da2843faeede5e8e0ab1`.
+
+Status: TECHNICAL_DOCUMENTATION_REMEDIATION_COMPLETE - FORMAL_SIGN_OFF_PENDING. BUSINESS_SIGN_OFF=PENDING; FORMAL_ACCEPTANCE=ON_HOLD. All deliverables require manual CODEOWNER review. New policy examples are PROPOSED and SPECIFIED_NOT_EXECUTED.
+
+| UC | Primary actor | Affected subject | Supporting actors | Approval or correction authority | Requirement | D IDs | Permission rows |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| UC-F4-01P | Coach | M-201 personal plan and its assignment | None | Dat + Hung coordinate D-02; runtime author/edit rights remain PENDING_HUMAN_DECISION under D-12. | F4-REQ-01 | D-02, D-11, D-12, D-13 | PM-01, PM-03, PM-05, PM-15, PM-16 |
+| UC-F4-01C | Coach | K-401 shared plan, recipient set and linked sessions | None | Dat + Hung coordinate class/audience policy; correction and publishing authority remain PENDING_HUMAN_DECISION. | F4-REQ-01 | D-02, D-12, D-13 | PM-02, PM-06, PM-07, PM-17 |
+| UC-F4-01V | Coach | P-301 published revision, entitled audience and historical session references | None | Dat + Hung coordinate lifecycle/publish policy; Truc reviews visibility; runtime publishers/correctors remain PENDING_HUMAN_DECISION. | F4-REQ-01 | D-02, D-12, D-13 | PM-03, PM-04, PM-07, PM-16 |
+| UC-F4-02 | Coach | S-501/M-201 result, metric observations and correction history | None | Dat + Truc + Hung coordinate D-03; metric/privacy authority is OWNER_UNCONFIRMED; current corrector rights remain PENDING_HUMAN_DECISION. | F4-REQ-02 | D-03, D-12, D-13 | PM-08, PM-09, PM-35 |
+| UC-F4-03 | Coach | M-201 progress assessment and classified Coach comments | None | Dat + Truc + Hung coordinate feedback/evaluation choices; privacy authority is OWNER_UNCONFIRMED; no publication or oversight privilege is granted. | F4-REQ-03 | D-03, D-12 | PM-10, PM-11, PM-14, PM-30 |
+| UC-F4-04 | Coach | Eligible roster members participation in S-501, not facility arrival | None | Dat + Hung coordinate attendance policy; proposed current Coach write authority requires D-12/D-13 approval. | F4-REQ-04 | D-01, D-12, D-13 | PM-12, PM-17, PM-35 |
+| UC-F4-04C | Coach | Existing S-501/M-201 attendance revision and correction evidence | None | Dat + Hung coordinate D-13; actor allowed to correct/supersede after reassignment remains PENDING_HUMAN_DECISION in D-12/D-13. | F4-REQ-04 | D-01, D-12, D-13 | PM-13, PM-16, PM-33 |
+| UC-F4-05 | Member | Signed-in Member own attendance and outcome history | None | Read-only interaction has no runtime approver or corrector. Dat + Truc coordinate visibility policy; correction requests are outside this read and require separately defined authority. | F4-REQ-05 | D-01, D-03, D-12, D-13 | PM-20, PM-21, PM-33 |
+| UC-F4-06 | Member | Signed-in Member permitted personal/shared plan revisions and visible feedback | None | Read-only interaction has no runtime approver or corrector. Dat + Truc + Hung coordinate publication/history/feedback policy; no former Coach access is implied. | F4-REQ-06 | D-02, D-03, D-12 | PM-18, PM-19, PM-22, PM-34 |
+| UC-F4-07 | Receptionist | Identified arriving Member and selected current-day booking arrival attempt | Member | No Coach approval or assignment is required by the inspected arrival path. Existing Manager role is an alternative initiating role under S02, not a supporting actor in this Receptionist case. Dat owns D-01 integration policy. | F4-REQ-07 | D-01, D-12, D-13 | PM-24, PM-25, PM-28 |
+
+All ten IDs and mappings are preserved. The two Member use cases are read-only with no simultaneous Coach approval or correction participant. A correction request is outside the read transaction. Receptionist arrival has Member identification support; Manager is an alternative initiating role in current guards, not an additional participant. Coach-only credentials do not gain reception authority, and reception does not depend on Coach assignment. For Coach authoring/recording, the Member/class is affected rather than automatically a runtime supporting actor.
+
+Independent checks compare these records to requirement actor expectations, permission-row actors and the rendered catalogue. They deliberately restore the old canned paragraph in a copied fixture and require rejection. This is documentation validation, not runtime authorization or approval of proposed roles. Current/historical ownership and every unknown privacy or correction grant remain pending.
