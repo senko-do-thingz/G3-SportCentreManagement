@@ -548,7 +548,8 @@ describe('UI-31 Verify payment and receipt', () => {
   })
 
   it('UI-31 the receipt page rejects an invoice with missing paymentId', async () => {
-    const { paymentId: _, ...noPaymentId } = INVOICE
+    const noPaymentId = { ...INVOICE }
+    delete (noPaymentId as { paymentId?: unknown }).paymentId
     await open('/reception/payments/41/receipt', { invoice: json(200, noPaymentId) })
     expect(await screen.findByText('Receipt not found')).toBeInTheDocument()
     expect(screen.queryByText('INV-1041')).not.toBeInTheDocument()
