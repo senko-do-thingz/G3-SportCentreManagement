@@ -1,5 +1,5 @@
 {
-  "executedAt": "2026-10-25T12:28:23.007Z",
+  "executedAt": "2026-10-25T13:18:18.459Z",
   "testCase": "TC-10",
   "testExecutionType": "synthetic-visibilitychange-event-harness",
   "scopeNote": "Synthetic visibilitychange event handler execution in DOM. Actual OS/Chromium background tab throttling is marked NOT_RUN.",
@@ -9,17 +9,31 @@
   "pollingTerminatedAfterSuccess": true,
   "totalRequestsObserved": 2,
   "expectedReferenceCode": "SP-52-TAYLOR",
+  "displayedTransferContent": "SP-52-TAYLOR",
   "actualCopiedText": "SP-52-TAYLOR",
+  "displayAndClipboardMatch": true,
+  "paymentCodeDistinctFromTransferContent": {
+    "paymentCode": "PAY-0052",
+    "transferContent": "SP-52-TAYLOR",
+    "note": "paymentCode is the internal payment identifier; transferContent is the bank transfer syntax required for reception matching"
+  },
   "clipboardExactMatch": true,
   "copyButtonPresent": true,
   "copyButtonEnabled": true,
+  "copyButtonUsable": true,
   "paymentConfirmedStatusDisplayed": true,
-  "negativeControls": {
-    "alteredReferenceRejected": true,
-    "missingButtonRejected": true,
-    "disabledButtonRejected": true,
+  "browserInteractionNegativeControls": {
+    "mutatedClipboardWriteRejected": true,
+    "disabledButtonCheckRejected": true,
+    "disabledButtonClickPreventedWrites": true,
+    "allBrowserNegativeControlsPassed": true
+  },
+  "unitPredicateNegativeChecks": {
+    "alteredRefStringRejected": true,
+    "missingButtonObjectRejected": true,
+    "disabledButtonObjectRejected": true,
     "emptyClipboardRejected": true,
-    "allNegativeControlsPassed": true
+    "allUnitPredicatesPassed": true
   },
   "mandatoryAssertions": {
     "exactOneInitialRequestObserved": true,
@@ -28,8 +42,11 @@
     "exactTwoTotalRequestsObserved": true,
     "pollingTerminatedAfterSuccess": true,
     "clipboardReferenceExact": true,
+    "displayMatchesClipboardWrite": true,
+    "copyButtonUsableAsserted": true,
     "paymentConfirmedRendered": true,
-    "negativeControlsPassed": true
+    "browserNegativeControlsPassed": true,
+    "unitPredicateNegativeChecksPassed": true
   },
   "notRun": {
     "nativeBrowserTabLifecycle": "NOT_RUN - actual Chromium OS/foreground background tab lifecycle is not claimed; test is scoped to synthetic document visibilitychange event handler execution"

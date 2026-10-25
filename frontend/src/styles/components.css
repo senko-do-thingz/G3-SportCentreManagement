@@ -396,9 +396,9 @@
 }
 
 .password-rules__list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -412,11 +412,13 @@
   color: var(--color-text-muted);
 }
 
+/* Empty circle until the rule is met, then a check mark. */
 .password-rules__item::before {
   content: '';
   flex-shrink: 0;
-  width: 8px;
-  height: 8px;
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
   border: 1.5px solid var(--color-border-strong);
   border-radius: 50%;
 }
@@ -426,14 +428,22 @@
 }
 
 .password-rules__item--met::before {
-  border-color: var(--color-success);
-  background: var(--color-success);
+  width: 6px;
+  height: 11px;
+  margin: 0 3px 2px;
+  border: solid var(--color-success);
+  border-width: 0 2px 2px 0;
+  border-radius: 0;
+  transform: rotate(45deg);
 }
 
-@media (max-width: 640px) {
-  .password-rules__list {
-    grid-template-columns: 1fr;
-  }
+.password-rules__item--error {
+  flex-basis: 100%;
+  color: var(--color-danger);
+}
+
+.password-rules__item--error::before {
+  border-color: var(--color-danger);
 }
 
 .select-wrap {

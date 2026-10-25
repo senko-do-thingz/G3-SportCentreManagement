@@ -18,12 +18,27 @@
 - A pending payment is checked at once when the tab becomes visible again (browsers slow background timers); a paid payment without an invoice says the receipt appears in My payments once issued.
 - Copy keeps the transfer content exactly as shown. Tests in memberPayments.test.tsx; cases in frontend/docs/UI-28-test-cases.md. S3-Mismatch is a reception screen, covered by UI-31. No API or backend changes.
 
+## 2026-10-24 - Redesign Sign up to the Home theme (UI-07)
+
+- Sign up moves to the same layout B as Log in: Home hero photo under the Home overlay, compact Home header (brand, Back to Home, sun and moon switch), slogan on the left, form card on the right (560 px for the two-field rows and password rules), photo band on phones. The password checklist is one quiet line without a box.
+- AuthShell keeps a single layout and loads src/styles/auth.css (renamed from login.css) and the display fonts itself, so Log in and Sign up cannot drift apart.
+- Retire the old split card: .auth-shell, .auth-hero and .auth-panel__toolbar rules leave layouts.css and appearance.css, and the unsourced src/assets/auth-hero.jpg is deleted; the credit now reads Home, Log in and Sign up. Color baseline tightened.
+- Behavior unchanged (POST /auth/register, automatic sign in, validation, password rules, terms, return navigation).
+- Password checklist reads like a normal sign up form: one quiet line under the password fields (8 to 64 characters, A letter, A number) with check marks, no box. The 72 byte BCrypt limit is still enforced but shows only as an error line when a password breaks it. Applies to My Profile change password too (shared component).
+- Wording on Log in and Sign up follows common sign up and log in pages: sentence case labels without asterisks, example placeholders (name@example.com, 0901 234 567), errors that say what to do (Enter your email, Create a password, Passwords don't match. Try again.), duplicate email reads An account with this email already exists. Log in instead., Keep me logged in, Incorrect email or password. Check them and try again., Don't have an account? Sign up, checklist At least 8 characters, 1 letter, 1 number without a strength label. Server field errors keep the backend text; My Profile keeps its messages.
+- Tests: src/styles/auth.test.ts (both screens). Browser check scripts/ui07-signup-check.py (light and dark, 390, 768 and 1440 px, empty, field errors and duplicate email): contrast at least 4.5:1 (lowest 5.2:1), visible focus, no overflow, sign up reaches /member; the Log in check still passes on this build. Sheets and report in frontend/docs/screenshots/ui-07; cases in frontend/docs/UI-07-test-cases.md.
+- Lint, tsc, all frontend tests (1431, after merging latest main) and the production build pass.
+- 720px responsive viewport evidence (scripts/generate-all-evidence.mjs --only ui-07, guest session): empty, field errors, duplicate email (mocked 409), filled form before submit, and mocked registration success redirecting to /member; measured no horizontal scrollbar, no clipped elements, stacked inputs; real Tab and Shift+Tab key presses reach all 13 controls in order. This is layout equivalence only: native 200% browser zoom, WCAG 1.4.10 at 320 CSS px, real backend sign up and the member dashboard after sign up are NOT_RUN. report.json is merged from the working tree (no Git history lookup) and checked by scripts/ui07-report.test.mjs.
+- Log in and Sign up background: a credited Unsplash dunk photo by August Phlieger (HOME_PHOTOS.auth, Unsplash License, listed on /credits) with the player on the left replaces the Home hero photo, through Photo with a responsive srcset and a small bundled copy (src/assets/auth/auth-dunk.jpg, 640 x 960) as the offline fallback. The overlay is lighter over the player and stays dark behind the form, the slogan sits low on the left, and the phone and tablet band keeps the player in view. The owner's first photo had no findable source, so it is not used. The ui06/ui07 browser check sheets were made with the Home hero photo.
+- Synced with the reviewed UI-00 (#121) and UI-03 (#122) branches; the color baseline was regenerated and holds exactly the same colors.
+
 ## 2026-10-24 - Member payment summary and single visit (UI-27)
 
 - Payment Summary (F3-01) and Single Visit Payment Summary (S3-Single) use a new shared PaymentHero in the Home theme (navy feature surface, gold eyebrow, uppercase title), built only from tokens; it is reused by the other payment and refund screens.
 - Amounts stay bound to GET /payments/{id}: the original price and discount rows are shown only when original - discount equals the amount charged, no original price is invented when the backend sends none, and a payment whose id differs from the link is not shown.
 - No false discount: the note mentions a card discount only when this payment has one, a single visit shows its visit date and never claims a card discount, and nothing is claimed while the paid item is unknown.
 - Tests in memberPayments.test.tsx; cases in frontend/docs/UI-27-test-cases.md. No API or backend changes.
+
 
 ## 2026-10-24 - Redesign Log in to the Home theme (UI-06)
 

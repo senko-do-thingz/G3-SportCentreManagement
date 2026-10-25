@@ -1,6 +1,6 @@
 import type { RegisterRequest } from '../api/types'
 import { EMAIL_PATTERN } from './loginValidation'
-import { isStrongPassword, STRONG_PASSWORD_MESSAGE } from './passwordRules'
+import { isStrongPassword } from './passwordRules'
 
 /** Values of the sign up form (Figma F1-06) as the user typed them. */
 export interface RegisterForm {
@@ -28,6 +28,12 @@ export const EMPTY_REGISTER_FORM: RegisterForm = {
  */
 export const EMAIL_TAKEN_MESSAGE = 'Email is already registered'
 
+/** What Sign up shows for EMAIL_TAKEN_MESSAGE (the backend text, used only to recognise the error). */
+export const EMAIL_TAKEN_DISPLAY = 'An account with this email already exists. Log in instead.'
+
+/** Sign up wording for a password that breaks the rules; the backend text stays STRONG_PASSWORD_MESSAGE. */
+export const PASSWORD_RULES_MESSAGE = 'Use 8 to 64 characters with at least 1 letter and 1 number'
+
 /** Same pattern as RegisterRequest.phone on the backend: 8 to 15 digits with an optional leading +. */
 export const PHONE_PATTERN = /^\+?\d{8,15}$/
 export const FULL_NAME_MAX_LENGTH = 100
@@ -47,6 +53,10 @@ export const REGISTER_FIELDS = ['fullName', 'phone', 'email', 'password', 'confi
 export const PASSWORDS_DO_NOT_MATCH = 'Passwords do not match'
 export const CONFIRM_PASSWORD_REQUIRED = 'Please confirm your password'
 
+/** Sign up wording (common sign up forms); My Profile keeps the shared constants above. */
+export const SIGNUP_PASSWORDS_DO_NOT_MATCH = "Passwords don't match. Try again."
+export const SIGNUP_CONFIRM_PASSWORD_REQUIRED = 'Confirm your password'
+
 /**
  * Client side checks run before POST /auth/register. Messages match the backend validation
  * messages of RegisterRequest so the user sees the same text whichever side catches the error.
@@ -58,41 +68,41 @@ export function validateRegister(form: RegisterForm): Record<string, string> {
 
   const fullName = form.fullName.trim()
   if (!fullName) {
-    errors.fullName = 'Full name is required'
+    errors.fullName = 'Enter your full name'
   } else if (fullName.length > FULL_NAME_MAX_LENGTH) {
-    errors.fullName = 'Full name must be at most 100 characters'
+    errors.fullName = 'Use 100 characters or fewer'
   }
 
   const phone = normalizePhone(form.phone)
   if (!phone) {
-    errors.phone = 'Phone is required'
+    errors.phone = 'Enter your phone number'
   } else if (!PHONE_PATTERN.test(phone)) {
-    errors.phone = 'Phone must be 8-15 digits with optional leading +'
+    errors.phone = 'Enter a valid phone number, like 0901 234 567'
   }
 
   const email = form.email.trim()
   if (!email) {
-    errors.email = 'Email is required'
+    errors.email = 'Enter your email'
   } else if (email.length > EMAIL_MAX_LENGTH) {
-    errors.email = 'Email must be at most 255 characters'
+    errors.email = 'Use 255 characters or fewer'
   } else if (!EMAIL_PATTERN.test(email)) {
-    errors.email = 'Email is invalid'
+    errors.email = 'Enter a valid email, like name@example.com'
   }
 
   if (!form.password) {
-    errors.password = 'Password is required'
+    errors.password = 'Create a password'
   } else if (!isStrongPassword(form.password)) {
-    errors.password = STRONG_PASSWORD_MESSAGE
+    errors.password = PASSWORD_RULES_MESSAGE
   }
 
   if (!form.confirmPassword) {
-    errors.confirmPassword = CONFIRM_PASSWORD_REQUIRED
+    errors.confirmPassword = SIGNUP_CONFIRM_PASSWORD_REQUIRED
   } else if (form.confirmPassword !== form.password) {
-    errors.confirmPassword = PASSWORDS_DO_NOT_MATCH
+    errors.confirmPassword = SIGNUP_PASSWORDS_DO_NOT_MATCH
   }
 
   if (!form.acceptTerms) {
-    errors.acceptTerms = 'You must accept the terms to create an account'
+    errors.acceptTerms = 'Agree to the Terms of Use and Privacy Policy to continue'
   }
 
   return errors
@@ -121,9 +131,9 @@ export function nextConfirmPasswordError(
     return undefined
   }
   if (!form.confirmPassword) {
-    return CONFIRM_PASSWORD_REQUIRED
+    return SIGNUP_CONFIRM_PASSWORD_REQUIRED
   }
-  return form.confirmPassword === form.password ? undefined : PASSWORDS_DO_NOT_MATCH
+  return form.confirmPassword === form.password ? undefined : SIGNUP_PASSWORDS_DO_NOT_MATCH
 }
 
 /** Form values and the field errors on screen, kept in one state so they always change together. */

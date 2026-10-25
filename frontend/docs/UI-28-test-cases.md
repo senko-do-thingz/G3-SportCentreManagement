@@ -41,17 +41,23 @@ No API or backend change.
 | Confirmed (no invoice) | 390 x 844 | Light | Safe messaging "The receipt appears in My payments once issued" | Pass |
 | Confirmed (no invoice) | 1440 x 900 | Dark | No broken link, polling completely stopped | Pass |
 
-## TC-10 Tab Resume & Clipboard Execution Provenance
+## TC-10 Tab Resume, Clipboard Display/Copy Consistency & Browser Negative Controls
 
 Executed via headless Chromium test harness (`frontend/scripts/generate-all-evidence.mjs --only ui-28`):
 - **Execution Mode**: `synthetic-visibilitychange-event-harness` (simulated tab hide/resume via `document.hidden` / `visibilityState` DOM events; native OS/browser background tab throttling is marked `NOT_RUN`).
-- **Initial Polls**: exactly 1 request observed on initial pending view (`GET /payments/52`, `initialRequests: 1`).
-- **Tab Hidden (`visibilityState = 'hidden'`)**: 0 background polling requests sent while tab is hidden (`requestsWhileHidden: 0`).
-- **Tab Resumed (`visibilityState = 'visible'`)**: exactly 1 immediate refresh request sent upon tab foregrounding (`resumeImmediateRequests: 1`).
+- **Initial Polls**: Exactly 1 request observed on initial pending view (`GET /payments/52`, `initialRequests: 1`) in production preview build (no dev StrictMode double-mounting).
+- **Tab Hidden (`visibilityState = 'hidden'`)**: Exactly 0 background polling requests sent while tab is hidden (`requestsWhileHidden: 0`).
+- **Tab Resumed (`visibilityState = 'visible'`)**: Exactly 1 immediate refresh request sent upon tab foregrounding (`resumeImmediateRequests: 1`).
 - **Status Transition**: Backend response transition to `SUCCESS` updates status to "Payment confirmed".
 - **Polling Termination**: Confirmed halted (0 additional requests across 2000 ms window; final total requests observed: 2; `pollingTerminatedAfterSuccess: true`).
-- **Clipboard Content & Executed Negative Controls**: Copy button verified present and enabled; `navigator.clipboard.writeText` intercepted; actual copied text matches exact string `SP-52-TAYLOR` (`actualCopiedText: 'SP-52-TAYLOR'`, `clipboardExactMatch: true`). Real executed negative controls verify that altered reference (`SP-52-ALTERED-REF`), missing copy button, disabled copy button, and empty/null clipboard writes fail validation.
-- **PASS/FAIL Enforcement**: Every mandatory assertion (initial poll count === 1, zero hidden polls, exactly one resume poll, total polls === 2, polling termination, exact clipboard content, payment confirmed status, all negative controls) contributes directly to `outcome: 'PASS'`.
+- **Display vs. Clipboard Copy Consistency (UI28-R5-02)**: Verified that the DOM text rendered next to the Copy control in `.copy-value__text` is exactly `SP-52-TAYLOR`, matching 1:1 with the intercepted `navigator.clipboard.writeText` string (`actualCopiedText: 'SP-52-TAYLOR'`, `displayAndClipboardMatch: true`). Distinct identifiers are documented: internal `paymentCode` is `PAY-0052`, whereas bank transfer syntax is `transferContent: 'SP-52-TAYLOR'`.
+- **Browser-Level Interaction Negative Controls (UI28-R5-01)**:
+  - *Browser Negative Control 1 (Mutated write)*: Isolated browser mutation injecting altered clipboard text (`SP-52-ALTERED-FAIL`) is strictly rejected by the acceptance assertion, with verified non-destructive cleanup restoring genuine copy behavior.
+  - *Browser Negative Control 2 (Disabled button & click prevention)*: DOM button disabled state is strictly rejected by the `assertButtonUsable` assertion, clicking the disabled button yields 0 clipboard writes (`disabledButtonClickPreventedWrites: true`), with non-destructive cleanup re-enabling the control.
+  - *Unit Predicate Checks*: Pure-function assertions explicitly classified and tested against mutated string, missing button object, disabled button object, and empty/null clipboard writes.
+  - *Positive Button Usability*: Verified the enabled button passes `assertButtonUsable` before proceeding with the positive copy flow.
+- **PASS/FAIL Enforcement**: Every mandatory assertion (initial count === 1, zero hidden polls, exactly 1 resume poll, total polls === 2, polling termination, exact clipboard content, display/clipboard identity match, positive button usability, payment confirmed status, browser negative controls, unit predicates) contributes directly to `outcome: 'PASS'`.
+- **Regenerated Visual Evidence**: All 12 screenshots regenerated with the final `SP-52-TAYLOR` fixture and confirmed untruncated.
 - **Evidence Log**: Captured in `frontend/docs/screenshots/ui-28/tab-resume-log.json`.
 
-Branch refreshed and merged with latest `main` (including UI-27, UI-29, and UI-30).
+Branch refreshed and merged with latest `main` (including UI-07 #131, UI-27, UI-29, and UI-30).

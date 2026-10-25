@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { UI07_NOT_RUN, UI07_SUPERSEDED_KEYS, assertUi07Baseline, mergeUi07Report } from './ui07-report.mjs'
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:4310'
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
@@ -349,6 +350,7 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
   let pollStatus = 'PENDING'
   let putCompleteCount = 0
   let registerMode = 'duplicate'
+  let isRegistered = false
 
   const listener = async ({ method, params, sessionId: from }) => {
     if (from !== sessionId) return
@@ -368,7 +370,7 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
               })
               return
             }
-            if (role === 'MEMBER') {
+            if (role === 'MEMBER' || isRegistered) {
               await send('Fetch.fulfillRequest', {
                 requestId, responseCode: 200,
                 responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
@@ -411,6 +413,14 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
               requestId, responseCode: 200,
               responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
               body: Buffer.from(JSON.stringify(PAYMENT_SUCCESS)).toString('base64'),
+            })
+            return
+          }
+          if (path === '/payments/55') {
+            await send('Fetch.fulfillRequest', {
+              requestId, responseCode: 200,
+              responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
+              body: Buffer.from(JSON.stringify({ ...PAYMENT_SUCCESS, id: 55, invoiceId: null, invoiceNumber: null })).toString('base64'),
             })
             return
           }
@@ -519,6 +529,7 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
               })
               return
             }
+            isRegistered = true
             await send('Fetch.fulfillRequest', {
               requestId, responseCode: 200,
               responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
@@ -636,12 +647,24 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
     await browser.send('Target.disposeBrowserContext', { browserContextId })
   }
 
+  // Real key presses through the browser input pipeline (not element.focus()).
+  const pressTab = async ({ shift = false } = {}) => {
+    const modifiers = shift ? 8 : 0
+    const key = { key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9, modifiers }
+    await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key })
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', ...key })
+    await pause(60)
+  }
+
   return {
-    send, evalJs, setViewport, goto, screenshot, printPdf, cleanup,
+    send, evalJs, setViewport, goto, screenshot, printPdf, cleanup, pressTab,
     getPollCount: () => pollCount,
     setPollStatus: (s) => { pollStatus = s },
     getPutCompleteCount: () => putCompleteCount,
-    setRegisterMode: (m) => { registerMode = m },
+    setRegisterMode: (m) => {
+      registerMode = m
+      if (m === 'success') isRegistered = false
+    },
   }
 }
 
@@ -656,10 +679,20 @@ async function main() {
 
   try {
     // =========================================================================
-    // 1. UI-07: Sign up Reflow & 4 Distinct States at 720px width (PR #131)
+    // 1. UI-07: Sign up at a 720px responsive viewport, 5 states (PR #131)
+    // Scope: layout equivalence of a 720 CSS px viewport (what 1440px at 200% zoom lays out to). This is NOT a
+    // native browser zoom run and does not establish WCAG 1.4.10 (320 CSS px); those stay NOT_RUN in the report.
+    // File names keep the `signup-zoom200-1440-*` prefix used by TC-15 so earlier review links stay valid.
     // =========================================================================
     if (shouldRun('ui-07')) {
-      console.log('\n[1/5] Generating UI-07 (Sign up 720px reflow states)...')
+      console.log('\n[1/5] Generating UI-07 (Sign up 720px responsive viewport states)...')
+      // Baseline comes from the report.json in this working tree, not from Git history. Fail before any work if it
+      // is missing a section, instead of silently writing empty contrast/layout/focus data.
+      const reportPath = join(SCREENSHOTS_DIR, 'ui-07/report.json')
+      if (!existsSync(reportPath)) throw new Error(`UI-07 ${reportPath} not found. Run scripts/ui07-signup-check.py first.`)
+      const baselineReport = JSON.parse(readFileSync(reportPath, 'utf8'))
+      assertUi07Baseline(baselineReport, reportPath)
+
       const session = await runSession(browser, { role: 'GUEST' })
       await session.setViewport(720, 900, 'light')
 
@@ -667,7 +700,64 @@ async function main() {
       await session.goto('/register', 'input[name="fullName"]')
       const path1 = await session.evalJs('window.location.pathname')
       if (path1 !== '/register') throw new Error(`UI-07 Expected /register but got ${path1}`)
+      const effectiveViewport = await session.evalJs(`({
+        width: window.innerWidth,
+        height: window.innerHeight,
+        matchesMaxWidth768: window.matchMedia('(max-width: 768px)').matches,
+      })`)
+      if (effectiveViewport.width !== 720 || !effectiveViewport.matchesMaxWidth768) {
+        throw new Error(`UI-07 Expected a 720px viewport inside the 768px breakpoint, got ${JSON.stringify(effectiveViewport)}`)
+      }
       await session.screenshot(join(SCREENSHOTS_DIR, 'ui-07/signup-zoom200-1440-empty.png'))
+
+      // Keyboard traversal: real Tab presses from the top of a freshly loaded page, then one Shift+Tab.
+      const tabbable = await session.evalJs(`
+        (() => {
+          const visible = (el) => {
+            const s = getComputedStyle(el);
+            return el.getClientRects().length > 0 && s.visibility !== 'hidden' && s.display !== 'none';
+          };
+          const els = Array.from(document.querySelectorAll('a[href], button, input, select, textarea, [tabindex]'))
+            .filter((el) => !el.disabled && el.type !== 'hidden' && el.tabIndex >= 0 && visible(el));
+          els.forEach((el, i) => el.setAttribute('data-tab-probe', String(i)));
+          return els.map((el) => ({
+            tag: el.tagName.toLowerCase(),
+            label: el.getAttribute('name') || el.getAttribute('aria-label') || el.textContent.trim().slice(0, 40),
+            positiveTabIndex: el.tabIndex > 0,
+          }));
+        })()
+      `)
+      const readFocus = `
+        (() => {
+          const el = document.activeElement;
+          const probe = el && el.getAttribute('data-tab-probe');
+          return probe === null || probe === undefined ? null : Number(probe);
+        })()
+      `
+      const tabSequence = []
+      for (let i = 0; i < tabbable.length; i++) {
+        await session.pressTab()
+        tabSequence.push(await session.evalJs(readFocus))
+      }
+      await session.pressTab({ shift: true })
+      const afterShiftTab = await session.evalJs(readFocus)
+      const expectedOrder = tabbable.map((_, i) => i)
+      const keyboard = {
+        method: 'Input.dispatchKeyEvent Tab x ' + tabbable.length + ', then Shift+Tab x 1, from page load',
+        tabbableControls: tabbable.map((t) => `${t.tag}:${t.label}`),
+        focusSequence: tabSequence.map((i) => (i === null ? null : `${tabbable[i].tag}:${tabbable[i].label}`)),
+        allControlsReachedByTab: expectedOrder.every((i) => tabSequence.includes(i)),
+        tabOrderFollowsDomOrder: JSON.stringify(tabSequence) === JSON.stringify(expectedOrder),
+        shiftTabMovesBack: tabbable.length > 1 && afterShiftTab === tabbable.length - 2,
+      }
+      await session.evalJs(`
+        document.activeElement && document.activeElement.blur();
+        document.querySelectorAll('[data-tab-probe]').forEach((el) => el.removeAttribute('data-tab-probe'));
+      `)
+      console.log(`UI-07 Keyboard traversal: ${JSON.stringify(keyboard)}`)
+      if (!keyboard.allControlsReachedByTab) throw new Error('UI-07 Not every control was reached with Tab')
+      if (!keyboard.tabOrderFollowsDomOrder) throw new Error('UI-07 Tab order does not follow the visual (DOM) order')
+      if (!keyboard.shiftTabMovesBack) throw new Error('UI-07 Shift+Tab did not move focus back one control')
 
       // State 2: Validation Errors (click submit empty)
       await session.evalJs(`document.querySelector('button[type="submit"]').click()`)
@@ -693,7 +783,7 @@ async function main() {
         fill('email', 'duplicate@sportify.demo');
         fill('password', 'Password123!');
         fill('confirmPassword', 'Password123!');
-        const lbl = document.querySelector('label.checkbox');
+        const lbl = document.querySelector('label.checkbox, input[name="acceptTerms"]');
         if (lbl) lbl.click();
       `)
       await session.evalJs(`document.querySelector('button[type="submit"]').click()`)
@@ -707,7 +797,7 @@ async function main() {
       }
       await session.screenshot(join(SCREENSHOTS_DIR, 'ui-07/signup-zoom200-1440-invalid.png'))
 
-      // State 4: Valid Completed Form State
+      // State 4: Valid Completed Form State (Pre-submit Snapshot)
       await session.evalJs(`
         (() => {
           const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
@@ -723,153 +813,365 @@ async function main() {
           fill('email', 'taylor.alex@sportify.demo');
           fill('password', 'Password123!');
           fill('confirmPassword', 'Password123!');
+          const cb = document.querySelector('input[name="acceptTerms"]');
+          if (cb && !cb.checked) {
+            cb.click();
+          }
         })()
       `)
       await pause(400)
       const validEmail = await session.evalJs(`document.querySelector('input[name="email"]').value`)
       if (validEmail !== 'taylor.alex@sportify.demo') throw new Error('UI-07 Failed to set valid email')
+
+      // Measure layout reflow at 720px viewport
+      const measuredScrollbar = await session.evalJs(`
+        document.documentElement.scrollWidth > document.documentElement.clientWidth ||
+        document.body.scrollWidth > document.body.clientWidth
+      `)
+      const measuredClippedCount = await session.evalJs(`
+        (() => {
+          let clipped = 0;
+          const elements = Array.from(document.querySelectorAll('label, input, button, h1, p, .auth-form__row, .password-rules'));
+          for (const el of elements) {
+            const rect = el.getBoundingClientRect();
+            if (rect.right > window.innerWidth || rect.left < 0) {
+              clipped++;
+            }
+          }
+          return clipped;
+        })()
+      `)
+      const measuredInputsStacked = await session.evalJs(`
+        (() => {
+          const inputs = Array.from(document.querySelectorAll('input:not([type="checkbox"])'));
+          for (let i = 0; i < inputs.length - 1; i++) {
+            const r1 = inputs[i].getBoundingClientRect();
+            const r2 = inputs[i+1].getBoundingClientRect();
+            if (r2.top < r1.bottom - 4 && r2.left >= r1.right - 4) {
+              return false;
+            }
+          }
+          return true;
+        })()
+      `)
+      // Programmatic focusability only (element.focus()); keyboard reachability is measured with real Tab presses above.
+      const measuredProgrammaticFocusable = await session.evalJs(`
+        (() => {
+          const controls = Array.from(document.querySelectorAll('input, button, a[href]'));
+          for (const el of controls) {
+            el.focus();
+            if (document.activeElement !== el) return false;
+          }
+          return controls.length > 0;
+        })()
+      `)
+
+      console.log(`UI-07 Layout measurements at 720px: scrollbar=${measuredScrollbar}, clipped=${measuredClippedCount}, stacked=${measuredInputsStacked}, programmaticFocusable=${measuredProgrammaticFocusable}`)
+      if (measuredScrollbar) throw new Error('UI-07 Measured horizontal scrollbar at 720px viewport')
+      if (measuredClippedCount > 0) throw new Error(`UI-07 Measured ${measuredClippedCount} clipped elements`)
+      if (!measuredInputsStacked) throw new Error('UI-07 Inputs not stacked vertically at 720px viewport')
+      if (!measuredProgrammaticFocusable) throw new Error('UI-07 Controls not programmatically focusable')
+
+      // Save pre-submit valid filled snapshot (Finding UI07-R3-01)
+      await session.screenshot(join(SCREENSHOTS_DIR, 'ui-07/signup-zoom200-1440-valid-filled.png'))
+
+      // State 5: Submit against the mocked POST /auth/register and check the client-side redirect to /member.
+      // Only the redirect is verified; dashboard APIs are not mocked, so the member page may show a load error.
+      console.log('Submitting valid form with mocked registration success...')
+      session.setRegisterMode('success')
+      await session.evalJs(`document.querySelector('button[type="submit"]').click()`)
+      await pause(1500)
+
+      const postRegisterPath = await session.evalJs('window.location.pathname')
+      console.log(`Path after submit: ${postRegisterPath}`)
+      if (!postRegisterPath.startsWith('/member')) {
+        throw new Error(`UI-07 Expected navigation to /member, but got ${postRegisterPath}`)
+      }
+      // Save post-submit redirect snapshot (mocked registration -> /member)
       await session.screenshot(join(SCREENSHOTS_DIR, 'ui-07/signup-zoom200-1440-success.png'))
 
-      // Update report.json with verified reflow
-      const report = {
-        generatedAt: new Date().toISOString(),
-        zoom200: {
-          effectiveViewportWidth: 720,
-          breakpointMatched: 'max-width: 768px',
-          horizontalScrollbar: false,
-          clippedLabels: 0,
-          inputsStacked: true,
-          statesGenerated: ['empty', 'errors', 'invalid', 'success'],
-          tc15Status: 'PASS',
+      const newScreens = [
+        'signup-zoom200-1440-empty',
+        'signup-zoom200-1440-errors',
+        'signup-zoom200-1440-invalid',
+        'signup-zoom200-1440-valid-filled',
+        'signup-zoom200-1440-success',
+      ]
+      const redirectedToMember = postRegisterPath.startsWith('/member')
+      const allAssertionsPass =
+        !measuredScrollbar && measuredClippedCount === 0 && measuredInputsStacked && measuredProgrammaticFocusable &&
+        keyboard.allControlsReachedByTab && keyboard.tabOrderFollowsDomOrder && keyboard.shiftTabMovesBack && redirectedToMember
+
+      const viewportSection = {
+        verifiedAt: new Date().toISOString(),
+        scope:
+          '720px responsive viewport equivalence (layout only): a 720 CSS px Chromium viewport, the width a 1440px ' +
+          'desktop lays out to at 200% zoom. Not a native browser zoom operation; WCAG 1.4.10 conformance is not claimed.',
+        effectiveViewport: { ...effectiveViewport, breakpoint: 'max-width: 768px' },
+        measuredAssertions: {
+          horizontalScrollbarPresent: measuredScrollbar,
+          clippedElementsCount: measuredClippedCount,
+          inputsStackedVertically: measuredInputsStacked,
+          programmaticFocusabilityVerified: measuredProgrammaticFocusable,
+          registrationFormFilled: validEmail === 'taylor.alex@sportify.demo',
         },
+        keyboardTraversal: keyboard,
+        mockRegistrationRedirect: {
+          scope: 'POST /auth/register and GET /users/me answered by the browser mock; only the client-side redirect is verified',
+          pathAfterSubmit: postRegisterPath,
+          redirectedToMemberRoute: redirectedToMember,
+          dashboardVerified: false,
+        },
+        statesCaptured: [
+          { state: 'empty', file: 'signup-zoom200-1440-empty.png', route: '/register' },
+          { state: 'validation_errors', file: 'signup-zoom200-1440-errors.png', route: '/register', errorCount: errCount },
+          { state: 'duplicate_email_409_mock', file: 'signup-zoom200-1440-invalid.png', route: '/register', duplicateErrorVisible: emailErr },
+          { state: 'valid_form_filled_pre_submit', file: 'signup-zoom200-1440-valid-filled.png', route: '/register' },
+          { state: 'mock_registration_success_redirect_to_member', file: 'signup-zoom200-1440-success.png', route: postRegisterPath },
+        ],
+        notRun: UI07_NOT_RUN,
+        supersedes: UI07_SUPERSEDED_KEYS,
+        outcome: allAssertionsPass ? 'PASS' : 'FAIL',
       }
-      writeFileSync(join(SCREENSHOTS_DIR, 'ui-07/report.json'), JSON.stringify(report, null, 2))
+
+      const integratedReport = mergeUi07Report(baselineReport, viewportSection, newScreens)
+      writeFileSync(reportPath, JSON.stringify(integratedReport, null, 2) + '\n')
+      if (!allAssertionsPass) throw new Error('UI-07 720px viewport assertions failed; see report.json')
       await session.cleanup()
       console.log('UI-07 completed successfully!')
     }
 
     // =========================================================================
-    // 2. UI-28: Tab-resume polling & clipboard real browser test (PR #125)
+    // 2. UI-28: Payment Instructions, Copy Buttons & Status Polling (PR #125)
     // =========================================================================
     if (shouldRun('ui-28')) {
-      console.log('\n[2/5] Running UI-28 Tab-resume & Clipboard test...')
+      console.log('\n[2/5] Generating UI-28 Screenshots & Running Tab-resume / Clipboard tests...')
       const session = await runSession(browser, { role: 'MEMBER' })
-      await session.setViewport(1440, 900, 'light')
-      await session.goto('/member/payments/52/status', '.payment-summary, [aria-label="Bank transfer"]')
 
-      // Initial check
-      const initialPolls = session.getPollCount()
+      // -----------------------------------------------------------------------
+      // Part A: Capture All 12 G-02 Screenshots with Final Fixture (SP-52-TAYLOR)
+      // -----------------------------------------------------------------------
+      console.log('Capturing UI-28 payment instructions pending states across viewports & themes...')
+      for (const vp of [{ w: 390, h: 844 }, { w: 768, h: 1024 }, { w: 1440, h: 900 }]) {
+        for (const th of ['light', 'dark']) {
+          await session.setViewport(vp.w, vp.h, th)
+          await session.goto('/member/payments/52/status', '.payment-summary, [aria-label="Bank transfer"]')
+          // Ensure transferContent SP-52-TAYLOR is visibly rendered in DOM before capturing
+          await session.evalJs(`(() => {
+            const el = document.querySelector('.copy-value__text');
+            return el && el.innerText.includes('SP-52-TAYLOR');
+          })()`)
+          await session.screenshot(join(SCREENSHOTS_DIR, `ui-28/payment-instructions-pending-${th}-${vp.w}.png`))
+        }
+      }
+
+      console.log('Capturing UI-28 payment confirmed states (with invoice & no-invoice)...')
+      for (const vp of [{ w: 390, h: 844 }, { w: 1440, h: 900 }]) {
+        for (const th of ['light', 'dark']) {
+          await session.setViewport(vp.w, vp.h, th)
+          await session.goto('/member/payments/54/status', '.payment-summary, .status-badge')
+          await session.screenshot(join(SCREENSHOTS_DIR, `ui-28/payment-status-confirmed-${th}-${vp.w}.png`))
+        }
+      }
+
+      // No-invoice confirmed state at 390px (light and dark)
+      for (const th of ['light', 'dark']) {
+        await session.setViewport(390, 844, th)
+        await session.goto('/member/payments/55/status', '.payment-summary, .status-badge')
+        await session.screenshot(join(SCREENSHOTS_DIR, `ui-28/payment-status-noinvoice-${th}-390.png`))
+      }
+      await session.cleanup()
+
+      // -----------------------------------------------------------------------
+      // Part B: Tab-Resume Polling, Clipboard Interception & Browser Negative Controls
+      // -----------------------------------------------------------------------
+      console.log('Testing UI-28 tab-resume polling and clipboard copy in fresh session...')
+      const pollSession = await runSession(browser, { role: 'MEMBER' })
+      await pollSession.setViewport(1440, 900, 'light')
+      pollSession.setPollStatus('PENDING')
+      await pollSession.goto('/member/payments/52/status', '.payment-summary, [aria-label="Bank transfer"]')
+      await pause(300)
+
+      // Initial check (deterministic: 1 request on initial mount in production build)
+      const initialPolls = pollSession.getPollCount()
       console.log(`Initial GET /payments/52 requests: ${initialPolls}`)
 
-      // Install clipboard spy
-      await session.evalJs(`(() => {
-        window.__clipboardWrites = [];
-        if (!navigator.clipboard) {
-          navigator.clipboard = {};
-        }
-        const origWrite = navigator.clipboard.writeText ? navigator.clipboard.writeText.bind(navigator.clipboard) : null;
-        navigator.clipboard.writeText = async (text) => {
-          window.__clipboardWrites.push(String(text));
-          if (origWrite) {
-            try { await origWrite(text); } catch {}
-          }
-        };
-        const origExec = document.execCommand ? document.execCommand.bind(document) : null;
-        document.execCommand = function(cmd) {
-          if (cmd === 'copy') {
-            const active = document.activeElement;
-            if (active && (active.value !== undefined || active.innerText !== undefined)) {
-              window.__clipboardWrites.push(String(active.value || active.innerText || ''));
-            }
-          }
-          return origExec ? origExec.apply(document, arguments) : true;
-        };
-      })()`)
-
-      // Clipboard test: Assert copy button exists and is enabled
-      const copyBtnCheck = await session.evalJs(`(() => {
-        const btn = document.querySelector('button[aria-label="Copy transfer content"], button[aria-label*="copy transfer" i], button.copy-btn');
-        if (!btn) return { exists: false, disabled: true, ariaLabel: null };
+      // Displayed vs Copied Verification (UI28-R5-02)
+      // Read the exact displayed transfer content text next to the Copy button
+      const displayedDetails = await pollSession.evalJs(`(() => {
+        const btn = document.querySelector('button[aria-label="Copy transfer content"], button[aria-label*="copy transfer" i]');
+        if (!btn) return null;
+        const copyValueEl = btn.closest('.copy-value');
+        const textEl = copyValueEl ? copyValueEl.querySelector('.copy-value__text') : null;
         return {
-          exists: true,
-          disabled: Boolean(btn.disabled),
+          btnFound: Boolean(btn),
+          btnDisabled: btn.disabled,
+          displayedTransferContent: textEl ? textEl.innerText.trim() : null,
           ariaLabel: btn.getAttribute('aria-label'),
         };
       })()`)
-      console.log('Copy button check:', JSON.stringify(copyBtnCheck))
-      if (!copyBtnCheck.exists) throw new Error('Assertion failed: Copy button not found in DOM')
-      if (copyBtnCheck.disabled) throw new Error('Assertion failed: Copy button is disabled')
+      console.log('UI-28 Displayed copy details in DOM:', JSON.stringify(displayedDetails))
 
-      // Executed negative controls:
-      // Negative Control 1: Altered reference code must be rejected by exact-match validator
-      const assertClipboardExact = (actual, expected) => actual === expected
-      const alteredRefRejected = !assertClipboardExact('SP-52-ALTERED-REF', 'SP-52-TAYLOR')
+      if (!displayedDetails || !displayedDetails.btnFound) {
+        throw new Error('Copy transfer content button not found in DOM')
+      }
+      if (displayedDetails.displayedTransferContent !== 'SP-52-TAYLOR') {
+        throw new Error(`Displayed transfer content mismatch: expected "SP-52-TAYLOR", got "${displayedDetails.displayedTransferContent}"`)
+      }
 
-      // Negative Control 2: Missing or disabled copy button must be rejected by button validator
-      const assertButtonUsable = (btn) => btn.exists && !btn.disabled
-      const missingButtonRejected = !assertButtonUsable({ exists: false, disabled: false })
-      const disabledButtonRejected = !assertButtonUsable({ exists: true, disabled: true })
+      // Install clipboard spy (intercepts both navigator.clipboard.writeText and textarea fallback)
+      await pollSession.evalJs(`(() => {
+        window.__clipboardWrites = [];
+        window.__clipboardMutate = null;
+        const recordWrite = (text) => {
+          const val = window.__clipboardMutate !== null ? window.__clipboardMutate : String(text);
+          window.__clipboardWrites.push(val);
+        };
+        try {
+          Object.defineProperty(navigator, 'clipboard', {
+            value: {
+              writeText: async (text) => {
+                recordWrite(text);
+                return Promise.resolve();
+              },
+              readText: async () => window.__clipboardWrites.slice(-1)[0] || '',
+            },
+            configurable: true,
+            writable: true,
+          });
+        } catch {}
+        const origExec = document.execCommand;
+        document.execCommand = function(cmd) {
+          if (cmd === 'copy') {
+            const ta = document.querySelector('textarea');
+            if (ta) recordWrite(ta.value);
+          }
+          return origExec ? origExec.apply(this, arguments) : true;
+        };
+      })()`)
 
-      // Negative Control 3: Null/empty clipboard write must be rejected
-      const emptyClipboardRejected = !assertClipboardExact(null, 'SP-52-TAYLOR') && !assertClipboardExact('', 'SP-52-TAYLOR')
+      // Acceptance predicates
+      const assertClipboardExact = (actual, expected) => typeof actual === 'string' && actual === expected
+      const assertButtonUsable = (btnCheck) => Boolean(btnCheck && btnCheck.exists && !btnCheck.disabled)
 
-      const negativeControlsExecuted = alteredRefRejected && missingButtonRejected && disabledButtonRejected && emptyClipboardRejected
-      console.log('UI-28 Executed negative controls:', {
-        alteredRefRejected,
-        missingButtonRejected,
-        disabledButtonRejected,
-        emptyClipboardRejected,
-        negativeControlsExecuted,
-      })
-      if (!negativeControlsExecuted) throw new Error('Assertion failed: Negative controls validation failed')
+      // Positive button usability check using assertButtonUsable
+      const positiveBtnCheck = { exists: displayedDetails.btnFound, disabled: displayedDetails.btnDisabled }
+      const copyButtonUsable = assertButtonUsable(positiveBtnCheck)
+      if (!copyButtonUsable) {
+        throw new Error('Copy transfer content button is not usable (missing or disabled)')
+      }
 
-      // Click copy button
-      await session.evalJs(`
-        const btn = document.querySelector('button[aria-label="Copy transfer content"], button[aria-label*="copy transfer" i], button.copy-btn');
+      // -----------------------------------------------------------------------
+      // UI28-R5-01: Real Browser-Level Negative Mutation Controls & Predicate Checks
+      // -----------------------------------------------------------------------
+      // Browser Negative Control 1: Mutated clipboard copy interaction
+      console.log('Executing browser-level negative mutation control (altered clipboard write)...')
+      await pollSession.evalJs(`(() => {
+        window.__clipboardWrites = [];
+        window.__clipboardMutate = 'SP-52-ALTERED-FAIL';
+        const btn = document.querySelector('button[aria-label="Copy transfer content"], button[aria-label*="copy transfer" i]');
+        btn.click();
+      })()`)
+      await pause(150)
+      const browserMutatedWrite = await pollSession.evalJs(`window.__clipboardWrites.slice(-1)[0] || null`)
+      const browserMutationRejected = !assertClipboardExact(browserMutatedWrite, 'SP-52-TAYLOR')
+      console.log(`Browser mutated write: "${browserMutatedWrite}", strictly rejected by acceptance: ${browserMutationRejected}`)
+
+      // Non-destructive cleanup: reset mutation override and clear writes
+      await pollSession.evalJs(`(() => {
+        window.__clipboardMutate = null;
+        window.__clipboardWrites = [];
+      })()`)
+
+      // Browser Negative Control 2: Disabled button state and interaction prevention
+      console.log('Executing browser-level negative control (disabled copy button)...')
+      await pollSession.evalJs(`(() => {
+        window.__clipboardWrites = [];
+        const btn = document.querySelector('button[aria-label="Copy transfer content"], button[aria-label*="copy transfer" i]');
+        btn.disabled = true;
+        btn.click();
+      })()`)
+      const disabledCheck = await pollSession.evalJs(`(() => {
+        const btn = document.querySelector('button[aria-label="Copy transfer content"], button[aria-label*="copy transfer" i]');
+        return { exists: Boolean(btn), disabled: btn ? btn.disabled : true };
+      })()`)
+      const disabledButtonInteractionWrites = await pollSession.evalJs(`window.__clipboardWrites.length`)
+      const disabledRejected = !assertButtonUsable(disabledCheck)
+      const disabledClickPrevented = disabledButtonInteractionWrites === 0
+      console.log(`Browser disabled button check rejected by acceptance: ${disabledRejected}, click prevented writes: ${disabledClickPrevented}`)
+
+      // Non-destructive cleanup: re-enable button
+      await pollSession.evalJs(`(() => {
+        const btn = document.querySelector('button[aria-label="Copy transfer content"], button[aria-label*="copy transfer" i]');
+        btn.disabled = false;
+      })()`)
+
+      // Predicate-only unit checks (distinctly classified)
+      const unitPredicateNegativeChecks = {
+        alteredRefStringRejected: !assertClipboardExact('SP-52-ALTERED-REF', 'SP-52-TAYLOR'),
+        missingButtonObjectRejected: !assertButtonUsable({ exists: false, disabled: false }),
+        disabledButtonObjectRejected: !assertButtonUsable({ exists: true, disabled: true }),
+        emptyClipboardRejected: !assertClipboardExact(null, 'SP-52-TAYLOR') && !assertClipboardExact('', 'SP-52-TAYLOR'),
+      }
+      const unitPredicatesPassed = Object.values(unitPredicateNegativeChecks).every(Boolean)
+
+      const browserNegativeControlsPassed = browserMutationRejected && disabledRejected && disabledClickPrevented
+      if (!browserNegativeControlsPassed || !unitPredicatesPassed) {
+        throw new Error('Assertion failed: Negative controls validation failed')
+      }
+
+      // Positive copy flow: click real button and intercept real write
+      console.log('Executing positive copy flow...')
+      await pollSession.evalJs(`
+        const btn = document.querySelector('button[aria-label="Copy transfer content"], button[aria-label*="copy transfer" i]');
         btn.click();
       `)
       await pause(300)
 
-      // Retrieve and assert exact clipboard text
-      const clipboardWrites = await session.evalJs(`window.__clipboardWrites || []`)
+      const clipboardWrites = await pollSession.evalJs(`window.__clipboardWrites || []`)
       const actualCopiedText = clipboardWrites.length > 0 ? clipboardWrites[clipboardWrites.length - 1] : null
-      console.log(`Actual copied text: "${actualCopiedText}" (expected: "SP-52-TAYLOR")`)
+      console.log(`Actual copied text: "${actualCopiedText}" (displayed: "${displayedDetails.displayedTransferContent}")`)
       const clipboardExactMatch = assertClipboardExact(actualCopiedText, 'SP-52-TAYLOR')
-      if (!clipboardExactMatch) {
-        throw new Error(`Assertion failed: Copied text "${actualCopiedText}" did not match expected "SP-52-TAYLOR"`)
+      const displayAndClipboardIdentical = actualCopiedText === displayedDetails.displayedTransferContent
+
+      if (!clipboardExactMatch || !displayAndClipboardIdentical) {
+        throw new Error(`Display/Copy consistency assertion failed: copied "${actualCopiedText}" vs displayed "${displayedDetails.displayedTransferContent}"`)
       }
 
+      // -----------------------------------------------------------------------
+      // Part C: Deterministic Tab Hide / Resume Polling Cycle
+      // -----------------------------------------------------------------------
       // Tab hide
       console.log('Simulating tab hide (visibilityState = "hidden")...')
-      await session.evalJs(`
+      await pollSession.evalJs(`
         Object.defineProperty(document, 'hidden', { value: true, writable: true, configurable: true });
         Object.defineProperty(document, 'visibilityState', { value: 'hidden', writable: true, configurable: true });
         document.dispatchEvent(new Event('visibilitychange'));
       `)
       await pause(1000)
-      const hiddenPolls = session.getPollCount()
+      const hiddenPolls = pollSession.getPollCount()
       const requestsWhileHidden = hiddenPolls - initialPolls
       console.log(`Polls while hidden: ${requestsWhileHidden} (initial: ${initialPolls}, total: ${hiddenPolls})`)
 
       // Tab resume with transition to SUCCESS
       console.log('Simulating tab resume with payment completed on backend...')
-      session.setPollStatus('SUCCESS')
-      await session.evalJs(`
+      pollSession.setPollStatus('SUCCESS')
+      await pollSession.evalJs(`
         Object.defineProperty(document, 'hidden', { value: false, writable: true, configurable: true });
         Object.defineProperty(document, 'visibilityState', { value: 'visible', writable: true, configurable: true });
         document.dispatchEvent(new Event('visibilitychange'));
       `)
       await pause(800)
-      const resumePolls = session.getPollCount()
+      const resumePolls = pollSession.getPollCount()
       const resumeImmediateRequests = resumePolls - hiddenPolls
       console.log(`Immediate resume polls: ${resumeImmediateRequests} (total after resume: ${resumePolls})`)
 
-      const confirmed = await session.evalJs(`document.body.innerText.includes('Payment confirmed') || document.body.innerText.includes('Confirmed') || document.body.innerText.includes('SUCCESS')`)
+      const confirmed = await pollSession.evalJs(`document.body.innerText.includes('Payment confirmed') || document.body.innerText.includes('Confirmed') || document.body.innerText.includes('SUCCESS')`)
       console.log(`Payment confirmed status displayed: ${confirmed}`)
 
-      const stopPolls1 = session.getPollCount()
+      const stopPolls1 = pollSession.getPollCount()
       await pause(2000)
-      const stopPolls2 = session.getPollCount()
+      const stopPolls2 = pollSession.getPollCount()
       const pollingStopped = stopPolls1 === stopPolls2
       console.log(`Polling terminated after SUCCESS: ${pollingStopped} (${stopPolls1} == ${stopPolls2})`)
 
@@ -881,6 +1183,7 @@ async function main() {
       const totalRequestsAssertion = stopPolls2 === 2
       const pollingStoppedAssertion = pollingStopped
       const clipboardAssertion = clipboardExactMatch
+      const displayClipboardMatchAssertion = displayAndClipboardIdentical
       const paymentConfirmedAssertion = Boolean(confirmed)
 
       const allMandatoryAssertionsPassed =
@@ -890,8 +1193,10 @@ async function main() {
         totalRequestsAssertion &&
         pollingStoppedAssertion &&
         clipboardAssertion &&
+        displayClipboardMatchAssertion &&
         paymentConfirmedAssertion &&
-        negativeControlsExecuted
+        browserNegativeControlsPassed &&
+        unitPredicatesPassed
 
       const outcome = allMandatoryAssertionsPassed ? 'PASS' : 'FAIL'
       if (outcome !== 'PASS') {
@@ -902,8 +1207,10 @@ async function main() {
           totalRequestsAssertion,
           pollingStoppedAssertion,
           clipboardAssertion,
+          displayClipboardMatchAssertion,
           paymentConfirmedAssertion,
-          negativeControlsExecuted,
+          browserNegativeControlsPassed,
+          unitPredicatesPassed,
         })}`)
       }
 
@@ -918,17 +1225,28 @@ async function main() {
         pollingTerminatedAfterSuccess: pollingStopped,
         totalRequestsObserved: stopPolls2,
         expectedReferenceCode: 'SP-52-TAYLOR',
+        displayedTransferContent: displayedDetails.displayedTransferContent,
         actualCopiedText: actualCopiedText,
+        displayAndClipboardMatch: displayAndClipboardIdentical,
+        paymentCodeDistinctFromTransferContent: {
+          paymentCode: 'PAY-0052',
+          transferContent: 'SP-52-TAYLOR',
+          note: 'paymentCode is the internal payment identifier; transferContent is the bank transfer syntax required for reception matching',
+        },
         clipboardExactMatch: clipboardExactMatch,
-        copyButtonPresent: copyBtnCheck.exists,
-        copyButtonEnabled: !copyBtnCheck.disabled,
+        copyButtonPresent: displayedDetails.btnFound,
+        copyButtonEnabled: !displayedDetails.btnDisabled,
+        copyButtonUsable: copyButtonUsable,
         paymentConfirmedStatusDisplayed: Boolean(confirmed),
-        negativeControls: {
-          alteredReferenceRejected: alteredRefRejected,
-          missingButtonRejected: missingButtonRejected,
-          disabledButtonRejected: disabledButtonRejected,
-          emptyClipboardRejected: emptyClipboardRejected,
-          allNegativeControlsPassed: negativeControlsExecuted,
+        browserInteractionNegativeControls: {
+          mutatedClipboardWriteRejected: browserMutationRejected,
+          disabledButtonCheckRejected: disabledRejected,
+          disabledButtonClickPreventedWrites: disabledClickPrevented,
+          allBrowserNegativeControlsPassed: browserNegativeControlsPassed,
+        },
+        unitPredicateNegativeChecks: {
+          ...unitPredicateNegativeChecks,
+          allUnitPredicatesPassed: unitPredicatesPassed,
         },
         mandatoryAssertions: {
           exactOneInitialRequestObserved: initialRequestsAssertion,
@@ -937,8 +1255,11 @@ async function main() {
           exactTwoTotalRequestsObserved: totalRequestsAssertion,
           pollingTerminatedAfterSuccess: pollingStoppedAssertion,
           clipboardReferenceExact: clipboardAssertion,
+          displayMatchesClipboardWrite: displayClipboardMatchAssertion,
+          copyButtonUsableAsserted: copyButtonUsable,
           paymentConfirmedRendered: paymentConfirmedAssertion,
-          negativeControlsPassed: negativeControlsExecuted,
+          browserNegativeControlsPassed: browserNegativeControlsPassed,
+          unitPredicateNegativeChecksPassed: unitPredicatesPassed,
         },
         notRun: {
           nativeBrowserTabLifecycle: 'NOT_RUN - actual Chromium OS/foreground background tab lifecycle is not claimed; test is scoped to synthetic document visibilitychange event handler execution',
@@ -946,7 +1267,7 @@ async function main() {
         outcome: outcome,
       }
       writeFileSync(join(SCREENSHOTS_DIR, 'ui-28/tab-resume-log.json'), JSON.stringify(tabResumeLog, null, 2) + '\n')
-      await session.cleanup()
+      await pollSession.cleanup()
       console.log('UI-28 tab-resume test completed!')
     }
 

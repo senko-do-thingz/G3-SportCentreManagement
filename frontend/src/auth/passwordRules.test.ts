@@ -76,13 +76,13 @@ describe('sign up form checks', () => {
     expect(validateRegister(valid)).toEqual({})
   })
 
-  it('uses the backend messages for length limits and phone format', () => {
-    expect(validateRegister({ ...valid, fullName: 'a'.repeat(101) }).fullName).toBe('Full name must be at most 100 characters')
-    expect(validateRegister({ ...valid, phone: '1234567' }).phone).toBe('Phone must be 8-15 digits with optional leading +')
-    expect(validateRegister({ ...valid, phone: '+8412345678901234' }).phone).toBe('Phone must be 8-15 digits with optional leading +')
+  it('uses common sign up wording for length limits and phone format', () => {
+    expect(validateRegister({ ...valid, fullName: 'a'.repeat(101) }).fullName).toBe('Use 100 characters or fewer')
+    expect(validateRegister({ ...valid, phone: '1234567' }).phone).toBe('Enter a valid phone number, like 0901 234 567')
+    expect(validateRegister({ ...valid, phone: '+8412345678901234' }).phone).toBe('Enter a valid phone number, like 0901 234 567')
     expect(validateRegister({ ...valid, phone: '+841234567890123' }).phone).toBeUndefined() // 15 digits
     expect(validateRegister({ ...valid, phone: '+84901234567' }).phone).toBeUndefined()
-    expect(validateRegister({ ...valid, email: 'jamie@sportify' }).email).toBe('Email is invalid')
+    expect(validateRegister({ ...valid, email: 'jamie@sportify' }).email).toBe('Enter a valid email, like name@example.com')
   })
 
   it('removes separators from the phone number before checking and sending it', () => {
@@ -111,7 +111,7 @@ describe('applyFieldChange works from the latest state (N3)', () => {
   })
 
   it('computes the Confirm password error from the same next values', () => {
-    const shown = { form: { ...EMPTY_REGISTER_FORM, password: 'Train2026', confirmPassword: 'Train2027' }, fieldErrors: { confirmPassword: 'Passwords do not match', password: 'x' } }
+    const shown = { form: { ...EMPTY_REGISTER_FORM, password: 'Train2026', confirmPassword: 'Train2027' }, fieldErrors: { confirmPassword: "Passwords don't match. Try again.", password: 'x' } }
     const fixed = applyFieldChange(shown, 'password', 'Train2027')
     expect(fixed.fieldErrors).toEqual({})
   })
@@ -123,18 +123,18 @@ describe('Confirm password error after editing either password field (R4)', () =
   })
 
   it('clears a shown mismatch as soon as the two values match', () => {
-    expect(nextConfirmPasswordError({ password: 'Train2027', confirmPassword: 'Train2027' }, 'Passwords do not match')).toBeUndefined()
+    expect(nextConfirmPasswordError({ password: 'Train2027', confirmPassword: 'Train2027' }, "Passwords don't match. Try again.")).toBeUndefined()
   })
 
   it('keeps the mismatch while the values still differ', () => {
-    expect(nextConfirmPasswordError({ password: 'Train2028', confirmPassword: 'Train2027' }, 'Passwords do not match')).toBe(
-      'Passwords do not match',
+    expect(nextConfirmPasswordError({ password: 'Train2028', confirmPassword: 'Train2027' }, "Passwords don't match. Try again.")).toBe(
+      "Passwords don't match. Try again.",
     )
   })
 
   it('asks for the confirmation again when the field is emptied', () => {
-    expect(nextConfirmPasswordError({ password: 'Train2026', confirmPassword: '' }, 'Passwords do not match')).toBe(
-      'Please confirm your password',
+    expect(nextConfirmPasswordError({ password: 'Train2026', confirmPassword: '' }, "Passwords don't match. Try again.")).toBe(
+      'Confirm your password',
     )
   })
 })

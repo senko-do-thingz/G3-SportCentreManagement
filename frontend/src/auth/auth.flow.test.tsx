@@ -84,7 +84,7 @@ describe('auth flow', () => {
 
     await logIn('manager@sportify.com', 'wrong')
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Incorrect email or password')
     expect(tokenStorage.hasSession()).toBe(false)
   })
 
@@ -346,8 +346,8 @@ describe('auth flow', () => {
 
       await user.click(await screen.findByRole('button', { name: /log in/i }))
 
-      expect(screen.getByText('Email is required')).toBeInTheDocument()
-      expect(screen.getByText('Password is required')).toBeInTheDocument()
+      expect(screen.getByText('Enter your email')).toBeInTheDocument()
+      expect(screen.getByText('Enter your password')).toBeInTheDocument()
       expect(calls).toHaveLength(0)
     })
 
@@ -357,7 +357,7 @@ describe('auth flow', () => {
 
       await logIn('manager.sportify.com', 'password')
 
-      expect(screen.getByText('Email is invalid')).toBeInTheDocument()
+      expect(screen.getByText('Enter a valid email, like name@example.com')).toBeInTheDocument()
       expect(screen.getByLabelText(/email address/i)).toHaveAttribute('aria-invalid', 'true')
       expect(calls).toHaveLength(0)
     })
@@ -370,8 +370,8 @@ describe('auth flow', () => {
 
       await user.type(screen.getByLabelText(/email address/i), 'm')
 
-      expect(screen.queryByText('Email is required')).not.toBeInTheDocument()
-      expect(screen.getByText('Password is required')).toBeInTheDocument()
+      expect(screen.queryByText('Enter your email')).not.toBeInTheDocument()
+      expect(screen.getByText('Enter your password')).toBeInTheDocument()
     })
 
     it('shows backend field errors over the client checks', async () => {
