@@ -41,4 +41,15 @@ No API or backend change.
 | Confirmed (no invoice) | 390 x 844 | Light | Safe messaging "The receipt appears in My payments once issued" | Pass |
 | Confirmed (no invoice) | 1440 x 900 | Dark | No broken link, polling completely stopped | Pass |
 
+## TC-10 Real-Browser Tab Resume & Clipboard Execution Provenance
+
+Executed via headless Chromium test harness (`frontend/scripts/generate-all-evidence.mjs --only ui-28`):
+- **Initial Polls**: 1 request observed on initial pending view (`GET /payments/52`).
+- **Tab Hidden (`visibilityState = 'hidden'`)**: 0 background polling requests sent while tab is hidden.
+- **Tab Resumed (`visibilityState = 'visible'`)**: exactly 1 immediate refresh request sent upon tab foregrounding.
+- **Status Transition**: Backend response transition to `SUCCESS` updates status to "Payment confirmed".
+- **Polling Termination**: Confirmed halted (0 additional requests across 2000 ms window; final total requests: 2).
+- **Clipboard Content**: Button copied reference code `SP-52-TAYLOR` with identical casing and untruncated characters.
+- **Evidence Log**: Captured in `frontend/docs/screenshots/ui-28/tab-resume-log.json`.
+
 Branch retested and merged onto `feat/ui-27` and latest `main`.
