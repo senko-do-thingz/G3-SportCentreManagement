@@ -1,0 +1,11 @@
+{
+  "executedAt": "2026-10-25T07:08:36.415Z",
+  "testCase": "TC-10",
+  "initialRequests": 1,
+  "requestsWhileHidden": 0,
+  "resumeImmediateRequests": 1,
+  "pollingTerminatedAfterSuccess": true,
+  "totalRequestsObserved": 2,
+  "expectedReferenceCode": "SP-52-TAYLOR",
+  "outcome": "PASS"
+}
