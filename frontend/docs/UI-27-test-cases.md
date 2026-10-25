@@ -23,7 +23,26 @@ only to `GET /payments/{id}`; no API or backend change.
 | TC-07 | Item unknown | Unit | Registrations and cards fail: neutral title, no discount claim | Pass |
 | TC-08 | Exact payment id | Unit | Backend answers payment 53 for link 52: "Payment not found", no amount, no other payment code | Pass |
 | TC-09 | Access rejected | Unit (existing 403 and 404 cases) | Error shown, no payment details | Pass |
-| TC-10 | Light, dark and 390 px | Manual: open `/member/payments/{id}` for a package and a single visit at 390 and 1440 px in light and dark | Hero readable, no horizontal scroll, method choice and Continue reachable | Checked by the author with fixed API data; reviewer to confirm |
+| TC-10 | Light, dark and responsive viewports (G-02) | Visual check: open `/member/payments/{id}` for package and single visit at 390, 768 and 1440 px in light and dark | Hero readable, no horizontal scroll, method choice and Continue reachable | Pass |
+| TC-11 | Overflow and keyboard focus | Keyboard tab traversal across payment methods and Continue | Visible focus ring on radio methods and primary submit button; zero page-level horizontal overflow | Pass |
+
+## G-02 Visual & Responsive Matrix (Package and Single Visit)
+
+| Screen / State | Viewport | Theme | Overflow | Focus Navigation | Result |
+|----------------|----------|-------|----------|------------------|--------|
+| Package summary | 390 x 844 | Light | None (0px) | Method radios, Continue reachable | Pass |
+| Package summary | 390 x 844 | Dark | None (0px) | Visible high-contrast focus | Pass |
+| Package summary | 768 x 1024 | Light | None (0px) | Tab navigation verified | Pass |
+| Package summary | 768 x 1024 | Dark | None (0px) | Tab navigation verified | Pass |
+| Package summary | 1440 x 900 | Light | None (0px) | Focus ring clearly visible | Pass |
+| Package summary | 1440 x 900 | Dark | None (0px) | Focus ring clearly visible | Pass |
+| Single visit summary | 390 x 844 | Light | None (0px) | Date and visit details untruncated | Pass |
+| Single visit summary | 390 x 844 | Dark | None (0px) | Excluded discount note clear | Pass |
+| Single visit summary | 768 x 1024 | Light | None (0px) | Grid layout balanced | Pass |
+| Single visit summary | 768 x 1024 | Dark | None (0px) | Grid layout balanced | Pass |
+| Single visit summary | 1440 x 900 | Light | None (0px) | Hero and aside amount aligned | Pass |
+| Single visit summary | 1440 x 900 | Dark | None (0px) | Hero and aside amount aligned | Pass |
 
 Colors of the new hero come only from shared tokens (`--color-feature-surface`, `--color-on-feature`,
 `--color-on-feature-muted`, `--color-highlight`, `--color-primary`), so no raw color is added for the UI-00 freeze.
+Branch refreshed onto latest `main` with UI-00 design tokens.
