@@ -203,6 +203,41 @@ def main():
         if not report["signup_flow"].startswith("/member"):
             fail(f"sign up flow ended on {report['signup_flow']}, expected the member area")
         context.close()
+
+        # 200% browser zoom check (TC-15): desktop 1440px viewport at 200% zoom (WCAG reflow)
+        report["zoom200"] = {}
+        for z_state in ("empty", "errors", "invalid", "success"):
+            z_name = f"signup-zoom200-1440-{z_state}"
+            context = browser.new_context(viewport={"width": 1440, "height": 900}, device_scale_factor=2, reduced_motion="reduce")
+            context.route("**/api/v1/**", api(z_state))
+            z_page = context.new_page()
+            z_page.goto(args.after.rstrip("/") + "/register", wait_until="networkidle")
+            z_page.wait_for_selector(".auth-form")
+            z_page.evaluate("document.body.style.zoom = '200%'")
+            z_page.evaluate("document.fonts.ready")
+            if z_state == "errors":
+                z_page.get_by_role("button", name="Create account", exact=True).click()
+                z_page.wait_for_selector(".field__error:not(:empty)")
+            elif z_state in ("invalid", "success"):
+                z_page.locator("input[name=fullName]").fill("Taylor Nguyen")
+                z_page.locator("input[name=phone]").fill("0901234567")
+                z_page.locator("input[name=email]").fill("member@sportify.demo")
+                z_page.locator("input[name=password]").fill("Sportify@2026")
+                z_page.locator("input[name=confirmPassword]").fill("Sportify@2026")
+                z_page.locator("input[name=acceptTerms]").check()
+                z_page.get_by_role("button", name="Create account", exact=True).click()
+                if z_state == "invalid":
+                    z_page.wait_for_selector('[role="alert"]')
+            if z_state == "success":
+                z_page.wait_for_function("!location.pathname.startsWith('/register')", timeout=10000)
+                report["zoom200"][z_state] = {"status": "success", "flow": z_page.evaluate("location.pathname")}
+            else:
+                z_layout = z_page.evaluate(LAYOUT)
+                report["zoom200"][z_state] = z_layout
+                if z_layout["overflow"] > 0:
+                    fail(f"{z_name}: horizontal overflow {z_layout['overflow']} px at 200% zoom")
+            z_page.screenshot(path=str(out / f"{z_name}.png"), full_page=True)
+            context.close()
         browser.close()
     (out / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     for line in report["failures"]:

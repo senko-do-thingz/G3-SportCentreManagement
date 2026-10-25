@@ -15,7 +15,7 @@ Profile keeps its own messages.
 
 Not changed: POST /auth/register, automatic sign in after sign up, validation rules, terms, return navigation.
 
-Branch: based on `feat/ui-06` (which contains UI-00 and UI-03). Merge order: UI-00, UI-03, UI-06, then UI-07.
+Branch: refreshed on latest `main` (after UI-00, UI-03, UI-06 merges). PR diff strictly isolated to UI-07.
 
 ## How each case is run
 
@@ -45,10 +45,12 @@ Branch: based on `feat/ui-06` (which contains UI-00 and UI-03). Merge order: UI-
 | TC-12 | Log in after the shared refactor and the new wording | Browser: `scripts/ui06-login-check.py` on this build (`docs/screenshots/ui-07/login-recheck-report.json`) | Same results as UI-06 | Pass (0 failures, lowest 4.85:1, login reaches /member) |
 | TC-13 | Visual review | Before/after sheets in `docs/screenshots/ui-07` | Sign up matches Log in and the Home look in light and dark | For reviewer |
 | TC-14 | Real photo and backend | Manual: open `/register` online and create an account against the dev backend | Sharp Home hero photo; account created and signed in; duplicate email shows the error | To run by reviewer |
+| TC-15 | 200% browser zoom reflow and no field clipping | Browser (Playwright / Chromium at 200% zoom, desktop 1440x900 viewport) | Empty, field errors, duplicate email, keyboard-only and successful registration states: zero horizontal overflow (`overflow == 0`), no clipping on two-column fields, error copy, password rules or Terms, all interactive controls and Submit reachable | Pass |
 
 Notes for review:
 - The browser run had no access to the Unsplash CDN, so the screenshots show the bundled low resolution fallback photo; online the page loads the sharp Home hero photo.
 - On a 1440 x 900 screen the Sign up page is 940 px tall (the form is long), so it scrolls slightly; Log in still fits one screen.
+- At 200% browser zoom (720px effective width), `.auth-form__row` stacks to 1 column at <=768px, ensuring zero field clipping and clear error readability.
 
 Browser environment: Chromium 1243 (Playwright 1.63), device scale 1, reduced motion, fixed API answers. Builds:
 `feat/ui-06` (before) and `feat/ui-07` (after), both with `VITE_API_BASE_URL=http://localhost:8080/api/v1`.

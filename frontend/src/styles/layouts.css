@@ -793,15 +793,15 @@
   .ui-kit__stats {
     grid-template-columns: 1fr;
   }
+
+  .auth-form__row {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
   .user-menu__text {
     display: none;
-  }
-
-  .auth-form__row {
-    grid-template-columns: 1fr;
   }
 
   .ui-kit__topbar {
