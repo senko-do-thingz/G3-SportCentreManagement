@@ -23,7 +23,7 @@ async function submitLogin(remember = false) {
   await user.type(await screen.findByLabelText(/email address/i), 'person@example.test')
   await user.type(screen.getByLabelText(/^password/i), 'test-input')
   if (remember) {
-    await user.click(screen.getByRole('checkbox', { name: 'Remember me' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Keep me logged in' }))
   }
   await user.click(screen.getByRole('button', { name: 'Log in' }))
   return user
@@ -55,7 +55,7 @@ describe('FE-00 login integration', () => {
     const { calls } = installFakeFetch(() => backendError(401, 'Unauthorized'))
     renderApp('/login')
     await submitLogin()
-    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Incorrect email or password')
     expect(calls).toHaveLength(1)
     expect(tokenStorage.hasSession()).toBe(false)
   })
@@ -81,7 +81,7 @@ describe('FE-00 login integration', () => {
     renderApp('/login')
     await submitLogin()
     expect(await screen.findByRole('alert')).toHaveTextContent(message)
-    expect(screen.queryByText(/Invalid email or password|locked or inactive|Internal diagnostic/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Incorrect email or password|locked or inactive|Internal diagnostic/)).not.toBeInTheDocument()
     expect(tokenStorage.hasSession()).toBe(false)
   })
 
@@ -97,7 +97,7 @@ describe('FE-00 login integration', () => {
     const user = await submitLogin(true)
     expect(await screen.findByRole('heading', { name: 'We could not load your account' })).toBeInTheDocument()
     expect(screen.getByText(/Your credentials were accepted/)).toBeInTheDocument()
-    expect(screen.queryByText(/Private .* diagnostic|Invalid email or password/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Private .* diagnostic|Incorrect email or password/)).not.toBeInTheDocument()
     expect(tokenStorage.getAccessToken()).toBe(PAIR.accessToken)
     expect(window.localStorage.getItem(tokenStorage.refreshKey)).toBe(PAIR.refreshToken)
     healthy = true

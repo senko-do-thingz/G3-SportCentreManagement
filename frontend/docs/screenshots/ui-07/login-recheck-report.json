@@ -1,0 +1,1536 @@
+{
+  "screens": [
+    "login-light-390-empty",
+    "login-light-390-errors",
+    "login-light-390-invalid",
+    "login-light-768-empty",
+    "login-light-768-errors",
+    "login-light-768-invalid",
+    "login-light-1440-empty",
+    "login-light-1440-errors",
+    "login-light-1440-invalid",
+    "login-dark-390-empty",
+    "login-dark-390-errors",
+    "login-dark-390-invalid",
+    "login-dark-768-empty",
+    "login-dark-768-errors",
+    "login-dark-768-invalid",
+    "login-dark-1440-empty",
+    "login-dark-1440-errors",
+    "login-dark-1440-invalid"
+  ],
+  "contrast": {
+    "login-light-390-empty": [
+      {
+        "name": "heading",
+        "ratio": 13.1,
+        "needed": 3
+      },
+      {
+        "name": "subtitle",
+        "ratio": 5.27,
+        "needed": 4.5
+      },
+      {
+        "name": "email label",
+        "ratio": 13.1,
+        "needed": 4.5
+      },
+      {
+        "name": "remember me",
+        "ratio": 13.1,
+        "needed": 4.5
+      },
+      {
+        "name": "forgot password",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "footer text",
+        "ratio": 5.27,
+        "needed": 4.5
+      },
+      {
+        "name": "create account link",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "log in button",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "brand name",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "brand mark",
+        "ratio": 6.63,
+        "needed": 3
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      }
+    ],
+    "login-light-390-errors": [
+      {
+        "name": "heading",
+        "ratio": 13.1,
+        "needed": 3
+      },
+      {
+        "name": "subtitle",
+        "ratio": 5.27,
+        "needed": 4.5
+      },
+      {
+        "name": "email label",
+        "ratio": 13.1,
+        "needed": 4.5
+      },
+      {
+        "name": "remember me",
+        "ratio": 13.1,
+        "needed": 4.5
+      },
+      {
+        "name": "forgot password",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "footer text",
+        "ratio": 5.27,
+        "needed": 4.5
+      },
+      {
+        "name": "create account link",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "log in button",
+        "ratio": 8.43,
+        "needed": 4.5
+      },
+      {
+        "name": "brand name",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "brand mark",
+        "ratio": 6.63,
+        "needed": 3
+      },
+      {
+        "name": "field error",
+        "ratio": 5.38,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      }
+    ],
+    "login-light-390-invalid": [
+      {
+        "name": "heading",
+        "ratio": 13.1,
+        "needed": 3
+      },
+      {
+        "name": "subtitle",
+        "ratio": 5.27,
+        "needed": 4.5
+      },
+      {
+        "name": "email label",
+        "ratio": 13.1,
+        "needed": 4.5
+      },
+      {
+        "name": "remember me",
+        "ratio": 13.1,
+        "needed": 4.5
+      },
+      {
+        "name": "forgot password",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "footer text",
+        "ratio": 5.27,
+        "needed": 4.5
+      },
+      {
+        "name": "create account link",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "log in button",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "brand name",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "brand mark",
+        "ratio": 6.63,
+        "needed": 3
+      },
+      {
+        "name": "form alert",
+        "ratio": 4.85,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      }
+    ],
+    "login-light-768-empty": [
+      {
+        "name": "heading",
+        "ratio": 13.1,
+        "needed": 3
+      },
+      {
+        "name": "subtitle",
+        "ratio": 5.27,
+        "needed": 4.5
+      },
+      {
+        "name": "email label",
+        "ratio": 13.1,
+        "needed": 4.5
+      },
+      {
+        "name": "remember me",
+        "ratio": 13.1,
+        "needed": 4.5
+      },
+      {
+        "name": "forgot password",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "footer text",
+        "ratio": 5.27,
+        "needed": 4.5
+      },
+      {
+        "name": "create account link",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "log in button",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "brand name",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "brand mark",
+        "ratio": 6.63,
+        "needed": 3
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
+        "needed": 4.5
+      }
+    ],
+    "login-light-768-errors": [
+      {
+        "name": "heading",
+        "ratio": 13.1,
+        "needed": 3
+      },
+      {
+        "name": "subtitle",
+        "ratio": 5.27,
+        "needed": 4.5
+      },
+      {
+        "name": "email label",
+        "ratio": 13.1,
+        "needed": 4.5
+      },
+      {
+        "name": "remember me",
+        "ratio": 13.1,
+        "needed": 4.5
+      },
+      {
+        "name": "forgot password",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "footer text",
+        "ratio": 5.27,
+        "needed": 4.5
+      },
+      {
+        "name": "create account link",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "log in button",
+        "ratio": 8.43,
+        "needed": 4.5
+      },
+      {
+        "name": "brand name",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "brand mark",
+        "ratio": 6.63,
+        "needed": 3
+      },
+      {
+        "name": "field error",
+        "ratio": 5.38,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
+        "needed": 4.5
+      }
+    ],
+    "login-light-768-invalid": [
+      {
+        "name": "heading",
+        "ratio": 13.1,
+        "needed": 3
+      },
+      {
+        "name": "subtitle",
+        "ratio": 5.27,
+        "needed": 4.5
+      },
+      {
+        "name": "email label",
+        "ratio": 13.1,
+        "needed": 4.5
+      },
+      {
+        "name": "remember me",
+        "ratio": 13.1,
+        "needed": 4.5
+      },
+      {
+        "name": "forgot password",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "footer text",
+        "ratio": 5.27,
+        "needed": 4.5
+      },
+      {
+        "name": "create account link",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "log in button",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "brand name",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "brand mark",
+        "ratio": 6.63,
+        "needed": 3
+      },
+      {
+        "name": "form alert",
+        "ratio": 4.85,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
+        "needed": 4.5
+      }
+    ],
+    "login-light-1440-empty": [
+      {
+        "name": "heading",
+        "ratio": 13.1,
+        "needed": 3
+      },
+      {
+        "name": "subtitle",
+        "ratio": 5.27,
+        "needed": 4.5
+      },
+      {
+        "name": "email label",
+        "ratio": 13.1,
+        "needed": 4.5
+      },
+      {
+        "name": "remember me",
+        "ratio": 13.1,
+        "needed": 4.5
+      },
+      {
+        "name": "forgot password",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "footer text",
+        "ratio": 5.27,
+        "needed": 4.5
+      },
+      {
+        "name": "create account link",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "log in button",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "brand name",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "brand mark",
+        "ratio": 6.63,
+        "needed": 3
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
+        "needed": 4.5
+      }
+    ],
+    "login-light-1440-errors": [
+      {
+        "name": "heading",
+        "ratio": 13.1,
+        "needed": 3
+      },
+      {
+        "name": "subtitle",
+        "ratio": 5.27,
+        "needed": 4.5
+      },
+      {
+        "name": "email label",
+        "ratio": 13.1,
+        "needed": 4.5
+      },
+      {
+        "name": "remember me",
+        "ratio": 13.1,
+        "needed": 4.5
+      },
+      {
+        "name": "forgot password",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "footer text",
+        "ratio": 5.27,
+        "needed": 4.5
+      },
+      {
+        "name": "create account link",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "log in button",
+        "ratio": 8.43,
+        "needed": 4.5
+      },
+      {
+        "name": "brand name",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "brand mark",
+        "ratio": 6.63,
+        "needed": 3
+      },
+      {
+        "name": "field error",
+        "ratio": 5.38,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
+        "needed": 4.5
+      }
+    ],
+    "login-light-1440-invalid": [
+      {
+        "name": "heading",
+        "ratio": 13.1,
+        "needed": 3
+      },
+      {
+        "name": "subtitle",
+        "ratio": 5.27,
+        "needed": 4.5
+      },
+      {
+        "name": "email label",
+        "ratio": 13.1,
+        "needed": 4.5
+      },
+      {
+        "name": "remember me",
+        "ratio": 13.1,
+        "needed": 4.5
+      },
+      {
+        "name": "forgot password",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "footer text",
+        "ratio": 5.27,
+        "needed": 4.5
+      },
+      {
+        "name": "create account link",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "log in button",
+        "ratio": 6.63,
+        "needed": 4.5
+      },
+      {
+        "name": "brand name",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "brand mark",
+        "ratio": 6.63,
+        "needed": 3
+      },
+      {
+        "name": "form alert",
+        "ratio": 4.85,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
+        "needed": 4.5
+      }
+    ],
+    "login-dark-390-empty": [
+      {
+        "name": "heading",
+        "ratio": 13.7,
+        "needed": 3
+      },
+      {
+        "name": "subtitle",
+        "ratio": 9.1,
+        "needed": 4.5
+      },
+      {
+        "name": "email label",
+        "ratio": 13.7,
+        "needed": 4.5
+      },
+      {
+        "name": "remember me",
+        "ratio": 13.7,
+        "needed": 4.5
+      },
+      {
+        "name": "forgot password",
+        "ratio": 6.9,
+        "needed": 4.5
+      },
+      {
+        "name": "footer text",
+        "ratio": 9.1,
+        "needed": 4.5
+      },
+      {
+        "name": "create account link",
+        "ratio": 6.9,
+        "needed": 4.5
+      },
+      {
+        "name": "log in button",
+        "ratio": 7.67,
+        "needed": 4.5
+      },
+      {
+        "name": "brand name",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "brand mark",
+        "ratio": 7.67,
+        "needed": 3
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      }
+    ],
+    "login-dark-390-errors": [
+      {
+        "name": "heading",
+        "ratio": 13.7,
+        "needed": 3
+      },
+      {
+        "name": "subtitle",
+        "ratio": 9.1,
+        "needed": 4.5
+      },
+      {
+        "name": "email label",
+        "ratio": 13.7,
+        "needed": 4.5
+      },
+      {
+        "name": "remember me",
+        "ratio": 13.7,
+        "needed": 4.5
+      },
+      {
+        "name": "forgot password",
+        "ratio": 6.9,
+        "needed": 4.5
+      },
+      {
+        "name": "footer text",
+        "ratio": 9.1,
+        "needed": 4.5
+      },
+      {
+        "name": "create account link",
+        "ratio": 6.9,
+        "needed": 4.5
+      },
+      {
+        "name": "log in button",
+        "ratio": 9.81,
+        "needed": 4.5
+      },
+      {
+        "name": "brand name",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "brand mark",
+        "ratio": 7.67,
+        "needed": 3
+      },
+      {
+        "name": "field error",
+        "ratio": 9.34,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      }
+    ],
+    "login-dark-390-invalid": [
+      {
+        "name": "heading",
+        "ratio": 13.7,
+        "needed": 3
+      },
+      {
+        "name": "subtitle",
+        "ratio": 9.1,
+        "needed": 4.5
+      },
+      {
+        "name": "email label",
+        "ratio": 13.7,
+        "needed": 4.5
+      },
+      {
+        "name": "remember me",
+        "ratio": 13.7,
+        "needed": 4.5
+      },
+      {
+        "name": "forgot password",
+        "ratio": 6.9,
+        "needed": 4.5
+      },
+      {
+        "name": "footer text",
+        "ratio": 9.1,
+        "needed": 4.5
+      },
+      {
+        "name": "create account link",
+        "ratio": 6.9,
+        "needed": 4.5
+      },
+      {
+        "name": "log in button",
+        "ratio": 7.67,
+        "needed": 4.5
+      },
+      {
+        "name": "brand name",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "brand mark",
+        "ratio": 7.67,
+        "needed": 3
+      },
+      {
+        "name": "form alert",
+        "ratio": 7.66,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      }
+    ],
+    "login-dark-768-empty": [
+      {
+        "name": "heading",
+        "ratio": 13.7,
+        "needed": 3
+      },
+      {
+        "name": "subtitle",
+        "ratio": 9.1,
+        "needed": 4.5
+      },
+      {
+        "name": "email label",
+        "ratio": 13.7,
+        "needed": 4.5
+      },
+      {
+        "name": "remember me",
+        "ratio": 13.7,
+        "needed": 4.5
+      },
+      {
+        "name": "forgot password",
+        "ratio": 6.9,
+        "needed": 4.5
+      },
+      {
+        "name": "footer text",
+        "ratio": 9.1,
+        "needed": 4.5
+      },
+      {
+        "name": "create account link",
+        "ratio": 6.9,
+        "needed": 4.5
+      },
+      {
+        "name": "log in button",
+        "ratio": 7.67,
+        "needed": 4.5
+      },
+      {
+        "name": "brand name",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "brand mark",
+        "ratio": 7.67,
+        "needed": 3
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
+        "needed": 4.5
+      }
+    ],
+    "login-dark-768-errors": [
+      {
+        "name": "heading",
+        "ratio": 13.7,
+        "needed": 3
+      },
+      {
+        "name": "subtitle",
+        "ratio": 9.1,
+        "needed": 4.5
+      },
+      {
+        "name": "email label",
+        "ratio": 13.7,
+        "needed": 4.5
+      },
+      {
+        "name": "remember me",
+        "ratio": 13.7,
+        "needed": 4.5
+      },
+      {
+        "name": "forgot password",
+        "ratio": 6.9,
+        "needed": 4.5
+      },
+      {
+        "name": "footer text",
+        "ratio": 9.1,
+        "needed": 4.5
+      },
+      {
+        "name": "create account link",
+        "ratio": 6.9,
+        "needed": 4.5
+      },
+      {
+        "name": "log in button",
+        "ratio": 9.81,
+        "needed": 4.5
+      },
+      {
+        "name": "brand name",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "brand mark",
+        "ratio": 7.67,
+        "needed": 3
+      },
+      {
+        "name": "field error",
+        "ratio": 9.34,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
+        "needed": 4.5
+      }
+    ],
+    "login-dark-768-invalid": [
+      {
+        "name": "heading",
+        "ratio": 13.7,
+        "needed": 3
+      },
+      {
+        "name": "subtitle",
+        "ratio": 9.1,
+        "needed": 4.5
+      },
+      {
+        "name": "email label",
+        "ratio": 13.7,
+        "needed": 4.5
+      },
+      {
+        "name": "remember me",
+        "ratio": 13.7,
+        "needed": 4.5
+      },
+      {
+        "name": "forgot password",
+        "ratio": 6.9,
+        "needed": 4.5
+      },
+      {
+        "name": "footer text",
+        "ratio": 9.1,
+        "needed": 4.5
+      },
+      {
+        "name": "create account link",
+        "ratio": 6.9,
+        "needed": 4.5
+      },
+      {
+        "name": "log in button",
+        "ratio": 7.67,
+        "needed": 4.5
+      },
+      {
+        "name": "brand name",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "brand mark",
+        "ratio": 7.67,
+        "needed": 3
+      },
+      {
+        "name": "form alert",
+        "ratio": 7.66,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
+        "needed": 4.5
+      }
+    ],
+    "login-dark-1440-empty": [
+      {
+        "name": "heading",
+        "ratio": 13.7,
+        "needed": 3
+      },
+      {
+        "name": "subtitle",
+        "ratio": 9.1,
+        "needed": 4.5
+      },
+      {
+        "name": "email label",
+        "ratio": 13.7,
+        "needed": 4.5
+      },
+      {
+        "name": "remember me",
+        "ratio": 13.7,
+        "needed": 4.5
+      },
+      {
+        "name": "forgot password",
+        "ratio": 6.9,
+        "needed": 4.5
+      },
+      {
+        "name": "footer text",
+        "ratio": 9.1,
+        "needed": 4.5
+      },
+      {
+        "name": "create account link",
+        "ratio": 6.9,
+        "needed": 4.5
+      },
+      {
+        "name": "log in button",
+        "ratio": 7.67,
+        "needed": 4.5
+      },
+      {
+        "name": "brand name",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "brand mark",
+        "ratio": 7.67,
+        "needed": 3
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
+        "needed": 4.5
+      }
+    ],
+    "login-dark-1440-errors": [
+      {
+        "name": "heading",
+        "ratio": 13.7,
+        "needed": 3
+      },
+      {
+        "name": "subtitle",
+        "ratio": 9.1,
+        "needed": 4.5
+      },
+      {
+        "name": "email label",
+        "ratio": 13.7,
+        "needed": 4.5
+      },
+      {
+        "name": "remember me",
+        "ratio": 13.7,
+        "needed": 4.5
+      },
+      {
+        "name": "forgot password",
+        "ratio": 6.9,
+        "needed": 4.5
+      },
+      {
+        "name": "footer text",
+        "ratio": 9.1,
+        "needed": 4.5
+      },
+      {
+        "name": "create account link",
+        "ratio": 6.9,
+        "needed": 4.5
+      },
+      {
+        "name": "log in button",
+        "ratio": 9.81,
+        "needed": 4.5
+      },
+      {
+        "name": "brand name",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "brand mark",
+        "ratio": 7.67,
+        "needed": 3
+      },
+      {
+        "name": "field error",
+        "ratio": 9.34,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
+        "needed": 4.5
+      }
+    ],
+    "login-dark-1440-invalid": [
+      {
+        "name": "heading",
+        "ratio": 13.7,
+        "needed": 3
+      },
+      {
+        "name": "subtitle",
+        "ratio": 9.1,
+        "needed": 4.5
+      },
+      {
+        "name": "email label",
+        "ratio": 13.7,
+        "needed": 4.5
+      },
+      {
+        "name": "remember me",
+        "ratio": 13.7,
+        "needed": 4.5
+      },
+      {
+        "name": "forgot password",
+        "ratio": 6.9,
+        "needed": 4.5
+      },
+      {
+        "name": "footer text",
+        "ratio": 9.1,
+        "needed": 4.5
+      },
+      {
+        "name": "create account link",
+        "ratio": 6.9,
+        "needed": 4.5
+      },
+      {
+        "name": "log in button",
+        "ratio": 7.67,
+        "needed": 4.5
+      },
+      {
+        "name": "brand name",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "brand mark",
+        "ratio": 7.67,
+        "needed": 3
+      },
+      {
+        "name": "form alert",
+        "ratio": 7.66,
+        "needed": 4.5
+      },
+      {
+        "name": "back to home",
+        "ratio": 17.65,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan title",
+        "ratio": 17.65,
+        "needed": 3
+      },
+      {
+        "name": "slogan eyebrow",
+        "ratio": 11.41,
+        "needed": 4.5
+      },
+      {
+        "name": "slogan text",
+        "ratio": 14.52,
+        "needed": 4.5
+      }
+    ]
+  },
+  "layout": {
+    "login-light-390-empty": {
+      "overflow": 0,
+      "cardHeight": 531,
+      "pageHeight": 900,
+      "baselineGap": 0,
+      "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+      "fontLoaded": true
+    },
+    "login-light-390-errors": {
+      "overflow": 0,
+      "cardHeight": 531,
+      "pageHeight": 900,
+      "baselineGap": 0,
+      "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+      "fontLoaded": true
+    },
+    "login-light-390-invalid": {
+      "overflow": 0,
+      "cardHeight": 612,
+      "pageHeight": 914,
+      "baselineGap": 0,
+      "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+      "fontLoaded": true
+    },
+    "login-light-768-empty": {
+      "overflow": 0,
+      "cardHeight": 526,
+      "pageHeight": 900,
+      "baselineGap": 0,
+      "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+      "fontLoaded": true
+    },
+    "login-light-768-errors": {
+      "overflow": 0,
+      "cardHeight": 526,
+      "pageHeight": 900,
+      "baselineGap": 0,
+      "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+      "fontLoaded": true
+    },
+    "login-light-768-invalid": {
+      "overflow": 0,
+      "cardHeight": 588,
+      "pageHeight": 960,
+      "baselineGap": 0,
+      "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+      "fontLoaded": true
+    },
+    "login-light-1440-empty": {
+      "overflow": 0,
+      "cardHeight": 534,
+      "pageHeight": 900,
+      "baselineGap": 0,
+      "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+      "fontLoaded": true
+    },
+    "login-light-1440-errors": {
+      "overflow": 0,
+      "cardHeight": 534,
+      "pageHeight": 900,
+      "baselineGap": 0,
+      "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+      "fontLoaded": true
+    },
+    "login-light-1440-invalid": {
+      "overflow": 0,
+      "cardHeight": 615,
+      "pageHeight": 900,
+      "baselineGap": 0,
+      "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+      "fontLoaded": true
+    },
+    "login-dark-390-empty": {
+      "overflow": 0,
+      "cardHeight": 531,
+      "pageHeight": 900,
+      "baselineGap": 0,
+      "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+      "fontLoaded": true
+    },
+    "login-dark-390-errors": {
+      "overflow": 0,
+      "cardHeight": 531,
+      "pageHeight": 900,
+      "baselineGap": 0,
+      "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+      "fontLoaded": true
+    },
+    "login-dark-390-invalid": {
+      "overflow": 0,
+      "cardHeight": 612,
+      "pageHeight": 914,
+      "baselineGap": 0,
+      "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+      "fontLoaded": true
+    },
+    "login-dark-768-empty": {
+      "overflow": 0,
+      "cardHeight": 526,
+      "pageHeight": 900,
+      "baselineGap": 0,
+      "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+      "fontLoaded": true
+    },
+    "login-dark-768-errors": {
+      "overflow": 0,
+      "cardHeight": 526,
+      "pageHeight": 900,
+      "baselineGap": 0,
+      "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+      "fontLoaded": true
+    },
+    "login-dark-768-invalid": {
+      "overflow": 0,
+      "cardHeight": 588,
+      "pageHeight": 960,
+      "baselineGap": 0,
+      "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+      "fontLoaded": true
+    },
+    "login-dark-1440-empty": {
+      "overflow": 0,
+      "cardHeight": 534,
+      "pageHeight": 900,
+      "baselineGap": 0,
+      "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+      "fontLoaded": true
+    },
+    "login-dark-1440-errors": {
+      "overflow": 0,
+      "cardHeight": 534,
+      "pageHeight": 900,
+      "baselineGap": 0,
+      "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+      "fontLoaded": true
+    },
+    "login-dark-1440-invalid": {
+      "overflow": 0,
+      "cardHeight": 615,
+      "pageHeight": 900,
+      "baselineGap": 0,
+      "headingFont": "\"Be Vietnam Pro\", Arial, \"Helvetica Neue\", Helvetica, sans-serif",
+      "fontLoaded": true
+    }
+  },
+  "focus": {
+    "light-390": {
+      "theme switch": true,
+      "email field": true,
+      "show password": true,
+      "log in button": true
+    },
+    "light-768": {
+      "theme switch": true,
+      "email field": true,
+      "show password": true,
+      "log in button": true
+    },
+    "light-1440": {
+      "theme switch": true,
+      "email field": true,
+      "show password": true,
+      "log in button": true
+    },
+    "dark-390": {
+      "theme switch": true,
+      "email field": true,
+      "show password": true,
+      "log in button": true
+    },
+    "dark-768": {
+      "theme switch": true,
+      "email field": true,
+      "show password": true,
+      "log in button": true
+    },
+    "dark-1440": {
+      "theme switch": true,
+      "email field": true,
+      "show password": true,
+      "log in button": true
+    }
+  },
+  "login_flow": "/member",
+  "failures": []
+}
