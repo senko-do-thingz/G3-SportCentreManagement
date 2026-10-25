@@ -106,9 +106,22 @@ export function memberLine(fullName: string | null | undefined, memberCode: stri
  */
 export const AMOUNT_MISMATCH_NOTE = 'Amount mismatch:'
 
+/**
+ * Strict pattern matching the machine-generated mismatch segment written by BE-18:
+ * "Amount mismatch: received <amount>, expected <amount> by <method>..."
+ * Must be at the start of notes or preceded by a segment separator (" | ").
+ * This contract prevents arbitrary free text containing "Amount mismatch:" from misclassifying records.
+ */
+export const AMOUNT_MISMATCH_PATTERN = /(?:^|\s*\|\s*)Amount mismatch:\s+received\s+\d+/i
+
+export function hasAmountMismatchNote(notes?: string | null): boolean {
+  if (!notes) return false
+  return AMOUNT_MISMATCH_PATTERN.test(notes)
+}
+
 /** A pending payment with a recorded amount mismatch needs review before anyone confirms it (UI-30). */
 export function needsReview(row: { status: string; notes?: string | null }): boolean {
-  return row.status === 'PENDING' && (row.notes ?? '').includes(AMOUNT_MISMATCH_NOTE)
+  return row.status === 'PENDING' && hasAmountMismatchNote(row.notes)
 }
 
 /** Badge of a queue row: Needs review for a pending payment with a mismatch, the payment status otherwise. */
