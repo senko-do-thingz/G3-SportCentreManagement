@@ -523,6 +523,22 @@ describe('UI-31 Verify payment and receipt', () => {
     await open('/reception/payments/41/receipt', { invoice: json(200, { ...INVOICE, paymentId: 99 }) })
     expect(await screen.findByText(/belongs to another payment/)).toBeInTheDocument()
     expect(screen.queryByText('INV-1041')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Print receipt' })).not.toBeInTheDocument()
+  })
+
+  it('UI-31 the receipt page rejects an invoice with null paymentId', async () => {
+    await open('/reception/payments/41/receipt', { invoice: json(200, { ...INVOICE, paymentId: null }) })
+    expect(await screen.findByText('Receipt not found')).toBeInTheDocument()
+    expect(screen.queryByText('INV-1041')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Print receipt' })).not.toBeInTheDocument()
+  })
+
+  it('UI-31 the receipt page rejects an invoice with missing paymentId', async () => {
+    const { paymentId: _, ...noPaymentId } = INVOICE
+    await open('/reception/payments/41/receipt', { invoice: json(200, noPaymentId) })
+    expect(await screen.findByText('Receipt not found')).toBeInTheDocument()
+    expect(screen.queryByText('INV-1041')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Print receipt' })).not.toBeInTheDocument()
   })
 
   it('UI-31 a cancelled invoice cannot be printed and missing amounts are not invented', async () => {
