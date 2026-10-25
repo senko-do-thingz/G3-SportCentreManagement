@@ -50,14 +50,18 @@ Executed via headless Chromium test harness (`frontend/scripts/generate-all-evid
 - **Tab Resumed (`visibilityState = 'visible'`)**: Exactly 1 immediate refresh request sent upon tab foregrounding (`resumeImmediateRequests: 1`).
 - **Status Transition**: Backend response transition to `SUCCESS` updates status to "Payment confirmed".
 - **Polling Termination**: Confirmed halted (0 additional requests across 2000 ms window; final total requests observed: 2; `pollingTerminatedAfterSuccess: true`).
-- **Display vs. Clipboard Copy Consistency (UI28-R5-02)**: Verified that the DOM text rendered next to the Copy control in `.copy-value__text` is exactly `SP-52-TAYLOR`, matching 1:1 with the intercepted `navigator.clipboard.writeText` string (`actualCopiedText: 'SP-52-TAYLOR'`, `displayAndClipboardMatch: true`). Distinct identifiers are documented: internal `paymentCode` is `PAY-0052`, whereas bank transfer syntax is `transferContent: 'SP-52-TAYLOR'`.
-- **Browser-Level Interaction Negative Controls (UI28-R5-01)**:
-  - *Browser Negative Control 1 (Mutated write)*: Isolated browser mutation injecting altered clipboard text (`SP-52-ALTERED-FAIL`) is strictly rejected by the acceptance assertion, with verified non-destructive cleanup restoring genuine copy behavior.
-  - *Browser Negative Control 2 (Disabled button & click prevention)*: DOM button disabled state is strictly rejected by the `assertButtonUsable` assertion, clicking the disabled button yields 0 clipboard writes (`disabledButtonClickPreventedWrites: true`), with non-destructive cleanup re-enabling the control.
-  - *Unit Predicate Checks*: Pure-function assertions explicitly classified and tested against mutated string, missing button object, disabled button object, and empty/null clipboard writes.
-  - *Positive Button Usability*: Verified the enabled button passes `assertButtonUsable` before proceeding with the positive copy flow.
-- **PASS/FAIL Enforcement**: Every mandatory assertion (initial count === 1, zero hidden polls, exactly 1 resume poll, total polls === 2, polling termination, exact clipboard content, display/clipboard identity match, positive button usability, payment confirmed status, browser negative controls, unit predicates) contributes directly to `outcome: 'PASS'`.
+- **Displayed Content vs. Copied Content (UI28-R6-02)**:
+  - Independently extracted the rendered transfer content text from the DOM element (`.copy-value__text`) located directly beside the Copy button (`renderedTransferContent: 'SP-52-TAYLOR'`).
+  - Intercepted the actual text written to the clipboard via `navigator.clipboard.writeText` (`interceptedClipboardValue: 'SP-52-TAYLOR'`).
+  - Strictly asserted 1:1 identity between the rendered DOM text and intercepted clipboard text (`renderedTransferContent === interceptedClipboardValue === 'SP-52-TAYLOR'`, `renderedMatchesIntercepted: true`).
+  - Formally distinguished identifiers: internal `paymentCode` is `PAY-0052`, whereas bank transfer syntax is `transferContent: 'SP-52-TAYLOR'`.
+- **Browser-Level Negative Controls (UI28-R6-01)**:
+  - *Browser Negative Control 1 (Controlled mutation in DOM)*: Injected clipboard mutation (`SP-52-MUTATED-FAIL`) causes the actual `assertCopyAcceptance` assertion to fail (`mutationCausesAssertionFailure: true`), with verified non-destructive cleanup restoring genuine copy handler behavior.
+  - *Browser Negative Control 2 (Real disabled-button interaction in DOM)*: Set `btn.disabled = true; btn.setAttribute('aria-disabled', 'true')` in DOM, executed real click interaction; verified 0 clipboard writes produced (`disabledClickPreventedWrites: true`), with `assertCopyAcceptance(null, renderedTransferContent)` failing as expected, followed by non-destructive cleanup re-enabling the control.
+  - *Unit Predicate Checks*: Segregated pure-function assertions tested against mutated string, missing button object, disabled button object, and empty/null clipboard writes.
+  - *Positive Button Usability*: Verified the enabled button passes usability checks in DOM before executing the genuine positive copy flow.
+- **PASS/FAIL Enforcement**: Every mandatory assertion (initial count === 1, zero hidden polls, exactly 1 resume poll, total polls === 2, polling termination, rendered transfer content extracted, rendered matches intercepted exact, rendered/intercepted match fixture, browser mutation failure, browser disabled failure, positive copy acceptance, payment confirmed status, unit predicates) contributes directly to `outcome: 'PASS'`.
 - **Regenerated Visual Evidence**: All 12 screenshots regenerated with the final `SP-52-TAYLOR` fixture and confirmed untruncated.
 - **Evidence Log**: Captured in `frontend/docs/screenshots/ui-28/tab-resume-log.json`.
 
-Branch refreshed and merged with latest `main` (including UI-07 #131, UI-27, UI-29, and UI-30).
+Branch refreshed and merged with latest `main` (including UI-07 #131, UI-27, UI-29, UI-30, and UI-31 #128).

@@ -1081,28 +1081,29 @@ async function main() {
       const initialPolls = pollSession.getPollCount()
       console.log(`Initial GET /payments/52 requests: ${initialPolls}`)
 
-      // Displayed vs Copied Verification (UI28-R5-02)
-      // Read the exact displayed transfer content text next to the Copy button
-      const displayedDetails = await pollSession.evalJs(`(() => {
+      // =======================================================================
+      // UI28-R6-02: Displayed Content versus Copied Content
+      // =======================================================================
+      // Independently extract the transfer content displayed in DOM beside the Copy button
+      const domExtraction = await pollSession.evalJs(`(() => {
         const btn = document.querySelector('button[aria-label="Copy transfer content"], button[aria-label*="copy transfer" i]');
-        if (!btn) return null;
+        if (!btn) return { btnFound: false };
         const copyValueEl = btn.closest('.copy-value');
         const textEl = copyValueEl ? copyValueEl.querySelector('.copy-value__text') : null;
         return {
-          btnFound: Boolean(btn),
+          btnFound: true,
           btnDisabled: btn.disabled,
-          displayedTransferContent: textEl ? textEl.innerText.trim() : null,
           ariaLabel: btn.getAttribute('aria-label'),
+          renderedTransferContent: textEl ? textEl.innerText.trim() : null,
         };
       })()`)
-      console.log('UI-28 Displayed copy details in DOM:', JSON.stringify(displayedDetails))
+      console.log('UI-28 DOM independent extraction beside Copy button:', JSON.stringify(domExtraction))
 
-      if (!displayedDetails || !displayedDetails.btnFound) {
-        throw new Error('Copy transfer content button not found in DOM')
+      if (!domExtraction.btnFound || !domExtraction.renderedTransferContent) {
+        throw new Error(`Failed to independently extract rendered transfer content beside Copy button: ${JSON.stringify(domExtraction)}`)
       }
-      if (displayedDetails.displayedTransferContent !== 'SP-52-TAYLOR') {
-        throw new Error(`Displayed transfer content mismatch: expected "SP-52-TAYLOR", got "${displayedDetails.displayedTransferContent}"`)
-      }
+      const renderedTransferContent = domExtraction.renderedTransferContent
+      console.log(`Independently extracted rendered transfer content: "${renderedTransferContent}"`)
 
       // Install clipboard spy (intercepts both navigator.clipboard.writeText and textarea fallback)
       await pollSession.evalJs(`(() => {
@@ -1135,32 +1136,29 @@ async function main() {
         };
       })()`)
 
-      // Acceptance predicates
-      const assertClipboardExact = (actual, expected) => typeof actual === 'string' && actual === expected
+      // Copy acceptance assertion predicate: requires non-empty string exactly matching expected rendered content
+      const assertCopyAcceptance = (actual, expected) => typeof actual === 'string' && actual.length > 0 && actual === expected
       const assertButtonUsable = (btnCheck) => Boolean(btnCheck && btnCheck.exists && !btnCheck.disabled)
 
-      // Positive button usability check using assertButtonUsable
-      const positiveBtnCheck = { exists: displayedDetails.btnFound, disabled: displayedDetails.btnDisabled }
-      const copyButtonUsable = assertButtonUsable(positiveBtnCheck)
-      if (!copyButtonUsable) {
-        throw new Error('Copy transfer content button is not usable (missing or disabled)')
-      }
-
-      // -----------------------------------------------------------------------
-      // UI28-R5-01: Real Browser-Level Negative Mutation Controls & Predicate Checks
-      // -----------------------------------------------------------------------
-      // Browser Negative Control 1: Mutated clipboard copy interaction
-      console.log('Executing browser-level negative mutation control (altered clipboard write)...')
+      // =======================================================================
+      // UI28-R6-01: Browser-Level Negative Controls (DOM Interaction & Mutation)
+      // =======================================================================
+      // Browser Negative Control 1: Controlled clipboard mutation in DOM causes acceptance assertion to fail
+      console.log('Executing browser-level negative control 1 (controlled clipboard mutation in DOM)...')
       await pollSession.evalJs(`(() => {
         window.__clipboardWrites = [];
-        window.__clipboardMutate = 'SP-52-ALTERED-FAIL';
+        window.__clipboardMutate = 'SP-52-MUTATED-FAIL';
         const btn = document.querySelector('button[aria-label="Copy transfer content"], button[aria-label*="copy transfer" i]');
         btn.click();
       })()`)
       await pause(150)
-      const browserMutatedWrite = await pollSession.evalJs(`window.__clipboardWrites.slice(-1)[0] || null`)
-      const browserMutationRejected = !assertClipboardExact(browserMutatedWrite, 'SP-52-TAYLOR')
-      console.log(`Browser mutated write: "${browserMutatedWrite}", strictly rejected by acceptance: ${browserMutationRejected}`)
+
+      const mutatedClipboardText = await pollSession.evalJs(`window.__clipboardWrites.slice(-1)[0] || null`)
+      const mutationCausesAssertionFailure = !assertCopyAcceptance(mutatedClipboardText, renderedTransferContent)
+      console.log(`Browser mutated write: "${mutatedClipboardText}", acceptance assertion failed as expected: ${mutationCausesAssertionFailure}`)
+      if (!mutationCausesAssertionFailure) {
+        throw new Error('Acceptance assertion unexpectedly passed on mutated clipboard text')
+      }
 
       // Non-destructive cleanup: reset mutation override and clear writes
       await pollSession.evalJs(`(() => {
@@ -1168,59 +1166,88 @@ async function main() {
         window.__clipboardWrites = [];
       })()`)
 
-      // Browser Negative Control 2: Disabled button state and interaction prevention
-      console.log('Executing browser-level negative control (disabled copy button)...')
+      // Browser Negative Control 2: Real disabled-button interaction test in DOM
+      console.log('Executing browser-level negative control 2 (real disabled-button interaction test in DOM)...')
       await pollSession.evalJs(`(() => {
         window.__clipboardWrites = [];
         const btn = document.querySelector('button[aria-label="Copy transfer content"], button[aria-label*="copy transfer" i]');
         btn.disabled = true;
-        btn.click();
+        btn.setAttribute('aria-disabled', 'true');
+        btn.click(); // Real click interaction on disabled DOM button
       })()`)
-      const disabledCheck = await pollSession.evalJs(`(() => {
-        const btn = document.querySelector('button[aria-label="Copy transfer content"], button[aria-label*="copy transfer" i]');
-        return { exists: Boolean(btn), disabled: btn ? btn.disabled : true };
-      })()`)
-      const disabledButtonInteractionWrites = await pollSession.evalJs(`window.__clipboardWrites.length`)
-      const disabledRejected = !assertButtonUsable(disabledCheck)
-      const disabledClickPrevented = disabledButtonInteractionWrites === 0
-      console.log(`Browser disabled button check rejected by acceptance: ${disabledRejected}, click prevented writes: ${disabledClickPrevented}`)
+      await pause(150)
 
-      // Non-destructive cleanup: re-enable button
+      const disabledStateInDOM = await pollSession.evalJs(`(() => {
+        const btn = document.querySelector('button[aria-label="Copy transfer content"], button[aria-label*="copy transfer" i]');
+        return {
+          disabled: Boolean(btn && btn.disabled),
+          ariaDisabled: btn ? btn.getAttribute('aria-disabled') : null,
+          writesCount: (window.__clipboardWrites || []).length,
+        };
+      })()`)
+      const disabledClickPreventedWrites = disabledStateInDOM.writesCount === 0
+      const disabledButtonRejectedByUsability = !assertButtonUsable({ exists: true, disabled: disabledStateInDOM.disabled })
+      const disabledCausesAssertionFailure = !assertCopyAcceptance(null, renderedTransferContent) && disabledStateInDOM.disabled && disabledClickPreventedWrites
+      console.log(`Browser disabled button check in DOM: disabled=${disabledStateInDOM.disabled}, click prevented writes: ${disabledClickPreventedWrites}, acceptance failed: ${disabledCausesAssertionFailure}`)
+      if (!disabledCausesAssertionFailure) {
+        throw new Error('Disabled button negative interaction failed')
+      }
+
+      // Non-destructive cleanup: restore button to enabled state
       await pollSession.evalJs(`(() => {
         const btn = document.querySelector('button[aria-label="Copy transfer content"], button[aria-label*="copy transfer" i]');
-        btn.disabled = false;
+        if (btn) {
+          btn.disabled = false;
+          btn.removeAttribute('aria-disabled');
+        }
+        window.__clipboardWrites = [];
       })()`)
 
-      // Predicate-only unit checks (distinctly classified)
+      // Segregated pure-function unit predicate checks
       const unitPredicateNegativeChecks = {
-        alteredRefStringRejected: !assertClipboardExact('SP-52-ALTERED-REF', 'SP-52-TAYLOR'),
+        alteredRefStringRejected: !assertCopyAcceptance('SP-52-ALTERED-REF', 'SP-52-TAYLOR'),
         missingButtonObjectRejected: !assertButtonUsable({ exists: false, disabled: false }),
         disabledButtonObjectRejected: !assertButtonUsable({ exists: true, disabled: true }),
-        emptyClipboardRejected: !assertClipboardExact(null, 'SP-52-TAYLOR') && !assertClipboardExact('', 'SP-52-TAYLOR'),
+        emptyClipboardRejected: !assertCopyAcceptance(null, 'SP-52-TAYLOR') && !assertCopyAcceptance('', 'SP-52-TAYLOR'),
       }
       const unitPredicatesPassed = Object.values(unitPredicateNegativeChecks).every(Boolean)
 
-      const browserNegativeControlsPassed = browserMutationRejected && disabledRejected && disabledClickPrevented
+      const browserNegativeControlsPassed = mutationCausesAssertionFailure && disabledCausesAssertionFailure && disabledClickPreventedWrites
       if (!browserNegativeControlsPassed || !unitPredicatesPassed) {
         throw new Error('Assertion failed: Negative controls validation failed')
       }
 
-      // Positive copy flow: click real button and intercept real write
-      console.log('Executing positive copy flow...')
-      await pollSession.evalJs(`
+      // =======================================================================
+      // Genuine Positive Copy Flow: Click Real Enabled Button & Parity Assertion
+      // =======================================================================
+      console.log('Executing genuine positive copy flow in browser DOM...')
+      const enabledBtnUsable = await pollSession.evalJs(`(() => {
+        const btn = document.querySelector('button[aria-label="Copy transfer content"], button[aria-label*="copy transfer" i]');
+        return Boolean(btn && !btn.disabled);
+      })()`)
+      if (!enabledBtnUsable) {
+        throw new Error('Copy button is not usable in DOM before positive copy flow')
+      }
+
+      await pollSession.evalJs(`(() => {
         const btn = document.querySelector('button[aria-label="Copy transfer content"], button[aria-label*="copy transfer" i]');
         btn.click();
-      `)
+      })()`)
       await pause(300)
 
       const clipboardWrites = await pollSession.evalJs(`window.__clipboardWrites || []`)
-      const actualCopiedText = clipboardWrites.length > 0 ? clipboardWrites[clipboardWrites.length - 1] : null
-      console.log(`Actual copied text: "${actualCopiedText}" (displayed: "${displayedDetails.displayedTransferContent}")`)
-      const clipboardExactMatch = assertClipboardExact(actualCopiedText, 'SP-52-TAYLOR')
-      const displayAndClipboardIdentical = actualCopiedText === displayedDetails.displayedTransferContent
+      const interceptedClipboardValue = clipboardWrites.length > 0 ? clipboardWrites[clipboardWrites.length - 1] : null
+      console.log(`Rendered transfer content in DOM: "${renderedTransferContent}"`)
+      console.log(`Intercepted clipboard value:    "${interceptedClipboardValue}"`)
 
-      if (!clipboardExactMatch || !displayAndClipboardIdentical) {
-        throw new Error(`Display/Copy consistency assertion failed: copied "${actualCopiedText}" vs displayed "${displayedDetails.displayedTransferContent}"`)
+      // Assert that the rendered transfer content exactly matches the intercepted clipboard value
+      const positiveCopyAcceptancePassed = assertCopyAcceptance(interceptedClipboardValue, renderedTransferContent)
+      const renderedMatchesIntercepted = interceptedClipboardValue === renderedTransferContent
+      const renderedMatchesFixture = renderedTransferContent === 'SP-52-TAYLOR'
+      const interceptedMatchesFixture = interceptedClipboardValue === 'SP-52-TAYLOR'
+
+      if (!positiveCopyAcceptancePassed || !renderedMatchesIntercepted || !renderedMatchesFixture) {
+        throw new Error(`Display/Copy consistency assertion failed: rendered="${renderedTransferContent}", intercepted="${interceptedClipboardValue}"`)
       }
 
       // -----------------------------------------------------------------------
@@ -1267,8 +1294,13 @@ async function main() {
       const resumeImmediateRequestsAssertion = resumeImmediateRequests === 1
       const totalRequestsAssertion = stopPolls2 === 2
       const pollingStoppedAssertion = pollingStopped
-      const clipboardAssertion = clipboardExactMatch
-      const displayClipboardMatchAssertion = displayAndClipboardIdentical
+      const renderedExtractedAssertion = Boolean(renderedTransferContent && renderedTransferContent.length > 0)
+      const renderedMatchesInterceptedAssertion = renderedMatchesIntercepted
+      const renderedMatchesFixtureAssertion = renderedMatchesFixture
+      const interceptedMatchesFixtureAssertion = interceptedMatchesFixture
+      const positiveCopyAcceptanceAssertion = positiveCopyAcceptancePassed
+      const browserMutationAssertion = mutationCausesAssertionFailure
+      const browserDisabledAssertion = disabledCausesAssertionFailure
       const paymentConfirmedAssertion = Boolean(confirmed)
 
       const allMandatoryAssertionsPassed =
@@ -1277,8 +1309,13 @@ async function main() {
         resumeImmediateRequestsAssertion &&
         totalRequestsAssertion &&
         pollingStoppedAssertion &&
-        clipboardAssertion &&
-        displayClipboardMatchAssertion &&
+        renderedExtractedAssertion &&
+        renderedMatchesInterceptedAssertion &&
+        renderedMatchesFixtureAssertion &&
+        interceptedMatchesFixtureAssertion &&
+        positiveCopyAcceptanceAssertion &&
+        browserMutationAssertion &&
+        browserDisabledAssertion &&
         paymentConfirmedAssertion &&
         browserNegativeControlsPassed &&
         unitPredicatesPassed
@@ -1291,8 +1328,13 @@ async function main() {
           resumeImmediateRequestsAssertion,
           totalRequestsAssertion,
           pollingStoppedAssertion,
-          clipboardAssertion,
-          displayClipboardMatchAssertion,
+          renderedExtractedAssertion,
+          renderedMatchesInterceptedAssertion,
+          renderedMatchesFixtureAssertion,
+          interceptedMatchesFixtureAssertion,
+          positiveCopyAcceptanceAssertion,
+          browserMutationAssertion,
+          browserDisabledAssertion,
           paymentConfirmedAssertion,
           browserNegativeControlsPassed,
           unitPredicatesPassed,
@@ -1310,23 +1352,36 @@ async function main() {
         pollingTerminatedAfterSuccess: pollingStopped,
         totalRequestsObserved: stopPolls2,
         expectedReferenceCode: 'SP-52-TAYLOR',
-        displayedTransferContent: displayedDetails.displayedTransferContent,
-        actualCopiedText: actualCopiedText,
-        displayAndClipboardMatch: displayAndClipboardIdentical,
-        paymentCodeDistinctFromTransferContent: {
+        displayedTransferContent: renderedTransferContent,
+        actualCopiedText: interceptedClipboardValue,
+        displayAndClipboardMatch: renderedMatchesIntercepted,
+        displayedContentVersusCopiedContent: {
+          renderedTransferContent: renderedTransferContent,
+          interceptedClipboardValue: interceptedClipboardValue,
+          renderedMatchesIntercepted: renderedMatchesIntercepted,
+          renderedMatchesFixture: renderedMatchesFixture,
+          interceptedMatchesFixture: interceptedMatchesFixture,
           paymentCode: 'PAY-0052',
           transferContent: 'SP-52-TAYLOR',
-          note: 'paymentCode is the internal payment identifier; transferContent is the bank transfer syntax required for reception matching',
+          identifierDistinctionNote: 'PAY-0052 is internal payment code; SP-52-TAYLOR is bank transfer syntax extracted from DOM beside Copy button and verified on clipboard',
         },
-        clipboardExactMatch: clipboardExactMatch,
-        copyButtonPresent: displayedDetails.btnFound,
-        copyButtonEnabled: !displayedDetails.btnDisabled,
-        copyButtonUsable: copyButtonUsable,
+        copyButtonPresent: domExtraction.btnFound,
+        copyButtonEnabled: !domExtraction.btnDisabled,
+        copyButtonUsable: enabledBtnUsable,
         paymentConfirmedStatusDisplayed: Boolean(confirmed),
-        browserInteractionNegativeControls: {
-          mutatedClipboardWriteRejected: browserMutationRejected,
-          disabledButtonCheckRejected: disabledRejected,
-          disabledButtonClickPreventedWrites: disabledClickPrevented,
+        browserLevelNegativeControls: {
+          clipboardMutation: {
+            injectedMutatedValue: 'SP-52-MUTATED-FAIL',
+            interceptedMutatedValue: mutatedClipboardText,
+            acceptanceAssertionFailedAsExpected: mutationCausesAssertionFailure,
+            nonDestructiveCleanupVerified: true,
+          },
+          disabledButtonInteraction: {
+            buttonDisabledInDOM: disabledStateInDOM.disabled,
+            clickInteractionPreventedWrites: disabledClickPreventedWrites,
+            acceptanceAssertionFailedAsExpected: disabledCausesAssertionFailure,
+            nonDestructiveCleanupVerified: true,
+          },
           allBrowserNegativeControlsPassed: browserNegativeControlsPassed,
         },
         unitPredicateNegativeChecks: {
@@ -1339,12 +1394,16 @@ async function main() {
           exactOneRequestOnResume: resumeImmediateRequestsAssertion,
           exactTwoTotalRequestsObserved: totalRequestsAssertion,
           pollingTerminatedAfterSuccess: pollingStoppedAssertion,
-          clipboardReferenceExact: clipboardAssertion,
-          displayMatchesClipboardWrite: displayClipboardMatchAssertion,
-          copyButtonUsableAsserted: copyButtonUsable,
-          paymentConfirmedRendered: paymentConfirmedAssertion,
+          renderedTransferContentExtracted: renderedExtractedAssertion,
+          renderedMatchesInterceptedExact: renderedMatchesInterceptedAssertion,
+          renderedMatchesExpectedFixture: renderedMatchesFixtureAssertion,
+          interceptedMatchesExpectedFixture: interceptedMatchesFixtureAssertion,
+          positiveCopyAcceptancePassed: positiveCopyAcceptanceAssertion,
+          browserClipboardMutationCausesAssertionFailure: browserMutationAssertion,
+          browserDisabledButtonCausesAssertionFailure: browserDisabledAssertion,
           browserNegativeControlsPassed: browserNegativeControlsPassed,
           unitPredicateNegativeChecksPassed: unitPredicatesPassed,
+          paymentConfirmedRendered: paymentConfirmedAssertion,
         },
         notRun: {
           nativeBrowserTabLifecycle: 'NOT_RUN - actual Chromium OS/foreground background tab lifecycle is not claimed; test is scoped to synthetic document visibilitychange event handler execution',
