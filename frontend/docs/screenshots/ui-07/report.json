@@ -1563,7 +1563,7 @@
   "signup_flow": "/member",
   "failures": [],
   "responsiveViewport720": {
-    "verifiedAt": "2026-10-25T11:50:08.503Z",
+    "verifiedAt": "2026-10-25T11:57:56.062Z",
     "scope": "720px responsive viewport equivalence (layout only): a 720 CSS px Chromium viewport, the width a 1440px desktop lays out to at 200% zoom. Not a native browser zoom operation; WCAG 1.4.10 conformance is not claimed.",
     "effectiveViewport": {
       "width": 720,
