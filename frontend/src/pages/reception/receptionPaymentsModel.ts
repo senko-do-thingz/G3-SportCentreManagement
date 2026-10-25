@@ -1,7 +1,7 @@
 import { ApiError } from '../../api/errors'
 import type { MemberCard, PackageRegistration } from '../../api/memberApi'
 import type { PaymentMethod } from '../../api/receptionApi'
-import type { ConfirmPaymentRequest, Refund } from '../../api/receptionPaymentsApi'
+import type { ConfirmPaymentRequest, Refund, StaffPayment } from '../../api/receptionPaymentsApi'
 import { humanizeCode } from '../../utils/format'
 import { isPaymentMethod, parseAmount } from './receptionModel'
 
@@ -306,6 +306,38 @@ export function mismatchAmounts(amountDue: number, typed: string, error?: unknow
     amountDue: due, amountReceived: received, outstanding: Math.round((due - received) * 100) / 100,
     ...(error instanceof ApiError ? { message: error.message } : {}),
   }
+}
+
+function moneyOf(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || String(value).trim() === '') return null
+  const amount = Number(value)
+  return Number.isFinite(amount) ? amount : null
+}
+
+function sameMoney(a: number, b: number): boolean {
+  return Math.abs(a - b) < 0.005
+}
+
+/**
+ * Why a SUCCESS payment must not be shown as a clean success (UI-31): the amount received or the
+ * invoice total differs from the amount due. Null when every known amount agrees. BE-18 rejects a
+ * mismatch, so this only catches inconsistent data, which must never look like a confirmed payment.
+ */
+export function confirmedAmountProblem(
+  payment: Pick<StaffPayment, 'amount' | 'amountReceived'>,
+  invoiceTotal?: number | string | null,
+): string | null {
+  const due = moneyOf(payment.amount)
+  if (due === null) return INVALID_AMOUNT_DUE_MESSAGE
+  const received = moneyOf(payment.amountReceived)
+  if (received !== null && !sameMoney(received, due)) {
+    return `The amount received (${formatPaymentMoney(received)}) differs from the amount due (${formatPaymentMoney(due)}). Do not hand over a receipt; ask a manager.`
+  }
+  const total = moneyOf(invoiceTotal)
+  if (total !== null && !sameMoney(total, due)) {
+    return `The invoice total (${formatPaymentMoney(total)}) differs from the amount due (${formatPaymentMoney(due)}). Do not hand over a receipt; ask a manager.`
+  }
+  return null
 }
 
 /* Payment Confirmed (F3-06): the card or package the payment activated */
