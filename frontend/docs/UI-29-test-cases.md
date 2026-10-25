@@ -43,8 +43,12 @@ S3-SingleReceipt) in the Home theme; A4 print. No API or backend change.
 
 | Scenario | Dimensions & Margin | Print Elements Included | Elements Hidden | Page Count |
 |----------|---------------------|-------------------------|-----------------|------------|
-| Short receipt (1 line item) | A4 (210 x 297 mm), 15 mm | Invoice number, issue date, member name, total due, status | `.payment-hero`, navbar, back button, print action | Exactly 1 page |
-| Long receipt (8 lines, long ref) | A4 (210 x 297 mm), 15 mm | All 8 lines, breakdown, subtotal, discount, total | `.payment-hero`, navbar, back button, print action | Exactly 1 page |
+| Short receipt (1 line item) | A4 (210 x 297 mm), 15 mm | Invoice #1054, issue date, member name, total due, status | `.payment-hero`, navbar, back button, print action | Exactly 1 page |
+| Long receipt (8 lines, long ref) | A4 (210 x 297 mm), 15 mm | Invoice #1055, 8 line items, breakdown, subtotal, discount, total | `.payment-hero`, navbar, back button, print action | Exactly 1 page |
 | Dark-to-print conversion | A4 standard | Forced high-contrast black/white print layout | Dark background, colorful shadows | Clean white page |
 
-Branch refreshed and merged on `feat/ui-27` and latest `main`.
+## Execution Route & PDF Provenance Note
+- **Receipt Route**: `/member/payments/receipts/:invoiceId` (`/member/payments/receipts/1054` for single-item and `/member/payments/receipts/1055` for 8-item long receipt).
+- **Page Count & Content Assertions**: Executed via Chromium CDP `Page.printToPDF` (`paperWidth: 8.27`, `paperHeight: 11.69`, `preferCSSPageSize: true`). Both `receipt-short-a4.pdf` and `receipt-long-a4.pdf` confirm `1 page(s)` with valid invoice totals, customer details, zero 404/403 screens, and print stylesheet hiding navbar and action buttons.
+
+Branch refreshed and merged on `feat/ui-28` and latest `main`.
