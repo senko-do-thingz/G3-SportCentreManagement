@@ -1,5 +1,5 @@
 {
-  "executedAt": "2026-10-25T13:18:18.459Z",
+  "executedAt": "2026-10-25T13:22:00.651Z",
   "testCase": "TC-10",
   "testExecutionType": "synthetic-visibilitychange-event-harness",
   "scopeNote": "Synthetic visibilitychange event handler execution in DOM. Actual OS/Chromium background tab throttling is marked NOT_RUN.",
