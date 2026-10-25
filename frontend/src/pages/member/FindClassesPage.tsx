@@ -7,7 +7,8 @@ import { BrowseError } from './BrowseError'
 import { MemberScheduleNav } from './MemberScheduleNav'
 import { SessionCard } from './SessionCard'
 import { browseToday } from './memberScheduleDates'
-import { sportImageFor } from './sportImages'
+import { Photo } from '../../media/Photo'
+import { sportPhotoFor } from './sportImages'
 import { BROWSE_FORMATS, BROWSE_LEVELS, browseFilters, browseRangeError, updateBrowseParams } from './scheduleFilters'
 import { useMemberResource } from './useMemberResource'
 
@@ -22,7 +23,7 @@ function SportPicker({ sports, selected, onChange }: { sports: Sport[]; selected
         <span>All sports</span>
       </button>
       {sports.map((sport) => <button type="button" className={`class-discovery__sport-choice${selected === sport.id ? ' is-selected' : ''}`} aria-pressed={selected === sport.id} key={sport.id} onClick={() => onChange(String(sport.id))}>
-        <img src={sportImageFor(sport.name)} alt="" loading="lazy" />
+        <Photo {...sportPhotoFor(sport.name, 480)} alt="" sizes="160px" width="480" height="320" loading="lazy" />
         <span>{sport.name}</span>
       </button>)}
     </div>
@@ -73,7 +74,7 @@ export function FindClassesPage() {
         <p>Find your sport, choose your level, and discover a session that fits your schedule.</p>
       </div>
       <div className="class-discovery__hero-art" aria-hidden="true">
-        {sportRows.slice(0, 3).map((sport) => <img src={sportImageFor(sport.name)} alt="" key={sport.id} />)}
+        {sportRows.slice(0, 3).map((sport) => <Photo {...sportPhotoFor(sport.name, 480)} alt="" key={sport.id} sizes="170px" width="480" height="320" />)}
       </div>
     </section>
     <Card className="class-discovery__filter-card" title="Find your next session">

@@ -70,7 +70,7 @@ describe('Home account navigation', () => {
     await user.click(screen.getByRole('button', { name: 'Log out' }))
     await screen.findByRole('heading', { name: 'Welcome back' })
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark')
-    expect(screen.getByLabelText('Appearance')).toHaveValue('dark')
+    expect(screen.getByRole('button', { name: 'Switch to light mode' })).toBeInTheDocument()
     expect(tokenStorage.hasSession()).toBe(false)
   })
 
