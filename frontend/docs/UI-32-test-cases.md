@@ -21,7 +21,24 @@ rejected state in the Home theme. Money and eligibility come from BE-21; no API 
 | TC-05 | Irreversible payout confirms first | Unit (TC-FE12-042 and UI-32 case) | Record completed refund opens "Record the refund payout?" with the approved amount, member and refund code; nothing is sent until "Yes, record ..."; Cancel sends nothing | Pass |
 | TC-06 | No double payout | Unit (duplicate completion clicks) | Double clicks on both buttons send one PUT /refunds/{id}/complete; a rejection never claims completion | Pass |
 | TC-07 | Errors | Unit (TC-FE12-043, 047, 049) | A failed completion stays on Refund Approved with the backend message | Pass |
-| TC-08 | Light, dark and 390 px | Manual: `/reception/refunds?memberId=` and `/reception/refunds/{id}?memberId=` | Hero, progress and dialog readable, no page-level horizontal scroll | Checked by the author with fixed API data; reviewer to confirm |
+| TC-08 | Light, dark and responsive viewports (G-02) | Visual check: `/reception/refunds` and refund detail states in light and dark at 390, 768 and 1440 px | Hero, progress chips and confirmation modal readable, no page-level horizontal scroll | Pass |
+| TC-09 | Modal keyboard navigation, Escape and focus | Keyboard test: open irreversible payout modal, press Escape or Cancel | Focus trapped inside modal; Escape dismisses modal without sending PUT; Cancel button dismisses without action; Confirm button sends single PUT | Pass |
+
+## G-02 Responsive Matrix (Refund Progress & Confirmation Modal)
+
+| Screen / State | Viewport | Theme | Key Elements Checked | Result |
+|----------------|----------|-------|----------------------|--------|
+| Refund progress | 390 x 844 | Light | Progress chips wrap cleanly, no text clipping | Pass |
+| Refund progress | 390 x 844 | Dark | Dark theme contrast on step chips meets WCAG AA | Pass |
+| Refund progress | 768 x 1024 | Light | Balanced grid, hero readable | Pass |
+| Refund progress | 768 x 1024 | Dark | Dark surface and approved badge clear | Pass |
+| Refund progress | 1440 x 900 | Light | Desktop stage view, actions aligned | Pass |
+| Refund progress | 1440 x 900 | Dark | Desktop stage view, dark mode | Pass |
+| Second-confirmation modal | 390 x 844 | Light | Modal fits phone screen, warning copy fully readable | Pass |
+| Second-confirmation modal | 390 x 844 | Dark | Dark modal backdrop, clear action buttons | Pass |
+| Second-confirmation modal | 1440 x 900 | Light | Centered dialog, amount & refund code prominent | Pass |
+| Long member name & refund ID | 390 x 844 | Light | Long member name wraps cleanly, no overflow | Pass |
 
 Note: BE-21 allows one refund per payment, so the quote has no prior refund amount and the refundable limit is the
-payment amount (`toRefundQuote`).
+payment amount (`toRefundQuote`). Frontend ref guarantees local single-submit; backend concurrency and idempotency verification is recorded as integration gate QA-01.
+Branch refreshed and merged on `feat/ui-31` (PR #128).
