@@ -36,9 +36,20 @@ rejected state in the Home theme. Money and eligibility come from BE-21; no API 
 | Refund progress | 1440 x 900 | Dark | Desktop stage view, dark mode | Pass |
 | Second-confirmation modal | 390 x 844 | Light | Modal fits phone screen, warning copy fully readable | Pass |
 | Second-confirmation modal | 390 x 844 | Dark | Dark modal backdrop, clear action buttons | Pass |
+| Second-confirmation modal | 768 x 1024 | Light | Tablet layout, confirmation dialog centered | Pass |
+| Second-confirmation modal | 768 x 1024 | Dark | High contrast modal on tablet dark mode | Pass |
 | Second-confirmation modal | 1440 x 900 | Light | Centered dialog, amount & refund code prominent | Pass |
+| Second-confirmation modal | 1440 x 900 | Dark | Desktop dark mode dialog | Pass |
 | Long member name & refund ID | 390 x 844 | Light | Long member name wraps cleanly, no overflow | Pass |
 
-Note: BE-21 allows one refund per payment, so the quote has no prior refund amount and the refundable limit is the
-payment amount (`toRefundQuote`). Frontend ref guarantees local single-submit; backend concurrency and idempotency verification is recorded as integration gate QA-01.
+## TC-09 Modal Keyboard & Irreversible Payout Execution Provenance
+
+Executed via headless Chromium test harness (`frontend/scripts/generate-all-evidence.mjs --only ui-32`):
+- **Modal Opening**: Triggered on approved refund #11 by checking completion acknowledgement and clicking "Record completed refund". Dialog opens with approved amount (450,000 đ), member name, and refund code (`REF-0011`).
+- **Dismissed by Escape**: `Escape` key event dispatched on document closes modal without sending any network request (0 PUT requests observed).
+- **Dismissed by Cancel**: "Cancel" button click dismisses modal without action (0 PUT requests observed).
+- **Single PUT on Confirmation**: "Yes, record refund payout" button click initiates exactly 1 `PUT /refunds/11/complete` request.
+- **Evidence Log**: Captured in `frontend/docs/screenshots/ui-32/modal-interaction-log.json`.
+
+Note: BE-21 allows one refund per payment, so the quote has no prior refund amount and the refundable limit is the payment amount (`toRefundQuote`). Frontend ref guarantees local single-submit; backend concurrency and idempotency verification is recorded as integration gate QA-01.
 Branch refreshed and merged on `feat/ui-31` (PR #128).

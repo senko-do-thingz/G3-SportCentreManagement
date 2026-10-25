@@ -1,0 +1,11 @@
+{
+  "executedAt": "2026-10-25T07:09:06.624Z",
+  "testCase": "TC-09",
+  "modalOpenedSuccessfully": true,
+  "dismissedByEscapeWithoutPut": true,
+  "dismissedByCancelWithoutPut": true,
+  "singlePutSentOnExplicitConfirm": true,
+  "approvedAmount": "450,000 đ",
+  "refundCode": "REF-0011",
+  "outcome": "PASS"
+}
