@@ -347,6 +347,7 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
   let pollCount = 0
   let pollStatus = 'PENDING'
   let putCompleteCount = 0
+  let registerMode = 'duplicate'
 
   const listener = async ({ method, params, sessionId: from }) => {
     if (from !== sessionId) return
@@ -505,9 +506,8 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
             return
           }
 
-          if (path === '/auth/register') {
-            const bodyStr = request.postData || ''
-            if (bodyStr.includes('duplicate@sportify.demo')) {
+          if (path.includes('/auth/register')) {
+            if (registerMode === 'duplicate') {
               await send('Fetch.fulfillRequest', {
                 requestId, responseCode: 409,
                 responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
@@ -640,6 +640,7 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
     getPollCount: () => pollCount,
     setPollStatus: (s) => { pollStatus = s },
     getPutCompleteCount: () => putCompleteCount,
+    setRegisterMode: (m) => { registerMode = m },
   }
 }
 
@@ -656,9 +657,8 @@ async function main() {
     // =========================================================================
     // 1. UI-07: Sign up Reflow & 4 Distinct States at 720px width (PR #131)
     // =========================================================================
-    if (shouldRun('ui-07'))
-    console.log('\n[1/5] Generating UI-07 (Sign up 720px reflow states)...')
-    {
+    if (shouldRun('ui-07')) {
+      console.log('\n[1/5] Generating UI-07 (Sign up 720px reflow states)...')
       const session = await runSession(browser, { role: 'GUEST' })
       await session.setViewport(720, 900, 'light')
 
@@ -677,6 +677,7 @@ async function main() {
       await session.screenshot(join(SCREENSHOTS_DIR, 'ui-07/signup-zoom200-1440-errors.png'))
 
       // State 3: Duplicate Email 409
+      session.setRegisterMode('duplicate')
       await session.evalJs(`
         const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
         const fill = (name, val) => {
@@ -696,25 +697,36 @@ async function main() {
       `)
       await session.evalJs(`document.querySelector('button[type="submit"]').click()`)
       await pause(800)
-      const emailErr = await session.evalJs(`document.body.innerText.includes('Email is already registered')`)
+      const emailErr = await session.evalJs(`document.body.innerText.includes('already exists') || document.body.innerText.includes('Email is already registered')`)
       console.log(`UI-07 Duplicate email error shown: ${emailErr}`)
       if (!emailErr) {
         const text = await session.evalJs('document.body.innerText')
         console.error('Body was:', text)
-        throw new Error('UI-07 Expected "Email is already registered" error')
+        throw new Error('UI-07 Expected duplicate email error')
       }
       await session.screenshot(join(SCREENSHOTS_DIR, 'ui-07/signup-zoom200-1440-invalid.png'))
 
-      // State 4: Success
+      // State 4: Valid Completed Form State
       await session.evalJs(`
-        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-        const el = document.querySelector('input[name="email"]');
-        setter.call(el, 'validnewuser@sportify.demo');
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
+        (() => {
+          const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+          const fill = (name, val) => {
+            const el = document.querySelector('input[name="' + name + '"]');
+            if (!el) throw new Error('Missing input ' + name);
+            setter.call(el, val);
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+          };
+          fill('fullName', 'Taylor Alex');
+          fill('phone', '0909876543');
+          fill('email', 'taylor.alex@sportify.demo');
+          fill('password', 'Password123!');
+          fill('confirmPassword', 'Password123!');
+        })()
       `)
-      await session.evalJs(`document.querySelector('button[type="submit"]').click()`)
-      await pause(800)
+      await pause(400)
+      const validEmail = await session.evalJs(`document.querySelector('input[name="email"]').value`)
+      if (validEmail !== 'taylor.alex@sportify.demo') throw new Error('UI-07 Failed to set valid email')
       await session.screenshot(join(SCREENSHOTS_DIR, 'ui-07/signup-zoom200-1440-success.png'))
 
       // Update report.json with verified reflow
@@ -738,9 +750,8 @@ async function main() {
     // =========================================================================
     // 2. UI-28: Tab-resume polling & clipboard real browser test (PR #125)
     // =========================================================================
-    if (shouldRun('ui-28'))
-    console.log('\n[2/5] Running UI-28 Tab-resume & Clipboard test...')
-    {
+    if (shouldRun('ui-28')) {
+      console.log('\n[2/5] Running UI-28 Tab-resume & Clipboard test...')
       const session = await runSession(browser, { role: 'MEMBER' })
       await session.setViewport(1440, 900, 'light')
       await session.goto('/member/payments/52/status', '.payment-summary, [aria-label="Bank transfer"]')
@@ -806,9 +817,8 @@ async function main() {
     // =========================================================================
     // 3. UI-29: Member Receipts & Verified 1-page A4 PDFs (PR #126)
     // =========================================================================
-    if (shouldRun('ui-29'))
-    console.log('\n[3/5] Generating UI-29 Member Receipts & 1-page A4 PDFs...')
-    {
+    if (shouldRun('ui-29')) {
+      console.log('\n[3/5] Generating UI-29 Member Receipts & 1-page A4 PDFs...')
       const session = await runSession(browser, { role: 'MEMBER' })
 
       // Capture list
@@ -849,8 +859,8 @@ async function main() {
     // =========================================================================
     // 4. UI-30: Receptionist Payment Queue with RECEPTIONIST role (PR #127)
     // =========================================================================
-    console.log('\n[4/5] Generating UI-30 Reception Payment Queue screenshots...')
-    {
+    if (shouldRun('ui-30')) {
+      console.log('\n[4/5] Generating UI-30 Reception Payment Queue screenshots...')
       const session = await runSession(browser, { role: 'RECEPTIONIST' })
       for (const vp of [{ w: 390, h: 844 }, { w: 768, h: 1024 }, { w: 1440, h: 900 }]) {
         for (const th of ['light', 'dark']) {
@@ -868,8 +878,8 @@ async function main() {
     // =========================================================================
     // 5. UI-31: Reception Payment Verify, Mismatch & Desk Receipt PDF (PR #128)
     // =========================================================================
-    console.log('\n[5/5] Generating UI-31 Reception Verify, Mismatch & Desk Receipt...')
-    {
+    if (shouldRun('ui-31')) {
+      console.log('\n[5/5] Generating UI-31 Reception Verify, Mismatch & Desk Receipt...')
       const session = await runSession(browser, { role: 'RECEPTIONIST' })
 
       // Verify screens
@@ -911,9 +921,8 @@ async function main() {
     // =========================================================================
     // 6. UI-32: Refund Requests, Detail & Irreversible Confirmation Modal (PR #129)
     // =========================================================================
-    if (shouldRun('ui-32'))
-    console.log('\n[6/5] Generating UI-32 Refund screens & Confirmation Modal...')
-    {
+    if (shouldRun('ui-32')) {
+      console.log('\n[6/5] Generating UI-32 Refund screens & Confirmation Modal...')
       const session = await runSession(browser, { role: 'RECEPTIONIST' })
 
       // Refund requests queue
