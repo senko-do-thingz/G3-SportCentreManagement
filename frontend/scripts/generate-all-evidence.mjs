@@ -348,6 +348,7 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
   let pollStatus = 'PENDING'
   let putCompleteCount = 0
   let registerMode = 'duplicate'
+  let isRegistered = false
 
   const listener = async ({ method, params, sessionId: from }) => {
     if (from !== sessionId) return
@@ -367,7 +368,7 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
               })
               return
             }
-            if (role === 'MEMBER') {
+            if (role === 'MEMBER' || isRegistered) {
               await send('Fetch.fulfillRequest', {
                 requestId, responseCode: 200,
                 responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
@@ -518,6 +519,7 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
               })
               return
             }
+            isRegistered = true
             await send('Fetch.fulfillRequest', {
               requestId, responseCode: 200,
               responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
@@ -640,7 +642,10 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
     getPollCount: () => pollCount,
     setPollStatus: (s) => { pollStatus = s },
     getPutCompleteCount: () => putCompleteCount,
-    setRegisterMode: (m) => { registerMode = m },
+    setRegisterMode: (m) => {
+      registerMode = m
+      if (m === 'success') isRegistered = false
+    },
   }
 }
 
@@ -655,7 +660,7 @@ async function main() {
 
   try {
     // =========================================================================
-    // 1. UI-07: Sign up Reflow & 4 Distinct States at 720px width (PR #131)
+    // 1. UI-07: Sign up Reflow & 5 Distinct States at 720px width (PR #131)
     // =========================================================================
     if (shouldRun('ui-07')) {
       console.log('\n[1/5] Generating UI-07 (Sign up 720px reflow states)...')
@@ -692,7 +697,7 @@ async function main() {
         fill('email', 'duplicate@sportify.demo');
         fill('password', 'Password123!');
         fill('confirmPassword', 'Password123!');
-        const lbl = document.querySelector('label.checkbox');
+        const lbl = document.querySelector('label.checkbox, input[name="acceptTerms"]');
         if (lbl) lbl.click();
       `)
       await session.evalJs(`document.querySelector('button[type="submit"]').click()`)
@@ -706,7 +711,7 @@ async function main() {
       }
       await session.screenshot(join(SCREENSHOTS_DIR, 'ui-07/signup-zoom200-1440-invalid.png'))
 
-      // State 4: Valid Completed Form State
+      // State 4: Valid Completed Form State (Pre-submit Snapshot)
       await session.evalJs(`
         (() => {
           const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
@@ -722,27 +727,139 @@ async function main() {
           fill('email', 'taylor.alex@sportify.demo');
           fill('password', 'Password123!');
           fill('confirmPassword', 'Password123!');
+          const cb = document.querySelector('input[name="acceptTerms"]');
+          if (cb && !cb.checked) {
+            cb.click();
+          }
         })()
       `)
       await pause(400)
       const validEmail = await session.evalJs(`document.querySelector('input[name="email"]').value`)
       if (validEmail !== 'taylor.alex@sportify.demo') throw new Error('UI-07 Failed to set valid email')
+
+      // Measure layout reflow at 720px viewport
+      const measuredScrollbar = await session.evalJs(`
+        document.documentElement.scrollWidth > document.documentElement.clientWidth ||
+        document.body.scrollWidth > document.body.clientWidth
+      `)
+      const measuredClippedCount = await session.evalJs(`
+        (() => {
+          let clipped = 0;
+          const elements = Array.from(document.querySelectorAll('label, input, button, h1, p, .auth-form__row, .password-rules'));
+          for (const el of elements) {
+            const rect = el.getBoundingClientRect();
+            if (rect.right > window.innerWidth || rect.left < 0) {
+              clipped++;
+            }
+          }
+          return clipped;
+        })()
+      `)
+      const measuredInputsStacked = await session.evalJs(`
+        (() => {
+          const inputs = Array.from(document.querySelectorAll('input:not([type="checkbox"])'));
+          for (let i = 0; i < inputs.length - 1; i++) {
+            const r1 = inputs[i].getBoundingClientRect();
+            const r2 = inputs[i+1].getBoundingClientRect();
+            if (r2.top < r1.bottom - 4 && r2.left >= r1.right - 4) {
+              return false;
+            }
+          }
+          return true;
+        })()
+      `)
+      const measuredKeyboardReachable = await session.evalJs(`
+        (() => {
+          const controls = Array.from(document.querySelectorAll('input, button, a[href]'));
+          for (const el of controls) {
+            el.focus();
+            if (document.activeElement !== el) return false;
+          }
+          return controls.length > 0;
+        })()
+      `)
+
+      console.log(`UI-07 Reflow measurements at 720px: scrollbar=${measuredScrollbar}, clipped=${measuredClippedCount}, stacked=${measuredInputsStacked}, keyboardReachable=${measuredKeyboardReachable}`)
+      if (measuredScrollbar) throw new Error('UI-07 Measured horizontal scrollbar at 720px reflow')
+      if (measuredClippedCount > 0) throw new Error(`UI-07 Measured ${measuredClippedCount} clipped elements`)
+      if (!measuredInputsStacked) throw new Error('UI-07 Inputs not stacked vertically at 720px reflow')
+      if (!measuredKeyboardReachable) throw new Error('UI-07 Controls not keyboard reachable')
+
+      // Save pre-submit valid filled snapshot (Finding UI07-R3-01)
+      await session.screenshot(join(SCREENSHOTS_DIR, 'ui-07/signup-zoom200-1440-valid-filled.png'))
+
+      // State 5: Submit and verify successful registration redirect to /member
+      console.log('Submitting valid form with mock registration success...')
+      session.setRegisterMode('success')
+      await session.evalJs(`document.querySelector('button[type="submit"]').click()`)
+      await pause(1500)
+
+      const postRegisterPath = await session.evalJs('window.location.pathname')
+      console.log(`Path after submit: ${postRegisterPath}`)
+      if (!postRegisterPath.startsWith('/member')) {
+        throw new Error(`UI-07 Expected navigation to /member, but got ${postRegisterPath}`)
+      }
+      // Save post-submit success redirect snapshot
       await session.screenshot(join(SCREENSHOTS_DIR, 'ui-07/signup-zoom200-1440-success.png'))
 
-      // Update report.json with verified reflow
-      const report = {
-        generatedAt: new Date().toISOString(),
-        zoom200: {
-          effectiveViewportWidth: 720,
-          breakpointMatched: 'max-width: 768px',
-          horizontalScrollbar: false,
-          clippedLabels: 0,
-          inputsStacked: true,
-          statesGenerated: ['empty', 'errors', 'invalid', 'success'],
-          tc15Status: 'PASS',
-        },
+      // Integrated report.json preserving historical baseline (Finding UI07-R3-03)
+      const cp = await import('child_process')
+      let integratedReport
+      try {
+        integratedReport = JSON.parse(cp.execSync('git show fc888e0~1:frontend/docs/screenshots/ui-07/report.json', { encoding: 'utf8' }))
+      } catch (e) {
+        console.warn('Could not read fc888e0~1 report.json, using fallback')
+        integratedReport = {
+          screens: [],
+          contrast: {},
+          layout: {},
+          focus: {},
+        }
       }
-      writeFileSync(join(SCREENSHOTS_DIR, 'ui-07/report.json'), JSON.stringify(report, null, 2))
+
+      const newScreens = [
+        'signup-zoom200-1440-empty',
+        'signup-zoom200-1440-errors',
+        'signup-zoom200-1440-invalid',
+        'signup-zoom200-1440-valid-filled',
+        'signup-zoom200-1440-success',
+      ]
+      for (const sc of newScreens) {
+        if (!integratedReport.screens.includes(sc)) {
+          integratedReport.screens.push(sc)
+        }
+      }
+
+      const allAssertionsPass = !measuredScrollbar && (measuredClippedCount === 0) && measuredInputsStacked && measuredKeyboardReachable && postRegisterPath.startsWith('/member')
+
+      integratedReport.reflowEquivalenceZoom200_Round3 = {
+        verifiedAt: new Date().toISOString(),
+        viewportEquivalenceNote: '720px viewport equivalence representing 1440px desktop display at 200% browser zoom reflow (WCAG 1.4.10)',
+        effectiveViewport: {
+          width: 720,
+          height: 900,
+          breakpointMatched: 'max-width: 768px',
+        },
+        measuredAssertions: {
+          horizontalScrollbarPresent: measuredScrollbar,
+          clippedElementsCount: measuredClippedCount,
+          inputsStackedVertically: measuredInputsStacked,
+          keyboardReachabilityVerified: measuredKeyboardReachable,
+          registrationFormFilled: validEmail === 'taylor.alex@sportify.demo',
+          registrationSubmitRedirectPath: postRegisterPath,
+          redirectedToMemberDashboard: postRegisterPath.startsWith('/member'),
+        },
+        statesVerified: [
+          { state: 'empty', file: 'signup-zoom200-1440-empty.png', route: '/register' },
+          { state: 'validation_errors', file: 'signup-zoom200-1440-errors.png', route: '/register', errorCount: errCount },
+          { state: 'duplicate_email_409', file: 'signup-zoom200-1440-invalid.png', route: '/register', duplicateErrorVisible: emailErr },
+          { state: 'valid_form_filled_pre_submit', file: 'signup-zoom200-1440-valid-filled.png', route: '/register' },
+          { state: 'registration_success_post_submit', file: 'signup-zoom200-1440-success.png', route: postRegisterPath },
+        ],
+        tc15Outcome: allAssertionsPass ? 'PASS' : 'FAIL',
+      }
+
+      writeFileSync(join(SCREENSHOTS_DIR, 'ui-07/report.json'), JSON.stringify(integratedReport, null, 2))
       await session.cleanup()
       console.log('UI-07 completed successfully!')
     }
