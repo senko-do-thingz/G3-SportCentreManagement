@@ -11,6 +11,14 @@
 - Log in and Sign up background: a credited Unsplash dunk photo by August Phlieger (HOME_PHOTOS.auth, Unsplash License, listed on /credits) with the player on the left replaces the Home hero photo, through Photo with a responsive srcset and a small bundled copy (src/assets/auth/auth-dunk.jpg, 640 x 960) as the offline fallback. The overlay is lighter over the player and stays dark behind the form, the slogan sits low on the left, and the phone and tablet band keeps the player in view. The owner's first photo had no findable source, so it is not used. The ui06/ui07 browser check sheets were made with the Home hero photo.
 - Synced with the reviewed UI-00 (#121) and UI-03 (#122) branches; the color baseline was regenerated and holds exactly the same colors.
 
+## 2026-10-24 - Member payment summary and single visit (UI-27)
+
+- Payment Summary (F3-01) and Single Visit Payment Summary (S3-Single) use a new shared PaymentHero in the Home theme (navy feature surface, gold eyebrow, uppercase title), built only from tokens; it is reused by the other payment and refund screens.
+- Amounts stay bound to GET /payments/{id}: the original price and discount rows are shown only when original - discount equals the amount charged, no original price is invented when the backend sends none, and a payment whose id differs from the link is not shown.
+- No false discount: the note mentions a card discount only when this payment has one, a single visit shows its visit date and never claims a card discount, and nothing is claimed while the paid item is unknown.
+- Tests in memberPayments.test.tsx; cases in frontend/docs/UI-27-test-cases.md. No API or backend changes.
+
+
 ## 2026-10-24 - Redesign Log in to the Home theme (UI-06)
 
 - Log in uses layout B: the Home hero photo (credited, responsive through Photo) fills the page under the Home overlay, with a compact Home header (brand, Back to Home, the same sun and moon switch as Home), the slogan on the left and the form card on the right. Below 960 px the photo becomes a band with the slogan above the card.
@@ -59,6 +67,7 @@
 - PR #122 review round 1: Photo remembers a failure per src, so a reused Photo requests its new photo after an earlier one failed, the fallback never loops and a caller's onError still runs; the hero video treats a missing or unknown network type as not fast; the page-load hook re-checks the ready state after adding its listener, so a load event fired before the effect is not missed. Regression tests fail on the previous code.
 - Provenance decision (UI-03 owner): the offline fallbacks in src/assets/home were cut from the design screenshots with no recorded source, so they are replaced with small copies of the credited Unsplash photos they stand in for (sports 240 x 160 from SPORT_PHOTO_IDS, hero 640 x 427 from HOME_PHOTOS.hero; about 112 KB in all). auth-hero.jpg stays a temporary exception with no new use until UI-07 deletes it. The Credits page says the fallbacks are copies of the credited photos.
 - Real-media evidence: scripts/ui03-real-media-check.mjs (Node and Chrome, no packages) shows Home and Find Classes with the real photos in light and dark at 390, 768, 1440 px and a 3x phone with no broken or upscaled image, layout shift at most 0.0272 (none from images) including a slow network and a blocked photo CDN, dark-theme Home and credits pixel identical to the merge base, and Home image bytes transferred down 82% at 390 px, 60% at 768 px, 54% at 1440 px and 18% on a 3x phone. Both runners use pinned packages and reproduction steps from the PR revision; media provenance is listed per file in media-guidelines.md.
+>>>>>>> origin/main
 
 ## 2026-10-23 - Verify guest authentication return navigation (UI-05)
 
