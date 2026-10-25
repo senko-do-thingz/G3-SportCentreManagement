@@ -1555,6 +1555,12 @@
       "create account button": true
     }
   },
+  "zoom200": {
+    "empty": { "overflow": 0, "cardHeight": 612, "noClipping": true },
+    "errors": { "overflow": 0, "cardHeight": 670, "noClipping": true },
+    "invalid": { "overflow": 0, "cardHeight": 690, "noClipping": true },
+    "success": { "status": "success", "flow": "/member", "overflow": 0 }
+  },
   "signup_flow": "/member",
   "failures": []
 }
