@@ -636,8 +636,23 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
     await browser.send('Target.disposeBrowserContext', { browserContextId })
   }
 
+  const pressTab = async ({ shift = false } = {}) => {
+    const modifiers = shift ? 8 : 0
+    const key = { key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9, modifiers }
+    await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key })
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', ...key })
+    await pause(60)
+  }
+
+  const pressKey = async (keyName, keyCode) => {
+    const key = { key: keyName, code: keyName, windowsVirtualKeyCode: keyCode, nativeVirtualKeyCode: keyCode }
+    await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key })
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', ...key })
+    await pause(60)
+  }
+
   return {
-    send, evalJs, setViewport, goto, screenshot, printPdf, cleanup,
+    send, evalJs, setViewport, goto, screenshot, printPdf, cleanup, pressTab, pressKey,
     getPollCount: () => pollCount,
     setPollStatus: (s) => { pollStatus = s },
     getPutCompleteCount: () => putCompleteCount,
@@ -1149,77 +1164,149 @@ async function main() {
         throw new Error('UI-32 long name modal exceeds viewport or has horizontal clipping at 390px')
       }
 
-      // Assert modal DOM content: role, amount, refund code, and member name
+      // Assert modal DOM content: role, amount, refund code, and member name strictly within dialog
       const modalDomDetails = await session.evalJs(`(() => {
         const dialog = document.querySelector('[role="dialog"]');
         if (!dialog) return null;
-        const title = dialog.querySelector('h2, h3, [class*="title"]')?.innerText || '';
-        const desc = dialog.querySelector('p, [id*="description"]')?.innerText || '';
-        const has450k = desc.includes('450.000') || desc.includes('450,000') || document.body.innerText.includes('450.000') || document.body.innerText.includes('450,000');
-        const hasRef11 = desc.includes('REF-0011') || title.includes('REF-0011') || document.body.innerText.includes('REF-0011');
-        const hasMember = desc.includes('Nguyen Thi Mai Linh') || document.body.innerText.includes('Nguyen Thi Mai Linh');
+        const titleEl = dialog.querySelector('h2, h3, [class*="title"]');
+        const descEl = dialog.querySelector('p, [id*="description"]');
+        const title = titleEl ? titleEl.innerText : '';
+        const desc = descEl ? descEl.innerText : '';
+        const dialogText = (title + ' ' + desc).trim();
+
+        const amountRegex = /450[.,]000(?:\s*(?:VND|đ))?/i;
+        const refundCodeRegex = /REF-[0-9]+/;
+        const memberRegex = /Nguyen Thi Mai Linh/;
+
+        const amountMatch = dialogText.match(amountRegex);
+        const refundCodeMatch = dialogText.match(refundCodeRegex);
+        const memberMatch = dialogText.match(memberRegex);
+
         return {
           role: dialog.getAttribute('role'),
           title,
           description: desc,
-          has450k,
-          hasRef11,
-          hasMember,
-          approvedAmountObserved: desc.match(/450[.,]000\s*(?:VND|đ)?/i)?.[0] || '450.000 VND',
-          refundCodeObserved: desc.match(/REF-\d+/)?.[0] || 'REF-0011',
-          memberObserved: hasMember ? 'Nguyen Thi Mai Linh (Corporate Member Group VIP)' : 'Nguyen Thi Mai Linh',
+          hasApprovedAmount: Boolean(amountMatch),
+          hasRefundCode: Boolean(refundCodeMatch && refundCodeMatch[0] === 'REF-0011'),
+          hasMember: Boolean(memberMatch),
+          approvedAmountObserved: amountMatch ? amountMatch[0] : null,
+          refundCodeObserved: refundCodeMatch ? refundCodeMatch[0] : null,
+          memberObserved: memberMatch ? memberMatch[0] : null,
         };
       })()`)
       console.log('UI-32 Observed Modal DOM details:', JSON.stringify(modalDomDetails))
       if (!modalDomDetails || modalDomDetails.role !== 'dialog') {
         throw new Error('UI-32 modal missing role="dialog"')
       }
-      if (!modalDomDetails.has450k || !modalDomDetails.hasRef11) {
-        throw new Error('UI-32 modal content missing approved amount or refund code')
+      if (!modalDomDetails.hasApprovedAmount || !modalDomDetails.hasRefundCode || !modalDomDetails.hasMember) {
+        throw new Error(`UI-32 modal content missing required details: ${JSON.stringify(modalDomDetails)}`)
       }
 
-      // Focus trap and keyboard verification
-      console.log('Testing modal keyboard focus trap, Tab/Shift+Tab, Escape, Cancel, and focus restoration...')
-      const focusTrapResult = await session.evalJs(`(() => {
+      // Real keyboard focus trap and wrap testing via CDP input
+      // Focusable elements inside modal: [0] modal__close (Close dialog), [1] Cancel button, [2] Confirm button
+      console.log('Testing modal keyboard focus trap using real Tab / Shift+Tab key presses...')
+      const initialActive = await session.evalJs(`(() => {
         const dialog = document.querySelector('[role="dialog"]');
-        const activeInitial = document.activeElement;
-        const initialFocusInside = dialog ? dialog.contains(activeInitial) : false;
-
-        // Dispatch Tab key event
-        dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
-        const activeAfterTab = document.activeElement;
-        const tabMaintained = dialog ? dialog.contains(activeAfterTab) : false;
-
-        // Dispatch Shift+Tab key event
-        dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }));
-        const activeAfterShiftTab = document.activeElement;
-        const shiftTabMaintained = dialog ? dialog.contains(activeAfterShiftTab) : false;
-
+        const closeBtn = dialog ? dialog.querySelector('.modal__close, button[aria-label*="Close"]') : null;
         return {
-          initialFocusInside,
-          tabMaintained,
-          shiftTabMaintained,
-          trapMaintained: initialFocusInside && tabMaintained && shiftTabMaintained
+          isInside: dialog ? dialog.contains(document.activeElement) : false,
+          isCloseBtn: document.activeElement === closeBtn,
+          ariaLabel: document.activeElement ? document.activeElement.getAttribute('aria-label') : null,
+          label: document.activeElement ? document.activeElement.innerText : null
         };
       })()`)
-      console.log('UI-32 Focus trap check:', JSON.stringify(focusTrapResult))
+      console.log('UI-32 Initial modal focus:', JSON.stringify(initialActive))
 
-      // Focus restoration test with Escape
-      await session.evalJs(`
+      // Press real Tab to move to Cancel button
+      await session.pressTab()
+      const focusAfterTab1 = await session.evalJs(`(() => {
         const dialog = document.querySelector('[role="dialog"]');
-        if (dialog) dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
-      `)
+        return {
+          isInside: dialog ? dialog.contains(document.activeElement) : false,
+          label: document.activeElement ? document.activeElement.innerText : null,
+          isCancelBtn: document.activeElement?.innerText.trim() === 'Cancel'
+        };
+      })()`)
+      console.log('UI-32 Focus after Tab 1 (Cancel):', JSON.stringify(focusAfterTab1))
+
+      // Press real Tab to move to Confirm button ("Yes, record...")
+      await session.pressTab()
+      const focusAfterTab2 = await session.evalJs(`(() => {
+        const dialog = document.querySelector('[role="dialog"]');
+        return {
+          isInside: dialog ? dialog.contains(document.activeElement) : false,
+          label: document.activeElement ? document.activeElement.innerText : null,
+          isConfirmBtn: document.activeElement?.innerText.includes('Yes, record')
+        };
+      })()`)
+      console.log('UI-32 Focus after Tab 2 (Confirm):', JSON.stringify(focusAfterTab2))
+
+      // Press real Tab again from last control -> must wrap around to first control (.modal__close)
+      await session.pressTab()
+      const focusAfterWrapTab = await session.evalJs(`(() => {
+        const dialog = document.querySelector('[role="dialog"]');
+        const closeBtn = dialog ? dialog.querySelector('.modal__close, button[aria-label*="Close"]') : null;
+        return {
+          isInside: dialog ? dialog.contains(document.activeElement) : false,
+          isCloseBtn: document.activeElement === closeBtn,
+          ariaLabel: document.activeElement ? document.activeElement.getAttribute('aria-label') : null
+        };
+      })()`)
+      console.log('UI-32 Focus after wrap-around Tab (Close button):', JSON.stringify(focusAfterWrapTab))
+
+      // Press real Shift+Tab from first control (.modal__close) -> must wrap backwards to last control (Confirm)
+      await session.pressTab({ shift: true })
+      const focusAfterShiftTabWrap = await session.evalJs(`(() => {
+        const dialog = document.querySelector('[role="dialog"]');
+        return {
+          isInside: dialog ? dialog.contains(document.activeElement) : false,
+          label: document.activeElement ? document.activeElement.innerText : null,
+          isConfirmBtn: document.activeElement?.innerText.includes('Yes, record')
+        };
+      })()`)
+      console.log('UI-32 Focus after Shift+Tab backwards wrap (Confirm button):', JSON.stringify(focusAfterShiftTabWrap))
+
+      const focusTrapActive =
+        initialActive.isInside &&
+        initialActive.isCloseBtn &&
+        focusAfterTab1.isInside &&
+        focusAfterTab1.isCancelBtn &&
+        focusAfterTab2.isInside &&
+        focusAfterTab2.isConfirmBtn &&
+        focusAfterWrapTab.isInside &&
+        focusAfterWrapTab.isCloseBtn &&
+        focusAfterShiftTabWrap.isInside &&
+        focusAfterShiftTabWrap.isConfirmBtn
+
+      if (!focusTrapActive) {
+        throw new Error(`UI-32 focus trap failed: ${JSON.stringify({
+          initialActive,
+          focusAfterTab1,
+          focusAfterTab2,
+          focusAfterWrapTab,
+          focusAfterShiftTabWrap,
+        })}`)
+      }
+
+      // Mark the exact trigger button for strict restoration testing
+      await session.evalJs(`(() => {
+        const btn = document.querySelector('button[type="submit"]');
+        if (btn) btn.setAttribute('data-trigger-submit', 'true');
+      })()`)
+
+      // Dismiss with real Escape key press via CDP
+      console.log('Testing modal dismissal with real Escape key press...')
+      await session.pressKey('Escape', 27)
       await pause(300)
       const modalClosedByEscape = await session.evalJs(`!document.querySelector('[role="dialog"], .modal')`)
       const focusRestoredAfterEscape = await session.evalJs(`(() => {
-        const active = document.activeElement;
-        const submitBtn = document.querySelector('button[type="submit"]');
-        return active === submitBtn || active?.tagName === 'BUTTON';
+        const trigger = document.querySelector('button[type="submit"]');
+        return document.activeElement === trigger;
       })()`)
-      console.log(`Modal closed by Escape: ${modalClosedByEscape}, focus restored: ${focusRestoredAfterEscape}`)
+      console.log(`Modal closed by Escape: ${modalClosedByEscape}, focus strictly restored to trigger: ${focusRestoredAfterEscape}`)
       const putCountAfterEscape = session.getPutCompleteCount()
 
-      // Re-open and Cancel button test with focus restoration
+      // Re-open and Cancel button test with strict focus restoration
       await session.evalJs(`
         const submitBtn = document.querySelector('button[type="submit"]');
         if (submitBtn) { submitBtn.focus(); submitBtn.click(); }
@@ -1232,28 +1319,26 @@ async function main() {
       await pause(300)
       const modalClosedByCancel = await session.evalJs(`!document.querySelector('[role="dialog"], .modal')`)
       const focusRestoredAfterCancel = await session.evalJs(`(() => {
-        const active = document.activeElement;
-        const submitBtn = document.querySelector('button[type="submit"]');
-        return active === submitBtn || active?.tagName === 'BUTTON';
+        const trigger = document.querySelector('button[type="submit"]');
+        return document.activeElement === trigger;
       })()`)
-      console.log(`Modal closed by Cancel button: ${modalClosedByCancel}, focus restored: ${focusRestoredAfterCancel}`)
+      console.log(`Modal closed by Cancel button: ${modalClosedByCancel}, focus strictly restored to trigger: ${focusRestoredAfterCancel}`)
       const putCountAfterCancel = session.getPutCompleteCount()
 
       // Re-open and Confirm button test
       await pause(300)
-      const formState = await session.evalJs(`(() => {
+      const reOpenConfirmState = await session.evalJs(`(() => {
         const cb = document.querySelector('input[type="checkbox"]');
         const submitBtn = document.querySelector('button[type="submit"]');
-        const isCbChecked = cb ? cb.checked : false;
-        if (cb && !isCbChecked) cb.click();
-        const disabled = submitBtn ? submitBtn.disabled : true;
-        if (submitBtn && !disabled) {
+        if (cb && !cb.checked) cb.click();
+        if (submitBtn && !submitBtn.disabled) {
           submitBtn.focus();
           submitBtn.click();
+          return { cbChecked: cb ? cb.checked : false, clicked: true };
         }
-        return { cbFound: Boolean(cb), isCbChecked, submitDisabled: disabled };
+        return { cbChecked: cb ? cb.checked : false, clicked: false, submitDisabled: submitBtn ? submitBtn.disabled : null };
       })()`)
-      console.log('Form state before confirm re-open:', JSON.stringify(formState))
+      console.log('Re-open state for confirm:', JSON.stringify(reOpenConfirmState))
       await pause(500)
       const confirmClickResult = await session.evalJs(`(() => {
         const dialog = document.querySelector('[role="dialog"], .modal');
@@ -1270,9 +1355,10 @@ async function main() {
 
       // Mandatory assertions check: every requirement determines PASS/FAIL
       const modalRoleAssertion = Boolean(modalDomDetails && modalDomDetails.role === 'dialog')
-      const approvedAmountAssertion = Boolean(modalDomDetails?.has450k)
-      const refundCodeAssertion = Boolean(modalDomDetails?.hasRef11)
-      const focusTrapAssertion = Boolean(focusTrapResult.trapMaintained)
+      const approvedAmountAssertion = Boolean(modalDomDetails?.hasApprovedAmount)
+      const refundCodeAssertion = Boolean(modalDomDetails?.hasRefundCode)
+      const memberAssertion = Boolean(modalDomDetails?.hasMember)
+      const focusTrapAssertion = Boolean(focusTrapActive)
       const focusRestoreAssertion = Boolean(focusRestoredAfterEscape && focusRestoredAfterCancel)
       const escapeDismissalAssertion = modalClosedByEscape && putCountAfterEscape === 0
       const cancelDismissalAssertion = modalClosedByCancel && putCountAfterCancel === 0
@@ -1283,6 +1369,7 @@ async function main() {
         modalRoleAssertion &&
         approvedAmountAssertion &&
         refundCodeAssertion &&
+        memberAssertion &&
         focusTrapAssertion &&
         focusRestoreAssertion &&
         escapeDismissalAssertion &&
@@ -1294,13 +1381,19 @@ async function main() {
         executedAt: new Date().toISOString(),
         testCase: 'TC-09',
         modalOpenedSuccessfully: modalRoleAssertion,
-        observedApprovedAmount: modalDomDetails?.approvedAmountObserved || 'NOT_FOUND',
-        observedRefundCode: modalDomDetails?.refundCodeObserved || 'NOT_FOUND',
-        observedMember: modalDomDetails?.memberObserved || 'NOT_FOUND',
+        observedApprovedAmount: modalDomDetails?.approvedAmountObserved,
+        observedRefundCode: modalDomDetails?.refundCodeObserved,
+        observedMember: modalDomDetails?.memberObserved,
         focusTrapVerified: focusTrapAssertion,
-        initialFocusInsideDialog: focusTrapResult.initialFocusInside,
-        focusRestoredAfterEscape: focusRestoredAfterEscape,
-        focusRestoredAfterCancel: focusRestoredAfterCancel,
+        focusTrapSequence: {
+          initialOnCloseButton: initialActive.isCloseBtn,
+          tabToCancelButton: focusAfterTab1.isCancelBtn,
+          tabToConfirmButton: focusAfterTab2.isConfirmBtn,
+          wrapTabBackToCloseButton: focusAfterWrapTab.isCloseBtn,
+          shiftTabWrapToConfirmButton: focusAfterShiftTabWrap.isConfirmBtn,
+        },
+        focusStrictlyRestoredAfterEscape: focusRestoredAfterEscape,
+        focusStrictlyRestoredAfterCancel: focusRestoredAfterCancel,
         dismissedByEscapeWithoutPut: escapeDismissalAssertion,
         dismissedByCancelWithoutPut: cancelDismissalAssertion,
         singlePutSentOnExplicitConfirm: singlePutAssertion,
@@ -1309,15 +1402,19 @@ async function main() {
           modalRoleDialogPresent: modalRoleAssertion,
           approvedAmountMatchesDOM: approvedAmountAssertion,
           refundCodeMatchesDOM: refundCodeAssertion,
+          memberMatchesDOM: memberAssertion,
           focusTrapActive: focusTrapAssertion,
           focusRestoredOnDismiss: focusRestoreAssertion,
           singlePutOnConfirm: singlePutAssertion,
           zeroPutOnDismiss: putCountAfterEscape === 0 && putCountAfterCancel === 0,
           longTextWrappedNoScroll: overflowAssertion,
         },
+        integrationBoundaries: {
+          backendConcurrencyAndIdempotency: 'NOT_RUN - frontend client verifies single PUT dispatch on explicit confirm; multi-client concurrency gate QA-01 is tested at backend integration boundary',
+        },
         outcome: allMandatoryAssertionsPassed ? 'PASS' : 'FAIL',
       }
-      writeFileSync(join(SCREENSHOTS_DIR, 'ui-32/modal-interaction-log.json'), JSON.stringify(modalLog, null, 2))
+      writeFileSync(join(SCREENSHOTS_DIR, 'ui-32/modal-interaction-log.json'), JSON.stringify(modalLog, null, 2) + '\n')
       await session.cleanup()
       console.log('UI-32 modal & interaction test completed!')
     }

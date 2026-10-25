@@ -45,12 +45,18 @@ rejected state in the Home theme. Money and eligibility come from BE-21; no API 
 ## TC-09 Modal Keyboard & Irreversible Payout Execution Provenance
 
 Executed via headless Chromium test harness (`frontend/scripts/generate-all-evidence.mjs --only ui-32`):
-- **Modal Opening**: Triggered on approved refund #11 by checking completion acknowledgement and clicking "Record completed refund". Verified rendered DOM contains `role="dialog"`, approved amount (`450.000 VND`), refund code (`REF-0011`), and member name (`Nguyen Thi Mai Linh`).
-- **Focus Trap Verification**: Focus actively trapped within dialog; `Tab` and `Shift+Tab` keyboard events keep `document.activeElement` inside dialog.
-- **Dismissed by Escape & Focus Restoration**: `Escape` key event closes modal without network requests (0 PUT requests observed); focus automatically restored to the triggering button.
-- **Dismissed by Cancel & Focus Restoration**: "Cancel" button click dismisses modal without action (0 PUT requests observed); focus restored to the triggering button.
-- **Single PUT on Confirmation**: "Yes, record refund payout" button click initiates exactly 1 `PUT /refunds/11/complete` request.
-- **Long-Text Wrapping at 390px**: Verified `scrollWidth <= clientWidth` on phone viewport (390px), ensuring no horizontal scrolling or text clipping.
+- **Modal Opening**: Triggered on approved refund #11 by checking completion acknowledgement and clicking "Record completed refund". Verified rendered DOM strictly within `[role="dialog"]` contains approved amount (`450.000 VND`), refund code (`REF-0011`), and member name (`Nguyen Thi Mai Linh`).
+- **Real CDP Keyboard Focus Trap & Wrap**: Dispatched genuine Chrome DevTools Protocol `Input.dispatchKeyEvent` events (`rawKeyDown`/`keyUp`):
+  1. Initial focus: `.modal__close` (aria-label: "Close dialog")
+  2. `Tab` key press: moves focus to "Cancel" button
+  3. `Tab` key press: moves focus to "Yes, record 450.000 VND" confirm button
+  4. Wrap-around `Tab` key press: wraps focus back to `.modal__close` button
+  5. Backwards wrap `Shift+Tab` key press: wraps focus backwards to "Yes, record 450.000 VND" confirm button
+- **Dismissed by Escape & Strict Focus Restoration**: Genuine CDP `Escape` key press closes modal without network requests (0 PUT requests observed); focus strictly verified restored to the exact trigger button (`document.activeElement === trigger`).
+- **Dismissed by Cancel & Strict Focus Restoration**: "Cancel" button click dismisses modal without action (0 PUT requests observed); focus strictly restored to the exact trigger button.
+- **Single PUT on Confirmation**: Re-opened modal and clicked "Yes, record 450.000 VND" button; verified exactly 1 `PUT /refunds/11/complete` request dispatched.
+- **Long-Text Wrapping at 390px**: Verified `scrollWidth <= clientWidth` on phone viewport (390px) with 120-char member description, ensuring no horizontal scrolling or text clipping.
+- **Integration Boundary**: Frontend client verifies single PUT dispatch and disabled submit state; multi-client concurrency gate QA-01 is scoped and marked `NOT_RUN` at frontend, tested at backend integration boundary.
 - **Evidence Log**: Captured in `frontend/docs/screenshots/ui-32/modal-interaction-log.json`, with all assertions determining `outcome: 'PASS'`.
 
 Note: BE-21 allows one refund per payment, so the quote has no prior refund amount and the refundable limit is the payment amount (`toRefundQuote`). Frontend ref guarantees local single-submit; backend concurrency and idempotency verification is recorded as integration gate QA-01.
