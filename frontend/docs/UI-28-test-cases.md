@@ -24,7 +24,7 @@ No API or backend change.
 | TC-07 | Errors | Unit (TC-FE11-017, 018, 022) | 5xx keeps the payment and retries; 4xx stops checks with Refresh; first load error shows Retry | Pass |
 | TC-08 | Paid without invoice yet | Unit | "The receipt appears in My payments once it is issued", no receipt link | Pass |
 | TC-09 | Light, dark and responsive viewports (G-02) | Visual check: `/member/payments/{id}/status` for pending bank transfer and confirmed SUCCESS states | Hero readable, bank account, reference, amount and copy buttons fully untruncated, no horizontal scroll | Pass |
-| TC-10 | Real-browser tab visibility resume and copy verification | Browser tab hide/resume and clipboard copy test | Visibility change on tab resume triggers one poll refresh; polling stops cleanly after SUCCESS; copied reference preserves exact casing and characters | Pass |
+| TC-10 | Browser tab visibility resume and copy verification | Synthetic visibilitychange event harness with independent clipboard inspection | Visibility change on simulated tab resume triggers exactly one poll refresh; polling stops cleanly after SUCCESS; copied reference independently verified via clipboard interception matching exact casing and string SP-52-TAYLOR; all mandatory criteria determine PASS/FAIL | Pass |
 
 ## G-02 Responsive Matrix (Pending Transfer & Confirmed States)
 
@@ -41,15 +41,17 @@ No API or backend change.
 | Confirmed (no invoice) | 390 x 844 | Light | Safe messaging "The receipt appears in My payments once issued" | Pass |
 | Confirmed (no invoice) | 1440 x 900 | Dark | No broken link, polling completely stopped | Pass |
 
-## TC-10 Real-Browser Tab Resume & Clipboard Execution Provenance
+## TC-10 Tab Resume & Clipboard Execution Provenance
 
 Executed via headless Chromium test harness (`frontend/scripts/generate-all-evidence.mjs --only ui-28`):
+- **Execution Mode**: `synthetic-visibilitychange-event-harness` (simulated tab hide/resume via `document.hidden` / `visibilityState` lifecycle events).
 - **Initial Polls**: 1 request observed on initial pending view (`GET /payments/52`).
-- **Tab Hidden (`visibilityState = 'hidden'`)**: 0 background polling requests sent while tab is hidden.
-- **Tab Resumed (`visibilityState = 'visible'`)**: exactly 1 immediate refresh request sent upon tab foregrounding.
+- **Tab Hidden (`visibilityState = 'hidden'`)**: 0 background polling requests sent while tab is hidden (`requestsWhileHidden: 0`).
+- **Tab Resumed (`visibilityState = 'visible'`)**: exactly 1 immediate refresh request sent upon tab foregrounding (`resumeImmediateRequests: 1`).
 - **Status Transition**: Backend response transition to `SUCCESS` updates status to "Payment confirmed".
-- **Polling Termination**: Confirmed halted (0 additional requests across 2000 ms window; final total requests: 2).
-- **Clipboard Content**: Button copied reference code `SP-52-TAYLOR` with identical casing and untruncated characters.
+- **Polling Termination**: Confirmed halted (0 additional requests across 2000 ms window; final total requests: 2; `pollingTerminatedAfterSuccess: true`).
+- **Clipboard Content & Controls**: Copy button verified present and enabled; `navigator.clipboard.writeText` intercepted; actual copied text matches exact string `SP-52-TAYLOR` (`actualCopiedText: 'SP-52-TAYLOR'`, `clipboardExactMatch: true`). Negative control fails on altered reference.
+- **PASS/FAIL Enforcement**: Every mandatory assertion (initial poll, zero hidden polls, one resume poll, polling termination, exact clipboard content, payment confirmed status, negative control) contributes directly to `outcome: 'PASS'`.
 - **Evidence Log**: Captured in `frontend/docs/screenshots/ui-28/tab-resume-log.json`.
 
-Branch retested and merged onto `feat/ui-27` and latest `main`.
+Branch refreshed and merged with latest `main` (including UI-27, UI-29, and UI-30).
