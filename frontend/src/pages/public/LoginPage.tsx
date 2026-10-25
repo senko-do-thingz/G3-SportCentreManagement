@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import '@fontsource/be-vietnam-pro/800.css'
+import '@fontsource/be-vietnam-pro/800-italic.css'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, getErrorMessage, splitFieldErrors } from '../../api/errors'
 import type { LoginRedirectState } from '../../auth/RequireAuth'
@@ -16,6 +18,7 @@ import { ManagerPreviewLogin } from '../../components/ManagerPreviewLogin'
 import { useFocusFirstInvalid } from '../../utils/useFocusFirstInvalid'
 import { AuthShell } from './AuthShell'
 import { SessionErrorPage } from './SessionErrorPage'
+import '../../styles/login.css'
 
 /** Shown for HTTP 403 from POST /auth/login (DisabledException or LockedException on the backend). */
 export const ACCOUNT_DISABLED_MESSAGE =
@@ -160,7 +163,7 @@ export function LoginPage() {
   }
 
   return (
-    <AuthShell className="auth-shell--login" title="Welcome back" subtitle="Log in to manage your training.">
+    <AuthShell className="auth-shell--login" layout="stage" title="Welcome back" subtitle="Log in to manage your training.">
       {import.meta.env.DEV && managerPreviewEnabled() && <ManagerPreviewLogin />}
       {sample && (
         <p className="notice notice--info auth-sample">

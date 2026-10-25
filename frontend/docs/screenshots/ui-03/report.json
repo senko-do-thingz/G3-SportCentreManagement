@@ -1,0 +1,386 @@
+{
+  "home_photo_requests": {
+    "phone-390-3x": {
+      "before": {
+        "requests": 14,
+        "widths": [
+          900,
+          900,
+          900,
+          900,
+          1000,
+          1000,
+          1000,
+          1000,
+          1000,
+          1000,
+          1400,
+          1400,
+          2000,
+          2200
+        ],
+        "requested_megapixels": 14.67,
+        "broken": [],
+        "upscaled": []
+      },
+      "after": {
+        "requests": 14,
+        "widths": [
+          720,
+          720,
+          720,
+          720,
+          1000,
+          1000,
+          1000,
+          1000,
+          1000,
+          1000,
+          1400,
+          1400,
+          1600,
+          1600
+        ],
+        "requested_megapixels": 11.41,
+        "broken": [],
+        "upscaled": []
+      }
+    },
+    "390": {
+      "before": {
+        "requests": 14,
+        "widths": [
+          900,
+          900,
+          900,
+          900,
+          1000,
+          1000,
+          1000,
+          1000,
+          1000,
+          1000,
+          1400,
+          1400,
+          2000,
+          2200
+        ],
+        "requested_megapixels": 14.67,
+        "broken": [],
+        "upscaled": []
+      },
+      "after": {
+        "requests": 14,
+        "widths": [
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480
+        ],
+        "requested_megapixels": 2.15,
+        "broken": [],
+        "upscaled": []
+      }
+    },
+    "768": {
+      "before": {
+        "requests": 14,
+        "widths": [
+          900,
+          900,
+          900,
+          900,
+          1000,
+          1000,
+          1000,
+          1000,
+          1000,
+          1000,
+          1400,
+          1400,
+          2000,
+          2200
+        ],
+        "requested_megapixels": 14.67,
+        "broken": [],
+        "upscaled": []
+      },
+      "after": {
+        "requests": 15,
+        "widths": [
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          1000,
+          1080,
+          1080,
+          1080,
+          1080
+        ],
+        "requested_megapixels": 5.31,
+        "broken": [],
+        "upscaled": []
+      }
+    },
+    "1440": {
+      "before": {
+        "requests": 14,
+        "widths": [
+          900,
+          900,
+          900,
+          900,
+          1000,
+          1000,
+          1000,
+          1000,
+          1000,
+          1000,
+          1400,
+          1400,
+          2000,
+          2200
+        ],
+        "requested_megapixels": 14.67,
+        "broken": [],
+        "upscaled": []
+      },
+      "after": {
+        "requests": 14,
+        "widths": [
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          720,
+          720,
+          1600,
+          1600
+        ],
+        "requested_megapixels": 5.64,
+        "broken": [],
+        "upscaled": []
+      }
+    },
+    "1920": {
+      "before": {
+        "requests": 14,
+        "widths": [
+          900,
+          900,
+          900,
+          900,
+          1000,
+          1000,
+          1000,
+          1000,
+          1000,
+          1000,
+          1400,
+          1400,
+          2000,
+          2200
+        ],
+        "requested_megapixels": 14.67,
+        "broken": [],
+        "upscaled": []
+      },
+      "after": {
+        "requests": 14,
+        "widths": [
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          480,
+          720,
+          720,
+          2000,
+          2200
+        ],
+        "requested_megapixels": 8.12,
+        "broken": [],
+        "upscaled": []
+      }
+    }
+  },
+  "video": {
+    "390-before": {
+      "first_file": null,
+      "first_request_ms": null,
+      "load_event_end_ms": 123
+    },
+    "390-after": {
+      "first_file": null,
+      "first_request_ms": null,
+      "load_event_end_ms": 116
+    },
+    "1440-before": {
+      "first_file": "44448-1080.mp4",
+      "first_request_ms": 192,
+      "load_event_end_ms": 116
+    },
+    "1440-after": {
+      "first_file": "44448-720.mp4",
+      "first_request_ms": 260,
+      "load_event_end_ms": 111
+    },
+    "1920-before": {
+      "first_file": "44448-1080.mp4",
+      "first_request_ms": 272,
+      "load_event_end_ms": 117
+    },
+    "1920-after": {
+      "first_file": "44448-1080.mp4",
+      "first_request_ms": 220,
+      "load_event_end_ms": 106
+    }
+  },
+  "member_images": {
+    "phone-390-3x-before": {
+      "images": 15,
+      "upscaled": 15,
+      "broken": 0,
+      "photo_widths": [],
+      "natural_widths": [
+        86,
+        87
+      ]
+    },
+    "phone-390-3x-after": {
+      "images": 15,
+      "upscaled": 0,
+      "broken": 0,
+      "photo_widths": [
+        480,
+        480,
+        480,
+        480,
+        480,
+        480,
+        1080,
+        1080,
+        1080,
+        1080,
+        1080,
+        1080
+      ],
+      "natural_widths": [
+        480,
+        1080
+      ]
+    },
+    "1440-before": {
+      "images": 15,
+      "upscaled": 15,
+      "broken": 0,
+      "photo_widths": [],
+      "natural_widths": [
+        86,
+        87
+      ]
+    },
+    "1440-after": {
+      "images": 15,
+      "upscaled": 0,
+      "broken": 0,
+      "photo_widths": [
+        480,
+        480,
+        480,
+        480,
+        480,
+        480
+      ],
+      "natural_widths": [
+        480
+      ]
+    }
+  },
+  "offline": {
+    "/": {
+      "images": 15,
+      "broken": []
+    },
+    "/member/classes": {
+      "images": 15,
+      "broken": []
+    }
+  },
+  "screens": [
+    {
+      "screen": "home-390",
+      "identical": true,
+      "changed_pixels": 0,
+      "size": [
+        390,
+        10407
+      ]
+    },
+    {
+      "screen": "home-768",
+      "identical": true,
+      "changed_pixels": 0,
+      "size": [
+        768,
+        8037
+      ]
+    },
+    {
+      "screen": "home-1440",
+      "identical": true,
+      "changed_pixels": 0,
+      "size": [
+        1440,
+        6457
+      ]
+    },
+    {
+      "screen": "credits-390",
+      "identical": true,
+      "changed_pixels": 0,
+      "size": [
+        390,
+        8249
+      ]
+    },
+    {
+      "screen": "credits-1440",
+      "identical": true,
+      "changed_pixels": 0,
+      "size": [
+        1440,
+        3297
+      ]
+    }
+  ],
+  "failures": []
+}

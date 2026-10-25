@@ -1,0 +1,4 @@
+# Pinned Python packages for the local browser checks in frontend/scripts (ui00-visual-check.py).
+# Install: python -m pip install -r scripts/requirements-visual-check.txt; python -m playwright install chromium
+playwright==1.63.0
+pillow==13.0.0

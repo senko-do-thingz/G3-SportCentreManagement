@@ -1,3 +1,4 @@
+import { unsplashId, unsplashOriginal, unsplashThumb } from '../../media/unsplash'
 import { HOME_FACILITIES, HOME_HERO_VIDEOS, HOME_PHOTOS, HOME_SPORTS } from './homeContent'
 
 export interface CreditItem {
@@ -19,10 +20,9 @@ export interface CreditGroup {
 }
 
 const UNSPLASH_LICENSE = { name: 'Unsplash License', url: 'https://unsplash.com/license' }
-const unsplashId = (url: string) => /photo-[\w-]+/.exec(url)?.[0] ?? ''
 const unsplashItem = (usedFor: string, url: string): CreditItem => {
-  const id = unsplashId(url)
-  return { usedFor, thumb: `https://images.unsplash.com/${id}?auto=format&fit=crop&w=320&h=200&q=60`, link: `https://images.unsplash.com/${id}`, linkLabel: 'View original on Unsplash' }
+  const id = unsplashId(url) || url
+  return { usedFor, thumb: unsplashThumb(id, 320, 200), link: unsplashOriginal(id), linkLabel: 'View original on Unsplash' }
 }
 
 /** Demo coach portraits shipped in frontend/public/images/coaches (see scripts/demo-data/download-coach-photos.ps1). */
@@ -51,7 +51,7 @@ export function buildCredits(): CreditGroup[] {
       license: UNSPLASH_LICENSE,
       note: 'Free to use, including commercially; attribution is not required but is given here.',
       items: [
-        unsplashItem('Home - hero background', HOME_PHOTOS.hero),
+        unsplashItem('Home and Log in - hero background', HOME_PHOTOS.hero),
         ...HOME_SPORTS.map((sport) => unsplashItem(`Sports - ${sport.name}`, sport.photo)),
         ...HOME_FACILITIES.map((venue) => unsplashItem(`Where you play - ${venue.name}`, venue.photo)),
         unsplashItem('Home - Ready to play banner', HOME_PHOTOS.cta),
@@ -62,7 +62,7 @@ export function buildCredits(): CreditGroup[] {
       provider: 'Unsplash',
       license: UNSPLASH_LICENSE,
       note: 'Stock models used for the class demonstration only. They are not real staff of the centre.',
-      items: COACH_DEMO_PHOTOS.map((coach) => ({ ...unsplashItem(`Coaches - ${coach.name}`, coach.id), thumb: `https://images.unsplash.com/${coach.id}?auto=format&fit=crop&crop=faces&w=200&h=200&q=60` })),
+      items: COACH_DEMO_PHOTOS.map((coach) => ({ ...unsplashItem(`Coaches - ${coach.name}`, coach.id), thumb: unsplashThumb(coach.id, 200, 200, true) })),
     },
     {
       title: 'Background videos',
