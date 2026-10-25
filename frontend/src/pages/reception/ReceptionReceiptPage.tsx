@@ -61,7 +61,7 @@ export function ReceptionReceiptPage() {
   }
 
   const data = invoice.data
-  if (data.paymentId !== null && data.paymentId !== id) {
+  if (data.paymentId !== id) {
     return (
       <div className="page">
         <PaymentHero eyebrow={EYEBROW} title="Receipt" aside={back} />

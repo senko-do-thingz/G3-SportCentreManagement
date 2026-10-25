@@ -23,6 +23,6 @@ and the desk receipt (S3-Receipt) in the Home theme. Transaction atomicity stays
 | TC-06 | Double submit prevented | Unit (existing double click and UI-31 case) | Two submits in the same tick send one PUT /payments/{id}/confirm | Pass (fails on the previous page) |
 | TC-07 | Receipt follows success | Unit (TC-FE12-031, 036 and round 3) | After SUCCESS the invoice of GET /invoices/by-payment/{id} is shown; Print waits for the real invoice | Pass |
 | TC-08 | No invented receipt fields | Unit | No base price from the total, no discount or service when the invoice has none | Pass |
-| TC-09 | Desk receipt ownership and status | Unit | An invoice of another payment is not shown; a CANCELLED invoice cannot be printed | Pass |
-| TC-10 | Print | Print: PDF | One A4 page; hero, sidebar and actions not printed | Pass (1 page each) |
+| TC-09 | Desk receipt ownership and status | Unit | Exact payment-to-invoice association enforced: an invoice with null, missing or mismatched paymentId shows "Receipt not found" error state and cannot be printed; a CANCELLED invoice cannot be printed | Pass |
+| TC-10 | Print | Print: PDF | One A4 page; hero, sidebar and actions not printed; unverifiable/mismatch receipts cannot be printed | Pass (1 page each) |
 | TC-11 | Light, dark and 390 px | Manual: `/reception/payments/{id}` pending and paid | Hero readable, form usable, no page-level horizontal scroll | Checked by the author with fixed API data; reviewer to confirm |
