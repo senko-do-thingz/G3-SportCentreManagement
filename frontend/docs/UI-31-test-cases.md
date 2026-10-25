@@ -37,12 +37,12 @@ and the desk receipt (S3-Receipt) in the Home theme. Transaction atomicity stays
 | Payment Verify (Pending #41) | 768 x 1024 | Dark | Surface and field styling consistent | Pass |
 | Payment Verify (Pending #41) | 1440 x 900 | Light | Desktop verify layout, actions aligned | Pass |
 | Payment Verify (Pending #41) | 1440 x 900 | Dark | Full desktop view, high contrast dark theme | Pass |
-| Payment Needs Review (#44) | 390 x 844 | Light | "Payment Needs Review" alert, due & received amounts distinct | Pass |
-| Payment Needs Review (#44) | 390 x 844 | Dark | Warning banner high contrast | Pass |
-| Payment Needs Review (#44) | 768 x 1024 | Light | Mismatch alert prominently framed | Pass |
-| Payment Needs Review (#44) | 768 x 1024 | Dark | Dark theme alert readable | Pass |
-| Payment Needs Review (#44) | 1440 x 900 | Light | Full mismatch overview, discrepancy reason visible | Pass |
-| Payment Needs Review (#44) | 1440 x 900 | Dark | Desktop dark mismatch state | Pass |
+| Payment Needs Review (#44) | 390 x 844 | Light | "Payment Needs Review" alert, due (810,000 VND) & received (800,000 VND) amounts distinct, outstanding (10,000 VND) | Pass |
+| Payment Needs Review (#44) | 390 x 844 | Dark | Warning banner high contrast, confirmation button disabled | Pass |
+| Payment Needs Review (#44) | 768 x 1024 | Light | Mismatch alert prominently framed with monetary comparison | Pass |
+| Payment Needs Review (#44) | 768 x 1024 | Dark | Dark theme alert readable, no accidental submission path | Pass |
+| Payment Needs Review (#44) | 1440 x 900 | Light | Full mismatch overview, discrepancy reason & amounts visible | Pass |
+| Payment Needs Review (#44) | 1440 x 900 | Dark | Desktop dark mismatch state, Return to verification accessible | Pass |
 | Desk Receipt View (#41) | 390 x 844 | Light | Receipt details, issue date, Print button accessible | Pass |
 | Desk Receipt View (#41) | 390 x 844 | Dark | High contrast dark receipt card | Pass |
 | Desk Receipt View (#41) | 1440 x 900 | Light | Centered receipt card, clean layout | Pass |
@@ -51,7 +51,7 @@ and the desk receipt (S3-Receipt) in the Home theme. Transaction atomicity stays
 ## Desk Receipt A4 Print-to-PDF Verification
 - **Generated File**: `frontend/docs/screenshots/ui-31/reception-receipt-a4.pdf`
 - **Page Count**: Exactly 1 page verified (`preferCSSPageSize: true`, 8.27 x 11.69 inches).
-- **Extracted Content**: Invoice #41, 150,000 VND total, payment method Cash, valid member details.
+- **Extracted Content**: Invoice `INV-1041` (Payment #41), Total amount `810,000 VND` (Subtotal `900,000 VND`, Discount `90,000 VND`), Item `Basketball Academy (12 sessions)`, Member `Bao Nguyen` (`MEM-0003`), Issue date `2026-10-25`.
 - **Excluded Elements**: `@media print` eliminates navigation, sidebar, hero banner, and action buttons. Zero 403 or Access Denied screens.
 
-Branch refreshed and merged on `feat/ui-30` and latest `main`.
+Branch refreshed and merged on `feat/ui-30`, `feat/ui-28`, and latest `main`.

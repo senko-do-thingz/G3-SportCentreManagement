@@ -983,11 +983,53 @@ async function main() {
         }
       }
 
-      // Mismatch screens
+      // Mismatch screens: Trigger genuine amount mismatch state (received 800000 vs due 810000)
       for (const vp of [{ w: 390, h: 844 }, { w: 768, h: 1024 }, { w: 1440, h: 900 }]) {
         for (const th of ['light', 'dark']) {
           await session.setViewport(vp.w, vp.h, th)
           await session.goto('/reception/payments/44', '.payment-rows')
+          // Enter received amount that differs from amount due (800000 vs 810000 due) using React value setter
+          await session.evalJs(`
+            const input = document.querySelector('input[inputmode="decimal"]') || [...document.querySelectorAll('input')].find(i => i.placeholder === '810000' || i.id?.includes('amount'));
+            if (input) {
+              const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+              nativeSetter.call(input, '800000');
+              input.dispatchEvent(new Event('input', { bubbles: true }));
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          `)
+          await pause(400)
+
+          // Click "Amount does not match" button to transition to Payment Needs Review
+          await session.evalJs(`
+            const mismatchBtn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Amount does not match'));
+            if (mismatchBtn) mismatchBtn.click();
+          `)
+          await pause(500)
+
+          // Assert the mismatch screen is displayed with monetary comparison and alert text
+          const mismatchCheck = await session.evalJs(`(() => {
+            const heading = document.querySelector('h1, h2, .payment-hero__title')?.innerText || '';
+            const card = document.querySelector('[aria-label="Amount mismatch"], .card')?.innerText || '';
+            const alert = document.querySelector('[role="alert"], .notice--warning')?.innerText || '';
+            const hasDue = card.includes('810.000') || card.includes('810,000');
+            const hasReceived = card.includes('800.000') || card.includes('800,000');
+            const hasOutstanding = card.includes('10.000') || card.includes('10,000');
+            const isNeedsReview = heading.includes('Payment Needs Review') || card.includes('Amount mismatch');
+            const confirmBtn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Confirm payment'));
+            return {
+              isNeedsReview,
+              hasDue,
+              hasReceived,
+              hasOutstanding,
+              alertText: alert,
+              noAccidentalConfirm: !confirmBtn || confirmBtn.disabled
+            };
+          })()`)
+          console.log(`UI-31 mismatch check (${th} ${vp.w}):`, JSON.stringify(mismatchCheck))
+          if (!mismatchCheck.isNeedsReview || !mismatchCheck.hasDue || !mismatchCheck.hasReceived) {
+            throw new Error(`Failed to render genuine amount mismatch state on ${th} ${vp.w}`)
+          }
           await session.screenshot(join(SCREENSHOTS_DIR, `ui-31/reception-mismatch-${th}-${vp.w}.png`))
         }
       }
@@ -1005,6 +1047,21 @@ async function main() {
       await session.goto('/reception/payments/41/receipt', 'h1, h2, .receipt')
       const pdfDesk = await session.printPdf(join(SCREENSHOTS_DIR, 'ui-31/reception-receipt-a4.pdf'))
       if (pdfDesk.pageCount !== 1) throw new Error(`reception-receipt-a4.pdf has ${pdfDesk.pageCount} pages, expected 1`)
+
+      // Verify actual extracted invoice details from DOM matching INVOICE_41
+      const receiptContent = await session.evalJs(`(() => {
+        const text = document.body.innerText;
+        return {
+          invoiceNumber: text.includes('INV-1041'),
+          amountDue: text.includes('810.000') || text.includes('810,000'),
+          itemDescription: text.includes('Basketball Academy'),
+          memberName: text.includes('Bao Nguyen'),
+        };
+      })()`)
+      console.log('UI-31 Desk receipt content assertions:', JSON.stringify(receiptContent))
+      if (!receiptContent.invoiceNumber || !receiptContent.amountDue || !receiptContent.itemDescription || !receiptContent.memberName) {
+        throw new Error('Desk receipt content mismatch against fixture expectations')
+      }
 
       await session.cleanup()
       console.log('UI-31 verify & desk receipt completed!')
