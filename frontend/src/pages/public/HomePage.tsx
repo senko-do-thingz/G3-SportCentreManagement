@@ -14,7 +14,7 @@ import { HomeHeader } from './HomeHeader'
 import { HomeAuthDialog } from './HomeAuthDialog'
 import { HomeIcon } from './HomeIcons'
 import { HOME_FACILITIES, HOME_FAQ, HOME_HERO_VIDEOS, HOME_NOTICES, HOME_PHOTOS, HOME_SPORTS, homeHero } from './homeContent'
-import { HomePhoto } from './HomePhoto'
+import { Photo } from '../../media/Photo'
 import { HomeHeroVideo } from './HomeHeroVideo'
 import { HomeSelect } from './HomeSelect'
 import { HomeCoaches } from './HomeCoaches'
@@ -165,7 +165,7 @@ export function HomePage() {
       <HomeHeader />
       <main className="home-main" id="main-content" tabIndex={-1}>
         <section className="home-hero" aria-labelledby="home-title">
-          <HomePhoto className="home-hero__photo" src={HOME_PHOTOS.hero} fallback={homeHero} width="2200" height="1467" fetchPriority="high" />
+          <Photo className="home-hero__photo" src={HOME_PHOTOS.hero} fallback={homeHero} sizes="100vw" width="2200" height="1467" fetchPriority="high" />
           <HomeHeroVideo sources={HOME_HERO_VIDEOS} />
           <div className="home-wrap home-hero__body">
             <div className="home-highlight">
@@ -186,7 +186,7 @@ export function HomePage() {
           </div>
           <div className="home-wrap">
             <div className="home-strip">
-              <HomePhoto key={spotlight[0].name} className="home-strip__photo" src={spotlight[0].photo} fallback={spotlight[0].image} width="1000" height="667" />
+              <Photo key={spotlight[0].name} className="home-strip__photo" src={spotlight[0].photo} fallback={spotlight[0].image} sizes="(min-width: 1101px) 300px, 100vw" width="1000" height="667" />
               <div className="home-strip__sports" aria-live="polite">
                 {spotlight.map((sport) => <div key={sport.name}><span>Sports</span><h3>{sport.name}</h3><p>{sport.description}</p></div>)}
               </div>
@@ -238,7 +238,7 @@ export function HomePage() {
             <div className="home-sports">
               {HOME_SPORTS.map((sport) => {
                 const record = sportFor(sport.name)
-                const content = <><HomePhoto src={sport.photo} fallback={sport.image} alt={`${sport.name} training`} width="1000" height="667" loading="lazy" /><span className="home-sport__label"><h3>{sport.name}</h3><span className="home-sport__go" aria-hidden="true"><HomeIcon name="arrow" /></span></span></>
+                const content = <><Photo src={sport.photo} fallback={sport.image} alt={`${sport.name} training`} sizes="(min-width: 1101px) 400px, (min-width: 641px) 50vw, 100vw" width="1000" height="667" loading="lazy" /><span className="home-sport__label"><h3>{sport.name}</h3><span className="home-sport__go" aria-hidden="true"><HomeIcon name="arrow" /></span></span></>
                 return <article className="home-sport" key={sport.name}>
                   {record
                     ? memberAction(classPath(String(record.id)), content, 'secondary', `Explore ${sport.name}`, 'home-sport__link')
@@ -257,7 +257,7 @@ export function HomePage() {
             {venueTiles.length > 0 && <ul className={`home-venues${venueTiles.some((venue) => venue.wide) ? '' : ' home-venues--even'}`}>
               {venueTiles.map((venue) => (
                 <li key={venue.name} className={`home-venue${venue.wide ? ' home-venue--wide' : ''}`}>
-                  <HomePhoto src={venue.photo} fallback={venue.image} alt="" width={venue.wide ? '1400' : '900'} height={venue.wide ? '700' : '600'} loading="lazy" />
+                  <Photo src={venue.photo} fallback={venue.image} alt="" sizes={venue.wide ? '(min-width: 1101px) 620px, 100vw' : '(min-width: 1101px) 310px, 50vw'} width={venue.wide ? '1400' : '900'} height={venue.wide ? '700' : '600'} loading="lazy" />
                   <span className="home-venue__label">{venue.label}</span>
                   <div className="home-venue__text">
                     <h3>{venue.name}</h3>
@@ -326,7 +326,7 @@ export function HomePage() {
         </section>
 
         <section className="home-cta" aria-labelledby="cta-title">
-          <HomePhoto className="home-cta__photo" src={HOME_PHOTOS.cta} fallback={homeHero} width="2000" height="1333" loading="lazy" />
+          <Photo className="home-cta__photo" src={HOME_PHOTOS.cta} fallback={homeHero} sizes="100vw" width="2000" height="1333" loading="lazy" />
           <div className="home-wrap">
             <h2 id="cta-title">Ready to <span>play?</span></h2>
             <div className="home-cta__actions">

@@ -266,6 +266,20 @@ describe('FE-12 Payment Requests (F3-04)', () => {
     expect(within(table).getByText('Paid')).toBeInTheDocument()
   })
 
+  it('UI-30 free-text notes containing Amount mismatch without the machine contract do not mark for review', async () => {
+    const rows = [
+      pendingPayment({ id: 50, code: 'PAY-0050', itemCode: 'REG-1050', notes: 'Member inquiry regarding Amount mismatch: was clarified' }),
+      pendingPayment({ id: 51, code: 'PAY-0051', itemCode: 'REG-1051', notes: 'Prior note | Amount mismatch: received 500000, expected 550000 by CASH' }),
+    ]
+    await open('/reception/payments?status=ALL', { list: () => json(200, { content: rows, page: 0, size: 10, totalElements: 2, totalPages: 1 }) })
+    const table = await screen.findByRole('table', { name: 'Payment requests' })
+    await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(3))
+    const body = within(table).getAllByRole('row').slice(1)
+    expect(body[0]).toHaveTextContent('Pending payment')
+    expect(within(body[0]).queryByText('Needs review')).not.toBeInTheDocument()
+    expect(body[1]).toHaveTextContent('Needs review')
+  })
+
   it('TC-FE12-021 status filter, search and paging call GET /payments with the matching parameters', async () => {
     const { calls } = await open('/reception/payments')
     const user = userEvent.setup()
