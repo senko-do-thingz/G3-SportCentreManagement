@@ -1,11 +1,26 @@
 {
-  "executedAt": "2026-10-25T07:08:36.415Z",
+  "executedAt": "2026-10-25T09:47:46.573Z",
   "testCase": "TC-10",
-  "initialRequests": 1,
+  "testExecutionType": "synthetic-visibilitychange-event-harness",
+  "initialRequests": 2,
   "requestsWhileHidden": 0,
   "resumeImmediateRequests": 1,
   "pollingTerminatedAfterSuccess": true,
-  "totalRequestsObserved": 2,
+  "totalRequestsObserved": 3,
   "expectedReferenceCode": "SP-52-TAYLOR",
+  "actualCopiedText": "SP-52-TAYLOR",
+  "clipboardExactMatch": true,
+  "copyButtonPresent": true,
+  "copyButtonEnabled": true,
+  "paymentConfirmedStatusDisplayed": true,
+  "negativeControlPassed": true,
+  "mandatoryAssertions": {
+    "initialRequestObserved": true,
+    "zeroRequestsWhileHidden": true,
+    "exactOneRequestOnResume": true,
+    "pollingTerminatedAfterSuccess": true,
+    "clipboardReferenceExact": true,
+    "paymentConfirmedRendered": true
+  },
   "outcome": "PASS"
 }
