@@ -1,3 +1,9 @@
+## 2026-10-24 - My payments, history and receipts (UI-29)
+
+- My Payments and Receipts and the receipt pages use the shared PaymentHero in the Home theme; when a receipt prints, the hero is hidden like the old page header, and other printed payment pages show it as plain text.
+- No invented invoice fields: Base price, Discount and Service appear only when the invoice has them (the base price no longer falls back to the total, and a missing discount is no longer shown as 0 VND; a real 0 still is).
+- Receipts print on one A4 page, checked with Chrome print to PDF for a one-line receipt and an eight-line receipt with long numbers and names from a dark-theme session. Tests in memberPayments.test.tsx; cases in frontend/docs/UI-29-test-cases.md. No API or backend changes.
+
 ## 2026-10-24 - Payment instructions and status (UI-28)
 
 - Payment Instructions and Status (F3-02) uses the shared PaymentHero in the Home theme.
