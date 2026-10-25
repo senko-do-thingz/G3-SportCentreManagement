@@ -70,6 +70,8 @@ __pycache__/
 !scripts/ci/check-test-reports.py
 !scripts/ci/test_report_guard.py
 !scripts/ci/test_compose_smoke.py
+# Frontend browser checks (Playwright) referenced from frontend/docs test cases
+!frontend/scripts/*.py
 *.py[cod]
 *$py.class
 venv/
