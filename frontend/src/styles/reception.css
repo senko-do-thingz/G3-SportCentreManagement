@@ -284,6 +284,11 @@
   .staff-layout:has(.payment-print-receipt) .staff-content {
     padding: 0;
   }
+
+  /* The receipt carries its own heading; the page hero (UI-31) is not printed with it. */
+  body:has(.payment-print-receipt) .payment-hero {
+    display: none;
+  }
 }
 
 @media (max-width: 640px) {

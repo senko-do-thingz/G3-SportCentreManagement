@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { inflateSync } from 'node:zlib'
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:4310'
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
@@ -337,6 +338,90 @@ function countPdfPages(pdfBuffer) {
   const text = pdfBuffer.toString('binary')
   const matches = text.match(/\/Type\s*\/Page\b/g)
   return matches ? matches.length : 0
+}
+
+function extractPdfText(buffer) {
+  const streams = []
+  let pos = 0
+  while (true) {
+    const idx = buffer.indexOf(Buffer.from('stream'), pos)
+    if (idx === -1) break
+    let dataStart = idx + 6
+    if (buffer[dataStart] === 0x0d && buffer[dataStart + 1] === 0x0a) dataStart += 2
+    else if (buffer[dataStart] === 0x0a || buffer[dataStart] === 0x0d) dataStart += 1
+
+    const endstreamIdx = buffer.indexOf(Buffer.from('endstream'), dataStart)
+    if (endstreamIdx === -1) break
+    let dataEnd = endstreamIdx
+    if (buffer[dataEnd - 1] === 0x0a) dataEnd--
+    if (buffer[dataEnd - 1] === 0x0d) dataEnd--
+
+    const slice = buffer.slice(dataStart, dataEnd)
+    try {
+      const decompressed = inflateSync(slice).toString('latin1')
+      streams.push(decompressed)
+    } catch {}
+    pos = endstreamIdx + 9
+  }
+
+  const cMap = new Map()
+  for (const s of streams) {
+    if (!s.includes('begincmap')) continue
+    const bfCharBlocks = s.match(/beginbfchar([\s\S]*?)endbfchar/g) || []
+    for (const b of bfCharBlocks) {
+      const lines = b.match(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/g) || []
+      for (const line of lines) {
+        const m = /<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/.exec(line)
+        if (m) {
+          const cid = parseInt(m[1], 16)
+          const uni = String.fromCodePoint(parseInt(m[2], 16))
+          cMap.set(cid, uni)
+        }
+      }
+    }
+    const bfRangeBlocks = s.match(/beginbfrange([\s\S]*?)endbfrange/g) || []
+    for (const b of bfRangeBlocks) {
+      const lines = b.match(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/g) || []
+      for (const line of lines) {
+        const m = /<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/.exec(line)
+        if (m) {
+          const startCid = parseInt(m[1], 16)
+          const endCid = parseInt(m[2], 16)
+          let startUni = parseInt(m[3], 16)
+          for (let cid = startCid; cid <= endCid; cid++) {
+            cMap.set(cid, String.fromCodePoint(startUni++))
+          }
+        }
+      }
+    }
+  }
+
+  let fullText = ''
+  for (const s of streams) {
+    if (s.includes('begincmap')) continue
+    const hexMatches = s.match(/<([0-9A-Fa-f]+)>\s*Tj/g) || []
+    for (const hm of hexMatches) {
+      const hex = /<([0-9A-Fa-f]+)>/.exec(hm)[1]
+      for (let i = 0; i < hex.length; i += 4) {
+        const cid = parseInt(hex.slice(i, i + 4), 16)
+        fullText += cMap.get(cid) || ''
+      }
+      fullText += ' '
+    }
+    const tjArrays = s.match(/\[([\s\S]*?)\]\s*TJ/g) || []
+    for (const arr of tjArrays) {
+      const innerHex = arr.match(/<([0-9A-Fa-f]+)>/g) || []
+      for (const ih of innerHex) {
+        const hex = ih.replace(/[<>]/g, '')
+        for (let i = 0; i < hex.length; i += 4) {
+          const cid = parseInt(hex.slice(i, i + 4), 16)
+          fullText += cMap.get(cid) || ''
+        }
+      }
+      fullText += ' '
+    }
+  }
+  return fullText
 }
 
 async function runSession(browser, { role = 'GUEST', setup = null }) {
@@ -1027,11 +1112,59 @@ async function main() {
         }
       }
 
-      // Mismatch screens
+      // Mismatch screens: Trigger genuine amount mismatch state (received 800000 vs due 810000)
       for (const vp of [{ w: 390, h: 844 }, { w: 768, h: 1024 }, { w: 1440, h: 900 }]) {
         for (const th of ['light', 'dark']) {
           await session.setViewport(vp.w, vp.h, th)
           await session.goto('/reception/payments/44', '.payment-rows')
+          // Enter received amount that differs from amount due (800000 vs 810000 due) using React value setter
+          await session.evalJs(`
+            const input = document.querySelector('input[inputmode="decimal"]') || [...document.querySelectorAll('input')].find(i => i.placeholder === '810000' || i.id?.includes('amount'));
+            if (input) {
+              const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+              nativeSetter.call(input, '800000');
+              input.dispatchEvent(new Event('input', { bubbles: true }));
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          `)
+          await pause(400)
+
+          // Click "Amount does not match" button to transition to Payment Needs Review
+          await session.evalJs(`
+            const mismatchBtn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Amount does not match'));
+            if (mismatchBtn) mismatchBtn.click();
+          `)
+          await pause(500)
+
+          // Assert the mismatch screen is displayed with monetary comparison and alert text
+          const mismatchCheck = await session.evalJs(`(() => {
+            const heading = document.querySelector('h1, h2, .payment-hero__title')?.innerText || '';
+            const card = document.querySelector('[aria-label="Amount mismatch"], .card')?.innerText || '';
+            const alert = document.querySelector('[role="alert"], .notice--warning')?.innerText || '';
+            const hasDue = card.includes('810.000') || card.includes('810,000');
+            const hasReceived = card.includes('800.000') || card.includes('800,000');
+            const hasOutstanding = card.includes('10.000') || card.includes('10,000');
+            const isNeedsReview = heading.includes('Payment Needs Review') || card.includes('Amount mismatch');
+            const confirmBtn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Confirm payment'));
+            return {
+              isNeedsReview,
+              hasDue,
+              hasReceived,
+              hasOutstanding,
+              alertText: alert,
+              noAccidentalConfirm: !confirmBtn || confirmBtn.disabled
+            };
+          })()`)
+          console.log(`UI-31 mismatch check (${th} ${vp.w}):`, JSON.stringify(mismatchCheck))
+          if (
+            !mismatchCheck.isNeedsReview ||
+            !mismatchCheck.hasDue ||
+            !mismatchCheck.hasReceived ||
+            !mismatchCheck.hasOutstanding ||
+            !mismatchCheck.noAccidentalConfirm
+          ) {
+            throw new Error(`Failed to render genuine amount mismatch state on ${th} ${vp.w}: ${JSON.stringify(mismatchCheck)}`)
+          }
           await session.screenshot(join(SCREENSHOTS_DIR, `ui-31/reception-mismatch-${th}-${vp.w}.png`))
         }
       }
@@ -1040,15 +1173,62 @@ async function main() {
       for (const vp of [{ w: 390, h: 844 }, { w: 1440, h: 900 }]) {
         for (const th of ['light', 'dark']) {
           await session.setViewport(vp.w, vp.h, th)
-          await session.goto('/reception/payments/41/receipt', 'h1, h2, .receipt')
+          await session.goto('/reception/payments/41/receipt', '.payment-print-receipt .payment-rows')
+          const hasInvoice = await session.evalJs(`(() => {
+            return Boolean(document.body.innerText.includes('INV-1041') && !document.querySelector('.spinner, [aria-label*="Loading" i]'));
+          })()`)
+          if (!hasInvoice) throw new Error('UI-31 receipt view missing INV-1041 or still showing spinner')
           await session.screenshot(join(SCREENSHOTS_DIR, `ui-31/reception-receipt-view-${th}-${vp.w}.png`))
         }
       }
 
       await session.setViewport(1440, 900, 'light')
-      await session.goto('/reception/payments/41/receipt', 'h1, h2, .receipt')
+      await session.goto('/reception/payments/41/receipt', '.payment-print-receipt .payment-rows')
+
+      // Assert DOM readiness before printing (ensure invoice data rendered and spinner removed)
+      const prePrintReady = await session.evalJs(`(() => {
+        const text = document.body.innerText;
+        const hasSpinner = Boolean(document.querySelector('.spinner, [aria-label*="Loading" i]'));
+        return {
+          invoiceNumber: text.includes('INV-1041'),
+          amountDue: text.includes('810.000') || text.includes('810,000'),
+          itemDescription: text.includes('Basketball Academy'),
+          memberName: text.includes('Bao Nguyen'),
+          hasSpinner,
+        };
+      })()`)
+      console.log('UI-31 Pre-print DOM verification:', JSON.stringify(prePrintReady))
+      if (!prePrintReady.invoiceNumber || !prePrintReady.amountDue || !prePrintReady.itemDescription || !prePrintReady.memberName || prePrintReady.hasSpinner) {
+        throw new Error(`Receipt DOM is not ready before printing: ${JSON.stringify(prePrintReady)}`)
+      }
+
+      // Generate 1-page A4 PDF
       const pdfDesk = await session.printPdf(join(SCREENSHOTS_DIR, 'ui-31/reception-receipt-a4.pdf'))
       if (pdfDesk.pageCount !== 1) throw new Error(`reception-receipt-a4.pdf has ${pdfDesk.pageCount} pages, expected 1`)
+
+      // Independently extract and assert text content from the rendered PDF artifact
+      const extractedPdfText = extractPdfText(pdfDesk.buffer)
+      const pdfContentAssertions = {
+        hasInvoiceNumber: extractedPdfText.includes('INV-1041'),
+        hasAmountDue: extractedPdfText.includes('810.000') || extractedPdfText.includes('810,000'),
+        hasMember: /Bao\s*Nguy\s*en/i.test(extractedPdfText) || extractedPdfText.includes('MEM-0003'),
+        hasService: /Bask\s*etb\s*all/i.test(extractedPdfText),
+        hasSubtotal: extractedPdfText.includes('900.000') || extractedPdfText.includes('900,000'),
+        hasDiscount: extractedPdfText.includes('-90.000') || extractedPdfText.includes('90,000'),
+        noLoadingIndicator: !extractedPdfText.includes('Loading the receipt') && !/Loading/i.test(extractedPdfText),
+      }
+      console.log('UI-31 PDF artifact content assertions:', JSON.stringify(pdfContentAssertions))
+      if (
+        !pdfContentAssertions.hasInvoiceNumber ||
+        !pdfContentAssertions.hasAmountDue ||
+        !pdfContentAssertions.hasMember ||
+        !pdfContentAssertions.hasService ||
+        !pdfContentAssertions.hasSubtotal ||
+        !pdfContentAssertions.hasDiscount ||
+        !pdfContentAssertions.noLoadingIndicator
+      ) {
+        throw new Error(`PDF artifact content assertions failed: ${JSON.stringify(pdfContentAssertions)}`)
+      }
 
       await session.cleanup()
       console.log('UI-31 verify & desk receipt completed!')

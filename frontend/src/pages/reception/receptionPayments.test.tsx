@@ -1,4 +1,5 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
@@ -432,6 +433,137 @@ describe('FE-12 Verify and Record Payment (F3-05)', () => {
     expect(within(receipt).getByText('Paid')).toBeInTheDocument()
     expect(within(receipt).getByRole('link', { name: 'Back' })).toHaveAttribute('href', '/reception/payments/41')
     expect(calls.some((call) => call.path === '/invoices/by-payment/41')).toBe(true)
+  })
+})
+
+describe('UI-31 Verify payment and receipt', () => {
+  async function confirmFilled() {
+    const { user, form } = await fillTransfer()
+    await user.click(within(form).getByRole('checkbox'))
+    await user.click(within(form).getByRole('button', { name: 'Confirm payment' }))
+    return form
+  }
+
+  it('UI-31 shows the verification under the Home theme hero with the way back', async () => {
+    await open('/reception/payments/41')
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Verify and Record Payment' })
+    const hero = heading.closest('header') as HTMLElement
+    expect(hero).toHaveClass('payment-hero')
+    expect(within(hero).getByRole('link', { name: 'Payment requests' })).toHaveAttribute('href', '/reception/payments')
+  })
+
+  it('UI-31 a 200 answer that is not SUCCESS is never shown as a confirmed payment', async () => {
+    const { calls } = await open('/reception/payments/41', { onConfirm: () => json(200, pendingPayment()) })
+    const form = await confirmFilled()
+    expect(await within(form).findByText(/The payment was not confirmed \(status: Pending payment\)/)).toBeInTheDocument()
+    expect(calls.filter((call) => call.path === '/payments/41/confirm')).toHaveLength(1)
+    expect(screen.queryByText('Payment confirmed')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Payment Confirmed and Receipt' })).not.toBeInTheDocument()
+    expect(within(form).getByLabelText(/Amount received/)).toBeEnabled()
+  })
+
+  it('UI-31 a SUCCESS answer for another payment is not claimed as this one', async () => {
+    await open('/reception/payments/41', { onConfirm: () => json(200, pendingPayment({ id: 99, status: 'SUCCESS' })) })
+    const form = await confirmFilled()
+    expect(await within(form).findByText(/The payment was not confirmed/)).toBeInTheDocument()
+    expect(screen.queryByText('Payment confirmed')).not.toBeInTheDocument()
+  })
+
+  it('UI-31 a SUCCESS answer with another amount received gives no success message', async () => {
+    const { calls } = await open('/reception/payments/41', {
+      onConfirm: () => json(200, pendingPayment({ status: 'SUCCESS', amountReceived: 800000 })),
+    })
+    await confirmFilled()
+    await waitFor(() => expect(calls.filter((call) => call.path === '/payments/41' && call.method === 'GET')).toHaveLength(2))
+    expect(screen.queryByText('Payment confirmed')).not.toBeInTheDocument()
+  })
+
+  it('UI-31 a paid payment whose amount received differs is Needs review and cannot be printed', async () => {
+    await open('/reception/payments/41', { payments: { 41: pendingPayment({ status: 'SUCCESS', amountReceived: 800000 }) } })
+    expect(await screen.findByRole('heading', { level: 1, name: 'Payment Needs Review' })).toBeInTheDocument()
+    const receipt = screen.getByRole('region', { name: 'Payment receipt' })
+    await within(receipt).findByRole('heading', { name: 'Receipt INV-1041' })
+    expect(within(receipt).getByRole('alert')).toHaveTextContent('The amount received (800.000 VND) differs from the amount due (810.000 VND)')
+    expect(within(receipt).getByText('Needs review')).toBeInTheDocument()
+    expect(within(receipt).getByRole('button', { name: 'Print receipt' })).toBeDisabled()
+    expect(within(receipt).queryByRole('link', { name: 'Open receipt' })).not.toBeInTheDocument()
+    expect(receipt).not.toHaveClass('payment-print-receipt')
+    expect(screen.queryByRole('heading', { name: 'Payment Confirmed and Receipt' })).not.toBeInTheDocument()
+  })
+
+  it('UI-31 an invoice total that differs from the payment amount blocks the receipt', async () => {
+    await open('/reception/payments/41', {
+      payments: { 41: pendingPayment({ status: 'SUCCESS' }) },
+      invoice: json(200, { ...INVOICE, totalAmount: 800000 }),
+    })
+    expect(await screen.findByRole('heading', { level: 1, name: 'Payment Needs Review' })).toBeInTheDocument()
+    const receipt = screen.getByRole('region', { name: 'Payment receipt' })
+    expect(within(receipt).getByRole('alert')).toHaveTextContent('The invoice total (800.000 VND) differs from the amount due (810.000 VND)')
+    expect(within(receipt).getByRole('button', { name: 'Print receipt' })).toBeDisabled()
+  })
+
+  it('UI-31 a confirmed payment without a base price does not invent one from the total', async () => {
+    await open('/reception/payments/41', {
+      payments: { 41: pendingPayment({ status: 'SUCCESS', originalPrice: null }) },
+      invoice: json(200, { ...INVOICE, subtotalAmount: null }),
+    })
+    const receipt = await screen.findByRole('region', { name: 'Payment receipt' })
+    await within(receipt).findByRole('heading', { name: 'Receipt INV-1041' })
+    expect(within(receipt).queryByText('Base price')).not.toBeInTheDocument()
+    expect(within(receipt).getByRole('button', { name: 'Print receipt' })).toBeEnabled()
+  })
+
+  it('UI-31 two submits in the same tick send one confirmation', async () => {
+    let finish!: (response: Response) => void
+    const answer = new Promise<Response>((resolve) => { finish = resolve })
+    const { calls } = await open('/reception/payments/41', { onConfirm: () => answer })
+    const { user, form } = await fillTransfer()
+    await user.click(within(form).getByRole('checkbox'))
+    act(() => {
+      fireEvent.submit(form)
+      fireEvent.submit(form)
+    })
+    await waitFor(() => expect(calls.filter((call) => call.path === '/payments/41/confirm')).toHaveLength(1))
+    await act(async () => finish(json(200, pendingPayment({ status: 'SUCCESS' }))))
+    expect(calls.filter((call) => call.path === '/payments/41/confirm')).toHaveLength(1)
+  })
+
+  it('UI-31 the hero is not printed with a desk receipt', () => {
+    const css = readFileSync('src/styles/reception.css', 'utf8')
+    expect(css).toMatch(/@media print \{[\s\S]*body:has\(\.payment-print-receipt\) \.payment-hero \{\s*display: none;/)
+  })
+
+  it('UI-31 the receipt page never shows the invoice of another payment', async () => {
+    await open('/reception/payments/41/receipt', { invoice: json(200, { ...INVOICE, paymentId: 99 }) })
+    expect(await screen.findByText(/belongs to another payment/)).toBeInTheDocument()
+    expect(screen.queryByText('INV-1041')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Print receipt' })).not.toBeInTheDocument()
+  })
+
+  it('UI-31 the receipt page rejects an invoice with null paymentId', async () => {
+    await open('/reception/payments/41/receipt', { invoice: json(200, { ...INVOICE, paymentId: null }) })
+    expect(await screen.findByText('Receipt not found')).toBeInTheDocument()
+    expect(screen.queryByText('INV-1041')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Print receipt' })).not.toBeInTheDocument()
+  })
+
+  it('UI-31 the receipt page rejects an invoice with missing paymentId', async () => {
+    const noPaymentId = { ...INVOICE }
+    delete (noPaymentId as { paymentId?: unknown }).paymentId
+    await open('/reception/payments/41/receipt', { invoice: json(200, noPaymentId) })
+    expect(await screen.findByText('Receipt not found')).toBeInTheDocument()
+    expect(screen.queryByText('INV-1041')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Print receipt' })).not.toBeInTheDocument()
+  })
+
+  it('UI-31 a cancelled invoice cannot be printed and missing amounts are not invented', async () => {
+    await open('/reception/payments/41/receipt', { invoice: json(200, { ...INVOICE, status: 'CANCELLED', subtotalAmount: null, discountAmount: null }) })
+    const receipt = await screen.findByRole('region', { name: 'Receipt' })
+    expect(within(receipt).getByRole('alert')).toHaveTextContent('cannot be printed as a payment receipt')
+    expect(within(receipt).getByRole('button', { name: 'Print receipt' })).toBeDisabled()
+    expect(within(receipt).queryByText('Base price')).not.toBeInTheDocument()
+    expect(within(receipt).queryByText('Discount')).not.toBeInTheDocument()
+    expect(receipt).not.toHaveClass('payment-print-receipt')
   })
 })
 
