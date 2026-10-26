@@ -60,6 +60,15 @@ describe('FE-06 manager access and accounts', () => {
     await waitFor(() => expect(backend.calls.some((call) => call.path.includes('page=0') && call.path.includes('role=COACH') && call.path.includes('status=ACTIVE') && call.path.includes('search=Daniel+%2B'))).toBe(true))
     expect(backend.calls.find((call) => call.path.startsWith('/manager/users'))?.authorization).toBe('Bearer manager-test')
   })
+  it('presents staff identities, role badges and the server-reported matching account count', async () => {
+    authOnly()
+    vi.spyOn(managerUsersApi, 'list').mockResolvedValue(paged([staff], 0, 45))
+    renderApp('/manager')
+    expect(await screen.findByText('45 accounts found')).toBeInTheDocument()
+    const table = await screen.findByRole('table', { name: 'Center accounts' })
+    expect(within(table).getByText('DS')).toBeInTheDocument()
+    expect(within(table).getByText('Coach')).toBeInTheDocument()
+  })
   it('offers only account statuses supported by the backend', async () => {
     authOnly()
     vi.spyOn(managerUsersApi, 'list').mockResolvedValue(paged([]))
