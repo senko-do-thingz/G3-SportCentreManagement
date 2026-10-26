@@ -1,0 +1,726 @@
+{
+  "baseline": "4cdc0874fde95ae0b1500f0625c1521f428a6bec",
+  "migrations": [
+    {
+      "path": "backend/src/main/resources/db/migration/identity/V1__init_identity_schema.sql",
+      "version": 1,
+      "creates": [
+        "role",
+        "permission",
+        "role_permission",
+        "user_account"
+      ],
+      "drops": [],
+      "sha256_lf": "c25c5116a273bdb2c7d4d7cd84c04e4584be20f8f7cb4ec3980f9475b96d033f"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/identity/V2__add_identity_tables.sql",
+      "version": 2,
+      "creates": [
+        "[member_profile]",
+        "[coach_profile]",
+        "[coach_certification]",
+        "[password_reset_token]",
+        "[activity_log]"
+      ],
+      "drops": [],
+      "sha256_lf": "1d42c704fccd2bc1c72d303bf02ca4b821fd0054148bebb317b72ad068d56ff2"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/identity/V3__seed_identity_data.sql",
+      "version": 3,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "3c3c359008ddd0e2f28cfd2c6ed94c49ead65ef7d689b45f1d616eb5500f7793"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/identity/V4__seed_manager_account.sql",
+      "version": 4,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "58adfddd2b584ddb9d4c4fd525d04730b2e61871c2b57a415992f73e920dede0"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V5__create_catalog_membership_tables.sql",
+      "version": 5,
+      "creates": [
+        "[sport]",
+        "[age_group]",
+        "[facility]",
+        "[membership_plan]",
+        "[plan_eligible_sport]",
+        "[plan_feature]",
+        "[membership]",
+        "[membership_sport]",
+        "[check_in]"
+      ],
+      "drops": [],
+      "sha256_lf": "c3f4c3bb1169800161d71826eee5251c9b212ba3fc1571b42b3956fef78fb153"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V6__seed_catalog_data.sql",
+      "version": 6,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "913129e48cbb99b679f09ac41aa0977112ff056196ab01c1d62f5b9d05a6859f"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V9__add_registration_sequence.sql",
+      "version": 9,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "338a1c17ba320f13265d1578f1b12471ee33eba78d37ab34805a3393450f451d"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V10__context_refresh_schema.sql",
+      "version": 10,
+      "creates": [
+        "[membership_card_tier]",
+        "[member_card]",
+        "[sport_package]",
+        "[sport_package_registration]",
+        "[refund_request]",
+        "[sport_class]",
+        "[class_session]",
+        "[booking]"
+      ],
+      "drops": [],
+      "sha256_lf": "e9763e160a6e351b82d0deb492b1107dd175ab3c5f06cf73fcfc6b71f0decc8e"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V11__add_refunded_status.sql",
+      "version": 11,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "749652487ffbd164184ca8b647b1f99ccec295be1b333455ff5e962beda4d7a2"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V12__align_sport_package_seed_with_figma.sql",
+      "version": 12,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "00fd1389281b424aa8b9835faee7faf06f679a4af691af102348e4e4f1084c9c"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V13__add_session_minutes_to_sport_package.sql",
+      "version": 13,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "ec15451de242b81578cf797fb6ca35ebf330a66bd0339d8484dbdd557d45e9c6"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V14__create_payment_and_invoice_tables.sql",
+      "version": 14,
+      "creates": [
+        "[payment]",
+        "[invoice]",
+        "[invoice_line]"
+      ],
+      "drops": [],
+      "sha256_lf": "4f7144f367c39666f1fb04d19430f4228ad4e34540bbb58be87ae47e7f565ddc"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V15__create_class_waitlist_table.sql",
+      "version": 15,
+      "creates": [
+        "[waitlist_entry]"
+      ],
+      "drops": [],
+      "sha256_lf": "f18eb1d835752fddc5458148010d6100e1fe413ca28e0f660b1517c277285914"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V16__create_training_and_attendance_tables.sql",
+      "version": 16,
+      "creates": [
+        "[session_plan]",
+        "[session_plan_step]",
+        "[attendance_record]",
+        "[attendance_correction]",
+        "[skill_metric]",
+        "[session_result]",
+        "[session_result_score]",
+        "[coach_feedback]"
+      ],
+      "drops": [],
+      "sha256_lf": "7f9f55e0395ccb09ae0d2725443942e23c1938ba395ad0dd5d2f684ea3097135"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V17__create_support_and_ai_tables.sql",
+      "version": 17,
+      "creates": [
+        "[support_request]",
+        "[support_request_message]",
+        "[assistant_setting]",
+        "[assistant_topic]",
+        "[assistant_quick_prompt]",
+        "[ai_conversation]",
+        "[ai_message]"
+      ],
+      "drops": [],
+      "sha256_lf": "4d5f83eec64f3c814ac40378804dd83c56e441809a3d8df3de14bd3d1c4cad04"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V18__create_workout_recommendation_tables.sql",
+      "version": 18,
+      "creates": [
+        "[recommendation_rule_set]",
+        "[recommendation_rule_weight]",
+        "[workout_plan]",
+        "[workout_plan_candidate]",
+        "[workout_plan_week]",
+        "[workout_plan_day]",
+        "[workout_plan_exercise]",
+        "[plan_review]"
+      ],
+      "drops": [],
+      "sha256_lf": "5f2fe24cb0d6234ac8511faea19d84d5e23106e75f03d55aa70813d61fb5e736"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V19__create_notification_and_system_tables.sql",
+      "version": 19,
+      "creates": [
+        "[notification]",
+        "[announcement]",
+        "[system_setting]",
+        "[member_sport_interest]",
+        "[coach_sport]"
+      ],
+      "drops": [],
+      "sha256_lf": "4de359fdb8898948b13558b32b6f4d3815080f2929893776047be91238bd7e1f"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V20__align_schema_with_topic.sql",
+      "version": 20,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "2f1dae6de7e04d81f35445165242f53b3382f4ee88aa2117faf5ac33eaa90313"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V21__payment_pending_adjustments.sql",
+      "version": 21,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "be74f195f5349c1e2882053e04a0b071fe673d5ae31dd53add4f8d90a8d25076"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V22__add_upgrade_tracking_to_member_card.sql",
+      "version": 22,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "dad7658c89c0653ce2cb560bc90635154dce25a7caf71fe7a4629895b1143a74"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V23__add_session_cancellation_and_schedule_indexes.sql",
+      "version": 23,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "af08ff7428e1212c92a8ca8a5ee2a15d0308d76340875afcca077c40e7e7422e"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V26__add_front_desk_queue_indexes.sql",
+      "version": 26,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "db8ac70dfa784bca949121097c0ce53a6a7af0e7156e4e46b992ef0f455c643c"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V27__refund_request_payment_link.sql",
+      "version": 27,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "e56e7fde49767387529da30e6f6e63d9684ac13ace7dbf2e67d070f0edf69a06"
+    },
+    {
+      "path": "backend/src/main/resources/db/demo/V28__seed_demo_accounts.sql",
+      "version": 28,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "3a49ea5ca5a97ebd8639ce1c9511ba8f3c335a9aa57e5029e4047e5083b2d584"
+    },
+    {
+      "path": "backend/src/main/resources/db/demo/V29__seed_demo_classes_and_sessions.sql",
+      "version": 29,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "a5f8fc611880fdb7719149b39e05dc41d76c19186188da86c50ab0b49dcebc54"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V30__create_finance_report_views.sql",
+      "version": 30,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "0c22992f91c358eab312ea025c13bf4c21313216ebd4bc4c8aa210cdc4b06d4c"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V31__cash_event_cutover.sql",
+      "version": 31,
+      "creates": [
+        "dbo.cash_coverage",
+        "dbo.cash_capture_ticket",
+        "dbo.cash_event"
+      ],
+      "drops": [],
+      "sha256_lf": "6eb7097c5b00ce3ff8efd7723fa9a9019931e140a7cff912b7a13616d05c360a"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V32__seed_remaining_sport_facilities.sql",
+      "version": 32,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "949a779f8f94c66c580db4832711f8dedfa3a3f33f2dc8a4998c4710569b8bb3"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/identity/V33__create_user_avatar.sql",
+      "version": 33,
+      "creates": [
+        "[user_avatar]"
+      ],
+      "drops": [],
+      "sha256_lf": "681f378e5a0b3a42cbc71f0f4cee049d3d9d982125364dcaee55f29a47669b19"
+    }
+  ],
+  "create_occurrences": 62,
+  "create_names": [
+    "[activity_log]",
+    "[age_group]",
+    "[ai_conversation]",
+    "[ai_message]",
+    "[announcement]",
+    "[assistant_quick_prompt]",
+    "[assistant_setting]",
+    "[assistant_topic]",
+    "[attendance_correction]",
+    "[attendance_record]",
+    "[booking]",
+    "[check_in]",
+    "[class_session]",
+    "[coach_certification]",
+    "[coach_feedback]",
+    "[coach_profile]",
+    "[coach_sport]",
+    "[facility]",
+    "[invoice]",
+    "[invoice_line]",
+    "[member_card]",
+    "[member_profile]",
+    "[member_sport_interest]",
+    "[membership]",
+    "[membership_card_tier]",
+    "[membership_plan]",
+    "[membership_sport]",
+    "[notification]",
+    "[password_reset_token]",
+    "[payment]",
+    "[plan_eligible_sport]",
+    "[plan_feature]",
+    "[plan_review]",
+    "[recommendation_rule_set]",
+    "[recommendation_rule_weight]",
+    "[refund_request]",
+    "[session_plan]",
+    "[session_plan_step]",
+    "[session_result]",
+    "[session_result_score]",
+    "[skill_metric]",
+    "[sport]",
+    "[sport_class]",
+    "[sport_package]",
+    "[sport_package_registration]",
+    "[support_request]",
+    "[support_request_message]",
+    "[system_setting]",
+    "[user_avatar]",
+    "[waitlist_entry]",
+    "[workout_plan]",
+    "[workout_plan_candidate]",
+    "[workout_plan_day]",
+    "[workout_plan_exercise]",
+    "[workout_plan_week]",
+    "dbo.cash_capture_ticket",
+    "dbo.cash_coverage",
+    "dbo.cash_event",
+    "permission",
+    "role",
+    "role_permission",
+    "user_account"
+  ],
+  "drop_occurrences": [],
+  "entities": [
+    {
+      "path": "backend/src/main/java/com/sportify/catalog/entity/AgeGroup.java",
+      "tables": [
+        "age_group"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/catalog/entity/Booking.java",
+      "tables": [
+        "booking"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/catalog/entity/CheckIn.java",
+      "tables": [
+        "check_in"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/catalog/entity/ClassSession.java",
+      "tables": [
+        "class_session"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/catalog/entity/Facility.java",
+      "tables": [
+        "facility"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/catalog/entity/MemberCard.java",
+      "tables": [
+        "member_card"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/catalog/entity/Membership.java",
+      "tables": [
+        "membership"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/catalog/entity/MembershipCardTier.java",
+      "tables": [
+        "membership_card_tier"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/catalog/entity/MembershipPlan.java",
+      "tables": [
+        "membership_plan"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/catalog/entity/PlanFeature.java",
+      "tables": [
+        "plan_feature"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/catalog/entity/RefundRequest.java",
+      "tables": [
+        "refund_request"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/catalog/entity/Sport.java",
+      "tables": [
+        "sport"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/catalog/entity/SportClass.java",
+      "tables": [
+        "sport_class"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/catalog/entity/SportPackage.java",
+      "tables": [
+        "sport_package"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/catalog/entity/SportPackageRegistration.java",
+      "tables": [
+        "sport_package_registration"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/identity/entity/ActivityLog.java",
+      "tables": [
+        "activity_log"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/identity/entity/CoachCertification.java",
+      "tables": [
+        "coach_certification"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/identity/entity/CoachProfile.java",
+      "tables": [
+        "coach_profile"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/identity/entity/CoachSport.java",
+      "tables": [
+        "coach_sport"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/identity/entity/MemberProfile.java",
+      "tables": [
+        "member_profile"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/identity/entity/PasswordResetToken.java",
+      "tables": [
+        "password_reset_token"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/identity/entity/Permission.java",
+      "tables": [
+        "permission"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/identity/entity/Role.java",
+      "tables": [
+        "role"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/identity/entity/UserAccount.java",
+      "tables": [
+        "user_account"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/payment/entity/Invoice.java",
+      "tables": [
+        "invoice"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/payment/entity/InvoiceLine.java",
+      "tables": [
+        "invoice_line"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/payment/entity/Payment.java",
+      "tables": [
+        "payment"
+      ]
+    }
+  ],
+  "source_definitions": [
+    {
+      "id": "S01",
+      "path": "backend/src/main/resources/application.yml",
+      "line": 28,
+      "definition": "ddl-auto:"
+    },
+    {
+      "id": "S02",
+      "path": "backend/src/main/resources/application-demo.yml",
+      "line": 5,
+      "definition": "locations:"
+    },
+    {
+      "id": "S03",
+      "path": "backend/src/main/java/com/sportify/core/config/DemoProfileSafetyConfiguration.java",
+      "line": 10,
+      "definition": "class DemoProfile"
+    },
+    {
+      "id": "S04",
+      "path": "backend/src/main/resources/db/migration/catalog/V16__create_training_and_attendance_tables.sql",
+      "line": 10,
+      "definition": "CREATE TABLE [session_plan]"
+    },
+    {
+      "id": "S05",
+      "path": "backend/src/main/resources/db/migration/catalog/V10__context_refresh_schema.sql",
+      "line": 274,
+      "definition": "CREATE TABLE [class_session]"
+    },
+    {
+      "id": "S06",
+      "path": "backend/src/main/resources/db/migration/catalog/V20__align_schema_with_topic.sql",
+      "line": 6,
+      "definition": "ux_booking_active"
+    },
+    {
+      "id": "S07",
+      "path": "backend/src/main/resources/db/migration/catalog/V5__create_catalog_membership_tables.sql",
+      "line": 177,
+      "definition": "CREATE TABLE [check_in]"
+    },
+    {
+      "id": "S08",
+      "path": "backend/src/main/resources/db/migration/identity/V2__add_identity_tables.sql",
+      "line": 4,
+      "definition": "CREATE TABLE [member_profile]"
+    },
+    {
+      "id": "S09",
+      "path": "backend/src/main/resources/db/migration/identity/V3__seed_identity_data.sql",
+      "line": 4,
+      "definition": "code = 'MEMBER'"
+    },
+    {
+      "id": "S10",
+      "path": "backend/src/main/java/com/sportify/catalog/service/impl/CheckInServiceImpl.java",
+      "line": 48,
+      "definition": "public CheckInResponse recordCheckIn"
+    },
+    {
+      "id": "S11",
+      "path": "backend/src/main/java/com/sportify/catalog/controller/CheckInController.java",
+      "line": 20,
+      "definition": "@RequestMapping"
+    },
+    {
+      "id": "S12",
+      "path": "backend/src/main/java/com/sportify/catalog/repository/CheckInRepository.java",
+      "line": 22,
+      "definition": "findForDay"
+    },
+    {
+      "id": "S13",
+      "path": "backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java",
+      "line": 74,
+      "definition": "public BookingResponse createBooking"
+    },
+    {
+      "id": "S14",
+      "path": "backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java",
+      "line": 327,
+      "definition": "recordSelfTrainingAttendance"
+    },
+    {
+      "id": "S15",
+      "path": "backend/src/main/java/com/sportify/catalog/service/impl/CoachScheduleServiceImpl.java",
+      "line": 31,
+      "definition": "public class CoachSchedule"
+    },
+    {
+      "id": "S16",
+      "path": "backend/src/main/java/com/sportify/catalog/repository/CoachScheduleReadRepository.java",
+      "line": 46,
+      "definition": "findRoster"
+    },
+    {
+      "id": "S17",
+      "path": "backend/src/main/java/com/sportify/catalog/repository/ClassSessionRepository.java",
+      "line": 67,
+      "definition": "findForUpdate"
+    },
+    {
+      "id": "S18",
+      "path": "backend/src/main/java/com/sportify/identity/security/SecurityConfig.java",
+      "line": 27,
+      "definition": "@EnableMethodSecurity"
+    },
+    {
+      "id": "S19",
+      "path": "backend/src/main/java/com/sportify/identity/security/CustomUserDetails.java",
+      "line": 22,
+      "definition": "getAuthorities"
+    },
+    {
+      "id": "S20",
+      "path": "backend/src/main/java/com/sportify/identity/entity/MemberProfile.java",
+      "line": 23,
+      "definition": "@MapsId"
+    },
+    {
+      "id": "S21",
+      "path": "backend/src/main/java/com/sportify/identity/entity/CoachProfile.java",
+      "line": 21,
+      "definition": "@MapsId"
+    },
+    {
+      "id": "S22",
+      "path": "backend/src/main/java/com/sportify/core/common/SecurityUtils.java",
+      "line": 10,
+      "definition": "isStaff"
+    },
+    {
+      "id": "S23",
+      "path": "backend/src/main/java/com/sportify/core/audit/impl/AuditServiceImpl.java",
+      "line": 38,
+      "definition": "public void record"
+    },
+    {
+      "id": "S24",
+      "path": "backend/src/main/java/com/sportify/identity/entity/ActivityLog.java",
+      "line": 18,
+      "definition": "class ActivityLog"
+    },
+    {
+      "id": "S25",
+      "path": "backend/src/main/java/com/sportify/identity/controller/ActivityLogController.java",
+      "line": 17,
+      "definition": "@PreAuthorize"
+    },
+    {
+      "id": "S26",
+      "path": "backend/src/main/java/com/sportify/core/config/ClockConfig.java",
+      "line": 14,
+      "definition": "Clock.system"
+    },
+    {
+      "id": "S27",
+      "path": "backend/src/test/java/com/sportify/AbstractIntegrationTest.java",
+      "line": 13,
+      "definition": "@Tag"
+    },
+    {
+      "id": "S28",
+      "path": "backend/pom.xml",
+      "line": 181,
+      "definition": "maven-surefire-plugin"
+    },
+    {
+      "id": "S29",
+      "path": ".github/workflows/ci.yml",
+      "line": 8,
+      "definition": "workflow_dispatch:"
+    },
+    {
+      "id": "S30",
+      "path": "backend/src/main/java/com/sportify/catalog/entity/ClassSession.java",
+      "line": 19,
+      "definition": "class ClassSession"
+    },
+    {
+      "id": "S31",
+      "path": "backend/src/main/java/com/sportify/catalog/entity/Booking.java",
+      "line": 17,
+      "definition": "class Booking"
+    },
+    {
+      "id": "S32",
+      "path": "backend/src/main/java/com/sportify/catalog/entity/CheckIn.java",
+      "line": 22,
+      "definition": "class CheckIn"
+    },
+    {
+      "id": "S33",
+      "path": "backend/src/main/resources/db/migration/catalog/V23__add_session_cancellation_and_schedule_indexes.sql",
+      "line": 3,
+      "definition": "ALTER TABLE"
+    },
+    {
+      "id": "S34",
+      "path": "backend/src/main/java/com/sportify/identity/service/impl/ActivityLogServiceImpl.java",
+      "line": 17,
+      "definition": "class ActivityLogService"
+    },
+    {
+      "id": "S35",
+      "path": "backend/src/main/java/com/sportify/catalog/repository/SportPackageRegistrationRepository.java",
+      "line": 86,
+      "definition": "consumeSession"
+    }
+  ],
+  "method": "Tracked SQL under db/migration and db/demo; strip SQL comments; count permanent CREATE TABLE declarations, not table variables or deployed objects; normalized LF SHA-256. Tracked Java @Entity declarations counted separately.",
+  "deployed_schema": "UNVERIFIED_RUNTIME"
+}
