@@ -1,0 +1,126 @@
+{
+  "status": "PROPOSED",
+  "implementation": "BLOCKED_PENDING_APPROVAL",
+  "entities": {
+    "P_PLAN_IDENTITY": {
+      "status": "PROPOSED",
+      "decisions": [
+        "D-02",
+        "D-12"
+      ],
+      "fields": [
+        "candidate_id",
+        "legacy_plan_id",
+        "author_coach_id",
+        "sport_id"
+      ]
+    },
+    "P_PLAN_REVISION": {
+      "status": "PROPOSED",
+      "decisions": [
+        "D-02",
+        "D-12"
+      ],
+      "fields": [
+        "candidate_id",
+        "plan_identity_id",
+        "revision_sequence",
+        "content_snapshot",
+        "concurrency_token"
+      ]
+    },
+    "P_PLAN_ASSIGNMENT": {
+      "status": "PROPOSED",
+      "decisions": [
+        "D-02",
+        "D-12"
+      ],
+      "fields": [
+        "candidate_id",
+        "revision_id",
+        "member_id",
+        "class_id",
+        "audience_rule"
+      ]
+    },
+    "P_PLAN_RECIPIENT": {
+      "status": "PROPOSED",
+      "decisions": [
+        "D-02",
+        "D-12"
+      ],
+      "fields": [
+        "assignment_id",
+        "member_id"
+      ]
+    },
+    "P_PLAN_SESSION_USE": {
+      "status": "PROPOSED",
+      "decisions": [
+        "D-02",
+        "D-12"
+      ],
+      "fields": [
+        "candidate_id",
+        "revision_id",
+        "session_id"
+      ]
+    },
+    "P_RESULT_REVISION": {
+      "status": "PROPOSED",
+      "decisions": [
+        "D-03",
+        "D-12"
+      ],
+      "fields": [
+        "candidate_id",
+        "result_id",
+        "actor_user_id",
+        "previous_revision_id",
+        "concurrency_token"
+      ]
+    },
+    "P_RESULT_VALUE": {
+      "status": "PROPOSED",
+      "decisions": [
+        "D-03",
+        "D-12"
+      ],
+      "fields": [
+        "revision_id",
+        "metric_id",
+        "observed_value"
+      ]
+    },
+    "P_FEEDBACK_REVISION": {
+      "status": "PROPOSED",
+      "decisions": [
+        "D-03",
+        "D-12"
+      ],
+      "fields": [
+        "candidate_id",
+        "feedback_id",
+        "member_comment",
+        "staff_note",
+        "previous_revision_id"
+      ]
+    }
+  },
+  "physical_relationships": [
+    "E_SESSION_PLAN o|--o{ P_PLAN_IDENTITY : optional_legacy_origin",
+    "E_COACH_PROFILE ||--o{ P_PLAN_IDENTITY : proposed_author",
+    "P_PLAN_IDENTITY ||--o{ P_PLAN_REVISION : identity_fk",
+    "P_PLAN_REVISION ||--o{ P_PLAN_ASSIGNMENT : revision_fk",
+    "P_PLAN_ASSIGNMENT ||--o{ P_PLAN_RECIPIENT : assignment_fk",
+    "E_MEMBER_PROFILE ||--o{ P_PLAN_RECIPIENT : member_fk",
+    "P_PLAN_REVISION ||--o{ P_PLAN_SESSION_USE : revision_fk",
+    "E_CLASS_SESSION ||--o{ P_PLAN_SESSION_USE : session_fk",
+    "E_SESSION_RESULT ||--o{ P_RESULT_REVISION : result_fk",
+    "P_RESULT_REVISION ||--o{ P_RESULT_VALUE : revision_fk",
+    "E_SKILL_METRIC ||--o{ P_RESULT_VALUE : governed_metric_fk",
+    "E_COACH_FEEDBACK ||--o{ P_FEEDBACK_REVISION : feedback_fk",
+    "E_ATTENDANCE_RECORD ||--o{ E_ATTENDANCE_CORRECTION : existing_parent_fk"
+  ],
+  "business_cases": 60
+}
