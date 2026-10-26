@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom'
+import '@fontsource/be-vietnam-pro/800.css'
+import '@fontsource/be-vietnam-pro/800-italic.css'
 
 export interface BrandProps {
   to?: string

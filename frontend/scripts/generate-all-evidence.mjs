@@ -1,7 +1,7 @@
-import { spawn } from 'node:child_process'
+import { spawn, execSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { tmpdir, platform, release, arch } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { inflateSync } from 'node:zlib'
@@ -12,6 +12,18 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const FRONTEND_ROOT = resolve(__dirname, '..')
 const SCREENSHOTS_DIR = join(FRONTEND_ROOT, 'docs/screenshots')
 const MANIFEST_ENTRIES = []
+
+function getGitProvenance() {
+  try {
+    const branchSha = execSync('git rev-parse HEAD', { cwd: FRONTEND_ROOT }).toString().trim()
+    const baseSha = execSync('git rev-parse origin/main', { cwd: FRONTEND_ROOT }).toString().trim()
+    return { branchSha, baseSha }
+  } catch (err) {
+    return { branchSha: 'UNKNOWN', baseSha: 'UNKNOWN' }
+  }
+}
+const GIT_PROVENANCE = getGitProvenance()
+const RUNTIME_OS = `${platform()} ${release()} (${arch()})`
 
 function findChrome() {
   const candidates = [
@@ -109,6 +121,24 @@ const RECEPTIONIST = {
   fullName: 'Linh Receptionist',
   phone: '0912345678',
   role: 'RECEPTIONIST',
+  status: 'ACTIVE',
+}
+
+const COACH = {
+  id: 30,
+  email: 'coach@sportify.demo',
+  fullName: 'Coach Minh',
+  phone: '0903334455',
+  role: 'COACH',
+  status: 'ACTIVE',
+}
+
+const MANAGER = {
+  id: 1,
+  email: 'manager@sportify.demo',
+  fullName: 'Morgan Manager',
+  phone: '0901234500',
+  role: 'MANAGER',
   status: 'ACTIVE',
 }
 
@@ -457,6 +487,22 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
               })
               return
             }
+            if (role === 'COACH') {
+              await send('Fetch.fulfillRequest', {
+                requestId, responseCode: 200,
+                responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
+                body: Buffer.from(JSON.stringify(COACH)).toString('base64'),
+              })
+              return
+            }
+            if (role === 'MANAGER') {
+              await send('Fetch.fulfillRequest', {
+                requestId, responseCode: 200,
+                responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
+                body: Buffer.from(JSON.stringify(MANAGER)).toString('base64'),
+              })
+              return
+            }
             if (role === 'MEMBER' || isRegistered) {
               await send('Fetch.fulfillRequest', {
                 requestId, responseCode: 200,
@@ -628,6 +674,65 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
             return
           }
 
+          if (path.startsWith('/coach/sessions')) {
+            await send('Fetch.fulfillRequest', {
+              requestId, responseCode: 200,
+              responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
+              body: Buffer.from(JSON.stringify([])).toString('base64'),
+            })
+            return
+          }
+
+          if (path.startsWith('/manager/users')) {
+            await send('Fetch.fulfillRequest', {
+              requestId, responseCode: 200,
+              responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
+              body: Buffer.from(JSON.stringify({
+                content: [
+                  { id: 1, fullName: 'Morgan Manager', email: 'manager@sportify.demo', role: 'MANAGER', status: 'ACTIVE', phone: '0901234500', createdAt: '2026-01-01T00:00:00Z' },
+                  { id: 30, fullName: 'Coach Minh', email: 'coach@sportify.demo', role: 'COACH', status: 'ACTIVE', phone: '0903334455', createdAt: '2026-01-01T00:00:00Z' },
+                ],
+                totalElements: 2,
+                totalPages: 1,
+                page: 0,
+                size: 20,
+              })).toString('base64'),
+            })
+            return
+          }
+
+          if (path === '/sports') {
+            await send('Fetch.fulfillRequest', {
+              requestId, responseCode: 200,
+              responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
+              body: Buffer.from(JSON.stringify([
+                { id: 1, code: 'GYM', name: 'Fitness Gym', venueType: 'INDOOR', description: 'Gym fitness', imageUrl: null, displayOrder: 1 },
+                { id: 2, code: 'SWIM', name: 'Swimming', venueType: 'POOL', description: 'Olympic pool', imageUrl: null, displayOrder: 2 },
+              ])).toString('base64'),
+            })
+            return
+          }
+
+          if (path === '/packages') {
+            await send('Fetch.fulfillRequest', {
+              requestId, responseCode: 200,
+              responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
+              body: Buffer.from(JSON.stringify([
+                { id: 1, code: 'GYM-M', name: 'Gym 1 Month', sportId: 1, sportName: 'Fitness Gym', sportCode: 'GYM', trainingFormat: 'SELF_TRAINING', durationDays: 30, sessionCount: 30, sessionMinutes: 60, priceAmount: 500000, description: 'Gym month', isActive: true },
+              ])).toString('base64'),
+            })
+            return
+          }
+
+          if (path === '/membership-cards/my' || path === '/packages/registrations/my' || path === '/bookings/my') {
+            await send('Fetch.fulfillRequest', {
+              requestId, responseCode: 200,
+              responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
+              body: Buffer.from(JSON.stringify([])).toString('base64'),
+            })
+            return
+          }
+
           // Default fallback
           await send('Fetch.fulfillRequest', {
             requestId, responseCode: 200,
@@ -654,6 +759,10 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
   const tokenScript =
     role === 'RECEPTIONIST'
       ? `localStorage.setItem('sportify.accessToken', 'reception-token'); localStorage.setItem('sportify.refreshToken', 'reception-refresh');`
+      : role === 'COACH'
+      ? `localStorage.setItem('sportify.accessToken', 'coach-token'); localStorage.setItem('sportify.refreshToken', 'coach-refresh');`
+      : role === 'MANAGER'
+      ? `localStorage.setItem('sportify.accessToken', 'manager-token'); localStorage.setItem('sportify.refreshToken', 'manager-refresh');`
       : role === 'MEMBER'
       ? `localStorage.setItem('sportify.accessToken', 'member-token'); localStorage.setItem('sportify.refreshToken', 'member-refresh');`
       : `localStorage.clear();`
@@ -727,8 +836,9 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
       userRole: role,
       timestamp: new Date().toISOString(),
       browser: 'Chrome Headless (CDP)',
-      os: 'Windows',
-      baseSha: '4cdc0874fde95ae0b1500f0625c1521f428a6bec',
+      os: RUNTIME_OS,
+      branchSha: GIT_PROVENANCE.branchSha,
+      baseSha: GIT_PROVENANCE.baseSha,
     })
     console.log(`Saved screenshot: ${filePath} (sha256: ${hash.slice(0, 8)}...)`)
   }
@@ -1995,17 +2105,82 @@ async function main() {
       console.log('UI-32 modal & interaction test completed!')
     }
 
+    // =========================================================================
+    // 7. UI-SYNC: Full Website Shell & Route Audit (UI-SYNC-R1-04)
+    // Auditing Public, Auth, Member, Receptionist, Coach, and Manager areas
+    // =========================================================================
+    if (shouldRun('ui-sync') || shouldRun('all-routes')) {
+      console.log('\n[7/6] Generating UI-SYNC full cross-website shell evidence...')
+
+      // Public Home, Login, Credits
+      const guestSession = await runSession(browser, { role: 'GUEST' })
+      for (const th of ['light', 'dark']) {
+        await guestSession.setViewport(1440, 900, th)
+        await guestSession.goto('/', '.home-header')
+        await guestSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/home-${th}-1440.png`))
+        await guestSession.goto('/login', '.auth-panel')
+        await guestSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/login-${th}-1440.png`))
+        await guestSession.goto('/credits', 'main, h1, .brand')
+        await guestSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/credits-${th}-1440.png`))
+      }
+      await guestSession.cleanup()
+
+      // Member Shell
+      const memberSession = await runSession(browser, { role: 'MEMBER' })
+      for (const th of ['light', 'dark']) {
+        await memberSession.setViewport(1440, 900, th)
+        await memberSession.goto('/member', '.member-layout')
+        await memberSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/member-dashboard-${th}-1440.png`))
+        await memberSession.goto('/member/packages', '.member-layout')
+        await memberSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/member-packages-${th}-1440.png`))
+      }
+      await memberSession.cleanup()
+
+      // Receptionist Shell
+      const receptionSession = await runSession(browser, { role: 'RECEPTIONIST' })
+      for (const th of ['light', 'dark']) {
+        await receptionSession.setViewport(1440, 900, th)
+        await receptionSession.goto('/reception', '.staff-layout')
+        await receptionSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/reception-desk-${th}-1440.png`))
+      }
+      await receptionSession.cleanup()
+
+      // Coach Shell
+      const coachSession = await runSession(browser, { role: 'COACH' })
+      for (const th of ['light', 'dark']) {
+        await coachSession.setViewport(1440, 900, th)
+        await coachSession.goto('/coach', '.staff-layout')
+        await coachSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/coach-schedule-${th}-1440.png`))
+      }
+      await coachSession.cleanup()
+
+      // Manager Shell
+      const managerSession = await runSession(browser, { role: 'MANAGER' })
+      for (const th of ['light', 'dark']) {
+        await managerSession.setViewport(1440, 900, th)
+        await managerSession.goto('/manager', '.staff-layout')
+        await managerSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/manager-overview-${th}-1440.png`))
+      }
+      await managerSession.cleanup()
+      console.log('UI-SYNC full website shell audit completed!')
+    }
+
     if (MANIFEST_ENTRIES.length > 0) {
       const manifestPath = join(FRONTEND_ROOT, 'docs/screenshots-manifest.json')
       writeFileSync(manifestPath, JSON.stringify(MANIFEST_ENTRIES, null, 2) + '\n')
       console.log(`Saved screenshot manifest: ${manifestPath} (${MANIFEST_ENTRIES.length} entries)`)
-      const reportManifestPath = 'D:/SWP/G3-git/tasks/UI-SYNC-01 (i)/report/round 1/screenshots-manifest.json'
-      try {
-        mkdirSync('D:/SWP/G3-git/tasks/UI-SYNC-01 (i)/report/round 1', { recursive: true })
-        writeFileSync(reportManifestPath, JSON.stringify(MANIFEST_ENTRIES, null, 2) + '\n')
-        console.log(`Saved screenshot manifest to report directory: ${reportManifestPath}`)
-      } catch (err) {
-        console.warn('Could not write manifest to report dir:', err.message)
+      // Save manifest dynamically to latest active report round if task report dir exists
+      const taskReportRoot = resolve(FRONTEND_ROOT, '../../tasks/UI-SYNC-01 (i)/report')
+      if (existsSync(taskReportRoot)) {
+        for (const round of ['round 2', 'round 1']) {
+          const dir = join(taskReportRoot, round)
+          if (existsSync(dir)) {
+            const reportManifestPath = join(dir, 'screenshots-manifest.json')
+            writeFileSync(reportManifestPath, JSON.stringify(MANIFEST_ENTRIES, null, 2) + '\n')
+            console.log(`Saved screenshot manifest to report directory: ${reportManifestPath}`)
+            break
+          }
+        }
       }
     }
 

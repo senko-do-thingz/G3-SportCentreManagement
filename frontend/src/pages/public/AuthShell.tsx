@@ -6,7 +6,8 @@ import authFallback from '../../assets/auth/auth-dunk.jpg'
 import { Brand } from '../../components/Brand'
 import { Photo } from '../../media/Photo'
 import { ThemeToggle } from '../../theme/ThemeToggle'
-import { HOME_PHOTOS } from './homeContent'
+import { HOME_HERO_VIDEOS, HOME_PHOTOS } from './homeContent'
+import { HomeHeroVideo } from './HomeHeroVideo'
 import '../../styles/auth.css'
 
 export interface AuthShellProps {
@@ -15,6 +16,8 @@ export interface AuthShellProps {
   title: string
   subtitle: string
   children: ReactNode
+  /** Enable background video clips from Home (mandated for Sign Up). */
+  enableVideo?: boolean
 }
 
 function Slogan() {
@@ -35,12 +38,13 @@ function Slogan() {
  * Log in and Sign up (layout B, UI-06 and UI-07): the dunk photo fills the page with the player on the left, a compact
  * Home header (brand, Back to Home, sun and moon switch) sits on top, the slogan sits low on the left under the player
  * and the form card floats on the dark right side. On narrow screens the photo becomes a band with the slogan above
- * the card.
+ * the card. Sign up enhances this with seamless background video from Home.
  */
-export function AuthShell({ className, title, subtitle, children }: AuthShellProps) {
+export function AuthShell({ className, title, subtitle, children, enableVideo = false }: AuthShellProps) {
   return (
     <div className={['auth-stage', className].filter(Boolean).join(' ')}>
       <Photo className="auth-stage__photo" src={HOME_PHOTOS.auth} fallback={authFallback} sizes="100vw" width="2200" height="3300" fetchPriority="high" />
+      {enableVideo && <HomeHeroVideo sources={HOME_HERO_VIDEOS} />}
       <div className="auth-stage__header">
         <Brand />
         <div className="auth-stage__actions">

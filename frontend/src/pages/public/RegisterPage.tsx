@@ -122,7 +122,7 @@ export function RegisterPage() {
   const passwordsMatch = form.confirmPassword.length > 0 && form.confirmPassword === form.password
 
   return (
-    <AuthShell className="auth-shell--register" title="Create your account" subtitle="Join Sportify to book classes and track your training.">
+    <AuthShell className="auth-shell--register" title="Create your account" subtitle="Join Sportify to book classes and track your training." enableVideo>
       {formError && (
         <p className="notice notice--danger" role="alert">
           {formError}

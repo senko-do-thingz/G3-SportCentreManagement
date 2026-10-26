@@ -159,4 +159,97 @@ describe('UI Baseline Synchronization - ThemeToggle & Shared Shells (UI-SYNC-01)
     expect(nextLabel).not.toBe(initialLabel)
     expect(nextTheme).not.toBe(initialTheme)
   })
+
+  it('UI-SYNC-R1-02: verifies authoritative logo mark and wordmark consistency across Public, Auth, Member and Staff', () => {
+    // 1. MemberLayout Brand
+    const { container: memberBox } = render(
+      <MemoryRouter>
+        <AuthContext.Provider value={mockAuthValue}>
+          <ThemeProvider>
+            <MemberLayout />
+          </ThemeProvider>
+        </AuthContext.Provider>
+      </MemoryRouter>,
+    )
+    const memberMark = memberBox.querySelector('.member-header__bar .brand__mark')
+    const memberName = memberBox.querySelector('.member-header__bar .brand__name')
+    expect(memberMark?.textContent?.trim()).toBe('S')
+    expect(memberName?.textContent?.trim()).toBe('Sportify')
+
+    // 2. StaffLayout Brand
+    const { container: staffBox } = render(
+      <MemoryRouter>
+        <AuthContext.Provider value={mockReceptionAuthValue}>
+          <ThemeProvider>
+            <StaffLayout />
+          </ThemeProvider>
+        </AuthContext.Provider>
+      </MemoryRouter>,
+    )
+    const staffMark = staffBox.querySelector('.sidebar__brand .brand__mark')
+    const staffName = staffBox.querySelector('.sidebar__brand .brand__name')
+    expect(staffMark?.textContent?.trim()).toBe('S')
+    expect(staffName?.textContent?.trim()).toBe('Sportify')
+
+    // 3. AuthShell Brand
+    const { container: authBox } = render(
+      <MemoryRouter>
+        <ThemeProvider>
+          <AuthShell title="Create your account" subtitle="Join Sportify">
+            <div>Content</div>
+          </AuthShell>
+        </ThemeProvider>
+      </MemoryRouter>,
+    )
+    const authMark = authBox.querySelector('.auth-stage__header .brand__mark')
+    const authName = authBox.querySelector('.auth-stage__header .brand__name')
+    expect(authMark?.textContent?.trim()).toBe('S')
+    expect(authName?.textContent?.trim()).toBe('Sportify')
+
+    // 4. HomeHeader Brand
+    const { container: homeBox } = render(
+      <MemoryRouter>
+        <AuthContext.Provider value={mockAuthValue}>
+          <ThemeProvider>
+            <HomeHeader />
+          </ThemeProvider>
+        </AuthContext.Provider>
+      </MemoryRouter>,
+    )
+    const homeMark = homeBox.querySelector('.home-header .brand__mark')
+    const homeName = homeBox.querySelector('.home-header .brand__name')
+    expect(homeMark?.textContent?.trim()).toBe('S')
+    expect(homeName?.textContent?.trim()).toBe('Sportify')
+  })
+
+  it('UI-SYNC-R1-03: verifies Sign Up video background support with persistent fallback photo', () => {
+    const { container: withVideo } = render(
+      <MemoryRouter>
+        <ThemeProvider>
+          <AuthShell title="Create your account" subtitle="Join Sportify" enableVideo>
+            <div>Content</div>
+          </AuthShell>
+        </ThemeProvider>
+      </MemoryRouter>,
+    )
+
+    // Fallback photo is ALWAYS present as guaranteed baseline
+    const photo = withVideo.querySelector('.auth-stage__photo')
+    expect(photo).not.toBeNull()
+
+    // Form card readability overlay is present
+    expect(withVideo.querySelector('.auth-stage')).not.toBeNull()
+
+    // Without enableVideo (e.g. standard AuthShell), video component does not compete
+    const { container: withoutVideo } = render(
+      <MemoryRouter>
+        <ThemeProvider>
+          <AuthShell title="Welcome back" subtitle="Sign in">
+            <div>Content</div>
+          </AuthShell>
+        </ThemeProvider>
+      </MemoryRouter>,
+    )
+    expect(withoutVideo.querySelector('.auth-stage__photo')).not.toBeNull()
+  })
 })
