@@ -90,7 +90,9 @@ def main():
         def snapshot(page, name, theme, width):
             file = f'{theme}-{width}-{name}.png'
             page.screenshot(path=str(out / file), animations='disabled')
-            report['screenshots'].append({'file': file, 'route': urlparse(page.url).path + urlparse(page.url).fragment, 'theme': theme, 'viewport': page.viewport_size, 'scrollY': page.evaluate('scrollY'), 'sha': sha, 'dirty': dirty})
+            url = urlparse(page.url)
+            route = url.path + (f'#{url.fragment}' if url.fragment else '')
+            report['screenshots'].append({'file': file, 'route': route, 'theme': theme, 'viewport': page.viewport_size, 'scrollY': page.evaluate('scrollY'), 'sha': sha, 'dirty': dirty})
 
         def header_matrix(width, theme):
             _, page = page_for(width=width, theme=theme)
