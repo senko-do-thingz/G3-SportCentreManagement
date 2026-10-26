@@ -45,6 +45,7 @@ describe('staff workspace shell navigation', () => {
     setup(MANAGER, '/manager/classes')
     const navigation = await screen.findByRole('navigation', { name: 'Manager workspace navigation' })
     expect(screen.getByRole('button', { name: /Switch to .* mode/ })).toHaveClass('home-theme')
+    expect(navigation.closest('.staff-layout')).toHaveClass('staff-layout--manager')
 
     expect(within(navigation).getByRole('link', { name: 'Users' })).toHaveAttribute('href', '/manager')
     expect(within(navigation).getByRole('link', { name: 'Classes' })).toHaveAttribute('aria-current', 'page')

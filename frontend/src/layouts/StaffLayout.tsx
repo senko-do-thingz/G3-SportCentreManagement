@@ -13,7 +13,8 @@ export function StaffLayout() {
   const menuToggleRef = useRef<HTMLButtonElement>(null)
 
   // RequireRole guarantees a staff role here; fall back to the manager menu for type safety only.
-  const area = role && role !== 'MEMBER' ? STAFF_AREAS[role] : STAFF_AREAS.MANAGER
+  const staffRole = role && role !== 'MEMBER' ? role : 'MANAGER'
+  const area = STAFF_AREAS[staffRole]
   const activeItem = findActiveItem(area, location.pathname)
 
   const handleSidebarKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -33,7 +34,7 @@ export function StaffLayout() {
   )
 
   return (
-    <div className={'staff-layout' + (menuOpen ? ' staff-layout--menu-open' : '')}>
+    <div className={`staff-layout staff-layout--${staffRole.toLowerCase()}` + (menuOpen ? ' staff-layout--menu-open' : '')}>
       <header className="workspace-header staff-layout__header">
         <WorkspaceHeaderBar navigation={breadcrumb} />
       </header>
