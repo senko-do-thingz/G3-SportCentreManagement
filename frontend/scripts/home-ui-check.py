@@ -269,7 +269,8 @@ def main():
         def identity():
             _, page = page_for()
             def logo():
-                return page.locator('.brand').evaluate('(e) => {const read=(selector,keys)=>{const s=getComputedStyle(e.querySelector(selector));return Object.fromEntries(keys.map(k=>[k,s[k]]))};return {tile:read(".brand__mark",["backgroundColor","color","borderTopWidth","borderRadius","boxShadow","filter","width","height"]),wordmark:read(".brand__name",["color","fontFamily","fontStyle","fontSize","letterSpacing","filter"])}}')
+                # Wait for the Home mount; the auth page also has a shared Brand during navigation.
+                return page.locator('.home-header .brand').evaluate('(e) => {const read=(selector,keys)=>{const s=getComputedStyle(e.querySelector(selector));return Object.fromEntries(keys.map(k=>[k,s[k]]))};return {tile:read(".brand__mark",["backgroundColor","color","borderTopWidth","borderRadius","boxShadow","filter","width","height"]),wordmark:read(".brand__name",["color","fontFamily","fontStyle","fontSize","letterSpacing","filter"])}}')
             light = logo()
             for theme in ['dark', 'light']:
                 page.get_by_role('button', name=f'Switch to {theme} mode').click()
