@@ -10,7 +10,7 @@ Status: TECHNICAL_DRAFT_READY_FOR_CODEOWNER_REVIEW. The complete design is avail
 | Business adoption and policy | G-00/D-11 and D-01/02/03/12/13 plus 32 required dimensions pending |
 | FE/BE contract | D-10/G-01 pending, NX-03 technical remediation is not a signature |
 | Physical migration approval/runtime | NOT_FOUND / NOT_RUN_APPROVAL_BLOCKED; no disposable local SQL Server target established |
-| Validation | EXECUTED_PASS: 1,882 Maven unit tests and 62 shared Python tests; focused NX-04 suite 24 tests including 23 negative controls; three ERDs parsed/rendered; no failures/errors/skips |
+| Initial authoring validation | EXECUTED_PASS: 1,882 Maven unit tests and 62 shared Python tests; focused NX-04 suite 24 tests including 23 negative controls; three ERDs parsed/rendered; no failures/errors/skips |
 | Publication/review | Dedicated NX-04 branch only; commit/push/CI evidence retained separately; human CODEOWNER controls PR and merge |
 
 ## Contents
@@ -43,3 +43,5 @@ Source and static checks cannot prove deployed SQL constraints, engine collation
 On 2026-10-26, the static guard passed and Mermaid 11.12.0 parsed and rendered all three ERDs, which were visually inspected; an intentionally malformed relationship was rejected. The NX-04 self-tests passed 24 tests: a clean package control and 23 independent mutations of actual inputs covering authorization, decisions, immutable migrations, traceability, links, classification and private paths. The shared Python suite passed 62 tests, including that focused suite. Existing Maven `test` passed 1,882 tests with zero failures/errors/skips, the independent unit report guard confirmed those counters, and `mvn -B -ntp -DskipUnitTests=true -DskipITs=true package` completed with exit 0. All commands returned exit 0. Packaging intentionally reused completed unit evidence and did not run integrations.
 
 New runtime migration/authorization cases remain NOT_RUN_APPROVAL_BLOCKED; full local Maven verify was not eligible because integration containers require unavailable Docker and new migration execution lacks signed scope/disposable target. CI runs and their actual commit SHAs are reported in the publication handoff, without treating CI success as a business signature.
+
+Round 2 maintenance validation on 2026-10-26 passed the static guard and all 29 focused NX-04 tests. Five additional in-memory controls prove that an exact reviewed additive inventory update passes while retaining historical fingerprint/population checks, new-file fingerprints and the aggregate table census. See 09 for ordinary future-feature ownership and CODEOWNER review; updating this census does not require an extra NX-04 signature or grant migration approval. No guard exception or production SQL change was introduced.

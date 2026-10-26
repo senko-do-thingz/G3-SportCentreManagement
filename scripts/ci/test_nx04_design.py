@@ -1,6 +1,7 @@
 """Sensitivity tests mutate real NX-04 input copies without filesystem writes."""
 
 import copy
+import hashlib
 import json
 import unittest
 from pathlib import Path
@@ -53,6 +54,59 @@ class Nx04DesignGuardTest(unittest.TestCase):
     def test_new_unapproved_migration_is_rejected(self):
         self.data["backend/src/main/resources/db/migration/catalog/V34__unapproved.sql"] = "-- fixture only\n"
         self.rejected("migration:population")
+
+    def add_reviewed_migration_fixture(self):
+        """Simulate an append-only inventory review; never write SQL to disk."""
+        inventory_path = guard.DOCS + "source-inventory.json"
+        inventory = json.loads(self.data[inventory_path])
+        version = max(m["version"] for m in inventory["migrations"]) + 1
+        path = f"backend/src/main/resources/db/migration/catalog/V{version}__future_fixture.sql"
+        content = "CREATE TABLE [nx04_future_fixture] ([id] BIGINT NOT NULL);\n"
+        self.data[path] = content
+        inventory["migrations"].append({
+            "path": path,
+            "version": version,
+            "creates": ["[nx04_future_fixture]"],
+            "drops": [],
+            "sha256_lf": hashlib.sha256(content.encode()).hexdigest(),
+        })
+        inventory["create_occurrences"] += 1
+        inventory["create_names"] = sorted(inventory["create_names"] + ["[nx04_future_fixture]"])
+        self.data[inventory_path] = json.dumps(inventory)
+        return path
+
+    def test_reviewed_additive_inventory_update_is_accepted(self):
+        original = json.loads(self.data[guard.DOCS + "source-inventory.json"])["migrations"]
+        self.add_reviewed_migration_fixture()
+        updated = json.loads(self.data[guard.DOCS + "source-inventory.json"])["migrations"]
+        self.assertEqual(original, updated[:-1], "Historical inventory entries must remain unchanged")
+        self.assertEqual([], guard.validate(self.data))
+
+    def test_reviewed_addition_preserves_historical_fingerprints(self):
+        self.add_reviewed_migration_fixture()
+        inventory = json.loads(self.data[guard.DOCS + "source-inventory.json"])
+        path = inventory["migrations"][0]["path"]
+        self.data[path] += "\n-- changed historical fixture\n"
+        self.rejected("migration:fingerprint:" + path)
+
+    def test_reviewed_addition_preserves_historical_population(self):
+        self.add_reviewed_migration_fixture()
+        inventory = json.loads(self.data[guard.DOCS + "source-inventory.json"])
+        del self.data[inventory["migrations"][0]["path"]]
+        self.rejected("migration:population")
+
+    def test_reviewed_addition_still_checks_new_fingerprint(self):
+        path = self.add_reviewed_migration_fixture()
+        self.data[path] += "\n-- drift after inventory update\n"
+        self.rejected("migration:fingerprint:" + path)
+
+    def test_reviewed_addition_requires_updated_table_census(self):
+        self.add_reviewed_migration_fixture()
+        inventory_path = guard.DOCS + "source-inventory.json"
+        inventory = json.loads(self.data[inventory_path])
+        inventory["create_occurrences"] -= 1
+        self.data[inventory_path] = json.dumps(inventory)
+        self.rejected("source:table-census")
 
     def test_missing_historical_migration_is_rejected(self):
         inventory = json.loads(self.data[guard.DOCS + "source-inventory.json"])
