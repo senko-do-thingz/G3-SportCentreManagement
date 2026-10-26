@@ -39,6 +39,9 @@ const MIXKIT_PAGES: Record<string, { label: string; page: string }> = {
   '44448': { label: 'Skilled basketball player shooting baskets, training alone', page: 'https://mixkit.co/free-stock-video/skilled-basketball-player-shooting-baskets-training-alone-44448/' },
   '43499': { label: 'Goal play in a semi-professional soccer game', page: 'https://mixkit.co/free-stock-video/goal-play-in-a-semi-professional-soccer-game-43499/' },
   '873': { label: 'Tennis player serving', page: 'https://mixkit.co/free-stock-video/tennis-player-serving-873/' },
+  '3168': { label: 'Man swimming in a pool', page: 'https://mixkit.co/free-stock-video/man-swimming-in-a-pool-3168/' },
+  '12321': { label: 'Volleyball match view towards the net', page: 'https://mixkit.co/free-stock-video/volleyball-match-view-towards-the-net-12321/' },
+  '13038': { label: 'Siblings playing badminton in the sunset', page: 'https://mixkit.co/free-stock-video/siblings-playing-badminton-in-the-sunset-13038/' },
 }
 
 /** Every third-party photo, video and font on the public pages, built from the same constants the pages use. */

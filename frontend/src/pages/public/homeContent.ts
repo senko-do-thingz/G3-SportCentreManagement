@@ -23,7 +23,14 @@ const unsplash = unsplashUrl
  */
 const mixkit = (id: number) => [1080, 720].map((size) => `https://assets.mixkit.co/videos/${id}/${id}-${size}.mp4`)
 
-export const HOME_HERO_VIDEOS = [mixkit(44448), mixkit(43499), mixkit(873)] as const
+export const HOME_HERO_VIDEOS = [
+  mixkit(44448), // Basketball
+  mixkit(43499), // Football
+  mixkit(873),   // Tennis
+  mixkit(3168),  // Swimming
+  mixkit(12321), // Volleyball
+  mixkit(13038), // Badminton
+] as const
 
 export const HOME_PHOTOS = {
   hero: unsplash('photo-1626224583764-f87db24ac4ea', 2200),
