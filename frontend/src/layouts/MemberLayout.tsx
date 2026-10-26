@@ -3,7 +3,7 @@ import { AccountSwitchNotice } from '../components/AccountSwitchNotice'
 import { Brand } from '../components/Brand'
 import { areaItems, itemHref, MEMBER_AREA } from './navigation'
 import { UserMenu } from './UserMenu'
-import { AppearanceControl } from '../theme/AppearanceControl'
+import { ThemeToggle } from '../theme/ThemeToggle'
 
 /** Member area: brand and user on top, tab navigation below (Figma F1-07, F1-09). */
 export function MemberLayout() {
@@ -12,7 +12,7 @@ export function MemberLayout() {
       <header className="member-layout__header">
         <div className="member-header__bar container">
           <Brand />
-          <div className="header-actions"><AppearanceControl /><UserMenu /></div>
+          <div className="header-actions"><ThemeToggle className="member-theme" /><UserMenu /></div>
         </div>
         <nav className="member-nav" aria-label="Member navigation">
           <div className="member-nav__list container">

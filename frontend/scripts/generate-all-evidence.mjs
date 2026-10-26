@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -10,6 +11,7 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:4310'
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const FRONTEND_ROOT = resolve(__dirname, '..')
 const SCREENSHOTS_DIR = join(FRONTEND_ROOT, 'docs/screenshots')
+const MANIFEST_ENTRIES = []
 
 function findChrome() {
   const candidates = [
@@ -660,12 +662,18 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
     source: `try { ${tokenScript} } catch {}`,
   })
 
+  let currentViewport = { width: 1440, height: 900 }
+  let currentTheme = 'light'
+  let currentRoute = '/'
+
   const evalJs = async (expr) => {
     const res = await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true })
     return res.result?.value
   }
 
   const setViewport = async (w, h, theme = 'light') => {
+    currentViewport = { width: w, height: h }
+    currentTheme = theme
     await send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: w < 768 })
     await send('Emulation.setEmulatedMedia', {
       features: [{ name: 'prefers-color-scheme', value: theme }],
@@ -675,6 +683,7 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
   }
 
   const goto = async (path, expectedSelector, timeoutMs = 15000) => {
+    currentRoute = path
     await send('Page.navigate', { url: BASE_URL + path })
     const start = Date.now()
     while (Date.now() - start < timeoutMs) {
@@ -703,8 +712,25 @@ async function runSession(browser, { role = 'GUEST', setup = null }) {
   const screenshot = async (filePath) => {
     mkdirSync(join(filePath, '..'), { recursive: true })
     const { data } = await send('Page.captureScreenshot', { format: 'png' })
-    writeFileSync(filePath, Buffer.from(data, 'base64'))
-    console.log(`Saved screenshot: ${filePath}`)
+    const buf = Buffer.from(data, 'base64')
+    writeFileSync(filePath, buf)
+    const hash = createHash('sha256').update(buf).digest('hex')
+    const relPath = filePath.replace(FRONTEND_ROOT, '').replace(/^[\\\/]/, '').replace(/\\/g, '/')
+    MANIFEST_ENTRIES.push({
+      filePath: relPath,
+      sha256: hash,
+      route: currentRoute,
+      viewport: `${currentViewport.width}x${currentViewport.height}`,
+      viewportWidth: currentViewport.width,
+      viewportHeight: currentViewport.height,
+      theme: currentTheme,
+      userRole: role,
+      timestamp: new Date().toISOString(),
+      browser: 'Chrome Headless (CDP)',
+      os: 'Windows',
+      baseSha: '4cdc0874fde95ae0b1500f0625c1521f428a6bec',
+    })
+    console.log(`Saved screenshot: ${filePath} (sha256: ${hash.slice(0, 8)}...)`)
   }
 
   const printPdf = async (filePath) => {
@@ -786,6 +812,17 @@ async function main() {
       assertUi07Baseline(baselineReport, reportPath)
 
       const session = await runSession(browser, { role: 'GUEST' })
+
+      // Capture UI-07 standard matrix across 390px, 768px, 1440px in light and dark
+      console.log('Capturing UI-07 Sign up matrix across viewports & themes...')
+      for (const vp of [{ w: 390, h: 844 }, { w: 768, h: 1024 }, { w: 1440, h: 900 }]) {
+        for (const th of ['light', 'dark']) {
+          await session.setViewport(vp.w, vp.h, th)
+          await session.goto('/register', 'input[name="fullName"]')
+          await session.screenshot(join(SCREENSHOTS_DIR, `ui-07/signup-${th}-${vp.w}.png`))
+        }
+      }
+
       await session.setViewport(720, 900, 'light')
 
       // State 1: Empty
@@ -1058,7 +1095,7 @@ async function main() {
       }
 
       console.log('Capturing UI-28 payment confirmed states (with invoice & no-invoice)...')
-      for (const vp of [{ w: 390, h: 844 }, { w: 1440, h: 900 }]) {
+      for (const vp of [{ w: 390, h: 844 }, { w: 768, h: 1024 }, { w: 1440, h: 900 }]) {
         for (const th of ['light', 'dark']) {
           await session.setViewport(vp.w, vp.h, th)
           await session.goto('/member/payments/54/status', '.payment-summary, .status-badge')
@@ -1439,7 +1476,7 @@ async function main() {
       }
 
       // Capture receipt views (INV-1054)
-      for (const vp of [{ w: 390, h: 844 }, { w: 1440, h: 900 }]) {
+      for (const vp of [{ w: 390, h: 844 }, { w: 768, h: 1024 }, { w: 1440, h: 900 }]) {
         for (const th of ['light', 'dark']) {
           await session.setViewport(vp.w, vp.h, th)
           await session.goto('/member/payments/receipts/1054', 'h1, h2, .receipt')
@@ -1557,7 +1594,7 @@ async function main() {
       }
 
       // Desk receipt view & A4 PDF
-      for (const vp of [{ w: 390, h: 844 }, { w: 1440, h: 900 }]) {
+      for (const vp of [{ w: 390, h: 844 }, { w: 768, h: 1024 }, { w: 1440, h: 900 }]) {
         for (const th of ['light', 'dark']) {
           await session.setViewport(vp.w, vp.h, th)
           await session.goto('/reception/payments/41/receipt', '.payment-print-receipt .payment-rows')
@@ -1956,6 +1993,20 @@ async function main() {
       writeFileSync(join(SCREENSHOTS_DIR, 'ui-32/modal-interaction-log.json'), JSON.stringify(modalLog, null, 2) + '\n')
       await session.cleanup()
       console.log('UI-32 modal & interaction test completed!')
+    }
+
+    if (MANIFEST_ENTRIES.length > 0) {
+      const manifestPath = join(FRONTEND_ROOT, 'docs/screenshots-manifest.json')
+      writeFileSync(manifestPath, JSON.stringify(MANIFEST_ENTRIES, null, 2) + '\n')
+      console.log(`Saved screenshot manifest: ${manifestPath} (${MANIFEST_ENTRIES.length} entries)`)
+      const reportManifestPath = 'D:/SWP/G3-git/tasks/UI-SYNC-01 (i)/report/round 1/screenshots-manifest.json'
+      try {
+        mkdirSync('D:/SWP/G3-git/tasks/UI-SYNC-01 (i)/report/round 1', { recursive: true })
+        writeFileSync(reportManifestPath, JSON.stringify(MANIFEST_ENTRIES, null, 2) + '\n')
+        console.log(`Saved screenshot manifest to report directory: ${reportManifestPath}`)
+      } catch (err) {
+        console.warn('Could not write manifest to report dir:', err.message)
+      }
     }
 
     console.log('\n======================================================')

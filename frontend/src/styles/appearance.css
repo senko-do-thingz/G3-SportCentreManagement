@@ -9,4 +9,4 @@
   .header-actions { flex-wrap: wrap; gap: var(--space-3); }
   .staff-topbar__breadcrumb { flex-basis: 100%; }
 }
-@media print { .appearance { display: none !important; } }
+@media print { .appearance, .member-theme, .staff-theme, .home-theme, .auth-theme { display: none !important; } }
