@@ -1,8 +1,9 @@
-import { act, fireEvent, screen, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { installFakeFetch, json } from '../../test/fakeBackend'
 import { renderApp } from '../../test/renderApp'
+import { HOME_FAQ } from './homeContent'
 
 function catalog() {
   installFakeFetch((call) => json(200, call.path === '/sports'
@@ -10,9 +11,46 @@ function catalog() {
     : call.path === '/coaches/public' ? [{ id: 12, fullName: 'Demo Coach', sportIds: [1] }] : []))
 }
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, '', '/') })
 
 describe('Home navigation disclosures', () => {
+  it.each(['mouse', 'keyboard'])('reveals a selected FAQ answer using %s and can reopen the same hash', async (mode) => {
+    catalog()
+    const user = userEvent.setup()
+    renderApp('/')
+    const nav = screen.getByRole('navigation', { name: 'Home navigation' })
+    const item = document.getElementById('home-faq-2')!
+    const answer = within(item).getByText(HOME_FAQ[2].answer)
+    expect(answer).not.toBeVisible()
+    for (let attempt = 0; attempt < 2; attempt++) {
+      act(() => within(nav).getByRole('link', { name: 'FAQ' }).focus())
+      const link = within(nav).getByRole('link', { name: HOME_FAQ[2].question })
+      if (mode === 'mouse') await user.click(link)
+      else { act(() => link.focus()); await user.keyboard('{Enter}') }
+      expect(answer).toBeVisible()
+      expect(item.querySelector('summary')).toHaveFocus()
+      expect(within(document.getElementById('home-faq-3')!).getByText(HOME_FAQ[3].answer)).not.toBeVisible()
+      await user.click(item.querySelector('summary')!)
+      expect(answer).not.toBeVisible()
+    }
+  })
+
+  it('reveals direct and changed FAQ hashes without locking native summary toggles', async () => {
+    catalog()
+    const user = userEvent.setup()
+    renderApp('/#home-faq-2')
+    const answer = screen.getByText(HOME_FAQ[2].answer)
+    expect(answer).toBeVisible()
+    await user.click(document.querySelector('#home-faq-2 summary')!)
+    expect(answer).not.toBeVisible()
+    act(() => { window.location.hash = '#home-faq-3' })
+    await waitFor(() => expect(screen.getByText(HOME_FAQ[3].answer)).toBeVisible())
+    expect(answer).not.toBeVisible()
+    expect(document.querySelector('#home-faq-3 summary')).toHaveFocus()
+    await user.click(document.querySelector('#home-faq-3 summary')!)
+    expect(screen.getByText(HOME_FAQ[3].answer)).not.toBeVisible()
+  })
+
   it('uses existing content targets and keeps Home a leaf', async () => {
     catalog()
     renderApp('/')

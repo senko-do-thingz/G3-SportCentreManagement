@@ -18,6 +18,7 @@ import { Photo } from '../../media/Photo'
 import { HomeHeroVideo } from './HomeHeroVideo'
 import { HomeSelect } from './HomeSelect'
 import { HomeCoaches } from './HomeCoaches'
+import { revealHomeFaq } from './homeFaqNavigation'
 import type { PublicCoach } from './homeCoachModel'
 import { buildVenueTiles, facilitySummary, isPublicFacility, type PublicFacility } from './homeFacilityModel'
 import '@fontsource/be-vietnam-pro/700.css'
@@ -81,6 +82,12 @@ export function HomePage() {
   const { role, status, user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  useEffect(() => {
+    revealHomeFaq(location.hash, true)
+    const reveal = () => { revealHomeFaq(window.location.hash, true) }
+    window.addEventListener('hashchange', reveal)
+    return () => window.removeEventListener('hashchange', reveal)
+  }, [location.hash])
   const [sports, retrySports] = useResource(loadSports)
   const [packages, retryPackages] = useResource(loadPackages)
   const [facilities, retryFacilities] = useResource(loadFacilities)

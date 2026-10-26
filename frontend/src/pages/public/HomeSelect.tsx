@@ -13,7 +13,9 @@ interface HomeSelectProps {
 
 /**
  * Themed single-select for the Home class finder (listbox pattern).
- * Keyboard: Enter, Space or ArrowDown opens; ArrowUp and ArrowDown move; Home and End jump; Enter selects; Escape closes.
+ * List mode moves by one option vertically. The two-column grid moves by row vertically and within a row horizontally.
+ * Grid edges do not wrap; a missing cell in the final row leaves focus in its column. Home/End reach every option.
+ * Selection remains separate from active-descendant navigation. Enter/Space select; Escape closes.
  */
 export function HomeSelect({ label, placeholder, value, options, onChange, layout = 'list' }: HomeSelectProps) {
   const id = useId()
@@ -23,6 +25,8 @@ export function HomeSelect({ label, placeholder, value, options, onChange, layou
   const button = useRef<HTMLButtonElement>(null)
   const list = useRef<HTMLUListElement>(null)
   const items = [{ value: '', label: placeholder }, ...options]
+  // A catalogue refresh must never leave aria-activedescendant pointing past the final option.
+  if (active >= items.length) setActive(items.length - 1)
   const selected = items.find((item) => item.value === value) ?? items[0]
 
   useEffect(() => {
@@ -84,9 +88,10 @@ export function HomeSelect({ label, placeholder, value, options, onChange, layou
   }
   function onListKey(event: KeyboardEvent) {
     const last = items.length - 1
+    const columns = layout === 'grid' ? 2 : 1
     const moves: Record<string, () => void> = {
-      ArrowDown: () => setActive((index) => Math.min(last, index + 1)),
-      ArrowUp: () => setActive((index) => Math.max(0, index - 1)),
+      ArrowDown: () => setActive((index) => index + columns <= last ? index + columns : index),
+      ArrowUp: () => setActive((index) => index >= columns ? index - columns : index),
       Home: () => setActive(0),
       End: () => setActive(last),
       Enter: () => choose(active),
@@ -94,6 +99,10 @@ export function HomeSelect({ label, placeholder, value, options, onChange, layou
       Escape: () => { setOpen(false); button.current?.focus() },
       // Restore the trigger before native Tab traversal so removal of the list does not lose its position.
       Tab: () => { button.current?.focus(); setOpen(false) },
+    }
+    if (layout === 'grid') {
+      moves.ArrowRight = () => setActive((index) => index % columns === 0 && index < last ? index + 1 : index)
+      moves.ArrowLeft = () => setActive((index) => index % columns === 1 ? index - 1 : index)
     }
     const move = moves[event.key]
     if (!move) return
@@ -127,6 +136,7 @@ export function HomeSelect({ label, placeholder, value, options, onChange, layou
           role="listbox"
           tabIndex={-1}
           aria-label={label}
+          aria-describedby={layout === 'grid' ? `${id}-keyboard` : undefined}
           aria-activedescendant={`${id}-option-${active}`}
           onKeyDown={onListKey}
         >
@@ -147,6 +157,7 @@ export function HomeSelect({ label, placeholder, value, options, onChange, layou
           ))}
         </ul>
       )}
+      {layout === 'grid' && <span id={`${id}-keyboard`} className="home-sr-only">Two columns. Up and Down move within a column; Left and Right move within a row. Edges do not wrap. Home and End move to the first and last option. Enter or Space selects.</span>}
     </div>
   )
 }

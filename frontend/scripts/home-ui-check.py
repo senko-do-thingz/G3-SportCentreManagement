@@ -46,7 +46,7 @@ def main():
         browser = pw.chromium.launch(channel=args.channel, headless=True)
         report['browser'] = f'{args.channel} {browser.version}'
 
-        def page_for(width=1440, height=900, theme='light', growth=0, touch=False, member=False, media=False):
+        def page_for(width=1440, height=900, theme='light', growth=0, touch=False, member=False, media=False, fragment=''):
             context = browser.new_context(viewport={'width': width, 'height': height}, reduced_motion='no-preference' if media else 'reduce', has_touch=touch, is_mobile=touch)
             seed = {'sportify.themePreference': theme}
             if member:
@@ -68,7 +68,7 @@ def main():
                 context.route('https://assets.mixkit.co/**', lambda route: route.abort())
             page = context.new_page()
             page.set_default_timeout(7000)
-            page.goto(args.base, wait_until='load')
+            page.goto(args.base.rstrip('/') + '/' + fragment, wait_until='load')
             expect(page.get_by_role('button', name='Sport All sports')).to_be_visible()
             expect(page.get_by_role('button', name='View profile of Demo Coach')).to_have_count(1)
             page.evaluate('document.fonts.ready')
@@ -175,6 +175,8 @@ def main():
                     nav.get_by_role('list', name=f'{name} destinations').get_by_role('link', name=label, exact=True).click()
                     expect(page).to_have_url(re.compile(re.escape(href) + '$'))
                     target = page.locator(href)
+                    if href.startswith('#home-faq-'):
+                        expect(target.locator('p')).to_be_visible()
                     assert target.bounding_box()['y'] >= page.locator('.home-header').bounding_box()['height'] - 1, href
                     expect(nav.get_by_role('button', name=f'Toggle {name} destinations')).to_have_attribute('aria-expanded', 'false')
                     count += 1
@@ -195,6 +197,150 @@ def main():
             expect(page).to_have_url(re.compile('#home-sport-tennis$'))
             expect(page.get_by_role('button', name='Menu', exact=True)).to_have_attribute('aria-expanded', 'false')
         case('touch-navigation', touch_navigation)
+
+        def faq_visible(page, index):
+            item = page.locator(f'#home-faq-{index}')
+            answer = item.locator('p')
+            expect(answer).to_be_visible()
+            expect(item.locator('summary')).to_be_focused()
+            rect = answer.bounding_box()
+            assert rect['y'] >= page.locator('.home-header').bounding_box()['height'] - 1, rect
+            assert rect['y'] + rect['height'] <= page.viewport_size['height'] + 1, rect
+
+        def faq_navigation(mode, width):
+            _, page = page_for(width=width, height=844, touch=mode == 'touch')
+            nav = page.get_by_role('navigation', name='Home navigation')
+            item = page.locator('#home-faq-2')
+            question = item.locator('summary').inner_text()
+            expect(item.locator('p')).not_to_be_visible()
+            for attempt in range(2):
+                if mode == 'touch':
+                    page.get_by_role('button', name='Menu', exact=True).tap()
+                    nav.get_by_role('button', name='Toggle FAQ destinations').tap()
+                    nav.get_by_role('link', name=question, exact=True).tap()
+                elif mode == 'keyboard':
+                    parent = nav.get_by_role('link', name='FAQ', exact=True)
+                    for _ in range(100):
+                        if parent.evaluate('(e) => e === document.activeElement'):
+                            break
+                        page.keyboard.press('Tab')
+                    expect(parent).to_be_focused()
+                    page.keyboard.press('Tab')
+                    expect(nav.get_by_role('button', name='Toggle FAQ destinations')).to_be_focused()
+                    for _ in range(3):
+                        page.keyboard.press('Tab')
+                    expect(nav.get_by_role('link', name=question, exact=True)).to_be_focused()
+                    page.keyboard.press('Enter')
+                else:
+                    nav.get_by_role('link', name='FAQ', exact=True).hover()
+                    nav.get_by_role('link', name=question, exact=True).click()
+                expect(page).to_have_url(re.compile('#home-faq-2$'))
+                faq_visible(page, 2)
+                expect(page.locator('#home-faq-3 p')).not_to_be_visible()
+                snapshot(page, f'faq-{mode}-reveal-{attempt}', 'light', width)
+                if mode == 'keyboard':
+                    page.keyboard.press('Space')
+                elif mode == 'touch':
+                    item.locator('summary').tap()
+                else:
+                    item.locator('summary').click()
+                expect(item.locator('p')).not_to_be_visible()
+            return 'FAQ 2 answer visible, summary focused, native close retained, same hash reopens on repeat'
+        for mode, width in [('mouse', 1440), ('keyboard', 1440), ('touch', 390), ('touch', 320)]:
+            case(f'faq-{mode}-{width}', lambda m=mode, w=width: faq_navigation(m, w))
+
+        def faq_hash(width):
+            _, page = page_for(width=width, fragment='#home-faq-3')
+            faq_visible(page, 3)
+            assert page.locator('.home-faq__list details[open]').count() == 2
+            page.locator('#home-faq-3 summary').click()
+            expect(page.locator('#home-faq-3 p')).not_to_be_visible()
+            page.evaluate('location.hash = "#home-faq-2"')
+            faq_visible(page, 2)
+            page.evaluate('location.hash = "#home-faq-3"')
+            faq_visible(page, 3)
+            expect(page.locator('#home-faq-1 p')).not_to_be_visible()
+            page.reload(wait_until='load')
+            faq_visible(page, 3)
+            snapshot(page, 'faq-direct-hash', 'light', width)
+            return 'Direct FAQ 3 load, native hash changes, reload and independent disclosure state'
+        for width in [320, 390, 1440]:
+            case(f'faq-direct-hash-{width}', lambda w=width: faq_hash(w))
+
+        def grid_directions(width, count):
+            _, page = page_for(width=width, height=540 if width < 768 else 900, growth=count - 7)
+            page.evaluate('window.homeUiSubmits=0; document.querySelector(".home-finder form").addEventListener("submit",()=>window.homeUiSubmits++)')
+            trigger = page.get_by_role('button', name=re.compile('^Sport '))
+            trigger.click()
+            page.keyboard.press('Escape')
+            page.mouse.move(1, 1)
+            page.keyboard.press('ArrowDown')
+            menu = page.get_by_role('listbox', name='Sport', exact=True)
+            options = menu.get_by_role('option')
+            expect(options).to_have_count(count)
+            trace = []
+
+            def active(index, key):
+                option = options.nth(index)
+                expect(menu).to_have_attribute('aria-activedescendant', option.get_attribute('id'))
+                expect(menu).to_be_focused()
+                box = option.bounding_box()
+                trace.append({'key': key, 'index': index, 'label': option.inner_text(), 'box': box, 'scrollTop': menu.evaluate('(e)=>e.scrollTop')})
+                return box
+
+            start = active(0, 'open')
+            page.keyboard.press('ArrowDown')
+            down = active(2, 'ArrowDown')
+            assert down['y'] > start['y'] and abs(down['x'] - start['x']) < 1
+            page.keyboard.press('ArrowRight')
+            right = active(3, 'ArrowRight')
+            assert right['x'] > down['x'] and abs(right['y'] - down['y']) < 1
+            page.keyboard.press('ArrowRight')
+            active(3, 'ArrowRight at row edge')
+            page.keyboard.press('ArrowLeft')
+            active(2, 'ArrowLeft')
+            page.keyboard.press('ArrowUp')
+            active(0, 'ArrowUp')
+            page.keyboard.press('ArrowUp')
+            page.keyboard.press('ArrowLeft')
+            active(0, 'top/left edges')
+            snapshot(page, f'direction-{count}-first-rows', 'light', width)
+            page.keyboard.press('End')
+            last = active(count - 1, 'End')
+            rect = menu.bounding_box()
+            assert last['y'] >= rect['y'] and last['y'] + last['height'] <= rect['y'] + rect['height'] + 1
+            snapshot(page, f'direction-{count}-last-row', 'light', width)
+            for key in ['ArrowDown', 'ArrowRight', 'ArrowLeft']:
+                page.keyboard.press(key)
+                active(count - 1, key + ' at odd last row')
+            page.keyboard.press('ArrowUp')
+            active(count - 3, 'ArrowUp from last row')
+            page.keyboard.press('ArrowRight')
+            active(count - 2, 'ArrowRight to last occupied right cell')
+            page.keyboard.press('ArrowDown')
+            active(count - 2, 'ArrowDown toward missing cell')
+            expect(options.first).to_have_attribute('aria-selected', 'true')
+            expect(trigger).to_have_text('All sports')
+            page.keyboard.press('Home')
+            active(0, 'Home')
+            page.keyboard.press('ArrowRight')
+            page.keyboard.press('Enter')
+            expect(trigger).to_have_text('Football')
+            expect(trigger).to_be_focused()
+            trigger.click()
+            expect(page.get_by_role('option', name='Football', exact=True)).to_have_attribute('aria-selected', 'true')
+            page.keyboard.press('Escape')
+            expect(trigger).to_be_focused()
+            trigger.click()
+            page.keyboard.press('Tab')
+            expect(page.get_by_role('button', name='Level All levels')).to_be_focused()
+            assert page.get_by_role('listbox').count() == 0
+            assert page.evaluate('window.homeUiSubmits') == 0
+            assert urlparse(page.url).path == '/' and page.get_by_role('dialog').count() == 0
+            return {'count': count, 'trace': trace, 'submitted': 0}
+        for width in [320, 390, 1440]:
+            for count in [7, 31]:
+                case(f'grid-directions-{width}-{count}', lambda w=width, c=count: grid_directions(w, c))
 
         def filters(width=1440, height=900, growth=0):
             _, page = page_for(width=width, height=height, growth=growth)

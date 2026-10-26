@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { homePathFor } from '../../auth/roles'
 import { useAuth } from '../../auth/useAuth'
 import { Brand } from '../../components/Brand'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { UserMenu } from '../../layouts/UserMenu'
 import { ThemeToggle } from '../../theme/ThemeToggle'
+import { revealHomeFaq } from './homeFaqNavigation'
 
 export interface HomeNavGroup {
   label: string
@@ -16,6 +17,7 @@ export interface HomeNavGroup {
 export function HomeHeader({ groups = [] }: { groups?: HomeNavGroup[] }) {
   const { status, user } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [submenu, setSubmenu] = useState<string | null>(null)
   const [scrolled, setScrolled] = useState(false)
@@ -54,8 +56,16 @@ export function HomeHeader({ groups = [] }: { groups?: HomeNavGroup[] }) {
   }
   function close() { setOpen(false); setSubmenu(null) }
   function followSection(event: MouseEvent<HTMLAnchorElement>) {
-    const target = document.getElementById(event.currentTarget.hash.slice(1))
-    if (target) { target.tabIndex = -1; target.focus({ preventScroll: true }) }
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return
+    const hash = event.currentTarget.hash
+    if (revealHomeFaq(hash, true)) {
+      // Native fragment navigation can override summary focus with the details element.
+      event.preventDefault()
+      if (location.hash !== hash) navigate(location.pathname + location.search + hash, { state: location.state })
+    } else {
+      const target = document.getElementById(hash.slice(1))
+      if (target) { target.tabIndex = -1; target.focus({ preventScroll: true }) }
+    }
     close()
   }
 
