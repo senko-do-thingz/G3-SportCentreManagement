@@ -43,9 +43,9 @@ export function UserManagementPage() {
     { key: 'role', header: 'Role', width: '15%', render: (row) => <Badge tone={ROLE_TONES[row.role as keyof typeof ROLE_LABELS] ?? 'neutral'}>{ROLE_LABELS[row.role as keyof typeof ROLE_LABELS] ?? row.role}</Badge> },
     { key: 'phone', header: 'Phone' },
     { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-    { key: 'actions', header: 'Actions', render: (row) => <div className="manager-row-actions">
+    { key: 'actions', header: 'Actions', width: '32%', render: (row) => <div className="manager-row-actions">
       <Button variant="secondary" size="sm" onClick={() => setSelected(row)}>View profile</Button>
-      {row.role === 'COACH' && <Button variant="secondary" size="sm" aria-label={`Edit coach profile of ${row.fullName}`} onClick={() => setEditingCoach(row)}>Edit coach profile</Button>}
+      {row.role === 'COACH' && <Button variant="secondary" size="sm" aria-label={`Edit coach profile of ${row.fullName}`} onClick={() => setEditingCoach(row)}>Edit coach</Button>}
       <Button variant={row.status === 'ACTIVE' ? 'danger' : 'secondary'} size="sm" disabled={row.id === user?.id && row.status === 'ACTIVE'} title={row.id === user?.id ? 'You cannot deactivate your own account.' : undefined} onClick={() => setChanging(row)}>{row.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}</Button>
     </div> },
   ]
