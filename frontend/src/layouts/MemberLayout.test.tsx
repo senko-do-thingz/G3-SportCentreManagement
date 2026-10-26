@@ -32,7 +32,7 @@ describe('member header style isolation', () => {
     vi.unstubAllGlobals()
   })
 
-  it('keeps member navigation below the right-aligned user bar with receptionist styles loaded', async () => {
+  it('keeps member navigation in the Home-style header with receptionist styles loaded', async () => {
     tokenStorage.startSession({ accessToken: 'test-layout-access', refreshToken: 'test-layout-refresh' })
     installFakeFetch((call) => json(200, call.path === '/users/me' ? MEMBER : []))
     renderApp('/member')
@@ -44,8 +44,10 @@ describe('member header style isolation', () => {
 
     expect(getComputedStyle(header).display).toBe('block')
     expect(userBar).not.toBeNull()
-    expect(getComputedStyle(userBar!).justifyContent).toBe('space-between')
-    expect(userBar).not.toContainElement(navigation)
+    expect(getComputedStyle(userBar!).display).toBe('flex')
+    expect(within(header).getByRole('button', { name: /Switch to .* mode/ })).toHaveClass('home-theme')
+    expect(within(header).queryByLabelText('Appearance')).not.toBeInTheDocument()
+    expect(userBar).toContainElement(navigation)
     expect(within(navigation).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page')
     expect(within(navigation).getByRole('link', { name: 'My Profile' })).toHaveAttribute('href', '/member/profile')
     expect(within(header).getByText(MEMBER.fullName)).toBeInTheDocument()
@@ -66,11 +68,11 @@ describe('member header style isolation', () => {
     await user.click(toggle)
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    expect(navigation).toHaveClass('member-nav--open')
+    expect(navigation).toHaveClass('workspace-header__nav--open')
     await user.keyboard('{Escape}')
 
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(navigation).not.toHaveClass('member-nav--open')
+    expect(navigation).not.toHaveClass('workspace-header__nav--open')
     expect(toggle).toHaveFocus()
   })
 

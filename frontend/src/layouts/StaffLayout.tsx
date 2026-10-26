@@ -23,10 +23,19 @@ export function StaffLayout() {
     }
   }
 
+  const breadcrumb = (
+    <nav className="workspace-header__context" aria-label="Breadcrumb">
+      <ol className="workspace-header__breadcrumb">
+        <li><Link to="/">Sportify Center</Link></li>
+        <li><span aria-current="page">{activeItem?.title ?? 'Workspace'}</span></li>
+      </ol>
+    </nav>
+  )
+
   return (
-    <div className={`staff-layout${menuOpen ? ' staff-layout--menu-open' : ''}`}>
+    <div className={'staff-layout' + (menuOpen ? ' staff-layout--menu-open' : '')}>
       <header className="workspace-header staff-layout__header">
-        <WorkspaceHeaderBar />
+        <WorkspaceHeaderBar navigation={breadcrumb} />
       </header>
       <aside className="sidebar" aria-label={area.workspaceLabel} onKeyDown={handleSidebarKeyDown}>
         <div className="sidebar__top">
@@ -37,13 +46,13 @@ export function StaffLayout() {
             className="sidebar__toggle"
             aria-expanded={menuOpen}
             aria-controls="staff-menu"
-            aria-label={`${menuOpen ? 'Close' : 'Open'} ${area.workspaceLabel} navigation`}
+            aria-label={menuOpen ? 'Close ' + area.workspaceLabel + ' navigation' : 'Open ' + area.workspaceLabel + ' navigation'}
             onClick={() => setMenuOpen((open) => !open)}
           >
             {menuOpen ? 'Close' : 'Menu'}
           </button>
         </div>
-        <nav className="sidebar__nav" id="staff-menu" aria-label={`${area.workspaceLabel} navigation`}>
+        <nav className="sidebar__nav" id="staff-menu" aria-label={area.workspaceLabel + ' navigation'}>
           {area.sections.map((section, sectionIndex) => (
             <div className="sidebar__section" key={section.heading ?? sectionIndex}>
               {section.heading && <p className="sidebar__heading">{section.heading}</p>}
@@ -53,7 +62,7 @@ export function StaffLayout() {
                   to={itemHref(area, item)}
                   end={item.path === ''}
                   onClick={() => setMenuOpen(false)}
-                  className={({ isActive }) => `sidebar__link${isActive ? ' sidebar__link--active' : ''}`}
+                  className={({ isActive }) => 'sidebar__link' + (isActive ? ' sidebar__link--active' : '')}
                 >
                   {item.label}
                 </NavLink>
@@ -66,18 +75,10 @@ export function StaffLayout() {
           <p className="sidebar__footer-text">One center. More possibilities.</p>
         </div>
       </aside>
-      <div className="staff-main">
-        <nav className="staff-topbar" aria-label="Breadcrumb">
-          <ol className="staff-topbar__breadcrumb">
-            <li><Link to="/">Sportify Center</Link></li>
-            <li><span aria-current="page">{activeItem?.title ?? 'Workspace'}</span></li>
-          </ol>
-        </nav>
-        <main className="staff-content" id="main-content">
-          <AccountSwitchNotice />
-          <Outlet />
-        </main>
-      </div>
+      <main className="staff-content" id="main-content">
+        <AccountSwitchNotice />
+        <Outlet />
+      </main>
     </div>
   )
 }
