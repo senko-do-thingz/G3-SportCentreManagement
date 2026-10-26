@@ -162,7 +162,12 @@ export function HomePage() {
   return (
     <div className="home-page">
       <a className="home-skip" href="#main-content">Skip to content</a>
-      <HomeHeader />
+      <HomeHeader groups={[
+        { label: 'Sports', href: '#sports', children: HOME_SPORTS.map((sport) => ({ label: sport.name, href: `#home-sport-${sport.name.toLowerCase()}` })) },
+        { label: 'Coaches', href: '#coaches', children: coaches.status === 'ready' ? coaches.data.map((coach) => ({ label: coach.fullName, href: `#coach-${coach.id}` })) : [] },
+        { label: 'Packages', href: '#packages', children: PLAN_CARDS.map((card) => ({ label: card.title, href: `#home-plan-${card.kind}` })) },
+        { label: 'FAQ', href: '#faq', children: HOME_FAQ.map((item, index) => ({ label: item.question, href: `#home-faq-${index}` })) },
+      ]} />
       <main className="home-main" id="main-content" tabIndex={-1}>
         <section className="home-hero" aria-labelledby="home-title">
           <Photo className="home-hero__photo" src={HOME_PHOTOS.hero} fallback={homeHero} sizes="100vw" width="2200" height="1467" fetchPriority="high" />
@@ -178,8 +183,8 @@ export function HomePage() {
               <p>Coach-led classes or self-training, at every level.</p>
               <div className="home-hero__actions">
                 {status === 'anonymous'
-                  ? <Link className="home-btn home-btn--light" to="/register">Join now</Link>
-                  : memberAction('/member/classes', 'Browse classes', 'primary', undefined, 'home-btn home-btn--light')}
+                  ? <Link className="home-btn home-btn--primary" to="/register">Join now</Link>
+                  : memberAction('/member/classes', 'Browse classes', 'primary', undefined, 'home-btn home-btn--primary')}
                 <a className="home-play" href="#finder"><span aria-hidden="true" />Find a class</a>
               </div>
             </div>
@@ -211,7 +216,7 @@ export function HomePage() {
               event.preventDefault()
               requestMemberAction(classPath(sportId, format))
             }}>
-              <HomeSelect label="Sport" placeholder="All sports" value={sportId} options={catalogSports.map((sport) => ({ value: String(sport.id), label: sport.name }))} onChange={(value) => changeFinder('sportId', value)} />
+              <HomeSelect layout="grid" label="Sport" placeholder="All sports" value={sportId} options={catalogSports.map((sport) => ({ value: String(sport.id), label: sport.name }))} onChange={(value) => changeFinder('sportId', value)} />
               <HomeSelect label="Level" placeholder="All levels" value={level} options={BROWSE_LEVELS} onChange={(value) => changeFinder('level', value)} />
               <HomeSelect label="Training" placeholder="Any format" value={format} options={FORMAT_OPTIONS} onChange={(value) => changeFinder('format', value)} />
               <Button type="submit" disabled={status === 'loading'}>Find classes</Button>
@@ -239,7 +244,7 @@ export function HomePage() {
               {HOME_SPORTS.map((sport) => {
                 const record = sportFor(sport.name)
                 const content = <><Photo src={sport.photo} fallback={sport.image} alt={`${sport.name} training`} sizes="(min-width: 1101px) 400px, (min-width: 641px) 50vw, 100vw" width="1000" height="667" loading="lazy" /><span className="home-sport__label"><h3>{sport.name}</h3><span className="home-sport__go" aria-hidden="true"><HomeIcon name="arrow" /></span></span></>
-                return <article className="home-sport" key={sport.name}>
+                return <article id={`home-sport-${sport.name.toLowerCase()}`} className="home-sport" key={sport.name}>
                   {record
                     ? memberAction(classPath(String(record.id)), content, 'secondary', `Explore ${sport.name}`, 'home-sport__link')
                     : <button type="button" className="home-sport__link" aria-label={`Explore ${sport.name}`} onClick={() => setNotice({ title: sport.name, text: `${sport.description}. Choose from current sports in the class finder when the catalogue is available.` })}>{content}</button>}
@@ -291,7 +296,7 @@ export function HomePage() {
               {PLAN_CARDS.map((card) => {
                 const pkg = planPackage[card.kind]
                 const main = card.kind === 'coach'
-                return <article className={`home-plan${main ? ' home-plan--main' : ''}`} key={card.kind}>
+                return <article id={`home-plan-${card.kind}`} className={`home-plan${main ? ' home-plan--main' : ''}`} key={card.kind}>
                   {main && <span className="home-plan__badge">Popular</span>}
                   <small>{card.tag}</small>
                   <h3>{card.title}</h3>
@@ -320,7 +325,7 @@ export function HomePage() {
               <h2 id="faq-title">Got <span>questions?</span></h2>
             </div>
             <div className="home-faq__list">
-              {HOME_FAQ.map((item, index) => <details key={item.question} open={index === 0}><summary>{item.question}</summary><p>{item.answer}</p></details>)}
+              {HOME_FAQ.map((item, index) => <details id={`home-faq-${index}`} key={item.question} open={index === 0}><summary>{item.question}</summary><p>{item.answer}</p></details>)}
             </div>
           </div>
         </section>
@@ -331,8 +336,8 @@ export function HomePage() {
             <h2 id="cta-title">Ready to <span>play?</span></h2>
             <div className="home-cta__actions">
               {status === 'anonymous'
-                ? <Link className="home-btn home-btn--light" to="/register">Join now</Link>
-                : memberAction('/member/classes', 'Browse classes', 'primary', undefined, 'home-btn home-btn--light')}
+                ? <Link className="home-btn home-btn--primary" to="/register">Join now</Link>
+                : memberAction('/member/classes', 'Browse classes', 'primary', undefined, 'home-btn home-btn--primary')}
               <a className="home-btn home-btn--line" href="#finder">Find a class</a>
             </div>
           </div>

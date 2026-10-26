@@ -357,6 +357,8 @@ describe('public Home', () => {
     const nav = screen.getByRole('navigation', { name: 'Home navigation' })
     within(nav).getByRole('link', { name: 'Sports' }).focus()
     await user.keyboard('{Escape}')
+    expect(within(nav).getByRole('button', { name: 'Toggle Sports destinations' })).toHaveFocus()
+    await user.keyboard('{Escape}')
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     expect(toggle).toHaveFocus()
     await user.click(toggle)

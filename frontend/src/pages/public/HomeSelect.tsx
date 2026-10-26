@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 export interface HomeSelectOption { value: string; label: string }
 
@@ -8,13 +8,14 @@ interface HomeSelectProps {
   value: string
   options: readonly HomeSelectOption[]
   onChange: (value: string) => void
+  layout?: 'list' | 'grid'
 }
 
 /**
  * Themed single-select for the Home class finder (listbox pattern).
  * Keyboard: Enter, Space or ArrowDown opens; ArrowUp and ArrowDown move; Home and End jump; Enter selects; Escape closes.
  */
-export function HomeSelect({ label, placeholder, value, options, onChange }: HomeSelectProps) {
+export function HomeSelect({ label, placeholder, value, options, onChange, layout = 'list' }: HomeSelectProps) {
   const id = useId()
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
@@ -26,11 +27,48 @@ export function HomeSelect({ label, placeholder, value, options, onChange }: Hom
 
   useEffect(() => {
     if (!open) return
-    const close = (event: MouseEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false) }
-    document.addEventListener('mousedown', close)
+    const close = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false) }
+    document.addEventListener('pointerdown', close)
     list.current?.focus()
-    return () => document.removeEventListener('mousedown', close)
+    return () => document.removeEventListener('pointerdown', close)
   }, [open])
+
+  useLayoutEffect(() => {
+    if (!open || layout !== 'grid') return
+    function place() {
+      const menu = list.current
+      const field = root.current
+      if (!menu || !field) return
+      const rect = field.getBoundingClientRect()
+      const form = field.closest('form')?.getBoundingClientRect() ?? rect
+      const headerBottom = document.querySelector('.home-header')?.getBoundingClientRect().bottom ?? 0
+      const floor = Math.max(8, headerBottom + 8)
+      // Anchor outside the whole form so tablet rows and the submit action stay clear.
+      const below = Math.max(0, window.innerHeight - form.bottom - 16)
+      const above = Math.max(0, form.top - floor - 8)
+      menu.style.width = `${Math.min(rect.width - 24, window.innerWidth - 32)}px`
+      menu.style.left = `${Math.max(16, rect.left + 12)}px`
+      const desired = menu.scrollHeight
+      const up = desired > below && above > below
+      const available = up ? above : below
+      const sheet = window.innerWidth <= 640 && Math.max(above, below) < 88
+      menu.style.maxHeight = `${sheet ? Math.max(44, window.innerHeight - floor - 16) : available}px`
+      menu.style.top = `${sheet ? floor : up ? Math.max(floor, form.top - Math.min(desired, available) - 8) : form.bottom + 8}px`
+      menu.dataset.placement = sheet ? 'sheet' : up ? 'above' : 'below'
+    }
+    place()
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, { passive: true })
+    return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place) }
+  }, [open, layout, options.length])
+
+  useEffect(() => {
+    const menu = list.current
+    const option = menu?.children[active] as HTMLElement | undefined
+    if (!menu || !option) return
+    if (option.offsetTop < menu.scrollTop) menu.scrollTop = option.offsetTop
+    else if (option.offsetTop + option.offsetHeight > menu.scrollTop + menu.clientHeight) menu.scrollTop = option.offsetTop + option.offsetHeight - menu.clientHeight
+  }, [active, open])
 
   function show() {
     setActive(Math.max(0, items.findIndex((item) => item.value === value)))
@@ -54,7 +92,8 @@ export function HomeSelect({ label, placeholder, value, options, onChange }: Hom
       Enter: () => choose(active),
       ' ': () => choose(active),
       Escape: () => { setOpen(false); button.current?.focus() },
-      Tab: () => setOpen(false),
+      // Restore the trigger before native Tab traversal so removal of the list does not lose its position.
+      Tab: () => { button.current?.focus(); setOpen(false) },
     }
     const move = moves[event.key]
     if (!move) return
@@ -63,7 +102,8 @@ export function HomeSelect({ label, placeholder, value, options, onChange }: Hom
   }
 
   return (
-    <div className={`home-select${open ? ' home-select--open' : ''}`} ref={root}>
+    <div className={`home-select${open ? ' home-select--open' : ''}`} ref={root}
+      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setOpen(false) }}>
       <span className="home-select__label" id={`${id}-label`}>{label}</span>
       <button
         ref={button}
@@ -71,6 +111,7 @@ export function HomeSelect({ label, placeholder, value, options, onChange }: Hom
         className="home-select__button"
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-controls={open ? `${id}-list` : undefined}
         aria-labelledby={`${id}-label ${id}-value`}
         onClick={() => (open ? setOpen(false) : show())}
         onKeyDown={onButtonKey}
@@ -81,7 +122,8 @@ export function HomeSelect({ label, placeholder, value, options, onChange }: Hom
       {open && (
         <ul
           ref={list}
-          className="home-select__list"
+          id={`${id}-list`}
+          className={`home-select__list${layout === 'grid' ? ' home-select__list--grid' : ''}`}
           role="listbox"
           tabIndex={-1}
           aria-label={label}
