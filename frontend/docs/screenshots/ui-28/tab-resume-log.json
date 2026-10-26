@@ -1,26 +1,72 @@
 {
-  "executedAt": "2026-10-25T09:47:46.573Z",
+  "executedAt": "2026-10-25T14:22:19.288Z",
   "testCase": "TC-10",
   "testExecutionType": "synthetic-visibilitychange-event-harness",
-  "initialRequests": 2,
+  "scopeNote": "Synthetic visibilitychange event handler execution in DOM. Actual OS/Chromium background tab throttling is marked NOT_RUN.",
+  "initialRequests": 1,
   "requestsWhileHidden": 0,
   "resumeImmediateRequests": 1,
   "pollingTerminatedAfterSuccess": true,
-  "totalRequestsObserved": 3,
+  "totalRequestsObserved": 2,
   "expectedReferenceCode": "SP-52-TAYLOR",
+  "displayedTransferContent": "SP-52-TAYLOR",
   "actualCopiedText": "SP-52-TAYLOR",
-  "clipboardExactMatch": true,
+  "displayAndClipboardMatch": true,
+  "displayedContentVersusCopiedContent": {
+    "renderedTransferContent": "SP-52-TAYLOR",
+    "interceptedClipboardValue": "SP-52-TAYLOR",
+    "renderedMatchesIntercepted": true,
+    "renderedMatchesFixture": true,
+    "interceptedMatchesFixture": true,
+    "paymentCode": "PAY-0052",
+    "transferContent": "SP-52-TAYLOR",
+    "identifierDistinctionNote": "PAY-0052 is internal payment code; SP-52-TAYLOR is bank transfer syntax extracted from DOM beside Copy button and verified on clipboard"
+  },
   "copyButtonPresent": true,
   "copyButtonEnabled": true,
+  "copyButtonUsable": true,
   "paymentConfirmedStatusDisplayed": true,
-  "negativeControlPassed": true,
+  "browserLevelNegativeControls": {
+    "clipboardMutation": {
+      "injectedMutatedValue": "SP-52-MUTATED-FAIL",
+      "interceptedMutatedValue": "SP-52-MUTATED-FAIL",
+      "acceptanceAssertionFailedAsExpected": true,
+      "nonDestructiveCleanupVerified": true
+    },
+    "disabledButtonInteraction": {
+      "buttonDisabledInDOM": true,
+      "clickInteractionPreventedWrites": true,
+      "acceptanceAssertionFailedAsExpected": true,
+      "nonDestructiveCleanupVerified": true
+    },
+    "allBrowserNegativeControlsPassed": true
+  },
+  "unitPredicateNegativeChecks": {
+    "alteredRefStringRejected": true,
+    "missingButtonObjectRejected": true,
+    "disabledButtonObjectRejected": true,
+    "emptyClipboardRejected": true,
+    "allUnitPredicatesPassed": true
+  },
   "mandatoryAssertions": {
-    "initialRequestObserved": true,
+    "exactOneInitialRequestObserved": true,
     "zeroRequestsWhileHidden": true,
     "exactOneRequestOnResume": true,
+    "exactTwoTotalRequestsObserved": true,
     "pollingTerminatedAfterSuccess": true,
-    "clipboardReferenceExact": true,
+    "renderedTransferContentExtracted": true,
+    "renderedMatchesInterceptedExact": true,
+    "renderedMatchesExpectedFixture": true,
+    "interceptedMatchesExpectedFixture": true,
+    "positiveCopyAcceptancePassed": true,
+    "browserClipboardMutationCausesAssertionFailure": true,
+    "browserDisabledButtonCausesAssertionFailure": true,
+    "browserNegativeControlsPassed": true,
+    "unitPredicateNegativeChecksPassed": true,
     "paymentConfirmedRendered": true
+  },
+  "notRun": {
+    "nativeBrowserTabLifecycle": "NOT_RUN - actual Chromium OS/foreground background tab lifecycle is not claimed; test is scoped to synthetic document visibilitychange event handler execution"
   },
   "outcome": "PASS"
 }

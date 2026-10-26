@@ -5,6 +5,7 @@ import { AccountCreatedError } from '../../auth/authContext'
 import {
   applyFieldChange,
   EMAIL_MAX_LENGTH,
+  EMAIL_TAKEN_DISPLAY,
   EMAIL_TAKEN_MESSAGE,
   EMPTY_REGISTER_FORM,
   FULL_NAME_MAX_LENGTH,
@@ -42,7 +43,7 @@ function registerErrors(error: unknown): { fields: Record<string, string>; form:
   if (error instanceof ApiError) {
     if (error.status === 409) {
       return error.message === EMAIL_TAKEN_MESSAGE
-        ? { fields: { email: error.message }, form: null }
+        ? { fields: { email: EMAIL_TAKEN_DISPLAY }, form: null }
         : { fields: {}, form: error.message }
     }
     if (error.hasFieldErrors) {
@@ -121,7 +122,7 @@ export function RegisterPage() {
   const passwordsMatch = form.confirmPassword.length > 0 && form.confirmPassword === form.password
 
   return (
-    <AuthShell title="Create your account" subtitle="Your journey starts here.">
+    <AuthShell className="auth-shell--register" title="Create your account" subtitle="Join Sportify to book classes and track your training.">
       {formError && (
         <p className="notice notice--danger" role="alert">
           {formError}
@@ -148,7 +149,7 @@ export function RegisterPage() {
               name="phone"
               autoComplete="tel"
               inputMode="tel"
-              placeholder="0901234567"
+              placeholder="0901 234 567"
               maxLength={24}
               value={form.phone}
               onChange={(event) => update('phone', event.target.value)}
@@ -161,7 +162,7 @@ export function RegisterPage() {
             type="email"
             name="email"
             autoComplete="email"
-            placeholder="you@example.com"
+            placeholder="name@example.com"
             maxLength={EMAIL_MAX_LENGTH}
             value={form.email}
             onChange={(event) => update('email', event.target.value)}
@@ -195,7 +196,7 @@ export function RegisterPage() {
           </div>
           <Checkbox
             name="acceptTerms"
-            label="I agree to the Sportify Center terms of use and privacy policy"
+            label="I agree to the Terms of Use and Privacy Policy"
             checked={form.acceptTerms}
             onChange={(event) => update('acceptTerms', event.target.checked)}
             error={fieldErrors.acceptTerms}

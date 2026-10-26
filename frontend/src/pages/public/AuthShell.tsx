@@ -1,77 +1,63 @@
 import type { ReactNode } from 'react'
+import '@fontsource/be-vietnam-pro/800.css'
+import '@fontsource/be-vietnam-pro/800-italic.css'
 import { Link } from 'react-router-dom'
+import authFallback from '../../assets/auth/auth-dunk.jpg'
 import { Brand } from '../../components/Brand'
 import { Photo } from '../../media/Photo'
-import { AppearanceControl } from '../../theme/AppearanceControl'
 import { ThemeToggle } from '../../theme/ThemeToggle'
-import { HOME_PHOTOS, homeHero } from './homeContent'
+import { HOME_PHOTOS } from './homeContent'
+import '../../styles/auth.css'
 
 export interface AuthShellProps {
+  /** Screen modifier, for example auth-shell--login or auth-shell--register. */
   className?: string
   title: string
   subtitle: string
   children: ReactNode
-  /**
-   * "split" (default, Sign up): fixed two column card with the photo hero on the left.
-   * "stage" (Log in since UI-06): the Home hero photo fills the page, a compact Home header sits on top, the slogan
-   * is on the left and the form card floats on the right; on narrow screens the photo becomes a band above the card.
-   */
-  layout?: 'split' | 'stage'
 }
 
-function Slogan({ block }: { block: string }) {
+function Slogan() {
   return (
-    <section className={block} aria-hidden="true">
-      <p className={`${block}__eyebrow`}>One center. More possibilities.</p>
-      <p className={`${block}__title`}>
+    <section className="auth-stage__copy" aria-hidden="true">
+      <p className="auth-stage__copy__eyebrow">One center. More possibilities.</p>
+      <p className="auth-stage__copy__title">
         More sport.
         <br />
-        <span className={`${block}__accent`}>More you.</span>
+        <span className="auth-stage__copy__accent">More you.</span>
       </p>
-      <p className={`${block}__text`}>Find your sport, train your way, and make every session count.</p>
+      <p className="auth-stage__copy__text">Find your sport, train your way, and make every session count.</p>
     </section>
   )
 }
 
-function Heading({ title, subtitle }: { title: string; subtitle: string }) {
+/**
+ * Log in and Sign up (layout B, UI-06 and UI-07): the dunk photo fills the page with the player on the left, a compact
+ * Home header (brand, Back to Home, sun and moon switch) sits on top, the slogan sits low on the left under the player
+ * and the form card floats on the dark right side. On narrow screens the photo becomes a band with the slogan above
+ * the card.
+ */
+export function AuthShell({ className, title, subtitle, children }: AuthShellProps) {
   return (
-    <div className="auth-panel__heading">
-      <h1>{title}</h1>
-      <p>{subtitle}</p>
-    </div>
-  )
-}
-
-export function AuthShell({ className, title, subtitle, children, layout = 'split' }: AuthShellProps) {
-  if (layout === 'stage') {
-    return (
-      <div className={['auth-stage', className].filter(Boolean).join(' ')}>
-        <Photo className="auth-stage__photo" src={HOME_PHOTOS.hero} fallback={homeHero} sizes="100vw" width="2200" height="1467" fetchPriority="high" />
-        <div className="auth-stage__header">
-          <Brand />
-          <div className="auth-stage__actions">
-            <Link className="auth-stage__home" to="/">Back to Home</Link>
-            <ThemeToggle className="auth-theme" />
-          </div>
-        </div>
-        <div className="auth-stage__body">
-          <Slogan block="auth-stage__copy" />
-          <section className="auth-panel">
-            <Heading title={title} subtitle={subtitle} />
-            {children}
-          </section>
+    <div className={['auth-stage', className].filter(Boolean).join(' ')}>
+      <Photo className="auth-stage__photo" src={HOME_PHOTOS.auth} fallback={authFallback} sizes="100vw" width="2200" height="3300" fetchPriority="high" />
+      <div className="auth-stage__header">
+        <Brand />
+        <div className="auth-stage__actions">
+          <Link className="auth-stage__home" to="/">Back to Home</Link>
+          <ThemeToggle className="auth-theme" />
         </div>
       </div>
-    )
-  }
-  return (
-    <div className={['auth-shell', className].filter(Boolean).join(' ')}>
-      <Slogan block="auth-hero" />
-      <section className="auth-panel">
-        <div className="auth-panel__toolbar"><Brand /><AppearanceControl /></div>
-        <Heading title={title} subtitle={subtitle} />
-        {children}
-      </section>
+      <div className="auth-stage__body">
+        <Slogan />
+        <section className="auth-panel">
+          <div className="auth-panel__heading">
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
+          </div>
+          {children}
+        </section>
+      </div>
     </div>
   )
 }

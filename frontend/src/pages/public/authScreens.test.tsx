@@ -6,6 +6,7 @@ import { tokenStorage } from '../../api/tokenStorage'
 import { AuthProvider } from '../../auth/AuthProvider'
 import { useAuth } from '../../auth/useAuth'
 import { STRONG_PASSWORD_MESSAGE } from '../../auth/passwordRules'
+import { PASSWORD_RULES_MESSAGE } from '../../auth/registerValidation'
 import { Checkbox } from '../../components/ui/Checkbox'
 import { ToastProvider } from '../../components/ui/ToastProvider'
 import { AppRoutes } from '../../routes/AppRoutes'
@@ -123,7 +124,7 @@ describe('F1-05 Log in', () => {
     await user.type(screen.getByLabelText(/^password/i), 'some-password')
     await user.click(screen.getByRole('button', { name: /log in/i }))
 
-    const error = await screen.findByText('Email is invalid')
+    const error = await screen.findByText('Enter a valid email, like name@example.com')
     expect(emailField?.querySelector('.field__feedback--reserved')).toBe(feedbackSlot)
     expect(feedbackSlot).toContainElement(error)
     expect(calls.filter((call) => call.path === '/auth/login')).toHaveLength(0)
@@ -174,7 +175,7 @@ describe('F1-05 Log in', () => {
     expect(submit).toHaveAttribute('aria-busy', 'true')
     expect(screen.getByLabelText(/email address/i)).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Show password' })).toBeDisabled()
-    expect(screen.getByRole('checkbox', { name: 'Remember me' })).toBeDisabled()
+    expect(screen.getByRole('checkbox', { name: 'Keep me logged in' })).toBeDisabled()
 
     await user.click(submit)
     expect(calls.filter((call) => call.path === '/auth/login')).toHaveLength(1)
@@ -203,7 +204,7 @@ describe('F1-05 Log in', () => {
 
     await user.type(await screen.findByLabelText(/email address/i), 'member@sportify.demo')
     await user.type(screen.getByLabelText(/^password/i), 'Demo123!')
-    await user.click(screen.getByRole('checkbox', { name: 'Remember me' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Keep me logged in' }))
     await user.click(screen.getByRole('button', { name: /log in/i }))
     await screen.findByRole('heading', { name: 'Member Dashboard' })
 
@@ -219,7 +220,7 @@ describe('F1-05 Log in', () => {
     await user.type(await screen.findByLabelText(/email address/i), 'member@sportify.demo')
     await user.type(screen.getByLabelText(/^password/i), 'wrong-pass{Enter}')
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password. Please try again.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Incorrect email or password. Check them and try again.')
     expect(screen.getByLabelText(/email address/i)).toHaveValue('member@sportify.demo')
     expect(screen.getByRole('button', { name: /log in/i })).toBeEnabled()
     expect(tokenStorage.hasSession()).toBe(false)
@@ -259,7 +260,7 @@ describe('F1-05 Log in', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Forgot password?' }))
 
-    expect(screen.getByRole('status')).toHaveTextContent('ask the front desk to reset your password')
+    expect(screen.getByRole('status')).toHaveTextContent('Ask the front desk to reset your password')
     expect(calls).toHaveLength(0)
   })
 
@@ -271,7 +272,7 @@ describe('F1-05 Log in', () => {
     await user.type(await screen.findByLabelText(/email address/i), 'member@sportify.demo{Enter}')
 
     await waitFor(() => expect(screen.getByLabelText(/^password/i)).toHaveFocus())
-    expect(screen.getByText('Password is required')).toBeInTheDocument()
+    expect(screen.getByText('Enter your password')).toBeInTheDocument()
   })
 
   it('links to the sign up page', async () => {
@@ -279,7 +280,7 @@ describe('F1-05 Log in', () => {
     const user = userEvent.setup()
     renderApp('/login')
 
-    await user.click(await screen.findByRole('link', { name: 'Create an account' }))
+    await user.click(await screen.findByRole('link', { name: 'Sign up' }))
 
     expect(await screen.findByRole('heading', { name: 'Create your account' })).toBeInTheDocument()
   })
@@ -330,7 +331,7 @@ describe('F1-06 Sign up', () => {
     await waitFor(() => expect(calls.some((call) => call.path === '/users/me')).toBe(true))
   })
 
-  it('shows "Email is already registered" under the email field for a duplicate email', async () => {
+  it('shows the account-exists message under the email field for a duplicate email', async () => {
     installFakeFetch(authBackend())
     const user = userEvent.setup()
     renderApp('/register')
@@ -339,9 +340,9 @@ describe('F1-06 Sign up', () => {
     await user.click(screen.getByRole('button', { name: 'Create account' }))
 
     const email = screen.getByLabelText(/email address/i)
-    expect(await screen.findByText('Email is already registered')).toBeInTheDocument()
+    expect(await screen.findByText('An account with this email already exists. Log in instead.')).toBeInTheDocument()
     expect(email).toHaveAttribute('aria-invalid', 'true')
-    expect(email).toHaveAccessibleDescription('Email is already registered')
+    expect(email).toHaveAccessibleDescription('An account with this email already exists. Log in instead.')
     await waitFor(() => expect(email).toHaveFocus())
     expect(tokenStorage.hasSession()).toBe(false)
     expect(screen.getByRole('button', { name: 'Create account' })).toBeEnabled()
@@ -355,7 +356,7 @@ describe('F1-06 Sign up', () => {
     await fillRegisterForm(user, { password: 'onlyletters' })
     await user.click(screen.getByRole('button', { name: 'Create account' }))
 
-    expect(screen.getByText(STRONG_PASSWORD_MESSAGE)).toBeInTheDocument()
+    expect(screen.getByText(PASSWORD_RULES_MESSAGE)).toBeInTheDocument()
     expect(screen.getByLabelText(/^password/i)).toHaveAttribute('aria-invalid', 'true')
     expect(calls).toHaveLength(0)
   })
@@ -392,12 +393,12 @@ describe('F1-06 Sign up', () => {
     await user.type(password, 'abc')
     expect(rule('letter')).toHaveAttribute('data-met', 'true')
     expect(rule('digit')).toHaveAttribute('data-met', 'false')
-    expect(screen.getByText('Password strength: Weak')).toBeInTheDocument()
+    expect(screen.queryByText(/Password strength/)).not.toBeInTheDocument()
 
     await user.type(password, '12345')
     expect(rule('length')).toHaveAttribute('data-met', 'true')
     expect(rule('digit')).toHaveAttribute('data-met', 'true')
-    expect(screen.getByText('Meets requirements')).toBeInTheDocument()
+    expect(screen.queryByText('Meets requirements')).not.toBeInTheDocument()
     expect(within(rule('length') as HTMLElement).getByText('- met')).toBeInTheDocument()
   })
 
@@ -407,7 +408,7 @@ describe('F1-06 Sign up', () => {
     renderApp('/register')
 
     await user.click(await screen.findByRole('button', { name: 'Create account' }))
-    for (const message of ['Full name is required', 'Phone is required', 'Email is required', 'Password is required', 'Please confirm your password', 'You must accept the terms to create an account']) {
+    for (const message of ['Enter your full name', 'Enter your phone number', 'Enter your email', 'Create a password', 'Confirm your password', 'Agree to the Terms of Use and Privacy Policy to continue']) {
       expect(screen.getByText(message)).toBeInTheDocument()
     }
     await waitFor(() => expect(screen.getByLabelText(/full name/i)).toHaveFocus())
@@ -415,7 +416,7 @@ describe('F1-06 Sign up', () => {
     await user.type(screen.getByLabelText(/^password/i), 'Train2026')
     await user.type(screen.getByLabelText(/confirm password/i), 'Train2027')
     await user.click(screen.getByRole('button', { name: 'Create account' }))
-    expect(screen.getByText('Passwords do not match')).toBeInTheDocument()
+    expect(screen.getByText("Passwords don't match. Try again.")).toBeInTheDocument()
     expect(calls).toHaveLength(0)
   })
 
@@ -438,7 +439,7 @@ describe('F1-06 Sign up', () => {
     await fillRegisterForm(user, { phone: '12ab' })
     await user.click(screen.getByRole('button', { name: 'Create account' }))
 
-    expect(screen.getByText('Phone must be 8-15 digits with optional leading +')).toBeInTheDocument()
+    expect(screen.getByText('Enter a valid phone number, like 0901 234 567')).toBeInTheDocument()
     expect(calls).toHaveLength(0)
   })
 
@@ -613,7 +614,7 @@ describe('FE-01 review fixes (round 2)', () => {
       await user.type(await screen.findByLabelText(/^password/i), 'Train2026')
       await user.type(screen.getByLabelText(/confirm password/i), 'Train2027')
       await user.click(screen.getByRole('button', { name: 'Create account' }))
-      expect(screen.getByText('Passwords do not match')).toBeInTheDocument()
+      expect(screen.getByText("Passwords don't match. Try again.")).toBeInTheDocument()
       return user
     }
 
@@ -624,7 +625,7 @@ describe('FE-01 review fixes (round 2)', () => {
       await user.clear(password)
       await user.type(password, 'Train2027')
 
-      expect(screen.queryByText('Passwords do not match')).not.toBeInTheDocument()
+      expect(screen.queryByText("Passwords don't match. Try again.")).not.toBeInTheDocument()
       expect(screen.getByText('Passwords match')).toBeInTheDocument()
       expect(screen.getByLabelText(/confirm password/i)).not.toHaveAttribute('aria-invalid')
     })
@@ -636,7 +637,7 @@ describe('FE-01 review fixes (round 2)', () => {
       await user.clear(confirm)
       await user.type(confirm, 'Train2026')
 
-      expect(screen.queryByText('Passwords do not match')).not.toBeInTheDocument()
+      expect(screen.queryByText("Passwords don't match. Try again.")).not.toBeInTheDocument()
       expect(screen.getByText('Passwords match')).toBeInTheDocument()
     })
 
@@ -645,7 +646,7 @@ describe('FE-01 review fixes (round 2)', () => {
 
       await user.type(screen.getByLabelText(/^password/i), '9')
 
-      expect(screen.getByText('Passwords do not match')).toBeInTheDocument()
+      expect(screen.getByText("Passwords don't match. Try again.")).toBeInTheDocument()
     })
   })
 
@@ -701,7 +702,7 @@ describe('FE-01 review fixes (round 2)', () => {
       await fillRegisterForm(user, { email: 'member@sportify.demo' })
       await user.click(screen.getByRole('button', { name: 'Create account' }))
 
-      expect(await screen.findByText('Email is already registered')).toHaveClass('field__error')
+      expect(await screen.findByText('An account with this email already exists. Log in instead.')).toHaveClass('field__error')
       expect(screen.queryByRole('alert', { name: /conflicts/ })).not.toBeInTheDocument()
     })
   })
@@ -1028,14 +1029,37 @@ describe('FE-01 review fixes (round 3)', () => {
       renderApp('/register')
       const password = await screen.findByLabelText(/^password/i)
 
-      for (const rule of ['length', 'letter', 'digit', 'bytes']) {
+      for (const rule of ['length', 'letter', 'digit']) {
         expect(document.querySelector(`[data-rule="${rule}"]`)).toHaveAttribute('data-met', 'false')
       }
+      expect(document.querySelector('[data-rule="bytes"]')).toBeNull()
       expect(screen.queryByText(/Password strength|Meets requirements/)).not.toBeInTheDocument()
 
       await user.type(password, 'a')
       await user.clear(password)
-      expect(document.querySelector('[data-rule="bytes"]')).toHaveAttribute('data-met', 'false')
+      expect(document.querySelector('[data-rule="bytes"]')).toBeNull()
+    })
+  })
+
+  describe('N6b byte limit only when broken', () => {
+    it('lists only length, a letter and a number, and shows the byte limit as an error only when the password breaks it', async () => {
+      installFakeFetch(authBackend())
+      const user = userEvent.setup()
+      renderApp('/register')
+      const password = await screen.findByLabelText(/^password/i)
+      await user.type(password, 'abc12345')
+      expect(screen.getByText('At least 8 characters')).toBeInTheDocument()
+      expect(screen.getByText('1 letter')).toBeInTheDocument()
+      expect(screen.getByText('1 number')).toBeInTheDocument()
+      expect(screen.queryByText(/bytes|accented/)).not.toBeInTheDocument()
+
+      await user.clear(password)
+      await user.click(password)
+      await user.paste(`${'\u00E9'.repeat(36)}1`)
+      const tooLong = document.querySelector('[data-rule="bytes"]') as HTMLElement
+      expect(tooLong).toHaveAttribute('data-met', 'false')
+      expect(tooLong).toHaveClass('password-rules__item--error')
+      expect(within(tooLong).getByText('Too long: use fewer accented letters or symbols')).toBeInTheDocument()
     })
   })
 

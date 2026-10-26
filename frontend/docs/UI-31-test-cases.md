@@ -49,9 +49,10 @@ and the desk receipt (S3-Receipt) in the Home theme. Transaction atomicity stays
 | Desk Receipt View (#41) | 1440 x 900 | Dark | Desktop dark mode receipt | Pass |
 
 ## Desk Receipt A4 Print-to-PDF Verification
-- **Generated File**: `frontend/docs/screenshots/ui-31/reception-receipt-a4.pdf`
+- **Generated File**: `frontend/docs/screenshots/ui-31/reception-receipt-a4.pdf` (60,481 bytes)
 - **Page Count**: Exactly 1 page verified (`preferCSSPageSize: true`, 8.27 x 11.69 inches).
-- **Extracted Content**: Invoice `INV-1041` (Payment #41), Total amount `810,000 VND` (Subtotal `900,000 VND`, Discount `90,000 VND`), Item `Basketball Academy (12 sessions)`, Member `Bao Nguyen` (`MEM-0003`), Issue date `2026-10-25`.
+- **Pre-print Readiness**: Automated DOM assertions verify `INV-1041`, `810,000 VND`, `Basketball Academy`, and `Bao Nguyen` rendered with loading spinner completely removed prior to print trigger.
+- **Post-print Extracted Content**: Directly extracted and validated from decompressed PDF Flate streams and CMap font tables: Invoice `INV-1041` (Payment #41), Total amount `810.000 VND` (Subtotal `900.000 VND`, Discount `-90.000 VND`), Item `Basketball Academy`, Member `Bao Nguyen` (`MEM-0003`), zero loading indicator text.
 - **Excluded Elements**: `@media print` eliminates navigation, sidebar, hero banner, and action buttons. Zero 403 or Access Denied screens.
 
 Branch refreshed and merged on `feat/ui-30`, `feat/ui-28`, and latest `main`.
