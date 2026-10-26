@@ -688,13 +688,17 @@ describe('FE-12 Refund Requests (F3-07)', () => {
     expect(record).toBeDisabled()
     await user.click(within(form).getByRole('checkbox', { name: 'I have returned the approved amount' }))
     await user.click(record)
+    // UI-32: the payout cannot be undone, so it is confirmed once more with the amount.
+    expect(calls.filter((call) => call.path === '/refunds/7/complete')).toHaveLength(0)
+    const dialog = await screen.findByRole('dialog', { name: 'Record the refund payout?' })
+    await user.click(within(dialog).getByRole('button', { name: 'Yes, record 150.000 VND' }))
     expect(await screen.findByRole('heading', { name: 'Refund Completed' })).toBeInTheDocument()
     expect(calls.filter((call) => call.path === '/refunds/7/complete')).toHaveLength(1)
     expect(calls.find((call) => call.path === '/refunds/7/complete')?.body).toBeUndefined()
     const detail = screen.getByRole('region', { name: 'Refund' })
     expect(within(detail).getByRole('heading', { name: 'Refund receipt / RF-1040' })).toBeInTheDocument()
     expect(within(detail).queryByText('Refund reference')).not.toBeInTheDocument()
-    expect(within(detail).getByText('Refunded')).toBeInTheDocument()
+    expect(within(detail).getByText('Status').nextSibling).toHaveTextContent('Refunded')
     expect(screen.queryByText(/notified/i)).not.toBeInTheDocument()
   })
 
@@ -707,8 +711,45 @@ describe('FE-12 Refund Requests (F3-07)', () => {
     const form = await screen.findByRole('form', { name: 'Record completed refund' })
     await user.click(within(form).getByRole('checkbox', { name: 'I have returned the approved amount' }))
     await user.click(within(form).getByRole('button', { name: 'Record completed refund' }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /Yes, record/ }))
     expect(await within(form).findByText('Only approved refunds can be completed')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Refund Approved' })).toBeInTheDocument()
+  })
+
+  it('UI-32 Cancel in the payout confirmation sends nothing and keeps the refund approved', async () => {
+    const { calls } = await open('/reception/refunds/7?memberId=2', {
+      memberRefunds: [refund({ status: 'APPROVED', amountApproved: 120000 })],
+    })
+    const user = userEvent.setup()
+    const form = await screen.findByRole('form', { name: 'Record completed refund' })
+    await user.click(within(form).getByRole('checkbox', { name: 'I have returned the approved amount' }))
+    await user.click(within(form).getByRole('button', { name: 'Record completed refund' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Record the refund payout?' })
+    // The confirmation names the approved amount from the API, the member and the refund.
+    expect(dialog).toHaveTextContent('120.000 VND returned to Taylor Nguyen / MB-0246 for RF-1040. This cannot be undone.')
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(calls.some((call) => call.path === '/refunds/7/complete')).toBe(false)
+    expect(screen.getByRole('heading', { name: 'Refund Approved' })).toBeInTheDocument()
+  })
+
+  it.each([
+    ['PENDING', ['Requested', 'Approved', 'Refunded'], 'Requested'],
+    ['APPROVED', ['Requested', 'Approved', 'Refunded'], 'Approved'],
+    ['COMPLETED', ['Requested', 'Approved', 'Refunded'], 'Refunded'],
+    ['REJECTED', ['Requested', 'Rejected'], 'Rejected'],
+  ])('UI-32 a %s refund shows its progress with the current step marked', async (status, steps, current) => {
+    await open('/reception/refunds/7?memberId=2', { memberRefunds: [refund({ status, amountApproved: status === 'PENDING' ? null : 150000 })] })
+    const progress = await screen.findByRole('list', { name: 'Refund progress' })
+    expect(within(progress).getAllByRole('listitem').map((item) => item.textContent)).toEqual(steps)
+    expect(within(progress).getByText(current)).toHaveAttribute('aria-current', 'step')
+    expect(progress.querySelectorAll('[aria-current]')).toHaveLength(1)
+  })
+
+  it('UI-32 refund pages use the Home theme hero', async () => {
+    await open('/reception/refunds')
+    const heading = screen.getByRole('heading', { level: 1, name: 'Refund Requests' })
+    expect(heading.closest('header')).toHaveClass('payment-hero')
   })
 
   it('TC-FE12-044 a rejected refund shows the manager note; an unknown id is not found', async () => {
@@ -897,6 +938,7 @@ describe('FE-12 round 3 integration regressions', () => {
     const user = userEvent.setup()
     await user.click(within(form).getByRole('checkbox'))
     await user.dblClick(within(form).getByRole('button', { name: 'Record completed refund' }))
+    await user.dblClick(within(await screen.findByRole('dialog')).getByRole('button', { name: /Yes, record/ }))
     expect(calls.filter((call) => call.path === '/refunds/7/complete')).toHaveLength(1)
     await act(async () => finish(backendError(400, 'Only approved refunds can be completed')))
     expect(await within(form).findByText('Only approved refunds can be completed')).toBeInTheDocument()

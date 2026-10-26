@@ -325,6 +325,66 @@
 
 /* Receptionist payments and refunds (FE-12): F3-04 to F3-07 */
 
+/* Refund progress (UI-32): Requested, Approved, Refunded or Rejected. */
+.refund-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+  counter-reset: refund-step;
+}
+
+.refund-steps__step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  counter-increment: refund-step;
+}
+
+.refund-steps__step::before {
+  content: counter(refund-step);
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-border);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+}
+
+.refund-steps__step[data-state='done'] {
+  border-color: var(--color-success-border);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.refund-steps__step[data-state='done']::before {
+  content: '\2713';
+  background: var(--color-success);
+  color: var(--color-surface);
+}
+
+.refund-steps__step[data-state='current'] {
+  border-color: var(--color-highlight);
+  background: var(--color-feature-surface);
+  color: var(--color-on-feature);
+}
+
+.refund-steps__step[data-state='current']::before {
+  background: var(--color-highlight);
+  color: var(--color-feature-surface);
+}
+
 .payment-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

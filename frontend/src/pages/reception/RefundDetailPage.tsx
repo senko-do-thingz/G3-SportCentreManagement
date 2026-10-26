@@ -1,8 +1,9 @@
-import { useCallback, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { getErrorMessage } from '../../api/errors'
 import { receptionPaymentsApi, type Refund } from '../../api/receptionPaymentsApi'
-import { Button, Card, Checkbox, EmptyState, ErrorState, PageHeader, useToast } from '../../components/ui'
+import { PaymentHero } from '../../components/PaymentHero'
+import { Button, Card, Checkbox, EmptyState, ErrorState, Modal, useToast } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { useResource } from '../../hooks/useResource'
@@ -10,11 +11,14 @@ import { positiveId } from './receptionModel'
 import {
   REFUND_LIST_PATH,
   formatPaymentMoney as formatMoney,
+  memberLine,
   refundAmount,
   refundCreatePath,
   refundOriginal,
   refundStage,
   refundStatusLabel,
+  refundSteps,
+  type RefundStage,
 } from './receptionPaymentsModel'
 
 const EYEBROW = 'Receptionist / Payments and reports'
@@ -29,6 +33,8 @@ const EYEBROW = 'Receptionist / Payments and reports'
  *   Record completed refund (PUT /refunds/{id}/complete).
  * - COMPLETED: Refund Completed (S3-RefundDone).
  * - REJECTED: the manager decision and note.
+ * UI-32: every state shows the Requested, Approved, Refunded (or Rejected) progress, and recording the
+ * payout, which cannot be undone, asks for a second confirmation with the amount first.
  */
 export function RefundDetailPage() {
   const { refundId } = useParams()
@@ -58,7 +64,7 @@ export function RefundDetailPage() {
   if (id !== null && memberId === null) {
     return (
       <div className="page">
-        <PageHeader eyebrow={EYEBROW} title="Select the refund member" />
+        <PaymentHero eyebrow={EYEBROW} title="Select the refund member" />
         <EmptyState title="Member context required" description="Select the member in Refund requests, then reopen this refund. Keep the memberId in the link to reload any refund status." action={back} />
       </div>
     )
@@ -67,7 +73,7 @@ export function RefundDetailPage() {
   if (refund.status === 'loading') {
     return (
       <div className="page">
-        <PageHeader eyebrow={EYEBROW} title="Refund" />
+        <PaymentHero eyebrow={EYEBROW} title="Refund" />
         <Spinner label="Loading the refund" />
       </div>
     )
@@ -75,7 +81,7 @@ export function RefundDetailPage() {
   if (refund.status === 'error') {
     return (
       <div className="page">
-        <PageHeader eyebrow={EYEBROW} title="Refund" />
+        <PaymentHero eyebrow={EYEBROW} title="Refund" />
         <ErrorState title="We could not load the refund" error={refund.error} onRetry={reload} />
         <div className="reception-actions">{back}</div>
       </div>
@@ -84,7 +90,7 @@ export function RefundDetailPage() {
   if (refund.data === null) {
     return (
       <div className="page">
-        <PageHeader eyebrow={EYEBROW} title="Refund" />
+        <PaymentHero eyebrow={EYEBROW} title="Refund" />
         <EmptyState
           title="Refund not found"
           description="Open the refund again from the approved queue or the member's refunds."
@@ -95,10 +101,12 @@ export function RefundDetailPage() {
   }
 
   const data = refund.data
-  switch (refundStage(data.status)) {
+  const stage = refundStage(data.status)
+  switch (stage) {
     case 'submitted':
       return (
         <RefundState
+          stage={stage}
           title="Refund Request Submitted"
           description="The payment remains paid until the refund is completed."
           heading={`${data.refundCode} / Awaiting approval`}
@@ -115,6 +123,7 @@ export function RefundDetailPage() {
     case 'done':
       return (
         <RefundState
+          stage={stage}
           title="Refund Completed"
           description="The money has been returned and the refund was recorded."
           heading={`Refund receipt / ${data.refundCode}`}
@@ -127,6 +136,7 @@ export function RefundDetailPage() {
     case 'rejected':
       return (
         <RefundState
+          stage={stage}
           title="Refund Rejected"
           description="The manager rejected this refund. The payment stays paid."
           heading={`${data.refundCode} / Rejected`}
@@ -139,7 +149,7 @@ export function RefundDetailPage() {
       )
     default:
       return (
-        <RefundState title="Refund" heading={data.refundCode} back={back}>
+        <RefundState stage={stage} title="Refund" heading={data.refundCode} back={back}>
           <Row label="Status" value={refundStatusLabel(data.status)} />
         </RefundState>
       )
@@ -155,13 +165,30 @@ function Row({ label, value }: { label: string; value: ReactNode }) {
   )
 }
 
+/** Requested, Approved, Refunded (or Requested, Rejected), with the current step marked (UI-32). */
+function RefundProgress({ stage }: { stage: RefundStage }) {
+  const steps = refundSteps(stage)
+  if (steps.length === 0) return null
+  return (
+    <ol className="refund-steps" aria-label="Refund progress">
+      {steps.map((step) => (
+        <li key={step.label} className="refund-steps__step" data-state={step.state} aria-current={step.state === 'current' ? 'step' : undefined}>
+          {step.label}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
 function RefundState({
+  stage,
   title,
   description,
   heading,
   back,
   children,
 }: {
+  stage: RefundStage
   title: string
   description?: string
   heading: string
@@ -170,8 +197,9 @@ function RefundState({
 }) {
   return (
     <div className="page">
-      <PageHeader eyebrow={EYEBROW} title={title} description={description} />
+      <PaymentHero eyebrow={EYEBROW} title={title} description={description} />
       <Card title={heading} aria-label="Refund">
+        <RefundProgress stage={stage} />
         <dl className="summary-list payment-rows payment-rows--narrow">{children}</dl>
         <div className="reception-actions">{back}</div>
       </Card>
@@ -182,38 +210,53 @@ function RefundState({
 function RefundApproved({ refund, back, onCompleted }: { refund: Refund; back: ReactNode; onCompleted: () => void }) {
   const toast = useToast()
   const [verified, setVerified] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Set synchronously, so a double click on the confirmation sends one PUT.
+  const sending = useRef(false)
+  const amount = formatMoney(refundAmount(refund))
 
-  const submit = async (event: FormEvent) => {
+  const ask = (event: FormEvent) => {
     event.preventDefault()
     if (!verified || saving) return
+    setError(null)
+    setConfirming(true)
+  }
+
+  const record = async () => {
+    if (sending.current) return
+    sending.current = true
     setSaving(true)
     setError(null)
     try {
       await receptionPaymentsApi.completeRefund(refund.id)
       toast.success('Refund recorded', `${refund.refundCode} is completed.`)
+      setConfirming(false)
       onCompleted()
     } catch (failure) {
+      sending.current = false
       setSaving(false)
+      setConfirming(false)
       setError(getErrorMessage(failure))
     }
   }
 
   return (
     <div className="page">
-      <PageHeader
+      <PaymentHero
         eyebrow={EYEBROW}
         title="Refund Approved"
         description="Return the approved amount before recording completion."
       />
       <Card title={`${refund.refundCode} / Approved - not yet refunded`} aria-label="Refund">
+        <RefundProgress stage="approved" />
         <dl className="summary-list payment-rows payment-rows--narrow">
           <Row label="Approved amount" value={formatMoney(refundAmount(refund))} />
           <Row label="Original receipt" value={refundOriginal(refund)} />
           {refund.managerNote && <Row label="Manager note" value={refund.managerNote} />}
         </dl>
-        <form className="reception-form" aria-label="Record completed refund" noValidate onSubmit={submit}>
+        <form className="reception-form" aria-label="Record completed refund" noValidate onSubmit={ask}>
           <Checkbox
             label="I have returned the approved amount"
             checked={verified}
@@ -237,6 +280,25 @@ function RefundApproved({ refund, back, onCompleted }: { refund: Refund; back: R
           </div>
         </form>
       </Card>
+      <Modal
+        open={confirming}
+        onClose={() => !saving && setConfirming(false)}
+        dismissible={!saving}
+        title="Record the refund payout?"
+        description={`${amount} returned to ${memberLine(refund.memberFullName, refund.memberCode, refund.memberId)} for ${refund.refundCode}. This cannot be undone.`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirming(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={record} loading={saving}>
+              Yes, record {amount}
+            </Button>
+          </>
+        }
+      >
+        <p className="notice notice--warning">Record it only after the money has actually been returned to the member.</p>
+      </Modal>
     </div>
   )
 }

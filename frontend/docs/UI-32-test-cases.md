@@ -1,0 +1,63 @@
+# UI-32 - Refund request and review screens: test cases
+
+Scope: Refund Requests (F3-07) and the refund states S3-RefundSubmitted, S3-RefundApproved, S3-RefundDone and the
+rejected state in the Home theme. Money and eligibility come from BE-21; no API or backend change.
+
+## How each case is run
+
+| Kind | Where | Runs in CI |
+|------|-------|------------|
+| Unit (Vitest) | `src/pages/reception/receptionPayments.test.tsx`, "FE-12 Refund Requests" block (existing TC-FE12-040 to 049 plus the UI-32 cases) and "round 3 integration regressions" | Yes (`npm test`) |
+| Manual | Steps below | No |
+
+## Cases
+
+| ID | Case | How | Expected | Result |
+|----|------|-----|----------|--------|
+| TC-01 | Home theme heading | Unit | `h1` inside the shared `PaymentHero` on Refund Requests and every refund state | Pass |
+| TC-02 | Money from the API | Unit (TC-FE12-040, 041) | Amount prefilled with the quote's suggested amount; at most the payment amount; more never reaches POST /refunds | Pass |
+| TC-03 | Eligibility from the API | Unit (TC-FE12-041 and the zero unused sessions case) | Ineligible quote shows Not eligible with the reason, fields and Submit disabled | Pass |
+| TC-04 | Request, approved and paid are distinct | Unit | Progress list: PENDING marks Requested, APPROVED marks Approved, COMPLETED marks Refunded, REJECTED shows Requested then Rejected; one current step each | Pass |
+| TC-05 | Irreversible payout confirms first | Unit (TC-FE12-042 and UI-32 case) | Record completed refund opens "Record the refund payout?" with the approved amount, member and refund code; nothing is sent until "Yes, record ..."; Cancel sends nothing | Pass |
+| TC-06 | No double payout | Unit (duplicate completion clicks) | Double clicks on both buttons send one PUT /refunds/{id}/complete; a rejection never claims completion | Pass |
+| TC-07 | Errors | Unit (TC-FE12-043, 047, 049) | A failed completion stays on Refund Approved with the backend message | Pass |
+| TC-08 | Light, dark and responsive viewports (G-02) | Visual check: `/reception/refunds` and refund detail states in light and dark at 390, 768 and 1440 px | Hero, progress chips and confirmation modal readable, no page-level horizontal scroll | Pass |
+| TC-09 | Modal keyboard navigation, Escape, focus trap & restoration | Keyboard test: open irreversible payout modal, press Tab/Shift+Tab, Escape or Cancel | Focus trapped inside modal; Tab and Shift+Tab keep active element in dialog; Escape dismisses modal without PUT and restores focus to submit button; Cancel dismisses without action and restores focus; Confirm sends single PUT; all assertions determine PASS/FAIL | Pass |
+
+## G-02 Responsive Matrix (Refund Progress & Confirmation Modal)
+
+| Screen / State | Viewport | Theme | Key Elements Checked | Result |
+|----------------|----------|-------|----------------------|--------|
+| Refund progress | 390 x 844 | Light | Progress chips wrap cleanly, no text clipping | Pass |
+| Refund progress | 390 x 844 | Dark | Dark theme contrast on step chips meets WCAG AA | Pass |
+| Refund progress | 768 x 1024 | Light | Balanced grid, hero readable | Pass |
+| Refund progress | 768 x 1024 | Dark | Dark surface and approved badge clear | Pass |
+| Refund progress | 1440 x 900 | Light | Desktop stage view, actions aligned | Pass |
+| Refund progress | 1440 x 900 | Dark | Desktop stage view, dark mode | Pass |
+| Second-confirmation modal | 390 x 844 | Light | Modal fits phone screen, warning copy fully readable | Pass |
+| Second-confirmation modal | 390 x 844 | Dark | Dark modal backdrop, clear action buttons | Pass |
+| Second-confirmation modal | 768 x 1024 | Light | Tablet layout, confirmation dialog centered | Pass |
+| Second-confirmation modal | 768 x 1024 | Dark | High contrast modal on tablet dark mode | Pass |
+| Second-confirmation modal | 1440 x 900 | Light | Centered dialog, amount & refund code prominent | Pass |
+| Second-confirmation modal | 1440 x 900 | Dark | Desktop dark mode dialog | Pass |
+| Long member name & refund ID | 390 x 844 | Light | Long member name wraps cleanly, no overflow or clipping at 390px | Pass |
+
+## TC-09 Modal Keyboard & Irreversible Payout Execution Provenance
+
+Executed via headless Chromium test harness (`frontend/scripts/generate-all-evidence.mjs --only ui-32`):
+- **Modal Opening**: Triggered on approved refund #11 by checking completion acknowledgement and clicking "Record completed refund". Verified rendered DOM strictly within `[role="dialog"]` contains approved amount (`450.000 VND`), refund code (`REF-0011`), and member name (`Nguyen Thi Mai Linh`).
+- **Real CDP Keyboard Focus Trap & Wrap**: Dispatched genuine Chrome DevTools Protocol `Input.dispatchKeyEvent` events (`rawKeyDown`/`keyUp`):
+  1. Initial focus: `.modal__close` (aria-label: "Close dialog")
+  2. `Tab` key press: moves focus to "Cancel" button
+  3. `Tab` key press: moves focus to "Yes, record 450.000 VND" confirm button
+  4. Wrap-around `Tab` key press: wraps focus back to `.modal__close` button
+  5. Backwards wrap `Shift+Tab` key press: wraps focus backwards to "Yes, record 450.000 VND" confirm button
+- **Dismissed by Escape & Strict Focus Restoration**: Genuine CDP `Escape` key press closes modal without network requests (0 PUT requests observed); focus strictly verified restored to the exact trigger button (`document.activeElement === trigger`).
+- **Dismissed by Cancel & Strict Focus Restoration**: "Cancel" button click dismisses modal without action (0 PUT requests observed); focus strictly restored to the exact trigger button.
+- **Single PUT on Confirmation**: Re-opened modal and clicked "Yes, record 450.000 VND" button; verified exactly 1 `PUT /refunds/11/complete` request dispatched.
+- **Long-Text Wrapping at 390px**: Verified `scrollWidth <= clientWidth` on phone viewport (390px) with 120-char member description, ensuring no horizontal scrolling or text clipping.
+- **Integration Boundary**: Frontend client verifies single PUT dispatch and disabled submit state; multi-client concurrency gate QA-01 is scoped and marked `NOT_RUN` at frontend, tested at backend integration boundary.
+- **Evidence Log**: Captured in `frontend/docs/screenshots/ui-32/modal-interaction-log.json`, with all assertions determining `outcome: 'PASS'`.
+
+Note: BE-21 allows one refund per payment, so the quote has no prior refund amount and the refundable limit is the payment amount (`toRefundQuote`). Frontend ref guarantees local single-submit; backend concurrency and idempotency verification is recorded as integration gate QA-01.
+Branch refreshed and merged on `feat/ui-31` (PR #128), `feat/ui-28`, and `main`.

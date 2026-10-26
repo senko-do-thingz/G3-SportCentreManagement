@@ -1,0 +1,37 @@
+{
+  "executedAt": "2026-10-25T12:36:46.565Z",
+  "testCase": "TC-09",
+  "modalOpenedSuccessfully": true,
+  "observedApprovedAmount": "450.000",
+  "observedRefundCode": "REF-0011",
+  "observedMember": "Nguyen Thi Mai Linh",
+  "focusTrapVerified": true,
+  "focusTrapSequence": {
+    "initialOnCloseButton": true,
+    "tabToCancelButton": true,
+    "tabToConfirmButton": true,
+    "wrapTabBackToCloseButton": true,
+    "shiftTabWrapToConfirmButton": true
+  },
+  "focusStrictlyRestoredAfterEscape": true,
+  "focusStrictlyRestoredAfterCancel": true,
+  "dismissedByEscapeWithoutPut": true,
+  "dismissedByCancelWithoutPut": true,
+  "singlePutSentOnExplicitConfirm": true,
+  "longTextNoClippingAt390px": true,
+  "mandatoryAssertions": {
+    "modalRoleDialogPresent": true,
+    "approvedAmountMatchesDOM": true,
+    "refundCodeMatchesDOM": true,
+    "memberMatchesDOM": true,
+    "focusTrapActive": true,
+    "focusRestoredOnDismiss": true,
+    "singlePutOnConfirm": true,
+    "zeroPutOnDismiss": true,
+    "longTextWrappedNoScroll": true
+  },
+  "integrationBoundaries": {
+    "backendConcurrencyAndIdempotency": "NOT_RUN - frontend client verifies single PUT dispatch on explicit confirm; multi-client concurrency gate QA-01 is tested at backend integration boundary"
+  },
+  "outcome": "PASS"
+}

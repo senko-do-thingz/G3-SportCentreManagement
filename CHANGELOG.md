@@ -1,3 +1,10 @@
+## 2026-10-24 - Refund request and review screens (UI-32)
+
+- Refund Requests and every refund state use the shared PaymentHero in the Home theme.
+- Request, approval and payout are never confused: each refund shows its progress (Requested, Approved, Refunded, or Requested, Rejected) with the current step marked.
+- Recording the payout cannot be undone, so it asks once more in a dialog with the approved amount, member and refund code; nothing is sent until it is confirmed, Cancel sends nothing, and a double click sends one request.
+- Tests in receptionPayments.test.tsx; cases in frontend/docs/UI-32-test-cases.md. No API or backend changes.
+
 ## 2026-10-24 - Verify payment and receipt (UI-31)
 
 - Verify and Record Payment, Payment Needs Review, Payment Confirmed and Receipt, Payment Failed and the desk receipt use the shared PaymentHero in the Home theme; the hero is not printed with a receipt.
