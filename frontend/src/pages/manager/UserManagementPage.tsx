@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { managerUsersApi } from '../../api/managerUsersApi'
 import { useAuth } from '../../auth/useAuth'
 import { ROLE_LABELS } from '../../auth/roles'
@@ -33,11 +34,53 @@ export function UserManagementPage() {
   const [selected, setSelected] = useState<ManagerUser | null>(null)
   const [changing, setChanging] = useState<ManagerUser | null>(null)
   const [editingCoach, setEditingCoach] = useState<ManagerUser | null>(null)
+  const [coachMenu, setCoachMenu] = useState<{ user: ManagerUser; top: number; left: number } | null>(null)
+  const coachMenuRef = useRef<HTMLDivElement>(null)
+  const coachMenuItemRef = useRef<HTMLButtonElement>(null)
+  const coachMenuTriggerRef = useRef<HTMLButtonElement>(null)
   const load = useCallback((signal: AbortSignal) => managerUsersApi.list({ page, size: 20, role, status, search: debounced.trim() }, signal), [page, role, status, debounced])
   const [resource, reload] = useResource(load)
   const ready = resource.status === 'ready' && search === debounced
   const matchingAccounts = ready ? resource.data.totalElements : null
   const changed = () => { setChanging(null); toast.success('Account status updated'); reload() }
+  function toggleCoachMenu(event: MouseEvent<HTMLButtonElement>, account: ManagerUser) {
+    if (coachMenu?.user.id === account.id) {
+      setCoachMenu(null)
+      return
+    }
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const menuWidth = 192
+    const menuHeight = 48
+    const top = bounds.bottom + menuHeight + 8 <= window.innerHeight ? bounds.bottom + 4 : Math.max(8, bounds.top - menuHeight - 4)
+    const left = Math.max(8, Math.min(bounds.right - menuWidth, window.innerWidth - menuWidth - 8))
+    coachMenuTriggerRef.current = event.currentTarget
+    setCoachMenu({ user: account, top, left })
+  }
+  useEffect(() => {
+    if (!coachMenu) return
+    coachMenuItemRef.current?.focus()
+    const dismissOutside = (event: PointerEvent) => {
+      const target = event.target
+      if (target instanceof Node && !coachMenuRef.current?.contains(target) && !coachMenuTriggerRef.current?.contains(target)) setCoachMenu(null)
+    }
+    const dismiss = () => setCoachMenu(null)
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setCoachMenu(null)
+        coachMenuTriggerRef.current?.focus()
+      }
+    }
+    document.addEventListener('pointerdown', dismissOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('resize', dismiss)
+    window.addEventListener('scroll', dismiss, true)
+    return () => {
+      document.removeEventListener('pointerdown', dismissOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('resize', dismiss)
+      window.removeEventListener('scroll', dismiss, true)
+    }
+  }, [coachMenu])
   const columns: TableColumn<ManagerUser>[] = [
     { key: 'fullName', header: 'Account', width: '27%', render: (row) => <div className="manager-user-identity"><span className="manager-user-avatar" aria-hidden="true">{userInitials(row.fullName)}</span><span className="manager-user-copy"><strong>{row.fullName}</strong><span>{row.email}</span></span></div> },
     { key: 'role', header: 'Role', width: '15%', render: (row) => <Badge tone={ROLE_TONES[row.role as keyof typeof ROLE_LABELS] ?? 'neutral'}>{ROLE_LABELS[row.role as keyof typeof ROLE_LABELS] ?? row.role}</Badge> },
@@ -45,8 +88,10 @@ export function UserManagementPage() {
     { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
     { key: 'actions', header: 'Actions', width: '32%', render: (row) => <div className="manager-row-actions">
       <Button variant="secondary" size="sm" onClick={() => setSelected(row)}>View profile</Button>
-      {row.role === 'COACH' && <Button variant="secondary" size="sm" aria-label={`Edit coach profile of ${row.fullName}`} onClick={() => setEditingCoach(row)}>Edit coach</Button>}
       <Button variant={row.status === 'ACTIVE' ? 'danger' : 'secondary'} size="sm" disabled={row.id === user?.id && row.status === 'ACTIVE'} title={row.id === user?.id ? 'You cannot deactivate your own account.' : undefined} onClick={() => setChanging(row)}>{row.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}</Button>
+      {row.role === 'COACH' && <Button variant="ghost" size="sm" className="manager-user-more" aria-label={`More actions for ${row.fullName}`} aria-haspopup="menu" aria-expanded={coachMenu?.user.id === row.id} title="More actions" onClick={(event) => toggleCoachMenu(event, row)}>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="4" r="1.5" /><circle cx="10" cy="10" r="1.5" /><circle cx="10" cy="16" r="1.5" /></svg>
+      </Button>}
     </div> },
   ]
   return <div className="page manager-page manager-users-page">
@@ -69,5 +114,8 @@ export function UserManagementPage() {
     {changing && <ConfirmationModal title={changing.status === 'ACTIVE' ? 'Deactivate account' : 'Activate account'} description={`${changing.status === 'ACTIVE' ? 'Deactivate' : 'Activate'} ${changing.fullName}'s account? ${changing.status === 'ACTIVE' ? 'They will no longer be able to log in.' : 'They will be able to log in again.'}`} onClose={() => setChanging(null)} save={() => managerUsersApi.changeStatus(changing.id, changing.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE')} onSuccess={changed} confirmLabel={changing.status === 'ACTIVE' ? 'Deactivate account' : 'Activate account'} danger={changing.status === 'ACTIVE'} />}
     {editingCoach && <EditCoachProfileModal userId={editingCoach.id} name={editingCoach.fullName} onClose={() => setEditingCoach(null)} onSuccess={() => { setEditingCoach(null); toast.success('Coach profile updated', 'The Home page shows the new photo and details.') }} />}
     {selected && <Modal open title="Account profile" description="Account information from the current user list." onClose={() => setSelected(null)} footer={<Button variant="secondary" onClick={() => setSelected(null)}>Close</Button>}><DetailList items={[{ label: 'Full name', value: selected.fullName }, { label: 'Email', value: selected.email }, { label: 'Phone', value: selected.phone }, { label: 'Role', value: ROLE_LABELS[selected.role as keyof typeof ROLE_LABELS] ?? selected.role }, { label: 'Status', value: <StatusBadge status={selected.status} /> }, { label: 'Created', value: formatManagerDateTime(selected.createdAt) }]} /></Modal>}
+    {coachMenu && createPortal(<div ref={coachMenuRef} className="manager-user-menu" role="menu" aria-label={`More actions for ${coachMenu.user.fullName}`} style={{ top: coachMenu.top, left: coachMenu.left }} onBlur={(event) => { const next = event.relatedTarget; if (!(next instanceof Node) || !event.currentTarget.contains(next)) setCoachMenu(null) }}>
+      <button ref={coachMenuItemRef} type="button" role="menuitem" onClick={() => { const account = coachMenu.user; setCoachMenu(null); coachMenuTriggerRef.current?.focus(); setEditingCoach(account) }}>Edit coach profile</button>
+    </div>, document.body)}
   </div>
 }

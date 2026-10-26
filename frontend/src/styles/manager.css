@@ -108,6 +108,13 @@
 .manager-user-copy > span { color: var(--color-text-muted); font-size: var(--text-xs); }
 .manager-users-directory .manager-row-actions { flex-wrap: nowrap; gap: var(--space-1); }
 .manager-users-directory .manager-row-actions .btn { min-height: 32px; padding-inline: var(--space-2); font-size: var(--text-xs); }
+.manager-users-directory .manager-row-actions .manager-user-more { flex: 0 0 32px; width: 32px; min-width: 32px; padding: 0; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-muted); }
+.manager-users-directory .manager-user-more:hover:not(:disabled), .manager-users-directory .manager-user-more[aria-expanded='true'] { border-color: var(--color-primary); background: var(--color-primary-soft); color: var(--color-primary); }
+.manager-users-directory .manager-user-more > span { display: grid; place-items: center; }
+.manager-users-directory .manager-user-more svg { width: 16px; height: 16px; fill: currentColor; }
+.manager-user-menu { position: fixed; z-index: var(--z-modal); min-width: 192px; padding: var(--space-1); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: var(--shadow-md); }
+.manager-user-menu button { width: 100%; min-height: 36px; padding: var(--space-2) var(--space-3); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text); font: inherit; font-size: var(--text-sm); text-align: left; cursor: pointer; }
+.manager-user-menu button:hover, .manager-user-menu button:focus-visible { background: var(--color-primary-soft); color: var(--color-primary); outline: none; }
 .manager-users-page .manager-footnote { padding-top: var(--space-3); border-top: 1px solid var(--color-border); line-height: 1.6; }
 
 @media (max-width: 1100px) { .manager-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .manager-tier-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
