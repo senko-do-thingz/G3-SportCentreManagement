@@ -11,13 +11,16 @@ import {
   canConfirm,
   findPaidItem,
   initialConfirmForm,
+  hasAmountMismatchNote,
   isAmountMismatch,
   isAmountToReview,
   memberRefundHistory,
   mismatchAmounts,
+  needsReview,
   paymentStatusLabel,
   paymentStatusTone,
   pendingTotal,
+  queueStatus,
   readPaymentListParams,
   refundableRegistrations,
   refundAmount,
@@ -289,3 +292,36 @@ describe('FE-12 round 3 backend amount contract', () => {
     expect(() => toRefundQuote({ registrationId: 11, suggestedAmount: 150, paymentAmount: 100 })).toThrow()
   })
 })
+
+describe('UI-30 needsReview and backend mismatch contract', () => {
+  it('identifies machine-generated mismatch notes from BE-18 PaymentVerificationServiceImpl', () => {
+    expect(hasAmountMismatchNote('Amount mismatch: received 800000, expected 810000 by CASH')).toBe(true)
+    expect(hasAmountMismatchNote('Member requested visit | Amount mismatch: received 350000, expected 380000.00 by BANK_TRANSFER')).toBe(true)
+    expect(hasAmountMismatchNote(null)).toBe(false)
+    expect(hasAmountMismatchNote('')).toBe(false)
+    expect(hasAmountMismatchNote('Member paid via bank app')).toBe(false)
+  })
+
+  it('rejects arbitrary free-text containing "Amount mismatch:" without machine structure', () => {
+    expect(hasAmountMismatchNote('Staff note: Member inquired about Amount mismatch: from last month')).toBe(false)
+    expect(hasAmountMismatchNote('Amount mismatch:')).toBe(false)
+    expect(hasAmountMismatchNote('Note about Amount mismatch: none')).toBe(false)
+  })
+
+  it('needsReview requires both PENDING status and valid machine mismatch note', () => {
+    expect(needsReview({ status: 'PENDING', notes: 'Amount mismatch: received 500000' })).toBe(true)
+    expect(needsReview({ status: 'SUCCESS', notes: 'Amount mismatch: received 500000' })).toBe(false)
+    expect(needsReview({ status: 'FAILED', notes: 'Amount mismatch: received 500000' })).toBe(false)
+    expect(needsReview({ status: 'PENDING', notes: 'Member asked about Amount mismatch: verified ok' })).toBe(false)
+    expect(needsReview({ status: 'PENDING', notes: null })).toBe(false)
+    expect(queueStatus({ status: 'PENDING', notes: 'Amount mismatch: received 500000' })).toEqual({
+      code: 'NEEDS_REVIEW',
+      label: 'Needs review',
+    })
+    expect(queueStatus({ status: 'PENDING', notes: 'Free note: Amount mismatch: false alarm' })).toEqual({
+      code: 'PENDING',
+      label: 'Pending payment',
+    })
+  })
+})
+

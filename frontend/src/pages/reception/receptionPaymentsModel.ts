@@ -1,7 +1,7 @@
 import { ApiError } from '../../api/errors'
 import type { MemberCard, PackageRegistration } from '../../api/memberApi'
 import type { PaymentMethod } from '../../api/receptionApi'
-import type { ConfirmPaymentRequest, Refund } from '../../api/receptionPaymentsApi'
+import type { ConfirmPaymentRequest, Refund, StaffPayment } from '../../api/receptionPaymentsApi'
 import { humanizeCode } from '../../utils/format'
 import { isPaymentMethod, parseAmount } from './receptionModel'
 
@@ -98,6 +98,37 @@ export function memberLine(fullName: string | null | undefined, memberCode: stri
   const parts = [fullName, memberCode].filter((part): part is string => typeof part === 'string' && part.trim() !== '')
   if (parts.length > 0) return parts.join(' / ')
   return memberId ? `Member #${memberId}` : '-'
+}
+
+/**
+ * Start of the note BE-18 writes on a payment when the desk enters an amount that does not match
+ * (PaymentVerificationServiceImpl.recordMismatch). The payment stays PENDING.
+ */
+export const AMOUNT_MISMATCH_NOTE = 'Amount mismatch:'
+
+/**
+ * Strict pattern matching the machine-generated mismatch segment written by BE-18:
+ * "Amount mismatch: received <amount>, expected <amount> by <method>..."
+ * Must be at the start of notes or preceded by a segment separator (" | ").
+ * This contract prevents arbitrary free text containing "Amount mismatch:" from misclassifying records.
+ */
+export const AMOUNT_MISMATCH_PATTERN = /(?:^|\s*\|\s*)Amount mismatch:\s+received\s+\d+/i
+
+export function hasAmountMismatchNote(notes?: string | null): boolean {
+  if (!notes) return false
+  return AMOUNT_MISMATCH_PATTERN.test(notes)
+}
+
+/** A pending payment with a recorded amount mismatch needs review before anyone confirms it (UI-30). */
+export function needsReview(row: { status: string; notes?: string | null }): boolean {
+  return row.status === 'PENDING' && hasAmountMismatchNote(row.notes)
+}
+
+/** Badge of a queue row: Needs review for a pending payment with a mismatch, the payment status otherwise. */
+export function queueStatus(row: { status: string; notes?: string | null }): { code: string | null; label: string } {
+  return needsReview(row)
+    ? { code: 'NEEDS_REVIEW', label: 'Needs review' }
+    : { code: paymentStatusTone(row.status), label: paymentStatusLabel(row.status) }
 }
 
 /** Sum of the amounts of the PENDING rows on the page, for the "Amount due" stat card. */
@@ -275,6 +306,38 @@ export function mismatchAmounts(amountDue: number, typed: string, error?: unknow
     amountDue: due, amountReceived: received, outstanding: Math.round((due - received) * 100) / 100,
     ...(error instanceof ApiError ? { message: error.message } : {}),
   }
+}
+
+function moneyOf(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || String(value).trim() === '') return null
+  const amount = Number(value)
+  return Number.isFinite(amount) ? amount : null
+}
+
+function sameMoney(a: number, b: number): boolean {
+  return Math.abs(a - b) < 0.005
+}
+
+/**
+ * Why a SUCCESS payment must not be shown as a clean success (UI-31): the amount received or the
+ * invoice total differs from the amount due. Null when every known amount agrees. BE-18 rejects a
+ * mismatch, so this only catches inconsistent data, which must never look like a confirmed payment.
+ */
+export function confirmedAmountProblem(
+  payment: Pick<StaffPayment, 'amount' | 'amountReceived'>,
+  invoiceTotal?: number | string | null,
+): string | null {
+  const due = moneyOf(payment.amount)
+  if (due === null) return INVALID_AMOUNT_DUE_MESSAGE
+  const received = moneyOf(payment.amountReceived)
+  if (received !== null && !sameMoney(received, due)) {
+    return `The amount received (${formatPaymentMoney(received)}) differs from the amount due (${formatPaymentMoney(due)}). Do not hand over a receipt; ask a manager.`
+  }
+  const total = moneyOf(invoiceTotal)
+  if (total !== null && !sameMoney(total, due)) {
+    return `The invoice total (${formatPaymentMoney(total)}) differs from the amount due (${formatPaymentMoney(due)}). Do not hand over a receipt; ask a manager.`
+  }
+  return null
 }
 
 /* Payment Confirmed (F3-06): the card or package the payment activated */

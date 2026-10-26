@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -576,6 +577,73 @@ describe('FE-11 Payment Instructions and Status (F3-02)', () => {
     expect(paymentGets(calls)).toHaveLength(2)
   })
 
+  it('UI-28 shows the instructions under the Home theme payment hero', async () => {
+    paymentsBackend()
+    renderApp('/member/payments/52/status')
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Payment Instructions and Status' })
+    expect(heading.closest('header')).toHaveClass('payment-hero')
+  })
+
+  it('UI-28 the copied transfer content is exactly the reference shown, spaces and case kept', async () => {
+    const user = userEvent.setup()
+    paymentsBackend({
+      payments: [payment({ bankTransferInstructions: { accountName: 'SPORTIFY', accountNumber: '0123456789', bank: 'Demo Bank', transferContent: ' REG1041 MB0246 ' } })],
+    })
+    renderApp('/member/payments/52/status')
+    const bank = await screen.findByRole('region', { name: 'Bank transfer' })
+    const writeText = stubClipboard()
+    expect(within(bank).getByText('REG1041 MB0246')).toBeInTheDocument()
+    await user.click(within(bank).getByRole('button', { name: 'Copy transfer content' }))
+    expect(writeText).toHaveBeenLastCalledWith('REG1041 MB0246')
+  })
+
+  it('UI-28 never shows another payment when the backend answers with a different id', async () => {
+    paymentsBackend({ payments: [payment({ id: 99, code: 'PAY-0099' })] })
+    renderApp('/member/payments/52/status')
+    expect(await screen.findByRole('alert')).toHaveTextContent('does not match this link')
+    expect(screen.queryByText('PAY-0099')).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Bank transfer' })).not.toBeInTheDocument()
+  })
+
+  it('UI-28 keeps the right payment and stops checking when a later answer is for another payment', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const { calls } = paymentsBackend({ payments: [payment(), payment({ id: 99, code: 'PAY-0099', status: 'SUCCESS' })] })
+    renderApp('/member/payments/52/status')
+    const panel = await screen.findByRole('region', { name: 'Payment status' })
+    await act(async () => { await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS) })
+    expect(await within(panel).findByRole('alert')).toHaveTextContent('does not match this link')
+    expect(within(panel).getByRole('heading', { name: 'Awaiting confirmation' })).toBeInTheDocument()
+    expect(screen.queryByText('PAY-0099')).not.toBeInTheDocument()
+    await act(async () => { await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 3) })
+    expect(paymentGets(calls)).toHaveLength(2)
+  })
+
+  it('UI-28 checks a pending payment at once when the tab becomes visible again', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const { calls } = paymentsBackend({ payments: [payment(), payment({ status: 'SUCCESS', bankTransferInstructions: null, invoiceId: 7 })] })
+    renderApp('/member/payments/52/status')
+    const panel = await screen.findByRole('region', { name: 'Payment status' })
+    expect(paymentGets(calls)).toHaveLength(1)
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    // Let the effects of the first render run, as they have long before a member switches tabs.
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')) })
+    expect(await within(panel).findByRole('heading', { name: 'Payment confirmed' })).toBeInTheDocument()
+    expect(paymentGets(calls)).toHaveLength(2)
+    // Once paid, coming back to the tab sends nothing more.
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')) })
+    expect(paymentGets(calls)).toHaveLength(2)
+    visibility.mockRestore()
+  })
+
+  it('UI-28 a paid payment without an invoice yet says where the receipt will appear', async () => {
+    paymentsBackend({ payments: [payment({ status: 'SUCCESS', bankTransferInstructions: null, invoiceId: null })] })
+    renderApp('/member/payments/52/status')
+    const panel = await screen.findByRole('region', { name: 'Payment status' })
+    expect(within(panel).getByText('The receipt appears in My payments once it is issued.')).toBeInTheDocument()
+    expect(within(panel).queryByRole('link', { name: 'View receipt' })).not.toBeInTheDocument()
+  })
+
   it('aborts an in-flight request on unmount', async () => {
     let release: (response: Response) => void = () => undefined
     const { calls, fetchMock } = installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER) :
@@ -702,6 +770,13 @@ describe('FE-11 My Payments and Receipts (F3-03, S3-PaidHistory)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Server error')
   })
 
+  it('UI-29 the history heading is the Home theme payment hero', async () => {
+    paymentsBackend()
+    renderApp('/member/payments')
+    const heading = await screen.findByRole('heading', { level: 1, name: 'My Payments and Receipts' })
+    expect(heading.closest('header')).toHaveClass('payment-hero')
+  })
+
   it('TC-FE11-031 the My Payments menu item opens the real screen', async () => {
     paymentsBackend({ myPayments: () => json(200, historyPage()) })
     renderApp('/member/payments')
@@ -803,6 +878,33 @@ describe('FE-11 Receipts (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt)', 
     expect(within(receipt).getByText('Tax').nextSibling).toHaveTextContent('0,05 VND')
     expect(within(receipt).getAllByText(/First invoice line/)).toHaveLength(1)
     expect(within(receipt).getByRole('list', { name: 'Receipt items' })).toHaveTextContent('x 2')
+  })
+
+  it('UI-29 shows no base price, discount or service the invoice does not have', async () => {
+    paymentsBackend({ invoice: json(200, invoice({ subtotalAmount: null, discountAmount: null, lines: [] })) })
+    renderApp('/member/payments/receipts/7')
+    const receipt = await screen.findByRole('region', { name: 'Receipt INV-0007' })
+    expect(within(receipt).queryByText('Base price')).not.toBeInTheDocument()
+    expect(within(receipt).queryByText('Discount')).not.toBeInTheDocument()
+    expect(within(receipt).queryByText('Service')).not.toBeInTheDocument()
+    expect(within(receipt).getByTestId('receipt-total')).toHaveTextContent('810.000 VND')
+  })
+
+  it('UI-29 a zero discount sent by the invoice is still shown as 0 VND', async () => {
+    paymentsBackend({ invoice: json(200, invoice({ subtotalAmount: 810000, discountAmount: 0 })) })
+    renderApp('/member/payments/receipts/7')
+    const receipt = await screen.findByRole('region', { name: 'Receipt INV-0007' })
+    expect(within(receipt).getByText('Discount').nextSibling).toHaveTextContent('0 VND')
+    expect(within(receipt).getByText('Base price').nextSibling).toHaveTextContent('810.000 VND')
+  })
+
+  it('UI-29 receipt and history headings use the Home theme payment hero, hidden when the receipt prints', async () => {
+    paymentsBackend()
+    renderApp('/member/payments/receipts/7')
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Receipt INV-0007' })
+    expect(heading.closest('header')).toHaveClass('payment-hero')
+    const css = readFileSync('src/styles/payments.css', 'utf8')
+    expect(css).toMatch(/@media print \{[\s\S]*\.receipt-page \.page-header,\s*\.receipt-page \.payment-hero \{\s*display: none;/)
   })
 
   it('does not render another member receipt after the backend returns 403', async () => {

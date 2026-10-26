@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getErrorMessage } from '../../api/errors'
 import type { Payment } from '../../api/paymentsApi'
-import { Button, Card, EmptyState, ErrorState, PageHeader, StatusBadge, useToast } from '../../components/ui'
+import { PaymentHero } from '../../components/PaymentHero'
+import { Button, Card, EmptyState, ErrorState, StatusBadge, useToast } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { copyText } from '../../utils/clipboard'
@@ -35,7 +36,7 @@ export function PaymentStatusPage() {
   if (id === null) {
     return (
       <div className="page">
-        <PageHeader eyebrow="Member / Payments" title="Payment Instructions and Status" />
+        <PaymentHero eyebrow="Member / Payments" title="Payment Instructions and Status" />
         <EmptyState
           title="Payment not found"
           description="The payment link is not valid."
@@ -70,7 +71,7 @@ function PaymentStatusView({ paymentId }: { paymentId: number }) {
   }, [payment?.status, toast])
 
   const header = (
-    <PageHeader
+    <PaymentHero
       eyebrow="Member / Payments"
       title="Payment Instructions and Status"
       description="Pay at reception or use the bank transfer details below."
@@ -281,6 +282,9 @@ function StatusPanel({ polling, payment }: { polling: ReturnType<typeof usePayme
         </>
       )}
 
+      {payment.status === 'SUCCESS' && !payment.invoiceId && (
+        <p className="payment-status__text">The receipt appears in My payments once it is issued.</p>
+      )}
       <div className="payment-summary__actions">
         {payment.status === 'SUCCESS' && payment.invoiceId ? (
           <Link className={buttonClassName('primary', 'md', true)} to={PAYMENT_PATHS.receipt(payment.invoiceId)}>

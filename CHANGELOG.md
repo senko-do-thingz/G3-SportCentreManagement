@@ -1,3 +1,30 @@
+## 2026-10-24 - Verify payment and receipt (UI-31)
+
+- Verify and Record Payment, Payment Needs Review, Payment Confirmed and Receipt, Payment Failed and the desk receipt use the shared PaymentHero in the Home theme; the hero is not printed with a receipt.
+- A wrong amount is never shown as a success: the success message needs a SUCCESS answer for this payment id with the right amount; a paid payment whose amount received or invoice total differs from the amount due shows Payment Needs Review, and its receipt cannot be printed or opened.
+- Double submit is blocked synchronously, so two submits in the same tick send one confirmation. Receipts no longer invent a base price from the total, the desk receipt shows only the invoice of its payment, and a cancelled invoice cannot be printed.
+- Tests in receptionPayments.test.tsx (fail on the previous page); cases in frontend/docs/UI-31-test-cases.md. No API or backend changes.
+
+## 2026-10-24 - Reception payment requests queue (UI-30)
+
+- Payment Requests (F3-04) uses the shared PaymentHero in the Home theme, with Refund requests in the hero.
+- Every row has one Status badge and exactly one action: Needs review for a pending payment carrying the BE-18 "Amount mismatch:" note, Pending payment, Paid, Failed or Refunded; Review payment for pending rows (primary when it needs review), Open otherwise. Rows keep the backend order (PENDING first).
+- The placeholder "Refund requests -" stat card is replaced by "Needs review on this page". A COACH, like a MEMBER, gets Access denied with no payment request sent.
+- Tests in receptionPayments.test.tsx; cases in frontend/docs/UI-30-test-cases.md. No API or backend changes.
+
+## 2026-10-24 - My payments, history and receipts (UI-29)
+
+- My Payments and Receipts and the receipt pages use the shared PaymentHero in the Home theme; when a receipt prints, the hero is hidden like the old page header, and other printed payment pages show it as plain text.
+- No invented invoice fields: Base price, Discount and Service appear only when the invoice has them (the base price no longer falls back to the total, and a missing discount is no longer shown as 0 VND; a real 0 still is).
+- Receipts print on one A4 page, checked with Chrome print to PDF for a one-line receipt and an eight-line receipt with long numbers and names from a dark-theme session. Tests in memberPayments.test.tsx; cases in frontend/docs/UI-29-test-cases.md. No API or backend changes.
+
+## 2026-10-24 - Payment instructions and status (UI-28)
+
+- Payment Instructions and Status (F3-02) uses the shared PaymentHero in the Home theme.
+- Payment ownership: an answer for another payment id is an error and is never shown; after a correct first answer, a later mismatched one keeps the right payment on screen and stops the automatic checks.
+- A pending payment is checked at once when the tab becomes visible again (browsers slow background timers); a paid payment without an invoice says the receipt appears in My payments once issued.
+- Copy keeps the transfer content exactly as shown. Tests in memberPayments.test.tsx; cases in frontend/docs/UI-28-test-cases.md. S3-Mismatch is a reception screen, covered by UI-31. No API or backend changes.
+
 ## 2026-10-24 - Redesign Sign up to the Home theme (UI-07)
 
 - Sign up moves to the same layout B as Log in: Home hero photo under the Home overlay, compact Home header (brand, Back to Home, sun and moon switch), slogan on the left, form card on the right (560 px for the two-field rows and password rules), photo band on phones. The password checklist is one quiet line without a box.

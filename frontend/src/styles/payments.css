@@ -93,6 +93,34 @@
   overflow-wrap: anywhere;
 }
 
+/* Printed pages other than the receipt keep the heading as plain text, without the navy surface. */
+@media print {
+  .payment-hero {
+    min-height: 0;
+    padding: 0 0 4mm;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    color: var(--color-text);
+  }
+
+  .payment-hero::before {
+    display: none;
+  }
+
+  .payment-hero__title,
+  .payment-hero__aside-value {
+    color: var(--color-text);
+  }
+
+  .payment-hero__eyebrow,
+  .payment-hero__description,
+  .payment-hero__aside-label {
+    color: var(--color-text-muted);
+  }
+}
+
 @media (max-width: 720px) {
   .payment-hero {
     grid-template-columns: minmax(0, 1fr);
@@ -452,7 +480,8 @@
   }
 
   /* The receipt itself includes the complete invoice identity; avoid repeating it above. */
-  .receipt-page .page-header {
+  .receipt-page .page-header,
+  .receipt-page .payment-hero {
     display: none;
   }
 
