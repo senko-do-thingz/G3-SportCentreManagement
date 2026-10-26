@@ -44,7 +44,7 @@
   --h-border: #232d47;
   --h-ink: #e8ecf6;
   --h-muted: #96a0b8;
-  --h-primary: #3d6cf0;
+  --h-primary: var(--color-brand-mark);
   --h-primary-hover: #5a83f3;
   --h-primary-text: #8aa8ff;
   --h-icon-bg: rgba(138, 168, 255, 0.12);

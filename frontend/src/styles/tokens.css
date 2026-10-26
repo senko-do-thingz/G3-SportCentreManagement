@@ -9,6 +9,7 @@
   color-scheme: light;
   /* Brand */
   --color-primary: #1f4fd8;
+  --color-brand-mark: #1f4fd8;
   --color-primary-hover: #1a42b5;
   --color-primary-active: #16389a;
   --color-primary-soft: #e9eefc;
@@ -123,6 +124,7 @@
   :root[data-theme='dark'] {
     color-scheme: dark;
     --color-primary: #8aa8ff;
+    --color-brand-mark: #3d6cf0;
     --color-primary-hover: #a9c0ff;
     --color-primary-active: #6f91ff;
     --color-primary-soft: #1c2a4d;

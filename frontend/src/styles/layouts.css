@@ -622,8 +622,8 @@
   height: 56px;
   border: 0;
   border-radius: 0;
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  background: var(--color-brand-mark);
+  color: var(--color-text-inverse);
   font: italic 800 30px/1 var(--font-display);
 }
 

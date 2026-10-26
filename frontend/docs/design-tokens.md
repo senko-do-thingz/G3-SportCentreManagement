@@ -9,6 +9,7 @@ the shared brand tokens below carry the same Royal and Gold values so every othe
 | Token | Light | Dark | Use |
 |-------|-------|------|-----|
 | `--color-primary` | `#1f4fd8` | `#8aa8ff` | Primary actions, links, focus ring, active navigation |
+| `--color-brand-mark` | `#1f4fd8` | `#3d6cf0` | Royal-blue logo tile with white lettering in Home and workspace headers |
 | `--color-primary-hover` | `#1a42b5` | `#a9c0ff` | Hover on primary fills |
 | `--color-primary-active` | `#16389a` | `#6f91ff` | Pressed primary fills |
 | `--color-primary-soft` | `#e9eefc` | `#1c2a4d` | Soft fills: ghost buttons, tab list, info notice |
