@@ -1,3 +1,32 @@
+## 2026-10-27 - Selective and fail-closed CI (CI-OPT-01)
+
+- Round 2: preserve explicit CodeQL baseline categories across reusable callers; document independent owner verification for the app-bound, strict CI gate ruleset and a separate financial SQL follow-up.
+- Route PR checks from immutable merge-base path impact; unknown changes run the conservative full graph. Main, release, manual and weekly runs stay full.
+- Require validated child results, including Security and Compose, at the stable CI gate. Remove advisory dependency review and add frontend CodeQL/audit coverage.
+- Run backend unit and SQL integration independently; verify and reuse the integration-produced jar. Preserve all test isolation, financial migrations and assertions.
+- Pin CI actions, retain safe Maven/npm download caches and report counts/timings. Opt-in cash fixture diagnostics identify the retained V31 trigger cleanup bottleneck; no production SQL or UI behavior changes.
+- Isolate migration seed verification from committed controller-test edits, with a real SQL cross-catalog negative control and unchanged seed expectations.
+
+## 2026-10-27 - Home consolidated acceptance remediation (HOME-UI Round 4)
+
+- Preserve page geometry and inline styles during modal scroll locking, including stacked dialogs and existing scrollbar gutters.
+- Make all five header labels persistently underlined section links. Coaches has no submenu; remaining menus have separate accessible disclosures and specific destinations.
+- Source header sports from the public API and retain the class-finder All sports reset. Preserve accepted smooth navigation, FAQ, branding and filter behavior.
+- Use focused feedback before the final full frontend and browser gate. CI workflows and frozen UI-00 files remain unchanged; the existing color-contract exception still needs owner approval.
+
+## 2026-10-27 - Home acceptance remediation (HOME-UI Round 3)
+
+- Remove navigation expansion decorations while retaining label disclosures, section destinations, hover, keyboard and touch access.
+- Smooth Home fragment navigation uses the measured header offset and respects reduced motion, FAQ expansion, focus and history.
+- Restore the API-driven Sports selector to one column, attached below its trigger. Bounded page scroll assistance and an internal-scroll fallback keep larger catalogues reachable without upward flipping. Level and Training retain their existing policy.
+- Existing Home branding/colors are preserved. The separate UI-00 design-contract exception remains pending owner approval.
+
+## 2026-10-27 - Backend response-write and catalog query maintenance (BE-MAINT-01)
+
+- Resolve confirmed client disconnects before generic JSON error advice, with framework DEBUG/TRACE diagnostics and no secondary response write. Genuine connected-client errors keep the existing error contract; unusable or committed server failures remain observable at ERROR.
+- Round 2: require an observed servlet output failure before quiet disconnect classification. Direct/nested controller aborts, input failures and serialization bugs retain existing error handling and diagnostics; committed failures never receive another error body.
+- Fetch the singular sport with the active-package catalog read. SQL Server regression fixtures cover 1, 3 and 20 distinct sports, unchanged DTO content/order, public coach batching and negative controls. See backend/docs/BE-MAINT-01-test-cases.md.
+
 ## 2026-10-24 - Refund request and review screens (UI-32)
 
 - Refund Requests and every refund state use the shared PaymentHero in the Home theme.

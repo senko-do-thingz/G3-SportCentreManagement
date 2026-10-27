@@ -37,7 +37,7 @@ function session(role: Role) {
 afterEach(() => vi.unstubAllGlobals())
 
 async function pick(user: ReturnType<typeof userEvent.setup>, label: string, option: string) {
-  await user.click(screen.getByRole('button', { name: new RegExp(`^${label}`) }))
+  await user.click(screen.getByRole('button', { name: new RegExp(`^${label} `) }))
   await user.click(await screen.findByRole('option', { name: option }))
 }
 
@@ -331,7 +331,7 @@ describe('public Home', () => {
     renderApp('/')
     await pick(user, 'Sport', 'Football')
     await pick(user, 'Training', 'Coach-led')
-    expect(screen.getByRole('button', { name: /^Sport/ })).toHaveTextContent('Football')
+    expect(screen.getByRole('button', { name: /^Sport / })).toHaveTextContent('Football')
     await user.click(screen.getByRole('button', { name: 'Find classes' }))
     expect(screen.getByRole('dialog', { name: 'Sign in to continue' })).toHaveAccessibleDescription('Sign in to explore current classes with your selected filters.')
   })
@@ -356,6 +356,8 @@ describe('public Home', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     const nav = screen.getByRole('navigation', { name: 'Home navigation' })
     within(nav).getByRole('link', { name: 'Sports' }).focus()
+    await user.keyboard('{Escape}')
+    expect(within(nav).getByRole('link', { name: 'Sports' })).toHaveFocus()
     await user.keyboard('{Escape}')
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     expect(toggle).toHaveFocus()

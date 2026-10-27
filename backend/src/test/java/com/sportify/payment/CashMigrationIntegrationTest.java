@@ -24,6 +24,9 @@ import static org.assertj.core.api.Assertions.*;
 
 @Tag("integration") @Testcontainers
 class CashMigrationIntegrationTest {
+    private CashFixtureProfile profile;
+    @BeforeEach void startProfile(TestInfo info) { profile = new CashFixtureProfile(info.getDisplayName()); }
+    @AfterEach void finishProfile() { profile.close(); }
     @Container static final MSSQLServerContainer<?> SQL = new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2022-latest")
             .acceptLicense().withPassword("Aa1!" + UUID.randomUUID());
     record Database(DataSource source, JdbcTemplate jdbc) { }
@@ -39,7 +42,7 @@ class CashMigrationIntegrationTest {
             }
         };
         var db = new Database(source, new JdbcTemplate(source));
-        if (migrate) flyway(db, false, null).migrate();
+        if (migrate) profile.stage("database.migrate", () -> flyway(db, false, null).migrate());
         return db;
     }
     /** Last finance migration; count assertions stop here so later, unrelated migrations do not change them. */
@@ -251,23 +254,23 @@ class CashMigrationIntegrationTest {
         var db=database(true); long member=member(db); Clock time=clock("2026-04-01T00:00:00Z");
         collect(db,member,"1.00",clock("2026-01-01T00:00:00Z"));
         tx(db).executeWithoutResult(s -> {
-            db.jdbc().update("""
+            profile.stage("fixture.insert-pending", () -> db.jdbc().update("""
                     WITH digit(n) AS (SELECT n FROM (VALUES(0),(1),(2),(3),(4),(5),(6),(7),(8),(9)) d(n)),
                     tally(n) AS (SELECT TOP(50001) ROW_NUMBER() OVER(ORDER BY a.n,b.n,c.n,d.n,e.n) FROM digit a CROSS JOIN digit b CROSS JOIN digit c CROSS JOIN digit d CROSS JOIN digit e)
                     INSERT INTO dbo.payment(payment_code,member_id,amount,payment_method,payment_status)
                     SELECT CONCAT('CF-LIMIT-',n),?,0.01,'CASH','PENDING' FROM tally
-                    """,member);
-            db.jdbc().update("""
+                    """,member));
+            profile.stage("fixture.insert-tickets", () -> db.jdbc().update("""
                     INSERT INTO dbo.cash_capture_ticket(transaction_id,event_type,source_id,event_time_utc)
                     SELECT CURRENT_TRANSACTION_ID(),'COLLECTION',id,'2026-04-01T00:00:00' FROM dbo.payment WHERE payment_code LIKE 'CF-LIMIT-%'
-                    """);
-            db.jdbc().update("UPDATE dbo.payment SET payment_status='SUCCESS',payment_time='2026-04-01T07:00:00' WHERE payment_code LIKE 'CF-LIMIT-%'");
+                    """));
+            profile.sqlStage("fixture.activate-payments", db.source(), () -> db.jdbc().update("UPDATE dbo.payment SET payment_status='SUCCESS',payment_time='2026-04-01T07:00:00' WHERE payment_code LIKE 'CF-LIMIT-%'"));
         });
         var repository=new CashFlowRepository(new NamedParameterJdbcTemplate(db.source()));
         var service=new CashFlowReportService(repository,time);
-        assertThat(service.overview("2026-04").grossCashReceived()).isEqualByComparingTo("500.01");
-        assertThatThrownBy(() -> service.export(LocalDate.of(2026,4,1),LocalDate.of(2026,4,30))).isInstanceOf(BusinessRuleException.class);
-        List<Long> ids=new ArrayList<>(); repository.events(Instant.parse("2026-03-31T17:00:00Z"),Instant.parse("2026-04-30T17:00:00Z"),50001,e->ids.add(e.id()));
+        profile.stage("assert.overview", () -> assertThat(service.overview("2026-04").grossCashReceived()).isEqualByComparingTo("500.01"));
+        profile.stage("assert.export-limit", () -> assertThatThrownBy(() -> service.export(LocalDate.of(2026,4,1),LocalDate.of(2026,4,30))).isInstanceOf(BusinessRuleException.class));
+        List<Long> ids=new ArrayList<>(); profile.stage("assert.stream-events", () -> repository.events(Instant.parse("2026-03-31T17:00:00Z"),Instant.parse("2026-04-30T17:00:00Z"),50001,e->ids.add(e.id())));
         assertThat(ids).hasSize(50001).isSorted().doesNotHaveDuplicates();
     }
     @Test void collectionLedgerFailureRollsBackFirstActivationAndSourceInsert() throws Exception {
