@@ -1,9 +1,11 @@
 .f2-editor-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 24px; align-items: start; }
-.f2-calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; margin-top: 20px; }
+.f2-calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: start; gap: 10px; margin-top: 20px; }
 .f2-day { min-width: 0; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; padding: 10px; min-height: 220px; }
 .f2-day h3 { font-size: 14px; margin: 0 0 14px; }
 .f2-session { border: 1px solid var(--color-border-strong); border-left: 4px solid var(--color-primary); border-radius: 8px; background: var(--color-primary-soft); padding: 10px; margin-bottom: 10px; overflow-wrap: anywhere; }
-.f2-session p { font-size: 12px; margin: 7px 0; }
+.f2-session p { font-size: 12px; line-height: 1.35; margin: 5px 0; }
+.f2-session .manager-row-actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin-top: 8px; }
+.f2-session .manager-row-actions .btn { width: 100%; max-width: 100%; min-width: 0; min-height: 34px; padding: 6px 8px; white-space: normal; text-align: center; line-height: 1.25; }
 .f2-session--cancelled { border-color: var(--color-danger-border); background: var(--color-danger-soft); color: var(--color-danger); }
 .f2-session--cancelled strong { text-decoration: line-through; }
 .f2-session--completed { border-color: var(--color-border); background: var(--color-surface-muted); }
