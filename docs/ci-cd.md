@@ -6,21 +6,36 @@ The project utilizes automated GitHub Actions workflows to ensure code quality, 
 
 ### Continuous Integration (CI) Workflow (`.github/workflows/ci.yml`)
 
-The CI pipeline runs on every pull request and on pushes to `main`. The workflow is composed of parallel and staged jobs:
+CI is the sole PR/main/manual/weekly orchestrator. It classifies the complete immutable
+PR merge-base diff and runs frontend, backend and deployment checks according to their
+actual dependency impact. Unknown, renamed/deleted, shared contract and infrastructure
+changes run full validation. Main, manual, release/reusable and weekly runs are full.
+See [the impact and merge-gate contract](CI-OPT-01.md) for the exhaustive policy.
 
-1. `conventions`: Checks for forbidden characters (em-dash, emoji, non-English text) via `scripts/ci/check-conventions.sh` and lints all GitHub workflows via `actionlint`.
-2. `migration-guard`: Executes on pull requests to ensure merged Flyway migrations are immutable and new migrations follow strictly increasing version numbers via `scripts/ci/check-migrations.sh`.
-3. `unit-tests`: Runs unit tests without Docker (`mvn -B -ntp test`). Enforces no container execution by setting `DOCKER_HOST=unix:///nonexistent.sock`. Fails if any test is skipped via `scripts/ci/check-no-skipped-tests.sh`. Publishes test reports and uploads surefire XML artifacts.
-4. `integration-tests`: Depends on `unit-tests`. Runs Docker-dependent integration tests (`mvn -B -ntp verify -DskipUnitTests=true`) against real Microsoft SQL Server 2022 containers managed via Testcontainers. Fails on skipped tests and uploads failsafe XML artifacts.
-5. `package`: Depends on `unit-tests` and `integration-tests`. Builds the production executable Spring Boot JAR file (`mvn -B -ntp -DskipUnitTests=true -DskipITs=true package`) and uploads it as an artifact.
-6. `frontend`: Runs Node.js 22 checks in the `frontend` module: dependency installation (`npm ci`), linting (`npm run lint`), unit/component testing (`npm run test`), and production bundle build (`npm run build`).
-7. `ci-gate`: Gating job that evaluates the outcomes of all required predecessor jobs (`conventions`, `migration-guard`, `unit-tests`, `integration-tests`, `package`, `frontend`). This is the single required status check for branch protection.
+- Conventions, workflow lint and CI infrastructure negative controls run for every PR.
+- Backend changes require all unit and SQL integration tests, migration guards and a
+  verified jar. Unit and SQL jobs run independently. Maven's integration lifecycle
+  already builds the jar; the package job verifies its source/checksums and publishes
+  it without recompiling. Existing no-skips/tag/mandatory-suite guards remain.
+- Frontend changes require all frontend tests, lint/typecheck/build, npm audit and
+  JS/TS CodeQL. Backend Java CodeQL runs whenever backend impact requires it.
+- Security and Compose Smoke Test are reusable children. Every PR's dependency review
+  is blocking. Deploy/runtime/infrastructure changes require Compose smoke validation.
+- `CI gate` always validates every expected child result. Only validated policy skips
+  are allowed; failures, cancellations, missing checks and unexpected skips fail.
+- Superseded normal PR runs are cancelled. Old reruns and main/release runs use
+  separate groups so they cannot cancel a newer required HEAD or authoritative run.
 
-Plain Text Job Flow:
-- PR Trigger -> [conventions, migration-guard, unit-tests, frontend]
-- unit-tests -> integration-tests
-- [unit-tests, integration-tests] -> package
-- [conventions, migration-guard, unit-tests, integration-tests, package, frontend] -> ci-gate
+At the CI-OPT-01 baseline, main uses a CODEOWNER repository ruleset with an empty
+required-status list. CODEOWNER must add the stable `CI gate` status to that ruleset
+to enforce the aggregate; the task does not modify protection settings. Child display
+names inside reusable workflows have a caller prefix. Test counts, slow-suite summaries,
+full XML and source-bound artifacts remain available for review.
+
+The 50,001-event cash boundary test and all financial assertions remain intact.
+Opt-in `cash_profile=true` manual CI records SQL request/trigger plans. V31's expensive
+ticket-cleanup statement needs a separately reviewed financial SQL task; it is not
+silently removed from full validation to meet a time target.
 
 ### Continuous Delivery (CD) Workflow (`.github/workflows/cd.yml`)
 
