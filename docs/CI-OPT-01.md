@@ -34,11 +34,14 @@ no financial-test exemption. Frontend full means lint, TypeScript/production bui
 all Vitest tests and npm audit. No node_modules, compiled classes, DB state or secrets
 are cached. setup-java caches Maven artifacts with the POM key; setup-node caches
 downloaded npm packages with the lockfile key. Independent runners install their
-own dependencies; CodeQL Java must compile production sources for tracing.
+own dependencies; CodeQL Java compiles production and test sources for tracing,
+preserving the previous extraction scope without packaging or running tests twice.
 
 The classifier fails nonzero and emits full workload flags on malformed metadata,
-unavailable Git objects or an ambiguous diff. Child job conditions use `always()`
-and the classifier result, so a classifier failure runs the conservative graph.
+unavailable Git objects or an ambiguous diff. Workload conditions use `!cancelled()`
+and the classifier result, so a classifier failure runs the conservative graph
+without retaining expensive obsolete jobs after workflow cancellation. Only
+aggregate gates and diagnostic/report cleanup use `always()`.
 The aggregate still rejects that failed classifier. Missing outputs cannot turn
 an error into a docs-only pass.
 
@@ -94,12 +97,14 @@ Failsafe's `verify` lifecycle already creates the executable jar. After successf
 integration/report checks it uploads that build with source SHA and SHA-256 manifest.
 Package application waits for unit and SQL success, downloads this same-run artifact,
 checks source identity and every checksum, and publishes backend-jar. It does not
-recompile or suppress test failures. CodeQL compiles production sources directly;
+recompile or suppress test failures. CodeQL compiles both source trees directly;
 it no longer creates an unnecessary executable package. CD's image build remains
 separate and its existing scan/deployment approvals are preserved.
 
 JUnit counts and slow suites appear in job summaries. Full XML, frontend results,
 impact JSON and optional SQL profiles are artifacts. Large logs are not PR comments.
+Report publishers explicitly fail on test failures, parse errors or missing tests;
+the independently enforced raw XML guards remain authoritative, including on forks.
 
 ## Cash migration profiling and retained cost
 

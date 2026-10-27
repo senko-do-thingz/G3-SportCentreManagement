@@ -54,6 +54,7 @@ node_modules/
 dist/
 .vite/
 npm-debug.log*
+/frontend/vitest-results.json
 
 # OS generated files
 .DS_Store

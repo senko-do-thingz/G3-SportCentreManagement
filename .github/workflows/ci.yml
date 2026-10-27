@@ -83,7 +83,7 @@ jobs:
   migration-guard:
     name: Flyway migration guard
     needs: impact
-    if: always() && (needs.impact.result != 'success' || needs.impact.outputs.backend == 'true')
+    if: ${{ !cancelled() && (needs.impact.result != 'success' || needs.impact.outputs.backend == 'true') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -106,7 +106,7 @@ jobs:
   unit-tests:
     name: Unit tests (no Docker)
     needs: impact
-    if: always() && (needs.impact.result != 'success' || needs.impact.outputs.backend == 'true')
+    if: ${{ !cancelled() && (needs.impact.result != 'success' || needs.impact.outputs.backend == 'true') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -141,6 +141,9 @@ jobs:
         with:
           report_paths: backend/target/surefire-reports/TEST-*.xml
           check_name: Unit test report
+          fail_on_failure: true
+          fail_on_parse_error: true
+          require_tests: true
       - name: Upload surefire reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -153,7 +156,7 @@ jobs:
   integration-tests:
     name: Integration tests (Testcontainers, SQL Server 2022)
     needs: impact
-    if: always() && (needs.impact.result != 'success' || needs.impact.outputs.backend == 'true')
+    if: ${{ !cancelled() && (needs.impact.result != 'success' || needs.impact.outputs.backend == 'true') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:
@@ -191,6 +194,9 @@ jobs:
         with:
           report_paths: backend/target/failsafe-reports/TEST-*.xml
           check_name: Integration test report
+          fail_on_failure: true
+          fail_on_parse_error: true
+          require_tests: true
       - name: Upload failsafe reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -227,7 +233,7 @@ jobs:
   package:
     name: Package application
     needs: [impact, unit-tests, integration-tests]
-    if: always() && needs.unit-tests.result == 'success' && needs.integration-tests.result == 'success'
+    if: ${{ !cancelled() && needs.unit-tests.result == 'success' && needs.integration-tests.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -251,7 +257,7 @@ jobs:
   frontend:
     name: Frontend checks and build
     needs: impact
-    if: always() && (needs.impact.result != 'success' || needs.impact.outputs.frontend == 'true')
+    if: ${{ !cancelled() && (needs.impact.result != 'success' || needs.impact.outputs.frontend == 'true') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -288,7 +294,7 @@ jobs:
   security:
     name: Security
     needs: impact
-    if: always()
+    if: ${{ !cancelled() }}
     uses: ./.github/workflows/security.yml
     permissions:
       contents: read
@@ -300,7 +306,7 @@ jobs:
   compose-smoke:
     name: Compose smoke
     needs: impact
-    if: always() && (needs.impact.result != 'success' || needs.impact.outputs.compose == 'true')
+    if: ${{ !cancelled() && (needs.impact.result != 'success' || needs.impact.outputs.compose == 'true') }}
     uses: ./.github/workflows/compose-smoke-test.yml
     permissions:
       contents: read
