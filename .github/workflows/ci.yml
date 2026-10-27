@@ -212,6 +212,7 @@ jobs:
         run: |
           mkdir ci-package
           cp ./*.jar ci-package/
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           printf '%s\n' "$GITHUB_SHA" > ci-package/source-sha.txt
           cd ci-package
           sha256sum ./*.jar source-sha.txt | sed 's#  ./#  #' > SHA256SUMS
@@ -317,3 +318,6 @@ jobs:
           POLICY_JSON: ${{ needs.impact.outputs.policy }}
           NEEDS_JSON: ${{ toJSON(needs) }}
         run: python3 scripts/ci/gate.py
+      - name: Reject workflow cancellation
+        if: cancelled()
+        run: exit 1
