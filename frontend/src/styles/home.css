@@ -187,6 +187,7 @@
 .home-select__list--sports .home-select__option { overflow-wrap: anywhere; }
 .home-select__list--sports .home-select__option svg { flex: none; }
 .home-select__list--sports:focus-visible { outline: 2px solid var(--h-primary-text); outline-offset: 2px; }
+.home-page:has(.home-select__list--sports) .home-top { visibility: hidden; opacity: 0; pointer-events: none; transition: none; }
 .home-select__option { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 10px 14px; color: var(--h-ink); font-size: 16px; font-weight: 500; cursor: pointer; }
 .home-select__option--active { background: var(--h-icon-bg); color: var(--h-primary-text); }
 .home-select__option[aria-selected='true'] { color: var(--h-primary-text); font-weight: 700; }

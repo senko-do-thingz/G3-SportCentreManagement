@@ -323,6 +323,8 @@ def main():
             page.keyboard.press('End'); last=active(count-1,'End')
             rect=menu.bounding_box()
             assert last['y']>=rect['y'] and last['y']+last['height']<=rect['y']+rect['height']+1
+            assert options.last.evaluate('(e)=>{const r=e.getBoundingClientRect(); return document.elementFromPoint(r.right-8,r.top+r.height/2)?.closest("[role=option]")===e}'), 'Last option hit target is obstructed'
+            expect(page.get_by_role('button',name='Back to top',include_hidden=True)).not_to_be_visible()
             for key in ['ArrowDown','ArrowLeft','ArrowRight']:
                 page.keyboard.press(key); active(count-1,key+' at end')
             snapshot(page,f'list-{count}-last',theme,width)
@@ -332,6 +334,7 @@ def main():
             page.keyboard.press('Home'); active(0,'Home')
             page.keyboard.press('ArrowDown'); page.keyboard.press('Enter')
             expect(trigger).to_have_text('Football'); expect(trigger).to_be_focused()
+            if page.evaluate('scrollY')>600: expect(page.get_by_role('button',name='Back to top')).to_be_visible()
             trigger.click(); expect(page.get_by_role('option',name='Football',exact=True)).to_have_attribute('aria-selected','true')
             page.keyboard.press('Escape'); expect(trigger).to_be_focused()
             trigger.click(); page.keyboard.press('Tab')
