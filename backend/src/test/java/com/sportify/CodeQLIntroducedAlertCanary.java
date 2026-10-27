@@ -12,3 +12,5 @@ public final class CodeQLIntroducedAlertCanary {
                 + request.getParameter("name") + "'");
     }
 }
+
+// Repeat the same detection control against main, the implementation PR comparison base.
