@@ -319,7 +319,6 @@
     "@media screen { :root[data-theme='dark'] { --color-bg|#0d1724": 1,
     "@media screen { :root[data-theme='dark'] { --color-border-strong|#6f89a6": 1,
     "@media screen { :root[data-theme='dark'] { --color-border|#334b64": 1,
-    "@media screen { :root[data-theme='dark'] { --color-brand-mark|#3d6cf0": 1,
     "@media screen { :root[data-theme='dark'] { --color-control-border|#6f89a6": 1,
     "@media screen { :root[data-theme='dark'] { --color-danger-border|#a06560": 1,
     "@media screen { :root[data-theme='dark'] { --color-danger-fill-hover|#a8362d": 1,
