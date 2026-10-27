@@ -395,7 +395,7 @@ def main():
             expect(trigger).to_have_text('Tennis'); expect(trigger).to_be_focused()
             trigger.click(); page.keyboard.press('Escape'); expect(trigger).to_be_focused()
             trigger.click(); page.wait_for_timeout(250)
-            snapshot(page,'below-near-bottom-'+motion,'light',width)
+            snapshot(page,f'below-near-bottom-{height}-{motion}','light',width)
             return {'scrollAssist':after-before,'menu':rect,'trigger':anchor,'motion':motion}
         for width,height in [(320,640),(390,844),(768,900),(1440,900),(1440,480)]:
             for motion in ['reduce','no-preference']:
@@ -568,6 +568,11 @@ def main():
                         body=response.json()
                         responses[path]={'status':response.status,'count':len(body) if isinstance(body,list) else None,
                             'allowOrigin':response.headers.get('access-control-allow-origin')}
+                        if path=='/facilities/public':
+                            responses[path]['types']={kind:sum(row['facilityType']==kind for row in body)
+                                for kind in ['COURT','FIELD','HALL','STUDIO','POOL']}
+                        if path=='/packages': responses[path]['ids']=[row['id'] for row in body]
+                        if path=='/sports': responses[path]['names']=[row['name'] for row in body]
                     except Exception as error: errors.append(str(error))
             page.on('response',observed)
             page.on('requestfailed',lambda request:errors.append({'url':request.url,'failure':request.failure,'origin':request.headers.get('origin')}) if '/api/v1/' in request.url else None)
@@ -581,13 +586,19 @@ def main():
             trigger=page.get_by_role('button',name='Sport All sports'); trigger.click()
             expect(page.get_by_role('option')).to_have_count(responses['/sports']['count']+1)
             options=page.get_by_role('option').all_inner_texts()
+            assert options==['All sports',*responses['/sports']['names']]
             snapshot(page,'live-api-sports','light',1440)
             page.keyboard.press('Escape')
             expect(page.locator('#coaches button[aria-label^="View profile of "]')).to_have_count(responses['/coaches/public']['count'])
             summary=page.locator('#facilities .home-head__sub').inner_text()
-            assert 'membership card' in summary
+            nouns={'COURT':'court','FIELD':'field','HALL':'hall','STUDIO':'studio','POOL':'pool'}
+            parts=[f"{count} {nouns[kind]}{'s' if count!=1 else ''}" for kind,count in responses['/facilities/public']['types'].items() if count]
+            expected_summary=(', '.join(parts[:-1])+' and '+parts[-1] if len(parts)>1 else parts[0])+', one membership card.' if parts else 'Every court and pool, one membership card.'
+            assert summary==expected_summary
             package_links=page.locator('#packages a[aria-label^="View options for "]').count()
             if responses['/packages']['count']: assert package_links>0
+            for link in page.locator('#packages a[aria-label^="View options for "]').all():
+                assert int(link.get_attribute('href').split('/')[-1]) in responses['/packages']['ids']
             assert page.locator('.home-cards').get_by_text('Save on every sport package.').count()==1
             return {'responses':responses,'options':options,'coachCards':responses['/coaches/public']['count'],
                 'browserOrigin':args.live_origin or args.base,'frontendAssetSource':args.base,'apiInterception':False,
