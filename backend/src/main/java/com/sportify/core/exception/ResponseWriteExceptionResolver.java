@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.dao.DataAccessException;
-import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
@@ -34,7 +33,7 @@ public final class ResponseWriteExceptionResolver extends AbstractHandlerExcepti
     @Override
     protected ModelAndView doResolveException(HttpServletRequest request, HttpServletResponse response,
             Object handler, Exception exception) {
-        Evidence evidence = inspect(exception);
+        Evidence evidence = inspect(exception, ResponseWriteFailureFilter.failure(request));
         if (evidence.disconnected()) {
             // Spring emits a single DEBUG diagnostic, or the full cause chain at TRACE when requested.
             DISCONNECT_LOG.checkAndLogClientDisconnectedException(exception);
@@ -48,25 +47,26 @@ public final class ResponseWriteExceptionResolver extends AbstractHandlerExcepti
         return null; // Preserve all existing connected-client controller-advice status/body contracts.
     }
 
-    private static Evidence inspect(Exception exception) {
+    private static Evidence inspect(Exception exception, IOException writeFailure) {
+        if (writeFailure == null) return new Evidence(false, false);
         Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
-        boolean async = false, containerAbort = false, excluded = false;
+        boolean correlated = false, containerAbort = false, excluded = false;
         Throwable root = exception;
         for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
-            if (!seen.add(cause)) return new Evidence(false, exception instanceof AsyncRequestNotUsableException);
-            async |= cause instanceof AsyncRequestNotUsableException;
-            containerAbort |= cause instanceof ClientAbortException;
+            if (!seen.add(cause)) return new Evidence(false, true);
+            correlated |= cause == writeFailure;
+            // Only transport causes belonging to the observed write count, not application wrappers.
+            containerAbort |= correlated && cause instanceof ClientAbortException;
             excluded |= cause instanceof DataAccessException || cause instanceof RestClientException;
             root = cause;
         }
-        // Spring 6.2 also recognizes the AsyncRequestNotUsableException name alone. Require transport
-        // evidence instead, and never mistake a database or upstream HTTP failure for this client's abort.
-        boolean disconnected = !excluded && (containerAbort || async && root instanceof IOException
+        // A lifecycle exception type alone is not proof. Require the exact observed output failure,
+        // and retain ERROR diagnostics for application wrappers even after a real output failure.
+        boolean writeException = exception == writeFailure || exception instanceof AsyncRequestNotUsableException;
+        boolean disconnected = correlated && writeException && !excluded && (containerAbort || root instanceof IOException
                 && !(root instanceof AsyncRequestNotUsableException)
                 && DisconnectedClientHelper.isClientDisconnectedException(root));
-        boolean unusable = exception instanceof AsyncRequestNotUsableException
-                || !excluded && async && exception instanceof HttpMessageNotWritableException;
-        return new Evidence(disconnected, unusable);
+        return new Evidence(disconnected, true);
     }
 
     private record Evidence(boolean disconnected, boolean unusable) { }
