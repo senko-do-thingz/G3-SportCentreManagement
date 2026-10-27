@@ -2106,33 +2106,120 @@ async function main() {
     }
 
     // =========================================================================
-    // 7. UI-SYNC: Full Website Shell & Route Audit (UI-SYNC-R1-04)
+    // 7. UI-SYNC: Full Website Shell, Action Button & Brand Contract Audit
     // Auditing Public, Auth, Member, Receptionist, Coach, and Manager areas
     // =========================================================================
     if (shouldRun('ui-sync') || shouldRun('all-routes')) {
-      console.log('\n[7/6] Generating UI-SYNC full cross-website shell evidence...')
+      console.log('\n[7/6] Generating UI-SYNC full cross-website shell evidence & button contract...')
 
-      // Public Home, Login, Credits
+      const contractAuditResults = []
+      const viewports = [
+        { name: '1440', w: 1440, h: 900 },
+        { name: '768', w: 768, h: 1024 },
+        { name: '390', w: 390, h: 844 },
+      ]
+
+      // Helper to evaluate style properties
+      const inspectContract = async (session, route, role, theme, viewport) => {
+        return await session.evalJs(`(() => {
+          const brandEl = document.querySelector('.brand__mark')
+          const primaryBtn = document.querySelector('.btn--primary, button.btn--primary, .auth-form button[type="submit"]')
+          const secondaryBtn = document.querySelector('.btn--secondary, button.btn--secondary')
+          const logoutBtn = document.querySelector('.user-menu__logout')
+          const videoToggleBtn = document.querySelector('.home-hero__video-toggle')
+
+          const brandStyles = brandEl ? {
+            bg: window.getComputedStyle(brandEl).backgroundColor,
+            fg: window.getComputedStyle(brandEl).color,
+            borderRadius: window.getComputedStyle(brandEl).borderRadius,
+            borderWidth: window.getComputedStyle(brandEl).borderTopWidth,
+            borderStyle: window.getComputedStyle(brandEl).borderTopStyle,
+            borderColor: window.getComputedStyle(brandEl).borderTopColor,
+          } : null
+
+          const primaryStyles = primaryBtn ? {
+            text: primaryBtn.innerText.trim(),
+            bg: window.getComputedStyle(primaryBtn).backgroundColor,
+            fg: window.getComputedStyle(primaryBtn).color,
+            borderRadius: window.getComputedStyle(primaryBtn).borderRadius,
+          } : null
+
+          const secondaryStyles = secondaryBtn ? {
+            text: secondaryBtn.innerText.trim(),
+            bg: window.getComputedStyle(secondaryBtn).backgroundColor,
+            fg: window.getComputedStyle(secondaryBtn).color,
+            borderRadius: window.getComputedStyle(secondaryBtn).borderRadius,
+          } : null
+
+          const logoutStyles = logoutBtn ? {
+            text: logoutBtn.innerText.trim(),
+            color: window.getComputedStyle(logoutBtn).color,
+            borderRadius: window.getComputedStyle(logoutBtn).borderRadius,
+            borderWidth: window.getComputedStyle(logoutBtn).borderTopWidth,
+          } : null
+
+          return {
+            brand: brandStyles,
+            primaryButton: primaryStyles,
+            secondaryButton: secondaryStyles,
+            logout: logoutStyles,
+            hasVideoToggle: Boolean(videoToggleBtn),
+          }
+        })()`)
+      }
+
+      // Public / Guest Shell: Home, Register, Login, Credits
       const guestSession = await runSession(browser, { role: 'GUEST' })
       for (const th of ['light', 'dark']) {
-        await guestSession.setViewport(1440, 900, th)
-        await guestSession.goto('/', '.home-header')
-        await guestSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/home-${th}-1440.png`))
-        await guestSession.goto('/login', '.auth-panel')
-        await guestSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/login-${th}-1440.png`))
-        await guestSession.goto('/credits', 'main, h1, .brand')
-        await guestSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/credits-${th}-1440.png`))
+        for (const vp of viewports) {
+          await guestSession.setViewport(vp.w, vp.h, th)
+          await guestSession.goto('/', '.home-header')
+          await guestSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/home-${th}-${vp.name}.png`))
+          const homeAudit = await inspectContract(guestSession, '/', 'GUEST', th, vp.name)
+          contractAuditResults.push({ route: '/', role: 'GUEST', theme: th, viewport: vp.name, audit: homeAudit })
+
+          await guestSession.goto('/register', '.auth-panel')
+          await guestSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/register-${th}-${vp.name}.png`))
+          const regAudit = await inspectContract(guestSession, '/register', 'GUEST', th, vp.name)
+          contractAuditResults.push({ route: '/register', role: 'GUEST', theme: th, viewport: vp.name, audit: regAudit })
+
+          if (vp.name === '1440') {
+            await guestSession.goto('/login', '.auth-panel')
+            await guestSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/login-${th}-1440.png`))
+            const loginAudit = await inspectContract(guestSession, '/login', 'GUEST', th, '1440')
+            contractAuditResults.push({ route: '/login', role: 'GUEST', theme: th, viewport: '1440', audit: loginAudit })
+
+            await guestSession.goto('/credits', 'main, h1, .brand')
+            await guestSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/credits-${th}-1440.png`))
+            const creditsAudit = await inspectContract(guestSession, '/credits', 'GUEST', th, '1440')
+            contractAuditResults.push({ route: '/credits', role: 'GUEST', theme: th, viewport: '1440', audit: creditsAudit })
+          }
+        }
       }
       await guestSession.cleanup()
 
-      // Member Shell
+      // Member Shell: Dashboard, Schedule, Packages
       const memberSession = await runSession(browser, { role: 'MEMBER' })
       for (const th of ['light', 'dark']) {
-        await memberSession.setViewport(1440, 900, th)
-        await memberSession.goto('/member', '.member-layout')
-        await memberSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/member-dashboard-${th}-1440.png`))
-        await memberSession.goto('/member/packages', '.member-layout')
-        await memberSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/member-packages-${th}-1440.png`))
+        for (const vp of viewports) {
+          await memberSession.setViewport(vp.w, vp.h, th)
+          await memberSession.goto('/member', '.member-layout')
+          await memberSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/member-dashboard-${th}-${vp.name}.png`))
+          const dashAudit = await inspectContract(memberSession, '/member', 'MEMBER', th, vp.name)
+          contractAuditResults.push({ route: '/member', role: 'MEMBER', theme: th, viewport: vp.name, audit: dashAudit })
+
+          await memberSession.goto('/member/schedule', '.member-layout')
+          await memberSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/member-schedule-${th}-${vp.name}.png`))
+          const schedAudit = await inspectContract(memberSession, '/member/schedule', 'MEMBER', th, vp.name)
+          contractAuditResults.push({ route: '/member/schedule', role: 'MEMBER', theme: th, viewport: vp.name, audit: schedAudit })
+
+          if (vp.name === '1440') {
+            await memberSession.goto('/member/packages', '.member-layout')
+            await memberSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/member-packages-${th}-1440.png`))
+            const pkgAudit = await inspectContract(memberSession, '/member/packages', 'MEMBER', th, '1440')
+            contractAuditResults.push({ route: '/member/packages', role: 'MEMBER', theme: th, viewport: '1440', audit: pkgAudit })
+          }
+        }
       }
       await memberSession.cleanup()
 
@@ -2142,6 +2229,8 @@ async function main() {
         await receptionSession.setViewport(1440, 900, th)
         await receptionSession.goto('/reception', '.staff-layout')
         await receptionSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/reception-desk-${th}-1440.png`))
+        const recepAudit = await inspectContract(receptionSession, '/reception', 'RECEPTIONIST', th, '1440')
+        contractAuditResults.push({ route: '/reception', role: 'RECEPTIONIST', theme: th, viewport: '1440', audit: recepAudit })
       }
       await receptionSession.cleanup()
 
@@ -2151,18 +2240,99 @@ async function main() {
         await coachSession.setViewport(1440, 900, th)
         await coachSession.goto('/coach', '.staff-layout')
         await coachSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/coach-schedule-${th}-1440.png`))
+        const coachAudit = await inspectContract(coachSession, '/coach', 'COACH', th, '1440')
+        contractAuditResults.push({ route: '/coach', role: 'COACH', theme: th, viewport: '1440', audit: coachAudit })
       }
       await coachSession.cleanup()
 
-      // Manager Shell
+      // Manager Shell: 1440, 768, 390
       const managerSession = await runSession(browser, { role: 'MANAGER' })
       for (const th of ['light', 'dark']) {
-        await managerSession.setViewport(1440, 900, th)
-        await managerSession.goto('/manager', '.staff-layout')
-        await managerSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/manager-overview-${th}-1440.png`))
+        for (const vp of viewports) {
+          await managerSession.setViewport(vp.w, vp.h, th)
+          await managerSession.goto('/manager', '.staff-layout')
+          await managerSession.screenshot(join(SCREENSHOTS_DIR, `ui-sync/manager-overview-${th}-${vp.name}.png`))
+          const mgrAudit = await inspectContract(managerSession, '/manager', 'MANAGER', th, vp.name)
+          contractAuditResults.push({ route: '/manager', role: 'MANAGER', theme: th, viewport: vp.name, audit: mgrAudit })
+        }
       }
       await managerSession.cleanup()
-      console.log('UI-SYNC full website shell audit completed!')
+
+      // Validate contract assertions across audit results
+      // 1. Primary button color: light: rgb(31, 79, 216), dark: rgb(61, 108, 240)
+      const primaryBtnLightCheck = contractAuditResults
+        .filter((r) => r.theme === 'light' && r.audit?.primaryButton?.bg)
+        .every((r) => r.audit.primaryButton.bg === 'rgb(31, 79, 216)')
+
+      const primaryBtnDarkCheck = contractAuditResults
+        .filter((r) => r.theme === 'dark' && r.audit?.primaryButton?.bg)
+        .every((r) => r.audit.primaryButton.bg === 'rgb(61, 108, 240)')
+
+      // 2. Brand mark immutable: rgb(31, 79, 216) bg, rgb(255, 255, 255) fg, 0px radius, no border
+      const brandMarkBgCheck = contractAuditResults
+        .filter((r) => r.audit?.brand?.bg)
+        .every((r) => r.audit.brand.bg === 'rgb(31, 79, 216)')
+
+      const brandMarkRadiusCheck = contractAuditResults
+        .filter((r) => r.audit?.brand?.borderRadius)
+        .every((r) => r.audit.brand.borderRadius === '0px')
+
+      const brandMarkBorderCheck = contractAuditResults
+        .filter((r) => r.audit?.brand)
+        .every((r) => r.audit.brand.borderWidth === '0px' || r.audit.brand.borderStyle === 'none')
+
+      // 3. Logout button rectangular (not pill)
+      const logoutRectangularCheck = contractAuditResults
+        .filter((r) => r.audit?.logout?.borderRadius)
+        .every((r) => {
+          const radiusVal = parseInt(r.audit.logout.borderRadius, 10) || 0
+          return radiusVal <= 10 // e.g. 6px or 8px (radius-md), definitely not 9999px pill
+        })
+
+      // 4. Auth video controls suppressed, Home preserved (on viewports >= 768px where video plays)
+      const authVideoToggleSuppressed = contractAuditResults
+        .filter((r) => r.route === '/register')
+        .every((r) => r.audit?.hasVideoToggle === false)
+
+      const homeVideoTogglePreserved = contractAuditResults
+        .filter((r) => r.route === '/' && r.viewport !== '390')
+        .every((r) => r.audit?.hasVideoToggle === true)
+
+      const contractLog = {
+        executedAt: new Date().toISOString(),
+        gitProvenance: GIT_PROVENANCE,
+        viewportsTested: [1440, 768, 390],
+        themesTested: ['light', 'dark'],
+        assertions: {
+          primaryButtonLightColor_1f4fd8: primaryBtnLightCheck,
+          primaryButtonDarkColor_3d6cf0: primaryBtnDarkCheck,
+          brandMarkBgImmutable_1f4fd8: brandMarkBgCheck,
+          brandMarkRadiusZero_0px: brandMarkRadiusCheck,
+          brandMarkBorderNone: brandMarkBorderCheck,
+          logoutButtonRectangular_notPill: logoutRectangularCheck,
+          authVideoToggleSuppressedOnRegister: authVideoToggleSuppressed,
+          homeVideoTogglePreservedOnHome: homeVideoTogglePreserved,
+        },
+        outcome: (
+          primaryBtnLightCheck &&
+          primaryBtnDarkCheck &&
+          brandMarkBgCheck &&
+          brandMarkRadiusCheck &&
+          brandMarkBorderCheck &&
+          logoutRectangularCheck &&
+          authVideoToggleSuppressed &&
+          homeVideoTogglePreserved
+        ) ? 'PASS' : 'FAIL',
+        auditedItemsCount: contractAuditResults.length,
+        auditedEntries: contractAuditResults,
+      }
+
+      mkdirSync(join(SCREENSHOTS_DIR, 'ui-sync'), { recursive: true })
+      writeFileSync(
+        join(SCREENSHOTS_DIR, 'ui-sync/button-and-brand-contract-log.json'),
+        JSON.stringify(contractLog, null, 2) + '\n'
+      )
+      console.log('UI-SYNC full website shell audit & contract log completed! Outcome:', contractLog.outcome)
     }
 
     if (MANIFEST_ENTRIES.length > 0) {
@@ -2170,9 +2340,14 @@ async function main() {
       writeFileSync(manifestPath, JSON.stringify(MANIFEST_ENTRIES, null, 2) + '\n')
       console.log(`Saved screenshot manifest: ${manifestPath} (${MANIFEST_ENTRIES.length} entries)`)
       // Save manifest dynamically to latest active report round if task report dir exists
-      const taskReportRoot = resolve(FRONTEND_ROOT, '../../tasks/UI-SYNC-01 (i)/report')
-      if (existsSync(taskReportRoot)) {
-        for (const round of ['round 2', 'round 1']) {
+      const reportCandidates = [
+        resolve(FRONTEND_ROOT, '../../UI-SYNC-01 (i)/report'),
+        resolve(FRONTEND_ROOT, '../../tasks/UI-SYNC-01 (i)/report'),
+        resolve(FRONTEND_ROOT, '../tasks/UI-SYNC-01 (i)/report'),
+      ]
+      const taskReportRoot = reportCandidates.find((c) => existsSync(c))
+      if (taskReportRoot) {
+        for (const round of ['round 3', 'round 2', 'round 1']) {
           const dir = join(taskReportRoot, round)
           if (existsSync(dir)) {
             const reportManifestPath = join(dir, 'screenshots-manifest.json')

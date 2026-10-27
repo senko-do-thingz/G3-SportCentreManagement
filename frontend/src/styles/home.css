@@ -86,7 +86,7 @@
 .home-header { position: absolute; inset: 0 0 auto; z-index: var(--z-header); color: #ffffff; }
 .home-header__bar { display: flex; align-items: center; gap: 32px; min-height: 96px; padding-left: 0; }
 .home-header .brand { flex: none; gap: 20px; color: #ffffff; }
-.home-header .brand__mark { width: 96px; height: 96px; border-radius: 0; background: var(--h-primary); color: #ffffff; font: italic 800 48px/1 var(--h-display); }
+.home-header .brand__mark { width: 96px; height: 96px; border: 0; border-radius: 0; background: var(--color-brand-mark-bg); color: var(--color-brand-mark-fg); font: italic 800 48px/1 var(--h-display); }
 .home-header .brand__name { color: #ffffff; font: italic 800 30px/1 var(--h-display); letter-spacing: 0.08em; text-transform: uppercase; }
 .home-nav { display: flex; align-items: center; gap: 32px; margin-left: auto; }
 .home-nav a { position: relative; padding-block: 8px; color: #ffffff; font-weight: 600; letter-spacing: 0.06em; text-decoration: none; }
@@ -102,6 +102,22 @@
 .home-account .btn--secondary { color: #ffffff; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.55); }
 .home-account .btn--secondary:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); box-shadow: inset 0 0 0 1.5px #ffffff; }
 .home-account .user-menu, .home-account .user-menu__text, .home-account [role='status'] { color: #ffffff; }
+.home-account .user-menu__name { color: #ffffff; }
+.home-account .user-menu__role { color: rgba(255, 255, 255, 0.78); }
+.home-account .user-menu__logout {
+  min-height: 44px;
+  padding: 8px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: #ffffff;
+  transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+}
+.home-account .user-menu__logout:hover {
+  border-color: #ffffff;
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
 .home-menu-toggle { display: none; }
 
 /* Hero */

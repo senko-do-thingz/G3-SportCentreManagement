@@ -46,7 +46,12 @@ function usePageLoaded(): boolean {
  * with a connection reported as 4g, and the clip mounts after the page load event so it never delays the hero photo.
  * A clip whose files all fail is skipped; when every clip fails the video is removed.
  */
-export function HomeHeroVideo({ sources }: { sources: readonly (readonly string[])[] }) {
+export interface HomeHeroVideoProps {
+  sources: readonly (readonly string[])[]
+  showToggle?: boolean
+}
+
+export function HomeHeroVideo({ sources, showToggle = true }: HomeHeroVideoProps) {
   const video = useRef<HTMLVideoElement>(null)
   const [enabled] = useState(canPlayHeroVideo)
   const [fullHd] = useState(() => enabled && prefersFullHd())
@@ -97,13 +102,15 @@ export function HomeHeroVideo({ sources }: { sources: readonly (readonly string[
           <source key={src} src={src} type="video/mp4" onError={i === files.length - 1 ? () => setFailed((list) => [...list, current]) : undefined} />
         ))}
       </video>
-      <button type="button" className="home-hero__video-toggle" aria-label={paused ? 'Play background video' : 'Pause background video'} aria-pressed={paused} onClick={toggle}>
-        {paused ? (
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 5.5v13l10.5-6.5z" /></svg>
-        ) : (
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" focusable="false"><rect x="6.5" y="5" width="4" height="14" rx="1" /><rect x="13.5" y="5" width="4" height="14" rx="1" /></svg>
-        )}
-      </button>
+      {showToggle && (
+        <button type="button" className="home-hero__video-toggle" aria-label={paused ? 'Play background video' : 'Pause background video'} aria-pressed={paused} onClick={toggle}>
+          {paused ? (
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 5.5v13l10.5-6.5z" /></svg>
+          ) : (
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" focusable="false"><rect x="6.5" y="5" width="4" height="14" rx="1" /><rect x="13.5" y="5" width="4" height="14" rx="1" /></svg>
+          )}
+        </button>
+      )}
     </>
   )
 }

@@ -51,6 +51,14 @@ describe('HomeHeroVideo', () => {
     expect(screen.getByRole('button', { name: 'Pause background video' })).toHaveAttribute('aria-pressed', 'false')
   })
 
+  it('does not render toggle button when showToggle is false', () => {
+    media()
+    const { container } = render(<HomeHeroVideo sources={SOURCES} showToggle={false} />)
+    expect(videoOf(container)).not.toBeNull()
+    expect(screen.queryByRole('button', { name: /background video/i })).toBeNull()
+    expect(container.querySelector('.home-hero__video-toggle')).toBeNull()
+  })
+
   it('keeps a clip while its fallback file can still load, skips it when all files fail and removes the video when none can load', () => {
     media()
     const { container } = render(<HomeHeroVideo sources={SOURCES} />)

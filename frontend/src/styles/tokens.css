@@ -16,6 +16,14 @@
   --color-navy: #0b1736;
   --color-accent: #f5b301;
   --color-accent-hover: #e0a300;
+  /* Canonical Brand Logo Mark - Immutable across themes and roles */
+  --color-brand-mark-bg: #1f4fd8;
+  --color-brand-mark-fg: #ffffff;
+  /* Canonical Action Buttons - Follows Home Membership offers & Find classes */
+  --color-action-primary: #1f4fd8;
+  --color-action-primary-hover: #1a42b5;
+  --color-action-primary-active: #16389a;
+  --color-action-primary-text: #ffffff;
   /* Gold highlight for marks and selected states; never use it as text on a light surface. */
   --color-highlight: #f5b301;
   /* Brand surfaces from the approved Home (hero, footer, call to action). Light text only. */
@@ -127,6 +135,11 @@
     --color-primary-active: #6f91ff;
     --color-primary-soft: #1c2a4d;
     --color-primary-soft-hover: #24365f;
+    /* Canonical Action Buttons - Matches Home dark theme */
+    --color-action-primary: #3d6cf0;
+    --color-action-primary-hover: #5a83f3;
+    --color-action-primary-active: #2b5ef0;
+    --color-action-primary-text: #ffffff;
     --color-bg: #0d1724;
     --color-surface: #162333;
     --color-surface-muted: #1b2c40;

@@ -110,17 +110,17 @@
   min-height: 48px;
   padding-inline: 24px;
   border: 0;
-  border-radius: 0;
-  background: var(--schedule-gold-bright);
-  color: #10172e;
+  border-radius: var(--radius-md);
+  background: var(--color-action-primary);
+  color: var(--color-action-primary-text);
   font-weight: 700;
   box-shadow: 0 8px 20px rgba(5, 12, 29, 0.2);
   transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
 .member-schedule-theme .page-header__actions .btn:hover:not(:disabled) {
-  background: #ffd65e;
-  color: #10172e;
+  background: var(--color-action-primary-hover);
+  color: var(--color-action-primary-text);
   transform: translateY(-1px);
 }
 

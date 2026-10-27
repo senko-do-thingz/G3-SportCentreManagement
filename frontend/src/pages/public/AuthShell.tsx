@@ -44,7 +44,7 @@ export function AuthShell({ className, title, subtitle, children, enableVideo = 
   return (
     <div className={['auth-stage', className].filter(Boolean).join(' ')}>
       <Photo className="auth-stage__photo" src={HOME_PHOTOS.auth} fallback={authFallback} sizes="100vw" width="2200" height="3300" fetchPriority="high" />
-      {enableVideo && <HomeHeroVideo sources={HOME_HERO_VIDEOS} />}
+      {enableVideo && <HomeHeroVideo sources={HOME_HERO_VIDEOS} showToggle={false} />}
       <div className="auth-stage__header">
         <Brand />
         <div className="auth-stage__actions">

@@ -122,9 +122,10 @@
 .auth-stage .brand__mark {
   width: 64px;
   height: 64px;
+  border: 0;
   border-radius: 0;
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  background: var(--color-brand-mark-bg);
+  color: var(--color-brand-mark-fg);
   font-family: var(--font-display);
   font-size: 32px;
   font-style: italic;
@@ -343,20 +344,20 @@
 .auth-stage .auth-form .btn--primary {
   min-height: 52px;
   border-radius: 0;
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-on-primary);
+  background: var(--color-action-primary);
+  border-color: var(--color-action-primary);
+  color: var(--color-action-primary-fg, var(--color-on-primary));
   font-weight: var(--weight-bold);
   letter-spacing: 0.02em;
 }
 
 .auth-stage .auth-form .btn--primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
+  background: var(--color-action-primary-hover);
+  border-color: var(--color-action-primary-hover);
 }
 
 .auth-stage .auth-form .btn--primary:focus-visible {
-  box-shadow: 0 0 0 3px var(--color-surface), 0 0 0 6px var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-surface), 0 0 0 6px var(--color-action-primary);
 }
 
 .auth-stage .link-button,

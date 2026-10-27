@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
@@ -251,5 +252,99 @@ describe('UI Baseline Synchronization - ThemeToggle & Shared Shells (UI-SYNC-01)
       </MemoryRouter>,
     )
     expect(withoutVideo.querySelector('.auth-stage__photo')).not.toBeNull()
+  })
+
+  it('UI-SYNC-COLOR-01: canonical action button tokens match Home primary blue across Light and Dark themes', () => {
+    const tokensCss = readFileSync('src/styles/tokens.css', 'utf8')
+    const componentsCss = readFileSync('src/styles/components.css', 'utf8')
+    const homeCss = readFileSync('src/styles/home.css', 'utf8')
+
+    // 1. Light theme tokens
+    expect(tokensCss).toMatch(/--color-action-primary:\s*#1f4fd8;/)
+    expect(tokensCss).toMatch(/--color-action-primary-hover:\s*#1a42b5;/)
+    expect(tokensCss).toMatch(/--color-action-primary-active:\s*#16389a;/)
+    expect(tokensCss).toMatch(/--color-action-primary-text:\s*#ffffff;/)
+
+    // 2. Dark theme tokens match Home dark theme
+    expect(tokensCss).toMatch(/--color-action-primary:\s*#3d6cf0;/)
+    expect(tokensCss).toMatch(/--color-action-primary-hover:\s*#5a83f3;/)
+    expect(tokensCss).toMatch(/--color-action-primary-text:\s*#ffffff;/)
+
+    // 3. components.css btn--primary consumes canonical action tokens
+    expect(componentsCss).toMatch(/\.btn--primary\s*\{[^}]*background:\s*var\(--color-action-primary\);/)
+    expect(componentsCss).toMatch(/\.btn--primary\s*\{[^}]*color:\s*var\(--color-action-primary-text\);/)
+    expect(componentsCss).toMatch(/\.btn--primary:hover:not\(:disabled\)\s*\{[^}]*background:\s*var\(--color-action-primary-hover\);/)
+
+    // 4. Home page Find classes and Membership offers use the exact same primary blue
+    expect(homeCss).toMatch(/--h-primary:\s*var\(--color-primary\);/)
+    expect(homeCss).toMatch(/--h-primary:\s*#3d6cf0;/)
+  })
+
+  it('UI-SYNC-BRAND-02: canonical brand mark has no decorative gold border and is immutable across themes', () => {
+    const tokensCss = readFileSync('src/styles/tokens.css', 'utf8')
+    const componentsCss = readFileSync('src/styles/components.css', 'utf8')
+    const layoutsCss = readFileSync('src/styles/layouts.css', 'utf8')
+    const authCss = readFileSync('src/styles/auth.css', 'utf8')
+
+    // Immutable brand mark tokens defined in :root
+    expect(tokensCss).toMatch(/--color-brand-mark-bg:\s*#1f4fd8;/)
+    expect(tokensCss).toMatch(/--color-brand-mark-fg:\s*#ffffff;/)
+
+    // Brand mark has no gold border, border is 0 and radius is 0
+    expect(componentsCss).toMatch(/\.brand__mark\s*\{[^}]*border:\s*0;/)
+    expect(componentsCss).toMatch(/\.brand__mark\s*\{[^}]*border-radius:\s*0;/)
+    expect(componentsCss).toMatch(/\.brand__mark\s*\{[^}]*background:\s*var\(--color-brand-mark-bg\);/)
+
+    // Member layout header brand mark has no gold border or glow
+    expect(layoutsCss).not.toMatch(/\.member-layout__header \.brand__mark\s*\{[^}]*border:\s*1px solid rgba\(255,\s*200,\s*61/)
+    expect(layoutsCss).toMatch(/\.member-layout__header \.brand__mark\s*\{[^}]*border:\s*0;/)
+
+    // Auth stage brand mark uses immutable tokens
+    expect(authCss).toMatch(/\.auth-stage \.brand__mark\s*\{[^}]*background:\s*var\(--color-brand-mark-bg\);/)
+  })
+
+  it('UI-SYNC-HEADER-03: Log out button is rectangular and outlined with readable contrast over video headers', () => {
+    const layoutsCss = readFileSync('src/styles/layouts.css', 'utf8')
+    const homeCss = readFileSync('src/styles/home.css', 'utf8')
+
+    // Default logout is rectangular (var(--radius-md)), not pill
+    expect(layoutsCss).toMatch(/\.user-menu__logout\s*\{[^}]*border:\s*1px solid var\(--color-border\);/)
+    expect(layoutsCss).toMatch(/\.user-menu__logout\s*\{[^}]*border-radius:\s*var\(--radius-md\);/)
+    expect(layoutsCss).not.toMatch(/\.member-layout__header \.user-menu__logout\s*\{[^}]*border-radius:\s*var\(--radius-pill\);/)
+
+    // Member layout header logout is rectangular, outlined, and high contrast white
+    expect(layoutsCss).toMatch(/\.member-layout__header \.user-menu__logout\s*\{[^}]*border-radius:\s*var\(--radius-md\);/)
+    expect(layoutsCss).toMatch(/\.member-layout__header \.user-menu__logout\s*\{[^}]*color:\s*#ffffff;/)
+    expect(layoutsCss).toMatch(/\.member-layout__header \.user-menu__name\s*\{[^}]*color:\s*#ffffff;/)
+
+    // Home account logout is high-contrast white and rectangular
+    expect(homeCss).toMatch(/\.home-account \.user-menu__logout\s*\{[^}]*border-radius:\s*var\(--radius-md\);/)
+    expect(homeCss).toMatch(/\.home-account \.user-menu__logout\s*\{[^}]*color:\s*#ffffff;/)
+  })
+
+  it('UI-SYNC-AUTH-04: floating video toggle is suppressed on AuthShell and present on Home', () => {
+    // 1. AuthShell with enableVideo does NOT render floating video playback button
+    const { container: authBox } = render(
+      <MemoryRouter>
+        <ThemeProvider>
+          <AuthShell title="Create account" subtitle="Join Sportify" enableVideo>
+            <div>Form content</div>
+          </AuthShell>
+        </ThemeProvider>
+      </MemoryRouter>,
+    )
+    expect(authBox.querySelector('.home-hero__video-toggle')).toBeNull()
+
+    // 2. HomeHeader / Home has no unintended playback toggle outside hero
+    const { container: homeHeaderBox } = render(
+      <MemoryRouter>
+        <AuthContext.Provider value={mockAuthValue}>
+          <ThemeProvider>
+            <HomeHeader />
+          </ThemeProvider>
+        </AuthContext.Provider>
+      </MemoryRouter>,
+    )
+    expect(homeHeaderBox.querySelector('.home-hero__video-toggle')).toBeNull()
   })
 })

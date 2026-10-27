@@ -35,19 +35,26 @@
   text-decoration: none;
 }
 
+.brand:focus-visible {
+  outline: 2px solid var(--color-action-primary);
+  outline-offset: 3px;
+}
+
 .brand__mark {
   display: inline-grid;
   place-items: center;
   width: 40px;
   height: 40px;
+  border: 0;
   border-radius: 0;
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  background: var(--color-brand-mark-bg);
+  color: var(--color-brand-mark-fg);
   font-family: var(--font-display);
   font-size: 1.25rem;
   font-style: italic;
   font-weight: 800;
   line-height: 1;
+  box-shadow: none;
 }
 
 .brand__text {
@@ -98,6 +105,11 @@
   text-decoration: none;
 }
 
+.btn:focus-visible {
+  outline: 2px solid var(--color-action-primary);
+  outline-offset: 2px;
+}
+
 .btn:disabled {
   cursor: not-allowed;
   opacity: 0.55;
@@ -126,16 +138,21 @@
 }
 
 .btn--primary {
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  background: var(--color-action-primary);
+  border-color: var(--color-action-primary);
+  color: var(--color-action-primary-text);
 }
 
 .btn--primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
+  background: var(--color-action-primary-hover);
+  border-color: var(--color-action-primary-hover);
+  color: var(--color-action-primary-text);
 }
 
 .btn--primary:active:not(:disabled) {
-  background: var(--color-primary-active);
+  background: var(--color-action-primary-active);
+  border-color: var(--color-action-primary-active);
+  color: var(--color-action-primary-text);
 }
 
 .btn--secondary {
