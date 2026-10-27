@@ -77,5 +77,12 @@ class WorkflowContractTest(unittest.TestCase):
         for workflow in [self.job('ci-gate'), self.security.split('  security-gate:')[1]]:
             self.assertRegex(workflow,r'run: python3 scripts/ci/gate.py[^\n]*\n\s+- name: Reject workflow cancellation\n\s+if: cancelled\(\)\n\s+run: exit 1')
 
+    def test_test_report_publishers_do_not_mask_failure_or_empty_input(self):
+        for name in ['unit-tests','integration-tests']:
+            job=self.job(name)
+            self.assertIn('fail_on_failure: true',job)
+            self.assertIn('fail_on_parse_error: true',job)
+            self.assertIn('require_tests: true',job)
+
 
 if __name__=='__main__':unittest.main()

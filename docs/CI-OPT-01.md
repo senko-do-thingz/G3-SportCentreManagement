@@ -100,6 +100,8 @@ separate and its existing scan/deployment approvals are preserved.
 
 JUnit counts and slow suites appear in job summaries. Full XML, frontend results,
 impact JSON and optional SQL profiles are artifacts. Large logs are not PR comments.
+Report publishers explicitly fail on test failures, parse errors or missing tests;
+the independently enforced raw XML guards remain authoritative, including on forks.
 
 ## Cash migration profiling and retained cost
 
