@@ -145,7 +145,7 @@ jobs:
 
       - name: Run integration tests
         working-directory: backend
-        run: mvn -B -ntp verify -DskipUnitTests=true
+        run: mvn -B -ntp verify -DskipUnitTests=true -Dci.cash.profile=true
 
       - name: Verify executed integration suites and report counts
         if: always()
@@ -168,6 +168,15 @@ jobs:
         with:
           name: failsafe-reports-integration
           path: backend/target/failsafe-reports
+          retention-days: 14
+
+      - name: Upload cash fixture profile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cash-fixture-profile
+          path: backend/target/cash-profile
+          if-no-files-found: error
           retention-days: 14
 
   package:
