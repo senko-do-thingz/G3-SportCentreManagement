@@ -179,12 +179,12 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.6.0</version>
+                <version>3.6.1</version>
                 <configuration>
                     <argLine>@{argLine}</argLine>
                     <skipTests>${skipUnitTests}</skipTests>
                     <excludedGroups>integration</excludedGroups>
-                    <!-- Surefire 3.6.0 auto-detects transitive JUnit 4 and switches groups to Vintage categories.
+                    <!-- Surefire 3.6.1 auto-detects transitive JUnit 4 and switches groups to Vintage categories.
                          Disable Vintage auto-addition so integration is interpreted as a Jupiter tag. -->
                     <properties>
                         <property>
