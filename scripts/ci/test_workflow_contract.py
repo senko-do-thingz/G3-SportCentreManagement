@@ -40,14 +40,17 @@ class WorkflowContractTest(unittest.TestCase):
 
     def test_failed_classifier_runs_every_relevant_branch(self):
         for job,flag in [('unit-tests','backend'),('integration-tests','backend'),('frontend','frontend'),('migration-guard','backend'),('compose-smoke','compose')]:
-            self.assertIn("if: always() && (needs.impact.result != 'success' || needs.impact.outputs."+flag+" == 'true')",self.job(job))
+            self.assertIn("if: ${{ !cancelled() && (needs.impact.result != 'success' || needs.impact.outputs."+flag+" == 'true') }}",self.job(job))
         self.assertIn("needs.impact.result != 'success' || needs.impact.outputs.backend == 'true'",self.job('security'))
         self.assertIn("needs.impact.result != 'success' || needs.impact.outputs.frontend == 'true'",self.job('security'))
+        self.assertIn("if: ${{ !cancelled() }}",self.job('security'))
 
     def test_security_cannot_be_advisory_and_contains_both_languages(self):
         self.assertNotIn('continue-on-error:',self.security)
         self.assertIn('languages: java-kotlin',self.security)
         self.assertIn('languages: javascript-typescript',self.security)
+        self.assertIn('run: mvn -B -ntp test-compile',self.security)
+        self.assertNotIn('-DskipTests',self.security)
         self.assertIn('python3 scripts/ci/gate.py --security',self.security)
         self.assertIn('fail-on-severity: high',self.security)
         self.assertNotIn('pull_request_target:',self.ci+self.security+self.compose)
@@ -76,6 +79,13 @@ class WorkflowContractTest(unittest.TestCase):
     def test_workflow_cancellation_has_a_native_failing_step_after_gate(self):
         for workflow in [self.job('ci-gate'), self.security.split('  security-gate:')[1]]:
             self.assertRegex(workflow,r'run: python3 scripts/ci/gate.py[^\n]*\n\s+- name: Reject workflow cancellation\n\s+if: cancelled\(\)\n\s+run: exit 1')
+
+    def test_test_report_publishers_do_not_mask_failure_or_empty_input(self):
+        for name in ['unit-tests','integration-tests']:
+            job=self.job(name)
+            self.assertIn('fail_on_failure: true',job)
+            self.assertIn('fail_on_parse_error: true',job)
+            self.assertIn('require_tests: true',job)
 
 
 if __name__=='__main__':unittest.main()

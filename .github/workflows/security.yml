@@ -35,9 +35,9 @@ jobs:
         with:
           languages: java-kotlin
           build-mode: manual
-      - name: Compile production sources for CodeQL tracing
+      - name: Compile production and test sources for CodeQL tracing
         working-directory: backend
-        run: mvn -B -ntp compile
+        run: mvn -B -ntp test-compile
       - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
 
   frontend-codeql:
