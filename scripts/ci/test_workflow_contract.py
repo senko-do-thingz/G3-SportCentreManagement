@@ -73,5 +73,9 @@ class WorkflowContractTest(unittest.TestCase):
                 if not action.startswith('./'):
                     self.assertRegex(action,r'^[\w-]+/[\w/-]+@[0-9a-f]{40}$')
 
+    def test_workflow_cancellation_has_a_native_failing_step_after_gate(self):
+        for workflow in [self.job('ci-gate'), self.security.split('  security-gate:')[1]]:
+            self.assertRegex(workflow,r'run: python3 scripts/ci/gate.py[^\n]*\n\s+- name: Reject workflow cancellation\n\s+if: cancelled\(\)\n\s+run: exit 1')
+
 
 if __name__=='__main__':unittest.main()

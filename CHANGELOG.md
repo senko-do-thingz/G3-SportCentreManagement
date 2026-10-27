@@ -4,6 +4,7 @@
 - Require validated child results, including Security and Compose, at the stable CI gate. Remove advisory dependency review and add frontend CodeQL/audit coverage.
 - Run backend unit and SQL integration independently; verify and reuse the integration-produced jar. Preserve all test isolation, financial migrations and assertions.
 - Pin CI actions, retain safe Maven/npm download caches and report counts/timings. Opt-in cash fixture diagnostics identify the retained V31 trigger cleanup bottleneck; no production SQL or UI behavior changes.
+- Isolate migration seed verification from committed controller-test edits, with a real SQL cross-catalog negative control and unchanged seed expectations.
 
 ## 2026-10-27 - Home consolidated acceptance remediation (HOME-UI Round 4)
 
