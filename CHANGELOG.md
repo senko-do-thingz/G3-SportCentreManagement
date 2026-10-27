@@ -1,3 +1,10 @@
+## 2026-10-27 - Selective and fail-closed CI (CI-OPT-01)
+
+- Route PR checks from immutable merge-base path impact; unknown changes run the conservative full graph. Main, release, manual and weekly runs stay full.
+- Require validated child results, including Security and Compose, at the stable CI gate. Remove advisory dependency review and add frontend CodeQL/audit coverage.
+- Run backend unit and SQL integration independently; verify and reuse the integration-produced jar. Preserve all test isolation, financial migrations and assertions.
+- Pin CI actions, retain safe Maven/npm download caches and report counts/timings. Opt-in cash fixture diagnostics identify the retained V31 trigger cleanup bottleneck; no production SQL or UI behavior changes.
+
 ## 2026-10-27 - Home consolidated acceptance remediation (HOME-UI Round 4)
 
 - Preserve page geometry and inline styles during modal scroll locking, including stacked dialogs and existing scrollbar gutters.

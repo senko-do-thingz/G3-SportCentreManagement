@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** Opt-in diagnostics for synthetic CI fixtures, never a production connection or a test bypass. */
 final class CashFixtureProfile implements AutoCloseable {
@@ -26,6 +27,7 @@ final class CashFixtureProfile implements AutoCloseable {
         if (!enabled) { action.run(); return; }
         var jdbc = new JdbcTemplate(source);
         var samples = new AtomicInteger();
+        var diagnosticFailure = new AtomicReference<RuntimeException>();
         var monitor = Executors.newSingleThreadScheduledExecutor();
         monitor.scheduleAtFixedRate(() -> {
             if (samples.incrementAndGet() > 90) return;
@@ -40,7 +42,7 @@ final class CashFixtureProfile implements AutoCloseable {
                         WHERE r.database_id = DB_ID() AND r.session_id <> @@SPID
                         """));
             } catch (RuntimeException failure) {
-                throw new IllegalStateException("Cash fixture SQL profiling failed", failure);
+                diagnosticFailure.compareAndSet(null, failure);
             }
         }, 0, 10, TimeUnit.SECONDS);
         try { stage(name, action); }
@@ -62,6 +64,7 @@ final class CashFixtureProfile implements AutoCloseable {
                     System.out.println("CI_CASH_TRIGGER stage=" + name + " stats=" + plan);
                     if (xml != null) Files.writeString(directory.resolve(name + "-" + index++ + ".xml"), xml.toString());
                 }
+                if (diagnosticFailure.get() != null) throw new IllegalStateException("SQL sampling failed", diagnosticFailure.get());
             } catch (Exception failure) {
                 throw new IllegalStateException("Cash fixture profile collection failed", failure);
             }
