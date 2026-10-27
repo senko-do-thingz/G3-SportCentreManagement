@@ -64,7 +64,7 @@ Links use canonical Git casing (`backend`, although Windows may display `Backend
 | S26 | [backend/src/main/java/com/sportify/core/config/ClockConfig.java#L14](../../backend/src/main/java/com/sportify/core/config/ClockConfig.java#L14) | `Clock.system` | SOURCE_CONFIRMED |
 | S27 | [backend/src/test/java/com/sportify/AbstractIntegrationTest.java#L13](../../backend/src/test/java/com/sportify/AbstractIntegrationTest.java#L13) | `@Tag` | SOURCE_CONFIRMED |
 | S28 | [backend/pom.xml#L181](../../backend/pom.xml#L181) | `maven-surefire-plugin` | SOURCE_CONFIRMED |
-| S29 | [.github/workflows/ci.yml#L8](../../.github/workflows/ci.yml#L8) | `workflow_dispatch:` | SOURCE_CONFIRMED |
+| S29 | [.github/workflows/ci.yml#L14](../../.github/workflows/ci.yml#L14) | `workflow_dispatch:` | SOURCE_CONFIRMED |
 | S30 | [backend/src/main/java/com/sportify/catalog/entity/ClassSession.java#L19](../../backend/src/main/java/com/sportify/catalog/entity/ClassSession.java#L19) | `class ClassSession` | SOURCE_CONFIRMED |
 | S31 | [backend/src/main/java/com/sportify/catalog/entity/Booking.java#L17](../../backend/src/main/java/com/sportify/catalog/entity/Booking.java#L17) | `class Booking` | SOURCE_CONFIRMED |
 | S32 | [backend/src/main/java/com/sportify/catalog/entity/CheckIn.java#L22](../../backend/src/main/java/com/sportify/catalog/entity/CheckIn.java#L22) | `class CheckIn` | SOURCE_CONFIRMED |

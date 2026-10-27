@@ -1,26 +1,7 @@
 name: Compose Smoke Test
 
 on:
-  pull_request:
-    paths:
-      - "deploy/**"
-      - "backend/Dockerfile"
-      - "backend/src/main/resources/**"
-      - "scripts/ci/compose-smoke.sh"
-      - "scripts/ci/test_compose_smoke.py"
-      - ".github/workflows/compose-smoke-test.yml"
-  push:
-    branches: ["main"]
-    paths:
-      - "deploy/**"
-      - "backend/Dockerfile"
-      - "backend/src/main/resources/**"
-      - "scripts/ci/compose-smoke.sh"
-      - "scripts/ci/test_compose_smoke.py"
-      - ".github/workflows/compose-smoke-test.yml"
-  schedule:
-    - cron: "0 0 * * 0"
-  workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -38,7 +19,7 @@ jobs:
       IMAGE_TAG: "ci"
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Create temporary test .env
         run: bash scripts/ci/compose-smoke.sh prepare
