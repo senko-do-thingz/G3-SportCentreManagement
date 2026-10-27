@@ -16,6 +16,36 @@ export interface ModalProps {
 
 /** Open modals in opening order; the last one is on top. */
 const openModals: RefObject<HTMLDivElement | null>[] = []
+let documentLock: { release: () => void; returnFocus: HTMLElement | null } | null = null
+
+/** Snapshot once for the entire stack, including shorthand/longhand declaration priorities. */
+function lockDocument(returnFocus: HTMLElement | null) {
+  const body = document.body.style
+  const root = document.documentElement.style
+  const properties = ['overflow', 'overflow-x', 'overflow-y']
+  const original = Array.from({ length: body.length }, (_, i) => body.item(i))
+    .filter((name) => properties.includes(name))
+    .map((name) => [name, body.getPropertyValue(name), body.getPropertyPriority(name)] as const)
+  const gutter = root.getPropertyValue('scrollbar-gutter')
+  const gutterPriority = root.getPropertyPriority('scrollbar-gutter')
+  const reserve = window.innerWidth > document.documentElement.clientWidth
+    && !getComputedStyle(document.documentElement).scrollbarGutter.includes('stable')
+  // The root gutter preserves the containing block of fixed elements as well as normal content.
+  // Overlay/no-scrollbar pages receive no padding or new gutter.
+  if (reserve) root.setProperty('scrollbar-gutter', 'stable', gutterPriority)
+  body.setProperty('overflow', 'hidden', 'important')
+  documentLock = {
+    returnFocus,
+    release: () => {
+      for (const name of properties) body.removeProperty(name)
+      for (const [name, value, priority] of original) body.setProperty(name, value, priority)
+      if (reserve) {
+        if (gutter) root.setProperty('scrollbar-gutter', gutter, gutterPriority)
+        else root.removeProperty('scrollbar-gutter')
+      }
+    },
+  }
+}
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -67,23 +97,28 @@ export function Modal({
       return
     }
     const previouslyFocused = document.activeElement as HTMLElement | null
+    if (openModals.length === 0) lockDocument(previouslyFocused)
+    openModals.push(dialogRef)
     const dialog = dialogRef.current
     const firstFocusable = dialog ? focusableIn(dialog)[0] : undefined
-    ;(firstFocusable ?? dialog)?.focus()
-
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    openModals.push(dialogRef)
+    ;(firstFocusable ?? dialog)?.focus({ preventScroll: true })
 
     return () => {
       const index = openModals.lastIndexOf(dialogRef)
+      const wasTop = index === openModals.length - 1
       if (index >= 0) {
         openModals.splice(index, 1)
       }
       if (openModals.length === 0) {
-        document.body.style.overflow = previousOverflow
+        const initialFocus = documentLock?.returnFocus
+        documentLock?.release()
+        documentLock = null
+        ;(previouslyFocused?.isConnected ? previouslyFocused : initialFocus)?.focus?.({ preventScroll: true })
+      } else if (wasTop) {
+        const parent = openModals[openModals.length - 1].current
+        const target = parent?.contains(previouslyFocused) ? previouslyFocused : parent && (focusableIn(parent)[0] ?? parent)
+        target?.focus({ preventScroll: true })
       }
-      previouslyFocused?.focus?.()
     }
   }, [open])
 
@@ -155,6 +190,7 @@ export function Modal({
       className="modal-backdrop"
       onMouseDown={(event) => {
         if (dismissible && event.target === event.currentTarget) {
+          event.preventDefault()
           onClose()
         }
       }}

@@ -14,6 +14,7 @@
   /* Brand values come from the shared token contract (UI-00); see frontend/docs/design-tokens.md. */
   --h-primary: var(--color-primary);
   --h-primary-hover: var(--color-primary-hover);
+  --h-primary-active: var(--color-primary-active);
   --h-primary-text: var(--color-primary);
   --h-accent: var(--color-accent);
   --h-on-accent: var(--color-on-accent);
@@ -31,6 +32,7 @@
   /* Be Vietnam Pro (self-hosted, OFL) draws Vietnamese diacritics correctly at heavy weights; Arial Black does not. */
   --h-display: var(--font-display);
   --h-body: 'Segoe UI', Arial, sans-serif;
+  --home-header-height: 96px;
   background: var(--h-bg);
   color: var(--h-ink);
   font-family: var(--h-body);
@@ -44,8 +46,10 @@
   --h-border: #232d47;
   --h-ink: #e8ecf6;
   --h-muted: #96a0b8;
-  --h-primary: #3d6cf0;
-  --h-primary-hover: #5a83f3;
+  /* Pin Home fills to the approved light brand tokens; shared theme colors stay independent. */
+  --h-primary: #1f4fd8;
+  --h-primary-hover: #1a42b5;
+  --h-primary-active: #16389a;
   --h-primary-text: #8aa8ff;
   --h-icon-bg: rgba(138, 168, 255, 0.12);
   --h-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
@@ -60,18 +64,22 @@
 .home-icon--flip { transform: rotate(180deg); }
 .home-skip { position: fixed; left: 12px; top: -80px; z-index: 100; padding: 12px 20px; background: var(--h-surface); color: var(--h-ink); border: 2px solid var(--h-primary); }
 .home-skip:focus { top: 12px; }
-.home-page section[id] { scroll-margin-top: 24px; }
+.home-page [id] { scroll-margin-top: calc(var(--home-header-height) + 20px); }
 .home-page a:focus-visible, .home-page button:focus-visible, .home-page select:focus-visible, .home-page summary:focus-visible { outline: 2px solid var(--h-primary-text); outline-offset: 3px; }
 
 /* Buttons */
 .home-page .btn { min-height: 48px; border-radius: 0; font-family: var(--h-body); font-weight: 700; letter-spacing: 0.02em; transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease; }
 .home-page .btn--primary { background: var(--h-primary); border-color: var(--h-primary); color: #ffffff; }
 .home-page .btn--primary:hover:not(:disabled) { background: var(--h-primary-hover); border-color: var(--h-primary-hover); }
+.home-page .btn--primary:active:not(:disabled), .home-page .home-btn--primary:active { background: var(--h-primary-active); }
 .home-page .btn--secondary { background: transparent; border: 0; box-shadow: inset 0 0 0 1.5px var(--h-border); color: var(--h-primary-text); }
 .home-page .btn--secondary:hover:not(:disabled) { background: var(--h-icon-bg); box-shadow: inset 0 0 0 1.5px var(--h-primary); }
 .home-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 54px; padding: 0 30px; border: 0; font: 700 16px/1 var(--h-body); letter-spacing: 0.02em; text-decoration: none; cursor: pointer; transition: background-color 0.2s ease; }
 .home-btn--light { background: #ffffff; color: #0c1b2e; }
 .home-btn--light:hover { background: #e9f1fb; color: #0c1b2e; text-decoration: none; }
+.home-btn--primary { background: var(--h-primary); color: var(--color-on-hero); }
+.home-btn--primary:hover { background: var(--h-primary-hover); color: var(--color-on-hero); text-decoration: none; }
+.home-hero .home-btn:focus-visible, .home-cta .home-btn:focus-visible { outline-color: var(--color-hero-highlight); }
 .home-btn--line { background: transparent; color: #ffffff; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.55); }
 .home-btn--line:hover { background: rgba(255, 255, 255, 0.12); color: #ffffff; text-decoration: none; }
 
@@ -82,16 +90,29 @@
 .home-auth-actions > .btn--primary { background: #1f4fd8; border-color: #1f4fd8; color: #ffffff; }
 .home-auth-actions > .btn--primary:hover { background: #1a42b5; border-color: #1a42b5; }
 
-/* Header on top of the hero photo */
-.home-header { position: absolute; inset: 0 0 auto; z-index: var(--z-header); color: #ffffff; }
+/* Fixed overlay keeps hero geometry stable; the sentinel changes only the surface. */
+.home-header-sentinel { position: absolute; top: 96px; width: 1px; height: 1px; pointer-events: none; }
+.home-header { position: fixed; inset: 0 0 auto; z-index: var(--z-header); color: #ffffff; padding-top: env(safe-area-inset-top); }
+.home-header--solid { background: var(--color-navy); box-shadow: var(--h-shadow); }
 .home-header__bar { display: flex; align-items: center; gap: 32px; min-height: 96px; padding-left: 0; }
 .home-header .brand { flex: none; gap: 20px; color: #ffffff; }
-.home-header .brand__mark { width: 96px; height: 96px; border-radius: 0; background: var(--h-primary); color: #ffffff; font: italic 800 48px/1 var(--h-display); }
+.home-header .brand__mark { width: 96px; height: 96px; border: 0; border-radius: 0; background: var(--h-primary); color: #ffffff; box-shadow: none; filter: none; font: italic 800 48px/1 var(--h-display); }
 .home-header .brand__name { color: #ffffff; font: italic 800 30px/1 var(--h-display); letter-spacing: 0.08em; text-transform: uppercase; }
-.home-nav { display: flex; align-items: center; gap: 32px; margin-left: auto; }
+.home-header a:focus-visible, .home-header button:focus-visible { outline-color: var(--color-hero-highlight); }
+.home-nav { display: flex; align-items: center; gap: 12px; margin-left: auto; }
 .home-nav a { position: relative; padding-block: 8px; color: #ffffff; font-weight: 600; letter-spacing: 0.06em; text-decoration: none; }
 .home-nav a::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--h-accent); transform: scaleX(0); transform-origin: left; transition: transform 0.2s ease; }
 .home-nav a:hover::after, .home-nav a[aria-current='page']::after { transform: scaleX(1); }
+.home-nav .home-nav__link::after { transform: scaleX(1); }
+.home-nav .home-nav__link { display: inline-flex; align-items: center; min-height: 44px; width: fit-content; }
+.home-nav__group { position: relative; }
+.home-nav__parent { display: flex; align-items: center; gap: 4px; }
+.home-nav__toggle { display: grid; place-items: center; width: 24px; min-height: 44px; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.home-nav__submenu { position: absolute; top: 100%; left: 0; width: 260px; max-height: calc(100dvh - var(--home-header-height) - 24px); margin: 0; padding: 8px; overflow-y: auto; list-style: none; background: var(--color-navy); box-shadow: var(--h-shadow); }
+.home-nav__group:last-child .home-nav__submenu { left: auto; right: 0; width: 320px; }
+.home-nav__submenu a { display: block; min-height: 44px; padding: 12px; line-height: 1.4; letter-spacing: 0; overflow-wrap: anywhere; }
+.home-nav__submenu a:hover { background: var(--h-primary); }
+.home-nav__submenu a::after { content: none; }
 .home-account { display: flex; align-items: center; gap: 12px; }
 .home-theme { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.14); color: #ffffff; cursor: pointer; transition: background-color 0.2s ease; }
 .home-theme:hover { background: rgba(255, 255, 255, 0.26); }
@@ -163,6 +184,11 @@
 .home-select--open .home-select__chevron { transform: rotate(180deg); color: var(--h-primary-text); }
 .home-select__list { position: absolute; z-index: 30; top: calc(100% - 8px); left: 16px; right: 16px; max-height: 320px; margin: 0; padding: 8px; overflow-y: auto; list-style: none; background: var(--h-surface); border: 1px solid var(--h-border); border-top: 3px solid var(--h-primary); box-shadow: 0 22px 48px rgba(var(--h-overlay), 0.22); animation: home-select-in 0.16s ease-out; }
 .home-select__list:focus { outline: none; }
+.home-select__list--sports { top: calc(100% - 12px); left: 28px; right: 28px; display: block; max-height: none; overscroll-behavior: contain; }
+.home-select__list--sports .home-select__option { overflow-wrap: anywhere; }
+.home-select__list--sports .home-select__option svg { flex: none; }
+.home-select__list--sports:focus-visible { outline: 2px solid var(--h-primary-text); outline-offset: 2px; }
+.home-page:has(.home-select__list--sports) .home-top { visibility: hidden; opacity: 0; pointer-events: none; transition: none; }
 .home-select__option { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 10px 14px; color: var(--h-ink); font-size: 16px; font-weight: 500; cursor: pointer; }
 .home-select__option--active { background: var(--h-icon-bg); color: var(--h-primary-text); }
 .home-select__option[aria-selected='true'] { color: var(--h-primary-text); font-weight: 700; }
@@ -333,9 +359,13 @@
   .home-venues { grid-template-columns: repeat(2, 1fr); grid-auto-rows: 240px; }
   .home-header__bar { flex-wrap: wrap; gap: 16px; }
   .home-menu-toggle { display: block; margin-left: auto; min-height: 44px; padding: 8px 16px; border: 1px solid rgba(255, 255, 255, 0.45); background: rgba(255, 255, 255, 0.1); color: #ffffff; font-weight: 700; cursor: pointer; }
-  .home-nav { display: none; order: 4; width: 100%; margin: 0 0 0 max(20px, 4vw); padding: 8px 16px; background: rgba(var(--h-overlay), 0.92); }
-  .home-nav--open { display: flex; flex-wrap: wrap; }
+  .home-nav { display: none; position: absolute; top: 100%; left: 0; width: 100%; max-height: calc(100dvh - var(--home-header-height)); overflow-y: auto; margin: 0; padding: 12px max(20px, 4vw); background: var(--color-navy); }
+  .home-nav--open { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+  .home-nav__parent { justify-content: space-between; }
+  .home-nav__toggle { width: 44px; }
+  .home-nav__submenu, .home-nav__group:last-child .home-nav__submenu { position: static; width: 100%; max-height: none; box-shadow: none; }
   .home-account { order: 3; width: 100%; justify-content: flex-end; padding-left: max(20px, 4vw); }
+  .home-header__bar { padding-bottom: 12px; }
   .home-hero__body { grid-template-columns: 1fr; padding-top: 220px; }
   .home-highlight { display: none; }
   .home-strip { grid-template-columns: 1fr; }

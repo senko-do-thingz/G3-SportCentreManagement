@@ -2,15 +2,24 @@ package com.sportify.catalog.repository;
 
 import com.sportify.AbstractIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.AbstractDataSource;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.flywaydb.core.Flyway;
+import javax.sql.DataSource;
 
 import java.math.BigDecimal;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,8 +33,76 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Transactional
 class SportPackageSeedMigrationIntegrationTest extends AbstractIntegrationTest {
 
+    private static final String SEED_CATALOG = "seed_verification_" + UUID.randomUUID().toString().replace("-", "");
+    private static boolean catalogCreated;
+
+    /** Verify actual Flyway seed data, independently of other classes' committed catalog edits. */
+    @DynamicPropertySource
+    static synchronized void isolatedSeedCatalog(DynamicPropertyRegistry registry) throws SQLException {
+        if (!catalogCreated) {
+            try (var connection = sharedCatalogConnection(); var statement = connection.createStatement()) {
+                statement.execute("CREATE DATABASE [" + SEED_CATALOG + "]");
+            }
+            catalogCreated = true;
+        }
+        // Hikari selects this catalog for every connection, including Flyway and test transactions.
+        registry.add("spring.datasource.hikari.catalog", () -> SEED_CATALOG);
+    }
+
+    private static java.sql.Connection sharedCatalogConnection() throws SQLException {
+        return DriverManager.getConnection(MSSQL_SERVER_CONTAINER.getJdbcUrl(),
+                MSSQL_SERVER_CONTAINER.getUsername(), MSSQL_SERVER_CONTAINER.getPassword());
+    }
+
+    private static DataSource catalogSource(String catalog) {
+        return new AbstractDataSource() {
+            @Override public java.sql.Connection getConnection() throws SQLException {
+                var connection = sharedCatalogConnection();
+                connection.setCatalog(catalog);
+                return connection;
+            }
+            @Override public java.sql.Connection getConnection(String username, String password) throws SQLException {
+                var connection = DriverManager.getConnection(MSSQL_SERVER_CONTAINER.getJdbcUrl(), username, password);
+                connection.setCatalog(catalog);
+                return connection;
+            }
+        };
+    }
+
     @Autowired
     private JdbcTemplate jdbc;
+
+    @BeforeEach
+    void verifyIsolatedCatalog() {
+        assertThat(jdbc.queryForObject("SELECT DB_NAME()", String.class)).isEqualTo(SEED_CATALOG);
+    }
+
+    @Test
+    void sharedCatalogEditsCannotContaminateMigrationSeedAssertions() throws SQLException {
+        String otherCatalog = SEED_CATALOG + "_other";
+        try (var connection = sharedCatalogConnection(); var statement = connection.createStatement()) {
+            statement.execute("CREATE DATABASE [" + otherCatalog + "]");
+        }
+        DataSource other = catalogSource(otherCatalog);
+        Flyway.configure().dataSource(other).locations("classpath:db/migration/identity", "classpath:db/migration/catalog")
+                .cleanDisabled(true).outOfOrder(false).validateOnMigrate(true).load().migrate();
+        try (var shared = other.getConnection(); var statement = shared.createStatement()) {
+            shared.setAutoCommit(false);
+            try {
+                assertThat(shared.getCatalog()).isNotEqualTo(SEED_CATALOG);
+                assertThat(statement.executeUpdate("UPDATE dbo.membership_card_tier SET price = 500000 WHERE code = 'GOLD'"))
+                        .isEqualTo(1);
+                try (var rows = statement.executeQuery("SELECT price FROM dbo.membership_card_tier WHERE code = 'GOLD'")) {
+                    assertThat(rows.next()).isTrue();
+                    assertThat(rows.getBigDecimal(1)).isEqualByComparingTo("500000.00");
+                }
+                assertThat(jdbc.queryForObject("SELECT price FROM dbo.membership_card_tier WHERE code = 'GOLD'", BigDecimal.class))
+                        .isEqualByComparingTo("300000.00");
+            } finally {
+                shared.rollback();
+            }
+        }
+    }
 
     private record ExpectedPackage(
             String code,

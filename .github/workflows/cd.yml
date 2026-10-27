@@ -24,7 +24,7 @@ jobs:
     permissions:
       contents: read
       checks: write
-      pull-requests: write
+      security-events: write
 
   build-image:
     name: Build and push image
