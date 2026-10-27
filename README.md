@@ -387,7 +387,7 @@ mvn clean verify
 - The JaCoCo coverage report is written to `backend/target/site/jacoco/index.html`.
 - `backend/scripts/step2-smoke-test.ps1` is a PowerShell smoke test for a running local instance. Run `backend/scripts/dev/create-orphan-member.sql` first (local development only) so the orphan-member scenario can log in.
 
-CI (`.github/workflows/ci.yml`) checks conventions and migrations, runs separate non-Docker unit and mandatory SQL Server integration jobs with JDK 25, and runs frontend tests, lint and build. Test reports are uploaded as artifacts. See the workflow for triggers and exact commands.
+CI (`.github/workflows/ci.yml`) uses a conservative PR change-impact policy and an always-present aggregate gate. Relevant backend changes require all non-Docker unit and real SQL integration tests with JDK 25; relevant frontend changes require all frontend tests, lint, typecheck/build and security checks. Main/manual/release/weekly runs are full. Security and Compose are required reusable children when applicable. Test reports are artifacts. See `docs/CI-OPT-01.md` for exact routing, failure handling and required-status enforcement.
 
 ## Development Guidelines
 

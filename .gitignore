@@ -54,6 +54,7 @@ node_modules/
 dist/
 .vite/
 npm-debug.log*
+/frontend/vitest-results.json
 
 # OS generated files
 .DS_Store
@@ -70,6 +71,13 @@ __pycache__/
 !scripts/ci/check-test-reports.py
 !scripts/ci/test_report_guard.py
 !scripts/ci/test_compose_smoke.py
+!scripts/ci/impact.py
+!scripts/ci/gate.py
+!scripts/ci/verify_package.py
+!scripts/ci/test_impact_gate.py
+!scripts/ci/test_verify_package.py
+!scripts/ci/test_workflow_contract.py
+!scripts/ci/test_summary.py
 # Frontend browser checks (Playwright) referenced from frontend/docs test cases
 !frontend/scripts/*.py
 *.py[cod]
