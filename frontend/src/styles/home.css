@@ -86,7 +86,7 @@
 .home-header { position: absolute; inset: 0 0 auto; z-index: var(--z-header); color: #ffffff; }
 .home-header__bar { display: flex; align-items: center; gap: 32px; min-height: 96px; padding-left: 0; }
 .home-header .brand { flex: none; gap: 20px; color: #ffffff; }
-.home-header .brand__mark { width: 96px; height: 96px; border-radius: 0; background: var(--h-primary); color: #ffffff; font: italic 800 48px/1 var(--h-display); }
+.home-header .brand__mark { width: 96px; height: 96px; border-radius: 0; background: var(--color-brand-mark); color: #ffffff; font: italic 800 48px/1 var(--h-display); }
 .home-header .brand__name { color: #ffffff; font: italic 800 30px/1 var(--h-display); letter-spacing: 0.08em; text-transform: uppercase; }
 .home-nav { display: flex; align-items: center; gap: 32px; margin-left: auto; }
 .home-nav a { position: relative; padding-block: 8px; color: #ffffff; font-weight: 600; letter-spacing: 0.06em; text-decoration: none; }

@@ -709,19 +709,20 @@
 
 .workspace-header .user-menu__logout {
   margin-left: 0;
-  padding: 8px 0 8px 10px;
-  border: 0;
+  padding: 8px 14px;
+  border: 1px solid currentColor;
   border-radius: 0;
   background: transparent;
   color: var(--color-on-hero);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
-  transition: color 0.18s ease;
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
 }
 
 .workspace-header .user-menu__logout:hover {
-  background: transparent;
-  color: var(--workspace-gold);
+  border-color: var(--color-on-hero);
+  background: color-mix(in srgb, var(--color-on-hero) 12%, transparent);
+  color: var(--color-on-hero);
 }
 
 .workspace-header__context {
@@ -808,14 +809,14 @@
 
 .staff-layout .sidebar {
   position: sticky;
-  top: 76px;
+  top: 77px;
   z-index: calc(var(--z-header) - 1);
   grid-column: 1;
   grid-row: 2;
   align-self: start;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 76px);
+  height: calc(100vh - 77px);
   padding: var(--space-5) var(--space-4);
   background: linear-gradient(180deg, var(--workspace-navy), var(--workspace-nav));
   border-right: 1px solid var(--workspace-border);
@@ -947,6 +948,22 @@
     order: 2;
     flex: 1;
     margin-left: auto;
+  }
+
+  .staff-layout .workspace-header .home-header__bar {
+    flex-wrap: nowrap;
+    gap: clamp(10px, 1.25vw, 18px);
+    min-height: 76px;
+    padding-block: 10px;
+  }
+
+  .staff-layout .workspace-header__account.home-account {
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .staff-layout .workspace-header__context {
+    flex: 1 1 0;
   }
 }
 

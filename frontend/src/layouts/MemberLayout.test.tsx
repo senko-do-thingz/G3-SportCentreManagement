@@ -46,6 +46,9 @@ describe('member header style isolation', () => {
     expect(userBar).not.toBeNull()
     expect(getComputedStyle(userBar!).display).toBe('flex')
     expect(within(header).getByRole('button', { name: /Switch to .* mode/ })).toHaveClass('home-theme')
+    expect(getComputedStyle(logout).borderTopStyle).toBe('solid')
+    expect(getComputedStyle(logout).borderTopWidth).toBe('1px')
+    expect(getComputedStyle(logout).borderTopLeftRadius).toBe('0')
     expect(within(header).queryByLabelText('Appearance')).not.toBeInTheDocument()
     expect(userBar).toContainElement(navigation)
     expect(within(navigation).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page')
@@ -92,11 +95,13 @@ describe('member header style isolation', () => {
       root.removeAttribute('data-theme')
       expect(getComputedStyle(header).getPropertyValue('--workspace-navy').trim()).toBe('var(--color-hero)')
       expect(getComputedStyle(root).getPropertyValue('--color-hero').trim()).toBe('#0b1736')
+      expect(getComputedStyle(root).getPropertyValue('--color-brand-mark').trim()).toBe('#1f4fd8')
       expect(getComputedStyle(sidebar).getPropertyValue('--workspace-gold').trim()).toBe('var(--color-hero-highlight)')
 
       root.setAttribute('data-theme', 'dark')
       expect(getComputedStyle(header).getPropertyValue('--workspace-navy').trim()).toBe('var(--color-hero)')
       expect(getComputedStyle(root).getPropertyValue('--color-hero').trim()).toBe('#060b18')
+      expect(getComputedStyle(root).getPropertyValue('--color-brand-mark').trim()).toBe('#1f4fd8')
       expect(getComputedStyle(sidebar).getPropertyValue('--workspace-gold').trim()).toBe('var(--color-hero-highlight)')
     } finally {
       shell.remove()
