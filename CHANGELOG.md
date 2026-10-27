@@ -1,5 +1,6 @@
 ## 2026-10-27 - Selective and fail-closed CI (CI-OPT-01)
 
+- Round 2: preserve explicit CodeQL baseline categories across reusable callers; document independent owner verification for the app-bound, strict CI gate ruleset and a separate financial SQL follow-up.
 - Route PR checks from immutable merge-base path impact; unknown changes run the conservative full graph. Main, release, manual and weekly runs stay full.
 - Require validated child results, including Security and Compose, at the stable CI gate. Remove advisory dependency review and add frontend CodeQL/audit coverage.
 - Run backend unit and SQL integration independently; verify and reuse the integration-produced jar. Preserve all test isolation, financial migrations and assertions.

@@ -38,7 +38,10 @@ jobs:
       - name: Compile production and test sources for CodeQL tracing
         working-directory: backend
         run: mvn -B -ntp test-compile
+      # Match main's existing category even when CI is the workflow caller.
       - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          category: .github/workflows/security.yml:codeql
 
   frontend-codeql:
     name: Frontend CodeQL analysis
@@ -55,6 +58,8 @@ jobs:
           languages: javascript-typescript
           build-mode: none
       - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          category: .github/workflows/ci.yml:frontend-codeql
 
   dependency-review:
     name: Dependency review

@@ -87,5 +87,16 @@ class WorkflowContractTest(unittest.TestCase):
             self.assertIn('fail_on_parse_error: true',job)
             self.assertIn('require_tests: true',job)
 
+    def test_codeql_categories_preserve_main_baseline_across_reusable_callers(self):
+        java=self.security.split('  codeql:')[1].split('  frontend-codeql:')[0]
+        frontend=self.security.split('  frontend-codeql:')[1].split('  dependency-review:')[0]
+        # Preserve the exact historic default categories, independently of the caller path.
+        for job,category in [(java,'.github/workflows/security.yml:codeql'),
+                             (frontend,'.github/workflows/ci.yml:frontend-codeql')]:
+            self.assertRegex(job,r'uses: github/codeql-action/analyze@[^\n]+\n\s+with:\n\s+category: '+re.escape(category)+r'\n')
+        self.assertNotIn('CODEQL_ACTION_ANALYSIS_KEY',self.security)
+        self.assertNotIn('skip-queries:',self.security)
+        self.assertNotIn('upload: never',self.security)
+
 
 if __name__=='__main__':unittest.main()
