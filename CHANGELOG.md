@@ -1,3 +1,8 @@
+## 2026-10-27 - Backend response-write and catalog query maintenance (BE-MAINT-01)
+
+- Resolve confirmed client disconnects before generic JSON error advice, with framework DEBUG/TRACE diagnostics and no secondary response write. Genuine connected-client errors keep the existing error contract; unusable or committed server failures remain observable at ERROR.
+- Fetch the singular sport with the active-package catalog read. SQL Server regression fixtures cover 1, 3 and 20 distinct sports, unchanged DTO content/order, public coach batching and negative controls. See backend/docs/BE-MAINT-01-test-cases.md.
+
 ## 2026-10-24 - Refund request and review screens (UI-32)
 
 - Refund Requests and every refund state use the shared PaymentHero in the Home theme.
