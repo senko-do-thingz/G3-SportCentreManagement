@@ -301,3 +301,5 @@ class CashMigrationIntegrationTest {
         assertThat(byItem.collectionCount()).isEqualTo(1); assertThat(byItem.grossCashReceived()).isEqualByComparingTo("500.25");
     }
 }
+
+/* CI-OPT-01 routing acceptance probe backend; no behavior or assertion change. */
