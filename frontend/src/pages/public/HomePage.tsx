@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../../api/client'
 import type { CardTier } from '../../api/cardsApi'
@@ -18,7 +18,7 @@ import { Photo } from '../../media/Photo'
 import { HomeHeroVideo } from './HomeHeroVideo'
 import { HomeSelect } from './HomeSelect'
 import { HomeCoaches } from './HomeCoaches'
-import { revealHomeFaq } from './homeFaqNavigation'
+import { homeScrollBehavior, scrollHomeSection } from './homeSectionNavigation'
 import type { PublicCoach } from './homeCoachModel'
 import { buildVenueTiles, facilitySummary, isPublicFacility, type PublicFacility } from './homeFacilityModel'
 import '@fontsource/be-vietnam-pro/700.css'
@@ -82,12 +82,30 @@ export function HomePage() {
   const { role, status, user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const lastFragment = useRef<string | null>(null)
   useEffect(() => {
-    revealHomeFaq(location.hash, true)
-    const reveal = () => { revealHomeFaq(window.location.hash, true) }
+    const revealHash = (hash: string) => {
+      if (lastFragment.current === hash) return
+      // API-backed targets may arrive after the first render.
+      if (!hash || scrollHomeSection(hash)) lastFragment.current = hash
+    }
+    revealHash(location.hash)
+    const reveal = () => revealHash(window.location.hash)
     window.addEventListener('hashchange', reveal)
     return () => window.removeEventListener('hashchange', reveal)
-  }, [location.hash])
+  })
+  function followSection(event: MouseEvent<HTMLDivElement>) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return
+    const link = (event.target as Element).closest<HTMLAnchorElement>('a[href]')
+    if (!link || link.target || link.hasAttribute('download')) return
+    const url = new URL(link.href)
+    if (!link.getAttribute('href')?.startsWith('#') && (url.origin !== window.location.origin || url.pathname !== location.pathname || url.search !== location.search)) return
+    if (!url.hash) return
+    if (!scrollHomeSection(url.hash)) return
+    event.preventDefault()
+    lastFragment.current = url.hash
+    if (location.hash !== url.hash) navigate(location.pathname + location.search + url.hash, { state: location.state })
+  }
   const [sports, retrySports] = useResource(loadSports)
   const [packages, retryPackages] = useResource(loadPackages)
   const [facilities, retryFacilities] = useResource(loadFacilities)
@@ -124,8 +142,7 @@ export function HomePage() {
     const record = sportFor(name)
     if (record) changeFinder('sportId', String(record.id))
     const section = document.getElementById('finder')
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    section?.scrollIntoView?.({ behavior: reduce ? 'auto' : 'smooth', block: 'center' })
+    section?.scrollIntoView?.({ behavior: homeScrollBehavior(), block: 'start' })
     section?.querySelector<HTMLButtonElement>('.home-select__button')?.focus({ preventScroll: true })
   }
 
@@ -167,7 +184,7 @@ export function HomePage() {
   }
 
   return (
-    <div className="home-page">
+    <div className="home-page" onClick={followSection}>
       <a className="home-skip" href="#main-content">Skip to content</a>
       <HomeHeader groups={[
         { label: 'Sports', href: '#sports', children: HOME_SPORTS.map((sport) => ({ label: sport.name, href: `#home-sport-${sport.name.toLowerCase()}` })) },
@@ -223,7 +240,7 @@ export function HomePage() {
               event.preventDefault()
               requestMemberAction(classPath(sportId, format))
             }}>
-              <HomeSelect layout="grid" label="Sport" placeholder="All sports" value={sportId} options={catalogSports.map((sport) => ({ value: String(sport.id), label: sport.name }))} onChange={(value) => changeFinder('sportId', value)} />
+              <HomeSelect sports label="Sport" placeholder="All sports" value={sportId} options={catalogSports.map((sport) => ({ value: String(sport.id), label: sport.name }))} onChange={(value) => changeFinder('sportId', value)} />
               <HomeSelect label="Level" placeholder="All levels" value={level} options={BROWSE_LEVELS} onChange={(value) => changeFinder('level', value)} />
               <HomeSelect label="Training" placeholder="Any format" value={format} options={FORMAT_OPTIONS} onChange={(value) => changeFinder('format', value)} />
               <Button type="submit" disabled={status === 'loading'}>Find classes</Button>

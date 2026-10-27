@@ -4,6 +4,7 @@ python scripts/home-ui-check.py --base http://127.0.0.1:4173 --out <private-arti
 Uses real Playwright mouse, keyboard and touchscreen events. No production account is used.
 """
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -35,54 +36,74 @@ def main():
     parser.add_argument('--base', default='http://127.0.0.1:4173')
     parser.add_argument('--out', required=True)
     parser.add_argument('--channel', default='msedge')
+    parser.add_argument('--case', help='Development-only regex subset; omit for the full regression')
+    parser.add_argument('--live-api', action='store_true', help='Also verify the existing backend without API interception')
+    parser.add_argument('--live-origin', help='Optional allowed browser origin; bridge only frontend assets from --base, never API requests')
     args = parser.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
     dirty = bool(subprocess.check_output(['git', 'status', '--porcelain'], text=True).strip())
-    report = {'sha': sha, 'dirty': dirty, 'capturedAt': datetime.now(timezone.utc).isoformat(), 'cases': [], 'screenshots': [], 'contrast': [], 'notRun': ['Native browser zoom 200%', 'Assistive technology speech output']}
+    report = {'sha': sha, 'dirty': dirty, 'capturedAt': datetime.now(timezone.utc).isoformat(), 'cases': [], 'screenshots': [], 'contrast': [], 'selection': args.case, 'console': [], 'notRun': ['Native browser zoom 200%', 'Assistive technology speech output']}
+    report['buildAssets'] = {str(p.relative_to(Path('dist'))): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in [Path('dist/index.html'), *Path('dist/assets').glob('index-*.js'), *Path('dist/assets').glob('index-*.css')] if p.is_file()}
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(channel=args.channel, headless=True)
         report['browser'] = f'{args.channel} {browser.version}'
 
-        def page_for(width=1440, height=900, theme='light', growth=0, touch=False, member=False, media=False, fragment=''):
-            context = browser.new_context(viewport={'width': width, 'height': height}, reduced_motion='no-preference' if media else 'reduce', has_touch=touch, is_mobile=touch)
+        def page_for(width=1440, height=900, theme='light', growth=0, touch=False, member=False, media=False, fragment='', motion='reduce', api_mode='success'):
+            context = browser.new_context(viewport={'width': width, 'height': height}, reduced_motion='no-preference' if media else motion, has_touch=touch, is_mobile=touch)
             seed = {'sportify.themePreference': theme}
             if member:
                 seed.update({'sportify.accessToken': 'home-ui-fixture', 'sportify.refreshToken': 'fixture-refresh', 'sportify.sessionId': 'home-ui-fixture'})
             context.add_init_script(f'for (const [key, value] of Object.entries({json.dumps(seed)})) if (localStorage.getItem(key) === null) localStorage.setItem(key, value)')
             sports = SPORTS + [{'id': 7 + i, 'code': f'FUTURE_{i}', 'name': f'Future sport {i + 1}'} for i in range(growth)]
 
+            sports_calls = 0
             def api(route):
+                nonlocal sports_calls
                 path = urlparse(route.request.url).path.split('/api/v1')[-1]
                 body = {
                     '/sports': sports, '/coaches/public': COACHES, '/packages': [],
                     '/membership-cards/tiers': [], '/facilities/public': [], '/users/me': MEMBER,
                     '/sessions': {'content': [], 'page': 0, 'size': 20, 'totalElements': 0, 'totalPages': 0},
                 }.get(path, [])
+                if api_mode == 'empty': body = []
+                if path == '/sports':
+                    sports_calls += 1
+                    if api_mode == 'retry' and sports_calls == 1:
+                        route.fulfill(status=503, json={'message': 'Synthetic unavailable fixture'})
+                        return
                 route.fulfill(status=200, json=body, headers={'Access-Control-Allow-Origin': '*'})
             context.route('**/api/v1/**', api)
             context.route('https://images.unsplash.com/**', lambda route: route.abort())
             if not media:
                 context.route('https://assets.mixkit.co/**', lambda route: route.abort())
             page = context.new_page()
+            page.on('console', lambda message: report['console'].append({'type': message.type, 'text': message.text, 'url': page.url}) if message.type in ['warning', 'error'] else None)
+            page.on('pageerror', lambda error: report['console'].append({'type':'uncaught', 'text':str(error), 'url':page.url}))
             page.set_default_timeout(7000)
             page.goto(args.base.rstrip('/') + '/' + fragment, wait_until='load')
             expect(page.get_by_role('button', name='Sport All sports')).to_be_visible()
-            expect(page.get_by_role('button', name='View profile of Demo Coach')).to_have_count(1)
+            if api_mode != 'empty': expect(page.get_by_role('button', name='View profile of Demo Coach')).to_have_count(1)
             page.evaluate('document.fonts.ready')
             return context, page
 
         def case(name, fn):
+            if args.case and not re.search(args.case, name): return
             start = time.monotonic()
+            console_start = len(report['console'])
             try:
                 details = fn()
+                assert not any(item['type']=='uncaught' for item in report['console'][console_start:]), report['console'][console_start:]
                 report['cases'].append({'name': name, 'status': 'PASS', 'details': details, 'seconds': round(time.monotonic() - start, 2)})
                 print(f'PASS {name}', flush=True)
             except Exception as error:
                 report['cases'].append({'name': name, 'status': 'FAIL', 'error': str(error), 'traceback': traceback.format_exc()})
                 print(f'FAIL {name}: {error}', flush=True)
+                if browser.contexts and browser.contexts[-1].pages:
+                    browser.contexts[-1].pages[-1].screenshot(path=str(out / f'FAIL-{name}.png'))
             finally:
                 for context in list(browser.contexts):
                     context.close()
@@ -110,21 +131,22 @@ def main():
                 snapshot(page, name, theme, width)
             if width <= 1100:
                 page.get_by_role('button', name='Menu', exact=True).click()
-            page.get_by_role('navigation', name='Home navigation').get_by_role('link', name='Sports', exact=True).click()
+            page.get_by_role('navigation', name='Home navigation').get_by_role('button', name='Sports', exact=True).click()
+            page.get_by_role('navigation', name='Home navigation').get_by_role('link', name='All sports', exact=True).click()
             page.wait_for_timeout(100)
             assert page.locator('#sports').bounding_box()['y'] >= header.bounding_box()['height']
             snapshot(page, 'anchor', theme, width)
             return 'Fixed header at 0, one viewport and bottom; section heading visible; no horizontal overflow'
 
         for theme in ['light', 'dark']:
-            for width in [390, 768, 1440]:
+            for width in [320, 390, 768, 1440]:
                 case(f'header-{theme}-{width}', lambda w=width, t=theme: header_matrix(w, t))
 
         def nav_interactions():
             _, page = page_for()
             nav = page.get_by_role('navigation', name='Home navigation')
-            parent = nav.get_by_role('link', name='Sports', exact=True)
-            toggle = nav.get_by_role('button', name='Toggle Sports destinations')
+            parent = nav.get_by_role('button', name='Sports', exact=True)
+            toggle = nav.get_by_role('button', name='Sports', exact=True)
             parent.hover()
             expect(toggle).to_have_attribute('aria-expanded', 'true')
             child = nav.get_by_role('link', name='Football', exact=True)
@@ -142,11 +164,12 @@ def main():
                 page.keyboard.press('Tab')
             expect(parent).to_be_focused()
             expect(toggle).to_have_attribute('aria-expanded', 'true')
-            page.keyboard.press('Tab')
-            expect(toggle).to_be_focused()
+            assert toggle.inner_text() == 'Sports' and toggle.locator('span, svg').count() == 0
             page.keyboard.press('Space')
             expect(toggle).to_have_attribute('aria-expanded', 'false')
             page.keyboard.press('Enter')
+            page.keyboard.press('Tab')
+            expect(nav.get_by_role('link', name='All sports', exact=True)).to_be_focused()
             page.keyboard.press('Tab')
             expect(child).to_be_focused()
             page.keyboard.press('Escape')
@@ -166,7 +189,7 @@ def main():
             nav = page.get_by_role('navigation', name='Home navigation')
             count = 0
             for name in ['Sports', 'Coaches', 'Packages', 'FAQ']:
-                parent = nav.get_by_role('link', name=name, exact=True)
+                parent = nav.get_by_role('button', name=name, exact=True)
                 parent.hover()
                 links = nav.get_by_role('list', name=f'{name} destinations').get_by_role('link')
                 targets = [(link.inner_text(), link.get_attribute('href')) for link in links.all()]
@@ -178,7 +201,7 @@ def main():
                     if href.startswith('#home-faq-'):
                         expect(target.locator('p')).to_be_visible()
                     assert target.bounding_box()['y'] >= page.locator('.home-header').bounding_box()['height'] - 1, href
-                    expect(nav.get_by_role('button', name=f'Toggle {name} destinations')).to_have_attribute('aria-expanded', 'false')
+                    expect(nav.get_by_role('button', name=name, exact=True)).to_have_attribute('aria-expanded', 'false')
                     count += 1
             return f'{count} real content destinations navigated'
         case('all-child-destinations', child_destinations)
@@ -186,7 +209,7 @@ def main():
         def touch_navigation():
             _, page = page_for(width=390, height=844, touch=True)
             page.get_by_role('button', name='Menu', exact=True).tap()
-            toggle = page.get_by_role('button', name='Toggle Sports destinations')
+            toggle = page.get_by_role('button', name='Sports', exact=True)
             toggle.tap()
             expect(toggle).to_have_attribute('aria-expanded', 'true')
             snapshot(page, 'touch-submenu', 'light', 390)
@@ -216,23 +239,21 @@ def main():
             for attempt in range(2):
                 if mode == 'touch':
                     page.get_by_role('button', name='Menu', exact=True).tap()
-                    nav.get_by_role('button', name='Toggle FAQ destinations').tap()
+                    nav.get_by_role('button', name='FAQ', exact=True).tap()
                     nav.get_by_role('link', name=question, exact=True).tap()
                 elif mode == 'keyboard':
-                    parent = nav.get_by_role('link', name='FAQ', exact=True)
+                    parent = nav.get_by_role('button', name='FAQ', exact=True)
                     for _ in range(100):
                         if parent.evaluate('(e) => e === document.activeElement'):
                             break
                         page.keyboard.press('Tab')
                     expect(parent).to_be_focused()
-                    page.keyboard.press('Tab')
-                    expect(nav.get_by_role('button', name='Toggle FAQ destinations')).to_be_focused()
-                    for _ in range(3):
+                    for _ in range(4):
                         page.keyboard.press('Tab')
                     expect(nav.get_by_role('link', name=question, exact=True)).to_be_focused()
                     page.keyboard.press('Enter')
                 else:
-                    nav.get_by_role('link', name='FAQ', exact=True).hover()
+                    nav.get_by_role('button', name='FAQ', exact=True).hover()
                     nav.get_by_role('link', name=question, exact=True).click()
                 expect(page).to_have_url(re.compile('#home-faq-2$'))
                 faq_visible(page, 2)
@@ -267,80 +288,60 @@ def main():
         for width in [320, 390, 1440]:
             case(f'faq-direct-hash-{width}', lambda w=width: faq_hash(w))
 
-        def grid_directions(width, count):
-            _, page = page_for(width=width, height=540 if width < 768 else 900, growth=count - 7)
+        def list_directions(width, count, theme):
+            _, page = page_for(width=width, height=640 if width == 320 else 844 if width == 390 else 900, growth=count - 7, theme=theme)
             page.evaluate('window.homeUiSubmits=0; document.querySelector(".home-finder form").addEventListener("submit",()=>window.homeUiSubmits++)')
             trigger = page.get_by_role('button', name=re.compile('^Sport '))
             trigger.click()
-            page.keyboard.press('Escape')
-            page.mouse.move(1, 1)
-            page.keyboard.press('ArrowDown')
+            page.wait_for_timeout(300)
             menu = page.get_by_role('listbox', name='Sport', exact=True)
             options = menu.get_by_role('option')
             expect(options).to_have_count(count)
-            trace = []
-
+            trace=[]
             def active(index, key):
-                option = options.nth(index)
+                option=options.nth(index)
                 expect(menu).to_have_attribute('aria-activedescendant', option.get_attribute('id'))
                 expect(menu).to_be_focused()
-                box = option.bounding_box()
-                trace.append({'key': key, 'index': index, 'label': option.inner_text(), 'box': box, 'scrollTop': menu.evaluate('(e)=>e.scrollTop')})
+                box=option.bounding_box()
+                trace.append({'key':key,'index':index,'box':box,'scrollTop':menu.evaluate('(e)=>e.scrollTop')})
                 return box
-
-            start = active(0, 'open')
+            start=active(0,'open')
             page.keyboard.press('ArrowDown')
-            down = active(2, 'ArrowDown')
-            assert down['y'] > start['y'] and abs(down['x'] - start['x']) < 1
-            page.keyboard.press('ArrowRight')
-            right = active(3, 'ArrowRight')
-            assert right['x'] > down['x'] and abs(right['y'] - down['y']) < 1
-            page.keyboard.press('ArrowRight')
-            active(3, 'ArrowRight at row edge')
-            page.keyboard.press('ArrowLeft')
-            active(2, 'ArrowLeft')
-            page.keyboard.press('ArrowUp')
-            active(0, 'ArrowUp')
-            page.keyboard.press('ArrowUp')
-            page.keyboard.press('ArrowLeft')
-            active(0, 'top/left edges')
-            snapshot(page, f'direction-{count}-first-rows', 'light', width)
-            page.keyboard.press('End')
-            last = active(count - 1, 'End')
-            rect = menu.bounding_box()
-            assert last['y'] >= rect['y'] and last['y'] + last['height'] <= rect['y'] + rect['height'] + 1
-            snapshot(page, f'direction-{count}-last-row', 'light', width)
-            for key in ['ArrowDown', 'ArrowRight', 'ArrowLeft']:
-                page.keyboard.press(key)
-                active(count - 1, key + ' at odd last row')
-            page.keyboard.press('ArrowUp')
-            active(count - 3, 'ArrowUp from last row')
-            page.keyboard.press('ArrowRight')
-            active(count - 2, 'ArrowRight to last occupied right cell')
-            page.keyboard.press('ArrowDown')
-            active(count - 2, 'ArrowDown toward missing cell')
-            expect(options.first).to_have_attribute('aria-selected', 'true')
+            down=active(1,'ArrowDown')
+            assert down['y'] > start['y'] and abs(down['x']-start['x']) < 1
+            for key in ['ArrowRight','ArrowLeft']:
+                page.keyboard.press(key); active(1,key+' ignored')
+            page.keyboard.press('ArrowUp'); active(0,'ArrowUp')
+            page.keyboard.press('ArrowUp'); active(0,'top boundary')
+            boxes=[o.bounding_box() for o in options.all()]
+            assert all(abs(b['x']-boxes[0]['x'])<1 for b in boxes)
+            assert all(boxes[i+1]['y']>boxes[i]['y'] for i in range(count-1))
+            assert abs(menu.bounding_box()['width']-trigger.bounding_box()['width'])<2
+            assert menu.bounding_box()['y'] >= trigger.bounding_box()['y']+trigger.bounding_box()['height']+1
+            assert menu.evaluate('(e)=>getComputedStyle(e).position')=='absolute'
+            snapshot(page,f'list-{count}',theme,width)
+            page.keyboard.press('End'); last=active(count-1,'End')
+            rect=menu.bounding_box()
+            assert last['y']>=rect['y'] and last['y']+last['height']<=rect['y']+rect['height']+1
+            for key in ['ArrowDown','ArrowLeft','ArrowRight']:
+                page.keyboard.press(key); active(count-1,key+' at end')
+            snapshot(page,f'list-{count}-last',theme,width)
+            page.keyboard.press('ArrowUp'); active(count-2,'ArrowUp from end')
+            expect(options.first).to_have_attribute('aria-selected','true')
             expect(trigger).to_have_text('All sports')
-            page.keyboard.press('Home')
-            active(0, 'Home')
-            page.keyboard.press('ArrowRight')
-            page.keyboard.press('Enter')
-            expect(trigger).to_have_text('Football')
-            expect(trigger).to_be_focused()
-            trigger.click()
-            expect(page.get_by_role('option', name='Football', exact=True)).to_have_attribute('aria-selected', 'true')
-            page.keyboard.press('Escape')
-            expect(trigger).to_be_focused()
-            trigger.click()
-            page.keyboard.press('Tab')
-            expect(page.get_by_role('button', name='Level All levels')).to_be_focused()
-            assert page.get_by_role('listbox').count() == 0
-            assert page.evaluate('window.homeUiSubmits') == 0
-            assert urlparse(page.url).path == '/' and page.get_by_role('dialog').count() == 0
-            return {'count': count, 'trace': trace, 'submitted': 0}
-        for width in [320, 390, 1440]:
-            for count in [7, 31]:
-                case(f'grid-directions-{width}-{count}', lambda w=width, c=count: grid_directions(w, c))
+            page.keyboard.press('Home'); active(0,'Home')
+            page.keyboard.press('ArrowDown'); page.keyboard.press('Enter')
+            expect(trigger).to_have_text('Football'); expect(trigger).to_be_focused()
+            trigger.click(); expect(page.get_by_role('option',name='Football',exact=True)).to_have_attribute('aria-selected','true')
+            page.keyboard.press('Escape'); expect(trigger).to_be_focused()
+            trigger.click(); page.keyboard.press('Tab')
+            expect(page.get_by_role('button',name='Level All levels')).to_be_focused()
+            assert page.get_by_role('listbox').count()==0 and page.evaluate('window.homeUiSubmits')==0
+            return {'count':count,'theme':theme,'trace':trace,'submitted':0}
+        for theme in ['light','dark']:
+            for width in [320,390,768,1440]:
+                for count in [7,31]:
+                    case(f'list-directions-{theme}-{width}-{count}',lambda w=width,c=count,t=theme:list_directions(w,c,t))
 
         def filters(width=1440, height=900, growth=0):
             _, page = page_for(width=width, height=height, growth=growth)
@@ -355,11 +356,9 @@ def main():
             assert geometry['rect']['bottom'] <= height + 1
             if width == 1440 and height == 900 and not growth:
                 assert geometry['scroll'] <= geometry['height'] + 1, geometry
-            if width > 640:
-                for selector in ['.home-finder .btn', '.home-select:nth-child(2)', '.home-select:nth-child(3)']:
-                    other = page.locator(selector).bounding_box()
-                    rect = geometry['rect']
-                    assert not (rect['x'] < other['x'] + other['width'] and rect['right'] > other['x'] and rect['y'] < other['y'] + other['height'] and rect['bottom'] > other['y']), selector
+            trigger_box=trigger.bounding_box()
+            assert geometry['placement']=='below'
+            assert geometry['rect']['y'] >= trigger_box['y']+trigger_box['height']
             snapshot(page, f'filter-{height}-growth-{growth}', 'light', width)
             page.keyboard.press('End')
             last = menu.get_by_role('option').last
@@ -378,15 +377,29 @@ def main():
         for width, height, growth in [(1440, 900, 0), (768, 900, 0), (390, 540, 0), (1440, 480, 0), (1440, 900, 24), (320, 640, 24)]:
             case(f'filter-{width}-{height}-growth-{growth}', lambda w=width, h=height, g=growth: filters(w, h, g))
 
-        def above_placement():
-            _, page = page_for()
-            page.locator('#finder').evaluate('(e) => scrollBy(0,e.getBoundingClientRect().top-(innerHeight-150))')
-            page.get_by_role('button', name='Sport All sports').click()
-            menu = page.get_by_role('listbox', name='Sport', exact=True)
-            expect(menu).to_have_attribute('data-placement', 'above')
-            assert menu.evaluate('(e) => e.scrollHeight <= e.clientHeight + 1')
-            snapshot(page, 'filter-above', 'light', 1440)
-        case('filter-repositions-above', above_placement)
+        def below_placement(width, height, motion):
+            _,page=page_for(width=width,height=height,motion=motion)
+            trigger=page.get_by_role('button',name=re.compile('^Sport '))
+            trigger.evaluate('(e)=>scrollBy(0,e.getBoundingClientRect().bottom-(innerHeight-32))')
+            before=page.evaluate('scrollY')
+            trigger.click()
+            page.wait_for_timeout(800)
+            menu=page.get_by_role('listbox',name='Sport',exact=True)
+            rect=menu.bounding_box(); anchor=trigger.bounding_box(); after=page.evaluate('scrollY')
+            assert rect['y']>=anchor['y']+anchor['height'] and rect['y']+rect['height']<=height+1
+            assert 0 < after-before <= min(360,height*.4)+2
+            expect(menu).to_have_attribute('data-placement','below')
+            page.evaluate('scrollBy(0,32)'); page.wait_for_timeout(120)
+            assert abs(menu.bounding_box()['y']-trigger.bounding_box()['y']-trigger.bounding_box()['height']-8)<2
+            page.keyboard.press('End'); page.keyboard.press('Enter')
+            expect(trigger).to_have_text('Tennis'); expect(trigger).to_be_focused()
+            trigger.click(); page.keyboard.press('Escape'); expect(trigger).to_be_focused()
+            trigger.click(); page.wait_for_timeout(250)
+            snapshot(page,'below-near-bottom-'+motion,'light',width)
+            return {'scrollAssist':after-before,'menu':rect,'trigger':anchor,'motion':motion}
+        for width,height in [(320,640),(390,844),(768,900),(1440,900),(1440,480)]:
+            for motion in ['reduce','no-preference']:
+                case(f'below-near-bottom-{width}-{height}-{motion}',lambda w=width,h=height,m=motion:below_placement(w,h,m))
 
         def selections():
             _, page = page_for(member=True)
@@ -429,7 +442,7 @@ def main():
                     ratio = contrast(item['fg'], item['bg'])
                     assert ratio >= 4.5, item
                     report['contrast'].append({'theme': theme, **item, 'ratio': ratio})
-                page.get_by_role('navigation', name='Home navigation').get_by_role('link', name='Sports', exact=True).hover()
+                page.get_by_role('navigation', name='Home navigation').get_by_role('button', name='Sports', exact=True).hover()
                 submenu = page.get_by_role('list', name='Sports destinations')
                 fg, bg = submenu.evaluate('(e) => [getComputedStyle(e.querySelector("a")).color,getComputedStyle(e).backgroundColor]')
                 assert contrast(fg, bg) >= 4.5
@@ -459,7 +472,7 @@ def main():
         def independence():
             _, page = page_for()
             page.get_by_role('button', name='Sport All sports').click()
-            page.get_by_role('navigation', name='Home navigation').get_by_role('link', name='Sports', exact=True).hover()
+            page.get_by_role('navigation', name='Home navigation').get_by_role('button', name='Sports', exact=True).hover()
             expect(page.get_by_role('listbox', name='Sport', exact=True)).to_be_visible()
             expect(page.get_by_role('list', name='Sports destinations', exact=True)).to_be_visible()
             page.mouse.click(1200, 600)
@@ -470,7 +483,7 @@ def main():
             _, page = page_for(width=320, height=640)
             assert page.locator('video').count() == 0
             page.get_by_role('button', name='Menu', exact=True).click()
-            page.get_by_role('button', name='Toggle FAQ destinations').click()
+            page.get_by_role('button', name='FAQ', exact=True).click()
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
             snapshot(page, 'reflow-menu', 'light', 320)
         case('reduced-motion-and-320-reflow', reduced_motion)
@@ -479,8 +492,108 @@ def main():
             _, page = page_for(member=True)
             expect(page.get_by_role('link', name='My workspace')).to_have_attribute('href', '/member')
             expect(page.get_by_role('button', name='Log out')).to_be_visible()
-            expect(page.get_by_role('navigation', name='Home navigation').get_by_role('link', name='Sports', exact=True)).to_be_visible()
+            expect(page.get_by_role('navigation', name='Home navigation').get_by_role('button', name='Sports', exact=True)).to_be_visible()
         case('authenticated-public-navigation', authenticated_header)
+
+        def smooth_navigation(motion):
+            _,page=page_for(motion=motion)
+            page.evaluate('''() => {window.homeScrollCalls=[];
+                const original=Element.prototype.scrollIntoView;
+                Element.prototype.scrollIntoView=function(options){window.homeScrollCalls.push({id:this.id,...options}); return original.call(this,options)} }''')
+            nav=page.get_by_role('navigation',name='Home navigation')
+            initial=page.evaluate('history.length')
+            nav.get_by_role('button',name='Sports',exact=True).hover()
+            nav.get_by_role('link',name='All sports',exact=True).click()
+            page.wait_for_timeout(30)
+            early=page.evaluate('scrollY')
+            page.wait_for_function('Math.abs(document.querySelector("#sports").getBoundingClientRect().top-document.querySelector(".home-header").getBoundingClientRect().height-20)<2')
+            final=page.evaluate('scrollY')
+            assert final>100
+            if motion=='reduce': assert abs(early-final)<1
+            else: assert early<final-2, (early,final)
+            calls=page.evaluate('window.homeScrollCalls')
+            assert len(calls)==1 and calls[0]['behavior']==('instant' if motion=='reduce' else 'smooth'),calls
+            assert page.evaluate('history.length')==initial+1
+            nav.get_by_role('button',name='Sports',exact=True).hover()
+            nav.get_by_role('link',name='All sports',exact=True).click()
+            assert page.evaluate('history.length')==initial+1
+            assert len(page.evaluate('window.homeScrollCalls'))==2
+            page.go_back(); expect(page).to_have_url(re.compile('/$'))
+            page.go_forward(); expect(page).to_have_url(re.compile('#sports$'))
+            page.wait_for_function('document.activeElement.id=="sports"')
+            nav.get_by_role('link',name='Home',exact=True).click()
+            page.wait_for_function('scrollY<1')
+            expect(page.locator('#main-content')).to_be_focused()
+            before=len(page.evaluate('window.homeScrollCalls'))
+            page.get_by_role('link',name='Photo credits').click()
+            expect(page).to_have_url(re.compile('/credits$'))
+            assert len(page.evaluate('window.homeScrollCalls'))==before
+            return {'motion':motion,'earlyY':early,'finalY':final,'calls':calls,'historyDelta':1}
+        for motion in ['reduce','no-preference']:
+            case(f'smooth-navigation-{motion}',lambda m=motion:smooth_navigation(m))
+
+        def catalog_state(mode):
+            _,page=page_for(api_mode=mode)
+            trigger=page.get_by_role('button',name='Sport All sports')
+            if mode=='retry':
+                notice=page.get_by_text('Sport filters are temporarily unavailable. You can still browse classes.')
+                expect(notice).to_be_visible()
+                notice.locator('..').get_by_role('button',name='Retry',exact=True).click()
+                expect(notice).to_have_count(0)
+            trigger.click()
+            expect(page.get_by_role('option')).to_have_count(1 if mode=='empty' else 7)
+            page.keyboard.press('Escape')
+            return 'Fixture '+mode+': API-driven count, independent fallback and Retry'
+        for mode in ['empty','retry']:
+            case(f'catalog-{mode}',lambda m=mode:catalog_state(m))
+
+        def live_api():
+            context=browser.new_context(viewport={'width':1440,'height':900},reduced_motion='reduce')
+            context.grant_permissions(['local-network-access'], origin=args.live_origin or args.base)
+            if args.live_origin:
+                origin=args.live_origin.rstrip('/')
+                def frontend_asset(route):
+                    response=route.fetch(url=args.base.rstrip('/')+route.request.url[len(origin):])
+                    route.fulfill(response=response)
+                context.route(origin+'/**',frontend_asset)
+            context.route('https://images.unsplash.com/**',lambda route:route.abort())
+            context.route('https://assets.mixkit.co/**',lambda route:route.abort())
+            page=context.new_page()
+            responses={}
+            errors=[]
+            def observed(response):
+                if '/api/v1/' in response.url:
+                    path=urlparse(response.url).path.split('/api/v1')[-1]
+                    try:
+                        body=response.json()
+                        responses[path]={'status':response.status,'count':len(body) if isinstance(body,list) else None,
+                            'allowOrigin':response.headers.get('access-control-allow-origin')}
+                    except Exception as error: errors.append(str(error))
+            page.on('response',observed)
+            page.on('requestfailed',lambda request:errors.append({'url':request.url,'failure':request.failure,'origin':request.headers.get('origin')}) if '/api/v1/' in request.url else None)
+            page.on('console',lambda message:errors.append(message.text) if message.type=='error' and ('CORS' in message.text or 'fetch' in message.text) else None)
+            page.on('pageerror',lambda error:errors.append(str(error)))
+            page.goto(args.live_origin or args.base,wait_until='networkidle')
+            for path in ['/sports','/packages','/coaches/public','/facilities/public','/membership-cards/tiers']:
+                assert path in responses and responses[path]['status']==200, {'responses':responses,'errors':errors}
+            assert not errors,errors
+            assert page.get_by_text(re.compile('temporarily unavailable')).count()==0
+            trigger=page.get_by_role('button',name='Sport All sports'); trigger.click()
+            expect(page.get_by_role('option')).to_have_count(responses['/sports']['count']+1)
+            options=page.get_by_role('option').all_inner_texts()
+            snapshot(page,'live-api-sports','light',1440)
+            page.keyboard.press('Escape')
+            expect(page.locator('#coaches button[aria-label^="View profile of "]')).to_have_count(responses['/coaches/public']['count'])
+            summary=page.locator('#facilities .home-head__sub').inner_text()
+            assert 'membership card' in summary
+            package_links=page.locator('#packages a[aria-label^="View options for "]').count()
+            if responses['/packages']['count']: assert package_links>0
+            assert page.locator('.home-cards').get_by_text('Save on every sport package.').count()==1
+            return {'responses':responses,'options':options,'coachCards':responses['/coaches/public']['count'],
+                'browserOrigin':args.live_origin or args.base,'frontendAssetSource':args.base,'apiInterception':False,
+                'facilitySummary':summary,'livePackageLinks':package_links,
+                'tiersRendering':'Current Home renders a generic membership message, not individual benefit rows; loaded without error only'}
+        if args.live_api: case('live-api-browser-integration',live_api)
 
         def real_video():
             _, page = page_for(media=True)

@@ -1,12 +1,11 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { homePathFor } from '../../auth/roles'
 import { useAuth } from '../../auth/useAuth'
 import { Brand } from '../../components/Brand'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { UserMenu } from '../../layouts/UserMenu'
 import { ThemeToggle } from '../../theme/ThemeToggle'
-import { revealHomeFaq } from './homeFaqNavigation'
 
 export interface HomeNavGroup {
   label: string
@@ -17,7 +16,6 @@ export interface HomeNavGroup {
 export function HomeHeader({ groups = [] }: { groups?: HomeNavGroup[] }) {
   const { status, user } = useAuth()
   const location = useLocation()
-  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [submenu, setSubmenu] = useState<string | null>(null)
   const [scrolled, setScrolled] = useState(false)
@@ -25,6 +23,7 @@ export function HomeHeader({ groups = [] }: { groups?: HomeNavGroup[] }) {
   const header = useRef<HTMLElement>(null)
   const sentinel = useRef<HTMLSpanElement>(null)
   const pointerFocus = useRef(false)
+  const pointerType = useRef('')
 
   useEffect(() => {
     const element = header.current
@@ -55,19 +54,6 @@ export function HomeHeader({ groups = [] }: { groups?: HomeNavGroup[] }) {
     setSubmenu(null)
   }
   function close() { setOpen(false); setSubmenu(null) }
-  function followSection(event: MouseEvent<HTMLAnchorElement>) {
-    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return
-    const hash = event.currentTarget.hash
-    if (revealHomeFaq(hash, true)) {
-      // Native fragment navigation can override summary focus with the details element.
-      event.preventDefault()
-      if (location.hash !== hash) navigate(location.pathname + location.search + hash, { state: location.state })
-    } else {
-      const target = document.getElementById(hash.slice(1))
-      if (target) { target.tabIndex = -1; target.focus({ preventScroll: true }) }
-    }
-    close()
-  }
 
   return (
     <>
@@ -101,14 +87,14 @@ export function HomeHeader({ groups = [] }: { groups?: HomeNavGroup[] }) {
             }
           }}
         >
-          <Link to="/" aria-current="page" onClick={close}>Home</Link>
+          <a href="#main-content" aria-current="page" onClick={close}>Home</a>
           {groups.map((group) => {
             const expanded = submenu === group.label
             const id = `home-submenu-${group.label}`
             return <div className="home-nav__group" key={group.label}
               onPointerEnter={(event) => { if (event.pointerType === 'mouse' && group.children.length) setSubmenu(group.label) }}
               onPointerLeave={(event) => { if (event.pointerType === 'mouse') setSubmenu((current) => current === group.label ? null : current) }}
-              onPointerDown={() => { pointerFocus.current = true }}
+              onPointerDown={(event) => { pointerFocus.current = true; pointerType.current = event.pointerType }}
               onFocus={(event) => {
                 if (!pointerFocus.current && !event.currentTarget.contains(event.relatedTarget as Node) && group.children.length) setSubmenu(group.label)
               }}
@@ -116,15 +102,24 @@ export function HomeHeader({ groups = [] }: { groups?: HomeNavGroup[] }) {
                 pointerFocus.current = false
                 if (!event.currentTarget.contains(event.relatedTarget as Node)) setSubmenu((current) => current === group.label ? null : current)
               }}>
-              <div className="home-nav__parent">
-                <a href={group.href} onClick={followSection}>{group.label}</a>
-                {group.children.length > 0 && <button type="button" className="home-nav__toggle" aria-label={`Toggle ${group.label} destinations`} aria-expanded={expanded} aria-controls={id}
-                  onClick={() => { pointerFocus.current = false; setSubmenu(expanded ? null : group.label) }}>
-                  <span aria-hidden="true">{expanded ? '-' : '+'}</span>
-                </button>}
-              </div>
+              {group.children.length > 0 ? <button type="button" className="home-nav__toggle" aria-expanded={expanded} aria-controls={id}
+                onClick={() => {
+                  setSubmenu(pointerFocus.current && pointerType.current === 'mouse' ? group.label : expanded ? null : group.label)
+                  pointerFocus.current = false
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+                  event.preventDefault()
+                  setSubmenu(group.label)
+                  const first = event.key === 'ArrowDown'
+                  requestAnimationFrame(() => {
+                    const links = header.current?.querySelector(`#${id}`)?.querySelectorAll<HTMLAnchorElement>('a')
+                    links?.[first ? 0 : links.length - 1]?.focus()
+                  })
+                }}>{group.label}</button> : <a href={group.href} onClick={close}>{group.label}</a>}
               {group.children.length > 0 && <ul id={id} className="home-nav__submenu" hidden={!expanded} aria-label={`${group.label} destinations`}>
-                {group.children.map((child) => <li key={child.href}><a href={child.href} onClick={followSection}>{child.label}</a></li>)}
+                <li><a href={group.href} onClick={close}>All {group.label.toLowerCase()}</a></li>
+                {group.children.map((child) => <li key={child.href}><a href={child.href} onClick={close}>{child.label}</a></li>)}
               </ul>}
             </div>
           })}

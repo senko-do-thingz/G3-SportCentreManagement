@@ -1,3 +1,10 @@
+## 2026-10-27 - Home acceptance remediation (HOME-UI Round 3)
+
+- Remove navigation expansion decorations while retaining label disclosures, section destinations, hover, keyboard and touch access.
+- Smooth Home fragment navigation uses the measured header offset and respects reduced motion, FAQ expansion, focus and history.
+- Restore the API-driven Sports selector to one column, attached below its trigger. Bounded page scroll assistance and an internal-scroll fallback keep larger catalogues reachable without upward flipping. Level and Training retain their existing policy.
+- Existing Home branding/colors are preserved. The separate UI-00 design-contract exception remains pending owner approval.
+
 ## 2026-10-27 - Backend response-write and catalog query maintenance (BE-MAINT-01)
 
 - Resolve confirmed client disconnects before generic JSON error advice, with framework DEBUG/TRACE diagnostics and no secondary response write. Genuine connected-client errors keep the existing error contract; unusable or committed server failures remain observable at ERROR.

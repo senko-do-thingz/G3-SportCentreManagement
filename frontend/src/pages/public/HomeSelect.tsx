@@ -1,4 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { homeScrollBehavior } from './homeSectionNavigation'
 
 export interface HomeSelectOption { value: string; label: string }
 
@@ -8,22 +9,22 @@ interface HomeSelectProps {
   value: string
   options: readonly HomeSelectOption[]
   onChange: (value: string) => void
-  layout?: 'list' | 'grid'
+  sports?: boolean
 }
 
 /**
  * Themed single-select for the Home class finder (listbox pattern).
- * List mode moves by one option vertically. The two-column grid moves by row vertically and within a row horizontally.
- * Grid edges do not wrap; a missing cell in the final row leaves focus in its column. Home/End reach every option.
+ * All filters use a single vertical list with nonwrapping Up/Down and Home/End navigation.
  * Selection remains separate from active-descendant navigation. Enter/Space select; Escape closes.
  */
-export function HomeSelect({ label, placeholder, value, options, onChange, layout = 'list' }: HomeSelectProps) {
+export function HomeSelect({ label, placeholder, value, options, onChange, sports = false }: HomeSelectProps) {
   const id = useId()
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
   const root = useRef<HTMLDivElement>(null)
   const button = useRef<HTMLButtonElement>(null)
   const list = useRef<HTMLUListElement>(null)
+  const assisted = useRef(false)
   const items = [{ value: '', label: placeholder }, ...options]
   // A catalogue refresh must never leave aria-activedescendant pointing past the final option.
   if (active >= items.length) setActive(items.length - 1)
@@ -33,38 +34,34 @@ export function HomeSelect({ label, placeholder, value, options, onChange, layou
     if (!open) return
     const close = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false) }
     document.addEventListener('pointerdown', close)
-    list.current?.focus()
+    list.current?.focus(sports ? { preventScroll: true } : undefined)
     return () => document.removeEventListener('pointerdown', close)
-  }, [open])
+  }, [open, sports])
 
   useLayoutEffect(() => {
-    if (!open || layout !== 'grid') return
+    if (!open || !sports) return
     function place() {
       const menu = list.current
-      const field = root.current
-      if (!menu || !field) return
-      const rect = field.getBoundingClientRect()
-      const form = field.closest('form')?.getBoundingClientRect() ?? rect
-      const headerBottom = document.querySelector('.home-header')?.getBoundingClientRect().bottom ?? 0
-      const floor = Math.max(8, headerBottom + 8)
-      // Anchor outside the whole form so tablet rows and the submit action stay clear.
-      const below = Math.max(0, window.innerHeight - form.bottom - 16)
-      const above = Math.max(0, form.top - floor - 8)
-      menu.style.width = `${Math.min(rect.width - 24, window.innerWidth - 32)}px`
-      menu.style.left = `${Math.max(16, rect.left + 12)}px`
-      const desired = menu.scrollHeight
-      const up = desired > below && above > below
-      const available = up ? above : below
-      const sheet = window.innerWidth <= 640 && Math.max(above, below) < 88
-      menu.style.maxHeight = `${sheet ? Math.max(44, window.innerHeight - floor - 16) : available}px`
-      menu.style.top = `${sheet ? floor : up ? Math.max(floor, form.top - Math.min(desired, available) - 8) : form.bottom + 8}px`
-      menu.dataset.placement = sheet ? 'sheet' : up ? 'above' : 'below'
+      const trigger = button.current
+      if (!menu || !trigger) return
+      menu.style.maxHeight = `${Math.max(64, window.innerHeight - trigger.getBoundingClientRect().bottom - 24)}px`
+    }
+    const menu = list.current
+    const trigger = button.current
+    if (menu && trigger && !assisted.current) {
+      assisted.current = true
+      const rect = trigger.getBoundingClientRect()
+      const floor = (document.querySelector('.home-header')?.getBoundingClientRect().bottom ?? 0) + 12
+      const needed = menu.scrollHeight + 4 - (window.innerHeight - rect.bottom - 24)
+      // Move at most part of one viewport, once per opening. Never flip or detach the menu.
+      const top = rect.top < floor ? rect.top - floor : Math.min(Math.max(0, needed), 360, window.innerHeight * 0.4, Math.max(0, rect.top - floor))
+      if (rect.height > 0 && Math.abs(top) > 1) window.scrollBy({ top, behavior: homeScrollBehavior() })
     }
     place()
     window.addEventListener('resize', place)
     window.addEventListener('scroll', place, { passive: true })
     return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place) }
-  }, [open, layout, options.length])
+  }, [open, sports, options.length])
 
   useEffect(() => {
     const menu = list.current
@@ -75,6 +72,7 @@ export function HomeSelect({ label, placeholder, value, options, onChange, layou
   }, [active, open])
 
   function show() {
+    assisted.current = false
     setActive(Math.max(0, items.findIndex((item) => item.value === value)))
     setOpen(true)
   }
@@ -88,10 +86,9 @@ export function HomeSelect({ label, placeholder, value, options, onChange, layou
   }
   function onListKey(event: KeyboardEvent) {
     const last = items.length - 1
-    const columns = layout === 'grid' ? 2 : 1
     const moves: Record<string, () => void> = {
-      ArrowDown: () => setActive((index) => index + columns <= last ? index + columns : index),
-      ArrowUp: () => setActive((index) => index >= columns ? index - columns : index),
+      ArrowDown: () => setActive((index) => Math.min(last, index + 1)),
+      ArrowUp: () => setActive((index) => Math.max(0, index - 1)),
       Home: () => setActive(0),
       End: () => setActive(last),
       Enter: () => choose(active),
@@ -99,10 +96,6 @@ export function HomeSelect({ label, placeholder, value, options, onChange, layou
       Escape: () => { setOpen(false); button.current?.focus() },
       // Restore the trigger before native Tab traversal so removal of the list does not lose its position.
       Tab: () => { button.current?.focus(); setOpen(false) },
-    }
-    if (layout === 'grid') {
-      moves.ArrowRight = () => setActive((index) => index % columns === 0 && index < last ? index + 1 : index)
-      moves.ArrowLeft = () => setActive((index) => index % columns === 1 ? index - 1 : index)
     }
     const move = moves[event.key]
     if (!move) return
@@ -132,11 +125,12 @@ export function HomeSelect({ label, placeholder, value, options, onChange, layou
         <ul
           ref={list}
           id={`${id}-list`}
-          className={`home-select__list${layout === 'grid' ? ' home-select__list--grid' : ''}`}
+          className={`home-select__list${sports ? ' home-select__list--sports' : ''}`}
+          data-placement={sports ? 'below' : undefined}
           role="listbox"
           tabIndex={-1}
           aria-label={label}
-          aria-describedby={layout === 'grid' ? `${id}-keyboard` : undefined}
+          aria-describedby={sports ? `${id}-keyboard` : undefined}
           aria-activedescendant={`${id}-option-${active}`}
           onKeyDown={onListKey}
         >
@@ -147,7 +141,11 @@ export function HomeSelect({ label, placeholder, value, options, onChange, layou
               role="option"
               aria-selected={item.value === value}
               className={`home-select__option${index === active ? ' home-select__option--active' : ''}`}
-              onMouseEnter={() => setActive(index)}
+              onMouseEnter={sports ? undefined : () => setActive(index)}
+              onPointerMove={sports ? (event) => {
+                // Scrolling the page under a stationary pointer must not change keyboard focus.
+                if (event.pointerType === 'mouse' && (event.movementX || event.movementY)) setActive(index)
+              } : undefined}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => choose(index)}
             >
@@ -157,7 +155,7 @@ export function HomeSelect({ label, placeholder, value, options, onChange, layou
           ))}
         </ul>
       )}
-      {layout === 'grid' && <span id={`${id}-keyboard`} className="home-sr-only">Two columns. Up and Down move within a column; Left and Right move within a row. Edges do not wrap. Home and End move to the first and last option. Enter or Space selects.</span>}
+      {sports && <span id={`${id}-keyboard`} className="home-sr-only">One column. Up and Down move to the previous and next option without wrapping. Home and End move to the first and last option. Enter or Space selects.</span>}
     </div>
   )
 }

@@ -42,14 +42,14 @@ function app(path = '/', state?: unknown) {
 
 async function filters(user: ReturnType<typeof userEvent.setup>) {
   for (const [label, option] of [['Sport', 'Football'], ['Level', 'Beginner'], ['Training', 'Coach-led']]) {
-    await user.click(screen.getByRole('button', { name: new RegExp(`^${label}`) }))
+    await user.click(screen.getByRole('button', { name: new RegExp(`^${label} `) }))
     await user.click(await screen.findByRole('option', { name: option }))
   }
 }
 
 function expectFilters() {
   for (const [label, value] of [['Sport', 'Football'], ['Level', 'Beginner'], ['Training', 'Coach-led']]) {
-    expect(screen.getByRole('button', { name: new RegExp(`^${label}`) })).toHaveTextContent(value)
+    expect(screen.getByRole('button', { name: new RegExp(`^${label} `) })).toHaveTextContent(value)
   }
 }
 

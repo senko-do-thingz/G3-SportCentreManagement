@@ -1,64 +1,86 @@
-# Home navigation and Sports filter verification
+# Home acceptance regression specification
 
-Home uses a fixed overlay header. An IntersectionObserver sentinel switches its transparent hero surface to navy after 96px, and ResizeObserver supplies the actual header height for anchor offsets. Dropdowns remain below the modal layer. On narrow screens the navigation expands below the account row and scrolls within the available viewport.
+The fixed overlay header and measured --home-header-height retain the approved logo,
+theme, canonical CTA fills and scroll margins. Group labels are disclosure buttons
+without decoration or reserved indicator space. Hover/focus opens the list; real mouse
+movement into children stays open. Touch/click, Space/Enter, ArrowDown/ArrowUp and Escape
+work without hover. All sports/coaches/packages/faq links retain parent section access.
+Home remains a leaf link, now addressed to the main-content fragment.
 
-The parent section links remain anchors. Separate disclosure buttons support pointer hover, keyboard focus, Enter, Space, Escape and touch. The submenus link only to existing content: sport cards, loaded public coach headings, package cards and FAQ summaries. Home stays a leaf; an empty coach catalogue has no disclosure. Selecting a destination moves focus to the target and closes the navigation. No member route or account action is changed.
+All valid same-page Home anchors use one fragment-navigation path. It opens a selected
+FAQ first, focuses the summary (or section) without native focus scrolling, then uses
+scrollIntoView with the measured sticky-header margin. Normal motion is smooth;
+prefers-reduced-motion uses instant scrolling. Hash/history state, back/forward and
+modified clicks are preserved. Same-hash selection scrolls/reopens without a new history
+entry. Route/external links are excluded. Direct API-backed hashes retry after content
+arrives. Native FAQ summary toggling remains independent.
 
-FAQ child navigation opens the addressed answer and focuses its native summary. Direct `#home-faq-N` loads and hash changes reveal the same answer below the measured header. Selecting the same child again reopens a manually closed answer. Other questions retain their own disclosure state; native summary click and Space toggling still work.
+Sports is one vertical column at every width, exactly the trigger's width. It is an
+absolute popup attached below that field, never a fixed/above/sheet overlay. On opening,
+one page-scroll adjustment is bounded by 360px, 40% of viewport height and the space
+above the trigger without crossing the header. Reduced motion is respected. Remaining
+space determines max height; seven current choices fit at adequate desktop sizes and
+larger/short-viewport lists scroll internally. Page scrolling keeps the popup attached.
+A stationary pointer cannot override the active option while scroll assistance moves
+the page. Level and Training retain their existing positioning/focus policy.
 
-Only the Sports search filter uses the adaptive two-column layout. It positions outside the whole search form, prefers the available side and keeps a scrollable fallback for growing catalogues or short viewports. Small screens with insufficient space use the area below the fixed header. Native Tab continues from the filter trigger to the next control; Escape and selection restore trigger focus. Level and Training keep their existing selection model.
+| Key | Sports list policy |
+| --- | --- |
+| Up / Down | Previous / next option, clamp at ends |
+| Left / Right | No horizontal movement or selection |
+| Home / End | First / last option, brought inside the list viewport |
+| Enter / Space | Select, close and restore trigger focus; no form submit |
+| Escape / Tab | Close; restore trigger or continue native Tab traversal |
 
-Sports retains single-selection `listbox`/`option` semantics with DOM focus on the listbox and `aria-activedescendant` on the active option. The rendered two-column layout uses the explicit spatial policy below. Its accessible description announces the policy; navigating does not change the selected value until Enter or Space. This is a documented Home keyboard policy, not a claim that APG defines a two-dimensional listbox pattern. See [W3C focus and selection guidance](https://www.w3.org/WAI/ARIA/apg/practices/keyboard-interface/) and the [listbox role pattern](https://www.w3.org/WAI/ARIA/apg/patterns/listbox/).
+Active descendant and selected value remain separate. A shrinking catalogue clamps
+active focus. Options come only from the public sports API, with All sports prepended.
+Empty/error/Retry and authenticated/guest search return flows remain covered.
 
-| Key | Sports grid policy |
-|---|---|
-| ArrowDown / ArrowUp | Move one row in the same column, two option indices, when that cell exists |
-| ArrowRight / ArrowLeft | Move to the adjacent column in the same row; never wrap into another row |
-| Home / End | First / last option; includes an odd final left-column option |
-| Boundary or missing last-row right cell | Keep the current active option; Home/End and the occupied column still reach every option |
-| Enter / Space | Select active option, close, restore trigger focus; never submit the form |
-| Escape / Tab | Close; restore trigger for Escape or continue native Tab traversal |
+## Commands and evidence
 
-The layout is two columns at 320, 390 and 1440px. Level/Training keep vertical movement by one option and do not gain horizontal selection. Catalogue shrink clamps the active descendant to a remaining option.
-
-The canonical primary blue is the light `--color-primary` value in `src/styles/tokens.css`: `#1f4fd8`, with hover `#1a42b5` and active `#16389a`. Home pins those fills in dark mode, including the square white-S mark and primary Join now actions. Text and other Home surfaces retain theme behavior. The shared Brand component and global tokens are unchanged. The Round 1 raw-color baseline delta is documented in [HOME-UI-color-baseline-review.md](HOME-UI-color-baseline-review.md). UI-00 design-contract sign-off remains **PENDING APPROVAL**. Round 2 does not regenerate the baseline or edit global tokens/the frozen contract.
-
-## Commands
-
-From `frontend/`, using the repository Node version:
+From the actual HOME-UI worktree's frontend directory:
 
 ```powershell
 npm ci
+npm audit
 npm run lint
-npm test
+npm test -- --run
 npm run build
-python -m pip install -r scripts/requirements-visual-check.txt
-npm run preview -- --host 127.0.0.1 --port 4173 --strictPort
+npm run preview -- --host 127.0.0.1 --port 5173 --strictPort
+python scripts/home-ui-check.py --base http://127.0.0.1:5173 --out <private-evidence-directory>
 ```
 
-With preview running, in another shell:
+The runner uses installed Edge (or --channel chrome), actual pointer/keyboard/touch
+events, geometry, scroll samples and history assertions. It covers 320/390/768/1440px
+in both themes, seven/31 choices, short viewports, hover corridors, FAQ, branding,
+query routing and real CDN video decode/advance/Pause/Resume. Fixtures are test-only;
+photos use existing fallbacks. --case is development-only; omit it for full evidence.
+Record exact Git HEAD, dirty status, browser version and captures after a clean build.
+Full logs/results/screenshots stay outside Git. Browser contexts close after each case.
+Native 200% browser zoom and actual assistive-technology speech are NOT_RUN.
 
-```powershell
-python scripts/home-ui-check.py --base http://127.0.0.1:4173 --out <private-artifact-directory>
-```
+## Real backend integration
 
-The runner defaults to installed Microsoft Edge (`--channel msedge`); `--channel chrome` selects installed Chrome. Run it after committing and rebuilding. `results.json` records the full Git SHA, dirty status, browser version, viewport, theme, capture time, case outcomes and screenshots. Evidence with `dirty: true` is development evidence only. Keep generated evidence and full logs outside Git.
+Use --live-api only with the intended public backend (VITE_API_BASE_URL defaults to
+http://localhost:8080/api/v1). Its runtime CORS_ALLOWED_ORIGINS must allow the browser
+origin; do not change production security or commit local environment files.
+The additional case grants the isolated test browser local-network-access permission
+required by current Chromium, while leaving backend CORS enforcement active.
 
-## Browser coverage
+If another worktree owns the allowed preview origin, --live-origin http://localhost:5174
+bridges only frontend document/assets from --base inside that isolated test context.
+API requests still go directly to port 8080, without API interception or header rewriting.
+This preserves the other preview process and verifies the current build at an allowed
+origin. Report the bridge explicitly. HTTP 200 alone is not a UI-rendering assertion:
+record actual sports/options, coach cards, package links and facilities summary. Home
+currently renders a generic membership message; do not claim individual benefit rows
+were verified when only loading/error handling was checked.
 
-| Area | Checks |
-|---|---|
-| Sticky header | Light and dark at 390, 768, 1440 CSS px; top, one viewport, bottom; section offsets; horizontal overflow |
-| Navigation | Actual mouse movement through submenu region, pointer exit, outside click, native Tab, Space, Enter and Escape; focus visibility; all child anchor destinations |
-| FAQ answers | FAQ index 2 by mouse, native keyboard and real touch; repeated selection after manual close; direct index 3 load, reload and native hash changes; answer visible in the viewport and summary focused |
-| Touch | Real touchscreen taps at 390px; expand, collapse, child destination, mobile menu dismissal |
-| Sports | Seven current entries including All sports; desktop without inner scroll; tablet alignment; placement above; 480px and 540px short viewports; 31-entry growth; 320px reflow; last option scroll reachability |
-| Sports direction | All four arrows, Home/End and nonwrapping/odd-row boundaries at 320/390/1440px with 7 and 31 entries; measured option rectangles prove row/column movement; selected versus active state; no form submit |
-| Search | Each of the six catalogue sports reaches its original member query; reset, Level and Training retain independent query values |
-| Branding | Tile and wordmark computed identity across themes and Home -> credits/login/register -> Home; theme persistence; primary CTA fill equality and measured contrast |
-| Protection | Public navigation, My workspace and Logout for an authenticated fixture; independent nav/filter state; reduced-motion video fallback |
-| Video | Real existing Mixkit source decoding and advancing; native Pause/Resume, paused state and video dimensions; no mocked media APIs |
+## UI-00 governance
 
-API responses are deterministic public/member test fixtures; photos intentionally use bundled fallbacks. Only the video case uses the real media CDN. CDN availability is an external dependency and failures must be reported. Native 200% browser zoom and assistive-technology speech output are explicitly NOT_RUN by this runner.
-
-PR #136 video expansion and PR #138 shared branding/role layouts are independent. Do not import them for this verification. Existing CI can be dispatched on the published branch without creating a PR. Security and PR-only checks still require the owner's PR workflow. CODEOWNER review by `@senko-do-thingz` remains required.
+Round 3 does not modify tokens.css, rawColorBaseline.json, design-tokens.md, the scanner
+or frozen tests. The original six-entry Home color exception remains PENDING APPROVAL
+by UI-00 owner Phat, with CODEOWNER reconciliation direction still required. See
+HOME-UI-color-baseline-review.md for the exact delta and contract mismatch. Passing
+CI or preserving accepted visual behavior does not grant that separate approval.
+No PR #138 UI synchronization, backend edits, schema or API changes are introduced.

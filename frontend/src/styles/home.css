@@ -104,8 +104,9 @@
 .home-nav a::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--h-accent); transform: scaleX(0); transform-origin: left; transition: transform 0.2s ease; }
 .home-nav a:hover::after, .home-nav a[aria-current='page']::after { transform: scaleX(1); }
 .home-nav__group { position: relative; }
-.home-nav__parent { display: flex; align-items: center; }
-.home-nav__toggle { display: grid; place-items: center; width: 30px; min-height: 44px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.home-nav__toggle { position: relative; min-height: 44px; padding: 8px 0; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 600; letter-spacing: 0.06em; cursor: pointer; }
+.home-nav__toggle::after { content: ''; position: absolute; inset: auto 0 0; height: 2px; background: var(--h-accent); transform: scaleX(0); transition: transform 0.2s ease; }
+.home-nav__toggle:hover::after, .home-nav__toggle[aria-expanded='true']::after { transform: scaleX(1); }
 .home-nav__submenu { position: absolute; top: 100%; left: 0; width: 260px; max-height: calc(100dvh - var(--home-header-height) - 24px); margin: 0; padding: 8px; overflow-y: auto; list-style: none; background: var(--color-navy); box-shadow: var(--h-shadow); }
 .home-nav__group:last-child .home-nav__submenu { left: auto; right: 0; width: 320px; }
 .home-nav__submenu a { display: block; min-height: 44px; padding: 12px; line-height: 1.4; letter-spacing: 0; overflow-wrap: anywhere; }
@@ -182,10 +183,10 @@
 .home-select--open .home-select__chevron { transform: rotate(180deg); color: var(--h-primary-text); }
 .home-select__list { position: absolute; z-index: 30; top: calc(100% - 8px); left: 16px; right: 16px; max-height: 320px; margin: 0; padding: 8px; overflow-y: auto; list-style: none; background: var(--h-surface); border: 1px solid var(--h-border); border-top: 3px solid var(--h-primary); box-shadow: 0 22px 48px rgba(var(--h-overlay), 0.22); animation: home-select-in 0.16s ease-out; }
 .home-select__list:focus { outline: none; }
-.home-select__list--grid { position: fixed; right: auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; max-height: none; overscroll-behavior: contain; }
-.home-select__list--grid .home-select__option { gap: 4px; padding-inline: 8px; overflow-wrap: anywhere; }
-.home-select__list--grid .home-select__option svg { flex: none; }
-.home-select__list--grid:focus-visible { outline: 2px solid var(--h-primary-text); outline-offset: 2px; }
+.home-select__list--sports { top: calc(100% - 12px); left: 28px; right: 28px; display: block; max-height: none; overscroll-behavior: contain; }
+.home-select__list--sports .home-select__option { overflow-wrap: anywhere; }
+.home-select__list--sports .home-select__option svg { flex: none; }
+.home-select__list--sports:focus-visible { outline: 2px solid var(--h-primary-text); outline-offset: 2px; }
 .home-select__option { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 10px 14px; color: var(--h-ink); font-size: 16px; font-weight: 500; cursor: pointer; }
 .home-select__option--active { background: var(--h-icon-bg); color: var(--h-primary-text); }
 .home-select__option[aria-selected='true'] { color: var(--h-primary-text); font-weight: 700; }
@@ -358,8 +359,7 @@
   .home-menu-toggle { display: block; margin-left: auto; min-height: 44px; padding: 8px 16px; border: 1px solid rgba(255, 255, 255, 0.45); background: rgba(255, 255, 255, 0.1); color: #ffffff; font-weight: 700; cursor: pointer; }
   .home-nav { display: none; position: absolute; top: 100%; left: 0; width: 100%; max-height: calc(100dvh - var(--home-header-height)); overflow-y: auto; margin: 0; padding: 12px max(20px, 4vw); background: var(--color-navy); }
   .home-nav--open { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
-  .home-nav > a, .home-nav__parent > a { display: flex; align-items: center; min-height: 44px; flex: 1; }
-  .home-nav__toggle { width: 44px; }
+  .home-nav > a, .home-nav__group > a, .home-nav__toggle { display: flex; align-items: center; min-height: 44px; width: 100%; text-align: left; }
   .home-nav__submenu, .home-nav__group:last-child .home-nav__submenu { position: static; width: 100%; max-height: none; box-shadow: none; }
   .home-account { order: 3; width: 100%; justify-content: flex-end; padding-left: max(20px, 4vw); }
   .home-header__bar { padding-bottom: 12px; }

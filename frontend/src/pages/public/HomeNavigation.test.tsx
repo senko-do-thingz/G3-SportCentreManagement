@@ -23,7 +23,7 @@ describe('Home navigation disclosures', () => {
     const answer = within(item).getByText(HOME_FAQ[2].answer)
     expect(answer).not.toBeVisible()
     for (let attempt = 0; attempt < 2; attempt++) {
-      act(() => within(nav).getByRole('link', { name: 'FAQ' }).focus())
+      act(() => within(nav).getByRole('button', { name: 'FAQ' }).focus())
       const link = within(nav).getByRole('link', { name: HOME_FAQ[2].question })
       if (mode === 'mouse') await user.click(link)
       else { act(() => link.focus()); await user.keyboard('{Enter}') }
@@ -59,13 +59,13 @@ describe('Home navigation disclosures', () => {
     await screen.findByRole('button', { name: 'View profile of Demo Coach' })
     expect(within(nav).queryByRole('button', { name: /Home destinations/ })).not.toBeInTheDocument()
     for (const name of ['Sports', 'Coaches', 'Packages', 'FAQ']) {
-      act(() => within(nav).getByRole('link', { name }).focus())
+      act(() => within(nav).getByRole('button', { name }).focus())
       const list = within(nav).getByRole('list', { name: `${name} destinations` })
       for (const link of within(list).getAllByRole('link')) {
         expect(document.getElementById(link.getAttribute('href')!.slice(1))).not.toBeNull()
       }
       await user.keyboard('{Escape}')
-      expect(within(nav).getByRole('button', { name: `Toggle ${name} destinations` })).toHaveFocus()
+      expect(within(nav).getByRole('button', { name })).toHaveFocus()
     }
   })
 
@@ -74,16 +74,16 @@ describe('Home navigation disclosures', () => {
     renderApp('/')
     const user = userEvent.setup()
     const nav = screen.getByRole('navigation', { name: 'Home navigation' })
-    const sports = within(nav).getByRole('link', { name: 'Sports' })
-    const toggle = within(nav).getByRole('button', { name: 'Toggle Sports destinations' })
+    const sports = within(nav).getByRole('button', { name: 'Sports' })
+    const toggle = sports
     act(() => sports.focus())
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    await user.tab()
-    expect(toggle).toHaveFocus()
     await user.keyboard(' ')
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     await user.keyboard('{Enter}')
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await user.tab()
+    expect(within(nav).getByRole('link', { name: 'All sports' })).toHaveFocus()
     await user.tab()
     expect(within(nav).getByRole('link', { name: 'Football' })).toHaveFocus()
     await user.keyboard('{Escape}')
@@ -94,6 +94,43 @@ describe('Home navigation disclosures', () => {
     await user.click(toggle)
     await user.click(screen.getByRole('heading', { name: /Find your sport/ }))
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('uses only label text, while arrow keys reach section and child links', async () => {
+    catalog()
+    renderApp('/')
+    const user = userEvent.setup()
+    const nav = screen.getByRole('navigation', { name: 'Home navigation' })
+    await screen.findByRole('button', { name: 'View profile of Demo Coach' })
+    for (const name of ['Sports', 'Coaches', 'Packages', 'FAQ']) {
+      const trigger = within(nav).getByRole('button', { name })
+      expect(trigger.textContent).toBe(name)
+      expect(trigger).toHaveAttribute('aria-controls')
+      act(() => trigger.focus())
+      await user.keyboard('{Escape}{ArrowDown}')
+      await waitFor(() => expect(within(nav).getByRole('link', { name: `All ${name.toLowerCase()}` })).toHaveFocus())
+      await user.keyboard('{Escape}')
+      expect(trigger).toHaveFocus()
+    }
+  })
+
+  it.each([false, true])('scrolls an in-page CTA once, with reduced motion %s', async (reduce) => {
+    catalog()
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('reduced-motion') && reduce, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+    const previous = HTMLElement.prototype.scrollIntoView
+    const scroll = vi.fn()
+    HTMLElement.prototype.scrollIntoView = scroll
+    try {
+      renderApp('/')
+      const user = userEvent.setup()
+      const link = screen.getAllByRole('link', { name: 'Find a class' })[0]
+      await user.click(link)
+      expect(scroll).toHaveBeenCalledTimes(1)
+      expect(scroll).toHaveBeenCalledWith({ behavior: reduce ? 'instant' : 'smooth', block: 'start' })
+      expect(document.getElementById('finder')).toHaveFocus()
+      await user.click(link)
+      expect(scroll).toHaveBeenCalledTimes(2)
+    } finally { HTMLElement.prototype.scrollIntoView = previous }
   })
 
   it('changes header surface at the sentinel and disconnects observers', () => {
