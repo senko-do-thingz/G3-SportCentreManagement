@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { homePathFor } from '../../auth/roles'
 import { useAuth } from '../../auth/useAuth'
@@ -10,7 +10,7 @@ import { ThemeToggle } from '../../theme/ThemeToggle'
 export interface HomeNavGroup {
   label: string
   href: string
-  children: { label: string; href: string }[]
+  children: { label: string; href: string; sportId?: string }[]
 }
 
 export function HomeHeader({ groups = [] }: { groups?: HomeNavGroup[] }) {
@@ -23,7 +23,7 @@ export function HomeHeader({ groups = [] }: { groups?: HomeNavGroup[] }) {
   const header = useRef<HTMLElement>(null)
   const sentinel = useRef<HTMLSpanElement>(null)
   const pointerFocus = useRef(false)
-  const pointerType = useRef('')
+  const menuOrigin = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     const element = header.current
@@ -54,6 +54,17 @@ export function HomeHeader({ groups = [] }: { groups?: HomeNavGroup[] }) {
     setSubmenu(null)
   }
   function close() { setOpen(false); setSubmenu(null) }
+  function enterSubmenu(event: KeyboardEvent<HTMLElement>, label: string, id: string) {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+    event.preventDefault()
+    menuOrigin.current = event.currentTarget
+    setSubmenu(label)
+    const first = event.key === 'ArrowDown'
+    requestAnimationFrame(() => {
+      const links = header.current?.querySelector(`#${id}`)?.querySelectorAll<HTMLAnchorElement>('a')
+      links?.[first ? 0 : links.length - 1]?.focus()
+    })
+  }
 
   return (
     <>
@@ -82,44 +93,49 @@ export function HomeHeader({ groups = [] }: { groups?: HomeNavGroup[] }) {
               if (submenu) {
                 const trigger = header.current?.querySelector<HTMLButtonElement>(`[aria-controls="home-submenu-${submenu}"]`)
                 setSubmenu(null)
-                trigger?.focus()
+                ;(menuOrigin.current?.isConnected ? menuOrigin.current : trigger)?.focus()
               } else if (open) { close(); toggle.current?.focus() }
             }
           }}
         >
-          <a href="#main-content" aria-current="page" onClick={close}>Home</a>
+          <a className="home-nav__link" href="#main-content" aria-current="page" onClick={close}>Home</a>
           {groups.map((group) => {
             const expanded = submenu === group.label
             const id = `home-submenu-${group.label}`
             return <div className="home-nav__group" key={group.label}
-              onPointerEnter={(event) => { if (event.pointerType === 'mouse' && group.children.length) setSubmenu(group.label) }}
+              onPointerEnter={(event) => {
+                if (event.pointerType === 'mouse' && group.children.length) {
+                  menuOrigin.current = event.currentTarget.querySelector<HTMLAnchorElement>('.home-nav__link')
+                  setSubmenu(group.label)
+                }
+              }}
               onPointerLeave={(event) => { if (event.pointerType === 'mouse') setSubmenu((current) => current === group.label ? null : current) }}
-              onPointerDown={(event) => { pointerFocus.current = true; pointerType.current = event.pointerType }}
+              onPointerDown={() => { pointerFocus.current = true }}
               onFocus={(event) => {
-                if (!pointerFocus.current && !event.currentTarget.contains(event.relatedTarget as Node) && group.children.length) setSubmenu(group.label)
+                if (!pointerFocus.current && !event.currentTarget.contains(event.relatedTarget as Node) && group.children.length) {
+                  menuOrigin.current = event.target as HTMLElement
+                  setSubmenu(group.label)
+                }
               }}
               onBlur={(event) => {
                 pointerFocus.current = false
                 if (!event.currentTarget.contains(event.relatedTarget as Node)) setSubmenu((current) => current === group.label ? null : current)
               }}>
-              {group.children.length > 0 ? <button type="button" className="home-nav__toggle" aria-expanded={expanded} aria-controls={id}
-                onClick={() => {
-                  setSubmenu(pointerFocus.current && pointerType.current === 'mouse' ? group.label : expanded ? null : group.label)
-                  pointerFocus.current = false
-                }}
-                onKeyDown={(event) => {
-                  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
-                  event.preventDefault()
-                  setSubmenu(group.label)
-                  const first = event.key === 'ArrowDown'
-                  requestAnimationFrame(() => {
-                    const links = header.current?.querySelector(`#${id}`)?.querySelectorAll<HTMLAnchorElement>('a')
-                    links?.[first ? 0 : links.length - 1]?.focus()
-                  })
-                }}>{group.label}</button> : <a href={group.href} onClick={close}>{group.label}</a>}
+              <div className="home-nav__parent">
+                <a className="home-nav__link" href={group.href} onClick={close}
+                  onKeyDown={group.children.length ? (event) => enterSubmenu(event, group.label, id) : undefined}>{group.label}</a>
+                {group.children.length > 0 && <button type="button" className="home-nav__toggle" aria-label={`Toggle ${group.label} destinations`} aria-expanded={expanded} aria-controls={id}
+                  onClick={(event) => {
+                    menuOrigin.current = event.currentTarget
+                    setSubmenu(expanded ? null : group.label)
+                    pointerFocus.current = false
+                  }}
+                  onKeyDown={(event) => enterSubmenu(event, group.label, id)}>
+                  <svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" focusable="false"><path d="M5 7l5 5 5-5" /></svg>
+                </button>}
+              </div>
               {group.children.length > 0 && <ul id={id} className="home-nav__submenu" hidden={!expanded} aria-label={`${group.label} destinations`}>
-                <li><a href={group.href} onClick={close}>All {group.label.toLowerCase()}</a></li>
-                {group.children.map((child) => <li key={child.href}><a href={child.href} onClick={close}>{child.label}</a></li>)}
+                {group.children.map((child) => <li key={`${child.href}-${child.label}`}><a href={child.href} data-home-sport={child.sportId} onClick={close}>{child.label}</a></li>)}
               </ul>}
             </div>
           })}

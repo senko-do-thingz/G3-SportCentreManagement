@@ -23,7 +23,7 @@ describe('Home navigation disclosures', () => {
     const answer = within(item).getByText(HOME_FAQ[2].answer)
     expect(answer).not.toBeVisible()
     for (let attempt = 0; attempt < 2; attempt++) {
-      act(() => within(nav).getByRole('button', { name: 'FAQ' }).focus())
+      act(() => within(nav).getByRole('link', { name: 'FAQ' }).focus())
       const link = within(nav).getByRole('link', { name: HOME_FAQ[2].question })
       if (mode === 'mouse') await user.click(link)
       else { act(() => link.focus()); await user.keyboard('{Enter}') }
@@ -58,14 +58,14 @@ describe('Home navigation disclosures', () => {
     const user = userEvent.setup()
     await screen.findByRole('button', { name: 'View profile of Demo Coach' })
     expect(within(nav).queryByRole('button', { name: /Home destinations/ })).not.toBeInTheDocument()
-    for (const name of ['Sports', 'Coaches', 'Packages', 'FAQ']) {
-      act(() => within(nav).getByRole('button', { name }).focus())
+    for (const name of ['Sports', 'Packages', 'FAQ']) {
+      act(() => within(nav).getByRole('link', { name }).focus())
       const list = within(nav).getByRole('list', { name: `${name} destinations` })
       for (const link of within(list).getAllByRole('link')) {
         expect(document.getElementById(link.getAttribute('href')!.slice(1))).not.toBeNull()
       }
       await user.keyboard('{Escape}')
-      expect(within(nav).getByRole('button', { name })).toHaveFocus()
+      expect(within(nav).getByRole('link', { name })).toHaveFocus()
     }
   })
 
@@ -74,16 +74,16 @@ describe('Home navigation disclosures', () => {
     renderApp('/')
     const user = userEvent.setup()
     const nav = screen.getByRole('navigation', { name: 'Home navigation' })
-    const sports = within(nav).getByRole('button', { name: 'Sports' })
-    const toggle = sports
+    const sports = within(nav).getByRole('link', { name: 'Sports' })
+    const toggle = await within(nav).findByRole('button', { name: 'Toggle Sports destinations' })
     act(() => sports.focus())
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await user.tab()
+    expect(toggle).toHaveFocus()
     await user.keyboard(' ')
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     await user.keyboard('{Enter}')
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    await user.tab()
-    expect(within(nav).getByRole('link', { name: 'All sports' })).toHaveFocus()
     await user.tab()
     expect(within(nav).getByRole('link', { name: 'Football' })).toHaveFocus()
     await user.keyboard('{Escape}')
@@ -96,22 +96,61 @@ describe('Home navigation disclosures', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('uses only label text, while arrow keys reach section and child links', async () => {
+  it('keeps parent links separate from disclosure and reaches concrete children with arrows', async () => {
     catalog()
     renderApp('/')
     const user = userEvent.setup()
     const nav = screen.getByRole('navigation', { name: 'Home navigation' })
     await screen.findByRole('button', { name: 'View profile of Demo Coach' })
-    for (const name of ['Sports', 'Coaches', 'Packages', 'FAQ']) {
-      const trigger = within(nav).getByRole('button', { name })
+    for (const name of ['Sports', 'Packages', 'FAQ']) {
+      const trigger = within(nav).getByRole('link', { name })
       expect(trigger.textContent).toBe(name)
-      expect(trigger).toHaveAttribute('aria-controls')
+      const disclosure = within(nav).getByRole('button', { name: `Toggle ${name} destinations` })
+      expect(disclosure).toHaveAttribute('aria-controls')
+      expect(disclosure.textContent).not.toMatch(/[+-]/)
       act(() => trigger.focus())
       await user.keyboard('{Escape}{ArrowDown}')
-      await waitFor(() => expect(within(nav).getByRole('link', { name: `All ${name.toLowerCase()}` })).toHaveFocus())
+      const links = within(within(nav).getByRole('list', { name: `${name} destinations` })).getAllByRole('link')
+      await waitFor(() => expect(links[0]).toHaveFocus())
       await user.keyboard('{Escape}')
       expect(trigger).toHaveFocus()
+      await user.keyboard('{ArrowUp}')
+      await waitFor(() => expect(links[links.length - 1]).toHaveFocus())
+      await user.keyboard('{Escape}')
     }
+  })
+
+  it('makes Coaches a plain link and excludes generic header entries while retaining the filter reset', async () => {
+    catalog()
+    renderApp('/')
+    const user = userEvent.setup()
+    const nav = screen.getByRole('navigation', { name: 'Home navigation' })
+    const coaches = within(nav).getByRole('link', { name: 'Coaches' })
+    expect(coaches).toHaveAttribute('href', '#coaches')
+    expect(coaches).not.toHaveAttribute('aria-expanded')
+    expect(coaches).not.toHaveAttribute('aria-haspopup')
+    fireEvent.pointerEnter(coaches.closest('.home-nav__group')!, { pointerType: 'mouse' })
+    expect(within(nav).queryByRole('button', { name: /Coaches destinations/ })).not.toBeInTheDocument()
+    expect(within(nav).queryByRole('list', { name: 'Coaches destinations', hidden: true })).not.toBeInTheDocument()
+    await user.click(coaches)
+    expect(document.getElementById('coaches')).toHaveFocus()
+    act(() => within(nav).getByRole('link', { name: 'Sports' }).focus())
+    expect(within(within(nav).getByRole('list', { name: 'Sports destinations' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Football'])
+    expect(within(nav).queryByRole('link', { name: /All (sports|coaches|packages|faq|questions)/i, hidden: true })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Sport All sports' }))
+    expect(screen.getByRole('option', { name: 'All sports' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('uses API sports absent from marketing cards as useful finder presets', async () => {
+    installFakeFetch((call) => json(200, call.path === '/sports' ? [{ id: 77, code: 'NEW', name: 'New sport' }] : []))
+    renderApp('/')
+    const user = userEvent.setup()
+    await screen.findByRole('button', { name: 'Toggle Sports destinations' })
+    const nav = screen.getByRole('navigation', { name: 'Home navigation' })
+    act(() => within(nav).getByRole('link', { name: 'Sports' }).focus())
+    await user.click(within(nav).getByRole('link', { name: 'New sport' }))
+    expect(screen.getByRole('button', { name: 'Sport New sport' })).toBeInTheDocument()
+    expect(document.getElementById('finder')).toHaveFocus()
   })
 
   it.each([false, true])('scrolls an in-page CTA once, with reduced motion %s', async (reduce) => {

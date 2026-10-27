@@ -1,3 +1,10 @@
+## 2026-10-27 - Home consolidated acceptance remediation (HOME-UI Round 4)
+
+- Preserve page geometry and inline styles during modal scroll locking, including stacked dialogs and existing scrollbar gutters.
+- Make all five header labels persistently underlined section links. Coaches has no submenu; remaining menus have separate accessible disclosures and specific destinations.
+- Source header sports from the public API and retain the class-finder All sports reset. Preserve accepted smooth navigation, FAQ, branding and filter behavior.
+- Use focused feedback before the final full frontend and browser gate. CI workflows and frozen UI-00 files remain unchanged; the existing color-contract exception still needs owner approval.
+
 ## 2026-10-27 - Home acceptance remediation (HOME-UI Round 3)
 
 - Remove navigation expansion decorations while retaining label disclosures, section destinations, hover, keyboard and touch access.

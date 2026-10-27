@@ -1,11 +1,22 @@
 # Home acceptance regression specification
 
 The fixed overlay header and measured --home-header-height retain the approved logo,
-theme, canonical CTA fills and scroll margins. Group labels are disclosure buttons
-without decoration or reserved indicator space. Hover/focus opens the list; real mouse
-movement into children stays open. Touch/click, Space/Enter, ArrowDown/ArrowUp and Escape
-work without hover. All sports/coaches/packages/faq links retain parent section access.
-Home remains a leaf link, now addressed to the main-content fragment.
+theme, canonical CTA fills and scroll margins. All five labels are section links with
+the same persistent accent underline. Home and Coaches are plain links. Sports,
+Packages and FAQ have separate named chevron disclosure buttons without plus/minus
+glyphs. Hover/focus opens lists; real mouse movement into children stays open.
+Touch/click, Space/Enter, ArrowDown/ArrowUp and Escape work without hover. Labels
+navigate directly; generic All entries are absent from header lists. API sports absent
+from marketing cards preset the class finder. Its separate All sports reset remains.
+
+The shared modal locks the document once per modal stack. On traditional scrollbars,
+a temporary root scrollbar-gutter preserves normal/fixed containing-block geometry.
+Existing stable gutters remain intact; overlay/no-scrollbar pages get no new gutter or
+padding. The final close restores overflow declarations and priorities and the gutter.
+Out-of-order closes retain the lock and focus in the surviving dialog. Browser checks
+measure header, logo, section and fixed Back to Top before/open/after five dismissal
+cycles in both themes, with real 17px classic scrollbars, zero-gap overlay scrollbars,
+and a naturally short page in a tall viewport. Short modal content scrolls independently.
 
 All valid same-page Home anchors use one fragment-navigation path. It opens a selected
 FAQ first, focuses the summary (or section) without native focus scrolling, then uses
@@ -41,7 +52,6 @@ Empty/error/Retry and authenticated/guest search return flows remain covered.
 From the actual HOME-UI worktree's frontend directory:
 
 ```powershell
-npm ci
 npm audit
 npm run lint
 npm test -- --run
@@ -78,7 +88,7 @@ were verified when only loading/error handling was checked.
 
 ## UI-00 governance
 
-Round 3 does not modify tokens.css, rawColorBaseline.json, design-tokens.md, the scanner
+Round 4 does not modify tokens.css, rawColorBaseline.json, design-tokens.md, the scanner
 or frozen tests. The original six-entry Home color exception remains PENDING APPROVAL
 by UI-00 owner Phat, with CODEOWNER reconciliation direction still required. See
 HOME-UI-color-baseline-review.md for the exact delta and contract mismatch. Passing

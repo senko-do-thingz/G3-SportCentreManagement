@@ -104,7 +104,13 @@ export function HomePage() {
     if (!scrollHomeSection(url.hash)) return
     event.preventDefault()
     lastFragment.current = url.hash
-    if (location.hash !== url.hash) navigate(location.pathname + location.search + url.hash, { state: location.state })
+    const headerSport = link.dataset.homeSport
+    const nextFinder = headerSport ? { ...finder, sportId: headerSport } : finder
+    if (headerSport) setFinder(nextFinder)
+    if (location.hash !== url.hash || headerSport) navigate(location.pathname + location.search + url.hash, {
+      replace: location.hash === url.hash,
+      state: headerSport ? { ...location.state, homeFinder: nextFinder } : location.state,
+    })
   }
   const [sports, retrySports] = useResource(loadSports)
   const [packages, retryPackages] = useResource(loadPackages)
@@ -187,8 +193,11 @@ export function HomePage() {
     <div className="home-page" onClick={followSection}>
       <a className="home-skip" href="#main-content">Skip to content</a>
       <HomeHeader groups={[
-        { label: 'Sports', href: '#sports', children: HOME_SPORTS.map((sport) => ({ label: sport.name, href: `#home-sport-${sport.name.toLowerCase()}` })) },
-        { label: 'Coaches', href: '#coaches', children: coaches.status === 'ready' ? coaches.data.map((coach) => ({ label: coach.fullName, href: `#coach-${coach.id}` })) : [] },
+        { label: 'Sports', href: '#sports', children: catalogSports.map((sport) => {
+          const card = HOME_SPORTS.find((item) => item.name.toLowerCase() === sport.name.toLowerCase())
+          return { label: sport.name, href: card ? `#home-sport-${card.name.toLowerCase()}` : '#finder', sportId: card ? undefined : String(sport.id) }
+        }) },
+        { label: 'Coaches', href: '#coaches', children: [] },
         { label: 'Packages', href: '#packages', children: PLAN_CARDS.map((card) => ({ label: card.title, href: `#home-plan-${card.kind}` })) },
         { label: 'FAQ', href: '#faq', children: HOME_FAQ.map((item, index) => ({ label: item.question, href: `#home-faq-${index}` })) },
       ]} />

@@ -50,10 +50,11 @@ def main():
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(channel=args.channel, headless=True)
+        classic_browser = pw.chromium.launch(channel=args.channel, headless=True, ignore_default_args=['--hide-scrollbars'])
         report['browser'] = f'{args.channel} {browser.version}'
 
-        def page_for(width=1440, height=900, theme='light', growth=0, touch=False, member=False, media=False, fragment='', motion='reduce', api_mode='success'):
-            context = browser.new_context(viewport={'width': width, 'height': height}, reduced_motion='no-preference' if media else motion, has_touch=touch, is_mobile=touch)
+        def page_for(width=1440, height=900, theme='light', growth=0, touch=False, member=False, media=False, fragment='', motion='reduce', api_mode='success', classic=False):
+            context = (classic_browser if classic else browser).new_context(viewport={'width': width, 'height': height}, reduced_motion='no-preference' if media else motion, has_touch=touch, is_mobile=touch)
             seed = {'sportify.themePreference': theme}
             if member:
                 seed.update({'sportify.accessToken': 'home-ui-fixture', 'sportify.refreshToken': 'fixture-refresh', 'sportify.sessionId': 'home-ui-fixture'})
@@ -85,6 +86,8 @@ def main():
             page.on('pageerror', lambda error: report['console'].append({'type':'uncaught', 'text':str(error), 'url':page.url}))
             page.set_default_timeout(7000)
             page.goto(args.base.rstrip('/') + '/' + fragment, wait_until='load')
+            if classic:
+                page.add_style_tag(content='::-webkit-scrollbar { width: 17px; height: 17px; }')
             expect(page.get_by_role('button', name='Sport All sports')).to_be_visible()
             if api_mode != 'empty': expect(page.get_by_role('button', name='View profile of Demo Coach')).to_have_count(1)
             page.evaluate('document.fonts.ready')
@@ -102,10 +105,11 @@ def main():
             except Exception as error:
                 report['cases'].append({'name': name, 'status': 'FAIL', 'error': str(error), 'traceback': traceback.format_exc()})
                 print(f'FAIL {name}: {error}', flush=True)
-                if browser.contexts and browser.contexts[-1].pages:
-                    browser.contexts[-1].pages[-1].screenshot(path=str(out / f'FAIL-{name}.png'))
+                contexts = [*browser.contexts, *classic_browser.contexts]
+                if contexts and contexts[-1].pages:
+                    contexts[-1].pages[-1].screenshot(path=str(out / f'FAIL-{name}.png'))
             finally:
-                for context in list(browser.contexts):
+                for context in [*browser.contexts, *classic_browser.contexts]:
                     context.close()
 
         def snapshot(page, name, theme, width):
@@ -131,8 +135,7 @@ def main():
                 snapshot(page, name, theme, width)
             if width <= 1100:
                 page.get_by_role('button', name='Menu', exact=True).click()
-            page.get_by_role('navigation', name='Home navigation').get_by_role('button', name='Sports', exact=True).click()
-            page.get_by_role('navigation', name='Home navigation').get_by_role('link', name='All sports', exact=True).click()
+            page.get_by_role('navigation', name='Home navigation').get_by_role('link', name='Sports', exact=True).click()
             page.wait_for_timeout(100)
             assert page.locator('#sports').bounding_box()['y'] >= header.bounding_box()['height']
             snapshot(page, 'anchor', theme, width)
@@ -145,8 +148,8 @@ def main():
         def nav_interactions():
             _, page = page_for()
             nav = page.get_by_role('navigation', name='Home navigation')
-            parent = nav.get_by_role('button', name='Sports', exact=True)
-            toggle = nav.get_by_role('button', name='Sports', exact=True)
+            parent = nav.get_by_role('link', name='Sports', exact=True)
+            toggle = nav.get_by_role('button', name='Toggle Sports destinations', exact=True)
             parent.hover()
             expect(toggle).to_have_attribute('aria-expanded', 'true')
             child = nav.get_by_role('link', name='Football', exact=True)
@@ -164,12 +167,12 @@ def main():
                 page.keyboard.press('Tab')
             expect(parent).to_be_focused()
             expect(toggle).to_have_attribute('aria-expanded', 'true')
-            assert toggle.inner_text() == 'Sports' and toggle.locator('span, svg').count() == 0
+            assert parent.inner_text() == 'Sports' and not re.search(r'[+-]', toggle.inner_text())
+            page.keyboard.press('Tab')
+            expect(toggle).to_be_focused()
             page.keyboard.press('Space')
             expect(toggle).to_have_attribute('aria-expanded', 'false')
             page.keyboard.press('Enter')
-            page.keyboard.press('Tab')
-            expect(nav.get_by_role('link', name='All sports', exact=True)).to_be_focused()
             page.keyboard.press('Tab')
             expect(child).to_be_focused()
             page.keyboard.press('Escape')
@@ -188,8 +191,8 @@ def main():
             _, page = page_for()
             nav = page.get_by_role('navigation', name='Home navigation')
             count = 0
-            for name in ['Sports', 'Coaches', 'Packages', 'FAQ']:
-                parent = nav.get_by_role('button', name=name, exact=True)
+            for name in ['Sports', 'Packages', 'FAQ']:
+                parent = nav.get_by_role('link', name=name, exact=True)
                 parent.hover()
                 links = nav.get_by_role('list', name=f'{name} destinations').get_by_role('link')
                 targets = [(link.inner_text(), link.get_attribute('href')) for link in links.all()]
@@ -201,7 +204,7 @@ def main():
                     if href.startswith('#home-faq-'):
                         expect(target.locator('p')).to_be_visible()
                     assert target.bounding_box()['y'] >= page.locator('.home-header').bounding_box()['height'] - 1, href
-                    expect(nav.get_by_role('button', name=name, exact=True)).to_have_attribute('aria-expanded', 'false')
+                    expect(nav.get_by_role('button', name=f'Toggle {name} destinations', exact=True)).to_have_attribute('aria-expanded', 'false')
                     count += 1
             return f'{count} real content destinations navigated'
         case('all-child-destinations', child_destinations)
@@ -209,7 +212,7 @@ def main():
         def touch_navigation():
             _, page = page_for(width=390, height=844, touch=True)
             page.get_by_role('button', name='Menu', exact=True).tap()
-            toggle = page.get_by_role('button', name='Sports', exact=True)
+            toggle = page.get_by_role('button', name='Toggle Sports destinations', exact=True)
             toggle.tap()
             expect(toggle).to_have_attribute('aria-expanded', 'true')
             snapshot(page, 'touch-submenu', 'light', 390)
@@ -239,10 +242,10 @@ def main():
             for attempt in range(2):
                 if mode == 'touch':
                     page.get_by_role('button', name='Menu', exact=True).tap()
-                    nav.get_by_role('button', name='FAQ', exact=True).tap()
+                    nav.get_by_role('button', name='Toggle FAQ destinations', exact=True).tap()
                     nav.get_by_role('link', name=question, exact=True).tap()
                 elif mode == 'keyboard':
-                    parent = nav.get_by_role('button', name='FAQ', exact=True)
+                    parent = nav.get_by_role('link', name='FAQ', exact=True)
                     for _ in range(100):
                         if parent.evaluate('(e) => e === document.activeElement'):
                             break
@@ -253,7 +256,7 @@ def main():
                     expect(nav.get_by_role('link', name=question, exact=True)).to_be_focused()
                     page.keyboard.press('Enter')
                 else:
-                    nav.get_by_role('button', name='FAQ', exact=True).hover()
+                    nav.get_by_role('link', name='FAQ', exact=True).hover()
                     nav.get_by_role('link', name=question, exact=True).click()
                 expect(page).to_have_url(re.compile('#home-faq-2$'))
                 faq_visible(page, 2)
@@ -445,7 +448,7 @@ def main():
                     ratio = contrast(item['fg'], item['bg'])
                     assert ratio >= 4.5, item
                     report['contrast'].append({'theme': theme, **item, 'ratio': ratio})
-                page.get_by_role('navigation', name='Home navigation').get_by_role('button', name='Sports', exact=True).hover()
+                page.get_by_role('navigation', name='Home navigation').get_by_role('link', name='Sports', exact=True).hover()
                 submenu = page.get_by_role('list', name='Sports destinations')
                 fg, bg = submenu.evaluate('(e) => [getComputedStyle(e.querySelector("a")).color,getComputedStyle(e).backgroundColor]')
                 assert contrast(fg, bg) >= 4.5
@@ -475,7 +478,7 @@ def main():
         def independence():
             _, page = page_for()
             page.get_by_role('button', name='Sport All sports').click()
-            page.get_by_role('navigation', name='Home navigation').get_by_role('button', name='Sports', exact=True).hover()
+            page.get_by_role('navigation', name='Home navigation').get_by_role('link', name='Sports', exact=True).hover()
             expect(page.get_by_role('listbox', name='Sport', exact=True)).to_be_visible()
             expect(page.get_by_role('list', name='Sports destinations', exact=True)).to_be_visible()
             page.mouse.click(1200, 600)
@@ -486,7 +489,7 @@ def main():
             _, page = page_for(width=320, height=640)
             assert page.locator('video').count() == 0
             page.get_by_role('button', name='Menu', exact=True).click()
-            page.get_by_role('button', name='FAQ', exact=True).click()
+            page.get_by_role('button', name='Toggle FAQ destinations', exact=True).click()
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
             snapshot(page, 'reflow-menu', 'light', 320)
         case('reduced-motion-and-320-reflow', reduced_motion)
@@ -495,7 +498,7 @@ def main():
             _, page = page_for(member=True)
             expect(page.get_by_role('link', name='My workspace')).to_have_attribute('href', '/member')
             expect(page.get_by_role('button', name='Log out')).to_be_visible()
-            expect(page.get_by_role('navigation', name='Home navigation').get_by_role('button', name='Sports', exact=True)).to_be_visible()
+            expect(page.get_by_role('navigation', name='Home navigation').get_by_role('link', name='Sports', exact=True)).to_be_visible()
         case('authenticated-public-navigation', authenticated_header)
 
         def smooth_navigation(motion):
@@ -505,8 +508,8 @@ def main():
                 Element.prototype.scrollIntoView=function(options){window.homeScrollCalls.push({id:this.id,...options}); return original.call(this,options)} }''')
             nav=page.get_by_role('navigation',name='Home navigation')
             initial=page.evaluate('history.length')
-            nav.get_by_role('button',name='Sports',exact=True).hover()
-            nav.get_by_role('link',name='All sports',exact=True).click()
+            nav.get_by_role('link',name='Sports',exact=True).hover()
+            nav.get_by_role('link',name='Sports',exact=True).click()
             page.wait_for_timeout(30)
             early=page.evaluate('scrollY')
             page.wait_for_function('Math.abs(document.querySelector("#sports").getBoundingClientRect().top-document.querySelector(".home-header").getBoundingClientRect().height-20)<2')
@@ -517,8 +520,8 @@ def main():
             calls=page.evaluate('window.homeScrollCalls')
             assert len(calls)==1 and calls[0]['behavior']==('instant' if motion=='reduce' else 'smooth'),calls
             assert page.evaluate('history.length')==initial+1
-            nav.get_by_role('button',name='Sports',exact=True).hover()
-            nav.get_by_role('link',name='All sports',exact=True).click()
+            nav.get_by_role('link',name='Sports',exact=True).hover()
+            nav.get_by_role('link',name='Sports',exact=True).click()
             assert page.evaluate('history.length')==initial+1
             assert len(page.evaluate('window.homeScrollCalls'))==2
             page.go_back(); expect(page).to_have_url(re.compile('/$'))
@@ -592,6 +595,12 @@ def main():
             assert options==['All sports',*responses['/sports']['names']]
             snapshot(page,'live-api-sports','light',1440)
             page.keyboard.press('Escape')
+            nav=page.get_by_role('navigation',name='Home navigation')
+            nav.get_by_role('link',name='Sports',exact=True).hover()
+            header_sports=nav.get_by_role('list',name='Sports destinations').get_by_role('link')
+            assert header_sports.all_inner_texts()==responses['/sports']['names']
+            snapshot(page,'live-api-header-sports','light',1440)
+            page.mouse.move(1400,800)
             expect(page.locator('#coaches button[aria-label^="View profile of "]')).to_have_count(responses['/coaches/public']['count'])
             summary=page.locator('#facilities .home-head__sub').inner_text()
             nouns={'COURT':'court','FIELD':'field','HALL':'hall','STUDIO':'studio','POOL':'pool'}
@@ -609,6 +618,184 @@ def main():
                 'tiersRendering':'Current Home renders a generic membership message, not individual benefit rows; loaded without error only'}
         if args.live_api: case('live-api-browser-integration',live_api)
 
+        def nav_contract(width, theme):
+            _, page = page_for(width=width, height=844 if width < 768 else 900, theme=theme)
+            nav = page.get_by_role('navigation', name='Home navigation')
+            samples = []
+            for state, y in [('transparent', 0), ('sticky', 1000)]:
+                page.evaluate('(y) => scrollTo(0,y)', y)
+                if width <= 1100:
+                    page.get_by_role('button', name='Menu', exact=True).click()
+                labels = nav.locator('.home-nav__link')
+                expect(labels).to_have_text(['Home', 'Sports', 'Coaches', 'Packages', 'FAQ'])
+                before = labels.evaluate_all('(links)=>links.map(e=>e.getBoundingClientRect().toJSON())')
+                styles = labels.evaluate_all('''(links)=>links.map(e=>{const s=getComputedStyle(e,'::after');
+                    return {height:s.height,background:s.backgroundColor,transform:s.transform,bottom:s.bottom,left:s.left,right:s.right,content:s.content}})''')
+                assert all(s == styles[0] for s in styles), styles
+                assert styles[0]['height'] == '2px' and styles[0]['transform'] == 'matrix(1, 0, 0, 1, 0, 0)', styles
+                assert styles[0]['background'] != 'rgba(0, 0, 0, 0)'
+                coaches = nav.get_by_role('link', name='Coaches', exact=True)
+                coaches.hover()
+                assert coaches.get_attribute('aria-expanded') is None and coaches.get_attribute('aria-haspopup') is None
+                assert nav.get_by_role('list', name='Coaches destinations', include_hidden=True).count() == 0
+                assert nav.get_by_role('button', name=re.compile('Coaches destinations')).count() == 0
+                for label in ['Sports', 'Packages', 'FAQ']:
+                    page.mouse.move(width-2, page.viewport_size['height']-2)
+                    nav.get_by_role('link', name=label, exact=True).hover()
+                    expect(nav.get_by_role('button',name=f'Toggle {label} destinations')).to_have_attribute('aria-expanded','true')
+                    children = nav.get_by_role('list', name=f'{label} destinations').get_by_role('link')
+                    assert not any(re.match(r'All (sports|coaches|packages|faqs?|questions)', text, re.I) for text in children.all_inner_texts())
+                    assert children.first.evaluate("e=>getComputedStyle(e,'::after').content") == 'none'
+                after = labels.evaluate_all('(links)=>links.map(e=>e.getBoundingClientRect().toJSON())')
+                assert all(abs(a[k]-b[k]) < 1 for a,b in zip(before,after) for k in ['x','y','width','height']), (before,after)
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                samples.append({'state':state,'styles':styles,'labelBoxes':after})
+                page.mouse.move(width-2, page.viewport_size['height']-2)
+                snapshot(page, f'r4-nav-{state}', theme, width)
+                if width <= 1100:
+                    page.get_by_role('button', name='Menu', exact=True).click()
+            return samples
+        for theme in ['light','dark']:
+            for width in [320,390,768,1440]:
+                case(f'r4-nav-contract-{theme}-{width}', lambda w=width,t=theme:nav_contract(w,t))
+
+        def direct_parents(mode):
+            width = 390 if mode == 'touch' else 1440
+            _, page = page_for(width=width, touch=mode=='touch')
+            nav = page.get_by_role('navigation',name='Home navigation')
+            trace = []
+            for label, target in [('Coaches','coaches'),('Sports','sports'),('Packages','packages'),('FAQ','faq')]:
+                if mode == 'touch':
+                    page.get_by_role('button',name='Menu',exact=True).tap()
+                link = nav.get_by_role('link',name=label,exact=True)
+                if mode == 'keyboard':
+                    for _ in range(120):
+                        if link.evaluate('e=>e===document.activeElement'): break
+                        page.keyboard.press('Tab')
+                    expect(link).to_be_focused()
+                    assert link.evaluate('e=>getComputedStyle(e).outlineStyle') != 'none'
+                    page.keyboard.press('Enter')
+                elif mode == 'touch': link.tap()
+                else: link.click()
+                expect(page).to_have_url(re.compile('#'+target+'$'))
+                expect(page.locator('#'+target)).to_be_focused()
+                assert page.locator('#'+target).bounding_box()['y'] >= page.locator('.home-header').bounding_box()['height']
+                trace.append({'label':label,'hash':page.evaluate('location.hash')})
+            snapshot(page,'r4-direct-'+mode,'light',width)
+            return trace
+        for mode in ['mouse','keyboard','touch']:
+            case('r4-direct-parents-'+mode, lambda m=mode:direct_parents(m))
+
+        def api_header():
+            _,page=page_for(growth=24)
+            nav=page.get_by_role('navigation',name='Home navigation')
+            nav.get_by_role('link',name='Sports',exact=True).hover()
+            links=nav.get_by_role('list',name='Sports destinations').get_by_role('link')
+            expect(links).to_have_count(30)
+            assert links.all_inner_texts()==NAMES+[f'Future sport {i+1}' for i in range(24)]
+            links.last.click()
+            expect(page).to_have_url(re.compile('#finder$'))
+            expect(page.get_by_role('button',name='Sport Future sport 24')).to_be_visible()
+            page.get_by_role('button',name='Sport Future sport 24').click()
+            page.get_by_role('option',name='All sports',exact=True).click()
+            expect(page.get_by_role('button',name='Sport All sports')).to_be_focused()
+            snapshot(page,'r4-api-sport-reset','light',1440)
+            return 'Header follows 30 API records; API-only sport presets finder; All sports resets independently'
+        case('r4-api-header-and-filter-reset',api_header)
+
+        def modal_geometry(width, height, theme, classic=False, stable=False):
+            _,page=page_for(width=width,height=height,theme=theme,touch=width<768,classic=classic)
+            page.evaluate('''() => {
+                document.body.style.setProperty('overflow-y','auto','important');
+                document.documentElement.style.setProperty('scrollbar-gutter','auto','important');
+            }''')
+            if stable:
+                page.evaluate("document.documentElement.style.setProperty('scrollbar-gutter','stable both-edges','important')")
+            opener=page.get_by_role('link',name='Explore Football',exact=True)
+            opener.scroll_into_view_if_needed()
+            page.wait_for_timeout(150)
+            def measure():
+                return page.evaluate('''() => ({y:scrollY,gap:innerWidth-document.documentElement.clientWidth,
+                    body:document.body.style.cssText,root:document.documentElement.style.cssText,
+                    boxes:['.home-header','.home-header .brand','#sports .home-wrap','.home-top'].map(s=>({selector:s,...document.querySelector(s).getBoundingClientRect().toJSON()}))})''')
+            initial=measure()
+            if classic: assert initial['gap']==17,initial
+            else: assert initial['gap']==0,initial
+            if height==30000: assert page.evaluate('document.documentElement.scrollHeight<=innerHeight')
+            trace=[]
+            for cycle, dismiss in enumerate(['escape','close','continue','backdrop','escape']):
+                opener.focus()
+                before=measure()
+                if cycle==0: snapshot(page,f'r4-modal-{height}-{classic}-{stable}-before',theme,width)
+                opener.click()
+                dialog=page.get_by_role('dialog',name='Sign in to continue')
+                expect(dialog).to_be_visible()
+                opened=measure()
+                assert page.evaluate("getComputedStyle(document.body).overflowY")=='hidden'
+                assert dialog.evaluate('e=>e.contains(document.activeElement)')
+                for key in ['Shift+Tab','Tab','Tab','Tab','Tab']:
+                    page.keyboard.press(key)
+                    assert dialog.evaluate('e=>e.contains(document.activeElement)')
+                page.mouse.move(3,height/2)
+                page.mouse.wheel(0,500)
+                page.wait_for_timeout(100)
+                assert abs(page.evaluate('scrollY')-before['y'])<1
+                body=dialog.locator('.modal__body')
+                own=body.evaluate('e=>({height:e.clientHeight,scroll:e.scrollHeight})') if body.count() else {'height':0,'scroll':0}
+                if own['scroll']>own['height']:
+                    body.hover(); page.mouse.wheel(0,300); page.wait_for_timeout(100)
+                    assert body.evaluate('e=>e.scrollTop')>0
+                    assert abs(page.evaluate('scrollY')-before['y'])<1
+                if cycle==0: snapshot(page,f'r4-modal-{height}-{classic}-{stable}-open',theme,width)
+                if dismiss=='escape': page.keyboard.press('Escape')
+                elif dismiss=='close': dialog.get_by_role('button',name='Close dialog').click()
+                elif dismiss=='continue': dialog.get_by_role('button',name='Continue browsing').click()
+                else: page.mouse.click(initial['gap']+2,height/2)
+                expect(dialog).to_have_count(0)
+                expect(opener).to_be_focused()
+                after=measure()
+                assert before['body']==after['body'] and before['root']==after['root'],(before,after)
+                assert abs(after['y']-before['y'])<1
+                delta=max(abs(a[k]-b[k]) for stage in [opened,after] for a,b in zip(before['boxes'],stage['boxes']) for k in ['x','width'])
+                assert delta<=1,{'delta':delta,'before':before,'opened':opened,'after':after}
+                trace.append({'dismiss':dismiss,'delta':delta,'before':before,'open':opened,'after':after,'modalBody':own})
+                if cycle==0: snapshot(page,f'r4-modal-{height}-{classic}-{stable}-after',theme,width)
+            # A distinct consecutive dialog must inherit no stale lock or focus target.
+            contact=page.get_by_role('button',name='Contact reception',exact=True)
+            contact.click(); expect(page.get_by_role('dialog')).to_be_visible()
+            assert page.evaluate("getComputedStyle(document.body).overflowY")=='hidden'
+            page.keyboard.press('Escape'); expect(contact).to_be_focused()
+            assert measure()['body']==initial['body'] and measure()['root']==initial['root']
+            assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+            return {'classic':classic,'stableBothEdges':stable,'initialGap':initial['gap'],'cycles':trace}
+        for theme in ['light','dark']:
+            for width,height,classic in [(1440,900,True),(768,900,True),(390,420,False),(320,420,False),(1440,30000,False)]:
+                case(f'r4-modal-{theme}-{width}-{height}-{classic}',lambda w=width,h=height,t=theme,c=classic:modal_geometry(w,h,t,c))
+        case('r4-modal-existing-stable-gutter',lambda:modal_geometry(1440,900,'light',True,True))
+
+        def short_modal_body():
+            _,page=page_for(width=320,height=420,touch=True)
+            opener=page.get_by_role('button',name='Contact reception',exact=True)
+            opener.click()
+            page.set_viewport_size({'width':320,'height':160})
+            page.wait_for_timeout(200)
+            dialog=page.get_by_role('dialog')
+            expect(dialog).to_be_visible()
+            body=dialog.locator('.modal__body')
+            dimensions=body.evaluate('''e=>({height:e.clientHeight,scroll:e.scrollHeight,innerHeight,
+                visualHeight:visualViewport.height,dialogMax:getComputedStyle(e.parentElement).maxHeight,
+                dialog:e.parentElement.getBoundingClientRect().toJSON()})''')
+            assert dimensions['scroll']>dimensions['height'],dimensions
+            before=page.evaluate('scrollY')
+            body.hover(); page.mouse.wheel(0,300); page.wait_for_timeout(150)
+            assert body.evaluate('e=>e.scrollTop')>0
+            assert page.evaluate('scrollY')==before
+            snapshot(page,'r4-short-modal-body','light',320)
+            dialog.get_by_role('button',name='Close dialog').click()
+            expect(opener).to_be_focused()
+            return dimensions
+        case('r4-modal-own-scroll-short-viewport',short_modal_body)
+
         def real_video():
             _, page = page_for(media=True)
             video = page.locator('.home-hero__video')
@@ -625,6 +812,7 @@ def main():
             return result
         case('real-cdn-video-pause-resume', real_video)
         browser.close()
+        classic_browser.close()
 
     report['passed'] = sum(c['status'] == 'PASS' for c in report['cases'])
     report['failed'] = sum(c['status'] == 'FAIL' for c in report['cases'])
