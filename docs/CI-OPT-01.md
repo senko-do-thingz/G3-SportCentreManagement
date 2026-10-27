@@ -70,13 +70,25 @@ prefix; they are not independently configured required checks in the baseline.
 Normal PR synchronization cancels superseded PR runs. Reruns use a separate
 run/attempt group, preventing an old rerun from cancelling a newer required HEAD.
 Main, manual and release runs use distinct run/attempt groups and are never cancelled
-by another authoritative run. A cancelled run is never treated as a successful gate.
+by another authoritative run. Both gates also reject workflow cancellation reported
+at gate execution, even if children have already completed. Cancellation after a
+check has completed cannot retroactively change it; review the overall run and the
+current HEAD together, never a superseded commit's successful child alone.
 
 ## Parallelism and artifacts
 
 Backend unit and full SQL integration depend only on impact and run independently.
 Their JUnit tag/report isolation guards remain mandatory. Test class/method isolation,
 Maven test grouping and Vitest's two-worker configuration are unchanged.
+
+The seed-migration verification class uses its own fresh SQL catalog on the same
+ephemeral container. An observed order-dependent failure read GOLD at 500000 after
+another committed controller test edited the shared seed; the migration expects
+300000. The class now migrates an empty catalog, asserts its connection identity,
+and includes a negative control that mutates another freshly migrated catalog in a rolled-back
+transaction while checking that genuine isolated seed data stays unchanged. No
+expected price, migration checksum or production behavior is changed. This adds
+one SQL test and avoids relying on class order or resetting expected data by hand.
 
 Failsafe's `verify` lifecycle already creates the executable jar. After successful
 integration/report checks it uploads that build with source SHA and SHA-256 manifest.

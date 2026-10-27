@@ -84,3 +84,6 @@ jobs:
           IS_PR: ${{ github.event_name == 'pull_request' }}
           NEEDS_JSON: ${{ toJSON(needs) }}
         run: python3 scripts/ci/gate.py --security
+      - name: Reject workflow cancellation
+        if: cancelled()
+        run: exit 1
