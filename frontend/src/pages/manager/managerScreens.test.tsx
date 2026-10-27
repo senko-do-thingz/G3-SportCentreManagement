@@ -79,13 +79,20 @@ describe('FE-06 manager access and accounts', () => {
   })
   it('distinguishes loading, server errors with retry, and an empty list', async () => {
     authOnly()
-    let finish: (value: ReturnType<typeof paged<ManagerUser>>) => void = () => {}
-    const list = vi.spyOn(managerUsersApi, 'list').mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    let finish: ((value: ReturnType<typeof paged<ManagerUser>>) => void) | undefined
+    let markListStarted: () => void = () => {}
+    const listStarted = new Promise<void>((resolve) => { markListStarted = resolve })
+    const list = vi.spyOn(managerUsersApi, 'list').mockImplementationOnce(() => new Promise((resolve) => {
+      finish = resolve
+      markListStarted()
+    }))
     list.mockRejectedValueOnce(new ApiError(500, 'The user service is unavailable.')).mockResolvedValueOnce(paged([]))
     const user = userEvent.setup()
     renderApp('/manager')
     expect(await screen.findByText('Loading rows')).toBeInTheDocument()
-    await act(async () => finish(paged([staff])))
+    await listStarted
+    expect(finish).toBeDefined()
+    await act(async () => finish?.(paged([staff])))
     await screen.findByText('Daniel Smith')
     await user.selectOptions(screen.getByLabelText('Role'), 'COACH')
     expect(await screen.findByText('The user service is unavailable.')).toBeInTheDocument()
