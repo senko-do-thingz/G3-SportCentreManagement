@@ -33,10 +33,14 @@ describe('FE-07 schedule', () => {
     expect(screen.queryByText(/The facility dropdown API is not available/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled()
   })
-  it('renders exact week, cancelled reason and only valid actions', async () => {
+  it('renders the week as time-slot rows with the cancelled reason and valid actions', async () => {
     backend()
     renderApp(`/manager/schedule?week=${monday(date)}`)
     expect(await screen.findByText('Reason: Maintenance')).toBeInTheDocument()
+    const table = screen.getByRole('table', { name: 'Manager weekly schedule' })
+    expect(within(table).getAllByRole('columnheader')).toHaveLength(8)
+    expect(within(table).getAllByRole('row')).toHaveLength(2)
+    expect(table.querySelectorAll('.f2-session')).toHaveLength(2)
     expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(1)
     expect(screen.getAllByRole('button', { name: 'Cancel session' })).toHaveLength(1)
   })
