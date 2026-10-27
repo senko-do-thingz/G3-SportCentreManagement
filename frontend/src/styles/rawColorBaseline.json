@@ -17,9 +17,10 @@
     ":root[data-theme='dark'] .home-page { --h-icon-bg|rgba(138,168,255,0.12)": 1,
     ":root[data-theme='dark'] .home-page { --h-ink|#e8ecf6": 1,
     ":root[data-theme='dark'] .home-page { --h-muted|#96a0b8": 1,
-    ":root[data-theme='dark'] .home-page { --h-primary-hover|#5a83f3": 1,
+    ":root[data-theme='dark'] .home-page { --h-primary-active|#16389a": 1,
+    ":root[data-theme='dark'] .home-page { --h-primary-hover|#1a42b5": 1,
     ":root[data-theme='dark'] .home-page { --h-primary-text|#8aa8ff": 1,
-    ":root[data-theme='dark'] .home-page { --h-primary|#3d6cf0": 1,
+    ":root[data-theme='dark'] .home-page { --h-primary|#1f4fd8": 1,
     ":root[data-theme='dark'] .home-page { --h-shadow|rgba(0,0,0,0.4)": 1,
     ":root[data-theme='dark'] .home-page { --h-surface|#141c31": 1,
     ".credits-item { box-shadow|rgba(var(--h-overlay),0.08)": 1,
@@ -138,8 +139,7 @@
     ".home-venue::after { background|rgba(var(--h-overlay),0.9)": 1,
     "@media (max-width: 1100px) { .home-menu-toggle { background|rgba(255,255,255,0.1)": 1,
     "@media (max-width: 1100px) { .home-menu-toggle { border|rgba(255,255,255,0.45)": 1,
-    "@media (max-width: 1100px) { .home-menu-toggle { color|#ffffff": 1,
-    "@media (max-width: 1100px) { .home-nav { background|rgba(var(--h-overlay),0.92)": 1
+    "@media (max-width: 1100px) { .home-menu-toggle { color|#ffffff": 1
   },
   "src/styles/layouts.css": {
     ":root[data-theme='dark'] .member-layout__header { --member-header-blue|#172f70": 1,
