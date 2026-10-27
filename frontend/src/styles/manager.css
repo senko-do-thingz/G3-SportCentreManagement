@@ -90,6 +90,10 @@
 .manager-users-hero .page-header__description { color: var(--color-on-hero-muted); line-height: 1.6; }
 .manager-users-hero .page-header__actions { position: relative; z-index: 1; }
 .manager-users-hero .page-header__actions .btn { min-height: 48px; padding-inline: var(--space-6); border-radius: 0; font-weight: var(--weight-bold); }
+.manager-users-hero .manager-users-add-staff.btn--primary,
+.manager-users-hero .manager-users-add-staff.btn--primary:hover:not(:disabled) { background: var(--color-brand-mark); border-color: var(--color-brand-mark); color: var(--color-text-inverse); }
+.manager-users-hero .manager-users-add-staff.btn--primary:hover:not(:disabled) { filter: brightness(1.08); }
+.manager-users-hero .manager-users-add-staff.btn--primary:active:not(:disabled) { filter: brightness(0.94); }
 .manager-users-hero-note { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); padding-top: var(--space-4); border-top: 1px solid color-mix(in srgb, var(--color-on-hero) 20%, transparent); color: var(--color-on-hero-muted); font-size: var(--text-xs); }
 .manager-users-hero-note span:first-child { color: var(--color-hero-highlight); font-weight: var(--weight-bold); letter-spacing: var(--tracking-eyebrow); }
 .manager-users-directory { border-radius: var(--radius-lg); }
@@ -99,6 +103,8 @@
 .manager-users-filters { grid-template-columns: minmax(240px, 1.8fr) repeat(2, minmax(150px, 1fr)) auto; align-items: end; margin-block: var(--space-5); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-muted); }
 .manager-users-filters .btn { min-height: 42px; }
 .manager-users-directory .table { min-width: 860px; }
+.manager-users-directory .table-block, .manager-users-directory .table-scroll { min-width: 0; max-width: 100%; }
+.manager-users-directory .table-scroll { overscroll-behavior-x: contain; }
 .manager-users-directory .table th { padding-block: var(--space-4); }
 .manager-users-directory .table td { padding-block: var(--space-4); }
 .manager-user-identity { display: flex; align-items: center; gap: var(--space-3); min-width: 190px; }

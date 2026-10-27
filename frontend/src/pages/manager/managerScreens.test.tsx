@@ -112,7 +112,9 @@ describe('FE-06 manager access and accounts', () => {
     const create = vi.spyOn(managerUsersApi, 'create').mockResolvedValue(staff)
     const user = userEvent.setup()
     renderApp('/manager')
-    await user.click(await screen.findByRole('button', { name: '+ Add staff' }))
+    const addStaff = await screen.findByRole('button', { name: '+ Add staff' })
+    expect(addStaff).toHaveClass('btn--primary', 'manager-users-add-staff')
+    await user.click(addStaff)
     let dialog = within(screen.getByRole('dialog'))
     await user.click(dialog.getByRole('button', { name: 'Save account' }))
     expect(await dialog.findByText('Full name is required.')).toBeInTheDocument()
@@ -256,6 +258,71 @@ describe('FE-06 manager access and accounts', () => {
     fail = false
     await user.click(within(dialog).getByRole('button', { name: 'Try again' }))
     expect(await within(dialog).findByLabelText('Headline')).toHaveValue('')
+  })
+  it('supports coach menu keyboard navigation and dismisses it on outside click, scrolling, resize and account changes', async () => {
+    const receptionist: ManagerUser = { ...staff, id: 4, fullName: 'Jamie Tran', role: 'RECEPTIONIST' }
+    installFakeFetch((call) => {
+      if (call.path === '/users/me') return json(200, MANAGER)
+      if (call.path.startsWith('/manager/users?')) return json(200, paged([staff, receptionist]))
+      return backendError(404, 'Unexpected request')
+    })
+    const user = userEvent.setup()
+    renderApp('/manager')
+    const trigger = await screen.findByRole('button', { name: 'More actions for Daniel Smith' })
+
+    await user.click(trigger)
+    const menu = await screen.findByRole('menu', { name: 'More actions for Daniel Smith' })
+    const menuItem = within(menu).getByRole('menuitem', { name: 'Edit coach profile' })
+    expect(menuItem).toHaveFocus()
+    await user.keyboard('{ArrowDown}')
+    expect(menuItem).toHaveFocus()
+    await user.keyboard('{Shift>}{Tab}{/Shift}')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+
+    await user.click(trigger)
+    await screen.findByRole('menu')
+    await user.keyboard('{Tab}')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    const receptionistRow = screen.getByText('Jamie Tran').closest('tr')!
+    expect(within(receptionistRow).getByRole('button', { name: 'View profile' })).toHaveFocus()
+
+    await user.click(trigger)
+    await screen.findByRole('menu')
+    fireEvent.scroll(window)
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+
+    await user.click(trigger)
+    await screen.findByRole('menu')
+    fireEvent(window, new Event('resize'))
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+
+    await user.click(trigger)
+    await screen.findByRole('menu')
+    await user.click(document.body)
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+
+    await user.click(trigger)
+    await screen.findByRole('menu')
+    await user.type(screen.getByLabelText('Search accounts'), 'Jamie')
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+  })
+  it('returns focus after Escape and keeps the coach menu inside a narrow viewport', async () => {
+    vi.stubGlobal('innerWidth', 390)
+    vi.stubGlobal('innerHeight', 400)
+    authOnly()
+    vi.spyOn(managerUsersApi, 'list').mockResolvedValue(paged([staff]))
+    const user = userEvent.setup()
+    renderApp('/manager')
+    const trigger = await screen.findByRole('button', { name: 'More actions for Daniel Smith' })
+    vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue({ x: 365, y: 360, left: 365, right: 405, top: 360, bottom: 392, width: 40, height: 32, toJSON: () => ({}) })
+
+    await user.click(trigger)
+    const menu = await screen.findByRole('menu', { name: 'More actions for Daniel Smith' })
+    expect(menu).toHaveStyle({ left: '190px', top: '308px' })
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+    expect(trigger).toHaveFocus()
   })
   it('protects self-deactivation and requires confirmation before a single status write', async () => {
     authOnly()
