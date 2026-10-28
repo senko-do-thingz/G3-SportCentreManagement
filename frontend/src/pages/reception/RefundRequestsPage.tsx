@@ -17,6 +17,7 @@ import {
   type TableColumn,
 } from '../../components/ui'
 import { PaymentHero } from '../../components/PaymentHero'
+import { PaymentWorkspace } from '../../components/PaymentWorkspace'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { useResource } from '../../hooks/useResource'
@@ -63,7 +64,7 @@ export function RefundRequestsPage() {
   }
 
   return (
-    <div className="page">
+    <PaymentWorkspace>
       <PaymentHero
         eyebrow={EYEBROW}
         title="Refund Requests"
@@ -84,7 +85,7 @@ export function RefundRequestsPage() {
       ) : (
         <RegistrationPicker memberId={memberId} onMember={chooseMember} />
       )}
-    </div>
+    </PaymentWorkspace>
   )
 }
 
@@ -440,7 +441,7 @@ function MemberRefundQueues({ memberId }: { memberId: number }) {
       <p className="notice notice--info">Refund queues show only the selected member.</p>
       {queues.map((queue) => (
         <Card key={queue.caption} title={queue.title}>
-          <Table caption={queue.caption} columns={REFUND_COLUMNS} rows={queue.rows} rowKey={(row) => row.id} emptyTitle={queue.emptyTitle} />
+          <Table caption={queue.caption} scrollLabel={`${queue.caption} - scroll to view all columns`} columns={REFUND_COLUMNS} rows={queue.rows} rowKey={(row) => row.id} emptyTitle={queue.emptyTitle} />
         </Card>
       ))}
     </>

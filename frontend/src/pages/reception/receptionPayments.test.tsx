@@ -749,6 +749,7 @@ describe('FE-12 Refund Requests (F3-07)', () => {
   it('UI-32 refund pages use the Home theme hero', async () => {
     await open('/reception/refunds')
     const heading = screen.getByRole('heading', { level: 1, name: 'Refund Requests' })
+    expect(heading.closest('.payment-workspace')).toHaveClass('home-page')
     expect(heading.closest('header')).toHaveClass('payment-hero')
   })
 

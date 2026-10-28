@@ -4,6 +4,7 @@ import { getErrorMessage } from '../../api/errors'
 import { memberApi, type MemberCard, type PackageRegistration } from '../../api/memberApi'
 import { ONLINE_PAYMENT_METHODS, paymentsApi, type Payment } from '../../api/paymentsApi'
 import { PaymentHero } from '../../components/PaymentHero'
+import { PaymentWorkspace } from '../../components/PaymentWorkspace'
 import { Button, Card, EmptyState, ErrorState, StatusBadge } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
@@ -61,7 +62,7 @@ export function PaymentSummaryPage() {
   const id = parseIdParam(paymentId)
   if (id === null) {
     return (
-      <div className="page">
+      <PaymentWorkspace>
         <PaymentHero eyebrow={EYEBROW} title="Payment Summary" />
         <EmptyState
           title="Payment not found"
@@ -72,7 +73,7 @@ export function PaymentSummaryPage() {
             </Link>
           }
         />
-      </div>
+      </PaymentWorkspace>
     )
   }
   return <PaymentSummaryView key={id} paymentId={id} />
@@ -86,7 +87,7 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
 
   if (payment.status !== 'ready') {
     return (
-      <div className="page">
+      <PaymentWorkspace>
         <PaymentNav paymentId={paymentId} />
         <PaymentHero eyebrow={EYEBROW} title="Payment Summary" />
         {payment.status === 'loading' ? (
@@ -94,7 +95,7 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
         ) : (
           <ErrorState title="We could not load the payment" error={payment.error} onRetry={reload} />
         )}
-      </div>
+      </PaymentWorkspace>
     )
   }
 
@@ -102,7 +103,7 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
   // The amounts shown must belong to the payment in the link, never to another one.
   if (data.id !== paymentId) {
     return (
-      <div className="page">
+      <PaymentWorkspace>
         <PaymentNav paymentId={paymentId} />
         <PaymentHero eyebrow={EYEBROW} title="Payment Summary" />
         <EmptyState
@@ -114,7 +115,7 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
             </Link>
           }
         />
-      </div>
+      </PaymentWorkspace>
     )
   }
   const registrations = items.status === 'ready' ? items.data.registrations : []
@@ -126,7 +127,7 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
   const note = paymentSummaryNote(kind, priceBreakdown(data)?.discount ?? 0)
 
   return (
-    <div className="page">
+    <PaymentWorkspace>
       <PaymentNav paymentId={paymentId} />
       <PaymentHero
         eyebrow={EYEBROW}
@@ -173,7 +174,7 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
         </Card>
         <OrderSummary payment={data} singleVisit={singleVisit} onStale={reload} />
       </div>
-    </div>
+    </PaymentWorkspace>
   )
 }
 

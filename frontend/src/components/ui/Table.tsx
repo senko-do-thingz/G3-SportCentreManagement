@@ -24,6 +24,8 @@ export interface TableProps<T> {
   emptyDescription?: ReactNode
   /** Accessible name of the table. */
   caption?: string
+  /** Name a keyboard-focusable horizontal scroll region when wide data needs local scrolling. */
+  scrollLabel?: string
   pagination?: PaginationProps
 }
 
@@ -48,6 +50,7 @@ export function Table<T>({
   emptyTitle = 'No data yet',
   emptyDescription,
   caption,
+  scrollLabel,
   pagination,
 }: TableProps<T>) {
   if (error !== undefined && error !== null) {
@@ -62,7 +65,7 @@ export function Table<T>({
 
   return (
     <div className="table-block">
-      <div className={`table-scroll${showOverlay ? ' table-scroll--loading' : ''}`}>
+      <div className={`table-scroll${showOverlay ? ' table-scroll--loading' : ''}`} tabIndex={scrollLabel ? 0 : undefined} role={scrollLabel ? 'region' : undefined} aria-label={scrollLabel}>
         <table className="table">
           {caption && <caption className="visually-hidden">{caption}</caption>}
           <thead>
