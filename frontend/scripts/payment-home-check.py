@@ -100,7 +100,7 @@ console.log(new Function(code + ';return JSON.stringify({MEMBER,RECEPTIONIST,PAY
                 elif path == '/sports': data = [{'id': 1, 'code': 'FOOTBALL', 'name': 'Football'}]
                 elif path == '/sessions' or path.endswith('/payments/my'):
                     data = {'content': [], 'page': 0, 'size': 20, 'totalElements': 0, 'totalPages': 0}
-                r.fulfill(status=status, json=data, headers={'Access-Control-Allow-Origin': '*'})
+                r.fulfill(status=status, json=data, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'})
 
             context.route('**/api/v1/**', api)
             page = context.new_page()
@@ -232,6 +232,8 @@ console.log(new Function(code + ';return JSON.stringify({MEMBER,RECEPTIONIST,PAY
                     check('One refund POST', sum(r['method'] == 'POST' and r['path'] == '/refunds' for r in requests) == 1)
                 elif state == 'ineligible':
                     expect(page.get_by_role('button', name='Submit for approval')).to_be_disabled()
+                else:
+                    expect(page.get_by_role('heading', name='No approved refund is waiting', exact=True)).to_be_visible()
                 capture('UI-32', page, route, 'light', state, role)
                 ctx.unroute_all(behavior='ignoreErrors'); ctx.close()
             for width in [1440, 768, 390]:
