@@ -171,9 +171,11 @@ describe('shared UI components', () => {
     const columns = [{ key: 'name', header: 'Name' }]
     const rows = [{ id: 1, name: 'Taylor Nguyen' }]
     const { container, rerender } = render(
-      <Table caption="People" columns={columns} rows={rows} rowKey={(row) => row.id} />,
+      <Table caption="People" scrollLabel="People - scroll to view all columns" columns={columns} rows={rows} rowKey={(row) => row.id} />,
     )
+    expect(screen.getByRole('region', { name: 'People - scroll to view all columns' })).toHaveAttribute('tabindex', '0')
     rerender(<Table caption="People" columns={columns} rows={rows} rowKey={(row) => row.id} loading />)
+    expect(screen.queryByRole('region', { name: 'People - scroll to view all columns' })).not.toBeInTheDocument()
 
     expect(screen.getByText('Taylor Nguyen')).toBeInTheDocument()
     expect(container.querySelector('tbody')).toHaveAttribute('aria-busy', 'true')

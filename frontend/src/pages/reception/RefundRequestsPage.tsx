@@ -441,7 +441,7 @@ function MemberRefundQueues({ memberId }: { memberId: number }) {
       <p className="notice notice--info">Refund queues show only the selected member.</p>
       {queues.map((queue) => (
         <Card key={queue.caption} title={queue.title}>
-          <Table caption={queue.caption} columns={REFUND_COLUMNS} rows={queue.rows} rowKey={(row) => row.id} emptyTitle={queue.emptyTitle} />
+          <Table caption={queue.caption} scrollLabel={`${queue.caption} - scroll to view all columns`} columns={REFUND_COLUMNS} rows={queue.rows} rowKey={(row) => row.id} emptyTitle={queue.emptyTitle} />
         </Card>
       ))}
     </>

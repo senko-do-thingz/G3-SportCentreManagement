@@ -245,6 +245,13 @@ console.log(new Function(code + ';return JSON.stringify({MEMBER,RECEPTIONIST,PAY
                             check('Refund table remains scrollable locally', page.locator('.table-scroll').first.evaluate('(e)=>getComputedStyle(e).overflowX') == 'auto')
                             check('Refund action stays visible horizontally', page.get_by_role('link', name='Open refund REF-0011').evaluate('(e)=>{const a=e.getBoundingClientRect(),s=e.closest(".table-scroll").getBoundingClientRect();return a.left >= s.left && a.right <= s.right}'))
                             check('Refund action label stays on one line', page.get_by_role('link', name='Open refund REF-0011').evaluate('(e)=>getComputedStyle(e).whiteSpace') == 'nowrap')
+                            scroll = page.get_by_role('region', name='Approved refunds waiting to be refunded - scroll to view all columns')
+                            scroll.focus()
+                            if scroll.evaluate('(e)=>e.scrollWidth > e.clientWidth'):
+                                page.keyboard.press('ArrowRight')
+                                page.wait_for_timeout(200)
+                                check('Refund table scrolls with the keyboard', scroll.evaluate('(e)=>e.scrollLeft') > 0)
+                                scroll.evaluate('(e)=>e.scrollLeft=0')
                         elif state == 'refund-form':
                             expect(page.get_by_label('Refund amount')).to_have_value('450000')
                         else:
@@ -257,6 +264,8 @@ console.log(new Function(code + ';return JSON.stringify({MEMBER,RECEPTIONIST,PAY
                                 page.get_by_role('button', name='Menu', exact=True).click()
                                 expect(page.get_by_role('link', name='Refund requests', exact=True)).to_be_visible()
                         check('Refund page fits viewport', page.evaluate('document.documentElement.scrollWidth <= innerWidth'))
+                        for empty in page.locator('.table__state-cell').all():
+                            check('Empty refund queue fits its scroll region', empty.evaluate('(e)=>e.getBoundingClientRect().width <= e.closest(".table-scroll").clientWidth + 1'))
                         capture('UI-32', page, route, theme, state, role)
                         ctx.unroute_all(behavior='ignoreErrors'); ctx.close()
             for status in ['PENDING', 'REJECTED']:
