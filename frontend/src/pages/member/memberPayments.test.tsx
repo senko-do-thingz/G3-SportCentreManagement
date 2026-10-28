@@ -236,6 +236,7 @@ describe('FE-11 Payment Summary (F3-01, S3-Single)', () => {
     renderApp('/member/payments/52')
     const heading = await screen.findByRole('heading', { level: 1, name: 'Payment Summary' })
     const hero = heading.closest('header')
+    expect(heading.closest('.payment-workspace')).toHaveClass('home-page')
     expect(hero).toHaveClass('payment-hero')
     expect(within(hero as HTMLElement).getByText('Member / Payments')).toHaveClass('payment-hero__eyebrow')
   })
@@ -581,6 +582,7 @@ describe('FE-11 Payment Instructions and Status (F3-02)', () => {
     paymentsBackend()
     renderApp('/member/payments/52/status')
     const heading = await screen.findByRole('heading', { level: 1, name: 'Payment Instructions and Status' })
+    expect(heading.closest('.payment-workspace')).toHaveClass('home-page')
     expect(heading.closest('header')).toHaveClass('payment-hero')
   })
 

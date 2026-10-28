@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useMatch } from 'react-router-dom'
 import { AccountSwitchNotice } from '../components/AccountSwitchNotice'
 import { Brand } from '../components/Brand'
 import { areaItems, itemHref, MEMBER_AREA } from './navigation'
@@ -7,8 +7,10 @@ import { AppearanceControl } from '../theme/AppearanceControl'
 
 /** Member area: brand and user on top, tab navigation below (Figma F1-07, F1-09). */
 export function MemberLayout() {
+  const summary = useMatch('/member/payments/:paymentId')
+  const status = useMatch('/member/payments/:paymentId/status')
   return (
-    <div className="member-layout">
+    <div className={`member-layout${summary || status ? ' home-page payment-area' : ''}`}>
       <header className="member-layout__header">
         <div className="member-header__bar container">
           <Brand />

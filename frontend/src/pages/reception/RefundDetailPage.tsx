@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { getErrorMessage } from '../../api/errors'
 import { receptionPaymentsApi, type Refund } from '../../api/receptionPaymentsApi'
 import { PaymentHero } from '../../components/PaymentHero'
+import { PaymentWorkspace } from '../../components/PaymentWorkspace'
 import { Button, Card, Checkbox, EmptyState, ErrorState, Modal, useToast } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
@@ -63,40 +64,40 @@ export function RefundDetailPage() {
 
   if (id !== null && memberId === null) {
     return (
-      <div className="page">
+      <PaymentWorkspace>
         <PaymentHero eyebrow={EYEBROW} title="Select the refund member" />
         <EmptyState title="Member context required" description="Select the member in Refund requests, then reopen this refund. Keep the memberId in the link to reload any refund status." action={back} />
-      </div>
+      </PaymentWorkspace>
     )
   }
 
   if (refund.status === 'loading') {
     return (
-      <div className="page">
+      <PaymentWorkspace>
         <PaymentHero eyebrow={EYEBROW} title="Refund" />
         <Spinner label="Loading the refund" />
-      </div>
+      </PaymentWorkspace>
     )
   }
   if (refund.status === 'error') {
     return (
-      <div className="page">
+      <PaymentWorkspace>
         <PaymentHero eyebrow={EYEBROW} title="Refund" />
         <ErrorState title="We could not load the refund" error={refund.error} onRetry={reload} />
         <div className="reception-actions">{back}</div>
-      </div>
+      </PaymentWorkspace>
     )
   }
   if (refund.data === null) {
     return (
-      <div className="page">
+      <PaymentWorkspace>
         <PaymentHero eyebrow={EYEBROW} title="Refund" />
         <EmptyState
           title="Refund not found"
           description="Open the refund again from the approved queue or the member's refunds."
           action={back}
         />
-      </div>
+      </PaymentWorkspace>
     )
   }
 
@@ -196,14 +197,14 @@ function RefundState({
   children: ReactNode
 }) {
   return (
-    <div className="page">
+    <PaymentWorkspace>
       <PaymentHero eyebrow={EYEBROW} title={title} description={description} />
       <Card title={heading} aria-label="Refund">
         <RefundProgress stage={stage} />
         <dl className="summary-list payment-rows payment-rows--narrow">{children}</dl>
         <div className="reception-actions">{back}</div>
       </Card>
-    </div>
+    </PaymentWorkspace>
   )
 }
 
@@ -243,7 +244,7 @@ function RefundApproved({ refund, back, onCompleted }: { refund: Refund; back: R
   }
 
   return (
-    <div className="page">
+    <PaymentWorkspace>
       <PaymentHero
         eyebrow={EYEBROW}
         title="Refund Approved"
@@ -281,6 +282,7 @@ function RefundApproved({ refund, back, onCompleted }: { refund: Refund; back: R
         </form>
       </Card>
       <Modal
+        className="home-page payment-dialog"
         open={confirming}
         onClose={() => !saving && setConfirming(false)}
         dismissible={!saving}
@@ -299,6 +301,6 @@ function RefundApproved({ refund, back, onCompleted }: { refund: Refund; back: R
       >
         <p className="notice notice--warning">Record it only after the money has actually been returned to the member.</p>
       </Modal>
-    </div>
+    </PaymentWorkspace>
   )
 }

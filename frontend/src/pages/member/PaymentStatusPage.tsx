@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { getErrorMessage } from '../../api/errors'
 import type { Payment } from '../../api/paymentsApi'
 import { PaymentHero } from '../../components/PaymentHero'
+import { PaymentWorkspace } from '../../components/PaymentWorkspace'
 import { Button, Card, EmptyState, ErrorState, StatusBadge, useToast } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
@@ -35,7 +36,7 @@ export function PaymentStatusPage() {
   const id = parseIdParam(paymentId)
   if (id === null) {
     return (
-      <div className="page">
+      <PaymentWorkspace>
         <PaymentHero eyebrow="Member / Payments" title="Payment Instructions and Status" />
         <EmptyState
           title="Payment not found"
@@ -46,7 +47,7 @@ export function PaymentStatusPage() {
             </Link>
           }
         />
-      </div>
+      </PaymentWorkspace>
     )
   }
   return <PaymentStatusView key={id} paymentId={id} />
@@ -80,7 +81,7 @@ function PaymentStatusView({ paymentId }: { paymentId: number }) {
 
   if (!payment) {
     return (
-      <div className="page">
+      <PaymentWorkspace>
         <PaymentNav paymentId={paymentId} />
         {header}
         {loadError ? (
@@ -88,19 +89,19 @@ function PaymentStatusView({ paymentId }: { paymentId: number }) {
         ) : (
           <Spinner label="Loading the payment" />
         )}
-      </div>
+      </PaymentWorkspace>
     )
   }
 
   return (
-    <div className="page">
+    <PaymentWorkspace>
       <PaymentNav paymentId={paymentId} />
       {header}
       <div className="payment-summary">
         <Instructions payment={payment} />
         <StatusPanel polling={polling} payment={payment} />
       </div>
-    </div>
+    </PaymentWorkspace>
   )
 }
 
