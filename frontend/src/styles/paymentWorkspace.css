@@ -163,7 +163,8 @@
 .payment-workspace .notice,
 .payment-workspace .table-scroll,
 .payment-workspace .copy-value__button,
-.payment-workspace .refund-steps__step {
+.payment-workspace .refund-steps__step,
+.payment-workspace .member-results__item {
   border-radius: 0;
 }
 
@@ -194,6 +195,27 @@
 
 .payment-workspace .table td {
   overflow-wrap: anywhere;
+}
+
+/* Keep financial columns readable and the action reachable while the data scrolls locally. */
+.payment-workspace .table {
+  min-width: 56rem;
+}
+
+.payment-workspace .table :is(th, td):last-child {
+  position: sticky;
+  right: 0;
+  min-width: 140px;
+  border-left: 1px solid var(--h-border);
+  background: var(--h-surface);
+}
+
+.payment-workspace .table th:last-child {
+  background: var(--h-band);
+}
+
+.payment-workspace .table .btn {
+  white-space: nowrap;
 }
 
 .payment-workspace .refund-steps__step[data-state='current'] {
@@ -251,7 +273,7 @@
   text-transform: uppercase;
 }
 
-:is(.member-layout, .staff-layout):has(.payment-workspace) :is(.appearance, .appearance__select, .user-menu__logout, .member-nav__link, .sidebar__link) {
+:is(.member-layout, .staff-layout):has(.payment-workspace) :is(.appearance, .appearance__select, .user-menu__logout, .member-nav__link, .sidebar__link, .sidebar__toggle) {
   border-radius: 0;
 }
 

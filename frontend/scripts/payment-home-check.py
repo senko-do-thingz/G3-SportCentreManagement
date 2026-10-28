@@ -243,6 +243,8 @@ console.log(new Function(code + ';return JSON.stringify({MEMBER,RECEPTIONIST,PAY
                         if state == 'populated-queues':
                             expect(page.get_by_role('link', name='Open refund REF-0011')).to_be_visible()
                             check('Refund table remains scrollable locally', page.locator('.table-scroll').first.evaluate('(e)=>getComputedStyle(e).overflowX') == 'auto')
+                            check('Refund action stays visible horizontally', page.get_by_role('link', name='Open refund REF-0011').evaluate('(e)=>{const a=e.getBoundingClientRect(),s=e.closest(".table-scroll").getBoundingClientRect();return a.left >= s.left && a.right <= s.right}'))
+                            check('Refund action label stays on one line', page.get_by_role('link', name='Open refund REF-0011').evaluate('(e)=>getComputedStyle(e).whiteSpace') == 'nowrap')
                         elif state == 'refund-form':
                             expect(page.get_by_label('Refund amount')).to_have_value('450000')
                         else:
