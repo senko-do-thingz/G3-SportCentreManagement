@@ -11,7 +11,8 @@ import { PaymentWorkspaceHeader } from './PaymentWorkspaceHeader'
 export function MemberLayout() {
   const summary = useMatch('/member/payments/:paymentId')
   const status = useMatch('/member/payments/:paymentId/status')
-  const paymentRoute = Boolean(summary || status)
+  const qrDemo = useMatch('/member/payments/:paymentId/qr-demo')
+  const paymentRoute = Boolean(summary || status || qrDemo)
   const [menuOpen, setMenuOpen] = useState(false)
   const navigation = (
     <nav className={`member-nav${paymentRoute ? ` payment-workspace-navigation${menuOpen ? ' payment-workspace-navigation--open' : ''}` : ''}`} aria-label="Member navigation" id="member-navigation">
@@ -26,7 +27,7 @@ export function MemberLayout() {
     </nav>
   )
   return (
-    <div className={`member-layout${summary || status ? ' home-page payment-area' : ''}`}>
+    <div className={`member-layout${paymentRoute ? ' home-page payment-area' : ''}`}>
       {paymentRoute ? <PaymentWorkspaceHeader menuId="member-navigation" menuOpen={menuOpen} onMenuChange={setMenuOpen} navigation={navigation} /> : <header className="member-layout__header">
         <div className="member-header__bar container">
           <Brand />

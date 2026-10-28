@@ -16,6 +16,7 @@ import { MyProfilePage } from '../pages/member/MyProfilePage'
 import { PackageDetailPage } from '../pages/member/PackageDetailPage'
 import { PaymentStatusPage } from '../pages/member/PaymentStatusPage'
 import { PaymentSummaryPage } from '../pages/member/PaymentSummaryPage'
+const QrPaymentDemoPage = lazy(() => import('../pages/member/QrPaymentDemoPage').then((module) => ({ default: module.QrPaymentDemoPage })))
 import { ReceiptPage } from '../pages/member/ReceiptPage'
 import { SportPackagesPage } from '../pages/member/SportPackagesPage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
@@ -118,6 +119,7 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
     { path: 'membership/cards', element: <MembershipCardsPage /> },
     { path: 'payments/:paymentId', element: <PaymentSummaryPage /> },
     { path: 'payments/:paymentId/status', element: <PaymentStatusPage /> },
+    { path: 'payments/:paymentId/qr-demo', element: <Suspense fallback={<PageLoader label="Loading QR demo" />}><QrPaymentDemoPage /></Suspense> },
     { path: 'payments/receipts/:invoiceId', element: <ReceiptPage /> },
   ],
   '/reception': [
