@@ -31,10 +31,13 @@ def main():
     parser.add_argument('--out', required=True)
     parser.add_argument('--phase', choices=['before', 'after'], default='after')
     parser.add_argument('--smoke', action='store_true', help='Only the mobile theme and interaction matrix')
+    parser.add_argument('--round', default='round-01', help='Task evidence round directory')
+    parser.add_argument('--parity', action='store_true', help='Run direct Home component parity and interaction acceptance')
+    parser.add_argument('--reference-dev-base', default='http://127.0.0.1:5187', help='Same-source dev-only shared component catalogue')
     args = parser.parse_args()
     label = args.phase + ('-smoke' if args.smoke else '')
     out = Path(args.out)
-    integration = out / 'integration-f-i/round-01'
+    integration = out / f'integration-f-i/{args.round}'
     integration.mkdir(parents=True, exist_ok=True)
     # Reuse the repository's established synthetic payment fixtures.
     fixture_script = """const fs = require('node:fs');
@@ -59,7 +62,7 @@ console.log(new Function(code + ';return JSON.stringify({MEMBER,RECEPTIONIST,PAY
             if role != 'GUEST':
                 storage.update({'sportify.accessToken': 'payment-browser-fixture', 'sportify.refreshToken': 'fixture-refresh',
                                 'sportify.sessionId': 'payment-browser-fixture'})
-            context.add_init_script(f'for (const [k,v] of Object.entries({json.dumps(storage)})) localStorage.setItem(k,v)')
+            context.add_init_script(f'for (const [k,v] of Object.entries({json.dumps(storage)})) if (localStorage.getItem(k) === null) localStorage.setItem(k,v)')
             requests = []
             model = {'status': 'PENDING', 'refund': 'APPROVED', 'mode': state}
             payment = dict(fixtures['PAYMENT_SINGLE'] if state == 'single-visit' else fixtures['PAYMENT_PACKAGE'])
@@ -98,6 +101,7 @@ console.log(new Function(code + ';return JSON.stringify({MEMBER,RECEPTIONIST,PAY
                     model['refund'] = 'COMPLETED'
                     data = dict(fixtures['REFUND_11'], status='COMPLETED')
                 elif path == '/sports': data = [{'id': 1, 'code': 'FOOTBALL', 'name': 'Football'}]
+                elif args.parity and path == '/coaches/public': data = [{'id': 22, 'fullName': 'Demo Coach', 'sportIds': [1], 'headline': 'Football coach', 'yearsExperience': 4}]
                 elif path == '/sessions' or path.endswith('/payments/my'):
                     data = {'content': [], 'page': 0, 'size': 20, 'totalElements': 0, 'totalPages': 0}
                 r.fulfill(status=status, json=data, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'})
@@ -110,7 +114,7 @@ console.log(new Function(code + ';return JSON.stringify({MEMBER,RECEPTIONIST,PAY
             page.evaluate('document.fonts.ready')
             if code == 'UI-27' and state not in ['loading', 'error', 'invalid-link']:
                 expect(page.get_by_role('region', name='Order summary')).to_be_visible()
-            elif code == 'UI-28' and state not in ['loading', 'error']:
+            elif code == 'UI-28' and state not in ['loading', 'error', 'invalid-link']:
                 expect(page.get_by_role('region', name='Payment status')).to_be_visible()
             elif code == 'UI-32' and '/11?' in route and state not in ['loading', 'error', 'empty']:
                 expect(page.get_by_role('heading', name='Refund Approved', exact=True)).to_be_visible()
@@ -124,9 +128,10 @@ console.log(new Function(code + ';return JSON.stringify({MEMBER,RECEPTIONIST,PAY
         def capture(code, page, route, theme, state, role):
             width = page.viewport_size['width']
             viewport = 'desktop' if width == 1440 else 'tablet' if width == 768 else 'effective-200pct' if width == 720 else 'mobile'
-            prefix = f'{code}-f-i-{args.phase}' if code != 'HOME' else f'HOME-reference-{args.phase}'
+            round_label = '' if args.round == 'round-01' else f'{args.round}-'
+            prefix = f'{code}-f-i-{round_label}{args.phase}' if code != 'HOME' else f'HOME-reference-{round_label}{args.phase}'
             if args.smoke: prefix += '-smoke'
-            folder = out / f'{code}-f-i/round-01/screenshots' if code != 'HOME' else integration / 'screenshots'
+            folder = out / f'{code}-f-i/{args.round}/screenshots' if code != 'HOME' else integration / 'screenshots'
             folder.mkdir(parents=True, exist_ok=True)
             file = folder / f'{prefix}-{theme}-{viewport}-{width}-{state}.png'
             page.screenshot(path=str(file), full_page='modal' not in state, animations='disabled')
@@ -137,6 +142,12 @@ console.log(new Function(code + ';return JSON.stringify({MEMBER,RECEPTIONIST,PAY
                 'browser': report['browser'], 'mode': report['mode'], 'time': datetime.now(timezone.utc).isoformat(),
                 'masks': 'none; synthetic data only', 'exists': file.is_file(), 'hash': hashlib.sha256(file.read_bytes()).hexdigest()})
             (integration / f'payment-browser-{label}.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
+
+        if args.parity:
+            from payment_home_parity import run_parity
+            run_parity(args, out, integration, browser, open_page, report, contrast)
+            browser.close()
+            return
 
         routes = {'UI-27': '/member/payments/52', 'UI-28': '/member/payments/52/status', 'UI-32': '/reception/refunds/11?memberId=2', 'HOME': '/'}
         for code, route in routes.items():

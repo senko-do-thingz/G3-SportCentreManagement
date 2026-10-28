@@ -6,6 +6,7 @@ import { Brand } from '../components/Brand'
 import { findActiveItem, itemHref, STAFF_AREAS } from './navigation'
 import { UserMenu } from './UserMenu'
 import { AppearanceControl } from '../theme/AppearanceControl'
+import { PaymentWorkspaceHeader } from './PaymentWorkspaceHeader'
 
 /**
  * Workspace for RECEPTIONIST, MANAGER and COACH: side navigation with the menu of the signed in
@@ -22,9 +23,16 @@ export function StaffLayout() {
   const activeItem = findActiveItem(area, location.pathname)
 
   return (
-    <div className={`staff-layout${menuOpen ? ' staff-layout--menu-open' : ''}${refundRoute ? ' home-page payment-area' : ''}`}>
+    <div className={`staff-layout${menuOpen ? ' staff-layout--menu-open' : ''}${refundRoute ? ' home-page payment-area' : ''}`} onKeyDown={(event) => {
+      if (refundRoute && menuOpen && event.key === 'Escape') {
+        event.preventDefault()
+        setMenuOpen(false)
+        event.currentTarget.querySelector<HTMLButtonElement>('.home-menu-toggle')?.focus()
+      }
+    }}>
+      {refundRoute && <PaymentWorkspaceHeader menuId="staff-menu" menuOpen={menuOpen} onMenuChange={setMenuOpen} />}
       <aside className="sidebar" aria-label={area.workspaceLabel}>
-        <div className="sidebar__brand">
+        {!refundRoute && <div className="sidebar__brand">
           <Brand />
           <button
             type="button"
@@ -35,7 +43,7 @@ export function StaffLayout() {
           >
             Menu
           </button>
-        </div>
+        </div>}
         <nav className="sidebar__nav" id="staff-menu">
           <p className="sidebar__workspace">{area.workspaceLabel}</p>
           {area.sections.map((section, sectionIndex) => (
@@ -61,12 +69,12 @@ export function StaffLayout() {
         </div>
       </aside>
       <div className="staff-main">
-        <header className="staff-topbar">
+        {!refundRoute && <header className="staff-topbar">
           <p className="staff-topbar__breadcrumb">
             Sportify Center / <span>{activeItem?.title ?? 'Workspace'}</span>
           </p>
           <div className="header-actions"><AppearanceControl /><UserMenu /></div>
-        </header>
+        </header>}
         <main className="staff-content" id="main-content">
           <AccountSwitchNotice />
           <Outlet />

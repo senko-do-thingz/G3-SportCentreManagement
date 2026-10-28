@@ -282,7 +282,7 @@ function RefundApproved({ refund, back, onCompleted }: { refund: Refund; back: R
         </form>
       </Card>
       <Modal
-        className="home-page payment-dialog"
+        className="payment-dialog"
         open={confirming}
         onClose={() => !saving && setConfirming(false)}
         dismissible={!saving}

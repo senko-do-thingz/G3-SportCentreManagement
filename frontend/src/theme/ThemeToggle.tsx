@@ -1,8 +1,8 @@
 import { useTheme } from './useTheme'
 
 /**
- * Light and dark switch shared by Home and Log in, so the public screens look the same; app headers keep the
- * three-way AppearanceControl. The icon shows the current mode (sun for light, moon for dark); the label names the action.
+ * Light and dark switch shared by Home, authentication and payment workspace headers.
+ * The icon shows the current mode (sun for light, moon for dark); the label names the action.
  */
 export function ThemeToggle({ className = 'theme-toggle' }: { className?: string }) {
   const { resolved, setPreference } = useTheme()
