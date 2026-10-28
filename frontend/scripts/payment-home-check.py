@@ -130,7 +130,9 @@ console.log(new Function(code + ';return JSON.stringify({MEMBER,RECEPTIONIST,PAY
             folder.mkdir(parents=True, exist_ok=True)
             file = folder / f'{prefix}-{theme}-{viewport}-{width}-{state}.png'
             page.screenshot(path=str(file), full_page='modal' not in state, animations='disabled')
-            report['screenshots'].append({'ui': code, 'path': str(file.relative_to(out)), 'sha': sha, 'route': route,
+            actual_url = urlparse(page.url)
+            actual_route = actual_url.path + ('?' + actual_url.query if actual_url.query else '')
+            report['screenshots'].append({'ui': code, 'path': str(file.relative_to(out)), 'sha': sha, 'route': actual_route, 'requestedRoute': route,
                 'viewport': f"{width}x{page.viewport_size['height']}", 'theme': theme, 'state': state, 'role': role,
                 'browser': report['browser'], 'mode': report['mode'], 'time': datetime.now(timezone.utc).isoformat(),
                 'masks': 'none; synthetic data only', 'exists': file.is_file(), 'hash': hashlib.sha256(file.read_bytes()).hexdigest()})
@@ -291,6 +293,7 @@ console.log(new Function(code + ';return JSON.stringify({MEMBER,RECEPTIONIST,PAY
             capture('HOME', page, '/', 'light', 'dropdown-open', role)
             page.keyboard.press('Escape')
             ctx.unroute_all(behavior='ignoreErrors'); ctx.close()
+        check('No uncaught browser errors', not report['consoleErrors'], report['consoleErrors'])
         browser.close()
     log = integration / f'payment-browser-{label}.json'
     log.write_text(json.dumps(report, indent=2), encoding='utf-8')
