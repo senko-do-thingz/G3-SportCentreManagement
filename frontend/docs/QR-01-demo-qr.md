@@ -1,5 +1,7 @@
 # QR-01 non-payable QR interface demo
 
+Historical QR-01 baseline. QR-03 supersedes the fixed VERSION=1 payload with bank-aware VERSION=2 text; see QR-03-dynamic-demo-qr.md for the current contract.
+
 Owner: Senko (Dat). New teacher-feedback enhancement, separate from Flow 4-6 requirements.
 Baseline: approved main after UI alignment PR #158. Home, payment enums, APIs and refunds are unchanged.
 

@@ -86,6 +86,10 @@ describe('QR-01 guarded demo route and payment integration', () => {
   it.each([
     payment({ id: 53 }),
     payment({ amount: 'not-an-amount' }),
+    payment({ amount: 0 }),
+    payment({ amount: -1 }),
+    payment({ amount: '0' }),
+    payment({ amount: '-0.01' }),
   ])('does not expose mismatched or malformed DTOs', async (data) => {
     backend({ data })
     renderApp('/member/payments/52/qr-demo')

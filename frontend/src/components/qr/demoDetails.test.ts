@@ -14,7 +14,7 @@ describe('QR-02 display-only details', () => {
     expect(normalizeDemoBank(value)).toBe('vietcombank')
   })
 
-  it.each(DEMO_BANK_OPTIONS)('copies deterministic safe details for $label without changing the QR', ({ value, label }) => {
+  it.each(DEMO_BANK_OPTIONS)('copies deterministic safe details for $label independently of QR data', ({ value, label }) => {
     const bank = normalizeDemoBank(value)
     expect(demoDetails(payment({ amount: '731234' }), bank)).toBe([
       `Demo bank: ${label}`,
@@ -23,8 +23,8 @@ describe('QR-02 display-only details', () => {
       'Demo reference: DEMO-52',
       'DEMO ONLY - NOT A REAL PAYMENT',
     ].join('\n'))
-    expect(DEMO_BANKS[bank]).toBe(label)
-    expect(demoQrPayload(52)).toBe('SPORTIFY_DEMO_QR|VERSION=1|PAYMENT_ID=52|MODE=NON_PAYABLE|BANK_LABEL=VIETCOMBANK_DEMO')
+    expect(DEMO_BANKS[bank].label).toBe(label)
+    expect(demoQrPayload(52, bank)).toContain(`BANK_CODE=${DEMO_BANKS[bank].code}`)
   })
 
   it('rejects missing/unsafe IDs and amounts rather than inventing copy data', () => {
@@ -32,5 +32,9 @@ describe('QR-02 display-only details', () => {
     expect(() => demoReference(0)).toThrow()
     expect(() => demoReference('52|ACCOUNT=1234567890' as unknown as number)).toThrow()
     expect(() => demoDetails(payment({ amount: 'invalid' }), 'mb')).toThrow('Demo amount unavailable')
+  })
+
+  it.each([0, -1, '0', '-0.01', '', ' ', NaN, Infinity])('does not copy an ineligible demo amount %s', (amount) => {
+    expect(() => demoDetails(payment({ amount }), 'mb')).toThrow('Demo amount unavailable')
   })
 })

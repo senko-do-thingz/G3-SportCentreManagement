@@ -1,22 +1,15 @@
 import type { Payment } from '../../api/paymentsApi'
 import { formatPaymentMoney } from '../../pages/member/paymentsModel'
 import { demoQrPayload } from './demoQr'
+import { DEMO_BANKS, normalizeDemoBank, type DemoBank } from './demoBanks'
 
-export const DEMO_BANKS = {
-  vietcombank: 'Vietcombank (demo)',
-  bidv: 'BIDV (demo)',
-  techcombank: 'Techcombank (demo)',
-  mb: 'MB Bank (demo)',
-} as const
-
-export type DemoBank = keyof typeof DEMO_BANKS
-export const DEFAULT_DEMO_BANK: DemoBank = 'vietcombank'
-export const DEMO_BANK_OPTIONS = Object.entries(DEMO_BANKS).map(([value, label]) => ({ value, label }))
+export { DEFAULT_DEMO_BANK, DEMO_BANK_OPTIONS, DEMO_BANKS, normalizeDemoBank, type DemoBank } from './demoBanks'
 export const DEMO_ACCOUNT = 'DEMO - NOT AVAILABLE'
 export const DEMO_WARNING = 'DEMO ONLY - NOT A REAL PAYMENT'
 
-export function normalizeDemoBank(value: unknown): DemoBank {
-  return typeof value === 'string' && Object.hasOwn(DEMO_BANKS, value) ? value as DemoBank : DEFAULT_DEMO_BANK
+/** QR demo eligibility only; does not reprice or mutate the underlying payment. */
+export function demoPaymentAmountAvailable(amount: Payment['amount']): boolean {
+  return (typeof amount === 'number' || typeof amount === 'string') && Number(amount) > 0 && formatPaymentMoney(amount) !== '-'
 }
 
 export function demoReference(paymentId: number): string {
@@ -28,9 +21,9 @@ export function demoReference(paymentId: number): string {
 export function demoDetails(payment: Pick<Payment, 'id' | 'amount'>, bank: DemoBank): string {
   const reference = demoReference(payment.id)
   const amount = formatPaymentMoney(payment.amount)
-  if (amount === '-') throw new Error('Demo amount unavailable')
+  if (!demoPaymentAmountAvailable(payment.amount)) throw new Error('Demo amount unavailable')
   return [
-    `Demo bank: ${DEMO_BANKS[normalizeDemoBank(bank)]}`,
+    `Demo bank: ${DEMO_BANKS[normalizeDemoBank(bank)].label}`,
     `Account: ${DEMO_ACCOUNT}`,
     `Amount from payment: ${amount}`,
     `Demo reference: ${reference}`,
