@@ -1,9 +1,11 @@
-.demo-session-panel { border-top: 1px solid var(--h-line); margin-top: var(--space-6); padding-top: var(--space-6); }
+.demo-session-panel { border-top: 1px solid var(--h-border); margin-top: var(--space-6); padding-top: var(--space-6); }
 .demo-session-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-5); }
 .demo-session-actions .btn { min-height: 2.75rem; white-space: normal; }
 .demo-confirm-page { max-width: 56rem; margin-inline: auto; }
 .demo-confirm-page .card { min-width: 0; }
 .demo-confirm-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); margin-block: var(--space-5); }
+.demo-confirm-header .home-theme { color: var(--h-ink); background: var(--h-surface); border: 1px solid var(--h-border); }
+.demo-confirm-header .home-theme:hover { background: var(--h-band); }
 .demo-confirm-form { display: grid; gap: var(--space-4); max-width: 30rem; }
 .demo-confirm-page .summary-list dd { overflow-wrap: anywhere; }
 @media (max-width: 30rem) {
