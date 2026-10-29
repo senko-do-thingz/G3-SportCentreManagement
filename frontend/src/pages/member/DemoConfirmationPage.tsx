@@ -1,22 +1,47 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { demoQrApi, type DemoSession } from '../../api/demoQrApi'
 import { validateLogin } from '../../auth/loginValidation'
 import { useAuth } from '../../auth/useAuth'
+import { homePathFor } from '../../auth/roles'
 import { Brand } from '../../components/Brand'
 import { PaymentWorkspace } from '../../components/PaymentWorkspace'
 import { DemoSessionSummary } from '../../components/qr/DemoSessionSummary'
 import { Button, Card, Input, PasswordInput } from '../../components/ui'
 import { ThemeToggle } from '../../theme/ThemeToggle'
 import { qrPaymentDemoEnabled } from '../../config/env'
-import { NotFoundPage } from '../public/NotFoundPage'
 import '../../components/qr/demoSession.css'
 
 import { confirmationToken } from '../../components/qr/confirmationLink'
 
 export function DemoConfirmationPage() {
-  if (!qrPaymentDemoEnabled()) return <NotFoundPage />
+  if (!qrPaymentDemoEnabled()) return <DemoConfirmationDisabled />
   return <DemoConfirmationContent />
+}
+
+/** Reuse the approved Home/workspace brand composition for every public demo state. */
+function DemoConfirmationLayout({ children }: { children: ReactNode }) {
+  return <div className="home-page payment-area"><meta name="referrer" content="no-referrer" />
+    <header className="home-header workspace-header demo-confirm-header">
+      <div className="home-wrap home-header__bar">
+        <Brand compact />
+        <div className="home-account"><ThemeToggle className="home-theme" /></div>
+      </div>
+    </header>
+    <main id="main-content" className="container demo-confirm-page">
+      <PaymentWorkspace>{children}</PaymentWorkspace>
+    </main>
+  </div>
+}
+
+function DemoConfirmationDisabled() {
+  const { status, user } = useAuth()
+  const target = status === 'authenticated' ? homePathFor(user) : '/login'
+  return <DemoConfirmationLayout>
+    <h1>Page not found</h1>
+    <p>The page you are looking for does not exist or has been moved.</p>
+    <p><Link to={target === '/403' ? '/login' : target}>{status === 'authenticated' ? 'Back to my home page' : 'Go to log in'}</Link></p>
+  </DemoConfirmationLayout>
 }
 
 function DemoConfirmationContent() {
@@ -34,10 +59,7 @@ function DemoConfirmationContent() {
   useLayoutEffect(() => {
     if (location.hash) navigate({ pathname: location.pathname, search: '', hash: '' }, { replace: true, state: null })
   }, [location.hash, location.pathname, navigate])
-  return <div className="home-page payment-area"><meta name="referrer" content="no-referrer" />
-    <main id="main-content" className="container demo-confirm-page">
-      <header className="demo-confirm-header"><Brand compact /><ThemeToggle className="home-theme" /></header>
-      <PaymentWorkspace>
+  return <DemoConfirmationLayout>
         <h1>Demo payment confirmation</h1>
         <p className="notice notice--warning">DEMO ONLY - NO MONEY TRANSFER</p>
         <p>This is a time-limited simulation link, not a payment request. Opening it never confirms anything.</p>
@@ -48,9 +70,7 @@ function DemoConfirmationContent() {
           : role !== 'MEMBER' ? <Card title="Owner sign-in required"><p role="alert">Only the member who owns this demo session can access it. Sign out and rescan with the owner account.</p></Card>
           : <DemoSessionControls key={`${user!.id}:${capture.generation}`} token={token} />}
         <p><Link to="/">Back to Home</Link></p>
-      </PaymentWorkspace>
-    </main>
-  </div>
+  </DemoConfirmationLayout>
 }
 
 /** A different account gets a fresh component, so no previous owner's snapshot can render. */
