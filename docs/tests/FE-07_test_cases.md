@@ -10,6 +10,12 @@
 | AC1 weekly schedule | Four inclusive Mondays produce four sessions; request uses range/weekdays, seconds, training type and no date/status | `managerSchedule.test.tsx` |
 | AC2 conflict | Every exact conflict is displayed, including missing-resource fallback, and editor values survive dismissal | `managerSchedule.test.tsx`, `managerSessionsApi.test.ts` |
 | AC3 cancellation | Cancelled reason is visible and cancelled cards have no management actions; reason is required | `managerSchedule.test.tsx` |
+| Weekly timetable | Labels start-time grouping explicitly and shows each full interval; overlapping sessions remain independently visible; midnight-adjacent sessions stay under their calendar dates; same-time sessions render deterministically; current-day highlight survives the general table-header rule | `managerSchedule.test.tsx` |
+| Dense schedule and long content | Many unique start times and long class/facility names remain in the labeled scroll region; Edit and Cancel remain present for each manageable session | `managerSchedule.test.tsx` |
+| Week navigation | Previous/current/next-week controls request each matching range; a delayed superseded response cannot overwrite the last selected week | `managerSchedule.test.tsx` |
+| Responsive class editor | The class editor detail/qualification panels stack at widths up to 900px; computed grid checked at 390px, 768px and actual 200% browser zoom | `managerClasses.test.tsx`, `frontend/docs/FE-07-verification.md` |
+| Browser layout and theme | Preview checked at 390x844, 768x1024, 1024x768 and 1440x900 in light and dark themes, plus actual 200% Edge browser zoom; no page-wide horizontal overflow and timetable scroll stays inside its labeled region | `frontend/docs/FE-07-verification.md` |
+| Responsive and keyboard access | Horizontal overflow stays inside the labeled timetable region; the region is focusable and Tab/Shift+Tab reaches session actions | `managerSchedule.test.tsx` |
 | Edit safety | Capacity cannot fall below booked count; class/training type remain immutable | `managerSchedule.test.tsx` |
 | Missing API | A facility 404 enables explicit known-ID entry; 403/500 never trigger fallback; existing sessions remain visible | `managerSchedule.test.tsx` |
 | Coach discovery | All active coaches load before sport selection; selecting sport filters qualification; refresh reloads directory | `managerClasses.test.tsx` |
