@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { Brand } from '../../components/Brand'
+import { ThemeToggle } from '../../theme/ThemeToggle'
 import '@fontsource/be-vietnam-pro/800.css'
 import '@fontsource/be-vietnam-pro/800-italic.css'
 import '../../styles/home.css'
@@ -10,13 +12,18 @@ export function CreditsPage() {
   const groups = buildCredits()
   useEffect(() => {
     document.title = 'Photo credits - Sportify Center'
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
   }, [])
   return (
     <div className="home-page credits-page">
       <header className="credits-bar">
         <div className="home-wrap credits-bar__inner">
-          <Link to="/" className="credits-bar__brand">Sportify</Link>
-          <Link to="/" className="credits-bar__back">Back to Home</Link>
+          <Brand compact />
+          <div className="credits-bar__actions">
+            <ThemeToggle className="home-theme" />
+            <Link to="/" className="credits-bar__back">Back to Home</Link>
+          </div>
         </div>
       </header>
       <main className="home-wrap credits-main" id="main-content">
