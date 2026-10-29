@@ -50,7 +50,13 @@ const PEXELS_PAGES: Record<string, { label: string; page: string }> = {
 export function buildCredits(): CreditGroup[] {
   const videos = HOME_HERO_VIDEOS.map((files) => {
     const source = files[0]
-    const isPexels = source.includes('videos.pexels.com')
+    const isPexels = (() => {
+      try {
+        return new URL(source).hostname === 'videos.pexels.com'
+      } catch {
+        return false
+      }
+    })()
     const pattern = isPexels ? /video-files\/(\d+)\// : /videos\/(\d+)\//
     const id = pattern.exec(source)?.[1] ?? ''
     const page = (isPexels ? PEXELS_PAGES : MIXKIT_PAGES)[id]
