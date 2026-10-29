@@ -4,12 +4,13 @@ import { paymentsApi } from '../../api/paymentsApi'
 import { PaymentHero } from '../../components/PaymentHero'
 import { PaymentWorkspace } from '../../components/PaymentWorkspace'
 import { DemoQrCard } from '../../components/qr/DemoQrCard'
+import { demoPaymentAmountAvailable } from '../../components/qr/demoDetails'
 import { EmptyState, ErrorState } from '../../components/ui'
 import { Spinner } from '../../components/ui/Spinner'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { qrPaymentDemoEnabled } from '../../config/env'
 import { NotFoundPage } from '../public/NotFoundPage'
-import { formatPaymentMoney, parseIdParam, PAYMENT_PATHS } from './paymentsModel'
+import { parseIdParam, PAYMENT_PATHS } from './paymentsModel'
 import { useMemberResource } from './useMemberResource'
 
 /** Member guard and backend ownership are identical to the existing payment detail routes. */
@@ -31,7 +32,7 @@ function QrPaymentDemoView({ paymentId }: { paymentId: number }) {
   const load = useCallback((signal: AbortSignal) => paymentsApi.payment(paymentId, { signal }), [paymentId])
   const [payment, reload] = useMemberResource(load)
   const back = <Link className={buttonClassName('secondary', 'md')} to={PAYMENT_PATHS.summary(paymentId)}>Back to Payment Summary</Link>
-  const valid = payment.status === 'ready' && payment.data.id === paymentId && formatPaymentMoney(payment.data.amount) !== '-'
+  const valid = payment.status === 'ready' && payment.data.id === paymentId && demoPaymentAmountAvailable(payment.data.amount)
   return (
     <PaymentWorkspace>
       <PaymentHero eyebrow="Member / Demo" title="QR Payment (Demo)" description="A non-payable interface preview. Your actual payment is not changed." />

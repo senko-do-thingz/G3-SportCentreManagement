@@ -3,17 +3,19 @@
  * (https or localhost) and falls back to a hidden textarea with document.execCommand('copy'),
  * which still works on a plain http demo server. Rejects when both ways fail, so the caller can
  * tell the member to copy the value by hand.
+ * Demo callers can disable the legacy fallback to report permission denial without moving focus.
  */
-export async function copyText(text: string): Promise<void> {
-  if (typeof navigator !== 'undefined' && navigator.clipboard && window.isSecureContext !== false) {
+export async function copyText(text: string, { allowFallback = true }: { allowFallback?: boolean } = {}): Promise<void> {
+  if (typeof navigator !== 'undefined' && navigator.clipboard && (allowFallback ? window.isSecureContext !== false : window.isSecureContext === true)) {
     try {
       await navigator.clipboard.writeText(text)
       return
     } catch {
+      if (!allowFallback) throw new Error('Copy is not available in this browser.')
       // Permission denied or not focused: try the fallback below.
     }
   }
-  if (!copyWithTextarea(text)) {
+  if (!allowFallback || !copyWithTextarea(text)) {
     throw new Error('Copy is not available in this browser.')
   }
 }
