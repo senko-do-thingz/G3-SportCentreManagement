@@ -16,6 +16,6 @@ public final class DemoQrException extends RuntimeException {
     public String code() { return code; }
 
     public static DemoQrException unavailable() {
-        return new DemoQrException(HttpStatus.NOT_FOUND, "DEMO_UNAVAILABLE", "Demo session or eligible payment unavailable.");
+        return new DemoQrException(HttpStatus.NOT_FOUND, "SIMULATOR_UNAVAILABLE", "Simulation session or eligible payment unavailable. Start a new session for legacy links.");
     }
 }

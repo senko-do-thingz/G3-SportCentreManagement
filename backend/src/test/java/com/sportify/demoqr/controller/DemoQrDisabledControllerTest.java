@@ -31,21 +31,21 @@ abstract class DisabledDemoQrContract {
     @MockitoBean UserDetailsService userDetailsService;
 
     @ParameterizedTest
-    @ValueSource(strings = {"", "/preview", "/confirm", "/00000000-0000-0000-0000-000000000000/cancel", "/read"})
+    @ValueSource(strings = {"", "/preview", "/confirm-intent", "/00000000-0000-0000-0000-000000000000/cancel", "/read"})
     void everyOperationIsAbsentEvenWithAuthenticatedOwner(String suffix) throws Exception {
         var owner = new CustomUserDetails(UserAccount.builder().id(2L).status("ACTIVE")
                 .role(Role.builder().code("MEMBER").name("MEMBER").build()).build());
-        var request = suffix.equals("/read") ? get("/api/v1/demo/qr/sessions/00000000-0000-0000-0000-000000000000")
-                : post("/api/v1/demo/qr/sessions" + suffix).contentType(MediaType.APPLICATION_JSON)
+        var request = suffix.equals("/read") ? get("/api/v1/payments/simulated-qr/sessions/00000000-0000-0000-0000-000000000000")
+                : post("/api/v1/payments/simulated-qr/sessions" + suffix).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"paymentId\":52,\"bankCode\":\"BIDV_DEMO\",\"token\":\"invalid\"}");
         mvc.perform(request.with(user(owner))).andExpect(status().isNotFound());
     }
 }
 
-@ActiveProfiles("dev")
-@TestPropertySource(properties = "app.demo.qr.enabled=false")
+@ActiveProfiles("qr-simulator")
+@TestPropertySource(properties = "app.payment.simulator.enabled=false")
 class DemoQrDisabledControllerTest extends DisabledDemoQrContract { }
 
 @ActiveProfiles("prod")
-@TestPropertySource(properties = "app.demo.qr.enabled=true")
+@TestPropertySource(properties = "app.payment.simulator.enabled=true")
 class DemoQrProductionControllerTest extends DisabledDemoQrContract { }

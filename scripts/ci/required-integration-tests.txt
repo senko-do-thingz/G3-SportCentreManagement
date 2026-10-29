@@ -33,3 +33,4 @@ com.sportify.payment.FinanceReportIntegrationTest
 com.sportify.payment.FinanceMigrationCompatibilityIntegrationTest
 com.sportify.payment.CashEventIntegrationTest
 com.sportify.payment.CashMigrationIntegrationTest
+com.sportify.demoqr.DemoQrDatabaseIntegrationTest

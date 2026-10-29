@@ -1,7 +1,7 @@
 import { api } from './client'
 import { DEMO_BANKS } from '../components/qr/demoBanks'
 
-export type DemoSessionState = 'PENDING' | 'CONFIRMED' | 'CANCELED' | 'EXPIRED'
+export type DemoSessionState = 'PENDING' | 'AUTHORIZED_PENDING_SETTLEMENT' | 'CANCELED' | 'EXPIRED'
 export interface DemoSession {
   id: string
   paymentId: number
@@ -17,7 +17,7 @@ export interface DemoSession {
   mode: 'NON_PAYABLE'
 }
 export interface CreatedDemoSession { session: DemoSession; confirmationUrl: string }
-const path = '/demo/qr/sessions'
+const path = '/payments/simulated-qr/sessions'
 export const DEMO_TOKEN = /^[A-Za-z0-9_-]{43}$/
 
 function session(value: unknown): DemoSession {
@@ -26,7 +26,7 @@ function session(value: unknown): DemoSession {
     || !Number.isSafeInteger(item.paymentId) || item.paymentId <= 0 || item.reference !== `DEMO-${item.paymentId}`
     || !Number.isFinite(Number(item.amount)) || Number(item.amount) <= 0 || item.currency !== 'VND'
     || !Object.values(DEMO_BANKS).some((bank) => bank.code === item.bankCode && bank.label === item.bankLabel)
-    || !['PENDING', 'CONFIRMED', 'CANCELED', 'EXPIRED'].includes(item.state) || item.mode !== 'NON_PAYABLE'
+    || !['PENDING', 'AUTHORIZED_PENDING_SETTLEMENT', 'CANCELED', 'EXPIRED'].includes(item.state) || item.mode !== 'NON_PAYABLE'
     || ![item.createdAt, item.expiresAt, item.serverTime].every((time) => typeof time === 'string' && Number.isFinite(Date.parse(time)))) {
     throw new Error('Invalid demo session response')
   }
@@ -37,7 +37,7 @@ function created(value: unknown): CreatedDemoSession {
   const item = value as CreatedDemoSession
   const snapshot = session(item?.session)
   const url = new URL(item.confirmationUrl)
-  if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.search
+  if (url.protocol !== 'https:' || url.username || url.password || url.search
     || !url.pathname.endsWith('/demo/qr/confirm') || !DEMO_TOKEN.test(url.hash.slice(7)) || !url.hash.startsWith('#token=')) {
     throw new Error('Invalid demo confirmation link')
   }
@@ -46,9 +46,13 @@ function created(value: unknown): CreatedDemoSession {
 
 /** The shared bearer client handles authentication; no financial endpoint is called here. */
 export const demoQrApi = {
-  create: async (paymentId: number, bankCode: string) => created(await api.post(path, { paymentId, bankCode })),
+  capability: async (): Promise<boolean> => {
+    const value = await api.get<{ enabled: boolean; settlementEnabled: boolean; contractVersion: number }>('/payments/simulated-qr/capability')
+    return value.enabled === true && value.settlementEnabled === false && value.contractVersion === 1
+  },
+  create: async (paymentId: number, bankCode: string) => created(await api.post(path, { paymentId, bankCode, requestId: crypto.randomUUID() })),
   get: async (id: string) => session(await api.get(`${path}/${encodeURIComponent(id)}`)),
   preview: async (token: string) => session(await api.post(`${path}/preview`, { token })),
-  confirm: async (token: string) => session(await api.post(`${path}/confirm`, { token })),
+  confirm: async (token: string) => session(await api.post(`${path}/confirm-intent`, { token })),
   cancel: async (id: string) => session(await api.post(`${path}/${encodeURIComponent(id)}/cancel`)),
 }

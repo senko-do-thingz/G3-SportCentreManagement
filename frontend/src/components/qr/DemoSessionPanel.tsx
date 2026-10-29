@@ -15,6 +15,13 @@ export function DemoSessionPanel({ paymentId, bank }: { paymentId: number; bank:
 }
 
 function DemoSessionPanelContent({ paymentId, bank }: { paymentId: number; bank: DemoBank }) {
+  const [capability, setCapability] = useState<boolean | null>(null)
+  useEffect(() => {
+    let active = true
+    void demoQrApi.capability().then((enabled) => { if (active) setCapability(enabled) })
+      .catch(() => { if (active) setCapability(false) })
+    return () => { active = false }
+  }, [])
   const [created, setCreated] = useState<CreatedDemoSession | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -72,22 +79,26 @@ function DemoSessionPanelContent({ paymentId, bank }: { paymentId: number; bank:
       await copyText(created.confirmationUrl, { allowFallback: false })
       if (mounted.current && feedbackRequest.current === current) setFeedback('Time-limited demo link copied. Share only with the payment owner.')
     } catch {
-      if (mounted.current && feedbackRequest.current === current) setError('Could not copy the demo link. Use Open demo confirmation instead.')
+      if (mounted.current && feedbackRequest.current === current) setError('Could not copy the demo link. Use Review confirmation intent instead.')
     }
   }
   const size = qr ? qr.modules.size + 8 : 0
   const path = qr ? Array.from(qr.modules.data, (dark, index) => dark
     ? `M${index % qr.modules.size + 4} ${Math.floor(index / qr.modules.size) + 4}h1v1h-1z` : '').join('') : ''
+  if (capability !== true) return <section className="demo-session-panel" aria-label="QR Payment (Simulation)">
+    <h3>QR Payment (Simulation)</h3>
+    <p role="status">{capability === null ? 'Checking simulation availability...' : 'Simulation is unavailable. The payment remains pending. Legacy links must be reissued when simulation becomes available.'}</p>
+  </section>
   return <section className="demo-session-panel" aria-label="Demo confirmation session">
-    <h3>Demo Confirmation Link</h3>
-    <p>Scan to Confirm Demo is a separate application link. It is not a bank transfer QR. Only the authenticated payment owner can confirm.</p>
+    <h3>QR Payment (Simulation)</h3>
+    <p>The simulation session is a separate authenticated application link. It is not a bank transfer QR. Only the authenticated payment owner can record confirmation intent. Payment is not completed in this phase.</p>
     <p className="notice notice--warning">DEMO ONLY - NO MONEY TRANSFER</p>
     <p>Changing the bank or leaving this page attempts to cancel the current session. A disconnected session expires on the server.</p>
     {created && <DemoSessionSummary session={created.session} onDeadline={reachedDeadline} />}
-    {deadline && created?.session.state === 'PENDING' && <p className="notice notice--warning">The displayed deadline has passed. Refresh Demo Status to read the server result.</p>}
+    {deadline && created?.session.state === 'PENDING' && <p className="notice notice--warning">The displayed deadline has passed. Refresh Simulation Status to read the server result.</p>}
     {qr && <figure className="qr-demo-card__figure">
       <svg className="qr-demo-card__symbol" viewBox={`0 0 ${size} ${size}`} role="img" aria-labelledby={qrTitle} shapeRendering="crispEdges">
-        <title id={qrTitle}>Scan to Confirm Demo, {DEMO_BANKS[bank].label}, payment {paymentId}</title>
+        <title id={qrTitle}>Scan to review simulation, {DEMO_BANKS[bank].label}, payment {paymentId}</title>
         <rect width={size} height={size} className="qr-demo-card__paper" />
         <path d={path} fill="currentColor" />
       </svg>
@@ -95,12 +106,12 @@ function DemoSessionPanelContent({ paymentId, bank }: { paymentId: number; bank:
     </figure>}
     {created?.session.state === 'PENDING' && !deadline && !qr && <p role="alert">The demo link QR could not be generated. Cancel this session and retry.</p>}
     <div className="demo-session-actions">
-      {(!created || created.session.state !== 'PENDING' || deadline) && <Button disabled={busy} onClick={() => void operation('start')}>Start demo confirmation session</Button>}
-      {created && <Button variant="secondary" disabled={busy} onClick={() => void operation('refresh')}>Refresh Demo Status</Button>}
-      {created?.session.state === 'PENDING' && <Button variant="secondary" disabled={busy} onClick={() => void operation('cancel')}>Cancel Demo Session</Button>}
+      {(!created || created.session.state !== 'PENDING' || deadline) && <Button disabled={busy} onClick={() => void operation('start')}>Start simulation session</Button>}
+      {created && <Button variant="secondary" disabled={busy} onClick={() => void operation('refresh')}>Refresh Simulation Status</Button>}
+      {created?.session.state === 'PENDING' && <Button variant="secondary" disabled={busy} onClick={() => void operation('cancel')}>Cancel Simulation Session</Button>}
       {created && qr && <>
-        <a className="btn btn--secondary" href={created.confirmationUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Open demo confirmation</a>
-        <Button variant="secondary" disabled={busy} onClick={() => void copy()}>Copy demo confirmation link</Button>
+        <a className="btn btn--secondary" href={created.confirmationUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Review confirmation intent</a>
+        <Button variant="secondary" disabled={busy} onClick={() => void copy()}>Copy simulation session link</Button>
       </>}
     </div>
     {busy && <p aria-live="polite">Updating demo session...</p>}

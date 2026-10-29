@@ -7,6 +7,8 @@ import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.core.common.SecurityUtils;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.payment.entity.PaymentStatus;
+import com.sportify.payment.entity.Payment;
+import org.springframework.transaction.annotation.Propagation;
 import com.sportify.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -19,30 +21,42 @@ import java.math.BigDecimal;
 /** This boundary has reads only. No payment service or financial mutation is injected. */
 @Service
 @RequiredArgsConstructor
-@Profile("(dev | qr-demo) & !prod & !production")
-@ConditionalOnProperty(name = "app.demo.qr.enabled", havingValue = "true")
+@Profile("qr-simulator & !prod & !production")
+@ConditionalOnProperty(name = "app.payment.simulator.enabled", havingValue = "true")
 public class DemoPaymentReader {
     private final PaymentRepository payments;
     private final MemberCardRepository cards;
     private final SportPackageRegistrationRepository registrations;
 
-    public record Snapshot(long paymentId, BigDecimal amount) { }
+    public record Snapshot(long paymentId, BigDecimal amount, String currency) { }
 
-    @Transactional(readOnly = true)
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Payment requireOwner(long paymentId, UserAccount actor) {
+        var payment = payments.findByIdForUpdate(paymentId).orElseThrow(DemoQrException::unavailable);
+        if (payment.getMember() == null || !payment.getMember().getId().equals(actor.getId())) throw DemoQrException.unavailable();
+        return payment;
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
     public Snapshot read(long paymentId, UserAccount actor) {
         if (paymentId <= 0 || !SecurityUtils.isMember(actor) || !"ACTIVE".equals(actor.getStatus())) {
             throw DemoQrException.unavailable();
         }
-        var payment = payments.findById(paymentId).orElseThrow(DemoQrException::unavailable);
+        var payment = requireOwner(paymentId, actor);
         if (payment.getMember() == null || !actor.getId().equals(payment.getMember().getId())
                 || payment.getPaymentStatus() != PaymentStatus.PENDING || payment.getAmount() == null
                 || payment.getAmount().signum() <= 0) throw DemoQrException.unavailable();
-        cards.findByPaymentId(paymentId).ifPresent(card -> {
-            if (card.getStatus() != CardStatus.PENDING_PAYMENT) throw DemoQrException.unavailable();
+        var card = cards.findByPaymentId(paymentId);
+        var registration = registrations.findByPaymentId(paymentId);
+        if (card.isPresent() == registration.isPresent()) throw DemoQrException.unavailable();
+        card.ifPresent(item -> {
+            if (item.getStatus() != CardStatus.PENDING_PAYMENT || item.getMember() == null
+                    || !actor.getId().equals(item.getMember().getId())) throw DemoQrException.unavailable();
         });
-        registrations.findByPaymentId(paymentId).ifPresent(registration -> {
-            if (registration.getStatus() != PackageRegistrationStatus.PENDING_PAYMENT) throw DemoQrException.unavailable();
+        registration.ifPresent(item -> {
+            if (item.getStatus() != PackageRegistrationStatus.PENDING_PAYMENT || item.getMember() == null
+                    || !actor.getId().equals(item.getMember().getId())) throw DemoQrException.unavailable();
         });
-        return new Snapshot(paymentId, payment.getAmount());
+        return new Snapshot(paymentId, payment.getAmount(), "VND");
     }
 }

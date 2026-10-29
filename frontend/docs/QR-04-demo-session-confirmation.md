@@ -1,126 +1,51 @@
-# QR-04 demo sessions and mobile confirmation
+# QR-04 durable simulated payment foundation
 
-QR-04 adds a separate Demo Confirmation Link QR. The existing QR-03 Version 2
-NON_PAYABLE data QR, four demo banks, copy actions and real payment screens remain.
-Demo confirmation changes only an isolated in-memory session. It does not transfer
-money, mark a payment paid, create a receipt or write any financial table.
+QR-04 records confirmation intent only. Payment remains PENDING, no receipt is issued, no entitlement is activated, and no cash or revenue event is inserted. The paid state in the existing Java/SQL domain is SUCCESS, not an enum named PAID. QR-05 must reconcile that mapping with its business contract before enabling settlement.
 
-## Explicit non-production setup
+## Release and compatibility
 
-Use one development backend process. Both dev or qr-demo and explicit opt-in are
-required; prod or production disables every demo operation even with opt-in true.
-Normal configuration is disabled. The following environment settings are examples;
-replace the LAN address with the actual frontend host and use existing local DB/JWT
-configuration. Do not commit environment files or secrets.
+The default `app.payment.simulator.enabled=false` is independent of the retired `app.demo.qr.enabled` setting. Both an explicit true simulator property and the `qr-simulator` profile are required. `prod` and `production` exclude the service even when the property is true. Use this profile only for a designated isolated simulation environment. This phase does not support mixing actual and simulated payments in one deployment. QR-05 must add a server-enforced cohort policy before any mixed environment can settle.
 
-```powershell
-# Backend, from backend/. For deployed non-production use an allowlisted HTTPS base.
-$env:SPRING_PROFILES_ACTIVE = 'dev,qr-demo'
-$env:QR_DEMO_ENABLED = 'true'
-$env:QR_DEMO_PUBLIC_BASE_URL = 'http://192.168.1.50:5173/'
-$env:QR_DEMO_ALLOWED_ORIGINS = 'http://192.168.1.50:5173'
-$env:QR_DEMO_ALLOW_LAN_HTTP = 'true'
-$env:CORS_ALLOWED_ORIGINS = 'http://192.168.1.50:5173'
-mvn spring-boot:run
+`GET /api/v1/payments/simulated-qr/capability` requires an authenticated Member and returns `enabled`, `settlementEnabled=false`, and `contractVersion=1`. The frontend fails closed on missing/invalid capability responses. The old VITE_QR_PAYMENT_DEMO build flag remains an additional protective UI gate; it grants no backend capability. Default production builds cannot activate this route.
 
-# Frontend, from frontend/. API must also be reachable by the phone.
-$env:VITE_QR_PAYMENT_DEMO = 'true'
-$env:VITE_API_BASE_URL = 'http://192.168.1.50:8080/api/v1'
-npm run dev -- --host 0.0.0.0
-```
+The old `/api/v1/demo/qr/sessions` API returns authenticated Members HTTP 410 with SIMULATOR_REISSUE_REQUIRED. Old process-local tokens have no SQL row and cannot be converted. The existing `/demo/qr/confirm#token=...` browser route is retained to avoid breaking QR-01/02/03 navigation. It clears the fragment using replace navigation, keeps the token only in component memory, and uses the new authenticated API. The separate QR-03 bank display QR remains VERSION=2, MODE=NON_PAYABLE.
 
-The backend base must include the same path prefix as the Vite BASE_URL. The
-BrowserRouter uses that base. Normal production builds disable both QR frontend
-routes even if VITE_QR_PAYMENT_DEMO=true. Explicit qr-demo builds are supported
-only with the independent backend guard. HTTPS is required outside local LAN
-testing. HTTP requires explicit opt-in and canonical private IPv4 plus an exact
-origin allowlist. localhost/loopback, userinfo, queries, fragments, dot segments
-and untrusted origins are rejected. Host headers never generate the link.
+## API contract
 
-## API and state contract
+All session operations require a currently ACTIVE Member, bearer authentication and current Payment ownership. Tokens never replace identity. Responses use no-store and no-referrer headers. Missing or unavailable resources use a generic denial; malformed JSON has a sanitized error. Datastore errors return 503 and never manufacture intent or payment success.
 
-All paths start at /api/v1/demo/qr/sessions. Authentication is the application's
-existing current MEMBER bearer token. Staff roles do not bypass owner checks.
+- POST `/api/v1/payments/simulated-qr/sessions`: `{paymentId, bankCode, requestId}`. requestId is a client UUID. Extra amount, owner and currency properties have no authority. The response returns one raw 256-bit token in the creation URL fragment only. Only a SHA-256 verifier is stored.
+- GET `.../sessions/{id}`: owner-bound durable state, never a raw token.
+- POST `.../sessions/preview`: `{token}`; no confirmation side effect. Stale eligibility or amount revokes an active session.
+- POST `.../sessions/confirm-intent`: `{token}`; records AUTHORIZED_PENDING_SETTLEMENT only. Retries before expiry return the same intent without another transition.
+- POST `.../sessions/{id}/cancel`: idempotent cancellation of PENDING or AUTHORIZED_PENDING_SETTLEMENT. A terminal state never returns to PENDING.
 
-| Method/path | Input | Result |
-| --- | --- | --- |
-| POST / | paymentId, allowlisted bankCode | Immutable session snapshot and a one-time-returned confirmationUrl |
-| GET /{id} | Random session ID | Owner-only snapshot/state, no token or URL |
-| POST /preview | token in JSON | Owner-only snapshot; never confirms |
-| POST /confirm | token in JSON | Atomically confirms an eligible unexpired PENDING demo session |
-| POST /{id}/cancel | Random session ID | Owner cancellation; terminal state remains unchanged |
+Creation retries with the same owner/requestId return 409 SIMULATOR_REISSUE_REQUIRED without revealing/recovering the original token. Starting a new request replaces any active session for that Payment/owner, including an earlier intent. A timed-out creation may have committed: restart explicitly with a new requestId. SQL uniqueness is the final arbiter. Concurrent database conflicts/connection failures return a bounded 503 retry response; no unbounded server retry loop runs.
 
-Snapshot fields are id, paymentId, demo reference, server-authorized amount,
-VND currency, fake bank label/code, createdAt, expiresAt, serverTime, state and
-NON_PAYABLE mode. Client owner/amount/currency fields cannot override them.
-Creation and confirmation read the genuine pending payment and linked item
-eligibility; the reader uses a read-only transaction. A changed amount or no-longer
-eligible payment cancels the pending demo session. No financial mutation is called.
+Five creates and sixty session/token operations per Member per SQL-clock window of sixty seconds are persisted in SQL. Failed token attempts consume budget. A new process does not reset that budget. Account rows serialize initial budget insertion and budget updates; session transactions use Payment -> session lock order.
 
-The only transitions are PENDING -> CONFIRMED, CANCELED or EXPIRED. Expiry at or
-after expiresAt is enforced by the injected server Clock, including a second clock
-sample after eligibility reads. CONFIRMED replay by the same authenticated owner
-returns the same terminal snapshot idempotently; it performs no second transition
-or financial operation. Confirming CANCELED/EXPIRED returns 409 with DEMO_CANCELED
-or DEMO_EXPIRED. Unknown/malformed IDs or tokens and cross-owner access share a
-generic 404 DEMO_UNAVAILABLE. Invalid JSON/bank/body returns sanitized 400
-DEMO_INVALID_REQUEST. Existing auth returns 401/403. Capacity/rate denial is 429.
+## Durable model and migration
 
-Tokens contain 32 CSPRNG bytes, URL-safe base64 without padding. Only SHA-256
-verifiers are stored. No demo data is written to persistence. Five create attempts
-and 60 status/token/cancel requests per owner per 60 seconds are allowed. The store
-is capped at 1000 sessions; entries older than expiry plus ten minutes are cleaned
-on access. The default lifetime is 300 seconds, configurable only from 30 to 600.
-Restart revokes every session. Multiple backend replicas are unsupported without
-a separately approved shared, non-financial store.
+V34 is additive. It creates `simulated_qr_session`, `simulated_qr_transition` and `simulated_qr_rate_limit`; it does not alter historical payment methods, financial enums, reporting views or cash triggers. Session snapshots include owner, Payment, display bank, authoritative amount, VND currency, verifier, creation request and UTC times. The current domain has no per-Payment currency column: VND is an explicit server-side domain contract, not a client value.
 
-## Browser lifecycle and privacy
+PENDING -> AUTHORIZED_PENDING_SETTLEMENT means confirmation intent received, payment not yet completed. Both active states can become CANCELED or EXPIRED. SETTLED is reserved and unreachable: the V34 lifecycle trigger rejects every transition to it. Session snapshots and transition history are immutable; history is retained on expiry. SQL filtered uniqueness enforces one active session per Payment/owner. Each actual transition increments version and appends one history row. SQL Server SYSUTCDATETIME is authoritative across nodes; authorization checks expiry again inside the SQL UPDATE, including after Payment lock waits. Both active states expire, including an intent that QR-05 has not settled.
 
-Opening the link never confirms it. Its fragment token is cleared from the address
-bar and kept only in page memory, including inline owner sign-in. Reload requires
-rescanning. It is never stored in localStorage, sessionStorage or navigation state.
-No third-party assets/tracking are added. Responses use no-store and no-referrer;
-the page sets no-referrer and links use noreferrer. A copied link is a time-limited
-simulation capability, still requiring the same authenticated owner. HTTP LAN
-clipboard permissions can be unavailable; an explicit open-link alternative exists.
+Read and write paths lock the existing Payment before the session. Eligibility requires PENDING Payment, positive amount, matching owner, and exactly one owned card or registration still PENDING_PAYMENT. No financial writer is injected. Normal accounting and activation services remain unchanged.
 
-Desktop bank/payment changes and unmount immediately hide the old link and attempt
-owner cancellation, including late create responses. Offline/unload cancellation
-is best effort; server expiry guarantees the bound, and retries replace the prior
-pending link for that owner/payment. Leaving the phone page intentionally retains
-the server session until desktop cancellation/replacement or expiry, so rescanning
-can resume it. No phone state is automatically confirmed or synchronized through
-browser storage. A different authenticated account gets fresh summary state.
+Deploy V34 using normal Flyway after snapshot/backup of the designated environment. Validate a fresh isolated database and a V33 synthetic legacy cohort before rollout. SQL Server transactional DDL can be rolled back before migration commit; the integration suite dry-runs that recovery. After commit, disable the capability and roll application code back while retaining these additive tables and immutable history. Do not use Flyway clean, delete schema history, rewrite old migrations, or drop tables to recover. Investigate unexpected pre-existing objects/checksum failures rather than repairing them blindly.
 
-Desktop Refresh Demo Status reads only demo state. No financial polling or QR-05
-payment-status integration is implemented. The countdown is advisory, based on a
-server-time snapshot and elapsed monotonic browser time; the server remains final.
+## QR-05 settlement handoff
 
-## Verification
+Before any successful write is enabled, QR-05 needs a new additive migration for immutable settlement provenance and an immutable `simulated_payment_transaction`. At minimum enforce a unique successful settlement per Payment, for example `CREATE UNIQUE INDEX ux_simulated_payment_success ON dbo.simulated_payment_transaction(payment_id) WHERE status='SUCCEEDED'`, plus unique session and idempotency references, Payment/Member/session FKs, positive authoritative amount/currency, provider SPORTIFY_SIMULATOR and settlement_type SIMULATED. Existing unknown records must remain unknown; never backfill SIMULATED or actual receipt provenance without evidence.
 
-```powershell
-# Frontend
-npm run lint
-npx tsc -b
-npm test
-npm run build
-npm run build -- --mode qr-demo
+One transaction must lock Payment -> session -> linked entitlement, validate the current owner/account/cohort/token/deadline/PENDING status and exact amount/currency, insert one immutable simulated settlement, apply the legitimate activation/invoice/audit effects once, update the existing paid domain status with immutable provenance, and transition the session to SETTLED. Retry must read the already committed outcome. A competing manual/actual payment must win once, without duplicate settlements or downstream events. All partial failures roll back together.
 
-# Backend unit/controller/config/security tests, no Docker
-mvn '-Dtest=DemoQr*Test' test
-```
+Do not call the existing markPaymentSuccess path unchanged: CashCaptureService and V31 tr_cash_collection currently classify SUCCESS as a collection under active coverage. QR-05 must explicitly separate simulated settlement before changing Payment. V30 vw_paid_payment includes all SUCCESS rows; manager revenue, exports, ledgers, receipts, refunds and history must distinguish SIMULATED before the first write. Actual cash/reconciliation must not increase. Legacy records cannot silently be classified as actual cash. A payment-method enum alone cannot solve these semantics.
 
-DemoQrDatabaseIntegrationTest exercises real HTTP, JWT login, Flyway and SQL Server
-with financial fingerprints. CI can use its isolated Testcontainers SQL Server.
-Local no-Docker execution requires QR04_TEST_DB_URL naming a newly provisioned
-sportify_qr04_test_YYYYMMDDHHMMSS database plus QR04_TEST_DB_USER and
-QR04_TEST_DB_PASSWORD. It refuses an ordinary/shared database. Test fixture
-creation precedes financial snapshots; confirmation/cancel tests assert every
-financial table remains identical. Run mvn -DskipUnitTests=true
--Dit.test=DemoQrDatabaseIntegrationTest verify with those local variables.
+QR-05 owns the final release wording, supported route/build migration, receipts/history, reporting separation, real SQL/browser settlement E2E, recovery and kill-switch verification. CODEOWNER approval and manual merge remain required. QR-04 is not a completed payment feature.
 
-Round 01 reports distinguish live SQL/browser checks from fixture-only tests and
-physical-phone checks. Rendered screenshots must be decoded with a QR decoder.
-Evidence links/tokens must be canceled or expired before publishing. Audit DOCX,
-renders, environment files and local DB credentials remain private and excluded
-from Git. CODEOWNER alone reviews and manually merges the PR.
+## Validation and evidence
+
+The required SQL suite is DemoQrDatabaseIntegrationTest, registered in scripts/ci/required-integration-tests.txt. It uses only a new isolated QR04_TEST_DB_URL matching the guarded name or a disposable CI SQL Server container. Missing database access fails the suite rather than skipping it. Local Windows runs do not use Docker. The browser script uses real Edge, compiled assets and unchanged HTTP responses from that SQL backend; its report explicitly identifies the proxy transport boundary. Full-document axe findings are recorded, including shared Brand issues, without changing the approved shared design or declaring a partial scan compliant.
+
+Private Round 03 reports, screenshots, evidence, test master and AI Audit Log remain local. They must never be included in the PR patch. Only the CODEOWNER may approve or merge.

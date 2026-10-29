@@ -19,17 +19,23 @@ import org.springframework.core.MethodParameter;
 import java.util.Map;
 
 /** Never echo rejected token/body values, even through validation error messages. */
-@RestControllerAdvice(assignableTypes = DemoQrController.class)
+@RestControllerAdvice(assignableTypes = {DemoQrController.class, LegacyDemoQrController.class, SimulatorCapabilityController.class})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class DemoQrAdvice implements ResponseBodyAdvice<Object> {
     @ExceptionHandler(DemoQrException.class)
     public ResponseEntity<Map<String, String>> demoError(DemoQrException ex) {
-        return ResponseEntity.status(ex.status()).body(Map.of("code", ex.code(), "message", ex.getMessage()));
+        return ResponseEntity.status(ex.status()).header("Cache-Control", "no-store").header("Referrer-Policy", "no-referrer").body(Map.of("code", ex.code(), "message", ex.getMessage()));
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class})
     public ResponseEntity<Map<String, String>> invalidBody(Exception ignored) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("code", "DEMO_INVALID_REQUEST", "message", "Invalid demo request."));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).header("Cache-Control", "no-store").header("Referrer-Policy", "no-referrer").body(Map.of("code", "SIMULATOR_INVALID_REQUEST", "message", "Invalid simulation request."));
+    }
+
+    @ExceptionHandler({org.springframework.dao.DataAccessException.class, org.springframework.transaction.TransactionException.class})
+    public ResponseEntity<Map<String, String>> databaseUnavailable(Exception ignored) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).header("Cache-Control", "no-store").header("Referrer-Policy", "no-referrer").body(Map.of("code", "SIMULATOR_RETRY",
+                "message", "Simulation state unavailable. Refresh before retrying; payment was not settled."));
     }
 
     @Override

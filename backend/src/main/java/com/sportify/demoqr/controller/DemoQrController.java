@@ -13,15 +13,15 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/demo/qr/sessions")
+@RequestMapping("/api/v1/payments/simulated-qr/sessions")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('MEMBER')")
-@Profile("(dev | qr-demo) & !prod & !production")
-@ConditionalOnProperty(name = "app.demo.qr.enabled", havingValue = "true")
+@Profile("qr-simulator & !prod & !production")
+@ConditionalOnProperty(name = "app.payment.simulator.enabled", havingValue = "true")
 public class DemoQrController {
     private final DemoQrService service;
 
-    public record CreateRequest(@Positive long paymentId, @NotNull DemoQrService.Bank bankCode) { }
+    public record CreateRequest(@Positive long paymentId, @NotNull DemoQrService.Bank bankCode, @NotNull java.util.UUID requestId) { }
     public record TokenRequest(String token) {
         @Override public String toString() { return "TokenRequest[REDACTED]"; }
     }
@@ -29,7 +29,7 @@ public class DemoQrController {
     @PostMapping
     public DemoQrService.Created create(@Valid @RequestBody CreateRequest request,
                                        @AuthenticationPrincipal CustomUserDetails user) {
-        return service.create(request.paymentId(), request.bankCode(), user.getUserAccount());
+        return service.create(request.paymentId(), request.bankCode(), request.requestId(), user.getUserAccount());
     }
 
     @GetMapping("/{id}")
@@ -42,7 +42,7 @@ public class DemoQrController {
         return service.preview(request.token(), user.getUserAccount());
     }
 
-    @PostMapping("/confirm")
+    @PostMapping("/confirm-intent")
     public DemoQrService.View confirm(@RequestBody TokenRequest request, @AuthenticationPrincipal CustomUserDetails user) {
         return service.confirm(request.token(), user.getUserAccount());
     }

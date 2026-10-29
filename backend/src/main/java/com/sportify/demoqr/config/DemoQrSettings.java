@@ -6,8 +6,14 @@ import java.util.Locale;
 
 /** Explicit configuration only; request Host headers and client origins never create links. */
 public record DemoQrSettings(String publicBaseUrl, long lifetimeSeconds) {
-    public DemoQrSettings(String base, String allowedOrigins, boolean allowLanHttp, long seconds) {
-        this(validate(base, allowedOrigins, allowLanHttp), validateLifetime(seconds));
+    public DemoQrSettings {
+        lifetimeSeconds = validateLifetime(lifetimeSeconds);
+        URI uri = URI.create(publicBaseUrl);
+        publicBaseUrl = validate(publicBaseUrl, uri.getScheme() + "://" + uri.getRawAuthority());
+    }
+
+    public DemoQrSettings(String base, String allowedOrigins, boolean ignoredLegacyLanHttp, long seconds) {
+        this(validate(base, allowedOrigins), validateLifetime(seconds));
     }
 
     private static long validateLifetime(long seconds) {
@@ -15,7 +21,7 @@ public record DemoQrSettings(String publicBaseUrl, long lifetimeSeconds) {
         return seconds;
     }
 
-    private static String validate(String base, String origins, boolean allowLanHttp) {
+    private static String validate(String base, String origins) {
         try {
             URI uri = URI.create(base);
             String origin = uri.getScheme() + "://" + uri.getRawAuthority();
@@ -23,32 +29,18 @@ public record DemoQrSettings(String publicBaseUrl, long lifetimeSeconds) {
             String host = uri.getHost();
             String normalizedHost = host == null ? "" : host.toLowerCase(Locale.ROOT).replace("[", "").replace("]", "");
             boolean https = "https".equals(uri.getScheme());
-            boolean localHttp = "http".equals(uri.getScheme()) && allowLanHttp && isPrivateIpv4(host);
+
             if (!allowed || host == null || normalizedHost.equals("localhost") || normalizedHost.endsWith(".localhost")
                     || normalizedHost.startsWith("127.") || normalizedHost.equals("0.0.0.0") || normalizedHost.equals("::1")
                     || uri.getUserInfo() != null || uri.getRawQuery() != null
-                    || uri.getRawFragment() != null || (!https && !localHttp)
+                    || uri.getRawFragment() != null || !https
                     || !uri.normalize().equals(uri) || base.contains("%") || base.contains("\\")) {
                 throw new IllegalArgumentException();
             }
             return base.endsWith("/") ? base : base + "/";
         } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("Configure an allowlisted HTTPS frontend base or explicit private LAN HTTP base");
+            throw new IllegalArgumentException("Configure an allowlisted HTTPS frontend base");
         }
     }
 
-    private static boolean isPrivateIpv4(String host) {
-        if (host == null || !host.matches("[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+")) return false;
-        int[] octets;
-        try {
-            octets = Arrays.stream(host.split("\\.")).mapToInt(Integer::parseInt).toArray();
-        } catch (NumberFormatException ex) {
-            return false;
-        }
-        for (int octet : octets) if (octet > 255) return false;
-        String canonical = octets[0] + "." + octets[1] + "." + octets[2] + "." + octets[3];
-        if (!host.equals(canonical)) return false;
-        return octets[0] == 10 || (octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31)
-                || (octets[0] == 192 && octets[1] == 168);
-    }
 }

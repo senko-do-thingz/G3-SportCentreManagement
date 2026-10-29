@@ -15,6 +15,11 @@ import '../../components/qr/demoSession.css'
 import { confirmationToken } from '../../components/qr/confirmationLink'
 
 export function DemoConfirmationPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  useLayoutEffect(() => {
+    if (!qrPaymentDemoEnabled() && location.hash) navigate({ pathname: location.pathname, search: '', hash: '' }, { replace: true, state: null })
+  }, [location.hash, location.pathname, navigate])
   if (!qrPaymentDemoEnabled()) return <DemoConfirmationDisabled />
   return <DemoConfirmationContent />
 }
@@ -60,7 +65,7 @@ function DemoConfirmationContent() {
     if (location.hash) navigate({ pathname: location.pathname, search: '', hash: '' }, { replace: true, state: null })
   }, [location.hash, location.pathname, navigate])
   return <DemoConfirmationLayout>
-        <h1>Demo payment confirmation</h1>
+        <h1>QR Payment (Simulation)</h1>
         <p className="notice notice--warning">DEMO ONLY - NO MONEY TRANSFER</p>
         <p>This is a time-limited simulation link, not a payment request. Opening it never confirms anything.</p>
         {!token ? <Card title="Demo link unavailable"><p role="alert">The token is missing or malformed. Rescan the current desktop demo link. Reloading clears a link for your privacy.</p></Card>
@@ -85,10 +90,13 @@ function DemoSessionControls({ token }: { token: string }) {
   const reachedDeadline = useCallback(() => setDeadline(true), [])
   useEffect(() => {
     const current = ++generation.current
-    void demoQrApi.preview(token).then((result) => {
+    void demoQrApi.capability().then((enabled) => {
+      if (!enabled) throw new Error('Simulation unavailable')
+      return demoQrApi.preview(token)
+    }).then((result) => {
       if (generation.current === current) setSession(result)
     }).catch(() => {
-      if (generation.current === current) setError('Demo link unavailable. It may be invalid, revoked, or belong to another member. Check your connection and retry. No payment was changed.')
+      if (generation.current === current) setError('Demo link unavailable. It may be invalid, revoked, legacy, or simulation may be disabled. Start a new session when available. No payment was changed.')
     }).finally(() => { if (generation.current === current) setBusy(false) })
     return () => { generation.current += 1 }
   }, [token])
@@ -120,10 +128,10 @@ function DemoSessionControls({ token }: { token: string }) {
     {error && <p role="alert" className="notice notice--danger">{error}</p>}
     <div className="demo-session-actions">
       {session?.state === 'PENDING' && !deadline && <>
-        <Button disabled={busy} onClick={() => void action('confirm')}>Confirm Demo Payment</Button>
-        <Button variant="secondary" disabled={busy} onClick={() => void action('cancel')}>Cancel Demo Session</Button>
+        <Button disabled={busy} onClick={() => void action('confirm')}>Record confirmation intent</Button>
+        <Button variant="secondary" disabled={busy} onClick={() => void action('cancel')}>Cancel Simulation Session</Button>
       </>}
-      <Button variant="secondary" disabled={busy} onClick={() => void action('refresh')}>Refresh Demo Status</Button>
+      <Button variant="secondary" disabled={busy} onClick={() => void action('refresh')}>Refresh Simulation Status</Button>
     </div>
   </Card>
 }
@@ -155,7 +163,7 @@ function DemoOwnerLogin() {
       <Input label="Email" type="email" autoComplete="username" value={email} required error={fields.email} disabled={busy} onChange={(event) => setEmail(event.target.value)} />
       <PasswordInput label="Password" autoComplete="current-password" value={password} required error={fields.password} disabled={busy} onChange={(event) => setPassword(event.target.value)} />
       {error && <p role="alert" className="notice notice--danger">{error}</p>}
-      <Button type="submit" loading={busy}>Sign in to review demo</Button>
+      <Button type="submit" loading={busy}>Sign in to review simulation</Button>
     </form>
   </Card>
 }

@@ -13,196 +13,149 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.time.Clock;
 import java.time.Instant;
-import java.util.ArrayDeque;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.HexFormat;
-import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 
+/** Durable confirmation intent only. Financial writers are deliberately absent. */
 @Service
-@Profile("(dev | qr-demo) & !prod & !production")
-@ConditionalOnProperty(name = "app.demo.qr.enabled", havingValue = "true")
+@Profile("qr-simulator & !prod & !production")
+@ConditionalOnProperty(name = "app.payment.simulator.enabled", havingValue = "true")
 public class DemoQrService {
-    public enum State { PENDING, CONFIRMED, CANCELED, EXPIRED }
+    public enum State { PENDING, AUTHORIZED_PENDING_SETTLEMENT, CANCELED, EXPIRED, SETTLED }
     public enum Bank {
         VIETCOMBANK_DEMO("Vietcombank (demo)"), BIDV_DEMO("BIDV (demo)"),
         TECHCOMBANK_DEMO("Techcombank (demo)"), MB_BANK_DEMO("MB Bank (demo)");
         public final String label;
         Bank(String label) { this.label = label; }
     }
-
     public record View(UUID id, long paymentId, String reference, BigDecimal amount, String currency,
                        Bank bankCode, String bankLabel, Instant createdAt, Instant expiresAt,
                        Instant serverTime, State state, String mode) { }
     public record Created(View session, String confirmationUrl) {
         @Override public String toString() { return "Created[confirmationUrl=REDACTED]"; }
     }
-
-    private static final int MAX_SESSIONS = 1000;
+    private record Outcome<T>(T value, DemoQrException error) { }
     private final DemoPaymentReader reader;
     private final DemoQrSettings settings;
-    private final Clock clock;
+    private final SqlQrStore store;
     private final SecureRandom random = new SecureRandom();
-    private final Map<UUID, Session> sessions = new HashMap<>();
-    private final Map<String, UUID> verifiers = new HashMap<>();
-    private final Map<Long, ArrayDeque<Instant>> creates = new HashMap<>();
-    private final Map<Long, ArrayDeque<Instant>> accesses = new HashMap<>();
 
-    public DemoQrService(DemoPaymentReader reader, DemoQrSettings settings, Clock clock) {
-        this.reader = reader;
-        this.settings = settings;
-        this.clock = clock;
+    public DemoQrService(DemoPaymentReader reader, DemoQrSettings settings, SqlQrStore store) {
+        this.reader = reader; this.settings = settings; this.store = store;
     }
 
-    /** One monitor serializes replacement, expiry and all terminal transitions in this demo process. */
-    public synchronized Created create(long paymentId, Bank bank, UserAccount actor) {
-        owner(actor);
-        cleanup();
-        limit(creates, actor.getId(), 5);
-        if (bank == null) throw DemoQrException.unavailable();
-        var snapshot = reader.read(paymentId, actor);
-        if (sessions.size() >= MAX_SESSIONS) {
-            throw new DemoQrException(HttpStatus.TOO_MANY_REQUESTS, "DEMO_CAPACITY", "Demo capacity reached. Try again later.");
-        }
-        sessions.values().stream().filter(s -> s.owner == actor.getId() && s.paymentId == paymentId)
-                .forEach(s -> { expire(s); if (s.state == State.PENDING) s.state = State.CANCELED; });
-        byte[] bytes = new byte[32];
-        random.nextBytes(bytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        Instant now = clock.instant();
-        Session session = new Session(UUID.randomUUID(), actor.getId(), snapshot.paymentId(), snapshot.amount(),
-                bank, now, now.plusSeconds(settings.lifetimeSeconds()), digest(token));
-        sessions.put(session.id, session);
-        verifiers.put(session.verifier, session.id);
-        return new Created(view(session), settings.publicBaseUrl() + "demo/qr/confirm#token=" + token);
+    public Created create(long paymentId, Bank bank, UUID requestId, UserAccount actor) {
+        budget(actor, true);
+        if (paymentId <= 0 || bank == null || requestId == null) throw DemoQrException.unavailable();
+        return store.transaction(() -> {
+            var snapshot = reader.read(paymentId, actor);
+            if (store.requestExists(actor.getId(), requestId)) {
+                throw new DemoQrException(HttpStatus.CONFLICT, "SIMULATOR_REISSUE_REQUIRED",
+                        "Creation already processed. Start a new session; previous tokens cannot be recovered.");
+            }
+            store.replace(paymentId, actor.getId());
+            byte[] bytes = new byte[32];
+            random.nextBytes(bytes);
+            String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+            UUID id = store.insert(paymentId, actor.getId(), snapshot.amount(), bank, digest(token), requestId, settings.lifetimeSeconds());
+            return new Created(view(store.findId(id, actor.getId())), settings.publicBaseUrl() + "demo/qr/confirm#token=" + token);
+        });
     }
 
-    public synchronized View get(String id, UserAccount actor) {
-        owner(actor);
-        limit(accesses, actor.getId(), 60);
-        Session session;
-        try { session = sessions.get(UUID.fromString(id)); }
-        catch (IllegalArgumentException ex) { throw DemoQrException.unavailable(); }
-        return view(authorized(session, actor));
+    public View get(String id, UserAccount actor) { return byId(id, actor, false); }
+    public View cancel(String id, UserAccount actor) { return byId(id, actor, true); }
+
+    private View byId(String id, UserAccount actor, boolean cancel) {
+        budget(actor, false);
+        UUID parsed;
+        try { parsed = UUID.fromString(id); }
+        catch (IllegalArgumentException | NullPointerException ignored) { throw DemoQrException.unavailable(); }
+        return committed(() -> {
+            var candidate = store.findId(parsed, actor.getId());
+            reader.requireOwner(candidate.paymentId(), actor);
+            var session = store.expire(store.lock(parsed, actor.getId()));
+            if (!cancel && (session.state() == State.PENDING || session.state() == State.AUTHORIZED_PENDING_SETTLEMENT)) {
+                var error = invalidateIfStale(session, actor);
+                if (error != null) return new Outcome<>(null, error);
+            }
+            return new Outcome<>(view(cancel ? store.cancel(session) : session), null);
+        });
     }
 
-    /** Preview is authenticated and read-only with respect to confirmation. Scanning never confirms. */
-    public synchronized View preview(String token, UserAccount actor) {
-        return view(byToken(token, actor));
-    }
+    public View preview(String token, UserAccount actor) { return byToken(token, actor, false); }
+    public View confirm(String token, UserAccount actor) { return byToken(token, actor, true); }
 
-    public synchronized View confirm(String token, UserAccount actor) {
-        Session session = byToken(token, actor);
-        if (session.state == State.CONFIRMED) return view(session);
-        requirePending(session);
-        try {
-            var current = reader.read(session.paymentId, actor);
-            if (current.amount().compareTo(session.amount) != 0) throw DemoQrException.unavailable();
-        } catch (DemoQrException ex) {
-            session.state = State.CANCELED;
-            throw ex;
-        }
-        // The database read may cross the deadline. Sample server time again at the transition.
-        expire(session);
-        requirePending(session);
-        session.state = State.CONFIRMED;
-        return view(session);
-    }
-
-    public synchronized View cancel(String id, UserAccount actor) {
-        owner(actor);
-        limit(accesses, actor.getId(), 60);
-        Session session;
-        try { session = sessions.get(UUID.fromString(id)); }
-        catch (IllegalArgumentException ex) { throw DemoQrException.unavailable(); }
-        session = authorized(session, actor);
-        expire(session);
-        if (session.state == State.PENDING) session.state = State.CANCELED;
-        return view(session);
-    }
-
-    private Session byToken(String token, UserAccount actor) {
-        owner(actor);
-        limit(accesses, actor.getId(), 60);
+    private View byToken(String token, UserAccount actor, boolean confirm) {
+        budget(actor, false);
         if (token == null || !token.matches("[A-Za-z0-9_-]{43}")) throw DemoQrException.unavailable();
-        return authorized(sessions.get(verifiers.get(digest(token))), actor);
+        return committed(() -> {
+            var candidate = store.findVerifier(digest(token), actor.getId());
+            // Every path locks Payment before its session, matching existing financial writers.
+            reader.requireOwner(candidate.paymentId(), actor);
+            var session = store.expire(store.lock(candidate.id(), actor.getId()));
+            if (!confirm) {
+                if (session.state() == State.PENDING || session.state() == State.AUTHORIZED_PENDING_SETTLEMENT) {
+                    var error = invalidateIfStale(session, actor);
+                    if (error != null) return new Outcome<>(null, error);
+                }
+                return new Outcome<>(view(session), null);
+            }
+            if (session.state() != State.PENDING && session.state() != State.AUTHORIZED_PENDING_SETTLEMENT) {
+                return new Outcome<>(null, stateError(session));
+            }
+            var error = invalidateIfStale(session, actor);
+            if (error != null) return new Outcome<>(null, error);
+            // Expiry is also checked in the actual SQL UPDATE, after the payment validation and lock wait.
+            session = store.authorize(session);
+            return session.state() == State.AUTHORIZED_PENDING_SETTLEMENT
+                    ? new Outcome<>(view(session), null) : new Outcome<>(null, stateError(session));
+        });
     }
 
-    private Session authorized(Session session, UserAccount actor) {
-        if (session == null || session.owner != actor.getId()) throw DemoQrException.unavailable();
-        expire(session);
-        return session;
+    private DemoQrException invalidateIfStale(SqlQrStore.Session session, UserAccount actor) {
+        try {
+            var current = reader.read(session.paymentId(), actor);
+            if (current.amount().compareTo(session.amount()) != 0 || !current.currency().equals(session.currency())) {
+                throw DemoQrException.unavailable();
+            }
+            return null;
+        } catch (DemoQrException error) {
+            store.cancel(session);
+            return error;
+        }
     }
 
-    private static void owner(UserAccount actor) {
+    /** Commit expiry/revocation before reporting denial; throwing inside a transaction would resurrect state. */
+    private View committed(Supplier<Outcome<View>> work) {
+        var outcome = store.transaction(work);
+        if (outcome.error() != null) throw outcome.error();
+        return outcome.value();
+    }
+
+    private void budget(UserAccount actor, boolean create) {
         if (!SecurityUtils.isMember(actor) || actor.getId() == null || !"ACTIVE".equals(actor.getStatus())) {
             throw DemoQrException.unavailable();
         }
+        if (!store.spend(actor.getId(), create)) throw new DemoQrException(HttpStatus.TOO_MANY_REQUESTS,
+                "SIMULATOR_RATE_LIMIT", "Simulation rate limit reached. Retry after 60 seconds.");
     }
 
-    private void requirePending(Session session) {
-        if (session.state != State.PENDING) throw new DemoQrException(HttpStatus.CONFLICT,
-                "DEMO_" + session.state.name(), "Demo session is " + session.state.name() + ". The real payment remains unchanged.");
+    private static DemoQrException stateError(SqlQrStore.Session session) {
+        return new DemoQrException(HttpStatus.CONFLICT, "SIMULATOR_" + session.state(),
+                "Simulation session is " + session.state() + ". Payment is not settled.");
     }
 
-    private void expire(Session session) {
-        if (session.state == State.PENDING && !clock.instant().isBefore(session.expiresAt)) session.state = State.EXPIRED;
+    private View view(SqlQrStore.Session session) {
+        return new View(session.id(), session.paymentId(), "DEMO-" + session.paymentId(), session.amount(), session.currency(),
+                session.bank(), session.bank().label, session.createdAt(), session.expiresAt(), store.now(), session.state(), "NON_PAYABLE");
     }
 
-    private View view(Session session) {
-        expire(session);
-        return new View(session.id, session.paymentId, "DEMO-" + session.paymentId, session.amount, "VND",
-                session.bank, session.bank.label, session.createdAt, session.expiresAt, clock.instant(), session.state, "NON_PAYABLE");
-    }
-
-    private void cleanup() {
-        Instant cutoff = clock.instant().minusSeconds(600);
-        sessions.values().removeIf(s -> {
-            expire(s);
-            if (s.expiresAt.isBefore(cutoff)) { verifiers.remove(s.verifier); return true; }
-            return false;
-        });
-        creates.values().removeIf(q -> q.isEmpty() || q.peekLast().isBefore(clock.instant().minusSeconds(60)));
-        accesses.values().removeIf(q -> q.isEmpty() || q.peekLast().isBefore(clock.instant().minusSeconds(60)));
-    }
-
-    private void limit(Map<Long, ArrayDeque<Instant>> buckets, long owner, int max) {
-        cleanup();
-        if (!buckets.containsKey(owner) && buckets.size() >= MAX_SESSIONS) {
-            throw new DemoQrException(HttpStatus.TOO_MANY_REQUESTS, "DEMO_RATE_LIMIT", "Demo rate limit reached. Try again later.");
-        }
-        var bucket = buckets.computeIfAbsent(owner, ignored -> new ArrayDeque<>());
-        Instant now = clock.instant();
-        while (!bucket.isEmpty() && !bucket.peekFirst().isAfter(now.minusSeconds(60))) bucket.removeFirst();
-        if (bucket.size() >= max) throw new DemoQrException(HttpStatus.TOO_MANY_REQUESTS,
-                "DEMO_RATE_LIMIT", "Demo rate limit reached. Try again later.");
-        bucket.addLast(now);
-    }
-
-    private static String digest(String token) {
+    static String digest(String token) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.US_ASCII)));
         } catch (NoSuchAlgorithmException ex) { throw new IllegalStateException("SHA-256 unavailable"); }
-    }
-
-    private static final class Session {
-        private final UUID id;
-        private final long owner;
-        private final long paymentId;
-        private final BigDecimal amount;
-        private final Bank bank;
-        private final Instant createdAt;
-        private final Instant expiresAt;
-        private final String verifier;
-        private State state = State.PENDING;
-
-        private Session(UUID id, long owner, long paymentId, BigDecimal amount, Bank bank,
-                        Instant createdAt, Instant expiresAt, String verifier) {
-            this.id = id; this.owner = owner; this.paymentId = paymentId; this.amount = amount;
-            this.bank = bank; this.createdAt = createdAt; this.expiresAt = expiresAt; this.verifier = verifier;
-        }
     }
 }

@@ -6,6 +6,7 @@ import com.sportify.demoqr.controller.DemoQrController;
 import com.sportify.demoqr.service.DemoPaymentReader;
 import com.sportify.demoqr.service.DemoQrService;
 import com.sportify.payment.repository.PaymentRepository;
+import com.sportify.demoqr.service.SqlQrStore;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -18,15 +19,16 @@ import static org.mockito.Mockito.mock;
 
 class DemoQrConfigurationTest {
     @ParameterizedTest
-    @CsvSource({"dev,true,true", "qr-demo,true,true", "dev,false,false", "prod,true,false", "production,true,false", "default,true,false", "'dev,prod',true,false", "'qr-demo,production',true,false"})
+    @CsvSource({"qr-simulator,true,true", "qr-demo,true,false", "dev,true,false", "dev,false,false", "prod,true,false", "production,true,false", "default,true,false", "'dev,prod',true,false", "'qr-demo,production',true,false"})
     void independentProfileAndExplicitOptInAreBothRequired(String profiles, String enabled, boolean present) {
         new ApplicationContextRunner().withUserConfiguration(DemoQrConfiguration.class, DemoQrService.class, DemoQrController.class, DemoPaymentReader.class)
                 .withBean(Clock.class, Clock::systemUTC)
+                .withBean(SqlQrStore.class, () -> mock(SqlQrStore.class))
                 .withBean(PaymentRepository.class, () -> mock(PaymentRepository.class))
                 .withBean(MemberCardRepository.class, () -> mock(MemberCardRepository.class))
                 .withBean(SportPackageRegistrationRepository.class, () -> mock(SportPackageRegistrationRepository.class))
-                .withPropertyValues("spring.profiles.active=" + profiles, "app.demo.qr.enabled=" + enabled,
-                        "app.demo.qr.public-base-url=https://demo.example.test/", "app.demo.qr.allowed-origins=https://demo.example.test")
+                .withPropertyValues("spring.profiles.active=" + profiles, "app.payment.simulator.enabled=" + enabled,
+                        "app.payment.simulator.public-base-url=https://demo.example.test/", "app.payment.simulator.allowed-origins=https://demo.example.test")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     for (Class<?> type : new Class<?>[]{DemoQrController.class, DemoQrService.class, DemoPaymentReader.class, DemoQrSettings.class}) {
@@ -44,9 +46,9 @@ class DemoQrConfigurationTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"http://192.168.1.50:5173/", "http://10.0.0.20:5173/base/", "http://172.16.0.4:5173/"})
-    void privateLanRequiresExplicitHttpOptInAndAnExactOrigin(String base) {
+    void privateLanHttpIsRejectedEvenWithTheRetiredOptIn(String base) {
         String origin = java.net.URI.create(base).getScheme() + "://" + java.net.URI.create(base).getAuthority();
-        assertThat(new DemoQrSettings(base, origin, true, 300).publicBaseUrl()).isEqualTo(base);
+        assertThatThrownBy(() -> new DemoQrSettings(base, origin, true, 300)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new DemoQrSettings(base, origin, false, 300)).isInstanceOf(IllegalArgumentException.class);
     }
 
