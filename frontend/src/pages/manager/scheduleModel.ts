@@ -19,6 +19,18 @@ export function monday(value: string): string {
   return addDays(date, -((new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7))
 }
 export function displayDate(value: string): string { return value.split('-').reverse().join('/') }
+function compareName(left: string | null | undefined, right: string | null | undefined): number {
+  const a = (left ?? '').normalize('NFKC').trim().toLowerCase()
+  const b = (right ?? '').normalize('NFKC').trim().toLowerCase()
+  return a < b ? -1 : a > b ? 1 : 0
+}
+/** Stable display order for sessions occupying the same timetable cell. */
+export function compareScheduleSessions(a: ManagerSession, b: ManagerSession): number {
+  return compareName(a.class?.name, b.class?.name)
+    || compareName(a.coach?.name, b.coach?.name)
+    || compareName(a.facility?.name, b.facility?.name)
+    || a.id - b.id
+}
 export function repeatDates(from: string, to: string, days: DayOfWeek[]): string[] {
   if (!validDate(from) || !validDate(to) || to < from || !days.length) return []
   const result: string[] = []

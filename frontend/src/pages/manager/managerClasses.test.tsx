@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -25,6 +26,10 @@ function backend(profile = MANAGER) {
 beforeEach(() => { vi.stubEnv('VITE_MANAGER_PREVIEW', 'false'); tokenStorage.startSession({ accessToken: 'manager-test', refreshToken: 'refresh-test' }) })
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 describe('FE-07 class management', () => {
+  it('stacks the class editor panels at the tablet breakpoint', () => {
+    const css = readFileSync('src/styles/managerSchedule.css', 'utf8')
+    expect(css).toContain('@media (max-width: 900px) { .f2-editor-layout { grid-template-columns: minmax(0, 1fr); } }')
+  })
   it('lists active coaches before sport selection and allows refreshing newly added coaches', async () => {
     const api = backend()
     const user = userEvent.setup()
