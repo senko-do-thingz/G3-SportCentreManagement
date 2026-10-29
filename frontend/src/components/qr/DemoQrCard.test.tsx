@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import QRCode from 'qrcode'
 import { payment } from '../../test/memberFixtures'
 import { DemoQrCard } from './DemoQrCard'
 import { DEMO_BANK_OPTIONS, demoDetails, normalizeDemoBank } from './demoDetails'
@@ -21,11 +22,11 @@ describe('QR-02 selector and clipboard outcomes', () => {
   beforeEach(() => vi.stubGlobal('isSecureContext', true))
   afterEach(() => { vi.unstubAllGlobals(); Reflect.deleteProperty(document, 'execCommand') })
 
-  it('uses a labeled native selector, safe account and explicit fixed-QR disclosure', () => {
+  it('uses a labeled native selector, safe account and explicit dynamic non-payable disclosure', () => {
     render(<DemoQrCard payment={payment()} />)
     const select = screen.getByRole('combobox', { name: 'Demo bank' })
     expect(select).toHaveValue('vietcombank')
-    expect(select).toHaveAccessibleDescription(/example information only.*fixed, non-payable Vietcombank demo sample/)
+    expect(select).toHaveAccessibleDescription(/QR updates.*plain text only.*cannot transfer money.*does not confirm a payment/)
     expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual(DEMO_BANK_OPTIONS.map((option) => option.label))
     expect(screen.getByText('DEMO - NOT AVAILABLE')).toBeVisible()
     expect(screen.queryByText('0123456789')).not.toBeInTheDocument()
@@ -35,10 +36,13 @@ describe('QR-02 selector and clipboard outcomes', () => {
     const user = userEvent.setup()
     const write = clipboard()
     render(<DemoQrCard payment={payment()} />)
-    const qrBefore = screen.getByRole('img').innerHTML
+    const qrBefore = screen.getByRole('img').querySelector('path')?.getAttribute('d')
     await user.selectOptions(screen.getByRole('combobox'), value)
     expect(screen.getByText(label, { selector: 'dd' })).toBeVisible()
-    expect(screen.getByRole('img').innerHTML).toBe(qrBefore)
+    const qrAfter = screen.getByRole('img').querySelector('path')?.getAttribute('d')
+    if (value === 'vietcombank') expect(qrAfter).toBe(qrBefore)
+    else expect(qrAfter).not.toBe(qrBefore)
+    expect(screen.getByRole('img')).toHaveAccessibleName(new RegExp(label.replace(/[()]/g, '\\$&')))
     await user.click(screen.getByRole('button', { name: 'Copy demo details' }))
     expect(write).toHaveBeenCalledExactlyOnceWith(demoDetails(payment(), normalizeDemoBank(value)))
     expect(screen.getByRole('status')).toHaveTextContent('Demo details copied. Demo only - not a real payment.')
@@ -136,5 +140,43 @@ describe('QR-02 selector and clipboard outcomes', () => {
     await act(async () => old.resolve())
     expect(screen.getByText('DEMO-53')).toBeVisible()
     expect(screen.getByRole('status')).toBeEmptyDOMElement()
+  })
+
+  it('reproduces matrix data on switch-back and updates it with the authorized payment', async () => {
+    const user = userEvent.setup()
+    const view = render(<DemoQrCard payment={payment()} />)
+    const initial = screen.getByRole('img').querySelector('path')?.getAttribute('d')
+    for (const bank of ['mb', 'bidv', 'techcombank', 'vietcombank']) await user.selectOptions(screen.getByRole('combobox'), bank)
+    expect(screen.getByRole('img').querySelector('path')?.getAttribute('d')).toBe(initial)
+    expect(screen.getByText(/Demo QR updated for Vietcombank.*payment 52/)).toHaveAttribute('aria-live', 'polite')
+    view.rerender(<DemoQrCard payment={payment({ id: 53, amount: 731234 })} />)
+    expect(screen.getByRole('img').querySelector('path')?.getAttribute('d')).not.toBe(initial)
+    expect(screen.getByRole('img')).toHaveAccessibleName(/payment 53, Vietcombank/)
+    clipboard()
+    await user.click(screen.getByRole('button', { name: 'Copy demo reference' }))
+    expect(navigator.clipboard.writeText).toHaveBeenCalledExactlyOnceWith('DEMO-53')
+  })
+
+  it('replaces a previous QR and copy controls with an accessible error when rendering fails', async () => {
+    const user = userEvent.setup()
+    const create = QRCode.create.bind(QRCode)
+    vi.spyOn(QRCode, 'create').mockImplementation((...args) => {
+      if (String(args[0]).includes('BIDV_DEMO')) throw new Error('Synthetic renderer failure with private diagnostics')
+      return create(...args)
+    })
+    render(<DemoQrCard payment={payment()} />)
+    expect(screen.getByRole('img')).toBeVisible()
+    await user.selectOptions(screen.getByRole('combobox'), 'bidv')
+    expect(screen.getByRole('alert')).toHaveTextContent('The demo QR could not be generated. No payment was made.')
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Copy demo/ })).not.toBeInTheDocument()
+    expect(screen.queryByText(/private diagnostics/)).not.toBeInTheDocument()
+  })
+
+  it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])('fails safely for invalid payment ID %s', (id) => {
+    render(<DemoQrCard payment={payment({ id })} />)
+    expect(screen.getByRole('alert')).toHaveTextContent('The demo QR could not be generated.')
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 })

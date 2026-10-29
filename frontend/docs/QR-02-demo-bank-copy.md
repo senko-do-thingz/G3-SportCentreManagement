@@ -1,5 +1,7 @@
 # QR-02 demo bank selector and copy actions
 
+Historical QR-02 baseline. Its fixed VERSION=1 QR/disclosure is superseded by QR-03; selector and clipboard behavior remain. Use QR-03-dynamic-demo-qr.md and qr03-browser-check.py for current acceptance.
+
 The existing Member route `/member/payments/:paymentId/qr-demo` now offers exactly
 Vietcombank (demo), BIDV (demo), Techcombank (demo) and MB Bank (demo), in that order.
 Vietcombank is the default. Choice is local to the mounted card and changes example
