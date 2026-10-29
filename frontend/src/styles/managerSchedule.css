@@ -9,7 +9,8 @@
 .f2-schedule-table thead th > span, .f2-schedule-table thead th > time { display: block; }
 .f2-schedule-table thead th > time { margin-top: 3px; color: var(--color-text-muted); font-size: 11px; font-weight: 400; }
 .f2-schedule-table tbody th { background: var(--color-surface-muted); color: var(--color-text-muted); font-size: 12px; font-weight: 700; text-align: center; white-space: nowrap; }
-.f2-schedule-table__today { background: var(--color-primary-soft); }
+.f2-schedule-table thead th.f2-schedule-table__today,
+.f2-schedule-table tbody td.f2-schedule-table__today { background: var(--color-primary-soft); }
 .f2-schedule-table__empty-cell { display: block; color: var(--color-text-muted); font-size: 12px; text-align: center; }
 .f2-schedule-table__entries { display: grid; gap: 6px; }
 .f2-session { display: grid; gap: 5px; min-width: 0; margin: 0; padding: 8px; border: 1px solid var(--color-border-strong); border-left: 3px solid var(--color-primary); border-radius: 8px; background: var(--color-surface); overflow-wrap: anywhere; }

@@ -8,7 +8,7 @@ import { Button, Card, EmptyState, Input, PageHeader, PageLoader, Select, Status
 import { ManagerError, PreviewNotice } from './ManagerShared'
 import { useResource } from './useManagerTools'
 import { loadScheduleClasses } from './loadScheduleClasses'
-import { addDays, canManageSession, centerNow, displayDate, monday, WEEKDAYS } from './scheduleModel'
+import { addDays, canManageSession, centerNow, compareScheduleSessions, displayDate, monday, WEEKDAYS } from './scheduleModel'
 import { SessionEditorModal } from './SessionEditorModal'
 import { CancelSessionModal } from './CancelSessionModal'
 
@@ -40,8 +40,11 @@ export function ManagerSchedulePage() {
   if (sessions.status === 'ready') {
     for (const session of sessions.data) {
       const key = `${session.date}|${session.startTime.slice(0, 5)}`
-      sessionsByDateAndTime.set(key, [...(sessionsByDateAndTime.get(key) ?? []), session])
+      const group = sessionsByDateAndTime.get(key)
+      if (group) group.push(session)
+      else sessionsByDateAndTime.set(key, [session])
     }
+    for (const group of sessionsByDateAndTime.values()) group.sort(compareScheduleSessions)
   }
   const manualFacility = facilities.status === 'error' && facilities.error instanceof ApiError && facilities.error.status === 404
   const facilitiesUsable = manualFacility || (facilities.status === 'ready' && facilities.data.some((item) => item.active !== false))
