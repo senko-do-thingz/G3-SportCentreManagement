@@ -65,11 +65,13 @@ export function ManagerSchedulePage() {
       <div className="manager-row-actions"><Button variant="secondary" onClick={() => query('week', addDays(week, -7))}>Previous week</Button><Button variant="secondary" onClick={() => query('week', monday(centerNow().date))}>This week</Button><Button variant="secondary" onClick={() => query('week', addDays(week, 7))}>Next week</Button><strong>{displayDate(week)} - {displayDate(addDays(week, 6))}</strong></div>
       {sessions.status === 'loading' ? <PageLoader label="Loading schedule" /> : sessions.status === 'error' ? <ManagerError error={sessions.error} onRetry={reload} /> : <>
         {!sessions.data.length ? <EmptyState title="No sessions this week" description="Change filters or create a session for an active class." /> : (
+          <>
+          <p id="manager-schedule-grouping" className="f2-schedule-table__guidance">Sessions are grouped by start time. Each card shows its full time range; separate rows can overlap.</p>
           <div className="f2-schedule-table-wrap" role="region" aria-label="Weekly session timetable" tabIndex={0}>
-            <table className="f2-schedule-table" aria-label="Manager weekly schedule">
+            <table className="f2-schedule-table" aria-label="Manager weekly schedule" aria-describedby="manager-schedule-grouping">
               <thead>
                 <tr>
-                  <th className="f2-schedule-table__time-heading" scope="col">Time</th>
+                  <th className="f2-schedule-table__time-heading" scope="col">Starts at</th>
                   {dates.map((date, index) => {
                     const isToday = date === today
                     return <th className={isToday ? 'f2-schedule-table__today' : undefined} scope="col" key={date} aria-current={isToday ? 'date' : undefined}>
@@ -104,6 +106,7 @@ export function ManagerSchedulePage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </>}
     </Card>
@@ -133,7 +136,7 @@ function ManagerScheduleEntry({
     </div>
     <p className="f2-session__meta">Coach: {session.coach?.name ?? 'Not assigned'}</p>
     <p className="f2-session__meta">Facility: {session.facility?.name ?? 'Not assigned'}</p>
-    <p className="f2-session__meta">{session.bookedCount} / {session.capacity} booked · {session.trainingType === 'COACH_LED' ? 'Coach-led' : 'Self-training'}</p>
+    <p className="f2-session__meta">{session.bookedCount} / {session.capacity} booked - {session.trainingType === 'COACH_LED' ? 'Coach-led' : 'Self-training'}</p>
     {session.status === 'CANCELLED' && <p className="f2-session__meta f2-session__reason">Reason: {session.cancelReason || 'Not provided'}</p>}
     {canManage && <div className="f2-session__actions">
       <Button size="sm" variant="secondary" disabled={editDisabled} onClick={onEdit}>Edit</Button>

@@ -59,6 +59,43 @@ describe('FE-07 schedule', () => {
     expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(1)
     expect(screen.getAllByRole('button', { name: 'Cancel session' })).toHaveLength(1)
   })
+  it('explains start-time grouping and shows complete intervals for overlapping sessions', async () => {
+    const overlaps = [
+      { ...session, id: 40, startTime: '09:00:00', endTime: '11:00:00', class: { ...session.class, id: 40, code: 'CL-040', name: 'Morning skills session' } },
+      { ...session, id: 41, startTime: '09:30:00', endTime: '10:30:00', class: { ...session.class, id: 41, code: 'CL-041', name: 'Technique practice session' } },
+      { ...session, id: 42, startTime: '10:00:00', endTime: '10:30:00', class: { ...session.class, id: 42, code: 'CL-042', name: 'Afternoon court session' } },
+    ]
+    backend(false, false, overlaps)
+    renderApp(`/manager/schedule?week=${monday(date)}`)
+
+    expect(await screen.findByText('Sessions are grouped by start time. Each card shows its full time range; separate rows can overlap.')).toBeInTheDocument()
+    const table = screen.getByRole('table', { name: 'Manager weekly schedule' })
+    expect(within(table).getAllByRole('row')).toHaveLength(4)
+    expect(within(table).getAllByRole('rowheader').map((header) => header.textContent)).toEqual(['09:00', '09:30', '10:00'])
+    expect(screen.getByText('09:00 - 11:00')).toBeInTheDocument()
+    expect(screen.getByText('09:30 - 10:30')).toBeInTheDocument()
+    expect(screen.getByText('10:00 - 10:30')).toBeInTheDocument()
+  })
+  it('keeps dense weeks and lengthy session details in the scrollable timetable', async () => {
+    const asTime = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}:00`
+    const denseSessions = Array.from({ length: 12 }, (_, index) => ({
+      ...session,
+      id: 60 + index,
+      startTime: asTime(6 * 60 + index * 30),
+      endTime: asTime(6 * 60 + index * 30 + 45),
+      class: { ...session.class, id: 60 + index, code: `CL-${60 + index}`, name: `Foundations and advanced skills practice for mixed ability groups ${index + 1}` },
+      facility: { ...session.facility, name: 'North court training area with equipment storage and spectator seating' },
+    }))
+    backend(false, false, denseSessions)
+    renderApp(`/manager/schedule?week=${monday(date)}`)
+
+    const table = await screen.findByRole('table', { name: 'Manager weekly schedule' })
+    const region = screen.getByRole('region', { name: 'Weekly session timetable' })
+    expect(within(table).getAllByRole('row')).toHaveLength(13)
+    expect(region).toHaveTextContent('North court training area with equipment storage and spectator seating')
+    expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(12)
+    expect(screen.getAllByRole('button', { name: 'Cancel session' })).toHaveLength(12)
+  })
   it('shows multiple time slots and sorts same-time sessions regardless of API order', async () => {
     const namedSession = (id: number, name: string, sessionDate = date, startTime = '09:00:00', endTime = '10:00:00') => ({
       ...session,
@@ -82,6 +119,61 @@ describe('FE-07 schedule', () => {
     expect([...table.querySelectorAll('.f2-session__title')].map((title) => title.textContent)).toEqual([
       'Alpha class', 'Zulu class', 'Next day class', 'Later class',
     ])
+  })
+  it('keeps sessions adjacent to midnight on their own calendar dates', async () => {
+    const lateDate = addDays(monday(date), 3)
+    const earlyDate = addDays(lateDate, 1)
+    backend(false, false, [
+      { ...session, id: 45, date: lateDate, startTime: '23:00:00', endTime: '23:59:00', class: { ...session.class, name: 'Late evening session' } },
+      { ...session, id: 46, date: earlyDate, startTime: '00:00:00', endTime: '01:00:00', class: { ...session.class, name: 'Early morning session' } },
+    ])
+    renderApp('/manager/schedule?week=' + monday(date))
+
+    const table = await screen.findByRole('table', { name: 'Manager weekly schedule' })
+    const lateTitle = within(table).getByText('Late evening session')
+    const earlyTitle = within(table).getByText('Early morning session')
+    const lateCellIndex = lateTitle.closest('td')?.cellIndex ?? -1
+    const earlyCellIndex = earlyTitle.closest('td')?.cellIndex ?? -1
+    expect(lateCellIndex).toBe(earlyCellIndex - 1)
+    expect(within(table).getByRole('rowheader', { name: '23:00' })).toBeInTheDocument()
+    expect(within(table).getByRole('rowheader', { name: '00:00' })).toBeInTheDocument()
+    expect(screen.getByText('23:00 - 23:59')).toBeInTheDocument()
+    expect(screen.getByText('00:00 - 01:00')).toBeInTheDocument()
+  })
+  it('keeps the last selected week when a superseded schedule request resolves late', async () => {
+    const selectedWeek = addDays(monday(centerNow().date), 14)
+    const staleWeek = addDays(selectedWeek, 7)
+    const latestWeek = addDays(selectedWeek, 14)
+    let releaseStale!: (response: Response) => void
+    const staleResponse = new Promise<Response>((resolve) => { releaseStale = resolve })
+    const api = backend(false, false, [])
+    const originalFetch = api.fetchMock
+    const delayedFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(typeof input === 'string' ? input : input.toString())
+      if (url.pathname.endsWith('/manager/sessions')) {
+        const from = url.searchParams.get('from')
+        if (from === staleWeek) return staleResponse
+        const displayedWeek = from === selectedWeek ? selectedWeek : latestWeek
+        const name = from === selectedWeek ? 'Initial week session' : 'Latest week session'
+        return json(200, [{ ...session, id: displayedWeek === selectedWeek ? 70 : 72, date: displayedWeek, class: { ...session.class, name } }])
+      }
+      return originalFetch(input, init)
+    })
+    vi.stubGlobal('fetch', delayedFetch)
+    const user = userEvent.setup()
+    renderApp(`/manager/schedule?week=${selectedWeek}`)
+
+    expect(await screen.findByText('Initial week session')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Next week' }))
+    await waitFor(() => expect(delayedFetch.mock.calls.some(([input]) => String(input).includes(`from=${staleWeek}`))).toBe(true))
+    await user.click(screen.getByRole('button', { name: 'Next week' }))
+    expect(await screen.findByText('Latest week session')).toBeInTheDocument()
+
+    releaseStale(json(200, [{ ...session, id: 71, date: staleWeek, class: { ...session.class, name: 'Stale week session' } }]))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(screen.getByText('Latest week session')).toBeInTheDocument()
+    expect(screen.queryByText('Stale week session')).not.toBeInTheDocument()
+    expect(screen.getByText(`${displayDate(latestWeek)} - ${displayDate(addDays(latestWeek, 6))}`)).toBeInTheDocument()
   })
   it('highlights today even though the general table header has its own background', async () => {
     const today = centerNow().date
