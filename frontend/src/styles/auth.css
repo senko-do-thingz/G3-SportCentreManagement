@@ -79,8 +79,8 @@
   width: 64px;
   height: 64px;
   border-radius: 0;
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  background: var(--color-brand-logo);
+  color: var(--color-text-inverse);
   font-family: var(--font-display);
   font-size: 32px;
   font-style: italic;
@@ -228,6 +228,13 @@
   grid-template-columns: minmax(0, 1fr) 560px;
 }
 
+.auth-shell--register .auth-panel {
+  width: 560px;
+  max-width: calc(100vw - 40px);
+  box-sizing: border-box;
+  justify-self: center;
+}
+
 .auth-shell--register .auth-stage__copy__title {
   font-size: clamp(3rem, 4.4vw, 4.25rem);
 }
@@ -294,6 +301,10 @@
 
 .auth-stage .auth-form__options .link-button {
   line-height: inherit;
+}
+
+.auth-shell--register .checkbox-field {
+  min-height: 1.5em;
 }
 
 .auth-stage .auth-form .btn--primary {
