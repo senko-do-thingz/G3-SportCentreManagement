@@ -114,7 +114,7 @@ export function CheckInPage() {
   ]
 
   return (
-    <div className="page">
+    <div className="page reception-page">
       <PageHeader
         eyebrow="Front desk"
         title="Check-in"

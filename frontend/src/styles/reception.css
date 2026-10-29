@@ -498,3 +498,21 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Front desk look aligned with the Manager workspace (.reception-page: Member Search, Register and Renew, Check-in). */
+.reception-page { gap: var(--space-6); }
+.reception-page .page-header { align-items: center; padding: var(--space-8); border: 0; border-radius: var(--radius-xl); background: linear-gradient(120deg, var(--color-hero-deep) 0%, var(--color-navy) 45%, var(--color-primary) 100%); box-shadow: var(--shadow-md); }
+.reception-page .page-header .eyebrow { color: var(--color-hero-highlight); }
+.reception-page .page-header__title { font-family: var(--font-display); font-size: var(--text-3xl); letter-spacing: -0.03em; color: var(--color-on-hero); }
+.reception-page .page-header__description { font-size: var(--text-base); line-height: 1.6; color: var(--color-on-hero-muted); }
+.reception-page .page-header__actions .btn { height: 48px; padding: 0 var(--space-6); font-size: var(--text-base); box-shadow: var(--shadow-sm); }
+.reception-page .page-header__actions .btn--primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-on-accent); }
+.reception-page .page-header__actions .btn--primary:hover:not(:disabled) { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
+.reception-page .card { padding: var(--space-8); border-radius: var(--radius-xl); border-top: 4px solid var(--color-primary); box-shadow: var(--shadow-md); }
+.reception-page .card__title { font-size: var(--text-xl); letter-spacing: -0.02em; color: var(--color-primary); }
+.reception-page .field__label { font-size: var(--text-md); }
+.reception-page .input, .reception-page .select { height: 48px; font-size: var(--text-base); }
+.reception-page .table-scroll { border: 1px solid var(--color-primary-soft-hover); border-radius: var(--radius-lg); }
+.reception-page .table th { background: var(--color-primary-soft); color: var(--color-primary); border-bottom: 2px solid var(--color-primary); }
+.reception-page .table tbody tr:hover td { background: var(--color-primary-soft); }
+@media (max-width: 640px) { .reception-page .page-header { padding: var(--space-5); } .reception-page .page-header__title { font-size: var(--text-2xl); } .reception-page .card { padding: var(--space-4); } }
