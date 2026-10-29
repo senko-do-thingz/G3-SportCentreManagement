@@ -39,11 +39,23 @@ const MIXKIT_PAGES: Record<string, { label: string; page: string }> = {
   '44448': { label: 'Skilled basketball player shooting baskets, training alone', page: 'https://mixkit.co/free-stock-video/skilled-basketball-player-shooting-baskets-training-alone-44448/' },
   '43499': { label: 'Goal play in a semi-professional soccer game', page: 'https://mixkit.co/free-stock-video/goal-play-in-a-semi-professional-soccer-game-43499/' },
   '873': { label: 'Tennis player serving', page: 'https://mixkit.co/free-stock-video/tennis-player-serving-873/' },
+  '3171': { label: 'Swimming underwater in a pool', page: 'https://mixkit.co/free-stock-video/swimming-underwater-in-a-pool-3171/' },
+}
+const PEXELS_PAGES: Record<string, { label: string; page: string }> = {
+  '6216965': { label: 'Men playing volleyball', page: 'https://www.pexels.com/video/men-playing-volleyball-6216965/' },
+  '8053487': { label: 'Teammates playing badminton together', page: 'https://www.pexels.com/video/teammates-playing-badminton-together-8053487/' },
 }
 
 /** Every third-party photo, video and font on the public pages, built from the same constants the pages use. */
 export function buildCredits(): CreditGroup[] {
-  const videoIds = HOME_HERO_VIDEOS.map((files) => /videos\/(\d+)\//.exec(files[0])?.[1] ?? '')
+  const videos = HOME_HERO_VIDEOS.map((files) => {
+    const source = files[0]
+    const isPexels = source.includes('videos.pexels.com')
+    const pattern = isPexels ? /video-files\/(\d+)\// : /videos\/(\d+)\//
+    const id = pattern.exec(source)?.[1] ?? ''
+    const page = (isPexels ? PEXELS_PAGES : MIXKIT_PAGES)[id]
+    return { ...page, id, provider: isPexels ? 'Pexels' : 'Mixkit' }
+  })
   return [
     {
       title: 'Photos',
@@ -67,10 +79,10 @@ export function buildCredits(): CreditGroup[] {
     },
     {
       title: 'Background videos',
-      provider: 'Mixkit',
+      provider: 'Mixkit / Pexels',
       license: { name: 'Mixkit License', url: 'https://mixkit.co/license/#videoFree' },
-      note: 'Free stock video, no attribution required.',
-      items: videoIds.map((id) => ({ usedFor: `Home - hero video: ${MIXKIT_PAGES[id]?.label ?? `clip ${id}`}`, thumb: null, link: MIXKIT_PAGES[id]?.page ?? 'https://mixkit.co/', linkLabel: `Mixkit ${id}` })),
+      note: 'Free stock video; see each source page for the applicable Mixkit or Pexels license.',
+      items: videos.map(({ id, label, page, provider }) => ({ usedFor: `Home - hero video: ${label ?? `clip ${id}`}`, thumb: null, link: page ?? 'https://mixkit.co/', linkLabel: `${provider} ${id}` })),
     },
     {
       title: 'Font',

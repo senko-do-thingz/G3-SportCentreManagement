@@ -17,13 +17,23 @@ export const homeHero = hero
 const unsplash = unsplashUrl
 
 /**
- * Background clips for the Home hero from Mixkit (free for commercial and personal use under the Mixkit License,
- * no attribution required). Each clip streams from the Mixkit CDN in Full HD (1080p) with 720p as the fallback;
- * the hero photo shows while they load or when both files fail.
+ * Background clips for the Home hero from Mixkit and Pexels. Each clip lists a higher-quality source first and a
+ * lighter fallback; the hero photo shows while they load or when both files fail.
  */
 const mixkit = (id: number) => [1080, 720].map((size) => `https://assets.mixkit.co/videos/${id}/${id}-${size}.mp4`)
+const pexels = (id: number, frameRate: 25 | 30) => [
+  `https://videos.pexels.com/video-files/${id}/${id}-uhd_2560_1440_${frameRate}fps.mp4`,
+  `https://videos.pexels.com/video-files/${id}/${id}-hd_1920_1080_${frameRate}fps.mp4`,
+]
 
-export const HOME_HERO_VIDEOS = [mixkit(44448), mixkit(43499), mixkit(873)] as const
+export const HOME_HERO_VIDEOS = [
+  mixkit(44448), // Basketball
+  mixkit(43499), // Football
+  mixkit(873),   // Tennis
+  mixkit(3171),  // Swimming
+  pexels(6216965, 30), // Volleyball
+  pexels(8053487, 25), // Badminton
+] as const
 
 export const HOME_PHOTOS = {
   hero: unsplash('photo-1626224583764-f87db24ac4ea', 2200),
