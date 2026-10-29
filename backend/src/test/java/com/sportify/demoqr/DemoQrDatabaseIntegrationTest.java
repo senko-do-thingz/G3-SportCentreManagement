@@ -195,7 +195,7 @@ class DemoQrDatabaseIntegrationTest {
 
     @ParameterizedTest @ValueSource(strings={"SUCCESS","FAILED","REFUNDED"})
     void rejectsPaymentThatBecameIneligibleAndCommitsRevocation(String status) {
-        var created=create();jdbc.update("UPDATE payment SET payment_status=? WHERE id=?",status,paymentId);
+        var created=create();jdbc.update("UPDATE payment SET payment_status=?,payment_time=CASE WHEN ?='SUCCESS' THEN SYSUTCDATETIME() ELSE payment_time END WHERE id=?",status,status,paymentId);
         assertThat(post(PREFIX+"/confirm-intent",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(state(created.session().id())).isEqualTo("CANCELED");
         assertThat(post(PREFIX,request(UUID.randomUUID()),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -351,7 +351,7 @@ class DemoQrDatabaseIntegrationTest {
         Flyway legacy=Flyway.configure().dataSource(source).locations("classpath:db/migration/identity","classpath:db/migration/catalog").target("33").cleanDisabled(true).load();legacy.migrate();
         database.update("INSERT user_account(email,password_hash,full_name,role_id,status,version) VALUES ('legacy@qr04.example.test','unused-synthetic-hash','Legacy synthetic member',(SELECT id FROM role WHERE code='MEMBER'),'ACTIVE',0)");
         database.update("INSERT member_profile(user_id,member_code,current_level,joined_on) SELECT id,'QR04-LEGACY','BEGINNER',CAST(SYSUTCDATETIME() AS DATE) FROM user_account WHERE email='legacy@qr04.example.test'");
-        database.update("INSERT payment(payment_code,member_id,amount,payment_method,payment_status,version) SELECT TOP 1 'QR04-LEGACY',user_id,123456,'CASH','SUCCESS',0 FROM member_profile");
+        database.update("INSERT payment(payment_code,member_id,amount,payment_method,payment_status,payment_time,version) SELECT TOP 1 'QR04-LEGACY',user_id,123456,'CASH','SUCCESS',SYSUTCDATETIME(),0 FROM member_profile");
         assertThat(database.queryForObject("SELECT COUNT(*) FROM payment WHERE payment_code='QR04-LEGACY'",Integer.class)).isEqualTo(1);
         var before=fingerprint(database);
         // SQL Server transactional DDL dry run: rollback leaves the V33 cohort and its data intact.
