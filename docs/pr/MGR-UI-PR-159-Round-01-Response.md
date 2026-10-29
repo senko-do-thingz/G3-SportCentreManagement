@@ -6,14 +6,15 @@ Branch: feat/manager-ui-readability-and-colors. Remediation commits: 32e1c74 and
 
 | # | Requirement from review | Status | Evidence |
 |---|---|---|---|
-| 1 | Exact Task ID(s), Screen ID(s), affected routes, acceptance criteria, ownership | PARTIAL: Task/Screen IDs must be filled from the assignment spreadsheet | Route: /manager (UserManagementPage). Criteria and ownership: [test cases](../tests/MGR-UI_test_cases.md) sections 1-3 |
+| 1 | Exact Task ID(s), Screen ID(s), affected routes, acceptance criteria, ownership | DONE with a caveat: Task ID NX-14, no Screen ID exists for this screen in the spreadsheet | Route: /manager (UserManagementPage). Criteria and ownership: [test cases](../tests/MGR-UI_test_cases.md) sections 1-3 |
 | 2 | Real before/after screenshots at 390px, 768px, 1440px, light and dark, with interaction states | DONE | Section 2 below, files in [evidence folder](../tests/evidence/mgr-ui/) |
 | 3 | No regression across other Manager screens, shared components, responsive layouts | DONE for 4 screens, 4 not captured | Section 3 below |
 | 4 | Actual test results, accessibility checks, CI evidence for latest commit | PARTIAL: local results and contrast done; CI link pending | Section 4 below |
 | 5 | AI Audit Log, test documentation, PR checklist | DONE (CI checkbox open) | [AI audit log](../audit/MGR-UI-01_ai_audit_log.md), [test cases](../tests/MGR-UI_test_cases.md), [PR description](MGR-UI-01_PR_DESCRIPTION.md) |
 
 ## 1. Scope
-- Task ID(s): TO BE FILLED. Screen ID(s): TO BE FILLED.
+- Task ID(s): NX-14 (Flow 4, F4-REQ-06, owner Truc, assigned to the PR author). Note: NX-14 deliverable is the Member training plans UI. This PR is a Manager UI polish that arose outside that deliverable; it does not change any Member training plan screen.
+- Screen ID(s): Not assigned in the spreadsheet (the sheet has no Screen ID column; NX-14 lists Member training plans). Affected screen: Manager User Management.
 - Route: /manager, page UserManagementPage.
 - Ownership: author of PR #159.
 - Change: the readability and colour CSS was selecting every `.manager-page`, so all Manager screens changed. It is now scoped to `.manager-page--users`, and the modifier class is added only in UserManagementPage.tsx. No logic or API change.

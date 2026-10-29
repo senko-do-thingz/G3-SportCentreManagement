@@ -2,8 +2,8 @@
 
 ## 1. Scope and provenance
 - Branch: feat/manager-ui-readability-and-colors. Review: PR #159, code owner round 1 (Request Changes).
-- Task ID(s): TO BE FILLED by the author from the task assignment spreadsheet. Not invented here.
-- Screen ID(s): TO BE FILLED from the same spreadsheet. Affected screen: Manager User Management.
+- Task ID(s): NX-14 (Flow 4, F4-REQ-06, owner Truc, assigned to the PR author). Note: NX-14 deliverable is the Member training plans UI. This PR is a Manager UI polish that arose outside that deliverable; it does not change any Member training plan screen.
+- Screen ID(s): Not assigned in the spreadsheet (the sheet has no Screen ID column; NX-14 lists Member training plans). Affected screen: Manager User Management.
 - Affected route: the route that renders UserManagementPage (frontend/src/pages/manager/UserManagementPage.tsx).
 - Ownership: the author of PR #159 owns this change. Other Manager screens are owned by their own tasks and must not change visually.
 
