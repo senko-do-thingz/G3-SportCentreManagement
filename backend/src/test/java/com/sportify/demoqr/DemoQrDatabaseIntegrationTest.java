@@ -91,7 +91,8 @@ class DemoQrDatabaseIntegrationTest {
 
     private long payment(long member) {
         String code="QR04-"+UUID.randomUUID().toString().replace("-","").substring(0,20);
-        Long id=jdbc.queryForObject("INSERT dbo.payment(payment_code,member_id,amount,payment_method,payment_status,version) OUTPUT INSERTED.id VALUES (?,?,810000,'BANK_TRANSFER','PENDING',0)",Long.class,code,member);
+        jdbc.update("INSERT dbo.payment(payment_code,member_id,amount,payment_method,payment_status,version) VALUES (?,?,810000,'BANK_TRANSFER','PENDING',0)",code,member);
+        Long id=jdbc.queryForObject("SELECT id FROM dbo.payment WHERE payment_code=?",Long.class,code);
         jdbc.update("INSERT dbo.member_card(card_code,member_id,tier_id,start_date,status,price_paid,payment_id) VALUES (?,?,(SELECT TOP 1 id FROM membership_card_tier ORDER BY id),CAST(SYSUTCDATETIME() AS DATE),'PENDING_PAYMENT',810000,?)",code,member,id);
         return id;
     }
@@ -235,7 +236,8 @@ class DemoQrDatabaseIntegrationTest {
     }
 
     @Test void exactSqlDeadlineIsRejectedAndExpiredHistorySurvives() {
-        String raw="t".repeat(43);UUID id=insertAtDeadline(raw);
+        byte[] bytes=new byte[32];new java.security.SecureRandom().nextBytes(bytes);
+        String raw=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);UUID id=insertAtDeadline(raw);
         assertThat(post(PREFIX+"/confirm-intent",Map.of("token",raw),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(service.get(id.toString(),owner).state()).isEqualTo(DemoQrService.State.EXPIRED);
         assertThat(service.cancel(id.toString(),owner).state()).isEqualTo(DemoQrService.State.EXPIRED);

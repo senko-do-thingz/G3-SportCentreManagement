@@ -9,19 +9,20 @@ import { DemoSessionSummary } from './DemoSessionSummary'
 import './demoSession.css'
 
 /** A key owned by the bank/payment context ensures old links disappear immediately. */
-export function DemoSessionPanel({ paymentId, bank }: { paymentId: number; bank: DemoBank }) {
+export function DemoSessionPanel({ paymentId, bank, amount }: { paymentId: number; bank: DemoBank; amount: number | string }) {
   if (!qrPaymentDemoEnabled()) return null
-  return <DemoSessionPanelContent key={`${paymentId}:${bank}`} paymentId={paymentId} bank={bank} />
+  return <DemoSessionPanelContent key={`${paymentId}:${bank}:${amount}`} paymentId={paymentId} bank={bank} amount={amount} />
 }
 
-function DemoSessionPanelContent({ paymentId, bank }: { paymentId: number; bank: DemoBank }) {
+function DemoSessionPanelContent({ paymentId, bank, amount }: { paymentId: number; bank: DemoBank; amount: number | string }) {
   const [capability, setCapability] = useState<boolean | null>(null)
+  const [capabilityAttempt, setCapabilityAttempt] = useState(0)
   useEffect(() => {
     let active = true
     void demoQrApi.capability().then((enabled) => { if (active) setCapability(enabled) })
       .catch(() => { if (active) setCapability(false) })
     return () => { active = false }
-  }, [])
+  }, [capabilityAttempt])
   const [created, setCreated] = useState<CreatedDemoSession | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -56,7 +57,11 @@ function DemoSessionPanelContent({ paymentId, bank }: { paymentId: number; bank:
     try {
       if (action === 'start') {
         const result = await demoQrApi.create(paymentId, DEMO_BANKS[bank].code)
-        if (result.session.paymentId !== paymentId || result.session.bankCode !== DEMO_BANKS[bank].code) throw new Error('Context mismatch')
+        if (result.session.paymentId !== paymentId || result.session.bankCode !== DEMO_BANKS[bank].code
+          || Number(result.session.amount) !== Number(amount)) {
+          void demoQrApi.cancel(result.session.id).catch(() => undefined)
+          throw new Error('Payment context changed; reload the payment before starting a new session')
+        }
         if (!mounted.current) { void demoQrApi.cancel(result.session.id).catch(() => undefined); return }
         sessionId.current = result.session.id
         setCreated(result); setDeadline(false)
@@ -65,7 +70,7 @@ function DemoSessionPanelContent({ paymentId, bank }: { paymentId: number; bank:
         if (mounted.current) { setCreated({ ...created, session }); setDeadline(false) }
       }
     } catch {
-      if (mounted.current) setError('Could not update the demo session. Check your connection and demo configuration, then refresh or retry. The real payment remains unchanged.')
+      if (mounted.current) setError('Could not update the demo session. Check your connection and demo configuration, then refresh or retry. Reload the payment if its details changed. The real payment remains unchanged.')
     } finally {
       sending.current = false
       if (mounted.current) setBusy(false)
@@ -87,7 +92,8 @@ function DemoSessionPanelContent({ paymentId, bank }: { paymentId: number; bank:
     ? `M${index % qr.modules.size + 4} ${Math.floor(index / qr.modules.size) + 4}h1v1h-1z` : '').join('') : ''
   if (capability !== true) return <section className="demo-session-panel" aria-label="QR Payment (Simulation)">
     <h3>QR Payment (Simulation)</h3>
-    <p role="status">{capability === null ? 'Checking simulation availability...' : 'Simulation is unavailable. The payment remains pending. Legacy links must be reissued when simulation becomes available.'}</p>
+    <p aria-live="polite">{capability === null ? 'Checking simulation availability...' : 'Simulation is unavailable. The payment remains pending. Legacy links must be reissued when simulation becomes available.'}</p>
+    {capability === false && <Button variant="secondary" onClick={() => { setCapability(null); setCapabilityAttempt((value) => value + 1) }}>Retry simulation availability</Button>}
   </section>
   return <section className="demo-session-panel" aria-label="Demo confirmation session">
     <h3>QR Payment (Simulation)</h3>

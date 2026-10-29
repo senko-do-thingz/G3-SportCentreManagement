@@ -99,7 +99,7 @@ function DemoQrCardContent({ payment }: { payment: Pick<Payment, 'id' | 'amount'
       <div role="alert" aria-atomic="true">
         {feedback?.kind === 'error' && <Notice tone="danger" live="off">{feedback.text}</Notice>}
       </div>
-      <DemoSessionPanel paymentId={payment.id} bank={bank} />
+      <DemoSessionPanel paymentId={payment.id} bank={bank} amount={payment.amount} />
     </Card>
   )
 }
