@@ -10,8 +10,10 @@
 | AC1 weekly schedule | Four inclusive Mondays produce four sessions; request uses range/weekdays, seconds, training type and no date/status | `managerSchedule.test.tsx` |
 | AC2 conflict | Every exact conflict is displayed, including missing-resource fallback, and editor values survive dismissal | `managerSchedule.test.tsx`, `managerSessionsApi.test.ts` |
 | AC3 cancellation | Cancelled reason is visible and cancelled cards have no management actions; reason is required | `managerSchedule.test.tsx` |
-| Weekly timetable | Shows multiple time slots and sessions on different dates; same-time sessions render in deterministic class/coach/facility/ID order even when the API returns them out of order; current-day header highlight survives the general table-header rule | `managerSchedule.test.tsx` |
-| Week navigation | Previous/current/next-week controls update the displayed date range and request each matching `from`/`to` range | `managerSchedule.test.tsx` |
+| Weekly timetable | Labels start-time grouping explicitly and shows each full interval; overlapping sessions remain independently visible; midnight-adjacent sessions stay under their calendar dates; same-time sessions render deterministically; current-day highlight survives the general table-header rule | `managerSchedule.test.tsx` |
+| Dense schedule and long content | Many unique start times and long class/facility names remain in the labeled scroll region; Edit and Cancel remain present for each manageable session | `managerSchedule.test.tsx` |
+| Week navigation | Previous/current/next-week controls request each matching range; a delayed superseded response cannot overwrite the last selected week | `managerSchedule.test.tsx` |
+| Browser layout and theme | Real-browser preview checked at 390x844, 768x1024, 1024x768 and 1440x900 in light and dark themes; no page-wide horizontal overflow, table scroll is contained, computed today colors change by theme; native 200% zoom is not verified | frontend/docs/FE-07-verification.md |
 | Responsive and keyboard access | Horizontal overflow stays inside the labeled timetable region; the region is focusable and Tab/Shift+Tab reaches session actions | `managerSchedule.test.tsx` |
 | Edit safety | Capacity cannot fall below booked count; class/training type remain immutable | `managerSchedule.test.tsx` |
 | Missing API | A facility 404 enables explicit known-ID entry; 403/500 never trigger fallback; existing sessions remain visible | `managerSchedule.test.tsx` |

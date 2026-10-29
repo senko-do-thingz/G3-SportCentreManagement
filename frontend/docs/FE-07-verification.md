@@ -81,3 +81,25 @@ All four PNGs in `context/Flow 2 - Class booking and schedule management/Flow 2 
 - Training type is supplied on session creation because the backend requires it. No session `status` is sent: the backend publishes new sessions, and there is no publish-later endpoint.
 - No speculative availability endpoint or advisory availability button is added. Conflict decisions come from the save response.
 - The schedule selector loads all class pages at 100 rows per request, forwards the screen abort signal and stops between pages when the view unmounts or reloads. It supports up to 100 pages (10,000 classes); a larger result shows an error instead of silently omitting classes. A failed page request reaches the existing retry state. A lightweight filtered lookup remains a backend improvement.
+
+## PR #150 Round 1 review follow-up (2026-10-29)
+
+### Frontend decisions and regression coverage
+
+The timetable is a weekly session list indexed by start time, not a duration occupancy grid. This matches the FE-07 weekly calendar scope and available Figma flow; the schedule creation flow does not specify a row-span calendar. Each card displays its full start/end range. A visible and screen-reader description states that separate start-time rows can overlap, so a row must not be interpreted as availability. No booking or backend conflict behavior was changed.
+
+Added frontend coverage for simultaneous overlapping intervals at 09:00-11:00, 09:30-10:30 and 10:00-10:30; adjacent dates across midnight; 12 unique starts with lengthy class/facility text; delayed stale week responses; 44px narrow-screen Edit/Cancel targets; and the existing edit/cancel controls. The non-ASCII separator is now ASCII.
+
+### Real-browser verification
+
+- Environment: isolated Vite manager-preview fixture at http://127.0.0.1:5195/manager/schedule; the page explicitly identifies sample data and says changes never reach the backend. No live authenticated backend was used.
+- Browser: Chromium through the Codex in-app browser.
+- Viewport/theme matrix: 390x844, 768x1024, 1024x768 and 1440x900, each in light and dark mode. document.documentElement.scrollWidth did not exceed clientWidth in any checked case. At 390 and 768 CSS px the 900px timetable remains inside its labeled overflow-x:auto region; desktop content fits the region.
+- Actual computed current-day header colors: light rgb(233, 238, 252), dark rgb(28, 42, 77).
+- Narrow action target measurement: Edit and Cancel were 44x44px at 390 and 768 viewports, and remained inside each session card. At 1024 and 1440 desktop viewports the measured heights were 28px.
+- Keyboard check: Tab from the focusable timetable region reached Edit; the 3px visible focus ring appeared and the horizontal scroller moved to the target session (scrollLeft 593 of 593). Cancel remained adjacent and in-card. No page-wide horizontal overflow was introduced.
+- Functional browser checks: Edit opened the existing session editor; Cancel opened the existing reason-confirmation dialog. Both dialogs were closed without submitting. Three rapid Next-week clicks ended at week=2026-11-16, displayed 16/11/2026 - 22/11/2026, and rendered the preview empty state.
+- Screenshot status: viewport screenshots were captured in the browser session for visual inspection. The browser tool did not provide a local file path, so screenshots are not saved under the repository or task-report directory. Do not treat these inline captures as a packaged screenshot artifact.
+- Native browser zoom: NOT RUN. The in-app browser exposes viewport sizing but not browser zoom; Ctrl+Plus did not change its CSS viewport or device scale. A native 200% zoom check remains required before claiming full review acceptance.
+
+Live manager-role behavior, backend conflicts, 403/404/500 handling and production CI are not asserted by this fixture check. Existing automated tests cover their relevant FE-07 authorization, API-error and action states. No backend files, endpoints or authorization rules were changed.
