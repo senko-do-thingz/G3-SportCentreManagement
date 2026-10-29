@@ -35,6 +35,8 @@ import { LoginPage } from '../pages/public/LoginPage'
 import { NotFoundPage } from '../pages/public/NotFoundPage'
 import { RegisterPage } from '../pages/public/RegisterPage'
 import { AccountSwitchRedirect } from './AccountSwitchRedirect'
+import { MemberTrainingPlansPage } from '../pages/member/MemberTrainingPlansPage'
+import { MemberTrainingHistoryPage } from '../pages/member/MemberTrainingHistoryPage'
 import { UserManagementPage } from '../pages/manager/UserManagementPage'
 import { ManagerPackagesPage } from '../pages/manager/ManagerPackagesPage'
 import { MembershipCardsManagementPage } from '../pages/manager/MembershipCardsManagementPage'
@@ -73,6 +75,8 @@ const SCREENS: Record<string, ReactNode> = {
   '/member/membership': <MyMembershipPage />,
   '/member/payments': <MyPaymentsPage />,
   '/member/schedule': <MemberSchedulePage />,
+  '/member/training': <MemberTrainingPlansPage />,
+  '/member/history': <MemberTrainingHistoryPage />,
   '/reception': <MemberSearchPage />,
   '/reception/bookings': <ReceptionBookingsPage />,
   '/reception/register': <RegisterRenewPage />,

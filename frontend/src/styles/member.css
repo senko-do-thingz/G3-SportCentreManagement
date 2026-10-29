@@ -587,3 +587,21 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Member training screens (NX-14 plans and coach notes, NX-15 attendance and results). */
+.member-training-page { gap: var(--space-6); }
+.training-list { display: grid; gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+.training-item { display: grid; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+.training-item__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.training-item__title { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-semibold); color: var(--color-text); }
+.training-item__meta { margin: 0; font-size: var(--text-sm); color: var(--color-text-muted); }
+.training-item__text { margin: 0; color: var(--color-text); overflow-wrap: anywhere; }
+.training-steps { display: grid; gap: var(--space-3); margin: var(--space-2) 0 0; padding-left: var(--space-6); list-style: decimal; }
+.training-list + .pagination { margin-top: var(--space-4); }
+.training-steps__step { display: grid; gap: var(--space-1); }
+.training-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-3); margin: var(--space-2) 0; }
+.training-metrics__metric { display: grid; gap: var(--space-1); padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-surface-muted); }
+.training-metrics__metric dt { font-size: var(--text-sm); color: var(--color-text-muted); }
+.training-metrics__metric dd { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-semibold); color: var(--color-text); }
+.training-metrics__metric dd.training-metrics__missing { font-size: var(--text-md); font-weight: var(--weight-regular); color: var(--color-text-muted); }
+@media (max-width: 640px) { .training-item { padding: var(--space-3); } }
