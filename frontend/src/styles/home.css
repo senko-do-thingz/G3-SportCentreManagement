@@ -407,9 +407,9 @@
 .credits-bar { background: var(--h-hero); }
 .credits-bar__inner { display: flex; align-items: center; justify-content: space-between; min-height: 72px; }
 .home-page .credits-bar a { color: #ffffff; text-decoration: none; }
-.credits-bar .brand { gap: 20px; color: #ffffff; }
-.credits-bar .brand__mark { width: 64px; height: 64px; border: 0; border-radius: 0; background: var(--h-primary); color: #ffffff; box-shadow: none; filter: none; font: italic 800 36px/1 var(--h-display); }
-.credits-bar .brand__name { color: #ffffff; font: italic 800 26px/1 var(--h-display); letter-spacing: 0.08em; text-transform: uppercase; }
+.credits-bar .brand { gap: 20px; color: var(--color-on-hero); }
+.credits-bar .brand__mark { width: 64px; height: 64px; border: 0; border-radius: 0; background: var(--h-primary); color: var(--color-on-hero); box-shadow: none; filter: none; font: italic 800 36px/1 var(--h-display); }
+.credits-bar .brand__name { color: var(--color-on-hero); font: italic 800 26px/1 var(--h-display); letter-spacing: 0.08em; text-transform: uppercase; }
 .credits-bar__actions { display: flex; align-items: center; gap: 16px; }
 .credits-bar__back { font-weight: 700; }
 .credits-main { display: grid; gap: 18px; padding-block: 64px 96px; }
