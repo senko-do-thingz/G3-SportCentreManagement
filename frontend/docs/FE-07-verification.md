@@ -103,3 +103,15 @@ Added frontend coverage for simultaneous overlapping intervals at 09:00-11:00, 0
 - Native browser zoom: NOT RUN. The in-app browser exposes viewport sizing but not browser zoom; Ctrl+Plus did not change its CSS viewport or device scale. A native 200% zoom check remains required before claiming full review acceptance.
 
 Live manager-role behavior, backend conflicts, 403/404/500 handling and production CI are not asserted by this fixture check. Existing automated tests cover their relevant FE-07 authorization, API-error and action states. No backend files, endpoints or authorization rules were changed.
+
+## PR #150 Round 2 responsive-layout verification (2026-10-29)
+
+The removed narrow `.f2-editor-layout` breakpoint is restored in `src/styles/managerSchedule.css`: at widths up to 900px, Class details and Coach qualification stack in one column. The class-management regression suite asserts that breakpoint, and the actual computed grid was verified in the manager preview.
+
+- Isolated preview: `npm run dev:preview -- --host 127.0.0.1 --port 5195`, using only the built-in synthetic manager account. The visible fixture notice states that changes stay in the browser and are never sent to the backend.
+- 390x844 viewport: CSS client/scroll width 375/375; editor grid one 343px column; both cards stacked. Schedule page width 375/375; the 900px timetable remains inside its 307px `overflow-x: auto` region.
+- 768x1024 viewport: CSS client/scroll width 753/753; editor grid one 736px column; both cards stacked. Schedule page width 753/753; timetable remains inside its 669px scroll region.
+- Native Edge browser zoom: applied actual Ctrl+Shift+Equals browser zoom steps to 200% (devicePixelRatio 2, visualViewport scale 1, CSS viewport 460px). Class editor grid is one 421px column; page width is 453/453. Schedule page width is 453/453; the 900px table remains contained in a 385px scroll region.
+- The local Round 2 handoff package at `E:\SWP391_SS2\RC\reports\round-02` contains screenshots and measured viewport metadata. Synthetic fixtures only; no backend or production data was used.
+
+The 900px table's horizontal scroll is intentional for its seven day columns. No backend files or authorization checks changed.
