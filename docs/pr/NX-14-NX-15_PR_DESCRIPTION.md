@@ -27,7 +27,7 @@ The Flow 4 contract in docs/nx-03 is an unsigned draft ("IMPLEMENTATION_NOT_AUTH
 - **Failures / Errors / Skipped**: 0 / 0 / 0 (local); lint and tsc pass
 
 ## Visual evidence
-docs/tests/evidence/member-training-ui/: both screens at 390/768/1440px, light and dark, plus empty, error and keyboard states.
+docs/tests/evidence/member-training-ui/: both screens at 390/768/1440px, light and dark, plus empty, error and keyboard states. Contrast measured on both screens in both themes: all text at or above 4.5:1 (lowest 4.54, idle tab in light mode); table in the test document.
 
 ## Related Issue / Ticket
 - **Task ID**: NX-14, NX-15

@@ -22,4 +22,4 @@
 - NX-18 could only be a framework: Coach screens (NX-11 to NX-13) are not in the repository.
 
 ## Limitations
-- No real backend; contract compatibility unverified; contrast not measured; no screen-reader pass; Chrome only.
+- No real backend; contract compatibility unverified; no screen-reader pass; Chrome only. Contrast was measured with computed styles (all above 4.5:1).

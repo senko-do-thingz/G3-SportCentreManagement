@@ -37,7 +37,7 @@ Run from frontend/ on this branch, 2026-10-29.
 | npx vitest run (full suite, final) | 89 files, 1613 tests passed (a first run under heavy machine load showed 16 timing failures in two unrelated public-page test files; they pass alone and in the clean re-run) |
 | npx vitest run memberTraining.test.tsx memberTrainingApi.test.ts (after the fixes) | 2 files, 16 tests passed |
 
-New tests (16): frontend/src/api/memberTrainingApi.test.ts (parsers, privacy allowlist, zero vs missing, rejects) and frontend/src/pages/member/memberTraining.test.tsx (both screens, empty/error/403/malformed/paging). Final full-suite run and CI URL for the latest commit: TO BE FILLED after the pipeline runs.
+New tests (16): frontend/src/api/memberTrainingApi.test.ts (parsers, privacy allowlist, zero vs missing, rejects) and frontend/src/pages/member/memberTraining.test.tsx (both screens, empty/error/403/malformed/paging). Final full-suite run passed locally. CI URL for the latest commit: TO BE FILLED (CI runs only on pull requests; open the PR first).
 
 ## 5. Visual evidence
 Chrome headless (puppeteer-core) against `vite --mode manager-preview`, synthetic data. Folder: docs/tests/evidence/member-training-ui/. Names: `<plans|history|results>_<390|768|1440>_<light|dark>.png`; states `*_empty_*` and `*_error_*` at 1440 and 390; `history_keyboard_focus_1440_<theme>.png`; report.json.
@@ -45,7 +45,22 @@ Chrome headless (puppeteer-core) against `vite --mode manager-preview`, syntheti
 - Pressing ArrowRight on the Attendance tab selects Training results (checked in light and dark).
 - A screenshot review found "Arrived -" lines caused by an invalid sample time; fixed so an unreadable arrival time is hidden, with a regression test.
 
-Not covered: contrast ratios were not measured for these screens; no screen-reader pass; Chrome only; no real backend.
+Contrast (WCAG, computed from rendered styles on both screens and both tabs, threshold 4.5:1 for normal text), lowest value per element:
+
+| Element | Light | Dark |
+|---|---|---|
+| Page title (34px) | 12.3 | 15.55 |
+| Card title and item title (18px) | 13.1 | 13.7 |
+| Body text | 13.1 | 13.7 |
+| Meta text and pagination summary | 5.27 | 9.1 |
+| Badge text | 5.43 | 6.13 |
+| Metric label | 5.02 | 8.12 |
+| Metric value | 12.5 | 12.23 |
+| Metric Not recorded text | 5.02 | 8.12 |
+| Selected tab | 6.63 | 6.9 |
+| Idle tab | 4.54 | 8.09 |
+
+All pass. The lowest margin is the idle tab in light mode (4.54). Not covered: no screen-reader pass; Chrome only; no real backend.
 
 ## 6. Limitations
-Provisional contract, synthetic data, no backend, no Coach-side screens (NX-11 to NX-13) to produce real plans, notes, attendance or results.
+Provisional contract, synthetic data, no backend, CI runs only on pull requests so no CI run exists yet, no Coach-side screens (NX-11 to NX-13) to produce real plans, notes, attendance or results.
