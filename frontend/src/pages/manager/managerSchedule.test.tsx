@@ -1,29 +1,44 @@
+import { readFileSync } from 'node:fs'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
 import { renderApp } from '../../test/renderApp'
 import { backendError, installFakeFetch, json, MANAGER } from '../../test/fakeBackend'
-import { addDays, centerNow, monday } from './scheduleModel'
+import { addDays, centerNow, displayDate, monday } from './scheduleModel'
 
 const date = addDays(centerNow().date, 7)
 const item = { id: 5, code: 'CL-005', name: 'Badminton foundations', sportId: 1, sportName: 'Badminton', ageGroupId: 1, ageGroupLabel: 'Adults', level: 'BEGINNER', coachId: 3, coachName: 'Quan Coach', maxMembers: 20, upcomingSessions: 1, active: true }
 const session = { id: 7, date, startTime: '09:00:00', endTime: '10:00:00', class: { id: 5, code: item.code, name: item.name }, coach: { id: 3, name: 'Quan Coach' }, facility: { id: 1, name: 'Court A' }, capacity: 20, bookedCount: 2, trainingType: 'COACH_LED', status: 'PUBLISHED', cancelReason: null }
-function backend(conflict = false, facilitiesMissing: boolean | number = false) {
+const cancelledSession = { ...session, id: 8, status: 'CANCELLED', cancelReason: 'Maintenance' }
+const tokensCss = readFileSync('src/styles/tokens.css', 'utf8')
+const scheduleCss = readFileSync('src/styles/managerSchedule.css', 'utf8')
+let injectedStyles: HTMLStyleElement
+
+function backend(conflict = false, facilitiesMissing: boolean | number = false, schedule: unknown[] = [session, cancelledSession]) {
   return installFakeFetch((call) => {
     const path = call.path.split('?')[0]
     if (path === '/users/me') return json(200, MANAGER)
     if (path === '/manager/classes') return json(200, { content: [item], page: 0, size: 100, totalElements: 1, totalPages: 1 })
     if (path === '/coaches') return json(200, [{ id: 3, fullName: 'Quan Coach', sportIds: [1] }])
     if (path === '/facilities') return facilitiesMissing ? backendError(typeof facilitiesMissing === 'number' ? facilitiesMissing : 404, 'Facility endpoint unavailable') : json(200, [{ id: 1, name: 'Court A', active: true }])
-    if (path === '/manager/sessions') return json(200, [session, { ...session, id: 8, status: 'CANCELLED', cancelReason: 'Maintenance' }])
+    if (path === '/manager/sessions') return json(200, schedule)
     if (path === '/manager/classes/5/sessions' && call.method === 'POST') return conflict ? json(409, { status: 409, message: 'Schedule conflict', details: { conflicts: [{ sessionId: 7, requestedDate: date, date, startTime: '09:00:00', endTime: '10:00:00', class: session.class, coach: session.coach, facility: session.facility, conflictType: 'BOTH' }, { sessionId: 9, requestedDate: date, date, startTime: '09:15:00', endTime: '10:15:00', class: null, coach: null, facility: null, conflictType: 'FACILITY' }] } }) : json(201, [session])
     if (path === '/manager/sessions/7/cancel' || path === '/manager/sessions/7') return json(200, session)
     return backendError(404, 'Unexpected test request')
   })
 }
-beforeEach(() => { vi.stubEnv('VITE_MANAGER_PREVIEW', 'false'); tokenStorage.startSession({ accessToken: 'manager-test', refreshToken: 'refresh-test' }) })
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs() })
+beforeEach(() => {
+  vi.stubEnv('VITE_MANAGER_PREVIEW', 'false')
+  tokenStorage.startSession({ accessToken: 'manager-test', refreshToken: 'refresh-test' })
+  injectedStyles = document.createElement('style')
+  const computedStyleCss = scheduleCss
+    .replaceAll('var(--color-primary-soft)', 'rgb(1, 2, 3)')
+    .replaceAll('var(--color-surface-muted)', 'rgb(4, 5, 6)')
+  injectedStyles.textContent = `${tokensCss}\n${computedStyleCss}`
+  document.head.append(injectedStyles)
+})
+afterEach(() => { injectedStyles.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 describe('FE-07 schedule', () => {
   it.each([403, 500])('does not turn a facility %s into a missing-lookup fallback', async (status) => {
     backend(false, status)
@@ -33,12 +48,180 @@ describe('FE-07 schedule', () => {
     expect(screen.queryByText(/The facility dropdown API is not available/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled()
   })
-  it('renders exact week, cancelled reason and only valid actions', async () => {
+  it('renders the week as time-slot rows with the cancelled reason and valid actions', async () => {
     backend()
     renderApp(`/manager/schedule?week=${monday(date)}`)
     expect(await screen.findByText('Reason: Maintenance')).toBeInTheDocument()
+    const table = screen.getByRole('table', { name: 'Manager weekly schedule' })
+    expect(within(table).getAllByRole('columnheader')).toHaveLength(8)
+    expect(within(table).getAllByRole('row')).toHaveLength(2)
+    expect(table.querySelectorAll('.f2-session')).toHaveLength(2)
     expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(1)
     expect(screen.getAllByRole('button', { name: 'Cancel session' })).toHaveLength(1)
+  })
+  it('explains start-time grouping and shows complete intervals for overlapping sessions', async () => {
+    const overlaps = [
+      { ...session, id: 40, startTime: '09:00:00', endTime: '11:00:00', class: { ...session.class, id: 40, code: 'CL-040', name: 'Morning skills session' } },
+      { ...session, id: 41, startTime: '09:30:00', endTime: '10:30:00', class: { ...session.class, id: 41, code: 'CL-041', name: 'Technique practice session' } },
+      { ...session, id: 42, startTime: '10:00:00', endTime: '10:30:00', class: { ...session.class, id: 42, code: 'CL-042', name: 'Afternoon court session' } },
+    ]
+    backend(false, false, overlaps)
+    renderApp(`/manager/schedule?week=${monday(date)}`)
+
+    expect(await screen.findByText('Sessions are grouped by start time. Each card shows its full time range; separate rows can overlap.')).toBeInTheDocument()
+    const table = screen.getByRole('table', { name: 'Manager weekly schedule' })
+    expect(within(table).getAllByRole('row')).toHaveLength(4)
+    expect(within(table).getAllByRole('rowheader').map((header) => header.textContent)).toEqual(['09:00', '09:30', '10:00'])
+    expect(screen.getByText('09:00 - 11:00')).toBeInTheDocument()
+    expect(screen.getByText('09:30 - 10:30')).toBeInTheDocument()
+    expect(screen.getByText('10:00 - 10:30')).toBeInTheDocument()
+  })
+  it('keeps dense weeks and lengthy session details in the scrollable timetable', async () => {
+    const asTime = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}:00`
+    const denseSessions = Array.from({ length: 12 }, (_, index) => ({
+      ...session,
+      id: 60 + index,
+      startTime: asTime(6 * 60 + index * 30),
+      endTime: asTime(6 * 60 + index * 30 + 45),
+      class: { ...session.class, id: 60 + index, code: `CL-${60 + index}`, name: `Foundations and advanced skills practice for mixed ability groups ${index + 1}` },
+      facility: { ...session.facility, name: 'North court training area with equipment storage and spectator seating' },
+    }))
+    backend(false, false, denseSessions)
+    renderApp(`/manager/schedule?week=${monday(date)}`)
+
+    const table = await screen.findByRole('table', { name: 'Manager weekly schedule' })
+    const region = screen.getByRole('region', { name: 'Weekly session timetable' })
+    expect(within(table).getAllByRole('row')).toHaveLength(13)
+    expect(region).toHaveTextContent('North court training area with equipment storage and spectator seating')
+    expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(12)
+    expect(screen.getAllByRole('button', { name: 'Cancel session' })).toHaveLength(12)
+  })
+  it('shows multiple time slots and sorts same-time sessions regardless of API order', async () => {
+    const namedSession = (id: number, name: string, sessionDate = date, startTime = '09:00:00', endTime = '10:00:00') => ({
+      ...session,
+      id,
+      date: sessionDate,
+      startTime,
+      endTime,
+      class: { id, code: `CL-${id}`, name },
+    })
+    backend(false, false, [
+      namedSession(30, 'Zulu class'),
+      namedSession(31, 'Next day class', addDays(date, 1)),
+      namedSession(32, 'Later class', date, '10:00:00', '11:00:00'),
+      namedSession(33, 'Alpha class'),
+    ])
+    renderApp(`/manager/schedule?week=${monday(date)}`)
+
+    const table = await screen.findByRole('table', { name: 'Manager weekly schedule' })
+    const rows = within(table).getAllByRole('row')
+    expect(rows.map((row) => within(row).queryByRole('rowheader')?.textContent).filter(Boolean)).toEqual(['09:00', '10:00'])
+    expect([...table.querySelectorAll('.f2-session__title')].map((title) => title.textContent)).toEqual([
+      'Alpha class', 'Zulu class', 'Next day class', 'Later class',
+    ])
+  })
+  it('keeps sessions adjacent to midnight on their own calendar dates', async () => {
+    const lateDate = addDays(monday(date), 3)
+    const earlyDate = addDays(lateDate, 1)
+    backend(false, false, [
+      { ...session, id: 45, date: lateDate, startTime: '23:00:00', endTime: '23:59:00', class: { ...session.class, name: 'Late evening session' } },
+      { ...session, id: 46, date: earlyDate, startTime: '00:00:00', endTime: '01:00:00', class: { ...session.class, name: 'Early morning session' } },
+    ])
+    renderApp('/manager/schedule?week=' + monday(date))
+
+    const table = await screen.findByRole('table', { name: 'Manager weekly schedule' })
+    const lateTitle = within(table).getByText('Late evening session')
+    const earlyTitle = within(table).getByText('Early morning session')
+    const lateCellIndex = lateTitle.closest('td')?.cellIndex ?? -1
+    const earlyCellIndex = earlyTitle.closest('td')?.cellIndex ?? -1
+    expect(lateCellIndex).toBe(earlyCellIndex - 1)
+    expect(within(table).getByRole('rowheader', { name: '23:00' })).toBeInTheDocument()
+    expect(within(table).getByRole('rowheader', { name: '00:00' })).toBeInTheDocument()
+    expect(screen.getByText('23:00 - 23:59')).toBeInTheDocument()
+    expect(screen.getByText('00:00 - 01:00')).toBeInTheDocument()
+  })
+  it('keeps the last selected week when a superseded schedule request resolves late', async () => {
+    const selectedWeek = addDays(monday(centerNow().date), 14)
+    const staleWeek = addDays(selectedWeek, 7)
+    const latestWeek = addDays(selectedWeek, 14)
+    let releaseStale!: (response: Response) => void
+    const staleResponse = new Promise<Response>((resolve) => { releaseStale = resolve })
+    const api = backend(false, false, [])
+    const originalFetch = api.fetchMock
+    const delayedFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(typeof input === 'string' ? input : input.toString())
+      if (url.pathname.endsWith('/manager/sessions')) {
+        const from = url.searchParams.get('from')
+        if (from === staleWeek) return staleResponse
+        const displayedWeek = from === selectedWeek ? selectedWeek : latestWeek
+        const name = from === selectedWeek ? 'Initial week session' : 'Latest week session'
+        return json(200, [{ ...session, id: displayedWeek === selectedWeek ? 70 : 72, date: displayedWeek, class: { ...session.class, name } }])
+      }
+      return originalFetch(input, init)
+    })
+    vi.stubGlobal('fetch', delayedFetch)
+    const user = userEvent.setup()
+    renderApp(`/manager/schedule?week=${selectedWeek}`)
+
+    expect(await screen.findByText('Initial week session')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Next week' }))
+    await waitFor(() => expect(delayedFetch.mock.calls.some(([input]) => String(input).includes(`from=${staleWeek}`))).toBe(true))
+    await user.click(screen.getByRole('button', { name: 'Next week' }))
+    expect(await screen.findByText('Latest week session')).toBeInTheDocument()
+
+    releaseStale(json(200, [{ ...session, id: 71, date: staleWeek, class: { ...session.class, name: 'Stale week session' } }]))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(screen.getByText('Latest week session')).toBeInTheDocument()
+    expect(screen.queryByText('Stale week session')).not.toBeInTheDocument()
+    expect(screen.getByText(`${displayDate(latestWeek)} - ${displayDate(addDays(latestWeek, 6))}`)).toBeInTheDocument()
+  })
+  it('highlights today even though the general table header has its own background', async () => {
+    const today = centerNow().date
+    backend(false, false, [{ ...session, date: today }])
+    renderApp(`/manager/schedule?week=${monday(today)}`)
+
+    const table = await screen.findByRole('table', { name: 'Manager weekly schedule' })
+    const todayHeader = within(table).getByRole('columnheader', { name: new RegExp(displayDate(today)) })
+    const otherHeader = within(table).getAllByRole('columnheader').find((header) => header !== todayHeader && header.className !== 'f2-schedule-table__time-heading')!
+    expect(todayHeader).toHaveAttribute('aria-current', 'date')
+    expect(getComputedStyle(todayHeader).backgroundColor).toBe('rgb(1, 2, 3)')
+    expect(getComputedStyle(otherHeader).backgroundColor).toBe('rgb(4, 5, 6)')
+  })
+  it('navigates between previous, current, and next-week ranges', async () => {
+    const api = backend()
+    const user = userEvent.setup()
+    const currentWeek = monday(centerNow().date)
+    const selectedWeek = addDays(currentWeek, 14)
+    renderApp(`/manager/schedule?week=${selectedWeek}`)
+    await screen.findByText(`${displayDate(selectedWeek)} - ${displayDate(addDays(selectedWeek, 6))}`)
+
+    const navigation = [
+      { button: 'Previous week', week: addDays(selectedWeek, -7) },
+      { button: 'This week', week: currentWeek },
+      { button: 'Next week', week: addDays(currentWeek, 7) },
+    ]
+    for (const { button, week } of navigation) {
+      await user.click(screen.getByRole('button', { name: button }))
+      expect(await screen.findByText(`${displayDate(week)} - ${displayDate(addDays(week, 6))}`)).toBeInTheDocument()
+      await waitFor(() => expect(api.calls.some((call) => call.path.includes(`from=${week}&to=${addDays(week, 6)}`))).toBe(true))
+    }
+  })
+  it('contains horizontal overflow and exposes the timetable to keyboard users', async () => {
+    const user = userEvent.setup()
+    backend()
+    renderApp(`/manager/schedule?week=${monday(date)}`)
+    await screen.findByText('Reason: Maintenance')
+
+    const region = screen.getByRole('region', { name: 'Weekly session timetable' })
+    const table = within(region).getByRole('table', { name: 'Manager weekly schedule' })
+    expect(getComputedStyle(region).overflowX).toBe('auto')
+    expect(getComputedStyle(table).minWidth).toBe('900px')
+    region.focus()
+    expect(region).toHaveFocus()
+    await user.tab()
+    expect(screen.getByRole('button', { name: 'Edit' })).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(region).toHaveFocus()
   })
   it('allows explicit facility IDs when only the dropdown API is missing', async () => {
     const api = backend(false, true)
