@@ -42,7 +42,7 @@ describe('QR-02 selector and clipboard outcomes', () => {
     const qrAfter = screen.getByRole('img').querySelector('path')?.getAttribute('d')
     if (value === 'vietcombank') expect(qrAfter).toBe(qrBefore)
     else expect(qrAfter).not.toBe(qrBefore)
-    expect(screen.getByRole('img')).toHaveAccessibleName(new RegExp(label.replace(/[()]/g, '\\$&')))
+    expect(screen.getByRole('img')).toHaveAccessibleName(`Non-payable demo QR for payment 52, ${label} Encodes SPORTIFY_DEMO_QR version 2 plain text marked NON_PAYABLE with the selected demo bank code. No beneficiary account, payment URL or banking instruction is encoded.`)
     await user.click(screen.getByRole('button', { name: 'Copy demo details' }))
     expect(write).toHaveBeenCalledExactlyOnceWith(demoDetails(payment(), normalizeDemoBank(value)))
     expect(screen.getByRole('status')).toHaveTextContent('Demo details copied. Demo only - not a real payment.')
