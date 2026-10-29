@@ -141,6 +141,7 @@ export function RegisterPage() {
               value={form.fullName}
               onChange={(event) => update('fullName', event.target.value)}
               error={fieldErrors.fullName}
+              reserveErrorSpace
               required
             />
             <Input
@@ -154,6 +155,7 @@ export function RegisterPage() {
               value={form.phone}
               onChange={(event) => update('phone', event.target.value)}
               error={fieldErrors.phone}
+              reserveErrorSpace
               required
             />
           </div>
@@ -167,6 +169,7 @@ export function RegisterPage() {
             value={form.email}
             onChange={(event) => update('email', event.target.value)}
             error={fieldErrors.email}
+            reserveErrorSpace
             required
           />
           <div className="field-group">
@@ -178,6 +181,7 @@ export function RegisterPage() {
                 value={form.password}
                 onChange={(event) => update('password', event.target.value)}
                 error={fieldErrors.password}
+                reserveErrorSpace
                 aria-describedby={rulesId}
                 required
               />
@@ -189,6 +193,7 @@ export function RegisterPage() {
                 onChange={(event) => update('confirmPassword', event.target.value)}
                 error={fieldErrors.confirmPassword}
                 hint={passwordsMatch ? 'Passwords match' : undefined}
+                reserveErrorSpace
                 required
               />
             </div>
