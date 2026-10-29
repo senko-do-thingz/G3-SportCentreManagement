@@ -21,6 +21,24 @@ describe('QR-01 guarded demo route and payment integration', () => {
   })
   afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals() })
 
+  it('keeps all four bank choices and copy actions display-only on the authorized route', async () => {
+    const { calls } = backend({ data: payment({ method: 'MOMO' }) })
+    const user = userEvent.setup()
+    const write = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: write } })
+    vi.stubGlobal('isSecureContext', true)
+    renderApp('/member/payments/52/qr-demo')
+    const select = await screen.findByRole('combobox', { name: 'Demo bank' })
+    for (const bank of ['vietcombank', 'bidv', 'techcombank', 'mb']) {
+      await user.selectOptions(select, bank)
+      await user.click(screen.getByRole('button', { name: 'Copy demo details' }))
+      expect(screen.getByRole('status')).toHaveTextContent('Demo details copied.')
+    }
+    expect(write).toHaveBeenCalledTimes(4)
+    expect(calls.every((call) => call.method === 'GET')).toBe(true)
+    expect(screen.getByText('810.000 VND')).toBeVisible()
+  })
+
   it('opens the isolated demo without submitting a method or changing the real Continue action', async () => {
     const { calls } = backend({ data: payment({ method: 'MOMO' }) })
     const user = userEvent.setup()
