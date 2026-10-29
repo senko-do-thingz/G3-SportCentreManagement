@@ -10,6 +10,8 @@ export interface ModalProps {
   /** Buttons shown at the bottom right, for example Cancel and Save. */
   footer?: ReactNode
   size?: 'sm' | 'md' | 'lg'
+  /** Optional scoped presentation for a portalled dialog. */
+  className?: string
   /** Set to false for flows that must not be dismissed by Escape or a backdrop click. */
   dismissible?: boolean
 }
@@ -79,6 +81,7 @@ export function Modal({
   children,
   footer,
   size = 'md',
+  className,
   dismissible = true,
 }: ModalProps) {
   const titleId = useId()
@@ -197,7 +200,7 @@ export function Modal({
     >
       <div
         ref={dialogRef}
-        className={`modal modal--${size}`}
+        className={['modal', `modal--${size}`, className].filter(Boolean).join(' ')}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

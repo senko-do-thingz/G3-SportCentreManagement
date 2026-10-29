@@ -1,3 +1,9 @@
+## 2026-10-28 - Align payment summary status and refunds with merged Home
+
+- UI-27, UI-28 and UI-32 reuse Home's scoped palette, display fonts, square controls and cards, gold navigation marks and spacing through PaymentWorkspace. Rounded gradient payment banners are replaced by functional Home-style section headings on these routes only.
+- Improve narrow-screen wrapping, refund form layout and copy-button touch targets. Preserve payment amounts, polling, validation, role guards, refund quotes, confirmation and duplicate-submit protection. The refund dialog keeps shared focus and scroll-lock behavior.
+- Add route regression assertions and a reproducible Edge browser acceptance runner. Home, frozen design tokens, raw-color exceptions, dependency versions and backend contracts are unchanged. Evidence remains local under the task reports directory.
+
 ## 2026-10-27 - Selective and fail-closed CI (CI-OPT-01)
 
 - Round 2: preserve explicit CodeQL baseline categories across reusable callers; document independent owner verification for the app-bound, strict CI gate ruleset and a separate financial SQL follow-up.

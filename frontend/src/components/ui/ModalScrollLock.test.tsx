@@ -25,6 +25,17 @@ function Stack({ outer, inner }: { outer: boolean; inner: boolean }) {
 }
 
 describe('shared modal document lock', () => {
+  it('keeps shared dialog classes and focus when adding a scoped presentation class', () => {
+    const { rerender } = render(<Modal open title="Payout" onClose={() => undefined} className="home-page payment-dialog"><button>Record</button></Modal>)
+    const dialog = screen.getByRole('dialog', { name: 'Payout' })
+    expect(dialog).toHaveClass('modal', 'modal--md', 'home-page', 'payment-dialog')
+    expect(dialog).toContainElement(document.activeElement as HTMLElement)
+    rerender(<Modal open title="Payout" onClose={() => undefined}><button>Record</button></Modal>)
+    expect(dialog).toHaveClass('modal', 'modal--md')
+    expect(dialog).not.toHaveClass('payment-dialog')
+    expect(document.body.style.overflow).toBe('hidden')
+  })
+
   it.each([0, 17])('restores exact overflow/gutter styles across repeated out-of-order stacks with a %ipx gutter', (gap) => {
     vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(window.innerWidth - gap)
     document.body.style.setProperty('overflow-y', 'auto', 'important')

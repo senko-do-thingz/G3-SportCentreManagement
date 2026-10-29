@@ -1,0 +1,2 @@
+-r requirements-visual-check.txt
+zxing-cpp==3.1.1

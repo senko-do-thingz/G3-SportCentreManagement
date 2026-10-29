@@ -33,6 +33,11 @@ export function managerPreviewEnabled(): boolean {
   return import.meta.env.DEV && import.meta.env.VITE_MANAGER_PREVIEW === 'true'
 }
 
+/** Explicit local/demo-build opt-in. A normal production build cannot enable this surface. */
+export function qrPaymentDemoEnabled(): boolean {
+  return import.meta.env.VITE_QR_PAYMENT_DEMO === 'true' && (import.meta.env.DEV || import.meta.env.MODE === 'qr-demo')
+}
+
 export interface SampleAccount {
   email: string
   password: string

@@ -1,0 +1,322 @@
+/* UI-27, UI-28, UI-32: consume Home's actual scoped palette and component geometry.
+ * Keep functional layouts, status colors and other payment/receipt routes unchanged.
+ */
+.payment-workspace,
+.payment-area { overflow-x: visible; }
+.payment-area { min-height: 100dvh; }
+
+.payment-workspace {
+  padding: var(--space-6);
+  gap: var(--space-6);
+}
+
+.payment-workspace .payment-hero {
+  min-height: 0;
+  padding: var(--space-6) 0 var(--space-8);
+  border: 0;
+  border-bottom: 1px solid var(--h-border);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--h-ink);
+}
+
+.payment-workspace .payment-hero::before {
+  display: none;
+}
+
+.payment-workspace .payment-hero__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  color: var(--h-primary-text);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.2em;
+}
+
+.payment-workspace .payment-hero__eyebrow::before {
+  content: '';
+  width: var(--space-8);
+  height: 3px;
+  flex: none;
+  background: var(--h-accent);
+}
+
+.payment-workspace .payment-hero__title {
+  color: var(--h-ink);
+  font-size: clamp(1.75rem, 3.2vw, 2.625rem);
+  line-height: 1.1;
+  text-wrap: balance;
+}
+
+.payment-workspace .payment-hero__description {
+  margin-top: var(--space-4);
+  color: var(--h-muted);
+}
+
+.payment-workspace .card,
+.payment-workspace .state--panel {
+  min-width: 0;
+  padding: 32px 28px;
+  border: 1px solid var(--h-border);
+  border-radius: 0;
+  background: var(--h-surface);
+  box-shadow: none;
+}
+
+.payment-workspace .card__title,
+.payment-workspace .state__title {
+  font-size: 21px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.payment-workspace .payment-status__title,
+.payment-workspace .payment-status__subtitle {
+  line-height: 1.3;
+  font-size: var(--text-lg);
+}
+
+.payment-workspace .payment-status__title {
+  margin-top: var(--space-2);
+}
+
+.payment-workspace .payment-status__subtitle {
+  margin-block: var(--space-5) var(--space-2);
+}
+
+.payment-workspace p.notice {
+  margin-top: var(--space-4);
+}
+
+.payment-workspace .payment-summary,
+.payment-workspace .reception-grid {
+  gap: var(--space-6);
+}
+
+.payment-workspace .summary-list dt,
+.payment-workspace .summary-list dd,
+.payment-workspace .copy-value__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.payment-workspace .summary-list > div {
+  align-items: baseline;
+  font-size: var(--text-md);
+}
+
+.payment-workspace .summary-list dt {
+  flex: 0 0 38%;
+}
+
+.payment-workspace .payment-summary__amount {
+  margin-block: var(--space-6) var(--space-4);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.payment-workspace .payment-nav {
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--h-border);
+}
+
+.payment-workspace .payment-nav__link {
+  min-width: 0;
+  min-height: 44px;
+  padding: var(--space-2) 0;
+  flex: 0 0 auto;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--h-muted);
+}
+
+.payment-workspace .payment-nav__link:hover,
+.payment-workspace .payment-nav__link--active {
+  border-bottom-color: var(--h-accent);
+  background: none;
+  color: var(--h-primary-text);
+  text-decoration: none;
+}
+
+.payment-workspace .btn--sm {
+  height: 40px;
+  padding: 0 var(--space-4);
+  font-size: var(--text-md);
+}
+
+/* Home secondary actions are the approved analogue for transactional ghost links. */
+.payment-workspace .btn--ghost {
+  border: 0;
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--h-border);
+  color: var(--h-primary-text);
+}
+
+.payment-workspace .btn--ghost:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  background: var(--h-icon-bg);
+  box-shadow: inset 0 0 0 1.5px var(--h-primary);
+}
+
+.payment-workspace .input,
+.payment-workspace .payment-methods__option,
+.payment-workspace .table-scroll,
+.payment-workspace .copy-value__button,
+.payment-workspace .refund-steps__step,
+.payment-workspace .member-results__item {
+  border-radius: 0;
+}
+
+.payment-workspace .input {
+  font-family: var(--font-sans);
+}
+
+.payment-workspace .copy-value {
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.payment-workspace .copy-value__button {
+  min-height: 44px;
+  min-width: 56px;
+  color: var(--h-primary-text);
+}
+
+.payment-workspace .table th {
+  background: var(--h-band);
+  color: var(--h-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.payment-workspace .table td {
+  overflow-wrap: anywhere;
+}
+
+/* Keep financial columns readable and the action reachable while the data scrolls locally. */
+.payment-workspace .table {
+  min-width: 56rem;
+}
+
+.payment-workspace .table :is(th, td):last-child:not([colspan]) {
+  position: sticky;
+  right: 0;
+  min-width: 140px;
+  border-left: 1px solid var(--h-border);
+  background: var(--h-surface);
+}
+
+.payment-workspace .table th:last-child {
+  background: var(--h-band);
+}
+
+.payment-workspace .table .btn {
+  white-space: nowrap;
+}
+
+.payment-workspace .table:has(.table__state-cell) {
+  min-width: 0;
+}
+
+.payment-workspace .table:has(.table__state-cell) thead {
+  display: none;
+}
+
+.payment-workspace .table-scroll:focus-visible {
+  outline: 2px solid var(--h-primary-text);
+  outline-offset: 3px;
+}
+
+.payment-workspace .refund-steps__step[data-state='current'] {
+  border-color: var(--h-primary-text);
+  background: var(--h-icon-bg);
+  color: var(--h-primary-text);
+}
+
+/* Home informational dialogs use the unmodified shared Modal outside the Home palette scope. */
+.payment-dialog .modal__description { overflow-wrap: anywhere; }
+
+/* The brand and sun/moon control use actual Home selectors through PaymentWorkspaceHeader. */
+.payment-workspace-header { position: sticky; grid-column: 1 / -1; top: 0; box-shadow: none; }
+.payment-workspace-header .home-account { margin-left: auto; }
+.payment-workspace-header .user-menu__name { color: var(--color-on-hero); }
+.payment-workspace-header .user-menu__role { color: var(--color-on-hero-muted); }
+.payment-workspace-header .user-menu__logout { color: var(--color-on-hero); min-height: 44px; }
+.payment-workspace-navigation { border: 0; }
+.payment-workspace-navigation .member-nav__list { justify-content: center; gap: 12px; }
+.payment-workspace-navigation .member-nav__link { display: inline-flex; align-items: center; color: var(--color-on-hero); min-height: 44px; padding-block: 8px; font-size: 16px; font-weight: 600; letter-spacing: 0.06em; }
+.payment-workspace-navigation .member-nav__link:hover,
+.payment-workspace-navigation .member-nav__link--active { color: var(--color-on-hero); }
+.payment-workspace-navigation .member-nav__link--active::after { background: var(--h-accent); height: 2px; }
+.staff-layout.payment-area { grid-template-rows: auto 1fr; }
+.payment-area .sidebar { top: 96px; height: calc(100dvh - 96px); background: var(--color-navy); border-color: var(--color-navy); }
+.payment-area .sidebar__nav { margin-top: 0; }
+.payment-area .sidebar__link { border-radius: 0; min-height: 44px; padding: 12px; font-size: 16px; font-weight: 600; line-height: 1.4; }
+.payment-area .sidebar__link--active { background: var(--h-primary); color: var(--color-on-hero); }
+.payment-area .sidebar__link--active::before { background: var(--h-accent); border-radius: 0; }
+
+@media (max-width: 1100px) {
+  .payment-workspace-navigation { display: none; }
+  .payment-workspace-navigation--open { display: block; position: absolute; top: 100%; left: 0; width: 100%; max-height: calc(100dvh - var(--home-header-height)); overflow-y: auto; background: var(--color-navy); }
+  .payment-workspace-navigation .member-nav__list { flex-direction: column; align-items: start; gap: 4px; padding-block: 12px; }
+  .staff-layout.payment-area { grid-template-columns: minmax(0, 1fr); }
+  .payment-area .sidebar { display: none; position: static; height: auto; }
+  .payment-area.staff-layout--menu-open .sidebar { display: flex; position: fixed; top: var(--home-header-height); left: 0; right: 0; z-index: var(--z-header); max-height: calc(100dvh - var(--home-header-height)); overflow-y: auto; }
+  .payment-area.staff-layout--menu-open .sidebar__nav { display: flex; max-height: 50dvh; margin-top: 0; overflow-y: auto; }
+}
+
+@media (max-width: 960px) {
+  .payment-workspace .reception-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .payment-workspace { padding: var(--space-4) 0; }
+  .payment-workspace .payment-picker-form { grid-template-columns: minmax(0, 1fr); }
+  .payment-workspace .payment-picker-form > .btn { grid-column: 1; grid-row: 4; }
+  .payment-workspace .reception-form__actions > * { width: 100%; }
+}
+
+@media print { .payment-workspace { padding: 0; } }
+
+/* Explicit Home surface typography leaves shared form/status tokens intact. */
+.payment-workspace .summary-list dd,
+.payment-workspace .payment-summary__amount,
+.payment-workspace .payment-status__title,
+.payment-workspace .payment-status__subtitle,
+.payment-workspace .payment-methods__legend { color: var(--h-ink); }
+.payment-workspace .summary-list dt,
+.payment-workspace .payment-status__text,
+.payment-workspace .payment-status__check,
+.payment-workspace .payment-methods__hint,
+.payment-workspace .payment-hint,
+.payment-workspace .card__intro,
+.payment-workspace .reception-cell__meta,
+.payment-workspace .state__description { color: var(--h-muted); }
+.payment-workspace .payment-methods__option { border-color: var(--h-border); }
+.payment-workspace .payment-methods__option:has(input:checked) {
+  border-color: var(--h-primary-text);
+  background: var(--h-icon-bg);
+  color: var(--h-primary-text);
+}
+.payment-workspace .copy-value__button { background: var(--h-surface); }
+.payment-workspace .table { background: var(--h-surface); color: var(--h-ink); }
+.payment-workspace .table-scroll,
+.payment-workspace .table :is(th, td) { border-color: var(--h-border); }
+.payment-area .sidebar__link { color: var(--color-on-hero); }
+.payment-area .sidebar__link:hover { background: var(--h-primary); color: var(--color-on-hero); }
+.payment-area .sidebar__link:focus-visible { outline-color: var(--color-on-hero); }
+.payment-area .sidebar__heading,
+.payment-area .sidebar__workspace,
+.payment-area .sidebar__footer-title,
+.payment-area .sidebar__footer-text { color: var(--color-on-hero-muted); }
+.payment-area .sidebar__footer { border-color: color-mix(in srgb, var(--color-on-hero) 10%, transparent); }
