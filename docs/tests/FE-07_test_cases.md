@@ -10,6 +10,9 @@
 | AC1 weekly schedule | Four inclusive Mondays produce four sessions; request uses range/weekdays, seconds, training type and no date/status | `managerSchedule.test.tsx` |
 | AC2 conflict | Every exact conflict is displayed, including missing-resource fallback, and editor values survive dismissal | `managerSchedule.test.tsx`, `managerSessionsApi.test.ts` |
 | AC3 cancellation | Cancelled reason is visible and cancelled cards have no management actions; reason is required | `managerSchedule.test.tsx` |
+| Weekly timetable | Shows multiple time slots and sessions on different dates; same-time sessions render in deterministic class/coach/facility/ID order even when the API returns them out of order; current-day header highlight survives the general table-header rule | `managerSchedule.test.tsx` |
+| Week navigation | Previous/current/next-week controls update the displayed date range and request each matching `from`/`to` range | `managerSchedule.test.tsx` |
+| Responsive and keyboard access | Horizontal overflow stays inside the labeled timetable region; the region is focusable and Tab/Shift+Tab reaches session actions | `managerSchedule.test.tsx` |
 | Edit safety | Capacity cannot fall below booked count; class/training type remain immutable | `managerSchedule.test.tsx` |
 | Missing API | A facility 404 enables explicit known-ID entry; 403/500 never trigger fallback; existing sessions remain visible | `managerSchedule.test.tsx` |
 | Coach discovery | All active coaches load before sport selection; selecting sport filters qualification; refresh reloads directory | `managerClasses.test.tsx` |

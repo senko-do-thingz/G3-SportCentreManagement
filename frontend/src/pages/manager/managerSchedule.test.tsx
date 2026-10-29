@@ -95,18 +95,24 @@ describe('FE-07 schedule', () => {
     expect(getComputedStyle(todayHeader).backgroundColor).toBe('rgb(1, 2, 3)')
     expect(getComputedStyle(otherHeader).backgroundColor).toBe('rgb(4, 5, 6)')
   })
-  it('navigates to the requested next-week range', async () => {
+  it('navigates between previous, current, and next-week ranges', async () => {
     const api = backend()
     const user = userEvent.setup()
-    const currentWeek = monday(date)
-    const nextWeek = addDays(currentWeek, 7)
-    renderApp(`/manager/schedule?week=${currentWeek}`)
-    await screen.findByText('Reason: Maintenance')
+    const currentWeek = monday(centerNow().date)
+    const selectedWeek = addDays(currentWeek, 14)
+    renderApp(`/manager/schedule?week=${selectedWeek}`)
+    await screen.findByText(`${displayDate(selectedWeek)} - ${displayDate(addDays(selectedWeek, 6))}`)
 
-    await user.click(screen.getByRole('button', { name: 'Next week' }))
-
-    expect(await screen.findByText(`${displayDate(nextWeek)} - ${displayDate(addDays(nextWeek, 6))}`)).toBeInTheDocument()
-    await waitFor(() => expect(api.calls.some((call) => call.path.includes(`from=${nextWeek}&to=${addDays(nextWeek, 6)}`))).toBe(true))
+    const navigation = [
+      { button: 'Previous week', week: addDays(selectedWeek, -7) },
+      { button: 'This week', week: currentWeek },
+      { button: 'Next week', week: addDays(currentWeek, 7) },
+    ]
+    for (const { button, week } of navigation) {
+      await user.click(screen.getByRole('button', { name: button }))
+      expect(await screen.findByText(`${displayDate(week)} - ${displayDate(addDays(week, 6))}`)).toBeInTheDocument()
+      await waitFor(() => expect(api.calls.some((call) => call.path.includes(`from=${week}&to=${addDays(week, 6)}`))).toBe(true))
+    }
   })
   it('contains horizontal overflow and exposes the timetable to keyboard users', async () => {
     const user = userEvent.setup()
