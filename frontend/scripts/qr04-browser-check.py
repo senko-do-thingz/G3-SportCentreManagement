@@ -85,6 +85,7 @@ def install(context, theme):
 
 def inspect(page, name):
     page.evaluate('document.fonts.ready')
+    page.evaluate('''()=>{window.scrollTo(0,0);return new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))}''')
     page.screenshot(path=str(out / 'screenshots' / (name + '.png')), full_page=True, animations='disabled')
     check('No horizontal overflow: ' + name, page.evaluate('document.documentElement.scrollWidth<=innerWidth'))
     page.add_script_tag(path=args.axe)
