@@ -121,6 +121,7 @@ try:
             mobile.keyboard.press('Enter')
             expect(mobile.get_by_text('Confirmation intent received; payment not yet completed.')).to_be_visible()
             inspect(mobile, 'mobile-intent-' + theme)
+            check('Keyboard confirmation moves focus to result: ' + theme, mobile.evaluate("document.activeElement?.getAttribute('aria-label')") == 'Demo session result')
             desktop.get_by_role('button', name='Refresh Simulation Status').click()
             expect(desktop.get_by_text('AUTHORIZED_PENDING_SETTLEMENT', exact=True)).to_be_visible()
             status, preview = request('/payments/simulated-qr/sessions/preview', {'token': tokens[-1]}, auth['accessToken'])
@@ -137,15 +138,22 @@ try:
 except Exception as failure:
     report['failure'] = {'type': type(failure).__name__, 'message': str(failure)}
 finally:
+    report['tokenInvalidation'] = []
     if auth:
         for raw in tokens:
+            entry = {'tokenSha256': hashlib.sha256(raw.encode()).hexdigest(), 'confirmedTerminal': False}
             try:
                 status, view = request('/payments/simulated-qr/sessions/preview', {'token': raw}, auth['accessToken'])
-                if status == 200:
-                    request('/payments/simulated-qr/sessions/' + view['id'] + '/cancel', {}, auth['accessToken'])
-            except Exception:
-                pass
-    report['screenshotTokenPolicy'] = 'Test links canceled or expired before packaging; no live link published.'
+                if status == 200 and view['state'] not in ['CANCELED', 'EXPIRED']:
+                    status, view = request('/payments/simulated-qr/sessions/' + view['id'] + '/cancel', {}, auth['accessToken'])
+                entry.update({'httpStatus': status, 'state': view.get('state'), 'confirmedTerminal': status == 200 and view.get('state') in ['CANCELED', 'EXPIRED']})
+            except Exception as failure:
+                entry['failureType'] = type(failure).__name__
+            report['tokenInvalidation'].append(entry)
+    invalidated = all(item['confirmedTerminal'] for item in report['tokenInvalidation'])
+    report['screenshotTokenPolicy'] = 'All captured links verified canceled/expired before packaging.' if invalidated else 'BLOCKED: token invalidation unverified; keep screenshots private and do not package.'
+    report['functionalOutcome'] = 'PASS' if 'failure' not in report and invalidated else 'FAIL'
+    report['axeViolationsResult'] = 'FAIL' if any(item['result'] == 'FAIL' for item in report['accessibility']) else 'PASS'
     serialized = json.dumps(report, indent=2, ensure_ascii=True)
     for raw in tokens:
         serialized = serialized.replace(raw, '[INVALIDATED_TOKEN_SHA256:' + hashlib.sha256(raw.encode()).hexdigest() + ']')
@@ -155,5 +163,7 @@ finally:
                 serialized = serialized.replace(auth[key], '[REDACTED]')
     (out / 'browser-logs/qr04-round03-browser-results.json').write_text(serialized + '\n', encoding='ascii')
     print(json.dumps({'checks': len(report['checks']), 'failures': sum(x['result'] == 'FAIL' for x in report['checks']), 'axeFailures': sum(x['result'] == 'FAIL' for x in report['accessibility']), 'runtimeFailure': report.get('failure', {}).get('type')}))
-if 'failure' in report:
+if report['functionalOutcome'] != 'PASS':
     raise SystemExit(1)
+if report['axeViolationsResult'] == 'FAIL':
+    raise SystemExit(2)

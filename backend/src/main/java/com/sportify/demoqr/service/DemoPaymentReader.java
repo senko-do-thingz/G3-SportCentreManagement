@@ -30,14 +30,15 @@ public class DemoPaymentReader {
 
     public record Snapshot(long paymentId, BigDecimal amount, String currency) { }
 
-    @Transactional(propagation = Propagation.MANDATORY)
+    @Transactional(propagation = Propagation.MANDATORY, noRollbackFor = DemoQrException.class)
     public Payment requireOwner(long paymentId, UserAccount actor) {
         var payment = payments.findByIdForUpdate(paymentId).orElseThrow(DemoQrException::unavailable);
         if (payment.getMember() == null || !payment.getMember().getId().equals(actor.getId())) throw DemoQrException.unavailable();
         return payment;
     }
 
-    @Transactional(propagation = Propagation.MANDATORY)
+    // The caller commits session revocation on an expected eligibility denial. SQL failures still roll back.
+    @Transactional(propagation = Propagation.MANDATORY, noRollbackFor = DemoQrException.class)
     public Snapshot read(long paymentId, UserAccount actor) {
         if (paymentId <= 0 || !SecurityUtils.isMember(actor) || !"ACTIVE".equals(actor.getStatus())) {
             throw DemoQrException.unavailable();

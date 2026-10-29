@@ -235,13 +235,15 @@ class DemoQrDatabaseIntegrationTest {
         assertThat(transitions(created.session().id())).isEqualTo(2);
     }
 
-    @Test void exactSqlDeadlineIsRejectedAndExpiredHistorySurvives() {
+    @Test void exactSqlDeadlineIsRejectedAndExpiredHistorySurvives() throws Exception {
+        var before=fingerprint(jdbc);
         byte[] bytes=new byte[32];new java.security.SecureRandom().nextBytes(bytes);
         String raw=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);UUID id=insertAtDeadline(raw);
         assertThat(post(PREFIX+"/confirm-intent",Map.of("token",raw),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(service.get(id.toString(),owner).state()).isEqualTo(DemoQrService.State.EXPIRED);
         assertThat(service.cancel(id.toString(),owner).state()).isEqualTo(DemoQrService.State.EXPIRED);
         assertThat(transitions(id)).isEqualTo(2);
+        assertThat(fingerprint(jdbc)).isEqualTo(before);
         assertThatThrownBy(()->jdbc.update("UPDATE simulated_qr_session SET state='PENDING',active=1,version=version+1 WHERE id=?",id.toString())).isInstanceOf(org.springframework.dao.DataAccessException.class);
     }
 
@@ -260,17 +262,23 @@ class DemoQrDatabaseIntegrationTest {
     }
 
     @Test void twoNodesCreateExactlyOneActiveSession() throws Exception {
+        var before=fingerprint(jdbc);
         var other=anotherNode();var results=parallel(()->service.create(paymentId,DemoQrService.Bank.BIDV_DEMO,UUID.randomUUID(),owner),()->other.create(paymentId,DemoQrService.Bank.MB_BANK_DEMO,UUID.randomUUID(),owner));
         assertThat(results).hasSize(2);assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM simulated_qr_session WHERE payment_id=? AND active=1",Integer.class,paymentId)).isEqualTo(1);
+        assertThat(fingerprint(jdbc)).isEqualTo(before);
     }
     @Test void twoNodesConfirmExactlyOneIntentTransition() throws Exception {
+        var before=fingerprint(jdbc);
         var created=create();var other=anotherNode();parallel(()->service.confirm(token(created),owner),()->other.confirm(token(created),owner));
         assertThat(transitions(created.session().id())).isEqualTo(2);assertThat(state(created.session().id())).isEqualTo("AUTHORIZED_PENDING_SETTLEMENT");
+        assertThat(fingerprint(jdbc)).isEqualTo(before);
     }
     @Test void cancellationAndIntentRaceAreSerializedInSql() throws Exception {
+        var before=fingerprint(jdbc);
         var created=create();var other=anotherNode();
         parallel(()->{try{return service.confirm(token(created),owner);}catch(DemoQrException denied){return null;}},()->other.cancel(created.session().id().toString(),owner));
         assertThat(state(created.session().id())).isEqualTo("CANCELED");assertThat(transitions(created.session().id())).isBetween(2,3);
+        assertThat(fingerprint(jdbc)).isEqualTo(before);
     }
     private <T> List<T> parallel(Callable<T> first,Callable<T> second) throws Exception {
         var start=new CountDownLatch(1);
