@@ -16,10 +16,11 @@
 - Edits: scoped the readability/colour CSS blocks from .manager-page to .manager-page--users; added the modifier class to UserManagementPage.
 - Ran, from frontend/: npm run lint, npx tsc -b, npm run build, npm test. All passed (1589 tests).
 - Created docs/tests/MGR-UI_test_cases.md and docs/pr/MGR-UI-01_PR_DESCRIPTION.md.
+- Captured before/after screenshots with Chrome headless (puppeteer-core installed outside the repo) against two vite preview servers; compared PNG bytes for unchanged screens; computed contrast ratios.
 
 ## Findings and decisions
 - Root cause of the review concern: the earlier CSS styled every .manager-page, so nine other Manager screens changed without being in scope. Decision: scope to User Management only.
-- Not done by the agent (needs a human): real screenshots, accessibility measurements, Task/Screen IDs from the spreadsheets, CI run link. These are marked TO BE FILLED, not fabricated.
+- Not done by the agent (needs a human): Task/Screen IDs from the spreadsheets, CI run link. These are marked TO BE FILLED, not fabricated.
 
 ## Limitations
-- No browser rendering was performed, so visual correctness is unverified.
+- Chrome only; sample data only; four Manager pages (class editor, cards, activity, reports) not captured.

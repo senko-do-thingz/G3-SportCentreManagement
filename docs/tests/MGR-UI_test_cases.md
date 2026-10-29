@@ -33,20 +33,34 @@ Run on the working tree on top of 65a90e8, 2026-10-29, from frontend/.
 
 CI run URL for the final commit: TO BE FILLED after push.
 
-## 5. Manual visual matrix (to be completed with real screenshots)
-Capture with `npm run dev:preview`. Store images under docs/tests/evidence/mgr-ui/ and link them here.
+## 5. Visual evidence (captured)
+Captured 2026-10-29 with Chrome headless (puppeteer-core) against `vite --mode manager-preview` (sample data). Before = origin/main d8a56c5. After = this branch. Images and the raw report are in docs/tests/evidence/mgr-ui/ (naming: `<before|after>_<screen>_<390|768|1440>_<light|dark>.png`, full page).
 
-| Screen | 390px light | 390px dark | 768px light | 768px dark | 1440px light | 1440px dark |
-|---|---|---|---|---|---|---|
-| User Management, before (main) | | | | | | |
-| User Management, after | | | | | | |
-| One unchanged screen per Manager page, main vs branch | | | | | | |
+Screens captured: users, packages, classes, finance, transactions, each at 390px, 768px and 1440px in light and dark, for before and after.
 
-Interaction states to capture on User Management: default, row hover, button hover, keyboard focus, disabled self-deactivate button, add-staff modal open.
+| Screen | Result (before vs after, 6 viewport/theme combinations each) |
+|---|---|
+| packages | Pixel-identical in 6 of 6 |
+| classes | Pixel-identical in 6 of 6 |
+| finance | Pixel-identical in 6 of 6 |
+| transactions | Pixel-identical in 6 of 6 |
+| users | Intentionally different in 6 of 6 (new header band, gold CTA, tinted table) |
 
-## 6. Accessibility checks (to be completed)
-- Contrast of header title and description on the gradient band in light and dark.
-- Contrast of gold primary button text (on-accent over accent).
-- Contrast of table header text over primary-soft background in dark mode.
-- Keyboard-only walk through filters, table actions and pagination.
-Record tool used and measured ratios here.
+This is the regression evidence for AC-2: the other captured Manager screens are byte-identical in PNG output to main. Not captured: Class editor, Membership cards, Activity log, Revenue reports. They use the same `.manager-page` class and the same scoped selectors, so they are expected to match, but this is not pixel-verified.
+
+Horizontal overflow check (scrollWidth > clientWidth): none in any of the 60 captures (AC-3).
+
+Interaction states on User Management, before and after, at 1440px and 390px, light and dark: `*_users_<w>_<scheme>_hover.png` (row action hover), `*_focus.png` (after three Tab presses), `*_modal.png` (Add staff modal open). The disabled self-deactivate button is visible in the first row of every users capture.
+
+Limitations: Chrome only (no Firefox or Safari); sample data, no live backend.
+
+## 6. Accessibility checks
+Computed from getComputedStyle on the rendered User Management page (WCAG contrast ratio, text colour vs its own background colour). Threshold 4.5:1 for normal text.
+
+| Element | Light | Dark |
+|---|---|---|
+| Table header text | 5.71 | 6.13 |
+| Gold primary button (Add staff) | 9.89 | 9.89 |
+| Secondary row action button | 6.63 | 6.90 |
+
+All pass. Not measured: title and description over the gradient header band (no single background colour). They were inspected visually in the screenshots (light text on dark navy, readable in both themes). Keyboard focus was exercised with Tab presses and captured; a full screen-reader pass was not done.

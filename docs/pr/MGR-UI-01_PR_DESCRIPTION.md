@@ -24,7 +24,7 @@ Addresses code owner round 1 on #159: the styling is now scoped to `.manager-pag
 - **Failures / Errors / Skipped**: 0 / 0 / 0 (local); lint, tsc and build also pass
 
 ## Visual evidence
-Before/after screenshots at 390px, 768px, 1440px in light and dark, plus unchanged-screen comparisons: TO BE ATTACHED (matrix in the test document).
+Screenshots at 390px, 768px, 1440px in light and dark, before (main d8a56c5) and after, are in `docs/tests/evidence/mgr-ui/`. Packages, classes, finance and transactions are pixel-identical to main in all 6 combinations each; only User Management changes. No horizontal overflow in any capture. Contrast ratios (all above 4.5:1) and details: `docs/tests/MGR-UI_test_cases.md` sections 5 and 6.
 
 ## Related Issue / Ticket
 - **Task ID**: TO BE FILLED
