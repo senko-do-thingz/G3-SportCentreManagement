@@ -11,3 +11,6 @@
 @import './styles/manager.css';
 @import './styles/managerSchedule.css';
 @import './styles/memberSchedule.css';
+
+@import './styles/home.css';
+@import './styles/workspace.css';
