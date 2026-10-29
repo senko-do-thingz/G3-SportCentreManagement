@@ -60,6 +60,130 @@ describe('FE-06 manager access and accounts', () => {
     await waitFor(() => expect(backend.calls.some((call) => call.path.includes('page=0') && call.path.includes('role=COACH') && call.path.includes('status=ACTIVE') && call.path.includes('search=Daniel+%2B'))).toBe(true))
     expect(backend.calls.find((call) => call.path.startsWith('/manager/users'))?.authorization).toBe('Bearer manager-test')
   })
+  it('shows the server-reported directory total, identity initials, role badges, and scrollable table region', async () => {
+    authOnly()
+    vi.spyOn(managerUsersApi, 'list').mockResolvedValue(paged([staff], 0, 45))
+    renderApp('/manager')
+
+    const table = await screen.findByRole('table', { name: 'Center accounts' })
+    expect(await screen.findByText('45 accounts found')).toBeInTheDocument()
+    expect(within(table).getByText('DS')).toBeInTheDocument()
+    expect(within(table).getByText('Coach')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Scrollable center accounts table' })).toHaveAttribute('tabindex', '0')
+    expect(screen.getByRole('button', { name: '+ Add staff' })).toHaveClass('btn--primary')
+  })
+
+  it('opens the coach profile disclosure with Enter and Space, restores focus on Escape, and tabs back into the table', async () => {
+    const receptionist: ManagerUser = { ...staff, id: 4, fullName: 'Jamie Tran', role: 'RECEPTIONIST' }
+    authOnly()
+    vi.spyOn(managerUsersApi, 'list').mockResolvedValue(paged([staff, receptionist], 0, 45))
+    const user = userEvent.setup()
+    renderApp('/manager')
+
+    const trigger = await screen.findByRole('button', { name: 'More actions for Daniel Smith' })
+    const receptionistRow = screen.getByText('Jamie Tran').closest('tr')!
+    expect(screen.queryByRole('button', { name: 'More actions for Jamie Tran' })).not.toBeInTheDocument()
+
+    trigger.focus()
+    await user.keyboard('{Enter}')
+    let popover = await screen.findByRole('group', { name: 'More actions for Daniel Smith' })
+    expect(within(popover).getByRole('button', { name: 'Edit coach profile' })).toHaveFocus()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('group', { name: 'More actions for Daniel Smith' })).not.toBeInTheDocument())
+    expect(trigger).toHaveFocus()
+
+    await user.keyboard(' ')
+    popover = await screen.findByRole('group', { name: 'More actions for Daniel Smith' })
+    expect(within(popover).getByRole('button', { name: 'Edit coach profile' })).toHaveFocus()
+    await user.keyboard('{Tab}')
+    expect(within(receptionistRow).getByRole('button', { name: 'View profile' })).toHaveFocus()
+
+    trigger.focus()
+    await user.keyboard(' ')
+    await screen.findByRole('group', { name: 'More actions for Daniel Smith' })
+    await user.keyboard('{Shift>}{Tab}{/Shift}')
+    await waitFor(() => expect(screen.queryByRole('group', { name: 'More actions for Daniel Smith' })).not.toBeInTheDocument())
+    expect(trigger).toHaveFocus()
+
+    await user.click(trigger)
+    await screen.findByRole('group', { name: 'More actions for Daniel Smith' })
+    await user.click(screen.getByLabelText('Search accounts'))
+    expect(screen.queryByRole('group', { name: 'More actions for Daniel Smith' })).not.toBeInTheDocument()
+  })
+
+  it('opens only the selected coach profile after choosing the overflow action', async () => {
+    authOnly()
+    vi.spyOn(managerUsersApi, 'list').mockResolvedValue(paged([staff]))
+    const coachProfile = vi.spyOn(managerUsersApi, 'coachProfile').mockResolvedValue({
+      userId: staff.id,
+      fullName: staff.fullName,
+      avatarUrl: null,
+      headline: null,
+      bio: null,
+      yearsExperience: null,
+      specialties: null,
+      isPublic: true,
+      displayOrder: 0,
+    })
+    const user = userEvent.setup()
+    renderApp('/manager')
+
+    await user.click(await screen.findByRole('button', { name: 'More actions for Daniel Smith' }))
+    const popover = await screen.findByRole('group', { name: 'More actions for Daniel Smith' })
+    await user.click(within(popover).getByRole('button', { name: 'Edit coach profile' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Edit coach profile' })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'More actions for Daniel Smith' })).not.toBeInTheDocument()
+    expect(coachProfile).toHaveBeenCalledTimes(1)
+    expect(coachProfile).toHaveBeenCalledWith(staff.id, expect.any(AbortSignal))
+  })
+
+  it('dismisses the coach disclosure on scroll, resize, and filter transitions', async () => {
+    authOnly()
+    vi.spyOn(managerUsersApi, 'list').mockResolvedValue(paged([staff], 0, 45))
+    const user = userEvent.setup()
+    renderApp('/manager')
+    const trigger = await screen.findByRole('button', { name: 'More actions for Daniel Smith' })
+
+    await user.click(trigger)
+    await screen.findByRole('group', { name: 'More actions for Daniel Smith' })
+    fireEvent(window, new Event('scroll'))
+    await waitFor(() => expect(screen.queryByRole('group', { name: 'More actions for Daniel Smith' })).not.toBeInTheDocument())
+
+    await user.click(trigger)
+    await screen.findByRole('group', { name: 'More actions for Daniel Smith' })
+    fireEvent(window, new Event('resize'))
+    await waitFor(() => expect(screen.queryByRole('group', { name: 'More actions for Daniel Smith' })).not.toBeInTheDocument())
+
+    await user.click(trigger)
+    await screen.findByRole('group', { name: 'More actions for Daniel Smith' })
+    fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'COACH' } })
+    await waitFor(() => expect(screen.queryByRole('group', { name: 'More actions for Daniel Smith' })).not.toBeInTheDocument())
+  })
+
+  it('clamps the coach disclosure to a short, narrow viewport', async () => {
+    vi.stubGlobal('innerWidth', 390)
+    vi.stubGlobal('innerHeight', 400)
+    authOnly()
+    vi.spyOn(managerUsersApi, 'list').mockResolvedValue(paged([staff]))
+    const nativeBounds = HTMLElement.prototype.getBoundingClientRect
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('manager-users-more')) {
+        return { x: 350, y: 340, width: 36, height: 36, top: 340, right: 386, bottom: 376, left: 350, toJSON: () => ({}) } as DOMRect
+      }
+      if (this.classList.contains('manager-user-actions-popover')) {
+        return { x: 0, y: 0, width: 208, height: 52, top: 0, right: 208, bottom: 52, left: 0, toJSON: () => ({}) } as DOMRect
+      }
+      return nativeBounds.call(this)
+    })
+    const user = userEvent.setup()
+    renderApp('/manager')
+
+    await user.click(await screen.findByRole('button', { name: 'More actions for Daniel Smith' }))
+    const popover = await screen.findByRole('group', { name: 'More actions for Daniel Smith' })
+    await waitFor(() => expect(popover).toHaveStyle({ left: '174px', top: '280px' }))
+  })
+
   it('offers only account statuses supported by the backend', async () => {
     authOnly()
     vi.spyOn(managerUsersApi, 'list').mockResolvedValue(paged([]))
@@ -158,8 +282,10 @@ describe('FE-06 manager access and accounts', () => {
     const user = userEvent.setup({ applyAccept: false })
     renderApp('/manager')
     await screen.findByText('Jamie Tran')
-    expect(screen.queryByRole('button', { name: 'Edit coach profile of Jamie Tran' })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Edit coach profile of Daniel Smith' }))
+    expect(screen.queryByRole('button', { name: 'More actions for Jamie Tran' })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'More actions for Daniel Smith' }))
+    const actions = await screen.findByRole('group', { name: 'More actions for Daniel Smith' })
+    await user.click(within(actions).getByRole('button', { name: 'Edit coach profile' }))
     const dialog = await screen.findByRole('dialog', { name: 'Edit coach profile' })
     const headline = await within(dialog).findByLabelText('Headline')
     expect(headline).toHaveValue('Old headline')
@@ -214,7 +340,9 @@ describe('FE-06 manager access and accounts', () => {
     })
     const user = userEvent.setup()
     renderApp('/manager')
-    await user.click(await screen.findByRole('button', { name: 'Edit coach profile of Daniel Smith' }))
+    await user.click(await screen.findByRole('button', { name: 'More actions for Daniel Smith' }))
+    const actions = await screen.findByRole('group', { name: 'More actions for Daniel Smith' })
+    await user.click(within(actions).getByRole('button', { name: 'Edit coach profile' }))
     const dialog = await screen.findByRole('dialog', { name: 'Edit coach profile' })
     await within(dialog).findByLabelText('Headline')
     expect(dialog.querySelector('.manager-photo-preview img')).toHaveAttribute('src', 'https://images.example.test/daniel.jpg')
@@ -236,7 +364,9 @@ describe('FE-06 manager access and accounts', () => {
     })
     const user = userEvent.setup()
     renderApp('/manager')
-    await user.click(await screen.findByRole('button', { name: 'Edit coach profile of Daniel Smith' }))
+    await user.click(await screen.findByRole('button', { name: 'More actions for Daniel Smith' }))
+    const actions = await screen.findByRole('group', { name: 'More actions for Daniel Smith' })
+    await user.click(within(actions).getByRole('button', { name: 'Edit coach profile' }))
     const dialog = await screen.findByRole('dialog', { name: 'Edit coach profile' })
     expect(await within(dialog).findByText('Coach profile not found')).toBeInTheDocument()
     fail = false
