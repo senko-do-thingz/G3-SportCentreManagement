@@ -60,6 +60,6 @@ export const demoQrApi = {
   create: async (paymentId: number, bankCode: string) => created(await api.post(path, { paymentId, bankCode, requestId: crypto.randomUUID() })),
   get: async (id: string) => session(await api.get(`${path}/${encodeURIComponent(id)}`)),
   preview: async (token: string) => session(await api.post(`${path}/preview`, { token })),
-  confirm: async (token: string) => session(await api.post(`${path}/confirm-intent`, { token })),
+  confirm: async (token: string) => session(await api.post(`${path}/confirm`, { token })),
   cancel: async (id: string) => session(await api.post(`${path}/${encodeURIComponent(id)}/cancel`)),
 }

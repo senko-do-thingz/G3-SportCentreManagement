@@ -176,6 +176,10 @@ try:
             inspect(desktop, 'desktop-settled-1440-' + theme)
             mobile.goto(args.base + '/demo/qr/confirm#token=' + 'z' * 43)
             expect(mobile.get_by_role('alert')).to_be_visible()
+            check('Error state never claims unverified non-settlement: ' + theme,
+                  'No simulated settlement was recorded' not in mobile.content()
+                  and 'No payment was changed' not in mobile.content()
+                  and 'Your actual payment is not changed' not in mobile.content())
             inspect(mobile, 'mobile-unavailable-' + theme)
             mobile_context.close()
             context.close()

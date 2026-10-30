@@ -71,7 +71,18 @@ function DemoSessionPanelContent({ paymentId, bank, amount }: { paymentId: numbe
         if (mounted.current) { setCreated({ ...created, session }); setDeadline(false) }
       }
     } catch {
-      if (mounted.current) setError('Could not update the demo session. Check your connection and demo configuration, then refresh or retry. Reload the payment if its details changed. No simulated settlement was recorded.')
+      if (action !== 'start' && created) {
+        try {
+          const reconciled = await demoQrApi.get(created.session.id)
+          if (reconciled.state !== 'PENDING') sessionId.current = null
+          if (mounted.current && reconciled.state !== 'PENDING') {
+            setCreated({ ...created, session: reconciled }); setDeadline(false); return
+          }
+        } catch {
+          // Server reconciliation also failed; fall through to unknown-outcome alert.
+        }
+      }
+      if (mounted.current) setError('Could not update the demo session. Check your connection and demo configuration, then refresh Simulation Status to verify the authoritative server state before retrying. Reload the payment if its details changed.')
     } finally {
       sending.current = false
       if (mounted.current) setBusy(false)

@@ -210,9 +210,11 @@ try:
         check('Create durable restart fixture', status == 200)
         created.append(value)
     confirm_token = created[1]['confirmationUrl'].split('#token=')[1]
-    status, settled = request('/payments/simulated-qr/sessions/confirm-intent', {'token': confirm_token}, auth['accessToken'])
+    status, legacy_rejected = request('/payments/simulated-qr/sessions/confirm-intent', {'token': confirm_token}, auth['accessToken'])
+    check('Legacy confirm-intent rejected without settling payment', status == 409 and legacy_rejected.get('code') == 'SIMULATOR_CONFIRM_ENDPOINT_REQUIRED')
+    status, settled = request('/payments/simulated-qr/sessions/confirm', {'token': confirm_token}, auth['accessToken'])
     check('Confirmation settles simulated payment', status == 200 and settled['state'] == 'SETTLED' and settled.get('settlementType') == 'SIMULATED' and settled.get('settlementProvider') == 'SPORTIFY_SIMULATOR')
-    status, duplicate = request('/payments/simulated-qr/sessions/confirm-intent', {'token': confirm_token}, auth['accessToken'])
+    status, duplicate = request('/payments/simulated-qr/sessions/confirm', {'token': confirm_token}, auth['accessToken'])
     check('Duplicate confirmation is idempotent', status == 200 and duplicate['state'] == 'SETTLED' and duplicate.get('simulatedTransactionId') == settled.get('simulatedTransactionId'))
     status, cancel_after = request('/payments/simulated-qr/sessions/' + created[1]['session']['id'] + '/cancel', {}, auth['accessToken'])
     check('Cancel after SETTLED rejected with 409', status == 409)

@@ -588,19 +588,21 @@ describe('FE-13 Round 2 action safety', () => {
     },
   )
 
-  it('distinguishes SIMULATED and legacy UNKNOWN provenance rows in Manager Transactions', async () => {
+  it('distinguishes SIMULATED, verified ACTUAL, and legacy NULL/UNKNOWN provenance rows in Manager Transactions', async () => {
     tokenStorage.startSession({ accessToken: 'finance-manager-token', refreshToken: 'finance-refresh-token' })
     installFakeFetch((call) => {
       if (call.path === '/users/me') return json(200, MANAGER)
       if (call.path.startsWith('/manager/finance/transactions')) {
         return json(200, {
           content: [
-            { ...transactionDto, id: 41, code: 'PAY-1041', settlementType: 'SIMULATED', settlementProvider: 'SPORTIFY_SIMULATOR' },
-            { ...transactionDto, id: 42, code: 'PAY-1042', invoiceNumber: 'INV-1042', settlementType: 'UNKNOWN', settlementProvider: null },
+            { ...transactionDto, id: 41, code: 'PAY-1041', method: 'BANK_TRANSFER', settlementType: 'SIMULATED', settlementProvider: 'SPORTIFY_SIMULATOR' },
+            { ...transactionDto, id: 42, code: 'PAY-1042', invoiceNumber: 'INV-1042', method: 'CASH', settlementType: 'ACTUAL', settlementProvider: 'DESK_CASH' },
+            { ...transactionDto, id: 43, code: 'PAY-1043', invoiceNumber: 'INV-1043', method: 'CREDIT_CARD', settlementType: null, settlementProvider: null },
+            { ...transactionDto, id: 44, code: 'PAY-1044', invoiceNumber: 'INV-1044', method: 'BANK_TRANSFER', settlementType: 'UNKNOWN', settlementProvider: null },
           ],
           page: 0,
           size: 20,
-          totalElements: 2,
+          totalElements: 4,
           totalPages: 1,
         })
       }
@@ -609,7 +611,10 @@ describe('FE-13 Round 2 action safety', () => {
     })
     renderApp('/manager/transactions')
     expect(await screen.findByText('Paid - Simulated')).toBeVisible()
-    expect(screen.getByText('Bank transfer (Simulated)')).toBeVisible()
-    expect(screen.getByText('Bank transfer (Legacy unverified)')).toBeVisible()
+    const table = screen.getByRole('table', { name: 'Payment transactions' })
+    expect(within(table).getByText('Bank transfer (Simulated)')).toBeVisible()
+    expect(within(table).getByText('Cash')).toBeVisible()
+    expect(within(table).getByText('Credit card (Legacy unverified)')).toBeVisible()
+    expect(within(table).getByText('Bank transfer (Legacy unverified)')).toBeVisible()
   })
 })

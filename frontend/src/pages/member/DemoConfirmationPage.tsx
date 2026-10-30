@@ -96,7 +96,7 @@ function DemoSessionControls({ token }: { token: string }) {
     }).then((result) => {
       if (generation.current === current) setSession(result)
     }).catch(() => {
-      if (generation.current === current) setError('Demo link unavailable. It may be invalid, revoked, legacy, or simulation may be disabled. Start a new session when available. No payment was changed.')
+      if (generation.current === current) setError('Demo link unavailable. It may be invalid, revoked, legacy, or simulation may be disabled. Check your payment status or start a new session when available.')
     }).finally(() => { if (generation.current === current) setBusy(false) })
     return () => { generation.current += 1 }
   }, [token])
@@ -111,9 +111,20 @@ function DemoSessionControls({ token }: { token: string }) {
         : kind === 'cancel' && session ? await demoQrApi.cancel(session.id) : await demoQrApi.preview(token)
       if (current === generation.current) { setSession(result); setDeadline(false); summary.current?.focus() }
     } catch {
+      if (kind !== 'refresh') {
+        try {
+          const reconciled = await demoQrApi.preview(token)
+          if (current === generation.current && reconciled.state !== 'PENDING') {
+            setSession(reconciled); setDeadline(false); summary.current?.focus()
+            return
+          }
+        } catch {
+          // Server reconciliation also failed; fall through to unknown-outcome alert.
+        }
+      }
       if (current === generation.current) {
-        setError('Could not complete the demo action. Refresh the demo status before retrying. No simulated settlement was recorded.')
-        // A timeout or conflict is not success. Hide stale pending controls until the owner refreshes.
+        setError('Could not complete the demo action. The simulation outcome could not be confirmed; refresh Simulation Status to verify the authoritative server state before retrying.')
+        // An unverified timeout or conflict is not success. Hide stale pending controls until the owner refreshes.
         setSession(null)
       }
     } finally {

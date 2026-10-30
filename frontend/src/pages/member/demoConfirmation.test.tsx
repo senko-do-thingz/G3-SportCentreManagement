@@ -62,7 +62,7 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
     expect(brand.closest('header')).toHaveClass('home-header', 'workspace-header')
     expect(brand).toHaveTextContent('Sportify')
     expect(brand).not.toHaveTextContent('Sports center')
-    expect(calls.some((call) => call.path === `${base}/confirm-intent`)).toBe(false)
+    expect(calls.some((call) => call.path === `${base}/confirm` || call.path === `${base}/confirm-intent`)).toBe(false)
     expect(screen.queryByRole('button', { name: 'Confirm simulated payment' }) !== null).toBe(state === 'PENDING')
     expect(screen.queryByText(/Final simulated-payment consent:/) !== null).toBe(state === 'PENDING')
     expect(document.querySelector('meta[name="referrer"]')).toHaveAttribute('content', 'no-referrer')
@@ -70,11 +70,11 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
     expect(sessionStorage.getItem('token')).toBeNull()
   })
 
-  it('confirms only on explicit consent, settles in simulation and guards a second tap while the request is pending', async () => {
+  it('confirms only on explicit consent via /confirm, settles in simulation and guards a second tap while the request is pending', async () => {
     let complete!: (response: Response) => void
     const { calls } = installFakeFetch((call) => {
       if (call.path === '/users/me') return json(200, MEMBER)
-      if (call.path === `${base}/confirm-intent`) return new Promise<Response>((resolve) => { complete = resolve })
+      if (call.path === `${base}/confirm`) return new Promise<Response>((resolve) => { complete = resolve })
       return json(200, snapshot)
     })
     const user = userEvent.setup()
@@ -82,7 +82,8 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
     const button = await screen.findByRole('button', { name: 'Confirm simulated payment' })
     expect(screen.getByText(/Final simulated-payment consent: Confirming finalizes this payment as Paid - Simulated \(SUCCESS\)/)).toBeVisible()
     await user.dblClick(button)
-    expect(calls.filter((call) => call.path === `${base}/confirm-intent`)).toHaveLength(1)
+    expect(calls.filter((call) => call.path === `${base}/confirm`)).toHaveLength(1)
+    expect(calls.some((call) => call.path === `${base}/confirm-intent`)).toBe(false)
     complete(json(200, {
       ...snapshot,
       state: 'SETTLED',
@@ -126,13 +127,87 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
 
   it('does not announce success after a confirm error and requires a fresh server read', async () => {
     installFakeFetch((call) => call.path === '/users/me' ? json(200, MEMBER)
-      : call.path.endsWith('/confirm-intent') ? backendError(409, 'Expired') : json(200, snapshot))
+      : call.path.endsWith('/confirm') ? backendError(409, 'Expired') : json(200, snapshot))
     const user = userEvent.setup()
     renderApp(`/demo/qr/confirm#token=${token}`)
     await user.click(await screen.findByRole('button', { name: 'Confirm simulated payment' }))
-    expect(await screen.findByText(/Could not complete the demo action/)).toBeVisible()
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/Could not complete the demo action\. The simulation outcome could not be confirmed; refresh Simulation Status to verify the authoritative server state before retrying\./)
+    expect(alert).not.toHaveTextContent(/No simulated settlement was recorded/)
     expect(screen.queryByText(/Paid - Simulated\. Your payment was settled in simulation only/)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Confirm simulated payment' })).not.toBeInTheDocument()
+  })
+
+  it('reconciles authoritative SETTLED server state automatically when confirm HTTP response is lost after SQL commit', async () => {
+    let committedOnServer = false
+    const settledSnapshot: DemoSession = {
+      ...snapshot,
+      state: 'SETTLED',
+      settlementType: 'SIMULATED',
+      settlementProvider: 'SPORTIFY_SIMULATOR',
+      transactionCode: 'SIM-QR-52-LOST-RESP',
+      invoiceId: 19,
+      invoiceNumber: 'INV-0019',
+    }
+    const { calls } = installFakeFetch((call) => {
+      if (call.path === '/users/me') return json(200, MEMBER)
+      if (call.path === `${base}/confirm`) {
+        committedOnServer = true
+        throw new TypeError('Network connection lost after server commit')
+      }
+      if (call.path === `${base}/preview`) {
+        return json(200, committedOnServer ? settledSnapshot : snapshot)
+      }
+      return json(200, snapshot)
+    })
+    const user = userEvent.setup()
+    renderApp(`/demo/qr/confirm#token=${token}`)
+    await user.click(await screen.findByRole('button', { name: 'Confirm simulated payment' }))
+    expect(await screen.findByText(/Paid - Simulated\. Your payment was settled in simulation only/)).toBeVisible()
+    expect(screen.getByText('SIM-QR-52-LOST-RESP')).toBeVisible()
+    expect(screen.getByRole('link', { name: 'View simulated receipt' })).toHaveAttribute('href', '/member/payments/receipts/19')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(calls.filter((call) => call.path === `${base}/preview`)).toHaveLength(2)
+  })
+
+  it('reports unknown outcome without claiming no settlement was recorded when both confirm and reconciliation fail, then reconciles on Refresh', async () => {
+    let committedOnServer = false
+    let networkOnline = true
+    const settledSnapshot: DemoSession = {
+      ...snapshot,
+      state: 'SETTLED',
+      settlementType: 'SIMULATED',
+      settlementProvider: 'SPORTIFY_SIMULATOR',
+      transactionCode: 'SIM-QR-52-RECOVERED',
+      invoiceId: 21,
+      invoiceNumber: 'INV-0021',
+    }
+    installFakeFetch((call) => {
+      if (call.path === '/users/me') return json(200, MEMBER)
+      if (call.path === `${base}/confirm`) {
+        committedOnServer = true
+        networkOnline = false
+        throw new TypeError('Network dropped after SQL commit')
+      }
+      if (call.path === `${base}/preview`) {
+        if (!networkOnline) throw new TypeError('Still offline')
+        return json(200, committedOnServer ? settledSnapshot : snapshot)
+      }
+      return json(200, snapshot)
+    })
+    const user = userEvent.setup()
+    renderApp(`/demo/qr/confirm#token=${token}`)
+    await user.click(await screen.findByRole('button', { name: 'Confirm simulated payment' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('The simulation outcome could not be confirmed; refresh Simulation Status to verify the authoritative server state before retrying.')
+    expect(alert).not.toHaveTextContent('No simulated settlement was recorded')
+    expect(screen.queryByRole('button', { name: 'Confirm simulated payment' })).not.toBeInTheDocument()
+
+    networkOnline = true
+    await user.click(screen.getByRole('button', { name: 'Refresh Simulation Status' }))
+    expect(await screen.findByText(/Paid - Simulated\. Your payment was settled in simulation only/)).toBeVisible()
+    expect(screen.getByText('SIM-QR-52-RECOVERED')).toBeVisible()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('retains the fragment only in memory through inline owner sign-in', async () => {
@@ -151,7 +226,7 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
     await user.click(screen.getByRole('button', { name: 'Sign in to review simulation' }))
     expect(await screen.findByText('DEMO-52')).toBeVisible()
     expect(calls.find((call) => call.path === `${base}/preview`)?.body).toEqual({ token })
-    expect(calls.some((call) => call.path.endsWith('/confirm-intent'))).toBe(false)
+    expect(calls.some((call) => call.path.endsWith('/confirm') || call.path.endsWith('/confirm-intent'))).toBe(false)
   })
 
   it.each(['MANAGER', 'RECEPTIONIST', 'COACH'])('never queries session details for role %s', async (role) => {
@@ -178,7 +253,7 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
     expect(await screen.findByText('DEMO-53')).toBeVisible()
     expect(screen.queryByText('DEMO-52')).not.toBeInTheDocument()
     expect(calls.filter((call) => call.path.endsWith('/preview'))).toHaveLength(2)
-    expect(calls.some((call) => call.path.endsWith('/confirm-intent'))).toBe(false)
+    expect(calls.some((call) => call.path.endsWith('/confirm') || call.path.endsWith('/confirm-intent'))).toBe(false)
   })
 
   it.each([['false', true, 'test'], ['false', false, 'production']] as const)('disabled flag rejects route: %s %s %s', async (flag, dev, mode) => {

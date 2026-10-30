@@ -113,7 +113,7 @@ class DemoQrDatabaseIntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK); return response.getBody();
     }
     private String token(DemoQrService.Created created) { return created.confirmationUrl().split("#token=")[1]; }
-    private ResponseEntity<DemoQrService.View> intent(DemoQrService.Created created) { return post(PREFIX+"/confirm-intent",Map.of("token",token(created)),ownerToken,DemoQrService.View.class); }
+    private ResponseEntity<DemoQrService.View> intent(DemoQrService.Created created) { return post(PREFIX+"/confirm",Map.of("token",token(created)),ownerToken,DemoQrService.View.class); }
     private String state(UUID id) { return jdbc.queryForObject("SELECT state FROM simulated_qr_session WHERE id=?",String.class,id.toString()); }
     private int transitions(UUID id) { return jdbc.queryForObject("SELECT COUNT(*) FROM simulated_qr_transition WHERE session_id=?",Integer.class,id.toString()); }
 
@@ -133,6 +133,15 @@ class DemoQrDatabaseIntegrationTest {
         long cashTicketCountBefore = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.cash_capture_ticket", Long.class);
 
         var created = create();
+        // Legacy /confirm-intent endpoint must fail closed with 409 SIMULATOR_CONFIRM_ENDPOINT_REQUIRED and never settle Payment.
+        var legacyAttempt = post(PREFIX + "/confirm-intent", Map.of("token", token(created)), ownerToken, Map.class);
+        assertThat(legacyAttempt.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(legacyAttempt.getBody()).containsEntry("code", "SIMULATOR_CONFIRM_ENDPOINT_REQUIRED");
+        assertThat(state(created.session().id())).isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.simulated_payment_transaction WHERE payment_id=?", Integer.class, paymentId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT payment_status FROM dbo.payment WHERE id=?", String.class, paymentId)).isEqualTo("PENDING");
+        assertThat(fingerprint(jdbc)).isEqualTo(before);
+
         var first = intent(created);
         assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
         var settledView = first.getBody();
@@ -146,7 +155,7 @@ class DemoQrDatabaseIntegrationTest {
         assertThat(settledView.invoiceNumber()).startsWith("INV-");
 
         var afterFirst = fingerprint(jdbc);
-        // Second confirm via /confirm-intent and third via /confirm must be idempotent and add zero rows.
+        // Second and third confirm calls via /confirm must be idempotent and add zero rows.
         var second = intent(created);
         var third = post(PREFIX + "/confirm", Map.of("token", token(created)), ownerToken, DemoQrService.View.class);
         assertThat(second.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -205,7 +214,7 @@ class DemoQrDatabaseIntegrationTest {
     @Test void otherMemberCannotEnumerateCreateReadPreviewConfirmOrCancel() {
         var created=create();String otherToken=login(users.findById(otherId).orElseThrow().getEmail());
         assertThat(post(PREFIX,request(UUID.randomUUID()),otherToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        for(String suffix:List.of("/preview","/confirm-intent")) {
+        for(String suffix:List.of("/preview","/confirm")) {
             var denied=post(PREFIX+suffix,Map.of("token",token(created)),otherToken,Map.class);
             var unknown=post(PREFIX+suffix,Map.of("token","z".repeat(43)),otherToken,Map.class);
             assertThat(denied.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);assertThat(denied.getBody()).isEqualTo(unknown.getBody());
@@ -217,7 +226,7 @@ class DemoQrDatabaseIntegrationTest {
 
     @Test void unauthenticatedTokenCannotAuthorize() {
         var created=create();
-        assertThat(post(PREFIX+"/confirm-intent",Map.of("token",token(created)),null,Map.class).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(post(PREFIX+"/confirm",Map.of("token",token(created)),null,Map.class).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test void unknownPaymentInvalidBankAndMalformedIdAreRejectedSafely() {
@@ -245,21 +254,21 @@ class DemoQrDatabaseIntegrationTest {
 
     @Test void revokedAccountIsRejectedDespitePreviouslyIssuedJwt() {
         var created=create();jdbc.update("UPDATE user_account SET status='INACTIVE' WHERE id=?",ownerId);
-        assertThat(post(PREFIX+"/confirm-intent",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode().is2xxSuccessful()).isFalse();
+        assertThat(post(PREFIX+"/confirm",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode().is2xxSuccessful()).isFalse();
         assertThat(state(created.session().id())).isEqualTo("PENDING");
     }
 
     @ParameterizedTest @ValueSource(strings={"SUCCESS","FAILED","REFUNDED"})
     void rejectsPaymentThatBecameIneligibleAndCommitsRevocation(String status) {
         var created=create();jdbc.update("UPDATE payment SET payment_status=?,payment_time=CASE WHEN ?='SUCCESS' THEN SYSUTCDATETIME() ELSE payment_time END WHERE id=?",status,status,paymentId);
-        assertThat(post(PREFIX+"/confirm-intent",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(post(PREFIX+"/confirm",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(state(created.session().id())).isEqualTo("CANCELED");
         assertThat(post(PREFIX,request(UUID.randomUUID()),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test void staleAmountAbortsIntentAndRetainsOriginalSnapshot() {
         var created=create();jdbc.update("UPDATE payment SET amount=1 WHERE id=?",paymentId);
-        assertThat(post(PREFIX+"/confirm-intent",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(post(PREFIX+"/confirm",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(state(created.session().id())).isEqualTo("CANCELED");
         assertThat(jdbc.queryForObject("SELECT amount FROM simulated_qr_session WHERE id=?",java.math.BigDecimal.class,created.session().id().toString())).isEqualByComparingTo("810000");
     }
@@ -267,7 +276,7 @@ class DemoQrDatabaseIntegrationTest {
     @Test void paymentOwnershipChangePreventsAllSessionDisclosure() {
         var created=create();jdbc.update("UPDATE payment SET member_id=? WHERE id=?",otherId,paymentId);
         assertThat(post(PREFIX+"/preview",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(post(PREFIX+"/confirm-intent",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(post(PREFIX+"/confirm",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test void canceledLinkedItemAndOrphanPaymentAreIneligible() {
@@ -281,13 +290,13 @@ class DemoQrDatabaseIntegrationTest {
         UUID request=UUID.randomUUID();var first=post(PREFIX,request(request),ownerToken,DemoQrService.Created.class).getBody();
         assertThat(post(PREFIX,request(request),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         var next=create();assertThat(state(first.session().id())).isEqualTo("CANCELED");
-        assertThat(post(PREFIX+"/confirm-intent",Map.of("token",token(first)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(post(PREFIX+"/confirm",Map.of("token",token(first)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(intent(next).getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     @Test void cancelAndConfirmCannotResurrectTerminalSession() {
         var created=create();service.cancel(created.session().id().toString(),owner);service.cancel(created.session().id().toString(),owner);
-        assertThat(post(PREFIX+"/confirm-intent",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(post(PREFIX+"/confirm",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(transitions(created.session().id())).isEqualTo(2);
     }
 
@@ -295,7 +304,7 @@ class DemoQrDatabaseIntegrationTest {
         var before=fingerprint(jdbc);
         byte[] bytes=new byte[32];new java.security.SecureRandom().nextBytes(bytes);
         String raw=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);UUID id=insertAtDeadline(raw);
-        assertThat(post(PREFIX+"/confirm-intent",Map.of("token",raw),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(post(PREFIX+"/confirm",Map.of("token",raw),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(service.get(id.toString(),owner).state()).isEqualTo(DemoQrService.State.EXPIRED);
         assertThat(service.cancel(id.toString(),owner).state()).isEqualTo(DemoQrService.State.EXPIRED);
         assertThat(transitions(id)).isEqualTo(2);

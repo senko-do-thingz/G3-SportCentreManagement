@@ -91,11 +91,21 @@ class DemoQrControllerTest {
     }
 
     @Test void forgedFormAndUntrustedCorsAreRejected() throws Exception {
-        mvc.perform(post(BASE+"/confirm-intent").contentType(MediaType.APPLICATION_FORM_URLENCODED).content("token=forged"))
+        mvc.perform(post(BASE+"/confirm").contentType(MediaType.APPLICATION_FORM_URLENCODED).content("token=forged"))
                 .andExpect(status().isUnauthorized());
-        mvc.perform(options(BASE+"/confirm-intent").header("Origin","https://evil.example")
+        mvc.perform(options(BASE+"/confirm").header("Origin","https://evil.example")
                 .header("Access-Control-Request-Method","POST").header("Access-Control-Request-Headers","authorization,content-type"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test void legacyConfirmIntentIsRejectedWithoutSettlingPayment() throws Exception {
+        mvc.perform(post(BASE + "/confirm-intent").with(user(principal("MEMBER")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"" + "a".repeat(43) + "\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SIMULATOR_CONFIRM_ENDPOINT_REQUIRED"))
+                .andExpect(header().string("Cache-Control", "no-store"));
+        verifyNoInteractions(service);
     }
 
     @ParameterizedTest @ValueSource(strings={"/api/v1/payments/simulated-qr/capability","/api/v1/payments/simulator-config"})
