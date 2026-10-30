@@ -315,6 +315,7 @@
     ":root { --color-bg|#f5f8fc": 1,
     ":root { --color-border-strong|#c5d3e1": 1,
     ":root { --color-border|#dde6ef": 1,
+    ":root { --color-brand-logo|#1f4fd8": 1,
     ":root { --color-control-border|#7d8fa3": 1,
     ":root { --color-danger-border|#f5d2cc": 1,
     ":root { --color-danger-fill-hover|#9c3a2e": 1,
