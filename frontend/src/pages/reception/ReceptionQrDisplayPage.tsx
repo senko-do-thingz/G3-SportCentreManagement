@@ -25,6 +25,11 @@ import '../../components/qr/demoQr.css'
 import { formatPaymentMoney } from '../member/paymentsModel'
 import { positiveId } from './receptionModel'
 import { PAYMENT_LIST_PATH, paymentReceiptPath } from './receptionPaymentsModel'
+import {
+  classifyFinancialPresentation,
+  mergePolledProjection,
+  resolveBankSession,
+} from './receptionQrDisplayModel'
 
 const EYEBROW = 'Receptionist / Payments and reports'
 
@@ -76,7 +81,7 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
   )
   const [resource, reload] = useResource(load)
   const [polledProjection, setPolledProjection] = useState<ReceptionDeskProjection | null>(null)
-  const [bank, setBank] = useState<DemoBank>(DEFAULT_DEMO_BANK)
+  const [previewBank, setPreviewBank] = useState<DemoBank>(DEFAULT_DEMO_BANK)
   const [feedback, setFeedback] = useState<{ kind: 'pending' | 'success' | 'error'; text: string } | null>(null)
   const copyRequest = useRef(0)
   const mounted = useRef(true)
@@ -85,6 +90,9 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
   const descriptionId = useId()
 
   const projection = polledProjection ?? (resource.status === 'ready' ? resource.data : null)
+  const presentation = classifyFinancialPresentation(projection)
+  const bankSession = resolveBankSession(projection?.activeSession, previewBank)
+  const effectiveBank = bankSession.effectiveBank
 
   useEffect(() => {
     mounted.current = true
@@ -103,7 +111,7 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
       void demoQrApi.receptionDeskProjection(paymentId).then(
         (data) => {
           if (mounted.current) {
-            setPolledProjection(data)
+            setPolledProjection((prev) => mergePolledProjection(prev, data))
           }
         },
         () => {
@@ -120,9 +128,9 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
   const amountAvailable = projection ? demoPaymentAmountAvailable(projection.amount) : false
 
   const generatedQr = useMemo(() => {
-    if (!amountAvailable || !projection) return null
+    if (!amountAvailable || !projection || presentation.isTerminal) return null
     try {
-      const payload = demoQrPayload(projection.paymentId, bank)
+      const payload = demoQrPayload(projection.paymentId, effectiveBank)
       return {
         qr: QRCode.create(payload, { errorCorrectionLevel: 'M' }),
         reference: demoReference(projection.paymentId),
@@ -130,9 +138,10 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
     } catch {
       return null
     }
-  }, [amountAvailable, projection, bank])
+  }, [amountAvailable, projection, effectiveBank, presentation.isTerminal])
 
   async function copy(kind: 'reference' | 'details') {
+    if (presentation.isTerminal) return
     const current = ++copyRequest.current
     const label = kind === 'reference' ? 'Demo reference' : 'Demo details'
     setFeedback({ kind: 'pending', text: `Copying ${label.toLowerCase()}...` })
@@ -141,7 +150,7 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
       const textToCopy =
         kind === 'reference'
           ? generatedQr.reference
-          : demoDetails({ id: projection.paymentId, amount: projection.amount }, bank)
+          : demoDetails({ id: projection.paymentId, amount: projection.amount }, effectiveBank)
       await copyText(textToCopy, { allowFallback: false })
       if (mounted.current && current === copyRequest.current) {
         setFeedback({
@@ -195,15 +204,12 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
     )
   }
 
-  const isSuccess = projection.paymentStatus === 'SUCCESS'
-  const isPending = projection.paymentStatus === 'PENDING'
-
   return (
     <div className="page staff-layout">
       <PaymentHero
         eyebrow={EYEBROW}
         title="Simulated QR Payment Display"
-        description="Customer-facing simulated QR code presentation for front desk payments. The customer confirms on their own device. Reception staff cannot settle simulated payments directly."
+        description="Customer-facing informational QR presentation for front desk payments. The customer confirms on their own device. Reception staff cannot settle simulated payments directly."
         aside={actions}
       />
 
@@ -213,40 +219,135 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
         </p>
       </div>
 
-      {isSuccess && (
+      {presentation.bannerMessage && (
         <div role="status" aria-live="polite" className="reception-notice-banner">
-          <Notice tone="success">
-            Simulated payment received. Provenance: {projection.settlementType ?? 'SIMULATED'} (
-            {projection.settlementProvider ?? 'SPORTIFY_SIMULATOR'}). Entitlement is active.
+          <Notice tone={presentation.bannerTone ?? 'info'}>
+            {presentation.bannerMessage}
           </Notice>
         </div>
       )}
 
       <div className="reception-grid">
-        {/* Left column: Customer QR code presentation */}
+        {/* Left column: Informational QR code presentation */}
         <Card
-          title="Customer QR Presentation"
+          title="Informational Desk QR (Not Payable)"
           className="qr-demo-card"
-          aria-label="Non-payable QR presentation"
+          aria-label="Informational QR presentation"
         >
-          <p className="card__intro">
-            Present this code to the customer. A generic scanner or member portal reads the demo
-            payload. This is not a bank transfer and transfers no real funds.
-          </p>
+          <div className="card__intro">
+            <p>
+              <strong>Informational QR - Not payable:</strong> Scanning this code does not transfer funds or confirm payment. Front desk staff cannot settle payments directly.
+            </p>
+            <div
+              style={{
+                marginTop: 'var(--space-3)',
+                padding: 'var(--space-3)',
+                background: 'var(--color-surface-subtle)',
+                borderRadius: 'var(--radius-md)',
+              }}
+            >
+              <p style={{ fontWeight: 600, margin: '0 0 var(--space-2)' }}>
+                Member Self-Confirmation Steps:
+              </p>
+              <ol
+                style={{
+                  margin: 0,
+                  paddingLeft: 'var(--space-4)',
+                  fontSize: 'var(--text-sm)',
+                  color: 'var(--color-muted)',
+                }}
+              >
+                <li>Customer signs in at <code>/login</code> with their Sportify Member account.</li>
+                <li>Customer opens <strong>My Payments</strong> or <strong>Payment Summary</strong> (<code>/member/payments/{projection.paymentId}</code>).</li>
+                <li>Customer opens simulated payment (<code>/member/payments/{projection.paymentId}/qr-demo</code>).</li>
+                <li>Customer reviews details and confirms on their own device.</li>
+              </ol>
+            </div>
+            {bankSession.statusNotice && (
+              <p
+                style={{
+                  marginTop: 'var(--space-3)',
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--color-muted)',
+                }}
+              >
+                {bankSession.statusNotice}
+              </p>
+            )}
+          </div>
 
-          <Select
-            label="Demo bank"
-            options={DEMO_BANK_OPTIONS}
-            value={bank}
-            hint="Changes the simulated bank payload for customer scanning. plain text only; no banking API or gateway integration."
-            onChange={(event) => {
-              copyRequest.current += 1
-              setBank(normalizeDemoBank(event.target.value))
-              setFeedback(null)
-            }}
-          />
+          {/* Bank selector or locked session bank display */}
+          {bankSession.isLockedToActiveSession ? (
+            <div
+              style={{
+                marginBottom: 'var(--space-4)',
+                padding: 'var(--space-3)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-md)',
+              }}
+            >
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: 600,
+                  color: 'var(--color-muted)',
+                  marginBottom: 'var(--space-1)',
+                }}
+              >
+                Session bank (authoritative)
+              </label>
+              <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)' }}>
+                {bankSession.sessionBankLabel}
+              </div>
+              <p
+                style={{
+                  margin: 'var(--space-1) 0 0',
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--color-muted)',
+                }}
+              >
+                Bank selection is locked to the customer active session. Front desk cannot modify the session bank.
+              </p>
+            </div>
+          ) : (
+            <Select
+              label="Demo bank"
+              options={DEMO_BANK_OPTIONS}
+              value={previewBank}
+              hint="Informational preview only - Does not change the Member session or settlement bank."
+              onChange={(event) => {
+                copyRequest.current += 1
+                setPreviewBank(normalizeDemoBank(event.target.value))
+                setFeedback(null)
+              }}
+            />
+          )}
 
-          {generatedQr ? (
+          {/* QR representation or terminal inactive state */}
+          {presentation.isTerminal ? (
+            <div
+              className="qr-demo-card__body"
+              style={{
+                textAlign: 'center',
+                padding: 'var(--space-6) var(--space-4)',
+                border: '1px dashed var(--border-subtle)',
+                borderRadius: 'var(--radius-md)',
+                marginBottom: 'var(--space-4)',
+              }}
+              role="status"
+            >
+              <p
+                className="notice notice--info"
+                style={{ display: 'inline-block', marginBottom: 'var(--space-3)' }}
+              >
+                QR Code Inactive - Payment is {presentation.statusBadgeLabel}
+              </p>
+              <p style={{ color: 'var(--color-muted)', fontSize: 'var(--text-sm)', margin: 0 }}>
+                This payment has reached a terminal state ({presentation.statusBadgeLabel}). Payment instructions and QR code are no longer active.
+              </p>
+            </div>
+          ) : generatedQr ? (
             <div className="qr-demo-card__body">
               <figure className="qr-demo-card__figure">
                 <svg
@@ -257,7 +358,7 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
                   shapeRendering="crispEdges"
                 >
                   <title id={titleId}>
-                    Non-payable demo QR for payment {projection.paymentId}, {DEMO_BANKS[bank].label}
+                    Informational demo QR for payment {projection.paymentId}, {DEMO_BANKS[effectiveBank].label}
                   </title>
                   <desc id={descriptionId}>
                     Encodes SPORTIFY_DEMO_QR version 2 plain text marked NON_PAYABLE with the
@@ -279,13 +380,13 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
                     fill="currentColor"
                   />
                 </svg>
-                <figcaption>Simulated QR - No real bank transfer</figcaption>
+                <figcaption>Informational QR - Not payable</figcaption>
               </figure>
 
               <dl className="summary-list">
                 <div>
                   <dt>Demo bank label</dt>
-                  <dd>{DEMO_BANKS[bank].label}</dd>
+                  <dd>{DEMO_BANKS[effectiveBank].label}</dd>
                 </div>
                 <div>
                   <dt>Payment ID</dt>
@@ -311,14 +412,17 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
             </Notice>
           )}
 
-          <div className="qr-demo-card__copy-actions">
-            <Button variant="secondary" onClick={() => void copy('reference')}>
-              Copy demo reference
-            </Button>
-            <Button variant="secondary" onClick={() => void copy('details')}>
-              Copy demo details
-            </Button>
-          </div>
+          {/* Copy actions: only accessible while payment is pending */}
+          {!presentation.isTerminal && (
+            <div className="qr-demo-card__copy-actions">
+              <Button variant="secondary" onClick={() => void copy('reference')}>
+                Copy demo reference
+              </Button>
+              <Button variant="secondary" onClick={() => void copy('details')}>
+                Copy demo details
+              </Button>
+            </div>
+          )}
 
           <div role="status" aria-live="polite" aria-atomic="true">
             {feedback && feedback.kind !== 'error' && (
@@ -340,22 +444,10 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
         <Card title="Payment & Settlement Status" aria-label="Authoritative payment status">
           <div className="reception-status-header" style={{ marginBottom: 'var(--space-4)' }}>
             <StatusBadge
-              status={
-                isSuccess
-                  ? 'success'
-                  : isPending
-                  ? 'warning'
-                  : 'danger'
-              }
-              label={
-                isSuccess
-                  ? 'Paid - Simulated'
-                  : isPending
-                  ? 'Pending payment'
-                  : projection.paymentStatus
-              }
+              status={presentation.statusBadgeTone}
+              label={presentation.statusBadgeLabel}
             />
-            {isPending && (
+            {presentation.isPending && (
               <span
                 style={{
                   fontSize: 'var(--text-xs)',
@@ -388,18 +480,10 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
               <dt>Amount due</dt>
               <dd>{formatPaymentMoney(projection.amount)}</dd>
             </div>
-            {projection.settlementType && (
-              <div>
-                <dt>Settlement type</dt>
-                <dd>{projection.settlementType}</dd>
-              </div>
-            )}
-            {projection.settlementProvider && (
-              <div>
-                <dt>Provider</dt>
-                <dd>{projection.settlementProvider}</dd>
-              </div>
-            )}
+            <div>
+              <dt>Settlement provenance</dt>
+              <dd>{presentation.provenanceLabel}</dd>
+            </div>
             {projection.simulatedTransactionId && (
               <div>
                 <dt>Simulated Tx ID</dt>
@@ -418,7 +502,7 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
               }}
             >
               <h3 style={{ fontSize: 'var(--text-sm)', marginBottom: 'var(--space-2)' }}>
-                Active Simulation Session
+                Member Simulation Session
               </h3>
               <dl className="summary-list">
                 <div>
@@ -451,14 +535,14 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
           )}
 
           <div style={{ marginTop: 'var(--space-6)' }}>
-            {isSuccess ? (
+            {presentation.isSimulatedSuccess || presentation.classification === 'ACTUAL' ? (
               <Link
                 to={paymentReceiptPath(projection.paymentId)}
                 className={buttonClassName('primary', 'md')}
               >
                 View receipt
               </Link>
-            ) : (
+            ) : presentation.isPending ? (
               <p
                 style={{
                   fontSize: 'var(--text-sm)',
@@ -468,6 +552,16 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
               >
                 Awaiting member authorization. Once the customer completes simulated payment on
                 their device, this status updates automatically.
+              </p>
+            ) : (
+              <p
+                style={{
+                  fontSize: 'var(--text-sm)',
+                  color: 'var(--color-muted)',
+                  margin: 0,
+                }}
+              >
+                Payment is finalized in status {presentation.statusBadgeLabel}. No further customer authorization is expected.
               </p>
             )}
           </div>

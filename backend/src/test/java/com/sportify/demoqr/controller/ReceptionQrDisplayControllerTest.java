@@ -286,4 +286,66 @@ class ReceptionQrDisplayControllerTest {
                         .with(user(new CustomUserDetails(receptionist))))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    @DisplayName("Settled ACTUAL payment returns actual provenance without simulated transaction")
+    void settledActualPaymentReturnsActualProvenance() throws Exception {
+        samplePayment.setPaymentStatus(PaymentStatus.SUCCESS);
+        samplePayment.setSettlementType("ACTUAL");
+        samplePayment.setSettlementProvider("DESK_CASH");
+        samplePayment.setSimulatedTransactionId(null);
+
+        when(paymentRepository.findById(101L)).thenReturn(Optional.of(samplePayment));
+        when(itemResolver.summarize(samplePayment)).thenReturn(
+                new PaymentItemResolver.PaymentItemSummary("Gold Membership (1 Month)", null, null));
+        when(store.findLatestByPayment(101L)).thenReturn(Optional.empty());
+
+        mvc.perform(get("/api/v1/payments/simulated-qr/desk-projection/101")
+                        .with(user(new CustomUserDetails(receptionist))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentStatus").value("SUCCESS"))
+                .andExpect(jsonPath("$.settlementType").value("ACTUAL"))
+                .andExpect(jsonPath("$.settlementProvider").value("DESK_CASH"))
+                .andExpect(jsonPath("$.simulatedTransactionId").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Legacy payment with NULL provenance returns null settlement fields")
+    void legacyPaymentWithNullProvenanceReturnsNullSettlementFields() throws Exception {
+        samplePayment.setPaymentStatus(PaymentStatus.SUCCESS);
+        samplePayment.setSettlementType(null);
+        samplePayment.setSettlementProvider(null);
+        samplePayment.setSimulatedTransactionId(null);
+
+        when(paymentRepository.findById(101L)).thenReturn(Optional.of(samplePayment));
+        when(itemResolver.summarize(samplePayment)).thenReturn(
+                new PaymentItemResolver.PaymentItemSummary("Gold Membership (1 Month)", null, null));
+        when(store.findLatestByPayment(101L)).thenReturn(Optional.empty());
+
+        mvc.perform(get("/api/v1/payments/simulated-qr/desk-projection/101")
+                        .with(user(new CustomUserDetails(receptionist))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentStatus").value("SUCCESS"))
+                .andExpect(jsonPath("$.settlementType").doesNotExist())
+                .andExpect(jsonPath("$.settlementProvider").doesNotExist())
+                .andExpect(jsonPath("$.simulatedTransactionId").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Desk projection strictly excludes member confirmation tokens and secret URLs")
+    void deskProjectionStrictlyExcludesSecrets() throws Exception {
+        when(paymentRepository.findById(101L)).thenReturn(Optional.of(samplePayment));
+        when(itemResolver.summarize(samplePayment)).thenReturn(
+                new PaymentItemResolver.PaymentItemSummary("Gold Membership (1 Month)", null, null));
+        when(store.findLatestByPayment(101L)).thenReturn(Optional.empty());
+
+        mvc.perform(get("/api/v1/payments/simulated-qr/desk-projection/101")
+                        .with(user(new CustomUserDetails(receptionist))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").doesNotExist())
+                .andExpect(jsonPath("$.tokenHash").doesNotExist())
+                .andExpect(jsonPath("$.tokenVerifier").doesNotExist())
+                .andExpect(jsonPath("$.confirmationUrl").doesNotExist())
+                .andExpect(jsonPath("$.secret").doesNotExist());
+    }
 }
