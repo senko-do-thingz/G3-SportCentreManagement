@@ -4,6 +4,7 @@ import { memberTrainingApi, type AttendanceRecord, type TrainingResult } from '.
 import { Badge, Card, EmptyState, ErrorState, PageHeader, Pagination, Tabs } from '../../components/ui'
 import { Spinner } from '../../components/ui/Spinner'
 import { EMPTY_VALUE, formatDateTime } from '../../utils/format'
+import { MemberTrainingNav } from './MemberTrainingNav'
 import { MemberTrainingPreviewNotice } from './MemberTrainingPreviewNotice'
 import { ATTENDANCE_LABEL, ATTENDANCE_TONE, metricValue, sessionTitle, sessionWhen } from './trainingPresentation'
 import { useMemberResource } from './useMemberResource'
@@ -26,6 +27,7 @@ export function MemberTrainingHistoryPage() {
         title="Attendance and Results"
         description="Your own attendance history and the result recorded for each session."
       />
+      <MemberTrainingNav />
       <MemberTrainingPreviewNotice />
       <Tabs
         items={TABS}

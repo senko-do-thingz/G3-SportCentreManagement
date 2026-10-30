@@ -4,7 +4,7 @@ import fs from 'node:fs'
 const OUT = process.argv[2]; fs.mkdirSync(OUT, { recursive: true })
 const base = 'http://localhost:5175'
 const sizes = { 390: [390, 844], 768: [768, 1024], 1440: [1440, 900] }
-const pages = { plans: '/member/training', history: '/member/history', results: '/member/history?tab=results' }
+const pages = { plans: '/member/training', history: '/member/training/history', results: '/member/training/history?tab=results' }
 const browser = await puppeteer.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true })
 const report = []
 for (const scheme of ['light', 'dark']) {
@@ -30,7 +30,7 @@ for (const scheme of ['light', 'dark']) {
   }
   // keyboard: focus on tabs
   await page.setViewport({ width: 1440, height: 900 })
-  await page.goto(base + '/member/history', { waitUntil: 'networkidle0' }); await new Promise(r => setTimeout(r, 900))
+  await page.goto(base + '/member/training/history', { waitUntil: 'networkidle0' }); await new Promise(r => setTimeout(r, 900))
   await page.focus('[role=tab]'); await page.keyboard.press('ArrowRight'); await new Promise(r => setTimeout(r, 600))
   const sel = await page.evaluate(() => document.querySelector('[role=tab][aria-selected=true]')?.textContent)
   report.push({ scheme, name: 'keyboard-tab-arrow', selected: sel })

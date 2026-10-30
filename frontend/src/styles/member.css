@@ -598,7 +598,9 @@
 .training-item__text { margin: 0; color: var(--color-text); overflow-wrap: anywhere; }
 .training-steps { display: grid; gap: var(--space-3); margin: var(--space-2) 0 0; padding-left: var(--space-6); list-style: decimal; }
 .training-list + .pagination { margin-top: var(--space-4); }
-.training-steps__step { display: grid; gap: var(--space-1); }
+.training-steps__step { display: list-item; }
+.training-steps__step > * { display: block; }
+.training-steps__step > * + * { margin-top: var(--space-1); }
 .training-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-3); margin: var(--space-2) 0; }
 .training-metrics__metric { display: grid; gap: var(--space-1); padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-surface-muted); }
 .training-metrics__metric dt { font-size: var(--text-sm); color: var(--color-text-muted); }

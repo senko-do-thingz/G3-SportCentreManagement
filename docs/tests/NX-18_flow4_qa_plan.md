@@ -5,7 +5,7 @@ Task: "Run Flow 4 frontend regression and accessibility checks" (F4-REQ-01..07, 
 ## Current status
 | Area | Screens | Status |
 |---|---|---|
-| Member | /member/training, /member/history | Built, QA executed on synthetic data (see NX-14-NX-15_test_cases.md) |
+| Member | /member/training, /member/training/history | Built, QA executed on synthetic data (see NX-14-NX-15_test_cases.md) |
 | Coach | NX-11, NX-12, NX-13 screens | NOT in the repository yet, QA not run |
 | Reception | Check-in (existing FE-05 screen) and NX-13 receptionist check-in UI | Existing check-in only; NX-13 part not in the repository |
 | FE/BE contract | docs/nx-03 | Unsigned draft; no backend endpoints; contract compatibility cannot be verified |

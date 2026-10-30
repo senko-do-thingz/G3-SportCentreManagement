@@ -83,7 +83,7 @@ describe('NX-14 member training plans and coach notes', () => {
 describe('NX-15 member attendance and training results', () => {
   it('lists attendance with Not recorded yet apart from Absent, using My Bookings date wording', async () => {
     const api = backend()
-    renderApp('/member/history')
+    renderApp('/member/training/history')
     const list = await screen.findByRole('list')
     expect(within(list).getAllByText('Basketball Foundations')).toHaveLength(3)
     expect(within(list).getByText('Attended')).toBeInTheDocument()
@@ -96,7 +96,7 @@ describe('NX-15 member attendance and training results', () => {
   it('shows results with a recorded zero apart from a missing value', async () => {
     backend()
     const user = userEvent.setup()
-    renderApp('/member/history')
+    renderApp('/member/training/history')
     await user.click(await screen.findByRole('tab', { name: 'Training results' }))
     expect(await screen.findByText('Free-throw accuracy improved')).toBeInTheDocument()
     expect(screen.getByText('Turnovers').nextElementSibling).toHaveTextContent(/^0$/)
@@ -105,11 +105,11 @@ describe('NX-15 member attendance and training results', () => {
 
   it('shows empty and error states for attendance', async () => {
     backend({ attendance: () => json(200, pageOf([])) })
-    const { unmount } = renderApp('/member/history')
+    const { unmount } = renderApp('/member/training/history')
     expect(await screen.findByText('No attendance yet')).toBeInTheDocument()
     unmount()
     backend({ attendance: () => backendError(503, 'History service unavailable') })
-    renderApp('/member/history')
+    renderApp('/member/training/history')
     expect(await screen.findByText('History service unavailable')).toBeInTheDocument()
     expect(screen.queryByText('No attendance yet')).not.toBeInTheDocument()
   })
@@ -118,7 +118,7 @@ describe('NX-15 member attendance and training results', () => {
     const rows = Array.from({ length: 10 }, (_, index) => ({ id: index + 1, ...when, sessionId: index + 1, state: 'ATTENDED' }))
     const api = backend({ attendance: () => json(200, { content: rows, page: 0, size: 10, totalElements: 12, totalPages: 2 }) })
     const user = userEvent.setup()
-    renderApp('/member/history')
+    renderApp('/member/training/history')
     await screen.findByText('Showing 1-10 of 12')
     await user.click(screen.getByRole('button', { name: 'Page 2' }))
     expect(api.calls.some((call) => call.path.startsWith(`${MEMBER_TRAINING_ROUTES.attendance}?`) && call.path.includes('page=1'))).toBe(true)
@@ -126,7 +126,7 @@ describe('NX-15 member attendance and training results', () => {
 
   it('hides an arrival line when the arrival time cannot be read', async () => {
     backend({ attendance: () => json(200, pageOf([{ id: 1, ...when, sessionId: 9, state: 'ATTENDED', arrivedAt: 'not-a-date' }])) })
-    renderApp('/member/history')
+    renderApp('/member/training/history')
     expect(await screen.findByText('Attended')).toBeInTheDocument()
     expect(screen.queryByText(/Arrived/)).not.toBeInTheDocument()
   })

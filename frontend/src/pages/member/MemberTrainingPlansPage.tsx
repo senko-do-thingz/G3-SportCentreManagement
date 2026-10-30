@@ -3,6 +3,7 @@ import { memberTrainingApi, type CoachNote, type TrainingPlan } from '../../api/
 import { Badge, Card, EmptyState, ErrorState, PageHeader } from '../../components/ui'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatDateTime } from '../../utils/format'
+import { MemberTrainingNav } from './MemberTrainingNav'
 import { MemberTrainingPreviewNotice } from './MemberTrainingPreviewNotice'
 import { useMemberResource } from './useMemberResource'
 
@@ -19,6 +20,7 @@ export function MemberTrainingPlansPage() {
         title="My Training Plans"
         description="Plans your coach has published for you, and the notes your coach shared."
       />
+      <MemberTrainingNav />
       <MemberTrainingPreviewNotice />
       <PlansPanel />
       <NotesPanel />

@@ -1,7 +1,7 @@
 ## Description
-Adds two read-only Member screens for Flow 4 and their menu entries:
-- NX-14 My Training Plans (/member/training): published plans with steps and the coach notes shared with the member.
-- NX-15 Attendance and Results (/member/history): own attendance history and per-session training results, with paging.
+Adds two read-only Member screens for Flow 4 and one menu entry (Training) with a tab bar between them:
+- NX-14 My Training Plans (/member/training, menu entry Training): published plans with steps and the coach notes shared with the member.
+- NX-15 Attendance and Results (/member/training/history): own attendance history and per-session training results, with paging.
 
 Also adds the NX-18 QA plan and a screenshot helper (documentation only).
 
@@ -23,7 +23,7 @@ The Flow 4 contract in docs/nx-03 is an unsigned draft ("IMPLEMENTATION_NOT_AUTH
 
 ## CI Verification Evidence
 - **Run URL**: TO BE FILLED after push
-- **Total Tests Run**: local full run 89 files, 1613 tests passed; 16 new tests in 2 files
+- **Total Tests Run**: local full run after merging main c6358dc: 89 files, 1613 tests passed; 16 new tests in 2 files
 - **Failures / Errors / Skipped**: 0 / 0 / 0 (local); lint and tsc pass
 
 ## Visual evidence
