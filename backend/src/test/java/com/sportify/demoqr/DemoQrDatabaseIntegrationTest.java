@@ -391,7 +391,7 @@ class DemoQrDatabaseIntegrationTest {
         String conflictInvNo = "INV-CONFLICT-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         jdbc.update("""
                 INSERT INTO dbo.invoice(invoice_number, payment_id, member_id, subtotal_amount, discount_amount,
-                    tax_amount, total_amount, status, issued_at)
+                    tax_amount, total_amount, status, issue_date)
                 VALUES (?, ?, ?, 810000, 0, 0, 810000, 'PAID', SYSUTCDATETIME())
                 """, conflictInvNo, paymentId, ownerId);
         try {
