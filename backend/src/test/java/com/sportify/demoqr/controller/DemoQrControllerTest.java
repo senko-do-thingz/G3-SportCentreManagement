@@ -42,7 +42,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(DemoQrController.class)
+@WebMvcTest({DemoQrController.class, SimulatorCapabilityController.class})
 @ActiveProfiles("qr-simulator")
 @TestPropertySource(properties = {"app.payment.simulator.enabled=true", "app.payment.simulator.public-base-url=https://demo.example.test/", "app.payment.simulator.allowed-origins=https://demo.example.test"})
 @Import({DemoQrAdvice.class,
@@ -61,7 +61,7 @@ class DemoQrControllerTest {
                 .role(Role.builder().code(role).name(role).build()).build());
     }
 
-    @ParameterizedTest @ValueSource(strings={"","/preview","/confirm-intent","/id/cancel"})
+    @ParameterizedTest @ValueSource(strings={"","/preview","/confirm-intent","/confirm","/id/cancel"})
     void unauthenticatedRequestsAreRejected(String suffix) throws Exception {
         mvc.perform(post(BASE+suffix).contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isUnauthorized());
@@ -96,5 +96,14 @@ class DemoQrControllerTest {
         mvc.perform(options(BASE+"/confirm-intent").header("Origin","https://evil.example")
                 .header("Access-Control-Request-Method","POST").header("Access-Control-Request-Headers","authorization,content-type"))
                 .andExpect(status().isForbidden());
+    }
+
+    @ParameterizedTest @ValueSource(strings={"/api/v1/payments/simulated-qr/capability","/api/v1/payments/simulator-config"})
+    void capabilityReportsEnabledAndSettlementEnabledForAuthenticatedMember(String path) throws Exception {
+        mvc.perform(get(path).with(user(principal("MEMBER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.settlementEnabled").value(true))
+                .andExpect(jsonPath("$.contractVersion").value(1));
     }
 }

@@ -43,7 +43,7 @@ describe('QR-01 guarded demo route and payment integration', () => {
     const { calls } = backend({ data: payment({ method: 'MOMO' }) })
     const user = userEvent.setup()
     renderApp('/member/payments/52')
-    const demo = await screen.findByRole('link', { name: 'QR Payment (Demo)' })
+    const demo = await screen.findByRole('link', { name: 'Pay with QR (Simulation)' })
     expect(screen.getByRole('button', { name: 'Continue to payment' })).toBeEnabled()
     expect(screen.getByRole('radio', { name: 'MoMo' })).toBeDisabled()
     await user.click(demo)
@@ -101,11 +101,27 @@ describe('QR-01 guarded demo route and payment integration', () => {
     backend({ data: payment({ status }) })
     const view = renderApp('/member/payments/52')
     await screen.findByRole('heading', { name: 'Order summary' })
-    expect(screen.queryByRole('link', { name: 'QR Payment (Demo)' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Pay with QR (Simulation)' })).not.toBeInTheDocument()
     view.unmount()
     renderApp('/member/payments/52/qr-demo')
     expect(await screen.findByRole('heading', { name: 'Demo unavailable for this payment' })).toBeVisible()
     expect(screen.queryByRole('img', { name: /Non-payable/ })).not.toBeInTheDocument()
+  })
+
+  it('renders Paid - Simulated summary on reload when payment was settled via QR simulation', async () => {
+    backend({
+      data: payment({
+        status: 'SUCCESS',
+        settlementType: 'SIMULATED',
+        settlementProvider: 'SPORTIFY_SIMULATOR',
+        referenceCode: 'SIM-QR-52-00000052',
+      }),
+    })
+    renderApp('/member/payments/52/qr-demo')
+    expect(await screen.findByRole('heading', { name: 'Simulated QR Payment Completed' })).toBeVisible()
+    expect(screen.getByText('Paid - Simulated')).toBeVisible()
+    expect(screen.getByText('SIMULATED (SPORTIFY_SIMULATOR)')).toBeVisible()
+    expect(screen.getByText('SIM-QR-52-00000052')).toBeVisible()
   })
 
   it('keeps anonymous users behind login and does not read payments', async () => {
@@ -126,13 +142,13 @@ describe('QR-01 guarded demo route and payment integration', () => {
 
   it.each([
     ['false', true, 'development'],
-    ['true', false, 'production'],
-  ])('disables entry and direct route for flag %s / DEV %s / mode %s', async (flag, dev, mode) => {
+    ['false', false, 'production'],
+  ])('disables entry and direct route when flag is explicitly %s / DEV %s / mode %s', async (flag, dev, mode) => {
     vi.stubEnv('VITE_QR_PAYMENT_DEMO', flag); vi.stubEnv('DEV', dev); vi.stubEnv('MODE', mode)
     const { calls } = backend()
     const summary = renderApp('/member/payments/52')
     await screen.findByRole('heading', { name: 'Order summary' })
-    expect(screen.queryByRole('link', { name: 'QR Payment (Demo)' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Pay with QR (Simulation)' })).not.toBeInTheDocument()
     summary.unmount()
     calls.length = 0
     renderApp('/member/payments/52/qr-demo')
@@ -142,8 +158,8 @@ describe('QR-01 guarded demo route and payment integration', () => {
     expect(calls.some((call) => call.path.startsWith('/payments/'))).toBe(false)
   })
 
-  it('supports only the explicit opted-in demo build when DEV is false', async () => {
-    vi.stubEnv('DEV', false); vi.stubEnv('MODE', 'qr-demo')
+  it('supports official simulation rollout in production mode without requiring --mode qr-demo', async () => {
+    vi.stubEnv('VITE_QR_PAYMENT_DEMO', ''); vi.stubEnv('DEV', false); vi.stubEnv('MODE', 'production')
     backend()
     renderApp('/member/payments/52/qr-demo')
     expect(await screen.findByRole('img', { name: /Non-payable/ })).toBeVisible()

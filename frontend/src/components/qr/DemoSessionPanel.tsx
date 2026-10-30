@@ -67,6 +67,7 @@ function DemoSessionPanelContent({ paymentId, bank, amount }: { paymentId: numbe
         setCreated(result); setDeadline(false)
       } else if (created) {
         const session = action === 'refresh' ? await demoQrApi.get(created.session.id) : await demoQrApi.cancel(created.session.id)
+        if (session.state !== 'PENDING') sessionId.current = null
         if (mounted.current) { setCreated({ ...created, session }); setDeadline(false) }
       }
     } catch {
@@ -97,9 +98,9 @@ function DemoSessionPanelContent({ paymentId, bank, amount }: { paymentId: numbe
   </section>
   return <section className="demo-session-panel" aria-label="Demo confirmation session">
     <h3>QR Payment (Simulation)</h3>
-    <p>The simulation session is a separate authenticated application link. It is not a bank transfer QR. Only the authenticated payment owner can record confirmation intent. Payment is not completed in this phase.</p>
+    <p>The simulation session is a separate authenticated application link. It is not a bank transfer QR. Only the authenticated payment owner can confirm simulated settlement. No real bank transfer or cash movement occurs.</p>
     <p className="notice notice--warning">DEMO ONLY - NO MONEY TRANSFER</p>
-    <p>Changing the bank or leaving this page attempts to cancel the current session. A disconnected session expires on the server.</p>
+    <p>Changing the bank or leaving this page attempts to cancel an unconfirmed session. A disconnected session expires on the server.</p>
     {created && <DemoSessionSummary session={created.session} onDeadline={reachedDeadline} />}
     {deadline && created?.session.state === 'PENDING' && <p className="notice notice--warning">The displayed deadline has passed. Refresh Simulation Status to read the server result.</p>}
     {qr && <figure className="qr-demo-card__figure">
@@ -112,7 +113,7 @@ function DemoSessionPanelContent({ paymentId, bank, amount }: { paymentId: numbe
     </figure>}
     {created?.session.state === 'PENDING' && !deadline && !qr && <p role="alert">The demo link QR could not be generated. Cancel this session and retry.</p>}
     <div className="demo-session-actions">
-      {(!created || created.session.state !== 'PENDING' || deadline) && <Button disabled={busy} onClick={() => void operation('start')}>Start simulation session</Button>}
+      {(!created || (created.session.state !== 'PENDING' && created.session.state !== 'SETTLED') || (created.session.state === 'PENDING' && deadline)) && <Button disabled={busy} onClick={() => void operation('start')}>Start simulation session</Button>}
       {created && <Button variant="secondary" disabled={busy} onClick={() => void operation('refresh')}>Refresh Simulation Status</Button>}
       {created?.session.state === 'PENDING' && <Button variant="secondary" disabled={busy} onClick={() => void operation('cancel')}>Cancel Simulation Session</Button>}
       {created && qr && <>

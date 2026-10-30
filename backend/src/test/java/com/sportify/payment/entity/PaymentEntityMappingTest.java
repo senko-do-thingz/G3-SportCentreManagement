@@ -94,6 +94,20 @@ class PaymentEntityMappingTest {
         Field updatedAt = Payment.class.getDeclaredField("updatedAt");
         Column updatedCol = updatedAt.getAnnotation(Column.class);
         assertThat(updatedCol.name()).isEqualTo("updated_at");
+
+        Field settlementType = Payment.class.getDeclaredField("settlementType");
+        Column stCol = settlementType.getAnnotation(Column.class);
+        assertThat(stCol.name()).isEqualTo("settlement_type");
+        assertThat(stCol.length()).isEqualTo(20);
+
+        Field settlementProvider = Payment.class.getDeclaredField("settlementProvider");
+        Column spCol = settlementProvider.getAnnotation(Column.class);
+        assertThat(spCol.name()).isEqualTo("settlement_provider");
+        assertThat(spCol.length()).isEqualTo(40);
+
+        Field simulatedTxId = Payment.class.getDeclaredField("simulatedTransactionId");
+        Column stxCol = simulatedTxId.getAnnotation(Column.class);
+        assertThat(stxCol.name()).isEqualTo("simulated_transaction_id");
     }
 
     @Test

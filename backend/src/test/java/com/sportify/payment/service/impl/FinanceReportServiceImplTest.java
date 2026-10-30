@@ -118,6 +118,25 @@ class FinanceReportServiceImplTest {
         assertThat(o.previousPaidRevenue()).isEqualByComparingTo("1600000");
         assertThat(o.revenueChange()).isEqualByComparingTo("400000");
         assertThat(o.revenueChangePercent()).isEqualByComparingTo("25.00");
+        assertThat(o.simulatedRevenue()).isEqualByComparingTo("0.00");
+        assertThat(o.simulatedTransactions()).isZero();
+    }
+
+    @Test
+    @DisplayName("Overview: simulated QR settlements are reported separately and never added to paidRevenue")
+    void overview_SeparatesSimulatedTotalsFromActualPaidRevenue() {
+        when(repository.paidTotals(OCT, NOV)).thenReturn(totals("2000000.00", 3));
+        when(repository.pendingTotals(OCT, NOV)).thenReturn(totals("700000.00", 1));
+        when(repository.refundedTotals(OCT, NOV)).thenReturn(totals("200000.00", 1));
+        when(repository.paidTotals(SEP, OCT)).thenReturn(totals("1600000.00", 2));
+        when(repository.simulatedTotals(OCT, NOV)).thenReturn(totals("810000.00", 2));
+
+        FinanceOverviewResponse o = service.overview("2026-10");
+
+        assertThat(o.paidRevenue()).isEqualByComparingTo("2000000.00");
+        assertThat(o.paidTransactions()).isEqualTo(3);
+        assertThat(o.simulatedRevenue()).isEqualByComparingTo("810000.00");
+        assertThat(o.simulatedTransactions()).isEqualTo(2);
     }
 
     @Test

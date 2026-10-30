@@ -239,6 +239,45 @@ describe('FE-13 financial overview', () => {
     expect(await screen.findByText(/do not have access|access denied|forbidden/i)).toBeInTheDocument()
     expect(screen.queryByText('Paid revenue')).not.toBeInTheDocument()
   })
+
+  it('QR-05 displays simulated QR volume separately from actual paid revenue and labels simulated transactions', async () => {
+    tokenStorage.startSession({ accessToken: 'finance-manager-token', refreshToken: 'finance-refresh-token' })
+    installFakeFetch((call) => {
+      if (call.path === '/users/me') return json(200, MANAGER)
+      if (call.path.startsWith('/manager/finance/overview')) {
+        return json(200, { ...overviewDto, simulatedRevenue: '810000', simulatedTransactions: 1 })
+      }
+      if (call.path === '/manager/finance/trend?months=6') return json(200, trendDto)
+      if (call.path.startsWith('/manager/finance/transactions')) {
+        return json(200, {
+          ...transactionPageDto,
+          size: 5,
+          content: [{
+            ...transactionDto,
+            referenceCode: 'SIM-QR-41-00000041',
+            settlementType: 'SIMULATED',
+            settlementProvider: 'SPORTIFY_SIMULATOR',
+            simulatedTransactionId: 41,
+          }],
+        })
+      }
+      if (call.path.startsWith('/manager/finance/revenue')) return json(200, serviceBreakdownDto)
+      if (call.path === '/refunds/pending') return json(200, pendingRefundListDto)
+      return backendError(404, `Unexpected request: ${call.method} ${call.path}`)
+    })
+    const view = renderApp('/manager/finance?month=2026-10')
+    const kpis = await screen.findByRole('region', { name: 'Financial key performance indicators' })
+    expect(within(kpis).getByText('16.110.000 VND')).toBeInTheDocument()
+    expect(within(kpis).getByText('Simulated QR volume (non-cash)')).toBeInTheDocument()
+    expect(within(kpis).getByText('1 simulated transactions (excluded from paid revenue)')).toBeInTheDocument()
+    expect(await screen.findByText('Paid - Simulated')).toBeInTheDocument()
+    view.unmount()
+
+    renderApp('/manager/transactions?month=2026-10')
+    expect(await screen.findByText('Paid - Simulated')).toBeInTheDocument()
+    expect(screen.getByText('Bank transfer (Simulated)')).toBeInTheDocument()
+    expect(screen.getByText('SIM-QR-41-00000041')).toBeInTheDocument()
+  })
 })
 
 describe('FE-13 transaction ledger and refund review', () => {

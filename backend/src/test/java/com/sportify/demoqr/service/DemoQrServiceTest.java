@@ -77,4 +77,90 @@ class DemoQrServiceTest {
         assertThatThrownBy(() -> service.confirm("a".repeat(43),owner)).isInstanceOf(org.springframework.dao.DataAccessException.class);
         verifyNoInteractions(reader);
     }
+
+    @Test void confirmSettlesPendingSessionAtomicallyAndReturnsProvenance() {
+        String token = "b".repeat(43);
+        UUID sessionId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-10-30T06:00:00Z");
+        var pending = new SqlQrStore.Session(sessionId, 52L, 2L, new BigDecimal("810000.00"), "VND",
+                DemoQrService.Bank.BIDV_DEMO, now.minusSeconds(30), now.plusSeconds(270),
+                DemoQrService.State.PENDING, 0L);
+        var settled = new SqlQrStore.Session(sessionId, 52L, 2L, new BigDecimal("810000.00"), "VND",
+                DemoQrService.Bank.BIDV_DEMO, now.minusSeconds(30), now.plusSeconds(270),
+                DemoQrService.State.SETTLED, 1L);
+        var tx = new SqlQrStore.SimulatedTx(901L, "SIM-QR-52-ABCDEF123456", now);
+        var info = new SqlQrStore.SettlementInfo("SIMULATED", "SPORTIFY_SIMULATOR", 901L,
+                "SIM-QR-52-ABCDEF123456", now, 77L, "INV-1077");
+
+        when(store.findVerifier(DemoQrService.digest(token), 2L)).thenReturn(pending);
+        when(store.lock(sessionId, 2L)).thenReturn(pending);
+        when(store.expire(pending)).thenReturn(pending);
+        when(reader.read(52L, owner)).thenReturn(new DemoPaymentReader.Snapshot(52L, new BigDecimal("810000.00"), "VND"));
+        when(store.isBeforeDeadline(sessionId)).thenReturn(true);
+        when(store.insertSettlement(pending)).thenReturn(tx);
+        when(reader.settle(52L, owner, "BIDV_DEMO", 901L, "SIM-QR-52-ABCDEF123456"))
+                .thenReturn(new DemoPaymentReader.SettlementOutcome(77L, "INV-1077"));
+        when(store.settle(pending)).thenReturn(settled);
+        when(store.findSettlement(sessionId, 52L)).thenReturn(java.util.Optional.of(info));
+        when(store.now()).thenReturn(now);
+
+        var view = service.confirm(token, owner);
+
+        assertThat(view.state()).isEqualTo(DemoQrService.State.SETTLED);
+        assertThat(view.settlementType()).isEqualTo("SIMULATED");
+        assertThat(view.settlementProvider()).isEqualTo("SPORTIFY_SIMULATOR");
+        assertThat(view.simulatedTransactionId()).isEqualTo(901L);
+        assertThat(view.transactionCode()).isEqualTo("SIM-QR-52-ABCDEF123456");
+        assertThat(view.invoiceId()).isEqualTo(77L);
+        assertThat(view.invoiceNumber()).isEqualTo("INV-1077");
+        verify(store).insertSettlement(pending);
+        verify(reader).settle(52L, owner, "BIDV_DEMO", 901L, "SIM-QR-52-ABCDEF123456");
+        verify(store).settle(pending);
+    }
+
+    @Test void confirmOnAlreadySettledSessionIsIdempotentWithoutDuplicateWrites() {
+        String token = "c".repeat(43);
+        UUID sessionId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-10-30T06:00:00Z");
+        var settled = new SqlQrStore.Session(sessionId, 52L, 2L, new BigDecimal("810000.00"), "VND",
+                DemoQrService.Bank.BIDV_DEMO, now.minusSeconds(60), now.plusSeconds(240),
+                DemoQrService.State.SETTLED, 1L);
+        var info = new SqlQrStore.SettlementInfo("SIMULATED", "SPORTIFY_SIMULATOR", 901L,
+                "SIM-QR-52-ABCDEF123456", now, 77L, "INV-1077");
+
+        when(store.findVerifier(DemoQrService.digest(token), 2L)).thenReturn(settled);
+        when(store.lock(sessionId, 2L)).thenReturn(settled);
+        when(store.expire(settled)).thenReturn(settled);
+        when(store.findSettlement(sessionId, 52L)).thenReturn(java.util.Optional.of(info));
+        when(store.now()).thenReturn(now);
+
+        var view = service.confirm(token, owner);
+
+        assertThat(view.state()).isEqualTo(DemoQrService.State.SETTLED);
+        assertThat(view.simulatedTransactionId()).isEqualTo(901L);
+        verify(store, never()).insertSettlement(any());
+        verify(reader, never()).settle(anyLong(), any(), anyString(), anyLong(), anyString());
+        verify(store, never()).settle(any());
+    }
+
+    @Test void cancelOnSettledSessionIsRejectedWithConflict() {
+        UUID sessionId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-10-30T06:00:00Z");
+        var settled = new SqlQrStore.Session(sessionId, 52L, 2L, new BigDecimal("810000.00"), "VND",
+                DemoQrService.Bank.BIDV_DEMO, now.minusSeconds(60), now.plusSeconds(240),
+                DemoQrService.State.SETTLED, 1L);
+
+        when(store.findId(sessionId, 2L)).thenReturn(settled);
+        when(store.lock(sessionId, 2L)).thenReturn(settled);
+        when(store.expire(settled)).thenReturn(settled);
+
+        assertThatThrownBy(() -> service.cancel(sessionId.toString(), owner))
+                .isInstanceOf(DemoQrException.class)
+                .satisfies(ex -> {
+                    DemoQrException dqe = (DemoQrException) ex;
+                    assertThat(dqe.status()).isEqualTo(org.springframework.http.HttpStatus.CONFLICT);
+                    assertThat(dqe.code()).isEqualTo("SIMULATOR_SETTLED");
+                });
+        verify(store, never()).cancel(any());
+    }
 }

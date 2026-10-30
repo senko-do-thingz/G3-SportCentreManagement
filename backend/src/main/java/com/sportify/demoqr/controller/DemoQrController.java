@@ -42,7 +42,7 @@ public class DemoQrController {
         return service.preview(request.token(), user.getUserAccount());
     }
 
-    @PostMapping("/confirm-intent")
+    @PostMapping({"/confirm-intent", "/confirm"})
     public DemoQrService.View confirm(@RequestBody TokenRequest request, @AuthenticationPrincipal CustomUserDetails user) {
         return service.confirm(request.token(), user.getUserAccount());
     }

@@ -127,4 +127,20 @@ class PaymentRefundServiceImplTest {
         verify(invoiceRepository).save(issued);
         verify(invoiceRepository, never()).save(cancelled);
     }
+
+    @Test
+    @DisplayName("SIMULATED payment: 409 SIMULATED_PAYMENT_NOT_REFUNDABLE, nothing saved")
+    void markRefunded_SimulatedPayment_Conflict() {
+        payment.setSettlementType("SIMULATED");
+        payment.setSettlementProvider("SPORTIFY_SIMULATOR");
+        payment.setSimulatedTransactionId(901L);
+        when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(payment));
+
+        assertThatThrownBy(() -> service.markRefunded(70L, "RFD-0005", BigDecimal.ONE))
+                .isInstanceOf(ConflictException.class)
+                .satisfies(ex -> assertThat(((ConflictException) ex).getCode())
+                        .isEqualTo(PaymentRefundService.CODE_SIMULATED_PAYMENT_NOT_REFUNDABLE));
+        verify(paymentRepository, never()).save(any());
+        verifyNoInteractions(invoiceRepository);
+    }
 }

@@ -83,6 +83,33 @@ describe('QR-04 desktop session lifecycle', () => {
     await waitFor(() => expect(demoQrApi.cancel).toHaveBeenCalledWith(response().session.id))
   })
 
+  it('manual refresh reads SETTLED and shows Paid - Simulated provenance without offering a new session', async () => {
+    vi.spyOn(demoQrApi, 'create').mockResolvedValue(response())
+    const get = vi.spyOn(demoQrApi, 'get').mockResolvedValue({
+      ...response().session,
+      state: 'SETTLED',
+      settlementType: 'SIMULATED',
+      settlementProvider: 'SPORTIFY_SIMULATOR',
+      transactionCode: 'SIM-QR-52-00000052',
+      invoiceId: 7,
+      invoiceNumber: 'INV-0007',
+    })
+    const user = userEvent.setup()
+    const view = render(<DemoSessionPanel amount="810000.00" paymentId={52} bank="vietcombank" />)
+    await user.click(await screen.findByRole('button', { name: 'Start simulation session' }))
+    await user.click(await screen.findByRole('button', { name: 'Refresh Simulation Status' }))
+    expect(get).toHaveBeenCalledWith(response().session.id)
+    expect(await screen.findByText('SETTLED')).toBeVisible()
+    expect(screen.getByText('Paid - Simulated')).toBeVisible()
+    expect(screen.getByText('SIM-QR-52-00000052')).toBeVisible()
+    expect(screen.getByText('SIMULATED (SPORTIFY_SIMULATOR)')).toBeVisible()
+    expect(screen.getByRole('link', { name: 'View simulated receipt' })).toHaveAttribute('href', '/member/payments/receipts/7')
+    expect(screen.queryByRole('button', { name: 'Start simulation session' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    view.unmount()
+    expect(demoQrApi.cancel).not.toHaveBeenCalled()
+  })
+
   it('manual refresh reads CONFIRMED without changing the financial payment', async () => {
     vi.spyOn(demoQrApi, 'create').mockResolvedValue(response())
     const get = vi.spyOn(demoQrApi, 'get').mockResolvedValue({ ...response().session, state: 'AUTHORIZED_PENDING_SETTLEMENT' })

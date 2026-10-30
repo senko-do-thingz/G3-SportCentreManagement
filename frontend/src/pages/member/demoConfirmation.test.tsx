@@ -16,7 +16,7 @@ const token = 'a'.repeat(43)
 const base = '/payments/simulated-qr/sessions'
 const capabilityPath = '/payments/simulated-qr/capability'
 function installFakeFetch(handler: Handler) {
-  return installBaseFetch((call) => call.path === capabilityPath ? json(200, { enabled: true, settlementEnabled: false, contractVersion: 1 }) : handler(call))
+  return installBaseFetch((call) => call.path === capabilityPath ? json(200, { enabled: true, settlementEnabled: true, contractVersion: 1 }) : handler(call))
 }
 export const snapshot: DemoSession = {
   id: '00000000-0000-4000-8000-000000000052', paymentId: 52, reference: 'DEMO-52', amount: '810000.00', currency: 'VND',
@@ -51,7 +51,7 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
     expect(calls.every((call) => call.path === '/users/me')).toBe(true)
   })
 
-  it.each(['PENDING', 'AUTHORIZED_PENDING_SETTLEMENT', 'CANCELED', 'EXPIRED'] as const)('shows server state %s and never auto-confirms', async (state) => {
+  it.each(['PENDING', 'AUTHORIZED_PENDING_SETTLEMENT', 'SETTLED', 'CANCELED', 'EXPIRED'] as const)('shows server state %s and never auto-confirms', async (state) => {
     const { calls } = installFakeFetch((call) => call.path === '/users/me' ? json(200, MEMBER) : json(200, { ...snapshot, state }))
     renderApp(`/demo/qr/confirm#token=${token}`)
     expect(await screen.findByText('BIDV (demo)')).toBeVisible()
@@ -69,7 +69,7 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
     expect(sessionStorage.getItem('token')).toBeNull()
   })
 
-  it('confirms only on explicit intent and guards a second tap while the request is pending', async () => {
+  it('confirms only on explicit intent, settles in simulation and guards a second tap while the request is pending', async () => {
     let complete!: (response: Response) => void
     const { calls } = installFakeFetch((call) => {
       if (call.path === '/users/me') return json(200, MEMBER)
@@ -81,8 +81,19 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
     const button = await screen.findByRole('button', { name: 'Record confirmation intent' })
     await user.dblClick(button)
     expect(calls.filter((call) => call.path === `${base}/confirm-intent`)).toHaveLength(1)
-    complete(json(200, { ...snapshot, state: 'AUTHORIZED_PENDING_SETTLEMENT' }))
-    expect(await screen.findByText('Confirmation intent received; payment not yet completed.')).toBeVisible()
+    complete(json(200, {
+      ...snapshot,
+      state: 'SETTLED',
+      settlementType: 'SIMULATED',
+      settlementProvider: 'SPORTIFY_SIMULATOR',
+      transactionCode: 'SIM-QR-52-00000052',
+      invoiceId: 7,
+      invoiceNumber: 'INV-0007',
+    }))
+    expect(await screen.findByText(/Paid - Simulated\. Your payment was settled in simulation only/)).toBeVisible()
+    expect(screen.getByText('SIM-QR-52-00000052')).toBeVisible()
+    expect(screen.getByText('SIMULATED (SPORTIFY_SIMULATOR)')).toBeVisible()
+    expect(screen.getByRole('link', { name: 'View simulated receipt' })).toHaveAttribute('href', '/member/payments/receipts/7')
     await waitFor(() => expect(document.activeElement).toHaveAttribute('aria-label', 'Demo session result'))
     expect(calls.every((call) => call.path === '/users/me' || call.path === capabilityPath || call.path.startsWith(base))).toBe(true)
   })
@@ -168,7 +179,7 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
     expect(calls.some((call) => call.path.endsWith('/confirm-intent'))).toBe(false)
   })
 
-  it.each([['false', true, 'test'], ['true', false, 'production']] as const)('disabled flag/mode rejects route: %s %s %s', async (flag, dev, mode) => {
+  it.each([['false', true, 'test'], ['false', false, 'production']] as const)('disabled flag rejects route: %s %s %s', async (flag, dev, mode) => {
     vi.stubEnv('VITE_QR_PAYMENT_DEMO', flag); vi.stubEnv('DEV', dev); vi.stubEnv('MODE', mode)
     const { calls } = installFakeFetch(() => json(200, MEMBER))
     renderApp(`/demo/qr/confirm#token=${token}`)
@@ -176,5 +187,12 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
     expect(screen.getByRole('link', { name: 'Sportify Sports center home' }).closest('header')).toHaveClass('home-header', 'workspace-header')
     expect(screen.queryByRole('button', { name: 'Record confirmation intent' })).not.toBeInTheDocument()
     expect(calls.every((call) => call.path === '/users/me')).toBe(true)
+  })
+
+  it('supports official simulation rollout in production mode when backend capability is enabled', async () => {
+    vi.stubEnv('VITE_QR_PAYMENT_DEMO', ''); vi.stubEnv('DEV', false); vi.stubEnv('MODE', 'production')
+    installFakeFetch((call) => call.path === '/users/me' ? json(200, MEMBER) : json(200, snapshot))
+    renderApp(`/demo/qr/confirm#token=${token}`)
+    expect(await screen.findByRole('button', { name: 'Record confirmation intent' })).toBeVisible()
   })
 })

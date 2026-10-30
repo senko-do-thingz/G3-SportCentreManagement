@@ -288,9 +288,18 @@
       ],
       "drops": [],
       "sha256_lf": "acacb78e3f3ab8806e36f8009a26a2065b82cfdc01ea7e3617afbea9027ea028"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V35__create_simulated_qr_settlement.sql",
+      "version": 35,
+      "creates": [
+        "dbo.simulated_payment_transaction"
+      ],
+      "drops": [],
+      "sha256_lf": "4f200648db1a66854e7de152cf2b539a314427a7c415562beb1428832cc5b5b5"
     }
   ],
-  "create_occurrences": 65,
+  "create_occurrences": 66,
   "create_names": [
     "[activity_log]",
     "[age_group]",
@@ -350,6 +359,7 @@
     "dbo.cash_capture_ticket",
     "dbo.cash_coverage",
     "dbo.cash_event",
+    "dbo.simulated_payment_transaction",
     "dbo.simulated_qr_rate_limit",
     "dbo.simulated_qr_session",
     "dbo.simulated_qr_transition",

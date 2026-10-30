@@ -20,6 +20,7 @@ parser.add_argument('--out', required=True)
 parser.add_argument('--asset-root', required=True)
 parser.add_argument('--axe', required=True)
 parser.add_argument('--payment-id', type=int, required=True)
+parser.add_argument('--dark-payment-id', type=int, help='Optional second pending payment ID for dark theme settlement E2E.')
 parser.add_argument('--email', default='owner@qr04.example.test')
 parser.add_argument('--native-https', action='store_true', help='Use real HTTPS sockets and browser CORS without request interception.')
 parser.add_argument('--tls-ca', help='Isolated test CA PEM for Python HTTP verification.')
@@ -103,7 +104,7 @@ try:
     status, auth = request('/auth/login', {'email': args.email, 'password': 'Qr04IsolatedTest2026!'})
     check('Real owner JWT login', status == 200)
     status, capability = request('/payments/simulated-qr/capability', bearer=auth['accessToken'])
-    check('Intent enabled with settlement disabled', status == 200 and capability['enabled'] and not capability['settlementEnabled'])
+    check('Simulated settlement capability enabled', status == 200 and capability['enabled'] and capability['settlementEnabled'])
     with sync_playwright() as playwright:
         launch_args = []
         if args.native_https:
@@ -114,17 +115,18 @@ try:
                 launch_args.append('--host-resolver-rules=' + args.host_resolver_rules)
         browser = playwright.chromium.launch(channel='msedge', headless=True, args=launch_args)
         report['browserVersion'] = browser.version
-        for theme in ['light', 'dark']:
+        theme_payments = [('light', args.payment_id), ('dark', args.dark_payment_id or args.payment_id)]
+        for theme, current_payment_id in theme_payments:
             context, desktop = new_page(browser, theme, 1440)
-            desktop.goto(args.base + f'/member/payments/{args.payment_id}/qr-demo')
+            desktop.goto(args.base + f'/member/payments/{current_payment_id}/qr-demo')
             expect(desktop.get_by_role('button', name='Start simulation session')).to_be_visible()
             desktop.get_by_role('button', name='Start simulation session').click()
             link = desktop.get_by_role('link', name='Review confirmation intent')
             expect(link).to_be_visible()
-            url = link.get_attribute('href')
-            tokens.append(url.split('#token=')[1])
+            first_url = link.get_attribute('href')
+            tokens.append(first_url.split('#token=')[1])
             values = zxingcpp.read_barcodes(Image.open(BytesIO(desktop.locator('.demo-session-panel svg').screenshot())))
-            check('Rendered application QR decodes: ' + theme, len(values) == 1 and values[0].text == url)
+            check('Rendered application QR decodes: ' + theme, len(values) == 1 and values[0].text == first_url)
             legacy = zxingcpp.read_barcodes(Image.open(BytesIO(desktop.locator('.qr-demo-card svg').first.screenshot())))
             check('QR03 NON_PAYABLE decoder: ' + theme, len(legacy) == 1 and 'MODE=NON_PAYABLE' in legacy[0].text)
             for width in [390, 768, 1440]:
@@ -138,22 +140,31 @@ try:
                 check('Escape closes member navigation and restores focus: ' + theme,
                       menu.get_attribute('aria-expanded') == 'false' and menu.evaluate('(element)=>document.activeElement===element'))
             mobile_context, mobile = new_page(browser, theme)
-            mobile.goto(url)
+            mobile.goto(first_url)
             expect(mobile.get_by_role('button', name='Record confirmation intent')).to_be_visible()
             check('Fragment cleared: ' + theme, '#' not in mobile.url)
             inspect(mobile, 'mobile-pending-' + theme)
+            mobile.get_by_role('button', name='Cancel Simulation Session').click()
+            expect(mobile.get_by_text('CANCELED', exact=True)).to_be_visible()
+            inspect(mobile, 'mobile-canceled-' + theme)
+            desktop.get_by_role('button', name='Refresh Simulation Status').click()
+            expect(desktop.get_by_text('CANCELED', exact=True)).to_be_visible()
+            desktop.get_by_role('button', name='Start simulation session').click()
+            second_link = desktop.get_by_role('link', name='Review confirmation intent')
+            expect(second_link).to_be_visible()
+            url = second_link.get_attribute('href')
+            tokens.append(url.split('#token=')[1])
+            mobile.goto(url)
+            expect(mobile.get_by_role('button', name='Record confirmation intent')).to_be_visible()
             mobile.get_by_role('button', name='Record confirmation intent').focus()
             mobile.keyboard.press('Enter')
-            expect(mobile.get_by_text('Confirmation intent received; payment not yet completed.')).to_be_visible()
+            expect(mobile.get_by_text('Paid - Simulated. Your payment was settled in simulation only; no real bank transfer occurred.')).to_be_visible()
             inspect(mobile, 'mobile-intent-' + theme)
             check('Keyboard confirmation moves focus to result: ' + theme, mobile.evaluate("document.activeElement?.getAttribute('aria-label')") == 'Demo session result')
             desktop.get_by_role('button', name='Refresh Simulation Status').click()
-            expect(desktop.get_by_text('AUTHORIZED_PENDING_SETTLEMENT', exact=True)).to_be_visible()
-            status, preview = request('/payments/simulated-qr/sessions/preview', {'token': tokens[-1]}, auth['accessToken'])
-            request('/payments/simulated-qr/sessions/' + preview['id'] + '/cancel', {}, auth['accessToken'])
-            mobile.get_by_role('button', name='Refresh Simulation Status').click()
-            expect(mobile.get_by_text('CANCELED', exact=True)).to_be_visible()
-            inspect(mobile, 'mobile-canceled-' + theme)
+            expect(desktop.get_by_text('SETTLED', exact=True)).to_be_visible()
+            expect(desktop.get_by_text('Paid - Simulated', exact=True)).to_be_visible()
+            inspect(desktop, 'desktop-settled-1440-' + theme)
             mobile.goto(args.base + '/demo/qr/confirm#token=' + 'z' * 43)
             expect(mobile.get_by_role('alert')).to_be_visible()
             inspect(mobile, 'mobile-unavailable-' + theme)
@@ -169,9 +180,9 @@ finally:
             entry = {'tokenSha256': hashlib.sha256(raw.encode()).hexdigest(), 'confirmedTerminal': False}
             try:
                 status, view = request('/payments/simulated-qr/sessions/preview', {'token': raw}, auth['accessToken'])
-                if status == 200 and view['state'] not in ['CANCELED', 'EXPIRED']:
+                if status == 200 and view['state'] not in ['SETTLED', 'CANCELED', 'EXPIRED']:
                     status, view = request('/payments/simulated-qr/sessions/' + view['id'] + '/cancel', {}, auth['accessToken'])
-                entry.update({'httpStatus': status, 'state': view.get('state'), 'confirmedTerminal': status == 200 and view.get('state') in ['CANCELED', 'EXPIRED']})
+                entry.update({'httpStatus': status, 'state': view.get('state'), 'confirmedTerminal': status == 200 and view.get('state') in ['SETTLED', 'CANCELED', 'EXPIRED']})
             except Exception as failure:
                 entry['failureType'] = type(failure).__name__
             report['tokenInvalidation'].append(entry)
