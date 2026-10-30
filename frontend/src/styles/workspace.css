@@ -331,7 +331,8 @@
   min-width: 0;
 }
 
-@media (max-width: 1180px) {
+/* Keep the centered member links clear of the account controls before they overlap. */
+@media (max-width: 1540px) {
   .workspace-header--member .workspace-header__menu-toggle {
     display: inline-flex;
     margin-left: auto;
