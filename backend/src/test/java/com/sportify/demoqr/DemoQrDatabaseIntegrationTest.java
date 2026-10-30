@@ -598,7 +598,7 @@ class DemoQrDatabaseIntegrationTest {
         // SQL Server transactional DDL dry run: rollback leaves the V33 cohort and its data intact.
         try(var connection=source.getConnection();var statement=connection.createStatement()) {
             connection.setAutoCommit(false);
-            for (String file : List.of("V34__create_simulated_qr_foundation.sql", "V35__create_simulated_qr_settlement.sql")) {
+            for (String file : List.of("V34__create_simulated_qr_foundation.sql", "V35__create_simulated_qr_settlement.sql", "V36__enforce_simulated_settlement_provenance.sql")) {
                 String script=Files.readString(Path.of("src/main/resources/db/migration/catalog/" + file));
                 for(String batch:script.split("(?im)^GO\\s*$")) if(!batch.isBlank()) statement.execute(batch);
             }
@@ -607,11 +607,125 @@ class DemoQrDatabaseIntegrationTest {
         assertThat(database.queryForObject("SELECT COUNT(*) FROM sys.tables WHERE name IN ('simulated_qr_session','simulated_payment_transaction')",Integer.class)).isZero();
         assertThat(fingerprint(database)).isEqualTo(before);
         var current=Flyway.configure().dataSource(source).locations("classpath:db/migration/identity","classpath:db/migration/catalog").cleanDisabled(true).load();
-        assertThat(current.migrate().migrationsExecuted).isEqualTo(2);
+        assertThat(current.migrate().migrationsExecuted).isEqualTo(3);
         current.validate();
         assertThat(current.migrate().migrationsExecuted).isZero();
         assertThat(database.queryForObject("SELECT settlement_type FROM dbo.payment WHERE payment_code='QR04-LEGACY'", String.class)).isNull();
         assertThat(database.queryForObject("SELECT COUNT(*) FROM dbo.vw_paid_payment WHERE payment_code='QR04-LEGACY'", Integer.class)).isEqualTo(1);
+    }
+
+    @Test void sqlProvenanceIntegrityMatrixEnforcesFailClosedProvenance() {
+        var created = create();
+        var settled = intent(created).getBody();
+        assertThat(settled).isNotNull();
+        assertThat(settled.state()).isEqualTo(DemoQrService.State.SETTLED);
+        long validTxId = settled.simulatedTransactionId();
+
+        // SQL-R4-01: SIMULATED + NULL provider + valid simulated FK -> REJECT
+        assertThatThrownBy(() -> jdbc.update("""
+                UPDATE dbo.payment
+                SET settlement_type = 'SIMULATED', settlement_provider = NULL, simulated_transaction_id = ?
+                WHERE id = ?
+                """, validTxId, paymentId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .hasMessageContaining("ck_payment_simulated_consistency");
+
+        // SQL-R4-02: SIMULATED + non-simulator provider + valid simulated FK -> REJECT
+        assertThatThrownBy(() -> jdbc.update("""
+                UPDATE dbo.payment
+                SET settlement_type = 'SIMULATED', settlement_provider = 'DESK_CASH', simulated_transaction_id = ?
+                WHERE id = ?
+                """, validTxId, paymentId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .hasMessageContaining("ck_payment_simulated_consistency");
+
+        // SQL-R4-03: SIMULATED + simulator provider + NULL FK -> REJECT
+        assertThatThrownBy(() -> jdbc.update("""
+                UPDATE dbo.payment
+                SET settlement_type = 'SIMULATED', settlement_provider = 'SPORTIFY_SIMULATOR', simulated_transaction_id = NULL
+                WHERE id = ?
+                """, paymentId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .hasMessageContaining("ck_payment_simulated_consistency");
+
+        // SQL-R4-04: SIMULATED + simulator provider + invalid FK -> REJECT (FK)
+        assertThatThrownBy(() -> jdbc.update("""
+                UPDATE dbo.payment
+                SET settlement_type = 'SIMULATED', settlement_provider = 'SPORTIFY_SIMULATOR', simulated_transaction_id = -999999
+                WHERE id = ?
+                """, paymentId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .hasMessageContaining("fk_payment_simulated_tx");
+
+        // SQL-R4-05: ACTUAL + simulator provider + NULL FK -> REJECT
+        assertThatThrownBy(() -> jdbc.update("""
+                UPDATE dbo.payment
+                SET settlement_type = 'ACTUAL', settlement_provider = 'SPORTIFY_SIMULATOR', simulated_transaction_id = NULL
+                WHERE id = ?
+                """, paymentId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .hasMessageContaining("ck_payment_simulated_consistency");
+
+        // SQL-R4-06: ACTUAL + any provider + non-NULL simulated FK -> REJECT
+        assertThatThrownBy(() -> jdbc.update("""
+                UPDATE dbo.payment
+                SET settlement_type = 'ACTUAL', settlement_provider = 'GATEWAY', simulated_transaction_id = ?
+                WHERE id = ?
+                """, validTxId, paymentId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .hasMessageContaining("ck_payment_simulated_consistency");
+
+        // SQL-R4-07: NULL legacy type + simulator provider -> REJECT
+        assertThatThrownBy(() -> jdbc.update("""
+                UPDATE dbo.payment
+                SET settlement_type = NULL, settlement_provider = 'SPORTIFY_SIMULATOR', simulated_transaction_id = NULL
+                WHERE id = ?
+                """, paymentId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .hasMessageContaining("ck_payment_simulated_consistency");
+
+        // SQL-R4-08: NULL legacy type + non-NULL simulated FK -> REJECT
+        assertThatThrownBy(() -> jdbc.update("""
+                UPDATE dbo.payment
+                SET settlement_type = NULL, settlement_provider = NULL, simulated_transaction_id = ?
+                WHERE id = ?
+                """, validTxId, paymentId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .hasMessageContaining("ck_payment_simulated_consistency");
+
+        // SQL-R4-09: VALID SIMULATED + simulator provider + valid FK -> ACCEPT
+        var simRow = jdbc.queryForMap("SELECT settlement_type, settlement_provider, simulated_transaction_id FROM dbo.payment WHERE id=?", settled.paymentId());
+        assertThat(simRow.get("settlement_type")).isEqualTo("SIMULATED");
+        assertThat(simRow.get("settlement_provider")).isEqualTo("SPORTIFY_SIMULATOR");
+        assertThat(simRow.get("simulated_transaction_id")).isEqualTo(validTxId);
+
+        // SQL-R4-10: VALID ACTUAL + approved provider + NULL simulated FK -> ACCEPT
+        long actualPayId = payment(ownerId);
+        jdbc.update("UPDATE dbo.payment SET settlement_type='ACTUAL', settlement_provider='GATEWAY', simulated_transaction_id=NULL WHERE id=?", actualPayId);
+        var actRow = jdbc.queryForMap("SELECT settlement_type, settlement_provider, simulated_transaction_id FROM dbo.payment WHERE id=?", actualPayId);
+        assertThat(actRow.get("settlement_type")).isEqualTo("ACTUAL");
+        assertThat(actRow.get("settlement_provider")).isEqualTo("GATEWAY");
+        assertThat(actRow.get("simulated_transaction_id")).isNull();
+
+        // SQL-R4-11: VALID historical NULL type + acceptable legacy fields -> ACCEPT
+        long legacyPayId = payment(ownerId);
+        jdbc.update("UPDATE dbo.payment SET settlement_type=NULL, settlement_provider=NULL, simulated_transaction_id=NULL WHERE id=?", legacyPayId);
+        var legRow = jdbc.queryForMap("SELECT settlement_type, settlement_provider, simulated_transaction_id FROM dbo.payment WHERE id=?", legacyPayId);
+        assertThat(legRow.get("settlement_type")).isNull();
+        assertThat(legRow.get("settlement_provider")).isNull();
+        assertThat(legRow.get("simulated_transaction_id")).isNull();
+
+        // SQL-R4-12: Existing valid QR simulated payment stays valid after migration -> ACCEPT
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.payment WHERE settlement_type='SIMULATED' AND settlement_provider='SPORTIFY_SIMULATOR' AND simulated_transaction_id IS NOT NULL", Integer.class)).isGreaterThanOrEqualTo(1);
+
+        // SQL-R4-13: Invalid UPDATE attempting SIMULATED -> ACTUAL without removing inconsistent fields -> REJECT
+        assertThatThrownBy(() -> jdbc.update("""
+                UPDATE dbo.payment
+                SET settlement_type = 'ACTUAL'
+                WHERE id = ?
+                """, settled.paymentId()))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .hasMessageContaining("ck_payment_simulated_consistency");
     }
 
     @AfterAll static void closeContainer() { if(container!=null)container.stop(); }

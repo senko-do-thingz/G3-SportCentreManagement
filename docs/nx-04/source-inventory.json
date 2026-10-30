@@ -297,6 +297,13 @@
       ],
       "drops": [],
       "sha256_lf": "4f200648db1a66854e7de152cf2b539a314427a7c415562beb1428832cc5b5b5"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V36__enforce_simulated_settlement_provenance.sql",
+      "version": 36,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "1250cf917a2b750417f7d19d7c8fe93481f828b9547ba2e1f30dcdc9da618715"
     }
   ],
   "create_occurrences": 66,

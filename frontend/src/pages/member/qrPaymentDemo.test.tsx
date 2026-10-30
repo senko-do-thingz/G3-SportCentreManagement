@@ -54,7 +54,7 @@ describe('QR-01 guarded demo route and payment integration', () => {
     expect(screen.getByText('DEMO - NOT AVAILABLE')).toBeVisible()
     expect(screen.queryByText('0123456789')).not.toBeInTheDocument()
     expect(screen.queryByText('SPORTIFY CENTER')).not.toBeInTheDocument()
-    expect(screen.getByText('DEMO ONLY - NO MONEY WILL BE TRANSFERRED')).toBeVisible()
+    expect(screen.getByText('Simulated QR Payment - No real money is transferred.')).toBeVisible()
     expect(document.querySelector('.payment-workspace-header .home-theme')).toBeInTheDocument()
     expect(document.querySelector('.payment-workspace-header select')).not.toBeInTheDocument()
     await user.click(screen.getByRole('link', { name: 'Back to Payment Summary' }))

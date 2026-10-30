@@ -56,7 +56,7 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
     renderApp(`/demo/qr/confirm#token=${token}`)
     expect(await screen.findByText('BIDV (demo)')).toBeVisible()
     expect(screen.getByText(state)).toBeVisible()
-    expect(screen.getByText('DEMO ONLY - NO MONEY TRANSFER')).toBeVisible()
+    expect(screen.getByText('Simulated QR Payment - No real money is transferred.')).toBeVisible()
     const brand = screen.getByRole('link', { name: 'Sportify Sports center home' })
     expect(brand).toBeVisible()
     expect(brand.closest('header')).toHaveClass('home-header', 'workspace-header')

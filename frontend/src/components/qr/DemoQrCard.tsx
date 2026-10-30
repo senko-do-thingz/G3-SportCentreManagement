@@ -42,13 +42,13 @@ function DemoQrCardContent({ payment }: { payment: Pick<Payment, 'id' | 'amount'
     try {
       if (!generated) throw new Error('Demo QR unavailable')
       await copyText(kind === 'reference' ? generated.reference : demoDetails(payment, bank), { allowFallback: false })
-      if (mounted.current && current === request.current) setFeedback({ kind: 'success', text: `${label} copied. Demo only - not a real payment.` })
+      if (mounted.current && current === request.current) setFeedback({ kind: 'success', text: `${label} copied. Simulated payment - no real money is transferred.` })
     } catch {
       if (mounted.current && current === request.current) setFeedback({ kind: 'error', text: 'Could not copy. Select and copy the demo text manually.' })
     }
   }
   if (!generated) return (
-    <Card title="QR Payment (Demo)" className="qr-demo-card" aria-label="Non-payable QR demo">
+    <Card title="Simulated QR Payment" className="qr-demo-card" aria-label="Non-payable QR demo">
       <Notice tone="danger">The demo QR could not be generated. No payment was made. Choose another payment or reopen this demo.</Notice>
     </Card>
   )
@@ -59,8 +59,8 @@ function DemoQrCardContent({ payment }: { payment: Pick<Payment, 'id' | 'amount'
     ? `M${index % qr.modules.size + quietZone} ${Math.floor(index / qr.modules.size) + quietZone}h1v1h-1z`
     : '').join('')
   return (
-    <Card title="QR Payment (Demo)" className="qr-demo-card" aria-label="Non-payable QR demo">
-      <p className="notice notice--warning">DEMO ONLY - NO MONEY WILL BE TRANSFERRED</p>
+    <Card title="Simulated QR Payment" className="qr-demo-card" aria-label="Non-payable QR demo">
+      <p className="notice notice--warning">Simulated QR Payment - No real money is transferred.</p>
       <p className="card__intro">A generic scanner can read demo text. This is not a bank payment QR and cannot be used to pay.</p>
       <Select label="Demo bank" options={DEMO_BANK_OPTIONS} value={bank}
         hint="The QR updates for the selected demo bank and authorized payment. It contains plain text only, cannot transfer money in a banking app, and does not confirm a payment."
@@ -78,7 +78,7 @@ function DemoQrCardContent({ payment }: { payment: Pick<Payment, 'id' | 'amount'
             <rect width={size} height={size} className="qr-demo-card__paper" />
             <path d={path} fill="currentColor" />
           </svg>
-          <figcaption>DEMO ONLY - NOT A REAL PAYMENT</figcaption>
+          <figcaption>Simulated QR - No real bank transfer</figcaption>
         </figure>
         <dl className="summary-list">
           <div><dt>Demo bank label</dt><dd>{DEMO_BANKS[bank].label}</dd></div>

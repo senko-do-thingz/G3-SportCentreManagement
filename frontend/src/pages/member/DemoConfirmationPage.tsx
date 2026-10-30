@@ -65,8 +65,8 @@ function DemoConfirmationContent() {
     if (location.hash) navigate({ pathname: location.pathname, search: '', hash: '' }, { replace: true, state: null })
   }, [location.hash, location.pathname, navigate])
   return <DemoConfirmationLayout>
-        <h1>QR Payment (Simulation)</h1>
-        <p className="notice notice--warning">DEMO ONLY - NO MONEY TRANSFER</p>
+        <h1>Simulated QR Payment</h1>
+        <p className="notice notice--warning">Simulated QR Payment - No real money is transferred.</p>
         <p>This is a time-limited simulation link, not a bank transfer request. Opening this link only previews the session; confirming finalizes your Sportify payment as Paid - Simulated and activates your purchased entitlement without moving real bank money.</p>
         {!token ? <Card title="Demo link unavailable"><p role="alert">The token is missing or malformed. Rescan the current desktop demo link. Reloading clears a link for your privacy.</p></Card>
           : status === 'anonymous' ? <DemoOwnerLogin />

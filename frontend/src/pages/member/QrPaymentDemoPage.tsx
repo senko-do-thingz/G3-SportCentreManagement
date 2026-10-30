@@ -25,7 +25,7 @@ export function QrPaymentDemoPage() {
   )
   if (id === null) return (
     <PaymentWorkspace>
-      <PaymentHero eyebrow="Member / Simulation" title="QR Payment (Simulation)" />
+      <PaymentHero eyebrow="Member / Simulation" title="Simulated QR Payment" />
       <EmptyState title="Payment not found" description="The demo payment link is not valid."
         action={<Link className={buttonClassName('secondary', 'md')} to={PAYMENT_PATHS.list}>My payments</Link>} />
     </PaymentWorkspace>
@@ -40,7 +40,7 @@ function QrPaymentDemoView({ paymentId }: { paymentId: number }) {
   const valid = payment.status === 'ready' && payment.data.id === paymentId && demoPaymentAmountAvailable(payment.data.amount)
   return (
     <PaymentWorkspace>
-      <PaymentHero eyebrow="Member / Simulation" title="QR Payment (Simulation)" description="Owner confirmation finalizes this payment as Paid - Simulated and activates the purchased entitlement. No real bank transfer or cash movement occurs." />
+      <PaymentHero eyebrow="Member / Simulation" title="Simulated QR Payment" description="Owner confirmation finalizes this payment as Paid - Simulated and activates the purchased entitlement. No real bank transfer or cash movement occurs." />
       {payment.status === 'loading' ? <Spinner label="Loading the payment demo" />
         : payment.status === 'error' ? <ErrorState title="We could not load the payment demo" error={payment.error} onRetry={reload} />
         : !valid ? <EmptyState title="Payment details unavailable" description="Open the correct payment again from My payments." />

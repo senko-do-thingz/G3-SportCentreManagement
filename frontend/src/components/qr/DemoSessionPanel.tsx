@@ -102,15 +102,15 @@ function DemoSessionPanelContent({ paymentId, bank, amount }: { paymentId: numbe
   const size = qr ? qr.modules.size + 8 : 0
   const path = qr ? Array.from(qr.modules.data, (dark, index) => dark
     ? `M${index % qr.modules.size + 4} ${Math.floor(index / qr.modules.size) + 4}h1v1h-1z` : '').join('') : ''
-  if (capability !== true) return <section className="demo-session-panel" aria-label="QR Payment (Simulation)">
-    <h3>QR Payment (Simulation)</h3>
+  if (capability !== true) return <section className="demo-session-panel" aria-label="Simulated QR Payment">
+    <h3>Simulated QR Payment</h3>
     <p aria-live="polite">{capability === null ? 'Checking simulation availability...' : 'Simulation is unavailable. The payment remains pending. Legacy links must be reissued when simulation becomes available.'}</p>
     {capability === false && <Button variant="secondary" onClick={() => { setCapability(null); setCapabilityAttempt((value) => value + 1) }}>Retry simulation availability</Button>}
   </section>
-  return <section className="demo-session-panel" aria-label="Demo confirmation session">
-    <h3>QR Payment (Simulation)</h3>
+  return <section className="demo-session-panel" aria-label="Simulated confirmation session">
+    <h3>Simulated QR Payment</h3>
     <p>The simulation session is a separate authenticated application link. It is not a bank transfer QR. Confirming as the authenticated payment owner finalizes this payment as Paid - Simulated and activates the purchased entitlement. No real bank transfer or cash movement occurs.</p>
-    <p className="notice notice--warning">DEMO ONLY - NO MONEY TRANSFER</p>
+    <p className="notice notice--warning">Simulated QR Payment - No real money is transferred.</p>
     <p>Changing the bank or leaving this page attempts to cancel an unconfirmed session. A disconnected session expires on the server.</p>
     {created && <DemoSessionSummary session={created.session} onDeadline={reachedDeadline} />}
     {deadline && created?.session.state === 'PENDING' && <p className="notice notice--warning">The displayed deadline has passed. Refresh Simulation Status to read the server result.</p>}
@@ -120,7 +120,7 @@ function DemoSessionPanelContent({ paymentId, bank, amount }: { paymentId: numbe
         <rect width={size} height={size} className="qr-demo-card__paper" />
         <path d={path} fill="currentColor" />
       </svg>
-      <figcaption>Demo Confirmation Link - time-limited simulation only</figcaption>
+      <figcaption>Simulated Confirmation Link - time-limited simulation only</figcaption>
     </figure>}
     {created?.session.state === 'PENDING' && !deadline && !qr && <p role="alert">The demo link QR could not be generated. Cancel this session and retry.</p>}
     <div className="demo-session-actions">
