@@ -1,0 +1,21 @@
+.recommendation-page { gap: var(--space-5); min-width: 0; }
+.recommendation-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: var(--space-4); margin-top: var(--space-4); }
+.recommendation-form, .recommendation-exercises { display: grid; gap: var(--space-4); }
+.recommendation-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.recommendation-consent { display: flex; align-items: flex-start; gap: var(--space-2); color: var(--color-text); }
+.recommendation-consent input { margin-top: .2rem; }
+.recommendation-muted { color: var(--color-text-muted); }
+.recommendation-facts { display: grid; gap: 0; margin: 0; }
+.recommendation-facts div, .recommendation-summary div { display: flex; justify-content: space-between; gap: var(--space-4); padding: var(--space-3) 0; border-bottom: 1px solid var(--color-border); }
+.recommendation-facts dt { color: var(--color-text-muted); }
+.recommendation-facts dd { margin: 0; font-weight: 700; text-align: right; }
+.recommendation-queue { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.recommendation-queue button { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); cursor: pointer; }
+.recommendation-queue span { display: grid; text-align: left; }
+.recommendation-queue small { color: var(--color-text-muted); }
+.recommendation-review-note { margin-bottom: var(--space-4); padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-surface-muted); color: var(--color-text-muted); }
+.recommendation-exercise { display: grid; grid-template-columns: 1.5fr .55fr 1fr 1.5fr auto; gap: var(--space-3); align-items: end; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.recommendation-actions { display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-4); }
+.recommendation-summary { margin: var(--space-4) 0; }
+@media (max-width: 900px) { .recommendation-grid { grid-template-columns: 1fr; } .recommendation-exercise { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .recommendation-fields, .recommendation-exercise { grid-template-columns: 1fr; } .recommendation-actions { align-items: stretch; flex-direction: column; } }

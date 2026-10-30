@@ -6,5 +6,7 @@ describe('Flow 4 role navigation', () => {
     expect(areaItems(MEMBER_AREA).find((item) => item.path === 'training')?.screens).toEqual(['F4-REQ-05', 'F4-REQ-06'])
     expect(areaItems(COACH_AREA).find((item) => item.path === 'training')?.screens).toEqual(['F4-REQ-01', 'F4-REQ-02', 'F4-REQ-03', 'F4-REQ-04'])
     expect(areaItems(RECEPTIONIST_AREA).find((item) => item.path === 'training-attendance')?.screens).toEqual(['F4-REQ-04', 'F4-REQ-07'])
+    expect(areaItems(COACH_AREA).find((item) => item.path === 'recommendations')?.screens).toEqual(['F5-REQ-01'])
+    expect(areaItems(MEMBER_AREA).some((item) => item.path === 'recommendations')).toBe(false)
   })
 })
