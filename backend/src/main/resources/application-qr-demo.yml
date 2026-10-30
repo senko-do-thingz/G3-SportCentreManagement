@@ -1,0 +1,9 @@
+# Independent opt-in. Never activate qr-demo on a production deployment.
+app:
+  demo:
+    qr:
+      enabled: ${QR_DEMO_ENABLED:false}
+      public-base-url: ${QR_DEMO_PUBLIC_BASE_URL:}
+      allowed-origins: ${QR_DEMO_ALLOWED_ORIGINS:}
+      allow-lan-http: ${QR_DEMO_ALLOW_LAN_HTTP:false}
+      lifetime-seconds: ${QR_DEMO_LIFETIME_SECONDS:300}

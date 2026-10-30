@@ -7,6 +7,7 @@ import { Button, Card, Notice, Select } from '../ui'
 import { demoQrPayload } from './demoQr'
 import { DEFAULT_DEMO_BANK, DEMO_ACCOUNT, DEMO_BANK_OPTIONS, DEMO_BANKS, demoDetails, demoPaymentAmountAvailable, demoReference, normalizeDemoBank, type DemoBank } from './demoDetails'
 import './demoQr.css'
+import { DemoSessionPanel } from './DemoSessionPanel'
 
 /** Only id/amount are consumed. Actual recipient, member and bank instruction fields are never used. */
 export function DemoQrCard({ payment }: { payment: Pick<Payment, 'id' | 'amount'> }) {
@@ -98,6 +99,7 @@ function DemoQrCardContent({ payment }: { payment: Pick<Payment, 'id' | 'amount'
       <div role="alert" aria-atomic="true">
         {feedback?.kind === 'error' && <Notice tone="danger" live="off">{feedback.text}</Notice>}
       </div>
+      <DemoSessionPanel paymentId={payment.id} bank={bank} amount={payment.amount} />
     </Card>
   )
 }
