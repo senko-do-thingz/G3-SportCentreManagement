@@ -34,6 +34,7 @@ import {
   type PasswordForm,
   type ProfileForm,
 } from './profileValidation'
+import { AssistantEntry } from './assistant/AssistantEntry'
 import { useMemberResource } from './useMemberResource'
 
 function loadProfile(signal: AbortSignal): Promise<UserProfile> {
@@ -96,6 +97,7 @@ export function MyProfilePage() {
         <ErrorState title="We could not load your profile" error={profile.error} onRetry={reload} />
       )}
       {profile.status === 'ready' && <ProfileContent key={profile.data.id} initial={profile.data} />}
+      <AssistantEntry />
     </div>
   )
 }
