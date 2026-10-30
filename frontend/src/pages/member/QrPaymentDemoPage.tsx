@@ -9,7 +9,6 @@ import { EmptyState, ErrorState } from '../../components/ui'
 import { Spinner } from '../../components/ui/Spinner'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { qrPaymentDemoEnabled } from '../../config/env'
-import { NotFoundPage } from '../public/NotFoundPage'
 import { parseIdParam, PAYMENT_PATHS } from './paymentsModel'
 import { useMemberResource } from './useMemberResource'
 
@@ -17,7 +16,13 @@ import { useMemberResource } from './useMemberResource'
 export function QrPaymentDemoPage() {
   const { paymentId } = useParams()
   const id = parseIdParam(paymentId)
-  if (!qrPaymentDemoEnabled()) return <NotFoundPage />
+  if (!qrPaymentDemoEnabled()) return (
+    <PaymentWorkspace>
+      <h1>Page not found</h1>
+      <p>The page you are looking for does not exist or has been moved.</p>
+      <Link to={PAYMENT_PATHS.list}>My payments</Link>
+    </PaymentWorkspace>
+  )
   if (id === null) return (
     <PaymentWorkspace>
       <PaymentHero eyebrow="Member / Demo" title="QR Payment (Demo)" />

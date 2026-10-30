@@ -1,0 +1,13 @@
+.demo-session-panel { border-top: 1px solid var(--h-border); margin-top: var(--space-6); padding-top: var(--space-6); }
+.demo-session-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-5); }
+.demo-session-actions .btn { min-height: 2.75rem; white-space: normal; }
+.demo-confirm-page { max-width: 56rem; margin-inline: auto; }
+.demo-confirm-page .card { min-width: 0; }
+.demo-confirm-header .home-account { margin-left: auto; }
+.demo-confirm-header .home-theme { width: 44px; height: 44px; }
+.demo-confirm-form { display: grid; gap: var(--space-4); max-width: 30rem; }
+.demo-confirm-page .summary-list dd { overflow-wrap: anywhere; }
+@media (max-width: 30rem) {
+  .demo-session-actions { flex-direction: column; }
+  .demo-session-actions .btn { width: 100%; }
+}
