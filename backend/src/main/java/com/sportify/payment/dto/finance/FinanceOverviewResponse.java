@@ -24,6 +24,33 @@ public record FinanceOverviewResponse(
         BigDecimal previousPaidRevenue,
         long previousPaidTransactions,
         BigDecimal revenueChange,
-        BigDecimal revenueChangePercent
+        BigDecimal revenueChangePercent,
+        BigDecimal simulatedRevenue,
+        long simulatedTransactions
 ) {
+    @com.fasterxml.jackson.annotation.JsonCreator
+    public FinanceOverviewResponse {
+    }
+    public FinanceOverviewResponse(
+            String month,
+            LocalDate from,
+            LocalDate to,
+            BigDecimal paidRevenue,
+            long paidTransactions,
+            BigDecimal averagePayment,
+            BigDecimal pendingAmount,
+            long pendingTransactions,
+            BigDecimal refundedAmount,
+            long refundedTransactions,
+            String previousMonth,
+            BigDecimal previousPaidRevenue,
+            long previousPaidTransactions,
+            BigDecimal revenueChange,
+            BigDecimal revenueChangePercent
+    ) {
+        this(month, from, to, paidRevenue, paidTransactions, averagePayment,
+                pendingAmount, pendingTransactions, refundedAmount, refundedTransactions,
+                previousMonth, previousPaidRevenue, previousPaidTransactions,
+                revenueChange, revenueChangePercent, BigDecimal.ZERO, 0L);
+    }
 }

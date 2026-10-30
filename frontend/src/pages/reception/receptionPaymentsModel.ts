@@ -83,8 +83,9 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
   REFUNDED: 'Refunded',
 }
 
-export function paymentStatusLabel(status: string | null | undefined): string {
+export function paymentStatusLabel(status: string | null | undefined, settlementType?: string | null): string {
   if (!status) return 'Unknown'
+  if (status === 'SUCCESS' && settlementType === 'SIMULATED') return 'Paid - Simulated'
   return PAYMENT_STATUS_LABELS[status] ?? humanizeCode(status)
 }
 
@@ -125,10 +126,10 @@ export function needsReview(row: { status: string; notes?: string | null }): boo
 }
 
 /** Badge of a queue row: Needs review for a pending payment with a mismatch, the payment status otherwise. */
-export function queueStatus(row: { status: string; notes?: string | null }): { code: string | null; label: string } {
+export function queueStatus(row: { status: string; notes?: string | null; settlementType?: string | null }): { code: string | null; label: string } {
   return needsReview(row)
     ? { code: 'NEEDS_REVIEW', label: 'Needs review' }
-    : { code: paymentStatusTone(row.status), label: paymentStatusLabel(row.status) }
+    : { code: paymentStatusTone(row.status), label: paymentStatusLabel(row.status, row.settlementType) }
 }
 
 /** Sum of the amounts of the PENDING rows on the page, for the "Amount due" stat card. */

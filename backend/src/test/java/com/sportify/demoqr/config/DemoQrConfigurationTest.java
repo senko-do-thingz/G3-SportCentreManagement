@@ -6,7 +6,9 @@ import com.sportify.demoqr.controller.DemoQrController;
 import com.sportify.demoqr.service.DemoPaymentReader;
 import com.sportify.demoqr.service.DemoQrService;
 import com.sportify.payment.repository.PaymentRepository;
+import com.sportify.payment.service.PaymentVerificationService;
 import com.sportify.demoqr.service.SqlQrStore;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -27,6 +29,7 @@ class DemoQrConfigurationTest {
                 .withBean(PaymentRepository.class, () -> mock(PaymentRepository.class))
                 .withBean(MemberCardRepository.class, () -> mock(MemberCardRepository.class))
                 .withBean(SportPackageRegistrationRepository.class, () -> mock(SportPackageRegistrationRepository.class))
+                .withBean(PaymentVerificationService.class, () -> mock(PaymentVerificationService.class))
                 .withPropertyValues("spring.profiles.active=" + profiles, "app.payment.simulator.enabled=" + enabled,
                         "app.payment.simulator.public-base-url=https://demo.example.test/", "app.payment.simulator.allowed-origins=https://demo.example.test")
                 .run(context -> {
@@ -35,6 +38,17 @@ class DemoQrConfigurationTest {
                         assertThat(context.getBeansOfType(type).size()).isEqualTo(present ? 1 : 0);
                     }
                 });
+    }
+
+    @Test
+    void demoPaymentReaderRequiresPaymentVerificationServiceFailClosed() {
+        assertThatThrownBy(() -> new DemoPaymentReader(
+                mock(PaymentRepository.class),
+                mock(MemberCardRepository.class),
+                mock(SportPackageRegistrationRepository.class),
+                null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("PaymentVerificationService is required");
     }
 
     @ParameterizedTest

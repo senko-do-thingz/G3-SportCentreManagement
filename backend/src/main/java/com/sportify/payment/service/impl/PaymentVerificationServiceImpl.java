@@ -220,6 +220,11 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
         details.put("itemCode", item.code());
         details.put("invoiceNumber", invoice.getInvoiceNumber());
         details.put("note", note);
+        if (payment.getSettlementType() != null) {
+            details.put("settlementType", payment.getSettlementType());
+            details.put("settlementProvider", payment.getSettlementProvider());
+            details.put("simulatedTransactionId", payment.getSimulatedTransactionId());
+        }
         auditService.record(AuditEvent.builder()
                 .actor(actor)
                 .action(AuditAction.PAYMENT_CONFIRMED)
@@ -419,6 +424,9 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
                 .discount(summary.discount())
                 .confirmedByUserId(confirmedBy != null ? confirmedBy.getId() : null)
                 .confirmedByName(confirmedBy != null ? confirmedBy.getFullName() : null)
+                .settlementType(payment.getSettlementType())
+                .settlementProvider(payment.getSettlementProvider())
+                .simulatedTransactionId(payment.getSimulatedTransactionId())
                 .invoiceId(invoice != null ? invoice.getId() : null)
                 .invoiceNumber(invoice != null ? invoice.getInvoiceNumber() : null)
                 .createdAt(payment.getCreatedAt())

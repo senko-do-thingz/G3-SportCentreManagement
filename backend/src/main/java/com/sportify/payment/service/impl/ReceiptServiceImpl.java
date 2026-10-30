@@ -148,6 +148,10 @@ public class ReceiptServiceImpl implements ReceiptService {
                 .createdAt(payment.getCreatedAt())
                 .memberId(member != null ? member.getId() : null)
                 .memberCode(member != null ? member.getMemberCode() : null)
+                .referenceCode(payment.getReferenceCode())
+                .settlementType(payment.getSettlementType())
+                .settlementProvider(payment.getSettlementProvider())
+                .simulatedTransactionId(payment.getSimulatedTransactionId())
                 .invoiceId(invoice != null ? invoice.getId() : null)
                 .invoiceNumber(invoice != null ? invoice.getInvoiceNumber() : null)
                 .build();
