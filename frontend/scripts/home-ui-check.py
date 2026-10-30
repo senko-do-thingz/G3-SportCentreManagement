@@ -469,7 +469,7 @@ def main():
             assert logo() == light
             for route in ['/login', '/register']:
                 page.goto(args.base + route, wait_until='load')
-                page.get_by_role('link', name='Sportify Center home').click()
+                page.get_by_role('link', name='Sportify Sports center home').click()
                 assert logo() == light
                 expect(page.locator('html')).to_have_attribute('data-theme', 'dark')
             return light

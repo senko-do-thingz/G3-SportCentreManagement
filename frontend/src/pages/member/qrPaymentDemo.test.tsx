@@ -137,8 +137,8 @@ describe('QR-01 guarded demo route and payment integration', () => {
     calls.length = 0
     renderApp('/member/payments/52/qr-demo')
     expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeVisible()
-    expect(screen.getAllByRole('link', { name: 'Sportify Center home' })).toHaveLength(1)
-    expect(screen.getByRole('link', { name: 'Sportify Center home' }).closest('header')).toHaveClass('workspace-header')
+    expect(screen.getAllByRole('link', { name: 'Sportify Sports center home' })).toHaveLength(1)
+    expect(screen.getByRole('link', { name: 'Sportify Sports center home' }).closest('header')).toHaveClass('workspace-header')
     expect(calls.some((call) => call.path.startsWith('/payments/'))).toBe(false)
   })
 
