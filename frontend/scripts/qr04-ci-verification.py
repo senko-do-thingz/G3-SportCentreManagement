@@ -183,7 +183,7 @@ try:
                                         serialization.PublicFormat.SubjectPublicKeyInfo)).digest()).decode()
     tls = ssl.create_default_context(cafile=str(args.private / 'tls-cert.pem'))
     first_pid = start_backend()
-    check('Fresh isolated SQL migrated to V35', sql('SELECT MAX(TRY_CONVERT(int,version)) FROM flyway_schema_history WHERE success=1;') == '35')
+    check('Fresh isolated SQL migrated through V36', sql('SELECT MAX(TRY_CONVERT(int,version)) FROM flyway_schema_history WHERE success=1;') == '36')
     encoded = bcrypt.hashpw(b'Qr04IsolatedTest2026!', bcrypt.gensalt(rounds=10)).decode()
     sql("SET XACT_ABORT ON; BEGIN TRANSACTION; INSERT user_account(email,password_hash,full_name,role_id,status,version) "
         f"VALUES ('owner@qr04.example.test','{encoded}','Synthetic QR04 CI Member',(SELECT id FROM role WHERE code='MEMBER'),'ACTIVE',0); "
