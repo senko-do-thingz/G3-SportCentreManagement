@@ -48,6 +48,12 @@ app:
     # Empty means no cross-origin request is accepted. Overridden per profile.
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
   payment:
+    simulator:
+      # QR-04 is intent-only. Also requires the isolated qr-simulator profile; QR-05 owns settlement.
+      enabled: ${PAYMENT_SIMULATOR_ENABLED:false}
+      public-base-url: ${PAYMENT_SIMULATOR_PUBLIC_BASE_URL:}
+      allowed-origins: ${PAYMENT_SIMULATOR_ALLOWED_ORIGINS:}
+      lifetime-seconds: ${PAYMENT_SIMULATOR_LIFETIME_SECONDS:300}
     bank-transfer:
       account-name: ${SPORTIFY_PAYMENT_ACCOUNT_NAME}
       account-number: ${SPORTIFY_PAYMENT_ACCOUNT_NUMBER}

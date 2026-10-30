@@ -17,6 +17,7 @@ import { PackageDetailPage } from '../pages/member/PackageDetailPage'
 import { PaymentStatusPage } from '../pages/member/PaymentStatusPage'
 import { PaymentSummaryPage } from '../pages/member/PaymentSummaryPage'
 const QrPaymentDemoPage = lazy(() => import('../pages/member/QrPaymentDemoPage').then((module) => ({ default: module.QrPaymentDemoPage })))
+const DemoConfirmationPage = lazy(() => import('../pages/member/DemoConfirmationPage').then((module) => ({ default: module.DemoConfirmationPage })))
 import { ReceiptPage } from '../pages/member/ReceiptPage'
 import { SportPackagesPage } from '../pages/member/SportPackagesPage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
@@ -172,6 +173,7 @@ function ApplicationRoutes() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/credits" element={<CreditsPage />} />
+        <Route path="/demo/qr/confirm" element={<Suspense fallback={<PageLoader label="Loading demo confirmation" />}><DemoConfirmationPage /></Suspense>} />
 
         <Route element={<PublicLayout />}>
           <Route path="/login" element={<LoginPage />} />
