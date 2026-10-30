@@ -20,7 +20,7 @@ Aligns the Reception front desk pages (Member Search, Register and Renew, Check-
 - **Failures / Errors / Skipped**: 0 / 0 / 0 (local); lint and tsc pass
 
 ## Visual evidence
-Before (main) and after screenshots at 390px, 768px, 1440px in light and dark: docs/tests/evidence/reception-ui/. Check-in has horizontal overflow at 390px both before and after (pre-existing).
+Before (main c6358dc) and after screenshots at 390px, 768px, 1440px in light and dark: docs/tests/evidence/reception-ui/. Check-in has horizontal overflow at 390px both before and after (pre-existing).
 
 ## Related Issue / Ticket
 - **Task ID**: not assigned (see Scope)

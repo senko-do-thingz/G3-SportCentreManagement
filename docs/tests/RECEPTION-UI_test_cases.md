@@ -1,7 +1,7 @@
 # Test Cases - Reception Front Desk UI aligned with the Manager workspace
 
 ## 1. Scope and provenance
-- Branch: feat/reception-ui-front-desk-manager-style, based on main 5224d58.
+- Branch: feat/reception-ui-front-desk-manager-style, based on main 5224d58, then merged with main c6358dc (ui-02 shared shell); screenshots retaken after the merge.
 - Task ID: no row in the task assignment spreadsheet covers this change. The author's assigned tasks NX-14 (Member training plans UI) and NX-15 (Member attendance and results UI) are Member screens and are not changed here. This is a UI consistency improvement outside those deliverables. Owner decision on a Task ID is pending.
 - Screen ID(s): none assigned in the spreadsheet. Existing in-code references: F1-13 (Member Search and Profile), F1-14 (Register and Renew), F1-15 (Check-in), task FE-05.
 - Routes: /reception, /reception/register, /reception/check-in.
@@ -28,7 +28,7 @@ Run from frontend/ on this branch, 2026-10-29.
 Full-suite run and CI URL for the latest commit: TO BE FILLED after the pipeline runs.
 
 ## 4. Visual evidence
-Chrome headless (puppeteer-core), Vite dev server, API responses mocked in the browser (receptionist profile and a 3-member search result; no backend). Before = main 5224d58. Images: docs/tests/evidence/reception-ui/, named `<before|after>_<member-search|register|check-in>_<390|768|1440>_<light|dark>.png`. 36 images plus report.json.
+Chrome headless (puppeteer-core), Vite dev server, API responses mocked in the browser (receptionist profile and a 3-member search result; no backend). Before = main c6358dc. Images: docs/tests/evidence/reception-ui/, named `<before|after>_<member-search|register|check-in>_<390|768|1440>_<light|dark>.png`. 36 images plus report.json.
 
 | Screen | Viewports and themes captured | Observed |
 |---|---|---|
