@@ -1,4 +1,4 @@
-# AI Audit Log: NX-14 and NX-15 Member training screens, NX-18 QA framework
+# AI Audit Log: NX-14 and NX-15 Member training screens
 
 ## Metadata
 - Date: 2026-10-29.
@@ -14,12 +14,12 @@
 - Added api/memberTrainingApi.ts, api/mock/memberTrainingPreview.ts, two Member pages, presentation helpers, CSS, menu items and routes; wired the preview fixture into the existing preview layer.
 - Added 16 tests; ran lint, tsc and the full vitest suite (1613 passed in the final run).
 - Captured screenshots with Chrome headless and mocked data; found and fixed an "Arrived -" display defect from review of the screenshots.
-- Wrote test cases, contract-gap questions for the backend owner, and the NX-18 QA plan. A temporary dev server was started and stopped; puppeteer-core was installed outside the repo.
+- Wrote test cases, contract-gap questions for the backend owner. The NX-18 QA plan and runner were moved to branch nx-18-flow4-cross-role-qa. A temporary dev server was started and stopped; puppeteer-core was installed outside the repo.
 
 ## Findings and decisions
 - The author chose to build the UI against a provisional contract with synthetic data rather than wait for backend sign-off. Routes and fields are therefore proposals, isolated in one file and flagged in code, tests and the PR.
 - Privacy by construction: parsers copy only allowlisted fields, the API has no member id parameter, and tests assert it.
-- NX-18 could only be a framework: Coach screens (NX-11 to NX-13) are not in the repository.
+- NX-18 is delivered on its own branch (nx-18-flow4-cross-role-qa); it was a framework only when this branch was written.
 
 ## Limitations
 - No real backend; contract compatibility unverified; no screen-reader pass; Chrome only. Contrast was measured with computed styles (all above 4.5:1).

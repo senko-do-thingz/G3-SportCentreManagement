@@ -3,15 +3,15 @@ Adds two read-only Member screens for Flow 4 and one menu entry (Training) with 
 - NX-14 My Training Plans (/member/training, menu entry Training): published plans with steps and the coach notes shared with the member.
 - NX-15 Attendance and Results (/member/training/history): own attendance history and per-session training results, with paging.
 
-Also adds the NX-18 QA plan and a screenshot helper (documentation only).
+The NX-18 cross-role QA lives on branch nx-18-flow4-cross-role-qa.
 
 ## IMPORTANT: provisional API contract
 The Flow 4 contract in docs/nx-03 is an unsigned draft ("IMPLEMENTATION_NOT_AUTHORIZED"), the Member read routes are TBD_AFTER_APPROVAL, and the backend tasks NX-07 to NX-10 are not in the repository. The screens use a proposed contract isolated in `frontend/src/api/memberTrainingApi.ts` and read synthetic data in manager-preview mode. Real backend compatibility is NOT verified. Questions for the backend owner: docs/pr/NX-14-NX-15_contract_gaps_for_BE.md. Please do not merge before the contract is signed, or merge knowing the routes are placeholders.
 
 ## Scope
-- Tasks: NX-14 (F4-REQ-06), NX-15 (F4-REQ-05), NX-18 framework only (the Coach and Reception screens it needs do not exist yet).
+- Tasks: NX-14 (F4-REQ-06), NX-15 (F4-REQ-05), NX-18 is delivered separately.
 - Screen IDs: none in the spreadsheet.
-- Details: docs/tests/NX-14-NX-15_test_cases.md, docs/tests/NX-18_flow4_qa_plan.md
+- Details: docs/tests/NX-14-NX-15_test_cases.md, docs/nx-18/NX-18_flow4_cross_role_QA_report.md (on branch nx-18-flow4-cross-role-qa)
 
 ## Pre-Merge Checklist
 - [ ] Tests executed and passed in CI (include GitHub Actions run link below)
