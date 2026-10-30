@@ -156,7 +156,7 @@ describe('public Home', () => {
     await user.click(screen.getByRole('button', { name: 'Log in' }))
     await screen.findByRole('heading', { name: 'Find Classes' })
     await waitFor(() => expect(calls.some((call) => call.path.startsWith('/sessions?') && call.path.includes('sportId=41') && call.path.includes('level=BEGINNER'))).toBe(true))
-    expect(screen.getByRole('link', { name: 'Sportify Center home' })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('link', { name: 'Sportify Sports center home' })).toHaveAttribute('href', '/')
   })
 
   it('uses real catalogue IDs for sport exploration and package links', async () => {
@@ -391,7 +391,7 @@ describe('public Home', () => {
     await user.click(await screen.findByRole('button', { name: 'Log out' }))
     await screen.findByRole('heading', { name: 'Welcome back' })
     expect(tokenStorage.hasSession()).toBe(false)
-    await user.click(screen.getByRole('link', { name: 'Sportify Center home' }))
+    await user.click(screen.getByRole('link', { name: 'Sportify Sports center home' }))
     expect(await screen.findByRole('heading', { name: /Find your sport/ })).toBeInTheDocument()
   })
 })

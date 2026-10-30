@@ -39,7 +39,7 @@ describe('payment workspace canonical Home header', () => {
     expect(localStorage.getItem('sportify.themePreference')).toBe('dark')
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
     expect(within(header).getByRole('button', { name: 'Switch to light mode' })).toBeInTheDocument()
-    await user.click(within(header).getByRole('link', { name: 'Sportify Center home' }))
+    await user.click(within(header).getByRole('link', { name: 'Sportify Sports center home' }))
     expect(await screen.findByRole('heading', { name: /Find your sport/i })).toBeInTheDocument()
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
   })
