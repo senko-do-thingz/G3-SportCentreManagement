@@ -8,7 +8,7 @@ export interface BrandProps {
 
 export function Brand({ to = '/', compact = false }: BrandProps) {
   return (
-    <Link to={to} className="brand" aria-label="Sportify Center home">
+    <Link to={to} className="brand" aria-label="Sportify Sports center home">
       <span className="brand__mark" aria-hidden="true">
         S
       </span>
