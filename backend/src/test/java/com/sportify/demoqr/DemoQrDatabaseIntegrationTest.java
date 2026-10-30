@@ -356,7 +356,11 @@ class DemoQrDatabaseIntegrationTest {
     @Test void injectedDownstreamFailureRollsBackSimulatedTransactionAndPayment() throws Exception {
         var before = fingerprint(jdbc);
         var created = create();
-        var failingReader = new DemoPaymentReader(null, null, null) {
+        var failingReader = new DemoPaymentReader(
+                org.mockito.Mockito.mock(com.sportify.payment.repository.PaymentRepository.class),
+                org.mockito.Mockito.mock(com.sportify.catalog.repository.MemberCardRepository.class),
+                org.mockito.Mockito.mock(com.sportify.catalog.repository.SportPackageRegistrationRepository.class),
+                org.mockito.Mockito.mock(com.sportify.payment.service.PaymentVerificationService.class)) {
             @Override
             public com.sportify.payment.entity.Payment requireOwner(long id, UserAccount actor) {
                 return reader.requireOwner(id, actor);
@@ -375,6 +379,72 @@ class DemoQrDatabaseIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM simulated_payment_transaction WHERE payment_id=?", Integer.class, paymentId)).isZero();
         assertThat(state(created.session().id())).isEqualTo("PENDING");
         assertThat(fingerprint(jdbc)).isEqualTo(before);
+    }
+
+    @Test void invoiceOrAuditCreationFailureRollsBackCompleteSettlementInSql() throws Exception {
+        var before = fingerprint(jdbc);
+        var created = create();
+
+        // 1. Invoice creation failure inside PaymentVerificationService.recordPaymentConfirmed
+        // Pre-insert a conflicting invoice row so recordPaymentConfirmed throws ConflictException
+        // AFTER simulated_payment_transaction insert, MemberCard activation, and Payment SUCCESS flush.
+        String conflictInvNo = "INV-CONFLICT-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        jdbc.update("""
+                INSERT INTO dbo.invoice(invoice_number, payment_id, member_id, subtotal_amount, discount_amount,
+                    tax_amount, total_amount, status, issued_at)
+                VALUES (?, ?, ?, 810000, 0, 0, 810000, 'PAID', SYSUTCDATETIME())
+                """, conflictInvNo, paymentId, ownerId);
+        try {
+            assertThatThrownBy(() -> service.confirm(token(created), owner))
+                    .isInstanceOf(com.sportify.core.exception.ConflictException.class);
+        } finally {
+            jdbc.update("DELETE FROM dbo.invoice WHERE invoice_number=?", conflictInvNo);
+        }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.simulated_payment_transaction WHERE payment_id=?", Integer.class, paymentId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT payment_status FROM dbo.payment WHERE id=?", String.class, paymentId)).isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject("SELECT settlement_type FROM dbo.payment WHERE id=?", String.class, paymentId)).isNull();
+        assertThat(jdbc.queryForObject("SELECT status FROM dbo.member_card WHERE payment_id=?", String.class, paymentId)).isEqualTo("PENDING_PAYMENT");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.activity_log WHERE entity_type='PAYMENT' AND entity_id=? AND action='PAYMENT_CONFIRMED'", Integer.class, paymentId)).isZero();
+        assertThat(state(created.session().id())).isEqualTo("PENDING");
+        assertThat(fingerprint(jdbc)).isEqualTo(before);
+
+        // 2. Audit log (dbo.activity_log) creation failure inside PaymentVerificationService.recordPaymentConfirmed
+        // Temporary SQL trigger rejects PAYMENT_CONFIRMED activity_log insert AFTER simulated_payment_transaction,
+        // MemberCard activation, Payment SUCCESS flush, and Invoice + InvoiceLine inserts have executed.
+        jdbc.execute("""
+                CREATE OR ALTER TRIGGER dbo.tr_test_fail_payment_confirmed_audit
+                ON dbo.activity_log
+                AFTER INSERT
+                AS
+                BEGIN
+                    SET NOCOUNT ON;
+                    IF EXISTS (SELECT 1 FROM inserted WHERE entity_type = 'PAYMENT' AND action = 'PAYMENT_CONFIRMED')
+                        THROW 51099, 'Injected audit log failure during simulated settlement.', 1;
+                END
+                """);
+        try {
+            assertThatThrownBy(() -> service.confirm(token(created), owner))
+                    .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        } finally {
+            jdbc.execute("DROP TRIGGER IF EXISTS dbo.tr_test_fail_payment_confirmed_audit");
+        }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.simulated_payment_transaction WHERE payment_id=?", Integer.class, paymentId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.invoice WHERE payment_id=?", Integer.class, paymentId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT payment_status FROM dbo.payment WHERE id=?", String.class, paymentId)).isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject("SELECT settlement_type FROM dbo.payment WHERE id=?", String.class, paymentId)).isNull();
+        assertThat(jdbc.queryForObject("SELECT status FROM dbo.member_card WHERE payment_id=?", String.class, paymentId)).isEqualTo("PENDING_PAYMENT");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.activity_log WHERE entity_type='PAYMENT' AND entity_id=? AND action='PAYMENT_CONFIRMED'", Integer.class, paymentId)).isZero();
+        assertThat(state(created.session().id())).isEqualTo("PENDING");
+        assertThat(fingerprint(jdbc)).isEqualTo(before);
+
+        // 3. After removing the injected faults, the same session confirms cleanly and atomically
+        var settled = service.confirm(token(created), owner);
+        assertThat(settled.state()).isEqualTo(DemoQrService.State.SETTLED);
+        assertThat(settled.invoiceId()).isNotNull();
+        assertThat(settled.invoiceNumber()).isNotBlank();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.simulated_payment_transaction WHERE payment_id=?", Integer.class, paymentId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.invoice WHERE payment_id=?", Integer.class, paymentId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.activity_log WHERE entity_type='PAYMENT' AND entity_id=? AND action='PAYMENT_CONFIRMED'", Integer.class, paymentId)).isEqualTo(1);
     }
 
     @Test void simulatedSettlementBlocksCashCaptureRefundsAndMutationInSql() {

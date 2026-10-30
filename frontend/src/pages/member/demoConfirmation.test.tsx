@@ -35,7 +35,7 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
     renderApp(`/demo/qr/confirm#token=${token}`)
     expect(await screen.findByRole('alert')).toHaveTextContent('simulation may be disabled')
     expect(calls.some((call) => call.path.startsWith(base))).toBe(false)
-    expect(screen.queryByRole('button', { name: 'Record confirmation intent' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Confirm simulated payment' })).not.toBeInTheDocument()
   })
 
   it.each(['', '#token=', '#token=52', `#token=${token}&owner=2`, '#token=<script>', `#other=${token}`])('rejects missing or malformed fragments: %s', (hash) => {
@@ -47,7 +47,7 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
     renderApp('/demo/qr/confirm')
     expect(await screen.findByRole('heading', { name: 'Demo link unavailable' })).toBeVisible()
     expect(screen.getByRole('link', { name: 'Sportify Sports center home' }).closest('header')).toHaveClass('workspace-header')
-    expect(screen.queryByRole('button', { name: 'Record confirmation intent' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Confirm simulated payment' })).not.toBeInTheDocument()
     expect(calls.every((call) => call.path === '/users/me')).toBe(true)
   })
 
@@ -63,13 +63,14 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
     expect(brand).toHaveTextContent('Sportify')
     expect(brand).not.toHaveTextContent('Sports center')
     expect(calls.some((call) => call.path === `${base}/confirm-intent`)).toBe(false)
-    expect(screen.queryByRole('button', { name: 'Record confirmation intent' }) !== null).toBe(state === 'PENDING')
+    expect(screen.queryByRole('button', { name: 'Confirm simulated payment' }) !== null).toBe(state === 'PENDING')
+    expect(screen.queryByText(/Final simulated-payment consent:/) !== null).toBe(state === 'PENDING')
     expect(document.querySelector('meta[name="referrer"]')).toHaveAttribute('content', 'no-referrer')
     expect(localStorage.getItem('token')).toBeNull()
     expect(sessionStorage.getItem('token')).toBeNull()
   })
 
-  it('confirms only on explicit intent, settles in simulation and guards a second tap while the request is pending', async () => {
+  it('confirms only on explicit consent, settles in simulation and guards a second tap while the request is pending', async () => {
     let complete!: (response: Response) => void
     const { calls } = installFakeFetch((call) => {
       if (call.path === '/users/me') return json(200, MEMBER)
@@ -78,7 +79,8 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
     })
     const user = userEvent.setup()
     renderApp(`/demo/qr/confirm#token=${token}`)
-    const button = await screen.findByRole('button', { name: 'Record confirmation intent' })
+    const button = await screen.findByRole('button', { name: 'Confirm simulated payment' })
+    expect(screen.getByText(/Final simulated-payment consent: Confirming finalizes this payment as Paid - Simulated \(SUCCESS\)/)).toBeVisible()
     await user.dblClick(button)
     expect(calls.filter((call) => call.path === `${base}/confirm-intent`)).toHaveLength(1)
     complete(json(200, {
@@ -119,7 +121,7 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
     renderApp(`/demo/qr/confirm#token=${token}`)
     expect(await screen.findByText(/Demo link unavailable. It may be/)).toBeVisible()
     expect(screen.queryByText('810.000 VND')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Record confirmation intent' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Confirm simulated payment' })).not.toBeInTheDocument()
   })
 
   it('does not announce success after a confirm error and requires a fresh server read', async () => {
@@ -127,10 +129,10 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
       : call.path.endsWith('/confirm-intent') ? backendError(409, 'Expired') : json(200, snapshot))
     const user = userEvent.setup()
     renderApp(`/demo/qr/confirm#token=${token}`)
-    await user.click(await screen.findByRole('button', { name: 'Record confirmation intent' }))
+    await user.click(await screen.findByRole('button', { name: 'Confirm simulated payment' }))
     expect(await screen.findByText(/Could not complete the demo action/)).toBeVisible()
-    expect(screen.queryByText(/Confirmation intent received/)).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Record confirmation intent' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Paid - Simulated\. Your payment was settled in simulation only/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Confirm simulated payment' })).not.toBeInTheDocument()
   })
 
   it('retains the fragment only in memory through inline owner sign-in', async () => {
@@ -185,7 +187,7 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
     renderApp(`/demo/qr/confirm#token=${token}`)
     expect(await screen.findByRole('heading', { name: /Page not found/ })).toBeVisible()
     expect(screen.getByRole('link', { name: 'Sportify Sports center home' }).closest('header')).toHaveClass('home-header', 'workspace-header')
-    expect(screen.queryByRole('button', { name: 'Record confirmation intent' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Confirm simulated payment' })).not.toBeInTheDocument()
     expect(calls.every((call) => call.path === '/users/me')).toBe(true)
   })
 
@@ -193,6 +195,6 @@ describe('QR-04 owner-authorized mobile confirmation', () => {
     vi.stubEnv('VITE_QR_PAYMENT_DEMO', ''); vi.stubEnv('DEV', false); vi.stubEnv('MODE', 'production')
     installFakeFetch((call) => call.path === '/users/me' ? json(200, MEMBER) : json(200, snapshot))
     renderApp(`/demo/qr/confirm#token=${token}`)
-    expect(await screen.findByRole('button', { name: 'Record confirmation intent' })).toBeVisible()
+    expect(await screen.findByRole('button', { name: 'Confirm simulated payment' })).toBeVisible()
   })
 })

@@ -67,7 +67,7 @@ function DemoConfirmationContent() {
   return <DemoConfirmationLayout>
         <h1>QR Payment (Simulation)</h1>
         <p className="notice notice--warning">DEMO ONLY - NO MONEY TRANSFER</p>
-        <p>This is a time-limited simulation link, not a payment request. Opening it never confirms anything.</p>
+        <p>This is a time-limited simulation link, not a bank transfer request. Opening this link only previews the session; confirming finalizes your Sportify payment as Paid - Simulated and activates your purchased entitlement without moving real bank money.</p>
         {!token ? <Card title="Demo link unavailable"><p role="alert">The token is missing or malformed. Rescan the current desktop demo link. Reloading clears a link for your privacy.</p></Card>
           : status === 'anonymous' ? <DemoOwnerLogin />
           : status === 'loading' ? <p role="status">Restoring your session...</p>
@@ -112,7 +112,7 @@ function DemoSessionControls({ token }: { token: string }) {
       if (current === generation.current) { setSession(result); setDeadline(false); summary.current?.focus() }
     } catch {
       if (current === generation.current) {
-        setError('Could not complete the demo action. Refresh the demo status before retrying. The real payment remains unchanged.')
+        setError('Could not complete the demo action. Refresh the demo status before retrying. No simulated settlement was recorded.')
         // A timeout or conflict is not success. Hide stale pending controls until the owner refreshes.
         setSession(null)
       }
@@ -125,10 +125,11 @@ function DemoSessionControls({ token }: { token: string }) {
     <div ref={summary} tabIndex={-1} role="region" aria-label="Demo session result">{session && <DemoSessionSummary session={session} onDeadline={reachedDeadline} />}</div>
     {busy && <p role="status">Loading demo session...</p>}
     {deadline && session?.state === 'PENDING' && <p>The displayed deadline has passed. Refresh the server status.</p>}
+    {session?.state === 'PENDING' && !deadline && <p className="notice notice--info">Final simulated-payment consent: Confirming finalizes this payment as Paid - Simulated (SUCCESS), issues a simulated receipt, and activates your purchased card or package. No real bank transfer or cash collection occurs.</p>}
     {error && <p role="alert" className="notice notice--danger">{error}</p>}
     <div className="demo-session-actions">
       {session?.state === 'PENDING' && !deadline && <>
-        <Button disabled={busy} onClick={() => void action('confirm')}>Record confirmation intent</Button>
+        <Button disabled={busy} onClick={() => void action('confirm')}>Confirm simulated payment</Button>
         <Button variant="secondary" disabled={busy} onClick={() => void action('cancel')}>Cancel Simulation Session</Button>
       </>}
       <Button variant="secondary" disabled={busy} onClick={() => void action('refresh')}>Refresh Simulation Status</Button>

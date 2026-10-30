@@ -48,6 +48,8 @@ describe('QR-01 guarded demo route and payment integration', () => {
     expect(screen.getByRole('radio', { name: 'MoMo' })).toBeDisabled()
     await user.click(demo)
     expect(await screen.findByRole('img', { name: /Non-payable demo QR for payment 52/ })).toBeVisible()
+    expect(screen.getByText(/Owner confirmation finalizes this payment as Paid - Simulated and activates the purchased entitlement\./)).toBeVisible()
+    expect(screen.queryByText(/Your actual payment is not changed/i)).not.toBeInTheDocument()
     expect(screen.getByText('810.000 VND')).toBeVisible()
     expect(screen.getByText('DEMO - NOT AVAILABLE')).toBeVisible()
     expect(screen.queryByText('0123456789')).not.toBeInTheDocument()

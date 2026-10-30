@@ -71,7 +71,7 @@ function DemoSessionPanelContent({ paymentId, bank, amount }: { paymentId: numbe
         if (mounted.current) { setCreated({ ...created, session }); setDeadline(false) }
       }
     } catch {
-      if (mounted.current) setError('Could not update the demo session. Check your connection and demo configuration, then refresh or retry. Reload the payment if its details changed. The real payment remains unchanged.')
+      if (mounted.current) setError('Could not update the demo session. Check your connection and demo configuration, then refresh or retry. Reload the payment if its details changed. No simulated settlement was recorded.')
     } finally {
       sending.current = false
       if (mounted.current) setBusy(false)
@@ -85,7 +85,7 @@ function DemoSessionPanelContent({ paymentId, bank, amount }: { paymentId: numbe
       await copyText(created.confirmationUrl, { allowFallback: false })
       if (mounted.current && feedbackRequest.current === current) setFeedback('Time-limited demo link copied. Share only with the payment owner.')
     } catch {
-      if (mounted.current && feedbackRequest.current === current) setError('Could not copy the demo link. Use Review confirmation intent instead.')
+      if (mounted.current && feedbackRequest.current === current) setError('Could not copy the demo link. Use Open simulation confirmation instead.')
     }
   }
   const size = qr ? qr.modules.size + 8 : 0
@@ -98,7 +98,7 @@ function DemoSessionPanelContent({ paymentId, bank, amount }: { paymentId: numbe
   </section>
   return <section className="demo-session-panel" aria-label="Demo confirmation session">
     <h3>QR Payment (Simulation)</h3>
-    <p>The simulation session is a separate authenticated application link. It is not a bank transfer QR. Only the authenticated payment owner can confirm simulated settlement. No real bank transfer or cash movement occurs.</p>
+    <p>The simulation session is a separate authenticated application link. It is not a bank transfer QR. Confirming as the authenticated payment owner finalizes this payment as Paid - Simulated and activates the purchased entitlement. No real bank transfer or cash movement occurs.</p>
     <p className="notice notice--warning">DEMO ONLY - NO MONEY TRANSFER</p>
     <p>Changing the bank or leaving this page attempts to cancel an unconfirmed session. A disconnected session expires on the server.</p>
     {created && <DemoSessionSummary session={created.session} onDeadline={reachedDeadline} />}
@@ -117,7 +117,7 @@ function DemoSessionPanelContent({ paymentId, bank, amount }: { paymentId: numbe
       {created && <Button variant="secondary" disabled={busy} onClick={() => void operation('refresh')}>Refresh Simulation Status</Button>}
       {created?.session.state === 'PENDING' && <Button variant="secondary" disabled={busy} onClick={() => void operation('cancel')}>Cancel Simulation Session</Button>}
       {created && qr && <>
-        <a className="btn btn--secondary" href={created.confirmationUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Review confirmation intent</a>
+        <a className="btn btn--secondary" href={created.confirmationUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Open simulation confirmation</a>
         <Button variant="secondary" disabled={busy} onClick={() => void copy()}>Copy simulation session link</Button>
       </>}
     </div>

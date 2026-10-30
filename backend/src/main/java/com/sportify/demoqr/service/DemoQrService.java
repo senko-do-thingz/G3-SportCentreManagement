@@ -131,7 +131,11 @@ public class DemoQrService {
                 return new Outcome<>(null, stateError(session));
             }
             var tx = store.insertSettlement(session);
-            reader.settle(session.paymentId(), actor, session.bank().name(), tx.id(), tx.transactionCode());
+            var settlement = reader.settle(session.paymentId(), actor, session.bank().name(), tx.id(), tx.transactionCode());
+            if (settlement == null || settlement.invoiceId() == null
+                    || settlement.invoiceNumber() == null || settlement.invoiceNumber().isBlank()) {
+                throw new IllegalStateException("Simulated settlement requires a persisted PAID invoice and audit record");
+            }
             session = store.settle(session);
             return session.state() == State.SETTLED
                     ? new Outcome<>(view(session), null) : new Outcome<>(null, stateError(session));

@@ -28,6 +28,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 /**
  * Payment domain boundary for the QR payment simulator: locks Payment first, validates ownership and item eligibility,
@@ -41,27 +42,29 @@ public class DemoPaymentReader {
     private final PaymentRepository payments;
     private final MemberCardRepository cards;
     private final SportPackageRegistrationRepository registrations;
-    private final ObjectProvider<PaymentVerificationService> verificationService;
+    private final PaymentVerificationService verificationService;
     private final ObjectProvider<Clock> clock;
     private final ObjectProvider<EntityManager> entityManager;
 
     public DemoPaymentReader(PaymentRepository payments,
                              MemberCardRepository cards,
-                             SportPackageRegistrationRepository registrations) {
-        this(payments, cards, registrations, null, null, null);
+                             SportPackageRegistrationRepository registrations,
+                             PaymentVerificationService verificationService) {
+        this(payments, cards, registrations, verificationService, null, null);
     }
 
     @Autowired
     public DemoPaymentReader(PaymentRepository payments,
                              MemberCardRepository cards,
                              SportPackageRegistrationRepository registrations,
-                             ObjectProvider<PaymentVerificationService> verificationService,
+                             PaymentVerificationService verificationService,
                              ObjectProvider<Clock> clock,
                              ObjectProvider<EntityManager> entityManager) {
-        this.payments = payments;
-        this.cards = cards;
-        this.registrations = registrations;
-        this.verificationService = verificationService;
+        this.payments = Objects.requireNonNull(payments, "PaymentRepository is required");
+        this.cards = Objects.requireNonNull(cards, "MemberCardRepository is required");
+        this.registrations = Objects.requireNonNull(registrations, "SportPackageRegistrationRepository is required");
+        this.verificationService = Objects.requireNonNull(
+                verificationService, "PaymentVerificationService is required for simulated QR settlement");
         this.clock = clock;
         this.entityManager = entityManager;
     }
@@ -191,14 +194,16 @@ public class DemoPaymentReader {
         payment.setNotes(PaymentNotes.append(payment.getNotes(), simNote));
         payments.saveAndFlush(payment);
 
-        PaymentVerificationService verifier = verificationService != null ? verificationService.getIfAvailable() : null;
-        if (verifier != null) {
-            Invoice invoice = verifier.recordPaymentConfirmed(payment.getId(), actor,
-                    "Simulated QR settlement " + transactionCode + " (" + bankCode + ")");
-            payments.flush();
-            return new SettlementOutcome(invoice != null ? invoice.getId() : null,
-                    invoice != null ? invoice.getInvoiceNumber() : null);
+        Invoice invoice = verificationService.recordPaymentConfirmed(payment.getId(), actor,
+                "Simulated QR settlement " + transactionCode + " (" + bankCode + ")");
+        if (invoice == null || invoice.getId() == null
+                || invoice.getInvoiceNumber() == null || invoice.getInvoiceNumber().isBlank()) {
+            throw new IllegalStateException("Simulated settlement requires a persisted PAID invoice and audit record");
         }
-        return new SettlementOutcome(null, null);
+        payments.flush();
+        if (em != null) {
+            em.flush();
+        }
+        return new SettlementOutcome(invoice.getId(), invoice.getInvoiceNumber());
     }
 }

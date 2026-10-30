@@ -118,6 +118,30 @@ class DemoQrServiceTest {
         verify(store).settle(pending);
     }
 
+    @Test void confirmFailsClosedWhenSettlementOutcomeLacksPersistedInvoice() {
+        String token = "d".repeat(43);
+        UUID sessionId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-10-30T06:00:00Z");
+        var pending = new SqlQrStore.Session(sessionId, 52L, 2L, new BigDecimal("810000.00"), "VND",
+                DemoQrService.Bank.BIDV_DEMO, now.minusSeconds(30), now.plusSeconds(270),
+                DemoQrService.State.PENDING, 0L);
+        var tx = new SqlQrStore.SimulatedTx(901L, "SIM-QR-52-ABCDEF123456", now);
+
+        when(store.findVerifier(DemoQrService.digest(token), 2L)).thenReturn(pending);
+        when(store.lock(sessionId, 2L)).thenReturn(pending);
+        when(store.expire(pending)).thenReturn(pending);
+        when(reader.read(52L, owner)).thenReturn(new DemoPaymentReader.Snapshot(52L, new BigDecimal("810000.00"), "VND"));
+        when(store.isBeforeDeadline(sessionId)).thenReturn(true);
+        when(store.insertSettlement(pending)).thenReturn(tx);
+        when(reader.settle(52L, owner, "BIDV_DEMO", 901L, "SIM-QR-52-ABCDEF123456"))
+                .thenReturn(new DemoPaymentReader.SettlementOutcome(null, null));
+
+        assertThatThrownBy(() -> service.confirm(token, owner))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("persisted PAID invoice");
+        verify(store, never()).settle(any());
+    }
+
     @Test void confirmOnAlreadySettledSessionIsIdempotentWithoutDuplicateWrites() {
         String token = "c".repeat(43);
         UUID sessionId = UUID.randomUUID();

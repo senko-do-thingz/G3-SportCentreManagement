@@ -45,7 +45,7 @@ describe('QR-04 desktop session lifecycle', () => {
     await user.click(await screen.findByRole('button', { name: 'Start simulation session' }))
     expect(await screen.findByRole('alert')).toBeVisible()
     expect(demoQrApi.cancel).toHaveBeenCalledWith(response().session.id)
-    expect(screen.queryByRole('link', { name: 'Review confirmation intent' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Open simulation confirmation' })).not.toBeInTheDocument()
   })
 
   it.each(Object.keys(DEMO_BANKS) as DemoBank[])('explicitly starts a separately labeled link for %s', async (bank) => {
@@ -56,7 +56,7 @@ describe('QR-04 desktop session lifecycle', () => {
     await user.click(await screen.findByRole('button', { name: 'Start simulation session' }))
     expect(create).toHaveBeenCalledWith(52, DEMO_BANKS[bank].code)
     expect(await screen.findByRole('img', { name: `Scan to review simulation, ${DEMO_BANKS[bank].label}, payment 52` })).toBeVisible()
-    expect(screen.getByRole('link', { name: 'Review confirmation intent' })).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(screen.getByRole('link', { name: 'Open simulation confirmation' })).toHaveAttribute('rel', 'noopener noreferrer')
   })
 
   it('bank/payment transitions hide old links immediately and revoke their sessions', async () => {
@@ -69,7 +69,7 @@ describe('QR-04 desktop session lifecycle', () => {
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
     expect(demoQrApi.cancel).toHaveBeenCalledWith(response().session.id)
     view.rerender(<DemoSessionPanel amount="810000.00" paymentId={53} bank="bidv" />)
-    expect(screen.queryByRole('link', { name: 'Review confirmation intent' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Open simulation confirmation' })).not.toBeInTheDocument()
   })
 
   it('revokes a late create result when its owning view has unmounted', async () => {
@@ -110,7 +110,7 @@ describe('QR-04 desktop session lifecycle', () => {
     expect(demoQrApi.cancel).not.toHaveBeenCalled()
   })
 
-  it('manual refresh reads CONFIRMED without changing the financial payment', async () => {
+  it('manual refresh reads AUTHORIZED_PENDING_SETTLEMENT without inventing settled state', async () => {
     vi.spyOn(demoQrApi, 'create').mockResolvedValue(response())
     const get = vi.spyOn(demoQrApi, 'get').mockResolvedValue({ ...response().session, state: 'AUTHORIZED_PENDING_SETTLEMENT' })
     const user = userEvent.setup()
@@ -118,7 +118,7 @@ describe('QR-04 desktop session lifecycle', () => {
     await user.click(await screen.findByRole('button', { name: 'Start simulation session' }))
     await user.click(await screen.findByRole('button', { name: 'Refresh Simulation Status' }))
     expect(get).toHaveBeenCalledWith(response().session.id)
-    expect(await screen.findByText('Confirmation intent received; payment not yet completed.')).toBeVisible()
+    expect(await screen.findByText('Legacy simulation state; refresh simulation status.')).toBeVisible()
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
 
@@ -130,7 +130,7 @@ describe('QR-04 desktop session lifecycle', () => {
     await user.click(await screen.findByRole('button', { name: 'Start simulation session' }))
     await user.click(await screen.findByRole('button', { name: 'Refresh Simulation Status' }))
     expect(await screen.findByText(state)).toBeVisible()
-    expect(screen.queryByRole('link', { name: 'Review confirmation intent' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Open simulation confirmation' })).not.toBeInTheDocument()
   })
 
   it('reports creation failure without inventing a usable QR', async () => {

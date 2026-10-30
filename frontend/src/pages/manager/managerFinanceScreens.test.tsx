@@ -587,4 +587,29 @@ describe('FE-13 Round 2 action safety', () => {
       expect(document.querySelector('a[download]')).toBeNull()
     },
   )
+
+  it('distinguishes SIMULATED and legacy UNKNOWN provenance rows in Manager Transactions', async () => {
+    tokenStorage.startSession({ accessToken: 'finance-manager-token', refreshToken: 'finance-refresh-token' })
+    installFakeFetch((call) => {
+      if (call.path === '/users/me') return json(200, MANAGER)
+      if (call.path.startsWith('/manager/finance/transactions')) {
+        return json(200, {
+          content: [
+            { ...transactionDto, id: 41, code: 'PAY-1041', settlementType: 'SIMULATED', settlementProvider: 'SPORTIFY_SIMULATOR' },
+            { ...transactionDto, id: 42, code: 'PAY-1042', invoiceNumber: 'INV-1042', settlementType: 'UNKNOWN', settlementProvider: null },
+          ],
+          page: 0,
+          size: 20,
+          totalElements: 2,
+          totalPages: 1,
+        })
+      }
+      if (call.path === '/refunds/pending') return json(200, [])
+      return backendError(404, `Unexpected request: ${call.method} ${call.path}`)
+    })
+    renderApp('/manager/transactions')
+    expect(await screen.findByText('Paid - Simulated')).toBeVisible()
+    expect(screen.getByText('Bank transfer (Simulated)')).toBeVisible()
+    expect(screen.getByText('Bank transfer (Legacy unverified)')).toBeVisible()
+  })
 })

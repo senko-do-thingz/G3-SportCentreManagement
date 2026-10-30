@@ -46,7 +46,7 @@ const TRANSACTION_COLUMNS: TableColumn<FinanceTransaction>[] = [
   { key: 'member', header: 'Member', render: (row) => <div className="manager-cell"><span className="manager-cell-primary">{row.memberName ?? 'Member not provided'}</span><span>{row.memberCode ?? '-'}</span></div> },
   { key: 'service', header: 'Service', render: (row) => <div className="manager-cell"><span className="manager-cell-primary">{row.itemName ?? row.itemCode ?? row.sportName ?? 'Service not provided'}</span><span>{humanizeCode(row.itemType)}</span></div> },
   { key: 'amount', header: 'Amount', align: 'right', render: (row) => <strong className="manager-nowrap">{formatMoney(row.amount)}</strong> },
-  { key: 'method', header: 'Method', render: (row) => row.settlementType === 'SIMULATED' ? `${humanizeCode(row.method)} (Simulated)` : humanizeCode(row.method) },
+  { key: 'method', header: 'Method', render: (row) => row.settlementType === 'SIMULATED' ? `${humanizeCode(row.method)} (Simulated)` : row.settlementType === 'UNKNOWN' ? `${humanizeCode(row.method)} (Legacy unverified)` : humanizeCode(row.method) },
   { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} label={row.status === 'SUCCESS' && row.settlementType === 'SIMULATED' ? 'Paid - Simulated' : humanizeCode(row.status)} /> },
   { key: 'time', header: 'Date', render: (row) => formatDateTime(row.time) },
 ]
