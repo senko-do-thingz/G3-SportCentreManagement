@@ -277,9 +277,20 @@
       ],
       "drops": [],
       "sha256_lf": "681f378e5a0b3a42cbc71f0f4cee049d3d9d982125364dcaee55f29a47669b19"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V34__create_simulated_qr_foundation.sql",
+      "version": 34,
+      "creates": [
+        "dbo.simulated_qr_session",
+        "dbo.simulated_qr_transition",
+        "dbo.simulated_qr_rate_limit"
+      ],
+      "drops": [],
+      "sha256_lf": "acacb78e3f3ab8806e36f8009a26a2065b82cfdc01ea7e3617afbea9027ea028"
     }
   ],
-  "create_occurrences": 62,
+  "create_occurrences": 65,
   "create_names": [
     "[activity_log]",
     "[age_group]",
@@ -339,6 +350,9 @@
     "dbo.cash_capture_ticket",
     "dbo.cash_coverage",
     "dbo.cash_event",
+    "dbo.simulated_qr_rate_limit",
+    "dbo.simulated_qr_session",
+    "dbo.simulated_qr_transition",
     "permission",
     "role",
     "role_permission",
