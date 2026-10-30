@@ -728,5 +728,79 @@ class DemoQrDatabaseIntegrationTest {
                 .hasMessageContaining("ck_payment_simulated_consistency");
     }
 
+    private long staff(String roleCode) {
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        return jdbc.queryForObject(
+                "INSERT dbo.user_account(email,password_hash,full_name,role_id,status,version) OUTPUT INSERTED.id " +
+                "VALUES (?,?,?,(SELECT id FROM role WHERE code=?),'ACTIVE',0)",
+                Long.class,
+                suffix + "@qr06.example.test", encoder.encode(PASSWORD), "Synthetic QR06 " + roleCode, roleCode);
+    }
+
+    private Map<String, String> qr06Fingerprint(JdbcTemplate database) throws Exception {
+        var result = new TreeMap<String, String>();
+        for (String table : List.of(
+                "payment", "invoice", "invoice_line", "member_card", "sport_package_registration",
+                "refund_request", "cash_event", "cash_capture_ticket", "cash_coverage",
+                "simulated_qr_session", "simulated_qr_transition", "simulated_payment_transaction")) {
+            var canonical = database.queryForList("SELECT * FROM [" + table + "]").stream().map(row -> new TreeMap<>(row).toString()).sorted().toList().toString();
+            result.put(table, HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(canonical.getBytes(StandardCharsets.UTF_8))));
+        }
+        return result;
+    }
+
+    @Test
+    void deskProjectionAndRepeatedPollingProducesStrictlyZeroDatabaseWrites() throws Exception {
+        long receptionistId = staff("RECEPTIONIST");
+        UserAccount receptionist = users.findById(receptionistId).orElseThrow();
+        String receptionistToken = login(receptionist.getEmail());
+
+        var created = create();
+        assertThat(created).isNotNull();
+
+        var beforeFingerprint = qr06Fingerprint(jdbc);
+        long paymentCountBefore = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.payment", Long.class);
+        long invoiceCountBefore = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.invoice", Long.class);
+        long simTxCountBefore = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.simulated_payment_transaction", Long.class);
+        long simSessionCountBefore = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.simulated_qr_session", Long.class);
+        long simTransCountBefore = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.simulated_qr_transition", Long.class);
+        long cashEventCountBefore = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.cash_event", Long.class);
+
+        String deskProjectionUrl = "/api/v1/payments/simulated-qr/desk-projection/" + paymentId;
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(receptionistToken);
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        for (int i = 1; i <= 5; i++) {
+            var response = http.exchange(deskProjectionUrl, HttpMethod.GET, entity, Map.class);
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            Map<?, ?> body = response.getBody();
+            assertThat(body).isNotNull();
+            assertThat(body.get("paymentId")).isEqualTo((int) paymentId);
+            assertThat(body.get("paymentStatus")).isEqualTo("PENDING");
+            assertThat(body.get("activeSession")).isNotNull();
+        }
+
+        var afterFingerprint = qr06Fingerprint(jdbc);
+        assertThat(afterFingerprint).isEqualTo(beforeFingerprint);
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.payment", Long.class)).isEqualTo(paymentCountBefore);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.invoice", Long.class)).isEqualTo(invoiceCountBefore);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.simulated_payment_transaction", Long.class)).isEqualTo(simTxCountBefore);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.simulated_qr_session", Long.class)).isEqualTo(simSessionCountBefore);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.simulated_qr_transition", Long.class)).isEqualTo(simTransCountBefore);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.cash_event", Long.class)).isEqualTo(cashEventCountBefore);
+
+        HttpHeaders memberHeaders = new HttpHeaders();
+        memberHeaders.setBearerAuth(ownerToken);
+        var memberResp = http.exchange(deskProjectionUrl, HttpMethod.GET, new HttpEntity<>(memberHeaders), Map.class);
+        assertThat(memberResp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        var anonResp = http.exchange(deskProjectionUrl, HttpMethod.GET, new HttpEntity<>(new HttpHeaders()), Map.class);
+        assertThat(anonResp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        assertThat(qr06Fingerprint(jdbc)).isEqualTo(beforeFingerprint);
+    }
+
     @AfterAll static void closeContainer() { if(container!=null)container.stop(); }
 }

@@ -213,11 +213,13 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
         aside={actions}
       />
 
-      <div role="status" aria-live="polite" className="reception-notice-banner">
-        <p className="notice notice--warning">
-          Simulated QR Payment - No real money is transferred.
-        </p>
-      </div>
+      {presentation.classification !== 'ACTUAL' && (
+        <div role="status" aria-live="polite" className="reception-notice-banner">
+          <p className="notice notice--warning">
+            Simulated QR Payment - No real money is transferred.
+          </p>
+        </div>
+      )}
 
       {presentation.bannerMessage && (
         <div role="status" aria-live="polite" className="reception-notice-banner">

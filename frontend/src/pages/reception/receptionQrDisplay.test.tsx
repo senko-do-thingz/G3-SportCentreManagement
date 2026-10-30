@@ -268,6 +268,9 @@ describe('ReceptionQrDisplayPage', () => {
       screen.getByText(/Payment settled via actual payment provider \(DESK_CASH\)\./),
     ).toBeInTheDocument()
     expect(screen.queryByText('Paid - Simulated')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('Simulated QR Payment - No real money is transferred.'),
+    ).not.toBeInTheDocument()
   })
 
   it('renders Paid - Legacy unverified for null provenance (QR06-R1-01)', async () => {

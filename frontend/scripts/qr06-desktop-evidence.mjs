@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:http'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -8,12 +8,24 @@ import { fileURLToPath } from 'node:url'
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const ROOT = resolve(__dirname, '../..')
 const DIST = join(ROOT, 'frontend/dist')
-const OUT_DIR = join(ROOT, 'tasks/QR-06 (i)/reports/round-02')
+const ROUND = process.env.ROUND || 'round-03'
+const OUT_DIR = join(ROOT, `tasks/QR-06 (i)/reports/${ROUND}`)
 const SCREENSHOTS_DIR = join(OUT_DIR, 'screenshots')
 const LOGS_DIR = join(OUT_DIR, 'browser-logs')
+const TOOLING_DIR = join(OUT_DIR, 'tooling')
 
 mkdirSync(SCREENSHOTS_DIR, { recursive: true })
 mkdirSync(LOGS_DIR, { recursive: true })
+mkdirSync(TOOLING_DIR, { recursive: true })
+
+// Copy axe.min.js to tooling directory for offline reproducibility
+const SOURCE_AXE = join(ROOT, 'docs/audit/qr04-r3-private-qa/axe.min.js')
+const TARGET_AXE = join(TOOLING_DIR, 'axe.min.js')
+if (existsSync(SOURCE_AXE) && !existsSync(TARGET_AXE)) {
+  copyFileSync(SOURCE_AXE, TARGET_AXE)
+}
+const AXE_SOURCE_PATH = existsSync(TARGET_AXE) ? TARGET_AXE : SOURCE_AXE
+const AXE_SCRIPT = existsSync(AXE_SOURCE_PATH) ? readFileSync(AXE_SOURCE_PATH, 'utf-8') : ''
 
 const MIMES = {
   '.html': 'text/html; charset=utf-8',
@@ -77,7 +89,7 @@ const PROJECTIONS = {
       serverTime: '2026-10-31T03:04:00Z',
     },
   },
-  // Scenario 3: Settled with ACTUAL provenance
+  // Scenario 3: Settled with ACTUAL provenance (e.g. cash at front desk)
   '103': {
     paymentId: 103,
     paymentCode: 'PAY-103',
@@ -93,7 +105,7 @@ const PROJECTIONS = {
     simulatedTransactionId: null,
     activeSession: null,
   },
-  // Scenario 4: Settled with legacy NULL provenance
+  // Scenario 4: Settled with legacy NULL provenance (historical payment)
   '104': {
     paymentId: 104,
     paymentCode: 'PAY-104',
@@ -173,7 +185,7 @@ function startStaticServer(port = 4567) {
       const url = new URL(req.url, `http://localhost:${port}`)
       const pathname = url.pathname
 
-      // API mock endpoints for desk projection and auth
+      // API mock endpoints fallback
       if (pathname.startsWith('/api/v1/payments/simulated-qr/desk-projection/')) {
         const id = pathname.split('/').pop()
         const proj = PROJECTIONS[id]
@@ -319,6 +331,7 @@ async function run() {
   const consoleLogs = []
   const networkRequests = []
   const accessibilityResults = []
+  const axeCoreResults = []
 
   // Create browser context and page target session
   const { browserContextId } = await browser.send('Target.createBrowserContext')
@@ -327,38 +340,154 @@ async function run() {
 
   const sendPage = (method, params = {}) => browser.send(method, params, sessionId)
 
-  browser.listeners.add((msg) => {
+  // Attach Fetch interceptor to guarantee all /api/v1 requests are fulfilled regardless of target host/port
+  browser.listeners.add(async (msg) => {
     if (msg.sessionId !== sessionId) return
     if (msg.method === 'Runtime.consoleAPICalled') {
       const args = (msg.params.args || []).map((a) => a.value ?? a.description ?? '').join(' ')
       consoleLogs.push(`[${msg.params.type}] ${args}`)
     }
-    if (msg.method === 'Network.requestWillBeSent') {
-      networkRequests.push({
-        url: msg.params.request.url,
-        method: msg.params.request.method,
-        timestamp: new Date().toISOString(),
-      })
+
+    if (msg.method === 'Fetch.requestPaused') {
+      const { requestId, request } = msg.params
+      try {
+        const url = new URL(request.url)
+        const pathname = url.pathname
+
+        if (pathname === '/api/v1/users/me' || pathname === '/api/v1/auth/me') {
+          const body = JSON.stringify({
+            id: 10,
+            email: 'receptionist@sportify.demo',
+            fullName: 'Linh Receptionist',
+            role: 'RECEPTIONIST',
+            status: 'ACTIVE',
+          })
+          networkRequests.push({
+            url: request.url,
+            method: request.method,
+            status: 200,
+            type: 'MOCK_FETCH_AUTH_ME',
+            timestamp: new Date().toISOString(),
+          })
+          await sendPage('Fetch.fulfillRequest', {
+            requestId,
+            responseCode: 200,
+            responseHeaders: [
+              { name: 'Content-Type', value: 'application/json; charset=utf-8' },
+              { name: 'Access-Control-Allow-Origin', value: '*' },
+              { name: 'Access-Control-Allow-Headers', value: '*' },
+              { name: 'Access-Control-Allow-Methods', value: 'GET,POST,OPTIONS' },
+            ],
+            body: Buffer.from(body).toString('base64'),
+          })
+          return
+        }
+
+        if (pathname === '/api/v1/payments/simulated-qr/capability') {
+          const body = JSON.stringify({
+            enabled: true,
+            settlementEnabled: true,
+            contractVersion: 1,
+          })
+          networkRequests.push({
+            url: request.url,
+            method: request.method,
+            status: 200,
+            type: 'MOCK_FETCH_CAPABILITY',
+            timestamp: new Date().toISOString(),
+          })
+          await sendPage('Fetch.fulfillRequest', {
+            requestId,
+            responseCode: 200,
+            responseHeaders: [
+              { name: 'Content-Type', value: 'application/json; charset=utf-8' },
+              { name: 'Access-Control-Allow-Origin', value: '*' },
+              { name: 'Access-Control-Allow-Headers', value: '*' },
+              { name: 'Access-Control-Allow-Methods', value: 'GET,POST,OPTIONS' },
+            ],
+            body: Buffer.from(body).toString('base64'),
+          })
+          return
+        }
+
+        if (pathname.startsWith('/api/v1/payments/simulated-qr/desk-projection/')) {
+          const id = pathname.split('/').pop()
+          const proj = PROJECTIONS[id]
+          if (proj) {
+            const body = JSON.stringify(proj)
+            networkRequests.push({
+              url: request.url,
+              method: request.method,
+              status: 200,
+              type: 'MOCK_FETCH_DESK_PROJECTION',
+              timestamp: new Date().toISOString(),
+            })
+            await sendPage('Fetch.fulfillRequest', {
+              requestId,
+              responseCode: 200,
+              responseHeaders: [
+                { name: 'Content-Type', value: 'application/json; charset=utf-8' },
+                { name: 'Access-Control-Allow-Origin', value: '*' },
+                { name: 'Access-Control-Allow-Headers', value: '*' },
+                { name: 'Access-Control-Allow-Methods', value: 'GET,POST,OPTIONS' },
+              ],
+              body: Buffer.from(body).toString('base64'),
+            })
+          } else {
+            const body = JSON.stringify({ code: 'PAYMENT_NOT_FOUND', message: 'Payment not found' })
+            networkRequests.push({
+              url: request.url,
+              method: request.method,
+              status: 404,
+              type: 'MOCK_FETCH_NOT_FOUND',
+              timestamp: new Date().toISOString(),
+            })
+            await sendPage('Fetch.fulfillRequest', {
+              requestId,
+              responseCode: 404,
+              responseHeaders: [
+                { name: 'Content-Type', value: 'application/json; charset=utf-8' },
+                { name: 'Access-Control-Allow-Origin', value: '*' },
+              ],
+              body: Buffer.from(body).toString('base64'),
+            })
+          }
+          return
+        }
+
+        if (request.method === 'OPTIONS') {
+          await sendPage('Fetch.fulfillRequest', {
+            requestId,
+            responseCode: 204,
+            responseHeaders: [
+              { name: 'Access-Control-Allow-Origin', value: '*' },
+              { name: 'Access-Control-Allow-Headers', value: '*' },
+              { name: 'Access-Control-Allow-Methods', value: 'GET,POST,OPTIONS' },
+            ],
+          })
+          return
+        }
+
+        // Pass through static assets
+        await sendPage('Fetch.continueRequest', { requestId })
+      } catch {
+        // Safe catch for aborted or already handled requests
+      }
     }
   })
 
-  await sendPage('Network.enable')
+  await sendPage('Fetch.enable', { patterns: [{ urlPattern: '*' }] })
   await sendPage('Page.enable')
   await sendPage('Runtime.enable')
 
-  // Set up initial localStorage on origin
+  // Set up initial authentic localStorage for Sportify tokenStorage and AuthProvider
   await sendPage('Page.navigate', { url: `http://localhost:${port}/` })
   await new Promise((r) => setTimeout(r, 600))
   await sendPage('Runtime.evaluate', {
     expression: `
-      localStorage.setItem('auth.user', JSON.stringify({
-        id: 10,
-        email: 'receptionist@sportify.demo',
-        fullName: 'Linh Receptionist',
-        role: 'RECEPTIONIST',
-        status: 'ACTIVE'
-      }));
-      localStorage.setItem('auth.token', 'mock-receptionist-token-round-02');
+      localStorage.setItem('sportify.accessToken', 'evidence-mock-access-token-round-03');
+      localStorage.setItem('sportify.refreshToken', 'evidence-mock-refresh-token-round-03');
+      localStorage.setItem('sportify.sessionId', 'evidence-mock-session-id-round-03');
     `,
   })
 
@@ -373,8 +502,29 @@ async function run() {
     const targetUrl = `http://localhost:${port}/reception/payments/${paymentId}/qr-display`
     await sendPage('Page.navigate', { url: targetUrl })
 
-    // Wait for content render
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    // Wait until the reception page has mounted and rendered its header (up to 6 seconds)
+    let ready = false
+    for (let i = 0; i < 60; i++) {
+      const check = await sendPage('Runtime.evaluate', {
+        expression: `({
+          hasHeading: document.querySelector('h1')?.textContent?.includes('Simulated QR Payment Display') || false,
+          isLogin: document.querySelector('h1')?.textContent?.includes('Welcome back') || document.title.includes('Log in')
+        })`,
+        returnByValue: true,
+      })
+      if (check.result?.value?.hasHeading) {
+        ready = true
+        break
+      }
+      if (check.result?.value?.isLogin) {
+        throw new Error(`CRITICAL VERIFICATION ERROR: Route redirected to login page for ${filename}!`)
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+
+    if (!ready) {
+      throw new Error(`Timeout waiting for Reception QR Display to mount on view ${filename}`)
+    }
 
     // Apply theme, zoom, focus
     await sendPage('Runtime.evaluate', {
@@ -385,29 +535,94 @@ async function run() {
       `,
     })
 
-    await new Promise((resolve) => setTimeout(resolve, 600))
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
+    // Real axe-core accessibility audit
+    let axeData = null
+    if (AXE_SCRIPT) {
+      await sendPage('Runtime.evaluate', { expression: AXE_SCRIPT })
+      const axeRun = await sendPage('Runtime.evaluate', {
+        expression: `
+          (async () => {
+            const res = await window.axe.run(document, {
+              runOnly: {
+                type: 'tag',
+                values: ['wcag2a', 'wcag2aa']
+              }
+            });
+            return {
+              violationsCount: res.violations.length,
+              violations: res.violations.map(v => ({
+                id: v.id,
+                impact: v.impact,
+                description: v.description,
+                help: v.help,
+                helpUrl: v.helpUrl,
+                nodesCount: v.nodes.length,
+                nodes: v.nodes.map(n => ({ html: n.html, failureSummary: n.failureSummary }))
+              })),
+              passesCount: res.passes.length,
+              incompleteCount: res.incomplete.length,
+              inapplicableCount: res.inapplicable.length,
+              timestamp: new Date().toISOString()
+            };
+          })()
+        `,
+        awaitPromise: true,
+        returnByValue: true,
+      })
+      axeData = axeRun.result?.value
+    }
 
     const domAudit = await sendPage('Runtime.evaluate', {
       expression: `({
         title: document.title,
         heading: document.querySelector('h1')?.textContent?.trim(),
+        isLoginPage: document.querySelector('h1')?.textContent?.includes('Welcome back') || document.title.includes('Log in'),
         cardTitles: Array.from(document.querySelectorAll('.card__title')).map(el => el.textContent.trim()),
         statusBadge: document.querySelector('.reception-status-header .badge')?.textContent?.trim(),
         hasInactiveNotice: !!document.querySelector('.qr-demo-card__body [role="status"]'),
         copyButtonsCount: document.querySelectorAll('.qr-demo-card__copy-actions button').length,
         hasNoMoneyWarning: document.body.textContent.includes('Simulated QR Payment - No real money is transferred.'),
-        noHorizontalOverflow: document.documentElement.scrollWidth <= window.innerWidth
+        classification: document.querySelector('.reception-status-header')?.textContent?.trim() || '',
+        noHorizontalOverflow: document.documentElement.scrollWidth <= window.innerWidth,
+        focusedElement: document.activeElement ? {
+          tagName: document.activeElement.tagName,
+          className: document.activeElement.className,
+          text: document.activeElement.textContent?.trim()?.slice(0, 50)
+        } : null
       })`,
       returnByValue: true,
     })
+
+    const auditValue = domAudit.result.value
+    if (auditValue.isLoginPage) {
+      throw new Error(`CRITICAL ERROR: View ${filename} captured the Login page!`)
+    }
 
     accessibilityResults.push({
       view: filename,
       viewport: `${width}x${height}`,
       theme,
       zoom: `${zoom * 100}%`,
-      audit: domAudit.result.value,
+      audit: auditValue,
+      axeSummary: axeData ? {
+        violationsCount: axeData.violationsCount,
+        passesCount: axeData.passesCount,
+        incompleteCount: axeData.incompleteCount,
+        inapplicableCount: axeData.inapplicableCount,
+      } : 'axe-core not executed',
     })
+
+    if (axeData) {
+      axeCoreResults.push({
+        view: filename,
+        viewport: `${width}x${height}`,
+        theme,
+        zoom: `${zoom * 100}%`,
+        axe: axeData,
+      })
+    }
 
     const screenshotData = await sendPage('Page.captureScreenshot', {
       format: 'png',
@@ -417,10 +632,10 @@ async function run() {
     const buffer = Buffer.from(screenshotData.data, 'base64')
     const filePath = join(SCREENSHOTS_DIR, filename)
     writeFileSync(filePath, buffer)
-    console.log(`Saved screenshot: ${filename} (${width}x${height}, ${theme}, noOverflow=${domAudit.result.value?.noHorizontalOverflow})`)
+    console.log(`Saved screenshot: ${filename} (${width}x${height}, ${theme}, noOverflow=${auditValue?.noHorizontalOverflow}, axeViolations=${axeData?.violationsCount ?? 0})`)
   }
 
-  console.log('Capturing desktop and responsive viewports across themes...')
+  console.log('Capturing genuine QR-06 reception desk views across responsive breakpoints and themes...')
 
   // Viewport 1280 (Light & Dark)
   await captureView('101', 'desktop-1280-light-pending.png', { width: 1280, height: 900, theme: 'light' })
@@ -438,7 +653,7 @@ async function run() {
   await captureView('102', 'desktop-1440-light-settled-simulated.png', { width: 1440, height: 900, theme: 'light' })
   await captureView('102', 'desktop-1440-dark-settled-simulated.png', { width: 1440, height: 900, theme: 'dark' })
 
-  // Settled ACTUAL (Paid - Actual)
+  // Settled ACTUAL (Paid - Actual; banner suppressed!)
   await captureView('103', 'desktop-1440-light-settled-actual.png', { width: 1440, height: 900, theme: 'light' })
 
   // Settled Legacy unverified (Paid - Legacy unverified)
@@ -472,8 +687,9 @@ async function run() {
   writeFileSync(join(LOGS_DIR, 'browser-console.log'), consoleLogs.join('\n') || '[INFO] No console errors or warnings recorded.')
   writeFileSync(join(LOGS_DIR, 'network-requests.json'), JSON.stringify(networkRequests, null, 2))
   writeFileSync(join(LOGS_DIR, 'accessibility-audit.json'), JSON.stringify(accessibilityResults, null, 2))
+  writeFileSync(join(LOGS_DIR, 'axe-core-audit.json'), JSON.stringify(axeCoreResults, null, 2))
 
-  console.log('Finished capturing all screenshots and logs.')
+  console.log(`Finished capturing all 17 screenshots and logs to ${OUT_DIR}`)
 
   browser.close()
   server.close()
