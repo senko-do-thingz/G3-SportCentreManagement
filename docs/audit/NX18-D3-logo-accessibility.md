@@ -10,18 +10,19 @@ which was reported as NX18-D3 (axe label-content-name-mismatch, WCAG 2.5.3).
 
 Updated the aria-label to "Sportify Sports center home" so it contains the
 visible label in order. The compact variant displays "Sportify" and is also
-covered by the new name. Updated existing Home and payment workspace test
-selectors and the Home browser-check selector together.
+covered by the new name. Updated existing Home, payment workspace, QR payment
+and QR confirmation test selectors and the Home browser-check selector together.
 
 ## Verification and test expectations
 
-- `npm.cmd test -- src/pages/public/HomePage.test.tsx src/layouts/PaymentWorkspaceHeader.test.tsx`:
-  2 files and 35 tests passed, with no failures or skips.
+- `npm.cmd test`: 89 files and 1642 tests passed, with no failures or skips.
 - The existing Home tests verify navigation to Home through the renamed link
   after logout and its destination after the member login return flow.
 - The existing payment workspace tests cover the compact logo on member
   payment, payment status and receptionist refund routes, including navigation
   to Home and retention of the selected theme.
+- Existing QR tests verify the shared header and Home link on confirmation
+  states, unavailable links and disabled demo routes.
 - `npm.cmd run lint`: passed.
 - `npm.cmd run build`: passed with a bundle-size warning.
 - `git diff --check`: passed.
