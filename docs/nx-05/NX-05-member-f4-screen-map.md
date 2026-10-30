@@ -210,4 +210,4 @@ Until these boxes are ticked by a human, the map is a proposal.
 
 ## 10. Implementation status
 
-NX-14 and NX-15 implement M-F4-01 to M-F4-04 on branch feat/member-ui-flow4-training-plans-and-history (screens, tests and screenshots at 390, 768 and 1440px in light and dark). They read synthetic data until the contract is signed.
+NX-14 and NX-15 implement M-F4-01 to M-F4-04 on branch nx-14-nx-15-member-training-screens (screens, tests and screenshots at 390, 768 and 1440px in light and dark). They read synthetic data until the contract is signed.

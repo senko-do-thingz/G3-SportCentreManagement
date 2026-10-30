@@ -5,7 +5,7 @@ Adds the Member Flow 4 screen map for NX-05: traceability to UC-F4-05 and UC-F4-
 - Task ID: NX-05 (Flow 4, F4-REQ-05 and F4-REQ-06, owner Truc, wave W1, predecessor NX-02)
 - Document: docs/nx-05/NX-05-member-f4-screen-map.md
 - Status: DRAFT FOR REVIEW. NX-02 sign-off is still pending, so "approved use cases" and "mock flows approved" are not claimed; section 9 of the document is the checklist for the reviewer.
-- Related: NX-14 and NX-15 implement these screens on feat/member-ui-flow4-training-plans-and-history.
+- Related: NX-14 and NX-15 implement these screens on nx-14-nx-15-member-training-screens.
 
 ## Pre-Merge Checklist
 - [ ] Tests executed and passed in CI (include GitHub Actions run link below)
