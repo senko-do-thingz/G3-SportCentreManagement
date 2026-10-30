@@ -175,6 +175,7 @@ export function CheckInPage() {
         >
           <Table
             caption="Today's check-ins"
+            scrollLabel="Today's check-ins, scrollable"
             columns={columns}
             rows={todayList.status === 'ready' ? todayList.data : []}
             rowKey={(row) => row.id}

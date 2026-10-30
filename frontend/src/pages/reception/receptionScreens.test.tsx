@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -743,4 +744,15 @@ describe('FE-05 access', () => {
       expect(calls.some((call) => call.path.startsWith('/members') || call.path.startsWith('/check-ins') || call.path.startsWith('/payments'))).toBe(false)
     },
   )
+})
+
+describe('NX-18 Check-in narrow screens', () => {
+  it('keeps the today list reachable by keyboard and the card inside a 390px screen', async () => {
+    await open('/reception/check-in')
+    const region = await screen.findByRole('region', { name: "Today's check-ins, scrollable" })
+    expect(region).toHaveAttribute('tabindex', '0')
+    // A bare 1fr column grows to its widest content and pushed the card past the viewport at 390px.
+    const css = readFileSync('src/styles/reception.css', 'utf8')
+    expect(css).toMatch(/\.reception-checkin\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\);/)
+  })
 })
