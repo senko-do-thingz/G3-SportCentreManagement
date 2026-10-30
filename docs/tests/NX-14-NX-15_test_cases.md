@@ -2,7 +2,7 @@
 
 ## 1. Scope and provenance
 - Tasks: NX-14 "Build member training plans and coach notes UI" (F4-REQ-06) and NX-15 "Build member attendance and training result history" (F4-REQ-05). Owner Truc, Flow 4, wave W2, from the task assignment spreadsheet.
-- Branch: feat/member-ui-flow4-training-plans-and-history, based on main 5224d58.
+- Branch: nx-14-nx-15-member-training-screens, based on main 5224d58.
 - Routes: /member/training (My Training Plans, NX-14) and /member/training/history (Attendance and Results, tabs Attendance and Training results, NX-15). The Member menu gets ONE entry, Training; a tab bar (Plans and coach notes | Attendance and results) switches between the two pages, like My Schedule. Two separate menu entries were tried first and made the shared header (ui-02) overlap at 1440px, so they were merged.
 - Screen IDs: the spreadsheet has no Screen ID column for these tasks; none is invented.
 

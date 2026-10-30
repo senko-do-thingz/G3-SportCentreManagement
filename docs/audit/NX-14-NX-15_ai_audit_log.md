@@ -3,7 +3,7 @@
 ## Metadata
 - Date: 2026-10-29.
 - Agent: Claude Code (claude-sonnet-5-5), AI-assisted. Human approval is not claimed.
-- Branch: feat/member-ui-flow4-training-plans-and-history, based on main 5224d58.
+- Branch: nx-14-nx-15-member-training-screens, based on main 5224d58.
 
 ## Inputs inspected
 - Task rows NX-14, NX-15, NX-18 pasted by the author; other Flow 4 rows read from the shared task spreadsheet.
