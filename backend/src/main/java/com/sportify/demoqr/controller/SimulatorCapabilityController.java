@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 @RestController
-@PreAuthorize("hasRole('MEMBER')")
+@PreAuthorize("hasAnyRole('MEMBER', 'RECEPTIONIST', 'MANAGER')")
 public class SimulatorCapabilityController {
     private final ObjectProvider<DemoQrService> service;
 

@@ -19,7 +19,12 @@ import org.springframework.core.MethodParameter;
 import java.util.Map;
 
 /** Never echo rejected token/body values, even through validation error messages. */
-@RestControllerAdvice(assignableTypes = {DemoQrController.class, LegacyDemoQrController.class, SimulatorCapabilityController.class})
+@RestControllerAdvice(assignableTypes = {
+        DemoQrController.class,
+        LegacyDemoQrController.class,
+        SimulatorCapabilityController.class,
+        ReceptionQrDisplayController.class
+})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class DemoQrAdvice implements ResponseBodyAdvice<Object> {
     @ExceptionHandler(DemoQrException.class)

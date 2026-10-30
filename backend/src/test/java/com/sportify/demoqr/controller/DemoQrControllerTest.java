@@ -116,4 +116,20 @@ class DemoQrControllerTest {
                 .andExpect(jsonPath("$.settlementEnabled").value(true))
                 .andExpect(jsonPath("$.contractVersion").value(1));
     }
+
+    @ParameterizedTest @ValueSource(strings={"/api/v1/payments/simulated-qr/capability","/api/v1/payments/simulator-config"})
+    void capabilityAllowsReceptionistAndManager(String path) throws Exception {
+        mvc.perform(get(path).with(user(principal("RECEPTIONIST"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(true));
+        mvc.perform(get(path).with(user(principal("MANAGER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(true));
+    }
+
+    @ParameterizedTest @ValueSource(strings={"/api/v1/payments/simulated-qr/capability","/api/v1/payments/simulator-config"})
+    void capabilityForbidsCoach(String path) throws Exception {
+        mvc.perform(get(path).with(user(principal("COACH"))))
+                .andExpect(status().isForbidden());
+    }
 }
