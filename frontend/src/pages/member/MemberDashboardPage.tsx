@@ -30,6 +30,7 @@ import {
   type HeroVariant,
   type PendingItem,
 } from './dashboardModel'
+import { AssistantEntry } from './assistant/AssistantEntry'
 import { useMemberResource, type Resource } from './useMemberResource'
 
 /** Number of packages and sessions listed on the dashboard; the rest is on the linked screens. */
@@ -154,6 +155,7 @@ export function MemberDashboardPage() {
         <aside className="dashboard__side" aria-label="Profile and quick links">
           <ProfileCard />
           <QuickLinksCard />
+          <AssistantEntry />
         </aside>
       </div>
     </div>

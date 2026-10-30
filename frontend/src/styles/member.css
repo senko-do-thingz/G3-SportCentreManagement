@@ -587,3 +587,9 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Member assistant entry points and page (NX-31). */
+.assistant-entry__text { margin: 0 0 var(--space-4); color: var(--color-text-muted); }
+.assistant-points { display: grid; gap: var(--space-3); margin: 0 0 var(--space-5); padding-left: var(--space-5); color: var(--color-text); }
+.assistant-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.assistant-note { margin: var(--space-4) 0 0; font-size: var(--text-sm); color: var(--color-text-muted); }

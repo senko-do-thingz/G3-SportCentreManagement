@@ -33,6 +33,15 @@ export function managerPreviewEnabled(): boolean {
   return import.meta.env.DEV && import.meta.env.VITE_MANAGER_PREVIEW === 'true'
 }
 
+/**
+ * Member AI assistant entry points (NX-31, Flow 6). Off unless VITE_ASSISTANT_ENABLED is exactly
+ * "true", so a normal build shows no entry point and the route redirects to the member home.
+ * Read on every call so tests can change the variable.
+ */
+export function assistantEnabled(): boolean {
+  return import.meta.env.VITE_ASSISTANT_ENABLED === 'true'
+}
+
 /** Explicit local/demo-build opt-in. A normal production build cannot enable this surface. */
 export function qrPaymentDemoEnabled(): boolean {
   return import.meta.env.VITE_QR_PAYMENT_DEMO === 'true' && (import.meta.env.DEV || import.meta.env.MODE === 'qr-demo')

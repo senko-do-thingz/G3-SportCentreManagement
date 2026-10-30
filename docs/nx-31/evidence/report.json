@@ -1,0 +1,196 @@
+[
+ {
+  "step": "profile entry",
+  "w": "390",
+  "scheme": "light",
+  "overflow": false,
+  "entry": true
+ },
+ {
+  "step": "consent",
+  "w": "390",
+  "scheme": "light",
+  "overflow": false
+ },
+ {
+  "step": "back returns to profile",
+  "w": "390",
+  "scheme": "light",
+  "ok": true
+ },
+ {
+  "step": "assistant on",
+  "w": "390",
+  "scheme": "light",
+  "overflow": false
+ },
+ {
+  "step": "turned off hides entry",
+  "w": "390",
+  "scheme": "light",
+  "entryGone": true
+ },
+ {
+  "step": "profile entry",
+  "w": "768",
+  "scheme": "light",
+  "overflow": false,
+  "entry": true
+ },
+ {
+  "step": "consent",
+  "w": "768",
+  "scheme": "light",
+  "overflow": false
+ },
+ {
+  "step": "back returns to profile",
+  "w": "768",
+  "scheme": "light",
+  "ok": true
+ },
+ {
+  "step": "assistant on",
+  "w": "768",
+  "scheme": "light",
+  "overflow": false
+ },
+ {
+  "step": "turned off hides entry",
+  "w": "768",
+  "scheme": "light",
+  "entryGone": true
+ },
+ {
+  "step": "profile entry",
+  "w": "1440",
+  "scheme": "light",
+  "overflow": false,
+  "entry": true
+ },
+ {
+  "step": "consent",
+  "w": "1440",
+  "scheme": "light",
+  "overflow": false
+ },
+ {
+  "step": "back returns to profile",
+  "w": "1440",
+  "scheme": "light",
+  "ok": true
+ },
+ {
+  "step": "assistant on",
+  "w": "1440",
+  "scheme": "light",
+  "overflow": false
+ },
+ {
+  "step": "turned off hides entry",
+  "w": "1440",
+  "scheme": "light",
+  "entryGone": true
+ },
+ {
+  "step": "profile entry",
+  "w": "390",
+  "scheme": "dark",
+  "overflow": false,
+  "entry": true
+ },
+ {
+  "step": "consent",
+  "w": "390",
+  "scheme": "dark",
+  "overflow": false
+ },
+ {
+  "step": "back returns to profile",
+  "w": "390",
+  "scheme": "dark",
+  "ok": true
+ },
+ {
+  "step": "assistant on",
+  "w": "390",
+  "scheme": "dark",
+  "overflow": false
+ },
+ {
+  "step": "turned off hides entry",
+  "w": "390",
+  "scheme": "dark",
+  "entryGone": true
+ },
+ {
+  "step": "profile entry",
+  "w": "768",
+  "scheme": "dark",
+  "overflow": false,
+  "entry": true
+ },
+ {
+  "step": "consent",
+  "w": "768",
+  "scheme": "dark",
+  "overflow": false
+ },
+ {
+  "step": "back returns to profile",
+  "w": "768",
+  "scheme": "dark",
+  "ok": true
+ },
+ {
+  "step": "assistant on",
+  "w": "768",
+  "scheme": "dark",
+  "overflow": false
+ },
+ {
+  "step": "turned off hides entry",
+  "w": "768",
+  "scheme": "dark",
+  "entryGone": true
+ },
+ {
+  "step": "profile entry",
+  "w": "1440",
+  "scheme": "dark",
+  "overflow": false,
+  "entry": true
+ },
+ {
+  "step": "consent",
+  "w": "1440",
+  "scheme": "dark",
+  "overflow": false
+ },
+ {
+  "step": "back returns to profile",
+  "w": "1440",
+  "scheme": "dark",
+  "ok": true
+ },
+ {
+  "step": "assistant on",
+  "w": "1440",
+  "scheme": "dark",
+  "overflow": false
+ },
+ {
+  "step": "turned off hides entry",
+  "w": "1440",
+  "scheme": "dark",
+  "entryGone": true
+ },
+ {
+  "step": "coach denied",
+  "denied": "Access denied"
+ },
+ {
+  "step": "signed out",
+  "path": "/login"
+ }
+]
