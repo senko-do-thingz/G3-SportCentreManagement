@@ -1,0 +1,88 @@
+import { useCallback, useState, type FormEvent } from 'react'
+import { ApiError } from '../../api/errors'
+import { trainingApi, type AttendanceStatus, type CoachTrainingClass, type CoachTrainingMember, type SavePlanInput, type SaveResultInput, type TrainingExercise, type TrainingPlan, type TrainingResult } from '../../api/trainingApi'
+import { Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, PageLoader, Select, Tabs, TextArea } from '../../components/ui'
+import { useResource } from '../../hooks/useResource'
+
+const blankExercise = (): TrainingExercise => ({ name: '', sets: null, reps: null, durationMinutes: null, instructions: null })
+const loadAccess = async (signal: AbortSignal) => ({ members: await trainingApi.coachMembers(signal), classes: await trainingApi.coachClasses(signal) })
+
+function PlanEditor({ members, classes, plan, onSaved, onCancel }: { members: CoachTrainingMember[]; classes: CoachTrainingClass[]; plan: TrainingPlan | null; onSaved: () => void; onCancel: () => void }) {
+  const [form, setForm] = useState<SavePlanInput>(() => plan ? { targetType: plan.targetType ?? (plan.classId ? 'CLASS' : 'MEMBER'), memberId: plan.memberId, classId: plan.classId ?? null, title: plan.title, goal: plan.goal, startDate: plan.startDate, endDate: plan.endDate, exercises: plan.exercises, expectedRevision: plan.revision } : { targetType: 'MEMBER', memberId: members[0]?.id ?? null, classId: null, title: '', goal: '', startDate: new Date().toISOString().slice(0, 10), endDate: null, exercises: [blankExercise()] })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const validTarget = form.targetType === 'MEMBER' ? Boolean(form.memberId) : Boolean(form.classId)
+  const valid = validTarget && form.title.trim() && form.goal.trim() && form.startDate && form.exercises.length > 0 && form.exercises.every((item) => item.name.trim())
+  function exercise(index: number, patch: Partial<TrainingExercise>) { setForm((current) => ({ ...current, exercises: current.exercises.map((item, i) => i === index ? { ...item, ...patch } : item) })) }
+  async function submit(event: FormEvent) { event.preventDefault(); if (!valid || saving) return; setSaving(true); setError(null); try { await trainingApi.savePlan(form, plan?.id); onSaved() } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not save the training plan.') } finally { setSaving(false) } }
+  return <Card title={plan ? 'Edit training plan' : 'Create training plan'}><form className="training-form" onSubmit={submit}>
+    <div className="training-form-grid"><Select label="Plan audience" required disabled={Boolean(plan)} value={form.targetType} onChange={(e) => setForm({ ...form, targetType: e.target.value as 'MEMBER' | 'CLASS', memberId: e.target.value === 'MEMBER' ? members[0]?.id ?? null : null, classId: e.target.value === 'CLASS' ? classes[0]?.id ?? null : null })} options={[{ value: 'MEMBER', label: 'Individual member' }, { value: 'CLASS', label: 'Whole class' }]} />{form.targetType === 'MEMBER' ? <Select label="Member" required disabled={Boolean(plan)} value={String(form.memberId || '')} onChange={(e) => setForm({ ...form, memberId: Number(e.target.value) })} placeholder="Choose member" options={members.map((member) => ({ value: String(member.id), label: `${member.memberCode} · ${member.name}` }))} /> : <Select label="Class" required disabled={Boolean(plan)} value={String(form.classId || '')} onChange={(e) => setForm({ ...form, classId: Number(e.target.value) })} placeholder="Choose class" options={classes.map((item) => ({ value: String(item.id), label: `${item.name} · ${item.sportName}` }))} />}<Input label="Plan title" required maxLength={120} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /><Input label="Start date" required type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} /><Input label="End date" type="date" min={form.startDate} value={form.endDate ?? ''} onChange={(e) => setForm({ ...form, endDate: e.target.value || null })} /></div>
+    <TextArea label="Goal" required maxLength={1000} value={form.goal} onChange={(e) => setForm({ ...form, goal: e.target.value })} />
+    <div className="training-section-heading"><h3>Exercises</h3><Button type="button" variant="secondary" onClick={() => setForm({ ...form, exercises: [...form.exercises, blankExercise()] })}>Add exercise</Button></div>
+    {form.exercises.map((item, index) => <div className="training-exercise-editor" key={index}><Input label="Exercise" required value={item.name} onChange={(e) => exercise(index, { name: e.target.value })} /><Input label="Sets" type="number" min="1" value={item.sets ?? ''} onChange={(e) => exercise(index, { sets: e.target.value ? Number(e.target.value) : null })} /><Input label="Reps" type="number" min="1" value={item.reps ?? ''} onChange={(e) => exercise(index, { reps: e.target.value ? Number(e.target.value) : null })} /><Input label="Minutes" type="number" min="1" value={item.durationMinutes ?? ''} onChange={(e) => exercise(index, { durationMinutes: e.target.value ? Number(e.target.value) : null })} /><Input label="Instructions" value={item.instructions ?? ''} onChange={(e) => exercise(index, { instructions: e.target.value || null })} /><Button type="button" variant="ghost" disabled={form.exercises.length === 1} onClick={() => setForm({ ...form, exercises: form.exercises.filter((_, i) => i !== index) })}>Remove</Button></div>)}
+    {error && <p className="notice notice--error" role="alert">{error}</p>}<div className="training-actions"><Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button><Button type="submit" disabled={!valid || saving}>{saving ? 'Saving…' : 'Save draft'}</Button></div>
+  </form></Card>
+}
+
+function PlansPanel({ members, classes }: { members: CoachTrainingMember[]; classes: CoachTrainingClass[] }) {
+  const [editing, setEditing] = useState<TrainingPlan | 'new' | null>(null)
+  const loader = useCallback((signal: AbortSignal) => trainingApi.coachPlans(undefined, signal), [])
+  const [resource, reload] = useResource(loader)
+  const rows = resource.status === 'ready' ? resource.data : []
+  if (editing) return <PlanEditor members={members} classes={classes} plan={editing === 'new' ? null : editing} onCancel={() => setEditing(null)} onSaved={() => { reload(); setEditing(null) }} />
+  return <>{resource.status === 'loading' ? <PageLoader label="Loading training plans" /> : resource.status === 'error' ? <ErrorState title="Could not load training plans" error={resource.error} onRetry={reload} /> : <><div className="training-panel-actions"><Button onClick={() => setEditing('new')}>Create plan</Button></div>{rows.length === 0 ? <EmptyState title="No training plans" description="Create a draft plan for an assigned member or class." /> : <div className="training-card-list">{rows.map((plan) => <Card key={plan.id} title={plan.title} actions={<Badge tone={plan.status === 'PUBLISHED' ? 'success' : 'neutral'}>{plan.status}</Badge>}><p><strong>{plan.className || plan.memberName || 'Assigned audience'}</strong> · {plan.startDate} – {plan.endDate || 'Ongoing'}</p><p>{plan.goal}</p><p className="training-meta">{plan.exercises.length} exercises · Revision {plan.revision}</p><div className="training-actions"><Button variant="secondary" onClick={() => setEditing(plan)}>Edit</Button>{plan.status === 'DRAFT' && <Button onClick={async () => { await trainingApi.publishPlan(plan.id, plan.revision); reload() }}>Publish</Button>}</div></Card>)}</div>}</>}</>
+}
+
+function AttendancePanel() {
+  const [sessionId, setSessionId] = useState('')
+  const [loadedId, setLoadedId] = useState<number | null>(null)
+  const loader = useCallback((signal: AbortSignal) => loadedId ? trainingApi.sessionAttendance(loadedId, signal) : Promise.resolve(null), [loadedId])
+  const [resource, reload] = useResource(loader)
+  const [statuses, setStatuses] = useState<Record<number, AttendanceStatus>>({})
+  const [reasons, setReasons] = useState<Record<number, string>>({})
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const session = resource.status === 'ready' ? resource.data : null
+  const changedCorrections = session?.rows.filter((row) => row.attendanceId && statuses[row.bookingId] && statuses[row.bookingId] !== row.status) ?? []
+  const correctionReasonsValid = changedCorrections.every((row) => reasons[row.bookingId]?.trim())
+  async function save() {
+    if (!session || !correctionReasonsValid) return
+    setSaving(true); setError(null)
+    try {
+      const newRows = session.rows.filter((row) => !row.attendanceId).map((row) => ({ bookingId: row.bookingId, status: statuses[row.bookingId] ?? row.status ?? 'PRESENT' }))
+      if (newRows.length) await trainingApi.saveAttendance(session.sessionId, newRows)
+      await Promise.all(changedCorrections.map((row) => trainingApi.correctAttendance(row.attendanceId!, statuses[row.bookingId], reasons[row.bookingId], row.revision)))
+      setStatuses({}); setReasons({}); reload()
+    } catch (reason) { setError(reason instanceof ApiError && reason.status === 409 ? 'Attendance changed while you were editing. Reload and review the latest values.' : reason instanceof Error ? reason.message : 'Could not save attendance.') }
+    finally { setSaving(false) }
+  }
+  return <div className="training-card-list"><Card title="Open session attendance"><form className="training-inline" onSubmit={(e) => { e.preventDefault(); if (/^\d+$/.test(sessionId)) { setStatuses({}); setReasons({}); setError(null); setLoadedId(Number(sessionId)) } }}><Input label="Session ID" type="number" min="1" required value={sessionId} onChange={(e) => setSessionId(e.target.value)} /><Button type="submit">Load roster</Button></form></Card>{resource.status === 'loading' ? <PageLoader label="Loading attendance roster" /> : resource.status === 'error' ? <ErrorState title="Could not load attendance" error={resource.error} onRetry={reload} /> : session && <Card title={`${session.className} · ${session.sessionDate}`}><div className="training-attendance-list">{session.rows.map((row) => { const changed = Boolean(row.attendanceId && statuses[row.bookingId] && statuses[row.bookingId] !== row.status); return <div key={row.bookingId}><span><strong>{row.memberName}</strong><small>{row.memberCode}</small></span><Select aria-label={`Attendance for ${row.memberName}`} value={statuses[row.bookingId] ?? row.status ?? 'PRESENT'} onChange={(e) => setStatuses({ ...statuses, [row.bookingId]: e.target.value as AttendanceStatus })} options={['PRESENT', 'LATE', 'ABSENT', 'EXCUSED'].map((value) => ({ value, label: value }))} />{changed && <Input aria-label={`Correction reason for ${row.memberName}`} placeholder="Correction reason" required maxLength={500} value={reasons[row.bookingId] ?? ''} onChange={(e) => setReasons({ ...reasons, [row.bookingId]: e.target.value })} />}</div> })}</div>{error && <p className="notice notice--error" role="alert">{error}</p>}<div className="training-actions"><Button disabled={saving || !correctionReasonsValid} onClick={save}>{saving ? 'Saving…' : 'Save attendance'}</Button></div></Card>}</div>
+}
+
+function ResultsPanel({ members }: { members: CoachTrainingMember[] }) {
+  const loader = useCallback((signal: AbortSignal) => trainingApi.coachResults(undefined, signal), [])
+  const [resource, reload] = useResource(loader)
+  const [form, setForm] = useState<SaveResultInput>({ sessionId: 0, memberId: members[0]?.id ?? 0, attendance: 'PRESENT', summary: '', coachFeedback: '', metrics: [] })
+  const [metric, setMetric] = useState({ label: '', value: '' })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [editing, setEditing] = useState<TrainingResult | null>(null)
+  const rows = resource.status === 'ready' ? resource.data : []
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    if (!form.sessionId || !form.memberId || !form.summary.trim()) return
+    setSaving(true); setError(null)
+    try { if (editing) await trainingApi.correctResult(editing.id, form); else await trainingApi.saveResult(form); setForm({ ...form, sessionId: 0, summary: '', coachFeedback: '', metrics: [], correctionReason: undefined, expectedRevision: undefined }); setEditing(null); reload() }
+    catch (reason) { setError(reason instanceof ApiError && reason.status === 409 ? 'This record changed after you opened it. Reload the latest record before correcting it.' : reason instanceof Error ? reason.message : 'Could not save the training result.') }
+    finally { setSaving(false) }
+  }
+  return <div className="training-card-list"><Card title={editing ? 'Correct session outcome' : 'Record session outcome'}><form className="training-form" onSubmit={submit}><div className="training-form-grid"><Input label="Session ID" required disabled={Boolean(editing)} type="number" min="1" value={form.sessionId || ''} onChange={(e) => setForm({ ...form, sessionId: Number(e.target.value) })} /><Select label="Member" required disabled={Boolean(editing)} value={String(form.memberId || '')} onChange={(e) => setForm({ ...form, memberId: Number(e.target.value) })} placeholder="Choose member" options={members.map((member) => ({ value: String(member.id), label: `${member.memberCode} · ${member.name}` }))} /><Select label="Attendance" required value={form.attendance} onChange={(e) => setForm({ ...form, attendance: e.target.value as AttendanceStatus })} options={['PRESENT', 'LATE', 'ABSENT', 'EXCUSED'].map((value) => ({ value, label: value }))} /></div><TextArea label="Outcome summary" required maxLength={2000} value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} /><TextArea label="Member-visible feedback" maxLength={2000} hint="Do not include private staff notes or information about another member." value={form.coachFeedback} onChange={(e) => setForm({ ...form, coachFeedback: e.target.value })} />{editing && <TextArea label="Correction reason" required maxLength={500} value={form.correctionReason ?? ''} onChange={(e) => setForm({ ...form, correctionReason: e.target.value })} />}<div className="training-inline"><Input label="Metric" placeholder="Distance" value={metric.label} onChange={(e) => setMetric({ ...metric, label: e.target.value })} /><Input label="Value" placeholder="5 km" value={metric.value} onChange={(e) => setMetric({ ...metric, value: e.target.value })} /><Button type="button" variant="secondary" disabled={!metric.label.trim() || !metric.value.trim()} onClick={() => { setForm({ ...form, metrics: [...form.metrics, metric] }); setMetric({ label: '', value: '' }) }}>Add metric</Button></div>{form.metrics.length > 0 && <div className="training-metric-chips">{form.metrics.map((item, index) => <button type="button" key={`${item.label}-${index}`} onClick={() => setForm({ ...form, metrics: form.metrics.filter((_, i) => i !== index) })}>{item.label}: {item.value} ×</button>)}</div>}{error && <p className="notice notice--error" role="alert">{error}</p>}<div className="training-actions">{editing && <Button type="button" variant="secondary" onClick={() => { setEditing(null); setForm({ ...form, sessionId: 0, summary: '', coachFeedback: '', metrics: [], correctionReason: undefined, expectedRevision: undefined }) }}>Cancel correction</Button>}<Button type="submit" disabled={!form.sessionId || !form.memberId || !form.summary.trim() || Boolean(editing && !form.correctionReason?.trim()) || saving}>{saving ? 'Saving…' : editing ? 'Save correction' : 'Save result & feedback'}</Button></div></form></Card>
+    {resource.status === 'loading' ? <PageLoader label="Loading recent results" /> : resource.status === 'error' ? <ErrorState title="Could not load recent results" error={resource.error} onRetry={reload} /> : rows.length === 0 ? <EmptyState title="No recorded outcomes" description="Save a session result to begin the training history." /> : <Card title="Recent outcomes"><div className="training-result-list">{rows.map((row) => <article key={row.id}><div><strong>{row.memberName}</strong><span>{row.sportName} · {row.sessionDate}</span></div><Badge tone={row.attendance === 'PRESENT' ? 'success' : 'neutral'}>{row.attendance}</Badge><p>{row.summary || 'No summary'}</p><Button variant="ghost" onClick={() => { setEditing(row); setError(null); setForm({ sessionId: row.sessionId, memberId: row.memberId, attendance: row.attendance, summary: row.summary ?? '', coachFeedback: row.coachFeedback ?? '', metrics: row.metrics, expectedRevision: row.revision, correctionReason: '' }) }}>Correct record</Button></article>)}</div></Card>}
+  </div>
+}
+
+export function CoachTrainingPage() {
+  const [tab, setTab] = useState('plans')
+  const [access, reload] = useResource(loadAccess)
+  return <div className="page training-page"><PageHeader eyebrow="Coach" title="Training Management" description="Create individual or class plans, record outcomes and manage session attendance." />{access.status === 'loading' ? <PageLoader label="Loading assigned training scope" /> : access.status === 'error' ? <ErrorState title="Could not load assigned training scope" error={access.error} onRetry={reload} /> : <Tabs label="Training management" value={tab} onChange={setTab} items={[{ id: 'plans', label: 'Plans' }, { id: 'results', label: 'Results & feedback' }, { id: 'attendance', label: 'Attendance' }]}>{() => tab === 'plans' ? <PlansPanel members={access.data.members} classes={access.data.classes} /> : tab === 'results' ? <ResultsPanel members={access.data.members} /> : <AttendancePanel />}</Tabs>}</div>
+}
