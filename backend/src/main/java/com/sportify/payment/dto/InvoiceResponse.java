@@ -28,6 +28,9 @@ public class InvoiceResponse {
     private PaymentMethod paymentMethod;
     private String paymentReference;
     private LocalDateTime paymentTime;
+    private String settlementType;
+    private String settlementProvider;
+    private Long simulatedTransactionId;
 
     private Long memberId;
     private String memberCode;

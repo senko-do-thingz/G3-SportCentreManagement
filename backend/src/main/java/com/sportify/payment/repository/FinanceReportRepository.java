@@ -74,6 +74,27 @@ public class FinanceReportRepository {
     }
 
     /**
+     * SIMULATED QR settlements completed (payment_time) in the range, reported separately from actual paid revenue.
+     * Guards against pre-V35 schemas (e.g. V31 compatibility tests) via COL_LENGTH.
+     */
+    public Totals simulatedTotals(LocalDateTime from, LocalDateTime toExclusive) {
+        Integer colLength = jdbc.queryForObject(
+                "SELECT COL_LENGTH(N'dbo.payment', N'settlement_type')",
+                new MapSqlParameterSource(),
+                Integer.class);
+        if (colLength == null || colLength <= 0) {
+            return new Totals(BigDecimal.ZERO, 0L);
+        }
+        return totals("""
+                SELECT COALESCE(SUM(amount), 0) AS total, COUNT_BIG(*) AS cnt
+                FROM dbo.payment
+                WHERE payment_status = 'SUCCESS'
+                  AND settlement_type = 'SIMULATED'
+                  AND payment_time >= :from AND payment_time < :to
+                """, from, toExclusive);
+    }
+
+    /**
      * COMPLETED refund requests whose completion time falls in the range. refund_request has no completed_at column.
      * The completion time is the REFUND_COMPLETED activity_log row, written once in the same transaction that sets
      * the refund to COMPLETED (BE-21) and never changed afterwards. A refund without that row (legacy or seeded data)
@@ -230,6 +251,15 @@ public class FinanceReportRepository {
     private static FinanceTransactionResponse mapLedgerRow(ResultSet rs, int rowNum) throws SQLException {
         long invoiceId = rs.getLong("invoice_id");
         Long invoice = rs.wasNull() ? null : invoiceId;
+        String settlementType = null;
+        String settlementProvider = null;
+        Long simulatedTransactionId = null;
+        if (hasColumn(rs, "settlement_type")) {
+            settlementType = rs.getString("settlement_type");
+            settlementProvider = rs.getString("settlement_provider");
+            long simTxId = rs.getLong("simulated_transaction_id");
+            simulatedTransactionId = rs.wasNull() ? null : simTxId;
+        }
         return new FinanceTransactionResponse(
                 rs.getLong("payment_id"),
                 rs.getString("payment_code"),
@@ -248,7 +278,25 @@ public class FinanceReportRepository {
                 rs.getString("item_name"),
                 rs.getString("sport_name"),
                 invoice,
-                rs.getString("invoice_number"));
+                rs.getString("invoice_number"),
+                settlementType,
+                settlementProvider,
+                simulatedTransactionId);
+    }
+
+    private static boolean hasColumn(ResultSet rs, String columnLabel) throws SQLException {
+        var meta = rs.getMetaData();
+        if (meta == null) {
+            return false;
+        }
+        int count = meta.getColumnCount();
+        for (int i = 1; i <= count; i++) {
+            if (columnLabel.equalsIgnoreCase(meta.getColumnLabel(i))
+                    || columnLabel.equalsIgnoreCase(meta.getColumnName(i))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String upper(String value) {

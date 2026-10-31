@@ -4,12 +4,12 @@ package com.sportify.payment.service.impl;
  * Appends notes to payment.notes (NVARCHAR(500)). Segments are separated by " | "; when the column would
  * overflow, the oldest segments are dropped first so the newest note is always kept intact.
  */
-final class PaymentNotes {
+public final class PaymentNotes {
 
     private PaymentNotes() {
     }
 
-    static String append(String existing, String append) {
+    public static String append(String existing, String append) {
         if (append == null || append.isBlank()) {
             return truncateSingleNote(existing);
         }
