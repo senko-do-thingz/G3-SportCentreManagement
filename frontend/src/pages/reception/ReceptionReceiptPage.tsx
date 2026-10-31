@@ -74,10 +74,16 @@ export function ReceptionReceiptPage() {
   const hasSubtotal = data.subtotalAmount !== null && data.subtotalAmount !== undefined && String(data.subtotalAmount).trim() !== ''
   const hasDiscount = data.discountAmount !== null && data.discountAmount !== undefined && String(data.discountAmount).trim() !== ''
   const printable = data.status === 'PAID' || data.status === 'REFUNDED'
+  const simulated = data.settlementType === 'SIMULATED'
   return (
     <div className="page">
       <PaymentHero eyebrow={EYEBROW} title={`Receipt ${data.invoiceNumber}`} description="Confirmed payment record." />
       <Card title="Sportify / Payment receipt" aria-label="Receipt" className={printable ? 'payment-receipt payment-print-receipt' : 'payment-receipt'}>
+        {simulated && (
+          <p className="notice notice--warning" role="status">
+            SIMULATED SETTLEMENT - Completed via Sportify QR Simulator. No real bank transfer or cash collection occurred.
+          </p>
+        )}
         <dl className="summary-list payment-rows">
           <div>
             <dt>Receipt / date</dt>
@@ -111,9 +117,15 @@ export function ReceptionReceiptPage() {
             <dt>Paid total</dt>
             <dd>{formatMoney(data.totalAmount)}</dd>
           </div>
+          {simulated && (
+            <div>
+              <dt>Settlement provenance</dt>
+              <dd>SIMULATED ({data.settlementProvider ?? 'SPORTIFY_SIMULATOR'})</dd>
+            </div>
+          )}
           <div>
             <dt>Status</dt>
-            <dd>{data.status === 'PAID' ? 'Paid' : humanizeCode(data.status)}</dd>
+            <dd>{data.status === 'PAID' ? (simulated ? 'Paid - Simulated' : 'Paid') : humanizeCode(data.status)}</dd>
           </div>
         </dl>
         {!printable && (

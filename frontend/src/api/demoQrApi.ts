@@ -1,7 +1,7 @@
 import { api } from './client'
 import { DEMO_BANKS } from '../components/qr/demoBanks'
 
-export type DemoSessionState = 'PENDING' | 'AUTHORIZED_PENDING_SETTLEMENT' | 'CANCELED' | 'EXPIRED'
+export type DemoSessionState = 'PENDING' | 'AUTHORIZED_PENDING_SETTLEMENT' | 'SETTLED' | 'CANCELED' | 'EXPIRED'
 export interface DemoSession {
   id: string
   paymentId: number
@@ -15,8 +15,42 @@ export interface DemoSession {
   serverTime: string
   state: DemoSessionState
   mode: 'NON_PAYABLE'
+  settlementType?: string | null
+  settlementProvider?: string | null
+  simulatedTransactionId?: number | null
+  transactionCode?: string | null
+  settledAt?: string | null
+  invoiceId?: number | null
+  invoiceNumber?: string | null
 }
 export interface CreatedDemoSession { session: DemoSession; confirmationUrl: string }
+
+export interface ReceptionActiveSession {
+  sessionId: string
+  bankCode: string
+  bankLabel: string
+  state: DemoSessionState
+  createdAt: string
+  expiresAt: string
+  serverTime: string
+}
+
+export interface ReceptionDeskProjection {
+  paymentId: number
+  paymentCode: string
+  amount: number
+  currency: 'VND'
+  paymentStatus: 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELED' | 'REFUNDED'
+  itemDescription: string | null
+  memberFullName: string | null
+  memberCode: string | null
+  memberId: number | null
+  settlementType: string | null
+  settlementProvider: string | null
+  simulatedTransactionId: number | null
+  activeSession: ReceptionActiveSession | null
+}
+
 const path = '/payments/simulated-qr/sessions'
 export const DEMO_TOKEN = /^[A-Za-z0-9_-]{43}$/
 
@@ -26,7 +60,7 @@ function session(value: unknown): DemoSession {
     || !Number.isSafeInteger(item.paymentId) || item.paymentId <= 0 || item.reference !== `DEMO-${item.paymentId}`
     || !Number.isFinite(Number(item.amount)) || Number(item.amount) <= 0 || item.currency !== 'VND'
     || !Object.values(DEMO_BANKS).some((bank) => bank.code === item.bankCode && bank.label === item.bankLabel)
-    || !['PENDING', 'AUTHORIZED_PENDING_SETTLEMENT', 'CANCELED', 'EXPIRED'].includes(item.state) || item.mode !== 'NON_PAYABLE'
+    || !['PENDING', 'AUTHORIZED_PENDING_SETTLEMENT', 'SETTLED', 'CANCELED', 'EXPIRED'].includes(item.state) || item.mode !== 'NON_PAYABLE'
     || ![item.createdAt, item.expiresAt, item.serverTime].every((time) => typeof time === 'string' && Number.isFinite(Date.parse(time)))) {
     throw new Error('Invalid demo session response')
   }
@@ -44,15 +78,17 @@ function created(value: unknown): CreatedDemoSession {
   return { session: snapshot, confirmationUrl: url.href }
 }
 
-/** The shared bearer client handles authentication; no financial endpoint is called here. */
+/** The shared bearer client handles authentication; simulated settlement is gated by backend capability. */
 export const demoQrApi = {
   capability: async (): Promise<boolean> => {
     const value = await api.get<{ enabled: boolean; settlementEnabled: boolean; contractVersion: number }>('/payments/simulated-qr/capability')
-    return value.enabled === true && value.settlementEnabled === false && value.contractVersion === 1
+    return value.enabled === true && value.settlementEnabled === true && value.contractVersion === 1
   },
   create: async (paymentId: number, bankCode: string) => created(await api.post(path, { paymentId, bankCode, requestId: crypto.randomUUID() })),
   get: async (id: string) => session(await api.get(`${path}/${encodeURIComponent(id)}`)),
   preview: async (token: string) => session(await api.post(`${path}/preview`, { token })),
-  confirm: async (token: string) => session(await api.post(`${path}/confirm-intent`, { token })),
+  confirm: async (token: string) => session(await api.post(`${path}/confirm`, { token })),
   cancel: async (id: string) => session(await api.post(`${path}/${encodeURIComponent(id)}/cancel`)),
+  receptionDeskProjection: async (paymentId: number): Promise<ReceptionDeskProjection> =>
+    api.get<ReceptionDeskProjection>(`/payments/simulated-qr/desk-projection/${encodeURIComponent(paymentId)}`),
 }

@@ -48,6 +48,10 @@ public class StaffPaymentResponse {
     private Long invoiceId;
     private String invoiceNumber;
 
+    private String settlementType;
+    private String settlementProvider;
+    private Long simulatedTransactionId;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

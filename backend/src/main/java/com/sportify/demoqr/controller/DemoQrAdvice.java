@@ -19,7 +19,12 @@ import org.springframework.core.MethodParameter;
 import java.util.Map;
 
 /** Never echo rejected token/body values, even through validation error messages. */
-@RestControllerAdvice(assignableTypes = {DemoQrController.class, LegacyDemoQrController.class, SimulatorCapabilityController.class})
+@RestControllerAdvice(assignableTypes = {
+        DemoQrController.class,
+        LegacyDemoQrController.class,
+        SimulatorCapabilityController.class,
+        ReceptionQrDisplayController.class
+})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class DemoQrAdvice implements ResponseBodyAdvice<Object> {
     @ExceptionHandler(DemoQrException.class)
@@ -35,7 +40,7 @@ public class DemoQrAdvice implements ResponseBodyAdvice<Object> {
     @ExceptionHandler({org.springframework.dao.DataAccessException.class, org.springframework.transaction.TransactionException.class})
     public ResponseEntity<Map<String, String>> databaseUnavailable(Exception ignored) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).header("Cache-Control", "no-store").header("Referrer-Policy", "no-referrer").body(Map.of("code", "SIMULATOR_RETRY",
-                "message", "Simulation state unavailable. Refresh before retrying; payment was not settled."));
+                "message", "Simulation state unavailable. Refresh before retrying to verify the authoritative server status."));
     }
 
     @Override

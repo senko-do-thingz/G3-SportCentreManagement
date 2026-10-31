@@ -30,7 +30,7 @@ const recentColumns: TableColumn<FinanceTransaction>[] = [
   { key: 'reference', header: 'Reference', render: (row) => <strong>{row.invoiceNumber ?? row.code}</strong> },
   { key: 'service', header: 'Service', render: (row) => <div className="manager-cell"><span className="manager-cell-primary">{row.itemName ?? row.itemCode ?? row.sportName ?? 'Service not provided'}</span><span>{row.memberName ?? row.memberCode ?? 'Member not provided'}</span></div> },
   { key: 'amount', header: 'Amount', align: 'right', render: (row) => <strong className="manager-nowrap">{formatMoney(row.amount)}</strong> },
-  { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} label={humanizeCode(row.status)} /> },
+  { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} label={row.status === 'SUCCESS' && row.settlementType === 'SIMULATED' ? 'Paid - Simulated' : humanizeCode(row.status)} /> },
   { key: 'time', header: 'Date', render: (row) => formatDateTime(row.time) },
 ]
 
@@ -71,6 +71,9 @@ export function ManagerFinancialOverviewPage() {
         <StatCard label="Paid revenue" value={formatMoney(resource.data.overview.paidRevenue)} hint={`${resource.data.overview.paidTransactions} successful transactions`} />
         <StatCard label="Pending payments" value={formatMoney(resource.data.overview.pendingAmount)} hint={`${resource.data.overview.pendingTransactions} pending transactions`} />
         <StatCard label="Refunded amount" value={formatMoney(resource.data.overview.refundedAmount)} hint={`${resource.data.overview.refundedTransactions} completed refunds`} />
+        {(resource.data.overview.simulatedTransactions > 0 || resource.data.overview.simulatedRevenue > 0) && (
+          <StatCard label="Simulated QR volume (non-cash)" value={formatMoney(resource.data.overview.simulatedRevenue)} hint={`${resource.data.overview.simulatedTransactions} simulated transactions (excluded from paid revenue)`} />
+        )}
       </section>
 
       <div className="finance-overview-grid">
