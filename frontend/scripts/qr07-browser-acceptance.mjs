@@ -1225,6 +1225,9 @@ async function run() {
   // ==========================================
   // STEP 4: Real Keyboard Navigation Verification (Tab and Shift+Tab)
   // ==========================================
+  await captureView(ctx1, `http://localhost:${port}/reception/payments/102/qr-display`,
+    'reception-1440-dark-settled-css-zoom.png',
+    { width: 1440, height: 900, theme: 'dark', zoom: 2, readySelector: '.reception-grid' })
   console.log('\n--- EXECUTING REAL KEYBOARD NAVIGATION (CDP TAB & SHIFT+TAB KEYSTROKES) ---')
   await ctx1.sendPage('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false })
   await ctx1.sendPage('Page.navigate', { url: `http://localhost:${port}/reception/payments/101/qr-display` })

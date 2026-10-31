@@ -689,6 +689,11 @@ try:
         check('Context 2 Confirm preview axe has 0 violations', preview_axe['violationsCount'] == 0)
 
         confirm_before = snapshot('beforeLostResponseConfirmation')
+        before_payment = sql_json(f"SELECT id,payment_status,settlement_type,simulated_transaction_id FROM dbo.payment WHERE id={p1_id} FOR JSON PATH,INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER;")
+        sql_evidence['paymentBeforeConfirmation'] = before_payment
+        check('Before confirmation payment is PENDING without a simulated transaction',
+              before_payment['payment_status'] == 'PENDING' and before_payment['simulated_transaction_id'] is None
+              and sql(f'SELECT COUNT(*) FROM dbo.simulated_payment_transaction WHERE payment_id={p1_id};') == '0')
         check('Repeated live preview reads preserve pending SQL state', confirm_before == sql_evidence['snapshots']['afterPendingJvmRestart']['sha256'])
         measured = measure_brand(page2, 'confirmation-light')
         check('confirmation-light: brand local contrast meets conservative 4.5 threshold', measured['passed'])
@@ -812,8 +817,8 @@ try:
             page3.set_viewport_size({'width': width, 'height': height})
             page3.evaluate('(zoom) => document.body.style.zoom = zoom', zoom)
             geometry = page3.evaluate('() => ({scrollWidth:document.documentElement.scrollWidth, clientWidth:document.documentElement.clientWidth, cssZoom:getComputedStyle(document.body).zoom})')
-            check(label + ': no horizontal overflow', geometry['scrollWidth'] <= geometry['clientWidth'], geometry=geometry)
             page3.screenshot(path=str(args.out / f'screenshots/ci-e2e-reception-{label}.png'))
+            check(label + ': no horizontal overflow', geometry['scrollWidth'] <= geometry['clientWidth'], geometry=geometry)
             layout_results.append({'label': label, **geometry, 'nativeBrowserZoom': 'NOT RUN'})
         (args.out / 'browser-logs/keyboard-navigation.json').write_text(json.dumps(keyboard_results, indent=2) + '\n', encoding='ascii')
         (args.out / 'browser-logs/layout-geometry.json').write_text(json.dumps(layout_results, indent=2) + '\n', encoding='ascii')
@@ -936,6 +941,7 @@ try:
     check('Manager transaction list contains committed simulated provenance', status_transactions == 200 and
           any(str(item.get('settlementType')) == 'SIMULATED' and item.get('settlementProvider') == 'SPORTIFY_SIMULATOR'
               for item in transactions.get('content', [])))
+    sql_evidence['managerTransactions'] = transactions
     export_status, export_csv = api_request('/manager/finance/revenue/export', bearer=auth_mgr['accessToken'], response_format='text')
     check('Actual revenue CSV export does not include simulated payment', export_status == 200 and 'QR07-CI-P01' not in export_csv)
     sql_evidence['financeExport'] = {'status': export_status, 'sha256': hashlib.sha256(export_csv.encode()).hexdigest(),
@@ -949,6 +955,8 @@ try:
           disabled_pid > 0 and history_status == 200 and receipt_status == 200
           and any(item.get('id') == p1_id and item.get('settlementType') == 'SIMULATED' for item in history.get('content', []))
           and receipt.get('paymentId') == p1_id)
+    sql_evidence['disabledSimulatorHistory'] = history
+    sql_evidence['disabledSimulatorReceipt'] = receipt
     disabled_status, disabled_capability = api_request('/payments/simulated-qr/capability', bearer=auth_mem['accessToken'])
     check('Restarted server reports simulator disabled', disabled_status == 200 and not disabled_capability.get('enabled') and not disabled_capability.get('settlementEnabled'))
     check('Kill-switch history and receipt reads preserve all 12 SQL tables', after_fingerprints == snapshot('afterDisabledJvmRestartHistoryReads'))

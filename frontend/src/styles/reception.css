@@ -99,6 +99,24 @@
   align-items: start;
 }
 
+/* Keep the QR desk readable when CSS scaling narrows its content container. */
+.reception-qr-display-page {
+  container-type: inline-size;
+  container-name: reception-qr;
+}
+
+.reception-qr-display-page .summary-list dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@container reception-qr (max-width: 600px) {
+  .reception-qr-display-page .payment-hero,
+  .reception-qr-display-page .reception-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .reception-side-note {
   margin: 0;
   height: 100%;
