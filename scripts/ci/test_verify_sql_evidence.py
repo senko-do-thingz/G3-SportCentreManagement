@@ -14,6 +14,7 @@ Validates genuine positive execution and 9 mandatory negative control categories
  10. Marker appearing only in suite-level output (rejected)
 
 All negative controls must fail closed (raise ValueError or exit nonzero).
+Self-contained without external repository path assumptions.
 """
 
 import copy
@@ -27,26 +28,221 @@ import unittest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VERIFIER_SCRIPT = REPO_ROOT / "scripts" / "verify-sql-evidence.py"
-GENUINE_XML_PATH = (
-    REPO_ROOT
-    / "tasks"
-    / "QR-06 (i)"
-    / "reports"
-    / "round-05"
-    / "ci-evidence"
-    / "run-41172370718"
-    / "failsafe-reports-integration"
-    / "TEST-com.sportify.demoqr.DemoQrDatabaseIntegrationTest.xml"
-)
-GENUINE_JSON_PATH = (
-    REPO_ROOT
-    / "tasks"
-    / "QR-06 (i)"
-    / "reports"
-    / "round-05"
-    / "sql-evidence"
-    / "qr06-round05-sql-evidence.json"
-)
+
+# Genuine Round 05 SQL Server 2022 Testcontainers evidence payload
+GENUINE_JSON_STRING = r'''{
+  "title": "QR-06 (i) Round 05 - SQL-Backed Desk Projection Zero-Write Verification",
+  "testClass": "com.sportify.demoqr.DemoQrDatabaseIntegrationTest",
+  "testMethod": "deskProjectionAndRepeatedPollingProducesStrictlyZeroDatabaseWrites",
+  "databaseEngine": "Microsoft SQL Server 2022 (Testcontainers mssql/server:2022-latest)",
+  "targetPaymentId": 39,
+  "utcTimestamp": "2026-10-31T05:25:40.796819137Z",
+  "snapshotAlgorithm": "SHA-256 over sorted TreeMap canonical row string representations: database.queryForList(\"SELECT * FROM [\" + table + \"]\").stream().map(row -> new TreeMap<>(row).toString()).sorted().toList().toString()",
+  "emptyTableCanonicalString": "[]",
+  "emptyTableSha256Digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "executedRequests": [
+    {
+      "actualStatus": 200,
+      "expectedStatus": 200,
+      "requestNumber": 1,
+      "description": "Initial projection fetch by front desk staff",
+      "role": "RECEPTIONIST",
+      "method": "GET"
+    },
+    {
+      "actualStatus": 200,
+      "expectedStatus": 200,
+      "requestNumber": 2,
+      "description": "Sequential poll 1 (0s test interval; frontend client polls at 4s)",
+      "role": "RECEPTIONIST",
+      "method": "GET"
+    },
+    {
+      "actualStatus": 200,
+      "expectedStatus": 200,
+      "requestNumber": 3,
+      "description": "Sequential poll 2 (0s test interval; frontend client polls at 4s)",
+      "role": "RECEPTIONIST",
+      "method": "GET"
+    },
+    {
+      "actualStatus": 200,
+      "expectedStatus": 200,
+      "requestNumber": 4,
+      "description": "Sequential poll 3 (0s test interval; frontend client polls at 4s)",
+      "role": "RECEPTIONIST",
+      "method": "GET"
+    },
+    {
+      "actualStatus": 200,
+      "expectedStatus": 200,
+      "requestNumber": 5,
+      "description": "Sequential poll 4 (0s test interval; frontend client polls at 4s)",
+      "role": "RECEPTIONIST",
+      "method": "GET"
+    },
+    {
+      "actualStatus": 200,
+      "expectedStatus": 200,
+      "requestNumber": 6,
+      "description": "Supervisor desk projection read access (HTTP 200 OK verified)",
+      "role": "MANAGER",
+      "method": "GET"
+    },
+    {
+      "actualStatus": 403,
+      "expectedStatus": 403,
+      "requestNumber": 7,
+      "description": "Customer forbidden from desk projection (HTTP 403 Forbidden verified)",
+      "role": "MEMBER",
+      "method": "GET"
+    },
+    {
+      "actualStatus": 401,
+      "expectedStatus": 401,
+      "requestNumber": 8,
+      "description": "Unauthenticated request rejected (HTTP 401 Unauthorized verified)",
+      "role": "ANONYMOUS",
+      "method": "GET"
+    }
+  ],
+  "totalMonitoredTables": 12,
+  "zeroWritesConfirmed": true,
+  "tables": [
+    {
+      "tableName": "cash_capture_ticket",
+      "status": "EMPTY",
+      "rowCountBefore": 0,
+      "rowCountAfter": 0,
+      "rowCountDelta": 0,
+      "sha256DigestBefore": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "sha256DigestAfter": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "digestsIdentical": true,
+      "mutationDetected": false
+    },
+    {
+      "tableName": "cash_coverage",
+      "status": "POPULATED",
+      "rowCountBefore": 1,
+      "rowCountAfter": 1,
+      "rowCountDelta": 0,
+      "sha256DigestBefore": "f8fa065769ec02a8522f68cb0f2d62d48b111adb1c166dd86d4c671527d2a01d",
+      "sha256DigestAfter": "f8fa065769ec02a8522f68cb0f2d62d48b111adb1c166dd86d4c671527d2a01d",
+      "digestsIdentical": true,
+      "mutationDetected": false
+    },
+    {
+      "tableName": "cash_event",
+      "status": "EMPTY",
+      "rowCountBefore": 0,
+      "rowCountAfter": 0,
+      "rowCountDelta": 0,
+      "sha256DigestBefore": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "sha256DigestAfter": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "digestsIdentical": true,
+      "mutationDetected": false
+    },
+    {
+      "tableName": "invoice",
+      "status": "POPULATED",
+      "rowCountBefore": 8,
+      "rowCountAfter": 8,
+      "rowCountDelta": 0,
+      "sha256DigestBefore": "daf56b55f5feb97142779a1a4b94f859eaa717ea6b126ba19bf03221dfdf2598",
+      "sha256DigestAfter": "daf56b55f5feb97142779a1a4b94f859eaa717ea6b126ba19bf03221dfdf2598",
+      "digestsIdentical": true,
+      "mutationDetected": false
+    },
+    {
+      "tableName": "invoice_line",
+      "status": "POPULATED",
+      "rowCountBefore": 8,
+      "rowCountAfter": 8,
+      "rowCountDelta": 0,
+      "sha256DigestBefore": "2f32de7bac34ab9ba6737d9c3433406312f94479062390fbd43332bbf2ad922a",
+      "sha256DigestAfter": "2f32de7bac34ab9ba6737d9c3433406312f94479062390fbd43332bbf2ad922a",
+      "digestsIdentical": true,
+      "mutationDetected": false
+    },
+    {
+      "tableName": "member_card",
+      "status": "POPULATED",
+      "rowCountBefore": 38,
+      "rowCountAfter": 38,
+      "rowCountDelta": 0,
+      "sha256DigestBefore": "0b0af12340bc8fcb438f34c5356d5f62629e5e3e18486dab4ef9c1728143f359",
+      "sha256DigestAfter": "0b0af12340bc8fcb438f34c5356d5f62629e5e3e18486dab4ef9c1728143f359",
+      "digestsIdentical": true,
+      "mutationDetected": false
+    },
+    {
+      "tableName": "payment",
+      "status": "POPULATED",
+      "rowCountBefore": 39,
+      "rowCountAfter": 39,
+      "rowCountDelta": 0,
+      "sha256DigestBefore": "f8430df66fca1707e75faad0b414691d74b5696fd52187edd02eef891884c576",
+      "sha256DigestAfter": "f8430df66fca1707e75faad0b414691d74b5696fd52187edd02eef891884c576",
+      "digestsIdentical": true,
+      "mutationDetected": false
+    },
+    {
+      "tableName": "refund_request",
+      "status": "EMPTY",
+      "rowCountBefore": 0,
+      "rowCountAfter": 0,
+      "rowCountDelta": 0,
+      "sha256DigestBefore": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "sha256DigestAfter": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "digestsIdentical": true,
+      "mutationDetected": false
+    },
+    {
+      "tableName": "simulated_payment_transaction",
+      "status": "POPULATED",
+      "rowCountBefore": 8,
+      "rowCountAfter": 8,
+      "rowCountDelta": 0,
+      "sha256DigestBefore": "3b5fffbcd28363c1ea3198df29aa7e35aec4118689c791c2134ae6f6d8cb654e",
+      "sha256DigestAfter": "3b5fffbcd28363c1ea3198df29aa7e35aec4118689c791c2134ae6f6d8cb654e",
+      "digestsIdentical": true,
+      "mutationDetected": false
+    },
+    {
+      "tableName": "simulated_qr_session",
+      "status": "POPULATED",
+      "rowCountBefore": 38,
+      "rowCountAfter": 38,
+      "rowCountDelta": 0,
+      "sha256DigestBefore": "1506c9a4c14daceb6393011edf1abf1f82e7faef590251f73fd95f0f9886ccee",
+      "sha256DigestAfter": "1506c9a4c14daceb6393011edf1abf1f82e7faef590251f73fd95f0f9886ccee",
+      "digestsIdentical": true,
+      "mutationDetected": false
+    },
+    {
+      "tableName": "simulated_qr_transition",
+      "status": "POPULATED",
+      "rowCountBefore": 66,
+      "rowCountAfter": 66,
+      "rowCountDelta": 0,
+      "sha256DigestBefore": "4f779563336b70a8aef5fc8a903a9bb6649ff60da463b787c4a751980269199e",
+      "sha256DigestAfter": "4f779563336b70a8aef5fc8a903a9bb6649ff60da463b787c4a751980269199e",
+      "digestsIdentical": true,
+      "mutationDetected": false
+    },
+    {
+      "tableName": "sport_package_registration",
+      "status": "POPULATED",
+      "rowCountBefore": 1,
+      "rowCountAfter": 1,
+      "rowCountDelta": 0,
+      "sha256DigestBefore": "55aa1ef4c687c864c20f4f7c4c6c552060e1a59f62d9cc6d2ef9647bb203c788",
+      "sha256DigestAfter": "55aa1ef4c687c864c20f4f7c4c6c552060e1a59f62d9cc6d2ef9647bb203c788",
+      "digestsIdentical": true,
+      "mutationDetected": false
+    }
+  ]
+}'''
 
 # Dynamic import of verify-sql-evidence.py
 spec = importlib.util.spec_from_file_location("verify_sql_evidence_mod", VERIFIER_SCRIPT)
@@ -57,14 +253,21 @@ spec.loader.exec_module(verifier_mod)
 class TestVerifySqlEvidence(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        with open(GENUINE_JSON_PATH, "r", encoding="utf-8") as f:
-            cls.genuine_json_data = json.load(f)
-        _, cls.genuine_xml_data = verifier_mod.extract_json_from_junit_xml(str(GENUINE_XML_PATH))
+        cls.genuine_json_data = json.loads(GENUINE_JSON_STRING)
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
         self.work_dir = Path(self.temp_dir.name)
+
+        # Create genuine files in tempdir for clean, isolated testing
+        self.genuine_json_file = self.work_dir / "genuine.json"
+        self.genuine_json_file.write_text(GENUINE_JSON_STRING, encoding="utf-8")
+
+        self.genuine_xml_file = self.create_custom_xml(
+            testcase_body=f"=== GENUINE SQL EVIDENCE JSON ===\n{GENUINE_JSON_STRING}"
+        )
+        _, self.genuine_xml_data = verifier_mod.extract_json_from_junit_xml(str(self.genuine_xml_file))
 
     def run_verifier_process(self, xml_path: Path, json_path: Path) -> subprocess.CompletedProcess:
         cmd = [
@@ -87,7 +290,7 @@ class TestVerifySqlEvidence(unittest.TestCase):
         skipped: bool = False,
         duplicate_testcase: bool = False,
     ) -> Path:
-        xml_file = self.work_dir / "custom-test.xml"
+        xml_file = self.work_dir / f"test-{abs(hash(testcase_body))}.xml"
         tc_children = []
         if failure_msg:
             tc_children.append(f'<failure message="{failure_msg}">{failure_msg}</failure>')
@@ -118,7 +321,7 @@ class TestVerifySqlEvidence(unittest.TestCase):
         diffs = verifier_mod.verify_sql_evidence(self.genuine_xml_data, self.genuine_json_data)
         self.assertEqual([], diffs, f"Expected zero differences in genuine evidence, got: {diffs}")
 
-        proc = self.run_verifier_process(GENUINE_XML_PATH, GENUINE_JSON_PATH)
+        proc = self.run_verifier_process(self.genuine_xml_file, self.genuine_json_file)
         self.assertEqual(0, proc.returncode, f"Verifier process failed on genuine data:\n{proc.stdout}\n{proc.stderr}")
         self.assertIn("100% whole-document recursive deep equality and semantic safety verified!", proc.stdout)
 
@@ -132,7 +335,7 @@ class TestVerifySqlEvidence(unittest.TestCase):
 
         json_file = self.work_dir / "tampered-algo.json"
         json_file.write_text(json.dumps(tampered), encoding="utf-8")
-        proc = self.run_verifier_process(GENUINE_XML_PATH, json_file)
+        proc = self.run_verifier_process(self.genuine_xml_file, json_file)
         self.assertEqual(1, proc.returncode)
         self.assertIn("root['snapshotAlgorithm']", proc.stdout)
 
@@ -149,13 +352,12 @@ class TestVerifySqlEvidence(unittest.TestCase):
 
         json_file = self.work_dir / "tampered-desc.json"
         json_file.write_text(json.dumps(tampered), encoding="utf-8")
-        proc = self.run_verifier_process(GENUINE_XML_PATH, json_file)
+        proc = self.run_verifier_process(self.genuine_xml_file, json_file)
         self.assertEqual(1, proc.returncode)
         self.assertIn("root['executedRequests'][0]['description']", proc.stdout)
 
     def test_04_negative_unexpected_root_and_nested_keys(self):
         """Injecting unexpected keys at root and nested levels must trigger full-path diffs and exit code 1."""
-        # 4a. Unexpected root key
         tampered_root = copy.deepcopy(self.genuine_json_data)
         tampered_root["unexpectedRootField"] = "malicious_injection"
 
@@ -165,7 +367,6 @@ class TestVerifySqlEvidence(unittest.TestCase):
             f"Expected unexpected root key diff, got: {diffs_root}",
         )
 
-        # 4b. Unexpected nested key in table
         tampered_nested = copy.deepcopy(self.genuine_json_data)
         tampered_nested["tables"][0]["unexpectedTableField"] = True
 
@@ -177,7 +378,7 @@ class TestVerifySqlEvidence(unittest.TestCase):
 
         json_file = self.work_dir / "unexpected-key.json"
         json_file.write_text(json.dumps(tampered_root), encoding="utf-8")
-        proc = self.run_verifier_process(GENUINE_XML_PATH, json_file)
+        proc = self.run_verifier_process(self.genuine_xml_file, json_file)
         self.assertEqual(1, proc.returncode)
         self.assertIn("root['unexpectedRootField']", proc.stdout)
 
@@ -194,13 +395,12 @@ class TestVerifySqlEvidence(unittest.TestCase):
 
         json_file = self.work_dir / "tampered-digest.json"
         json_file.write_text(json.dumps(tampered), encoding="utf-8")
-        proc = self.run_verifier_process(GENUINE_XML_PATH, json_file)
+        proc = self.run_verifier_process(self.genuine_xml_file, json_file)
         self.assertEqual(1, proc.returncode)
         self.assertIn("root['tables'][0]['sha256DigestBefore']", proc.stdout)
 
     def test_06_negative_removed_and_duplicate_table(self):
         """Removing a table or having duplicate table names must fail both semantic safety and deep equality."""
-        # Removed table (11 tables instead of 12)
         tampered_removed = copy.deepcopy(self.genuine_json_data)
         tampered_removed["tables"] = tampered_removed["tables"][:11]
         tampered_removed["totalMonitoredTables"] = 11
@@ -211,7 +411,6 @@ class TestVerifySqlEvidence(unittest.TestCase):
             f"Expected table count failure, got: {diffs_rem}",
         )
 
-        # Duplicate table name
         tampered_dup = copy.deepcopy(self.genuine_json_data)
         tampered_dup["tables"][1]["tableName"] = tampered_dup["tables"][0]["tableName"]
         diffs_dup = verifier_mod.verify_sql_evidence(self.genuine_xml_data, tampered_dup)
@@ -222,14 +421,14 @@ class TestVerifySqlEvidence(unittest.TestCase):
 
     def test_07_negative_malformed_json(self):
         """Malformed JSON payloads in XML or JSON files must fail with error and exit code 1."""
-        malformed_body = "=== GENUINE SQL EVIDENCE JSON ===\n{ \"invalid\": [ unquoted string }"
+        malformed_body = '=== GENUINE SQL EVIDENCE JSON ===\n{ "invalid": [ unquoted string }'
         xml_file = self.create_custom_xml(testcase_body=malformed_body)
 
         with self.assertRaises(ValueError) as ctx:
             verifier_mod.extract_json_from_junit_xml(str(xml_file))
         self.assertIn("Malformed JSON", str(ctx.exception))
 
-        proc = self.run_verifier_process(xml_file, GENUINE_JSON_PATH)
+        proc = self.run_verifier_process(xml_file, self.genuine_json_file)
         self.assertEqual(1, proc.returncode)
 
     def test_08_negative_missing_testcase(self):
@@ -240,33 +439,31 @@ class TestVerifySqlEvidence(unittest.TestCase):
             verifier_mod.extract_json_from_junit_xml(str(xml_file))
         self.assertIn("not found in JUnit XML", str(ctx.exception))
 
-        proc = self.run_verifier_process(xml_file, GENUINE_JSON_PATH)
+        proc = self.run_verifier_process(xml_file, self.genuine_json_file)
         self.assertEqual(1, proc.returncode)
 
     def test_09_negative_testcase_with_failure(self):
         """Testcase containing a <failure> or <error> node must fail closed even if it emitted evidence."""
-        evidence_str = json.dumps(self.genuine_json_data)
-        body = f"=== GENUINE SQL EVIDENCE JSON ===\n{evidence_str}"
+        body = f"=== GENUINE SQL EVIDENCE JSON ===\n{GENUINE_JSON_STRING}"
         xml_file = self.create_custom_xml(testcase_body=body, failure_msg="AssertionError: delta was 1")
 
         with self.assertRaises(ValueError) as ctx:
             verifier_mod.extract_json_from_junit_xml(str(xml_file))
         self.assertIn("contains a <failure> node", str(ctx.exception))
 
-        proc = self.run_verifier_process(xml_file, GENUINE_JSON_PATH)
+        proc = self.run_verifier_process(xml_file, self.genuine_json_file)
         self.assertEqual(1, proc.returncode)
 
     def test_10_negative_marker_only_in_suite_level_output(self):
         """Marker appearing only in suite-level <system-out> instead of testcase <system-out> must be rejected."""
-        evidence_str = json.dumps(self.genuine_json_data)
-        suite_body = f"=== GENUINE SQL EVIDENCE JSON ===\n{evidence_str}"
+        suite_body = f"=== GENUINE SQL EVIDENCE JSON ===\n{GENUINE_JSON_STRING}"
         xml_file = self.create_custom_xml(testcase_body="", suite_body=suite_body)
 
         with self.assertRaises(ValueError) as ctx:
             verifier_mod.extract_json_from_junit_xml(str(xml_file))
         self.assertIn("No <system-out> found inside testcase", str(ctx.exception))
 
-        proc = self.run_verifier_process(xml_file, GENUINE_JSON_PATH)
+        proc = self.run_verifier_process(xml_file, self.genuine_json_file)
         self.assertEqual(1, proc.returncode)
 
 
