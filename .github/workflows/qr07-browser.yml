@@ -7,13 +7,22 @@ on:
       - backend/src/main/java/com/sportify/demoqr/**
       - backend/src/main/java/com/sportify/payment/**
       - backend/src/main/java/com/sportify/identity/**
+      - backend/src/main/java/com/sportify/core/**
+      - backend/src/main/java/com/sportify/config/**
+      - backend/pom.xml
       - backend/src/main/resources/application*.properties
       - backend/src/main/resources/application*.yml
       - backend/src/main/resources/db/migration/catalog/V34__create_simulated_qr_foundation.sql
       - backend/src/main/resources/db/migration/catalog/V35__create_simulated_qr_settlement.sql
       - backend/src/main/resources/db/migration/catalog/V36__enforce_simulated_settlement_provenance.sql
-      - frontend/scripts/qr07-*.py
+      - frontend/scripts/*qr07*.py
       - frontend/scripts/qr07-*.mjs
+      - frontend/package.json
+      - frontend/package-lock.json
+      - frontend/vite.config.*
+      - frontend/src/api/client.ts
+      - frontend/src/components/Brand.tsx
+      - frontend/src/theme/**
       - frontend/src/api/demoQrApi.ts
       - frontend/src/auth/**
       - frontend/src/config/**
@@ -22,8 +31,7 @@ on:
       - frontend/src/pages/member/QrPaymentDemoPage.tsx
       - frontend/src/pages/member/PaymentSummaryPage.tsx
       - frontend/src/pages/reception/ReceptionQrDisplayPage.tsx
-      - frontend/src/styles/paymentWorkspace.css
-      - frontend/src/styles/reception.css
+      - frontend/src/styles/**
 
 permissions:
   contents: read
@@ -68,6 +76,8 @@ jobs:
       - name: Build the real backend
         working-directory: backend
         run: mvn -B -ntp package -DskipTests -DskipITs
+      - name: Verify evidence helpers and negative controls
+        run: python3 -m unittest discover -s frontend/scripts -p 'test_qr07*.py' -v
       - name: Build the real simulator assets
         working-directory: frontend
         env:

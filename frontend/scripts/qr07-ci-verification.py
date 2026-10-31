@@ -9,6 +9,7 @@ import http.server
 from io import BytesIO
 import ipaddress
 import json
+import math
 import mimetypes
 import os
 from pathlib import Path
@@ -21,7 +22,11 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 import uuid
+from qr07_evidence import (
+    TABLES, constraint_rejected, correlation_observation, localized_contrast, validate_fingerprints,
+)
 
 parser = argparse.ArgumentParser()
 for name in ['jar', 'assets', 'axe', 'out', 'private']:
@@ -51,6 +56,9 @@ head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
 
 report = {
     'head': head,
+    'runId': os.environ.get('GITHUB_RUN_ID'),
+    'runAttempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
+    'runUrl': f"https://github.com/{os.environ.get('GITHUB_REPOSITORY')}/actions/runs/{os.environ.get('GITHUB_RUN_ID')}",
     'database': database,
     'environment': 'GitHub Actions Ubuntu 24.04 (Architecture A)',
     'checks': [],
@@ -60,15 +68,40 @@ report = {
 network_logs = []
 console_logs = []
 axe_results = []
+contrast_results = []
+browser_events = []
+sql_evidence = {'head': head, 'database': database, 'runId': report['runId'], 'snapshots': {}}
+primary_keys = {}
+secrets = [password]
 process = None
 logs = []
 
 
 def check(name, passed, **details):
-    report['checks'].append({'name': name, 'passed': bool(passed), **details})
+    report['checks'].append({'name': name, 'passed': bool(passed), 'timestamp': timestamp(), **details})
     print(f"[CHECK] {'PASS' if passed else 'FAIL'}: {name}")
     if not passed:
         raise AssertionError(f'FAILED CHECK: {name}')
+
+
+def timestamp():
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
+def sanitize(value):
+    text = str(value)
+    for secret in secrets:
+        if secret:
+            text = text.replace(secret, '[REDACTED]')
+    text = re.sub(r'(?i)(bearer\s+)[A-Za-z0-9._-]+', r'\1[REDACTED]', text)
+    text = re.sub(r'(?i)([?#&]token=)[A-Za-z0-9_-]+', r'\1[REDACTED]', text)
+    return text.encode('ascii', errors='backslashreplace').decode('ascii')
+
+
+def snapshot(name):
+    result = fingerprints()
+    sql_evidence['snapshots'][name] = {'timestamp': timestamp(), 'sha256': result}
+    return result
 
 
 def sql(query, target=None):
@@ -111,27 +144,22 @@ def sql_json(query, target=None):
     if result.returncode:
         raise RuntimeError(f'Dedicated CI SQL JSON command failed: {result.stderr.strip()}')
     raw = ''.join(line.strip() for line in result.stdout.splitlines() if line.strip())
-    return json.loads(raw) if raw else []
+    if not raw:
+        raise ValueError('SQL JSON command returned no evidence')
+    return json.loads(raw)
 
 
 def fingerprints():
-    tables = [
-        'payment', 'invoice', 'invoice_line', 'member_card', 'sport_package_registration',
-        'refund_request', 'cash_event', 'cash_capture_ticket', 'cash_coverage',
-        'simulated_payment_transaction', 'simulated_qr_session', 'activity_log',
-    ]
-    def sort_clause(table_name):
-        if table_name == 'cash_capture_ticket':
-            return 'ORDER BY transaction_id, event_type, source_id'
-        return 'ORDER BY id'
-
-    return {
+    if set(primary_keys) != set(TABLES):
+        raise ValueError('Primary key discovery incomplete')
+    return validate_fingerprints({
         table: sql(
             "SELECT CONVERT(varchar(64),HASHBYTES('SHA2_256',CONVERT(nvarchar(max),"
-            f"(SELECT * FROM dbo.{table} {sort_clause(table)} FOR JSON PATH,INCLUDE_NULL_VALUES))),2);"
+            f"(SELECT * FROM dbo.[{table}] ORDER BY {','.join('[' + c + ']' for c in primary_keys[table])} "
+            "FOR JSON PATH,INCLUDE_NULL_VALUES))),2);"
         )
-        for table in tables
-    }
+        for table in TABLES
+    })
 
 
 def api_request(path, body=None, bearer=None, method=None):
@@ -143,6 +171,9 @@ def api_request(path, body=None, bearer=None, method=None):
     req = urllib.request.Request('https://127.0.0.1:55444/api/v1' + path, data, headers, method=req_method)
     client_corr = str(uuid.uuid4())
     req.add_header('X-Correlation-Id', client_corr)
+    sent_corr = req.get_header('X-correlation-id')
+    if sent_corr != client_corr:
+        raise ValueError('Correlation header missing from actual outbound request')
     server_corr = None
     try:
         with urllib.request.urlopen(req, context=tls, timeout=20) as response:
@@ -164,6 +195,7 @@ def api_request(path, body=None, bearer=None, method=None):
         'status': status,
         'clientCorrelationId': client_corr,
         'serverCorrelationId': server_corr,
+        'sentHeaderVerified': sent_corr == client_corr,
         'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat(),
     })
     return status, resp_data
@@ -256,7 +288,7 @@ try:
             time.sleep(2)
 
     sql(f'CREATE DATABASE [{database}];', 'master')
-    check('Dedicated disposable SQL Server database created', True, database=database)
+    check('Dedicated disposable SQL Server database created', sql('SELECT DB_NAME();') == database, database=database)
 
     # Step 2: Generate TLS certificates for HTTPS loopback
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -301,6 +333,21 @@ try:
         'Fresh isolated SQL migrated through V36',
         sql('SELECT MAX(TRY_CONVERT(int,version)) FROM flyway_schema_history WHERE success=1;') == '36',
     )
+    sql_evidence['server'] = sql_json('SELECT DB_NAME() AS databaseName, @@VERSION AS version FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;')
+    key_rows = sql_json("""
+        SELECT t.name AS tableName, c.name AS columnName, ic.key_ordinal AS ordinal
+        FROM sys.tables t JOIN sys.indexes i ON i.object_id=t.object_id AND i.is_primary_key=1
+        JOIN sys.index_columns ic ON ic.object_id=i.object_id AND ic.index_id=i.index_id
+        JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id
+        WHERE SCHEMA_NAME(t.schema_id)='dbo' ORDER BY t.name,ic.key_ordinal FOR JSON PATH;
+    """)
+    for row in key_rows:
+        if row['tableName'] in TABLES:
+            if not re.fullmatch(r'[a-z_]+', row['columnName']):
+                raise ValueError('Unexpected SQL identifier')
+            primary_keys.setdefault(row['tableName'], []).append(row['columnName'])
+    check('All 12 fingerprint orderings use discovered unique primary keys', set(primary_keys) == set(TABLES), keys=primary_keys)
+    sql_evidence['primaryKeys'] = primary_keys
 
     # Step 4: Synthetic Data Seeding inside isolated SQL
     encoded_pw = bcrypt.hashpw(b'Qr07IsolatedTest2026!', bcrypt.gensalt(rounds=10)).decode()
@@ -336,6 +383,7 @@ try:
 
     status_rec, auth_rec = api_request('/auth/login', {'email': 'receptionist@qr07.example.test', 'password': 'Qr07IsolatedTest2026!'})
     check('Real Receptionist authentication succeeds with genuine JWT', status_rec == 200 and 'accessToken' in auth_rec)
+    secrets.extend(auth.get(field) for auth in (auth_mem, auth_rec) for field in ('accessToken', 'refreshToken', 'sessionId'))
 
     # Step 6: Simulator Capability Check
     status_cap, cap = api_request('/payments/simulated-qr/capability', bearer=auth_mem['accessToken'])
@@ -352,8 +400,9 @@ try:
     check('Member attempting receptionist desk projection is rejected with 403 Forbidden', status_rej3 == 403)
 
     # Step 8: Baseline Financial Fingerprints
-    before_fingerprints = fingerprints()
+    before_fingerprints = snapshot('beforeSessionCreation')
     check('Recorded authoritative baseline 12-table SHA-256 digests', len(before_fingerprints) == 12)
+    check('Repeated baseline SQL snapshot is deterministic', before_fingerprints == snapshot('repeatedBaseline'))
 
     # Step 9: Launch Static Server for Frontend Assets
     class StaticHandler(http.server.SimpleHTTPRequestHandler):
@@ -374,7 +423,8 @@ try:
     server_tls.load_cert_chain(args.private / 'tls-cert.pem', args.private / 'tls-key.pem')
     httpd.socket = server_tls.wrap_socket(httpd.socket, server_side=True)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    check('Frontend asset server listening on HTTPS 55443', True)
+    with urllib.request.urlopen('https://127.0.0.1:55443/', context=tls, timeout=10) as response:
+        check('Frontend asset server listening on HTTPS 55443', response.status == 200)
 
     # Step 10: Multi-tier Two-Context Genuine Browser E2E with Playwright Edge
     print('\n--- EXECUTING GENUINE TWO-CONTEXT BROWSER E2E ---')
@@ -408,21 +458,108 @@ try:
                 const r = await axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } });
                 return {
                     violationsCount: r.violations.length,
-                    violations: r.violations.map(v => ({ id: v.id, impact: v.impact, description: v.description })),
+                    violations: r.violations,
                     passesCount: r.passes.length,
-                    incompleteCount: r.incomplete.length
+                    incompleteCount: r.incomplete.length,
+                    incomplete: r.incomplete
                 };
             }""")
             axe_results.append({'view': view_name, 'axe': res})
             return res
 
+        def observe_page(page, label):
+            def event(kind, request, **details):
+                parsed = urlsplit(request.url)
+                if parsed.path.startswith('/api/v1/'):
+                    browser_events.append({'context': label, 'event': kind, 'timestamp': timestamp(),
+                                           'method': request.method, 'path': parsed.path,
+                                           'clientCorrelationId': request.headers.get('x-correlation-id'), **details})
+            page.on('request', lambda request: event('request', request))
+            page.on('requestfailed', lambda request: event('requestfailed', request, failure=request.failure))
+            def response_received(response):
+                details = {'status': response.status, 'serverCorrelationId': response.headers.get('x-correlation-id')}
+                if '/desk-projection/' in response.url and response.status == 200:
+                    data = response.json()
+                    details.update({key: data.get(key) for key in (
+                        'paymentStatus', 'settlementType', 'settlementProvider', 'simulatedTransactionId')})
+                    check('Live desk GET response contains no secret confirmation material',
+                          all(key not in json.dumps(data).lower() for key in ('token', 'confirmationurl')))
+                event('response', response.request, **details)
+            page.on('response', response_received)
+            page.on('console', lambda msg: console_logs.append(sanitize(f'[{label}] {msg.type}: {msg.text}')))
+
+        def measure_brand(page, label, selector='.brand__name'):
+            element = page.locator(selector).first
+            expect(element).to_be_visible()
+            page.evaluate('() => document.fonts.ready')
+            box = element.bounding_box()
+            if not box:
+                raise ValueError('Brand geometry unavailable')
+            clip = {'x': math.floor(box['x']), 'y': math.floor(box['y']),
+                    'width': math.ceil(box['x'] + box['width']) - math.floor(box['x']),
+                    'height': math.ceil(box['y'] + box['height']) - math.floor(box['y'])}
+            css = element.evaluate("""el => {
+                const s = getComputedStyle(el);
+                return {color:s.color, textFill:s.webkitTextFillColor, backgroundImage:s.backgroundImage,
+                        backgroundClip:s.backgroundClip, opacity:s.opacity, fontSize:s.fontSize,
+                        fontWeight:s.fontWeight, textShadow:s.textShadow, style:el.getAttribute('style')};
+            }""")
+            captures = {}
+            try:
+                for mode in ('original', 'background', 'black', 'white'):
+                    element.evaluate("""(el, args) => {
+                        const [mode, saved] = args;
+                        saved === null ? el.removeAttribute('style') : el.setAttribute('style', saved);
+                        if (mode === 'background') el.style.setProperty('visibility','hidden','important');
+                        if (mode === 'black' || mode === 'white') {
+                            const color = mode === 'black' ? '#000000' : '#ffffff';
+                            el.style.setProperty('background','none','important');
+                            el.style.setProperty('color',color,'important');
+                            el.style.setProperty('-webkit-text-fill-color',color,'important');
+                            el.style.setProperty('text-shadow','none','important');
+                        }
+                    }""", [mode, css['style']])
+                    relative = f'accessibility/{label}-{mode}.png'
+                    raw = page.screenshot(path=str(args.out / relative), clip=clip, animations='disabled')
+                    img = Image.open(BytesIO(raw)).convert('RGB')
+                    captures[mode] = {'pixels': list(img.getdata()), 'width': img.width, 'height': img.height,
+                                      'path': relative, 'sha256': hashlib.sha256(raw).hexdigest()}
+            finally:
+                element.evaluate("(el, saved) => saved === null ? el.removeAttribute('style') : el.setAttribute('style', saved)", css['style'])
+            check(f'{label}: paired contrast captures have identical dimensions',
+                  len({(v['width'], v['height']) for v in captures.values()}) == 1)
+            result = localized_contrast(*(captures[mode]['pixels'] for mode in ('original', 'background', 'black', 'white')),
+                                        captures['original']['width'])
+            result.update({'view': label, 'selector': selector, 'clip': clip, 'computedCss': css,
+                           'method': 'Paired opaque glyph mask and background at identical coordinates; minimum local ratio',
+                           'images': {mode: {k: v for k, v in data.items() if k != 'pixels'} for mode, data in captures.items()}})
+            contrast_results.append(result)
+            return result
+
+        def keyboard_check(page, label):
+            focus = []
+            for key in ('Tab', 'Tab', 'Tab', 'Shift+Tab'):
+                page.keyboard.press(key)
+                state = page.evaluate("""() => {
+                    const el=document.activeElement, s=getComputedStyle(el), r=el.getBoundingClientRect();
+                    return {tag:el.tagName, text:el.textContent.slice(0,100), outline:s.outlineStyle,
+                            outlineWidth:s.outlineWidth, visible:r.width>0 && r.height>0, key:null};
+                }""")
+                state['key'] = key
+                focus.append(state)
+            check(f'{label}: keyboard forward and reverse focus is visible',
+                  all(s['visible'] and s['tag'] != 'BODY' and s['outline'] != 'none' and s['outlineWidth'] != '0px' for s in focus))
+            return {'view': label, 'steps': focus}
+
         # ----------------------------------------------------
         # BROWSER CONTEXT 3: Receptionist Desk Projection (OPENED BEFORE SETTLEMENT)
         # ----------------------------------------------------
-        ctx3 = browser.new_context(viewport={'width': 1440, 'height': 900})
+        ctx3 = browser.new_context(viewport={'width': 1440, 'height': 900}, ignore_https_errors=True)
         configure_page(ctx3, auth_rec, 'light')
         page3 = ctx3.new_page()
-        page3.on('console', lambda msg: console_logs.append(f'[Context3-Receptionist] {msg.type}: {msg.text}'))
+        observe_page(page3, 'Receptionist')
+        rec_navigations = []
+        page3.on('framenavigated', lambda frame: rec_navigations.append({'url': frame.url.split('#')[0], 'timestamp': timestamp()}) if frame == page3.main_frame else None)
 
         # Navigate to desk projection BEFORE Member initiates or confirms
         page3.goto(f'https://demo.example.test:55443/reception/payments/{p1_id}/qr-display')
@@ -434,15 +571,27 @@ try:
         page3.screenshot(path=str(args.out / 'screenshots/ci-e2e-reception-pending.png'))
         rec_pending_axe = run_axe(page3, 'ci-e2e-reception-pending')
         check('Context 3 Receptionist projection pending axe has 0 violations', rec_pending_axe['violationsCount'] == 0)
-        check('Receptionist display opens in PENDING state with informational QR prior to settlement', True)
+        check('Receptionist display opens in PENDING state with informational QR prior to settlement',
+              page3.get_by_text('Pending payment').first.is_visible() and page3.locator('.qr-demo-card svg').count() == 1)
+        rec_identity = page3.evaluate('() => ({timeOrigin:performance.timeOrigin, url:location.href})')
+        pending_before = snapshot('beforeLivePendingPolling')
+        page3.wait_for_timeout(8500)
+        check('Live pending browser GET polling causes zero changes in all 12 tables', pending_before == snapshot('afterLivePendingPolling'))
+        pending_polls = [e for e in browser_events if e['context'] == 'Receptionist' and e['event'] == 'response'
+                         and '/desk-projection/' in e['path'] and e.get('paymentStatus') == 'PENDING']
+        check('Receptionist performed real recurring pending GET polling', len(pending_polls) >= 3, responses=pending_polls)
+        poll_intervals = [(datetime.datetime.fromisoformat(b['timestamp']) - datetime.datetime.fromisoformat(a['timestamp'])).total_seconds()
+                          for a, b in zip(pending_polls, pending_polls[1:])]
+        check('Observed pending polling interval matches 4-second timer within scheduling tolerance',
+              all(2.5 <= interval <= 6 for interval in poll_intervals), intervalsSeconds=poll_intervals)
 
         # ----------------------------------------------------
         # BROWSER CONTEXT 1: Member Desktop Session Initiation
         # ----------------------------------------------------
-        ctx1 = browser.new_context(viewport={'width': 1440, 'height': 900})
+        ctx1 = browser.new_context(viewport={'width': 1440, 'height': 900}, ignore_https_errors=True)
         configure_page(ctx1, auth_mem, 'light')
         page1 = ctx1.new_page()
-        page1.on('console', lambda msg: console_logs.append(f'[Context1] {msg.type}: {msg.text}'))
+        observe_page(page1, 'Member')
 
         # Member Payment Summary & Start Session
         page1.goto(f'https://demo.example.test:55443/member/payments/{p1_id}/qr-demo')
@@ -454,35 +603,12 @@ try:
         pending_axe = run_axe(page1, 'ci-e2e-member-desktop-pending')
         check('Context 1 Member desktop pending axe has 0 violations', pending_axe['violationsCount'] == 0)
 
-        # Rendered pixel contrast check for .brand__name (R4-06)
-        brand_box = page1.locator('.brand__name').first.bounding_box()
-        pixel_contrast_data = None
-        if brand_box:
-            try:
-                img_crop = Image.open(args.out / 'screenshots/ci-e2e-member-desktop-pending.png').convert('RGB')
-                bx, by = int(brand_box['x']), int(brand_box['y'])
-                bw, bh = max(1, int(brand_box['width'])), max(1, int(brand_box['height']))
-                crop_pixels = list(img_crop.crop((bx, by, bx + bw, by + bh)).getdata())
-                def lin(c):
-                    cf = c / 255.0
-                    return cf / 12.92 if cf <= 0.04045 else ((cf + 0.055) / 1.055) ** 2.4
-                lums = [0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b) for r, g, b in crop_pixels]
-                min_l, max_l = min(lums), max(lums)
-                c_ratio = (max_l + 0.05) / (min_l + 0.05)
-                pixel_contrast_data = {
-                    'target': '.brand__name',
-                    'imagePath': 'screenshots/ci-e2e-member-desktop-pending.png',
-                    'boundingBox': {'x': bx, 'y': by, 'width': bw, 'height': bh},
-                    'sampledPixelCount': len(crop_pixels),
-                    'minLuminance': round(min_l, 4),
-                    'maxLuminance': round(max_l, 4),
-                    'computedContrastRatio': round(c_ratio, 2),
-                    'wcagThreshold': '4.5:1 (WCAG AA normal text) / 3.0:1 (large text)',
-                    'passesWCAG': c_ratio >= 4.5,
-                    'axeAutomatedStatus': 'NOT VERIFIED BY AUTOMATED AXE (CSS background-clip: text gradient limitation)',
-                }
-            except Exception as e:
-                pixel_contrast_data = {'error': str(e)}
+        # Verify actual brand pixels against their matching local background.
+        keyboard_results = [keyboard_check(page3, 'reception-pending')]
+        for live_page, label in ((page1, 'member-light'), (page3, 'reception-light')):
+            measured = measure_brand(live_page, label)
+            check(f'{label}: brand local contrast meets conservative 4.5 threshold', measured['passed'],
+                  minimumRatio=measured['minimumLocalContrastRatio'])
 
         # Trigger genuine session creation
         page1.get_by_role('button', name='Start simulation session').click()
@@ -491,10 +617,12 @@ try:
         confirmation_url = link.get_attribute('href')
         check('Spring Boot issued genuine confirmation URL', confirmation_url and '#token=' in confirmation_url)
         token = confirmation_url.split('#token=')[1]
+        secrets.append(token)
         check('Confirmation token has valid base64url shape', len(token) >= 42 and re.fullmatch(r'[A-Za-z0-9_-]+', token))
 
         # Decode rendered application QR image using zxing-cpp
         qr_svg = page1.locator('.demo-session-panel svg')
+        expect(qr_svg).to_be_visible()
         if qr_svg.is_visible():
             barcodes = zxingcpp.read_barcodes(Image.open(BytesIO(qr_svg.screenshot())))
             check('Rendered application QR decodes to genuine confirmation URL', len(barcodes) == 1 and barcodes[0].text == confirmation_url)
@@ -502,10 +630,10 @@ try:
         # ----------------------------------------------------
         # BROWSER CONTEXT 2: Isolated Member Confirmation with Genuine Response Loss (R4-01)
         # ----------------------------------------------------
-        ctx2 = browser.new_context(viewport={'width': 1440, 'height': 900})
+        ctx2 = browser.new_context(viewport={'width': 1440, 'height': 900}, ignore_https_errors=True)
         configure_page(ctx2, auth_mem, 'light')
         page2 = ctx2.new_page()
-        page2.on('console', lambda msg: console_logs.append(f'[Context2] {msg.type}: {msg.text}'))
+        observe_page(page2, 'Confirmation')
 
         # Open confirmation link
         page2.goto(confirmation_url)
@@ -521,27 +649,44 @@ try:
         preview_axe = run_axe(page2, 'ci-e2e-confirm-preview')
         check('Context 2 Confirm preview axe has 0 violations', preview_axe['violationsCount'] == 0)
 
+        confirm_before = snapshot('beforeLostResponseConfirmation')
+        measured = measure_brand(page2, 'confirmation-light')
+        check('confirmation-light: brand local contrast meets conservative 4.5 threshold', measured['passed'])
+
         # R4-01: Genuine Transport Failure AFTER commit
         # 1. Forward real confirmation request to Spring Boot backend.
         # 2. Wait for backend to commit transaction (status 200).
         # 3. Deliberately abort client response so browser experiences transport response loss.
         # 4. Abort immediate preview catch-block call once so client transitions to uncertainty alert.
-        transport_drop = {'confirm_committed': False, 'preview_dropped': False}
+        transport_drop = {'confirm_committed': False, 'preview_dropped': False, 'errors': []}
 
         def intercept_transport(route, request):
-            url = request.url
-            if request.method == 'POST' and '/payments/simulated-qr/sessions/confirm' in url and not transport_drop['confirm_committed']:
-                # Execute real commit in backend
-                res = route.fetch()
-                assert res.status == 200, f"Expected Spring Boot commit 200 OK, got {res.status}"
-                transport_drop['confirm_committed'] = True
-                # Deliberately drop client response
-                route.abort('connectionreset')
-            elif request.method == 'GET' and '/payments/simulated-qr/sessions/preview' in url and transport_drop['confirm_committed'] and not transport_drop['preview_dropped']:
-                transport_drop['preview_dropped'] = True
-                route.abort('connectionreset')
-            else:
-                route.continue_()
+            path = urlsplit(request.url).path
+            try:
+                if request.method == 'POST' and path.endswith('/sessions/confirm') and not transport_drop['confirm_committed']:
+                    # Playwright APIRequest uses OS DNS, unlike Edge host-resolver-rules.
+                    # Forward the unchanged real POST to the same HTTPS loopback backend.
+                    res = route.fetch(url='https://127.0.0.1:55444' + path, max_retries=0, max_redirects=0)
+                    data = res.json()
+                    check('Real upstream confirmation returns committed SETTLED state', res.status == 200 and data.get('state') == 'SETTLED')
+                    committed = sql_json(f"SELECT payment_status,settlement_type,simulated_transaction_id FROM dbo.payment WHERE id={p1_id} FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;")
+                    check('Independent SQL read sees commit before client response is dropped',
+                          committed['payment_status'] == 'SUCCESS' and committed['settlement_type'] == 'SIMULATED'
+                          and committed['simulated_transaction_id'] is not None)
+                    transport_drop.update({'confirm_committed': True, 'upstreamStatus': res.status,
+                                           'upstreamState': data['state'], 'committedSql': committed,
+                                           'committedAt': timestamp()})
+                    sql_evidence['commitBeforeResponseAbort'] = committed
+                    route.abort('connectionreset')
+                elif request.method == 'POST' and path.endswith('/sessions/preview') and transport_drop['confirm_committed'] and not transport_drop['preview_dropped']:
+                    transport_drop['preview_dropped'] = True
+                    route.abort('connectionreset')
+                else:
+                    route.continue_()
+            except Exception as error:
+                # Route.fetch exceptions include bearer headers; never print them.
+                transport_drop['errors'].append(sanitize(error))
+                route.abort('failed')
 
         page2.route('**/api/v1/payments/simulated-qr/sessions/**', intercept_transport)
 
@@ -549,14 +694,24 @@ try:
         page2.get_by_role('button', name='Confirm simulated payment').click()
 
         # Verify client displays uncertainty alert
-        expect(page2.locator('.notice--danger')).to_be_visible()
-        expect(page2.get_by_text('Could not complete the demo action. The simulation outcome could not be confirmed')).to_be_visible()
+        expect(page2.locator('.notice--danger')).to_be_visible(timeout=20000)
+        expect(page2.get_by_role('alert')).to_contain_text('The simulation outcome could not be confirmed')
         page2.screenshot(path=str(args.out / 'screenshots/ci-e2e-confirm-uncertainty-alert.png'))
-        check('Client displays explicit uncertainty alert on transport loss after backend commit', transport_drop['confirm_committed'])
+        check('Client displays explicit uncertainty alert on transport loss after backend commit',
+              transport_drop['confirm_committed'] and transport_drop['preview_dropped'] and not transport_drop['errors']
+              and page2.get_by_role('alert').is_visible(), transport=transport_drop)
+        confirm_failures = [e for e in browser_events if e['context'] == 'Confirmation' and e['event'] == 'requestfailed' and e['path'].endswith('/sessions/confirm')]
+        confirm_responses = [e for e in browser_events if e['context'] == 'Confirmation' and e['event'] == 'response' and e['path'].endswith('/sessions/confirm')]
+        check('Browser records connection reset and receives no successful confirmation response',
+              len(confirm_failures) == 1 and 'CONNECTION_RESET' in confirm_failures[0]['failure'] and not confirm_responses,
+              failures=confirm_failures, responses=confirm_responses)
+        sql_evidence['transportDrop'] = transport_drop
+        snapshot('afterLostResponseCommit')
 
         # Remove route interception to restore network connectivity
         page2.unroute('**/api/v1/payments/simulated-qr/sessions/**', intercept_transport)
 
+        reconciliation_start = timestamp()
         # Client reconciles state via fresh backend read: Click "Refresh Simulation Status"
         page2.get_by_role('button', name='Refresh Simulation Status').click()
 
@@ -566,7 +721,12 @@ try:
         page2.screenshot(path=str(args.out / 'screenshots/ci-e2e-confirm-settled.png'))
         settled_axe = run_axe(page2, 'ci-e2e-confirm-settled')
         check('Context 2 Confirm settled axe has 0 violations', settled_axe['violationsCount'] == 0)
-        check('Client reconciles to authoritative committed state via fresh backend read', True)
+        fresh_reads = [e for e in browser_events if e['context'] == 'Confirmation' and e['event'] == 'response'
+                       and e['path'].endswith('/sessions/preview') and e['timestamp'] >= reconciliation_start and e['status'] == 200]
+        check('Client reconciles to authoritative committed state via fresh backend read',
+              bool(fresh_reads) and page2.get_by_text('Paid - Simulated').first.is_visible(), reads=fresh_reads)
+        check('Reconciliation read leaves all 12 SQL tables unchanged',
+              sql_evidence['snapshots']['afterLostResponseCommit']['sha256'] == snapshot('afterReconciliationRead'))
 
         # ----------------------------------------------------
         # BROWSER CONTEXT 3: Receptionist Live Polling Transition (R4-02)
@@ -574,11 +734,19 @@ try:
         # Page 3 was kept open in PENDING state. The 4-second polling timer now
         # automatically updates the DOM to Paid - Simulated without reload or navigation.
         expect(page3.get_by_text('Paid - Simulated').first).to_be_visible(timeout=20000)
-        expect(page3.get_by_text('SIMULATED').first).to_be_visible()
+        expect(page3.get_by_text('SIMULATED (SPORTIFY_SIMULATOR)', exact=True)).to_be_visible()
         page3.screenshot(path=str(args.out / 'screenshots/ci-e2e-reception-settled-simulated.png'))
         rec_settled_axe = run_axe(page3, 'ci-e2e-reception-settled-simulated')
         check('Context 3 Receptionist projection settled axe has 0 violations', rec_settled_axe['violationsCount'] == 0)
-        check('Receptionist desk projection updates live from PENDING to Paid - Simulated via polling without reload', True)
+        settled_polls = [e for e in browser_events if e['context'] == 'Receptionist' and e['event'] == 'response'
+                         and '/desk-projection/' in e['path'] and e.get('paymentStatus') == 'SUCCESS']
+        check('Receptionist desk projection updates live from PENDING to Paid - Simulated via polling without reload',
+              bool(settled_polls) and len(rec_navigations) == 1 and rec_identity == page3.evaluate('() => ({timeOrigin:performance.timeOrigin, url:location.href})')
+              and all(e['method'] == 'GET' and e.get('settlementType') == 'SIMULATED' for e in settled_polls),
+              pageIdentity=rec_identity, navigations=rec_navigations, settledResponses=settled_polls)
+        check('Settled desk displays no scannable QR or settlement action', page3.locator('.qr-demo-card svg').count() == 0
+              and page3.get_by_role('button', name='Confirm simulated payment').count() == 0)
+        keyboard_results.append(keyboard_check(page3, 'reception-settled'))
 
         # ----------------------------------------------------
         # BROWSER CONTEXT 1: Member View Post-Settlement Readback
@@ -587,30 +755,56 @@ try:
         expect(page1.locator('.notice--success')).to_be_visible()
         expect(page1.get_by_text('Paid - Simulated').first).to_be_visible()
         page1.screenshot(path=str(args.out / 'screenshots/ci-e2e-member-settled-simulated.png'))
-        check('Context 1 displays committed Paid - Simulated state after settlement', True)
+        check('Context 1 displays committed Paid - Simulated state after settlement', page1.get_by_text('Paid - Simulated').first.is_visible())
 
+        # Execute live light/dark audits, contrast, reflow and CSS zoom separately.
+        for live_page, label in ((page1, 'member'), (page2, 'confirmation'), (page3, 'reception')):
+            live_page.get_by_role('button', name='Switch to dark mode').click()
+            dark_axe = run_axe(live_page, label + '-dark-settled')
+            check(label + ': dark settled axe has 0 violations', dark_axe['violationsCount'] == 0)
+            measured = measure_brand(live_page, label + '-dark')
+            check(label + ': dark brand local contrast meets conservative 4.5 threshold', measured['passed'])
+            live_page.screenshot(path=str(args.out / f'screenshots/ci-e2e-{label}-dark-settled.png'))
+        layout_results = []
+        for width, height, zoom, label in ((720, 450, '1', 'reflow-720'), (1440, 900, '2', 'css-zoom-200')):
+            page3.set_viewport_size({'width': width, 'height': height})
+            page3.evaluate('(zoom) => document.body.style.zoom = zoom', zoom)
+            geometry = page3.evaluate('() => ({scrollWidth:document.documentElement.scrollWidth, clientWidth:document.documentElement.clientWidth, cssZoom:getComputedStyle(document.body).zoom})')
+            check(label + ': no horizontal overflow', geometry['scrollWidth'] <= geometry['clientWidth'], geometry=geometry)
+            page3.screenshot(path=str(args.out / f'screenshots/ci-e2e-reception-{label}.png'))
+            layout_results.append({'label': label, **geometry, 'nativeBrowserZoom': 'NOT RUN'})
+        (args.out / 'browser-logs/keyboard-navigation.json').write_text(json.dumps(keyboard_results, indent=2) + '\n', encoding='ascii')
+        (args.out / 'browser-logs/layout-geometry.json').write_text(json.dumps(layout_results, indent=2) + '\n', encoding='ascii')
+        negative_page = ctx1.new_page()
+        negative_page.set_content('<html><body><span id="low" style="font:bold 32px sans-serif;color:#aaa;background:#fff">Low contrast control</span></body></html>')
+        negative = measure_brand(negative_page, 'known-low-contrast-negative-control', '#low')
+        check('Rendered known low-contrast negative control is rejected', not negative['passed'] and negative['minimumLocalContrastRatio'] < 4.5)
         browser.close()
 
     # Step 11: Idempotency & Negative Controls via API
+    replay_before = snapshot('beforeDuplicateRetry')
     status_dup, dup = api_request('/payments/simulated-qr/sessions/confirm', {'token': token}, bearer=auth_mem['accessToken'])
     check('Duplicate confirmation is idempotent 200 with matching state', status_dup == 200 and dup.get('state') == 'SETTLED')
+    check('Duplicate confirmation changes none of the 12 SQL tables', replay_before == snapshot('afterDuplicateRetry'))
+    status_staff_confirm, _ = api_request('/payments/simulated-qr/sessions/confirm', {'token': token}, bearer=auth_rec['accessToken'])
+    check('Receptionist cannot confirm even with genuine owner session token', status_staff_confirm == 403)
 
     session_id = dup.get('id')
     status_can, _ = api_request(f'/payments/simulated-qr/sessions/{session_id}/cancel', {}, bearer=auth_mem['accessToken'])
     check('Cancel after SETTLED is rejected with 409 Conflict', status_can == 409)
 
     # Step 12: Receptionist Polling Zero-Write Invariant
-    poll_before = fingerprints()
+    poll_before = snapshot('beforeSettledReadOnlyPolling')
     for _ in range(5):
         st, proj = api_request(f'/payments/simulated-qr/desk-projection/{p1_id}', bearer=auth_rec['accessToken'])
         if st != 200:
             raise RuntimeError(f'Desk projection polling failed with status {st}')
-    poll_after = fingerprints()
+    poll_after = snapshot('afterSettledReadOnlyPolling')
     for table, b_hash in poll_before.items():
         check(f'Receptionist desk polling produces 0 database writes: {table}', b_hash == poll_after[table])
 
     # Step 13: Authoritative SQL Readback & Ledger Isolation
-    after_fingerprints = fingerprints()
+    after_fingerprints = snapshot('afterSettlementAndRetry')
 
     # Specific before/after financial snapshot assertions (R4-05)
     for mutated_tbl in ['payment', 'simulated_payment_transaction', 'simulated_qr_session', 'invoice', 'invoice_line', 'member_card', 'activity_log']:
@@ -631,29 +825,70 @@ try:
 
     txn_row = sql_json(f"SELECT id, payment_id, status, settlement_type, provider FROM dbo.simulated_payment_transaction WHERE payment_id={p1_id} FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;")
     check('Simulated payment transaction committed with status SUCCEEDED', txn_row.get('status') == 'SUCCEEDED' and txn_row.get('settlement_type') == 'SIMULATED')
+    check('Exactly 1 matching simulated transaction exists',
+          sql(f"SELECT COUNT(*) FROM dbo.simulated_payment_transaction WHERE payment_id={p1_id};") == '1'
+          and txn_row['id'] == p1_row['simulated_transaction_id'] and txn_row['provider'] == 'SPORTIFY_SIMULATOR')
+    check('Transaction amount, session and owner match payment', sql(f"""
+        SELECT COUNT(*) FROM dbo.simulated_payment_transaction t
+        JOIN dbo.payment p ON p.id=t.payment_id AND p.simulated_transaction_id=t.id
+        JOIN dbo.simulated_qr_session s ON s.id=t.session_id AND s.payment_id=p.id
+        WHERE p.id={p1_id} AND t.amount=p.amount AND s.amount=p.amount AND t.member_id=p.member_id
+        AND s.owner_id=p.member_id AND s.state='SETTLED' AND s.active=0 AND t.currency='VND';
+    """) == '1')
 
     inv_count = sql(f"SELECT COUNT(*) FROM dbo.invoice WHERE payment_id={p1_id} AND status='PAID';")
     check('Exactly 1 invoice issued with status PAID', inv_count == '1')
 
     card_count = sql(f"SELECT COUNT(*) FROM dbo.member_card WHERE payment_id={p1_id} AND status='ACTIVE';")
     check('Exactly 1 member card activated', card_count == '1')
+    check('Invoice total and single entitlement line match authoritative payment', sql(f"""
+        SELECT COUNT(*) FROM dbo.invoice i JOIN dbo.invoice_line l ON l.invoice_id=i.id
+        JOIN dbo.member_card c ON c.id=l.item_reference_id AND c.payment_id=i.payment_id
+        JOIN dbo.payment p ON p.id=i.payment_id WHERE p.id={p1_id} AND i.total_amount=p.amount
+        AND l.line_total=p.amount AND l.quantity=1 AND l.item_type='MEMBERSHIP_CARD' AND c.status='ACTIVE';
+    """) == '1')
 
-    log_count = sql(f"SELECT COUNT(*) FROM dbo.activity_log WHERE entity_type='PAYMENT' AND entity_id={p1_id};")
-    check('Exactly 1 activity log audit recorded', int(log_count) >= 1)
+    audits = sql_json(f"SELECT id,actor_user_id,action,entity_type,entity_id,details FROM dbo.activity_log WHERE entity_type='PAYMENT' AND entity_id={p1_id} ORDER BY id FOR JSON PATH;")
+    check('Exactly 1 PAYMENT_CONFIRMED activity log audit recorded', len(audits) == 1 and audits[0]['action'] == 'PAYMENT_CONFIRMED')
+    audit_details = json.loads(audits[0]['details'])
+    check('Audit contains simulated provenance and matches real transaction and member actor',
+          audit_details.get('settlementType') == 'SIMULATED' and audit_details.get('settlementProvider') == 'SPORTIFY_SIMULATOR'
+          and audit_details.get('simulatedTransactionId') == txn_row['id']
+          and str(audits[0]['actor_user_id']) == sql(f'SELECT member_id FROM payment WHERE id={p1_id};'))
+    check('Unrelated pending payment and entitlement remain unchanged', sql(f"""
+        SELECT COUNT(*) FROM dbo.payment p JOIN dbo.member_card c ON c.payment_id=p.id WHERE p.id={p2_id}
+        AND p.payment_status='PENDING' AND p.simulated_transaction_id IS NULL AND c.status='PENDING_PAYMENT';
+    """) == '1')
 
     # Negative Control: Attempt unauthorized table mutation violating check constraint (R4-05)
-    neg_control_passed = False
-    try:
-        sql(f"UPDATE dbo.payment SET settlement_type='SIMULATED', settlement_provider=NULL WHERE id={p1_id};")
-    except RuntimeError as err:
-        err_msg = str(err)
-        if 'ck_payment_simulated_consistency' in err_msg or 'CHECK constraint' in err_msg:
-            neg_control_passed = True
-    check('SQL Server check constraint rejects unauthorized settlement provenance mutation', neg_control_passed)
+    controls = []
+    for mutation in (
+        "settlement_provider=NULL", "settlement_type=NULL", "simulated_transaction_id=NULL",
+        "settlement_type='ACTUAL'", "settlement_provider='UNAPPROVED_PROVIDER'",
+    ):
+        # Always roll back even if an invalid mutation unexpectedly succeeds.
+        control = sql_json(f"""
+            BEGIN TRY
+                BEGIN TRANSACTION;
+                UPDATE dbo.payment SET {mutation} WHERE id={p1_id};
+                ROLLBACK;
+                SELECT 0 AS errorNumber,'MUTATION ACCEPTED' AS errorMessage FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
+            END TRY BEGIN CATCH
+                IF @@TRANCOUNT>0 ROLLBACK;
+                SELECT ERROR_NUMBER() AS errorNumber,ERROR_MESSAGE() AS errorMessage FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
+            END CATCH;
+        """)
+        controls.append({'mutation': mutation, **control})
+        check('V36 rejects invalid provenance: ' + mutation, constraint_rejected(control, 'ck_payment_simulated_consistency'), sqlResult=control)
+    check('Every rolled-back provenance negative control preserves all 12 tables', after_fingerprints == snapshot('afterProvenanceNegativeControls'))
+    sql_evidence['constraintNegativeControls'] = controls
+    sql_evidence['paymentAudit'] = audits
 
     # Correlation ID audit verification (R4-03)
-    check('Client correlation ID propagated in all network requests', all(e.get('clientCorrelationId') is not None for e in network_logs))
-    check('Server correlation ID header response truthfully audited as absent (null)', all(e.get('serverCorrelationId') is None for e in network_logs))
+    check('Client correlation ID is attached to every harness API request', bool(network_logs) and all(e.get('sentHeaderVerified') for e in network_logs))
+    observations = [correlation_observation(e['clientCorrelationId'], e['serverCorrelationId']) for e in network_logs]
+    report['correlation'] = {'observations': observations, 'serverEchoContract': 'NOT IMPLEMENTED / NOT RUN',
+                             'browserClientHeaders': 'Recorded as observed, including null; no injected fallback'}
 
     # Step 14: Export Structured Evidence
     sql_snapshot = {
@@ -670,12 +905,7 @@ try:
         'actualCashEventCount': int(sql('SELECT COUNT(*) FROM dbo.cash_event;')),
         'actualPaidViewRowCount': int(sql('SELECT COUNT(*) FROM dbo.vw_paid_payment;')),
     }
-    (args.out / 'sql/qr07-ci-sql-evidence.json').write_text(json.dumps(sql_snapshot, indent=2) + '\n', encoding='ascii')
-    (args.out / 'browser-logs/network-requests.json').write_text(json.dumps(network_logs, indent=2) + '\n', encoding='ascii')
-    (args.out / 'browser-logs/browser-console.log').write_text('\n'.join(console_logs) + '\n', encoding='ascii')
-    (args.out / 'accessibility/axe-core-audit.json').write_text(json.dumps({'results': axe_results}, indent=2) + '\n', encoding='ascii')
-    if pixel_contrast_data:
-        (args.out / 'accessibility/rendered-pixel-contrast.json').write_text(json.dumps(pixel_contrast_data, indent=2) + '\n', encoding='ascii')
+    sql_evidence.update(sql_snapshot)
 
     report['status'] = 'PASS'
     report['beforeFinancialSha256'] = before_fingerprints
@@ -685,13 +915,25 @@ try:
 except Exception as err:
     report['status'] = 'FAIL'
     report['failureType'] = type(err).__name__
-    report['failure'] = str(err)[:1000]
-    print(f"\n[QR-07] CRITICAL FAILURE: {err}")
+    report['failure'] = sanitize(err)[:1000]
+    print(f"\n[QR-07] CRITICAL FAILURE: {sanitize(err)}")
 
 finally:
     stop_backend()
     for l in logs:
         l.close()
-    (args.out / 'verification.json').write_text(json.dumps(report, indent=2) + '\n', encoding='ascii')
+    # Persist partial authentic evidence on failures, too; sanitize before upload.
+    for relative, payload in (
+        ('verification.json', report), ('sql/qr07-ci-sql-evidence.json', sql_evidence),
+        ('browser-logs/network-requests.json', network_logs), ('browser-logs/browser-events.json', browser_events),
+        ('accessibility/axe-core-audit.json', {'results': axe_results}),
+        ('accessibility/rendered-pixel-contrast.json', {'results': contrast_results}),
+    ):
+        (args.out / relative).write_text(sanitize(json.dumps(payload, indent=2)) + '\n', encoding='ascii')
+    (args.out / 'browser-logs/browser-console.log').write_text(sanitize('\n'.join(console_logs)) + '\n', encoding='ascii')
+    provenance = {key: report[key] for key in ('head', 'runId', 'runAttempt', 'runUrl', 'database', 'environment', 'status')}
+    provenance['files'] = {p.relative_to(args.out).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+                           for p in sorted(args.out.rglob('*')) if p.is_file()}
+    (args.out / 'artifact-provenance.json').write_text(json.dumps(provenance, indent=2) + '\n', encoding='ascii')
 
 raise SystemExit(0 if report['status'] == 'PASS' else 1)
