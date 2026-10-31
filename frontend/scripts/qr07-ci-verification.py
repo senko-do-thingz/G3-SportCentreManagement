@@ -120,10 +120,15 @@ def fingerprints():
         'refund_request', 'cash_event', 'cash_capture_ticket', 'cash_coverage',
         'simulated_payment_transaction', 'simulated_qr_session', 'activity_log',
     ]
+    def sort_clause(table_name):
+        if table_name == 'cash_capture_ticket':
+            return 'ORDER BY transaction_id, event_type, source_id'
+        return 'ORDER BY id'
+
     return {
         table: sql(
             "SELECT CONVERT(varchar(64),HASHBYTES('SHA2_256',CONVERT(nvarchar(max),"
-            f"(SELECT * FROM dbo.{table} ORDER BY id FOR JSON PATH,INCLUDE_NULL_VALUES))),2);"
+            f"(SELECT * FROM dbo.{table} {sort_clause(table)} FOR JSON PATH,INCLUDE_NULL_VALUES))),2);"
         )
         for table in tables
     }
