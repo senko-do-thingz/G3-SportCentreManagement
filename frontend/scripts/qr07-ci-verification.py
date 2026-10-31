@@ -467,7 +467,7 @@ try:
         # Click Confirm simulated payment
         page2.get_by_role('button', name='Confirm simulated payment').click()
         expect(page2.locator('.notice--success')).to_be_visible()
-        expect(page2.get_by_text('Paid - Simulated')).to_be_visible()
+        expect(page2.get_by_text('Paid - Simulated').first).to_be_visible()
 
         # Capture confirmed view & run axe
         page2.screenshot(path=str(args.out / 'screenshots/ci-e2e-confirm-settled.png'))
@@ -479,7 +479,7 @@ try:
         # ----------------------------------------------------
         page1.reload()
         expect(page1.locator('.notice--success')).to_be_visible()
-        expect(page1.get_by_text('Paid - Simulated')).to_be_visible()
+        expect(page1.get_by_text('Paid - Simulated').first).to_be_visible()
         page1.screenshot(path=str(args.out / 'screenshots/ci-e2e-member-settled-simulated.png'))
         check('Context 1 displays committed Paid - Simulated state after settlement', True)
 
@@ -493,7 +493,7 @@ try:
 
         page3.goto(f'https://demo.example.test:55443/reception/payments/{p1_id}/qr-display')
         expect(page3.locator('.reception-grid')).to_be_visible()
-        expect(page3.get_by_text('Paid - Simulated')).to_be_visible()
+        expect(page3.get_by_text('Paid - Simulated').first).to_be_visible()
 
         page3.screenshot(path=str(args.out / 'screenshots/ci-e2e-reception-settled-simulated.png'))
         reception_axe = run_axe(page3, 'ci-e2e-reception-settled-simulated')
