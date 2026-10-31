@@ -37,7 +37,7 @@ export function UserManagementPage() {
       <Button variant={row.status === 'ACTIVE' ? 'danger' : 'secondary'} size="sm" disabled={row.id === user?.id && row.status === 'ACTIVE'} title={row.id === user?.id ? 'You cannot deactivate your own account.' : undefined} onClick={() => setChanging(row)}>{row.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}</Button>
     </div> },
   ]
-  return <div className="page manager-page">
+  return <div className="page manager-page manager-page--users">
     <PageHeader eyebrow="Center management" title="User Management" description="Manage member, coach and receptionist accounts." actions={<Button onClick={() => setAdding(true)}>+ Add staff</Button>} />
     <PreviewNotice />
     <Card title="Center accounts">

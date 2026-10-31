@@ -1,0 +1,542 @@
+[
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "users",
+  "w": "390",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "users",
+  "w": "768",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "users",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "packages",
+  "w": "390",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "packages",
+  "w": "768",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "packages",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "classes",
+  "w": "390",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "classes",
+  "w": "768",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "classes",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "finance",
+  "w": "390",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "finance",
+  "w": "768",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "finance",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "transactions",
+  "w": "390",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "transactions",
+  "w": "768",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "transactions",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "users",
+  "w": "390",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "users",
+  "w": "768",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "users",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "packages",
+  "w": "390",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "packages",
+  "w": "768",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "packages",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "classes",
+  "w": "390",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "classes",
+  "w": "768",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "classes",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "finance",
+  "w": "390",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "finance",
+  "w": "768",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "finance",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "transactions",
+  "w": "390",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "transactions",
+  "w": "768",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "transactions",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "users",
+  "w": "390",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "w": "390",
+  "contrast": {
+   "th": "5.71",
+   "cta": "9.89",
+   "rowbtn": "6.63"
+  }
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "users",
+  "w": "768",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "w": "768",
+  "contrast": {
+   "th": "5.71",
+   "cta": "9.89",
+   "rowbtn": "6.63"
+  }
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "users",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "w": "1440",
+  "contrast": {
+   "th": "5.71",
+   "cta": "9.89",
+   "rowbtn": "6.63"
+  }
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "packages",
+  "w": "390",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "packages",
+  "w": "768",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "packages",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "classes",
+  "w": "390",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "classes",
+  "w": "768",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "classes",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "finance",
+  "w": "390",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "finance",
+  "w": "768",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "finance",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "transactions",
+  "w": "390",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "transactions",
+  "w": "768",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "transactions",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "light"
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "users",
+  "w": "390",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "w": "390",
+  "contrast": {
+   "th": "6.13",
+   "cta": "9.89",
+   "rowbtn": "6.90"
+  }
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "users",
+  "w": "768",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "w": "768",
+  "contrast": {
+   "th": "6.13",
+   "cta": "9.89",
+   "rowbtn": "6.90"
+  }
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "users",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "w": "1440",
+  "contrast": {
+   "th": "6.13",
+   "cta": "9.89",
+   "rowbtn": "6.90"
+  }
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "packages",
+  "w": "390",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "packages",
+  "w": "768",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "packages",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "classes",
+  "w": "390",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "classes",
+  "w": "768",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "classes",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "finance",
+  "w": "390",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "finance",
+  "w": "768",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "finance",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "transactions",
+  "w": "390",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "transactions",
+  "w": "768",
+  "overflowX": false,
+  "theme": "dark"
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "transactions",
+  "w": "1440",
+  "overflowX": false,
+  "theme": "dark"
+ }
+]
