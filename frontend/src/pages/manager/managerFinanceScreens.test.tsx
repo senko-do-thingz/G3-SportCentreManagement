@@ -239,6 +239,45 @@ describe('FE-13 financial overview', () => {
     expect(await screen.findByText(/do not have access|access denied|forbidden/i)).toBeInTheDocument()
     expect(screen.queryByText('Paid revenue')).not.toBeInTheDocument()
   })
+
+  it('QR-05 displays simulated QR volume separately from actual paid revenue and labels simulated transactions', async () => {
+    tokenStorage.startSession({ accessToken: 'finance-manager-token', refreshToken: 'finance-refresh-token' })
+    installFakeFetch((call) => {
+      if (call.path === '/users/me') return json(200, MANAGER)
+      if (call.path.startsWith('/manager/finance/overview')) {
+        return json(200, { ...overviewDto, simulatedRevenue: '810000', simulatedTransactions: 1 })
+      }
+      if (call.path === '/manager/finance/trend?months=6') return json(200, trendDto)
+      if (call.path.startsWith('/manager/finance/transactions')) {
+        return json(200, {
+          ...transactionPageDto,
+          size: 5,
+          content: [{
+            ...transactionDto,
+            referenceCode: 'SIM-QR-41-00000041',
+            settlementType: 'SIMULATED',
+            settlementProvider: 'SPORTIFY_SIMULATOR',
+            simulatedTransactionId: 41,
+          }],
+        })
+      }
+      if (call.path.startsWith('/manager/finance/revenue')) return json(200, serviceBreakdownDto)
+      if (call.path === '/refunds/pending') return json(200, pendingRefundListDto)
+      return backendError(404, `Unexpected request: ${call.method} ${call.path}`)
+    })
+    const view = renderApp('/manager/finance?month=2026-10')
+    const kpis = await screen.findByRole('region', { name: 'Financial key performance indicators' })
+    expect(within(kpis).getByText('16.110.000 VND')).toBeInTheDocument()
+    expect(within(kpis).getByText('Simulated QR volume (non-cash)')).toBeInTheDocument()
+    expect(within(kpis).getByText('1 simulated transactions (excluded from paid revenue)')).toBeInTheDocument()
+    expect(await screen.findByText('Paid - Simulated')).toBeInTheDocument()
+    view.unmount()
+
+    renderApp('/manager/transactions?month=2026-10')
+    expect(await screen.findByText('Paid - Simulated')).toBeInTheDocument()
+    expect(screen.getByText('Bank transfer (Simulated)')).toBeInTheDocument()
+    expect(screen.getByText('SIM-QR-41-00000041')).toBeInTheDocument()
+  })
 })
 
 describe('FE-13 transaction ledger and refund review', () => {
@@ -548,4 +587,34 @@ describe('FE-13 Round 2 action safety', () => {
       expect(document.querySelector('a[download]')).toBeNull()
     },
   )
+
+  it('distinguishes SIMULATED, verified ACTUAL, and legacy NULL/UNKNOWN provenance rows in Manager Transactions', async () => {
+    tokenStorage.startSession({ accessToken: 'finance-manager-token', refreshToken: 'finance-refresh-token' })
+    installFakeFetch((call) => {
+      if (call.path === '/users/me') return json(200, MANAGER)
+      if (call.path.startsWith('/manager/finance/transactions')) {
+        return json(200, {
+          content: [
+            { ...transactionDto, id: 41, code: 'PAY-1041', method: 'BANK_TRANSFER', settlementType: 'SIMULATED', settlementProvider: 'SPORTIFY_SIMULATOR' },
+            { ...transactionDto, id: 42, code: 'PAY-1042', invoiceNumber: 'INV-1042', method: 'CASH', settlementType: 'ACTUAL', settlementProvider: 'DESK_CASH' },
+            { ...transactionDto, id: 43, code: 'PAY-1043', invoiceNumber: 'INV-1043', method: 'CREDIT_CARD', settlementType: null, settlementProvider: null },
+            { ...transactionDto, id: 44, code: 'PAY-1044', invoiceNumber: 'INV-1044', method: 'BANK_TRANSFER', settlementType: 'UNKNOWN', settlementProvider: null },
+          ],
+          page: 0,
+          size: 20,
+          totalElements: 4,
+          totalPages: 1,
+        })
+      }
+      if (call.path === '/refunds/pending') return json(200, [])
+      return backendError(404, `Unexpected request: ${call.method} ${call.path}`)
+    })
+    renderApp('/manager/transactions')
+    expect(await screen.findByText('Paid - Simulated')).toBeVisible()
+    const table = screen.getByRole('table', { name: 'Payment transactions' })
+    expect(within(table).getByText('Bank transfer (Simulated)')).toBeVisible()
+    expect(within(table).getByText('Cash')).toBeVisible()
+    expect(within(table).getByText('Credit card (Legacy unverified)')).toBeVisible()
+    expect(within(table).getByText('Bank transfer (Legacy unverified)')).toBeVisible()
+  })
 })

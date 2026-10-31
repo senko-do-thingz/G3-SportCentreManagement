@@ -21,7 +21,7 @@ describe('QR-02 display-only details', () => {
       'Account: DEMO - NOT AVAILABLE',
       'Amount from payment: 731.234 VND',
       'Demo reference: DEMO-52',
-      'DEMO ONLY - NOT A REAL PAYMENT',
+      'Simulated QR - No real money is transferred.',
     ].join('\n'))
     expect(DEMO_BANKS[bank].label).toBe(label)
     expect(demoQrPayload(52, bank)).toContain(`BANK_CODE=${DEMO_BANKS[bank].code}`)

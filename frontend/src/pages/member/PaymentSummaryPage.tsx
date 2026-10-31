@@ -18,6 +18,7 @@ import {
   isPending,
   DEFAULT_PAYMENT_METHOD,
   isMethodAvailable,
+  isSimulatedSettlement,
   isSingleVisitRegistration,
   methodLabel,
   parseIdParam,
@@ -154,9 +155,21 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
             <div>
               <dt>Status</dt>
               <dd>
-                <StatusBadge status={paymentStatusToneCode(data.status)} label={paymentStatusLabel(data.status)} />
+                <StatusBadge status={paymentStatusToneCode(data.status)} label={paymentStatusLabel(data.status, data.settlementType)} />
               </dd>
             </div>
+            {isSimulatedSettlement(data) && (
+              <div>
+                <dt>Settlement provenance</dt>
+                <dd>SIMULATED ({data.settlementProvider ?? 'SPORTIFY_SIMULATOR'})</dd>
+              </div>
+            )}
+            {isSimulatedSettlement(data) && data.referenceCode && (
+              <div>
+                <dt>Simulated transaction</dt>
+                <dd>{data.referenceCode}</dd>
+              </div>
+            )}
             {registration && <RegistrationRows registration={registration} singleVisit={singleVisit} />}
             {card && <CardRows card={card} />}
             <div>
@@ -353,7 +366,7 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
       ) : (
         <div className="payment-summary__actions">
           <p className="payment-methods__hint">
-            {payment.status === 'SUCCESS' ? 'Paid with' : 'Method'}: {methodLabel(payment.method)}
+            {payment.status === 'SUCCESS' ? (isSimulatedSettlement(payment) ? 'Paid (Simulated) with' : 'Paid with') : 'Method'}: {methodLabel(payment.method)}
           </p>
           {payment.invoiceId ? (
             <Link className={buttonClassName('primary', 'md', true)} to={PAYMENT_PATHS.receipt(payment.invoiceId)}>
@@ -368,9 +381,9 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
       {pending && qrPaymentDemoEnabled() && (
         <div className="qr-demo-entry">
           <Link className={buttonClassName('secondary', 'md', true)} to={demoQrPath(payment.id)} aria-describedby="qr-demo-entry-description">
-            QR Payment (Demo)
+            Pay with QR (Simulation)
           </Link>
-          <p id="qr-demo-entry-description" className="payment-methods__hint">Interface demo only. No bank transfer or payment update.</p>
+          <p id="qr-demo-entry-description" className="payment-methods__hint">Simulated QR confirmation. Completes payment in simulation only with no real bank transfer.</p>
         </div>
       )}
       <Link className={buttonClassName('ghost', 'md', true, 'no-print')} to={MEMBER_PATHS.membership}>

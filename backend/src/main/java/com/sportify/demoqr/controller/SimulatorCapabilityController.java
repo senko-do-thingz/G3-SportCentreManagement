@@ -9,14 +9,15 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 @RestController
-@PreAuthorize("hasRole('MEMBER')")
+@PreAuthorize("hasAnyRole('MEMBER', 'RECEPTIONIST', 'MANAGER')")
 public class SimulatorCapabilityController {
     private final ObjectProvider<DemoQrService> service;
 
     public SimulatorCapabilityController(ObjectProvider<DemoQrService> service) { this.service = service; }
 
-    @GetMapping("/api/v1/payments/simulated-qr/capability")
+    @GetMapping({"/api/v1/payments/simulated-qr/capability", "/api/v1/payments/simulator-config"})
     public Map<String, Object> capability() {
-        return Map.of("enabled", service.getIfAvailable() != null, "settlementEnabled", false, "contractVersion", 1);
+        boolean active = service.getIfAvailable() != null;
+        return Map.of("enabled", active, "settlementEnabled", active, "contractVersion", 1);
     }
 }

@@ -64,10 +64,17 @@ export function methodLabel(method: string | null | undefined): string {
   return METHOD_LABELS[method] ?? method
 }
 
-/** "Paid" for SUCCESS, as in Figma F3-03; other codes keep their own word. */
-export function paymentStatusLabel(status: string | null | undefined): string {
+export function isSimulatedSettlement(item: { settlementType?: string | null } | null | undefined): boolean {
+  return item?.settlementType === 'SIMULATED'
+}
+
+/** "Paid" for SUCCESS, as in Figma F3-03; "Paid - Simulated" when settled via Sportify QR simulator. */
+export function paymentStatusLabel(status: string | null | undefined, settlementType?: string | null): string {
   if (!status) {
     return 'Unknown'
+  }
+  if (status === 'SUCCESS' && settlementType === 'SIMULATED') {
+    return 'Paid - Simulated'
   }
   return STATUS_LABELS[status] ?? status
 }

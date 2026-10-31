@@ -100,8 +100,38 @@ describe('FE-13 manager finance API - BE contract integration', () => {
       previousPaidRevenue: 17000000,
       revenueChange: -890000,
       revenueChangePercent: -5.24,
+      simulatedRevenue: 0,
+      simulatedTransactions: 0,
     })
     expect(calls[0].path).toBe('/manager/finance/overview?month=2026-10')
+  })
+
+  it('maps QR-05 simulated revenue and transaction settlement provenance fields', async () => {
+    installFakeFetch((call) => call.path.includes('/overview')
+      ? json(200, { ...overviewDto, simulatedRevenue: '2400000', simulatedTransactions: 2 })
+      : json(200, {
+        content: [{
+          ...transactionDto,
+          settlementType: 'SIMULATED',
+          settlementProvider: 'SPORTIFY_SIMULATOR',
+          simulatedTransactionId: 501,
+        }],
+        page: 0,
+        size: 20,
+        totalElements: 1,
+        totalPages: 1,
+      }))
+
+    await expect(managerFinanceApi.overview('2026-10')).resolves.toMatchObject({
+      simulatedRevenue: 2400000,
+      simulatedTransactions: 2,
+    })
+    const txPage = await managerFinanceApi.transactions({ month: '2026-10' })
+    expect(txPage.content[0]).toMatchObject({
+      settlementType: 'SIMULATED',
+      settlementProvider: 'SPORTIFY_SIMULATOR',
+      simulatedTransactionId: 501,
+    })
   })
 
   it('requests the current six-month trend using RevenueTrendPoint DTO fields', async () => {
