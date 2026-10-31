@@ -6,6 +6,7 @@ import base64
 import datetime
 import hashlib
 import http.server
+from io import BytesIO
 import ipaddress
 import json
 import mimetypes
