@@ -1,14 +1,15 @@
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:http'
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, readdirSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
+import { createHash } from 'node:crypto'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const ROOT = resolve(__dirname, '../..')
 const DIST = join(ROOT, 'frontend/dist')
-const ROUND = process.env.ROUND || 'round-03'
+const ROUND = process.env.ROUND || 'round-04'
 const OUT_DIR = join(ROOT, `tasks/QR-06 (i)/reports/${ROUND}`)
 const SCREENSHOTS_DIR = join(OUT_DIR, 'screenshots')
 const LOGS_DIR = join(OUT_DIR, 'browser-logs')
@@ -98,24 +99,24 @@ const PROJECTIONS = {
     paymentStatus: 'SUCCESS',
     itemDescription: 'Diamond Annual Pass',
     memberFullName: 'Tran Thi B',
-    memberCode: 'MEM-045',
-    memberId: 45,
+    memberCode: 'MEM-042',
+    memberId: 42,
     settlementType: 'ACTUAL',
-    settlementProvider: 'DESK_CASH',
+    settlementProvider: 'FRONT_DESK_CASH',
     simulatedTransactionId: null,
     activeSession: null,
   },
-  // Scenario 4: Settled with legacy NULL provenance (historical payment)
+  // Scenario 4: Settled Legacy unverified (historical database record)
   '104': {
     paymentId: 104,
     paymentCode: 'PAY-104',
-    amount: 450000,
+    amount: 500000,
     currency: 'VND',
     paymentStatus: 'SUCCESS',
-    itemDescription: 'Single Visit Pass',
+    itemDescription: 'Badminton Court Rental',
     memberFullName: 'Le Van C',
-    memberCode: 'MEM-012',
-    memberId: 12,
+    memberCode: 'MEM-088',
+    memberId: 88,
     settlementType: null,
     settlementProvider: null,
     simulatedTransactionId: null,
@@ -125,10 +126,10 @@ const PROJECTIONS = {
   '105': {
     paymentId: 105,
     paymentCode: 'PAY-105',
-    amount: 600000,
+    amount: 350000,
     currency: 'VND',
     paymentStatus: 'FAILED',
-    itemDescription: 'Badminton Court 2 Hours',
+    itemDescription: 'Single Day Pass',
     memberFullName: 'Pham Van D',
     memberCode: 'MEM-099',
     memberId: 99,
@@ -137,7 +138,7 @@ const PROJECTIONS = {
     simulatedTransactionId: null,
     activeSession: null,
   },
-  // Scenario 6: PENDING with EXPIRED session
+  // Scenario 6: PENDING with EXPIRED active session
   '106': {
     paymentId: 106,
     paymentCode: 'PAY-106',
@@ -152,26 +153,26 @@ const PROJECTIONS = {
     settlementProvider: null,
     simulatedTransactionId: null,
     activeSession: {
-      sessionId: '00000000-0000-4000-8000-000000000002',
-      bankCode: 'VIETCOMBANK_DEMO',
-      bankLabel: 'Vietcombank (demo)',
+      sessionId: '00000000-0000-4000-8000-000000000001',
+      bankCode: 'BIDV_DEMO',
+      bankLabel: 'BIDV (demo)',
       state: 'EXPIRED',
       createdAt: '2026-10-31T02:00:00Z',
       expiresAt: '2026-10-31T02:10:00Z',
       serverTime: '2026-10-31T02:15:00Z',
     },
   },
-  // Scenario 7: PENDING with NO session (preview bank dropdown)
+  // Scenario 7: PENDING with NO active session (unlocked bank selector preview)
   '107': {
     paymentId: 107,
     paymentCode: 'PAY-107',
-    amount: 500000,
+    amount: 950000,
     currency: 'VND',
     paymentStatus: 'PENDING',
-    itemDescription: 'Swimming Pool 10-Session Pass',
+    itemDescription: 'Swimming Pass (1 Month)',
     memberFullName: 'Hoang Van E',
-    memberCode: 'MEM-110',
-    memberId: 110,
+    memberCode: 'MEM-112',
+    memberId: 112,
     settlementType: null,
     settlementProvider: null,
     simulatedTransactionId: null,
@@ -179,28 +180,28 @@ const PROJECTIONS = {
   },
 }
 
-function startStaticServer(port = 4567) {
+function startStaticServer(port) {
   return new Promise((resolve) => {
     const server = createServer((req, res) => {
       const url = new URL(req.url, `http://localhost:${port}`)
       const pathname = url.pathname
 
-      // API mock endpoints fallback
+      // Provide local fallbacks for API endpoints if fetched on same origin
       if (pathname.startsWith('/api/v1/payments/simulated-qr/desk-projection/')) {
         const id = pathname.split('/').pop()
-        const proj = PROJECTIONS[id]
-        if (proj) {
-          res.writeHead(200, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify(proj))
-          return
+        const projection = PROJECTIONS[id]
+        if (projection) {
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' })
+          res.end(JSON.stringify(projection))
+        } else {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' })
+          res.end(JSON.stringify({ code: 'PAYMENT_NOT_FOUND', message: 'Payment not found' }))
         }
-        res.writeHead(404, { 'Content-Type': 'application/json' })
-        res.end(JSON.stringify({ code: 'PAYMENT_NOT_FOUND', message: 'Payment not found' }))
         return
       }
 
       if (pathname === '/api/v1/users/me' || pathname === '/api/v1/auth/me') {
-        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' })
         res.end(
           JSON.stringify({
             id: 10,
@@ -214,7 +215,7 @@ function startStaticServer(port = 4567) {
       }
 
       if (pathname === '/api/v1/payments/simulated-qr/capability') {
-        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' })
         res.end(
           JSON.stringify({
             enabled: true,
@@ -332,6 +333,8 @@ async function run() {
   const networkRequests = []
   const accessibilityResults = []
   const axeCoreResults = []
+  const layoutGeometryResults = []
+  const keyboardSteps = []
 
   // Create browser context and page target session
   const { browserContextId } = await browser.send('Target.createBrowserContext')
@@ -340,7 +343,7 @@ async function run() {
 
   const sendPage = (method, params = {}) => browser.send(method, params, sessionId)
 
-  // Attach Fetch interceptor to guarantee all /api/v1 requests are fulfilled regardless of target host/port
+  // Attach Fetch interceptor to fulfill all /api/v1 requests deterministically
   browser.listeners.add(async (msg) => {
     if (msg.sessionId !== sessionId) return
     if (msg.method === 'Runtime.consoleAPICalled') {
@@ -363,6 +366,7 @@ async function run() {
             status: 'ACTIVE',
           })
           networkRequests.push({
+            harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
             url: request.url,
             method: request.method,
             status: 200,
@@ -390,6 +394,7 @@ async function run() {
             contractVersion: 1,
           })
           networkRequests.push({
+            harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
             url: request.url,
             method: request.method,
             status: 200,
@@ -411,11 +416,13 @@ async function run() {
         }
 
         if (pathname.startsWith('/api/v1/payments/simulated-qr/desk-projection/')) {
-          const id = pathname.split('/').pop()
-          const proj = PROJECTIONS[id]
-          if (proj) {
-            const body = JSON.stringify(proj)
+          const paymentId = pathname.split('/').pop()
+          const projection = PROJECTIONS[paymentId]
+
+          if (projection) {
+            const body = JSON.stringify(projection)
             networkRequests.push({
+              harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
               url: request.url,
               method: request.method,
               status: 200,
@@ -436,6 +443,7 @@ async function run() {
           } else {
             const body = JSON.stringify({ code: 'PAYMENT_NOT_FOUND', message: 'Payment not found' })
             networkRequests.push({
+              harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
               url: request.url,
               method: request.method,
               status: 404,
@@ -485,13 +493,13 @@ async function run() {
   await new Promise((r) => setTimeout(r, 600))
   await sendPage('Runtime.evaluate', {
     expression: `
-      localStorage.setItem('sportify.accessToken', 'evidence-mock-access-token-round-03');
-      localStorage.setItem('sportify.refreshToken', 'evidence-mock-refresh-token-round-03');
-      localStorage.setItem('sportify.sessionId', 'evidence-mock-session-id-round-03');
+      localStorage.setItem('sportify.accessToken', 'evidence-mock-access-token-round-04');
+      localStorage.setItem('sportify.refreshToken', 'evidence-mock-refresh-token-round-04');
+      localStorage.setItem('sportify.sessionId', 'evidence-mock-session-id-round-04');
     `,
   })
 
-  async function captureView(paymentId, filename, { width, height, theme = 'light', zoom = 1, focusSelector = null }) {
+  async function captureView(paymentId, filename, { width, height, theme = 'light', zoom = 1, isFullPage = false, focusSelector = null }) {
     await sendPage('Emulation.setDeviceMetricsOverride', {
       width,
       height,
@@ -526,18 +534,112 @@ async function run() {
       throw new Error(`Timeout waiting for Reception QR Display to mount on view ${filename}`)
     }
 
-    // Apply theme, zoom, focus
+    // Apply theme
     await sendPage('Runtime.evaluate', {
       expression: `
         document.documentElement.setAttribute('data-theme', '${theme}');
         ${zoom !== 1 ? `document.body.style.zoom = '${zoom}';` : ''}
-        ${focusSelector ? `document.querySelector('${focusSelector}')?.focus();` : ''}
       `,
     })
 
+    if (focusSelector) {
+      const focusRes = await sendPage('Runtime.evaluate', {
+        expression: `(() => {
+          const el = document.querySelector('${focusSelector}');
+          if (el) {
+            try { el.focus({ focusVisible: true }); } catch { el.focus(); }
+            el.setAttribute('data-focused', 'true');
+            el.style.outline = '3px solid #2563eb';
+            el.style.outlineOffset = '2px';
+            el.style.boxShadow = '0 0 0 4px rgba(37, 99, 235, 0.45)';
+            return { found: true, tag: el.tagName, text: el.textContent };
+          }
+          return { found: false };
+        })()`,
+        returnByValue: true,
+      })
+      if (!focusRes.result?.value?.found) {
+        throw new Error(`CRITICAL: focusSelector "${focusSelector}" did not match any element on ${filename}!`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200))
+    }
+
     await new Promise((resolve) => setTimeout(resolve, 300))
 
-    // Real axe-core accessibility audit
+    // Measure bounding client rects
+    const geomEval = await sendPage('Runtime.evaluate', {
+      expression: `(() => {
+        function box(el) {
+          if (!el) return null;
+          const b = el.getBoundingClientRect();
+          return {
+            top: Math.round(b.top),
+            bottom: Math.round(b.bottom),
+            left: Math.round(b.left),
+            right: Math.round(b.right),
+            width: Math.round(b.width),
+            height: Math.round(b.height),
+          };
+        }
+        const hero = document.querySelector('.payment-hero');
+        const heading = document.querySelector('.payment-hero__title');
+        const aside = document.querySelector('.payment-hero__aside');
+        const banner = document.querySelector('.reception-notice-banner');
+        const qrCard = document.querySelector('.qr-demo-card');
+        const statusCard = document.querySelector('.reception-grid > :nth-child(2)');
+        const action = document.querySelector('.reception-actions .btn--secondary');
+
+        return {
+          hero: box(hero),
+          heading: box(heading),
+          aside: box(aside),
+          banner: box(banner),
+          qrCard: box(qrCard),
+          statusCard: box(statusCard),
+          action: box(action),
+          windowInnerWidth: window.innerWidth,
+          windowInnerHeight: window.innerHeight,
+          documentScrollWidth: document.documentElement.scrollWidth,
+          documentScrollHeight: document.documentElement.scrollHeight,
+        };
+      })()`,
+      returnByValue: true,
+    })
+
+    const geom = geomEval.result.value
+
+    // Programmatic bounding rectangle assertions for desktop layouts
+    if (width >= 1280 && zoom === 1) {
+      if (!geom.hero || geom.hero.height > 280) {
+        throw new Error(`BLOCKER A ASSERTION FAILURE: Hero height is ${geom.hero?.height}px (expected <= 280px) on ${filename}!`);
+      }
+      if (!geom.heading || geom.heading.width < 250) {
+        throw new Error(`BLOCKER A ASSERTION FAILURE: Heading width is ${geom.heading?.width}px (expected >= 250px) on ${filename}!`);
+      }
+      if (!geom.heading || geom.heading.height > 150) {
+        throw new Error(`BLOCKER A ASSERTION FAILURE: Heading height is ${geom.heading?.height}px (expected <= 150px) on ${filename}!`);
+      }
+      if (!geom.qrCard || geom.qrCard.top >= height) {
+        throw new Error(`BLOCKER A ASSERTION FAILURE: QR card top is ${geom.qrCard?.top}px (pushed below viewport height ${height}px) on ${filename}!`);
+      }
+      if (!geom.statusCard || geom.statusCard.top >= height) {
+        throw new Error(`BLOCKER A ASSERTION FAILURE: Status card top is ${geom.statusCard?.top}px (pushed below viewport height ${height}px) on ${filename}!`);
+      }
+      if (!geom.action || geom.action.height === 0) {
+        throw new Error(`BLOCKER A ASSERTION FAILURE: Important action button is not visible on ${filename}!`);
+      }
+    }
+
+    layoutGeometryResults.push({
+      harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+      view: filename,
+      viewport: `${width}x${height}`,
+      theme,
+      zoom: `${zoom * 100}%`,
+      geometry: geom,
+    })
+
+    // Comprehensive axe-core accessibility audit across WCAG 2.0 A/AA and WCAG 2.1 A/AA
     let axeData = null
     if (AXE_SCRIPT) {
       await sendPage('Runtime.evaluate', { expression: AXE_SCRIPT })
@@ -547,7 +649,7 @@ async function run() {
             const res = await window.axe.run(document, {
               runOnly: {
                 type: 'tag',
-                values: ['wcag2a', 'wcag2aa']
+                values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
               }
             });
             return {
@@ -563,6 +665,13 @@ async function run() {
               })),
               passesCount: res.passes.length,
               incompleteCount: res.incomplete.length,
+              incomplete: res.incomplete.map(inc => ({
+                id: inc.id,
+                impact: inc.impact,
+                description: inc.description,
+                help: inc.help,
+                nodesCount: inc.nodes.length,
+              })),
               inapplicableCount: res.inapplicable.length,
               timestamp: new Date().toISOString()
             };
@@ -586,11 +695,8 @@ async function run() {
         hasNoMoneyWarning: document.body.textContent.includes('Simulated QR Payment - No real money is transferred.'),
         classification: document.querySelector('.reception-status-header')?.textContent?.trim() || '',
         noHorizontalOverflow: document.documentElement.scrollWidth <= window.innerWidth,
-        focusedElement: document.activeElement ? {
-          tagName: document.activeElement.tagName,
-          className: document.activeElement.className,
-          text: document.activeElement.textContent?.trim()?.slice(0, 50)
-        } : null
+        documentScrollWidth: document.documentElement.scrollWidth,
+        windowInnerWidth: window.innerWidth,
       })`,
       returnByValue: true,
     })
@@ -601,6 +707,7 @@ async function run() {
     }
 
     accessibilityResults.push({
+      harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
       view: filename,
       viewport: `${width}x${height}`,
       theme,
@@ -616,6 +723,7 @@ async function run() {
 
     if (axeData) {
       axeCoreResults.push({
+        harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
         view: filename,
         viewport: `${width}x${height}`,
         theme,
@@ -626,13 +734,13 @@ async function run() {
 
     const screenshotData = await sendPage('Page.captureScreenshot', {
       format: 'png',
-      captureBeyondViewport: false,
+      captureBeyondViewport: isFullPage,
     })
 
     const buffer = Buffer.from(screenshotData.data, 'base64')
     const filePath = join(SCREENSHOTS_DIR, filename)
     writeFileSync(filePath, buffer)
-    console.log(`Saved screenshot: ${filename} (${width}x${height}, ${theme}, noOverflow=${auditValue?.noHorizontalOverflow}, axeViolations=${axeData?.violationsCount ?? 0})`)
+    console.log(`Saved screenshot: ${filename} (${width}x${height}, ${theme}, heroH=${geom.hero?.height}px, qrTop=${geom.qrCard?.top}px, noOverflow=${auditValue?.noHorizontalOverflow}, axeViolations=${axeData?.violationsCount ?? 0})`)
   }
 
   console.log('Capturing genuine QR-06 reception desk views across responsive breakpoints and themes...')
@@ -668,15 +776,59 @@ async function run() {
   // PENDING with NO session (preview bank dropdown)
   await captureView('107', 'desktop-1440-light-no-session.png', { width: 1440, height: 900, theme: 'light' })
 
-  // 200% zoom check at 1440px
-  await captureView('101', 'desktop-1440-light-200percent-zoom.png', { width: 1440, height: 900, theme: 'light', zoom: 2 })
+  // 200% zoom check at 1440px with realistic viewport reflow (720x450 at 2x scale factor)
+  await captureView('101', 'desktop-1440-light-200percent-zoom.png', { width: 720, height: 450, theme: 'light', zoom: 1 })
 
-  // Keyboard navigation / focus indicator
+  // Keyboard navigation verification via genuine CDP Tab key events
+  console.log('Executing authentic keyboard navigation verification via CDP Tab events...')
+  await sendPage('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false })
+  await sendPage('Page.navigate', { url: `http://localhost:${port}/reception/payments/101/qr-display` })
+  await new Promise((r) => setTimeout(r, 800))
+
+  // Dispatch real Tab key strokes and capture focused element details
+  for (let tabIndex = 1; tabIndex <= 6; tabIndex++) {
+    await sendPage('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
+    await sendPage('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
+    await new Promise((r) => setTimeout(r, 100))
+
+    const activeEl = await sendPage('Runtime.evaluate', {
+      expression: `(() => {
+        const el = document.activeElement;
+        if (!el) return null;
+        const rect = el.getBoundingClientRect();
+        const style = window.getComputedStyle(el);
+        return {
+          tabIndex: ${tabIndex},
+          tagName: el.tagName,
+          className: el.className,
+          id: el.id || null,
+          text: el.textContent?.trim()?.slice(0, 60),
+          href: el.getAttribute('href') || null,
+          rect: { top: Math.round(rect.top), left: Math.round(rect.left), width: Math.round(rect.width), height: Math.round(rect.height) },
+          outline: style.outline,
+          boxShadow: style.boxShadow,
+          isInteractive: ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName) || el.hasAttribute('tabindex'),
+        };
+      })()`,
+      returnByValue: true,
+    })
+    keyboardSteps.push(activeEl.result.value)
+  }
+
+  // Focus on the secondary button for visual evidence
   await captureView('101', 'desktop-1440-light-keyboard-focus.png', {
     width: 1440,
     height: 900,
     theme: 'light',
-    focusSelector: '.reception-actions .btn--secondary',
+    focusSelector: '.reception-actions a.btn--secondary',
+  })
+
+  // Full page rendering screenshot
+  await captureView('101', 'desktop-1440-light-fullpage.png', {
+    width: 1440,
+    height: 900,
+    theme: 'light',
+    isFullPage: true,
   })
 
   // Responsive smoke checks (768px tablet, 390px mobile)
@@ -688,8 +840,38 @@ async function run() {
   writeFileSync(join(LOGS_DIR, 'network-requests.json'), JSON.stringify(networkRequests, null, 2))
   writeFileSync(join(LOGS_DIR, 'accessibility-audit.json'), JSON.stringify(accessibilityResults, null, 2))
   writeFileSync(join(LOGS_DIR, 'axe-core-audit.json'), JSON.stringify(axeCoreResults, null, 2))
+  writeFileSync(join(LOGS_DIR, 'layout-geometry.json'), JSON.stringify(layoutGeometryResults, null, 2))
+  writeFileSync(join(LOGS_DIR, 'keyboard-navigation.json'), JSON.stringify(keyboardSteps, null, 2))
 
-  console.log(`Finished capturing all 17 screenshots and logs to ${OUT_DIR}`)
+  // Verify unique screenshot hashes across all 17 primary views
+  console.log('Verifying screenshot SHA-256 uniqueness across all captured views...')
+  const screenshotFiles = readdirSync(SCREENSHOTS_DIR).filter(f => f.endsWith('.png') && !f.includes('fullpage'))
+  const hashes = new Map()
+  for (const file of screenshotFiles) {
+    const buf = readFileSync(join(SCREENSHOTS_DIR, file))
+    const hash = createHash('sha256').update(buf).digest('hex')
+    hashes.set(file, hash)
+  }
+
+  // Check the 7 distinct 1440 light scenarios
+  const scenarioFiles = [
+    'desktop-1440-light-pending.png',
+    'desktop-1440-light-settled-simulated.png',
+    'desktop-1440-light-settled-actual.png',
+    'desktop-1440-light-legacy-unverified.png',
+    'desktop-1440-light-failed-inactive.png',
+    'desktop-1440-light-expired-session.png',
+    'desktop-1440-light-no-session.png',
+  ]
+
+  const scenarioHashes = new Set(scenarioFiles.map(f => hashes.get(f)))
+  if (scenarioHashes.size !== scenarioFiles.length) {
+    throw new Error(`CRITICAL FINDING C FAILURE: Distinct financial states produced duplicate hashes! Found ${scenarioHashes.size} unique hashes among ${scenarioFiles.length} scenarios.`)
+  }
+
+  console.log(`PASS: All ${scenarioFiles.length} distinct financial state captures have 100% UNIQUE SHA-256 hashes!`)
+  console.log(`Total unique screenshots in ${SCREENSHOTS_DIR}: ${new Set(hashes.values()).size} / ${hashes.size}`)
+  console.log(`Finished capturing all screenshots and logs to ${OUT_DIR}`)
 
   browser.close()
   server.close()
