@@ -365,6 +365,8 @@ try:
         f"VALUES ('receptionist@qr07.example.test','{encoded_pw}','Synthetic QR07 Receptionist',(SELECT id FROM role WHERE code='RECEPTIONIST'),'ACTIVE',0); "
         "INSERT user_account(email,password_hash,full_name,role_id,status,version) "
         f"VALUES ('manager@qr07.example.test','{encoded_pw}','Synthetic QR07 Manager',(SELECT id FROM role WHERE code='MANAGER'),'ACTIVE',0); "
+        "INSERT user_account(email,password_hash,full_name,role_id,status,version) "
+        f"VALUES ('coach@qr07.example.test','{encoded_pw}','Synthetic QR07 Coach',(SELECT id FROM role WHERE code='COACH'),'ACTIVE',0); "
         "INSERT payment(payment_code,member_id,amount,payment_method,payment_status,version) "
         "VALUES ('QR07-CI-P01',@owner,810000,'BANK_TRANSFER','PENDING',0); "
         "DECLARE @p1 bigint=SCOPE_IDENTITY(); "
@@ -392,6 +394,9 @@ try:
     status_mgr, auth_mgr = api_request('/auth/login', {'email': 'manager@qr07.example.test', 'password': 'Qr07IsolatedTest2026!'})
     check('Real Manager authentication succeeds for read-only finance regression', status_mgr == 200 and 'accessToken' in auth_mgr)
     secrets.extend(auth_mgr.get(field) for field in ('accessToken', 'refreshToken', 'sessionId'))
+    status_coach, auth_coach = api_request('/auth/login', {'email': 'coach@qr07.example.test', 'password': 'Qr07IsolatedTest2026!'})
+    check('Real Coach authentication succeeds for forbidden-confirm negative control', status_coach == 200 and 'accessToken' in auth_coach)
+    secrets.extend(auth_coach.get(field) for field in ('accessToken', 'refreshToken', 'sessionId'))
     finance_month = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m')
     status_finance, finance_before = api_request('/manager/finance/overview?month=' + finance_month, bearer=auth_mgr['accessToken'])
     check('Read-only finance baseline records actual and simulated totals', status_finance == 200 and finance_before['simulatedTransactions'] == 0)
@@ -549,18 +554,21 @@ try:
             return result
 
         def keyboard_check(page, label):
+            page.bring_to_front()
+            page.locator('a.brand').first.focus()
             focus = []
             for key in ('Tab', 'Tab', 'Tab', 'Shift+Tab'):
                 page.keyboard.press(key)
                 state = page.evaluate("""() => {
                     const el=document.activeElement, s=getComputedStyle(el), r=el.getBoundingClientRect();
-                    return {tag:el.tagName, text:el.textContent.slice(0,100), outline:s.outlineStyle,
+                    return {tag:el.tagName, text:el.textContent.slice(0,100), href:el.getAttribute('href'), outline:s.outlineStyle,
                             outlineWidth:s.outlineWidth, visible:r.width>0 && r.height>0, key:null};
                 }""")
                 state['key'] = key
                 focus.append(state)
             check(f'{label}: keyboard forward and reverse focus is visible',
-                  all(s['visible'] and s['tag'] != 'BODY' and s['outline'] != 'none' and s['outlineWidth'] != '0px' for s in focus))
+                  all(s['visible'] and s['tag'] != 'BODY' and s['outline'] != 'none' and s['outlineWidth'] != '0px' for s in focus)
+                  and focus[1]['text'] == focus[3]['text'] and focus[1]['href'] == focus[3]['href'], steps=focus)
             return {'view': label, 'steps': focus}
 
         # ----------------------------------------------------
@@ -652,6 +660,11 @@ try:
         check('Real JVM restart preserves authenticated pending session and token verifier',
               restarted_pid != first_pid and persisted_status == 200 and persisted_pending.get('state') == 'PENDING')
         check('Pending JVM restart and preview preserve all 12 SQL tables', pending_restart_before == snapshot('afterPendingJvmRestart'))
+        for forbidden_role, forbidden_auth in (('Coach', auth_coach), ('Manager', auth_mgr), ('Receptionist', auth_rec)):
+            denied_status, _ = api_request('/payments/simulated-qr/sessions/confirm', {'token': token}, bearer=forbidden_auth['accessToken'])
+            check(forbidden_role + ' cannot confirm genuine pending owner session', denied_status == 403)
+        anonymous_read, _ = api_request('/payments/simulated-qr/sessions/' + persisted_pending['id'])
+        check('Anonymous caller cannot read genuine owner session', anonymous_read == 401)
 
         # ----------------------------------------------------
         # BROWSER CONTEXT 2: Isolated Member Confirmation with Genuine Response Loss (R4-01)
