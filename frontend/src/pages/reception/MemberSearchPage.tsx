@@ -66,7 +66,7 @@ export function MemberSearchPage() {
   )
 
   return (
-    <div className="page">
+    <div className="page reception-page">
       <PageHeader
         eyebrow="Front desk"
         title="Member Search and Profile"
