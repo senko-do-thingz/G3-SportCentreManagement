@@ -1,5 +1,6 @@
 package com.sportify.demoqr.controller;
 
+import com.sportify.demoqr.service.DemoQrException;
 import com.sportify.demoqr.service.DemoQrService;
 import com.sportify.identity.security.CustomUserDetails;
 import jakarta.validation.Valid;
@@ -8,6 +9,7 @@ import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -43,6 +45,12 @@ public class DemoQrController {
     }
 
     @PostMapping("/confirm-intent")
+    public DemoQrService.View confirmIntent(@RequestBody TokenRequest request, @AuthenticationPrincipal CustomUserDetails user) {
+        throw new DemoQrException(HttpStatus.CONFLICT, "SIMULATOR_CONFIRM_ENDPOINT_REQUIRED",
+                "Legacy intent-only confirmation is retired because QR simulation now finalizes payment as Paid - Simulated. Refresh and use the explicit /confirm endpoint.");
+    }
+
+    @PostMapping("/confirm")
     public DemoQrService.View confirm(@RequestBody TokenRequest request, @AuthenticationPrincipal CustomUserDetails user) {
         return service.confirm(request.token(), user.getUserAccount());
     }

@@ -23,6 +23,8 @@ export interface ManagerFinanceOverview {
   previousPaidRevenue: number
   revenueChange: number
   revenueChangePercent: number | null
+  simulatedRevenue: number
+  simulatedTransactions: number
 }
 
 /** Mirrors BE-22 RevenueTrendPoint. The endpoint is anchored to the current month. */
@@ -52,6 +54,9 @@ export interface FinanceTransaction {
   sportName: string | null
   invoiceId: number | null
   invoiceNumber: string | null
+  settlementType: string | null
+  settlementProvider: string | null
+  simulatedTransactionId: number | null
 }
 
 /** The UI keeps a month and query in the URL; these are translated to BE-22 from/to/search. */
@@ -150,6 +155,8 @@ function asOverview(value: unknown): ManagerFinanceOverview {
     previousPaidRevenue: amount(value.previousPaidRevenue),
     revenueChange: signedAmount(value.revenueChange),
     revenueChangePercent: nullableSignedAmount(value.revenueChangePercent),
+    simulatedRevenue: value.simulatedRevenue === null || value.simulatedRevenue === undefined ? 0 : amount(value.simulatedRevenue),
+    simulatedTransactions: value.simulatedTransactions === null || value.simulatedTransactions === undefined ? 0 : count(value.simulatedTransactions),
   }
 }
 
@@ -190,6 +197,9 @@ function asTransaction(value: unknown): FinanceTransaction {
     sportName: optionalText(value.sportName),
     invoiceId: value.invoiceId === null || value.invoiceId === undefined ? null : count(value.invoiceId),
     invoiceNumber: optionalText(value.invoiceNumber),
+    settlementType: optionalText(value.settlementType),
+    settlementProvider: optionalText(value.settlementProvider),
+    simulatedTransactionId: value.simulatedTransactionId === null || value.simulatedTransactionId === undefined ? null : count(value.simulatedTransactionId),
   }
 }
 

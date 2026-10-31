@@ -77,6 +77,9 @@ export interface Invoice {
   /** ISSUED, PAID, CANCELLED or REFUNDED. */
   status: string
   issueDate: string | null
+  settlementType?: string | null
+  settlementProvider?: string | null
+  simulatedTransactionId?: number | null
   lines?: InvoiceLine[] | null
 }
 

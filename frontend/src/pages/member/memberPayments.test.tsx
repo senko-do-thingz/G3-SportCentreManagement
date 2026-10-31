@@ -916,4 +916,45 @@ describe('FE-11 Receipts (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt)', 
     expect(screen.queryByTestId('receipt-total')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Print receipt' })).not.toBeInTheDocument()
   })
+
+  it('QR-05 displays Paid - Simulated and explicit simulation provenance across summary, history and receipt', async () => {
+    const simulatedPayment = payment({
+      status: 'SUCCESS',
+      settlementType: 'SIMULATED',
+      settlementProvider: 'SPORTIFY_SIMULATOR',
+      referenceCode: 'SIM-QR-52-00000052',
+      invoiceId: 7,
+      invoiceNumber: 'INV-0007',
+      bankTransferInstructions: null,
+    })
+    const simulatedInvoice = invoice({
+      settlementType: 'SIMULATED',
+      settlementProvider: 'SPORTIFY_SIMULATOR',
+      simulatedTransactionId: 52,
+      paymentReference: 'SIM-QR-52-00000052',
+    })
+    paymentsBackend({
+      payments: [simulatedPayment],
+      myPayments: () => json(200, historyPage([simulatedPayment])),
+      invoice: json(200, simulatedInvoice),
+    })
+
+    const summary = renderApp('/member/payments/52')
+    expect(await screen.findByText('Paid - Simulated')).toBeInTheDocument()
+    expect(screen.getByText('SIMULATED (SPORTIFY_SIMULATOR)')).toBeInTheDocument()
+    expect(screen.getByText('SIM-QR-52-00000052')).toBeInTheDocument()
+    expect(screen.getByText('Paid (Simulated) with: Bank transfer')).toBeInTheDocument()
+    summary.unmount()
+
+    const history = renderApp('/member/payments')
+    expect(await screen.findByText('Paid - Simulated')).toBeInTheDocument()
+    expect(screen.getByText('Bank transfer (Simulated)')).toBeInTheDocument()
+    history.unmount()
+
+    renderApp('/member/payments/receipts/7')
+    const receipt = await screen.findByRole('region', { name: 'Receipt INV-0007' })
+    expect(within(receipt).getByText(/SIMULATED SETTLEMENT - Completed via Sportify QR Simulator/)).toBeInTheDocument()
+    expect(within(receipt).getByText('SIMULATED (SPORTIFY_SIMULATOR)')).toBeInTheDocument()
+    expect(within(receipt).getByText('Paid - Simulated')).toBeInTheDocument()
+  })
 })

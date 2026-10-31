@@ -43,4 +43,9 @@ public class MemberPaymentResponse {
 
     private Long invoiceId;
     private String invoiceNumber;
+
+    private String referenceCode;
+    private String settlementType;
+    private String settlementProvider;
+    private Long simulatedTransactionId;
 }

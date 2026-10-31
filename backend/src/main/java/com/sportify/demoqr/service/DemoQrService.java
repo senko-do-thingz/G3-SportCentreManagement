@@ -19,7 +19,7 @@ import java.util.HexFormat;
 import java.util.UUID;
 import java.util.function.Supplier;
 
-/** Durable confirmation intent only. Financial writers are deliberately absent. */
+/** SQL-backed QR payment simulation service with atomic simulated settlement. */
 @Service
 @Profile("qr-simulator & !prod & !production")
 @ConditionalOnProperty(name = "app.payment.simulator.enabled", havingValue = "true")
@@ -33,7 +33,19 @@ public class DemoQrService {
     }
     public record View(UUID id, long paymentId, String reference, BigDecimal amount, String currency,
                        Bank bankCode, String bankLabel, Instant createdAt, Instant expiresAt,
-                       Instant serverTime, State state, String mode) { }
+                       Instant serverTime, State state, String mode,
+                       String settlementType, String settlementProvider, Long simulatedTransactionId,
+                       String transactionCode, Instant settledAt, Long invoiceId, String invoiceNumber) {
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public View {
+        }
+        public View(UUID id, long paymentId, String reference, BigDecimal amount, String currency,
+                    Bank bankCode, String bankLabel, Instant createdAt, Instant expiresAt,
+                    Instant serverTime, State state, String mode) {
+            this(id, paymentId, reference, amount, currency, bankCode, bankLabel, createdAt, expiresAt,
+                    serverTime, state, mode, null, null, null, null, null, null, null);
+        }
+    }
     public record Created(View session, String confirmationUrl) {
         @Override public String toString() { return "Created[confirmationUrl=REDACTED]"; }
     }
@@ -77,6 +89,9 @@ public class DemoQrService {
             var candidate = store.findId(parsed, actor.getId());
             reader.requireOwner(candidate.paymentId(), actor);
             var session = store.expire(store.lock(parsed, actor.getId()));
+            if (cancel && session.state() == State.SETTLED) {
+                return new Outcome<>(null, stateError(session));
+            }
             if (!cancel && (session.state() == State.PENDING || session.state() == State.AUTHORIZED_PENDING_SETTLEMENT)) {
                 var error = invalidateIfStale(session, actor);
                 if (error != null) return new Outcome<>(null, error);
@@ -103,14 +118,26 @@ public class DemoQrService {
                 }
                 return new Outcome<>(view(session), null);
             }
+            if (session.state() == State.SETTLED) {
+                return new Outcome<>(view(session), null);
+            }
             if (session.state() != State.PENDING && session.state() != State.AUTHORIZED_PENDING_SETTLEMENT) {
                 return new Outcome<>(null, stateError(session));
             }
             var error = invalidateIfStale(session, actor);
             if (error != null) return new Outcome<>(null, error);
-            // Expiry is also checked in the actual SQL UPDATE, after the payment validation and lock wait.
-            session = store.authorize(session);
-            return session.state() == State.AUTHORIZED_PENDING_SETTLEMENT
+            if (!store.isBeforeDeadline(session.id())) {
+                session = store.expire(session);
+                return new Outcome<>(null, stateError(session));
+            }
+            var tx = store.insertSettlement(session);
+            var settlement = reader.settle(session.paymentId(), actor, session.bank().name(), tx.id(), tx.transactionCode());
+            if (settlement == null || settlement.invoiceId() == null
+                    || settlement.invoiceNumber() == null || settlement.invoiceNumber().isBlank()) {
+                throw new IllegalStateException("Simulated settlement requires a persisted PAID invoice and audit record");
+            }
+            session = store.settle(session);
+            return session.state() == State.SETTLED
                     ? new Outcome<>(view(session), null) : new Outcome<>(null, stateError(session));
         });
     }
@@ -144,13 +171,33 @@ public class DemoQrService {
     }
 
     private static DemoQrException stateError(SqlQrStore.Session session) {
+        String suffix = session.state() == State.SETTLED
+                ? "Payment is already settled (simulated)."
+                : "Payment is not settled.";
         return new DemoQrException(HttpStatus.CONFLICT, "SIMULATOR_" + session.state(),
-                "Simulation session is " + session.state() + ". Payment is not settled.");
+                "Simulation session is " + session.state() + ". " + suffix);
     }
 
     private View view(SqlQrStore.Session session) {
+        SqlQrStore.SettlementInfo info = null;
+        if (session.state() == State.SETTLED) {
+            var found = store.findSettlement(session.id(), session.paymentId());
+            if (found != null) {
+                info = found.orElse(null);
+            }
+        }
+        String settlementType = info != null ? info.settlementType()
+                : (session.state() == State.SETTLED ? "SIMULATED" : null);
+        String settlementProvider = info != null ? info.settlementProvider()
+                : (session.state() == State.SETTLED ? "SPORTIFY_SIMULATOR" : null);
+        Long simulatedTxId = info != null ? info.simulatedTransactionId() : null;
+        String txCode = info != null ? info.transactionCode() : null;
+        Instant settledAt = info != null ? info.settledAt() : null;
+        Long invoiceId = info != null ? info.invoiceId() : null;
+        String invoiceNumber = info != null ? info.invoiceNumber() : null;
         return new View(session.id(), session.paymentId(), "DEMO-" + session.paymentId(), session.amount(), session.currency(),
-                session.bank(), session.bank().label, session.createdAt(), session.expiresAt(), store.now(), session.state(), "NON_PAYABLE");
+                session.bank(), session.bank().label, session.createdAt(), session.expiresAt(), store.now(), session.state(), "NON_PAYABLE",
+                settlementType, settlementProvider, simulatedTxId, txCode, settledAt, invoiceId, invoiceNumber);
     }
 
     static String digest(String token) {

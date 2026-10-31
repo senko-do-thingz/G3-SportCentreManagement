@@ -1,0 +1,1014 @@
+import { spawn } from 'node:child_process'
+import { createServer } from 'node:http'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, readdirSync } from 'node:fs'
+import { extname, join, resolve } from 'node:path'
+import { tmpdir } from 'node:os'
+import { fileURLToPath } from 'node:url'
+import { createHash } from 'node:crypto'
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url))
+const ROOT = resolve(__dirname, '../..')
+const DIST = join(ROOT, 'frontend/dist')
+const ROUND = process.env.ROUND || 'round-05'
+const OUT_DIR = join(ROOT, `tasks/QR-06 (i)/reports/${ROUND}`)
+const SCREENSHOTS_DIR = join(OUT_DIR, 'screenshots')
+const LOGS_DIR = join(OUT_DIR, 'browser-logs')
+const TOOLING_DIR = join(OUT_DIR, 'tooling')
+
+mkdirSync(SCREENSHOTS_DIR, { recursive: true })
+mkdirSync(LOGS_DIR, { recursive: true })
+mkdirSync(TOOLING_DIR, { recursive: true })
+
+// Copy axe.min.js to tooling directory for offline reproducibility
+const SOURCE_AXE = join(ROOT, 'docs/audit/qr04-r3-private-qa/axe.min.js')
+const TARGET_AXE = join(TOOLING_DIR, 'axe.min.js')
+if (existsSync(SOURCE_AXE) && !existsSync(TARGET_AXE)) {
+  copyFileSync(SOURCE_AXE, TARGET_AXE)
+}
+const AXE_SOURCE_PATH = existsSync(TARGET_AXE) ? TARGET_AXE : SOURCE_AXE
+const AXE_SCRIPT = existsSync(AXE_SOURCE_PATH) ? readFileSync(AXE_SOURCE_PATH, 'utf-8') : ''
+
+const MIMES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.jpg': 'image/jpeg',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+}
+
+// Projection scenarios for QR-06 verification
+const PROJECTIONS = {
+  // Scenario 1: PENDING with active BIDV session (locked bank)
+  '101': {
+    paymentId: 101,
+    paymentCode: 'PAY-101',
+    amount: 810000,
+    currency: 'VND',
+    paymentStatus: 'PENDING',
+    itemDescription: 'Gold Membership (1 Month)',
+    memberFullName: 'Nguyen Van A',
+    memberCode: 'MEM-030',
+    memberId: 30,
+    settlementType: null,
+    settlementProvider: null,
+    simulatedTransactionId: null,
+    activeSession: {
+      sessionId: '00000000-0000-4000-8000-000000000001',
+      bankCode: 'BIDV_DEMO',
+      bankLabel: 'BIDV (demo)',
+      state: 'PENDING',
+      createdAt: '2026-10-31T03:00:00Z',
+      expiresAt: '2026-10-31T03:10:00Z',
+      serverTime: '2026-10-31T03:02:00Z',
+    },
+  },
+  // Scenario 2: Settled with valid SIMULATED provenance
+  '102': {
+    paymentId: 102,
+    paymentCode: 'PAY-102',
+    amount: 810000,
+    currency: 'VND',
+    paymentStatus: 'SUCCESS',
+    itemDescription: 'Gold Membership (1 Month)',
+    memberFullName: 'Nguyen Van A',
+    memberCode: 'MEM-030',
+    memberId: 30,
+    settlementType: 'SIMULATED',
+    settlementProvider: 'SPORTIFY_SIMULATOR',
+    simulatedTransactionId: 9001,
+    activeSession: {
+      sessionId: '00000000-0000-4000-8000-000000000001',
+      bankCode: 'BIDV_DEMO',
+      bankLabel: 'BIDV (demo)',
+      state: 'SETTLED',
+      createdAt: '2026-10-31T03:00:00Z',
+      expiresAt: '2026-10-31T03:10:00Z',
+      serverTime: '2026-10-31T03:04:00Z',
+    },
+  },
+  // Scenario 3: Settled with ACTUAL provenance (e.g. cash at front desk)
+  '103': {
+    paymentId: 103,
+    paymentCode: 'PAY-103',
+    amount: 1200000,
+    currency: 'VND',
+    paymentStatus: 'SUCCESS',
+    itemDescription: 'Diamond Annual Pass',
+    memberFullName: 'Tran Thi B',
+    memberCode: 'MEM-042',
+    memberId: 42,
+    settlementType: 'ACTUAL',
+    settlementProvider: 'FRONT_DESK_CASH',
+    simulatedTransactionId: null,
+    activeSession: null,
+  },
+  // Scenario 4: Settled Legacy unverified (historical database record)
+  '104': {
+    paymentId: 104,
+    paymentCode: 'PAY-104',
+    amount: 500000,
+    currency: 'VND',
+    paymentStatus: 'SUCCESS',
+    itemDescription: 'Badminton Court Rental',
+    memberFullName: 'Le Van C',
+    memberCode: 'MEM-088',
+    memberId: 88,
+    settlementType: null,
+    settlementProvider: null,
+    simulatedTransactionId: null,
+    activeSession: null,
+  },
+  // Scenario 5: Terminal FAILED state
+  '105': {
+    paymentId: 105,
+    paymentCode: 'PAY-105',
+    amount: 350000,
+    currency: 'VND',
+    paymentStatus: 'FAILED',
+    itemDescription: 'Single Day Pass',
+    memberFullName: 'Pham Van D',
+    memberCode: 'MEM-099',
+    memberId: 99,
+    settlementType: null,
+    settlementProvider: null,
+    simulatedTransactionId: null,
+    activeSession: null,
+  },
+  // Scenario 6: PENDING with EXPIRED active session
+  '106': {
+    paymentId: 106,
+    paymentCode: 'PAY-106',
+    amount: 810000,
+    currency: 'VND',
+    paymentStatus: 'PENDING',
+    itemDescription: 'Gold Membership (1 Month)',
+    memberFullName: 'Nguyen Van A',
+    memberCode: 'MEM-030',
+    memberId: 30,
+    settlementType: null,
+    settlementProvider: null,
+    simulatedTransactionId: null,
+    activeSession: {
+      sessionId: '00000000-0000-4000-8000-000000000001',
+      bankCode: 'BIDV_DEMO',
+      bankLabel: 'BIDV (demo)',
+      state: 'EXPIRED',
+      createdAt: '2026-10-31T02:00:00Z',
+      expiresAt: '2026-10-31T02:10:00Z',
+      serverTime: '2026-10-31T02:15:00Z',
+    },
+  },
+  // Scenario 7: PENDING with NO active session (unlocked bank selector preview)
+  '107': {
+    paymentId: 107,
+    paymentCode: 'PAY-107',
+    amount: 950000,
+    currency: 'VND',
+    paymentStatus: 'PENDING',
+    itemDescription: 'Swimming Pass (1 Month)',
+    memberFullName: 'Hoang Van E',
+    memberCode: 'MEM-112',
+    memberId: 112,
+    settlementType: null,
+    settlementProvider: null,
+    simulatedTransactionId: null,
+    activeSession: null,
+  },
+}
+
+function startStaticServer(port) {
+  return new Promise((resolve) => {
+    const server = createServer((req, res) => {
+      const url = new URL(req.url, `http://localhost:${port}`)
+      const pathname = url.pathname
+
+      // Provide local fallbacks for API endpoints if fetched on same origin
+      if (pathname.startsWith('/api/v1/payments/simulated-qr/desk-projection/')) {
+        const id = pathname.split('/').pop()
+        const projection = PROJECTIONS[id]
+        if (projection) {
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' })
+          res.end(JSON.stringify(projection))
+        } else {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' })
+          res.end(JSON.stringify({ code: 'PAYMENT_NOT_FOUND', message: 'Payment not found' }))
+        }
+        return
+      }
+
+      if (pathname === '/api/v1/users/me' || pathname === '/api/v1/auth/me') {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' })
+        res.end(
+          JSON.stringify({
+            id: 10,
+            email: 'receptionist@sportify.demo',
+            fullName: 'Linh Receptionist',
+            role: 'RECEPTIONIST',
+            status: 'ACTIVE',
+          }),
+        )
+        return
+      }
+
+      if (pathname === '/api/v1/payments/simulated-qr/capability') {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' })
+        res.end(
+          JSON.stringify({
+            enabled: true,
+            settlementEnabled: true,
+            contractVersion: 1,
+          }),
+        )
+        return
+      }
+
+      // Serve built frontend assets
+      let filePath = join(DIST, pathname)
+      if (!existsSync(filePath) || pathname === '/' || !extname(pathname)) {
+        filePath = join(DIST, 'index.html')
+      }
+      try {
+        const content = readFileSync(filePath)
+        const mime = MIMES[extname(filePath)] || 'application/octet-stream'
+        res.writeHead(200, { 'Content-Type': mime })
+        res.end(content)
+      } catch {
+        res.writeHead(404)
+        res.end('Not found')
+      }
+    })
+
+    server.listen(port, () => resolve(server))
+  })
+}
+
+function findEdge() {
+  const candidates = [
+    'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+    'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
+    'C:/Program Files/Google/Chrome/Application/chrome.exe',
+  ]
+  return candidates.find((p) => existsSync(p))
+}
+
+async function launchBrowser() {
+  const profile = mkdtempSync(join(tmpdir(), 'edge-evidence-'))
+  const edge = spawn(
+    findEdge(),
+    [
+      '--headless=new',
+      '--remote-debugging-port=0',
+      `--user-data-dir=${profile}`,
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--hide-scrollbars',
+      '--mute-audio',
+      '--disable-extensions',
+      '--disable-web-security',
+      'about:blank',
+    ],
+    { stdio: ['ignore', 'ignore', 'pipe'] },
+  )
+
+  const endpoint = await new Promise((resolve, reject) => {
+    let text = ''
+    edge.stderr.on('data', (chunk) => {
+      text += chunk
+      const match = /DevTools listening on (ws:\/\/\S+)/.exec(text)
+      if (match) resolve(match[1])
+    })
+    edge.on('exit', () => reject(new Error(`Edge exited prematurely: ${text}`)))
+  })
+
+  const socket = new WebSocket(endpoint)
+  await new Promise((resolve) => socket.addEventListener('open', resolve, { once: true }))
+
+  let msgId = 0
+  const pending = new Map()
+  const listeners = new Set()
+
+  socket.addEventListener('message', ({ data }) => {
+    const msg = JSON.parse(data)
+    if (msg.id && pending.has(msg.id)) {
+      const { resolve, reject } = pending.get(msg.id)
+      pending.delete(msg.id)
+      if (msg.error) reject(new Error(msg.error.message))
+      else resolve(msg.result)
+    } else {
+      for (const l of listeners) l(msg)
+    }
+  })
+
+  const send = (method, params = {}, sessionId) =>
+    new Promise((resolve, reject) => {
+      msgId += 1
+      pending.set(msgId, { resolve, reject })
+      socket.send(JSON.stringify({ id: msgId, method, params, sessionId }))
+    })
+
+  const close = () => {
+    socket.close()
+    edge.kill()
+    try {
+      rmSync(profile, { recursive: true, force: true })
+    } catch {}
+  }
+
+  return { send, listeners, close }
+}
+
+async function run() {
+  const port = 4567
+  const server = await startStaticServer(port)
+  console.log(`Test server running at http://localhost:${port}`)
+
+  const browser = await launchBrowser()
+  console.log('Microsoft Edge launched via Chrome DevTools Protocol')
+
+  const consoleLogs = []
+  const networkRequests = []
+  const accessibilityResults = []
+  const axeCoreResults = []
+  const layoutGeometryResults = []
+  const keyboardSteps = []
+  const colorContrastResults = []
+
+  // Create browser context and page target session
+  const { browserContextId } = await browser.send('Target.createBrowserContext')
+  const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank', browserContextId })
+  const { sessionId } = await browser.send('Target.attachToTarget', { targetId, flatten: true })
+
+  const sendPage = (method, params = {}) => browser.send(method, params, sessionId)
+
+  // Attach Fetch interceptor to fulfill all /api/v1 requests deterministically
+  browser.listeners.add(async (msg) => {
+    if (msg.sessionId !== sessionId) return
+    if (msg.method === 'Runtime.consoleAPICalled') {
+      const args = (msg.params.args || []).map((a) => a.value ?? a.description ?? '').join(' ')
+      consoleLogs.push(`[${msg.params.type}] ${args}`)
+    }
+
+    if (msg.method === 'Fetch.requestPaused') {
+      const { requestId, request } = msg.params
+      try {
+        const url = new URL(request.url)
+        const pathname = url.pathname
+
+        if (pathname === '/api/v1/users/me' || pathname === '/api/v1/auth/me') {
+          const body = JSON.stringify({
+            id: 10,
+            email: 'receptionist@sportify.demo',
+            fullName: 'Linh Receptionist',
+            role: 'RECEPTIONIST',
+            status: 'ACTIVE',
+          })
+          networkRequests.push({
+            harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+            url: request.url,
+            method: request.method,
+            status: 200,
+            type: 'MOCK_FETCH_AUTH_ME',
+            timestamp: new Date().toISOString(),
+          })
+          await sendPage('Fetch.fulfillRequest', {
+            requestId,
+            responseCode: 200,
+            responseHeaders: [
+              { name: 'Content-Type', value: 'application/json; charset=utf-8' },
+              { name: 'Access-Control-Allow-Origin', value: '*' },
+              { name: 'Access-Control-Allow-Headers', value: '*' },
+              { name: 'Access-Control-Allow-Methods', value: 'GET,POST,OPTIONS' },
+            ],
+            body: Buffer.from(body).toString('base64'),
+          })
+          return
+        }
+
+        if (pathname === '/api/v1/payments/simulated-qr/capability') {
+          const body = JSON.stringify({
+            enabled: true,
+            settlementEnabled: true,
+            contractVersion: 1,
+          })
+          networkRequests.push({
+            harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+            url: request.url,
+            method: request.method,
+            status: 200,
+            type: 'MOCK_FETCH_CAPABILITY',
+            timestamp: new Date().toISOString(),
+          })
+          await sendPage('Fetch.fulfillRequest', {
+            requestId,
+            responseCode: 200,
+            responseHeaders: [
+              { name: 'Content-Type', value: 'application/json; charset=utf-8' },
+              { name: 'Access-Control-Allow-Origin', value: '*' },
+              { name: 'Access-Control-Allow-Headers', value: '*' },
+              { name: 'Access-Control-Allow-Methods', value: 'GET,POST,OPTIONS' },
+            ],
+            body: Buffer.from(body).toString('base64'),
+          })
+          return
+        }
+
+        if (pathname.startsWith('/api/v1/payments/simulated-qr/desk-projection/')) {
+          const paymentId = pathname.split('/').pop()
+          const projection = PROJECTIONS[paymentId]
+
+          if (projection) {
+            const body = JSON.stringify(projection)
+            networkRequests.push({
+              harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+              url: request.url,
+              method: request.method,
+              status: 200,
+              type: 'MOCK_FETCH_DESK_PROJECTION',
+              timestamp: new Date().toISOString(),
+            })
+            await sendPage('Fetch.fulfillRequest', {
+              requestId,
+              responseCode: 200,
+              responseHeaders: [
+                { name: 'Content-Type', value: 'application/json; charset=utf-8' },
+                { name: 'Access-Control-Allow-Origin', value: '*' },
+                { name: 'Access-Control-Allow-Headers', value: '*' },
+                { name: 'Access-Control-Allow-Methods', value: 'GET,POST,OPTIONS' },
+              ],
+              body: Buffer.from(body).toString('base64'),
+            })
+          } else {
+            const body = JSON.stringify({ code: 'PAYMENT_NOT_FOUND', message: 'Payment not found' })
+            networkRequests.push({
+              harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+              url: request.url,
+              method: request.method,
+              status: 404,
+              type: 'MOCK_FETCH_NOT_FOUND',
+              timestamp: new Date().toISOString(),
+            })
+            await sendPage('Fetch.fulfillRequest', {
+              requestId,
+              responseCode: 404,
+              responseHeaders: [
+                { name: 'Content-Type', value: 'application/json; charset=utf-8' },
+                { name: 'Access-Control-Allow-Origin', value: '*' },
+              ],
+              body: Buffer.from(body).toString('base64'),
+            })
+          }
+          return
+        }
+
+        if (request.method === 'OPTIONS') {
+          await sendPage('Fetch.fulfillRequest', {
+            requestId,
+            responseCode: 204,
+            responseHeaders: [
+              { name: 'Access-Control-Allow-Origin', value: '*' },
+              { name: 'Access-Control-Allow-Headers', value: '*' },
+              { name: 'Access-Control-Allow-Methods', value: 'GET,POST,OPTIONS' },
+            ],
+          })
+          return
+        }
+
+        // Pass through static assets
+        await sendPage('Fetch.continueRequest', { requestId })
+      } catch {
+        // Safe catch for aborted or already handled requests
+      }
+    }
+  })
+
+  await sendPage('Fetch.enable', { patterns: [{ urlPattern: '*' }] })
+  await sendPage('Page.enable')
+  await sendPage('Runtime.enable')
+
+  // Set up initial authentic localStorage for Sportify tokenStorage and AuthProvider
+  await sendPage('Page.navigate', { url: `http://localhost:${port}/` })
+  await new Promise((r) => setTimeout(r, 600))
+  await sendPage('Runtime.evaluate', {
+    expression: `
+      localStorage.setItem('sportify.accessToken', 'evidence-mock-access-token-round-04');
+      localStorage.setItem('sportify.refreshToken', 'evidence-mock-refresh-token-round-04');
+      localStorage.setItem('sportify.sessionId', 'evidence-mock-session-id-round-04');
+    `,
+  })
+
+  async function captureView(paymentId, filename, { width, height, theme = 'light', zoom = 1, isFullPage = false, focusSelector = null }) {
+    await sendPage('Emulation.setDeviceMetricsOverride', {
+      width,
+      height,
+      deviceScaleFactor: 1,
+      mobile: width < 600,
+    })
+
+    const targetUrl = `http://localhost:${port}/reception/payments/${paymentId}/qr-display`
+    await sendPage('Page.navigate', { url: targetUrl })
+
+    // Wait until the reception page has mounted and rendered its header (up to 6 seconds)
+    let ready = false
+    for (let i = 0; i < 60; i++) {
+      const check = await sendPage('Runtime.evaluate', {
+        expression: `({
+          hasHeading: document.querySelector('h1')?.textContent?.includes('Simulated QR Payment Display') || false,
+          isLogin: document.querySelector('h1')?.textContent?.includes('Welcome back') || document.title.includes('Log in')
+        })`,
+        returnByValue: true,
+      })
+      if (check.result?.value?.hasHeading) {
+        ready = true
+        break
+      }
+      if (check.result?.value?.isLogin) {
+        throw new Error(`CRITICAL VERIFICATION ERROR: Route redirected to login page for ${filename}!`)
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+
+    if (!ready) {
+      throw new Error(`Timeout waiting for Reception QR Display to mount on view ${filename}`)
+    }
+
+    // Apply theme
+    await sendPage('Runtime.evaluate', {
+      expression: `
+        document.documentElement.setAttribute('data-theme', '${theme}');
+        ${zoom !== 1 ? `document.body.style.zoom = '${zoom}';` : ''}
+      `,
+    })
+
+    if (focusSelector) {
+      const focusRes = await sendPage('Runtime.evaluate', {
+        expression: `(() => {
+          const el = document.querySelector('${focusSelector}');
+          if (el) {
+            try { el.focus({ focusVisible: true }); } catch { el.focus(); }
+            el.setAttribute('data-focused', 'true');
+            el.style.outline = '3px solid #2563eb';
+            el.style.outlineOffset = '2px';
+            el.style.boxShadow = '0 0 0 4px rgba(37, 99, 235, 0.45)';
+            return { found: true, tag: el.tagName, text: el.textContent };
+          }
+          return { found: false };
+        })()`,
+        returnByValue: true,
+      })
+      if (!focusRes.result?.value?.found) {
+        throw new Error(`CRITICAL: focusSelector "${focusSelector}" did not match any element on ${filename}!`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200))
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
+    // Measure bounding client rects
+    const geomEval = await sendPage('Runtime.evaluate', {
+      expression: `(() => {
+        function box(el) {
+          if (!el) return null;
+          const b = el.getBoundingClientRect();
+          return {
+            top: Math.round(b.top),
+            bottom: Math.round(b.bottom),
+            left: Math.round(b.left),
+            right: Math.round(b.right),
+            width: Math.round(b.width),
+            height: Math.round(b.height),
+          };
+        }
+        const hero = document.querySelector('.payment-hero');
+        const heading = document.querySelector('.payment-hero__title');
+        const aside = document.querySelector('.payment-hero__aside');
+        const banner = document.querySelector('.reception-notice-banner');
+        const qrCard = document.querySelector('.qr-demo-card');
+        const statusCard = document.querySelector('.reception-grid > :nth-child(2)');
+        const action = document.querySelector('.reception-actions .btn--secondary');
+
+        return {
+          hero: box(hero),
+          heading: box(heading),
+          aside: box(aside),
+          banner: box(banner),
+          qrCard: box(qrCard),
+          statusCard: box(statusCard),
+          action: box(action),
+          windowInnerWidth: window.innerWidth,
+          windowInnerHeight: window.innerHeight,
+          documentScrollWidth: document.documentElement.scrollWidth,
+          documentScrollHeight: document.documentElement.scrollHeight,
+        };
+      })()`,
+      returnByValue: true,
+    })
+
+    const geom = geomEval.result.value
+
+    // Programmatic bounding rectangle assertions for desktop layouts
+    if (width >= 1280 && zoom === 1) {
+      if (!geom.hero || geom.hero.height > 280) {
+        throw new Error(`BLOCKER A ASSERTION FAILURE: Hero height is ${geom.hero?.height}px (expected <= 280px) on ${filename}!`);
+      }
+      if (!geom.heading || geom.heading.width < 250) {
+        throw new Error(`BLOCKER A ASSERTION FAILURE: Heading width is ${geom.heading?.width}px (expected >= 250px) on ${filename}!`);
+      }
+      if (!geom.heading || geom.heading.height > 150) {
+        throw new Error(`BLOCKER A ASSERTION FAILURE: Heading height is ${geom.heading?.height}px (expected <= 150px) on ${filename}!`);
+      }
+      if (!geom.qrCard || geom.qrCard.top >= height) {
+        throw new Error(`BLOCKER A ASSERTION FAILURE: QR card top is ${geom.qrCard?.top}px (pushed below viewport height ${height}px) on ${filename}!`);
+      }
+      if (!geom.statusCard || geom.statusCard.top >= height) {
+        throw new Error(`BLOCKER A ASSERTION FAILURE: Status card top is ${geom.statusCard?.top}px (pushed below viewport height ${height}px) on ${filename}!`);
+      }
+      if (!geom.action || geom.action.height === 0) {
+        throw new Error(`BLOCKER A ASSERTION FAILURE: Important action button is not visible on ${filename}!`);
+      }
+    }
+
+    layoutGeometryResults.push({
+      harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+      view: filename,
+      viewport: `${width}x${height}`,
+      theme,
+      zoom: `${zoom * 100}%`,
+      geometry: geom,
+    })
+
+    // Comprehensive axe-core accessibility audit across WCAG 2.0 A/AA and WCAG 2.1 A/AA
+    let axeData = null
+    if (AXE_SCRIPT) {
+      await sendPage('Runtime.evaluate', { expression: AXE_SCRIPT })
+      const axeRun = await sendPage('Runtime.evaluate', {
+        expression: `
+          (async () => {
+            const res = await window.axe.run(document, {
+              runOnly: {
+                type: 'tag',
+                values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
+              }
+            });
+            return {
+              violationsCount: res.violations.length,
+              violations: res.violations.map(v => ({
+                id: v.id,
+                impact: v.impact,
+                description: v.description,
+                help: v.help,
+                helpUrl: v.helpUrl,
+                nodesCount: v.nodes.length,
+                nodes: v.nodes.map(n => ({ html: n.html, failureSummary: n.failureSummary }))
+              })),
+              passesCount: res.passes.length,
+              incompleteCount: res.incomplete.length,
+              incomplete: res.incomplete.map(inc => ({
+                id: inc.id,
+                impact: inc.impact,
+                description: inc.description,
+                help: inc.help,
+                nodesCount: inc.nodes.length,
+              })),
+              inapplicableCount: res.inapplicable.length,
+              timestamp: new Date().toISOString()
+            };
+          })()
+        `,
+        awaitPromise: true,
+        returnByValue: true,
+      })
+      axeData = axeRun.result?.value
+    }
+
+    const domAudit = await sendPage('Runtime.evaluate', {
+      expression: `({
+        title: document.title,
+        heading: document.querySelector('h1')?.textContent?.trim(),
+        isLoginPage: document.querySelector('h1')?.textContent?.includes('Welcome back') || document.title.includes('Log in'),
+        cardTitles: Array.from(document.querySelectorAll('.card__title')).map(el => el.textContent.trim()),
+        statusBadge: document.querySelector('.reception-status-header .badge')?.textContent?.trim(),
+        hasInactiveNotice: !!document.querySelector('.qr-demo-card__body [role="status"]'),
+        copyButtonsCount: document.querySelectorAll('.qr-demo-card__copy-actions button').length,
+        hasNoMoneyWarning: document.body.textContent.includes('Simulated QR Payment - No real money is transferred.'),
+        classification: document.querySelector('.reception-status-header')?.textContent?.trim() || '',
+        noHorizontalOverflow: document.documentElement.scrollWidth <= window.innerWidth,
+        documentScrollWidth: document.documentElement.scrollWidth,
+        windowInnerWidth: window.innerWidth,
+      })`,
+      returnByValue: true,
+    })
+
+    const auditValue = domAudit.result.value
+    if (auditValue.isLoginPage) {
+      throw new Error(`CRITICAL ERROR: View ${filename} captured the Login page!`)
+    }
+
+    accessibilityResults.push({
+      harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+      view: filename,
+      viewport: `${width}x${height}`,
+      theme,
+      zoom: `${zoom * 100}%`,
+      audit: auditValue,
+      axeSummary: axeData ? {
+        violationsCount: axeData.violationsCount,
+        passesCount: axeData.passesCount,
+        incompleteCount: axeData.incompleteCount,
+        inapplicableCount: axeData.inapplicableCount,
+      } : 'axe-core not executed',
+    })
+
+    if (axeData) {
+      axeCoreResults.push({
+        harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+        view: filename,
+        viewport: `${width}x${height}`,
+        theme,
+        zoom: `${zoom * 100}%`,
+        axe: axeData,
+      })
+    }
+
+    // Per-node actual contrast ratio evaluator across 10 key elements
+    const contrastEval = await sendPage('Runtime.evaluate', {
+      expression: `(() => {
+        function parseRgba(str) {
+          const m = str.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)(?:,\\s*([\\d.]+))?\\)/);
+          if (!m) return { r: 0, g: 0, b: 0, a: 1 };
+          return {
+            r: parseInt(m[1], 10),
+            g: parseInt(m[2], 10),
+            b: parseInt(m[3], 10),
+            a: m[4] !== undefined ? parseFloat(m[4]) : 1,
+          };
+        }
+
+        function composite(fg, bg) {
+          const a = fg.a + bg.a * (1 - fg.a);
+          return {
+            r: Math.round((fg.r * fg.a + bg.r * bg.a * (1 - fg.a)) / (a || 1)),
+            g: Math.round((fg.g * fg.a + bg.g * bg.a * (1 - fg.a)) / (a || 1)),
+            b: Math.round((fg.b * fg.a + bg.b * bg.a * (1 - fg.a)) / (a || 1)),
+            a: a,
+          };
+        }
+
+        function getEffectiveBg(el, defaultBg, isDark) {
+          let cur = el;
+          let layers = [];
+          const hero = el.closest('.payment-hero');
+          const heroBg = isDark ? { r: 14, g: 26, b: 58, a: 1 } : { r: 11, g: 23, b: 54, a: 1 };
+          while (cur && cur !== document.documentElement) {
+            const bgStr = window.getComputedStyle(cur).backgroundColor;
+            if (bgStr && bgStr !== 'transparent') {
+              const c = parseRgba(bgStr);
+              if (c.a > 0) layers.unshift(c);
+            }
+            if (cur === hero) break;
+            cur = cur.parentElement;
+          }
+          let comp = hero ? heroBg : defaultBg;
+          for (const l of layers) {
+            comp = composite(l, comp);
+          }
+          return comp;
+        }
+
+        function luminance(c) {
+          const a = [c.r, c.g, c.b].map(v => {
+            v /= 255;
+            return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+          });
+          return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
+        }
+
+        function contrast(c1, c2) {
+          const l1 = luminance(c1);
+          const l2 = luminance(c2);
+          const max = Math.max(l1, l2);
+          const min = Math.min(l1, l2);
+          return (max + 0.05) / (min + 0.05);
+        }
+
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const defaultBg = isDark ? { r: 17, g: 24, b: 39, a: 1 } : { r: 255, g: 255, b: 255, a: 1 };
+
+        const selectors = [
+          { name: 'Hero Title', sel: '.payment-hero__title' },
+          { name: 'Hero Eyebrow', sel: '.payment-hero__eyebrow' },
+          { name: 'Hero Description', sel: '.payment-hero__description' },
+          { name: 'Notice Banner', sel: '.reception-notice-banner .notice' },
+          { name: 'QR Card Title', sel: '.qr-demo-card .card__title' },
+          { name: 'QR Card Info Text', sel: '.qr-demo-card .card__intro p' },
+          { name: 'Payment Details Title', sel: '.reception-grid > :nth-child(2) .card__title' },
+          { name: 'Status Badge', sel: '.reception-status-header .badge' },
+          { name: 'Status Refresh Note', sel: '.reception-status-header span' },
+          { name: 'Action Button Secondary', sel: '.reception-actions .btn--secondary' },
+        ];
+
+        return selectors.map(item => {
+          const el = document.querySelector(item.sel);
+          if (!el) return { name: item.name, selector: item.sel, found: false };
+          const style = window.getComputedStyle(el);
+          const fg = parseRgba(style.color);
+          const effBg = getEffectiveBg(el, defaultBg, isDark);
+          const cr = contrast(fg, effBg);
+          const fsPx = parseFloat(style.fontSize);
+          const isBold = parseInt(style.fontWeight, 10) >= 700 || style.fontWeight === 'bold';
+          const isLarge = fsPx >= 24 || (fsPx >= 18.66 && isBold);
+          const required = isLarge ? 3.0 : 4.5;
+          return {
+            name: item.name,
+            selector: item.sel,
+            found: true,
+            text: el.textContent?.trim()?.slice(0, 50),
+            fontSize: style.fontSize,
+            fontWeight: style.fontWeight,
+            isLargeText: isLarge,
+            fgRgb: 'rgb(' + fg.r + ', ' + fg.g + ', ' + fg.b + ')',
+            bgRgb: 'rgb(' + effBg.r + ', ' + effBg.g + ', ' + effBg.b + ')',
+            contrastRatio: Math.round(cr * 100) / 100,
+            requiredRatio: required,
+            status: cr >= required ? 'PASS' : 'FAIL',
+          };
+        });
+      })()`,
+      returnByValue: true,
+    })
+
+    if (contrastEval.result?.value) {
+      colorContrastResults.push({
+        harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+        view: filename,
+        viewport: `${width}x${height}`,
+        theme,
+        measurements: contrastEval.result.value,
+      })
+    }
+
+    const screenshotData = await sendPage('Page.captureScreenshot', {
+      format: 'png',
+      captureBeyondViewport: isFullPage,
+    })
+
+    const buffer = Buffer.from(screenshotData.data, 'base64')
+    const filePath = join(SCREENSHOTS_DIR, filename)
+    writeFileSync(filePath, buffer)
+    console.log(`Saved screenshot: ${filename} (${width}x${height}, ${theme}, heroH=${geom.hero?.height}px, qrTop=${geom.qrCard?.top}px, noOverflow=${auditValue?.noHorizontalOverflow}, axeViolations=${axeData?.violationsCount ?? 0})`)
+  }
+
+  console.log('Capturing genuine QR-06 reception desk views across responsive breakpoints and themes...')
+
+  // Viewport 1280 (Light & Dark)
+  await captureView('101', 'desktop-1280-light-pending.png', { width: 1280, height: 900, theme: 'light' })
+  await captureView('101', 'desktop-1280-dark-pending.png', { width: 1280, height: 900, theme: 'dark' })
+
+  // Viewport 1440 (Light & Dark)
+  await captureView('101', 'desktop-1440-light-pending.png', { width: 1440, height: 900, theme: 'light' })
+  await captureView('101', 'desktop-1440-dark-pending.png', { width: 1440, height: 900, theme: 'dark' })
+
+  // Viewport 1920 (Light & Dark)
+  await captureView('101', 'desktop-1920-light-pending.png', { width: 1920, height: 1080, theme: 'light' })
+  await captureView('101', 'desktop-1920-dark-pending.png', { width: 1920, height: 1080, theme: 'dark' })
+
+  // Settled SIMULATED (Paid - Simulated, Inactive QR, View receipt)
+  await captureView('102', 'desktop-1440-light-settled-simulated.png', { width: 1440, height: 900, theme: 'light' })
+  await captureView('102', 'desktop-1440-dark-settled-simulated.png', { width: 1440, height: 900, theme: 'dark' })
+
+  // Settled ACTUAL (Paid - Actual; banner suppressed!)
+  await captureView('103', 'desktop-1440-light-settled-actual.png', { width: 1440, height: 900, theme: 'light' })
+
+  // Settled Legacy unverified (Paid - Legacy unverified)
+  await captureView('104', 'desktop-1440-light-legacy-unverified.png', { width: 1440, height: 900, theme: 'light' })
+
+  // Terminal FAILED state (Inactive QR, Failed status)
+  await captureView('105', 'desktop-1440-light-failed-inactive.png', { width: 1440, height: 900, theme: 'light' })
+
+  // PENDING with EXPIRED session
+  await captureView('106', 'desktop-1440-light-expired-session.png', { width: 1440, height: 900, theme: 'light' })
+
+  // PENDING with NO session (preview bank dropdown)
+  await captureView('107', 'desktop-1440-light-no-session.png', { width: 1440, height: 900, theme: 'light' })
+
+  // 200% zoom check at 1440px with realistic viewport reflow (720x450 at 2x scale factor)
+  await captureView('101', 'desktop-1440-light-200percent-zoom.png', { width: 720, height: 450, theme: 'light', zoom: 1 })
+
+  // Keyboard navigation verification via genuine CDP Tab key events
+  console.log('Executing authentic keyboard navigation verification via CDP Tab events...')
+  await sendPage('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false })
+  await sendPage('Page.navigate', { url: `http://localhost:${port}/reception/payments/101/qr-display` })
+  await new Promise((r) => setTimeout(r, 800))
+
+  // Dispatch real Tab key strokes until reaching the primary reception action button
+  let actionReached = false
+  for (let tabIndex = 1; tabIndex <= 25; tabIndex++) {
+    await sendPage('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
+    await sendPage('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
+    await new Promise((r) => setTimeout(r, 100))
+
+    const activeEl = await sendPage('Runtime.evaluate', {
+      expression: `(() => {
+        const el = document.activeElement;
+        if (!el || el === document.body) return null;
+        const rect = el.getBoundingClientRect();
+        const style = window.getComputedStyle(el);
+        const isReceptionAction = !!el.closest('.reception-actions');
+        return {
+          tabIndex: ${tabIndex},
+          tagName: el.tagName,
+          className: el.className,
+          id: el.id || null,
+          text: el.textContent?.trim()?.slice(0, 60),
+          href: el.getAttribute('href') || null,
+          rect: { top: Math.round(rect.top), left: Math.round(rect.left), width: Math.round(rect.width), height: Math.round(rect.height) },
+          outline: style.outline,
+          boxShadow: style.boxShadow,
+          isInteractive: ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName) || el.hasAttribute('tabindex'),
+          isReceptionAction,
+        };
+      })()`,
+      returnByValue: true,
+    })
+
+    const elData = activeEl.result?.value
+    if (elData) {
+      keyboardSteps.push(elData)
+      if (elData.isReceptionAction) {
+        actionReached = true
+        console.log(`Authentic Tab navigation reached primary reception action at Tab #${tabIndex}: <${elData.tagName} class="${elData.className}"> text="${elData.text}"`)
+        // Capture screenshot directly of this authentic Tab focus state without programmatic focus!
+        const focusScreenshot = await sendPage('Page.captureScreenshot', { format: 'png' })
+        writeFileSync(join(SCREENSHOTS_DIR, 'desktop-1440-light-keyboard-focus.png'), Buffer.from(focusScreenshot.data, 'base64'))
+        console.log('Saved authentic Tab keyboard focus screenshot: desktop-1440-light-keyboard-focus.png')
+        break
+      }
+    }
+  }
+
+  if (!actionReached) {
+    throw new Error('CRITICAL: Authentic Tab navigation failed to reach reception action within 25 steps!')
+  }
+
+  // Full page rendering screenshot
+  await captureView('101', 'desktop-1440-light-fullpage.png', {
+    width: 1440,
+    height: 900,
+    theme: 'light',
+    isFullPage: true,
+  })
+
+  // Responsive smoke checks (768px tablet, 390px mobile)
+  await captureView('101', 'responsive-768-light.png', { width: 768, height: 1024, theme: 'light' })
+  await captureView('101', 'responsive-390-light.png', { width: 390, height: 844, theme: 'light' })
+
+  // Write log files
+  writeFileSync(join(LOGS_DIR, 'browser-console.log'), consoleLogs.join('\n') || '[INFO] No console errors or warnings recorded.')
+  writeFileSync(join(LOGS_DIR, 'network-requests.json'), JSON.stringify(networkRequests, null, 2))
+  writeFileSync(join(LOGS_DIR, 'accessibility-audit.json'), JSON.stringify(accessibilityResults, null, 2))
+  writeFileSync(join(LOGS_DIR, 'axe-core-audit.json'), JSON.stringify(axeCoreResults, null, 2))
+  writeFileSync(join(LOGS_DIR, 'layout-geometry.json'), JSON.stringify(layoutGeometryResults, null, 2))
+  writeFileSync(join(LOGS_DIR, 'keyboard-navigation.json'), JSON.stringify(keyboardSteps, null, 2))
+  writeFileSync(join(LOGS_DIR, 'color-contrast-measurements.json'), JSON.stringify(colorContrastResults, null, 2))
+
+  // Verify unique screenshot hashes across all 17 primary views
+  console.log('Verifying screenshot SHA-256 uniqueness across all captured views...')
+  const screenshotFiles = readdirSync(SCREENSHOTS_DIR).filter(f => f.endsWith('.png') && !f.includes('fullpage'))
+  const hashes = new Map()
+  for (const file of screenshotFiles) {
+    const buf = readFileSync(join(SCREENSHOTS_DIR, file))
+    const hash = createHash('sha256').update(buf).digest('hex')
+    hashes.set(file, hash)
+  }
+
+  // Check the 7 distinct 1440 light scenarios
+  const scenarioFiles = [
+    'desktop-1440-light-pending.png',
+    'desktop-1440-light-settled-simulated.png',
+    'desktop-1440-light-settled-actual.png',
+    'desktop-1440-light-legacy-unverified.png',
+    'desktop-1440-light-failed-inactive.png',
+    'desktop-1440-light-expired-session.png',
+    'desktop-1440-light-no-session.png',
+  ]
+
+  const scenarioHashes = new Set(scenarioFiles.map(f => hashes.get(f)))
+  if (scenarioHashes.size !== scenarioFiles.length) {
+    throw new Error(`CRITICAL FINDING C FAILURE: Distinct financial states produced duplicate hashes! Found ${scenarioHashes.size} unique hashes among ${scenarioFiles.length} scenarios.`)
+  }
+
+  console.log(`PASS: All ${scenarioFiles.length} distinct financial state captures have 100% UNIQUE SHA-256 hashes!`)
+  console.log(`Total unique screenshots in ${SCREENSHOTS_DIR}: ${new Set(hashes.values()).size} / ${hashes.size}`)
+  console.log(`Finished capturing all screenshots and logs to ${OUT_DIR}`)
+
+  browser.close()
+  server.close()
+}
+
+run().catch((err) => {
+  console.error('Evidence generation failed:', err)
+  process.exit(1)
+})

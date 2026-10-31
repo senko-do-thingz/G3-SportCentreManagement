@@ -74,6 +74,10 @@ public class FinanceReportServiceImpl implements FinanceReportService {
         Totals pending = repository.pendingTotals(start, end);
         Totals refunded = repository.refundedTotals(start, end);
         Totals previousPaid = repository.paidTotals(previousStart, start);
+        Totals simulated = repository.simulatedTotals(start, end);
+        if (simulated == null) {
+            simulated = new Totals(BigDecimal.ZERO, 0L);
+        }
 
         BigDecimal revenue = money(paid.amount());
         BigDecimal previousRevenue = money(previousPaid.amount());
@@ -96,7 +100,9 @@ public class FinanceReportServiceImpl implements FinanceReportService {
                 previousRevenue,
                 previousPaid.count(),
                 change,
-                changePercent);
+                changePercent,
+                money(simulated.amount()),
+                simulated.count());
     }
 
     @Override

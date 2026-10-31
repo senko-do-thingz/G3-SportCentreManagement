@@ -56,6 +56,15 @@ public class Payment {
     @JoinColumn(name = "confirmed_by_user_id")
     private UserAccount confirmedByUser;
 
+    @Column(name = "settlement_type", length = 20)
+    private String settlementType;
+
+    @Column(name = "settlement_provider", length = 40)
+    private String settlementProvider;
+
+    @Column(name = "simulated_transaction_id")
+    private Long simulatedTransactionId;
+
     @Version
     @Column(name = "version", nullable = false)
     private Integer version;

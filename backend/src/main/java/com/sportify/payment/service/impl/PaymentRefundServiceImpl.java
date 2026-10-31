@@ -37,6 +37,11 @@ public class PaymentRefundServiceImpl implements PaymentRefundService {
         Payment payment = paymentRepository.findByIdForUpdate(paymentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found for id: " + paymentId));
 
+        if ("SIMULATED".equalsIgnoreCase(payment.getSettlementType())) {
+            throw new ConflictException("Payment " + payment.getPaymentCode()
+                    + " was settled via QR simulation and cannot be refunded as real money",
+                    CODE_SIMULATED_PAYMENT_NOT_REFUNDABLE);
+        }
         if (payment.getPaymentStatus() == PaymentStatus.REFUNDED) {
             throw new ConflictException("Payment " + payment.getPaymentCode() + " has already been refunded",
                     CODE_PAYMENT_ALREADY_REFUNDED);
