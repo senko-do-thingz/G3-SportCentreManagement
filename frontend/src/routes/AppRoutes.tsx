@@ -37,6 +37,8 @@ import { LoginPage } from '../pages/public/LoginPage'
 import { NotFoundPage } from '../pages/public/NotFoundPage'
 import { RegisterPage } from '../pages/public/RegisterPage'
 import { AccountSwitchRedirect } from './AccountSwitchRedirect'
+import { MemberTrainingPlansPage } from '../pages/member/MemberTrainingPlansPage'
+import { MemberTrainingHistoryPage } from '../pages/member/MemberTrainingHistoryPage'
 import { UserManagementPage } from '../pages/manager/UserManagementPage'
 import { ManagerPackagesPage } from '../pages/manager/ManagerPackagesPage'
 import { MembershipCardsManagementPage } from '../pages/manager/MembershipCardsManagementPage'
@@ -75,6 +77,7 @@ const SCREENS: Record<string, ReactNode> = {
   '/member/membership': <MyMembershipPage />,
   '/member/payments': <MyPaymentsPage />,
   '/member/schedule': <MemberSchedulePage />,
+  '/member/training': <MemberTrainingPlansPage />,
   '/reception': <MemberSearchPage />,
   '/reception/bookings': <ReceptionBookingsPage />,
   '/reception/register': <RegisterRenewPage />,
@@ -96,6 +99,7 @@ const SCREENS: Record<string, ReactNode> = {
  * - 'payments/:paymentId/status': Payment Instructions and Status (F3-02, FE-11).
  * - 'payments/receipts/:invoiceId': Receipt (S3-CardReceipt, S3-MemberReceipt,
  *   S3-SingleReceipt, FE-11).
+ * - 'training/history': Attendance and Results (NX-15), reached from the Training screen (NX-14).
  * - '/reception' 'payments/:paymentId': Verify and Record Payment (F3-05) and
  *   Payment Confirmed and Receipt (F3-06), opened from Payment Requests (F3-04),
  *   a pending online request or a desk sale (FE-05, FE-12).
@@ -109,6 +113,7 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
     { path: 'classes/:classId/edit', element: <ClassEditorPage /> },
   ],
   '/member': [
+    { path: 'training/history', element: <MemberTrainingHistoryPage /> },
     { path: 'classes', element: <FindClassesPage /> },
     { path: 'sessions/:sessionId', element: <SessionDetailPage /> },
     { path: 'bookings', element: <MemberBookingsPage /> },

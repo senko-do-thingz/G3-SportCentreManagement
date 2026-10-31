@@ -76,6 +76,14 @@ export const MEMBER_AREA: RoleArea = {
           screens: ['F2-04', 'F2-05', 'F2-06'],
         },
         {
+          label: 'Training',
+          path: 'training',
+          title: 'My Training',
+          description: 'Your training plans, coach notes, attendance and results.',
+          task: 'NX-14, NX-15',
+          screens: [],
+        },
+        {
           label: 'My Payments',
           path: 'payments',
           title: 'My Payments and Receipts',

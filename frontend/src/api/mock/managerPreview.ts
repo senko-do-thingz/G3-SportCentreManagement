@@ -1,6 +1,7 @@
 import type { RequestOptions } from '../client'
 import { schedulePreviewResponse } from './managerSchedulePreview'
 import { memberBrowsePreview } from './memberBrowsePreview'
+import { memberTrainingPreview } from './memberTrainingPreview'
 import type { Sport } from '../packagesApi'
 import type { PageResponse, UserProfile } from '../types'
 import type { ActivityLog, CardTierUpdateDraft, ManagerCardTier, ManagerPackage, ManagerUser, PackageCreateRequest, PackageUpdateDraft, StaffAccountRequest } from '../../types/manager'
@@ -92,6 +93,8 @@ export async function previewResponse(path: string, options: RequestOptions, tok
   const empty = scenario === 'empty'
   const browse = token === 'preview-MEMBER' ? memberBrowsePreview(path, options, sports, scenario) : undefined
   if (browse) return browse
+  const training = token === 'preview-MEMBER' ? memberTrainingPreview(path, options, scenario) : undefined
+  if (training) return training
   const schedule = schedulePreviewResponse(path, options, sports, empty)
   if (schedule) return schedule
   if (path === '/sports') return json(200, sports)
