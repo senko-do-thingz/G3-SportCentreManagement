@@ -78,7 +78,9 @@ __pycache__/
 !scripts/ci/test_verify_package.py
 !scripts/ci/test_workflow_contract.py
 !scripts/ci/test_summary.py
+!scripts/ci/test_verify_sql_evidence.py
 !scripts/verify-sql-evidence.py
+!scripts/test_verify_sql_evidence.py
 # Frontend browser checks (Playwright) referenced from frontend/docs test cases
 !frontend/scripts/*.py
 *.py[cod]
