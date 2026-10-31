@@ -9,6 +9,20 @@ TABLES = (
 )
 
 
+def validate_provenance(provenance, report, sql, expected_head, expected_run):
+    if not re.fullmatch(r'[0-9a-f]{40}', expected_head) or not str(expected_run).isdigit():
+        raise ValueError('Invalid externally supplied run/HEAD')
+    for record in (provenance, report, sql):
+        if record.get('head') != expected_head or str(record.get('runId')) != str(expected_run):
+            raise ValueError('Evidence does not match externally verified run/HEAD')
+    if len({r.get('database') for r in (provenance, report, sql)}) != 1 or not sql.get('database'):
+        raise ValueError('Evidence database mismatch')
+    if report.get('status') != 'PASS' or provenance.get('status') != 'PASS' or not report.get('checks'):
+        raise ValueError('Evidence has no successful execution')
+    if any(c.get('passed') is not True for c in report['checks']):
+        raise ValueError('Evidence includes a non-passing assertion')
+
+
 def validate_fingerprints(values):
     if set(values) != set(TABLES) or any(
         not isinstance(v, str) or not re.fullmatch(r'[A-Fa-f0-9]{64}', v)

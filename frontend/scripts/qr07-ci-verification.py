@@ -164,7 +164,7 @@ def fingerprints():
     return validate_fingerprints(values)
 
 
-def api_request(path, body=None, bearer=None, method=None):
+def api_request(path, body=None, bearer=None, method=None, response_format='json'):
     headers = {'Content-Type': 'application/json'}
     if bearer:
         headers['Authorization'] = 'Bearer ' + bearer
@@ -181,7 +181,8 @@ def api_request(path, body=None, bearer=None, method=None):
         with urllib.request.urlopen(req, context=tls, timeout=20) as response:
             status = response.status
             server_corr = response.headers.get('X-Correlation-Id')
-            resp_data = json.loads(response.read().decode())
+            raw_response = response.read().decode('utf8-sig')
+            resp_data = json.loads(raw_response) if response_format == 'json' else raw_response
     except urllib.error.HTTPError as error:
         status = error.code
         server_corr = error.headers.get('X-Correlation-Id')
@@ -203,7 +204,7 @@ def api_request(path, body=None, bearer=None, method=None):
     return status, resp_data
 
 
-def start_backend():
+def start_backend(simulator_enabled='true'):
     global process
     log_path = args.private / f'backend-{len(logs)}.log'
     log = log_path.open('w', encoding='utf8')
@@ -217,7 +218,7 @@ def start_backend():
         'SPORTIFY_PAYMENT_ACCOUNT_NAME': 'CI synthetic center',
         'SPORTIFY_PAYMENT_ACCOUNT_NUMBER': 'NOT_AVAILABLE',
         'SPORTIFY_PAYMENT_BANK': 'Simulation only',
-        'PAYMENT_SIMULATOR_ENABLED': 'true',
+        'PAYMENT_SIMULATOR_ENABLED': simulator_enabled,
         'PAYMENT_SIMULATOR_LIFETIME_SECONDS': '600',
         'PAYMENT_SIMULATOR_PUBLIC_BASE_URL': 'https://demo.example.test:55443/',
         'PAYMENT_SIMULATOR_ALLOWED_ORIGINS': 'https://demo.example.test:55443',
@@ -362,6 +363,8 @@ try:
         "VALUES (@owner,'QR07-CI-MEM','BEGINNER',CAST(SYSUTCDATETIME() AS DATE)); "
         "INSERT user_account(email,password_hash,full_name,role_id,status,version) "
         f"VALUES ('receptionist@qr07.example.test','{encoded_pw}','Synthetic QR07 Receptionist',(SELECT id FROM role WHERE code='RECEPTIONIST'),'ACTIVE',0); "
+        "INSERT user_account(email,password_hash,full_name,role_id,status,version) "
+        f"VALUES ('manager@qr07.example.test','{encoded_pw}','Synthetic QR07 Manager',(SELECT id FROM role WHERE code='MANAGER'),'ACTIVE',0); "
         "INSERT payment(payment_code,member_id,amount,payment_method,payment_status,version) "
         "VALUES ('QR07-CI-P01',@owner,810000,'BANK_TRANSFER','PENDING',0); "
         "DECLARE @p1 bigint=SCOPE_IDENTITY(); "
@@ -386,6 +389,13 @@ try:
     status_rec, auth_rec = api_request('/auth/login', {'email': 'receptionist@qr07.example.test', 'password': 'Qr07IsolatedTest2026!'})
     check('Real Receptionist authentication succeeds with genuine JWT', status_rec == 200 and 'accessToken' in auth_rec)
     secrets.extend(auth.get(field) for auth in (auth_mem, auth_rec) for field in ('accessToken', 'refreshToken', 'sessionId'))
+    status_mgr, auth_mgr = api_request('/auth/login', {'email': 'manager@qr07.example.test', 'password': 'Qr07IsolatedTest2026!'})
+    check('Real Manager authentication succeeds for read-only finance regression', status_mgr == 200 and 'accessToken' in auth_mgr)
+    secrets.extend(auth_mgr.get(field) for field in ('accessToken', 'refreshToken', 'sessionId'))
+    finance_month = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m')
+    status_finance, finance_before = api_request('/manager/finance/overview?month=' + finance_month, bearer=auth_mgr['accessToken'])
+    check('Read-only finance baseline records actual and simulated totals', status_finance == 200 and finance_before['simulatedTransactions'] == 0)
+    sql_evidence['financeBefore'] = finance_before
 
     # Step 6: Simulator Capability Check
     status_cap, cap = api_request('/payments/simulated-qr/capability', bearer=auth_mem['accessToken'])
@@ -561,7 +571,9 @@ try:
         page3 = ctx3.new_page()
         observe_page(page3, 'Receptionist')
         rec_navigations = []
+        rec_documents = []
         page3.on('framenavigated', lambda frame: rec_navigations.append({'url': frame.url.split('#')[0], 'timestamp': timestamp()}) if frame == page3.main_frame else None)
+        page3.on('request', lambda request: rec_documents.append({'path': urlsplit(request.url).path, 'timestamp': timestamp()}) if request.is_navigation_request() and request.frame == page3.main_frame else None)
 
         # Navigate to desk projection BEFORE Member initiates or confirms
         page3.goto(f'https://demo.example.test:55443/reception/payments/{p1_id}/qr-display')
@@ -576,6 +588,8 @@ try:
         check('Receptionist display opens in PENDING state with informational QR prior to settlement',
               page3.get_by_text('Pending payment').first.is_visible() and page3.locator('.qr-demo-card svg').count() == 1)
         rec_identity = page3.evaluate('() => ({timeOrigin:performance.timeOrigin, url:location.href})')
+        rec_initial_navigations = len(rec_navigations)
+        rec_initial_documents = len(rec_documents)
         pending_before = snapshot('beforeLivePendingPolling')
         page3.wait_for_timeout(8500)
         check('Live pending browser GET polling causes zero changes in all 12 tables', pending_before == snapshot('afterLivePendingPolling'))
@@ -629,6 +643,16 @@ try:
             barcodes = zxingcpp.read_barcodes(Image.open(BytesIO(qr_svg.screenshot())))
             check('Rendered application QR decodes to genuine confirmation URL', len(barcodes) == 1 and barcodes[0].text == confirmation_url)
 
+        # A real JVM restart, distinct from the historical new-service-object test.
+        pending_restart_before = snapshot('beforePendingJvmRestart')
+        first_pid = process.pid
+        stop_backend()
+        restarted_pid = start_backend()
+        persisted_status, persisted_pending = api_request('/payments/simulated-qr/sessions/preview', {'token': token}, bearer=auth_mem['accessToken'])
+        check('Real JVM restart preserves authenticated pending session and token verifier',
+              restarted_pid != first_pid and persisted_status == 200 and persisted_pending.get('state') == 'PENDING')
+        check('Pending JVM restart and preview preserve all 12 SQL tables', pending_restart_before == snapshot('afterPendingJvmRestart'))
+
         # ----------------------------------------------------
         # BROWSER CONTEXT 2: Isolated Member Confirmation with Genuine Response Loss (R4-01)
         # ----------------------------------------------------
@@ -652,6 +676,7 @@ try:
         check('Context 2 Confirm preview axe has 0 violations', preview_axe['violationsCount'] == 0)
 
         confirm_before = snapshot('beforeLostResponseConfirmation')
+        check('Repeated live preview reads preserve pending SQL state', confirm_before == sql_evidence['snapshots']['afterPendingJvmRestart']['sha256'])
         measured = measure_brand(page2, 'confirmation-light')
         check('confirmation-light: brand local contrast meets conservative 4.5 threshold', measured['passed'])
 
@@ -743,9 +768,11 @@ try:
         settled_polls = [e for e in browser_events if e['context'] == 'Receptionist' and e['event'] == 'response'
                          and '/desk-projection/' in e['path'] and e.get('paymentStatus') == 'SUCCESS']
         check('Receptionist desk projection updates live from PENDING to Paid - Simulated via polling without reload',
-              bool(settled_polls) and len(rec_navigations) == 1 and rec_identity == page3.evaluate('() => ({timeOrigin:performance.timeOrigin, url:location.href})')
+              bool(settled_polls) and len(rec_navigations) == rec_initial_navigations and len(rec_documents) == rec_initial_documents
+              and rec_identity == page3.evaluate('() => ({timeOrigin:performance.timeOrigin, url:location.href})')
               and all(e['method'] == 'GET' and e.get('settlementType') == 'SIMULATED' for e in settled_polls),
-              pageIdentity=rec_identity, navigations=rec_navigations, settledResponses=settled_polls)
+              pageIdentity=rec_identity, initialNavigationCount=rec_initial_navigations,
+              navigations=rec_navigations, documents=rec_documents, settledResponses=settled_polls)
         check('Settled desk displays no scannable QR or settlement action', page3.locator('.qr-demo-card svg').count() == 0
               and page3.get_by_role('button', name='Confirm simulated payment').count() == 0)
         keyboard_results.append(keyboard_check(page3, 'reception-settled'))
@@ -885,6 +912,35 @@ try:
     check('Every rolled-back provenance negative control preserves all 12 tables', after_fingerprints == snapshot('afterProvenanceNegativeControls'))
     sql_evidence['constraintNegativeControls'] = controls
     sql_evidence['paymentAudit'] = audits
+
+    status_finance, finance_after = api_request('/manager/finance/overview?month=' + finance_month, bearer=auth_mgr['accessToken'])
+    check('Simulated finance total increments exactly once and actual revenue is unchanged',
+          status_finance == 200 and finance_after['simulatedTransactions'] == 1
+          and float(finance_after['simulatedRevenue']) == 810000
+          and all(finance_after[key] == finance_before[key] for key in ('paidRevenue', 'paidTransactions', 'refundedAmount', 'refundedTransactions')))
+    sql_evidence['financeAfter'] = finance_after
+    status_transactions, transactions = api_request('/manager/finance/transactions?search=QR07-CI-P01', bearer=auth_mgr['accessToken'])
+    check('Manager transaction list contains committed simulated provenance', status_transactions == 200 and
+          any(str(item.get('settlementType')) == 'SIMULATED' and item.get('settlementProvider') == 'SPORTIFY_SIMULATOR'
+              for item in transactions.get('content', [])))
+    export_status, export_csv = api_request('/manager/finance/revenue/export', bearer=auth_mgr['accessToken'], response_format='text')
+    check('Actual revenue CSV export does not include simulated payment', export_status == 200 and 'QR07-CI-P01' not in export_csv)
+    sql_evidence['financeExport'] = {'status': export_status, 'sha256': hashlib.sha256(export_csv.encode()).hexdigest(),
+                                    'lines': export_csv.splitlines(), 'contract': 'Actual revenue export excludes simulated settlements'}
+
+    stop_backend()
+    disabled_pid = start_backend(simulator_enabled='false')
+    history_status, history = api_request('/payments/my', bearer=auth_mem['accessToken'])
+    receipt_status, receipt = api_request('/invoices/by-payment/' + str(p1_id), bearer=auth_mem['accessToken'])
+    check('History and receipt survive JVM restart with simulator kill switch disabled',
+          disabled_pid > 0 and history_status == 200 and receipt_status == 200
+          and any(item.get('id') == p1_id and item.get('settlementType') == 'SIMULATED' for item in history.get('content', []))
+          and receipt.get('paymentId') == p1_id)
+    disabled_status, disabled_capability = api_request('/payments/simulated-qr/capability', bearer=auth_mem['accessToken'])
+    check('Restarted server reports simulator disabled', disabled_status == 200 and not disabled_capability.get('enabled') and not disabled_capability.get('settlementEnabled'))
+    check('Kill-switch history and receipt reads preserve all 12 SQL tables', after_fingerprints == snapshot('afterDisabledJvmRestartHistoryReads'))
+    private_log_content = '\n'.join(p.read_text(encoding='utf8', errors='replace') for p in args.private.glob('backend-*.log'))
+    check('Real backend logs contain no raw QR confirmation token', token not in private_log_content)
 
     # Correlation ID audit verification (R4-03)
     check('Client correlation ID is attached to every harness API request', bool(network_logs) and all(e.get('sentHeaderVerified') for e in network_logs))

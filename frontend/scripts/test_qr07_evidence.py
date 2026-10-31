@@ -1,12 +1,26 @@
 """Negative controls for evidence truthfulness, geometry and SQL error handling."""
 import unittest
+import copy
 from qr07_evidence import (
     TABLES, constraint_rejected, correlation_observation, localized_contrast,
-    validate_fingerprints,
+    validate_fingerprints, validate_provenance,
 )
 
 
 class EvidenceControls(unittest.TestCase):
+    def test_provenance_rejects_wrong_head_run_database_and_failed_execution(self):
+        # Deliberately synthetic records test the validator, never SQL execution.
+        head = 'a' * 40
+        original = {'head': head, 'runId': '123', 'database': 'isolated-test',
+                    'status': 'PASS', 'checks': [{'passed': True}]}
+        validate_provenance(original, original, original, head, '123')
+        for field, value in (('head', 'b' * 40), ('runId', '124'), ('database', 'other'),
+                             ('status', 'FAIL'), ('checks', [{'passed': False}])):
+            bad = copy.deepcopy(original)
+            bad[field] = value
+            with self.assertRaises(ValueError):
+                validate_provenance(original, bad, original, head, '123')
+
     def test_sql_requires_every_table_and_valid_digest(self):
         values = dict.fromkeys(TABLES, 'A' * 64)
         self.assertEqual(validate_fingerprints(values), values)
