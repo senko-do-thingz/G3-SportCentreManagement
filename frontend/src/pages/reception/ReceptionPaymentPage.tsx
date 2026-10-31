@@ -133,7 +133,22 @@ export function ReceptionPaymentPage() {
 
   const data = payment.data
   if (data.status === 'PENDING') {
-    return <VerifyPayment key={data.id} payment={data} actions={actions} onDone={reload} />
+    const pendingActions = (
+      <div className="reception-actions reception-print-hidden">
+        <Link className={buttonClassName('secondary', 'md')} to={PAYMENT_LIST_PATH}>
+          Payment requests
+        </Link>
+        <Link className={buttonClassName('secondary', 'md')} to={`/reception/payments/${data.id}/qr-display`}>
+          Desk QR Display
+        </Link>
+        {memberId !== null && (
+          <Link className={buttonClassName('ghost', 'md')} to={memberSearchPath(memberId)}>
+            Member profile
+          </Link>
+        )}
+      </div>
+    )
+    return <VerifyPayment key={data.id} payment={data} actions={pendingActions} onDone={reload} />
   }
   if (data.status === 'SUCCESS' || data.status === 'REFUNDED') {
     return <PaymentConfirmed payment={data} actions={actions} memberId={memberId} />

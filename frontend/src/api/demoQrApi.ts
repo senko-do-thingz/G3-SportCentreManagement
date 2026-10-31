@@ -24,6 +24,33 @@ export interface DemoSession {
   invoiceNumber?: string | null
 }
 export interface CreatedDemoSession { session: DemoSession; confirmationUrl: string }
+
+export interface ReceptionActiveSession {
+  sessionId: string
+  bankCode: string
+  bankLabel: string
+  state: DemoSessionState
+  createdAt: string
+  expiresAt: string
+  serverTime: string
+}
+
+export interface ReceptionDeskProjection {
+  paymentId: number
+  paymentCode: string
+  amount: number
+  currency: 'VND'
+  paymentStatus: 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELED' | 'REFUNDED'
+  itemDescription: string | null
+  memberFullName: string | null
+  memberCode: string | null
+  memberId: number | null
+  settlementType: string | null
+  settlementProvider: string | null
+  simulatedTransactionId: number | null
+  activeSession: ReceptionActiveSession | null
+}
+
 const path = '/payments/simulated-qr/sessions'
 export const DEMO_TOKEN = /^[A-Za-z0-9_-]{43}$/
 
@@ -62,4 +89,6 @@ export const demoQrApi = {
   preview: async (token: string) => session(await api.post(`${path}/preview`, { token })),
   confirm: async (token: string) => session(await api.post(`${path}/confirm`, { token })),
   cancel: async (id: string) => session(await api.post(`${path}/${encodeURIComponent(id)}/cancel`)),
+  receptionDeskProjection: async (paymentId: number): Promise<ReceptionDeskProjection> =>
+    api.get<ReceptionDeskProjection>(`/payments/simulated-qr/desk-projection/${encodeURIComponent(paymentId)}`),
 }

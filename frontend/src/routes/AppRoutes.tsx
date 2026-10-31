@@ -26,6 +26,7 @@ import { MemberSearchPage } from '../pages/reception/MemberSearchPage'
 import { PaymentRequestsPage } from '../pages/reception/PaymentRequestsPage'
 import { ReceptionPaymentPage } from '../pages/reception/ReceptionPaymentPage'
 import { ReceptionReceiptPage } from '../pages/reception/ReceptionReceiptPage'
+const ReceptionQrDisplayPage = lazy(() => import('../pages/reception/ReceptionQrDisplayPage').then((module) => ({ default: module.ReceptionQrDisplayPage })))
 import { RefundDetailPage } from '../pages/reception/RefundDetailPage'
 import { RefundRequestsPage } from '../pages/reception/RefundRequestsPage'
 import { RegisterRenewPage } from '../pages/reception/RegisterRenewPage'
@@ -129,6 +130,7 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
     { path: 'bookings/new', element: <ReceptionAssistedBookingPage /> },
     { path: 'bookings/confirmed/:bookingId', element: <ReceptionBookingConfirmedPage /> },
     { path: 'payments/:paymentId', element: <ReceptionPaymentPage /> },
+    { path: 'payments/:paymentId/qr-display', element: <Suspense fallback={<PageLoader label="Loading QR display" />}><ReceptionQrDisplayPage /></Suspense> },
     { path: 'payments/:paymentId/receipt', element: <ReceptionReceiptPage /> },
     { path: 'refunds/:refundId', element: <RefundDetailPage /> },
   ],
