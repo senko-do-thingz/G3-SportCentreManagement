@@ -909,9 +909,13 @@ try:
 
     # Negative Control: Attempt unauthorized table mutation violating check constraint (R4-05)
     controls = []
-    for mutation in (
-        "settlement_provider=NULL", "settlement_type=NULL", "simulated_transaction_id=NULL",
-        "settlement_type='ACTUAL'", "settlement_provider='UNAPPROVED_PROVIDER'",
+    for mutation, expected_constraint in (
+        ("settlement_provider=NULL", 'ck_payment_simulated_consistency'),
+        ("settlement_type=NULL", 'ck_payment_simulated_consistency'),
+        ("simulated_transaction_id=NULL", 'ck_payment_simulated_consistency'),
+        ("settlement_type='ACTUAL'", 'ck_payment_simulated_consistency'),
+        ("settlement_provider='GATEWAY'", 'ck_payment_simulated_consistency'),
+        ("settlement_provider='UNAPPROVED_PROVIDER'", 'ck_payment_settlement_provider'),
     ):
         # Always roll back even if an invalid mutation unexpectedly succeeds.
         control = sql_json(f"""
@@ -925,8 +929,9 @@ try:
                 SELECT ERROR_NUMBER() AS errorNumber,ERROR_MESSAGE() AS errorMessage FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
             END CATCH;
         """)
-        controls.append({'mutation': mutation, **control})
-        check('V36 rejects invalid provenance: ' + mutation, constraint_rejected(control, 'ck_payment_simulated_consistency'), sqlResult=control)
+        controls.append({'mutation': mutation, 'expectedConstraint': expected_constraint, **control})
+        check('SQL rejects invalid provenance using ' + expected_constraint + ': ' + mutation,
+              constraint_rejected(control, expected_constraint), sqlResult=control)
     check('Every rolled-back provenance negative control preserves all 12 tables', after_fingerprints == snapshot('afterProvenanceNegativeControls'))
     sql_evidence['constraintNegativeControls'] = controls
     sql_evidence['paymentAudit'] = audits
