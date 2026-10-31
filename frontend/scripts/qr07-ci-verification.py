@@ -152,14 +152,16 @@ def sql_json(query, target=None):
 def fingerprints():
     if set(primary_keys) != set(TABLES):
         raise ValueError('Primary key discovery incomplete')
-    return validate_fingerprints({
-        table: sql(
-            "SELECT CONVERT(varchar(64),HASHBYTES('SHA2_256',CONVERT(nvarchar(max),"
+    values = {
+        table: sql_json(
+            "SELECT CONVERT(varchar(64),HASHBYTES('SHA2_256',CONVERT(nvarchar(max),COALESCE("
             f"(SELECT * FROM dbo.[{table}] ORDER BY {','.join('[' + c + ']' for c in primary_keys[table])} "
-            "FOR JSON PATH,INCLUDE_NULL_VALUES))),2);"
-        )
+            "FOR JSON PATH,INCLUDE_NULL_VALUES),N'[]'))),2) AS digest FOR JSON PATH,WITHOUT_ARRAY_WRAPPER;"
+        ).get('digest')
         for table in TABLES
-    })
+    }
+    sql_evidence['lastFingerprintOutput'] = values
+    return validate_fingerprints(values)
 
 
 def api_request(path, body=None, bearer=None, method=None):
