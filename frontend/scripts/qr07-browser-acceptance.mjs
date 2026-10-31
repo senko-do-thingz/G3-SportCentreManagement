@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url'
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const ROOT = resolve(__dirname, '../..')
 const DIST = join(ROOT, 'frontend/dist')
-const OUT_DIR = join(ROOT, 'tasks/QR-07 (i)/reports/round-03')
+const targetRound = process.argv[2] || 'round-04'
+const OUT_DIR = join(ROOT, `tasks/QR-07 (i)/reports/${targetRound}`)
 const SCREENSHOTS_DIR = join(OUT_DIR, 'screenshots')
 const LOGS_DIR = join(OUT_DIR, 'browser-logs')
 const A11Y_DIR = join(OUT_DIR, 'accessibility')
@@ -796,7 +797,20 @@ async function run() {
       returnByValue: true,
     })
     const geom = geomRes.result.value
-    layoutGeometryResults.push({ view: filename, viewport: `${width}x${height}`, theme, geometry: geom })
+    const scalingMethod = zoom !== 1
+      ? `CSS zoom (document.body.style.zoom = '${zoom}') - not native browser chrome zoom`
+      : width === 720
+      ? 'Responsive layout reflow (720x450, WCAG 1.4.10)'
+      : 'Standard 100% desktop scale'
+
+    layoutGeometryResults.push({
+      view: filename,
+      viewport: `${width}x${height}`,
+      theme,
+      zoom: `${zoom * 100}%`,
+      scalingMethod,
+      geometry: geom,
+    })
 
     // Inject and execute axe-core audit
     let axeData = null
@@ -876,6 +890,7 @@ async function run() {
       viewport: `${width}x${height}`,
       theme,
       zoom: `${zoom * 100}%`,
+      scalingMethod,
       audit: domAudit.result.value,
       axeSummary: axeData
         ? {
@@ -1161,11 +1176,17 @@ async function run() {
     { width: 720, height: 450, theme: 'light', zoom: 1, readySelector: '.reception-grid' },
   )
 
-  // 3.7 Actual 200% Native Zoom Check on Receptionist Desk (WCAG 1.4.4 Resize Text)
+  // 3.7 CSS Zoom 200% Check on Receptionist Desk (document.body.style.zoom = '2')
   await captureView(
     ctx1,
     `http://localhost:${port}/reception/payments/101/qr-display`,
     'reception-1440-light-200percent-zoom.png',
+    { width: 1440, height: 900, theme: 'light', zoom: 2, readySelector: '.reception-grid' },
+  )
+  await captureView(
+    ctx1,
+    `http://localhost:${port}/reception/payments/101/qr-display`,
+    'reception-1440-light-css-zoom.png',
     { width: 1440, height: 900, theme: 'light', zoom: 2, readySelector: '.reception-grid' },
   )
 
