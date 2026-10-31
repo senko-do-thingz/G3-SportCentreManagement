@@ -5,7 +5,7 @@ import { DEMO_BANKS, normalizeDemoBank, type DemoBank } from './demoBanks'
 
 export { DEFAULT_DEMO_BANK, DEMO_BANK_OPTIONS, DEMO_BANKS, normalizeDemoBank, type DemoBank } from './demoBanks'
 export const DEMO_ACCOUNT = 'DEMO - NOT AVAILABLE'
-export const DEMO_WARNING = 'DEMO ONLY - NOT A REAL PAYMENT'
+export const DEMO_WARNING = 'Simulated QR - No real money is transferred.'
 
 /** QR demo eligibility only; does not reprice or mutate the underlying payment. */
 export function demoPaymentAmountAvailable(amount: Payment['amount']): boolean {

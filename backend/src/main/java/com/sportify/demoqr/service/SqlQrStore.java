@@ -26,6 +26,11 @@ public class SqlQrStore {
                           DemoQrService.Bank bank, Instant createdAt, Instant expiresAt,
                           DemoQrService.State state, long version) { }
 
+    public record SimulatedTx(long id, String transactionCode, Instant settledAt) { }
+
+    public record SettlementInfo(String settlementType, String settlementProvider, Long simulatedTransactionId,
+                                 String transactionCode, Instant settledAt, Long invoiceId, String invoiceNumber) { }
+
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final TransactionTemplate budgetTransaction;
@@ -129,6 +134,74 @@ public class SqlQrStore {
                 AND expires_at_utc>SYSUTCDATETIME()
                 """, session.id().toString(), session.version());
         return expire(findId(session.id(), session.ownerId()));
+    }
+
+    public boolean isBeforeDeadline(UUID id) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM dbo.simulated_qr_session WHERE id=? AND active=1 AND expires_at_utc>SYSUTCDATETIME()",
+                Integer.class, id.toString());
+        return count != null && count > 0;
+    }
+
+    public SimulatedTx insertSettlement(Session session) {
+        String txCode = "SIM-QR-" + session.paymentId() + "-"
+                + session.id().toString().replace("-", "").substring(0, 12).toUpperCase(java.util.Locale.ROOT);
+        return jdbc.queryForObject("""
+                DECLARE @now DATETIME2(7) = SYSUTCDATETIME();
+                INSERT INTO dbo.simulated_payment_transaction(
+                    transaction_code, payment_id, session_id, member_id, amount, currency,
+                    bank_code, settlement_type, provider, status, settled_at_utc, created_at_utc
+                )
+                OUTPUT INSERTED.id, INSERTED.transaction_code, INSERTED.settled_at_utc
+                VALUES (?, ?, ?, ?, ?, 'VND', ?, 'SIMULATED', 'SPORTIFY_SIMULATOR', 'SUCCEEDED', @now, @now)
+                """,
+                (rs, i) -> new SimulatedTx(
+                        rs.getLong("id"),
+                        rs.getString("transaction_code"),
+                        rs.getObject("settled_at_utc", LocalDateTime.class).toInstant(ZoneOffset.UTC)),
+                txCode, session.paymentId(), session.id().toString(), session.ownerId(),
+                session.amount(), session.bank().name());
+    }
+
+    public Session settle(Session session) {
+        int updated = jdbc.update("""
+                UPDATE dbo.simulated_qr_session
+                SET state='SETTLED', active=0, version=version+1, state_changed_at_utc=SYSUTCDATETIME()
+                WHERE id=? AND state IN ('PENDING','AUTHORIZED_PENDING_SETTLEMENT') AND version=?
+                """, session.id().toString(), session.version());
+        if (updated != 1) {
+            throw new IllegalStateException("Failed to transition session to SETTLED: " + session.id());
+        }
+        return findId(session.id(), session.ownerId());
+    }
+
+    public java.util.Optional<SettlementInfo> findSettlement(UUID sessionId, long paymentId) {
+        var rows = jdbc.query("""
+                SELECT tx.settlement_type, tx.provider, tx.id AS tx_id, tx.transaction_code, tx.settled_at_utc,
+                       inv.id AS invoice_id, inv.invoice_number
+                FROM dbo.simulated_payment_transaction tx
+                OUTER APPLY (
+                    SELECT TOP 1 i.id, i.invoice_number
+                    FROM dbo.invoice i
+                    WHERE i.payment_id = tx.payment_id
+                    ORDER BY i.id ASC
+                ) inv
+                WHERE tx.session_id = ? AND tx.payment_id = ?
+                """,
+                (rs, i) -> {
+                    long invId = rs.getLong("invoice_id");
+                    Long invoiceId = rs.wasNull() ? null : invId;
+                    return new SettlementInfo(
+                            rs.getString("settlement_type"),
+                            rs.getString("provider"),
+                            rs.getLong("tx_id"),
+                            rs.getString("transaction_code"),
+                            rs.getObject("settled_at_utc", LocalDateTime.class).toInstant(ZoneOffset.UTC),
+                            invoiceId,
+                            rs.getString("invoice_number"));
+                },
+                sessionId.toString(), paymentId);
+        return rows.stream().findFirst();
     }
 
     private static Session map(ResultSet row, int index) throws SQLException {

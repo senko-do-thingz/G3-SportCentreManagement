@@ -978,4 +978,40 @@ describe('FE-12 round 3 integration regressions', () => {
     expect(print).toHaveBeenCalledTimes(1)
     print.mockRestore()
   })
+
+  it('QR-05 displays Paid - Simulated and simulation provenance in receptionist payment detail and receipt', async () => {
+    await open('/reception/payments/41', {
+      payments: {
+        41: pendingPayment({
+          status: 'SUCCESS',
+          settlementType: 'SIMULATED',
+          settlementProvider: 'SPORTIFY_SIMULATOR',
+          paymentReference: 'SIM-QR-41-00000041',
+        }),
+      },
+      invoice: json(200, {
+        ...INVOICE,
+        settlementType: 'SIMULATED',
+        settlementProvider: 'SPORTIFY_SIMULATOR',
+        paymentReference: 'SIM-QR-41-00000041',
+      }),
+    })
+    expect(await screen.findByText('Paid - Simulated')).toBeInTheDocument()
+    expect(screen.getByText(/SIMULATED SETTLEMENT - Completed via Sportify QR Simulator/)).toBeInTheDocument()
+    expect(screen.getByText('SIMULATED (SPORTIFY_SIMULATOR)')).toBeInTheDocument()
+    vi.unstubAllGlobals()
+    document.body.innerHTML = ''
+
+    await open('/reception/payments/41/receipt', {
+      invoice: json(200, {
+        ...INVOICE,
+        settlementType: 'SIMULATED',
+        settlementProvider: 'SPORTIFY_SIMULATOR',
+        paymentReference: 'SIM-QR-41-00000041',
+      }),
+    })
+    expect(await screen.findByText('Paid - Simulated')).toBeInTheDocument()
+    expect(screen.getByText(/SIMULATED SETTLEMENT - Completed via Sportify QR Simulator/)).toBeInTheDocument()
+    expect(screen.getByText('SIMULATED (SPORTIFY_SIMULATOR)')).toBeInTheDocument()
+  })
 })

@@ -166,6 +166,7 @@ public class RefundServiceImpl implements RefundService {
                 throw new BusinessRuleException("Amount approved must have at most 2 decimal places");
             }
             if (payment != null) {
+                requireNoSimulatedPayment(payment);
                 requirePaymentOfRegistration(payment, refund.getPackageRegistration());
             }
             if (payment != null && approvedAmount.compareTo(payment.getAmount()) > 0) {
@@ -211,6 +212,7 @@ public class RefundServiceImpl implements RefundService {
         }
         SportPackageRegistration reg = refund.getPackageRegistration();
         if (lockedPayment != null) {
+            requireNoSimulatedPayment(lockedPayment);
             requirePaymentOfRegistration(lockedPayment, reg);
         }
 
@@ -322,6 +324,7 @@ public class RefundServiceImpl implements RefundService {
             throw new ConflictException("Package registration " + reg.getRegistrationCode()
                     + " has no payment, so it cannot be refunded", PaymentRefundService.CODE_PAYMENT_NOT_REFUNDABLE);
         }
+        requireNoSimulatedPayment(payment);
         requirePaymentOfRegistration(payment, reg);
         if (payment.getPaymentStatus() == PaymentStatus.REFUNDED
                 || refundRequestRepository.existsByPaymentIdAndStatusIn(payment.getId(), LIVE_STATUSES)) {
@@ -383,6 +386,14 @@ public class RefundServiceImpl implements RefundService {
      * payment; the payment belongs to another member; a membership card is paid by the same payment; or an invoice
      * line of the payment bills something other than this registration.
      */
+    private void requireNoSimulatedPayment(Payment payment) {
+        if ("SIMULATED".equalsIgnoreCase(payment.getSettlementType())) {
+            throw new ConflictException("Payment " + payment.getPaymentCode()
+                    + " was settled via QR simulation and cannot be refunded as real money",
+                    PaymentRefundService.CODE_SIMULATED_PAYMENT_NOT_REFUNDABLE);
+        }
+    }
+
     private void requirePaymentOfRegistration(Payment payment, SportPackageRegistration reg) {
         Long paymentMemberId = payment.getMember() != null ? payment.getMember().getId() : null;
         Long registrationMemberId = reg.getMember() != null ? reg.getMember().getId() : null;

@@ -67,10 +67,22 @@ function DemoSessionPanelContent({ paymentId, bank, amount }: { paymentId: numbe
         setCreated(result); setDeadline(false)
       } else if (created) {
         const session = action === 'refresh' ? await demoQrApi.get(created.session.id) : await demoQrApi.cancel(created.session.id)
+        if (session.state !== 'PENDING') sessionId.current = null
         if (mounted.current) { setCreated({ ...created, session }); setDeadline(false) }
       }
     } catch {
-      if (mounted.current) setError('Could not update the demo session. Check your connection and demo configuration, then refresh or retry. Reload the payment if its details changed. The real payment remains unchanged.')
+      if (action !== 'start' && created) {
+        try {
+          const reconciled = await demoQrApi.get(created.session.id)
+          if (reconciled.state !== 'PENDING') sessionId.current = null
+          if (mounted.current && reconciled.state !== 'PENDING') {
+            setCreated({ ...created, session: reconciled }); setDeadline(false); return
+          }
+        } catch {
+          // Server reconciliation also failed; fall through to unknown-outcome alert.
+        }
+      }
+      if (mounted.current) setError('Could not update the demo session. Check your connection and demo configuration, then refresh Simulation Status to verify the authoritative server state before retrying. Reload the payment if its details changed.')
     } finally {
       sending.current = false
       if (mounted.current) setBusy(false)
@@ -84,22 +96,22 @@ function DemoSessionPanelContent({ paymentId, bank, amount }: { paymentId: numbe
       await copyText(created.confirmationUrl, { allowFallback: false })
       if (mounted.current && feedbackRequest.current === current) setFeedback('Time-limited demo link copied. Share only with the payment owner.')
     } catch {
-      if (mounted.current && feedbackRequest.current === current) setError('Could not copy the demo link. Use Review confirmation intent instead.')
+      if (mounted.current && feedbackRequest.current === current) setError('Could not copy the demo link. Use Open simulation confirmation instead.')
     }
   }
   const size = qr ? qr.modules.size + 8 : 0
   const path = qr ? Array.from(qr.modules.data, (dark, index) => dark
     ? `M${index % qr.modules.size + 4} ${Math.floor(index / qr.modules.size) + 4}h1v1h-1z` : '').join('') : ''
-  if (capability !== true) return <section className="demo-session-panel" aria-label="QR Payment (Simulation)">
-    <h3>QR Payment (Simulation)</h3>
+  if (capability !== true) return <section className="demo-session-panel" aria-label="Simulated QR Payment">
+    <h3>Simulated QR Payment</h3>
     <p aria-live="polite">{capability === null ? 'Checking simulation availability...' : 'Simulation is unavailable. The payment remains pending. Legacy links must be reissued when simulation becomes available.'}</p>
     {capability === false && <Button variant="secondary" onClick={() => { setCapability(null); setCapabilityAttempt((value) => value + 1) }}>Retry simulation availability</Button>}
   </section>
-  return <section className="demo-session-panel" aria-label="Demo confirmation session">
-    <h3>QR Payment (Simulation)</h3>
-    <p>The simulation session is a separate authenticated application link. It is not a bank transfer QR. Only the authenticated payment owner can record confirmation intent. Payment is not completed in this phase.</p>
-    <p className="notice notice--warning">DEMO ONLY - NO MONEY TRANSFER</p>
-    <p>Changing the bank or leaving this page attempts to cancel the current session. A disconnected session expires on the server.</p>
+  return <section className="demo-session-panel" aria-label="Simulated confirmation session">
+    <h3>Simulated QR Payment</h3>
+    <p>The simulation session is a separate authenticated application link. It is not a bank transfer QR. Confirming as the authenticated payment owner finalizes this payment as Paid - Simulated and activates the purchased entitlement. No real bank transfer or cash movement occurs.</p>
+    <p className="notice notice--warning">Simulated QR Payment - No real money is transferred.</p>
+    <p>Changing the bank or leaving this page attempts to cancel an unconfirmed session. A disconnected session expires on the server.</p>
     {created && <DemoSessionSummary session={created.session} onDeadline={reachedDeadline} />}
     {deadline && created?.session.state === 'PENDING' && <p className="notice notice--warning">The displayed deadline has passed. Refresh Simulation Status to read the server result.</p>}
     {qr && <figure className="qr-demo-card__figure">
@@ -108,15 +120,15 @@ function DemoSessionPanelContent({ paymentId, bank, amount }: { paymentId: numbe
         <rect width={size} height={size} className="qr-demo-card__paper" />
         <path d={path} fill="currentColor" />
       </svg>
-      <figcaption>Demo Confirmation Link - time-limited simulation only</figcaption>
+      <figcaption>Simulated Confirmation Link - time-limited simulation only</figcaption>
     </figure>}
     {created?.session.state === 'PENDING' && !deadline && !qr && <p role="alert">The demo link QR could not be generated. Cancel this session and retry.</p>}
     <div className="demo-session-actions">
-      {(!created || created.session.state !== 'PENDING' || deadline) && <Button disabled={busy} onClick={() => void operation('start')}>Start simulation session</Button>}
+      {(!created || (created.session.state !== 'PENDING' && created.session.state !== 'SETTLED') || (created.session.state === 'PENDING' && deadline)) && <Button disabled={busy} onClick={() => void operation('start')}>Start simulation session</Button>}
       {created && <Button variant="secondary" disabled={busy} onClick={() => void operation('refresh')}>Refresh Simulation Status</Button>}
       {created?.session.state === 'PENDING' && <Button variant="secondary" disabled={busy} onClick={() => void operation('cancel')}>Cancel Simulation Session</Button>}
       {created && qr && <>
-        <a className="btn btn--secondary" href={created.confirmationUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Review confirmation intent</a>
+        <a className="btn btn--secondary" href={created.confirmationUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Open simulation confirmation</a>
         <Button variant="secondary" disabled={busy} onClick={() => void copy()}>Copy simulation session link</Button>
       </>}
     </div>

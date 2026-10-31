@@ -773,6 +773,37 @@ class RefundPaymentLinkTest {
     }
 
     @Test
+    @DisplayName("QR-05: quote, submit, review approve and complete reject SIMULATED payments with 409 SIMULATED_PAYMENT_NOT_REFUNDABLE")
+    void simulatedPayment_RejectedAcrossQuoteSubmitReviewAndComplete() {
+        payment.setSettlementType("SIMULATED");
+        payment.setSettlementProvider("SPORTIFY_SIMULATOR");
+        payment.setSimulatedTransactionId(901L);
+
+        when(registrationRepository.findPaymentIdById(50L)).thenReturn(Optional.of(70L));
+        when(paymentRepository.findById(70L)).thenReturn(Optional.of(payment));
+        when(paymentRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(payment));
+        when(registrationRepository.findById(50L)).thenReturn(Optional.of(registration));
+
+        assertThatThrownBy(() -> service.quoteRefund(50L, memberUser))
+                .satisfies(ex -> assertConflict(ex, PaymentRefundService.CODE_SIMULATED_PAYMENT_NOT_REFUNDABLE));
+        assertThatThrownBy(() -> service.submitRefund(RefundCreateRequest.builder()
+                .packageRegistrationId(50L).reason("Simulated refund attempt").build(), memberUser))
+                .satisfies(ex -> assertConflict(ex, PaymentRefundService.CODE_SIMULATED_PAYMENT_NOT_REFUNDABLE));
+
+        when(refundRequestRepository.findPaymentIdById(10L)).thenReturn(Optional.of(70L));
+        when(refundRequestRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingRefund()));
+        assertThatThrownBy(() -> service.reviewRefund(10L, RefundReviewRequest.builder().approved(true).build(), manager))
+                .satisfies(ex -> assertConflict(ex, PaymentRefundService.CODE_SIMULATED_PAYMENT_NOT_REFUNDABLE));
+
+        when(refundRequestRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(approvedRefund()));
+        assertThatThrownBy(() -> service.completeRefund(10L, receptionist))
+                .satisfies(ex -> assertConflict(ex, PaymentRefundService.CODE_SIMULATED_PAYMENT_NOT_REFUNDABLE));
+
+        verify(paymentRefundService, never()).markRefunded(anyLong(), anyString(), any());
+        verify(refundRequestRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     @DisplayName("Complete a legacy refund without a payment: no payment call, registration and bookings still handled")
     void complete_LegacyWithoutPayment() {
         RefundRequest refund = approvedRefund();

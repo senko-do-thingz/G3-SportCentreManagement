@@ -113,7 +113,7 @@ class DemoQrDatabaseIntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK); return response.getBody();
     }
     private String token(DemoQrService.Created created) { return created.confirmationUrl().split("#token=")[1]; }
-    private ResponseEntity<DemoQrService.View> intent(DemoQrService.Created created) { return post(PREFIX+"/confirm-intent",Map.of("token",token(created)),ownerToken,DemoQrService.View.class); }
+    private ResponseEntity<DemoQrService.View> intent(DemoQrService.Created created) { return post(PREFIX+"/confirm",Map.of("token",token(created)),ownerToken,DemoQrService.View.class); }
     private String state(UUID id) { return jdbc.queryForObject("SELECT state FROM simulated_qr_session WHERE id=?",String.class,id.toString()); }
     private int transitions(UUID id) { return jdbc.queryForObject("SELECT COUNT(*) FROM simulated_qr_transition WHERE session_id=?",Integer.class,id.toString()); }
 
@@ -126,14 +126,79 @@ class DemoQrDatabaseIntegrationTest {
         return result;
     }
 
-    @Test void authenticatedIntentRetryAndCancellationLeaveEveryFinancialRowIdentical() throws Exception {
-        var before=fingerprint(jdbc); var created=create();
-        assertThat(intent(created).getBody().state()).isEqualTo(DemoQrService.State.AUTHORIZED_PENDING_SETTLEMENT);
-        assertThat(intent(created).getBody().state()).isEqualTo(DemoQrService.State.AUTHORIZED_PENDING_SETTLEMENT);
-        assertThat(transitions(created.session().id())).isEqualTo(2);
-        service.cancel(created.session().id().toString(),owner);
-        assertThat(state(created.session().id())).isEqualTo("CANCELED");
+    @Test void authenticatedConfirmSettlesAtomicallyAndIdempotentRetryLeavesFinancialCountsExact() throws Exception {
+        var before = fingerprint(jdbc);
+        long paidViewCountBefore = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.vw_paid_payment", Long.class);
+        long cashEventCountBefore = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.cash_event", Long.class);
+        long cashTicketCountBefore = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.cash_capture_ticket", Long.class);
+
+        var created = create();
+        // Legacy /confirm-intent endpoint must fail closed with 409 SIMULATOR_CONFIRM_ENDPOINT_REQUIRED and never settle Payment.
+        var legacyAttempt = post(PREFIX + "/confirm-intent", Map.of("token", token(created)), ownerToken, Map.class);
+        assertThat(legacyAttempt.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(legacyAttempt.getBody()).containsEntry("code", "SIMULATOR_CONFIRM_ENDPOINT_REQUIRED");
+        assertThat(state(created.session().id())).isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.simulated_payment_transaction WHERE payment_id=?", Integer.class, paymentId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT payment_status FROM dbo.payment WHERE id=?", String.class, paymentId)).isEqualTo("PENDING");
         assertThat(fingerprint(jdbc)).isEqualTo(before);
+
+        var first = intent(created);
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var settledView = first.getBody();
+        assertThat(settledView).isNotNull();
+        assertThat(settledView.state()).isEqualTo(DemoQrService.State.SETTLED);
+        assertThat(settledView.settlementType()).isEqualTo("SIMULATED");
+        assertThat(settledView.settlementProvider()).isEqualTo("SPORTIFY_SIMULATOR");
+        assertThat(settledView.simulatedTransactionId()).isNotNull().isPositive();
+        assertThat(settledView.transactionCode()).startsWith("SIM-QR-" + paymentId + "-");
+        assertThat(settledView.invoiceId()).isNotNull().isPositive();
+        assertThat(settledView.invoiceNumber()).startsWith("INV-");
+
+        var afterFirst = fingerprint(jdbc);
+        // Second and third confirm calls via /confirm must be idempotent and add zero rows.
+        var second = intent(created);
+        var third = post(PREFIX + "/confirm", Map.of("token", token(created)), ownerToken, DemoQrService.View.class);
+        assertThat(second.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(third.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(second.getBody()).usingRecursiveComparison().ignoringFields("serverTime").isEqualTo(settledView);
+        assertThat(third.getBody()).usingRecursiveComparison().ignoringFields("serverTime").isEqualTo(settledView);
+        assertThat(transitions(created.session().id())).isEqualTo(2);
+        assertThat(state(created.session().id())).isEqualTo("SETTLED");
+        assertThat(fingerprint(jdbc)).isEqualTo(afterFirst);
+
+        // Verify simulated_payment_transaction, payment, member_card, invoice, activity_log, and financial separation.
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.simulated_payment_transaction WHERE payment_id=?", Integer.class, paymentId)).isEqualTo(1);
+        var paymentRow = jdbc.queryForMap("SELECT * FROM dbo.payment WHERE id=?", paymentId);
+        assertThat(paymentRow.get("payment_status")).isEqualTo("SUCCESS");
+        assertThat(paymentRow.get("settlement_type")).isEqualTo("SIMULATED");
+        assertThat(paymentRow.get("settlement_provider")).isEqualTo("SPORTIFY_SIMULATOR");
+        assertThat(paymentRow.get("simulated_transaction_id")).isEqualTo(settledView.simulatedTransactionId());
+        assertThat(paymentRow.get("reference_code")).isEqualTo(settledView.transactionCode());
+        assertThat(paymentRow.get("payment_time")).isNotNull();
+
+        assertThat(jdbc.queryForObject("SELECT status FROM dbo.member_card WHERE payment_id=?", String.class, paymentId)).isEqualTo("ACTIVE");
+        assertThat(jdbc.queryForObject("SELECT status FROM dbo.invoice WHERE payment_id=?", String.class, paymentId)).isEqualTo("PAID");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.activity_log WHERE entity_type='PAYMENT' AND entity_id=? AND action='PAYMENT_CONFIRMED'", Integer.class, paymentId)).isEqualTo(1);
+        String auditText = jdbc.queryForObject("SELECT details FROM dbo.activity_log WHERE entity_type='PAYMENT' AND entity_id=? AND action='PAYMENT_CONFIRMED'", String.class, paymentId);
+        assertThat(auditText).contains("SIMULATED").doesNotContain(token(created));
+
+        // Actual revenue and cash tables must remain completely untouched by simulated settlement.
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.vw_paid_payment", Long.class)).isEqualTo(paidViewCountBefore);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.cash_event", Long.class)).isEqualTo(cashEventCountBefore);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.cash_capture_ticket", Long.class)).isEqualTo(cashTicketCountBefore);
+        assertThat(afterFirst.get("cash_event")).isEqualTo(before.get("cash_event"));
+        assertThat(afterFirst.get("cash_capture_ticket")).isEqualTo(before.get("cash_capture_ticket"));
+        assertThat(afterFirst.get("cash_coverage")).isEqualTo(before.get("cash_coverage"));
+
+        var ledgerRow = jdbc.queryForMap("SELECT * FROM dbo.vw_payment_ledger WHERE payment_id=?", paymentId);
+        assertThat(ledgerRow.get("settlement_type")).isEqualTo("SIMULATED");
+        assertThat(ledgerRow.get("settlement_provider")).isEqualTo("SPORTIFY_SIMULATOR");
+        assertThat(ledgerRow.get("simulated_transaction_id")).isEqualTo(settledView.simulatedTransactionId());
+
+        // Settled session cannot be canceled, and settled payment cannot create a new session.
+        assertThat(post(PREFIX + "/" + created.session().id() + "/cancel", null, ownerToken, Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(post(PREFIX, request(UUID.randomUUID()), ownerToken, Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(fingerprint(jdbc)).isEqualTo(afterFirst);
     }
 
     @Test void authoritativeSnapshotAndOnlyHashPersists() {
@@ -149,7 +214,7 @@ class DemoQrDatabaseIntegrationTest {
     @Test void otherMemberCannotEnumerateCreateReadPreviewConfirmOrCancel() {
         var created=create();String otherToken=login(users.findById(otherId).orElseThrow().getEmail());
         assertThat(post(PREFIX,request(UUID.randomUUID()),otherToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        for(String suffix:List.of("/preview","/confirm-intent")) {
+        for(String suffix:List.of("/preview","/confirm")) {
             var denied=post(PREFIX+suffix,Map.of("token",token(created)),otherToken,Map.class);
             var unknown=post(PREFIX+suffix,Map.of("token","z".repeat(43)),otherToken,Map.class);
             assertThat(denied.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);assertThat(denied.getBody()).isEqualTo(unknown.getBody());
@@ -161,7 +226,7 @@ class DemoQrDatabaseIntegrationTest {
 
     @Test void unauthenticatedTokenCannotAuthorize() {
         var created=create();
-        assertThat(post(PREFIX+"/confirm-intent",Map.of("token",token(created)),null,Map.class).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(post(PREFIX+"/confirm",Map.of("token",token(created)),null,Map.class).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test void unknownPaymentInvalidBankAndMalformedIdAreRejectedSafely() {
@@ -189,21 +254,21 @@ class DemoQrDatabaseIntegrationTest {
 
     @Test void revokedAccountIsRejectedDespitePreviouslyIssuedJwt() {
         var created=create();jdbc.update("UPDATE user_account SET status='INACTIVE' WHERE id=?",ownerId);
-        assertThat(post(PREFIX+"/confirm-intent",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode().is2xxSuccessful()).isFalse();
+        assertThat(post(PREFIX+"/confirm",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode().is2xxSuccessful()).isFalse();
         assertThat(state(created.session().id())).isEqualTo("PENDING");
     }
 
     @ParameterizedTest @ValueSource(strings={"SUCCESS","FAILED","REFUNDED"})
     void rejectsPaymentThatBecameIneligibleAndCommitsRevocation(String status) {
         var created=create();jdbc.update("UPDATE payment SET payment_status=?,payment_time=CASE WHEN ?='SUCCESS' THEN SYSUTCDATETIME() ELSE payment_time END WHERE id=?",status,status,paymentId);
-        assertThat(post(PREFIX+"/confirm-intent",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(post(PREFIX+"/confirm",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(state(created.session().id())).isEqualTo("CANCELED");
         assertThat(post(PREFIX,request(UUID.randomUUID()),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test void staleAmountAbortsIntentAndRetainsOriginalSnapshot() {
         var created=create();jdbc.update("UPDATE payment SET amount=1 WHERE id=?",paymentId);
-        assertThat(post(PREFIX+"/confirm-intent",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(post(PREFIX+"/confirm",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(state(created.session().id())).isEqualTo("CANCELED");
         assertThat(jdbc.queryForObject("SELECT amount FROM simulated_qr_session WHERE id=?",java.math.BigDecimal.class,created.session().id().toString())).isEqualByComparingTo("810000");
     }
@@ -211,7 +276,7 @@ class DemoQrDatabaseIntegrationTest {
     @Test void paymentOwnershipChangePreventsAllSessionDisclosure() {
         var created=create();jdbc.update("UPDATE payment SET member_id=? WHERE id=?",otherId,paymentId);
         assertThat(post(PREFIX+"/preview",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(post(PREFIX+"/confirm-intent",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(post(PREFIX+"/confirm",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test void canceledLinkedItemAndOrphanPaymentAreIneligible() {
@@ -225,13 +290,13 @@ class DemoQrDatabaseIntegrationTest {
         UUID request=UUID.randomUUID();var first=post(PREFIX,request(request),ownerToken,DemoQrService.Created.class).getBody();
         assertThat(post(PREFIX,request(request),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         var next=create();assertThat(state(first.session().id())).isEqualTo("CANCELED");
-        assertThat(post(PREFIX+"/confirm-intent",Map.of("token",token(first)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(post(PREFIX+"/confirm",Map.of("token",token(first)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(intent(next).getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     @Test void cancelAndConfirmCannotResurrectTerminalSession() {
         var created=create();service.cancel(created.session().id().toString(),owner);service.cancel(created.session().id().toString(),owner);
-        assertThat(post(PREFIX+"/confirm-intent",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(post(PREFIX+"/confirm",Map.of("token",token(created)),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(transitions(created.session().id())).isEqualTo(2);
     }
 
@@ -239,7 +304,7 @@ class DemoQrDatabaseIntegrationTest {
         var before=fingerprint(jdbc);
         byte[] bytes=new byte[32];new java.security.SecureRandom().nextBytes(bytes);
         String raw=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);UUID id=insertAtDeadline(raw);
-        assertThat(post(PREFIX+"/confirm-intent",Map.of("token",raw),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(post(PREFIX+"/confirm",Map.of("token",raw),ownerToken,Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(service.get(id.toString(),owner).state()).isEqualTo(DemoQrService.State.EXPIRED);
         assertThat(service.cancel(id.toString(),owner).state()).isEqualTo(DemoQrService.State.EXPIRED);
         assertThat(transitions(id)).isEqualTo(2);
@@ -258,7 +323,7 @@ class DemoQrDatabaseIntegrationTest {
     private DemoQrService anotherNode() { return new DemoQrService(reader,settings,new SqlQrStore(jdbc,manager)); }
     @Test void newProcessObjectsReadPersistedPendingAndTerminalStates() {
         var created=create();var restarted=anotherNode();assertThat(restarted.preview(token(created),owner).state()).isEqualTo(DemoQrService.State.PENDING);
-        restarted.confirm(token(created),owner);assertThat(anotherNode().preview(token(created),owner).state()).isEqualTo(DemoQrService.State.AUTHORIZED_PENDING_SETTLEMENT);
+        restarted.confirm(token(created),owner);assertThat(anotherNode().preview(token(created),owner).state()).isEqualTo(DemoQrService.State.SETTLED);
     }
 
     @Test void twoNodesCreateExactlyOneActiveSession() throws Exception {
@@ -267,18 +332,192 @@ class DemoQrDatabaseIntegrationTest {
         assertThat(results).hasSize(2);assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM simulated_qr_session WHERE payment_id=? AND active=1",Integer.class,paymentId)).isEqualTo(1);
         assertThat(fingerprint(jdbc)).isEqualTo(before);
     }
-    @Test void twoNodesConfirmExactlyOneIntentTransition() throws Exception {
-        var before=fingerprint(jdbc);
-        var created=create();var other=anotherNode();parallel(()->service.confirm(token(created),owner),()->other.confirm(token(created),owner));
-        assertThat(transitions(created.session().id())).isEqualTo(2);assertThat(state(created.session().id())).isEqualTo("AUTHORIZED_PENDING_SETTLEMENT");
+    @Test void twoNodesConfirmExactlyOneSettlement() throws Exception {
+        var created=create();var other=anotherNode();
+        var results=parallel(()->service.confirm(token(created),owner),()->other.confirm(token(created),owner));
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0).state()).isEqualTo(DemoQrService.State.SETTLED);
+        assertThat(results.get(1).state()).isEqualTo(DemoQrService.State.SETTLED);
+        assertThat(results.get(0).simulatedTransactionId()).isEqualTo(results.get(1).simulatedTransactionId());
+        assertThat(transitions(created.session().id())).isEqualTo(2);
+        assertThat(state(created.session().id())).isEqualTo("SETTLED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM simulated_payment_transaction WHERE payment_id=?",Integer.class,paymentId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM invoice WHERE payment_id=?",Integer.class,paymentId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM cash_event WHERE payment_id=?",Integer.class,paymentId)).isZero();
+    }
+    @Test void cancellationAndConfirmRaceAreSerializedInSql() throws Exception {
+        var created=create();var other=anotherNode();
+        parallel(()->{try{return service.confirm(token(created),owner);}catch(DemoQrException denied){return null;}},
+                 ()->{try{return other.cancel(created.session().id().toString(),owner);}catch(DemoQrException denied){return null;}});
+        String finalState = state(created.session().id());
+        assertThat(finalState).isIn("CANCELED", "SETTLED");
+        assertThat(transitions(created.session().id())).isEqualTo(2);
+        if ("CANCELED".equals(finalState)) {
+            assertThat(jdbc.queryForObject("SELECT payment_status FROM payment WHERE id=?", String.class, paymentId)).isEqualTo("PENDING");
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM simulated_payment_transaction WHERE payment_id=?", Integer.class, paymentId)).isZero();
+        } else {
+            assertThat(jdbc.queryForObject("SELECT payment_status FROM payment WHERE id=?", String.class, paymentId)).isEqualTo("SUCCESS");
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM simulated_payment_transaction WHERE payment_id=?", Integer.class, paymentId)).isEqualTo(1);
+        }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM cash_event WHERE payment_id=?", Integer.class, paymentId)).isZero();
+    }
+
+    @Test void injectedDownstreamFailureRollsBackSimulatedTransactionAndPayment() throws Exception {
+        var before = fingerprint(jdbc);
+        var created = create();
+        var failingReader = new DemoPaymentReader(
+                org.mockito.Mockito.mock(com.sportify.payment.repository.PaymentRepository.class),
+                org.mockito.Mockito.mock(com.sportify.catalog.repository.MemberCardRepository.class),
+                org.mockito.Mockito.mock(com.sportify.catalog.repository.SportPackageRegistrationRepository.class),
+                org.mockito.Mockito.mock(com.sportify.payment.service.PaymentVerificationService.class)) {
+            @Override
+            public com.sportify.payment.entity.Payment requireOwner(long id, UserAccount actor) {
+                return reader.requireOwner(id, actor);
+            }
+            @Override
+            public Snapshot read(long id, UserAccount actor) {
+                return reader.read(id, actor);
+            }
+            @Override
+            public SettlementOutcome settle(long id, UserAccount actor, String bankCode, long txId, String txCode) {
+                throw new IllegalStateException("Injected downstream settlement failure");
+            }
+        };
+        var failingService = new DemoQrService(failingReader, settings, new SqlQrStore(jdbc, manager));
+        assertThatThrownBy(() -> failingService.confirm(token(created), owner)).isInstanceOf(IllegalStateException.class);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM simulated_payment_transaction WHERE payment_id=?", Integer.class, paymentId)).isZero();
+        assertThat(state(created.session().id())).isEqualTo("PENDING");
         assertThat(fingerprint(jdbc)).isEqualTo(before);
     }
-    @Test void cancellationAndIntentRaceAreSerializedInSql() throws Exception {
-        var before=fingerprint(jdbc);
-        var created=create();var other=anotherNode();
-        parallel(()->{try{return service.confirm(token(created),owner);}catch(DemoQrException denied){return null;}},()->other.cancel(created.session().id().toString(),owner));
-        assertThat(state(created.session().id())).isEqualTo("CANCELED");assertThat(transitions(created.session().id())).isBetween(2,3);
+
+    @Test void invoiceOrAuditCreationFailureRollsBackCompleteSettlementInSql() throws Exception {
+        var before = fingerprint(jdbc);
+        var created = create();
+
+        // 1. Invoice creation failure inside PaymentVerificationService.recordPaymentConfirmed
+        // Pre-insert a conflicting invoice row so recordPaymentConfirmed throws ConflictException
+        // AFTER simulated_payment_transaction insert, MemberCard activation, and Payment SUCCESS flush.
+        String conflictInvNo = "INV-CONFLICT-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        jdbc.update("""
+                INSERT INTO dbo.invoice(invoice_number, payment_id, member_id, subtotal_amount, discount_amount,
+                    tax_amount, total_amount, status, issue_date)
+                VALUES (?, ?, ?, 810000, 0, 0, 810000, 'PAID', SYSUTCDATETIME())
+                """, conflictInvNo, paymentId, ownerId);
+        try {
+            assertThatThrownBy(() -> service.confirm(token(created), owner))
+                    .isInstanceOf(com.sportify.core.exception.ConflictException.class);
+        } finally {
+            jdbc.update("DELETE FROM dbo.invoice WHERE invoice_number=?", conflictInvNo);
+        }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.simulated_payment_transaction WHERE payment_id=?", Integer.class, paymentId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT payment_status FROM dbo.payment WHERE id=?", String.class, paymentId)).isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject("SELECT settlement_type FROM dbo.payment WHERE id=?", String.class, paymentId)).isNull();
+        assertThat(jdbc.queryForObject("SELECT status FROM dbo.member_card WHERE payment_id=?", String.class, paymentId)).isEqualTo("PENDING_PAYMENT");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.activity_log WHERE entity_type='PAYMENT' AND entity_id=? AND action='PAYMENT_CONFIRMED'", Integer.class, paymentId)).isZero();
+        assertThat(state(created.session().id())).isEqualTo("PENDING");
         assertThat(fingerprint(jdbc)).isEqualTo(before);
+
+        // 2. Audit log (dbo.activity_log) creation failure inside PaymentVerificationService.recordPaymentConfirmed
+        // Temporary SQL trigger rejects PAYMENT_CONFIRMED activity_log insert AFTER simulated_payment_transaction,
+        // MemberCard activation, Payment SUCCESS flush, and Invoice + InvoiceLine inserts have executed.
+        jdbc.execute("""
+                CREATE OR ALTER TRIGGER dbo.tr_test_fail_payment_confirmed_audit
+                ON dbo.activity_log
+                AFTER INSERT
+                AS
+                BEGIN
+                    SET NOCOUNT ON;
+                    IF EXISTS (SELECT 1 FROM inserted WHERE entity_type = 'PAYMENT' AND action = 'PAYMENT_CONFIRMED')
+                        THROW 51099, 'Injected audit log failure during simulated settlement.', 1;
+                END
+                """);
+        try {
+            assertThatThrownBy(() -> service.confirm(token(created), owner))
+                    .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        } finally {
+            jdbc.execute("DROP TRIGGER IF EXISTS dbo.tr_test_fail_payment_confirmed_audit");
+        }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.simulated_payment_transaction WHERE payment_id=?", Integer.class, paymentId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.invoice WHERE payment_id=?", Integer.class, paymentId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT payment_status FROM dbo.payment WHERE id=?", String.class, paymentId)).isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject("SELECT settlement_type FROM dbo.payment WHERE id=?", String.class, paymentId)).isNull();
+        assertThat(jdbc.queryForObject("SELECT status FROM dbo.member_card WHERE payment_id=?", String.class, paymentId)).isEqualTo("PENDING_PAYMENT");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.activity_log WHERE entity_type='PAYMENT' AND entity_id=? AND action='PAYMENT_CONFIRMED'", Integer.class, paymentId)).isZero();
+        assertThat(state(created.session().id())).isEqualTo("PENDING");
+        assertThat(fingerprint(jdbc)).isEqualTo(before);
+
+        // 3. After removing the injected faults, the same session confirms cleanly and atomically
+        var settled = service.confirm(token(created), owner);
+        assertThat(settled.state()).isEqualTo(DemoQrService.State.SETTLED);
+        assertThat(settled.invoiceId()).isNotNull();
+        assertThat(settled.invoiceNumber()).isNotBlank();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.simulated_payment_transaction WHERE payment_id=?", Integer.class, paymentId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.invoice WHERE payment_id=?", Integer.class, paymentId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.activity_log WHERE entity_type='PAYMENT' AND entity_id=? AND action='PAYMENT_CONFIRMED'", Integer.class, paymentId)).isEqualTo(1);
+    }
+
+    @Test void simulatedSettlementBlocksCashCaptureRefundsAndMutationInSql() {
+        var created = create();
+        var settled = intent(created).getBody();
+        assertThat(settled.state()).isEqualTo(DemoQrService.State.SETTLED);
+        long txId = settled.simulatedTransactionId();
+
+        // Immutability trigger tr_simulated_tx_immutable blocks UPDATE and DELETE
+        assertThatThrownBy(() -> jdbc.update("UPDATE dbo.simulated_payment_transaction SET amount=1 WHERE id=?", txId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(() -> jdbc.update("DELETE FROM dbo.simulated_payment_transaction WHERE id=?", txId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+
+        // Cash collection trigger tr_cash_collection blocks cash_capture_ticket on SIMULATED payment
+        assertThatThrownBy(() -> new org.springframework.transaction.support.TransactionTemplate(manager).execute(status -> {
+            jdbc.update("""
+                    INSERT INTO dbo.cash_capture_ticket(transaction_id, event_type, source_id, event_time_utc)
+                    VALUES (CURRENT_TRANSACTION_ID(), 'COLLECTION', ?, SYSUTCDATETIME());
+                    """, paymentId);
+            jdbc.update("UPDATE dbo.payment SET payment_status='SUCCESS' WHERE id=?", paymentId);
+            return null;
+        })).isInstanceOf(org.springframework.dao.DataAccessException.class);
+
+        // Package registration settlement + refund protection (service + tr_cash_refund trigger)
+        String pkgPayCode = "QR05-PKG-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        jdbc.update("INSERT dbo.payment(payment_code,member_id,amount,payment_method,payment_status,version) VALUES (?,?,400000,'BANK_TRANSFER','PENDING',0)", pkgPayCode, ownerId);
+        Long pkgPayId = jdbc.queryForObject("SELECT id FROM dbo.payment WHERE payment_code=?", Long.class, pkgPayCode);
+        jdbc.update("""
+                INSERT dbo.sport_package_registration(
+                    registration_code, member_id, package_id, channel, original_price, discount_percentage,
+                    paid_amount, total_sessions, remaining_sessions, start_date, end_date, status, payment_id, created_by_user_id
+                )
+                VALUES (?, ?, (SELECT TOP 1 id FROM sport_package ORDER BY id), 'ONLINE', 400000, 0,
+                        400000, 10, 10, CAST(SYSUTCDATETIME() AS DATE), DATEADD(day, 30, CAST(SYSUTCDATETIME() AS DATE)),
+                        'PENDING_PAYMENT', ?, ?)
+                """, pkgPayCode, ownerId, pkgPayId, ownerId);
+        Long regId = jdbc.queryForObject("SELECT id FROM dbo.sport_package_registration WHERE payment_id=?", Long.class, pkgPayId);
+
+        var pkgSession = post(PREFIX, Map.of("paymentId", pkgPayId, "bankCode", "VIETCOMBANK_DEMO", "requestId", UUID.randomUUID()),
+                ownerToken, DemoQrService.Created.class).getBody();
+        var pkgSettled = post(PREFIX + "/confirm", Map.of("token", token(pkgSession)), ownerToken, DemoQrService.View.class).getBody();
+        assertThat(pkgSettled.state()).isEqualTo(DemoQrService.State.SETTLED);
+        assertThat(jdbc.queryForObject("SELECT status FROM dbo.sport_package_registration WHERE id=?", String.class, regId)).isEqualTo("ACTIVE");
+
+        // Refund quote & submit via HTTP must return 409 SIMULATED_PAYMENT_NOT_REFUNDABLE
+        var headers = new HttpHeaders();
+        headers.setBearerAuth(ownerToken);
+        var quoteRes = http.exchange("/api/v1/refunds/quote?registrationId=" + regId, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+        assertThat(quoteRes.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(quoteRes.getBody().get("code")).isEqualTo("SIMULATED_PAYMENT_NOT_REFUNDABLE");
+
+        var submitRes = post("/api/v1/refunds", Map.of("packageRegistrationId", regId, "reason", "Attempt refund on simulated QR"), ownerToken, Map.class);
+        assertThat(submitRes.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(submitRes.getBody().get("code")).isEqualTo("SIMULATED_PAYMENT_NOT_REFUNDABLE");
+
+        // Direct SQL insert into refund_request for a SIMULATED payment is blocked by tr_cash_refund (THROW 51043)
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO dbo.refund_request(refund_code, package_registration_id, member_id, payment_id,
+                    amount_requested, reason, status, requested_by_user_id)
+                VALUES (?, ?, ?, ?, 200000, 'Direct SQL bypass attempt', 'PENDING', ?)
+                """, "RFD-" + pkgPayCode.substring(0, 12), regId, ownerId, pkgPayId, ownerId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.refund_request WHERE payment_id=?", Integer.class, pkgPayId)).isZero();
     }
     private <T> List<T> parallel(Callable<T> first,Callable<T> second) throws Exception {
         var start=new CountDownLatch(1);
@@ -345,7 +584,9 @@ class DemoQrDatabaseIntegrationTest {
     @Test void freshAndSyntheticLegacyMigrationsAreAdditiveRepeatableAndRecoverable() throws Exception {
         String isolated="sportify_qr04_test_"+UUID.randomUUID().toString().replace("-","");
         String base=url.replaceAll("(?i);databaseName=[^;]*","");
-        try(var connection=DriverManager.getConnection(base+";databaseName=master",username,password);var statement=connection.createStatement()){statement.executeUpdate("CREATE DATABASE ["+isolated+"]");}
+        try(var connection=DriverManager.getConnection(base+";databaseName=master",username,password);var statement=connection.createStatement()){
+            statement.executeUpdate("CREATE DATABASE ["+isolated+"]; ALTER DATABASE ["+isolated+"] SET AUTO_CLOSE OFF;");
+        }
         String target=base+";databaseName="+isolated;
         var source=new org.springframework.jdbc.datasource.DriverManagerDataSource(target,username,password);var database=new JdbcTemplate(source);
         Flyway legacy=Flyway.configure().dataSource(source).locations("classpath:db/migration/identity","classpath:db/migration/catalog").target("33").cleanDisabled(true).load();legacy.migrate();
@@ -357,14 +598,134 @@ class DemoQrDatabaseIntegrationTest {
         // SQL Server transactional DDL dry run: rollback leaves the V33 cohort and its data intact.
         try(var connection=source.getConnection();var statement=connection.createStatement()) {
             connection.setAutoCommit(false);
-            String script=Files.readString(Path.of("src/main/resources/db/migration/catalog/V34__create_simulated_qr_foundation.sql"));
-            for(String batch:script.split("(?im)^GO\\s*$")) if(!batch.isBlank()) statement.execute(batch);
+            for (String file : List.of("V34__create_simulated_qr_foundation.sql", "V35__create_simulated_qr_settlement.sql", "V36__enforce_simulated_settlement_provenance.sql")) {
+                String script=Files.readString(Path.of("src/main/resources/db/migration/catalog/" + file));
+                for(String batch:script.split("(?im)^GO\\s*$")) if(!batch.isBlank()) statement.execute(batch);
+            }
             connection.rollback();
         }
-        assertThat(database.queryForObject("SELECT COUNT(*) FROM sys.tables WHERE name='simulated_qr_session'",Integer.class)).isZero();
+        assertThat(database.queryForObject("SELECT COUNT(*) FROM sys.tables WHERE name IN ('simulated_qr_session','simulated_payment_transaction')",Integer.class)).isZero();
         assertThat(fingerprint(database)).isEqualTo(before);
         var current=Flyway.configure().dataSource(source).locations("classpath:db/migration/identity","classpath:db/migration/catalog").cleanDisabled(true).load();
-        assertThat(current.migrate().migrationsExecuted).isEqualTo(1);current.validate();assertThat(current.migrate().migrationsExecuted).isZero();assertThat(fingerprint(database)).isEqualTo(before);
+        assertThat(current.migrate().migrationsExecuted).isEqualTo(3);
+        current.validate();
+        assertThat(current.migrate().migrationsExecuted).isZero();
+        assertThat(database.queryForObject("SELECT settlement_type FROM dbo.payment WHERE payment_code='QR04-LEGACY'", String.class)).isNull();
+        assertThat(database.queryForObject("SELECT COUNT(*) FROM dbo.vw_paid_payment WHERE payment_code='QR04-LEGACY'", Integer.class)).isEqualTo(1);
+    }
+
+    @Test void sqlProvenanceIntegrityMatrixEnforcesFailClosedProvenance() {
+        var created = create();
+        var settled = intent(created).getBody();
+        assertThat(settled).isNotNull();
+        assertThat(settled.state()).isEqualTo(DemoQrService.State.SETTLED);
+        long validTxId = settled.simulatedTransactionId();
+
+        // SQL-R4-01: SIMULATED + NULL provider + valid simulated FK -> REJECT
+        assertThatThrownBy(() -> jdbc.update("""
+                UPDATE dbo.payment
+                SET settlement_type = 'SIMULATED', settlement_provider = NULL, simulated_transaction_id = ?
+                WHERE id = ?
+                """, validTxId, paymentId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .hasMessageContaining("ck_payment_simulated_consistency");
+
+        // SQL-R4-02: SIMULATED + non-simulator provider + valid simulated FK -> REJECT
+        assertThatThrownBy(() -> jdbc.update("""
+                UPDATE dbo.payment
+                SET settlement_type = 'SIMULATED', settlement_provider = 'DESK_CASH', simulated_transaction_id = ?
+                WHERE id = ?
+                """, validTxId, paymentId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .hasMessageContaining("ck_payment_simulated_consistency");
+
+        // SQL-R4-03: SIMULATED + simulator provider + NULL FK -> REJECT
+        assertThatThrownBy(() -> jdbc.update("""
+                UPDATE dbo.payment
+                SET settlement_type = 'SIMULATED', settlement_provider = 'SPORTIFY_SIMULATOR', simulated_transaction_id = NULL
+                WHERE id = ?
+                """, paymentId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .hasMessageContaining("ck_payment_simulated_consistency");
+
+        // SQL-R4-04: SIMULATED + simulator provider + invalid FK -> REJECT (FK)
+        assertThatThrownBy(() -> jdbc.update("""
+                UPDATE dbo.payment
+                SET settlement_type = 'SIMULATED', settlement_provider = 'SPORTIFY_SIMULATOR', simulated_transaction_id = -999999
+                WHERE id = ?
+                """, paymentId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .hasMessageContaining("fk_payment_simulated_tx");
+
+        // SQL-R4-05: ACTUAL + simulator provider + NULL FK -> REJECT
+        assertThatThrownBy(() -> jdbc.update("""
+                UPDATE dbo.payment
+                SET settlement_type = 'ACTUAL', settlement_provider = 'SPORTIFY_SIMULATOR', simulated_transaction_id = NULL
+                WHERE id = ?
+                """, paymentId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .hasMessageContaining("ck_payment_simulated_consistency");
+
+        // SQL-R4-06: ACTUAL + any provider + non-NULL simulated FK -> REJECT
+        assertThatThrownBy(() -> jdbc.update("""
+                UPDATE dbo.payment
+                SET settlement_type = 'ACTUAL', settlement_provider = 'GATEWAY', simulated_transaction_id = ?
+                WHERE id = ?
+                """, validTxId, paymentId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .hasMessageContaining("ck_payment_simulated_consistency");
+
+        // SQL-R4-07: NULL legacy type + simulator provider -> REJECT
+        assertThatThrownBy(() -> jdbc.update("""
+                UPDATE dbo.payment
+                SET settlement_type = NULL, settlement_provider = 'SPORTIFY_SIMULATOR', simulated_transaction_id = NULL
+                WHERE id = ?
+                """, paymentId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .hasMessageContaining("ck_payment_simulated_consistency");
+
+        // SQL-R4-08: NULL legacy type + non-NULL simulated FK -> REJECT
+        assertThatThrownBy(() -> jdbc.update("""
+                UPDATE dbo.payment
+                SET settlement_type = NULL, settlement_provider = NULL, simulated_transaction_id = ?
+                WHERE id = ?
+                """, validTxId, paymentId))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .hasMessageContaining("ck_payment_simulated_consistency");
+
+        // SQL-R4-09: VALID SIMULATED + simulator provider + valid FK -> ACCEPT
+        var simRow = jdbc.queryForMap("SELECT settlement_type, settlement_provider, simulated_transaction_id FROM dbo.payment WHERE id=?", settled.paymentId());
+        assertThat(simRow.get("settlement_type")).isEqualTo("SIMULATED");
+        assertThat(simRow.get("settlement_provider")).isEqualTo("SPORTIFY_SIMULATOR");
+        assertThat(simRow.get("simulated_transaction_id")).isEqualTo(validTxId);
+
+        // SQL-R4-10: VALID ACTUAL + approved provider + NULL simulated FK -> ACCEPT
+        long actualPayId = payment(ownerId);
+        jdbc.update("UPDATE dbo.payment SET settlement_type='ACTUAL', settlement_provider='GATEWAY', simulated_transaction_id=NULL WHERE id=?", actualPayId);
+        var actRow = jdbc.queryForMap("SELECT settlement_type, settlement_provider, simulated_transaction_id FROM dbo.payment WHERE id=?", actualPayId);
+        assertThat(actRow.get("settlement_type")).isEqualTo("ACTUAL");
+        assertThat(actRow.get("settlement_provider")).isEqualTo("GATEWAY");
+        assertThat(actRow.get("simulated_transaction_id")).isNull();
+
+        // SQL-R4-11: VALID historical NULL type + acceptable legacy fields -> ACCEPT
+        long legacyPayId = payment(ownerId);
+        jdbc.update("UPDATE dbo.payment SET settlement_type=NULL, settlement_provider=NULL, simulated_transaction_id=NULL WHERE id=?", legacyPayId);
+        var legRow = jdbc.queryForMap("SELECT settlement_type, settlement_provider, simulated_transaction_id FROM dbo.payment WHERE id=?", legacyPayId);
+        assertThat(legRow.get("settlement_type")).isNull();
+        assertThat(legRow.get("settlement_provider")).isNull();
+        assertThat(legRow.get("simulated_transaction_id")).isNull();
+
+        // SQL-R4-12: Existing valid QR simulated payment stays valid after migration -> ACCEPT
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dbo.payment WHERE settlement_type='SIMULATED' AND settlement_provider='SPORTIFY_SIMULATOR' AND simulated_transaction_id IS NOT NULL", Integer.class)).isGreaterThanOrEqualTo(1);
+
+        // SQL-R4-13: Invalid UPDATE attempting SIMULATED -> ACTUAL without removing inconsistent fields -> REJECT
+        assertThatThrownBy(() -> jdbc.update("""
+                UPDATE dbo.payment
+                SET settlement_type = 'ACTUAL'
+                WHERE id = ?
+                """, settled.paymentId()))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class)
+                .hasMessageContaining("ck_payment_simulated_consistency");
     }
 
     @AfterAll static void closeContainer() { if(container!=null)container.stop(); }
