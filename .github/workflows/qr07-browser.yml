@@ -1,0 +1,110 @@
+name: QR-07 browser acceptance
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/qr07-browser.yml
+      - backend/src/main/java/com/sportify/demoqr/**
+      - backend/src/main/java/com/sportify/payment/**
+      - backend/src/main/java/com/sportify/identity/**
+      - backend/src/main/java/com/sportify/core/**
+      - backend/src/main/java/com/sportify/config/**
+      - backend/pom.xml
+      - backend/src/main/resources/application*.properties
+      - backend/src/main/resources/application*.yml
+      - backend/src/main/resources/db/migration/catalog/V34__create_simulated_qr_foundation.sql
+      - backend/src/main/resources/db/migration/catalog/V35__create_simulated_qr_settlement.sql
+      - backend/src/main/resources/db/migration/catalog/V36__enforce_simulated_settlement_provenance.sql
+      - frontend/scripts/*qr07*.py
+      - frontend/scripts/qr07-*.mjs
+      - frontend/package.json
+      - frontend/package-lock.json
+      - frontend/vite.config.*
+      - frontend/src/api/client.ts
+      - frontend/src/components/Brand.tsx
+      - frontend/src/theme/**
+      - frontend/src/api/demoQrApi.ts
+      - frontend/src/auth/**
+      - frontend/src/config/**
+      - frontend/src/components/qr/**
+      - frontend/src/pages/member/DemoConfirmationPage.tsx
+      - frontend/src/pages/member/QrPaymentDemoPage.tsx
+      - frontend/src/pages/member/PaymentSummaryPage.tsx
+      - frontend/src/pages/reception/ReceptionQrDisplayPage.tsx
+      - frontend/src/styles/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qr07-browser-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    name: Multi-tier genuine browser E2E and SQL isolation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      MAVEN_OPTS: -Xmx768m
+      # Ephemeral CI fixture only. No production credentials or connected database.
+      QR07_CI_SQL_PASSWORD: Qr07CiIsolated2026!
+    services:
+      sql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: Qr07CiIsolated2026!
+          MSSQL_MEMORY_LIMIT_MB: 2048
+        ports:
+          - 1433:1433
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+        with:
+          distribution: temurin
+          java-version: 25
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build the real backend
+        working-directory: backend
+        run: mvn -B -ntp package -DskipTests -DskipITs
+      - name: Verify evidence helpers and negative controls
+        run: python3 -m unittest discover -s frontend/scripts -p 'test_qr07*.py' -v
+      - name: Build the real simulator assets
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: https://api.demo.example.test:55444/api/v1
+        run: |
+          npm ci
+          npm run build -- --outDir "$RUNNER_TEMP/qr07-assets"
+      - name: Install isolated browser verification dependencies
+        run: |
+          python3 -m venv "$RUNNER_TEMP/qr07-python"
+          "$RUNNER_TEMP/qr07-python/bin/pip" install bcrypt==5.0.0 cryptography==50.0.2 playwright==1.63.0 Pillow==13.0.0 zxing-cpp==3.1.1
+          "$RUNNER_TEMP/qr07-python/bin/python" -m playwright install --with-deps msedge
+          npm pack axe-core@4.11.0 --pack-destination "$RUNNER_TEMP"
+          tar -xzf "$RUNNER_TEMP/axe-core-4.11.0.tgz" -C "$RUNNER_TEMP" package/axe.min.js
+      - name: Verify multi-tier genuine browser E2E, SQL settlement and financial isolation
+        env:
+          QR07_CI_SQL_CONTAINER: ${{ job.services.sql.id }}
+        run: |
+          "$RUNNER_TEMP/qr07-python/bin/python" frontend/scripts/qr07-ci-verification.py \
+            --jar backend/target/G3-SportCentreManagement-0.0.1-SNAPSHOT.jar \
+            --assets "$RUNNER_TEMP/qr07-assets" --axe "$RUNNER_TEMP/package/axe.min.js" \
+            --out "$RUNNER_TEMP/qr07-public-evidence" --private "$RUNNER_TEMP/qr07-private"
+      - name: Upload sanitized verification evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: qr07-real-ci-e2e-evidence
+          path: ${{ runner.temp }}/qr07-public-evidence
+          if-no-files-found: error
+          retention-days: 14
