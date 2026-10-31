@@ -52,6 +52,10 @@ export interface Payment {
   /** BE-20 history fields; GET /payments/{id} does not include an invoice association. */
   invoiceId?: number | null
   invoiceNumber?: string | null
+  referenceCode?: string | null
+  settlementType?: string | null
+  settlementProvider?: string | null
+  simulatedTransactionId?: number | null
 }
 
 /** BE-20 InvoiceLineResponse. */
@@ -84,6 +88,9 @@ export interface Invoice {
   /** ISSUED, PAID, CANCELLED or REFUNDED. */
   status: string
   issueDate: string | null
+  settlementType?: string | null
+  settlementProvider?: string | null
+  simulatedTransactionId?: number | null
   lines?: InvoiceLine[] | null
 }
 

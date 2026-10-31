@@ -45,7 +45,7 @@ describe('QR-02 selector and clipboard outcomes', () => {
     expect(screen.getByRole('img')).toHaveAccessibleName(`Non-payable demo QR for payment 52, ${label} Encodes SPORTIFY_DEMO_QR version 2 plain text marked NON_PAYABLE with the selected demo bank code. No beneficiary account, payment URL or banking instruction is encoded.`)
     await user.click(screen.getByRole('button', { name: 'Copy demo details' }))
     expect(write).toHaveBeenCalledExactlyOnceWith(demoDetails(payment(), normalizeDemoBank(value)))
-    expect(screen.getByRole('status')).toHaveTextContent('Demo details copied. Demo only - not a real payment.')
+    expect(screen.getByRole('status')).toHaveTextContent('Demo details copied. Simulated payment - no real money is transferred.')
     await user.selectOptions(screen.getByRole('combobox'), value === 'mb' ? 'bidv' : 'mb')
     expect(screen.getByRole('status')).toBeEmptyDOMElement()
   })

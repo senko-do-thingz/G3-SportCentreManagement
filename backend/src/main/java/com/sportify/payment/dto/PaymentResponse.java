@@ -31,6 +31,10 @@ public class PaymentResponse {
     private Long memberId;
     private String memberCode;
     private String notes;
+    private String referenceCode;
+    private String settlementType;
+    private String settlementProvider;
+    private Long simulatedTransactionId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

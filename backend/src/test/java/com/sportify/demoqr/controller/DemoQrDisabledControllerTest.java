@@ -31,7 +31,7 @@ abstract class DisabledDemoQrContract {
     @MockitoBean UserDetailsService userDetailsService;
 
     @ParameterizedTest
-    @ValueSource(strings = {"", "/preview", "/confirm-intent", "/00000000-0000-0000-0000-000000000000/cancel", "/read"})
+    @ValueSource(strings = {"", "/preview", "/confirm-intent", "/confirm", "/00000000-0000-0000-0000-000000000000/cancel", "/read"})
     void everyOperationIsAbsentEvenWithAuthenticatedOwner(String suffix) throws Exception {
         var owner = new CustomUserDetails(UserAccount.builder().id(2L).status("ACTIVE")
                 .role(Role.builder().code("MEMBER").name("MEMBER").build()).build());
