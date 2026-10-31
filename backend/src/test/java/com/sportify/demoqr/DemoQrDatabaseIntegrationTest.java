@@ -761,7 +761,7 @@ class DemoQrDatabaseIntegrationTest {
 
     private void exportSqlEvidence(Map<String, Long> countsBefore, Map<String, Long> countsAfter,
                                    Map<String, String> digestsBefore, Map<String, String> digestsAfter,
-                                   long targetPaymentId) {
+                                   long targetPaymentId, List<Map<String, Object>> executedRequests) {
         try {
             var tables = new java.util.ArrayList<Map<String, Object>>();
             for (String tableName : digestsBefore.keySet()) {
@@ -782,8 +782,10 @@ class DemoQrDatabaseIntegrationTest {
                 tables.add(tableEntry);
             }
 
+            boolean zeroWrites = countsBefore.equals(countsAfter) && digestsBefore.equals(digestsAfter);
+
             var root = new java.util.LinkedHashMap<String, Object>();
-            root.put("title", "QR-06 (i) Round 04 - SQL-Backed Desk Projection Zero-Write Verification");
+            root.put("title", "QR-06 (i) Round 05 - SQL-Backed Desk Projection Zero-Write Verification");
             root.put("testClass", "com.sportify.demoqr.DemoQrDatabaseIntegrationTest");
             root.put("testMethod", "deskProjectionAndRepeatedPollingProducesStrictlyZeroDatabaseWrites");
             root.put("databaseEngine", "Microsoft SQL Server 2022 (Testcontainers mssql/server:2022-latest)");
@@ -792,36 +794,33 @@ class DemoQrDatabaseIntegrationTest {
             root.put("snapshotAlgorithm", "SHA-256 over sorted TreeMap canonical row string representations: database.queryForList(\"SELECT * FROM [\" + table + \"]\").stream().map(row -> new TreeMap<>(row).toString()).sorted().toList().toString()");
             root.put("emptyTableCanonicalString", "[]");
             root.put("emptyTableSha256Digest", "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945");
-            root.put("executedRequests", List.of(
-                    Map.of("requestNumber", 1, "role", "RECEPTIONIST", "method", "GET", "expectedStatus", 200, "actualStatus", 200, "description", "Initial projection fetch by front desk staff"),
-                    Map.of("requestNumber", 2, "role", "RECEPTIONIST", "method", "GET", "expectedStatus", 200, "actualStatus", 200, "description", "Sequential poll 1 (0s test interval; frontend polls at 4s)"),
-                    Map.of("requestNumber", 3, "role", "RECEPTIONIST", "method", "GET", "expectedStatus", 200, "actualStatus", 200, "description", "Sequential poll 2"),
-                    Map.of("requestNumber", 4, "role", "RECEPTIONIST", "method", "GET", "expectedStatus", 200, "actualStatus", 200, "description", "Sequential poll 3"),
-                    Map.of("requestNumber", 5, "role", "RECEPTIONIST", "method", "GET", "expectedStatus", 200, "actualStatus", 200, "description", "Sequential poll 4"),
-                    Map.of("requestNumber", 6, "role", "MANAGER", "method", "GET", "expectedStatus", 200, "actualStatus", 200, "description", "Supervisor desk projection read access"),
-                    Map.of("requestNumber", 7, "role", "MEMBER", "method", "GET", "expectedStatus", 403, "actualStatus", 403, "description", "Customer forbidden from desk projection"),
-                    Map.of("requestNumber", 8, "role", "ANONYMOUS", "method", "GET", "expectedStatus", 401, "actualStatus", 401, "description", "Unauthenticated request rejected")
-            ));
+            root.put("executedRequests", executedRequests);
             root.put("totalMonitoredTables", tables.size());
-            root.put("zeroWritesConfirmed", true);
+            root.put("zeroWritesConfirmed", zeroWrites);
             root.put("tables", tables);
 
             var mapper = new com.fasterxml.jackson.databind.ObjectMapper().enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
             String json = mapper.writeValueAsString(root);
             System.out.println("=== GENUINE SQL EVIDENCE JSON ===\n" + json);
 
-            java.nio.file.Path targetPath = java.nio.file.Paths.get("target/qr06-round04-sql-evidence.json");
+            java.nio.file.Path targetPath = java.nio.file.Paths.get("target/qr06-round05-sql-evidence.json");
             if (targetPath.getParent() != null) {
                 java.nio.file.Files.createDirectories(targetPath.getParent());
             }
             java.nio.file.Files.writeString(targetPath, json);
 
-            java.nio.file.Path reportsDir = java.nio.file.Paths.get("tasks/QR-06 (i)/reports/round-04/sql-evidence");
+            java.nio.file.Path failsafePath = java.nio.file.Paths.get("target/failsafe-reports/qr06-round05-sql-evidence.json");
+            if (failsafePath.getParent() != null) {
+                java.nio.file.Files.createDirectories(failsafePath.getParent());
+            }
+            java.nio.file.Files.writeString(failsafePath, json);
+
+            java.nio.file.Path reportsDir = java.nio.file.Paths.get("tasks/QR-06 (i)/reports/round-05/sql-evidence");
             if (java.nio.file.Files.exists(reportsDir)) {
-                java.nio.file.Files.writeString(reportsDir.resolve("qr06-round04-sql-evidence.json"), json);
+                java.nio.file.Files.writeString(reportsDir.resolve("qr06-round05-sql-evidence.json"), json);
             }
         } catch (Exception ex) {
-            System.err.println("Failed to export SQL evidence: " + ex.getMessage());
+            throw new IllegalStateException("Mandatory SQL evidence export failed: " + ex.getMessage(), ex);
         }
     }
 
@@ -846,6 +845,8 @@ class DemoQrDatabaseIntegrationTest {
         receptionistHeaders.setBearerAuth(receptionistToken);
         HttpEntity<Void> receptionistEntity = new HttpEntity<>(receptionistHeaders);
 
+        var executedRequests = new java.util.ArrayList<Map<String, Object>>();
+
         for (int i = 1; i <= 5; i++) {
             var response = http.exchange(deskProjectionUrl, HttpMethod.GET, receptionistEntity, Map.class);
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -854,6 +855,15 @@ class DemoQrDatabaseIntegrationTest {
             assertThat(body.get("paymentId")).isEqualTo((int) paymentId);
             assertThat(body.get("paymentStatus")).isEqualTo("PENDING");
             assertThat(body.get("activeSession")).isNotNull();
+
+            executedRequests.add(Map.of(
+                    "requestNumber", i,
+                    "role", "RECEPTIONIST",
+                    "method", "GET",
+                    "expectedStatus", 200,
+                    "actualStatus", response.getStatusCode().value(),
+                    "description", i == 1 ? "Initial projection fetch by front desk staff" : "Sequential poll " + (i - 1) + " (0s test interval; frontend client polls at 4s)"
+            ));
         }
 
         HttpHeaders managerHeaders = new HttpHeaders();
@@ -863,13 +873,40 @@ class DemoQrDatabaseIntegrationTest {
         assertThat(managerResp.getBody()).isNotNull();
         assertThat(managerResp.getBody().get("paymentStatus")).isEqualTo("PENDING");
 
+        executedRequests.add(Map.of(
+                "requestNumber", 6,
+                "role", "MANAGER",
+                "method", "GET",
+                "expectedStatus", 200,
+                "actualStatus", managerResp.getStatusCode().value(),
+                "description", "Supervisor desk projection read access (HTTP 200 OK verified)"
+        ));
+
         HttpHeaders memberHeaders = new HttpHeaders();
         memberHeaders.setBearerAuth(ownerToken);
         var memberResp = http.exchange(deskProjectionUrl, HttpMethod.GET, new HttpEntity<>(memberHeaders), Map.class);
         assertThat(memberResp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
 
+        executedRequests.add(Map.of(
+                "requestNumber", 7,
+                "role", "MEMBER",
+                "method", "GET",
+                "expectedStatus", 403,
+                "actualStatus", memberResp.getStatusCode().value(),
+                "description", "Customer forbidden from desk projection (HTTP 403 Forbidden verified)"
+        ));
+
         var anonResp = http.exchange(deskProjectionUrl, HttpMethod.GET, new HttpEntity<>(new HttpHeaders()), Map.class);
         assertThat(anonResp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        executedRequests.add(Map.of(
+                "requestNumber", 8,
+                "role", "ANONYMOUS",
+                "method", "GET",
+                "expectedStatus", 401,
+                "actualStatus", anonResp.getStatusCode().value(),
+                "description", "Unauthenticated request rejected (HTTP 401 Unauthorized verified)"
+        ));
 
         var afterFingerprint = qr06Fingerprint(jdbc);
         var afterCounts = qr06RowCounts(jdbc);
@@ -877,7 +914,7 @@ class DemoQrDatabaseIntegrationTest {
         assertThat(afterFingerprint).isEqualTo(beforeFingerprint);
         assertThat(afterCounts).isEqualTo(beforeCounts);
 
-        exportSqlEvidence(beforeCounts, afterCounts, beforeFingerprint, afterFingerprint, paymentId);
+        exportSqlEvidence(beforeCounts, afterCounts, beforeFingerprint, afterFingerprint, paymentId, executedRequests);
     }
 
     @AfterAll static void closeContainer() { if(container!=null)container.stop(); }

@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto'
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const ROOT = resolve(__dirname, '../..')
 const DIST = join(ROOT, 'frontend/dist')
-const ROUND = process.env.ROUND || 'round-04'
+const ROUND = process.env.ROUND || 'round-05'
 const OUT_DIR = join(ROOT, `tasks/QR-06 (i)/reports/${ROUND}`)
 const SCREENSHOTS_DIR = join(OUT_DIR, 'screenshots')
 const LOGS_DIR = join(OUT_DIR, 'browser-logs')
@@ -335,6 +335,7 @@ async function run() {
   const axeCoreResults = []
   const layoutGeometryResults = []
   const keyboardSteps = []
+  const colorContrastResults = []
 
   // Create browser context and page target session
   const { browserContextId } = await browser.send('Target.createBrowserContext')
@@ -732,6 +733,123 @@ async function run() {
       })
     }
 
+    // Per-node actual contrast ratio evaluator across 10 key elements
+    const contrastEval = await sendPage('Runtime.evaluate', {
+      expression: `(() => {
+        function parseRgba(str) {
+          const m = str.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)(?:,\\s*([\\d.]+))?\\)/);
+          if (!m) return { r: 0, g: 0, b: 0, a: 1 };
+          return {
+            r: parseInt(m[1], 10),
+            g: parseInt(m[2], 10),
+            b: parseInt(m[3], 10),
+            a: m[4] !== undefined ? parseFloat(m[4]) : 1,
+          };
+        }
+
+        function composite(fg, bg) {
+          const a = fg.a + bg.a * (1 - fg.a);
+          return {
+            r: Math.round((fg.r * fg.a + bg.r * bg.a * (1 - fg.a)) / (a || 1)),
+            g: Math.round((fg.g * fg.a + bg.g * bg.a * (1 - fg.a)) / (a || 1)),
+            b: Math.round((fg.b * fg.a + bg.b * bg.a * (1 - fg.a)) / (a || 1)),
+            a: a,
+          };
+        }
+
+        function getEffectiveBg(el, defaultBg, isDark) {
+          let cur = el;
+          let layers = [];
+          const hero = el.closest('.payment-hero');
+          const heroBg = isDark ? { r: 14, g: 26, b: 58, a: 1 } : { r: 11, g: 23, b: 54, a: 1 };
+          while (cur && cur !== document.documentElement) {
+            const bgStr = window.getComputedStyle(cur).backgroundColor;
+            if (bgStr && bgStr !== 'transparent') {
+              const c = parseRgba(bgStr);
+              if (c.a > 0) layers.unshift(c);
+            }
+            if (cur === hero) break;
+            cur = cur.parentElement;
+          }
+          let comp = hero ? heroBg : defaultBg;
+          for (const l of layers) {
+            comp = composite(l, comp);
+          }
+          return comp;
+        }
+
+        function luminance(c) {
+          const a = [c.r, c.g, c.b].map(v => {
+            v /= 255;
+            return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+          });
+          return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
+        }
+
+        function contrast(c1, c2) {
+          const l1 = luminance(c1);
+          const l2 = luminance(c2);
+          const max = Math.max(l1, l2);
+          const min = Math.min(l1, l2);
+          return (max + 0.05) / (min + 0.05);
+        }
+
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const defaultBg = isDark ? { r: 17, g: 24, b: 39, a: 1 } : { r: 255, g: 255, b: 255, a: 1 };
+
+        const selectors = [
+          { name: 'Hero Title', sel: '.payment-hero__title' },
+          { name: 'Hero Eyebrow', sel: '.payment-hero__eyebrow' },
+          { name: 'Hero Description', sel: '.payment-hero__description' },
+          { name: 'Notice Banner', sel: '.reception-notice-banner .notice' },
+          { name: 'QR Card Title', sel: '.qr-demo-card .card__title' },
+          { name: 'QR Card Info Text', sel: '.qr-demo-card .card__intro p' },
+          { name: 'Payment Details Title', sel: '.reception-grid > :nth-child(2) .card__title' },
+          { name: 'Status Badge', sel: '.reception-status-header .badge' },
+          { name: 'Status Refresh Note', sel: '.reception-status-header span' },
+          { name: 'Action Button Secondary', sel: '.reception-actions .btn--secondary' },
+        ];
+
+        return selectors.map(item => {
+          const el = document.querySelector(item.sel);
+          if (!el) return { name: item.name, selector: item.sel, found: false };
+          const style = window.getComputedStyle(el);
+          const fg = parseRgba(style.color);
+          const effBg = getEffectiveBg(el, defaultBg, isDark);
+          const cr = contrast(fg, effBg);
+          const fsPx = parseFloat(style.fontSize);
+          const isBold = parseInt(style.fontWeight, 10) >= 700 || style.fontWeight === 'bold';
+          const isLarge = fsPx >= 24 || (fsPx >= 18.66 && isBold);
+          const required = isLarge ? 3.0 : 4.5;
+          return {
+            name: item.name,
+            selector: item.sel,
+            found: true,
+            text: el.textContent?.trim()?.slice(0, 50),
+            fontSize: style.fontSize,
+            fontWeight: style.fontWeight,
+            isLargeText: isLarge,
+            fgRgb: 'rgb(' + fg.r + ', ' + fg.g + ', ' + fg.b + ')',
+            bgRgb: 'rgb(' + effBg.r + ', ' + effBg.g + ', ' + effBg.b + ')',
+            contrastRatio: Math.round(cr * 100) / 100,
+            requiredRatio: required,
+            status: cr >= required ? 'PASS' : 'FAIL',
+          };
+        });
+      })()`,
+      returnByValue: true,
+    })
+
+    if (contrastEval.result?.value) {
+      colorContrastResults.push({
+        harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+        view: filename,
+        viewport: `${width}x${height}`,
+        theme,
+        measurements: contrastEval.result.value,
+      })
+    }
+
     const screenshotData = await sendPage('Page.captureScreenshot', {
       format: 'png',
       captureBeyondViewport: isFullPage,
@@ -785,8 +903,9 @@ async function run() {
   await sendPage('Page.navigate', { url: `http://localhost:${port}/reception/payments/101/qr-display` })
   await new Promise((r) => setTimeout(r, 800))
 
-  // Dispatch real Tab key strokes and capture focused element details
-  for (let tabIndex = 1; tabIndex <= 6; tabIndex++) {
+  // Dispatch real Tab key strokes until reaching the primary reception action button
+  let actionReached = false
+  for (let tabIndex = 1; tabIndex <= 25; tabIndex++) {
     await sendPage('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
     await sendPage('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
     await new Promise((r) => setTimeout(r, 100))
@@ -794,9 +913,10 @@ async function run() {
     const activeEl = await sendPage('Runtime.evaluate', {
       expression: `(() => {
         const el = document.activeElement;
-        if (!el) return null;
+        if (!el || el === document.body) return null;
         const rect = el.getBoundingClientRect();
         const style = window.getComputedStyle(el);
+        const isReceptionAction = !!el.closest('.reception-actions');
         return {
           tabIndex: ${tabIndex},
           tagName: el.tagName,
@@ -808,20 +928,30 @@ async function run() {
           outline: style.outline,
           boxShadow: style.boxShadow,
           isInteractive: ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName) || el.hasAttribute('tabindex'),
+          isReceptionAction,
         };
       })()`,
       returnByValue: true,
     })
-    keyboardSteps.push(activeEl.result.value)
+
+    const elData = activeEl.result?.value
+    if (elData) {
+      keyboardSteps.push(elData)
+      if (elData.isReceptionAction) {
+        actionReached = true
+        console.log(`Authentic Tab navigation reached primary reception action at Tab #${tabIndex}: <${elData.tagName} class="${elData.className}"> text="${elData.text}"`)
+        // Capture screenshot directly of this authentic Tab focus state without programmatic focus!
+        const focusScreenshot = await sendPage('Page.captureScreenshot', { format: 'png' })
+        writeFileSync(join(SCREENSHOTS_DIR, 'desktop-1440-light-keyboard-focus.png'), Buffer.from(focusScreenshot.data, 'base64'))
+        console.log('Saved authentic Tab keyboard focus screenshot: desktop-1440-light-keyboard-focus.png')
+        break
+      }
+    }
   }
 
-  // Focus on the secondary button for visual evidence
-  await captureView('101', 'desktop-1440-light-keyboard-focus.png', {
-    width: 1440,
-    height: 900,
-    theme: 'light',
-    focusSelector: '.reception-actions a.btn--secondary',
-  })
+  if (!actionReached) {
+    throw new Error('CRITICAL: Authentic Tab navigation failed to reach reception action within 25 steps!')
+  }
 
   // Full page rendering screenshot
   await captureView('101', 'desktop-1440-light-fullpage.png', {
@@ -842,6 +972,7 @@ async function run() {
   writeFileSync(join(LOGS_DIR, 'axe-core-audit.json'), JSON.stringify(axeCoreResults, null, 2))
   writeFileSync(join(LOGS_DIR, 'layout-geometry.json'), JSON.stringify(layoutGeometryResults, null, 2))
   writeFileSync(join(LOGS_DIR, 'keyboard-navigation.json'), JSON.stringify(keyboardSteps, null, 2))
+  writeFileSync(join(LOGS_DIR, 'color-contrast-measurements.json'), JSON.stringify(colorContrastResults, null, 2))
 
   // Verify unique screenshot hashes across all 17 primary views
   console.log('Verifying screenshot SHA-256 uniqueness across all captured views...')
