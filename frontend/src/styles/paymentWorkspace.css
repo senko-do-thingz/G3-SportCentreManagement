@@ -166,6 +166,17 @@
   box-shadow: inset 0 0 0 1.5px var(--h-primary);
 }
 
+.payment-workspace .btn--secondary {
+  background: var(--h-surface);
+  border: 1px solid var(--h-border);
+  color: var(--color-primary);
+}
+
+.payment-workspace .btn--secondary:hover:not(:disabled) {
+  background: var(--h-band);
+  border-color: var(--color-border-strong);
+}
+
 .payment-workspace .input,
 .payment-workspace .payment-methods__option,
 .payment-workspace .table-scroll,

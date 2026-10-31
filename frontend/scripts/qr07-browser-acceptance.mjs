@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const ROOT = resolve(__dirname, '../..')
 const DIST = join(ROOT, 'frontend/dist')
-const OUT_DIR = join(ROOT, 'tasks/QR-07 (i)/reports/round-01')
+const OUT_DIR = join(ROOT, 'tasks/QR-07 (i)/reports/round-03')
 const SCREENSHOTS_DIR = join(OUT_DIR, 'screenshots')
 const LOGS_DIR = join(OUT_DIR, 'browser-logs')
 const A11Y_DIR = join(OUT_DIR, 'accessibility')
@@ -209,7 +209,7 @@ const PAYMENTS = {
 }
 
 // 43-character base64url confirmation token matching DEMO_TOKEN regexp
-const TEST_TOKEN = 'evidence-valid-member-token-00123456789012'
+const TEST_TOKEN = 'evidence-valid-member-token-001234567890123'
 
 function startStaticServer(port) {
   return new Promise((resolve) => {
@@ -259,7 +259,6 @@ async function launchBrowser() {
       '--hide-scrollbars',
       '--mute-audio',
       '--disable-extensions',
-      '--disable-web-security',
       'about:blank',
     ],
     { stdio: ['ignore', 'ignore', 'pipe'] },
@@ -369,7 +368,7 @@ async function run() {
           // Auth verification endpoints
           if (pathname === '/api/v1/users/me' || pathname === '/api/v1/auth/me') {
             networkRequests.push({
-              harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+              harness: 'MOCK UI VISUAL REGRESSION (Deterministic Fixtures)',
               contextRole: role,
               url: request.url,
               method: request.method,
@@ -392,7 +391,7 @@ async function run() {
           // Capability endpoint
           if (pathname === '/api/v1/payments/simulated-qr/capability') {
             networkRequests.push({
-              harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+              harness: 'MOCK UI VISUAL REGRESSION (Deterministic Fixtures)',
               contextRole: role,
               url: request.url,
               method: request.method,
@@ -417,7 +416,7 @@ async function run() {
           // Member registrations and cards
           if (pathname === '/api/v1/members/me/registrations' || pathname === '/api/v1/members/me/cards') {
             networkRequests.push({
-              harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+              harness: 'MOCK UI VISUAL REGRESSION (Deterministic Fixtures)',
               contextRole: role,
               url: request.url,
               method: request.method,
@@ -459,7 +458,7 @@ async function run() {
               }
               if (payment) {
                 networkRequests.push({
-                  harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+                  harness: 'MOCK UI VISUAL REGRESSION (Deterministic Fixtures)',
                   contextRole: role,
                   url: request.url,
                   method: request.method,
@@ -486,7 +485,7 @@ async function run() {
             const postData = request.postData ? JSON.parse(request.postData) : {}
             const bankCode = postData.bankCode || 'BIDV_DEMO'
             networkRequests.push({
-              harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+              harness: 'MOCK UI VISUAL REGRESSION (Deterministic Fixtures)',
               contextRole: role,
               url: request.url,
               method: 'POST',
@@ -501,7 +500,7 @@ async function run() {
                 reference: 'DEMO-101',
                 amount: 810000,
                 currency: 'VND',
-                bankCode: 'bidv',
+                bankCode: 'BIDV_DEMO',
                 bankLabel: 'BIDV (demo)',
                 createdAt: '2026-10-31T03:00:00Z',
                 expiresAt: '2026-10-31T03:10:00Z',
@@ -526,7 +525,7 @@ async function run() {
           // Member session preview: POST /api/v1/payments/simulated-qr/sessions/preview
           if (pathname === '/api/v1/payments/simulated-qr/sessions/preview' && request.method === 'POST') {
             networkRequests.push({
-              harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+              harness: 'MOCK UI VISUAL REGRESSION (Deterministic Fixtures)',
               contextRole: role,
               url: request.url,
               method: 'POST',
@@ -540,7 +539,7 @@ async function run() {
               reference: 'DEMO-101',
               amount: 810000,
               currency: 'VND',
-              bankCode: 'bidv',
+              bankCode: 'BIDV_DEMO',
               bankLabel: 'BIDV (demo)',
               createdAt: '2026-10-31T03:00:00Z',
               expiresAt: '2026-10-31T03:10:00Z',
@@ -569,7 +568,7 @@ async function run() {
           if (pathname === '/api/v1/payments/simulated-qr/sessions/confirm' && request.method === 'POST') {
             dynamicPayment101Settled = true
             networkRequests.push({
-              harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+              harness: 'MOCK UI VISUAL REGRESSION (Deterministic Fixtures)',
               contextRole: role,
               url: request.url,
               method: 'POST',
@@ -583,7 +582,7 @@ async function run() {
               reference: 'DEMO-101',
               amount: 810000,
               currency: 'VND',
-              bankCode: 'bidv',
+              bankCode: 'BIDV_DEMO',
               bankLabel: 'BIDV (demo)',
               createdAt: '2026-10-31T03:00:00Z',
               expiresAt: '2026-10-31T03:10:00Z',
@@ -629,7 +628,7 @@ async function run() {
 
             if (projection) {
               networkRequests.push({
-                harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+                harness: 'MOCK UI VISUAL REGRESSION (Deterministic Fixtures)',
                 contextRole: role,
                 url: request.url,
                 method: request.method,
@@ -674,6 +673,21 @@ async function run() {
     await sendPage('Page.enable')
     await sendPage('Runtime.enable')
 
+    // Disable transitions and animations to ensure steady-state sampling for axe-core
+    await sendPage('Page.addScriptToEvaluateOnNewDocument', {
+      source: `
+        const style = document.createElement('style');
+        style.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; }';
+        if (document.head) {
+          document.head.appendChild(style);
+        } else {
+          document.addEventListener('DOMContentLoaded', () => {
+            if (document.head) document.head.appendChild(style);
+          });
+        }
+      `,
+    })
+
     // Seed authentic tokenStorage in localStorage
     await sendPage('Page.navigate', { url: `http://localhost:${port}/` })
     await new Promise((r) => setTimeout(r, 600))
@@ -682,6 +696,7 @@ async function run() {
         localStorage.setItem('sportify.accessToken', 'evidence-mock-access-token-qr07');
         localStorage.setItem('sportify.refreshToken', 'evidence-mock-refresh-token-qr07');
         localStorage.setItem('sportify.sessionId', 'evidence-mock-session-id-qr07');
+        localStorage.setItem('sportify.themePreference', 'light');
       `,
     })
 
@@ -722,7 +737,9 @@ async function run() {
       mobile: width < 600,
     })
 
-    await ctx.sendPage('Page.navigate', { url })
+    if (url) {
+      await ctx.sendPage('Page.navigate', { url })
+    }
 
     // Wait until target selector mounts
     let ready = false
@@ -752,9 +769,12 @@ async function run() {
     await ctx.sendPage('Runtime.evaluate', {
       expression: `
         document.documentElement.setAttribute('data-theme', '${theme}');
+        localStorage.setItem('sportify.themePreference', '${theme}');
         ${zoom !== 1 ? `document.body.style.zoom = '${zoom}';` : ''}
       `,
     })
+    // Give browser time to complete layout recalculation and font rendering in steady state
+    await new Promise((resolve) => setTimeout(resolve, 300))
 
     // Compute bounding geometry
     const geomRes = await ctx.sendPage('Runtime.evaluate', {
@@ -798,7 +818,17 @@ async function run() {
                 impact: v.impact,
                 description: v.description,
                 help: v.help,
+                helpUrl: v.helpUrl,
                 nodesCount: v.nodes.length,
+                nodes: v.nodes.map(n => ({
+                  html: n.html,
+                  target: n.target,
+                  failureSummary: n.failureSummary,
+                  impact: n.impact,
+                  any: (n.any || []).map(a => ({ id: a.id, data: a.data, message: a.message })),
+                  all: (n.all || []).map(a => ({ id: a.id, data: a.data, message: a.message })),
+                  none: (n.none || []).map(a => ({ id: a.id, data: a.data, message: a.message })),
+                })),
               })),
               passesCount: res.passes.length,
               incompleteCount: res.incomplete.length,
@@ -807,7 +837,17 @@ async function run() {
                 impact: inc.impact,
                 description: inc.description,
                 help: inc.help,
+                helpUrl: inc.helpUrl,
                 nodesCount: inc.nodes.length,
+                nodes: inc.nodes.map(n => ({
+                  html: n.html,
+                  target: n.target,
+                  failureSummary: n.failureSummary,
+                  impact: n.impact,
+                  any: (n.any || []).map(a => ({ id: a.id, data: a.data, message: a.message })),
+                  all: (n.all || []).map(a => ({ id: a.id, data: a.data, message: a.message })),
+                  none: (n.none || []).map(a => ({ id: a.id, data: a.data, message: a.message })),
+                })),
               })),
               inapplicableCount: res.inapplicable.length,
               timestamp: new Date().toISOString()
@@ -831,7 +871,7 @@ async function run() {
     })
 
     accessibilityResults.push({
-      harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+      harness: 'MOCK UI VISUAL REGRESSION (Deterministic Fixtures)',
       view: filename,
       viewport: `${width}x${height}`,
       theme,
@@ -849,7 +889,7 @@ async function run() {
 
     if (axeData) {
       axeCoreResults.push({
-        harness: 'MOCK BROWSER UI (Deterministic Fixtures)',
+        harness: 'MOCK UI VISUAL REGRESSION (Deterministic Fixtures)',
         view: filename,
         viewport: `${width}x${height}`,
         theme,
@@ -939,44 +979,74 @@ async function run() {
     ctx2,
     confirmUrl,
     'confirm-context2-1280-light-preview.png',
-    { width: 1280, height: 800, theme: 'light', readySelector: '.demo-confirm-page' },
+    { width: 1280, height: 800, theme: 'light', readySelector: '.summary-list' },
   )
   await captureView(
     ctx2,
     confirmUrl,
     'confirm-context2-1280-dark-preview.png',
-    { width: 1280, height: 800, theme: 'dark', readySelector: '.demo-confirm-page' },
+    { width: 1280, height: 800, theme: 'dark', readySelector: '.summary-list' },
   )
   await captureView(
     ctx2,
     confirmUrl,
     'confirm-context2-1440-light-preview.png',
-    { width: 1440, height: 900, theme: 'light', readySelector: '.demo-confirm-page' },
+    { width: 1440, height: 900, theme: 'light', readySelector: '.summary-list' },
   )
   await captureView(
     ctx2,
     confirmUrl,
     'confirm-context2-390-light-preview.png',
-    { width: 390, height: 844, theme: 'light', readySelector: '.demo-confirm-page' },
+    { width: 390, height: 844, theme: 'light', readySelector: '.summary-list' },
   )
 
   // 2.2 Trigger explicit Member confirmation button in Context 2
-  console.log('[QR-07] Context 2 clicking "Confirm Simulated Payment"...')
-  await ctx2.sendPage('Runtime.evaluate', {
-    expression: `(() => {
-      const btn = [...document.querySelectorAll('button')].find(b => b.textContent?.includes('Confirm Simulated Payment'));
-      if (btn) btn.click();
-    })()`,
+  console.log('[QR-07] Resetting Context 2 viewport to 1440x900 before confirmation click...')
+  await ctx2.sendPage('Emulation.setDeviceMetricsOverride', {
+    width: 1440,
+    height: 900,
+    deviceScaleFactor: 1,
+    mobile: false,
   })
-  await new Promise((r) => setTimeout(r, 800))
+  await new Promise((r) => setTimeout(r, 400))
 
-  // Capture confirmed state in Context 2
+  console.log('[QR-07] Context 2 clicking "Confirm simulated payment"...')
+  const clickRes = await ctx2.sendPage('Runtime.evaluate', {
+    expression: `(() => {
+      const btn = [...document.querySelectorAll('button')].find(b => b.textContent?.toLowerCase().includes('confirm simulated payment'));
+      if (btn) {
+        btn.click();
+        return { clicked: true, text: btn.textContent.trim() };
+      }
+      return { clicked: false, availableButtons: [...document.querySelectorAll('button')].map(b => b.textContent.trim()) };
+    })()`,
+    returnByValue: true,
+  })
+  console.log('[QR-07] Context 2 click result:', clickRes.result?.value)
+  if (!clickRes.result?.value?.clicked) {
+    throw new Error(`CRITICAL: Confirm button not found in Context 2! Available: ${JSON.stringify(clickRes.result?.value?.availableButtons)}`)
+  }
+  await new Promise((r) => setTimeout(r, 1200))
+
+  // Capture confirmed state in Context 2 WITHOUT re-navigating (retaining in-memory settled state)
+  console.log('[QR-07] Capturing Context 2 confirmed view (settled state in-place)...')
   await captureView(
     ctx2,
-    `http://localhost:${port}/demo/qr/confirm`,
+    null,
     'confirm-context2-1440-light-confirmed.png',
-    { width: 1440, height: 900, theme: 'light', readySelector: '.demo-confirm-page' },
+    { width: 1440, height: 900, theme: 'light', readySelector: '.notice--success' },
   )
+
+  const confirmedCheck = await ctx2.sendPage('Runtime.evaluate', {
+    expression: `({
+      hasPaidSimulated: document.body.textContent.includes('Paid - Simulated'),
+      hasTxn: document.body.textContent.includes('TXN-9001'),
+      hasSettled: document.body.textContent.includes('SETTLED'),
+      noConfirmButton: ![...document.querySelectorAll('button')].some(b => b.textContent?.toLowerCase().includes('confirm simulated payment')),
+    })`,
+    returnByValue: true,
+  })
+  console.log('[QR-07] Context 2 settled DOM assertions:', confirmedCheck.result?.value)
 
   // 2.3 Member Demo QR view reloaded after settlement (displays Paid - Simulated)
   console.log('[QR-07] Verifying Member view after settlement commit...')
@@ -984,13 +1054,13 @@ async function run() {
     ctxMember,
     `http://localhost:${port}/member/payments/101/qr-demo`,
     'member-1440-light-settled-simulated.png',
-    { width: 1440, height: 900, theme: 'light', readySelector: '.card' },
+    { width: 1440, height: 900, theme: 'light', readySelector: '.notice--success' },
   )
   await captureView(
     ctxMember,
     `http://localhost:${port}/member/payments/101/qr-demo`,
     'member-1440-dark-settled-simulated.png',
-    { width: 1440, height: 900, theme: 'dark', readySelector: '.card' },
+    { width: 1440, height: 900, theme: 'dark', readySelector: '.notice--success' },
   )
 
   // ==========================================
@@ -1083,18 +1153,26 @@ async function run() {
     { width: 1440, height: 900, theme: 'light', readySelector: '.reception-grid' },
   )
 
-  // 3.6 200% Zoom Check on Receptionist Desk
+  // 3.6 720px Reflow Check on Receptionist Desk (Responsive Layout Reflow)
+  await captureView(
+    ctx1,
+    `http://localhost:${port}/reception/payments/101/qr-display`,
+    'reception-720-light-reflow.png',
+    { width: 720, height: 450, theme: 'light', zoom: 1, readySelector: '.reception-grid' },
+  )
+
+  // 3.7 Actual 200% Native Zoom Check on Receptionist Desk (WCAG 1.4.4 Resize Text)
   await captureView(
     ctx1,
     `http://localhost:${port}/reception/payments/101/qr-display`,
     'reception-1440-light-200percent-zoom.png',
-    { width: 720, height: 450, theme: 'light', zoom: 1, readySelector: '.reception-grid' },
+    { width: 1440, height: 900, theme: 'light', zoom: 2, readySelector: '.reception-grid' },
   )
 
   // ==========================================
-  // STEP 4: Real Keyboard Navigation Verification
+  // STEP 4: Real Keyboard Navigation Verification (Tab and Shift+Tab)
   // ==========================================
-  console.log('\n--- EXECUTING REAL KEYBOARD NAVIGATION (CDP TAB KEYSTROKES) ---')
+  console.log('\n--- EXECUTING REAL KEYBOARD NAVIGATION (CDP TAB & SHIFT+TAB KEYSTROKES) ---')
   await ctx1.sendPage('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false })
   await ctx1.sendPage('Page.navigate', { url: `http://localhost:${port}/reception/payments/101/qr-display` })
   await new Promise((r) => setTimeout(r, 800))
@@ -1113,6 +1191,7 @@ async function run() {
         const isReceptionAction = !!el.closest('.reception-actions');
         return {
           tabIndex: ${tabIndex},
+          direction: 'forward',
           tagName: el.tagName,
           className: el.className,
           id: el.id || null,
@@ -1136,6 +1215,70 @@ async function run() {
       }
     }
   }
+
+  // Reverse traversal with Shift+Tab (3 steps back)
+  console.log('[QR-07] Executing reverse focus traversal with Shift+Tab (3 steps)...')
+  for (let reverseStep = 1; reverseStep <= 3; reverseStep++) {
+    // Modifier 8 represents Shift
+    await ctx1.sendPage('Input.dispatchKeyEvent', {
+      type: 'rawKeyDown',
+      key: 'Shift',
+      code: 'ShiftLeft',
+      windowsVirtualKeyCode: 16,
+      modifiers: 8,
+    })
+    await ctx1.sendPage('Input.dispatchKeyEvent', {
+      type: 'rawKeyDown',
+      key: 'Tab',
+      code: 'Tab',
+      windowsVirtualKeyCode: 9,
+      modifiers: 8,
+    })
+    await ctx1.sendPage('Input.dispatchKeyEvent', {
+      type: 'keyUp',
+      key: 'Tab',
+      code: 'Tab',
+      windowsVirtualKeyCode: 9,
+      modifiers: 8,
+    })
+    await ctx1.sendPage('Input.dispatchKeyEvent', {
+      type: 'keyUp',
+      key: 'Shift',
+      code: 'ShiftLeft',
+      windowsVirtualKeyCode: 16,
+      modifiers: 0,
+    })
+    await new Promise((r) => setTimeout(r, 150))
+
+    const activeEl = await ctx1.sendPage('Runtime.evaluate', {
+      expression: `(() => {
+        const el = document.activeElement;
+        if (!el || el === document.body) return null;
+        const rect = el.getBoundingClientRect();
+        return {
+          reverseStep: ${reverseStep},
+          direction: 'reverse',
+          tagName: el.tagName,
+          className: el.className,
+          id: el.id || null,
+          text: el.textContent?.trim()?.slice(0, 60),
+          href: el.getAttribute('href') || null,
+          rect: { top: Math.round(rect.top), left: Math.round(rect.left), width: Math.round(rect.width), height: Math.round(rect.height) },
+        };
+      })()`,
+      returnByValue: true,
+    })
+
+    const revData = activeEl.result?.value
+    if (revData) {
+      keyboardSteps.push(revData)
+      console.log(`[QR-07] Shift+Tab reverse step #${reverseStep}: <${revData.tagName}> "${revData.text}"`)
+    }
+  }
+
+  const shiftTabScreenshot = await ctx1.sendPage('Page.captureScreenshot', { format: 'png' })
+  writeFileSync(join(SCREENSHOTS_DIR, 'reception-1440-light-shift-tab-focus.png'), Buffer.from(shiftTabScreenshot.data, 'base64'))
+  console.log('[QR-07] Saved reception-1440-light-shift-tab-focus.png')
 
   // ==========================================
   // STEP 5: Write Artifacts

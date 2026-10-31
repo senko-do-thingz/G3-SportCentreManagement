@@ -111,6 +111,19 @@
   margin-top: var(--space-4);
 }
 
+.payment-hero .reception-actions .btn--secondary,
+.reception-actions .btn--secondary {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-primary);
+}
+
+.payment-hero .reception-actions .btn--ghost,
+.reception-actions .btn--ghost {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
 .reception-subtitle {
   margin: var(--space-4) 0 0;
   font-size: var(--text-lg);
