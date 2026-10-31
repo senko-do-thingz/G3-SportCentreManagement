@@ -1,0 +1,345 @@
+/* Hallmark · redesign: full · scope: app · shape: account directory · theme: Sportify homepage Royal and Gold · signature: live account table · states: loading, empty, error, full · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H5 E4 S5 R5 V4 · weakest: execution; one table-led surface replaces nested panels and tracked table labels */
+/* Hallmark · dropped "Center management / Access & team" · gate 54 removes the tracked-cap eyebrow; the page title names the same screen */
+html:has(.manager-users-screen),
+body:has(.manager-users-screen) {
+  overflow-x: clip;
+}
+
+.manager-users-screen {
+  width: 100%;
+  min-width: 0;
+}
+
+.manager-users-header {
+  padding-bottom: var(--space-6);
+}
+
+.manager-users-header .page-header__text {
+  gap: var(--space-2);
+}
+
+.manager-users-header .page-header__title {
+  color: var(--color-text);
+  font-family: var(--font-display);
+  letter-spacing: -0.035em;
+}
+
+.manager-users-header .page-header__description {
+  max-width: 68ch;
+  line-height: 1.6;
+}
+
+.manager-users-header .page-header__actions .btn {
+  min-height: 44px;
+  padding-inline: var(--space-5);
+}
+
+.manager-users-directory {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-top: 3px solid var(--color-accent);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.manager-users-directory__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+}
+
+.manager-users-directory__heading h2 {
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+  min-width: 0;
+  text-wrap: balance;
+}
+
+.manager-users-directory__heading p {
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.manager-users-count {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 32px;
+  padding-inline: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+
+.manager-filters.manager-users-filters {
+  grid-template-columns: minmax(240px, 2fr) repeat(2, minmax(145px, 1fr)) auto;
+  align-items: end;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4) var(--space-6);
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-surface-muted);
+}
+
+.manager-users-filters > .field {
+  min-width: 0;
+}
+
+.manager-users-filters > .btn {
+  min-height: 36px;
+  padding-inline: var(--space-4);
+  white-space: nowrap;
+}
+
+.manager-users-directory .table-block {
+  min-width: 0;
+  max-width: 100%;
+  gap: var(--space-4);
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.manager-users-directory .table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border-radius: 0;
+  scrollbar-color: var(--color-border-strong) var(--color-surface-muted);
+}
+
+.manager-users-directory .table-scroll:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: -3px;
+}
+
+.manager-users-directory .table {
+  min-width: 960px;
+  font-size: var(--text-sm);
+}
+
+.manager-users-directory .table th {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: normal;
+  text-align: left;
+  text-transform: none;
+}
+
+.manager-users-directory .table td {
+  padding: var(--space-3) var(--space-4);
+  vertical-align: middle;
+}
+
+.manager-users-directory .table th:last-child,
+.manager-users-directory .table td:last-child {
+  white-space: nowrap;
+}
+
+.manager-user-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 200px;
+}
+
+.manager-user-avatar {
+  display: grid;
+  flex: 0 0 36px;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+}
+
+.manager-user-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.manager-user-copy strong {
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.manager-user-copy > span {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.manager-users-directory .manager-users-row-actions {
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: max-content;
+}
+
+.manager-users-row-actions > .btn {
+  min-height: 36px;
+  padding-inline: var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.manager-users-row-actions > .btn:active:not(:disabled),
+.manager-users-header .btn:active:not(:disabled),
+.manager-users-filters > .btn:active:not(:disabled),
+.manager-users-more:active:not(:disabled),
+.manager-user-actions-popover > button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.manager-users-directory button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.manager-users-row-actions > .manager-users-more {
+  display: inline-grid;
+  flex: 0 0 36px;
+  place-items: center;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: var(--radius-md);
+}
+
+.manager-users-more__icon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.manager-users-more:focus-visible,
+.manager-user-actions-popover button:focus-visible,
+.manager-users-directory a:focus-visible,
+.manager-users-directory button:focus-visible,
+.manager-users-directory input:focus-visible,
+.manager-users-directory select:focus-visible,
+.manager-users-header .btn:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.manager-user-actions-popover {
+  position: fixed;
+  z-index: var(--z-modal);
+  box-sizing: border-box;
+  min-width: 208px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.manager-user-actions-popover > button {
+  width: 100%;
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-align: left;
+  cursor: pointer;
+}
+
+.manager-user-actions-popover > button:hover {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.manager-users-directory .manager-footnote {
+  margin: 0 var(--space-4);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+@media (max-width: 1100px) {
+  .manager-filters.manager-users-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .manager-users-header {
+    padding-bottom: var(--space-5);
+  }
+
+  .manager-users-header .page-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .manager-users-header .page-header__actions,
+  .manager-users-header .page-header__actions .btn {
+    width: 100%;
+  }
+
+  .manager-users-directory__heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+
+  .manager-filters.manager-users-filters {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-4);
+  }
+
+  .manager-users-filters > .btn {
+    justify-self: start;
+  }
+
+  .manager-users-directory .table-block {
+    padding-inline: var(--space-3);
+  }
+
+  .manager-users-directory .manager-footnote {
+    margin-inline: var(--space-3);
+  }
+}
