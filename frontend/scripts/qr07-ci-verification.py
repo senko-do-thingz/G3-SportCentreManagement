@@ -427,8 +427,8 @@ try:
         # Navigate to desk projection BEFORE Member initiates or confirms
         page3.goto(f'https://demo.example.test:55443/reception/payments/{p1_id}/qr-display')
         expect(page3.locator('.reception-grid')).to_be_visible()
-        expect(page3.locator('.status-badge:has-text("PENDING"), .status-badge--warning').first).to_be_visible()
-        expect(page3.locator('.reception-qr-card')).to_be_visible()
+        expect(page3.get_by_text('Pending payment').first).to_be_visible()
+        expect(page3.locator('.qr-demo-card').first).to_be_visible()
 
         # Capture pending view & scan axe
         page3.screenshot(path=str(args.out / 'screenshots/ci-e2e-reception-pending.png'))
