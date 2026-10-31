@@ -4,6 +4,7 @@
 @import './styles/layouts.css';
 @import './styles/appearance.css';
 @import './styles/member.css';
+@import './styles/memberAssistant.css';
 @import './styles/payments.css';
 @import './styles/reception.css';
 @import './styles/receptionBookings.css';

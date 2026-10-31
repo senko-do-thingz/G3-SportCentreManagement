@@ -45,6 +45,7 @@ import { ManagerClassesPage } from '../pages/manager/ManagerClassesPage'
 import { ClassEditorPage } from '../pages/manager/ClassEditorPage'
 import { ManagerSchedulePage } from '../pages/manager/ManagerSchedulePage'
 import { MemberSchedulePage } from '../pages/member/MemberSchedulePage'
+import { MemberAssistantPreviewPage } from '../pages/member/MemberAssistantPreviewPage'
 import { FindClassesPage } from '../pages/member/FindClassesPage'
 import { SessionDetailPage } from '../pages/member/SessionDetailPage'
 import { BookingConfirmedPage, BookingOptionsPage, BookingReviewPage } from '../pages/member/BookingCreationPages'
@@ -109,6 +110,7 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
     { path: 'classes/:classId/edit', element: <ClassEditorPage /> },
   ],
   '/member': [
+    ...(import.meta.env.DEV ? [{ path: 'assistant-preview', element: <MemberAssistantPreviewPage /> }] : []),
     { path: 'classes', element: <FindClassesPage /> },
     { path: 'sessions/:sessionId', element: <SessionDetailPage /> },
     { path: 'bookings', element: <MemberBookingsPage /> },
