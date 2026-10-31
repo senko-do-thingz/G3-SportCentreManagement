@@ -349,10 +349,10 @@ try:
 
     # Step 9: Launch Static Server for Frontend Assets
     class StaticHandler(http.server.SimpleHTTPRequestHandler):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, directory=str(args.assets.resolve()), **kwargs)
+        def __init__(self, *values, **kwargs):
+            super().__init__(*values, directory=str(args.assets.resolve()), **kwargs)
 
-        def log_message(self, format, *args):
+        def log_message(self, format, *msg_args):
             pass
 
         def do_GET(self):
