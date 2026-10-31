@@ -800,7 +800,7 @@ async function run() {
     const scalingMethod = zoom !== 1
       ? `CSS zoom (document.body.style.zoom = '${zoom}') - not native browser chrome zoom`
       : width === 720
-      ? 'Responsive layout reflow (720x450, WCAG 1.4.10)'
+      ? 'Responsive 720x450 reflow; not native zoom or a 320 CSS px WCAG 1.4.10 test'
       : 'Standard 100% desktop scale'
 
     layoutGeometryResults.push({
@@ -883,6 +883,9 @@ async function run() {
       })`,
       returnByValue: true,
     })
+    if (assertNoLogin && domAudit.result.value.isLoginPage) throw new Error(`Login page cannot be accepted as ${filename}`)
+    if (!domAudit.result.value.noHorizontalOverflow) throw new Error(`Horizontal overflow in ${filename}`)
+    if (!axeData || axeData.violationsCount !== 0) throw new Error(`Missing or failing axe audit in ${filename}`)
 
     accessibilityResults.push({
       harness: 'MOCK UI VISUAL REGRESSION (Deterministic Fixtures)',
@@ -918,6 +921,29 @@ async function run() {
     writeFileSync(filePath, buffer)
     console.log(`[QR-07] Saved: ${filename} (${width}x${height}, ${theme}, noOverflow=${domAudit.result.value.noHorizontalOverflow}, axeViolations=${axeData?.violationsCount ?? 0})`)
   }
+
+  // Explicit fixture-harness negative control: an unauthenticated capture must fail.
+  const anonymousCapture = await createPageSession('NEGATIVE_UNAUTHENTICATED_CAPTURE', MEMBER_USER)
+  await anonymousCapture.sendPage('Runtime.evaluate', { expression: 'localStorage.clear(); sessionStorage.clear();' })
+  let rejectedCapture = null
+  try {
+    await captureView(anonymousCapture, `http://localhost:${port}/member/payments/101/qr-demo`,
+      'negative-control-should-never-be-accepted.png',
+      { width: 1440, height: 900, readySelector: '.qr-demo-card' })
+  } catch (error) {
+    rejectedCapture = String(error.message)
+  }
+  const anonymousState = await anonymousCapture.sendPage('Runtime.evaluate', {
+    expression: '({path:location.pathname, heading:document.querySelector("h1")?.textContent})', returnByValue: true,
+  })
+  if (!rejectedCapture || anonymousState.result.value.path !== '/login') {
+    throw new Error('Unauthenticated capture negative control did not reject a login redirect')
+  }
+  writeFileSync(join(LOGS_DIR, 'negative-controls.json'), JSON.stringify({
+    harness: 'MOCK UI VISUAL REGRESSION (Deterministic Fixtures)',
+    name: 'Unauthenticated login capture is rejected', passed: true,
+    rejection: rejectedCapture, observed: anonymousState.result.value, timestamp: new Date().toISOString(),
+  }, null, 2))
 
   // ==========================================
   // STEP 1: Member Desktop Journey (Context 1 switched to Member)
@@ -970,6 +996,9 @@ async function run() {
     'member-1920-light-qr-demo.png',
     { width: 1920, height: 1080, theme: 'light', readySelector: '.qr-demo-card' },
   )
+  await captureView(ctxMember, `http://localhost:${port}/member/payments/101/qr-demo`,
+    'member-1920-dark-qr-demo.png',
+    { width: 1920, height: 1080, theme: 'dark', readySelector: '.qr-demo-card' })
   await captureView(
     ctxMember,
     `http://localhost:${port}/member/payments/101/qr-demo`,
@@ -1117,6 +1146,9 @@ async function run() {
     'reception-1920-light-pending.png',
     { width: 1920, height: 1080, theme: 'light', readySelector: '.reception-grid' },
   )
+  await captureView(ctx1, `http://localhost:${port}/reception/payments/101/qr-display`,
+    'reception-1920-dark-pending.png',
+    { width: 1920, height: 1080, theme: 'dark', readySelector: '.reception-grid' })
   await captureView(
     ctx1,
     `http://localhost:${port}/reception/payments/101/qr-display`,
@@ -1168,7 +1200,7 @@ async function run() {
     { width: 1440, height: 900, theme: 'light', readySelector: '.reception-grid' },
   )
 
-  // 3.6 720px Reflow Check on Receptionist Desk (Responsive Layout Reflow)
+  // 3.6 720px responsive reflow, separate from native zoom and 320 CSS px reflow.
   await captureView(
     ctx1,
     `http://localhost:${port}/reception/payments/101/qr-display`,

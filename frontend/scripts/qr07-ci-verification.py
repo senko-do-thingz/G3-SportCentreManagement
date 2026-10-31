@@ -181,7 +181,7 @@ def api_request(path, body=None, bearer=None, method=None, response_format='json
         with urllib.request.urlopen(req, context=tls, timeout=20) as response:
             status = response.status
             server_corr = response.headers.get('X-Correlation-Id')
-            raw_response = response.read().decode('utf8-sig')
+            raw_response = response.read().decode('utf-8-sig')
             resp_data = json.loads(raw_response) if response_format == 'json' else raw_response
     except urllib.error.HTTPError as error:
         status = error.code
