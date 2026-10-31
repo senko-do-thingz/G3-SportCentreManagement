@@ -5,11 +5,15 @@ on:
     paths:
       - .github/workflows/qr04-browser.yml
       - backend/src/main/java/com/sportify/demoqr/**
+      - backend/src/main/java/com/sportify/payment/**
       - backend/src/main/resources/db/migration/catalog/V34__create_simulated_qr_foundation.sql
+      - backend/src/main/resources/db/migration/catalog/V35__create_simulated_qr_settlement.sql
       - frontend/scripts/qr04-*.py
       - frontend/src/api/demoQrApi.ts
       - frontend/src/components/qr/**
       - frontend/src/pages/member/DemoConfirmationPage.tsx
+      - frontend/src/pages/member/QrPaymentDemoPage.tsx
+      - frontend/src/pages/member/PaymentSummaryPage.tsx
       - frontend/src/styles/workspace.css
 
 permissions:
@@ -59,10 +63,9 @@ jobs:
         working-directory: frontend
         env:
           VITE_API_BASE_URL: https://api.demo.example.test:55444/api/v1
-          VITE_QR_PAYMENT_DEMO: 'true'
         run: |
           npm ci
-          npm run build -- --mode qr-demo --outDir "$RUNNER_TEMP/qr04-assets"
+          npm run build -- --outDir "$RUNNER_TEMP/qr04-assets"
       - name: Install isolated browser verification dependencies
         run: |
           python3 -m venv "$RUNNER_TEMP/qr04-python"

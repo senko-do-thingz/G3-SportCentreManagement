@@ -18,6 +18,9 @@ public interface PaymentRefundService {
     /** 409 code: the payment is missing or not SUCCESS, so there is nothing to refund. */
     String CODE_PAYMENT_NOT_REFUNDABLE = "PAYMENT_NOT_REFUNDABLE";
 
+    /** 409 code: simulated QR settlements do not represent real collected funds and cannot be refunded as cash/bank payout. */
+    String CODE_SIMULATED_PAYMENT_NOT_REFUNDABLE = "SIMULATED_PAYMENT_NOT_REFUNDABLE";
+
     /**
      * 409 code: the payment does not pay only for the registration being refunded (another member, a membership
      * card, or an invoice line for another item), so it cannot be refunded through that registration.

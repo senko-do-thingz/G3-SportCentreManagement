@@ -133,7 +133,22 @@ export function ReceptionPaymentPage() {
 
   const data = payment.data
   if (data.status === 'PENDING') {
-    return <VerifyPayment key={data.id} payment={data} actions={actions} onDone={reload} />
+    const pendingActions = (
+      <div className="reception-actions reception-print-hidden">
+        <Link className={buttonClassName('secondary', 'md')} to={PAYMENT_LIST_PATH}>
+          Payment requests
+        </Link>
+        <Link className={buttonClassName('secondary', 'md')} to={`/reception/payments/${data.id}/qr-display`}>
+          Desk QR Display
+        </Link>
+        {memberId !== null && (
+          <Link className={buttonClassName('ghost', 'md')} to={memberSearchPath(memberId)}>
+            Member profile
+          </Link>
+        )}
+      </div>
+    )
+    return <VerifyPayment key={data.id} payment={data} actions={pendingActions} onDone={reload} />
   }
   if (data.status === 'SUCCESS' || data.status === 'REFUNDED') {
     return <PaymentConfirmed payment={data} actions={actions} memberId={memberId} />
@@ -543,6 +558,7 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
   // UI-31: a wrong amount is never shown as a success; the receipt cannot be printed until it is resolved.
   const problem = refunded ? null : confirmedAmountProblem(payment, invoiceData?.totalAmount)
   const basePrice = invoiceData?.subtotalAmount ?? payment.originalPrice
+  const simulated = payment.settlementType === 'SIMULATED' || invoiceData?.settlementType === 'SIMULATED'
 
   return (
     <div className="page">
@@ -572,7 +588,12 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
               </p>
             </>
           ) : (
-            <StatusBadge status={paymentStatusTone(payment.status)} label={paymentStatusLabel(payment.status)} />
+            <StatusBadge status={paymentStatusTone(payment.status)} label={paymentStatusLabel(payment.status, invoiceData?.settlementType ?? payment.settlementType)} />
+          )}
+          {simulated && (
+            <p className="notice notice--warning" role="status">
+              SIMULATED SETTLEMENT - Completed via Sportify QR Simulator. No real bank transfer or cash collection occurred.
+            </p>
           )}
           <dl className="summary-list payment-rows">
             <div>
@@ -611,6 +632,12 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
               <dt>Received at</dt>
               <dd>{formatDateTime(invoiceData?.paymentTime ?? payment.paymentTime ?? payment.updatedAt)}</dd>
             </div>
+            {simulated && (
+              <div>
+                <dt>Settlement provenance</dt>
+                <dd>SIMULATED ({invoiceData?.settlementProvider ?? payment.settlementProvider ?? 'SPORTIFY_SIMULATOR'})</dd>
+              </div>
+            )}
           </dl>
           {invoice.status === 'loading' && <Spinner label="Loading the invoice" inline />}
           {invoice.status === 'error' && (
