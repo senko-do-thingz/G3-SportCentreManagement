@@ -78,6 +78,7 @@ public class BookingServiceImplTest {
     private CodeFormatter codeFormatter;
     @Mock private EntityManager entityManager;
     @Mock private AuditService auditService;
+    @Mock private TrainingWriteService trainingWriteService;
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-10-06T00:00:00Z"), ZoneId.of("Asia/Ho_Chi_Minh"));
 
@@ -725,7 +726,9 @@ public class BookingServiceImplTest {
     }
 
     @Test
-    void recordSelfTrainingAttendance_Success_ReturnsAcknowledgedResponseAndNoSaveCalled() {
+    void recordSelfTrainingAttendance_Success_DelegatesPersistenceWithoutChargingAgain() {
+        session.setTrainingType(TrainingFormat.SELF_TRAINING);
+        session.setSessionDate(LocalDate.of(2026, 10, 6));
         Booking booking = Booking.builder()
                 .id(1L)
                 .bookingCode("BK-000001")
@@ -754,12 +757,21 @@ public class BookingServiceImplTest {
         assertEquals("MEM-100", response.getMemberCode());
         assertEquals("Badminton", response.getSportName());
         assertEquals("Receptionist User", response.getRecordedByName());
-        assertEquals("Self-training attendance acknowledged (persistence pending Flow 4 implementation)", response.getMessage());
+        assertEquals("Self-training attendance recorded", response.getMessage());
+        verify(trainingWriteService).selfAttendance(200L, 1L, null);
         assertEquals(5, response.getRemainingSessions());
         verify(bookingRepository, never()).save(any());
         verify(registrationRepository, never()).save(any());
         verify(sessionRepository, never()).save(any());
         verifyNoInteractions(checkInRepository);
+    }
+
+    @Test
+    void recordSelfTrainingAttendance_ManagerCannotBypassReceptionOnlyRule() {
+        var manager = UserAccount.builder().id(1L).role(Role.builder().code("MANAGER").build()).build();
+        assertThrows(AccessDeniedException.class, () -> bookingService.recordSelfTrainingAttendance(
+            SelfTrainingAttendanceRequest.builder().bookingId(1L).build(), manager));
+        verifyNoInteractions(trainingWriteService, bookingRepository);
     }
 
     @Test

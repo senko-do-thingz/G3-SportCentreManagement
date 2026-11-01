@@ -4,6 +4,8 @@ import { AccountSwitchNotice } from '../components/AccountSwitchNotice'
 import { areaItems, itemHref, MEMBER_AREA } from './navigation'
 import { PaymentWorkspaceHeader } from './PaymentWorkspaceHeader'
 import { WorkspaceHeader } from './WorkspaceHeader'
+import { MemberAssistantLink } from '../pages/member/MemberAssistantPage'
+import { TrainingNavigation } from '../pages/member/TrainingNavigation'
 
 /** Member workspace with a Home-branded header and role-specific tab navigation. */
 export function MemberLayout() {
@@ -11,6 +13,7 @@ export function MemberLayout() {
   const status = useMatch('/member/payments/:paymentId/status')
   const qrDemo = useMatch('/member/payments/:paymentId/qr-demo')
   const paymentRoute = Boolean(summary || status || qrDemo)
+  const trainingRoute = useMatch('/member/training/*')
   const [menuOpen, setMenuOpen] = useState(false)
 
   const navigation = (
@@ -25,11 +28,12 @@ export function MemberLayout() {
           to={itemHref(MEMBER_AREA, item)}
           end={item.path === ''}
           onClick={() => setMenuOpen(false)}
-          className={({ isActive }) => 'workspace-header__nav-link' + (isActive ? ' workspace-header__nav-link--active' : '')}
+          className={({ isActive }) => 'workspace-header__nav-link' + (isActive || (item.path === 'training/plans' && trainingRoute) ? ' workspace-header__nav-link--active' : '')}
         >
           {item.label}
         </NavLink>
       ))}
+      <MemberAssistantLink onNavigate={() => setMenuOpen(false)} />
     </nav>
   )
 
@@ -47,6 +51,7 @@ export function MemberLayout() {
       {paymentRoute ? <PaymentWorkspaceHeader {...headerProps} /> : <WorkspaceHeader {...headerProps} />}
       <main className="member-main container" id="main-content">
         <AccountSwitchNotice />
+        {trainingRoute && <TrainingNavigation />}
         <Outlet />
       </main>
     </div>

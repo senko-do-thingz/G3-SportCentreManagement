@@ -1,0 +1,21 @@
+import { NavLink } from 'react-router-dom'
+
+const trainingLinks = [
+  { path: 'plans', label: 'Training plans' },
+  { path: 'feedback', label: 'Coach feedback' },
+  { path: 'attendance', label: 'Attendance history' },
+  { path: 'results', label: 'Training results' },
+  { path: 'ai', label: 'AI recommendations - Pending approval' },
+]
+
+export function TrainingNavigation() {
+  return (
+    <nav className="training-navigation" aria-label="Training navigation">
+      {trainingLinks.map(item => (
+        <NavLink key={item.path} to={`/member/training/${item.path}`}>
+          {item.label}
+        </NavLink>
+      ))}
+    </nav>
+  )
+}
