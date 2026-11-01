@@ -335,6 +335,8 @@ describe('FE-06 packages and membership cards', () => {
     await user.selectOptions(screen.getByLabelText('Training type'), 'COACH_LED')
     await user.selectOptions(screen.getByLabelText('Status'), 'false')
     await waitFor(() => expect(list).toHaveBeenLastCalledWith({ sportId: '1', format: 'COACH_LED', active: 'false' }, expect.any(AbortSignal)))
+    await user.type(screen.getByRole('searchbox', { name: 'Search packages' }), 'fOoTbAlL')
+    expect(screen.getByText('1 package')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Edit' }))
     const dialog = within(screen.getByRole('dialog'))
     expect(dialog.getByLabelText('Package code', { exact: false })).toHaveAttribute('readonly')
