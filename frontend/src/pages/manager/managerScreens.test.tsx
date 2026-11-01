@@ -361,7 +361,7 @@ describe('FE-06 packages and membership cards', () => {
     const user = userEvent.setup()
     renderApp('/manager/packages')
     const search = await screen.findByRole('searchbox', { name: 'Search packages' })
-    expect(screen.getByText('Racket Basics')).toBeInTheDocument()
+    expect(await screen.findByText('Racket Basics')).toBeInTheDocument()
 
     await user.type(search, 'rAcKeT')
     expect(screen.getByText('Racket Basics')).toBeInTheDocument()
