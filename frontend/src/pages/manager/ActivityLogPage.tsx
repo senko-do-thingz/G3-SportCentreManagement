@@ -37,14 +37,15 @@ export function ActivityLogPage() {
   }, [page, actor, debounced, action, from, to])
   const [resource, reload] = useResource(load)
   const ready = resource.status === 'ready' && search === debounced && !invalidRange
+
   const activeFilterCount = [search.trim(), action, actor, from, to].filter(Boolean).length
   const filtered = activeFilterCount > 0
   const clearFilters = () => { setSearch(''); setAction(''); setActor(null); setFrom(''); setTo(''); setPage(0) }
   const columns: TableColumn<ActivityLog>[] = [
-    { key: 'createdAt', header: 'When', width: '19%', render: (log) => <div className="manager-activity__cell"><span className="manager-activity__label">When</span><time dateTime={log.createdAt}>{formatManagerDateTime(log.createdAt)}</time></div> },
-    { key: 'action', header: 'Activity', width: '30%', render: (log) => <div className="manager-activity__cell"><span className="manager-activity__label">Activity</span><span className="manager-activity__primary">{humanizeCode(log.action)}</span><span className="manager-activity__secondary">{log.actorName || 'System / unavailable actor'}{log.actorRole ? `, ${humanizeCode(log.actorRole)}` : ''}</span></div> },
-    { key: 'entityId', header: 'Target', width: '39%', render: (log) => <div className="manager-activity__cell"><span className="manager-activity__label">Target</span><span className="manager-activity__primary">{log.entityType ? humanizeCode(log.entityType) : 'Record'}{log.entityId !== null ? ` #${log.entityId}` : ''}</span><span className="manager-activity__secondary">{log.shortDetail || '-'}</span></div> },
-    { key: 'details', header: 'Details', width: '12%', render: (log) => <Button size="sm" variant="secondary" onClick={() => setSelected(log)}>View details</Button> },
+    { key: 'createdAt', header: 'When', width: '19%', render: (log) => <div className="manager-activity__cell"><time dateTime={log.createdAt}>{formatManagerDateTime(log.createdAt)}</time></div> },
+    { key: 'action', header: 'Activity', width: '27%', render: (log) => <div className="manager-activity__cell"><span className="manager-activity__primary">{humanizeCode(log.action)}</span><span className="manager-activity__secondary">{log.actorName || 'System / unavailable actor'}{log.actorRole ? ', ' + humanizeCode(log.actorRole) : ''}</span></div> },
+    { key: 'entityId', header: 'Target', width: '33%', render: (log) => <div className="manager-activity__cell"><span className="manager-activity__primary">{log.entityType ? humanizeCode(log.entityType) : 'Record'}{log.entityId !== null ? ' #' + log.entityId : ''}</span><span className="manager-activity__secondary">{log.shortDetail || '-'}</span></div> },
+    { key: 'details', header: 'Details', width: '21%', render: (log) => <Button size="sm" variant="secondary" aria-label={'View details for ' + humanizeCode(log.action) + ' by ' + (log.actorName || 'system')} onClick={() => setSelected(log)}>View details</Button> },
   ]
   return <div className="page manager-page manager-activity">
     <PageHeader title="Activity log" description="See who changed what and when across your center." actions={<Button variant="secondary" onClick={reload}>Refresh</Button>} />
@@ -68,7 +69,7 @@ export function ActivityLogPage() {
         </div>
       </div>
       {invalidRange && <p id="manager-activity-range-error" className="manager-activity__range-error" role="alert">End date must be on or after the start date.</p>}
-      {resource.status === 'error' && !invalidRange ? <ManagerError error={resource.error} onRetry={reload} /> : !invalidRange && <div className="manager-activity__table"><Table columns={columns} rows={ready ? resource.data.content : []} rowKey={(log) => log.id} loading={!ready} caption="Activity history" emptyTitle={filtered ? 'No matching activity' : 'No activity yet'} emptyDescription={filtered ? 'Clear filters or choose a different date range.' : 'Recorded center activity will appear here.'} pagination={ready ? { page, pageSize: 20, totalItems: resource.data.totalElements, onPageChange: setPage } : undefined} /></div>}
+      {resource.status === 'error' && search === debounced && !invalidRange ? <ManagerError error={resource.error} onRetry={reload} /> : !invalidRange && <div className="manager-activity__table"><Table columns={columns} rows={ready ? resource.data.content : []} rowKey={(log) => log.id} loading={!ready} caption="Activity history" scrollLabel="Activity history table. Scroll horizontally to view all columns." emptyTitle={filtered ? 'No matching activity' : 'No activity yet'} emptyDescription={filtered ? 'Clear filters or choose a different date range.' : 'Recorded center activity will appear here.'} pagination={ready ? { page, pageSize: 20, totalItems: resource.data.totalElements, onPageChange: setPage } : undefined} /></div>}
       <p className="manager-activity__footnote">Activity records are read-only. Times use the center timezone (Asia/Ho_Chi_Minh). Only the safe fields returned by the activity service are shown.</p>
     </Card>
     {picking && <ActorPickerModal onClose={() => setPicking(false)} onSelect={(selectedActor) => { setActor(selectedActor); setPicking(false); setPage(0) }} />}
