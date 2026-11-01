@@ -45,7 +45,13 @@ Long-text stress screenshots use the local preview with the first row's activity
 ## Accessibility and overflow evidence
 
 - Chromium accessibility snapshot exposes a native table, caption, and four column headers: When, Activity, Target, Details.
-- The horizontal scroll region has the accessible name “Activity history table. Scroll horizontally to view all columns.” and tabindex=0.
-- At 390px, document width equals 390px, while the table scroll region is 324px wide with 780px of table content. Tab from the region focused “View details for Package created by Morgan Lee”; the browser scrolled the table to bring the action fully into view.
+- The horizontal scroll region has the accessible name "Activity history table. Scroll horizontally to view all columns." and tabindex=0.
+- At 390px, document width equals 390px, while the table scroll region is 324px wide with 780px of table content. Tab from the region focused "View details for Package created by Morgan Lee"; the browser scrolled the table to bring the action fully into view.
 - At 1101px, the table has 780px content width within a 740px local scroll region. The 96.67px Details button is fully visible; page content does not overflow horizontally.
 - NVDA was not installed in the browser environment, so no manual screen-reader pass is claimed.
+
+## Round 03 follow-up
+
+The reported Unicode curly quotation marks were replaced with straight ASCII quotation marks. The additional diff-wide ASCII scan and its exact result are recorded in `../PR-186-Round-03/README.md`. This documentation correction does not alter screenshots or application behavior.
+
+UI16-TC-20 remains PARTIAL pending a real screen-reader pass or CODEOWNER-approved exception. The Chromium accessibility tree and keyboard evidence remain supplemental only.

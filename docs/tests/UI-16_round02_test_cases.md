@@ -39,3 +39,12 @@ This matrix preserves the 22 cases requested by the CODEOWNER Round 01 review. E
 - ESLint: passed.
 - Production TypeScript/Vite build: passed; Vite emitted the existing advisory for a bundle chunk above 500 kB.
 - The DOCX AI Audit Log is stored locally under docs/audit/ and is excluded from Git by the repository's private-audit ignore rules.
+
+## Round 03 follow-up status (2026-11-02)
+
+- UI16-TC-20 remains PARTIAL. NVDA/Chrome and VoiceOver/Safari testing were unavailable; the PR requests an explicit CODEOWNER-approved scope exception. Do not treat Chromium accessibility-tree and keyboard checks as a screen-reader pass.
+- The audit DOCX exists locally and opened read-only in Word (2 pages). It remains excluded from Git by repository policy. Private delivery is pending an authorized destination; no handoff is claimed yet.
+- UI16-TC-22 passed in the full frontend suite on source head `35b95a8b64830f2f34cdfac6a6fc438d93a9114a`. PR #184 remains open, so the requested post-merge branch update and duplicate fixture reconciliation are deferred.
+- The diff-wide ASCII scan command and result are in `docs/reviews/PR-186-Round-03/README.md`.
+- No production backend request or write was performed during Round 02/03 browser review. The local preview used synthetic data only.
+- Round 02 code CI: GitHub Actions run `41315606992`, 15/15 jobs passed. Final Round 03 head and CI run will be recorded in the PR description after the follow-up run completes.
