@@ -10,7 +10,8 @@
 | Main base | `6689165da6c09e2426f3677803a12d562342a32b` |
 | Source fix commit | `c5b05dc` - `fix(ui-15): address PR 184 review findings` |
 | Regression test commits | `987751f` and `112c543` |
-| Final local head | `112c5432e9af73cb1fc528bd5243ccce55defc99` |
+| UI remediation source head before CI follow-up | `112c5432e9af73cb1fc528bd5243ccce55defc99` |
+| CI timing-race test fix | `3cbd4dac98ae9ffbd15d915f4a671616fdc92424` |
 | Scope | Frontend and review evidence only. No backend code or migration changed. |
 
 GitHub still reports PR #184 open and unmerged. Its current `main` base SHA matches the base reviewed in Round 01. This remediation does not approve or merge the PR.
@@ -50,7 +51,13 @@ The test-file change includes focused coverage for name/code/sport search, combi
 | TypeScript and Vite production build | Passed. Existing Vite advisory: main JavaScript chunk exceeds 500 kB after minification. |
 | Browser viewport checks | 390 and 768 px document widths matched viewport on both UI-15 routes. Catalog tables scrolled locally. |
 | Browser accessibility checks | Semantic headers, named scroll region, keyboard focus, 2 px focus outline, and ArrowRight movement verified. Screen reader not run. |
-| GitHub Actions | Pending the final branch push; the PR description should be updated with results for the exact pushed SHA. |
+| GitHub Actions | The first evidence push (`bae8555`) exposed one async test timing race. It is corrected in `3cbd4da`; the corrected-head run will be recorded in the PR description after it completes. |
+
+## CI timing-race follow-up
+
+The first pushed head, `bae8555420736d5d6d4730d7cf58eccde38be126`, failed the Frontend checks and build job because `searches package name, code and sport case-insensitively` used a synchronous query while the catalog was still displaying its loading row. The test now waits for `Racket Basics` to render with `findByText` in commit `3cbd4dac98ae9ffbd15d915f4a671616fdc92424`.
+
+On the corrected code, the focused regression passed (1 passed) and the complete frontend suite passed (91 files, 1,700 tests, 0 failures). GitHub Actions for the corrected pushed head remains pending; its final URL and result belong in the PR description.
 
 ## Remaining review decisions and boundaries
 

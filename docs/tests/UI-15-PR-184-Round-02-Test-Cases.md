@@ -8,7 +8,8 @@
 | Pull request | https://github.com/senko-do-thingz/G3-SportCentreManagement/pull/184 |
 | Branch | `feat/ui-15` |
 | Main base | `6689165da6c09e2426f3677803a12d562342a32b` |
-| Final local source head | `112c5432e9af73cb1fc528bd5243ccce55defc99` |
+| UI remediation source head before CI follow-up | `112c5432e9af73cb1fc528bd5243ccce55defc99` |
+| CI timing-race test fix | `3cbd4dac98ae9ffbd15d915f4a671616fdc92424` |
 | Test file | `frontend/src/pages/manager/managerScreens.test.tsx` |
 | Browser | HeadlessChrome 156.0.0.0 on Windows 10 x64 |
 | Browser preview | `http://127.0.0.1:5176`, opt-in FE-06 manager preview with sample data |
@@ -55,6 +56,12 @@ The browser preview uses local fixtures only. Its UI states that changes stay in
 | Browser keyboard check | Passed for focusable tier scroll region, visible 2 px focus outline, and ArrowRight scrolling. |
 
 The browser preview is not a production backend integration environment. Screen-reader testing, live backend validation, and the single-visit domain decision remain unverified.
+
+## CI timing-race follow-up
+
+The first evidence push (`bae8555420736d5d6d4730d7cf58eccde38be126`) failed the frontend job because the package search regression queried `Racket Basics` synchronously while catalog rows were still loading. The test now awaits the rendered row with `findByText` in commit `3cbd4dac98ae9ffbd15d915f4a671616fdc92424`.
+
+After the fix, the focused test passed (1 passed, 35 skipped by the name filter) and the full suite passed (91 files, 1,700 tests). GitHub Actions for the corrected pushed head is pending; final CI evidence will be recorded in the PR description.
 
 ## Backend follow-up
 
