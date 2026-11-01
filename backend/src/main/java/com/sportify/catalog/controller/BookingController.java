@@ -90,7 +90,7 @@ public class BookingController {
     }
 
     @PostMapping("/self-training/attendance")
-    @PreAuthorize("hasRole('RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'MANAGER')")
     public SelfTrainingAttendanceResponse recordSelfTrainingAttendance(
             @Valid @RequestBody SelfTrainingAttendanceRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {

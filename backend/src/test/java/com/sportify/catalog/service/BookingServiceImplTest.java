@@ -725,8 +725,9 @@ public class BookingServiceImplTest {
         verify(registrationRepository, never()).save(any());
     }
 
-    @Test
-    void recordSelfTrainingAttendance_Success_DelegatesPersistenceWithoutChargingAgain() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"RECEPTIONIST", "MANAGER"})
+    void recordSelfTrainingAttendance_Success_DelegatesPersistenceWithoutChargingAgain(String role) {
         session.setTrainingType(TrainingFormat.SELF_TRAINING);
         session.setSessionDate(LocalDate.of(2026, 10, 6));
         Booking booking = Booking.builder()
@@ -745,7 +746,7 @@ public class BookingServiceImplTest {
         UserAccount receptionist = UserAccount.builder()
                 .id(200L)
                 .fullName("Receptionist User")
-                .role(Role.builder().id(2L).code("RECEPTIONIST").build())
+                .role(Role.builder().id(2L).code(role).build())
                 .build();
 
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
@@ -757,7 +758,7 @@ public class BookingServiceImplTest {
         assertEquals("MEM-100", response.getMemberCode());
         assertEquals("Badminton", response.getSportName());
         assertEquals("Receptionist User", response.getRecordedByName());
-        assertEquals("Self-training attendance recorded", response.getMessage());
+        assertEquals("Self-training attendance acknowledged (persistence pending Flow 4 implementation)", response.getMessage());
         verify(trainingWriteService).selfAttendance(200L, 1L, null);
         assertEquals(5, response.getRemainingSessions());
         verify(bookingRepository, never()).save(any());
@@ -767,10 +768,10 @@ public class BookingServiceImplTest {
     }
 
     @Test
-    void recordSelfTrainingAttendance_ManagerCannotBypassReceptionOnlyRule() {
-        var manager = UserAccount.builder().id(1L).role(Role.builder().code("MANAGER").build()).build();
+    void recordSelfTrainingAttendance_CoachCannotMarkSelfTrainingAttendance() {
+        var coach = UserAccount.builder().id(1L).role(Role.builder().code("COACH").build()).build();
         assertThrows(AccessDeniedException.class, () -> bookingService.recordSelfTrainingAttendance(
-            SelfTrainingAttendanceRequest.builder().bookingId(1L).build(), manager));
+            SelfTrainingAttendanceRequest.builder().bookingId(1L).build(), coach));
         verifyNoInteractions(trainingWriteService, bookingRepository);
     }
 
