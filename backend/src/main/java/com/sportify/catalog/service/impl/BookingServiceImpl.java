@@ -328,8 +328,8 @@ public class BookingServiceImpl implements BookingService {
     @Transactional
     public SelfTrainingAttendanceResponse recordSelfTrainingAttendance(SelfTrainingAttendanceRequest request, UserAccount receptionist) {
         requireActor(receptionist, false);
-        if (receptionist.getRole() == null || !"RECEPTIONIST".equals(receptionist.getRole().getCode()))
-            throw new AccessDeniedException("Only receptionists can mark attendance");
+        if (receptionist.getRole() == null || !("RECEPTIONIST".equals(receptionist.getRole().getCode()) || "MANAGER".equals(receptionist.getRole().getCode())))
+            throw new AccessDeniedException("Only receptionists or managers can mark self-training attendance");
         if (request == null) throw rule("Attendance request is required", "INVALID_REQUEST");
         requirePositiveId(request.getBookingId(), "Booking ID");
         Booking booking = bookingRepository.findById(request.getBookingId())
@@ -354,7 +354,7 @@ public class BookingServiceImpl implements BookingService {
                 .remainingSessions(remaining)
                 .confirmedAt(LocalDateTime.now(clock))
                 .recordedByName(receptionist.getFullName())
-                .message("Self-training attendance recorded")
+                .message("Self-training attendance acknowledged (persistence pending Flow 4 implementation)")
                 .build();
     }
 

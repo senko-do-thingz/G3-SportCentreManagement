@@ -56,9 +56,17 @@ class TrainingWriteControllersTest {
                 mvc.perform(get("/api/v1/reception/training/" + path).with(user(account(role)))).andExpect(status().isForbidden());
             mvc.perform(post("/api/v1/reception/training/attendance").with(user(account(role))).contentType(MediaType.APPLICATION_JSON).content("{\"bookingId\":1,\"status\":\"PRESENT\"}")).andExpect(status().isForbidden());
             mvc.perform(put("/api/v1/reception/training/attendance/1").with(user(account(role))).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"LATE\",\"reason\":\"Correction\"}")).andExpect(status().isForbidden());
+            if (!role.equals("MANAGER"))
             mvc.perform(post("/api/v1/bookings/self-training/attendance").with(user(account(role))).contentType(MediaType.APPLICATION_JSON).content("{\"bookingId\":1}")).andExpect(status().isForbidden());
         }
         verifyNoInteractions(service, bookingService);
+    }
+    @Test void selfTrainingAttendanceRetainsReceptionAndManagerAccess() throws Exception {
+        for (String role : List.of("RECEPTIONIST", "MANAGER")) {
+            mvc.perform(post("/api/v1/bookings/self-training/attendance").with(user(account(role)))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"bookingId\":1}"))
+                .andExpect(status().isOk());
+        }
     }
     @Test void anonymousCannotCreateOrCorrectTrainingData() throws Exception {
         mvc.perform(post("/api/v1/coach/training/plans").contentType(MediaType.APPLICATION_JSON).content(PLAN)).andExpect(status().isUnauthorized());

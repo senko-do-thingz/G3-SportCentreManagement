@@ -304,6 +304,13 @@
       "creates": [],
       "drops": [],
       "sha256_lf": "1250cf917a2b750417f7d19d7c8fe93481f828b9547ba2e1f30dcdc9da618715"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V37__personal_member_training.sql",
+      "version": 37,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "e516fa2d1324fa885ad2c4ad6a96a239ea797a21bf2dc0d3cdba57efb94cd77e"
     }
   ],
   "create_occurrences": 66,
@@ -616,13 +623,13 @@
     {
       "id": "S13",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java",
-      "line": 74,
+      "line": 76,
       "definition": "public BookingResponse createBooking"
     },
     {
       "id": "S14",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java",
-      "line": 327,
+      "line": 329,
       "definition": "recordSelfTrainingAttendance"
     },
     {
