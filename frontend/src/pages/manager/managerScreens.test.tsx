@@ -43,6 +43,23 @@ describe('FE-06 manager access and accounts', () => {
     expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
     expect(backend.calls.every((call) => call.path === '/users/me')).toBe(true)
   })
+  it('blocks direct package and tier catalog access for anonymous and member sessions', async () => {
+    tokenStorage.clear()
+    const packageList = vi.spyOn(managerPackagesApi, 'list').mockResolvedValue([sportPackage])
+    const tierList = vi.spyOn(managerCardTiersApi, 'list').mockResolvedValue([standard, vip])
+    authOnly()
+    const anonymous = renderApp('/manager/packages')
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(packageList).not.toHaveBeenCalled()
+    anonymous.unmount()
+
+    tokenStorage.startSession({ accessToken: 'member-test', refreshToken: 'member-refresh' })
+    const backend = authOnly(MEMBER)
+    renderApp('/manager/cards')
+    expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
+    expect(tierList).not.toHaveBeenCalled()
+    expect(backend.calls.every((call) => call.path === '/users/me')).toBe(true)
+  })
   it('loads pages and combines search, role and status while resetting the page', async () => {
     const backend = installFakeFetch((call) => {
       if (call.path === '/users/me') return json(200, MANAGER)
@@ -332,6 +349,78 @@ describe('FE-06 packages and membership cards', () => {
     await user.click(dialog.getByRole('button', { name: 'Save package' }))
     await waitFor(() => expect(update).toHaveBeenCalledExactlyOnceWith(1, { name: sportPackage.name, durationDays: 30, sessionCount: 8, sessionMinutes: 90, price: 950000, active: true }))
   })
+  it('searches package name, code and sport case-insensitively', async () => {
+    authOnly()
+    vi.spyOn(packagesApi, 'sports').mockResolvedValue(sports)
+    vi.spyOn(managerPackagesApi, 'list').mockResolvedValue([
+      { ...sportPackage, id: 1, code: 'PK-ALPHA', name: 'Racket Basics', sportName: 'Tennis' },
+      { ...sportPackage, id: 2, code: 'PK-BETA', name: 'Junior Swim', sportName: 'Swimming' },
+    ])
+    const user = userEvent.setup()
+    renderApp('/manager/packages')
+    const search = await screen.findByRole('searchbox', { name: 'Search packages' })
+    expect(screen.getByText('Racket Basics')).toBeInTheDocument()
+
+    await user.type(search, 'rAcKeT')
+    expect(screen.getByText('Racket Basics')).toBeInTheDocument()
+    expect(screen.queryByText('Junior Swim')).not.toBeInTheDocument()
+    expect(screen.getByText('1 package')).toBeInTheDocument()
+
+    await user.clear(search)
+    await user.type(search, 'pK-bEtA')
+    expect(screen.getByText('Junior Swim')).toBeInTheDocument()
+    expect(screen.queryByText('Racket Basics')).not.toBeInTheDocument()
+
+    await user.clear(search)
+    await user.type(search, 'sWiMm')
+    expect(screen.getByText('Junior Swim')).toBeInTheDocument()
+    expect(screen.queryByText('Racket Basics')).not.toBeInTheDocument()
+  })
+  it('keeps a missing package status unknown and requires an explicit choice before update', async () => {
+    authOnly()
+    vi.spyOn(packagesApi, 'sports').mockResolvedValue(sports)
+    vi.spyOn(managerPackagesApi, 'list').mockResolvedValue([{ ...sportPackage, isActive: null }])
+    const update = vi.spyOn(managerPackagesApi, 'update').mockResolvedValue(sportPackage)
+    const user = userEvent.setup()
+    renderApp('/manager/packages')
+    const row = (await screen.findByText(sportPackage.name)).closest('tr')!
+    expect(within(row).getByText('Unknown')).toBeInTheDocument()
+    expect(within(row).getByRole('button', { name: 'Activate' })).toBeDisabled()
+    await user.click(within(row).getByRole('button', { name: 'Edit' }))
+    const dialog = within(screen.getByRole('dialog'))
+    expect(dialog.getByText('Package status is not provided. Choose a status before saving.')).toBeInTheDocument()
+    await user.click(dialog.getByRole('button', { name: 'Save package' }))
+    expect(await dialog.findByText('Choose whether this package is active.')).toBeInTheDocument()
+    expect(update).not.toHaveBeenCalled()
+  })
+  it('resets package pagination when a filter changes on page two', async () => {
+    authOnly()
+    vi.spyOn(packagesApi, 'sports').mockResolvedValue(sports)
+    const packages = Array.from({ length: 21 }, (_, index) => ({ ...sportPackage, id: index + 1, code: `PK-${index + 1}`, name: `Package ${index + 1}` }))
+    const list = vi.spyOn(managerPackagesApi, 'list').mockImplementation(async ({ sportId }) => sportId === '2' ? [packages[20]] : packages)
+    const user = userEvent.setup()
+    renderApp('/manager/packages')
+    await screen.findByText('Showing 1-20 of 21')
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(await screen.findByText('Package 21')).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Sport'), '2')
+    await waitFor(() => expect(list).toHaveBeenLastCalledWith({ sportId: '2', format: '', active: '' }, expect.any(AbortSignal)))
+    expect(await screen.findByText('Showing 1-1 of 1')).toBeInTheDocument()
+    expect(screen.getByText('Package 21')).toBeInTheDocument()
+  })
+  it('retries a failed package catalog request and renders the returned data', async () => {
+    authOnly()
+    vi.spyOn(packagesApi, 'sports').mockResolvedValue(sports)
+    const list = vi.spyOn(managerPackagesApi, 'list')
+      .mockRejectedValueOnce(new ApiError(503, 'The package service is unavailable.'))
+      .mockResolvedValueOnce([sportPackage])
+    const user = userEvent.setup()
+    renderApp('/manager/packages')
+    expect(await screen.findByText('The package service is unavailable.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByText(sportPackage.name)).toBeInTheDocument()
+    expect(list).toHaveBeenCalledTimes(2)
+  })
   it('creates a package with verified fields and does not add an invented active field', async () => {
     authOnly()
     vi.spyOn(packagesApi, 'sports').mockResolvedValue(sports)
@@ -392,12 +481,18 @@ describe('FE-06 packages and membership cards', () => {
   it('labels a one-day package by duration without assuming its session count', async () => {
     authOnly()
     vi.spyOn(packagesApi, 'sports').mockResolvedValue(sports)
-    vi.spyOn(managerPackagesApi, 'list').mockResolvedValue([{ ...sportPackage, name: 'One-day clinic', durationDays: 1, sessionCount: 3 }])
+    vi.spyOn(managerPackagesApi, 'list').mockResolvedValue([
+      { ...sportPackage, name: 'One-day clinic', durationDays: 1, sessionCount: 3 },
+      { ...sportPackage, id: 2, code: 'PK-SINGLE', name: 'One-session package', durationDays: 1, sessionCount: 1 },
+    ])
     renderApp('/manager/packages')
-    const row = (await screen.findByText('One-day clinic')).closest('tr')!
-    expect(within(row).getByText('1 day')).toBeInTheDocument()
-    expect(within(row).getByText('3 sessions / 90 min each')).toBeInTheDocument()
-    expect(within(row).queryByText('Single visit')).not.toBeInTheDocument()
+    const multiSession = (await screen.findByText('One-day clinic')).closest('tr')!
+    const singleSession = screen.getByText('One-session package').closest('tr')!
+    expect(within(multiSession).getByText('1 day')).toBeInTheDocument()
+    expect(within(multiSession).getByText('3 sessions / 90 min each')).toBeInTheDocument()
+    expect(within(singleSession).getByText('1 day')).toBeInTheDocument()
+    expect(within(singleSession).getByText('1 session / 90 min each')).toBeInTheDocument()
+    expect(screen.queryByText('Single visit')).not.toBeInTheDocument()
   })
   it('returns to a valid package page after a mutation shrinks the catalog', async () => {
     authOnly()
@@ -490,6 +585,20 @@ describe('FE-06 packages and membership cards', () => {
     await user.click(dialog.getByRole('button', { name: 'Save benefits' }))
     expect(await dialog.findByText('Validity must not exceed 120.')).toBeInTheDocument()
     expect(update).toHaveBeenCalledTimes(2)
+  })
+  it('keeps a missing tier status unknown and requires an explicit choice before update', async () => {
+    authOnly()
+    vi.spyOn(managerCardTiersApi, 'list').mockResolvedValue([{ ...vip, isActive: null }])
+    const update = vi.spyOn(managerCardTiersApi, 'update').mockResolvedValue(vip)
+    const user = userEvent.setup()
+    renderApp('/manager/cards')
+    expect(await screen.findByText('Unknown')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Edit card benefits' }))
+    const dialog = within(screen.getByRole('dialog'))
+    expect(dialog.getByText('Tier status is not provided. Choose a status before saving.')).toBeInTheDocument()
+    await user.click(dialog.getByRole('button', { name: 'Save benefits' }))
+    expect(await dialog.findByText('Choose whether this tier is active.')).toBeInTheDocument()
+    expect(update).not.toHaveBeenCalled()
   })
   it('explains current tier discounts separately from paid card fees and saved registrations', async () => {
     authOnly()
