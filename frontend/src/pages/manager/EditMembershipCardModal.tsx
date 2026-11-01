@@ -21,7 +21,7 @@ export function EditMembershipCardModal({ tier, onClose, onSuccess }: { tier: Ma
     const errors: Record<string, string> = {}
     if (standard) return { price: 'Standard is a protected free account tier.' }
     const price = positivePriceError(draft.price)
-    const duration = numericError(draft.durationMonths, 'Validity', 0, true, 120)
+    const duration = numericError(draft.durationMonths, 'Validity', 1, true, 120)
     const discount = numericError(draft.discountPercentage, 'Discount', 0, true)
     if (price) errors.price = price
     if (duration) errors.durationMonths = duration
@@ -40,12 +40,12 @@ export function EditMembershipCardModal({ tier, onClose, onSuccess }: { tier: Ma
   return <Modal open title="Edit card benefits" description="Set the tier fee, validity and discount for future card purchases." onClose={onClose} dismissible={!form.saving}>
     <form ref={formRef} className="manager-form manager-catalog-form" onSubmit={form.submit} noValidate aria-busy={form.saving}>
       {form.error && <p className="notice notice--danger" role="alert">{form.error}</p>}
-      <p className="manager-catalog-form__note">Discounts apply to eligible duration packages. Existing cards keep the terms they were purchased with.</p>
+      <p className="manager-catalog-form__note">Active cards use this tier's current discount for future eligible 30-day and 90-day package registrations; single-session visits are excluded and discounts do not stack. Changing it does not change a card fee already paid or reprice registrations already made; each registration keeps its stored price and discount.</p>
       {tier.isActive === null && <p className="manager-catalog-form__note">Tier status is not provided. Choose a status before saving.</p>}
       <fieldset className="manager-form-grid" disabled={form.saving || standard}>
         <Input label="Tier name" value={tier.name} readOnly />
         <Input label="Card fee (VND)" name="price" type="number" min="0.01" step="0.01" value={draft.price} onChange={(event) => change('price', event.target.value)} error={form.errors.price} hint="The fee for a new card purchase." required />
-        <Input label="Validity (months)" name="durationMonths" type="number" step="1" min="0" max="120" value={draft.durationMonths} onChange={(event) => change('durationMonths', event.target.value)} error={form.errors.durationMonths} hint="From 0 to 120 months." required />
+        <Input label="Validity (months)" name="durationMonths" type="number" step="1" min="1" max="120" value={draft.durationMonths} onChange={(event) => change('durationMonths', event.target.value)} error={form.errors.durationMonths} hint="From 1 to 120 months for paid tiers." required />
         <Input label="Package discount (%)" name="discountPercentage" type="number" min="0" max="100" step="1" value={draft.discountPercentage} onChange={(event) => change('discountPercentage', event.target.value)} error={form.errors.discountPercentage} hint="Whole percentage from 0 to 100." required />
         <Select label="Status" name="isActive" placeholder="Choose status" value={draft.isActive === null ? '' : String(draft.isActive)} options={[{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }]} onChange={(event) => change('isActive', event.target.value === '' ? null : event.target.value === 'true')} error={form.errors.isActive ?? form.errors.active} />
         <TextArea className="manager-form-full" label="Description" name="description" maxLength={500} value={draft.description} onChange={(event) => change('description', event.target.value)} error={form.errors.description} hint={draft.description.length + ' / 500 characters'} rows={3} />

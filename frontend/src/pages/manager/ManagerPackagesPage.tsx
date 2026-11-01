@@ -36,7 +36,8 @@ export function ManagerPackagesPage() {
   function saved() {
     setEditing(null)
     setChanging(null)
-    toast.success('Sport package saved', 'Existing paid registrations keep their original price and benefits. Your filters have been preserved.')
+    setPage(0)
+    toast.success('Sport package saved', 'Existing registrations keep their stored price and discount. Your filters have been preserved.')
     reload()
   }
 
@@ -53,7 +54,7 @@ export function ManagerPackagesPage() {
       render: (row) => <div className="manager-catalog__identity">
         <span className="manager-catalog__label">Package</span>
         <strong>{row.name}</strong>
-        <span className="manager-catalog__secondary">{row.sportName} <span aria-hidden="true">·</span> {row.code}</span>
+        <span className="manager-catalog__secondary">{row.sportName} / {row.code}</span>
       </div>,
     },
     {
@@ -67,8 +68,8 @@ export function ManagerPackagesPage() {
       key: 'durationDays', header: 'Package terms', width: '21%',
       render: (row) => <div className="manager-catalog__cell">
         <span className="manager-catalog__label">Package terms</span>
-        <strong>{row.durationDays === 1 ? 'Single visit' : row.durationDays + ' days'}</strong>
-        <span className="manager-catalog__secondary">{row.sessionCount ?? 'Not provided'} {row.sessionCount === 1 ? 'session' : 'sessions'} <span aria-hidden="true">·</span> {row.sessionMinutes ?? 'Not provided'} min each</span>
+        <strong>{row.durationDays === 1 ? '1 day' : row.durationDays + ' days'}</strong>
+        <span className="manager-catalog__secondary">{row.sessionCount ?? 'Not provided'} {row.sessionCount === 1 ? 'session' : 'sessions'} / {row.sessionMinutes ?? 'Not provided'} min each</span>
       </div>,
     },
     {
@@ -120,7 +121,9 @@ export function ManagerPackagesPage() {
       {sports.status === 'error' && <div className="manager-catalog__inline-error"><ManagerError error={sports.error} onRetry={retrySports} /></div>}
       {resource.status === 'error'
         ? <div className="manager-catalog__inline-error"><ManagerError error={resource.error} onRetry={reload} /></div>
-        : <div className="manager-catalog__table">
+        : <>
+          <p className="manager-catalog__scroll-hint">Swipe or scroll horizontally to view all columns.</p>
+          <div className="manager-catalog__table">
           <Table
             columns={columns}
             rows={rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)}
@@ -132,11 +135,12 @@ export function ManagerPackagesPage() {
             emptyDescription="Adjust the search or filters, or create a package for an available sport."
             pagination={resource.status === 'ready' ? { page, pageSize: PAGE_SIZE, totalItems: rows.length, onPageChange: setPage } : undefined}
           />
-        </div>
+          </div>
+        </>
       }
       <div className="manager-catalog__policy">
         <span className="manager-catalog__policy-mark" aria-hidden="true">i</span>
-        <p>Package edits affect new registrations. Existing paid registrations keep the price and benefits they were purchased with.</p>
+        <p>Package price updates apply to new registrations. Existing registrations keep their stored price and discount. Active membership cards use their tier's current discount for future eligible registrations.</p>
       </div>
     </Card>
     {editing !== null && sports.status === 'ready' && <PackageEditorModal item={editing === 'create' ? undefined : editing} sports={sports.data} onClose={() => setEditing(null)} onSuccess={saved} />}

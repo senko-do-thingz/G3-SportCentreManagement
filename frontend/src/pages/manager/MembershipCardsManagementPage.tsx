@@ -25,7 +25,7 @@ export function MembershipCardsManagementPage() {
 
   const columns: TableColumn<ManagerCardTier>[] = [
     {
-      key: 'name', header: 'Tier', width: '34%',
+      key: 'name', header: 'Tier', width: '24%',
       render: (tier) => <div className="manager-catalog__identity">
         <span className="manager-catalog__label">Tier</span>
         <strong>{tier.name}</strong>
@@ -34,14 +34,14 @@ export function MembershipCardsManagementPage() {
       </div>,
     },
     {
-      key: 'price', header: 'Card fee', align: 'right', width: '16%',
+      key: 'price', header: 'Card fee', align: 'right', width: '14%',
       render: (tier) => <div className="manager-catalog__cell manager-catalog__cell--amount">
         <span className="manager-catalog__label">Card fee</span>
         <strong className="manager-catalog__amount">{formatMoney(tier.price)}</strong>
       </div>,
     },
     {
-      key: 'durationMonths', header: 'Validity', width: '15%',
+      key: 'durationMonths', header: 'Validity', width: '13%',
       render: (tier) => <div className="manager-catalog__cell">
         <span className="manager-catalog__label">Validity</span>
         <span>{tierValidity(tier)}</span>
@@ -55,14 +55,14 @@ export function MembershipCardsManagementPage() {
       </div>,
     },
     {
-      key: 'isActive', header: 'Status', width: '11%',
+      key: 'isActive', header: 'Status', width: '10%',
       render: (tier) => <div className="manager-catalog__cell">
         <span className="manager-catalog__label">Status</span>
         <StatusBadge status={tierStatus(tier.isActive)} />
       </div>,
     },
     {
-      key: 'actions', header: 'Actions', width: '9%',
+      key: 'actions', header: 'Actions', width: '24%',
       render: (tier) => <div className="manager-catalog__cell manager-catalog__actions">
         <span className="manager-catalog__label">Actions</span>
         {tier.code === 'STANDARD'
@@ -80,12 +80,13 @@ export function MembershipCardsManagementPage() {
     {resource.status === 'ready' && (!resource.data.length
       ? <Card className="manager-catalog__state"><EmptyState title="No membership card tiers yet" description="No tiers have been returned by the card catalog." /></Card>
       : <Card className="manager-catalog__panel" title="Membership tiers" actions={<span className="manager-catalog__count">{resource.data.length} {resource.data.length === 1 ? 'tier' : 'tiers'}</span>}>
+        <p className="manager-catalog__scroll-hint">Swipe or scroll horizontally to view all columns.</p>
         <div className="manager-catalog__table">
           <Table columns={columns} rows={resource.data} rowKey={(tier) => tier.id} caption="Membership card tiers" scrollLabel="Membership card tiers" emptyTitle="No membership card tiers yet" emptyDescription="No tiers have been returned by the card catalog." />
         </div>
         <div className="manager-catalog__policy">
           <span className="manager-catalog__policy-mark" aria-hidden="true">i</span>
-          <p>Standard is the protected account tier. Card discounts apply to eligible 30-day and 90-day sport packages; single visits are excluded and discounts do not stack.</p>
+          <p>Standard is the protected account tier. Active cards use their tier's current discount for future eligible 30-day and 90-day package registrations; single-session visits are excluded and discounts do not stack. A tier change does not change a card fee already paid or the stored price and discount on registrations already made.</p>
         </div>
       </Card>)}
     {selected && <EditMembershipCardModal tier={selected} onClose={() => setSelected(null)} onSuccess={() => { setSelected(null); toast.success('Card benefits saved'); reload() }} />}
