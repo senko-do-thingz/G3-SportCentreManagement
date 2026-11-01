@@ -97,7 +97,8 @@ describe('FE-07 schedule', () => {
     expect(screen.getAllByRole('button', { name: 'Cancel session' })).toHaveLength(12)
   })
   it('shows multiple time slots and sorts same-time sessions regardless of API order', async () => {
-    const namedSession = (id: number, name: string, sessionDate = date, startTime = '09:00:00', endTime = '10:00:00') => ({
+    const scheduleDate = addDays(monday(date), 2)
+    const namedSession = (id: number, name: string, sessionDate = scheduleDate, startTime = '09:00:00', endTime = '10:00:00') => ({
       ...session,
       id,
       date: sessionDate,
@@ -107,8 +108,8 @@ describe('FE-07 schedule', () => {
     })
     backend(false, false, [
       namedSession(30, 'Zulu class'),
-      namedSession(31, 'Next day class', addDays(date, 1)),
-      namedSession(32, 'Later class', date, '10:00:00', '11:00:00'),
+      namedSession(31, 'Next day class', addDays(scheduleDate, 1)),
+      namedSession(32, 'Later class', scheduleDate, '10:00:00', '11:00:00'),
       namedSession(33, 'Alpha class'),
     ])
     renderApp(`/manager/schedule?week=${monday(date)}`)
