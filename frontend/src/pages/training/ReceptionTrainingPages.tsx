@@ -32,24 +32,25 @@ function AttendanceSessionPicker({ sessions, coach = false }: { sessions: StaffS
           options={sessions.map(item => ({ value: String(item.id), label: `${item.className} - ${item.date} - ${item.startTime.slice(0, 5)}` }))} />
         {!sessions.length && <p>No sessions available.</p>}
       </Card>
-      {sessionId && <AttendanceWorkspace key={sessionId} sessionId={sessionId} coach={coach} />}
+      {sessionId && <AttendanceWorkspace key={sessionId} sessionId={sessionId} coach={coach} dateOpen={sessions.find(session => String(session.id) === sessionId)?.attendanceDateOpen !== false} />}
     </>
   )
 }
 
-function AttendanceWorkspace({ sessionId, coach }: { sessionId: string; coach: boolean }) {
+function AttendanceWorkspace({ sessionId, coach, dateOpen }: { sessionId: string; coach: boolean; dateOpen: boolean }) {
   const [revision, refresh] = useState(0)
   const [saved, setSaved] = useState(false)
   const load = useCallback((signal: AbortSignal) => (coach ? training.coachRoster : training.receptionRoster)(sessionId, signal), [sessionId, coach])
   return (
     <Card title="Bookings and attendance status">
       {saved && <p role="status">Attendance saved and the list updated.</p>}
-      <TrainingData key={revision} load={load}>{members => <AttendanceRoster members={members} coach={coach} onSaved={() => { setSaved(true); refresh(value => value + 1) }} />}</TrainingData>
+      {!dateOpen && <p role="status">Initial attendance is closed for this session. Ordinary attendance is recorded only on the session date in Asia/Ho_Chi_Minh. Saved records remain visible; existing corrections require a reason.</p>}
+      <TrainingData key={revision} load={load}>{members => <AttendanceRoster members={members} coach={coach} dateOpen={dateOpen} onSaved={() => { setSaved(true); refresh(value => value + 1) }} />}</TrainingData>
     </Card>
   )
 }
 
-function AttendanceRoster({ members, onSaved, coach }: { members: SessionMember[]; onSaved: () => void; coach: boolean }) {
+function AttendanceRoster({ members, onSaved, coach, dateOpen }: { members: SessionMember[]; onSaved: () => void; coach: boolean; dateOpen: boolean }) {
   const [bookingId, setBookingId] = useState('')
   const member = members.find(item => String(item.bookingId) === bookingId)
   if (!members.length) return <EmptyState title="No valid bookings for this session" />
@@ -57,7 +58,9 @@ function AttendanceRoster({ members, onSaved, coach }: { members: SessionMember[
     <div className="training-form">
       <Select label="Booking to mark attendance" value={bookingId} onChange={event => setBookingId(event.target.value)} placeholder="Select a member and booking"
         options={members.map(item => ({ value: String(item.bookingId), label: `${item.memberName} - Booking #${item.bookingId} - ${attendanceLabel(item.status)}` }))} />
-      {member && <AttendanceForm key={member.bookingId} member={member} onSaved={onSaved} coach={coach} />}
+      {member && (!dateOpen && member.attendanceId === null
+        ? <EmptyState title="Attendance not recorded" description="This session is outside the ordinary attendance date. An unmarked record does not mean absent. Contact authorized staff for help." />
+        : <AttendanceForm key={member.bookingId} member={member} onSaved={onSaved} coach={coach} />)}
     </div>
   )
 }

@@ -145,6 +145,32 @@ describe('Coach training writes', () => {
 })
 
 describe('Reception training writes', () => {
+  it.each(['COACH', 'RECEPTIONIST'] as const)('R07 shows server-closed dates without treating unmarked as absent for %s', async role => {
+    const root = role === 'COACH' ? '/coach' : '/reception'
+    const { calls } = signedIn(role, call => call.path === `${root}/training/sessions`
+      ? json(200, [{ ...session, attendanceDateOpen: false }])
+      : call.path === `${root}/training/sessions/5/members` ? json(200, [rosterMember]) : unexpected(call))
+    renderApp(`${root}/training/attendance`)
+    await userEvent.selectOptions(await screen.findByLabelText('Session to mark attendance'), '5')
+    expect(await screen.findByText(/Initial attendance is closed/)).toBeInTheDocument()
+    await userEvent.selectOptions(await screen.findByLabelText('Booking to mark attendance'), '11')
+    expect(await screen.findByRole('heading', { name: 'Attendance not recorded' })).toBeInTheDocument()
+    expect(screen.getByText(/An unmarked record does not mean absent/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save attendance' })).not.toBeInTheDocument()
+    expect(calls.some(call => call.method === 'POST')).toBe(false)
+  })
+  it.each(['COACH', 'RECEPTIONIST'] as const)('R07 retains saved history and reasoned correction when initial date is closed for %s', async role => {
+    const root = role === 'COACH' ? '/coach' : '/reception'
+    signedIn(role, call => call.path === `${root}/training/sessions`
+      ? json(200, [{ ...session, attendanceDateOpen: false }])
+      : call.path === `${root}/training/sessions/5/members` ? json(200, [{ ...rosterMember, attendanceId: 50, status: 'PRESENT', notes: 'Saved historical attendance' }]) : unexpected(call))
+    renderApp(`${root}/training/attendance`)
+    await userEvent.selectOptions(await screen.findByLabelText('Session to mark attendance'), '5')
+    await userEvent.selectOptions(await screen.findByLabelText('Booking to mark attendance'), '11')
+    expect(screen.getByLabelText('Attendance notes')).toHaveValue('Saved historical attendance')
+    expect(screen.getByLabelText('Correction reason')).toBeRequired()
+    expect(screen.getByRole('button', { name: 'Save correction' })).toBeInTheDocument()
+  })
   it('records attendance and requires an audit reason for a correction', async () => {
     let row = { ...rosterMember }
     const { calls } = signedIn('RECEPTIONIST', call => {

@@ -636,6 +636,66 @@ class TrainingWorkflowIntegrationTest {
         flyway.validate();
         assertThat(db.queryForObject("SELECT COUNT(*) FROM session_plan WHERE title='Legacy preserved' AND member_id IS NULL",Integer.class)).isEqualTo(1);
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"COACH,-30","COACH,-1","COACH,1","RECEPTION,-30","RECEPTION,-1","RECEPTION,1","SELF,-1","SELF,1"})
+    void R07_sql_ordinaryHistoricalAndFutureFirstMarksLeaveNoRowsOrAudit(String path,int offset) {
+        jdbc.update("UPDATE class_session SET session_date=DATEADD(day,?,'2026-11-02'),training_type=?,coach_id=? WHERE id=?",
+            offset,path.equals("SELF")?"SELF_TRAINING":"COACH_LED",path.equals("SELF")?null:coach,session);
+        assertThatThrownBy(()->{
+            if(path.equals("COACH"))writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
+            else if(path.equals("SELF"))writer.selfAttendance(reception,booking,null);
+            else writer.attendance(reception,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
+        }).isInstanceOf(BusinessRuleException.class);
+        assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?",booking)).isZero();
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE actor_user_id IN (?,?) AND action='TRAINING_ATTENDANCE_CREATED'",coach,reception)).isZero();
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"COACH,2026-11-01T16:59:59Z,false","COACH,2026-11-01T17:00:00Z,true","COACH,2026-11-02T01:59:59Z,true","COACH,2026-11-02T02:00:00Z,true","COACH,2026-11-02T02:00:01Z,true","COACH,2026-11-02T16:59:59Z,true","COACH,2026-11-02T17:00:00Z,false","RECEPTION,2026-11-01T16:59:59Z,false","RECEPTION,2026-11-01T17:00:00Z,true","RECEPTION,2026-11-02T01:59:59Z,true","RECEPTION,2026-11-02T02:00:00Z,true","RECEPTION,2026-11-02T02:00:01Z,true","RECEPTION,2026-11-02T16:59:59Z,true","RECEPTION,2026-11-02T17:00:00Z,false"})
+    void R07_sql_centerDayAndSessionStartBoundary(String path,String instant,boolean allowed) {
+        clock.value=Instant.parse(instant);
+        var action=(Callable<Object>)()->path.equals("COACH")?writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)):
+            writer.attendance(reception,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
+        if(allowed)assertThatCode(()->action.call()).doesNotThrowAnyException();
+        else assertThatThrownBy(()->action.call()).isInstanceOf(BusinessRuleException.class);
+        assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?",booking)).isEqualTo(allowed?1:0);
+        assertThat(writer.coachSessions(coach).stream().filter(row->row.id()==session).findFirst().orElseThrow().attendanceDateOpen()).isEqualTo(allowed);
+        assertThat(writer.receptionSessions().stream().filter(row->row.id()==session).findFirst().orElseThrow().attendanceDateOpen()).isEqualTo(allowed);
+    }
+    @Test void R07_sql_existingHistoricalCorrectionsRemainAuditedWithoutInventingACutoff() {
+        long id=writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)).id();
+        clock.value=clock.value.plus(Duration.ofDays(3));
+        writer.coachCorrection(coach,id,correction(TrainingWriteRequest.AttendanceStatus.LATE));
+        assertThat(count("SELECT COUNT(*) FROM attendance_correction WHERE attendance_record_id=? AND corrected_by=?",id,coach)).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE entity_type='ATTENDANCE_RECORD' AND entity_id=? AND action='TRAINING_ATTENDANCE_CORRECTED'",id)).isEqualTo(1);
+        assertThat(reader.attendance(member)).anySatisfy(row->assertThat(row.status()).isEqualTo("LATE"));
+        assertThat(writer.coachSessions(coach).stream().filter(row->row.id()==session).findFirst().orElseThrow().attendanceDateOpen()).isFalse();
+    }
+    @Test void R07_sql_attendanceAndAuditRollbackTogether() {
+        assertThatThrownBy(()->new TransactionTemplate(transactions).execute(status->{
+            writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
+            throw new IllegalStateException("attendance rollback probe");
+        })).isInstanceOf(IllegalStateException.class);
+        assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?",booking)).isZero();
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE actor_user_id=? AND action='TRAINING_ATTENDANCE_CREATED'",coach)).isZero();
+    }
+    @Test void R07_sql_cancellationWinsBeforeAttendanceWithoutPartialWrite() throws Exception {
+        clock.value=Instant.parse("2026-11-02T01:00:00Z");
+        var actor=actor(reception);
+        interleave(()->bookings.cancelBooking(booking,actor),
+            ()->writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)),BusinessRuleException.class);
+        assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?",booking)).isZero();
+    }
+    @Test void R07_sql_attendanceBeforeCancellationPreservesHistoricalParticipation() throws Exception {
+        clock.value=Instant.parse("2026-11-02T01:00:00Z");
+        var actor=actor(reception);
+        interleave(()->writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)),
+            ()->bookings.cancelBooking(booking,actor),null);
+        assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?",booking)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT status FROM booking WHERE id=?",String.class,booking)).isEqualTo("CANCELLED");
+        assertThat(reader.attendance(member)).anySatisfy(row->{
+            assertThat(row.status()).isEqualTo("CANCELLED");assertThat(row.recordedStatus()).isEqualTo("PRESENT");
+        });
+    }
     private void interleave(Callable<?> first,Callable<?> second,Class<? extends Throwable> failure) throws Exception {
         var held=new CountDownLatch(1);var release=new CountDownLatch(1);
         try(var pool=Executors.newFixedThreadPool(2)){

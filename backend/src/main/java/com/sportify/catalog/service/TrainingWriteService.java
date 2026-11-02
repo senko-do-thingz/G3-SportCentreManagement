@@ -283,6 +283,8 @@ public class TrainingWriteService {
         LocalDate today = LocalDate.now(clock);
         if (date.isAfter(today) || (selfOnly && !date.equals(today)))
             throw new BusinessRuleException(selfOnly ? "Self-training attendance must be recorded on the session date" : "Future session attendance cannot be recorded");
+        if (!date.equals(today))
+            throw new BusinessRuleException("Past session attendance cannot be recorded through ordinary attendance. Contact authorized staff about an existing record or correction.");
     }
     private void requireSessionEnded(long sessionId) {
         LocalDateTime end = jdbc.queryForObject("SELECT session_date, end_time FROM class_session WHERE id = ?",
@@ -316,7 +318,8 @@ public class TrainingWriteService {
             rs.getObject("attendance_id", Long.class), rs.getString("status"), rs.getString("notes"), rs.getObject("result_id", Long.class));
     }
     private SessionSummary mapSession(ResultSet rs, int row) throws SQLException {
-        return new SessionSummary(rs.getLong("id"), rs.getObject("class_id", Long.class), rs.getString("class_name"), rs.getLong("sport_id"), rs.getDate("session_date").toLocalDate(), rs.getTime("start_time").toLocalTime(), rs.getTime("end_time").toLocalTime(), rs.getString("training_type"));
+        LocalDate date = rs.getDate("session_date").toLocalDate();
+        return new SessionSummary(rs.getLong("id"), rs.getObject("class_id", Long.class), rs.getString("class_name"), rs.getLong("sport_id"), date, rs.getTime("start_time").toLocalTime(), rs.getTime("end_time").toLocalTime(), rs.getString("training_type"), date.equals(LocalDate.now(clock)));
     }
     private record AttendanceBooking(long sessionId, long memberId, String status, String trainingType) {}
     private record ExistingAttendance(long id, String status) {}

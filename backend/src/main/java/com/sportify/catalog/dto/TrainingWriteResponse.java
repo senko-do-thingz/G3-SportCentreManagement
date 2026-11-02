@@ -10,7 +10,8 @@ public final class TrainingWriteResponse {
     public record ClassSummary(long id, String name, long sportId) {}
     public record BookingCandidate(long bookingId, long memberId, String memberName, LocalDate sessionDate) {}
     public record SessionSummary(long id, Long classId, String className, long sportId,
-                                 LocalDate date, LocalTime startTime, LocalTime endTime, String trainingType) {}
+                                 LocalDate date, LocalTime startTime, LocalTime endTime, String trainingType,
+                                 boolean attendanceDateOpen) {}
     public record SessionMember(long bookingId, long memberId, String memberName, Long attendanceId, String status, String notes, Long resultId) {}
     public record CoachPlan(long id, String title, String description, long classId, String className,
                             long memberId, String memberName, String coachName) {}

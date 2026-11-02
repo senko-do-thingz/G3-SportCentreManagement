@@ -6,7 +6,7 @@ export interface BookingCandidate {
   bookingId: number; memberId: number; memberName: string; sessionDate: string
 }
 export interface StaffPlan extends TrainingPlan { classId: number; memberId: number; memberName: string }
-export interface StaffSession extends TrainingSession { classId: number | null; sportId: number; trainingType: string }
+export interface StaffSession extends TrainingSession { classId: number | null; sportId: number; trainingType: string; attendanceDateOpen?: boolean }
 export interface SessionMember {
   bookingId: number; memberId: number; memberName: string; attendanceId: number | null; status: string | null; notes: string | null; resultId?: number | null
 }
