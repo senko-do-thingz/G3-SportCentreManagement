@@ -42,9 +42,9 @@ This matrix preserves the 22 cases requested by the CODEOWNER Round 01 review. E
 
 ## Round 03 local validation
 
-- After fetching and merging current origin/main 646bd143c40d0e3721210433997e1316ae05cc1e into feat/ui-16 at cc54acc40ff6dc93446cd7b543bbd4c3d598ee63, the frontend suite passed: 94 test files and 1,764 tests, zero failures.
+- After fetching and merging current origin/main 646bd143c40d0e3721210433997e1316ae05cc1e into feat/ui-16 at cc54acc40ff6dc93446cd7b543bbd4c3d598ee63, the frontend suite passed: 94 test files and 1,764 tests, zero failures. This branch sync is pushed.
 - npm run lint passed.
 - npm run build passed with the existing Vite advisory for a bundle chunk above 500 kB.
-- GitHub Actions run 41378482529 passed on the earlier remote head 55e49b259134341511c7804421dd3e25b53a7ea4. It does not validate local head cc54acc; push and rerun CI before requesting approval.
+- GitHub Actions run 41388216476 passed on pushed head f07f06cc4bddbf10b808654bcba437ddab3e085e. The report-only correction after that head is documented with its exact CI in the current PR description.
 - The local audit DOCX remains excluded from Git and has not been delivered privately. No destination is authorized.
 - No production backend request or write was performed during the browser review or local merge.
