@@ -45,7 +45,7 @@ class TrainingWriteControllersTest {
         """;
     @Test void onlyAssignedRoleCanAccessEachWorkspace() throws Exception {
         for (String role : List.of("MEMBER", "RECEPTIONIST", "MANAGER")) {
-            for (String path : List.of("classes", "classes/1/members", "plans", "plans/1", "sessions", "sessions/1/members", "metrics?sportId=1"))
+            for (String path : List.of("classes", "classes/1/members", "plans", "plans/1", "sessions", "sessions/1/members", "metrics?sportId=1", "bookings/1/drill-suggestions"))
                 mvc.perform(get("/api/v1/coach/training/" + path).with(user(account(role)))).andExpect(status().isForbidden());
             mvc.perform(post("/api/v1/coach/training/plans").with(user(account(role))).contentType(MediaType.APPLICATION_JSON).content(PLAN)).andExpect(status().isForbidden());
             mvc.perform(post("/api/v1/coach/training/results").with(user(account(role))).contentType(MediaType.APPLICATION_JSON).content(RESULT)).andExpect(status().isForbidden());

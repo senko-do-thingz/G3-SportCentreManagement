@@ -365,6 +365,38 @@ class TrainingWorkflowIntegrationTest {
             .contentType("application/json").content("{\"question\":\"Show classes\",\"optIn\":true}"))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
     }
+    @Test void HOT09_draftsRequireExplicitCoachAssignmentAndUsePrivateFeedback() throws Exception {
+        long initial=writer.createPlan(coach,plan()).id();
+        writer.feedback(coach,initial,new TrainingWriteRequest.Feedback(4,"Practice passing",null,"Passing accuracy"));
+        writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
+        long metric=insert("INSERT skill_metric(sport_id,name,max_score) VALUES (?,'Passing accuracy',10)",sport);
+        writer.createResult(coach,new TrainingWriteRequest.Result(session,member,"Coach assessment",
+            List.of(new TrainingWriteRequest.Score(metric,java.math.BigDecimal.ONE))));
+        jdbc.update("UPDATE member_profile SET main_goal='BUILD_SKILLS' WHERE user_id=?",member);
+        int plansBefore=count("SELECT COUNT(*) FROM session_plan");
+        int invoicesBefore=count("SELECT COUNT(*) FROM invoice");
+        var draft=writer.drillSuggestions(coach,booking);
+        assertThat(draft.mode()).isEqualTo("RULE_BASED");
+        assertThat(draft.requiresCoachReview()).isTrue();
+        assertThat(draft.persisted()).isFalse();
+        assertThat(draft.drafts()).isNotEmpty();
+        assertThat(draft.drafts().getFirst().reason()).contains("coach feedback focus: passing","recorded assessment metric: passing","Saved member goal: BUILD_SKILLS");
+        assertThat(count("SELECT COUNT(*) FROM session_plan")).isEqualTo(plansBefore);
+        assertThatThrownBy(()->writer.drillSuggestions(otherCoach,booking)).isInstanceOf(ResourceNotFoundException.class);
+        var chosen=draft.drafts().getFirst();
+        var reviewed=new TrainingWriteRequest.Plan(classId,member,booking,"Reviewed supplementary practice",null,
+            List.of(new TrainingWriteRequest.Step(chosen.title(),chosen.durationMinutes(),chosen.instructions()+" Reviewed by Coach.")));
+        long assigned=writer.createPlan(coach,reviewed).id();
+        assertThat(reader.plan(member,assigned).steps().getFirst().instructions()).endsWith("Reviewed by Coach.");
+        assertThatThrownBy(()->writer.createPlan(coach,reviewed)).isInstanceOf(ConflictException.class);
+        assertThat(count("SELECT COUNT(*) FROM invoice")).isEqualTo(invoicesBefore);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/coach/training/bookings/"+booking+"/drill-suggestions")
+            .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(member)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        long unsupported=jdbc.queryForObject("SELECT id FROM sport WHERE code='SWIMMING'",Long.class);
+        jdbc.update("UPDATE class_session SET sport_id=? WHERE id=?",unsupported,session);
+        assertThat(writer.drillSuggestions(coach,booking).drafts()).isEmpty();
+    }
     @Test void R2_02_cancelledOrMismatchedBookingCannotReceivePlan() {
         var wrong=new TrainingWriteRequest.Plan(classId,peer,booking,"Wrong owner",null,plan().steps());
         assertThatThrownBy(()->writer.createPlan(coach,wrong)).isInstanceOf(BusinessRuleException.class);

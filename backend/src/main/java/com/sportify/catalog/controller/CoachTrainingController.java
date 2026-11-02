@@ -22,6 +22,8 @@ public class CoachTrainingController {
     public List<ClassSummary> classes(@AuthenticationPrincipal CustomUserDetails user) { return service.coachClasses(user.getUserAccount().getId()); }
     @GetMapping("/classes/{id}/members")
     public List<BookingCandidate> members(@PathVariable long id, @AuthenticationPrincipal CustomUserDetails user) { return service.coachMembers(user.getUserAccount().getId(), id); }
+    @GetMapping("/bookings/{id}/drill-suggestions")
+    public DrillSuggestions drillSuggestions(@PathVariable long id,@AuthenticationPrincipal CustomUserDetails user) { return service.drillSuggestions(user.getUserAccount().getId(),id); }
     @GetMapping("/plans")
     public List<CoachPlan> plans(@AuthenticationPrincipal CustomUserDetails user) { return service.coachPlans(user.getUserAccount().getId()); }
     @GetMapping("/plans/{id}")

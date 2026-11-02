@@ -19,6 +19,33 @@ const unexpected = (call: RecordedCall) => backendError(404, `Unexpected endpoin
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Coach training writes', () => {
+  it('previews rule-based drills, then requires review and an explicit plan assignment', async () => {
+    const draft = { title: 'Controlled short passing', goal: 'Passing accuracy', durationMinutes: 5, instructions: 'Use the target selected by your coach.', reason: 'Matches coach feedback focus: passing.', level: 'BEGINNER' }
+    const { calls } = signedIn('COACH', call => {
+      if (call.path === '/coach/training/classes') return json(200, [{ ...trainingClass, name: 'Football class' }])
+      if (call.path === '/coach/training/classes/1/members') return json(200, [bookingCandidate])
+      if (call.path === '/coach/training/plans' && call.method === 'GET') return json(200, [])
+      if (call.path === '/coach/training/bookings/11/drill-suggestions') return json(200, { mode: 'RULE_BASED', ruleVersion: 'curated-drills-v1', requiresCoachReview: true, persisted: false, bookingId: 11, memberId: 42, classId: 1, sportName: 'Football', level: 'BEGINNER', drafts: [draft] })
+      if (call.path === '/coach/training/plans' && call.method === 'POST') return json(201, { id: 8 })
+      return unexpected(call)
+    })
+    renderApp('/coach/training/plans')
+    const user = userEvent.setup()
+    await user.selectOptions(await screen.findByLabelText('Assigned class'), '1')
+    await user.selectOptions(await screen.findByLabelText(/Member booking/), '11')
+    await user.click(screen.getByRole('button', { name: 'Suggest practice drills' }))
+    expect(await screen.findByText('Matches coach feedback focus: passing.')).toBeInTheDocument()
+    expect(calls.filter(call => call.method === 'POST')).toHaveLength(0)
+    await user.click(screen.getByLabelText('Select draft: Controlled short passing'))
+    await user.click(screen.getByRole('button', { name: 'Review selected drafts in plan form' }))
+    expect(screen.getByLabelText(/Exercise title 1/)).toHaveValue(draft.title)
+    await user.type(screen.getByLabelText(/Plan title/), 'Reviewed passing')
+    await user.type(screen.getByLabelText('Exercise instructions 1'), ' Coach reviewed.')
+    expect(calls.filter(call => call.method === 'POST')).toHaveLength(0)
+    await user.click(screen.getByRole('button', { name: 'Assign plan' }))
+    expect(await screen.findByText('Plan assigned. The member can view it immediately.')).toBeInTheDocument()
+    expect(calls.find(call => call.method === 'POST')?.body).toMatchObject({ title: 'Reviewed passing', steps: [{ title: draft.title, durationMinutes: 5, instructions: draft.instructions + ' Coach reviewed.' }] })
+  })
   it('assigns an individual plan then publishes plan feedback without waiting for a session result', async () => {
     let created = false
     const { calls } = signedIn('COACH', call => {

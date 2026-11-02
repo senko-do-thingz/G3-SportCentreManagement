@@ -17,4 +17,7 @@ public final class TrainingWriteResponse {
     public record PlanStep(long id, int stepOrder, String title, int durationMinutes, String instructions) {}
     public record CoachPlanDetail(CoachPlan plan, List<PlanStep> steps) {}
     public record Metric(long id, String name, int maxScore) {}
+    public record DrillDraft(String title, String goal, int durationMinutes, String instructions, String reason, String level) {}
+    public record DrillSuggestions(String mode, String ruleVersion, boolean requiresCoachReview, boolean persisted,
+        long bookingId, long memberId, long classId, String sportName, String level, List<DrillDraft> drafts) {}
 }

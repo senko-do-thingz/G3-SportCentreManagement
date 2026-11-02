@@ -1,5 +1,5 @@
 import { useCallback, useState, type FormEvent } from 'react'
-import { staffTrainingApi as training, type BookingCandidate, type StaffPlan, type StaffSession, type TrainingClass, type TrainingMetric, type SessionMember } from '../../api/staffTrainingApi'
+import { staffTrainingApi as training, type BookingCandidate, type StaffPlan, type StaffSession, type TrainingClass, type TrainingMetric, type SessionMember, type DrillDraft, type DrillSuggestions } from '../../api/staffTrainingApi'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -42,6 +42,7 @@ function CoachPlansWorkspace({ classes }: { classes: TrainingClass[] }) {
 const blankStep = () => ({ title: '', durationMinutes: '10', instructions: '' })
 function CreatePlanForm({ classId, members, onSaved }: { classId: number; members: BookingCandidate[]; onSaved: () => void }) {
   const [steps, setSteps] = useState([blankStep()])
+  const [bookingId, setBookingId] = useState('')
   const action = useTrainingAction()
   if (!members.length) return <EmptyState title="No confirmed bookings" description="A confirmed booking in this class is required to assign a plan." />
 
@@ -62,6 +63,7 @@ function CreatePlanForm({ classId, members, onSaved }: { classId: number; member
         steps: steps.map(step => ({ title: step.title.trim(), durationMinutes: Number(step.durationMinutes), instructions: step.instructions.trim() || null })),
       })
       form.reset()
+      setBookingId('')
       setSteps([blankStep()])
       onSaved()
     }, 'Plan assigned. The member can view it immediately.')
@@ -74,8 +76,9 @@ function CreatePlanForm({ classId, members, onSaved }: { classId: number; member
   return (
     <form className="training-form" onSubmit={submit}>
       <fieldset disabled={action.pending} className="training-fieldset">
-        <Select label="Member booking" name="bookingId" required placeholder="Select a confirmed booking"
+        <Select label="Member booking" name="bookingId" required placeholder="Select a confirmed booking" value={bookingId} onChange={event => { setBookingId(event.target.value); setSteps([blankStep()]) }}
           options={members.map(member => ({ value: String(member.bookingId), label: `${member.memberName} - Booking #${member.bookingId} - ${member.sessionDate}` }))} />
+        {bookingId && <CoachDrillDrafts key={bookingId} bookingId={Number(bookingId)} onUse={drafts => setSteps(drafts.map(draft => ({ title: draft.title, durationMinutes: String(draft.durationMinutes), instructions: draft.instructions })))} />}
         <Input label="Plan title" name="title" required maxLength={150} />
         <TrainingTextarea label="Plan description" name="description" maxLength={1000} />
         {steps.map((step, index) => (
@@ -95,6 +98,22 @@ function CreatePlanForm({ classId, members, onSaved }: { classId: number; member
       <ActionMessage {...action} />
     </form>
   )
+}
+
+function CoachDrillDrafts({ bookingId, onUse }: { bookingId: number; onUse: (drafts: DrillDraft[]) => void }) {
+  const [suggestions, setSuggestions] = useState<DrillSuggestions | null>(null)
+  const [selected, setSelected] = useState<number[]>([])
+  const action = useTrainingAction()
+  return <div className="training-form"><h3>Supplementary drill drafts</h3>
+    <p>RULE_BASED drafts use this booking's sport, level and available feedback. Nothing is assigned until you review the plan and select Assign plan.</p>
+    <Button variant="secondary" loading={action.pending} onClick={() => { void action.run(async () => { setSuggestions(await training.drillSuggestions(bookingId)); setSelected([]) }, 'Drafts loaded for Coach review. Nothing assigned.') }}>Suggest practice drills</Button>
+    <ActionMessage {...action} />
+    {suggestions && (suggestions.drafts.length ? <><ul className="training-list">{suggestions.drafts.map((draft,index) => <li key={draft.title}>
+      <label><input type="checkbox" checked={selected.includes(index)} onChange={event => setSelected(current => event.target.checked ? [...current,index] : current.filter(value => value !== index))} /> Select draft: {draft.title}</label>
+      <p>{draft.goal} - {draft.level} - {draft.durationMinutes} minutes</p><p>{draft.instructions}</p><p>{draft.reason}</p>
+    </li>)}</ul><Button variant="secondary" disabled={!selected.length} onClick={() => onUse(suggestions.drafts.filter((_,index) => selected.includes(index)))}>Review selected drafts in plan form</Button></>
+      : <EmptyState title="No curated drafts for this sport and level" description="Create a Coach-authored plan using the exercise fields below." />)}
+  </div>
 }
 
 function OwnPlans({ plans }: { plans: StaffPlan[] }) {
