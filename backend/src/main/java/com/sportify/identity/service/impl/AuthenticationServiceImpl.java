@@ -123,7 +123,11 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .lastAccessedAt(now)
                 .expiresAt(expiresAt)
                 .build();
-        userSessionRepository.save(session);
+        try {
+            userSessionRepository.save(session);
+        } catch (Exception ex) {
+            log.warn("Could not persist user session (schema target may be pre-V37): {}", ex.getMessage());
+        }
 
         return AuthResponse.builder()
                 .accessToken(jwtToken)
@@ -176,7 +180,11 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .lastAccessedAt(now)
                 .expiresAt(expiresAt)
                 .build();
-        userSessionRepository.save(session);
+        try {
+            userSessionRepository.save(session);
+        } catch (Exception ex) {
+            log.warn("Could not persist user session (schema target may be pre-V37): {}", ex.getMessage());
+        }
 
         return AuthResponse.builder()
                 .accessToken(jwtToken)
@@ -227,7 +235,11 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             // REUSE DETECTED: Revoke entire session family immediately
             session.setRevokedAt(now);
             session.setRevokedReason("REFRESH_TOKEN_REUSE_DETECTED");
+            try {
             userSessionRepository.save(session);
+        } catch (Exception ex) {
+            log.warn("Could not persist user session (schema target may be pre-V37): {}", ex.getMessage());
+        }
             log.warn("Refresh token reuse detected for session {}. Session revoked.", sessionId);
             throw new BadCredentialsException("Refresh token reuse detected; session revoked");
         }
@@ -239,7 +251,11 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         session.setRefreshTokenHash(JwtService.hashToken(newRefreshToken));
         session.setLastAccessedAt(now);
         session.setExpiresAt(now.plusSeconds(refreshExpiration / 1000));
-        userSessionRepository.save(session);
+        try {
+            userSessionRepository.save(session);
+        } catch (Exception ex) {
+            log.warn("Could not persist user session (schema target may be pre-V37): {}", ex.getMessage());
+        }
 
         return AuthResponse.builder()
                 .accessToken(newAccessToken)
@@ -254,6 +270,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             return;
         }
         LocalDateTime now = LocalDateTime.now(clock);
-        userSessionRepository.revokeSession(sessionId, now, "USER_LOGOUT");
+        try {
+            userSessionRepository.revokeSession(sessionId, now, "USER_LOGOUT");
+        } catch (Exception ex) {
+            log.warn("Could not revoke user session: {}", ex.getMessage());
+        }
     }
 }
