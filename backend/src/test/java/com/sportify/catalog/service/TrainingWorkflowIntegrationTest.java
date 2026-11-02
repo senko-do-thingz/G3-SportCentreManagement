@@ -198,6 +198,25 @@ class TrainingWorkflowIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM session_result WHERE session_id=?", session)).isZero();
         assertThat(count("SELECT COUNT(*) FROM activity_log WHERE actor_user_id=? AND action='TRAINING_RESULT_CREATED'", coach)).isZero();
     }
+    @Test void HOT03_repeatedPlanAndReassignmentDoNotGrantPerpetualCoachRights() {
+        var request = plan();
+        long id = writer.createPlan(coach, request).id();
+        assertThatThrownBy(() -> writer.createPlan(coach, request)).isInstanceOf(ConflictException.class);
+        assertThat(count("SELECT COUNT(*) FROM session_plan WHERE booking_id=?", booking)).isEqualTo(1);
+        jdbc.update("UPDATE sport_class SET coach_id=? WHERE id=?", otherCoach, classId);
+        assertThat(writer.coachPlans(coach)).isEmpty();
+        assertThatThrownBy(() -> writer.coachPlan(coach, id)).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> writer.feedback(coach, id, new TrainingWriteRequest.Feedback(4, "Former coach", null, null)))
+            .isInstanceOf(ResourceNotFoundException.class);
+        assertThat(reader.plan(member, id).steps()).hasSize(1);
+        assertThatThrownBy(() -> writer.createPlan(otherCoach, plan())).isInstanceOf(BusinessRuleException.class);
+    }
+    @Test void HOT03_concurrentRepeatedPlanConflictsWithoutDuplicateSteps() throws Exception {
+        var request = plan();
+        interleave(() -> writer.createPlan(coach, request), () -> writer.createPlan(coach, request), ConflictException.class);
+        assertThat(count("SELECT COUNT(*) FROM session_plan WHERE booking_id=?", booking)).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM session_plan_step s JOIN session_plan p ON p.id=s.plan_id WHERE p.booking_id=?", booking)).isEqualTo(1);
+    }
     @Test void R2_02_cancelledOrMismatchedBookingCannotReceivePlan() {
         var wrong=new TrainingWriteRequest.Plan(classId,peer,booking,"Wrong owner",null,plan().steps());
         assertThatThrownBy(()->writer.createPlan(coach,wrong)).isInstanceOf(BusinessRuleException.class);

@@ -38,7 +38,7 @@ public class TrainingWriteService {
                m.full_name member_name, u.full_name coach_name
         FROM session_plan p JOIN sport_class c ON c.id = p.class_id
         JOIN user_account m ON m.id = p.member_id JOIN user_account u ON u.id = p.coach_id
-        WHERE p.coach_id = ? AND p.is_template = 0
+        WHERE p.coach_id = ? AND c.coach_id = p.coach_id AND p.is_template = 0
         """;
     private static final String SESSION_SELECT = """
         SELECT s.id, s.class_id, COALESCE(c.name, sp.name) class_name, s.sport_id,
@@ -67,7 +67,7 @@ public class TrainingWriteService {
             JOIN sport_class c ON c.id = s.class_id AND c.coach_id = ?
             JOIN user_account u ON u.id = b.member_id
             WHERE s.class_id = ? AND b.status = 'CONFIRMED' AND s.status <> 'CANCELLED'
-              AND s.training_type = 'COACH_LED'
+              AND s.training_type = 'COACH_LED' AND s.coach_id = c.coach_id
             ORDER BY u.full_name, s.session_date DESC, b.id
             """, (rs, row) -> new BookingCandidate(rs.getLong("booking_id"), rs.getLong("member_id"),
                 rs.getString("member_name"), rs.getDate("session_date").toLocalDate()), coachId, classId);
@@ -78,9 +78,12 @@ public class TrainingWriteService {
         requireCoachClass(coachId, request.classId());
         // Follow the existing session-first booking/cancellation lock order.
         lockBooking(request.bookingId());
-        if (!exists("SELECT COUNT(*) FROM booking b JOIN class_session s ON s.id = b.session_id JOIN sport_class c ON c.id = s.class_id WHERE b.id = ? AND b.member_id = ? AND s.class_id = ? AND c.coach_id = ? AND b.status = 'CONFIRMED' AND s.status <> 'CANCELLED' AND s.training_type = 'COACH_LED'",
+        if (!exists("SELECT COUNT(*) FROM booking b JOIN class_session s ON s.id = b.session_id JOIN sport_class c ON c.id = s.class_id WHERE b.id = ? AND b.member_id = ? AND s.class_id = ? AND c.coach_id = ? AND s.coach_id = c.coach_id AND b.status = 'CONFIRMED' AND s.status <> 'CANCELLED' AND s.training_type = 'COACH_LED'",
                 request.bookingId(), request.memberId(), request.classId(), coachId))
             throw new BusinessRuleException("Select a confirmed booking belonging to this member and class");
+        if (exists("SELECT COUNT(*) FROM session_plan WHERE booking_id=? AND member_id=? AND coach_id=? AND title=? AND is_template=0",
+                request.bookingId(), request.memberId(), coachId, request.title().trim()))
+            throw new ConflictException("A plan with this title already exists for this booking; choose a distinct title for a new plan");
         long id = insert("INSERT INTO session_plan(class_id, member_id, booking_id, coach_id, title, description, is_template, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)",
             request.classId(), request.memberId(), request.bookingId(), coachId, request.title().trim(), request.description(), now(), now());
         int order = 0;
