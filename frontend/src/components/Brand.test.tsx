@@ -12,6 +12,8 @@ describe('Brand link accessible name', () => {
     const link = screen.getByRole('link', { name: 'Sportify Sports center home' })
     const visible = visibleWords(link.querySelector('.brand__text')!)
     expect(visible.length).toBeGreaterThan(0)
+    // The logo letter is drawn by CSS, so it is not visible text that the accessible name would have to repeat.
+    expect(link.querySelector('.brand__mark')!.textContent).toBe('')
     expect(link.getAttribute('aria-label')!.toLowerCase()).toContain(visible)
   })
 })
