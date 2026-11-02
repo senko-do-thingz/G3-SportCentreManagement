@@ -58,4 +58,4 @@ This matrix preserves the 22 cases requested by the CODEOWNER Round 01 review. E
 - Frontend lint passed.
 - Production build passed with the existing Vite advisory for a bundle chunk above 500 kB.
 - One intermediate full-suite run had a failure in the unrelated auth storage-event test (1,764 passed, 1 failed). That auth test passed in isolation (25/25), and the subsequent full rerun passed (1,765/1,765).
-- Exact-head GitHub Actions for the Round 04 code change is tracked in PR #186; do not use the Round 03 run as validation for this change.
+- GitHub Actions run 41393307109 passed on exact Round 04 code head 1ccf2b660a0872d44aef955617e193f314d34560; all 16 checks succeeded.
