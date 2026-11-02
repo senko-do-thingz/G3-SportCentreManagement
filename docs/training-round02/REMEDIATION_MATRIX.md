@@ -12,7 +12,7 @@ Submission status: implementation for independent review, NOT approval to merge.
 | F-08 | Success message now reflects persisted attendance; response shape and Reception/Manager authorization unchanged. R2-07. | [backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java:357](../../backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java#L357) |
 | F-09 | Roster exposes resultId; form excludes saved members and remembers a successful save. R2-FE-03 and existing result-flow test. | [frontend/src/pages/training/CoachTrainingPages.tsx:181](../../frontend/src/pages/training/CoachTrainingPages.tsx#L181) |
 | F-06 | Latest origin/main and remote PR branch merged locally without conflict; final SHA and CI evidence belong in submission handoff. | Main baseline 646bd14; inspect final commit ancestry. |
-| F-07 | Scope/decision register, API map, test cases, private audit handoff and this matrix provided. V37 schema approval and explicit CODEOWNER exceptions are NOT fabricated; still pending. | SCOPE_AND_DECISIONS.md; TEST_CASES.md; API_AND_CODE_MAP.md. |
+| F-07 | Scope/decision register, API map, test cases and this matrix provided. Private audit draft generated; native visual QA is pending after app-approval timeout. V37 schema approval and explicit CODEOWNER exceptions are NOT fabricated; still pending. | SCOPE_AND_DECISIONS.md; TEST_CASES.md; API_AND_CODE_MAP.md. |
 
 ## Approval and submission gates
 
