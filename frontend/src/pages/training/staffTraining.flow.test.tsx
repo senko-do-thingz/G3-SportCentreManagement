@@ -89,6 +89,8 @@ describe('Coach training writes', () => {
     await user.type(screen.getByLabelText('Result notes'), 'Exercises completed')
     await user.click(screen.getByRole('button', { name: 'Save results' }))
     expect(await screen.findByText('Training results saved. The member can view them immediately.')).toBeInTheDocument()
+    expect(screen.getByText('Results already saved')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save results' })).not.toBeInTheDocument()
     expect(calls.find(call => call.path === '/coach/training/results')?.body).toEqual({ sessionId: 5, memberId: 42, notes: 'Exercises completed', scores: [] })
   })
 

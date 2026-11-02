@@ -164,6 +164,40 @@ class TrainingWorkflowIntegrationTest {
             () -> writer.coachAttendance(coach, attendance(TrainingWriteRequest.AttendanceStatus.LATE)), ConflictException.class);
         assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE session_id=? AND member_id=?", session, member)).isEqualTo(1);
     }
+    @ParameterizedTest @org.junit.jupiter.params.provider.EnumSource(TrainingWriteRequest.AttendanceStatus.class)
+    void HOT02_resultRequiresParticipatingAttendance(TrainingWriteRequest.AttendanceStatus state) {
+        writer.coachAttendance(coach, attendance(state));
+        if (state == TrainingWriteRequest.AttendanceStatus.PRESENT || state == TrainingWriteRequest.AttendanceStatus.LATE)
+            assertThat(writer.createResult(coach, result()).id()).isPositive();
+        else assertThatThrownBy(() -> writer.createResult(coach, result())).isInstanceOf(BusinessRuleException.class);
+    }
+    @Test void HOT02_invalidMetricsAndEmptyAssessmentNeverPersistPartialResults() {
+        writer.coachAttendance(coach, attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
+        long metric = insert("INSERT skill_metric(sport_id,name,max_score) VALUES (?,'Footwork',10)", sport);
+        long otherSport = jdbc.queryForObject("SELECT MIN(id) FROM sport WHERE id<>?", Long.class, sport);
+        long foreignMetric = insert("INSERT skill_metric(sport_id,name,max_score) VALUES (?,'Foreign sport',10)", otherSport);
+        var valid = new TrainingWriteRequest.Score(metric, new java.math.BigDecimal("8.25"));
+        for (var scores : List.of(List.of(valid, valid), List.of(new TrainingWriteRequest.Score(foreignMetric, java.math.BigDecimal.ONE)),
+            List.of(new TrainingWriteRequest.Score(metric, new java.math.BigDecimal("10.01"))),
+            List.of(new TrainingWriteRequest.Score(metric, new java.math.BigDecimal("1.001"))))) {
+            assertThatThrownBy(() -> writer.createResult(coach, new TrainingWriteRequest.Result(session, member, null, scores)))
+                .isInstanceOf(BusinessRuleException.class);
+        }
+        assertThatThrownBy(() -> writer.createResult(coach, new TrainingWriteRequest.Result(session, member, " ", List.of())))
+            .isInstanceOf(BusinessRuleException.class);
+        assertThat(count("SELECT COUNT(*) FROM session_result WHERE session_id=?", session)).isZero();
+        long id = writer.createResult(coach, new TrainingWriteRequest.Result(session, member, "Coach feedback", List.of(valid))).id();
+        assertThat(reader.result(member, id).scores().getFirst().score()).isEqualByComparingTo("8.25");
+    }
+    @Test void HOT02_resultAndAuditRollbackTogether() {
+        writer.coachAttendance(coach, attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
+        assertThatThrownBy(() -> new TransactionTemplate(transactions).execute(status -> {
+            writer.createResult(coach, result());
+            throw new IllegalStateException("result rollback probe");
+        })).isInstanceOf(IllegalStateException.class);
+        assertThat(count("SELECT COUNT(*) FROM session_result WHERE session_id=?", session)).isZero();
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE actor_user_id=? AND action='TRAINING_RESULT_CREATED'", coach)).isZero();
+    }
     @Test void R2_02_cancelledOrMismatchedBookingCannotReceivePlan() {
         var wrong=new TrainingWriteRequest.Plan(classId,peer,booking,"Wrong owner",null,plan().steps());
         assertThatThrownBy(()->writer.createPlan(coach,wrong)).isInstanceOf(BusinessRuleException.class);
