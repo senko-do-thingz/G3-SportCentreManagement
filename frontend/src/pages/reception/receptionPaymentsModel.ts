@@ -86,6 +86,7 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
 export function paymentStatusLabel(status: string | null | undefined, settlementType?: string | null): string {
   if (!status) return 'Unknown'
   if (status === 'SUCCESS' && settlementType === 'SIMULATED') return 'Paid - Simulated'
+  if (status === 'SUCCESS' && (settlementType === 'UNKNOWN' || settlementType === 'LEGACY_UNVERIFIED')) return 'Paid - Legacy unverified'
   return PAYMENT_STATUS_LABELS[status] ?? humanizeCode(status)
 }
 
