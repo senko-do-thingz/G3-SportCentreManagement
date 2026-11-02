@@ -22,6 +22,7 @@ import java.util.*;
 public class TrainingGuidanceService {
     private final JdbcTemplate jdbc;
     private final Clock clock;
+    private final VisibleTrainingSessions visibility;
     private static final Set<String> LEVELS = Set.of("BEGINNER", "INTERMEDIATE", "ADVANCED");
     private static final Set<String> GOALS = Set.of("IMPROVE_FITNESS", "BUILD_SKILLS", "COMPETITION");
 
@@ -85,6 +86,8 @@ public class TrainingGuidanceService {
                 rs.getString("sport_name"),rs.getString("level"),rs.getString("coach_name"),rs.getString("training_type"),
                 rs.getDate("session_date").toLocalDate(),start,end,rs.getInt("free_seats"),score,List.copyOf(reasons));
         }, values.toArray());
+        var visibleIds=visibility.filter(candidates.stream().map(ClassRecommendation::sessionId).toList());
+        candidates.removeIf(candidate->!visibleIds.contains(candidate.sessionId()));
         candidates.sort(Comparator.comparingInt(ClassRecommendation::score).reversed().thenComparing(ClassRecommendation::date)
             .thenComparing(ClassRecommendation::startTime).thenComparingLong(ClassRecommendation::classId).thenComparingLong(ClassRecommendation::sessionId));
         var classes = new LinkedHashMap<Long,ClassRecommendation>();

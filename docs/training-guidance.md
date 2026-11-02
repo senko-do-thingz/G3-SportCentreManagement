@@ -4,6 +4,8 @@ Class recommendations use GET /api/v1/member/training/recommendations for enable
 
 Only active sports/classes with published upcoming sessions and positive remaining capacity qualify. Already-booked sessions are excluded. Coach-led sessions require the current assigned active coach. Available times restrict the complete session. One session is selected per class after scoring and stable sorting by score descending, date, start time, class ID and session ID.
 
+Every candidate also passes the existing session catalog's authoritative visibility predicate before ranking or pagination. This includes an active facility, a valid time interval, an active Coach account with the COACH role and the required coach-sport qualification. Candidate IDs are checked in bounded batches to preserve SQL Server's parameter limit. Recommendation detail links therefore use the same visibility policy as GET /api/v1/sessions/{id}.
+
 The class-rules-v1 score adds 50 for a selected sport, 20 for the selected or saved level, 5 for the Member's own recorded participation in that sport, and 15 for a goal match. BUILD_SKILLS matches coached sessions, COMPETITION matches advanced coached sessions, and IMPROVE_FITNESS matches sessions lasting at least 60 minutes. These are transparent product heuristics and do not assert fitness or medical outcomes.
 
 The response declares mode RULE_BASED, ruleVersion class-rules-v1 and bookingEligibilityChecked false. Items include real class/session IDs, capacity snapshots, scores and reasons. Session details and the existing booking service remain authoritative for package eligibility and capacity. A recommendation creates no booking, invoice, credit debit or assigned plan.

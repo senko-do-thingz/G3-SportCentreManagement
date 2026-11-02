@@ -284,6 +284,9 @@ class TrainingWorkflowIntegrationTest {
     }
     @Test void HOT07_recommendationsUseLiveAvailabilityAndStablePreferenceRanking() throws Exception {
         jdbc.update("UPDATE class_session SET session_date='2026-11-03' WHERE id=?",session);
+        long facility=jdbc.queryForObject("SELECT MIN(id) FROM facility WHERE is_active=1",Long.class);
+        jdbc.update("UPDATE class_session SET facility_id=? WHERE id=?",facility,session);
+        jdbc.update("INSERT coach_sport(coach_id,sport_id) VALUES (?,?)",coach,sport);
         var request=new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,"BEGINNER","BUILD_SKILLS",null,null,null,null,0,10);
         int bookingsBefore=count("SELECT COUNT(*) FROM booking");
         var result=guidance.recommendations(peer,request);
@@ -297,6 +300,7 @@ class TrainingWorkflowIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM booking")).isEqualTo(bookingsBefore);
         long secondClass=insert("INSERT sport_class(code,name,sport_id,coach_id,max_members) VALUES (?,?,?,?,10)",code(),"Stable tie class",sport,coach);
         long secondSession=insert("INSERT class_session(class_id,sport_id,session_date,start_time,end_time,coach_id,training_type,capacity,booked_count,status) VALUES (?,?,'2026-11-03','09:00','10:00',?,'COACH_LED',10,0,'PUBLISHED')",secondClass,sport,coach);
+        jdbc.update("UPDATE class_session SET facility_id=? WHERE id=?",facility,secondSession);
         var firstPage=guidance.recommendations(peer,new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,"BEGINNER","BUILD_SKILLS",null,null,null,null,0,1));
         var nextPage=guidance.recommendations(peer,new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,"BEGINNER","BUILD_SKILLS",null,null,null,null,1,1));
         assertThat(firstPage.totalMatches()).isEqualTo(2);
@@ -305,6 +309,16 @@ class TrainingWorkflowIntegrationTest {
         assertThat(guidance.recommendations(peer,new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,"BEGINNER","BUILD_SKILLS",null,null,LocalTime.of(9,0),LocalTime.of(10,0),0,10)).totalMatches()).isEqualTo(2);
         assertThat(guidance.recommendations(peer,new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,"BEGINNER","BUILD_SKILLS",null,null,LocalTime.of(9,1),LocalTime.of(10,0),0,10)).items()).isEmpty();
         assertThat(guidance.recommendations(peer,new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(null,null,null,null,null,null,null,0,10)).mode()).isEqualTo("RULE_BASED");
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/sessions/"+session)
+            .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(peer)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.session.id").value(session));
+        jdbc.update("UPDATE class_session SET facility_id=NULL WHERE id=?",session);
+        assertThat(guidance.recommendations(peer,request).items()).noneMatch(item->item.sessionId()==session);
+        jdbc.update("UPDATE class_session SET facility_id=? WHERE id=?",facility,session);
+        jdbc.update("DELETE FROM coach_sport WHERE coach_id=? AND sport_id=?",coach,sport);
+        assertThat(guidance.recommendations(peer,request).items()).isEmpty();
+        jdbc.update("INSERT coach_sport(coach_id,sport_id) VALUES (?,?)",coach,sport);
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/recommendations?sportId="+sport)
             .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(peer)))))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
