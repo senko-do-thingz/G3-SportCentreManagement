@@ -18,6 +18,8 @@ POST /api/v1/member/training/consultation accepts question (1-500 characters) an
 
 Supported intents are published session availability, active sport-package base prices in VND, and existing booking guidance. The service reads live catalog rows; it shows at most five results and names the date window or price scope. It does not infer eligibility or confirm payment. Unknown/private instructions receive NO_ANSWER; personal training questions link to the human Coach conversation. Input is never executed as SQL or as a provider prompt.
 
+Session sources pass the canonical session-detail visibility predicate before the five-result limit is applied. Missing or inactive facilities and unqualified Coaches cannot produce unavailable detail links, and invalid earlier rows cannot hide valid later results.
+
 Questions and answers are ephemeral. No conversation tables are written and no chat history is transferred between accounts. UI opt-in resets on navigation/reload. Set app.training.consultation.enabled=false on the backend or VITE_TRAINING_CONSULTATION_ENABLED=false on the frontend to disable consultation. Backend opt-in and feature-off handling query no catalog data. There is no configured LLM fallback; the knowledge service remains explicit about its limits.
 
 ## Coach reviewed drill drafts

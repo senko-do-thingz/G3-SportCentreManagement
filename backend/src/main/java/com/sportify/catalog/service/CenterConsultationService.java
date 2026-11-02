@@ -23,9 +23,10 @@ public class CenterConsultationService {
     private final JdbcTemplate jdbc;
     private final Clock clock;
     private final boolean enabled;
+    private final VisibleTrainingSessions visibility;
     public CenterConsultationService(JdbcTemplate jdbc, Clock clock,
-        @Value("${app.training.consultation.enabled:true}") boolean enabled) {
-        this.jdbc=jdbc;this.clock=clock;this.enabled=enabled;
+        @Value("${app.training.consultation.enabled:true}") boolean enabled, VisibleTrainingSessions visibility) {
+        this.jdbc=jdbc;this.clock=clock;this.enabled=enabled;this.visibility=visibility;
     }
     public Consultation answer(String question,boolean optIn) {
         if(!enabled)return response("UNAVAILABLE","Automated center consultation is disabled.",List.of());
@@ -75,7 +76,7 @@ public class CenterConsultationService {
         LocalDate from=tomorrow?today.plusDays(1):today;
         LocalDate to=tomorrow?from:today.plusDays(14);
         String sql="""
-            SELECT TOP(5) s.id,c.name,sp.name sport_name,s.session_date,s.start_time,s.end_time,s.capacity-s.booked_count free_seats
+            SELECT s.id,c.name,sp.name sport_name,s.session_date,s.start_time,s.end_time,s.capacity-s.booked_count free_seats
             FROM class_session s JOIN sport sp ON sp.id=s.sport_id LEFT JOIN sport_class c ON c.id=s.class_id
             WHERE s.status='PUBLISHED' AND sp.is_active=1 AND (c.id IS NULL OR c.is_active=1)
                 AND s.booked_count<s.capacity AND s.session_date BETWEEN ? AND ?
@@ -88,8 +89,10 @@ public class CenterConsultationService {
             rs.getString("name")==null?rs.getString("sport_name")+" practice":rs.getString("name"),
             rs.getString("sport_name")+": "+rs.getDate("session_date")+" "+rs.getTime("start_time")+"-"+rs.getTime("end_time")+" (Vietnam time), "+rs.getInt("free_seats")+" places remaining. Package eligibility has not been checked.",
             "/member/sessions/"+rs.getLong("id")),values.toArray());
-        return response(sources.isEmpty()?"NO_ANSWER":"ANSWERED",sources.isEmpty()?"No matching published sessions with available places were found for "+from+" through "+to+". Reception can confirm other dates.":
-            "Published sessions with available places for "+from+" through "+to+" (up to 5, earliest first). Open the source to check current eligibility.",sources);
+        var visibleIds=visibility.filter(sources.stream().map(ConsultationSource::id).toList());
+        var visible=sources.stream().filter(source->visibleIds.contains(source.id())).limit(5).toList();
+        return response(visible.isEmpty()?"NO_ANSWER":"ANSWERED",visible.isEmpty()?"No matching published sessions with available places were found for "+from+" through "+to+". Reception can confirm other dates.":
+            "Published sessions with available places for "+from+" through "+to+" (up to 5, earliest first). Open the source to check current eligibility.",visible);
     }
     private static Consultation response(String status,String answer,List<ConsultationSource> sources) {
         return new Consultation("KNOWLEDGE_BASED",status,answer,false,sources);
