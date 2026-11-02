@@ -58,9 +58,12 @@ Addressed the confirmed Activity Log defects in the frontend, added focused regr
 
 ## Round 03 CODEOWNER follow-up (2026-11-02)
 
-- Fixed the reported curly quotation marks in `browser-evidence.md` with straight ASCII quotes.
-- The diff-wide ASCII scan is documented in `../PR-186-Round-03/README.md`; UI16-TC-20 remains PARTIAL and a screen-reader scope exception is requested, not presumed approved.
-- The local-only AI Audit Log was opened read-only in Word (2 pages). No private handoff is claimed until the requester supplies an authorized private destination.
-- PR #184 remains open. The review's requested post-merge update from `main` and reconciliation of the shared schedule test are deferred until that PR merges. Current `main` is `97abe0feebd0448cb87d9f89347ab8af2a320991`; this branch has not yet been updated to it.
-- No production backend request or write was performed during this review.
-- Round 02 source head `35b95a8b64830f2f34cdfac6a6fc438d93a9114a` passed GitHub Actions run `41315606992` (15/15 jobs). The final SHA and CI result for the Round 03 follow-up are recorded in PR #186 after the run completes.
+- The reported curly quotation marks in browser-evidence.md were replaced with straight ASCII quotes.
+- Latest origin/main, 646bd143c40d0e3721210433997e1316ae05cc1e, was fetched and merged locally into feat/ui-16 at cc54acc40ff6dc93446cd7b543bbd4c3d598ee63 with no conflicts. This local merge is not pushed yet.
+- PR #184 remains open at 0288be8d4d03e120285083e45a005f1e6877efd3. A changed-file comparison confirms overlap in frontend/src/pages/manager/managerSchedule.test.tsx and frontend/src/pages/manager/managerScreens.test.tsx. Keep the shared changes until PR #184 merges; then remove only what is redundant and rerun checks.
+- On local merge head cc54acc, the frontend suite passed: 94 files and 1,764 tests; lint and build passed. The build has the existing Vite chunk-size advisory.
+- GitHub Actions run 41378482529 passed on the prior remote UI-16 head 55e49b259134341511c7804421dd3e25b53a7ea4. It is not CI evidence for local head cc54acc; new CI is required after push.
+- UI16-TC-20 remains PARTIAL. No NVDA/Chrome or VoiceOver/Safari pass is claimed; an explicit CODEOWNER-approved scope exception remains necessary if manual testing cannot be provided.
+- The local-only AI Audit Log was opened read-only in Word and reported as 2 pages. It remains excluded from Git. Private delivery to the CODEOWNER has not happened because an approved destination and authorization are still missing.
+- The updated ASCII scan command and result are recorded in docs/reviews/PR-186-Round-03/README.md.
+- No production backend request or write was performed during the Round 02/03 browser review or this branch reconciliation.

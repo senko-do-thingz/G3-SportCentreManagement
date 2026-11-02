@@ -30,7 +30,7 @@ This matrix preserves the 22 cases requested by the CODEOWNER Round 01 review. E
 | UI16-TC-19 | 390x844, 768x1024, and 1440x900 in light/dark | PASS - exact viewport screenshots provided; no page-level horizontal overflow. Narrow table overflow stays inside its labelled scroll region. |
 | UI16-TC-20 | NVDA/Chrome or VoiceOver/Safari at mobile width | PARTIAL - NVDA is not installed in the available Windows environment. Chromium accessibility snapshot retains a native table and four column headers; keyboard focus and Tab navigation to Details were verified at 390px. A manual screen-reader pass remains outstanding. |
 | UI16-TC-21 | Refresh when the activity total changes | PASS - new UI-16 regression test changes the mocked total from 21 events to zero after Refresh and verifies the updated state. |
-| UI16-TC-22 | Existing manager schedule regression | PASS - full frontend suite includes the schedule test. The fixture correction is already on this branch because PR #184 remains open and the current main baseline does not contain it. |
+| UI16-TC-22 | Existing manager schedule regression | PASS - full frontend suite passed on local head cc54acc after current main was merged. The UI-16 diff still overlaps PR #184 in managerSchedule.test.tsx and managerScreens.test.tsx; reconcile after PR #184 merges. |
 
 ## Final local verification
 
@@ -40,11 +40,11 @@ This matrix preserves the 22 cases requested by the CODEOWNER Round 01 review. E
 - Production TypeScript/Vite build: passed; Vite emitted the existing advisory for a bundle chunk above 500 kB.
 - The DOCX AI Audit Log is stored locally under docs/audit/ and is excluded from Git by the repository's private-audit ignore rules.
 
-## Round 03 follow-up status (2026-11-02)
+## Round 03 local validation
 
-- UI16-TC-20 remains PARTIAL. NVDA/Chrome and VoiceOver/Safari testing were unavailable; the PR requests an explicit CODEOWNER-approved scope exception. Do not treat Chromium accessibility-tree and keyboard checks as a screen-reader pass.
-- The audit DOCX exists locally and opened read-only in Word (2 pages). It remains excluded from Git by repository policy. Private delivery is pending an authorized destination; no handoff is claimed yet.
-- UI16-TC-22 passed in the full frontend suite on source head `35b95a8b64830f2f34cdfac6a6fc438d93a9114a`. PR #184 remains open, so the requested post-merge branch update and duplicate fixture reconciliation are deferred.
-- The diff-wide ASCII scan command and result are in `docs/reviews/PR-186-Round-03/README.md`.
-- No production backend request or write was performed during Round 02/03 browser review. The local preview used synthetic data only.
-- Round 02 code CI: GitHub Actions run `41315606992`, 15/15 jobs passed. Final Round 03 head and CI run will be recorded in the PR description after the follow-up run completes.
+- After fetching and merging current origin/main 646bd143c40d0e3721210433997e1316ae05cc1e into feat/ui-16 at cc54acc40ff6dc93446cd7b543bbd4c3d598ee63, the frontend suite passed: 94 test files and 1,764 tests, zero failures.
+- npm run lint passed.
+- npm run build passed with the existing Vite advisory for a bundle chunk above 500 kB.
+- GitHub Actions run 41378482529 passed on the earlier remote head 55e49b259134341511c7804421dd3e25b53a7ea4. It does not validate local head cc54acc; push and rerun CI before requesting approval.
+- The local audit DOCX remains excluded from Git and has not been delivered privately. No destination is authorized.
+- No production backend request or write was performed during the browser review or local merge.

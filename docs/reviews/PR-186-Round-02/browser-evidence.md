@@ -50,8 +50,16 @@ Long-text stress screenshots use the local preview with the first row's activity
 - At 1101px, the table has 780px content width within a 740px local scroll region. The 96.67px Details button is fully visible; page content does not overflow horizontally.
 - NVDA was not installed in the browser environment, so no manual screen-reader pass is claimed.
 
-## Round 03 follow-up
+## Round 03 follow-up and branch reconciliation
 
-The reported Unicode curly quotation marks were replaced with straight ASCII quotation marks. The additional diff-wide ASCII scan and its exact result are recorded in `../PR-186-Round-03/README.md`. This documentation correction does not alter screenshots or application behavior.
+The reported Unicode curly quotation marks were replaced with straight ASCII quotation marks. The explicit diff-wide ASCII scan is recorded in ../PR-186-Round-03/README.md.
 
-UI16-TC-20 remains PARTIAL pending a real screen-reader pass or CODEOWNER-approved exception. The Chromium accessibility tree and keyboard evidence remain supplemental only.
+UI16-TC-20 remains PARTIAL. Chromium accessibility-tree and keyboard checks are supplemental; they are not a real NVDA/Chrome or VoiceOver/Safari screen-reader pass.
+
+Current main 646bd143c40d0e3721210433997e1316ae05cc1e was merged locally into feat/ui-16 at cc54acc40ff6dc93446cd7b543bbd4c3d598ee63. The merge added PR #188 reception changes and had no conflicts. It did not change the Activity Log browser screenshots or its frontend source.
+
+PR #184 remains open. The exact changed-file overlap is managerSchedule.test.tsx and managerScreens.test.tsx. These shared changes must be reviewed after PR #184 merges; no post-merge cleanup is claimed.
+
+GitHub Actions run 41378482529 passed on remote UI-16 head 55e49b259134341511c7804421dd3e25b53a7ea4. It does not cover local head cc54acc. A new CI run is required after the local update is pushed.
+
+Screenshots use synthetic local preview data. No production backend request or write was performed.
