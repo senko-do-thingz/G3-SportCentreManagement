@@ -186,10 +186,14 @@ public class TrainingWriteService {
 
     @Transactional
     public Created correctAttendance(long actorId, long id, TrainingWriteRequest.Correction request) {
+        if (request.reason() == null || request.reason().trim().length() < 3)
+            throw new BusinessRuleException("Provide a meaningful correction reason of at least 3 characters");
         var sessionIds = jdbc.query("SELECT session_id FROM attendance_record WHERE id = ?", (rs, row) -> rs.getLong("session_id"), id);
         if (sessionIds.isEmpty()) throw new ResourceNotFoundException("Attendance not found");
         // Match result creation/cancellation: session first, then participation row.
         lockSession(sessionIds.getFirst());
+        if (!exists("SELECT COUNT(*) FROM attendance_record a JOIN booking b ON b.id=a.booking_id JOIN class_session s ON s.id=a.session_id WHERE a.id=? AND b.status='CONFIRMED' AND s.status<>'CANCELLED'", id))
+            throw new BusinessRuleException("Attendance correction requires a confirmed booking and non-cancelled session");
         jdbc.update("UPDATE attendance_record SET notes = notes WHERE id = ?", id);
         String previous = jdbc.queryForObject("SELECT status FROM attendance_record WHERE id = ?", String.class, id);
         if (request.status() == TrainingWriteRequest.AttendanceStatus.ABSENT || request.status() == TrainingWriteRequest.AttendanceStatus.EXCUSED) {

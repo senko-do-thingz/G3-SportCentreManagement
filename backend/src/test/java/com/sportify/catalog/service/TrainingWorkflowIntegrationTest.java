@@ -138,6 +138,32 @@ class TrainingWorkflowIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM activity_log WHERE entity_id=? AND actor_user_id=? AND action='TRAINING_PLAN_CREATED'",id,coach)).isEqualTo(1);
         assertThat(count("SELECT COUNT(*) FROM activity_log WHERE actor_user_id=? AND action='TRAINING_FEEDBACK_CREATED' AND JSON_VALUE(details,'$.planId')=?",coach,String.valueOf(id))).isEqualTo(1);
     }
+    @ParameterizedTest @org.junit.jupiter.params.provider.EnumSource(TrainingWriteRequest.AttendanceStatus.class)
+    void HOT01_allParticipationStatesPersistWithoutFinancialEvents(TrainingWriteRequest.AttendanceStatus state) {
+        int invoices = count("SELECT COUNT(*) FROM invoice");
+        long id = writer.coachAttendance(coach, attendance(state)).id();
+        assertThat(reader.attendance(member)).anySatisfy(row -> {
+            assertThat(row.id()).isEqualTo(id);
+            assertThat(row.status()).isEqualTo(state.name());
+        });
+        assertThat(count("SELECT COUNT(*) FROM invoice")).isEqualTo(invoices);
+        assertThatThrownBy(() -> writer.coachAttendance(coach, attendance(state))).isInstanceOf(ConflictException.class);
+    }
+    @Test void HOT01_cancelledBookingAndEmptyReasonCannotBeCorrected() {
+        long id = writer.coachAttendance(coach, attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)).id();
+        assertThatThrownBy(() -> writer.coachCorrection(coach, id,
+            new TrainingWriteRequest.Correction(TrainingWriteRequest.AttendanceStatus.LATE, null, " ")))
+            .isInstanceOf(BusinessRuleException.class);
+        jdbc.update("UPDATE booking SET status='CANCELLED' WHERE id=?", booking);
+        assertThatThrownBy(() -> writer.coachCorrection(coach, id, correction(TrainingWriteRequest.AttendanceStatus.LATE)))
+            .isInstanceOf(BusinessRuleException.class);
+        assertThat(count("SELECT COUNT(*) FROM attendance_correction WHERE attendance_record_id=?", id)).isZero();
+    }
+    @Test void HOT01_concurrentMarksHaveOneAuthoritativeRow() throws Exception {
+        interleave(() -> writer.coachAttendance(coach, attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)),
+            () -> writer.coachAttendance(coach, attendance(TrainingWriteRequest.AttendanceStatus.LATE)), ConflictException.class);
+        assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE session_id=? AND member_id=?", session, member)).isEqualTo(1);
+    }
     @Test void R2_02_cancelledOrMismatchedBookingCannotReceivePlan() {
         var wrong=new TrainingWriteRequest.Plan(classId,peer,booking,"Wrong owner",null,plan().steps());
         assertThatThrownBy(()->writer.createPlan(coach,wrong)).isInstanceOf(BusinessRuleException.class);
