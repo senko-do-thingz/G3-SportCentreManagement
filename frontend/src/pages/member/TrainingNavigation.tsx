@@ -7,7 +7,7 @@ const trainingLinks = [
   { path: 'feedback', label: 'Coach feedback' },
   { path: 'attendance', label: 'Attendance history' },
   { path: 'results', label: 'Training results' },
-  { path: 'ai', label: 'AI recommendations - Pending approval' },
+  { path: 'recommendations', label: 'Class recommendations' },
 ]
 
 export function TrainingNavigation() {

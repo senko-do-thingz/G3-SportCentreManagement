@@ -64,6 +64,7 @@ class TrainingWorkflowIntegrationTest {
     @Autowired TrainingWriteService writer;
     @Autowired MemberTrainingService reader;
     @Autowired ClassLearningService learning;
+    @Autowired TrainingGuidanceService guidance;
     @Autowired BookingService bookings;
     @Autowired UserRepository users;
     @Autowired PlatformTransactionManager transactions;
@@ -279,6 +280,55 @@ class TrainingWorkflowIntegrationTest {
             ()->learning.reply(coach,true,question,"Follow your assigned steps."),null);
         assertThat(learning.discussion(member,false,question).messages()).hasSize(1);
         assertThat(count("SELECT COUNT(*) FROM activity_log WHERE entity_id=? AND action='TRAINING_QUESTION_REPLIED'",question)).isEqualTo(1);
+    }
+    @Test void HOT07_recommendationsUseLiveAvailabilityAndStablePreferenceRanking() throws Exception {
+        jdbc.update("UPDATE class_session SET session_date='2026-11-03' WHERE id=?",session);
+        var request=new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,"BEGINNER","BUILD_SKILLS",null,null,null,null,0,10);
+        int bookingsBefore=count("SELECT COUNT(*) FROM booking");
+        var result=guidance.recommendations(peer,request);
+        assertThat(result.mode()).isEqualTo("RULE_BASED");
+        assertThat(result.bookingEligibilityChecked()).isFalse();
+        var own=result.items().stream().filter(item->item.classId()==classId).findFirst().orElseThrow();
+        assertThat(own.score()).isEqualTo(85);
+        assertThat(own.reasons()).contains("Build skills goal: a coach-led session");
+        assertThat(guidance.recommendations(member,request).items()).noneMatch(item->item.sessionId()==session);
+        assertThat(guidance.recommendations(peer,request)).isEqualTo(result);
+        assertThat(count("SELECT COUNT(*) FROM booking")).isEqualTo(bookingsBefore);
+        long secondClass=insert("INSERT sport_class(code,name,sport_id,coach_id,max_members) VALUES (?,?,?,?,10)",code(),"Stable tie class",sport,coach);
+        long secondSession=insert("INSERT class_session(class_id,sport_id,session_date,start_time,end_time,coach_id,training_type,capacity,booked_count,status) VALUES (?,?,'2026-11-03','09:00','10:00',?,'COACH_LED',10,0,'PUBLISHED')",secondClass,sport,coach);
+        var firstPage=guidance.recommendations(peer,new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,"BEGINNER","BUILD_SKILLS",null,null,null,null,0,1));
+        var nextPage=guidance.recommendations(peer,new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,"BEGINNER","BUILD_SKILLS",null,null,null,null,1,1));
+        assertThat(firstPage.totalMatches()).isEqualTo(2);
+        assertThat(firstPage.items().getFirst().classId()).isEqualTo(classId);
+        assertThat(nextPage.items().getFirst().sessionId()).isEqualTo(secondSession);
+        assertThat(guidance.recommendations(peer,new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,"BEGINNER","BUILD_SKILLS",null,null,LocalTime.of(9,0),LocalTime.of(10,0),0,10)).totalMatches()).isEqualTo(2);
+        assertThat(guidance.recommendations(peer,new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,"BEGINNER","BUILD_SKILLS",null,null,LocalTime.of(9,1),LocalTime.of(10,0),0,10)).items()).isEmpty();
+        assertThat(guidance.recommendations(peer,new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(null,null,null,null,null,null,null,0,10)).mode()).isEqualTo("RULE_BASED");
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/recommendations?sportId="+sport)
+            .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(peer)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.mode").value("RULE_BASED"));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/recommendations"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/recommendations")
+            .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(coach)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        for(String state:List.of("DRAFT","CANCELLED")){
+            jdbc.update("UPDATE class_session SET status=? WHERE id=?",state,session);
+            assertThat(guidance.recommendations(peer,request).items()).noneMatch(item->item.sessionId()==session);
+        }
+        jdbc.update("UPDATE class_session SET status='PUBLISHED',booked_count=capacity WHERE id=?",session);
+        assertThat(guidance.recommendations(peer,request).items()).noneMatch(item->item.sessionId()==session);
+        jdbc.update("UPDATE class_session SET booked_count=0 WHERE id=?",session);
+        jdbc.update("UPDATE sport_class SET is_active=0 WHERE id=?",classId);
+        assertThat(guidance.recommendations(peer,request).items()).noneMatch(item->item.sessionId()==session);
+    }
+    @Test void HOT07_invalidPreferencesAreRejectedWithoutSqlSideEffects() {
+        for(var request:List.of(
+            new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,"' OR 1=1 --",null,null,null,null,null,0,10),
+            new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,null,null,null,null,null,null,0,21),
+            new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,null,null,LocalDate.of(2026,11,2),LocalDate.of(2026,12,4),null,null,0,10)))
+            assertThatThrownBy(()->guidance.recommendations(member,request)).isInstanceOf(BusinessRuleException.class);
     }
     @Test void R2_02_cancelledOrMismatchedBookingCannotReceivePlan() {
         var wrong=new TrainingWriteRequest.Plan(classId,peer,booking,"Wrong owner",null,plan().steps());

@@ -99,11 +99,15 @@ describe('Member training', () => {
     expect(within(training).getByRole('link', { name: 'Attendance history' })).toHaveAttribute('aria-current', 'page')
     expect(within(header).getByRole('link', { name: 'Training' })).toHaveClass('workspace-header__nav-link--active')
   })
-  it('does not call AI endpoints while scope is pending', async () => {
-    const { calls } = signedIn(() => json(200, []))
-    renderApp('/member/training/ai')
-    expect(await screen.findByText('Awaiting scope approval')).toBeInTheDocument()
-    expect(calls.map(call => call.path)).toEqual(['/users/me'])
+  it('labels deterministic recommendations and uses the canonical service', async () => {
+    const { calls } = signedIn(call => call.path.startsWith('/member/training/recommendations')
+      ? json(200, { mode: 'RULE_BASED', ruleVersion: 'class-rules-v1', bookingEligibilityChecked: false, message: 'Preference matches only.', page: 0, size: 10, totalMatches: 0, items: [] })
+      : json(200, []))
+    renderApp('/member/training/recommendations')
+    expect(await screen.findByText('No matching available classes')).toBeInTheDocument()
+    expect(screen.getByText(/RULE_BASED - Preference matches only/)).toBeInTheDocument()
+    expect(calls.some(call => call.path.startsWith('/member/training/recommendations'))).toBe(true)
+    expect(calls.every(call => call.method === 'GET')).toBe(true)
   })
   it('rejects external, traversal, assistant-loop and staff return paths', () => {
     for (const value of ['https://evil.test', '//evil.test', '/member/../manager', '/memberish', '/member/assistant', '/member\\evil']) {

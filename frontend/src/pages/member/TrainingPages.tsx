@@ -198,16 +198,3 @@ export function TrainingResultDetailPage() {
     </TrainingData>
   )
 }
-
-export function PendingAiRecommendationsPage() {
-  return (
-    <div className="training-page">
-      <PageHeader title="AI exercise recommendations" />
-      <EmptyState
-        title="Awaiting scope approval"
-        description="AI exercise recommendations are awaiting approval. Your assigned plans are available under Training plans."
-        action={<Link to="/member/training/plans">View training plans</Link>}
-      />
-    </div>
-  )
-}
