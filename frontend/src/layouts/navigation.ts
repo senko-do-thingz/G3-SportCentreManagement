@@ -83,6 +83,11 @@ export const MEMBER_AREA: RoleArea = {
           task: 'FE-11',
           screens: ['F3-01', 'F3-02', 'F3-03'],
         },
+        {
+          label: 'Training', path: 'training/plans', title: 'Training plans',
+          description: 'Your assigned plans, coach feedback, attendance and results.',
+          task: 'Member training', screens: ['F4-06', 'F4-07', 'F4-08'],
+        },
       ],
     },
   ],
@@ -93,6 +98,12 @@ export const RECEPTIONIST_AREA: RoleArea = {
   basePath: '/reception',
   workspaceLabel: 'Receptionist workspace',
   sections: [
+    {
+      heading: 'Training',
+      items: [
+        { label: 'Session attendance', path: 'training/attendance', title: 'Session attendance', description: 'Record attendance and corrections with a reason.', task: 'Training attendance', screens: [] },
+      ],
+    },
     {
       heading: 'Front desk',
       items: [
@@ -254,6 +265,15 @@ export const COACH_AREA: RoleArea = {
   basePath: '/coach',
   workspaceLabel: 'Coach workspace',
   sections: [
+    {
+      heading: 'Training',
+      items: [
+        { label: 'Session attendance', path: 'training/attendance', title: 'Session attendance', description: 'Record participation for assigned sessions.', task: 'Class learning', screens: ['F4-02'] },
+        { label: 'Member questions', path: 'training/questions', title: 'Member practice questions', description: 'Reply to supplementary practice questions.', task: 'Class learning', screens: [] },
+        { label: 'Plans and feedback', path: 'training/plans', title: 'Assign plans and feedback', description: 'Assign personal plans from confirmed bookings and provide member feedback.', task: 'Training plans', screens: [] },
+        { label: 'Record training results', path: 'training/results', title: 'Record training results', description: 'Record session results and skill scores.', task: 'Training results', screens: [] },
+      ],
+    },
     {
       items: [
         {

@@ -54,12 +54,31 @@ import { CoachRosterPage, CoachTeachingSchedulePage } from '../pages/coach/Coach
 import { ManagerFinancialOverviewPage } from '../pages/manager/ManagerFinancialOverviewPage'
 import { ManagerTransactionsPage } from '../pages/manager/ManagerTransactionsPage'
 import { ManagerRevenueReportsPage } from '../pages/manager/ManagerRevenueReportsPage'
+import {
+  TrainingPlansPage,
+  TrainingPlanDetailPage,
+  CoachFeedbackPage,
+  AttendancePage,
+  TrainingResultsPage,
+  TrainingResultDetailPage,
+  PendingAiRecommendationsPage,
+} from '../pages/member/TrainingPages'
+import { MemberAssistantPage } from '../pages/member/MemberAssistantPage'
+import { CoachTrainingPlansPage, CoachTrainingResultsPage } from '../pages/training/CoachTrainingPages'
+import { ClassQuestionsPage, MemberClassesPage, MemberClassDetailPage } from '../pages/training/ClassLearningPages'
+import { ReceptionTrainingAttendancePage, CoachTrainingAttendancePage } from '../pages/training/ReceptionTrainingPages'
 
 /**
  * Real screens by full path. Later tasks register their page here, for example
  * '/member/packages': <SportPackagesPage />. Paths without an entry show a placeholder.
  */
 const SCREENS: Record<string, ReactNode> = {
+  '/member/training/plans': <TrainingPlansPage />,
+  '/coach/training/plans': <CoachTrainingPlansPage />,
+  '/coach/training/results': <CoachTrainingResultsPage />,
+  '/coach/training/attendance': <CoachTrainingAttendancePage />,
+  '/coach/training/questions': <ClassQuestionsPage coach />,
+  '/reception/training/attendance': <ReceptionTrainingAttendancePage />,
   '/manager': <UserManagementPage />,
   '/manager/packages': <ManagerPackagesPage />,
   '/manager/cards': <MembershipCardsManagementPage />,
@@ -109,6 +128,16 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
     { path: 'classes/:classId/edit', element: <ClassEditorPage /> },
   ],
   '/member': [
+    { path: 'training/classes', element: <MemberClassesPage /> },
+    { path: 'training/classes/:id', element: <MemberClassDetailPage /> },
+    { path: 'training/questions', element: <ClassQuestionsPage /> },
+    { path: 'training/plans/:id', element: <TrainingPlanDetailPage /> },
+    { path: 'training/feedback', element: <CoachFeedbackPage /> },
+    { path: 'training/attendance', element: <AttendancePage /> },
+    { path: 'training/results', element: <TrainingResultsPage /> },
+    { path: 'training/results/:id', element: <TrainingResultDetailPage /> },
+    { path: 'training/ai', element: <PendingAiRecommendationsPage /> },
+    { path: 'assistant', element: <MemberAssistantPage /> },
     { path: 'classes', element: <FindClassesPage /> },
     { path: 'sessions/:sessionId', element: <SessionDetailPage /> },
     { path: 'bookings', element: <MemberBookingsPage /> },
