@@ -3,6 +3,7 @@ import com.sportify.catalog.dto.ClassLearningResponse.*;
 import com.sportify.core.audit.AuditEvent;
 import com.sportify.core.audit.AuditService;
 import com.sportify.core.exception.ResourceNotFoundException;
+import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.identity.entity.UserAccount;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -46,20 +47,24 @@ public class ClassLearningService {
         return new ClassDetail(classes.getFirst(),rows);
     }
     public List<Question> questions(long actorId, boolean coach) {
-        return jdbc.query(QUESTIONS + (coach ? "WHERE c.coach_id=?" : "WHERE q.member_id=?") + " ORDER BY q.created_at DESC,q.id DESC",this::mapQuestion,actorId);
+        return jdbc.query(QUESTIONS + (coach ? "WHERE c.coach_id=? AND q.assigned_staff_id=c.coach_id" : "WHERE q.member_id=?") + " ORDER BY q.created_at DESC,q.id DESC",this::mapQuestion,actorId);
     }
     public Discussion discussion(long actorId, boolean coach, long id) {
-        var q=jdbc.query(QUESTIONS + (coach ? "WHERE c.coach_id=?" : "WHERE q.member_id=?") + " AND q.id=?",this::mapQuestion,actorId,id);
+        var q=jdbc.query(QUESTIONS + (coach ? "WHERE c.coach_id=? AND q.assigned_staff_id=c.coach_id" : "WHERE q.member_id=?") + " AND q.id=?",this::mapQuestion,actorId,id);
         if(q.isEmpty()) throw new ResourceNotFoundException("Class question not found");
         return new Discussion(q.getFirst(),jdbc.query("SELECT m.id,u.full_name,m.message_body,m.created_at FROM support_request_message m JOIN user_account u ON u.id=m.sender_id WHERE m.request_id=? ORDER BY m.created_at,m.id",
             (rs,row)->new Message(rs.getLong("id"),rs.getString("full_name"),rs.getString("message_body"),rs.getTimestamp("created_at").toLocalDateTime()),id));
     }
     @Transactional
     public long ask(long memberId,long classId,String subject,String body) {
+        lockQuestionClass(classId);
         // A question requires an existing confirmed coached booking, never a fabricated enrollment.
         if(jdbc.queryForObject("SELECT COUNT(*) FROM booking b JOIN class_session s ON s.id=b.session_id JOIN sport_class c ON c.id=s.class_id WHERE b.member_id=? AND c.id=? AND b.status='CONFIRMED' AND s.status<>'CANCELLED' AND c.coach_id IS NOT NULL",Integer.class,memberId,classId)==0)
             throw new ResourceNotFoundException("A booked class with an assigned coach is required");
         Long coachId=jdbc.queryForObject("SELECT coach_id FROM sport_class WHERE id=?",Long.class,classId);
+        var prior=jdbc.query("SELECT id FROM support_request WHERE member_id=? AND category=? AND assigned_staff_id=? AND subject=? AND description=? AND status IN ('OPEN','IN_PROGRESS') ORDER BY id",
+            (rs,row)->rs.getLong("id"),memberId,"TRAINING_CLASS_"+classId,coachId,subject.trim(),body.trim());
+        if(!prior.isEmpty())return prior.getFirst();
         Long seq=jdbc.queryForObject("SELECT NEXT VALUE FOR seq_support_request_code",Long.class);
         long id=insert("INSERT INTO support_request(request_code,member_id,subject,category,description,assigned_staff_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)",
             "TRN-"+seq,memberId,subject.trim(),"TRAINING_CLASS_"+classId,body.trim(),coachId,now(),now());
@@ -68,12 +73,22 @@ public class ClassLearningService {
     @Transactional
     public long reply(long actorId,boolean coach,long id,String body) {
         var current=discussion(actorId,coach,id);
+        lockQuestionClass(current.question().classId());
         // Serialize conversation writes and repeat ownership validation after the lock.
         jdbc.update("UPDATE support_request SET updated_at=updated_at WHERE id=?",id);
         discussion(actorId,coach,id);
+        if(jdbc.queryForObject("SELECT COUNT(*) FROM support_request q JOIN sport_class c ON q.category=CONCAT('TRAINING_CLASS_',c.id) WHERE q.id=? AND q.assigned_staff_id=c.coach_id",Integer.class,id)==0)
+            throw new BusinessRuleException("Coach assignment changed; start a new question for the current coach");
+        var duplicate=jdbc.query("SELECT id FROM support_request_message WHERE request_id=? AND sender_id=? AND message_body=? AND id=(SELECT MAX(id) FROM support_request_message WHERE request_id=?)",
+            (rs,row)->rs.getLong("id"),id,actorId,body.trim(),id);
+        if(!duplicate.isEmpty())return duplicate.getFirst();
         long message=insert("INSERT INTO support_request_message(request_id,sender_id,message_body,created_at) VALUES (?,?,?,?)",id,actorId,body.trim(),now());
         jdbc.update("UPDATE support_request SET status='IN_PROGRESS',updated_at=? WHERE id=?",now(),id);
         audit(actorId,"TRAINING_QUESTION_REPLIED",id,Map.of("messageId",message,"classId",current.question().classId()));return message;
+    }
+    private void lockQuestionClass(long classId) {
+        if(jdbc.query("SELECT id FROM sport_class WITH (UPDLOCK,HOLDLOCK) WHERE id=?",(rs,row)->rs.getLong("id"),classId).isEmpty())
+            throw new ResourceNotFoundException("Class not found");
     }
     public Guidance guidance(long memberId,String query) {
         // Catalog search only: never present deterministic matches as an AI answer.

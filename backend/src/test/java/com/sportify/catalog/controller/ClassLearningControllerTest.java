@@ -56,4 +56,12 @@ class ClassLearningControllerTest {
         mvc.perform(post("/api/v1/coach/training/questions/1/messages").with(user(actor("COACH"))).contentType(MediaType.APPLICATION_JSON).content("{\"body\":\"\"}")).andExpect(status().isBadRequest());
         verifyNoInteractions(service);
     }
+    @Test void HOT06_disabledAccountsCannotReadOrReply()throws Exception{
+        var member=actor("MEMBER");member.getUserAccount().setStatus("INACTIVE");
+        mvc.perform(get("/api/v1/member/training/questions").with(user(member))).andExpect(status().isForbidden());
+        var coach=actor("COACH");coach.getUserAccount().setStatus("INACTIVE");
+        mvc.perform(post("/api/v1/coach/training/questions/1/messages").with(user(coach)).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"body\":\"Reply\"}")).andExpect(status().isForbidden());
+        verifyNoInteractions(service);
+    }
 }

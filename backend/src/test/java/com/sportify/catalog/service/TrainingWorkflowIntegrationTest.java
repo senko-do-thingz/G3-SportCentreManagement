@@ -259,6 +259,27 @@ class TrainingWorkflowIntegrationTest {
         assertThat(reader.attendance(member).getFirst().status()).isEqualTo("CANCELLED");
         assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?", booking)).isZero();
     }
+    @Test void HOT06_questionRetryAndReassignmentPreservePrivateHistory() {
+        long question=learning.ask(member,classId,"Footwork","How should I practise?");
+        assertThat(learning.ask(member,classId,"Footwork","How should I practise?")).isEqualTo(question);
+        long message=learning.reply(coach,true,question,"Review the assigned plan first.");
+        assertThat(learning.reply(coach,true,question,"Review the assigned plan first.")).isEqualTo(message);
+        assertThat(learning.questions(coach,true)).extracting(com.sportify.catalog.dto.ClassLearningResponse.Question::id).contains(question);
+        assertThat(learning.discussion(member,false,question).messages()).hasSize(1);
+        jdbc.update("UPDATE sport_class SET coach_id=? WHERE id=?",otherCoach,classId);
+        assertThatThrownBy(()->learning.discussion(coach,true,question)).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(()->learning.discussion(otherCoach,true,question)).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(()->learning.reply(member,false,question,"Follow-up")).isInstanceOf(BusinessRuleException.class);
+        assertThat(learning.discussion(member,false,question).messages()).hasSize(1);
+        assertThatThrownBy(()->learning.ask(peer,classId,"Unbooked","Private question")).isInstanceOf(ResourceNotFoundException.class);
+    }
+    @Test void HOT06_concurrentReplyRetryCreatesOneAuditedMessage() throws Exception {
+        long question=learning.ask(member,classId,"Practice","Which exercise next?");
+        interleave(()->learning.reply(coach,true,question,"Follow your assigned steps."),
+            ()->learning.reply(coach,true,question,"Follow your assigned steps."),null);
+        assertThat(learning.discussion(member,false,question).messages()).hasSize(1);
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE entity_id=? AND action='TRAINING_QUESTION_REPLIED'",question)).isEqualTo(1);
+    }
     @Test void R2_02_cancelledOrMismatchedBookingCannotReceivePlan() {
         var wrong=new TrainingWriteRequest.Plan(classId,peer,booking,"Wrong owner",null,plan().steps());
         assertThatThrownBy(()->writer.createPlan(coach,wrong)).isInstanceOf(BusinessRuleException.class);
