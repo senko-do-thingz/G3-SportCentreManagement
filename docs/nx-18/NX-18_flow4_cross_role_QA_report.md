@@ -1,105 +1,91 @@
-# NX-18 Flow 4 frontend cross-role QA report
+# NX-18 Flow 4 frontend cross-role QA report (round 2, after CODEOWNER review of PR #174)
 
 Task: NX-18 "Run Flow 4 frontend regression and accessibility checks" (Flow 4, F4-REQ-01..07, FE, owner Truc, with Hung and Phat, wave W3). Depends on NX-11, NX-12, NX-13 (Hung), NX-14, NX-15 (Truc). Status of the task proposal: requires team sign-off.
 
-Date: 2026-10-30. Base: main c6358dc (includes the ui-02 shared shell) plus the Member screens of branch nx-14-nx-15-member-training-screens.
+**NX-18 IS NOT COMPLETE.** The automated run currently FAILS (exit code 1) and several parts are BLOCKED. Nothing in this report claims completion.
 
-## 1. Result in one paragraph
+Date: 2026-11-02. Tree under test: main 646bd14 (includes PR #175, the logo label fix, merged 2026-10-30) + PR #168 (reception front desk UI, merged into a scratch tree, not into this branch) + the fixes of this branch.
 
-This is a PARTIAL run. NX-11, NX-12 and NX-13 (coach plan editor, coach outcomes and feedback, attendance UI) are not in the repository yet, so those screens could not be tested. The Flow 4 screens that exist today were tested across the three roles. The run found 2 defects that are fixed in this branch (Check-in overflowed horizontally at 390px, and the table that then scrolls was not keyboard reachable; section 5) and 1 accessibility defect in the shared header logo that is reported but NOT fixed here (section 6). FE/BE contract compatibility could not be verified: the Flow 4 contract (docs/nx-03) is an unsigned draft and the backend tasks are not in the repository. NX-18 therefore cannot be closed yet.
+## 1. What the review asked and what was done
+
+| Review item | Status |
+|---|---|
+| The runner must exit with a failure code when required checks fail | Done. `flow4-qa.mjs` exits 1 on any required failure or missing capture and 0 only when all required checks pass. The rules are in `evaluate.mjs` |
+| Demonstrate it with a negative-control test | Done, two levels. (a) `evaluate.test.mjs`: 17 unit tests, each breaks one rule on purpose and expects a failure. (b) `run-negative-controls.mjs`: in a real browser the clean run exits 0 and each of 8 injected defects exits 1 (evidence/negative-control) |
+| Rerun the integrated checks after #168 and #175 | Done on main (with #175) plus #168. Result: FAIL, see section 3 |
+| Keep unavailable backend and cross-role workflows BLOCKED, do not report NX-18 complete | Done, section 5. The runner prints the BLOCKED list on every run |
+| Remove tracked private audit material | Done. The AI audit log was force-added against the "AI Audit Logs are kept locally only" rule of .gitignore; it is no longer tracked on this branch. Earlier commits still contain it in the history |
+| Updated evidence | Done: evidence/integrated-rerun and evidence/negative-control. The earlier after-fix folder was removed because it mixed in screens from another branch |
 
 ## 2. Scope actually tested
 
-| Role | Screen | Route | Task | Tested |
-|---|---|---|---|---|
-| Coach | Teaching schedule | /coach | FE-10 | yes |
-| Coach | Class roster | /coach/roster | FE-10 | yes |
-| Receptionist | Member search | /reception | FE-05 | yes |
-| Receptionist | Check-in | /reception/check-in | FE-05 | yes |
-| Member | Training plans and coach notes | /member/training | NX-14 | yes (synthetic data) |
-| Member | Attendance | /member/training/history | NX-15 | yes (synthetic data) |
-| Member | Training results | /member/training/history?tab=results | NX-15 | yes (synthetic data) |
-| Coach | Plan editor, outcomes and feedback | not built | NX-11, NX-12 | NOT TESTED |
-| Coach and Receptionist | Attendance and check-in UI | not built | NX-13 | NOT TESTED |
+Only screens that exist on main (with #168):
 
-## 3. Method
+| Role | Screen | Route |
+|---|---|---|
+| Coach | Teaching schedule | /coach |
+| Coach | Class roster | /coach/roster |
+| Receptionist | Member search | /reception?q=an |
+| Receptionist | Check-in | /reception/check-in |
 
-Runner: docs/nx-18/qa-tools/flow4-qa.mjs (Chrome headless through puppeteer-core, axe-core 4 for accessibility). API answers are mocked in the browser, so no backend is involved. Setup is documented at the top of the script and uses packages installed outside the project (`npm install --no-save puppeteer-core axe-core`).
+Each in light and dark at 390, 768 and 1440 px (24 captures), plus empty, error (503) and forbidden (403) answers at 390 and 1440 px in both themes (48 state checks). API answers are mocked in the browser.
 
-Per screen, 3 viewports (390, 768, 1440 px) and 2 themes (light, dark): 42 captures. For each capture:
-- horizontal overflow (page wider than the viewport);
-- exactly one h1; no redirect to /login or /403;
-- axe-core run on the rendered page (all rules); serious and critical counted;
-- keyboard: up to 40 Tab presses; count of focus stops and of stops with no visible focus ring;
-- browser console errors.
+Not tested here: Member training screens (not on main; PR #185 is checked by a separate run), NX-11 to NX-13 screens (not built), any write flow.
 
-Error paths, at 1440 and 390 px in both themes (84 checks): empty (authorized, nothing to show), error (HTTP 503) and forbidden (HTTP 403). Each is checked for the right state: empty panel; alert with a Try again button; alert for 403 (and never an empty panel for 403 or 503).
+## 3. Result of the integrated run: FAIL (exit code 1)
 
-## 4. Results after the fixes in this branch
+Command: `node docs/nx-18/qa-tools/flow4-qa.mjs <outDir>` against a dev server of the tree above. Output: evidence/integrated-rerun/runner-output.txt, data in report.json.
 
 | Check | Result |
 |---|---|
-| Captures | 42 (coach 12, reception 12, member 18) |
-| Horizontal overflow | none in 42 of 42 |
-| One h1, no unexpected redirect, console errors | all pass, 0 console errors |
-| Keyboard | 4 to 30 focus stops per screen; 0 stops without a visible focus ring |
-| Empty state | correct empty panel in 28 of 28 checks |
-| Error (503) state | alert and Try again in 28 of 28 |
-| Forbidden (403) state | alert in 28 of 28, with Try again, never an empty list |
-| Overflow in the state checks | none |
-| axe serious or critical | 1 rule on every page: label-content-name-mismatch (header logo), section 6 |
-| axe other rules | none |
+| Horizontal overflow | none in 24 of 24 (Check-in at 390px passes after fix NX18-D1) |
+| One h1, no redirect to login or 403 | all pass |
+| Browser console errors | 0 |
+| Keyboard: visible focus ring on every stop | 0 failures |
+| Empty, error and forbidden states | all 48 pass |
+| axe serious or critical | **16 FAIL**: rule label-content-name-mismatch on the Menu button at 390 and 768 px (4 screens x 2 widths x 2 themes); none at 1440 px |
 
-Evidence: docs/nx-18/evidence/after-fix/ (`<screen>_<390|768|1440>_<light|dark>.png`, plus `_empty`, `_error`, `_forbidden` states, and report.json with every number above).
+The 16 failures have one cause, defect NX18-D4 below.
 
-## 5. Defects found and fixed in this branch
+## 4. Defects
 
-| ID | Severity | Finding | Fix | Evidence |
+| ID | Severity | Finding | Status |
+|---|---|---|---|
+| NX18-D1 | Blocking on mobile | Check-in overflowed horizontally at 390px (bare 1fr grid column) | Fixed in this branch (reception.css), regression test |
+| NX18-D2 | Serious | The scrolling Today's check-ins table was not keyboard reachable | Fixed (named scroll region), regression test |
+| NX18-D3 | Serious (WCAG 2.5.3) | Logo link name did not contain its visible text. PR #175 changed the label to "Sportify Sports center home" but axe still failed: the logo letter S was real text inside an aria-hidden span and still counted as visible text, and the two words were rendered without a space | Fixed in this branch: the letter is drawn by CSS and a text space separates the words (Brand.tsx, components.css). `Brand.test.tsx` fails without the fix. After this, 0 logo failures in the run |
+| NX18-D4 | Serious (WCAG 2.5.3) | On narrow screens the header Menu button has visible text Menu but aria-label "Open Coach workspace navigation", so the name does not contain the visible word. Component: WorkspaceHeader.tsx (shared shell) | OPEN, not fixed here. Changing the label breaks tests that look the button up by its current name on PR #185 (training.flow.test.tsx), so it needs a decision from the owner of the shared header (Phat). Suggested name: start with the visible word, for example "Menu: open Coach workspace navigation", and update the lookups together |
+
+## 5. BLOCKED (never counted as passed)
+
+- NX-11, NX-12, NX-13: Coach plan editor, outcomes and feedback, attendance UI are not on main.
+- Member training screens (NX-14, NX-15) are not on main; see the separate run on PR #185.
+- FE/BE contract compatibility: docs/nx-03 is an unsigned draft; no run against a backend.
+- Cross-role workflows (a coach records an outcome and the member sees it) need the backend.
+- Sign-off by Hung and Phat.
+- Not done: screen reader pass, Firefox and Safari, real devices, slow network; axe finds only part of the accessibility problems; the keyboard check measures focus visibility, not logical order.
+
+## 6. How to reproduce
+
+```
+npm install --no-save puppeteer-core axe-core      (outside the project dependencies)
+cd frontend && npx vite --port 5175                 (tree under test)
+node docs/nx-18/qa-tools/flow4-qa.mjs <outDir>      exit 0 = required checks passed, 1 = failed
+node docs/nx-18/qa-tools/run-negative-controls.mjs <outDir>     exit 0 = every injected defect was caught
+node --test docs/nx-18/qa-tools/evaluate.test.mjs   unit negative control
+```
+
+Exit code 0 of the runner never means NX-18 is done; it only means the required automated checks passed. The BLOCKED list is printed every time.
+
+## 7. Checklist for the full run (when NX-11 to NX-13 and the backend exist)
+
+Light and dark at 390, 768 and 1440 px: role access, loading, empty, error with retry, 403, malformed answer, privacy (no other member data, no edit control for members), keyboard order and focus, screen reader headings and live regions, layout without horizontal scroll, date and time wording, regression against main, contract fields against the signed contract.
+
+## 8. Sign-off table
+
+| Role | Screens | Automated run | Contract | Human sign-off |
 |---|---|---|---|---|
-| NX18-D1 | Blocking on mobile | Check-in (reception) overflowed horizontally at 390px in light and dark: the card was 433px wide in a 358px column, because `.reception-checkin` used a bare `1fr` column that grows to its widest content (frontend/src/styles/reception.css) | `grid-template-columns: minmax(0, 1fr)` | evidence/before-fix/ (report.json, reception-check-in_390_light.png) versus after-fix |
-| NX18-D2 | Serious (axe scrollable-region-focusable) | After D1 the Today's check-ins table scrolls inside its card at 390px, but a scrolling region must be reachable by keyboard | The existing Table prop `scrollLabel` gives the region tabindex 0 and an accessible name (frontend/src/pages/reception/CheckInPage.tsx) | axe after-fix: rule gone |
-
-A regression test covers both (receptionScreens.test.tsx, "NX-18 Check-in narrow screens").
-
-## 6. Defect found and NOT fixed
-
-| ID | Severity | Finding | Why not fixed here | Suggested fix |
-|---|---|---|---|---|
-| NX18-D3 | Serious per axe, WCAG 2.5.3 Label in Name | The logo link in the shared header has aria-label "Sportify Center home" but its visible text is different, so the accessible name does not contain the visible text. Present on all 7 screens in every theme and size (frontend/src/components/Brand.tsx) | It belongs to the shared shell (ui-02) and the public Home page, and 3 existing tests look the link up by that exact name (PaymentWorkspaceHeader.test.tsx, HomePage.test.tsx twice). Changing it is a shared UI decision | Make the aria-label start with the visible words, or drop the aria-label so the visible text is the name; update the 3 tests together. Owner: Phat (shared UI) |
-
-## 7. Not verified (open)
-
-- NX-11, NX-12, NX-13 screens do not exist; coach plan editing, outcome entry, feedback and the attendance UI have no QA.
-- FE/BE contract compatibility: not verifiable. docs/nx-03 is an unsigned draft with routes marked TBD_AFTER_APPROVAL, and NX-07 to NX-10 are not in the repository. The Member screens use a proposed contract (see the NX-14 and NX-15 branch, docs/pr/NX-14-NX-15_contract_gaps_for_BE.md).
-- Member data is synthetic; Coach and Reception answers are mocked in the browser.
-- Real end-to-end flow (a coach records an outcome, a member sees it) cannot run without the backend and the NX-11 to NX-13 screens.
-- Screen reader testing, Firefox and Safari, real devices, slow network: not done.
-- axe-core finds about a third of accessibility issues automatically; the keyboard check only measures focus visibility, not logical order.
-
-## 8. Checklist for the full run (when NX-11 to NX-13 and the backend exist)
-
-Run each item in light and dark, at 390, 768 and 1440 px.
-1. Role access: right role sees the screen; other roles get the access denied page; signed-out visitors go to login.
-2. States: loading, empty, error with Try again, 403, malformed answer, slow network.
-3. Privacy: no other member's data in a response or on screen; members see no edit control; staff-only notes never shown to members.
-4. Keyboard: Tab order follows the visual order; visible focus; tabs use arrow keys; dialogs trap focus and close with Escape.
-5. Screen reader: headings in order, list and table semantics, errors announced.
-6. Layout: no horizontal page scroll; touch targets at least 44px on mobile.
-7. Time: dates and times use the My Bookings wording and the center local clock.
-8. Regression: other areas unchanged against main.
-9. Contract: each request path, method, status and field matches the signed contract.
-
-Extend `SCREENS` and `answer()` in the runner for the new screens, then record the result in the table below.
-
-## 9. Sign-off table
-
-| Role | Screens | Light | Dark | Keyboard | Mobile | Error paths | Contract | Tester | Date |
-|---|---|---|---|---|---|---|---|---|---|
-| Member | training, attendance, results | pass | pass | pass (focus visible; order not judged) | pass | pass | blocked | automated run | 2026-10-30 |
-| Coach | schedule, roster | pass | pass | pass | pass | pass | blocked | automated run | 2026-10-30 |
-| Coach | NX-11, NX-12, NX-13 screens | not built | | | | | | | |
-| Reception | member search, check-in | pass (after D1, D2) | pass | pass | pass (after D1) | pass | blocked | automated run | 2026-10-30 |
-| Reception | NX-13 check-in UI | not built | | | | | | | |
-| All | header logo (D3) | open | | | | | | | |
-
-Human sign-off from Hung and Phat is still required (task: coordinate Truc, Hung and Phat). It is not claimed here.
+| Coach | schedule, roster | FAIL at 390 and 768 px (D4) | BLOCKED | pending |
+| Reception | member search, check-in | FAIL at 390 and 768 px (D4) | BLOCKED | pending |
+| Member | training screens | not on main | BLOCKED | pending |
+| Coach and Reception | NX-11 to NX-13 screens | not built | BLOCKED | pending |
