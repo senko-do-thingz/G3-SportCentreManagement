@@ -60,6 +60,6 @@ Current main 646bd143c40d0e3721210433997e1316ae05cc1e was merged locally into fe
 
 PR #184 remains open. The exact changed-file overlap is managerSchedule.test.tsx and managerScreens.test.tsx. These shared changes must be reviewed after PR #184 merges; no post-merge cleanup is claimed.
 
-GitHub Actions run 41388216476 passed on pushed UI-16 head f07f06cc4bddbf10b808654bcba437ddab3e085e. A subsequent report-only correction does not change application source; its exact CI result is linked in the current PR description.
+GitHub Actions run 41388216476 passed on UI-16 application head f07f06cc4bddbf10b808654bcba437ddab3e085e. The report-only Round 03 follow-up head d88eb9f879bc875c711e684b8b7c64080abb03d6 passed exact-head Actions run 41389298368 with all 16 checks. This is Round 03 evidence and does not validate the Round 04 pagination change.
 
 Screenshots use synthetic local preview data. No production backend request or write was performed.

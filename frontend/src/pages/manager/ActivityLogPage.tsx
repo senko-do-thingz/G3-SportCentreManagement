@@ -10,6 +10,8 @@ import { formatManagerDateTime } from './managerFormat'
 import { useDebounced, useResource } from './useManagerTools'
 import '../../styles/managerActivity.css'
 
+const ACTIVITY_PAGE_SIZE = 20
+
 export function ActivityLogPage() {
   const [search, setSearch] = useState('')
   const [action, setAction] = useState('')
@@ -33,10 +35,15 @@ export function ActivityLogPage() {
   }, [])
   const load = useCallback((signal: AbortSignal) => {
     if (from && to && from > to) return Promise.reject(new ApiError(400, 'End date must be on or after the start date.'))
-    return managerActivityLogsApi.list({ page, size: 20, actorId: actor ? String(actor.id) : undefined, action, from, to, search: debounced.trim() }, signal)
+    return managerActivityLogsApi.list({ page, size: ACTIVITY_PAGE_SIZE, actorId: actor ? String(actor.id) : undefined, action, from, to, search: debounced.trim() }, signal)
   }, [page, actor, debounced, action, from, to])
   const [resource, reload] = useResource(load)
-  const ready = resource.status === 'ready' && search === debounced && !invalidRange
+  const lastValidPage = resource.status === 'ready'
+    ? Math.max(0, Math.ceil(resource.data.totalElements / ACTIVITY_PAGE_SIZE) - 1)
+    : page
+  const pageOutOfRange = resource.status === 'ready' && page > lastValidPage
+  if (pageOutOfRange) setPage(lastValidPage)
+  const ready = resource.status === 'ready' && search === debounced && !invalidRange && !pageOutOfRange
 
   const activeFilterCount = [search.trim(), action, actor, from, to].filter(Boolean).length
   const filtered = activeFilterCount > 0
@@ -69,7 +76,7 @@ export function ActivityLogPage() {
         </div>
       </div>
       {invalidRange && <p id="manager-activity-range-error" className="manager-activity__range-error" role="alert">End date must be on or after the start date.</p>}
-      {resource.status === 'error' && search === debounced && !invalidRange ? <ManagerError error={resource.error} onRetry={reload} /> : !invalidRange && <div className="manager-activity__table"><Table columns={columns} rows={ready ? resource.data.content : []} rowKey={(log) => log.id} loading={!ready} caption="Activity history" scrollLabel="Activity history table. Scroll horizontally to view all columns." emptyTitle={filtered ? 'No matching activity' : 'No activity yet'} emptyDescription={filtered ? 'Clear filters or choose a different date range.' : 'Recorded center activity will appear here.'} pagination={ready ? { page, pageSize: 20, totalItems: resource.data.totalElements, onPageChange: setPage } : undefined} /></div>}
+      {resource.status === 'error' && search === debounced && !invalidRange ? <ManagerError error={resource.error} onRetry={reload} /> : !invalidRange && <div className="manager-activity__table"><Table columns={columns} rows={ready ? resource.data.content : []} rowKey={(log) => log.id} loading={!ready} caption="Activity history" scrollLabel="Activity history table. Scroll horizontally to view all columns." emptyTitle={filtered ? 'No matching activity' : 'No activity yet'} emptyDescription={filtered ? 'Clear filters or choose a different date range.' : 'Recorded center activity will appear here.'} pagination={ready ? { page, pageSize: ACTIVITY_PAGE_SIZE, totalItems: resource.data.totalElements, onPageChange: setPage } : undefined} /></div>}
       <p className="manager-activity__footnote">Activity records are read-only. Times use the center timezone (Asia/Ho_Chi_Minh). Only the safe fields returned by the activity service are shown.</p>
     </Card>
     {picking && <ActorPickerModal onClose={() => setPicking(false)} onSelect={(selectedActor) => { setActor(selectedActor); setPicking(false); setPage(0) }} />}

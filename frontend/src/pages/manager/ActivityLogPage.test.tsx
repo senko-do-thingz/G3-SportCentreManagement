@@ -316,6 +316,39 @@ describe('UI-16 manager activity log', () => {
     await user.keyboard('{Escape}')
     expect(detailsButton).toHaveFocus()
   })
+  it('recovers to the last valid page when a refresh shrinks the activity total', async () => {
+    authenticateManager()
+    const firstPageRows = Array.from({ length: 20 }, (_, index) => ({
+      ...activity,
+      id: 600 + index,
+      shortDetail: 'Activity row ' + (index + 1),
+    }))
+    const secondPageRow = { ...activity, id: 620, shortDetail: 'Last row on the second page' }
+    let firstPageRequests = 0
+    let secondPageRequests = 0
+    const list = vi.spyOn(managerActivityLogsApi, 'list').mockImplementation(({ page: requestedPage = 0 }) => {
+      if (requestedPage === 0) {
+        firstPageRequests += 1
+        return Promise.resolve(page(firstPageRows, 0, firstPageRequests === 1 ? 21 : 20))
+      }
+      secondPageRequests += 1
+      return Promise.resolve(page(secondPageRequests === 1 ? [secondPageRow] : [], 1, secondPageRequests === 1 ? 21 : 20))
+    })
+    const user = userEvent.setup()
+
+    renderApp('/manager/activity')
+    expect(await screen.findByText('21 events')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(await screen.findByText(secondPageRow.shortDetail)).toBeInTheDocument()
+    expect(await screen.findByText('Showing 21-21 of 21')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Refresh' }))
+    expect(await screen.findByText('20 events')).toBeInTheDocument()
+    expect(await screen.findByText(firstPageRows[0].shortDetail)).toBeInTheDocument()
+    expect(screen.queryByText(secondPageRow.shortDetail)).not.toBeInTheDocument()
+    expect(list.mock.calls.map(([query]) => query.page)).toEqual([0, 1, 1, 0])
+  })
+
   it('refreshes the activity list and updates its reported total', async () => {
     authenticateManager()
     const list = vi.spyOn(managerActivityLogsApi, 'list')

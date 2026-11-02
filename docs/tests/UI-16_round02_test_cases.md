@@ -31,6 +31,7 @@ This matrix preserves the 22 cases requested by the CODEOWNER Round 01 review. E
 | UI16-TC-20 | NVDA/Chrome or VoiceOver/Safari at mobile width | PARTIAL - NVDA is not installed in the available Windows environment. Chromium accessibility snapshot retains a native table and four column headers; keyboard focus and Tab navigation to Details were verified at 390px. A manual screen-reader pass remains outstanding. |
 | UI16-TC-21 | Refresh when the activity total changes | PASS - new UI-16 regression test changes the mocked total from 21 events to zero after Refresh and verifies the updated state. |
 | UI16-TC-22 | Existing manager schedule regression | PASS - full frontend suite passed on local head cc54acc after current main was merged. The UI-16 diff still overlaps PR #184 in managerSchedule.test.tsx and managerScreens.test.tsx; reconcile after PR #184 merges. |
+| UI16-TC-23 | Refresh on an out-of-range Activity Log page after the total shrinks | PASS - R4 regression starts with 21 events, navigates to zero-based page 1, refreshes to a total of 20, and verifies the actual corrected request sequence [0, 1, 1, 0] plus restored first-page rows. Test: ActivityLogPage.test.tsx. |
 
 ## Final local verification
 
@@ -45,6 +46,16 @@ This matrix preserves the 22 cases requested by the CODEOWNER Round 01 review. E
 - After fetching and merging current origin/main 646bd143c40d0e3721210433997e1316ae05cc1e into feat/ui-16 at cc54acc40ff6dc93446cd7b543bbd4c3d598ee63, the frontend suite passed: 94 test files and 1,764 tests, zero failures. This branch sync is pushed.
 - npm run lint passed.
 - npm run build passed with the existing Vite advisory for a bundle chunk above 500 kB.
-- GitHub Actions run 41388216476 passed on pushed head f07f06cc4bddbf10b808654bcba437ddab3e085e. The report-only correction after that head is documented with its exact CI in the current PR description.
+- GitHub Actions run 41388216476 passed on application and main-sync head f07f06cc4bddbf10b808654bcba437ddab3e085e.
+- GitHub Actions run 41389298368 passed on exact Round 03 report head d88eb9f879bc875c711e684b8b7c64080abb03d6; all 16 checks succeeded. This predates the Round 04 pagination change.
 - The local audit DOCX remains excluded from Git and has not been delivered privately. No destination is authorized.
 - No production backend request or write was performed during the browser review or local merge.
+
+## Round 04 local validation
+
+- The focused Activity Log suite passed: 1 test file and 12 tests.
+- The final full frontend rerun passed: 94 test files and 1,765 tests.
+- Frontend lint passed.
+- Production build passed with the existing Vite advisory for a bundle chunk above 500 kB.
+- One intermediate full-suite run had a failure in the unrelated auth storage-event test (1,764 passed, 1 failed). That auth test passed in isolation (25/25), and the subsequent full rerun passed (1,765/1,765).
+- Exact-head GitHub Actions for the Round 04 code change is tracked in PR #186; do not use the Round 03 run as validation for this change.

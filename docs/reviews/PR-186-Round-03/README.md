@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | R3-01. AI Audit Log private handoff | PARTIAL | The ignored local DOCX was previously opened read-only in Word and verified as 2 pages. It remains excluded from Git. No private delivery occurred because an approved destination and authorization are still missing. |
 | R3-02. Manual screen-reader acceptance | PARTIAL | No NVDA/Chrome or VoiceOver/Safari pass is available. UI16-TC-20 remains PARTIAL. A CODEOWNER-approved, clearly scoped exception is still required if a supported screen reader cannot be used. |
-| R3-03. Final-head CI | PASS on pushed head f07f06c | GitHub Actions run 41388216476 completed successfully on f07f06cc4bddbf10b808654bcba437ddab3e085e; all 16 reported checks succeeded, including frontend, unit, SQL Server integration, package, security, migration guard, conventions, and CI gate. A later report-only correction leaves application files unchanged; its exact workflow result is linked in the PR description. |
+| R3-03. Final-head CI | PASS | GitHub Actions run 41388216476 passed on application head f07f06cc4bddbf10b808654bcba437ddab3e085e. The report-only head d88eb9f879bc875c711e684b8b7c64080abb03d6 passed exact-head run 41389298368; all 16 checks succeeded. These Round 03 runs do not validate the later Round 04 source change. |
 | R3-04. Branch and PR #184 reconciliation | PARTIAL | Fetched and merged current main 646bd14 locally into feat/ui-16 at cc54acc with no conflicts. PR #184 remains open. The exact file overlap is managerSchedule.test.tsx and managerScreens.test.tsx. Reconcile/remove duplicate changes and rerun checks after PR #184 merges. |
 | R3-05. Final evidence consistency | UPDATED | The Round 02 report, browser evidence, test matrix, affected-file list, residual risks, and PR description record the branch sync, PASS/PARTIAL statuses, CI evidence, and exact latest head. No production backend writes were performed. |
 
@@ -36,10 +36,12 @@ On the local branch after merging current main at cc54acc:
 - npm run build: passed. Vite printed the existing advisory for a bundle chunk above 500 kB.
 - No production backend requests or writes were made.
 
-On the pushed head f07f06cc4bddbf10b808654bcba437ddab3e085e:
+On the pushed application head f07f06cc4bddbf10b808654bcba437ddab3e085e:
 - Actions run 41388216476 completed successfully; all 16 reported checks succeeded.
 - The integration report shows 802 passed, 0 skipped, 0 failed; the unit report shows 1,993 passed, 0 skipped, 0 failed.
-- A subsequent report-only correction changes no application source. Its exact head and CI result are linked in the PR description.
+On the report-only Round 03 head d88eb9f879bc875c711e684b8b7c64080abb03d6:
+- Actions run 41389298368 completed successfully; all 16 checks succeeded. The unit and SQL Server integration reports passed.
+- Neither Round 03 workflow validates the Round 04 pagination source change.
 
 ## ASCII scan
 
