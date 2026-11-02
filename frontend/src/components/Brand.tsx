@@ -14,6 +14,8 @@ export function Brand({ to = '/', compact = false }: BrandProps) {
       </span>
       <span className="brand__text">
         <span className="brand__name">Sportify</span>
+        {/* A text space keeps the visible words equal to the accessible name (WCAG 2.5.3); it takes no room in the flex column. */}
+        {!compact && ' '}
         {!compact && <span className="brand__tagline">Sports center</span>}
       </span>
     </Link>
