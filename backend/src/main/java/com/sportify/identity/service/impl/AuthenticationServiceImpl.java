@@ -58,6 +58,24 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Value("${application.security.jwt.refresh-token.expiration:604800000}")
     private long refreshExpiration;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
+    private boolean isUserSessionTablePresent() {
+        if (jdbcTemplate == null) {
+            return true;
+        }
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM sys.tables WHERE name = 'user_session'",
+                    Integer.class
+            );
+            return count != null && count > 0;
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -123,10 +141,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .lastAccessedAt(now)
                 .expiresAt(expiresAt)
                 .build();
-        try {
-            userSessionRepository.save(session);
-        } catch (Exception ex) {
-            log.warn("Could not persist user session (schema target may be pre-V37): {}", ex.getMessage());
+        if (isUserSessionTablePresent()) {
+            try {
+                userSessionRepository.save(session);
+            } catch (Exception ex) {
+                log.warn("Could not persist user session (schema target may be pre-V37): {}", ex.getMessage());
+            }
         }
 
         return AuthResponse.builder()
@@ -136,7 +156,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     @Override
-    @Transactional
     public AuthResponse authenticate(AuthRequest request) {
         String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
         try {
@@ -180,10 +199,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .lastAccessedAt(now)
                 .expiresAt(expiresAt)
                 .build();
-        try {
-            userSessionRepository.save(session);
-        } catch (Exception ex) {
-            log.warn("Could not persist user session (schema target may be pre-V37): {}", ex.getMessage());
+        if (isUserSessionTablePresent()) {
+            try {
+                userSessionRepository.save(session);
+            } catch (Exception ex) {
+                log.warn("Could not persist user session (schema target may be pre-V37): {}", ex.getMessage());
+            }
         }
 
         return AuthResponse.builder()
@@ -266,7 +287,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     @Transactional
     public void logout(String sessionId) {
-        if (sessionId == null || sessionId.isBlank()) {
+        if (sessionId == null || sessionId.isBlank() || !isUserSessionTablePresent()) {
             return;
         }
         LocalDateTime now = LocalDateTime.now(clock);
