@@ -1,6 +1,6 @@
 import { api } from './client'
-export interface LearningClass { id: number; name: string; sportName: string; coachName: string | null; level: string | null; capacity: number }
-export interface ClassParticipation { bookingId: number; sessionId: number; date: string; startTime: string; endTime: string; bookingStatus: string; attendanceStatus: string | null; notes: string | null; resultId: number | null }
+export interface LearningClass { id: number; name: string; sportName: string; coachName: string | null; level: string | null; capacity: number; active: boolean }
+export interface ClassParticipation { bookingId: number; sessionId: number; date: string; startTime: string; endTime: string; bookingStatus: string; attendanceStatus: string | null; notes: string | null; resultId: number | null; sessionStatus: string; trainingFormat: string; capacity: number; freeSeats: number }
 export interface ClassDetail { learningClass: LearningClass; sessions: ClassParticipation[] }
 export interface ClassQuestion { id: number; classId: number; className: string; memberName: string; subject: string; description: string; status: string; createdAt: string }
 export interface Discussion { question: ClassQuestion; messages: { id: number; senderName: string; body: string; createdAt: string }[] }

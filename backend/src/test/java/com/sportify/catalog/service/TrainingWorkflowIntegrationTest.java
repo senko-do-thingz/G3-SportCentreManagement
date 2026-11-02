@@ -217,6 +217,28 @@ class TrainingWorkflowIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM session_plan WHERE booking_id=?", booking)).isEqualTo(1);
         assertThat(count("SELECT COUNT(*) FROM session_plan_step s JOIN session_plan p ON p.id=s.plan_id WHERE p.booking_id=?", booking)).isEqualTo(1);
     }
+    @Test void HOT04_classDetailShowsRealAvailabilityAndOnlyOwnBookingContext() throws Exception {
+        jdbc.update("UPDATE class_session SET booked_count=capacity WHERE id=?", session);
+        long peerBooking = insert("INSERT booking(booking_code,session_id,member_id,status) VALUES (?,?,?,'CONFIRMED')", code(), session, peer);
+        var detail = learning.memberClass(member, classId);
+        assertThat(detail.learningClass().active()).isTrue();
+        assertThat(detail.sessions()).hasSize(1);
+        assertThat(detail.sessions().getFirst().freeSeats()).isZero();
+        assertThat(detail.sessions().getFirst().trainingFormat()).isEqualTo("COACH_LED");
+        assertThat(detail.sessions().getFirst().bookingId()).isNotEqualTo(peerBooking);
+        jdbc.update("UPDATE sport_class SET is_active=0,coach_id=NULL WHERE id=?", classId);
+        jdbc.update("UPDATE class_session SET status='CANCELLED' WHERE id=?", session);
+        detail = learning.memberClass(member, classId);
+        assertThat(detail.learningClass().active()).isFalse();
+        assertThat(detail.learningClass().coachName()).isNull();
+        assertThat(detail.sessions().getFirst().sessionStatus()).isEqualTo("CANCELLED");
+        assertThatThrownBy(() -> learning.memberClass(otherCoach, classId)).isInstanceOf(ResourceNotFoundException.class);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/classes/" + classId)
+            .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(member)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sessions[0].sessionStatus").value("CANCELLED"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sessions[0].memberId").doesNotExist());
+    }
     @Test void R2_02_cancelledOrMismatchedBookingCannotReceivePlan() {
         var wrong=new TrainingWriteRequest.Plan(classId,peer,booking,"Wrong owner",null,plan().steps());
         assertThatThrownBy(()->writer.createPlan(coach,wrong)).isInstanceOf(BusinessRuleException.class);

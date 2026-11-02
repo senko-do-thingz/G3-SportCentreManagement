@@ -24,7 +24,7 @@ public class ClassLearningService {
     private final Clock clock;
     private final AuditService audit;
     private final jakarta.persistence.EntityManager entityManager;
-    private static final String CLASSES = "SELECT c.id,c.name,sp.name sport_name,u.full_name coach_name,c.level,c.max_members FROM sport_class c JOIN sport sp ON sp.id=c.sport_id LEFT JOIN user_account u ON u.id=c.coach_id ";
+    private static final String CLASSES = "SELECT c.id,c.name,sp.name sport_name,u.full_name coach_name,c.level,c.max_members,c.is_active FROM sport_class c JOIN sport sp ON sp.id=c.sport_id LEFT JOIN user_account u ON u.id=c.coach_id ";
     private static final String QUESTIONS = "SELECT q.id,c.id class_id,c.name class_name,u.full_name member_name,q.subject,q.description,q.status,q.created_at FROM support_request q JOIN sport_class c ON q.category=CONCAT('TRAINING_CLASS_',c.id) JOIN user_account u ON u.id=q.member_id ";
     public List<LearningClass> memberClasses(long memberId) {
         return jdbc.query(CLASSES + "WHERE EXISTS(SELECT 1 FROM booking b JOIN class_session s ON s.id=b.session_id WHERE s.class_id=c.id AND b.member_id=?) ORDER BY c.name,c.id", this::mapClass, memberId);
@@ -34,12 +34,15 @@ public class ClassLearningService {
         if (classes.isEmpty()) throw new ResourceNotFoundException("Class not found");
         var rows = jdbc.query("""
             SELECT b.id booking_id,s.id session_id,s.session_date,s.start_time,s.end_time,b.status booking_status,
-            a.status attendance_status,a.notes,r.id result_id FROM booking b JOIN class_session s ON s.id=b.session_id
+            a.status attendance_status,a.notes,r.id result_id,s.status session_status,s.training_type,s.capacity,
+            CASE WHEN s.capacity>s.booked_count THEN s.capacity-s.booked_count ELSE 0 END free_seats
+            FROM booking b JOIN class_session s ON s.id=b.session_id
             LEFT JOIN attendance_record a ON a.session_id=s.id AND a.member_id=b.member_id
             LEFT JOIN session_result r ON r.session_id=s.id AND r.member_id=b.member_id
             WHERE b.member_id=? AND s.class_id=? ORDER BY s.session_date DESC,s.start_time DESC,b.id
             """, (rs,row) -> new Participation(rs.getLong("booking_id"),rs.getLong("session_id"),rs.getDate("session_date").toLocalDate(),
-            rs.getTime("start_time").toLocalTime(),rs.getTime("end_time").toLocalTime(),rs.getString("booking_status"),rs.getString("attendance_status"),rs.getString("notes"),rs.getObject("result_id",Long.class)),memberId,classId);
+            rs.getTime("start_time").toLocalTime(),rs.getTime("end_time").toLocalTime(),rs.getString("booking_status"),rs.getString("attendance_status"),rs.getString("notes"),rs.getObject("result_id",Long.class),
+            rs.getString("session_status"),rs.getString("training_type"),rs.getInt("capacity"),rs.getInt("free_seats")),memberId,classId);
         return new ClassDetail(classes.getFirst(),rows);
     }
     public List<Question> questions(long actorId, boolean coach) {
@@ -78,7 +81,7 @@ public class ClassLearningService {
         var classes=jdbc.query(CLASSES + "WHERE c.is_active=1 AND (c.name LIKE ? OR sp.name LIKE ? OR c.level LIKE ?) ORDER BY c.name,c.id",this::mapClass,"%"+term+"%","%"+term+"%","%"+term+"%");
         return new Guidance("CATALOG_SEARCH", classes.isEmpty()?"No matching classes. Search by sport or level, or ask your coach about supplementary practice.":"Matching active classes from the center catalog. These are search results, not AI recommendations.",classes);
     }
-    private LearningClass mapClass(ResultSet rs,int row)throws SQLException{return new LearningClass(rs.getLong("id"),rs.getString("name"),rs.getString("sport_name"),rs.getString("coach_name"),rs.getString("level"),rs.getInt("max_members"));}
+    private LearningClass mapClass(ResultSet rs,int row)throws SQLException{return new LearningClass(rs.getLong("id"),rs.getString("name"),rs.getString("sport_name"),rs.getString("coach_name"),rs.getString("level"),rs.getInt("max_members"),rs.getBoolean("is_active"));}
     private Question mapQuestion(ResultSet rs,int row)throws SQLException{return new Question(rs.getLong("id"),rs.getLong("class_id"),rs.getString("class_name"),rs.getString("member_name"),rs.getString("subject"),rs.getString("description"),rs.getString("status"),rs.getTimestamp("created_at").toLocalDateTime());}
     private LocalDateTime now(){return LocalDateTime.now(clock);}
     private long insert(String sql,Object... values){var key=new GeneratedKeyHolder();jdbc.update(connection->{PreparedStatement statement=connection.prepareStatement(sql,new String[]{"id"});for(int i=0;i<values.length;i++)statement.setObject(i+1,values[i]);return statement;},key);return key.getKey().longValue();}

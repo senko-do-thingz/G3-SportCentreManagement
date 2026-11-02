@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
 import { backendError, installFakeFetch, json, MEMBER, type RecordedCall } from '../../test/fakeBackend'
 import { renderApp } from '../../test/renderApp'
-const learningClass = { id: 1, name: 'Class skills', sportName: 'Badminton', coachName: 'Quan', level: 'BEGINNER', capacity: 10 }
+const learningClass = { id: 1, name: 'Class skills', sportName: 'Badminton', coachName: 'Quan', level: 'BEGINNER', capacity: 10, active: true }
 function login(role: string, handler: (call: RecordedCall) => Response) {
   tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
   return installFakeFetch(call => call.path === '/users/me' ? json(200, { ...MEMBER, role }) : handler(call))
@@ -12,11 +12,13 @@ function login(role: string, handler: (call: RecordedCall) => Response) {
 afterEach(() => vi.unstubAllGlobals())
 describe('Class learning Round 02', () => {
   it('R2-FE-01 shows actual class information and personal attendance', async () => {
-    login('MEMBER', () => json(200, { learningClass, sessions: [{ bookingId: 3, sessionId: 5, date: '2026-11-02', startTime: '09:00', endTime: '10:00', bookingStatus: 'CONFIRMED', attendanceStatus: 'LATE', notes: 'Arrived late', resultId: 9 }] }))
+    login('MEMBER', () => json(200, { learningClass, sessions: [{ bookingId: 3, sessionId: 5, date: '2026-11-02', startTime: '09:00', endTime: '10:00', bookingStatus: 'CONFIRMED', attendanceStatus: 'LATE', notes: 'Arrived late', resultId: 9, sessionStatus: 'PUBLISHED', trainingFormat: 'COACH_LED', capacity: 10, freeSeats: 0 }] }))
     renderApp('/member/training/classes/1')
     expect(await screen.findByRole('heading', { name: 'Class skills' })).toBeInTheDocument()
     expect(screen.getByText('Quan')).toBeInTheDocument()
     expect(screen.getByText('Late')).toBeInTheDocument()
+    expect(screen.getByText(/Coach-led - PUBLISHED - 0 of 10 places available - Full/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'View session availability and booking rules' })).toHaveAttribute('href', '/member/sessions/5')
     expect(screen.getByRole('link', { name: 'View session assessment' })).toHaveAttribute('href', '/member/training/results/9')
     expect(screen.getByRole('link', { name: 'Ask your coach about supplementary practice' })).toHaveAttribute('href', '/member/training/questions?classId=1')
   })
