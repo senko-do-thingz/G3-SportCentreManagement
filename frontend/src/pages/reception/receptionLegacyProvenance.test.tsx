@@ -244,7 +244,10 @@ describe('QR-07 D03 - Reception Legacy Provenance & Receipt Maintenance (QR07-05
     })
 
     const receiptCard = screen.getByRole('region', { name: 'Payment receipt' })
-    expect(within(receiptCard).getByText('Paid - Legacy unverified')).toBeInTheDocument()
+    const badge = within(receiptCard).getByText('Paid - Legacy unverified')
+    expect(badge).toBeInTheDocument()
+    expect(badge).toHaveClass('badge', 'badge--neutral')
+    expect(badge).not.toHaveClass('badge--success')
     expect(within(receiptCard).getByText('Legacy unverified')).toBeInTheDocument()
     expect(
       within(receiptCard).getByText(/LEGACY UNVERIFIED - Historical payment record without verified settlement provenance/),
@@ -269,7 +272,10 @@ describe('QR-07 D03 - Reception Legacy Provenance & Receipt Maintenance (QR07-05
     })
 
     const receiptCard = screen.getByRole('region', { name: 'Payment receipt' })
-    expect(within(receiptCard).getByText('Paid - Inconsistent provenance')).toBeInTheDocument()
+    const badge = within(receiptCard).getByText('Paid - Inconsistent provenance')
+    expect(badge).toBeInTheDocument()
+    expect(badge).toHaveClass('badge', 'badge--warning')
+    expect(badge).not.toHaveClass('badge--success')
     expect(within(receiptCard).getByRole('button', { name: 'Print receipt' })).toBeDisabled()
   })
 
@@ -342,7 +348,10 @@ describe('QR-07 D03 - Reception Legacy Provenance & Receipt Maintenance (QR07-05
     })
 
     const receiptCard = screen.getByRole('region', { name: 'Payment receipt' })
-    expect(within(receiptCard).getByText('Refunded - Legacy unverified')).toBeInTheDocument()
+    const badge = within(receiptCard).getByText('Refunded - Legacy unverified')
+    expect(badge).toBeInTheDocument()
+    expect(badge).toHaveClass('badge', 'badge--neutral')
+    expect(badge).not.toHaveClass('badge--success')
     expect(within(receiptCard).getByRole('button', { name: 'Print receipt' })).toBeDisabled()
     expect(
       within(receiptCard).getByText(/This payment record lacks verified settlement provenance \(Legacy unverified\)/),
@@ -428,7 +437,198 @@ describe('QR-07 D03 - Reception Legacy Provenance & Receipt Maintenance (QR07-05
     })
 
     const receiptCard = screen.getByRole('region', { name: 'Payment receipt' })
-    expect(within(receiptCard).getByText('Paid')).toBeInTheDocument()
+    const badge = within(receiptCard).getByText('Paid')
+    expect(badge).toBeInTheDocument()
+    expect(badge).toHaveClass('badge', 'badge--success')
+    expect(within(receiptCard).getByRole('button', { name: 'Print receipt' })).toBeEnabled()
+    expect(receiptCard).toHaveClass('payment-print-receipt')
+  })
+
+  // D03-05 and D03-06: Refunded cross-source reconciliation & badge tone regression tests
+  it('D03-05/D03-06: ReceptionPaymentPage blocks printing and renders warning badge for REFUNDED ACTUAL vs SIMULATED contradiction', async () => {
+    await openReception('/reception/payments/41', {
+      paymentRecord: {
+        status: 'REFUNDED',
+        settlementType: 'ACTUAL',
+        settlementProvider: 'MANUAL_TRANSFER',
+      },
+      invoice: {
+        ...LEGACY_INVOICE,
+        status: 'REFUNDED',
+        settlementType: 'SIMULATED',
+        settlementProvider: 'SPORTIFY_SIMULATOR',
+        simulatedTransactionId: 101,
+      },
+    })
+
+    const receiptCard = screen.getByRole('region', { name: 'Payment receipt' })
+    const badge = within(receiptCard).getByText('Refunded - Inconsistent provenance')
+    expect(badge).toBeInTheDocument()
+    expect(badge).toHaveClass('badge', 'badge--warning')
+    expect(badge).not.toHaveClass('badge--success')
+    expect(within(receiptCard).getByRole('button', { name: 'Print receipt' })).toBeDisabled()
+    expect(receiptCard).not.toHaveClass('payment-print-receipt')
+    expect(
+      within(receiptCard).getByText(/disagree on settlement provenance/),
+    ).toBeInTheDocument()
+  })
+
+  it('D03-05/D03-06: ReceptionPaymentPage blocks printing and renders warning badge for REFUNDED conflicting providers', async () => {
+    await openReception('/reception/payments/41', {
+      paymentRecord: {
+        status: 'REFUNDED',
+        settlementType: 'ACTUAL',
+        settlementProvider: 'provider-A',
+      },
+      invoice: {
+        ...LEGACY_INVOICE,
+        status: 'REFUNDED',
+        settlementType: 'ACTUAL',
+        settlementProvider: 'provider-B',
+      },
+    })
+
+    const receiptCard = screen.getByRole('region', { name: 'Payment receipt' })
+    const badge = within(receiptCard).getByText('Refunded - Inconsistent provenance')
+    expect(badge).toBeInTheDocument()
+    expect(badge).toHaveClass('badge', 'badge--warning')
+    expect(badge).not.toHaveClass('badge--success')
+    expect(within(receiptCard).getByRole('button', { name: 'Print receipt' })).toBeDisabled()
+    expect(receiptCard).not.toHaveClass('payment-print-receipt')
+    expect(
+      within(receiptCard).getByText(/conflicting settlement providers/),
+    ).toBeInTheDocument()
+  })
+
+  it('D03-05/D03-06: ReceptionPaymentPage blocks printing and renders warning badge for REFUNDED conflicting simulated txIds', async () => {
+    await openReception('/reception/payments/41', {
+      paymentRecord: {
+        status: 'REFUNDED',
+        settlementType: 'SIMULATED',
+        settlementProvider: 'SPORTIFY_SIMULATOR',
+        simulatedTransactionId: 101,
+      },
+      invoice: {
+        ...LEGACY_INVOICE,
+        status: 'REFUNDED',
+        settlementType: 'SIMULATED',
+        settlementProvider: 'SPORTIFY_SIMULATOR',
+        simulatedTransactionId: 202,
+      },
+    })
+
+    const receiptCard = screen.getByRole('region', { name: 'Payment receipt' })
+    const badge = within(receiptCard).getByText('Refunded - Inconsistent provenance')
+    expect(badge).toBeInTheDocument()
+    expect(badge).toHaveClass('badge', 'badge--warning')
+    expect(badge).not.toHaveClass('badge--success')
+    expect(within(receiptCard).getByRole('button', { name: 'Print receipt' })).toBeDisabled()
+    expect(receiptCard).not.toHaveClass('payment-print-receipt')
+    expect(
+      within(receiptCard).getByText(/conflicting simulated transaction identifiers/),
+    ).toBeInTheDocument()
+  })
+
+  it('D03-05/D03-06: ReceptionPaymentPage blocks printing and renders warning badge when payment is Legacy/UNKNOWN REFUNDED and invoice is verified ACTUAL', async () => {
+    await openReception('/reception/payments/41', {
+      paymentRecord: {
+        status: 'REFUNDED',
+        settlementType: 'UNKNOWN',
+        settlementProvider: null,
+      },
+      invoice: {
+        ...LEGACY_INVOICE,
+        status: 'REFUNDED',
+        settlementType: 'ACTUAL',
+        settlementProvider: 'DESK_CASH',
+      },
+    })
+
+    const receiptCard = screen.getByRole('region', { name: 'Payment receipt' })
+    const badge = within(receiptCard).getByText('Refunded - Inconsistent provenance')
+    expect(badge).toBeInTheDocument()
+    expect(badge).toHaveClass('badge', 'badge--warning')
+    expect(badge).not.toHaveClass('badge--success')
+    expect(within(receiptCard).getByRole('button', { name: 'Print receipt' })).toBeDisabled()
+    expect(receiptCard).not.toHaveClass('payment-print-receipt')
+  })
+
+  it('D03-05: ReceptionPaymentPage allows verified receipt printing and neutral badge for consistent refunded ACTUAL across sources', async () => {
+    await openReception('/reception/payments/41', {
+      paymentRecord: {
+        status: 'REFUNDED',
+        settlementType: 'ACTUAL',
+        settlementProvider: 'DESK_CASH',
+      },
+      invoice: {
+        ...LEGACY_INVOICE,
+        status: 'REFUNDED',
+        settlementType: 'ACTUAL',
+        settlementProvider: 'DESK_CASH',
+      },
+    })
+
+    const receiptCard = screen.getByRole('region', { name: 'Payment receipt' })
+    const badge = within(receiptCard).getByText('Refunded')
+    expect(badge).toBeInTheDocument()
+    expect(badge).toHaveClass('badge', 'badge--neutral')
+    expect(badge).not.toHaveClass('badge--success')
+    expect(within(receiptCard).getByText('ACTUAL (DESK_CASH)')).toBeInTheDocument()
+    expect(within(receiptCard).getByRole('button', { name: 'Print receipt' })).toBeEnabled()
+    expect(receiptCard).toHaveClass('payment-print-receipt')
+  })
+
+  it('D03-05: ReceptionPaymentPage allows receipt printing and retains SIMULATED warning for consistent refunded SIMULATED across sources', async () => {
+    await openReception('/reception/payments/41', {
+      paymentRecord: {
+        status: 'REFUNDED',
+        settlementType: 'SIMULATED',
+        settlementProvider: 'SPORTIFY_SIMULATOR',
+        simulatedTransactionId: 101,
+      },
+      invoice: {
+        ...LEGACY_INVOICE,
+        status: 'REFUNDED',
+        settlementType: 'SIMULATED',
+        settlementProvider: 'SPORTIFY_SIMULATOR',
+        simulatedTransactionId: 101,
+      },
+    })
+
+    const receiptCard = screen.getByRole('region', { name: 'Payment receipt' })
+    const badge = within(receiptCard).getByText('Refunded')
+    expect(badge).toBeInTheDocument()
+    expect(badge).toHaveClass('badge', 'badge--neutral')
+    expect(badge).not.toHaveClass('badge--success')
+    expect(within(receiptCard).getByText('SIMULATED (SPORTIFY_SIMULATOR)')).toBeInTheDocument()
+    expect(
+      within(receiptCard).getByText(/SIMULATED SETTLEMENT - Completed via Sportify QR Simulator/),
+    ).toBeInTheDocument()
+    expect(within(receiptCard).getByRole('button', { name: 'Print receipt' })).toBeEnabled()
+    expect(receiptCard).toHaveClass('payment-print-receipt')
+  })
+
+  it('D03-06: ReceptionPaymentPage renders Paid - Simulated with badge--success for consistent verified SIMULATED payment', async () => {
+    await openReception('/reception/payments/41', {
+      paymentRecord: {
+        status: 'SUCCESS',
+        settlementType: 'SIMULATED',
+        settlementProvider: 'SPORTIFY_SIMULATOR',
+        simulatedTransactionId: 9001,
+      },
+      invoice: {
+        ...LEGACY_INVOICE,
+        status: 'PAID',
+        settlementType: 'SIMULATED',
+        settlementProvider: 'SPORTIFY_SIMULATOR',
+        simulatedTransactionId: 9001,
+      },
+    })
+
+    const receiptCard = screen.getByRole('region', { name: 'Payment receipt' })
+    const badge = within(receiptCard).getByText('Paid - Simulated')
+    expect(badge).toBeInTheDocument()
+    expect(badge).toHaveClass('badge', 'badge--success')
     expect(within(receiptCard).getByRole('button', { name: 'Print receipt' })).toBeEnabled()
     expect(receiptCard).toHaveClass('payment-print-receipt')
   })

@@ -422,4 +422,164 @@ describe('receptionProvenanceModel - reconcileProvenance (D03-02)', () => {
     expect(res.statusBadgeLabel).toBe('Paid - Legacy unverified')
     expect(res.canPrintReceipt).toBe(false)
   })
+
+  // D03-05: Refunded cross-source reconciliation
+  it('D03-05: blocks receipt printing when payment REFUNDED/ACTUAL conflicts with invoice REFUNDED/SIMULATED', () => {
+    const payment = {
+      status: 'REFUNDED',
+      settlementType: 'ACTUAL',
+      settlementProvider: 'MANUAL_TRANSFER',
+    }
+    const invoice = {
+      status: 'REFUNDED',
+      settlementType: 'SIMULATED',
+      settlementProvider: 'SPORTIFY_SIMULATOR',
+      simulatedTransactionId: 101,
+    }
+    const res = reconcileProvenance(payment, invoice)
+    expect(res.classification).toBe('INCONSISTENT')
+    expect(res.statusBadgeLabel).toBe('Refunded - Inconsistent provenance')
+    expect(res.statusBadgeTone).toBe('warning')
+    expect(res.canPrintReceipt).toBe(false)
+    expect(res.receiptWarningMessage).toContain('disagree on settlement provenance')
+  })
+
+  it('D03-05: blocks receipt printing when payment REFUNDED/ACTUAL conflicts with invoice REFUNDED/ACTUAL conflicting providers', () => {
+    const payment = {
+      status: 'REFUNDED',
+      settlementType: 'ACTUAL',
+      settlementProvider: 'provider-A',
+    }
+    const invoice = {
+      status: 'REFUNDED',
+      settlementType: 'ACTUAL',
+      settlementProvider: 'provider-B',
+    }
+    const res = reconcileProvenance(payment, invoice)
+    expect(res.classification).toBe('INCONSISTENT')
+    expect(res.statusBadgeLabel).toBe('Refunded - Inconsistent provenance')
+    expect(res.statusBadgeTone).toBe('warning')
+    expect(res.canPrintReceipt).toBe(false)
+    expect(res.receiptWarningMessage).toContain('conflicting settlement providers')
+  })
+
+  it('D03-05: blocks receipt printing when payment REFUNDED/SIMULATED conflicts with invoice REFUNDED/SIMULATED conflicting txId', () => {
+    const payment = {
+      status: 'REFUNDED',
+      settlementType: 'SIMULATED',
+      settlementProvider: 'SPORTIFY_SIMULATOR',
+      simulatedTransactionId: 101,
+    }
+    const invoice = {
+      status: 'REFUNDED',
+      settlementType: 'SIMULATED',
+      settlementProvider: 'SPORTIFY_SIMULATOR',
+      simulatedTransactionId: 202,
+    }
+    const res = reconcileProvenance(payment, invoice)
+    expect(res.classification).toBe('INCONSISTENT')
+    expect(res.statusBadgeLabel).toBe('Refunded - Inconsistent provenance')
+    expect(res.statusBadgeTone).toBe('warning')
+    expect(res.canPrintReceipt).toBe(false)
+    expect(res.receiptWarningMessage).toContain('conflicting simulated transaction identifiers')
+  })
+
+  it('D03-05: blocks receipt printing when payment is Legacy/UNKNOWN REFUNDED and invoice is verified REFUNDED/ACTUAL', () => {
+    const payment = {
+      status: 'REFUNDED',
+      settlementType: 'UNKNOWN',
+      settlementProvider: null,
+    }
+    const invoice = {
+      status: 'REFUNDED',
+      settlementType: 'ACTUAL',
+      settlementProvider: 'DESK_CASH',
+    }
+    const res = reconcileProvenance(payment, invoice)
+    expect(res.classification).toBe('INCONSISTENT')
+    expect(res.statusBadgeLabel).toBe('Refunded - Inconsistent provenance')
+    expect(res.statusBadgeTone).toBe('warning')
+    expect(res.canPrintReceipt).toBe(false)
+    expect(res.receiptWarningMessage).toContain('disagree on settlement provenance')
+  })
+
+  it('D03-05: blocks receipt printing when payment is verified REFUNDED/ACTUAL and invoice is Legacy/NULL REFUNDED', () => {
+    const payment = {
+      status: 'REFUNDED',
+      settlementType: 'ACTUAL',
+      settlementProvider: 'DESK_CASH',
+    }
+    const invoice = {
+      status: 'REFUNDED',
+      settlementType: null,
+      settlementProvider: null,
+    }
+    const res = reconcileProvenance(payment, invoice)
+    expect(res.classification).toBe('INCONSISTENT')
+    expect(res.statusBadgeLabel).toBe('Refunded - Inconsistent provenance')
+    expect(res.statusBadgeTone).toBe('warning')
+    expect(res.canPrintReceipt).toBe(false)
+    expect(res.receiptWarningMessage).toContain('disagree on settlement provenance')
+  })
+
+  it('D03-05: rejects REFUNDED ACTUAL when invoice has missing settlement provider', () => {
+    const payment = {
+      status: 'REFUNDED',
+      settlementType: 'ACTUAL',
+      settlementProvider: 'DESK_CASH',
+    }
+    const invoice = {
+      status: 'REFUNDED',
+      settlementType: 'ACTUAL',
+      settlementProvider: null,
+    }
+    const res = reconcileProvenance(payment, invoice)
+    expect(res.classification).toBe('INCONSISTENT')
+    expect(res.statusBadgeLabel).toBe('Refunded - Inconsistent provenance')
+    expect(res.canPrintReceipt).toBe(false)
+    expect(res.receiptWarningMessage).toContain('conflicting settlement providers')
+  })
+
+  it('D03-05: allows receipt printing for consistent verified REFUNDED ACTUAL records across sources', () => {
+    const payment = {
+      status: 'REFUNDED',
+      settlementType: 'ACTUAL',
+      settlementProvider: 'DESK_CASH',
+    }
+    const invoice = {
+      status: 'REFUNDED',
+      settlementType: 'ACTUAL',
+      settlementProvider: 'DESK_CASH',
+    }
+    const res = reconcileProvenance(payment, invoice)
+    expect(res.classification).toBe('REFUNDED')
+    expect(res.statusBadgeLabel).toBe('Refunded')
+    expect(res.statusBadgeTone).toBe('neutral')
+    expect(res.provenanceLabel).toBe('ACTUAL (DESK_CASH)')
+    expect(res.isVerifiedActual).toBe(true)
+    expect(res.canPrintReceipt).toBe(true)
+  })
+
+  it('D03-05: allows receipt printing for consistent verified REFUNDED SIMULATED records preserving simulated warning banner', () => {
+    const payment = {
+      status: 'REFUNDED',
+      settlementType: 'SIMULATED',
+      settlementProvider: 'SPORTIFY_SIMULATOR',
+      simulatedTransactionId: 101,
+    }
+    const invoice = {
+      status: 'REFUNDED',
+      settlementType: 'SIMULATED',
+      settlementProvider: 'SPORTIFY_SIMULATOR',
+      simulatedTransactionId: 101,
+    }
+    const res = reconcileProvenance(payment, invoice)
+    expect(res.classification).toBe('REFUNDED')
+    expect(res.statusBadgeLabel).toBe('Refunded')
+    expect(res.statusBadgeTone).toBe('neutral')
+    expect(res.provenanceLabel).toBe('SIMULATED (SPORTIFY_SIMULATOR)')
+    expect(res.isSimulatedSuccess).toBe(true)
+    expect(res.canPrintReceipt).toBe(true)
+    expect(res.receiptWarningMessage).toContain('SIMULATED SETTLEMENT')
+  })
 })

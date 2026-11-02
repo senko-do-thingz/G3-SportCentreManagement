@@ -387,11 +387,34 @@ export function classifyProvenance(
   }
 }
 
+function buildInconsistentPresentation(
+  isRefund: boolean,
+  warningMessage: string,
+): ProvenancePresentation {
+  return {
+    classification: 'INCONSISTENT',
+    statusBadgeLabel: isRefund ? 'Refunded - Inconsistent provenance' : 'Paid - Inconsistent provenance',
+    statusBadgeTone: 'warning',
+    provenanceLabel: 'Inconsistent provenance',
+    isVerifiedActual: false,
+    isSimulatedSuccess: false,
+    isLegacyUnverified: false,
+    isInconsistent: true,
+    canPrintReceipt: false,
+    receiptHeroDescription: isRefund
+      ? 'Payment was refunded, but settlement provenance is contradictory or unverified.'
+      : 'Payment record with unverified or inconsistent settlement provenance.',
+    receiptWarningMessage: warningMessage,
+    receiptWarningTone: 'danger',
+  }
+}
+
 /**
  * Reconciles provenance between a Payment and its corresponding Invoice.
  * Prevents cross-source provenance contamination:
  * - A missing provenance in an invoice is NEVER upgraded by payment fields.
  * - Any material contradiction between payment and invoice fails closed as INCONSISTENT.
+ * - For REFUNDED records, compares underlying settlement type, provider, and simulated transaction ID (D03-05).
  * - If no ready invoice is available, canPrintReceipt is strictly false.
  */
 export function reconcileProvenance(
@@ -415,47 +438,79 @@ export function reconcileProvenance(
   const invoicePres = classifyProvenance(invoiceSubject)
   const paymentPres = classifyProvenance(paymentSubject)
 
+  const invoiceStatus = (invoiceSubject.status ?? invoiceSubject.paymentStatus ?? '').trim().toUpperCase()
+  const paymentStatus = (paymentSubject.status ?? paymentSubject.paymentStatus ?? '').trim().toUpperCase()
+  const isRefund =
+    invoiceStatus === 'REFUNDED' ||
+    paymentStatus === 'REFUNDED' ||
+    invoicePres.classification === 'REFUNDED' ||
+    paymentPres.classification === 'REFUNDED'
+
   // Direct classification mismatch across sources (e.g. invoice NULL and payment ACTUAL, or ACTUAL vs SIMULATED)
   if (invoicePres.classification !== paymentPres.classification) {
-    const rawStatus = (invoiceSubject.status ?? paymentSubject.status ?? '').trim().toUpperCase()
-    const isRefund = rawStatus === 'REFUNDED'
-    return {
-      classification: 'INCONSISTENT',
-      statusBadgeLabel: isRefund ? 'Refunded - Inconsistent provenance' : 'Paid - Inconsistent provenance',
-      statusBadgeTone: 'warning',
-      provenanceLabel: 'Inconsistent provenance',
-      isVerifiedActual: false,
-      isSimulatedSuccess: false,
-      isLegacyUnverified: false,
-      isInconsistent: true,
-      canPrintReceipt: false,
-      receiptHeroDescription: 'Payment record with unverified or inconsistent settlement provenance.',
-      receiptWarningMessage:
-        'INCONSISTENT PROVENANCE - Payment record and invoice disagree on settlement provenance. Not an authoritative proof of settlement.',
-      receiptWarningTone: 'danger',
-    }
+    return buildInconsistentPresentation(
+      isRefund,
+      'INCONSISTENT PROVENANCE - Payment record and invoice disagree on settlement provenance. Not an authoritative proof of settlement.',
+    )
   }
 
-  // Both have same classification, check detailed field consistency
+  // Cross-source reconciliation for REFUNDED records (D03-05)
+  if (invoicePres.classification === 'REFUNDED') {
+    const invType = (invoiceSubject.settlementType ?? '').trim().toUpperCase()
+    const payType = (paymentSubject.settlementType ?? '').trim().toUpperCase()
+
+    // Compare underlying settlement type (e.g. ACTUAL vs SIMULATED)
+    if (invType !== payType) {
+      return buildInconsistentPresentation(
+        true,
+        'INCONSISTENT PROVENANCE - Payment record and invoice disagree on settlement provenance. Not an authoritative proof of settlement.',
+      )
+    }
+
+    if (invType === 'ACTUAL') {
+      const invProv = (invoiceSubject.settlementProvider ?? '').trim().toUpperCase()
+      const payProv = (paymentSubject.settlementProvider ?? '').trim().toUpperCase()
+      if (!invProv || !payProv || invProv !== payProv) {
+        return buildInconsistentPresentation(
+          true,
+          'INCONSISTENT PROVENANCE - Payment and invoice specify conflicting settlement providers.',
+        )
+      }
+      return invoicePres
+    }
+
+    if (invType === 'SIMULATED') {
+      const invProv = (invoiceSubject.settlementProvider ?? '').trim().toUpperCase()
+      const payProv = (paymentSubject.settlementProvider ?? '').trim().toUpperCase()
+      const invTx = invoiceSubject.simulatedTransactionId ?? null
+      const payTx = paymentSubject.simulatedTransactionId ?? null
+      if (!invProv || !payProv || invProv !== payProv) {
+        return buildInconsistentPresentation(
+          true,
+          'INCONSISTENT PROVENANCE - Payment and invoice specify conflicting settlement providers.',
+        )
+      }
+      if (invTx === null || payTx === null || invTx !== payTx) {
+        return buildInconsistentPresentation(
+          true,
+          'INCONSISTENT PROVENANCE - Payment and invoice specify conflicting simulated transaction identifiers.',
+        )
+      }
+      return invoicePres
+    }
+
+    return invoicePres
+  }
+
+  // Both have same classification for non-refunded: check detailed field consistency
   if (invoicePres.classification === 'ACTUAL') {
     const invProv = (invoiceSubject.settlementProvider ?? '').trim().toUpperCase()
     const payProv = (paymentSubject.settlementProvider ?? '').trim().toUpperCase()
     if (invProv && payProv && invProv !== payProv) {
-      return {
-        classification: 'INCONSISTENT',
-        statusBadgeLabel: 'Paid - Inconsistent provenance',
-        statusBadgeTone: 'warning',
-        provenanceLabel: 'Inconsistent provenance',
-        isVerifiedActual: false,
-        isSimulatedSuccess: false,
-        isLegacyUnverified: false,
-        isInconsistent: true,
-        canPrintReceipt: false,
-        receiptHeroDescription: 'Payment record with unverified or inconsistent settlement provenance.',
-        receiptWarningMessage:
-          'INCONSISTENT PROVENANCE - Payment and invoice specify conflicting settlement providers.',
-        receiptWarningTone: 'danger',
-      }
+      return buildInconsistentPresentation(
+        isRefund,
+        'INCONSISTENT PROVENANCE - Payment and invoice specify conflicting settlement providers.',
+      )
     }
     return invoicePres
   }
@@ -464,25 +519,14 @@ export function reconcileProvenance(
     const invTx = invoiceSubject.simulatedTransactionId
     const payTx = paymentSubject.simulatedTransactionId
     if (invTx !== payTx) {
-      return {
-        classification: 'INCONSISTENT',
-        statusBadgeLabel: 'Paid - Inconsistent provenance',
-        statusBadgeTone: 'warning',
-        provenanceLabel: 'Inconsistent provenance',
-        isVerifiedActual: false,
-        isSimulatedSuccess: false,
-        isLegacyUnverified: false,
-        isInconsistent: true,
-        canPrintReceipt: false,
-        receiptHeroDescription: 'Payment record with unverified or inconsistent settlement provenance.',
-        receiptWarningMessage:
-          'INCONSISTENT PROVENANCE - Payment and invoice specify conflicting simulated transaction identifiers.',
-        receiptWarningTone: 'danger',
-      }
+      return buildInconsistentPresentation(
+        isRefund,
+        'INCONSISTENT PROVENANCE - Payment and invoice specify conflicting simulated transaction identifiers.',
+      )
     }
     return invoicePres
   }
 
-  // For LEGACY_UNVERIFIED, REFUNDED, PENDING, FAILED, CANCELLED, or INCONSISTENT
+  // For LEGACY_UNVERIFIED, PENDING, FAILED, CANCELLED, or INCONSISTENT
   return invoicePres
 }

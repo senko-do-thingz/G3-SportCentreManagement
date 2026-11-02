@@ -590,10 +590,9 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
               </p>
             </>
           ) : (
-            <StatusBadge
-              status={presentation.isLegacyUnverified ? 'neutral' : paymentStatusTone(payment.status)}
-              label={presentation.statusBadgeLabel}
-            />
+            <Badge tone={presentation.statusBadgeTone}>
+              {presentation.statusBadgeLabel}
+            </Badge>
           )}
           {presentation.receiptWarningMessage && (
             <p className={`notice notice--${presentation.receiptWarningTone ?? 'warning'}`} role="status">
