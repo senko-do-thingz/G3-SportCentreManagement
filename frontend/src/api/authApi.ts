@@ -30,4 +30,12 @@ export const authApi = {
     }
     return profile
   },
+
+  async logout(): Promise<void> {
+    try {
+      await api.post<void>('/auth/logout', null, { auth: true })
+    } catch {
+      // Gracefully handle network outage or already revoked tokens
+    }
+  },
 }

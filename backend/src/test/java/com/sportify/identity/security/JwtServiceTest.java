@@ -104,4 +104,36 @@ class JwtServiceTest {
         assertEquals("JWT_SECRET must be a valid Base64 string that decodes to at least 32 bytes", ex.getMessage());
         assertInstanceOf(IllegalArgumentException.class, ex.getCause());
     }
+
+    @Test
+    void generateTokenWithSession_shouldContainAndExtractSessionId() {
+        String token = jwtService.generateToken(userDetails, "session-abc-123");
+        assertEquals("session-abc-123", jwtService.extractSessionId(token));
+        assertTrue(jwtService.isTokenValid(token, userDetails));
+    }
+
+    @Test
+    void generateRefreshTokenWithSession_shouldContainAndExtractSessionId() {
+        String token = jwtService.generateRefreshToken(userDetails, "session-xyz-789");
+        assertEquals("session-xyz-789", jwtService.extractSessionId(token));
+        assertTrue(jwtService.isTokenValid(token, userDetails));
+    }
+
+    @Test
+    void hashToken_shouldProduceConsistentSha256Hex() {
+        String hash1 = JwtService.hashToken("sample-token");
+        String hash2 = JwtService.hashToken("sample-token");
+        assertEquals(hash1, hash2);
+        assertEquals(64, hash1.length());
+        assertNotEquals(hash1, JwtService.hashToken("different-token"));
+    }
+
+    @Test
+    void extractClaims_shouldSucceedEvenOnExpiredToken() throws InterruptedException {
+        ReflectionTestUtils.setField(jwtService, "jwtExpiration", 1L);
+        String token = jwtService.generateToken(userDetails, "expired-session-id");
+        Thread.sleep(10);
+        // Signature is valid, but expired: extractSessionId should still read the sid claim safely
+        assertEquals("expired-session-id", jwtService.extractSessionId(token));
+    }
 }

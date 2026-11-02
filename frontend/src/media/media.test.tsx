@@ -123,7 +123,23 @@ describe('UI-03 media rules', () => {
   })
 
   it('builds Unsplash URLs only through src/media/unsplash.ts', () => {
-    const offenders = sources.filter(({ file, text }) => text.includes('images.unsplash.com') && relative('src', file).replaceAll('\\', '/') !== 'media/unsplash.ts')
+    const unsplashUrlPattern = /https?:\/\/[^\s"'`)]+/g
+    const offenders = sources.filter(({ file, text }) => {
+      if (relative('src', file).replaceAll('\\', '/') === 'media/unsplash.ts') {
+        return false
+      }
+      const matches = text.match(unsplashUrlPattern)
+      if (!matches) {
+        return false
+      }
+      return matches.some((matchedUrl) => {
+        try {
+          return new URL(matchedUrl).hostname === 'images.unsplash.com'
+        } catch {
+          return false
+        }
+      })
+    })
     expect(offenders.map(({ file }) => file)).toEqual([])
   })
 

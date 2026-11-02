@@ -1,10 +1,12 @@
 package com.sportify.identity.security;
 
+import com.sportify.identity.repository.UserSessionRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,6 +17,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.LocalDateTime;
 
 @Component
 @RequiredArgsConstructor
@@ -22,6 +26,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final ObjectProvider<UserSessionRepository> userSessionRepositoryProvider;
+    private final ObjectProvider<Clock> clockProvider;
 
     @Override
     protected void doFilterInternal(
@@ -29,10 +35,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
-        if (request.getServletPath().contains("/api/v1/auth")) {
+        String servletPath = request.getServletPath();
+        if (servletPath != null && servletPath.startsWith("/api/v1/auth/") && !servletPath.equals("/api/v1/auth/logout")) {
             filterChain.doFilter(request, response);
             return;
         }
+
         final String authHeader = request.getHeader("Authorization");
         final String jwt;
         final String userEmail;
@@ -40,16 +48,34 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
-        
+
         try {
             jwt = authHeader.substring(7);
             userEmail = jwtService.extractUsername(jwt);
             String tokenType = jwtService.extractTokenType(jwt);
-            
+            String sessionId = jwtService.extractSessionId(jwt);
+
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
-                // A deactivated account is rejected here too, so deactivation takes effect before the token expires.
                 if ("access".equals(tokenType) && jwtService.isTokenValid(jwt, userDetails) && userDetails.isEnabled()) {
+                    UserSessionRepository userSessionRepository = userSessionRepositoryProvider.getIfAvailable();
+                    if (userSessionRepository != null) {
+                        if (sessionId == null || sessionId.isBlank()) {
+                            // Legacy token without session: fail closed
+                            filterChain.doFilter(request, response);
+                            return;
+                        }
+
+                        Clock clock = clockProvider.getIfAvailable() != null ? clockProvider.getIfAvailable() : Clock.systemUTC();
+                        var sessionOpt = userSessionRepository.findBySessionId(sessionId);
+                        LocalDateTime now = LocalDateTime.now(clock);
+                        if (sessionOpt.isEmpty() || !sessionOpt.get().isActive(now)) {
+                            // Session revoked, expired, or non-existent: fail closed
+                            filterChain.doFilter(request, response);
+                            return;
+                        }
+                    }
+
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
                             null,
@@ -62,9 +88,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
         } catch (io.jsonwebtoken.JwtException | IllegalArgumentException e) {
-            logger.error("JWT validation error: " + e.getMessage());
+            logger.debug("JWT validation error: " + e.getMessage());
         }
-        
+
         filterChain.doFilter(request, response);
     }
 }

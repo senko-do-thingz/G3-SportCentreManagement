@@ -236,8 +236,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const logout = useCallback(() => {
-    // The backend has no logout endpoint; dropping the tokens ends the session on this device.
     loadCounter.current += 1
+    void authApi.logout().catch(() => {
+      // Fire-and-forget: network errors or already revoked sessions must never block client logout
+    })
     tokenStorage.clear()
     setState(ANONYMOUS)
   }, [])

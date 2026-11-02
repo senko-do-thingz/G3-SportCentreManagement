@@ -40,8 +40,10 @@ public class SecurityConfig {
                 // so a preflight request is answered without a token.
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(req ->
-                        req.requestMatchers("/api/v1/auth/**", "/error")
+                        req.requestMatchers("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh", "/error")
                                 .permitAll()
+                                .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout")
+                                .authenticated()
                                 // Preflight requests never carry a token
                                 .requestMatchers(HttpMethod.OPTIONS, "/**")
                                 .permitAll()

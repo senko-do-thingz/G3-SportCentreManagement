@@ -1,6 +1,7 @@
 package com.sportify.identity.security;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
@@ -10,10 +11,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Service
@@ -48,14 +53,29 @@ public class JwtService {
         return extractClaim(token, claims -> claims.get("type", String.class));
     }
 
+    public String extractSessionId(String token) {
+        try {
+            return extractClaim(token, claims -> claims.get("sid", String.class));
+        } catch (ExpiredJwtException ex) {
+            return ex.getClaims().get("sid", String.class);
+        }
+    }
+
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
         return claimsResolver.apply(claims);
     }
 
     public String generateToken(UserDetails userDetails) {
+        return generateToken(userDetails, null);
+    }
+
+    public String generateToken(UserDetails userDetails, String sessionId) {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("type", "access");
+        if (sessionId != null) {
+            extraClaims.put("sid", sessionId);
+        }
         return generateToken(extraClaims, userDetails);
     }
 
@@ -64,8 +84,16 @@ public class JwtService {
     }
 
     public String generateRefreshToken(UserDetails userDetails) {
+        return generateRefreshToken(userDetails, null);
+    }
+
+    public String generateRefreshToken(UserDetails userDetails, String sessionId) {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("type", "refresh");
+        extraClaims.put("jti", UUID.randomUUID().toString());
+        if (sessionId != null) {
+            extraClaims.put("sid", sessionId);
+        }
         return buildToken(extraClaims, userDetails, refreshExpiration);
     }
 
@@ -105,5 +133,26 @@ public class JwtService {
     private Key getSignInKey() {
         byte[] keyBytes = Decoders.BASE64.decode(secretKey);
         return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    public static String hashToken(String token) {
+        if (token == null) {
+            return "";
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 algorithm not available", e);
+        }
     }
 }
