@@ -2,6 +2,7 @@ import type { ComponentType } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { assistantEnabled } from '../../config/env'
 import { safeMemberReturnTo } from './assistantNavigation'
 
 /** Integration contract for Phat's chat screen. Authentication is enforced by the parent route. */
@@ -11,6 +12,7 @@ export interface MemberAssistantChatProps {
 
 export function MemberAssistantLink({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation()
+  if (!assistantEnabled()) return null
   const active = location.pathname === '/member/assistant'
   const returnTo = `${location.pathname}${location.search}${location.hash}`
   const href = active ? `${location.pathname}${location.search}` : `/member/assistant?returnTo=${encodeURIComponent(returnTo)}`

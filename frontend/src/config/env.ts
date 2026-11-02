@@ -33,6 +33,15 @@ export function managerPreviewEnabled(): boolean {
   return import.meta.env.DEV && import.meta.env.VITE_MANAGER_PREVIEW === 'true'
 }
 
+/**
+ * Member AI assistant entry point (NX-31, Flow 6). Off unless VITE_ASSISTANT_ENABLED is exactly
+ * "true": the header link is hidden and /member/assistant redirects to the member home. Read on
+ * every call so tests can change the variable.
+ */
+export function assistantEnabled(): boolean {
+  return import.meta.env.VITE_ASSISTANT_ENABLED === 'true'
+}
+
 /** Enabled by default for the QR-05 simulation flow unless explicitly disabled via VITE_QR_PAYMENT_DEMO=false. Backend capability gating remains mandatory. */
 export function qrPaymentDemoEnabled(): boolean {
   return import.meta.env.VITE_QR_PAYMENT_DEMO !== 'false'

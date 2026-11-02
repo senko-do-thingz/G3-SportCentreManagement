@@ -11,7 +11,7 @@ function signedIn(handler: (call: RecordedCall) => Response, profile = MEMBER) {
   tokenStorage.startSession({ accessToken: 'member-token', refreshToken: 'refresh' })
   return installFakeFetch(call => call.path === '/users/me' ? json(200, profile) : handler(call))
 }
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); window.localStorage.clear() })
 describe('Member training', () => {
   it('opens a read-only assigned plan and its steps', async () => {
     const plan = { id: 7, title: 'Breathing technique', className: 'Beginner swimming', coachName: 'Coach An', description: 'Breathing practice' }
@@ -67,6 +67,9 @@ describe('Member training', () => {
     expect(calls.filter(call => call.path.startsWith('/member/training'))).toHaveLength(0)
   })
   it('preserves return navigation when opening the Assistant', async () => {
+    // NX-31: the link exists only when the feature is on, and the chat opens after the member opted in.
+    vi.stubEnv('VITE_ASSISTANT_ENABLED', 'true')
+    window.localStorage.setItem('sportify.assistant.optIn.' + MEMBER.id, 'on')
     signedIn(() => json(200, []))
     renderApp('/member/training/plans?view=week#plan-list')
     await userEvent.click(await screen.findByRole('button', { name: 'Open member navigation' }))
