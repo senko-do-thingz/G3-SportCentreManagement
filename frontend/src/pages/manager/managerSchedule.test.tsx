@@ -7,7 +7,7 @@ import { renderApp } from '../../test/renderApp'
 import { backendError, installFakeFetch, json, MANAGER } from '../../test/fakeBackend'
 import { addDays, centerNow, displayDate, monday } from './scheduleModel'
 
-const date = addDays(centerNow().date, 7)
+const date = addDays(monday(centerNow().date), 7)
 const item = { id: 5, code: 'CL-005', name: 'Badminton foundations', sportId: 1, sportName: 'Badminton', ageGroupId: 1, ageGroupLabel: 'Adults', level: 'BEGINNER', coachId: 3, coachName: 'Quan Coach', maxMembers: 20, upcomingSessions: 1, active: true }
 const session = { id: 7, date, startTime: '09:00:00', endTime: '10:00:00', class: { id: 5, code: item.code, name: item.name }, coach: { id: 3, name: 'Quan Coach' }, facility: { id: 1, name: 'Court A' }, capacity: 20, bookedCount: 2, trainingType: 'COACH_LED', status: 'PUBLISHED', cancelReason: null }
 const cancelledSession = { ...session, id: 8, status: 'CANCELLED', cancelReason: 'Maintenance' }
