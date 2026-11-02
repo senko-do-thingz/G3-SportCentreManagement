@@ -16,7 +16,7 @@ fs.mkdirSync(OUT, { recursive: true })
 
 function run(label, extra) {
   const dir = path.join(OUT, label)
-  const result = spawnSync(process.execPath, [path.join(here, 'flow4-qa.mjs'), dir, BASE, '--only=' + SCREEN, ...extra], { encoding: 'utf8' })
+  const result = spawnSync(process.execPath, [path.join(here, 'flow4-qa.mjs'), dir, BASE, '--only=' + SCREEN, '--sizes=1440', ...extra], { encoding: 'utf8' })
   const lines = (result.stdout || '').split('\n')
   return { label, exitCode: result.status, firstFailure: lines.find((l) => l.startsWith('FAIL')) ?? null, resultLine: lines.find((l) => l.startsWith('RESULT')) ?? null }
 }

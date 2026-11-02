@@ -17,25 +17,26 @@ export const BLOCKED = [
 
 /**
  * @param rows runner rows: captures (no `state`) and state checks (`state` set)
- * @param expected { screens: string[], emptyExempt?: string[] } screens that must be present
+ * @param expected { screens: string[], sizes?: string[], emptyExempt?: string[] } screens and viewport widths that must be present (sizes defaults to all three)
  * @returns { failures: string[], captures: number, stateChecks: number }
  */
 export function evaluate(rows, expected) {
   const failures = []
   const captures = rows.filter((r) => !r.state)
   const states = rows.filter((r) => r.state)
+  const sizes = expected.sizes ?? SIZES
   const where = (r) => `${r.screen}@${r.width}/${r.scheme}`
 
   // Coverage first: a run that captured nothing must not pass.
   for (const screen of expected.screens) {
-    for (const width of SIZES) {
+    for (const width of sizes) {
       for (const scheme of THEMES) {
         if (!captures.some((r) => r.screen === screen && r.width === width && r.scheme === scheme)) {
           failures.push(`missing capture ${screen}@${width}/${scheme}`)
         }
       }
     }
-    for (const width of ['390', '1440']) {
+    for (const width of sizes.filter((w) => w === '390' || w === '1440')) {
       for (const scheme of THEMES) {
         for (const state of STATES) {
           if (!states.some((r) => r.screen === screen && r.width === width && r.scheme === scheme && r.state === state)) {

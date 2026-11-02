@@ -76,7 +76,11 @@ const SCREENS = [
 const ONLY = (flags.find((f) => f.startsWith('--only=')) ?? '').split('=')[1] ?? null
 const ACTIVE = ONLY ? SCREENS.filter((s) => s.name === ONLY) : SCREENS
 if (ONLY && ACTIVE.length === 0) { console.log('FAIL unknown screen for --only: ' + ONLY); process.exit(1) }
-const SIZES = { 390: [390, 844], 768: [768, 1024], 1440: [1440, 900] }
+const ALL_SIZES = { 390: [390, 844], 768: [768, 1024], 1440: [1440, 900] }
+// --sizes=1440 (comma list) narrows the widths; the default and the real QA run use all three.
+const SIZE_ARG = (flags.find((f) => f.startsWith('--sizes=')) ?? '').split('=')[1] ?? null
+const SIZES = Object.fromEntries(Object.entries(ALL_SIZES).filter(([w]) => !SIZE_ARG || SIZE_ARG.split(',').includes(w)))
+if (Object.keys(SIZES).length === 0) { console.log('FAIL no valid width in --sizes=' + SIZE_ARG); process.exit(1) }
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' }
 
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: true })
@@ -144,7 +148,7 @@ for (const role of [...new Set(ACTIVE.map((s) => s.role))]) {
   }
 }
 await browser.close()
-const result = evaluate(rows, { screens: ACTIVE.map((s) => s.name) })
+const result = evaluate(rows, { screens: ACTIVE.map((s) => s.name), sizes: Object.keys(SIZES) })
 fs.writeFileSync(OUT + '/report.json', JSON.stringify({ injectedDefect: INJECT, failures: result.failures, blocked: BLOCKED, rows }, null, 1))
 console.log(`captures: ${result.captures}, state checks: ${result.stateChecks}${INJECT ? ', injected defect: ' + INJECT : ''}`)
 for (const failure of result.failures.slice(0, 40)) console.log('FAIL', failure)

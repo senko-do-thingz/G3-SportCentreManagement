@@ -38,6 +38,12 @@ test('a clean run has no failures', () => {
   assert.equal(result.captures, SCREENS.length * SIZES.length * THEMES.length)
 })
 
+test('a narrowed run only needs the widths it asked for, and still fails when one is missing', () => {
+  const narrow = goodRows().filter((r) => r.width === '1440')
+  assert.deepEqual(evaluate(narrow, { screens: SCREENS, sizes: ['1440'] }).failures, [])
+  assert.ok(evaluate(narrow, { screens: SCREENS }).failures.some((f) => f.startsWith('missing capture')))
+})
+
 test('an empty run fails: nothing captured is not a pass', () => {
   const result = evaluate([], { screens: SCREENS })
   assert.ok(result.failures.length > 0)
