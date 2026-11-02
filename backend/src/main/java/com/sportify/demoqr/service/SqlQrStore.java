@@ -204,6 +204,15 @@ public class SqlQrStore {
         return rows.stream().findFirst();
     }
 
+    public java.util.Optional<Session> findLatestByPayment(long paymentId) {
+        var rows = jdbc.query(
+                "SELECT TOP 1 id, payment_id, owner_id, amount, currency, bank_code, created_at_utc, expires_at_utc, state, version " +
+                "FROM dbo.simulated_qr_session WHERE payment_id = ? ORDER BY created_at_utc DESC",
+                SqlQrStore::map,
+                paymentId);
+        return rows.stream().findFirst();
+    }
+
     private static Session map(ResultSet row, int index) throws SQLException {
         return new Session(UUID.fromString(row.getString("id")),row.getLong("payment_id"),row.getLong("owner_id"),
                 row.getBigDecimal("amount"),row.getString("currency"),DemoQrService.Bank.valueOf(row.getString("bank_code")),

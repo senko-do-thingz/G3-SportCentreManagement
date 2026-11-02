@@ -19,4 +19,23 @@ describe('Vietnam schedule date model', () => {
     expect(canManageSession(session, new Date('2026-10-16T03:00:00Z'))).toBe(false)
     expect(canManageSession({ ...session, status: 'CANCELLED' }, new Date('2026-10-16T02:00:00Z'))).toBe(false)
   })
+  it('anchors weekly session fixtures to Monday across all weekdays including Sunday', () => {
+    const sampleDates = [
+      { day: 'Monday', iso: '2026-10-12T12:00:00+07:00', expectedDate: '2026-10-12' },
+      { day: 'Wednesday', iso: '2026-10-14T12:00:00+07:00', expectedDate: '2026-10-14' },
+      { day: 'Saturday', iso: '2026-10-17T12:00:00+07:00', expectedDate: '2026-10-17' },
+      { day: 'Sunday', iso: '2026-10-18T12:00:00+07:00', expectedDate: '2026-10-18' },
+    ]
+    for (const { iso, expectedDate } of sampleDates) {
+      const center = centerNow(new Date(iso))
+      expect(center.date).toBe(expectedDate)
+      const fixtureMonday = addDays(monday(center.date), 7)
+      const fixtureTuesday = addDays(fixtureMonday, 1)
+      const displayedWeekStart = monday(fixtureMonday)
+      const displayedWeekEnd = addDays(displayedWeekStart, 6)
+      expect(displayedWeekStart).toBe(fixtureMonday)
+      expect(fixtureMonday >= displayedWeekStart && fixtureMonday <= displayedWeekEnd).toBe(true)
+      expect(fixtureTuesday >= displayedWeekStart && fixtureTuesday <= displayedWeekEnd).toBe(true)
+    }
+  })
 })

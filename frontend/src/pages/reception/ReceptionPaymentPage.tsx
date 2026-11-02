@@ -59,6 +59,7 @@ import {
   type ConfirmForm,
   type MismatchAmounts,
 } from './receptionPaymentsModel'
+import { reconcileProvenance } from './receptionProvenanceModel'
 
 const EYEBROW = 'Receptionist / Payments and reports'
 
@@ -133,7 +134,22 @@ export function ReceptionPaymentPage() {
 
   const data = payment.data
   if (data.status === 'PENDING') {
-    return <VerifyPayment key={data.id} payment={data} actions={actions} onDone={reload} />
+    const pendingActions = (
+      <div className="reception-actions reception-print-hidden">
+        <Link className={buttonClassName('secondary', 'md')} to={PAYMENT_LIST_PATH}>
+          Payment requests
+        </Link>
+        <Link className={buttonClassName('secondary', 'md')} to={`/reception/payments/${data.id}/qr-display`}>
+          Desk QR Display
+        </Link>
+        {memberId !== null && (
+          <Link className={buttonClassName('ghost', 'md')} to={memberSearchPath(memberId)}>
+            Member profile
+          </Link>
+        )}
+      </div>
+    )
+    return <VerifyPayment key={data.id} payment={data} actions={pendingActions} onDone={reload} />
   }
   if (data.status === 'SUCCESS' || data.status === 'REFUNDED') {
     return <PaymentConfirmed payment={data} actions={actions} memberId={memberId} />
@@ -543,7 +559,8 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
   // UI-31: a wrong amount is never shown as a success; the receipt cannot be printed until it is resolved.
   const problem = refunded ? null : confirmedAmountProblem(payment, invoiceData?.totalAmount)
   const basePrice = invoiceData?.subtotalAmount ?? payment.originalPrice
-  const simulated = payment.settlementType === 'SIMULATED' || invoiceData?.settlementType === 'SIMULATED'
+  const presentation = reconcileProvenance(payment, invoiceData)
+  const canPrint = invoice.status === 'ready' && problem === null && presentation.canPrintReceipt
 
   return (
     <div className="page">
@@ -555,7 +572,7 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
             ? 'This payment was refunded to the member.'
             : problem
               ? 'The amounts of this payment do not agree.'
-              : 'Payment has been recorded. Check the service status below.'
+              : presentation.receiptHeroDescription
         }
         aside={actions}
       />
@@ -563,7 +580,7 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
         <Card
           title={invoiceData ? `Receipt ${invoiceData.invoiceNumber}` : 'Receipt'}
           aria-label="Payment receipt"
-          className={problem ? undefined : 'payment-print-receipt'}
+          className={canPrint ? 'payment-receipt payment-print-receipt' : 'payment-receipt'}
         >
           {problem ? (
             <>
@@ -573,11 +590,13 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
               </p>
             </>
           ) : (
-            <StatusBadge status={paymentStatusTone(payment.status)} label={paymentStatusLabel(payment.status, invoiceData?.settlementType ?? payment.settlementType)} />
+            <Badge tone={presentation.statusBadgeTone}>
+              {presentation.statusBadgeLabel}
+            </Badge>
           )}
-          {simulated && (
-            <p className="notice notice--warning" role="status">
-              SIMULATED SETTLEMENT - Completed via Sportify QR Simulator. No real bank transfer or cash collection occurred.
+          {presentation.receiptWarningMessage && (
+            <p className={`notice notice--${presentation.receiptWarningTone ?? 'warning'}`} role="status">
+              {presentation.receiptWarningMessage}
             </p>
           )}
           <dl className="summary-list payment-rows">
@@ -617,12 +636,10 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
               <dt>Received at</dt>
               <dd>{formatDateTime(invoiceData?.paymentTime ?? payment.paymentTime ?? payment.updatedAt)}</dd>
             </div>
-            {simulated && (
-              <div>
-                <dt>Settlement provenance</dt>
-                <dd>SIMULATED ({invoiceData?.settlementProvider ?? payment.settlementProvider ?? 'SPORTIFY_SIMULATOR'})</dd>
-              </div>
-            )}
+            <div>
+              <dt>Settlement provenance</dt>
+              <dd>{presentation.provenanceLabel}</dd>
+            </div>
           </dl>
           {invoice.status === 'loading' && <Spinner label="Loading the invoice" inline />}
           {invoice.status === 'error' && (
@@ -633,8 +650,13 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
               </Button>
             </div>
           )}
+          {!canPrint && problem === null && (payment.status === 'SUCCESS' || refunded) && invoice.status === 'ready' && (
+            <p className="notice notice--warning" role="alert">
+              This payment record lacks verified settlement provenance ({presentation.provenanceLabel}), so an ordinary verified payment receipt cannot be printed.
+            </p>
+          )}
           <div className="reception-actions reception-print-hidden">
-            <Button onClick={() => window.print()} disabled={invoice.status !== 'ready' || problem !== null}>Print receipt</Button>
+            <Button onClick={() => window.print()} disabled={!canPrint}>Print receipt</Button>
             {problem === null && (
               <Link className={buttonClassName('secondary', 'md')} to={paymentReceiptPath(payment.id)}>
                 Open receipt
