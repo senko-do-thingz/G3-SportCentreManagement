@@ -20,7 +20,7 @@ NX-27 (scope and RBAC), NX-29 (service) and NX-30 (chat UI) do not exist and the
 ## Pre-Merge Checklist
 - [ ] Tests executed and passed in CI (include GitHub Actions run link below)
 - [x] Database migrations reviewed, non-destructive, and backwards-compatible (none)
-- [x] AI Audit Log (`docs/audit/NX-31_ai_audit_log.md`) and test specifications updated
+- [x] AI Audit Log kept locally as the repository rules require (not tracked); test specifications updated
 - [x] No forbidden symbols (em-dashes, emoji, special symbols) present in added lines (ASCII checked)
 - [x] 100% English code, comments, documentation, and commit messages
 - [x] Breaking changes identified and documented (header link hidden by default; see above)
