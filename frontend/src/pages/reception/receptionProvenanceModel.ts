@@ -2,9 +2,11 @@
  * Pure provenance classification helper for Reception payments, invoices, and receipts.
  * Strictly guarantees truthful presentation of settlement provenance:
  * - VALID_SIMULATED: explicit simulated settlement label, warning banner, excluded from real cash.
+ *   Strictly requires settlementType = 'SIMULATED', provider = 'SPORTIFY_SIMULATOR', and positive txId.
  * - ACTUAL: truthful actual settlement presentation where supported by provider data.
- * - LEGACY_UNVERIFIED: explicit 'Legacy unverified' classification for successful payments with NULL/missing provenance.
+ * - LEGACY_UNVERIFIED: explicit 'Legacy unverified' classification for records with NULL/missing provenance.
  * - INCONSISTENT: explicit unverified/inconsistent classification for contradictory metadata.
+ * - REFUNDED: evaluates underlying settlement provenance; prevents unverified refunds from printing receipts.
  * - Non-successful statuses: preserves correct original status without false paid/verified claims.
  */
 
@@ -62,18 +64,134 @@ export function classifyProvenance(
 
   const rawStatus = (subject.status ?? subject.paymentStatus ?? '').trim().toUpperCase()
 
+  // REFUNDED: Evaluate underlying settlement provenance. Unverified refunds must NOT print receipts.
   if (rawStatus === 'REFUNDED') {
+    const type = (subject.settlementType ?? '').trim().toUpperCase()
+    const provider = (subject.settlementProvider ?? '').trim().toUpperCase()
+    const txId = subject.simulatedTransactionId
+    const hasValidTxId = typeof txId === 'number' && Number.isSafeInteger(txId) && txId > 0
+
+    // Refunded genuine ACTUAL settlement
+    if (type === 'ACTUAL') {
+      if (provider === 'SPORTIFY_SIMULATOR' || txId != null) {
+        return {
+          classification: 'INCONSISTENT',
+          statusBadgeLabel: 'Refunded - Inconsistent provenance',
+          statusBadgeTone: 'warning',
+          provenanceLabel: 'Inconsistent provenance',
+          isVerifiedActual: false,
+          isSimulatedSuccess: false,
+          isLegacyUnverified: false,
+          isInconsistent: true,
+          canPrintReceipt: false,
+          receiptHeroDescription: 'Payment was refunded, but settlement provenance is contradictory or unverified.',
+          receiptWarningMessage:
+            'INCONSISTENT PROVENANCE - Settlement provenance is contradictory or unverified. Not an authoritative proof of settlement.',
+          receiptWarningTone: 'danger',
+        }
+      }
+      const providerLabel = subject.settlementProvider ? `ACTUAL (${subject.settlementProvider})` : 'ACTUAL'
+      return {
+        classification: 'REFUNDED',
+        statusBadgeLabel: 'Refunded',
+        statusBadgeTone: 'neutral',
+        provenanceLabel: providerLabel,
+        isVerifiedActual: true,
+        isSimulatedSuccess: false,
+        isLegacyUnverified: false,
+        isInconsistent: false,
+        canPrintReceipt: true,
+        receiptHeroDescription: 'This payment was refunded to the member.',
+      }
+    }
+
+    // Refunded genuine SIMULATED settlement
+    if (type === 'SIMULATED') {
+      if (provider === 'SPORTIFY_SIMULATOR' && hasValidTxId) {
+        return {
+          classification: 'REFUNDED',
+          statusBadgeLabel: 'Refunded',
+          statusBadgeTone: 'neutral',
+          provenanceLabel: 'SIMULATED (SPORTIFY_SIMULATOR)',
+          isVerifiedActual: false,
+          isSimulatedSuccess: true,
+          isLegacyUnverified: false,
+          isInconsistent: false,
+          canPrintReceipt: true,
+          receiptHeroDescription: 'This payment was refunded to the member.',
+          receiptWarningMessage:
+            'SIMULATED SETTLEMENT - Completed via Sportify QR Simulator. No real bank transfer or cash collection occurred.',
+          receiptWarningTone: 'warning',
+        }
+      }
+      return {
+        classification: 'INCONSISTENT',
+        statusBadgeLabel: 'Refunded - Inconsistent provenance',
+        statusBadgeTone: 'warning',
+        provenanceLabel: 'Inconsistent provenance',
+        isVerifiedActual: false,
+        isSimulatedSuccess: false,
+        isLegacyUnverified: false,
+        isInconsistent: true,
+        canPrintReceipt: false,
+        receiptHeroDescription: 'Payment was refunded, but settlement provenance is contradictory or unverified.',
+        receiptWarningMessage:
+          'INCONSISTENT PROVENANCE - Settlement provenance is contradictory or unverified. Not an authoritative proof of settlement.',
+        receiptWarningTone: 'danger',
+      }
+    }
+
+    // Refunded LEGACY UNVERIFIED settlement (null, empty, or 'UNKNOWN')
+    if (type === 'UNKNOWN' || type === '') {
+      if (provider === 'SPORTIFY_SIMULATOR' || txId != null) {
+        return {
+          classification: 'INCONSISTENT',
+          statusBadgeLabel: 'Refunded - Inconsistent provenance',
+          statusBadgeTone: 'warning',
+          provenanceLabel: 'Inconsistent provenance',
+          isVerifiedActual: false,
+          isSimulatedSuccess: false,
+          isLegacyUnverified: false,
+          isInconsistent: true,
+          canPrintReceipt: false,
+          receiptHeroDescription: 'Payment was refunded, but settlement provenance is contradictory or unverified.',
+          receiptWarningMessage:
+            'INCONSISTENT PROVENANCE - Settlement provenance is contradictory or unverified. Not an authoritative proof of settlement.',
+          receiptWarningTone: 'danger',
+        }
+      }
+      return {
+        classification: 'LEGACY_UNVERIFIED',
+        statusBadgeLabel: 'Refunded - Legacy unverified',
+        statusBadgeTone: 'neutral',
+        provenanceLabel: 'Legacy unverified',
+        isVerifiedActual: false,
+        isSimulatedSuccess: false,
+        isLegacyUnverified: true,
+        isInconsistent: false,
+        canPrintReceipt: false,
+        receiptHeroDescription: 'Historical payment record without verified settlement provenance.',
+        receiptWarningMessage:
+          'LEGACY UNVERIFIED - Historical payment record without verified settlement provenance. Not an authoritative proof of settlement.',
+        receiptWarningTone: 'warning',
+      }
+    }
+
+    // Any other contradictory settlementType on REFUNDED
     return {
-      classification: 'REFUNDED',
-      statusBadgeLabel: 'Refunded',
-      statusBadgeTone: 'neutral',
-      provenanceLabel: subject.settlementType?.trim() || 'Refunded',
+      classification: 'INCONSISTENT',
+      statusBadgeLabel: 'Refunded - Inconsistent provenance',
+      statusBadgeTone: 'warning',
+      provenanceLabel: 'Inconsistent provenance',
       isVerifiedActual: false,
       isSimulatedSuccess: false,
       isLegacyUnverified: false,
-      isInconsistent: false,
-      canPrintReceipt: true,
-      receiptHeroDescription: 'This payment was refunded to the member.',
+      isInconsistent: true,
+      canPrintReceipt: false,
+      receiptHeroDescription: 'Payment was refunded, but settlement provenance is contradictory or unverified.',
+      receiptWarningMessage:
+        'INCONSISTENT PROVENANCE - Settlement provenance is contradictory or unverified. Not an authoritative proof of settlement.',
+      receiptWarningTone: 'danger',
     }
   }
 
@@ -129,9 +247,9 @@ export function classifyProvenance(
     const hasValidTxId = typeof txId === 'number' && Number.isSafeInteger(txId) && txId > 0
 
     // Case 1: Valid Simulated Settlement
-    // Strictly requires settlementType = 'SIMULATED', provider = 'SPORTIFY_SIMULATOR', and valid txId (if provided)
+    // Strictly requires settlementType = 'SIMULATED', provider = 'SPORTIFY_SIMULATOR', and valid positive txId
     if (type === 'SIMULATED') {
-      if (provider === 'SPORTIFY_SIMULATOR' && (txId === undefined || hasValidTxId)) {
+      if (provider === 'SPORTIFY_SIMULATOR' && hasValidTxId) {
         return {
           classification: 'VALID_SIMULATED',
           statusBadgeLabel: 'Paid - Simulated',
@@ -267,4 +385,104 @@ export function classifyProvenance(
     canPrintReceipt: false,
     receiptHeroDescription: 'Payment record with unverified status.',
   }
+}
+
+/**
+ * Reconciles provenance between a Payment and its corresponding Invoice.
+ * Prevents cross-source provenance contamination:
+ * - A missing provenance in an invoice is NEVER upgraded by payment fields.
+ * - Any material contradiction between payment and invoice fails closed as INCONSISTENT.
+ * - If no ready invoice is available, canPrintReceipt is strictly false.
+ */
+export function reconcileProvenance(
+  paymentSubject: ProvenanceSubject | null | undefined,
+  invoiceSubject: ProvenanceSubject | null | undefined,
+): ProvenancePresentation {
+  // If invoice is not yet ready or absent, printing an invoice receipt is impossible
+  if (!invoiceSubject) {
+    const payPres = classifyProvenance(paymentSubject)
+    return {
+      ...payPres,
+      canPrintReceipt: false,
+    }
+  }
+
+  // When only payment is missing, rely on the invoice itself
+  if (!paymentSubject) {
+    return classifyProvenance(invoiceSubject)
+  }
+
+  const invoicePres = classifyProvenance(invoiceSubject)
+  const paymentPres = classifyProvenance(paymentSubject)
+
+  // Direct classification mismatch across sources (e.g. invoice NULL and payment ACTUAL, or ACTUAL vs SIMULATED)
+  if (invoicePres.classification !== paymentPres.classification) {
+    const rawStatus = (invoiceSubject.status ?? paymentSubject.status ?? '').trim().toUpperCase()
+    const isRefund = rawStatus === 'REFUNDED'
+    return {
+      classification: 'INCONSISTENT',
+      statusBadgeLabel: isRefund ? 'Refunded - Inconsistent provenance' : 'Paid - Inconsistent provenance',
+      statusBadgeTone: 'warning',
+      provenanceLabel: 'Inconsistent provenance',
+      isVerifiedActual: false,
+      isSimulatedSuccess: false,
+      isLegacyUnverified: false,
+      isInconsistent: true,
+      canPrintReceipt: false,
+      receiptHeroDescription: 'Payment record with unverified or inconsistent settlement provenance.',
+      receiptWarningMessage:
+        'INCONSISTENT PROVENANCE - Payment record and invoice disagree on settlement provenance. Not an authoritative proof of settlement.',
+      receiptWarningTone: 'danger',
+    }
+  }
+
+  // Both have same classification, check detailed field consistency
+  if (invoicePres.classification === 'ACTUAL') {
+    const invProv = (invoiceSubject.settlementProvider ?? '').trim().toUpperCase()
+    const payProv = (paymentSubject.settlementProvider ?? '').trim().toUpperCase()
+    if (invProv && payProv && invProv !== payProv) {
+      return {
+        classification: 'INCONSISTENT',
+        statusBadgeLabel: 'Paid - Inconsistent provenance',
+        statusBadgeTone: 'warning',
+        provenanceLabel: 'Inconsistent provenance',
+        isVerifiedActual: false,
+        isSimulatedSuccess: false,
+        isLegacyUnverified: false,
+        isInconsistent: true,
+        canPrintReceipt: false,
+        receiptHeroDescription: 'Payment record with unverified or inconsistent settlement provenance.',
+        receiptWarningMessage:
+          'INCONSISTENT PROVENANCE - Payment and invoice specify conflicting settlement providers.',
+        receiptWarningTone: 'danger',
+      }
+    }
+    return invoicePres
+  }
+
+  if (invoicePres.classification === 'VALID_SIMULATED') {
+    const invTx = invoiceSubject.simulatedTransactionId
+    const payTx = paymentSubject.simulatedTransactionId
+    if (invTx !== payTx) {
+      return {
+        classification: 'INCONSISTENT',
+        statusBadgeLabel: 'Paid - Inconsistent provenance',
+        statusBadgeTone: 'warning',
+        provenanceLabel: 'Inconsistent provenance',
+        isVerifiedActual: false,
+        isSimulatedSuccess: false,
+        isLegacyUnverified: false,
+        isInconsistent: true,
+        canPrintReceipt: false,
+        receiptHeroDescription: 'Payment record with unverified or inconsistent settlement provenance.',
+        receiptWarningMessage:
+          'INCONSISTENT PROVENANCE - Payment and invoice specify conflicting simulated transaction identifiers.',
+        receiptWarningTone: 'danger',
+      }
+    }
+    return invoicePres
+  }
+
+  // For LEGACY_UNVERIFIED, REFUNDED, PENDING, FAILED, CANCELLED, or INCONSISTENT
+  return invoicePres
 }

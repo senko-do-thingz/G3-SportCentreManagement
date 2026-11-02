@@ -59,7 +59,7 @@ import {
   type ConfirmForm,
   type MismatchAmounts,
 } from './receptionPaymentsModel'
-import { classifyProvenance } from './receptionProvenanceModel'
+import { reconcileProvenance } from './receptionProvenanceModel'
 
 const EYEBROW = 'Receptionist / Payments and reports'
 
@@ -559,14 +559,8 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
   // UI-31: a wrong amount is never shown as a success; the receipt cannot be printed until it is resolved.
   const problem = refunded ? null : confirmedAmountProblem(payment, invoiceData?.totalAmount)
   const basePrice = invoiceData?.subtotalAmount ?? payment.originalPrice
-  const provenanceSubject = {
-    status: payment.status,
-    settlementType: invoiceData?.settlementType ?? payment.settlementType,
-    settlementProvider: invoiceData?.settlementProvider ?? payment.settlementProvider,
-    simulatedTransactionId: invoiceData?.simulatedTransactionId ?? payment.simulatedTransactionId,
-  }
-  const presentation = classifyProvenance(provenanceSubject)
-  const canPrint = invoice.status === 'ready' && problem === null && (refunded || presentation.canPrintReceipt)
+  const presentation = reconcileProvenance(payment, invoiceData)
+  const canPrint = invoice.status === 'ready' && problem === null && presentation.canPrintReceipt
 
   return (
     <div className="page">
@@ -657,7 +651,7 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
               </Button>
             </div>
           )}
-          {!canPrint && !refunded && problem === null && payment.status === 'SUCCESS' && (
+          {!canPrint && problem === null && (payment.status === 'SUCCESS' || refunded) && invoice.status === 'ready' && (
             <p className="notice notice--warning" role="alert">
               This payment record lacks verified settlement provenance ({presentation.provenanceLabel}), so an ordinary verified payment receipt cannot be printed.
             </p>

@@ -75,7 +75,7 @@ export function ReceptionReceiptPage() {
   const hasSubtotal = data.subtotalAmount !== null && data.subtotalAmount !== undefined && String(data.subtotalAmount).trim() !== ''
   const hasDiscount = data.discountAmount !== null && data.discountAmount !== undefined && String(data.discountAmount).trim() !== ''
   const presentation = classifyProvenance(data)
-  const printable = (data.status === 'PAID' && presentation.canPrintReceipt) || data.status === 'REFUNDED'
+  const printable = (data.status === 'PAID' || data.status === 'REFUNDED') && presentation.canPrintReceipt
   return (
     <div className="page">
       <PaymentHero eyebrow={EYEBROW} title={`Receipt ${data.invoiceNumber}`} description={presentation.receiptHeroDescription} />
@@ -124,12 +124,12 @@ export function ReceptionReceiptPage() {
           </div>
           <div>
             <dt>Status</dt>
-            <dd>{data.status === 'PAID' ? presentation.statusBadgeLabel : humanizeCode(data.status)}</dd>
+            <dd>{data.status === 'PAID' || data.status === 'REFUNDED' ? presentation.statusBadgeLabel : humanizeCode(data.status)}</dd>
           </div>
         </dl>
         {!printable && (
           <p className="notice notice--warning" role="alert">
-            {data.status === 'PAID'
+            {data.status === 'PAID' || data.status === 'REFUNDED'
               ? `This invoice lacks verified settlement provenance (${presentation.provenanceLabel}), so an ordinary verified payment receipt cannot be printed.`
               : `This invoice is ${humanizeCode(data.status).toLowerCase()}, so it cannot be printed as a payment receipt.`}
           </p>

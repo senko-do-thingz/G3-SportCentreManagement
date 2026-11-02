@@ -988,6 +988,7 @@ describe('FE-12 round 3 integration regressions', () => {
           status: 'SUCCESS',
           settlementType: 'SIMULATED',
           settlementProvider: 'SPORTIFY_SIMULATOR',
+          simulatedTransactionId: 41,
           paymentReference: 'SIM-QR-41-00000041',
         }),
       },
@@ -995,6 +996,7 @@ describe('FE-12 round 3 integration regressions', () => {
         ...INVOICE,
         settlementType: 'SIMULATED',
         settlementProvider: 'SPORTIFY_SIMULATOR',
+        simulatedTransactionId: 41,
         paymentReference: 'SIM-QR-41-00000041',
       }),
     })
@@ -1009,6 +1011,7 @@ describe('FE-12 round 3 integration regressions', () => {
         ...INVOICE,
         settlementType: 'SIMULATED',
         settlementProvider: 'SPORTIFY_SIMULATOR',
+        simulatedTransactionId: 41,
         paymentReference: 'SIM-QR-41-00000041',
       }),
     })

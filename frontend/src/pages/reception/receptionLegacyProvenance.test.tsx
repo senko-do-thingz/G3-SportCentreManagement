@@ -107,7 +107,7 @@ async function openReception(path: string, options: TestOptions = {}) {
   if (path.endsWith('/receipt')) {
     await screen.findByRole('heading', { name: /^Receipt INV-/ })
   } else {
-    await screen.findByRole('heading', { name: 'Payment Confirmed and Receipt' })
+    await screen.findByRole('heading', { name: /Payment (Confirmed and Receipt|Refunded|Needs Review)/ })
     await screen.findByRole('heading', { name: /^Receipt INV-/ })
   }
 }
@@ -236,6 +236,10 @@ describe('QR-07 D03 - Reception Legacy Provenance & Receipt Maintenance (QR07-05
 
   it('QR07-056: ReceptionPaymentPage displays Paid - Legacy unverified and unverified notice when invoice has null provenance', async () => {
     await openReception('/reception/payments/41', {
+      paymentRecord: {
+        settlementType: null,
+        settlementProvider: null,
+      },
       invoice: LEGACY_INVOICE,
     })
 
@@ -253,6 +257,10 @@ describe('QR-07 D03 - Reception Legacy Provenance & Receipt Maintenance (QR07-05
 
   it('ReceptionPaymentPage displays Paid - Inconsistent provenance when provenance metadata contradicts', async () => {
     await openReception('/reception/payments/41', {
+      paymentRecord: {
+        settlementType: 'SIMULATED',
+        settlementProvider: 'DESK_CASH',
+      },
       invoice: {
         ...LEGACY_INVOICE,
         settlementType: 'SIMULATED',
@@ -265,10 +273,172 @@ describe('QR-07 D03 - Reception Legacy Provenance & Receipt Maintenance (QR07-05
     expect(within(receiptCard).getByRole('button', { name: 'Print receipt' })).toBeDisabled()
   })
 
-  it('Print CSS regression: ensures warning and provenance notices survive native print media', () => {
+  // D03-01: REFUNDED provenance bypass regression tests
+  it('D03-01: ReceptionReceiptPage blocks printing and displays unverified banner for REFUNDED invoice with NULL provenance', async () => {
+    await openReception('/reception/payments/41/receipt', {
+      invoice: {
+        ...LEGACY_INVOICE,
+        status: 'REFUNDED',
+        settlementType: null,
+        settlementProvider: null,
+      },
+    })
+
+    const receipt = screen.getByRole('region', { name: 'Receipt' })
+    expect(within(receipt).getByText('Refunded - Legacy unverified')).toBeInTheDocument()
+    expect(
+      within(receipt).getByText(/LEGACY UNVERIFIED - Historical payment record without verified settlement provenance/),
+    ).toBeInTheDocument()
+    expect(within(receipt).getByRole('button', { name: 'Print receipt' })).toBeDisabled()
+    expect(receipt).not.toHaveClass('payment-print-receipt')
+  })
+
+  it('D03-01: ReceptionReceiptPage blocks printing for REFUNDED invoice with UNKNOWN provenance', async () => {
+    await openReception('/reception/payments/41/receipt', {
+      invoice: {
+        ...LEGACY_INVOICE,
+        status: 'REFUNDED',
+        settlementType: 'UNKNOWN',
+        settlementProvider: null,
+      },
+    })
+
+    const receipt = screen.getByRole('region', { name: 'Receipt' })
+    expect(within(receipt).getByText('Refunded - Legacy unverified')).toBeInTheDocument()
+    expect(within(receipt).getByRole('button', { name: 'Print receipt' })).toBeDisabled()
+    expect(receipt).not.toHaveClass('payment-print-receipt')
+  })
+
+  it('D03-01: ReceptionReceiptPage allows verified refund receipt for REFUNDED invoice with genuine ACTUAL settlement', async () => {
+    await openReception('/reception/payments/41/receipt', {
+      invoice: {
+        ...LEGACY_INVOICE,
+        status: 'REFUNDED',
+        settlementType: 'ACTUAL',
+        settlementProvider: 'DESK_CASH',
+      },
+    })
+
+    const receipt = screen.getByRole('region', { name: 'Receipt' })
+    expect(within(receipt).getByText('Refunded')).toBeInTheDocument()
+    expect(within(receipt).getByText('ACTUAL (DESK_CASH)')).toBeInTheDocument()
+    expect(within(receipt).getByRole('button', { name: 'Print receipt' })).toBeEnabled()
+    expect(receipt).toHaveClass('payment-print-receipt')
+  })
+
+  it('D03-01: ReceptionPaymentPage blocks print and displays warning for REFUNDED payment with NULL provenance', async () => {
+    await openReception('/reception/payments/41', {
+      paymentRecord: {
+        status: 'REFUNDED',
+        settlementType: null,
+        settlementProvider: null,
+      },
+      invoice: {
+        ...LEGACY_INVOICE,
+        status: 'REFUNDED',
+        settlementType: null,
+        settlementProvider: null,
+      },
+    })
+
+    const receiptCard = screen.getByRole('region', { name: 'Payment receipt' })
+    expect(within(receiptCard).getByText('Refunded - Legacy unverified')).toBeInTheDocument()
+    expect(within(receiptCard).getByRole('button', { name: 'Print receipt' })).toBeDisabled()
+    expect(
+      within(receiptCard).getByText(/This payment record lacks verified settlement provenance \(Legacy unverified\)/),
+    ).toBeInTheDocument()
+    expect(receiptCard).not.toHaveClass('payment-print-receipt')
+  })
+
+  // D03-02: Cross-source provenance field mixing regression tests
+  it('D03-02: ReceptionPaymentPage rejects invoice with NULL provenance even if payment has ACTUAL (no upgrade bypass)', async () => {
+    await openReception('/reception/payments/41', {
+      paymentRecord: {
+        status: 'SUCCESS',
+        settlementType: 'ACTUAL',
+        settlementProvider: 'DESK_CASH',
+      },
+      invoice: {
+        ...LEGACY_INVOICE,
+        settlementType: null,
+        settlementProvider: null,
+      },
+    })
+
+    const receiptCard = screen.getByRole('region', { name: 'Payment receipt' })
+    expect(within(receiptCard).getByText('Paid - Inconsistent provenance')).toBeInTheDocument()
+    expect(within(receiptCard).getByRole('button', { name: 'Print receipt' })).toBeDisabled()
+    expect(
+      within(receiptCard).getByText(/disagree on settlement provenance/),
+    ).toBeInTheDocument()
+    expect(receiptCard).not.toHaveClass('payment-print-receipt')
+  })
+
+  it('D03-02: ReceptionPaymentPage rejects invoice with UNKNOWN provenance when payment has ACTUAL', async () => {
+    await openReception('/reception/payments/41', {
+      paymentRecord: {
+        status: 'SUCCESS',
+        settlementType: 'ACTUAL',
+        settlementProvider: 'DESK_CASH',
+      },
+      invoice: {
+        ...LEGACY_INVOICE,
+        settlementType: 'UNKNOWN',
+        settlementProvider: null,
+      },
+    })
+
+    const receiptCard = screen.getByRole('region', { name: 'Payment receipt' })
+    expect(within(receiptCard).getByText('Paid - Inconsistent provenance')).toBeInTheDocument()
+    expect(within(receiptCard).getByRole('button', { name: 'Print receipt' })).toBeDisabled()
+  })
+
+  it('D03-02: ReceptionPaymentPage rejects contradiction between invoice ACTUAL and payment SIMULATED', async () => {
+    await openReception('/reception/payments/41', {
+      paymentRecord: {
+        status: 'SUCCESS',
+        settlementType: 'SIMULATED',
+        settlementProvider: 'SPORTIFY_SIMULATOR',
+        simulatedTransactionId: 9001,
+      },
+      invoice: {
+        ...LEGACY_INVOICE,
+        settlementType: 'ACTUAL',
+        settlementProvider: 'DESK_CASH',
+      },
+    })
+
+    const receiptCard = screen.getByRole('region', { name: 'Payment receipt' })
+    expect(within(receiptCard).getByText('Paid - Inconsistent provenance')).toBeInTheDocument()
+    expect(within(receiptCard).getByRole('button', { name: 'Print receipt' })).toBeDisabled()
+  })
+
+  it('D03-02: ReceptionPaymentPage allows verified receipt when payment and invoice both consistently assert ACTUAL', async () => {
+    await openReception('/reception/payments/41', {
+      paymentRecord: {
+        status: 'SUCCESS',
+        settlementType: 'ACTUAL',
+        settlementProvider: 'DESK_CASH',
+      },
+      invoice: {
+        ...LEGACY_INVOICE,
+        settlementType: 'ACTUAL',
+        settlementProvider: 'DESK_CASH',
+      },
+    })
+
+    const receiptCard = screen.getByRole('region', { name: 'Payment receipt' })
+    expect(within(receiptCard).getByText('Paid')).toBeInTheDocument()
+    expect(within(receiptCard).getByRole('button', { name: 'Print receipt' })).toBeEnabled()
+    expect(receiptCard).toHaveClass('payment-print-receipt')
+  })
+
+  // D03-03: Print CSS regression
+  it('D03-03: Print CSS regression ensures warning notices survive native print and unverified cards are styled with dashed border', () => {
     const css = readFileSync('src/styles/reception.css', 'utf-8')
-    expect(css).toMatch(/@media print \{[\s\S]*\.payment-print-receipt \.notice \{\s*display: block !important;/)
-    expect(css).toMatch(/border: 1px solid currentColor;/)
-    expect(css).toMatch(/font-weight: 600;/)
+    expect(css).toMatch(/@media print \{[\s\S]*\.payment-receipt \.notice,[\s\S]*\.payment-print-receipt \.notice \{\s*display: block !important;/)
+    expect(css).toMatch(/border: 2px solid currentColor !important;/)
+    expect(css).toMatch(/font-weight: 700 !important;/)
+    expect(css).toMatch(/\.payment-receipt:not\(\.payment-print-receipt\) \{\s*border: 2px dashed currentColor !important;/)
   })
 })
