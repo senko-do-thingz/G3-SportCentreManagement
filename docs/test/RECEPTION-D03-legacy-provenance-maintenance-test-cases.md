@@ -30,6 +30,8 @@ Remediation implemented:
 7. Visible `Legacy unverified` badge and explicit warning banner on `ReceptionReceiptPage` and `ReceptionPaymentPage`.
 8. Print restriction: Verified-receipt printing (`canPrintReceipt: false`) is strictly disabled for `LEGACY_UNVERIFIED` and `INCONSISTENT` records. The `Print receipt` button is disabled, the `.payment-print-receipt` CSS class is suppressed, and an explicit informational alert is shown.
 9. Print CSS hardening in `frontend/src/styles/reception.css`: `@media print` rules ensure warning and provenance notices survive native print media with 2px solid border and bold font weight, and unverified cards carry a 2px dashed border to prevent misrepresentation under browser-native Ctrl+P (D03-03).
+10. Cross-source reconciliation for REFUNDED ACTUAL records with nullable providers: `reconcileProvenance()` recognizes that under V35/V36, `settlement_provider` is nullable for `ACTUAL` settlements. Two consistently absent provider values are consistent (`canPrintReceipt: true`), while a provider present on only one source or two differing providers remains a material inconsistency (`canPrintReceipt: false`) (D03-07).
+11. Receipt card print styling alignment: In `ReceptionPaymentPage.tsx`, the card always carries `.payment-receipt` (and `.payment-print-receipt` when printable), ensuring `@media print` rules for dashed borders on unverified receipts and bordered warning notices apply under native print (D03-07).
 
 ---
 
@@ -57,6 +59,9 @@ Remediation implemented:
 | **TC-D03-REF-10** | Refund Reconcile | REFUNDED ACTUAL with missing invoice provider (D03-05) | `classification: 'INCONSISTENT'`, `canPrintReceipt: false`, status label `'Refunded - Inconsistent provenance'` | **PASS** |
 | **TC-D03-REF-11** | Refund Reconcile | Consistent verified REFUNDED ACTUAL across sources (D03-05) | `classification: 'REFUNDED'`, `canPrintReceipt: true`, status label `'Refunded'`, tone `'neutral'` | **PASS** |
 | **TC-D03-REF-12** | Refund Reconcile | Consistent verified REFUNDED SIMULATED across sources (D03-05) | `classification: 'REFUNDED'`, `canPrintReceipt: true`, status label `'Refunded'`, simulation banner retained | **PASS** |
+| **TC-D03-REF-13** | Refund Reconcile | REFUNDED ACTUAL with both providers null (D03-07) | `classification: 'REFUNDED'`, `canPrintReceipt: true`, status label `'Refunded'`, tone `'neutral'`, provider `'ACTUAL'` | **PASS** |
+| **TC-D03-REF-14** | Refund Reconcile | REFUNDED ACTUAL with payment provider null and invoice non-null (D03-07) | `classification: 'INCONSISTENT'`, `canPrintReceipt: false`, status label `'Refunded - Inconsistent provenance'` | **PASS** |
+| **TC-D03-REF-15** | Refund Reconcile | REFUNDED ACTUAL with matching normalized provider names (D03-07) | `classification: 'REFUNDED'`, `canPrintReceipt: true`, status label `'Refunded'`, provider `'ACTUAL (DESK_CASH)'` | **PASS** |
 | **TC-D03-REC-01** | Reconciliation | Absent or loading invoice disables receipt printing | `canPrintReceipt: false`, reflects payment status safely | **PASS** |
 | **TC-D03-REC-02** | Reconciliation | Invoice NULL provenance vs Payment ACTUAL (D03-02) | `classification: 'INCONSISTENT'`, `canPrintReceipt: false`, cross-source upgrade blocked | **PASS** |
 | **TC-D03-REC-03** | Reconciliation | Invoice UNKNOWN provenance vs Payment ACTUAL (D03-02) | `classification: 'INCONSISTENT'`, `canPrintReceipt: false`, cross-source upgrade blocked | **PASS** |
@@ -89,10 +94,13 @@ Remediation implemented:
 | **TC-D03-PAYM-12** | Reception Payment | Consistent verified REFUNDED ACTUAL enables printing with `badge--neutral` (D03-05/D03-06) | Status `'Refunded'`, badge has `badge--neutral`, print enabled, `.payment-print-receipt` present | **PASS** |
 | **TC-D03-PAYM-13** | Reception Payment | Consistent verified REFUNDED SIMULATED enables printing, retains banner (D03-05/D03-06) | Status `'Refunded'`, badge has `badge--neutral`, simulation banner visible, print enabled | **PASS** |
 | **TC-D03-PAYM-14** | Reception Payment | Consistent verified SIMULATED payment renders `badge--success` (D03-06) | Status `'Paid - Simulated'`, badge has `badge--success`, print enabled, `.payment-print-receipt` present | **PASS** |
+| **TC-D03-PAYM-15** | Reception Payment | REFUNDED ACTUAL with both providers null enables printing (D03-07) | Status `'Refunded'`, print button enabled, card has `.payment-receipt` and `.payment-print-receipt` | **PASS** |
+| **TC-D03-PAYM-16** | Reception Receipt | Cross-screen consistency for REFUNDED ACTUAL with null provider (D03-07) | Status `'Refunded'`, print button enabled, card has `.payment-receipt` and `.payment-print-receipt` | **PASS** |
+| **TC-D03-PAYM-17** | Reception Payment | REFUNDED ACTUAL with one provider null blocks printing and styles card (D03-07) | Status `'Refunded - Inconsistent provenance'`, print button disabled, card has `.payment-receipt` | **PASS** |
 | **TC-D03-CSS-01** | Print Styles | CSS print media query regression check (D03-03) | `.payment-receipt .notice` and `.payment-print-receipt .notice` include `display: block !important`, `border: 2px solid currentColor !important`, `font-weight: 700 !important`; unverified receipts carry dashed border | **PASS** |
 | **TC-D03-REG-01** | Reception Payments Suite | Existing Reception payments regression (`receptionPayments.test.tsx`) | 70/70 tests pass without regression | **PASS** |
 | **TC-D03-REG-02** | Desk QR Suite | Existing Desk QR display regression (`receptionQrDisplay.test.tsx`) | 15/15 tests pass without regression | **PASS** |
-| **TC-D03-FULL-01** | Full Frontend Suite | Full Vitest test suite (`npm test`) | 93/93 test files pass, 1747/1747 tests pass | **PASS** |
+| **TC-D03-FULL-01** | Full Frontend Suite | Full Vitest test suite (`npm test`) | 93/93 test files pass, 1753/1753 tests pass | **PASS** |
 | **TC-D03-LINT-01** | Lint and Typecheck | ESLint (`npm run lint`) | 0 lint errors | **PASS** |
 | **TC-D03-BLD-01** | Build Verification | TypeScript compilation and Vite production build (`npm run build`) | Build succeeds with zero errors | **PASS** |
 
@@ -102,22 +110,22 @@ Remediation implemented:
 
 ### Unit Model Evidence
 - File: `frontend/src/pages/reception/receptionProvenanceModel.test.ts`
-- Tests: 35 tests, 35 passed (29ms)
-- Verifies classification and cross-source reconciliation across normal, abnormal, null, unknown, inconsistent, and refunded scenarios, including cross-source refunded contradictions (D03-05).
+- Tests: 38 tests, 38 passed (23ms)
+- Verifies classification and cross-source reconciliation across normal, abnormal, null, unknown, inconsistent, and refunded scenarios, including cross-source refunded contradictions (D03-05) and nullable ACTUAL refund provider parity under V35/V36 (D03-07).
 
 ### Reception Component Integration Evidence
 - File: `frontend/src/pages/reception/receptionLegacyProvenance.test.tsx`
-- Tests: 23 tests, 23 passed (3458ms)
-- Verifies DOM rendering on `ReceptionReceiptPage` and `ReceptionPaymentPage`, including hero description, warning notices, disabled print buttons, cross-source disagreement, refunded edge cases, badge tone class assertions (`badge--warning`, `badge--neutral`, `badge--success`) (D03-06), and print CSS rules.
+- Tests: 26 tests, 26 passed (2051ms)
+- Verifies DOM rendering on `ReceptionReceiptPage` and `ReceptionPaymentPage`, including hero description, warning notices, disabled print buttons, cross-source disagreement, refunded edge cases, badge tone class assertions (`badge--warning`, `badge--neutral`, `badge--success`) (D03-06), provider-null consistency and print card classes (`payment-receipt`, `payment-print-receipt`) (D03-07), and print CSS rules.
 
 ### Existing Regression Suites
 - File: `frontend/src/pages/reception/receptionPayments.test.tsx`: 70 tests passed.
 - File: `frontend/src/pages/reception/receptionQrDisplay.test.tsx`: 15 tests passed.
-- Total Reception test coverage: 143 tests across 4 test suites passing.
+- Total Reception test coverage: 149 tests across 4 test suites passing.
 
 ### Full Frontend Suite
 - Command: `npm test`
-- Outcome: 93 test files passed, 1747 tests passed, 0 failures.
+- Outcome: 93 test files passed, 1753 tests passed, 0 failures.
 - Command: `npm run lint`
 - Outcome: 0 errors.
 - Command: `npm run build`

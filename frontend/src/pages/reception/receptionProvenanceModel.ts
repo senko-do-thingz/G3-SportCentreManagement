@@ -470,7 +470,9 @@ export function reconcileProvenance(
     if (invType === 'ACTUAL') {
       const invProv = (invoiceSubject.settlementProvider ?? '').trim().toUpperCase()
       const payProv = (paymentSubject.settlementProvider ?? '').trim().toUpperCase()
-      if (!invProv || !payProv || invProv !== payProv) {
+      // Under V35/V36 constraints, settlementProvider is nullable for ACTUAL settlements.
+      // Both providers consistently absent is valid; a provider present on only one source or differing providers is inconsistent (D03-07).
+      if (invProv !== payProv) {
         return buildInconsistentPresentation(
           true,
           'INCONSISTENT PROVENANCE - Payment and invoice specify conflicting settlement providers.',

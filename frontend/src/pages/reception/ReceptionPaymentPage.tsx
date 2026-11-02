@@ -580,7 +580,7 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
         <Card
           title={invoiceData ? `Receipt ${invoiceData.invoiceNumber}` : 'Receipt'}
           aria-label="Payment receipt"
-          className={canPrint ? 'payment-print-receipt' : undefined}
+          className={canPrint ? 'payment-receipt payment-print-receipt' : 'payment-receipt'}
         >
           {problem ? (
             <>

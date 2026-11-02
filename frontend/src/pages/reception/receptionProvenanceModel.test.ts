@@ -582,4 +582,65 @@ describe('receptionProvenanceModel - reconcileProvenance (D03-02)', () => {
     expect(res.canPrintReceipt).toBe(true)
     expect(res.receiptWarningMessage).toContain('SIMULATED SETTLEMENT')
   })
+
+  // D03-07: ACTUAL refund provider-null policy consistency per V35/V36
+  it('D03-07: allows receipt printing when both payment and invoice are REFUNDED ACTUAL with null settlementProvider', () => {
+    const payment = {
+      status: 'REFUNDED',
+      settlementType: 'ACTUAL',
+      settlementProvider: null,
+    }
+    const invoice = {
+      status: 'REFUNDED',
+      settlementType: 'ACTUAL',
+      settlementProvider: null,
+    }
+    const res = reconcileProvenance(payment, invoice)
+    expect(res.classification).toBe('REFUNDED')
+    expect(res.statusBadgeLabel).toBe('Refunded')
+    expect(res.statusBadgeTone).toBe('neutral')
+    expect(res.provenanceLabel).toBe('ACTUAL')
+    expect(res.isVerifiedActual).toBe(true)
+    expect(res.canPrintReceipt).toBe(true)
+    expect(res.receiptWarningMessage).toBeUndefined()
+  })
+
+  it('D03-07: rejects REFUNDED ACTUAL when payment has null provider and invoice has non-null provider', () => {
+    const payment = {
+      status: 'REFUNDED',
+      settlementType: 'ACTUAL',
+      settlementProvider: null,
+    }
+    const invoice = {
+      status: 'REFUNDED',
+      settlementType: 'ACTUAL',
+      settlementProvider: 'DESK_CASH',
+    }
+    const res = reconcileProvenance(payment, invoice)
+    expect(res.classification).toBe('INCONSISTENT')
+    expect(res.statusBadgeLabel).toBe('Refunded - Inconsistent provenance')
+    expect(res.statusBadgeTone).toBe('warning')
+    expect(res.canPrintReceipt).toBe(false)
+    expect(res.receiptWarningMessage).toContain('conflicting settlement providers')
+  })
+
+  it('D03-07: allows receipt printing when payment and invoice have matching normalized provider names for REFUNDED ACTUAL', () => {
+    const payment = {
+      status: 'REFUNDED',
+      settlementType: 'ACTUAL',
+      settlementProvider: ' desk_cash ',
+    }
+    const invoice = {
+      status: 'REFUNDED',
+      settlementType: 'ACTUAL',
+      settlementProvider: 'DESK_CASH',
+    }
+    const res = reconcileProvenance(payment, invoice)
+    expect(res.classification).toBe('REFUNDED')
+    expect(res.statusBadgeLabel).toBe('Refunded')
+    expect(res.statusBadgeTone).toBe('neutral')
+    expect(res.provenanceLabel).toBe('ACTUAL (DESK_CASH)')
+    expect(res.isVerifiedActual).toBe(true)
+    expect(res.canPrintReceipt).toBe(true)
+  })
 })
