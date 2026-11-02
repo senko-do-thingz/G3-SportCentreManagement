@@ -1,7 +1,7 @@
 package com.sportify.demoqr.service;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Profile;
+import com.sportify.demoqr.config.SimulatedSettlementEnabledCondition;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -19,8 +19,7 @@ import java.util.function.Supplier;
 
 /** SQL Server owns time, uniqueness and serialization; there is no process-local session state. */
 @Repository
-@Profile("qr-simulator & !prod & !production")
-@ConditionalOnProperty(name = "app.payment.simulator.enabled", havingValue = "true")
+@Conditional(SimulatedSettlementEnabledCondition.class)
 public class SqlQrStore {
     public record Session(UUID id, long paymentId, long ownerId, BigDecimal amount, String currency,
                           DemoQrService.Bank bank, Instant createdAt, Instant expiresAt,

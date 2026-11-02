@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { demoQrPath, demoQrPayload } from './demoQr'
+import { demoQrImageUrl, demoQrPath, demoQrPayload, demoQrSyntheticPayload } from './demoQr'
 import type { DemoBank } from './demoBanks'
 
 describe('QR-03 versioned non-payable payload boundary', () => {
@@ -38,5 +38,23 @@ describe('QR-03 versioned non-payable payload boundary', () => {
     const first = demoQrPayload(52, 'vietcombank')
     expect(new Set(banks.map((bank) => demoQrPayload(52, bank))).size).toBe(4)
     expect(demoQrPayload(52, 'vietcombank')).toBe(first)
+  })
+
+  it('generates safe synthetic non-payable payload for external QR provider', () => {
+    const payload = demoQrSyntheticPayload(52)
+    expect(payload).toBe('SPORTIFY_DEMO|REF=DEMO-52|NON_PAYABLE=1')
+    expect(payload).not.toMatch(/https?:|TOKEN=|BEARER=|ACCOUNT=|PASSWORD=/)
+
+    const customPayload = demoQrSyntheticPayload(52, 'PAY-CUSTOM')
+    expect(customPayload).toBe('SPORTIFY_DEMO|REF=PAY-52|NON_PAYABLE=1')
+  })
+
+  it('creates valid QRServer image URL without leaking sensitive parameters', () => {
+    const payload = demoQrSyntheticPayload(52)
+    const url = demoQrImageUrl(payload, 240)
+    expect(url).toContain('https://api.qrserver.com/v1/create-qr-code/?size=240x240&format=png&data=')
+    expect(url).toContain(encodeURIComponent(payload))
+    expect(url).not.toContain('localhost')
+    expect(url).not.toContain('token')
   })
 })

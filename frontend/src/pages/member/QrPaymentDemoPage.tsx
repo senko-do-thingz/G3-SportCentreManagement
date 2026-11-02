@@ -57,7 +57,7 @@ function QrPaymentDemoView({ paymentId }: { paymentId: number }) {
           </Card>
         )
         : payment.data.status !== 'PENDING' ? <EmptyState title="Demo unavailable for this payment" description="Open a pending payment to start a simulated QR payment session." />
-        : <DemoQrCard payment={payment.data} />}
+        : <DemoQrCard payment={payment.data} onSettled={reload} />}
       <div>{back}</div>
     </PaymentWorkspace>
   )
