@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.*;
 
 /** Real SQL Server, Spring transactions and audit persistence; no H2 or mocked training service. */
 @Tag("integration")
-@SpringBootTest(classes={com.sportify.SportifyApplication.class, TrainingWorkflowIntegrationTest.TimeConfig.class}, properties={"spring.jpa.show-sql=false"})
+@SpringBootTest(classes={com.sportify.SportifyApplication.class, TrainingWorkflowIntegrationTest.TimeConfig.class}, properties={"spring.jpa.show-sql=false", "app.training.attendance-backfill.enabled=true", "app.training.attendance-backfill.window=PT48H"})
 @ActiveProfiles("dev")
 @org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 class TrainingWorkflowIntegrationTest {
@@ -62,6 +62,7 @@ class TrainingWorkflowIntegrationTest {
     }
     @Autowired JdbcTemplate jdbc;
     @Autowired TrainingWriteService writer;
+    @Autowired AttendanceBackfillService backfiller;
     @Autowired MemberTrainingService reader;
     @Autowired ClassLearningService learning;
     @Autowired TrainingGuidanceService guidance;
@@ -695,6 +696,137 @@ class TrainingWorkflowIntegrationTest {
         assertThat(reader.attendance(member)).anySatisfy(row->{
             assertThat(row.status()).isEqualTo("CANCELLED");assertThat(row.recordedStatus()).isEqualTo("PRESENT");
         });
+    }
+    private com.sportify.catalog.dto.AttendanceBackfillRequest backfillRequest() {
+        return new com.sportify.catalog.dto.AttendanceBackfillRequest(booking,TrainingWriteRequest.AttendanceStatus.PRESENT," Verified missed roll call ","Reviewed by Manager");
+    }
+    private com.sportify.catalog.dto.TrainingWriteResponse.Created backfillAs(long id,com.sportify.catalog.dto.AttendanceBackfillRequest request) {
+        var principal=new com.sportify.identity.security.CustomUserDetails(actor(id));
+        var context=org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(principal,null,principal.getAuthorities()));
+        org.springframework.security.core.context.SecurityContextHolder.setContext(context);
+        try{return backfiller.backfill(id,request);}finally{org.springframework.security.core.context.SecurityContextHolder.clearContext();}
+    }
+    private void pastSession(){jdbc.update("UPDATE class_session SET session_date='2026-11-01' WHERE id=?",session);}
+    private void noBackfill(){
+        assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?",booking)).isZero();
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE action='TRAINING_ATTENDANCE_BACKFILLED' AND JSON_VALUE(details,'$.bookingId')=?",String.valueOf(booking))).isZero();
+    }
+    @Test void R09_backfillAuditsActualOperatorTimeAndOwnerReadbackWithoutFinancialMutation() {
+        pastSession();long admin=account("MANAGER");
+        int seats=count("SELECT booked_count FROM class_session WHERE id=?",session);
+        int invoices=count("SELECT COUNT(*) FROM invoice"),payments=count("SELECT COUNT(*) FROM payment");
+        long credits=jdbc.queryForObject("SELECT COALESCE(SUM(remaining_sessions),0) FROM sport_package_registration",Long.class);
+        long id=backfillAs(admin,backfillRequest()).id();
+        var row=jdbc.queryForMap("SELECT marked_by,marked_at,status FROM attendance_record WHERE id=?",id);
+        assertThat(((Number)row.get("marked_by")).longValue()).isEqualTo(admin);
+        assertThat(((java.sql.Timestamp)row.get("marked_at")).toLocalDateTime()).isEqualTo(LocalDateTime.of(2026,11,2,10,0));
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE entity_id=? AND action='TRAINING_ATTENDANCE_BACKFILLED' AND actor_user_id=? AND JSON_VALUE(details,'$.reason')='Verified missed roll call' AND JSON_VALUE(details,'$.bookingId')=? AND JSON_VALUE(details,'$.sessionId')=? AND JSON_VALUE(details,'$.memberId')=? AND JSON_VALUE(details,'$.status')='PRESENT' AND JSON_VALUE(details,'$.actionTime')='2026-11-02T10:00' AND created_at='2026-11-02T10:00:00'",id,admin,String.valueOf(booking),String.valueOf(session),String.valueOf(member))).isEqualTo(1);
+        assertThat(reader.attendance(member)).anySatisfy(a->{assertThat(a.id()).isEqualTo(id);assertThat(a.status()).isEqualTo("PRESENT");});
+        assertThat(reader.attendance(peer)).noneSatisfy(a->assertThat(a.id()).isEqualTo(id));
+        assertThat(learning.memberClass(member,classId).sessions()).anySatisfy(a->assertThat(a.attendanceStatus()).isEqualTo("PRESENT"));
+        assertThatThrownBy(()->learning.memberClass(peer,classId)).isInstanceOf(ResourceNotFoundException.class);
+        assertThat(count("SELECT booked_count FROM class_session WHERE id=?",session)).isEqualTo(seats);
+        assertThat(count("SELECT COUNT(*) FROM invoice")).isEqualTo(invoices);assertThat(count("SELECT COUNT(*) FROM payment")).isEqualTo(payments);
+        assertThat(jdbc.queryForObject("SELECT COALESCE(SUM(remaining_sessions),0) FROM sport_package_registration",Long.class)).isEqualTo(credits);
+        assertThat(count("SELECT COUNT(*) FROM attendance_correction WHERE attendance_record_id=?",id)).isZero();
+        writer.coachCorrection(coach,id,correction(TrainingWriteRequest.AttendanceStatus.LATE));
+        writer.createResult(coach,result());
+        assertThatThrownBy(()->writer.coachCorrection(coach,id,correction(TrainingWriteRequest.AttendanceStatus.ABSENT))).isInstanceOf(ConflictException.class);
+        assertThat(count("SELECT COUNT(*) FROM session_result WHERE session_id=? AND member_id=?",session,member)).isEqualTo(1);
+    }
+    @ParameterizedTest @ValueSource(strings={"PRESENT","LATE","ABSENT","EXCUSED"})
+    void R09_existingAttendanceAlwaysConflicts(String state) {
+        writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.valueOf(state)));pastSession();
+        assertThatThrownBy(()->backfillAs(account("MANAGER"),backfillRequest())).isInstanceOf(ConflictException.class);
+        assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?",booking)).isEqualTo(1);
+    }
+    @ParameterizedTest @ValueSource(strings={"MEMBER","COACH","RECEPTIONIST"})
+    void R09_serviceRoleSecurityCannotBeBypassed(String role) {
+        pastSession();assertThatThrownBy(()->backfillAs(account(role),backfillRequest())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);noBackfill();
+    }
+    @Test void R09_databaseRevalidatesDisabledManagerEvenWithStaleEnabledPrincipal() {
+        pastSession();long admin=account("MANAGER");var principal=new com.sportify.identity.security.CustomUserDetails(actor(admin));
+        jdbc.update("UPDATE user_account SET status='INACTIVE' WHERE id=?",admin);
+        var auth=new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(principal,null,principal.getAuthorities());
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+        try{assertThatThrownBy(()->backfiller.backfill(admin,backfillRequest())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);}
+        finally{org.springframework.security.core.context.SecurityContextHolder.clearContext();}noBackfill();
+    }
+    @ParameterizedTest @ValueSource(strings={"SAME_DAY","FUTURE","EXPIRED","NOT_ENDED","CANCELLED_SESSION","SELF_TRAINING","CANCELLED_BOOKING"})
+    void R09_invalidSessionOrBookingLeavesNoMutation(String scenario) {
+        pastSession();
+        switch(scenario){
+            case "SAME_DAY"->jdbc.update("UPDATE class_session SET session_date='2026-11-02' WHERE id=?",session);
+            case "FUTURE"->jdbc.update("UPDATE class_session SET session_date='2026-11-03' WHERE id=?",session);
+            case "EXPIRED"->jdbc.update("UPDATE class_session SET session_date='2026-10-29' WHERE id=?",session);
+            case "NOT_ENDED"-> {clock.value=Instant.parse("2026-11-01T17:00:00Z");jdbc.update("UPDATE class_session SET start_time='23:00',end_time='01:00' WHERE id=?",session);}
+            case "CANCELLED_SESSION"->jdbc.update("UPDATE class_session SET status='CANCELLED' WHERE id=?",session);
+            case "SELF_TRAINING"->jdbc.update("UPDATE class_session SET training_type='SELF_TRAINING',coach_id=NULL WHERE id=?",session);
+            case "CANCELLED_BOOKING"->jdbc.update("UPDATE booking SET status='CANCELLED' WHERE id=?",booking);
+        }
+        assertThatThrownBy(()->backfillAs(account("MANAGER"),backfillRequest())).isInstanceOf(BusinessRuleException.class);noBackfill();
+    }
+    @ParameterizedTest @org.junit.jupiter.params.provider.CsvSource({"2026-11-03T02:59:59Z,true","2026-11-03T03:00:00Z,true","2026-11-03T03:00:00.000000001Z,false","2026-11-01T16:59:59Z,false","2026-11-01T17:00:00Z,true"})
+    void R09_exactExpiryAndCenterMidnight(String instant,boolean allowed) {
+        pastSession();clock.value=Instant.parse(instant);long admin=account("MANAGER");
+        if(allowed)assertThat(backfillAs(admin,backfillRequest()).id()).isPositive();
+        else {assertThatThrownBy(()->backfillAs(admin,backfillRequest())).isInstanceOf(BusinessRuleException.class);noBackfill();}
+    }
+    @ParameterizedTest @org.junit.jupiter.params.provider.NullAndEmptySource @ValueSource(strings={" ","ab","  a  ","OVERLONG"})
+    void R09_reasonValidatedAtServiceBoundary(String reason) {
+        pastSession();String value="OVERLONG".equals(reason)?"x".repeat(501):reason;
+        var request=new com.sportify.catalog.dto.AttendanceBackfillRequest(booking,TrainingWriteRequest.AttendanceStatus.PRESENT,value,null);
+        assertThatThrownBy(()->backfillAs(account("MANAGER"),request)).isInstanceOf(BusinessRuleException.class);noBackfill();
+    }
+    @Test void R09_unknownBookingAndForgedActorAreDenied() {
+        long admin=account("MANAGER");var request=new com.sportify.catalog.dto.AttendanceBackfillRequest(Long.MAX_VALUE,TrainingWriteRequest.AttendanceStatus.PRESENT,"Missing booking",null);
+        assertThatThrownBy(()->backfillAs(admin,request)).isInstanceOf(ResourceNotFoundException.class);noBackfill();
+        assertThatThrownBy(()->backfiller.backfill(admin,backfillRequest())).isInstanceOf(org.springframework.security.authentication.AuthenticationCredentialsNotFoundException.class);
+    }
+    @Test void R09_auditInsertFailureRollsBackAttendance() {
+        pastSession();long admin=account("MANAGER");String trigger="r09_audit_failure_"+admin;
+        jdbc.execute("CREATE TRIGGER "+trigger+" ON activity_log AFTER INSERT AS BEGIN IF EXISTS(SELECT 1 FROM inserted WHERE action='TRAINING_ATTENDANCE_BACKFILLED' AND actor_user_id="+admin+") THROW 51000,'Isolated backfill audit failure',1; END");
+        try{assertThatThrownBy(()->backfillAs(admin,backfillRequest())).isInstanceOf(org.springframework.dao.DataAccessException.class);noBackfill();}
+        finally{jdbc.execute("DROP TRIGGER "+trigger);}
+    }
+    @Test void R09_concurrentReplayHasOneAttendanceAndOneAudit() throws Exception {
+        pastSession();long admin=account("MANAGER");
+        interleave(()->backfillAs(admin,backfillRequest()),()->backfillAs(admin,backfillRequest()),ConflictException.class);
+        assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?",booking)).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE action='TRAINING_ATTENDANCE_BACKFILLED' AND actor_user_id=?",admin)).isEqualTo(1);
+    }
+    @Test void R09_cancellationRevalidatedAfterSessionLock() throws Exception {
+        pastSession();long admin=account("MANAGER");
+        interleave(()->{jdbc.update("UPDATE class_session SET booked_count=booked_count WHERE id=?",session);jdbc.update("UPDATE booking SET status='CANCELLED' WHERE id=?",booking);return null;},
+            ()->backfillAs(admin,backfillRequest()),BusinessRuleException.class);noBackfill();
+    }
+    @Test void R09_backfillThenResultAndCorrectionSerialize() throws Exception {
+        pastSession();long admin=account("MANAGER");
+        interleave(()->backfillAs(admin,backfillRequest()),()->writer.createResult(coach,result()),null);
+        assertThat(count("SELECT COUNT(*) FROM session_result WHERE session_id=? AND member_id=?",session,member)).isEqualTo(1);
+        assertThatThrownBy(()->writer.coachCorrection(coach,jdbc.queryForObject("SELECT id FROM attendance_record WHERE booking_id=?",Long.class,booking),correction(TrainingWriteRequest.AttendanceStatus.EXCUSED))).isInstanceOf(ConflictException.class);
+    }
+    @Test void R09_backfillSerializesOrdinaryHistoricalAttemptAndExistingCorrection() throws Exception {
+        pastSession();long admin=account("MANAGER");
+        interleave(()->backfillAs(admin,backfillRequest()),()->writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)),BusinessRuleException.class);
+        long id=jdbc.queryForObject("SELECT id FROM attendance_record WHERE booking_id=?",Long.class,booking);
+        interleave(()->writer.coachCorrection(coach,id,correction(TrainingWriteRequest.AttendanceStatus.LATE)),()->backfillAs(admin,backfillRequest()),ConflictException.class);
+        assertThat(count("SELECT COUNT(*) FROM attendance_correction WHERE attendance_record_id=?",id)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT status FROM attendance_record WHERE id=?",String.class,id)).isEqualTo("LATE");
+    }
+    @Test void R09_realHttpBackfillAndMemberVisibility() throws Exception {
+        pastSession();long admin=account("MANAGER");
+        var user=org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(admin)));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/manager/training/attendance/backfill").with(user).contentType("application/json")
+            .content("{\"bookingId\":"+booking+",\"status\":\"PRESENT\",\"reason\":\"Verified missed roll call\"}"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/attendance")
+            .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(member)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$[0].status").value("PRESENT"));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/attendance")
+            .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(peer)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$").isEmpty());
     }
     private void interleave(Callable<?> first,Callable<?> second,Class<? extends Throwable> failure) throws Exception {
         var held=new CountDownLatch(1);var release=new CountDownLatch(1);

@@ -67,6 +67,7 @@ import { ClassRecommendationsPage } from '../pages/member/ClassRecommendationsPa
 import { CoachTrainingPlansPage, CoachTrainingResultsPage } from '../pages/training/CoachTrainingPages'
 import { ClassQuestionsPage, MemberClassesPage, MemberClassDetailPage } from '../pages/training/ClassLearningPages'
 import { ReceptionTrainingAttendancePage, CoachTrainingAttendancePage } from '../pages/training/ReceptionTrainingPages'
+import { ManagerAttendanceBackfillPage } from '../pages/training/ManagerAttendanceBackfillPage'
 
 /**
  * Real screens by full path. Later tasks register their page here, for example
@@ -85,6 +86,7 @@ const SCREENS: Record<string, ReactNode> = {
   '/manager/activity': <ActivityLogPage />,
   '/manager/classes': <ManagerClassesPage />,
   '/manager/schedule': <ManagerSchedulePage />,
+  '/manager/training/attendance/backfill': <ManagerAttendanceBackfillPage />,
   '/manager/finance': <ManagerFinancialOverviewPage />,
   '/manager/transactions': <ManagerTransactionsPage />,
   '/manager/reports': <ManagerRevenueReportsPage />,
