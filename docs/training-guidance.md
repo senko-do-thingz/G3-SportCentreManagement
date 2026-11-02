@@ -9,3 +9,11 @@ The class-rules-v1 score adds 50 for a selected sport, 20 for the selected or sa
 The response declares mode RULE_BASED, ruleVersion class-rules-v1 and bookingEligibilityChecked false. Items include real class/session IDs, capacity snapshots, scores and reasons. Session details and the existing booking service remain authoritative for package eligibility and capacity. A recommendation creates no booking, invoice, credit debit or assigned plan.
 
 No model-provider integration or third-party data transfer is used. Genuine LLM integration remains unavailable until a provider and data contract are approved. These rules do not imply CODEOWNER approval of pending release policies.
+
+## Automated center consultation
+
+POST /api/v1/member/training/consultation accepts question (1-500 characters) and optIn. Only enabled Members can use it. The response declares mode KNOWLEDGE_BASED, a status (ANSWERED, NO_ANSWER, CONSENT_REQUIRED or UNAVAILABLE), answer, historyStored false and source records with kind, ID, title, detail and application path.
+
+Supported intents are published session availability, active sport-package base prices in VND, and existing booking guidance. The service reads live catalog rows; it shows at most five results and names the date window or price scope. It does not infer eligibility or confirm payment. Unknown/private instructions receive NO_ANSWER; personal training questions link to the human Coach conversation. Input is never executed as SQL or as a provider prompt.
+
+Questions and answers are ephemeral. No conversation tables are written and no chat history is transferred between accounts. UI opt-in resets on navigation/reload. Set app.training.consultation.enabled=false on the backend or VITE_TRAINING_CONSULTATION_ENABLED=false on the frontend to disable consultation. Backend opt-in and feature-off handling query no catalog data. There is no configured LLM fallback; the knowledge service remains explicit about its limits.

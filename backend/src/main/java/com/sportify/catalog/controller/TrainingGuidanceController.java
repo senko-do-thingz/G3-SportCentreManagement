@@ -3,6 +3,8 @@ package com.sportify.catalog.controller;
 import com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences;
 import com.sportify.catalog.dto.TrainingGuidanceResponse.Recommendations;
 import com.sportify.catalog.service.TrainingGuidanceService;
+import com.sportify.catalog.service.CenterConsultationService;
+import jakarta.validation.Valid;
 import com.sportify.identity.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,6 +19,12 @@ import java.time.LocalTime;
 @RequiredArgsConstructor
 public class TrainingGuidanceController {
     private final TrainingGuidanceService service;
+    private final CenterConsultationService consultation;
+    @PostMapping("/consultation")
+    public com.sportify.catalog.dto.TrainingGuidanceResponse.Consultation consult(
+        @Valid @RequestBody com.sportify.catalog.dto.TrainingGuidanceRequest.Consultation request) {
+        return consultation.answer(request.question(),request.optIn());
+    }
     @GetMapping("/recommendations")
     public Recommendations recommendations(@AuthenticationPrincipal CustomUserDetails user,
         @RequestParam(required=false) Long sportId, @RequestParam(required=false) String level,

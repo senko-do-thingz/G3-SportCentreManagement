@@ -77,12 +77,12 @@ describe('Training request lifecycle', () => {
   })
 })
 
-it('passes the safe return path to an integrated chat component', () => {
+it('preserves the safe return path in the real center assistant', () => {
   render(
     <MemoryRouter initialEntries={['/member/assistant?returnTo=%2Fmember%2Ftraining%2Fplans%3Fview%3Dweek%23plan-list']}>
-      <MemberAssistantPage Chat={({ returnTo }) => <p>Chat return path: {returnTo}</p>} />
+      <MemberAssistantPage />
     </MemoryRouter>,
   )
-  expect(screen.getByText('Chat return path: /member/training/plans?view=week#plan-list')).toBeInTheDocument()
-  expect(screen.queryByText('AI is not configured')).not.toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Back to previous page' })).toHaveAttribute('href', '/member/training/plans?view=week#plan-list')
+  expect(screen.getByRole('button', { name: 'Ask center assistant' })).toBeDisabled()
 })

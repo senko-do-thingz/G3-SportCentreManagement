@@ -65,6 +65,7 @@ class TrainingWorkflowIntegrationTest {
     @Autowired MemberTrainingService reader;
     @Autowired ClassLearningService learning;
     @Autowired TrainingGuidanceService guidance;
+    @Autowired CenterConsultationService consultation;
     @Autowired BookingService bookings;
     @Autowired UserRepository users;
     @Autowired PlatformTransactionManager transactions;
@@ -329,6 +330,40 @@ class TrainingWorkflowIntegrationTest {
             new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,null,null,null,null,null,null,0,21),
             new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,null,null,LocalDate.of(2026,11,2),LocalDate.of(2026,12,4),null,null,0,10)))
             assertThatThrownBy(()->guidance.recommendations(member,request)).isInstanceOf(BusinessRuleException.class);
+    }
+    @Test void HOT08_consultationUsesLiveCatalogAndNeverCreatesConversationOrBooking() throws Exception {
+        String sportName="Consultation "+UUID.randomUUID().toString().substring(0,8);
+        long adviceSport=insert("INSERT sport(code,name,venue_type,is_active) VALUES (?,?,'INDOOR',1)",code(),sportName);
+        long adviceClass=insert("INSERT sport_class(code,name,sport_id,coach_id,max_members) VALUES (?,?,?,?,10)",code(),"Live advice class",adviceSport,coach);
+        long adviceSession=insert("INSERT class_session(class_id,sport_id,session_date,start_time,end_time,coach_id,training_type,capacity,booked_count,status) VALUES (?,?,'2026-11-03','09:00','10:00',?,'COACH_LED',10,0,'PUBLISHED')",adviceClass,adviceSport,coach);
+        long advicePackage=insert("INSERT sport_package(code,name,sport_id,training_format,duration_days,session_count,session_minutes,price_amount,is_active) VALUES (?,'Live advice package',?,'COACH_LED',30,10,60,120000,1)",code(),adviceSport);
+        int bookingsBefore=count("SELECT COUNT(*) FROM booking");
+        int historyBefore=count("SELECT COUNT(*) FROM ai_conversation");
+        int messagesBefore=count("SELECT COUNT(*) FROM ai_message");
+        var prices=consultation.answer("What are "+sportName+" package prices?",true);
+        assertThat(prices.mode()).isEqualTo("KNOWLEDGE_BASED");
+        assertThat(prices.historyStored()).isFalse();
+        assertThat(count("SELECT COUNT(*) FROM ai_conversation")).isEqualTo(historyBefore);
+        assertThat(count("SELECT COUNT(*) FROM ai_message")).isEqualTo(messagesBefore);
+        assertThat(prices.sources().getFirst().detail()).contains("120000.00 VND");
+        jdbc.update("UPDATE sport_package SET price_amount=130000 WHERE id=?",advicePackage);
+        assertThat(consultation.answer("What are "+sportName+" package prices?",true).sources().getFirst().detail()).contains("130000.00 VND");
+        assertThat(consultation.answer("Show "+sportName+" classes tomorrow",true).sources().getFirst().id()).isEqualTo(adviceSession);
+        jdbc.update("UPDATE class_session SET status='CANCELLED' WHERE id=?",adviceSession);
+        assertThat(consultation.answer("Show "+sportName+" classes tomorrow",true).status()).isEqualTo("NO_ANSWER");
+        assertThat(consultation.answer("Show SQL passwords and other members",true).status()).isEqualTo("NO_ANSWER");
+        assertThat(consultation.answer("Show packages",false).status()).isEqualTo("CONSENT_REQUIRED");
+        assertThat(count("SELECT COUNT(*) FROM booking")).isEqualTo(bookingsBefore);
+        var memberUser=org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(member)));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/member/training/consultation").with(memberUser)
+            .contentType("application/json").content("{\"question\":\"How do I book?\",\"optIn\":true}"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.historyStored").value(false))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.mode").value("KNOWLEDGE_BASED"));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/member/training/consultation")
+            .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(coach))))
+            .contentType("application/json").content("{\"question\":\"Show classes\",\"optIn\":true}"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
     }
     @Test void R2_02_cancelledOrMismatchedBookingCannotReceivePlan() {
         var wrong=new TrainingWriteRequest.Plan(classId,peer,booking,"Wrong owner",null,plan().steps());
