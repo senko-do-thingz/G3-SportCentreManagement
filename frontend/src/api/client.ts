@@ -43,6 +43,20 @@ export interface ApiDownload {
   blob: Blob
   contentDisposition: string | null
   contentType: string | null
+  correlationId?: string | null
+}
+
+export const CORRELATION_ID_HEADER = 'X-Correlation-Id'
+
+export function generateCorrelationId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
 }
 
 const AUTH_PATH_PREFIX = '/auth/'
@@ -166,6 +180,7 @@ async function performRefresh(failedAccessToken: string | null): Promise<string 
 
     // The request runs while this tab holds the cross tab lock, so it must not wait forever:
     // other tabs queue behind it. The timer covers the response headers and the body.
+    const refreshCorrelationId = generateCorrelationId()
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS)
     let response: Response
@@ -173,7 +188,11 @@ async function performRefresh(failedAccessToken: string | null): Promise<string 
     try {
       response = await fetch(buildUrl('/auth/refresh'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          [CORRELATION_ID_HEADER]: refreshCorrelationId,
+        },
         body: JSON.stringify({ refreshToken }),
         signal: controller.signal,
       })
@@ -181,15 +200,16 @@ async function performRefresh(failedAccessToken: string | null): Promise<string 
     } catch {
       // Unreachable server or timeout: keep the tokens so the user is not logged out by a network
       // blip. Throwing also ends the lock callback, so the lock is released for other tabs.
-      throw new ApiError(0, NETWORK_ERROR_MESSAGE)
+      throw new ApiError(0, NETWORK_ERROR_MESSAGE, {}, null, undefined, refreshCorrelationId)
     } finally {
       clearTimeout(timer)
     }
 
     if (!response.ok) {
+      const responseCorrelationId = response.headers.get(CORRELATION_ID_HEADER.toLowerCase()) ?? refreshCorrelationId
       if (!REJECTED_REFRESH_STATUSES.has(response.status)) {
         // A server error (5xx, 429) says nothing about the token: report it but keep the session.
-        throw apiErrorFromBody(response.status, data)
+        throw apiErrorFromBody(response.status, data, responseCorrelationId)
       }
       // Rejected. If another tab rotated the tokens meanwhile, the session is still valid.
       const currentRefreshToken = tokenStorage.getRefreshToken()
@@ -297,7 +317,20 @@ async function successfulResponse(path: string, options: RequestOptions): Promis
   const accessToken = useAuth ? tokenStorage.getAccessToken() : null
   const epoch = tokenStorage.getEpoch()
 
-  let response = await send(path, options, accessToken)
+  const correlationId =
+    options.headers?.[CORRELATION_ID_HEADER] ??
+    options.headers?.[CORRELATION_ID_HEADER.toLowerCase()] ??
+    generateCorrelationId()
+
+  const effectiveOptions: RequestOptions = {
+    ...options,
+    headers: {
+      ...options.headers,
+      [CORRELATION_ID_HEADER]: correlationId,
+    },
+  }
+
+  let response = await send(path, effectiveOptions, accessToken)
 
   // The session changed while the request was running (logout, login, or another tab switched
   // the account). The answer belongs to the previous account: drop it, and never retry it with
@@ -319,7 +352,7 @@ async function successfulResponse(path: string, options: RequestOptions): Promis
     if (tokenStorage.getEpoch() !== epoch) {
       throw new StaleSessionError()
     }
-    response = await send(path, options, newAccessToken)
+    response = await send(path, effectiveOptions, newAccessToken)
     if (tokenStorage.getEpoch() !== epoch) {
       throw new StaleSessionError()
     }
@@ -335,7 +368,8 @@ async function successfulResponse(path: string, options: RequestOptions): Promis
     if (useAuth && tokenStorage.getEpoch() !== epoch) {
       throw new StaleSessionError()
     }
-    throw apiErrorFromBody(response.status, data)
+    const responseCorrelationId = response.headers.get(CORRELATION_ID_HEADER.toLowerCase()) ?? correlationId
+    throw apiErrorFromBody(response.status, data, responseCorrelationId)
   }
   return { response, useAuth, epoch }
 }
@@ -361,6 +395,7 @@ export async function apiDownloadRequest(path: string, options: RequestOptions =
     blob,
     contentDisposition: response.headers.get('content-disposition'),
     contentType: response.headers.get('content-type'),
+    correlationId: response.headers.get(CORRELATION_ID_HEADER.toLowerCase()),
   }
 }
 
