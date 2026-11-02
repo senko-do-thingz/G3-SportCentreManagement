@@ -84,5 +84,5 @@ it('passes the safe return path to an integrated chat component', () => {
     </MemoryRouter>,
   )
   expect(screen.getByText('Chat return path: /member/training/plans?view=week#plan-list')).toBeInTheDocument()
-  expect(screen.queryByText('Chat is not connected yet')).not.toBeInTheDocument()
+  expect(screen.queryByText('AI is not configured')).not.toBeInTheDocument()
 })

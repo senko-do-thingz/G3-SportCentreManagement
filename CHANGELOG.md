@@ -1,3 +1,11 @@
+## 2026-11-02 - Class learning Round 02
+
+- Add Coach attendance, Member class information and private supplementary-practice questions/replies.
+- Serialize result/correction invariants, gate results at session end, preserve flexible attendance times and retain correction reasons.
+- Audit training writes transactionally; expose saved results to prevent duplicate form submissions.
+- Add actual SQL Server ownership/concurrency/rollback/migration coverage and ASCII source cleanup.
+- Explicitly label catalog guidance as non-AI while no model key is configured; CODEOWNER/schema approval remains pending.
+
 ## 2026-10-28 - Align payment summary status and refunds with merged Home
 
 - UI-27, UI-28 and UI-32 reuse Home's scoped palette, display fonts, square controls and cards, gold navigation marks and spacing through PaymentWorkspace. Rounded gradient payment banners are replaced by functional Home-style section headings on these routes only.

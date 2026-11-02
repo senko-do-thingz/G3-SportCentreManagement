@@ -1,6 +1,8 @@
 import { NavLink } from 'react-router-dom'
 
 const trainingLinks = [
+  { path: 'classes', label: 'My classes' },
+  { path: 'questions', label: 'Ask your coach' },
   { path: 'plans', label: 'Training plans' },
   { path: 'feedback', label: 'Coach feedback' },
   { path: 'attendance', label: 'Attendance history' },

@@ -8,7 +8,7 @@ export interface BookingCandidate {
 export interface StaffPlan extends TrainingPlan { classId: number; memberId: number; memberName: string }
 export interface StaffSession extends TrainingSession { classId: number | null; sportId: number; trainingType: string }
 export interface SessionMember {
-  bookingId: number; memberId: number; memberName: string; attendanceId: number | null; status: string | null; notes: string | null
+  bookingId: number; memberId: number; memberName: string; attendanceId: number | null; status: string | null; notes: string | null; resultId?: number | null
 }
 export interface TrainingMetric { id: number; name: string; maxScore: number }
 export interface CreatePlan {
@@ -36,5 +36,7 @@ export const staffTrainingApi = {
   receptionSessions: (signal: AbortSignal) => api.get<StaffSession[]>(`${reception}/sessions`, { signal }),
   receptionRoster: (id: string, signal: AbortSignal) => api.get<SessionMember[]>(`${reception}/sessions/${id}/members`, { signal }),
   attendance: (bookingId: number, body: AttendanceInput) => api.post<{ id: number }>(`${reception}/attendance`, { bookingId, ...body }),
+  coachAttendance: (bookingId: number, body: AttendanceInput) => api.post<{ id: number }>(`${coach}/attendance`, { bookingId, ...body }),
+  coachCorrectAttendance: (id: number, body: AttendanceInput & { reason: string }) => api.put<{ id: number }>(`${coach}/attendance/${id}`, body),
   correctAttendance: (id: number, body: AttendanceInput & { reason: string }) => api.put<{ id: number }>(`${reception}/attendance/${id}`, body),
 }

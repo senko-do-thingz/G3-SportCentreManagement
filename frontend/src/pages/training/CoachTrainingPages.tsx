@@ -75,7 +75,7 @@ function CreatePlanForm({ classId, members, onSaved }: { classId: number; member
     <form className="training-form" onSubmit={submit}>
       <fieldset disabled={action.pending} className="training-fieldset">
         <Select label="Member booking" name="bookingId" required placeholder="Select a confirmed booking"
-          options={members.map(member => ({ value: String(member.bookingId), label: `${member.memberName} · Booking #${member.bookingId} · ${member.sessionDate}` }))} />
+          options={members.map(member => ({ value: String(member.bookingId), label: `${member.memberName} - Booking #${member.bookingId} - ${member.sessionDate}` }))} />
         <Input label="Plan title" name="title" required maxLength={150} />
         <TrainingTextarea label="Plan description" name="description" maxLength={1000} />
         {steps.map((step, index) => (
@@ -104,12 +104,12 @@ function OwnPlans({ plans }: { plans: StaffPlan[] }) {
   return (
     <div className="training-form">
       <Select label="Assigned plans" value={planId} onChange={event => setPlanId(event.target.value)} placeholder="Select a plan to view and review"
-        options={plans.map(plan => ({ value: String(plan.id), label: `${plan.title} · ${plan.memberName} · ${plan.className}` }))} />
+        options={plans.map(plan => ({ value: String(plan.id), label: `${plan.title} - ${plan.memberName} - ${plan.className}` }))} />
       {planId && <TrainingData load={load}>{({ plan, steps }) => (
         <div className="training-form">
           <h3>{plan.title} - {plan.memberName}</h3>
           {plan.description && <p className="training-copy">{plan.description}</p>}
-          <ol className="training-steps">{steps.map(step => <li key={step.id}><strong>{step.title} · {step.durationMinutes} minutes</strong><p className="training-copy">{step.instructions}</p></li>)}</ol>
+          <ol className="training-steps">{steps.map(step => <li key={step.id}><strong>{step.title} - {step.durationMinutes} minutes</strong><p className="training-copy">{step.instructions}</p></li>)}</ol>
           <PublishFeedbackForm key={plan.id} planId={plan.id} />
         </div>
       )}</TrainingData>}
@@ -168,7 +168,7 @@ function CoachResultsWorkspace({ sessions }: { sessions: StaffSession[] }) {
   return (
     <Card title="Select a session">
       <Select label="Assigned session" value={sessionId} onChange={event => setSessionId(event.target.value)} placeholder="Select a session"
-        options={sessions.map(item => ({ value: String(item.id), label: `${item.className} · ${item.date} · ${item.startTime.slice(0, 5)}` }))} />
+        options={sessions.map(item => ({ value: String(item.id), label: `${item.className} - ${item.date} - ${item.startTime.slice(0, 5)}` }))} />
       {!sessions.length && <p>You have no assigned sessions.</p>}
       {session && <TrainingData load={load}>{data => <ResultForm key={session.id} sessionId={session.id} {...data} />}</TrainingData>}
     </Card>
@@ -177,8 +177,10 @@ function CoachResultsWorkspace({ sessions }: { sessions: StaffSession[] }) {
 
 function ResultForm({ sessionId, members, metrics }: { sessionId: number; members: SessionMember[]; metrics: TrainingMetric[] }) {
   const action = useTrainingAction()
-  const eligible = members.filter(member => member.status === 'PRESENT' || member.status === 'LATE')
-  if (!eligible.length) return <EmptyState title="No members eligible for results" description="Reception must mark the member Present or Late before you can save results." />
+  const [savedMemberIds, setSavedMemberIds] = useState<number[]>([])
+  const saved = members.filter(member => member.resultId || savedMemberIds.includes(member.memberId))
+  const eligible = members.filter(member => !member.resultId && !savedMemberIds.includes(member.memberId) && (member.status === 'PRESENT' || member.status === 'LATE'))
+  if (!eligible.length) return <><ActionMessage {...action} /><EmptyState title={saved.length ? "Results already saved" : "No members eligible for results"} description={saved.length ? "All eligible members already have a result. Duplicate submissions are disabled." : "Record Present or Late attendance before saving results."} /></>
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = event.currentTarget
@@ -193,15 +195,18 @@ function ResultForm({ sessionId, members, metrics }: { sessionId: number; member
         return [{ metricId: metric.id, score }]
       })
       if (!notes && !scores.length) throw new Error('Enter result notes or at least one skill score.')
-      await training.result({ sessionId, memberId: Number(values.get('memberId')), notes: notes || null, scores })
+      const memberId = Number(values.get('memberId'))
+      await training.result({ sessionId, memberId, notes: notes || null, scores })
+      setSavedMemberIds(current => [...current, memberId])
       form.reset()
     }, 'Training results saved. The member can view them immediately.')
   }
   return (
     <form className="training-form" onSubmit={submit}>
+      {saved.length > 0 && <p role="status">Results already saved for: {saved.map(member => member.memberName).join(', ')}</p>}
       <fieldset className="training-fieldset" disabled={action.pending}>
         <Select label="Member receiving results" name="memberId" required placeholder="Select a member"
-          options={eligible.map(member => ({ value: String(member.memberId), label: `${member.memberName} · ${attendanceLabel(member.status)}` }))} />
+          options={eligible.map(member => ({ value: String(member.memberId), label: `${member.memberName} - ${attendanceLabel(member.status)}` }))} />
         <TrainingTextarea label="Result notes" name="notes" maxLength={1000} required={!metrics.length} />
         {metrics.length ? metrics.map(metric => (
           <Input key={metric.id} label={`${metric.name} (0-${metric.maxScore})`} name={`metric-${metric.id}`} type="number" min={0} max={metric.maxScore} step="0.01" />

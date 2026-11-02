@@ -65,7 +65,8 @@ import {
 } from '../pages/member/TrainingPages'
 import { MemberAssistantPage } from '../pages/member/MemberAssistantPage'
 import { CoachTrainingPlansPage, CoachTrainingResultsPage } from '../pages/training/CoachTrainingPages'
-import { ReceptionTrainingAttendancePage } from '../pages/training/ReceptionTrainingPages'
+import { ClassQuestionsPage, MemberClassesPage, MemberClassDetailPage } from '../pages/training/ClassLearningPages'
+import { ReceptionTrainingAttendancePage, CoachTrainingAttendancePage } from '../pages/training/ReceptionTrainingPages'
 
 /**
  * Real screens by full path. Later tasks register their page here, for example
@@ -75,6 +76,8 @@ const SCREENS: Record<string, ReactNode> = {
   '/member/training/plans': <TrainingPlansPage />,
   '/coach/training/plans': <CoachTrainingPlansPage />,
   '/coach/training/results': <CoachTrainingResultsPage />,
+  '/coach/training/attendance': <CoachTrainingAttendancePage />,
+  '/coach/training/questions': <ClassQuestionsPage coach />,
   '/reception/training/attendance': <ReceptionTrainingAttendancePage />,
   '/manager': <UserManagementPage />,
   '/manager/packages': <ManagerPackagesPage />,
@@ -125,6 +128,9 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
     { path: 'classes/:classId/edit', element: <ClassEditorPage /> },
   ],
   '/member': [
+    { path: 'training/classes', element: <MemberClassesPage /> },
+    { path: 'training/classes/:id', element: <MemberClassDetailPage /> },
+    { path: 'training/questions', element: <ClassQuestionsPage /> },
     { path: 'training/plans/:id', element: <TrainingPlanDetailPage /> },
     { path: 'training/feedback', element: <CoachFeedbackPage /> },
     { path: 'training/attendance', element: <AttendancePage /> },

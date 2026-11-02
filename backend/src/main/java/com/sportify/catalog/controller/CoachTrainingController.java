@@ -38,4 +38,8 @@ public class CoachTrainingController {
     public List<Metric> metrics(@RequestParam long sportId) { return service.metrics(sportId); }
     @PostMapping("/results") @ResponseStatus(HttpStatus.CREATED)
     public Created result(@Valid @RequestBody TrainingWriteRequest.Result request, @AuthenticationPrincipal CustomUserDetails user) { return service.createResult(user.getUserAccount().getId(), request); }
+    @PostMapping("/attendance") @ResponseStatus(HttpStatus.CREATED)
+    public Created attendance(@Valid @RequestBody TrainingWriteRequest.Attendance request, @AuthenticationPrincipal CustomUserDetails user) { return service.coachAttendance(user.getUserAccount().getId(), request); }
+    @PutMapping("/attendance/{id}")
+    public Created correctAttendance(@PathVariable long id, @Valid @RequestBody TrainingWriteRequest.Correction request, @AuthenticationPrincipal CustomUserDetails user) { return service.coachCorrection(user.getUserAccount().getId(), id, request); }
 }

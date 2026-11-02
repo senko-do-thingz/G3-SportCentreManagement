@@ -268,6 +268,8 @@ export const COACH_AREA: RoleArea = {
     {
       heading: 'Training',
       items: [
+        { label: 'Session attendance', path: 'training/attendance', title: 'Session attendance', description: 'Record participation for assigned sessions.', task: 'Class learning', screens: ['F4-02'] },
+        { label: 'Member questions', path: 'training/questions', title: 'Member practice questions', description: 'Reply to supplementary practice questions.', task: 'Class learning', screens: [] },
         { label: 'Plans and feedback', path: 'training/plans', title: 'Assign plans and feedback', description: 'Assign personal plans from confirmed bookings and provide member feedback.', task: 'Training plans', screens: [] },
         { label: 'Record training results', path: 'training/results', title: 'Record training results', description: 'Record session results and skill scores.', task: 'Training results', screens: [] },
       ],

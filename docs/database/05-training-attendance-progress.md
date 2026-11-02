@@ -187,3 +187,12 @@ SELECT member_id, skill_metric_id, score, session_date
 FROM RankedScores
 WHERE rn = 1;
 ```
+
+
+## Round 02 class learning implementation
+
+The original design decisions above contain conceptual lifecycle fields not present in V16. They are not evidence that DRAFT/SUBMITTED/PUBLISHED states are implemented. Current implementation and explicit pending policy approvals are recorded in [the Round 02 decision register](../training-round02/SCOPE_AND_DECISIONS.md).
+
+Member class details derive only the member's own bookings and participation. Class questions reuse support_request with category TRAINING_CLASS_<classId> and support_request_message; member/current-coach ownership is checked on every read/write. Creating a question requires a confirmed class booking. No enrollment model is invented.
+
+Training writes create transactional activity_log entries with actor IDs and entity linkage. Attendance corrections keep previous/new statuses, correcting actor and reason. Result creation and attendance correction acquire the same session-first lock to reject ABSENT/EXCUSED corrections after a result exists. Result timing uses the configured center Clock and session end time. Attendance time within an eligible date remains flexible; self-training remains same-day.

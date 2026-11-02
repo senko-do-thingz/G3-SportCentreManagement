@@ -20,7 +20,7 @@ function SessionText({ session }: { session: TrainingSession }) {
   return (
     <div className="training-session">
       <strong>{session.className}</strong>
-      <span>{date} · {session.startTime.slice(0, 5)}-{session.endTime.slice(0, 5)}</span>
+      <span>{date} - {session.startTime.slice(0, 5)}-{session.endTime.slice(0, 5)}</span>
     </div>
   )
 }
@@ -34,7 +34,7 @@ function FeedbackList({ feedback }: { feedback: CoachFeedback[] }) {
     <ul className="training-list">
       {feedback.map(item => (
         <li key={item.id}>
-          <h3>{item.coachName} · Rating {item.rating}/5</h3>
+          <h3>{item.coachName} - Rating {item.rating}/5</h3>
           <p><Link to={`/member/training/plans/${item.planId}`}>{item.planTitle}</Link></p>
           <p><time dateTime={item.createdAt}>{new Intl.DateTimeFormat('en-GB', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(item.createdAt))}</time></p>
           <p className="training-copy">{item.comments}</p>
@@ -57,7 +57,7 @@ export function TrainingPlansPage() {
               {plans.map(plan => (
                 <li key={plan.id}>
                   <h2>{plan.title}</h2>
-                  <p>{plan.className} · Coach {plan.coachName}</p>
+                  <p>{plan.className} - Coach {plan.coachName}</p>
                   {plan.description && <p className="training-copy">{plan.description}</p>}
                   <Link to={`/member/training/plans/${plan.id}`} aria-label={`View plan details: ${plan.title}`}>
                     View plan details
@@ -81,14 +81,14 @@ export function TrainingPlanDetailPage() {
       {({ plan, steps, feedback }) => (
         <div className="training-page">
           <Link to="/member/training/plans">Back to training plans</Link>
-          <PageHeader title={plan.title} description={`${plan.className} · Coach ${plan.coachName} · Read only`} />
+          <PageHeader title={plan.title} description={`${plan.className} - Coach ${plan.coachName} - Read only`} />
           {plan.description && <p className="training-copy">{plan.description}</p>}
           <Card title="Exercises">
             {steps.length ? (
               <ol className="training-steps">
                 {steps.map(step => (
                   <li key={step.id}>
-                    <h3>{step.title} · {step.durationMinutes} minutes</h3>
+                    <h3>{step.title} - {step.durationMinutes} minutes</h3>
                     <p className="training-copy">{step.instructions || 'Your coach has not added instructions yet.'}</p>
                   </li>
                 ))}

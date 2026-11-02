@@ -758,7 +758,7 @@ public class BookingServiceImplTest {
         assertEquals("MEM-100", response.getMemberCode());
         assertEquals("Badminton", response.getSportName());
         assertEquals("Receptionist User", response.getRecordedByName());
-        assertEquals("Self-training attendance acknowledged (persistence pending Flow 4 implementation)", response.getMessage());
+        assertEquals("Self-training attendance recorded", response.getMessage());
         verify(trainingWriteService).selfAttendance(200L, 1L, null);
         assertEquals(5, response.getRemainingSessions());
         verify(bookingRepository, never()).save(any());

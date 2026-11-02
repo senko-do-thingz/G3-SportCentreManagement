@@ -29,7 +29,7 @@ describe('Member training', () => {
     signedIn(() => json(200, [{ id: 1, session, status: 'LATE', notes: 'Arrived 5 minutes late' }]))
     renderApp('/member/training/attendance')
     expect(await screen.findByText('Late')).toBeInTheDocument()
-    expect(screen.getByText(/30\/10\/2026 · 08:00-09:00/)).toBeInTheDocument()
+    expect(screen.getByText(/30\/10\/2026 - 08:00-09:00/)).toBeInTheDocument()
   })
   it('shows feedback on its personal plan immediately without a session result', async () => {
     const { calls } = signedIn(() => json(200, {
@@ -71,7 +71,7 @@ describe('Member training', () => {
     renderApp('/member/training/plans?view=week#plan-list')
     await userEvent.click(await screen.findByRole('button', { name: 'Open member navigation' }))
     await userEvent.click(screen.getByRole('link', { name: 'Open AI Assistant' }))
-    expect(await screen.findByText('Chat is not connected yet')).toBeInTheDocument()
+    expect(await screen.findByText('AI is not configured')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to previous page' })).toHaveAttribute('href', '/member/training/plans?view=week#plan-list')
     expect(screen.getByRole('button', { name: 'Open member navigation' })).toHaveAttribute('aria-expanded', 'false')
   })
