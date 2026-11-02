@@ -18,7 +18,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.mockito.Mockito.*;
-@WebMvcTest(ClassLearningController.class)
+@WebMvcTest(value=ClassLearningController.class,properties="app.cors.allowed-origins=http://localhost:5173")
 @Import({SecurityConfig.class,CustomAuthenticationEntryPoint.class,CustomAccessDeniedHandler.class,JwtAuthenticationFilter.class,GlobalExceptionHandler.class})
 class ClassLearningControllerTest {
     @Autowired MockMvc mvc;
@@ -41,7 +41,7 @@ class ClassLearningControllerTest {
         mvc.perform(post("/api/v1/member/training/questions").contentType(MediaType.APPLICATION_JSON).content(ask)).andExpect(status().isUnauthorized());
         mvc.perform(post("/api/v1/member/training/questions").with(user(actor("COACH"))).contentType(MediaType.APPLICATION_JSON).content(ask)).andExpect(status().isForbidden());
         mvc.perform(post("/api/v1/member/training/questions").with(user(actor("MEMBER"))).contentType(MediaType.APPLICATION_JSON).content(ask)).andExpect(status().isCreated());
-        verify(service).ask(42L,1L,"Practice","How should I practise?");
+        verify(service).ask(42L,1L,"Practice","How should I practise?",null);
         for(String role:List.of("MEMBER","COACH")){
             String root=role.equals("COACH")?"coach":"member";
             mvc.perform(get("/api/v1/"+root+"/training/questions/1").with(user(actor(role)))).andExpect(status().isOk());
@@ -63,5 +63,29 @@ class ClassLearningControllerTest {
         mvc.perform(post("/api/v1/coach/training/questions/1/messages").with(user(coach)).contentType(MediaType.APPLICATION_JSON)
             .content("{\"body\":\"Reply\"}")).andExpect(status().isForbidden());
         verifyNoInteractions(service);
+    }
+    @Test void R05_API_01_explicitOperationIdentityIsForwardedAndMalformedKeysFail()throws Exception{
+        var key=java.util.UUID.randomUUID();
+        mvc.perform(post("/api/v1/member/training/questions").with(user(actor("MEMBER")))
+            .header("Idempotency-Key",key).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"classId\":1,\"subject\":\"Practice\",\"body\":\"Same content\"}"))
+            .andExpect(status().isCreated());
+        verify(service).ask(42L,1L,"Practice","Same content",key);
+        for(String role:List.of("MEMBER","COACH")){
+            mvc.perform(post("/api/v1/"+role.toLowerCase()+"/training/questions/1/messages").with(user(actor(role)))
+                .header("Idempotency-Key",key).contentType(MediaType.APPLICATION_JSON).content("{\"body\":\"Reply\"}"))
+                .andExpect(status().isCreated());
+            verify(service).reply(42L,role.equals("COACH"),1L,"Reply",key);
+        }
+        mvc.perform(post("/api/v1/member/training/questions").with(user(actor("MEMBER")))
+            .header("Idempotency-Key","invalid").contentType(MediaType.APPLICATION_JSON)
+            .content("{\"classId\":1,\"subject\":\"Practice\",\"body\":\"Same content\"}"))
+            .andExpect(status().isBadRequest());
+    }
+    @Test void R05_API_02_browserPreflightAllowsOperationIdentity()throws Exception{
+        mvc.perform(options("/api/v1/member/training/questions").header("Origin","http://localhost:5173")
+            .header("Access-Control-Request-Method","POST")
+            .header("Access-Control-Request-Headers","content-type,idempotency-key"))
+            .andExpect(status().isOk()).andExpect(header().string("Access-Control-Allow-Headers",org.hamcrest.Matchers.containsString("idempotency-key")));
     }
 }

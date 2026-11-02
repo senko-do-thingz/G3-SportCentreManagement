@@ -262,10 +262,11 @@ class TrainingWorkflowIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?", booking)).isZero();
     }
     @Test void HOT06_questionRetryAndReassignmentPreservePrivateHistory() {
-        long question=learning.ask(member,classId,"Footwork","How should I practise?");
-        assertThat(learning.ask(member,classId,"Footwork","How should I practise?")).isEqualTo(question);
-        long message=learning.reply(coach,true,question,"Review the assigned plan first.");
-        assertThat(learning.reply(coach,true,question,"Review the assigned plan first.")).isEqualTo(message);
+        var questionKey=UUID.randomUUID();var replyKey=UUID.randomUUID();
+        long question=learning.ask(member,classId,"Footwork","How should I practise?",questionKey);
+        assertThat(learning.ask(member,classId,"Footwork","How should I practise?",questionKey)).isEqualTo(question);
+        long message=learning.reply(coach,true,question,"Review the assigned plan first.",replyKey);
+        assertThat(learning.reply(coach,true,question,"Review the assigned plan first.",replyKey)).isEqualTo(message);
         assertThat(learning.questions(coach,true)).extracting(com.sportify.catalog.dto.ClassLearningResponse.Question::id).contains(question);
         assertThat(learning.discussion(member,false,question).messages()).hasSize(1);
         jdbc.update("UPDATE sport_class SET coach_id=? WHERE id=?",otherCoach,classId);
@@ -277,10 +278,80 @@ class TrainingWorkflowIntegrationTest {
     }
     @Test void HOT06_concurrentReplyRetryCreatesOneAuditedMessage() throws Exception {
         long question=learning.ask(member,classId,"Practice","Which exercise next?");
-        interleave(()->learning.reply(coach,true,question,"Follow your assigned steps."),
-            ()->learning.reply(coach,true,question,"Follow your assigned steps."),null);
+        var replyKey=UUID.randomUUID();
+        interleave(()->learning.reply(coach,true,question,"Follow your assigned steps.",replyKey),
+            ()->learning.reply(coach,true,question,"Follow your assigned steps.",replyKey),null);
         assertThat(learning.discussion(member,false,question).messages()).hasSize(1);
         assertThat(count("SELECT COUNT(*) FROM activity_log WHERE entity_id=? AND action='TRAINING_QUESTION_REPLIED'",question)).isEqualTo(1);
+    }
+    @Test void R05_01_identicalIntentionalQuestionsAndRepliesRemainDistinct() {
+        long first=learning.ask(member,classId,"Practice","Same question",UUID.randomUUID());
+        long second=learning.ask(member,classId,"Practice","Same question",UUID.randomUUID());
+        assertThat(second).isNotEqualTo(first);
+        long message=learning.reply(coach,true,first,"Same reply",UUID.randomUUID());
+        assertThat(learning.reply(coach,true,first,"Same reply",UUID.randomUUID())).isNotEqualTo(message);
+        assertThat(learning.discussion(member,false,first).messages()).hasSize(2);
+        assertThat(learning.ask(member,classId,"Legacy","Same unkeyed question"))
+            .isNotEqualTo(learning.ask(member,classId,"Legacy","Same unkeyed question"));
+        assertThat(learning.reply(coach,true,first,"Unkeyed reply"))
+            .isNotEqualTo(learning.reply(coach,true,first,"Unkeyed reply"));
+    }
+    @Test void R05_02_questionRetrySerializesConcurrentDelivery() throws Exception {
+        var key=UUID.randomUUID();
+        interleave(()->learning.ask(member,classId,"Concurrent","Same operation",key),
+            ()->learning.ask(member,classId,"Concurrent","Same operation",key),null);
+        assertThat(learning.questions(member,false)).hasSize(1);
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE actor_user_id=? AND entity_code=?",member,key.toString())).isEqualTo(1);
+    }
+    @Test void R05_03_keysAreActorActionAndTargetScopedWithContentConflicts() {
+        var key=UUID.randomUUID();
+        long question=learning.ask(member,classId,"Practice","Original",key);
+        assertThatThrownBy(()->learning.ask(member,classId,"Practice","Edited",key)).isInstanceOf(ConflictException.class);
+        insert("INSERT booking(booking_code,session_id,member_id,status) VALUES (?,?,?,'CONFIRMED')",code(),session,peer);
+        long peerQuestion=learning.ask(peer,classId,"Practice","Original",key);
+        assertThat(peerQuestion).isNotEqualTo(question);
+        long coachMessage=learning.reply(coach,true,question,"Same body",key);
+        long memberMessage=learning.reply(member,false,question,"Same body",key);
+        assertThat(memberMessage).isNotEqualTo(coachMessage);
+        assertThat(learning.reply(member,false,question,"Same body",key)).isEqualTo(memberMessage);
+        assertThatThrownBy(()->learning.reply(member,false,question,"Edited body",key)).isInstanceOf(ConflictException.class);
+        long next=learning.ask(member,classId,"Practice","Original",UUID.randomUUID());
+        assertThat(learning.reply(coach,true,next,"Same body",key)).isNotEqualTo(coachMessage);
+        assertThatThrownBy(()->learning.reply(peer,false,question,"Same body",key)).isInstanceOf(ResourceNotFoundException.class);
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE actor_user_id=? AND entity_code=? AND action='TRAINING_QUESTION_REPLIED'",coach,key.toString())).isEqualTo(2);
+    }
+    @Test void R05_04_operationReceiptAndBusinessWriteRollbackTogether() {
+        var key=UUID.randomUUID();
+        assertThatThrownBy(()->new TransactionTemplate(transactions).execute(status->{
+            learning.ask(member,classId,"Rollback","Rollback operation",key);
+            throw new IllegalStateException("rollback probe");
+        })).isInstanceOf(IllegalStateException.class);
+        assertThat(learning.questions(member,false)).isEmpty();
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE actor_user_id=? AND entity_code=?",member,key.toString())).isZero();
+        long question=learning.ask(member,classId,"Rollback","Rollback operation",key);
+        assertThatThrownBy(()->new TransactionTemplate(transactions).execute(status->{
+            learning.reply(coach,true,question,"Rollback reply",key);
+            throw new IllegalStateException("rollback probe");
+        })).isInstanceOf(IllegalStateException.class);
+        assertThat(learning.discussion(member,false,question).messages()).isEmpty();
+        assertThat(learning.reply(coach,true,question,"Rollback reply",key)).isPositive();
+    }
+    @Test void R05_05_concurrentIntentionalRepliesRemainDistinct() throws Exception {
+        long question=learning.ask(member,classId,"Practice","Intentional repeats");
+        interleave(()->learning.reply(coach,true,question,"Same text",UUID.randomUUID()),
+            ()->learning.reply(coach,true,question,"Same text",UUID.randomUUID()),null);
+        assertThat(learning.discussion(member,false,question).messages()).hasSize(2);
+    }
+    @ParameterizedTest @ValueSource(strings={"FOOTBALL","BADMINTON","SWIMMING","BASKETBALL"})
+    void R05_06_manualPlansWorkForEverySeededSportWithoutSuggestions(String sportCode) {
+        long selectedSport=jdbc.queryForObject("SELECT id FROM sport WHERE code=?",Long.class,sportCode);
+        jdbc.update("UPDATE sport_class SET sport_id=? WHERE id=?",selectedSport,classId);
+        jdbc.update("UPDATE class_session SET sport_id=? WHERE id=?",selectedSport,session);
+        long id=writer.createPlan(coach,new TrainingWriteRequest.Plan(classId,member,booking,"Manual "+sportCode,
+            "Coach authored practice",List.of(new TrainingWriteRequest.Step("Coach assigned exercise",10,"Follow the human coach instructions")))).id();
+        assertThat(reader.plan(member,id).steps()).hasSize(1);
+        assertThatThrownBy(()->reader.plan(peer,id)).isInstanceOf(ResourceNotFoundException.class);
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE actor_user_id=? AND action='TRAINING_PLAN_CREATED' AND entity_id=?",coach,id)).isEqualTo(1);
     }
     @Test void HOT07_recommendationsUseLiveAvailabilityAndStablePreferenceRanking() throws Exception {
         jdbc.update("UPDATE class_session SET session_date='2026-11-03' WHERE id=?",session);

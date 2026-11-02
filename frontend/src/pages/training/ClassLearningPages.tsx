@@ -1,4 +1,4 @@
-import { useCallback, useState, type FormEvent } from 'react'
+import { useCallback, useRef, useState, type FormEvent } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { classLearningApi as learning, type LearningClass } from '../../api/classLearningApi'
 import { Button, Card, EmptyState, Input, PageHeader, Select } from '../../components/ui'
@@ -22,11 +22,12 @@ export function ClassQuestionsPage({ coach = false }: { coach?: boolean }) {
   const load = useCallback((signal: AbortSignal) => learning.questions(coach, signal), [coach])
   const discussion = useCallback((signal: AbortSignal) => learning.discussion(coach, selected, signal), [coach, selected])
   const action = useTrainingAction()
+  const operation = useSubmissionIdentity()
   function reply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = event.currentTarget
     const body = String(new FormData(form).get('body')).trim()
-    void action.run(async () => { await learning.reply(coach, selected, body); form.reset(); refresh(value => value + 1) }, 'Message sent.')
+    void action.run(async () => { await learning.reply(coach, selected, body, operation.key([coach, selected, body])); operation.complete(); form.reset(); refresh(value => value + 1) }, 'Message sent.')
   }
   return <div className="training-page"><PageHeader title={coach ? 'Member practice questions' : 'Ask your coach'} description="Discuss class exercises and supplementary practice with the assigned coach." />
     {!coach && <TrainingData load={learning.classes}>{classes => <AskForm classes={classes} onSaved={id => { setSelected(String(id)); refresh(value => value + 1) }} />}</TrainingData>}
@@ -37,12 +38,26 @@ export function ClassQuestionsPage({ coach = false }: { coach?: boolean }) {
 function AskForm({ classes, onSaved }: { classes: LearningClass[]; onSaved: (id: number) => void }) {
   const [params] = useSearchParams()
   const action = useTrainingAction()
+  const operation = useSubmissionIdentity()
   if (!classes.length) return null
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = event.currentTarget
     const values = new FormData(form)
-    void action.run(async () => { const created = await learning.ask({ classId: Number(values.get('classId')), subject: String(values.get('subject')).trim(), body: String(values.get('body')).trim() }); form.reset(); onSaved(created.id) }, 'Question sent to your coach.')
+    const request = { classId: Number(values.get('classId')), subject: String(values.get('subject')).trim(), body: String(values.get('body')).trim() }
+    void action.run(async () => { const created = await learning.ask(request, operation.key(request)); operation.complete(); form.reset(); onSaved(created.id) }, 'Question sent to your coach.')
   }
   return <Card title="New question"><form onSubmit={submit} className="training-form"><fieldset className="training-fieldset" disabled={action.pending}><Select label="Your class" name="classId" required defaultValue={params.get('classId') ?? ''} placeholder="Select your class" options={classes.map(c => ({ value: String(c.id), label: c.name }))} /><Input label="Question subject" name="subject" required maxLength={200} /><TrainingTextarea label="Practice question" name="body" required maxLength={2000} /><Button type="submit" loading={action.pending}>Ask coach</Button></fieldset></form><ActionMessage {...action} /></Card>
+}
+// Preserve the identity after an uncertain failure. Success or edited content starts a new operation.
+function useSubmissionIdentity() {
+  const pending = useRef<{ payload: string; id: string } | null>(null)
+  return {
+    key(payload: unknown) {
+      const serialized = JSON.stringify(payload)
+      if (pending.current?.payload !== serialized) pending.current = { payload: serialized, id: crypto.randomUUID() }
+      return pending.current.id
+    },
+    complete() { pending.current = null },
+  }
 }

@@ -4,6 +4,7 @@ import com.sportify.core.audit.AuditEvent;
 import com.sportify.core.audit.AuditService;
 import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.core.exception.BusinessRuleException;
+import com.sportify.core.exception.ConflictException;
 import com.sportify.identity.entity.UserAccount;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -17,6 +18,11 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -57,21 +63,30 @@ public class ClassLearningService {
     }
     @Transactional
     public long ask(long memberId,long classId,String subject,String body) {
+        return ask(memberId,classId,subject,body,null);
+    }
+    @Transactional
+    public long ask(long memberId,long classId,String subject,String body,UUID operationId) {
         lockQuestionClass(classId);
         // A question requires an existing confirmed coached booking, never a fabricated enrollment.
         if(jdbc.queryForObject("SELECT COUNT(*) FROM booking b JOIN class_session s ON s.id=b.session_id JOIN sport_class c ON c.id=s.class_id WHERE b.member_id=? AND c.id=? AND b.status='CONFIRMED' AND s.status<>'CANCELLED' AND c.coach_id IS NOT NULL",Integer.class,memberId,classId)==0)
             throw new ResourceNotFoundException("A booked class with an assigned coach is required");
         Long coachId=jdbc.queryForObject("SELECT coach_id FROM sport_class WHERE id=?",Long.class,classId);
-        var prior=jdbc.query("SELECT id FROM support_request WHERE member_id=? AND category=? AND assigned_staff_id=? AND subject=? AND description=? AND status IN ('OPEN','IN_PROGRESS') ORDER BY id",
-            (rs,row)->rs.getLong("id"),memberId,"TRAINING_CLASS_"+classId,coachId,subject.trim(),body.trim());
-        if(!prior.isEmpty())return prior.getFirst();
+        String fingerprint=fingerprint(subject.trim(),body.trim());
+        Long prior=replay(memberId,"TRAINING_QUESTION_CREATED",classId,null,operationId,fingerprint);
+        if(prior!=null){discussion(memberId,false,prior);return prior;}
         Long seq=jdbc.queryForObject("SELECT NEXT VALUE FOR seq_support_request_code",Long.class);
         long id=insert("INSERT INTO support_request(request_code,member_id,subject,category,description,assigned_staff_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)",
             "TRN-"+seq,memberId,subject.trim(),"TRAINING_CLASS_"+classId,body.trim(),coachId,now(),now());
-        audit(memberId,"TRAINING_QUESTION_CREATED",id,Map.of("classId",classId));return id;
+        auditOperation(memberId,"TRAINING_QUESTION_CREATED",id,operationId,
+            Map.of("classId",classId,"fingerprint",fingerprint,"resultId",id));return id;
     }
     @Transactional
     public long reply(long actorId,boolean coach,long id,String body) {
+        return reply(actorId,coach,id,body,null);
+    }
+    @Transactional
+    public long reply(long actorId,boolean coach,long id,String body,UUID operationId) {
         var current=discussion(actorId,coach,id);
         lockQuestionClass(current.question().classId());
         // Serialize conversation writes and repeat ownership validation after the lock.
@@ -79,12 +94,45 @@ public class ClassLearningService {
         discussion(actorId,coach,id);
         if(jdbc.queryForObject("SELECT COUNT(*) FROM support_request q JOIN sport_class c ON q.category=CONCAT('TRAINING_CLASS_',c.id) WHERE q.id=? AND q.assigned_staff_id=c.coach_id",Integer.class,id)==0)
             throw new BusinessRuleException("Coach assignment changed; start a new question for the current coach");
-        var duplicate=jdbc.query("SELECT id FROM support_request_message WHERE request_id=? AND sender_id=? AND message_body=? AND id=(SELECT MAX(id) FROM support_request_message WHERE request_id=?)",
-            (rs,row)->rs.getLong("id"),id,actorId,body.trim(),id);
-        if(!duplicate.isEmpty())return duplicate.getFirst();
+        String fingerprint=fingerprint(body.trim());
+        Long prior=replay(actorId,"TRAINING_QUESTION_REPLIED",current.question().classId(),id,operationId,fingerprint);
+        if(prior!=null)return prior;
         long message=insert("INSERT INTO support_request_message(request_id,sender_id,message_body,created_at) VALUES (?,?,?,?)",id,actorId,body.trim(),now());
         jdbc.update("UPDATE support_request SET status='IN_PROGRESS',updated_at=? WHERE id=?",now(),id);
-        audit(actorId,"TRAINING_QUESTION_REPLIED",id,Map.of("messageId",message,"classId",current.question().classId()));return message;
+        auditOperation(actorId,"TRAINING_QUESTION_REPLIED",id,operationId,
+            Map.of("messageId",message,"classId",current.question().classId(),"fingerprint",fingerprint,"resultId",message));return message;
+    }
+    // Class locks serialize operation lookup, business write and audit receipt in one transaction.
+    // A missing key means a new intentional operation; content alone never identifies a retry.
+    private Long replay(long actor,String action,long classId,Long questionId,UUID operationId,String fingerprint) {
+        if(operationId==null)return null;
+        entityManager.flush();
+        var receipts=jdbc.query("""
+            SELECT JSON_VALUE(details,'$.fingerprint') fingerprint,JSON_VALUE(details,'$.resultId') result_id
+            FROM activity_log WHERE actor_user_id=? AND action=? AND entity_type='SUPPORT_REQUEST'
+            AND entity_code=? AND JSON_VALUE(details,'$.classId')=?
+            """+(questionId==null?"":" AND entity_id=?"),
+            (rs,row)->Map.entry(rs.getString("fingerprint"),Long.valueOf(rs.getString("result_id"))),
+            questionId==null?new Object[]{actor,action,operationId.toString(),String.valueOf(classId)}:
+                new Object[]{actor,action,operationId.toString(),String.valueOf(classId),questionId});
+        if(receipts.isEmpty())return null;
+        if(!receipts.getFirst().getKey().equals(fingerprint))
+            throw new ConflictException("Operation key already used with different content; use a new key for a new submission");
+        return receipts.getFirst().getValue();
+    }
+    private String fingerprint(String... parts) {
+        try {
+            var digest=MessageDigest.getInstance("SHA-256");
+            for(String part:parts){byte[] value=part.getBytes(StandardCharsets.UTF_8);
+                digest.update(java.nio.ByteBuffer.allocate(4).putInt(value.length).array());digest.update(value);}
+            return HexFormat.of().formatHex(digest.digest());
+        }catch(NoSuchAlgorithmException exception){throw new IllegalStateException(exception);}
+    }
+    private void auditOperation(long actor,String action,long id,UUID operationId,Map<String,Object> details) {
+        audit.record(AuditEvent.builder().actor(entityManager.getReference(UserAccount.class,actor)).action(action)
+            .entityType("SUPPORT_REQUEST").entityId(id).entityCode(operationId==null?null:operationId.toString())
+            .summary(action).details(details).build());
+        entityManager.flush();
     }
     private void lockQuestionClass(long classId) {
         if(jdbc.query("SELECT id FROM sport_class WITH (UPDLOCK,HOLDLOCK) WHERE id=?",(rs,row)->rs.getLong("id"),classId).isEmpty())

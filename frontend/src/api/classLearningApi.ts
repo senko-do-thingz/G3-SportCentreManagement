@@ -11,7 +11,7 @@ export const classLearningApi = {
   detail: (id: string, signal: AbortSignal) => api.get<ClassDetail>(`/member/training/classes/${encodeURIComponent(id)}`, { signal }),
   questions: (coach: boolean, signal: AbortSignal) => api.get<ClassQuestion[]>(`${root(coach)}/questions`, { signal }),
   discussion: (coach: boolean, id: string, signal: AbortSignal) => api.get<Discussion>(`${root(coach)}/questions/${encodeURIComponent(id)}`, { signal }),
-  ask: (body: { classId: number; subject: string; body: string }) => api.post<{ id: number }>('/member/training/questions', body),
-  reply: (coach: boolean, id: string, body: string) => api.post<{ id: number }>(`${root(coach)}/questions/${encodeURIComponent(id)}/messages`, { body }),
+  ask: (body: { classId: number; subject: string; body: string }, operationId: string) => api.post<{ id: number }>('/member/training/questions', body, { headers: { 'Idempotency-Key': operationId } }),
+  reply: (coach: boolean, id: string, body: string, operationId: string) => api.post<{ id: number }>(`${root(coach)}/questions/${encodeURIComponent(id)}/messages`, { body }, { headers: { 'Idempotency-Key': operationId } }),
   guidance: (query: string, signal: AbortSignal) => api.get<Guidance>('/member/training/guidance', { query: { query }, signal }),
 }
