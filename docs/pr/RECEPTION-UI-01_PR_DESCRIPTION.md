@@ -9,7 +9,7 @@ Aligns the Reception front desk pages (Member Search, Register and Renew, Check-
 ## Pre-Merge Checklist
 - [ ] Tests executed and passed in CI (include GitHub Actions run link below)
 - [x] Database migrations reviewed, non-destructive, and backwards-compatible (none)
-- [x] AI Audit Log (`docs/audit/RECEPTION-UI-01_ai_audit_log.md`) and test specifications updated
+- [x] AI Audit Log kept locally as the repository rules require (not tracked); test specifications updated
 - [x] No forbidden symbols (em-dashes, emoji, special symbols) present in added lines
 - [x] 100% English code, comments, documentation, and commit messages
 - [x] Breaking changes identified and documented (none)
