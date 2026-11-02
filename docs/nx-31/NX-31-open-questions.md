@@ -15,3 +15,9 @@ The opt-in gate and route protection are built on top of PR #185 and switched of
 
 ## For the team
 The switch VITE_ASSISTANT_ENABLED is read at build time; decide who turns it on for the demo build.
+
+## Checked against NX-30 (Phat, branch feat/phat-nx-30-member-assistant-preview, 2026-11-02)
+- Merged with this branch in a scratch tree (not pushed). Only frontend/src/routes/AppRoutes.tsx conflicts: two adjacent route lines, keep both. After that tsc, lint and the full suite pass (95 files, 1722 tests). The NX-31 gate at /member/assistant and the dev-only preview at /member/assistant-preview live side by side under the same Member role guard.
+- The NX-30 page is a full page: it renders its own PageHeader, exists only in Vite development, takes an injectable `transport`, and today answers with an explicit "not connected" error. `MemberAssistantPage` (from PR #185) already renders a heading and a Back link around its `Chat` slot, so passing the NX-30 page in as it is would show two headings.
+- Proposed hand-over, to agree with Phat: NX-30 exports the chat body without the page header (props: `transport`, optional `returnTo`); NX-31 passes it as `Chat` behind the switch and the consent screen. The preview route can stay for development or be removed.
+- Still open: a production route for the NX-30 chat, and the gating by D-08 and NX-27 that the NX-30 document describes.
