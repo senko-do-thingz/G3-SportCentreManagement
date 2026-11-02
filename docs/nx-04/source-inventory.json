@@ -304,9 +304,18 @@
       "creates": [],
       "drops": [],
       "sha256_lf": "1250cf917a2b750417f7d19d7c8fe93481f828b9547ba2e1f30dcdc9da618715"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/identity/V37__create_user_session_and_refresh_token.sql",
+      "version": 37,
+      "creates": [
+        "[user_session]"
+      ],
+      "drops": [],
+      "sha256_lf": "949eaa3d65d47a44426f7d6d380907eb0d8cdf6597d5c5176dc918b3ca7e5da5"
     }
   ],
-  "create_occurrences": 66,
+  "create_occurrences": 67,
   "create_names": [
     "[activity_log]",
     "[age_group]",
@@ -357,6 +366,7 @@
     "[support_request_message]",
     "[system_setting]",
     "[user_avatar]",
+    "[user_session]",
     "[waitlist_entry]",
     "[workout_plan]",
     "[workout_plan_candidate]",
@@ -519,6 +529,12 @@
       "path": "backend/src/main/java/com/sportify/identity/entity/UserAccount.java",
       "tables": [
         "user_account"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/identity/entity/UserSession.java",
+      "tables": [
+        "user_session"
       ]
     },
     {
