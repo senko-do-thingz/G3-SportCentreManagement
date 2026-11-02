@@ -1,15 +1,39 @@
 // NX-18 Flow 4 cross-role QA runner.
 // Setup (outside the project dependencies): npm install --no-save puppeteer-core axe-core
-// Run a dev server of the branch under test (npx vite --port 5175), then: node flow4-qa.mjs <outDir> [baseUrl]
+// Run a dev server of the branch under test (npx vite --port 5175), then:
+//   node flow4-qa.mjs <outDir> [baseUrl] [--inject-defect=<name>]
 // API answers are mocked in the browser (request interception); no backend is needed.
+//
+// Exit code: 0 only when every required check passes (see evaluate.mjs); 1 when any required check
+// fails or a required capture is missing. BLOCKED work is printed on every run and is never counted
+// as passed. --inject-defect breaks the page on purpose (negative control); the run must then exit 1.
+// Names: overflow, h1, axe, focus, console, error-alert, forbidden-alert, empty-panel.
 import puppeteer from 'puppeteer-core'
 import fs from 'node:fs'
 import { createRequire } from 'node:module'
+import { BLOCKED, evaluate } from './evaluate.mjs'
 const require = createRequire(import.meta.url)
 const axeSource = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8')
 
-const OUT = process.argv[2]
-const BASE = process.argv[3] ?? 'http://localhost:5175'
+const flags = process.argv.slice(2).filter((a) => a.startsWith('--'))
+const args = process.argv.slice(2).filter((a) => !a.startsWith('--'))
+const INJECT = (flags.find((f) => f.startsWith('--inject-defect=')) ?? '').split('=')[1] ?? null
+const OUT = args[0]
+const BASE = args[1] ?? 'http://localhost:5175'
+
+/** Deliberate defects for the negative control. They only run when --inject-defect is given. */
+async function injectCapture(page) {
+  if (INJECT === 'overflow') await page.addStyleTag({ content: 'body::after{content:"";display:block;width:3000px;height:1px}' })
+  if (INJECT === 'h1') await page.evaluate(() => document.querySelectorAll('h1').forEach((e) => e.remove()))
+  if (INJECT === 'axe') await page.evaluate(() => { document.body.insertAdjacentHTML('beforeend', '<img src="x.png">') })
+  if (INJECT === 'focus') await page.addStyleTag({ content: '*:focus,*:focus-visible{outline:none!important;box-shadow:none!important}' })
+  if (INJECT === 'console') await page.evaluate(() => console.error('injected console error'))
+}
+async function injectState(page, state) {
+  if (INJECT === 'error-alert' && state === 'error') await page.evaluate(() => document.querySelectorAll('[role=alert]').forEach((e) => e.remove()))
+  if (INJECT === 'forbidden-alert' && state === 'forbidden') await page.evaluate(() => document.querySelectorAll('[role=alert]').forEach((e) => e.remove()))
+  if (INJECT === 'empty-panel' && state === 'empty') await page.evaluate(() => document.querySelectorAll('.state--panel, .state--plain').forEach((e) => e.remove()))
+}
 fs.mkdirSync(OUT, { recursive: true })
 const CHROME = process.env.CHROME_PATH ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 
@@ -38,36 +62,26 @@ function answer(role, path, mode) {
     return [200, pageOf(empty ? [] : [{ userId: 11, memberCode: 'MB-001', fullName: 'Linh Pham', email: 'linh@sportify.demo', phone: '0902000001', currentLevel: 'BEGINNER', status: null }])]
   }
   if (path.startsWith('/check-ins')) return [200, []]
-  if (path.startsWith('/members/me/training-plans')) {
-    return [200, empty ? [] : [{ id: 1, title: 'Basketball fundamentals', summary: 'Ball control.', audience: 'CLASS', coachName: 'Daniel Smith', revision: 1, publishedAt: day(-5) + 'T09:00:00', steps: [{ order: 1, title: 'Warm-up', details: 'Ten minutes.' }] }]]
-  }
-  if (path.startsWith('/members/me/coach-notes')) {
-    return [200, empty ? [] : [{ id: 1, planId: 1, sessionId: null, coachName: 'Daniel Smith', comment: 'Keep your head up.', createdAt: day(-1) + 'T18:00:00' }]]
-  }
-  if (path.startsWith('/members/me/attendance')) {
-    return [200, pageOf(empty ? [] : [{ id: 1, sessionId: 9, ...label, state: 'ATTENDED', arrivedAt: day(-2) + 'T08:55:00' }, { id: 2, sessionId: 10, ...label, state: 'UNRECORDED' }, { id: 3, sessionId: 11, ...label, state: 'ABSENT' }])]
-  }
-  if (path.startsWith('/members/me/training-results')) {
-    return [200, pageOf(empty ? [] : [{ id: 5, sessionId: 9, ...label, headline: 'Improved', metrics: [{ label: 'Turnovers', value: 0, unit: null }, { label: 'Sprint', value: null, unit: 's' }], comment: 'Steady.', recordedAt: day(-2) + 'T10:20:00' }])]
-  }
   return [200, []]
 }
 
+// Only screens that exist on main. The Member training screens are not on main yet (see BLOCKED).
 const SCREENS = [
   { role: 'coach', name: 'coach-schedule', path: '/coach' },
   { role: 'coach', name: 'coach-roster', path: '/coach/roster' },
   { role: 'reception', name: 'reception-member-search', path: '/reception?q=an' },
   { role: 'reception', name: 'reception-check-in', path: '/reception/check-in' },
-  { role: 'member', name: 'member-training-plans', path: '/member/training' },
-  { role: 'member', name: 'member-attendance', path: '/member/training/history' },
-  { role: 'member', name: 'member-results', path: '/member/training/history?tab=results' },
 ]
+// --only=<screen name> narrows the run (used by the negative control, which needs one screen).
+const ONLY = (flags.find((f) => f.startsWith('--only=')) ?? '').split('=')[1] ?? null
+const ACTIVE = ONLY ? SCREENS.filter((s) => s.name === ONLY) : SCREENS
+if (ONLY && ACTIVE.length === 0) { console.log('FAIL unknown screen for --only: ' + ONLY); process.exit(1) }
 const SIZES = { 390: [390, 844], 768: [768, 1024], 1440: [1440, 900] }
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' }
 
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: true })
 const rows = []
-for (const role of ['coach', 'reception', 'member']) {
+for (const role of [...new Set(ACTIVE.map((s) => s.role))]) {
   for (const scheme of ['light', 'dark']) {
     const ctx = await browser.createBrowserContext()
     const page = await ctx.newPage()
@@ -85,13 +99,14 @@ for (const role of ['coach', 'reception', 'member']) {
     })
     await page.goto(BASE + '/login', { waitUntil: 'domcontentloaded' })
     await page.evaluate(() => { localStorage.setItem('sportify.accessToken', 'x'); localStorage.setItem('sportify.refreshToken', 'y'); localStorage.setItem('sportify.sessionId', 'z') })
-    for (const screen of SCREENS.filter((s) => s.role === role)) {
+    for (const screen of ACTIVE.filter((s) => s.role === role)) {
       for (const [w, [vw, vh]] of Object.entries(SIZES)) {
         mode = 'ok'
         consoleErrors.length = 0
         await page.setViewport({ width: vw, height: vh })
         await page.goto(BASE + screen.path, { waitUntil: 'networkidle0' })
         await new Promise((r) => setTimeout(r, 700))
+        await injectCapture(page)
         const base = await page.evaluate(() => ({ path: location.pathname, h1: document.querySelectorAll('h1').length, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth, redirected: location.pathname === '/403' || location.pathname === '/login' }))
         await page.evaluate(axeSource)
         const axe = await page.evaluate(async () => { const r = await window.axe.run(document, { resultTypes: ['violations'] }); return r.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length })) })
@@ -117,7 +132,8 @@ for (const role of ['coach', 'reception', 'member']) {
             mode = m
             await page.goto(BASE + screen.path, { waitUntil: 'networkidle0' })
             await new Promise((r) => setTimeout(r, 700))
-            const st = await page.evaluate(() => ({ alert: !!document.querySelector('[role=alert]'), retry: [...document.querySelectorAll('button')].some((b) => /try again/i.test(b.textContent)), emptyState: !!document.querySelector('.state--panel, .state--plain'), text: (document.querySelector('[role=alert]')?.textContent || '').slice(0, 90), overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth }))
+            await injectState(page, m)
+            const st = await page.evaluate(() => ({ alert: !!document.querySelector('[role=alert]'), retry: [...document.querySelectorAll('button')].some((b) => /(try again|retry)/i.test(b.textContent)), emptyState: !!document.querySelector('.state--panel, .state--plain'), text: (document.querySelector('[role=alert]')?.textContent || '').slice(0, 90), overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth }))
             rows.push({ role, screen: screen.name, scheme, width: w, state: m, ...st })
             if (scheme === 'light') await page.screenshot({ path: OUT + '/' + screen.name + '_' + w + '_' + m + '.png', fullPage: true })
           }
@@ -128,15 +144,14 @@ for (const role of ['coach', 'reception', 'member']) {
   }
 }
 await browser.close()
-fs.writeFileSync(OUT + '/report.json', JSON.stringify(rows, null, 1))
-const main = rows.filter((r) => !r.state)
-const list = (arr, fn) => arr.map(fn).join(' | ') || 'none'
-console.log('captures', main.length, '| overflow:', list(main.filter((r) => r.overflow), (r) => r.screen + '@' + r.width + '/' + r.scheme))
-console.log('axe serious/critical:', list(main.filter((r) => r.axeSerious), (r) => r.screen + '@' + r.width + '/' + r.scheme + ':' + r.axeViolations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => v.id).join('+')))
-console.log('axe any:', list([...new Set(main.flatMap((r) => r.axeViolations.map((v) => v.id + '(' + v.impact + ')')))], (x) => x))
-console.log('invisible focus:', list(main.filter((r) => r.invisibleFocus), (r) => r.screen + '@' + r.width + '/' + r.scheme + ':' + r.invisibleFocus + '/' + r.focusStops))
-console.log('console errors:', main.filter((r) => r.consoleErrors).length, '| not exactly one h1:', list(main.filter((r) => r.h1 !== 1), (r) => r.screen + '@' + r.width), '| redirected:', main.filter((r) => r.redirected).length)
-const st = rows.filter((r) => r.state)
-console.log('error state without alert+retry:', list(st.filter((r) => r.state === 'error' && !(r.alert && r.retry)), (r) => r.screen + '@' + r.width))
-console.log('forbidden state without alert:', list(st.filter((r) => r.state === 'forbidden' && !r.alert), (r) => r.screen + '@' + r.width))
-console.log('empty state without empty panel:', list(st.filter((r) => r.state === 'empty' && !r.emptyState), (r) => r.screen + '@' + r.width))
+const result = evaluate(rows, { screens: ACTIVE.map((s) => s.name) })
+fs.writeFileSync(OUT + '/report.json', JSON.stringify({ injectedDefect: INJECT, failures: result.failures, blocked: BLOCKED, rows }, null, 1))
+console.log(`captures: ${result.captures}, state checks: ${result.stateChecks}${INJECT ? ', injected defect: ' + INJECT : ''}`)
+for (const failure of result.failures.slice(0, 40)) console.log('FAIL', failure)
+if (result.failures.length > 40) console.log(`... and ${result.failures.length - 40} more`)
+console.log('BLOCKED (not covered by this run, never counted as passed):')
+for (const item of BLOCKED) console.log(' -', item)
+console.log(result.failures.length
+  ? `RESULT: FAIL, ${result.failures.length} required check(s) failed`
+  : 'RESULT: all required checks passed. NX-18 is NOT complete: see BLOCKED.')
+process.exitCode = result.failures.length ? 1 : 0
