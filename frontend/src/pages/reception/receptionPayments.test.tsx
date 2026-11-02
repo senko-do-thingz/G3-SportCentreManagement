@@ -38,7 +38,7 @@ function pendingPayment(overrides: Record<string, unknown> = {}) {
     memberCode: 'MB-0246',
     bankTransferInstructions: null,
   })
-  return { ...base, memberFullName: 'Taylor Nguyen', itemCode: 'REG-1041', ...overrides }
+  return { ...base, memberFullName: 'Taylor Nguyen', itemCode: 'REG-1041', settlementType: 'ACTUAL', settlementProvider: 'MANUAL_TRANSFER', ...overrides }
 }
 
 const PENDING_ROWS = [
@@ -63,6 +63,8 @@ const INVOICE = {
   discountAmount: 90000,
   totalAmount: 810000,
   status: 'PAID',
+  settlementType: 'ACTUAL',
+  settlementProvider: 'MANUAL_TRANSFER',
   issueDate: '2026-10-02',
   taxAmount: 0,
   lines: [{ id: 1, itemType: 'SPORT_PACKAGE', description: 'Football / Coach-led / 30 days', quantity: 1, unitPrice: 900000, lineTotal: 900000 }],
@@ -986,6 +988,7 @@ describe('FE-12 round 3 integration regressions', () => {
           status: 'SUCCESS',
           settlementType: 'SIMULATED',
           settlementProvider: 'SPORTIFY_SIMULATOR',
+          simulatedTransactionId: 41,
           paymentReference: 'SIM-QR-41-00000041',
         }),
       },
@@ -993,6 +996,7 @@ describe('FE-12 round 3 integration regressions', () => {
         ...INVOICE,
         settlementType: 'SIMULATED',
         settlementProvider: 'SPORTIFY_SIMULATOR',
+        simulatedTransactionId: 41,
         paymentReference: 'SIM-QR-41-00000041',
       }),
     })
@@ -1007,6 +1011,7 @@ describe('FE-12 round 3 integration regressions', () => {
         ...INVOICE,
         settlementType: 'SIMULATED',
         settlementProvider: 'SPORTIFY_SIMULATOR',
+        simulatedTransactionId: 41,
         paymentReference: 'SIM-QR-41-00000041',
       }),
     })

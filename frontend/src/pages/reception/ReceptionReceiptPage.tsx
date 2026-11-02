@@ -9,6 +9,7 @@ import { useResource } from '../../hooks/useResource'
 import { formatDate, humanizeCode } from '../../utils/format'
 import { positiveId, receptionPaymentPath } from './receptionModel'
 import { formatPaymentMoney as formatMoney, memberLine } from './receptionPaymentsModel'
+import { classifyProvenance } from './receptionProvenanceModel'
 
 const EYEBROW = 'Receptionist / Payments and reports'
 
@@ -73,15 +74,15 @@ export function ReceptionReceiptPage() {
   const discount = Number(data.discountAmount ?? 0)
   const hasSubtotal = data.subtotalAmount !== null && data.subtotalAmount !== undefined && String(data.subtotalAmount).trim() !== ''
   const hasDiscount = data.discountAmount !== null && data.discountAmount !== undefined && String(data.discountAmount).trim() !== ''
-  const printable = data.status === 'PAID' || data.status === 'REFUNDED'
-  const simulated = data.settlementType === 'SIMULATED'
+  const presentation = classifyProvenance(data)
+  const printable = (data.status === 'PAID' || data.status === 'REFUNDED') && presentation.canPrintReceipt
   return (
     <div className="page">
-      <PaymentHero eyebrow={EYEBROW} title={`Receipt ${data.invoiceNumber}`} description="Confirmed payment record." />
+      <PaymentHero eyebrow={EYEBROW} title={`Receipt ${data.invoiceNumber}`} description={presentation.receiptHeroDescription} />
       <Card title="Sportify / Payment receipt" aria-label="Receipt" className={printable ? 'payment-receipt payment-print-receipt' : 'payment-receipt'}>
-        {simulated && (
-          <p className="notice notice--warning" role="status">
-            SIMULATED SETTLEMENT - Completed via Sportify QR Simulator. No real bank transfer or cash collection occurred.
+        {presentation.receiptWarningMessage && (
+          <p className={`notice notice--${presentation.receiptWarningTone ?? 'warning'}`} role="status">
+            {presentation.receiptWarningMessage}
           </p>
         )}
         <dl className="summary-list payment-rows">
@@ -117,20 +118,20 @@ export function ReceptionReceiptPage() {
             <dt>Paid total</dt>
             <dd>{formatMoney(data.totalAmount)}</dd>
           </div>
-          {simulated && (
-            <div>
-              <dt>Settlement provenance</dt>
-              <dd>SIMULATED ({data.settlementProvider ?? 'SPORTIFY_SIMULATOR'})</dd>
-            </div>
-          )}
+          <div>
+            <dt>Settlement provenance</dt>
+            <dd>{presentation.provenanceLabel}</dd>
+          </div>
           <div>
             <dt>Status</dt>
-            <dd>{data.status === 'PAID' ? (simulated ? 'Paid - Simulated' : 'Paid') : humanizeCode(data.status)}</dd>
+            <dd>{data.status === 'PAID' || data.status === 'REFUNDED' ? presentation.statusBadgeLabel : humanizeCode(data.status)}</dd>
           </div>
         </dl>
         {!printable && (
           <p className="notice notice--warning" role="alert">
-            This invoice is {humanizeCode(data.status).toLowerCase()}, so it cannot be printed as a payment receipt.
+            {data.status === 'PAID' || data.status === 'REFUNDED'
+              ? `This invoice lacks verified settlement provenance (${presentation.provenanceLabel}), so an ordinary verified payment receipt cannot be printed.`
+              : `This invoice is ${humanizeCode(data.status).toLowerCase()}, so it cannot be printed as a payment receipt.`}
           </p>
         )}
         <div className="reception-actions reception-print-hidden">
