@@ -239,6 +239,26 @@ class TrainingWorkflowIntegrationTest {
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sessions[0].sessionStatus").value("CANCELLED"))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sessions[0].memberId").doesNotExist());
     }
+    @Test void HOT05_unmarkedAndCancelledAreNeverFabricatedAsAbsent() throws Exception {
+        assertThat(reader.attendance(member).getFirst().status()).isEqualTo("UNMARKED");
+        assertThat(reader.attendance(member).getFirst().id()).isNull();
+        writer.coachAttendance(coach, attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
+        jdbc.update("UPDATE class_session SET status='CANCELLED' WHERE id=?", session);
+        var row = reader.attendance(member).getFirst();
+        assertThat(row.status()).isEqualTo("CANCELLED");
+        assertThat(row.recordedStatus()).isEqualTo("PRESENT");
+        assertThat(row.bookingStatus()).isEqualTo("CONFIRMED");
+        assertThat(reader.attendance(peer)).isEmpty();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/attendance?memberId=" + member)
+            .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(peer)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$").isEmpty());
+    }
+    @Test void HOT05_cancelledBookingIsVisibleWithoutCreatingAttendance() {
+        jdbc.update("UPDATE booking SET status='CANCELLED' WHERE id=?", booking);
+        assertThat(reader.attendance(member).getFirst().status()).isEqualTo("CANCELLED");
+        assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?", booking)).isZero();
+    }
     @Test void R2_02_cancelledOrMismatchedBookingCannotReceivePlan() {
         var wrong=new TrainingWriteRequest.Plan(classId,peer,booking,"Wrong owner",null,plan().steps());
         assertThatThrownBy(()->writer.createPlan(coach,wrong)).isInstanceOf(BusinessRuleException.class);

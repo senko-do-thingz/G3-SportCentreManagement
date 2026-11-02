@@ -31,6 +31,17 @@ describe('Member training', () => {
     expect(await screen.findByText('Late')).toBeInTheDocument()
     expect(screen.getByText(/30\/10\/2026 - 08:00-09:00/)).toBeInTheDocument()
   })
+  it('distinguishes unmarked and cancelled sessions from absence', async () => {
+    signedIn(() => json(200, [
+      { id: null, bookingId: 3, session, status: 'UNMARKED', notes: null, recordedStatus: null },
+      { id: 4, bookingId: 4, session, status: 'CANCELLED', notes: null, recordedStatus: 'PRESENT' },
+    ]))
+    renderApp('/member/training/attendance')
+    expect(await screen.findByText('Not marked')).toBeInTheDocument()
+    expect(screen.getByText('Cancelled')).toBeInTheDocument()
+    expect(screen.getByText('Recorded participation: Present')).toBeInTheDocument()
+    expect(screen.queryByText('Absent')).not.toBeInTheDocument()
+  })
   it('shows feedback on its personal plan immediately without a session result', async () => {
     const { calls } = signedIn(() => json(200, {
       plan: { id: 7, title: 'Breathing technique', className: 'Beginner swimming', coachName: 'An', description: null },

@@ -13,6 +13,8 @@ const attendanceLabels: Record<string, string> = {
   ABSENT: 'Absent',
   LATE: 'Late',
   EXCUSED: 'Excused',
+  UNMARKED: 'Not marked',
+  CANCELLED: 'Cancelled',
 }
 
 function SessionText({ session }: { session: TrainingSession }) {
@@ -123,15 +125,16 @@ export function AttendancePage() {
           <Card>
             <ul className="training-list">
               {rows.map(row => (
-                <li key={row.id}>
+                <li key={row.bookingId ?? `attendance-${row.id}`}>
                   <SessionText session={row.session} />
                   <p><strong>{attendanceLabels[row.status] ?? row.status}</strong></p>
+                  {row.status === 'CANCELLED' && row.recordedStatus && <p>Recorded participation: {attendanceLabels[row.recordedStatus] ?? row.recordedStatus}</p>}
                   {row.notes && <p className="training-copy">{row.notes}</p>}
                 </li>
               ))}
             </ul>
           </Card>
-        ) : <EmptyState title="No attendance history yet" description="Attendance will appear once reception records your session." />}
+        ) : <EmptyState title="No attendance history yet" description="Your booked sessions and recorded participation will appear here. Unmarked sessions do not mean absent." />}
       </TrainingData>
     </div>
   )

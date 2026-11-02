@@ -70,7 +70,7 @@ class MemberTrainingControllerTest {
     @Test void memberListsUsePrincipalAndExposeExpectedContracts() throws Exception {
         var session = trainingSession();
         when(service.plans(42L)).thenReturn(List.of(new Plan(7L, "Breathing", null, "Swimming", "Coach An")));
-        when(service.attendance(42L)).thenReturn(List.of(new Attendance(1L, session, "PRESENT", null)));
+        when(service.attendance(42L)).thenReturn(List.of(new Attendance(1L, session, "PRESENT", null, 3L, "CONFIRMED", "PUBLISHED", "PRESENT")));
         when(service.results(42L)).thenReturn(List.of(new Result(2L, session, "Completed")));
         when(service.feedback(42L)).thenReturn(List.of(coachFeedback(session)));
 

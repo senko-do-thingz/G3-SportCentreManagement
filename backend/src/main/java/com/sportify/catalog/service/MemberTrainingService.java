@@ -61,10 +61,19 @@ public class MemberTrainingService {
     }
 
     public List<Attendance> attendance(long memberId) {
-        return jdbc.query("SELECT r.id, r.status, r.notes, " + SESSION_COLUMNS
-            + " FROM attendance_record r " + SESSION_JOINS
-            + " WHERE r.member_id = ? ORDER BY s.session_date DESC, s.start_time DESC, r.id DESC",
-            (rs, row) -> new Attendance(rs.getLong("id"), session(rs), rs.getString("status"), rs.getString("notes")), memberId);
+        return jdbc.query("""
+            SELECT r.id,r.status recorded_status,r.notes,b.id booking_id,b.status booking_status,s.status session_status,
+                CASE WHEN b.status='CANCELLED' OR s.status='CANCELLED' THEN 'CANCELLED'
+                     WHEN r.id IS NULL THEN 'UNMARKED' ELSE r.status END status,
+            """ + SESSION_COLUMNS + """
+             FROM attendance_record r FULL OUTER JOIN booking b ON b.session_id=r.session_id AND b.member_id=r.member_id
+                 AND (r.booking_id IS NULL OR r.booking_id=b.id)
+             JOIN class_session s ON s.id=COALESCE(b.session_id,r.session_id)
+             LEFT JOIN sport_class c ON c.id=s.class_id JOIN sport sp ON sp.id=s.sport_id
+             WHERE COALESCE(b.member_id,r.member_id)=?
+             ORDER BY s.session_date DESC,s.start_time DESC,s.id DESC,b.id DESC,r.id DESC
+            """, (rs, row) -> new Attendance(rs.getObject("id", Long.class), session(rs), rs.getString("status"), rs.getString("notes"),
+                rs.getObject("booking_id", Long.class), rs.getString("booking_status"), rs.getString("session_status"), rs.getString("recorded_status")), memberId);
     }
 
     public List<Result> results(long memberId) {

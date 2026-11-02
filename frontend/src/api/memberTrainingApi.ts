@@ -31,10 +31,14 @@ export interface PlanDetail {
 }
 
 export interface Attendance {
-  id: number
+  id: number | null
   session: TrainingSession
   status: string
   notes: string | null
+  bookingId: number | null
+  bookingStatus: string | null
+  sessionStatus: string
+  recordedStatus: string | null
 }
 
 export interface TrainingResult {
