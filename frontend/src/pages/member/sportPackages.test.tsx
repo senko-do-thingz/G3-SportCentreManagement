@@ -209,8 +209,8 @@ describe('FE-03 Package Detail and Registration (F1-10)', () => {
     expect(summaryValue('Original price')).toBe('900.000 VND')
     expect(summaryValue('Membership discount')).toBe('VIP - 10% (-90.000 VND)')
     expect(summaryValue('Total payable')).toBe('810.000 VND')
-    expect(summaryValue('Start date')).toBe('13 Oct 2026')
-    expect(summaryValue('Expiry date')).toBe('11 Nov 2026')
+    expect(summaryValue('Start date')).toBe('13/10/2026')
+    expect(summaryValue('Expiry date')).toBe('11/11/2026')
   })
 
   it('TC-FE03-031 GOLD member gets 5% off', async () => {
@@ -229,7 +229,7 @@ describe('FE-03 Package Detail and Registration (F1-10)', () => {
     await openDetail({ cards: [VIP] }, '/member/packages/1')
     expect(summaryValue('Membership discount')).toBe('Not applied to single visits')
     expect(summaryValue('Total payable')).toBe('80.000 VND')
-    expect(summaryValue('Expiry date')).toBe('13 Oct 2026')
+    expect(summaryValue('Expiry date')).toBe('13/10/2026')
   })
 
   it('TC-FE03-034 the date picker starts at today and a past date cannot be submitted', async () => {
@@ -252,7 +252,7 @@ describe('FE-03 Package Detail and Registration (F1-10)', () => {
     const input = screen.getByLabelText(/Start date/)
     await user.clear(input)
     await user.type(input, '2026-11-01')
-    expect(summaryValue('Expiry date')).toBe('30 Nov 2026')
+    expect(summaryValue('Expiry date')).toBe('30/11/2026')
     await user.click(screen.getByRole('button', { name: 'Confirm registration' }))
     await screen.findByRole('dialog', { name: 'Payment summary' })
     const post = calls.find((call) => call.method === 'POST' && call.path === '/packages/registrations')

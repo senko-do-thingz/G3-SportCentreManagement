@@ -6,7 +6,7 @@ import { backendError, installFakeFetch, json, MANAGER, MEMBER, type RecordedCal
 import { renderApp } from '../../test/renderApp'
 import { safeMemberReturnTo } from './assistantNavigation'
 
-const session = { id: 5, className: 'Beginner swimming', date: '2026-10-30', startTime: '08:00:00', endTime: '09:00:00' }
+const session = { id: 5, sessionId: '301026SW01', className: 'Beginner swimming', sportName: 'Swimming', coachName: 'An', facilityName: 'Pool 1', trainingType: 'COACH_LED', date: '2026-10-30', startTime: '08:00:00', endTime: '09:00:00' }
 function signedIn(handler: (call: RecordedCall) => Response, profile = MEMBER) {
   tokenStorage.startSession({ accessToken: 'member-token', refreshToken: 'refresh' })
   return installFakeFetch(call => call.path === '/users/me' ? json(200, profile) : handler(call))
@@ -29,7 +29,9 @@ describe('Member training', () => {
     signedIn(() => json(200, [{ id: 1, session, status: 'LATE', notes: 'Arrived 5 minutes late' }]))
     renderApp('/member/training/attendance')
     expect(await screen.findByText('Late')).toBeInTheDocument()
-    expect(screen.getByText(/30\/10\/2026 - 08:00-09:00/)).toBeInTheDocument()
+    expect(screen.getByText('30/10/2026 08:00 - 09:00')).toBeInTheDocument()
+    expect(screen.getByText('301026SW01')).toBeInTheDocument()
+    expect(screen.getByText('Facility: Pool 1')).toBeInTheDocument()
   })
   it('distinguishes unmarked and cancelled sessions from absence', async () => {
     signedIn(() => json(200, [

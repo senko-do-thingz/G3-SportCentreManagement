@@ -16,7 +16,8 @@ public interface CoachScheduleReadRepository extends Repository<ClassSession, Lo
     @Query("""
             SELECT new com.sportify.catalog.dto.CoachSessionResponse(
                 s.id, c.id, c.name, sport.id, sport.name, co.id, u.fullName,
-                f.id, f.name, s.sessionDate, s.startTime, s.endTime, s.capacity, s.status)
+                f.id, f.name, s.sessionDate, s.startTime, s.endTime, s.capacity, 0L, s.status,
+                s.sessionCode, cast(s.trainingType as string))
             FROM ClassSession s JOIN s.coach co LEFT JOIN co.userAccount u
             LEFT JOIN s.sportClass c JOIN s.sport sport LEFT JOIN s.facility f
             WHERE s.sessionDate BETWEEN :from AND :to AND (:coachId IS NULL OR co.id = :coachId)
@@ -27,6 +28,8 @@ public interface CoachScheduleReadRepository extends Repository<ClassSession, Lo
 
     @Query("SELECT s.id AS id, co.id AS coachId FROM ClassSession s LEFT JOIN s.coach co WHERE s.id = :id")
     Optional<SessionOwnership> findOwnership(@Param("id") Long id);
+    @Query("SELECT s.id AS id, co.id AS coachId FROM ClassSession s LEFT JOIN s.coach co WHERE EXISTS (SELECT h.sessionCode FROM SessionCodeHistory h WHERE h.sessionId=s.id AND h.sessionCode=:code)")
+    Optional<SessionOwnership> findOwnershipByCode(@Param("code") String code);
 
     interface SessionOwnership {
         Long getId();

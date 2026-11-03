@@ -403,6 +403,7 @@ public class BookingServiceImpl implements BookingService {
     private void audit(Booking booking, UserAccount actor, String action) {
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("sessionId", booking.getSession().getId());
+        details.put("sessionCode", booking.getSession().getSessionCode());
         details.put("memberId", booking.getMember().getId());
         details.put("packageRegistrationId", booking.getPackageRegistration() == null ? null : booking.getPackageRegistration().getId());
         details.put("status", booking.getStatus());
@@ -426,6 +427,7 @@ public class BookingServiceImpl implements BookingService {
                 .id(b.getId())
                 .bookingCode(b.getBookingCode())
                 .sessionId(b.getSession().getId())
+                .sessionCode(b.getSession().getSessionCode())
                 .sessionDate(b.getSession().getSessionDate())
                 .startTime(b.getSession().getStartTime())
                 .endTime(b.getSession().getEndTime())

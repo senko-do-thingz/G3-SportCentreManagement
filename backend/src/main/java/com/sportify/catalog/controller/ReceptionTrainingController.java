@@ -20,6 +20,7 @@ public class ReceptionTrainingController {
     private final TrainingWriteService service;
     @GetMapping("/sessions") public List<SessionSummary> sessions() { return service.receptionSessions(); }
     @GetMapping("/sessions/{id}/members") public List<SessionMember> sessionMembers(@PathVariable long id) { return service.receptionSessionMembers(id); }
+    @GetMapping("/sessions/by-code/{sessionId}/members") public List<SessionMember> membersByCode(@PathVariable String sessionId) { return service.receptionSessionMembersByCode(sessionId); }
     @PostMapping("/attendance") @ResponseStatus(HttpStatus.CREATED)
     public Created attendance(@Valid @RequestBody TrainingWriteRequest.Attendance request, @AuthenticationPrincipal CustomUserDetails user) { return service.attendance(user.getUserAccount().getId(), request); }
     @PutMapping("/attendance/{id}")

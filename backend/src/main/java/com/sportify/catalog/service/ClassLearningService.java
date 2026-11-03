@@ -40,16 +40,19 @@ public class ClassLearningService {
         var classes = memberClasses(memberId).stream().filter(c -> c.id()==classId).toList();
         if (classes.isEmpty()) throw new ResourceNotFoundException("Class not found");
         var rows = jdbc.query("""
-            SELECT b.id booking_id,s.id session_id,s.session_date,s.start_time,s.end_time,b.status booking_status,
+            SELECT b.id booking_id,s.id session_id,s.session_code,s.session_date,s.start_time,s.end_time,b.status booking_status,
+            u.full_name coach_name,f.name facility_name,sp.name sport_name,
             a.status attendance_status,a.notes,r.id result_id,s.status session_status,s.training_type,s.capacity,
             CASE WHEN s.capacity>s.booked_count THEN s.capacity-s.booked_count ELSE 0 END free_seats
             FROM booking b JOIN class_session s ON s.id=b.session_id
+            JOIN sport sp ON sp.id=s.sport_id LEFT JOIN user_account u ON u.id=s.coach_id LEFT JOIN facility f ON f.id=s.facility_id
             LEFT JOIN attendance_record a ON a.session_id=s.id AND a.member_id=b.member_id
             LEFT JOIN session_result r ON r.session_id=s.id AND r.member_id=b.member_id
             WHERE b.member_id=? AND s.class_id=? ORDER BY s.session_date DESC,s.start_time DESC,b.id
             """, (rs,row) -> new Participation(rs.getLong("booking_id"),rs.getLong("session_id"),rs.getDate("session_date").toLocalDate(),
             rs.getTime("start_time").toLocalTime(),rs.getTime("end_time").toLocalTime(),rs.getString("booking_status"),rs.getString("attendance_status"),rs.getString("notes"),rs.getObject("result_id",Long.class),
-            rs.getString("session_status"),rs.getString("training_type"),rs.getInt("capacity"),rs.getInt("free_seats")),memberId,classId);
+            rs.getString("session_status"),rs.getString("training_type"),rs.getInt("capacity"),rs.getInt("free_seats"),
+            rs.getString("session_code"),rs.getString("coach_name"),rs.getString("facility_name"),rs.getString("sport_name")),memberId,classId);
         return new ClassDetail(classes.getFirst(),rows);
     }
     public List<Question> questions(long actorId, boolean coach) {

@@ -1,3 +1,4 @@
+import { businessDate } from '../../utils/date'
 import { useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { managerFinanceApi, type FinanceTransaction } from '../../api/managerFinanceApi'
@@ -9,8 +10,7 @@ import { formatDateTime, formatMoney, humanizeCode } from '../../utils/format'
 import '../../styles/managerFinance.css'
 
 function currentMonth(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  return businessDate().slice(0, 7)
 }
 
 function validMonth(value: string | null): string {

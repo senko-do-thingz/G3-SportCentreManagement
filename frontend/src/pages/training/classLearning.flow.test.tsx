@@ -53,14 +53,14 @@ describe('Class learning Round 02', () => {
   })
   it('R2-FE-04 enables coach attendance only through the coach endpoint', async () => {
     const { calls } = login('COACH', call => {
-      if (call.path === '/coach/training/sessions') return json(200, [{ id: 5, className: 'Class skills', date: '2026-11-02', startTime: '09:00', endTime: '10:00' }])
-      if (call.path === '/coach/training/sessions/5/members') return json(200, [{ bookingId: 3, memberId: 42, memberName: 'Member', attendanceId: null, status: null, notes: null, resultId: null }])
+      if (call.path === '/coach/training/sessions') return json(200, [{ id: 5, sessionId: '021126BM01', className: 'Class skills', date: '2026-11-02', startTime: '09:00', endTime: '10:00', attendanceDateOpen: true, bookedCount: 1, markedCount: 0 }])
+      if (call.path === '/coach/training/sessions/by-code/021126BM01/members') return json(200, [{ bookingId: 3, memberId: 42, memberName: 'Member', attendanceId: null, status: null, notes: null, resultId: null }])
       if (call.path === '/coach/training/attendance') return json(201, { id: 8 })
       return backendError(404, 'Unexpected request')
     })
     renderApp('/coach/training/attendance')
-    await userEvent.selectOptions(await screen.findByLabelText('Session to mark attendance'), '5')
-    await userEvent.selectOptions(await screen.findByLabelText('Booking to mark attendance'), '3')
+    await userEvent.click(await screen.findByRole('button', { name: /Select session 021126BM01/ }))
+    await screen.findByRole('form', { name: /Record attendance for Member/ })
     await userEvent.click(screen.getByRole('button', { name: 'Save attendance' }))
     expect(await screen.findByText('Attendance saved and the list updated.')).toBeInTheDocument()
     expect(calls.find(call => call.method === 'POST')?.path).toBe('/coach/training/attendance')

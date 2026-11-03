@@ -49,6 +49,12 @@ public class SessionController {
         return service.getSession(id, principal == null ? null : principal.getUserAccount());
     }
 
+    @GetMapping("/by-code/{sessionId}")
+    public SessionDetailResponse getSessionByCode(@PathVariable String sessionId,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        return service.getSessionByCode(sessionId, principal == null ? null : principal.getUserAccount());
+    }
+
     @GetMapping("/{id}/eligibility")
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'MANAGER')")
     public SessionDetailResponse getMemberEligibility(@PathVariable Long id, @RequestParam Long memberId,

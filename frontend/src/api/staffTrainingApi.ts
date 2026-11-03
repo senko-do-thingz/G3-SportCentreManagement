@@ -1,4 +1,5 @@
 import { api } from './client'
+import { parseSessionId, type SessionId } from './sessionIdentity'
 import type { TrainingPlan, TrainingSession, TrainingStep } from './memberTrainingApi'
 
 export interface TrainingClass { id: number; name: string; sportId: number }
@@ -6,7 +7,7 @@ export interface BookingCandidate {
   bookingId: number; memberId: number; memberName: string; sessionDate: string
 }
 export interface StaffPlan extends TrainingPlan { classId: number; memberId: number; memberName: string }
-export interface StaffSession extends TrainingSession { classId: number | null; sportId: number; trainingType: string; attendanceDateOpen?: boolean }
+export interface StaffSession extends TrainingSession { classId: number | null; sportId: number; trainingType: string; attendanceDateOpen?: boolean; status?: string; bookedCount?: number; markedCount?: number; attendanceState?: 'UPCOMING' | 'OPEN' | 'CLOSED' }
 export interface SessionMember {
   bookingId: number; memberId: number; memberName: string; attendanceId: number | null; status: string | null; notes: string | null; resultId?: number | null
 }
@@ -36,11 +37,12 @@ export const staffTrainingApi = {
   createPlan: (body: CreatePlan) => api.post<{ id: number }>(`${coach}/plans`, body),
   feedback: (id: number, body: CreateFeedback) => api.post<{ id: number }>(`${coach}/plans/${id}/feedback`, body),
   coachSessions: (signal: AbortSignal) => api.get<StaffSession[]>(`${coach}/sessions`, { signal }),
-  coachRoster: (id: string, signal: AbortSignal) => api.get<SessionMember[]>(`${coach}/sessions/${id}/members`, { signal }),
+  coachRoster: (id: string, signal: AbortSignal) => api.get<SessionMember[]>(`${coach}/sessions/${/^\d+$/.test(id) ? id : `by-code/${parseSessionId(id)}`}/members`, { signal }),
   metrics: (sportId: number, signal: AbortSignal) => api.get<TrainingMetric[]>(`${coach}/metrics`, { query: { sportId }, signal }),
   result: (body: CreateResult) => api.post<{ id: number }>(`${coach}/results`, body),
+  resultByCode: (sessionId: SessionId, body: Omit<CreateResult, 'sessionId'>) => api.post<{ id: number }>(`${coach}/sessions/by-code/${sessionId}/results`, body),
   receptionSessions: (signal: AbortSignal) => api.get<StaffSession[]>(`${reception}/sessions`, { signal }),
-  receptionRoster: (id: string, signal: AbortSignal) => api.get<SessionMember[]>(`${reception}/sessions/${id}/members`, { signal }),
+  receptionRoster: (id: string, signal: AbortSignal) => api.get<SessionMember[]>(`${reception}/sessions/${/^\d+$/.test(id) ? id : `by-code/${parseSessionId(id)}`}/members`, { signal }),
   attendance: (bookingId: number, body: AttendanceInput) => api.post<{ id: number }>(`${reception}/attendance`, { bookingId, ...body }),
   coachAttendance: (bookingId: number, body: AttendanceInput) => api.post<{ id: number }>(`${coach}/attendance`, { bookingId, ...body }),
   coachCorrectAttendance: (id: number, body: AttendanceInput & { reason: string }) => api.put<{ id: number }>(`${coach}/attendance/${id}`, body),

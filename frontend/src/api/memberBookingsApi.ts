@@ -1,4 +1,5 @@
 import { api } from './client'
+import { optionalSessionId, type SessionId } from './sessionIdentity'
 import { ApiError } from './errors'
 
 export type BookingWhen = 'UPCOMING' | 'PAST'
@@ -9,6 +10,7 @@ export interface MemberBookingRecord {
   id: number
   bookingCode: string
   sessionId: number
+  sessionCode?: SessionId
   sessionDate: string
   startTime: string | null
   endTime: string | null
@@ -57,7 +59,7 @@ export function parseMemberBooking(value: unknown): MemberBookingRecord {
     || !isNullableString(booking.startTime) || !isNullableString(booking.endTime)) {
     throw new ApiError(0, UNEXPECTED_BOOKING_RESPONSE)
   }
-  return booking as MemberBookingRecord
+  return { ...booking, sessionCode: optionalSessionId(booking.sessionCode) } as MemberBookingRecord
 }
 
 export function parseMemberBookings(value: unknown): MemberBookingRecord[] {

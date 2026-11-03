@@ -1,5 +1,6 @@
 package com.sportify.catalog.controller;
 
+import com.sportify.support.SessionIdentityFixtures;
 import com.sportify.AbstractIntegrationTest;
 import com.sportify.catalog.entity.ClassSession;
 import com.sportify.catalog.entity.Facility;
@@ -66,6 +67,7 @@ class FacilityLookupIntegrationTest extends AbstractIntegrationTest {
         Facility second = facility("A court", true);
         ClassSession historical = sessions.saveAndFlush(ClassSession.builder()
                 .sport(sports.findAll().getFirst()).facility(first).sessionDate(LocalDate.of(2020, 1, 1))
+                .sessionCode(SessionIdentityFixtures.reserve(jdbc, LocalDate.of(2020, 1, 1), sports.findAll().getFirst().getId()))
                 .startTime(LocalTime.of(9, 0)).endTime(LocalTime.of(10, 0))
                 .trainingType(TrainingFormat.SELF_TRAINING).status(SessionStatus.COMPLETED).build());
         String token = token("MANAGER");

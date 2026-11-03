@@ -9,5 +9,6 @@ import com.sportify.identity.entity.UserAccount;
 public interface MemberScheduleService {
     PageResponse<SessionResponse> listSessions(SessionSearchQuery query, UserAccount actor);
     SessionDetailResponse getSession(Long id, UserAccount actor);
+    SessionDetailResponse getSessionByCode(String sessionId, UserAccount actor);
     SessionDetailResponse getMemberEligibility(Long id, Long memberId, UserAccount actor);
 }

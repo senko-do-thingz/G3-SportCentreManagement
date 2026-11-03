@@ -275,7 +275,7 @@ export function ComponentDemoPage() {
         </Card>
 
         <div className="ui-kit__stats">
-          <StatCard label="Membership tier" value="VIP" hint="Active - Until 04 Jul 2027" />
+          <StatCard label="Membership tier" value="VIP" hint="Active - Until 04/07/2027" />
           <StatCard label="Active packages" value="0" hint="Your paid sport access" />
           <StatCard label="Upcoming sessions" value="0" hint="View and book your schedule" />
         </div>

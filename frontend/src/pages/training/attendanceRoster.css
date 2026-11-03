@@ -1,0 +1,42 @@
+.attendance-help { color: var(--color-text-muted); font-size: var(--text-sm); }
+.attendance-session-list, .attendance-roster { list-style: none; margin: var(--space-4) 0 0; padding: 0; display: grid; gap: var(--space-4); }
+.attendance-session-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); }
+.attendance-session-list > li, .attendance-roster > li { min-width: 0; }
+.attendance-session-card { display: grid; gap: var(--space-2); width: 100%; height: 100%; padding: var(--space-4); border: 1px solid var(--color-control-border); border-radius: var(--radius-lg); background: var(--color-surface); color: var(--color-text); text-align: left; cursor: pointer; font: inherit; font-size: var(--text-sm); overflow-wrap: anywhere; }
+.attendance-session-card:hover { background: var(--color-surface-muted); }
+.attendance-session-card.is-selected { border-color: var(--color-primary); background: var(--color-primary-soft); box-shadow: inset 0 0 0 1px var(--color-primary); }
+.attendance-session-card:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
+.attendance-session-state { font-weight: var(--weight-semibold); }
+.attendance-actionable { color: var(--color-success); }
+.attendance-roster-heading, .attendance-member-heading { display: flex; align-items: start; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); }
+.attendance-roster-heading { margin-bottom: var(--space-4); }
+.attendance-member-heading h3 { margin: 0; font-size: var(--text-lg); overflow-wrap: anywhere; }
+.attendance-status { color: var(--color-text-muted); }
+.attendance-row { display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); min-width: 0; }
+.attendance-row p { margin: 0; }
+.attendance-row-fields { border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(20rem, 1.2fr) minmax(0, 1fr) auto; align-items: end; gap: var(--space-3); min-width: 0; }
+.attendance-row-fields > .field { min-width: 0; }
+.attendance-row-fields .input { width: 100%; min-width: 0; }
+.attendance-row-fields .attendance-correction-reason { grid-column: 1 / -1; }
+.attendance-row-fields > .btn { grid-column: 3; grid-row: 1; }
+.attendance-status-choices { border: 0; margin: 0; padding: 0; min-width: 0; }
+.attendance-status-choices legend { padding: 0; margin-bottom: var(--space-2); font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.attendance-status-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
+.attendance-status-option { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 0 var(--space-1); padding: var(--space-2); border: 1px solid var(--color-control-border); border-radius: var(--radius-md); background: var(--color-surface); cursor: pointer; font-size: var(--text-sm); overflow-wrap: anywhere; }
+.attendance-status-option input { margin: 0; accent-color: var(--color-primary); }
+.attendance-status-option small { grid-column: 2; visibility: hidden; font-size: .65rem; font-weight: var(--weight-semibold); }
+.attendance-status-option input:checked ~ small { visibility: visible; }
+.attendance-status-option:has(input:checked) { border-color: var(--color-primary); background: var(--color-primary-soft); box-shadow: inset 0 0 0 1px var(--color-primary); }
+.attendance-status-option:has(input:focus-visible) { outline: 3px solid var(--color-primary); outline-offset: 2px; }
+.attendance-status-option:has(input:disabled) { cursor: wait; opacity: .7; }
+.attendance-status-help { margin-top: var(--space-2) !important; color: var(--color-text-muted); font-size: var(--text-xs); }
+@media (max-width: 1100px) {
+  .attendance-row-fields { grid-template-columns: minmax(0, 1fr); }
+  .attendance-row-fields > .btn { width: 100%; grid-column: auto; grid-row: auto; }
+}
+@media (max-width: 767px) {
+  .attendance-roster-heading > .session-context { flex-basis: 100%; }
+}
+@media (max-width: 480px) {
+  .attendance-status-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
