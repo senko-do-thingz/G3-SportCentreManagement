@@ -1,5 +1,6 @@
 package com.sportify.catalog;
 
+import com.sportify.support.SessionIdentityFixtures;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microsoft.sqlserver.jdbc.SQLServerException;
@@ -233,9 +234,9 @@ class RefundPaymentLinkIntegrationTest extends AbstractIntegrationTest {
 
     private long createSession(long sportId, LocalDate date, int bookedCount) {
         jdbc.update("""
-                INSERT INTO class_session (sport_id, session_date, start_time, end_time, training_type, capacity, booked_count, status)
-                VALUES (?, ?, CAST('18:00' AS TIME), CAST('19:30' AS TIME), 'SELF_TRAINING', 20, ?, 'PUBLISHED')
-                """, sportId, java.sql.Date.valueOf(date), bookedCount);
+                INSERT INTO class_session (sport_id, session_date, start_time, end_time, training_type, capacity, booked_count, status, session_code)
+                VALUES (?, ?, CAST('18:00' AS TIME), CAST('19:30' AS TIME), 'SELF_TRAINING', 20, ?, 'PUBLISHED', ?)
+                """, sportId, java.sql.Date.valueOf(date), bookedCount, SessionIdentityFixtures.reserve(jdbc, date, sportId));
         return jdbc.queryForObject("SELECT MAX(id) FROM class_session WHERE sport_id = ?", Long.class, sportId);
     }
 

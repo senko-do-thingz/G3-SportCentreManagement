@@ -1,5 +1,6 @@
 package com.sportify.catalog.repository;
 
+import com.sportify.support.SessionIdentityFixtures;
 import com.sportify.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -108,10 +109,10 @@ class V20SchemaIntegrationTest extends AbstractIntegrationTest {
 
     private long createSession() {
         jdbc.update("""
-                INSERT INTO class_session (sport_id, session_date, start_time, end_time, training_type, capacity)
-                SELECT s.id, CAST('2026-10-20' AS DATE), CAST('18:00' AS TIME), CAST('19:30' AS TIME), 'SELF_TRAINING', 10
+                INSERT INTO class_session (sport_id, session_date, start_time, end_time, training_type, capacity, session_code)
+                SELECT s.id, CAST('2026-10-20' AS DATE), CAST('18:00' AS TIME), CAST('19:30' AS TIME), 'SELF_TRAINING', 10, ?
                 FROM sport s WHERE s.code = 'BADMINTON'
-                """);
+                """, SessionIdentityFixtures.reserve(jdbc, java.time.LocalDate.of(2026, 10, 20), "BADMINTON"));
         return jdbc.queryForObject("SELECT MAX(id) FROM class_session", Long.class);
     }
 

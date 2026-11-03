@@ -1,5 +1,7 @@
 package com.sportify.catalog.service;
 
+import com.sportify.support.SessionIdentityFixtures;
+
 import com.sportify.catalog.dto.TrainingWriteRequest;
 import com.sportify.catalog.dto.SelfTrainingAttendanceRequest;
 import com.sportify.core.exception.*;
@@ -73,8 +75,28 @@ class TrainingWorkflowIntegrationTest {
     @Autowired MutableClock clock;
     @Autowired org.springframework.test.web.servlet.MockMvc mvc;
     long coach, otherCoach, member, peer, reception, sport, classId, session, booking;
+    private final List<Long> fixtureSessions = new ArrayList<>();
+    private Map<String, Integer> fixtureCounters;
+    @AfterEach void cleanupSessionFixtures() {
+        if (!fixtureSessions.isEmpty()) {
+            String ids = fixtureSessions.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+            String bookings = "SELECT id FROM booking WHERE session_id IN (" + ids + ")";
+            String plans = "SELECT id FROM session_plan WHERE booking_id IN (" + bookings + ")";
+            jdbc.update("DELETE FROM coach_feedback WHERE session_id IN (" + ids + ") OR plan_id IN (" + plans + ")");
+            jdbc.update("DELETE FROM session_plan WHERE booking_id IN (" + bookings + ")");
+            jdbc.update("DELETE FROM attendance_correction WHERE attendance_record_id IN (SELECT id FROM attendance_record WHERE session_id IN (" + ids + "))");
+            jdbc.update("DELETE FROM attendance_record WHERE session_id IN (" + ids + ")");
+            jdbc.update("DELETE FROM session_result WHERE session_id IN (" + ids + ")");
+            jdbc.update("DELETE FROM check_in WHERE booking_id IN (" + bookings + ")");
+            jdbc.update("DELETE FROM waitlist_entry WHERE session_id IN (" + ids + ") OR promoted_booking_id IN (" + bookings + ")");
+            jdbc.update("DELETE FROM booking WHERE session_id IN (" + ids + ")");
+            jdbc.update("DELETE FROM class_session WHERE id IN (" + ids + ")");
+        }
+        if (fixtureCounters != null) SessionIdentityFixtures.restoreAfterFixtureCleanup(jdbc, fixtureCounters);
+    }
     @AfterAll static void stopOwnedContainer() { if (container != null) container.stop(); }
     @BeforeEach void fixture() {
+        fixtureCounters=SessionIdentityFixtures.snapshot(jdbc);
         clock.value=Instant.parse("2026-11-02T03:00:00Z");
         coach=account("COACH");otherCoach=account("COACH");member=account("MEMBER");peer=account("MEMBER");reception=account("RECEPTIONIST");
         sport=jdbc.queryForObject("SELECT MIN(id) FROM sport",Long.class);
@@ -93,13 +115,21 @@ class TrainingWorkflowIntegrationTest {
     private long account(String role){String email=code()+"@training.test";long id=insert("INSERT user_account(email,password_hash,full_name,role_id,status) SELECT ?,'fixture',?,id,'ACTIVE' FROM role WHERE code=?",email,role,role);
         if(role.equals("COACH"))jdbc.update("INSERT coach_profile(user_id) VALUES (?)",id);
         if(role.equals("MEMBER"))jdbc.update("INSERT member_profile(user_id,member_code) VALUES (?,?)",id,code());return id;}
-    private long session(String type){return insert("INSERT class_session(class_id,sport_id,session_date,start_time,end_time,coach_id,training_type,capacity,booked_count,status) VALUES (?,?,'2026-11-02','09:00','10:00',?,?,10,1,'PUBLISHED')",classId,sport,type.equals("COACH_LED")?coach:null,type);}
-    private long insert(String sql,Object... values){var keys=new GeneratedKeyHolder();jdbc.update(connection->{PreparedStatement statement=connection.prepareStatement(sql,new String[]{"id"});for(int i=0;i<values.length;i++)statement.setObject(i+1,values[i]);return statement;},keys);return keys.getKey().longValue();}
+    private long session(String type){return insert("INSERT class_session(class_id,sport_id,session_date,start_time,end_time,coach_id,training_type,capacity,booked_count,status,session_code) VALUES (?,?,'2026-11-02','09:00','10:00',?,?,10,1,'PUBLISHED',?)",classId,sport,type.equals("COACH_LED")?coach:null,type,SessionIdentityFixtures.reserve(jdbc,LocalDate.of(2026,11,2),sport));}
+    private long insert(String sql,Object... values){var keys=new GeneratedKeyHolder();jdbc.update(connection->{PreparedStatement statement=connection.prepareStatement(sql,new String[]{"id"});for(int i=0;i<values.length;i++)statement.setObject(i+1,values[i]);return statement;},keys);long id=keys.getKey().longValue();if(sql.startsWith("INSERT class_session"))fixtureSessions.add(id);return id;}
     private int count(String sql,Object... values){return jdbc.queryForObject(sql,Integer.class,values);}
     private TrainingWriteRequest.Plan plan(){return new TrainingWriteRequest.Plan(classId,member,booking,code(),null,List.of(new TrainingWriteRequest.Step("Practice",10,"Coach guidance")));}
     private TrainingWriteRequest.Result result(){return new TrainingWriteRequest.Result(session,member,"Session assessment",List.of());}
     private TrainingWriteRequest.Attendance attendance(TrainingWriteRequest.AttendanceStatus status){return new TrainingWriteRequest.Attendance(booking,status,"Participation");}
     private TrainingWriteRequest.Correction correction(TrainingWriteRequest.AttendanceStatus status){return new TrainingWriteRequest.Correction(status,"Corrected note","Correcting a recording mistake");}
+
+    @Test void ID06_correctionAuditIncludesThePersistedPublicSessionIdentity() {
+        long id=writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)).id();
+        writer.correctAttendance(reception,id,correction(TrainingWriteRequest.AttendanceStatus.LATE));
+        String code=jdbc.queryForObject("SELECT session_code FROM class_session WHERE id=?",String.class,session);
+        assertThat(jdbc.queryForObject("SELECT JSON_VALUE(details,'$.sessionCode') FROM activity_log WHERE action='TRAINING_ATTENDANCE_CORRECTED' AND entity_id=?",String.class,id)).isEqualTo(code);
+        assertThat(reader.attendance(member)).hasSize(1);
+    }
 
     @Test void HOT00_realCoachToMemberAndReceptionToMemberContracts() throws Exception {
         var coachUser = org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
@@ -355,7 +385,7 @@ class TrainingWorkflowIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM activity_log WHERE actor_user_id=? AND action='TRAINING_PLAN_CREATED' AND entity_id=?",coach,id)).isEqualTo(1);
     }
     @Test void HOT07_recommendationsUseLiveAvailabilityAndStablePreferenceRanking() throws Exception {
-        jdbc.update("UPDATE class_session SET session_date='2026-11-03' WHERE id=?",session);
+        SessionIdentityFixtures.moveFixture(jdbc,session,LocalDate.of(2026,11,3));
         long facility=jdbc.queryForObject("SELECT MIN(id) FROM facility WHERE is_active=1",Long.class);
         jdbc.update("UPDATE class_session SET facility_id=? WHERE id=?",facility,session);
         jdbc.update("INSERT coach_sport(coach_id,sport_id) VALUES (?,?)",coach,sport);
@@ -371,7 +401,7 @@ class TrainingWorkflowIntegrationTest {
         assertThat(guidance.recommendations(peer,request)).isEqualTo(result);
         assertThat(count("SELECT COUNT(*) FROM booking")).isEqualTo(bookingsBefore);
         long secondClass=insert("INSERT sport_class(code,name,sport_id,coach_id,max_members) VALUES (?,?,?,?,10)",code(),"Stable tie class",sport,coach);
-        long secondSession=insert("INSERT class_session(class_id,sport_id,session_date,start_time,end_time,coach_id,training_type,capacity,booked_count,status) VALUES (?,?,'2026-11-03','09:00','10:00',?,'COACH_LED',10,0,'PUBLISHED')",secondClass,sport,coach);
+        long secondSession=insert("INSERT class_session(class_id,sport_id,session_date,start_time,end_time,coach_id,training_type,capacity,booked_count,status,session_code) VALUES (?,?,'2026-11-03','09:00','10:00',?,'COACH_LED',10,0,'PUBLISHED',?)",secondClass,sport,coach,SessionIdentityFixtures.reserve(jdbc,LocalDate.of(2026,11,3),sport));
         jdbc.update("UPDATE class_session SET facility_id=? WHERE id=?",facility,secondSession);
         var firstPage=guidance.recommendations(peer,new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,"BEGINNER","BUILD_SKILLS",null,null,null,null,0,1));
         var nextPage=guidance.recommendations(peer,new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,"BEGINNER","BUILD_SKILLS",null,null,null,null,1,1));
@@ -421,7 +451,7 @@ class TrainingWorkflowIntegrationTest {
         String sportName="Consultation "+UUID.randomUUID().toString().substring(0,8);
         long adviceSport=insert("INSERT sport(code,name,venue_type,is_active) VALUES (?,?,'INDOOR',1)",code(),sportName);
         long adviceClass=insert("INSERT sport_class(code,name,sport_id,coach_id,max_members) VALUES (?,?,?,?,10)",code(),"Live advice class",adviceSport,coach);
-        long adviceSession=insert("INSERT class_session(class_id,sport_id,session_date,start_time,end_time,coach_id,training_type,capacity,booked_count,status) VALUES (?,?,'2026-11-03','09:00','10:00',?,'COACH_LED',10,0,'PUBLISHED')",adviceClass,adviceSport,coach);
+        long adviceSession=insert("INSERT class_session(class_id,sport_id,session_date,start_time,end_time,coach_id,training_type,capacity,booked_count,status,session_code) VALUES (?,?,'2026-11-03','09:00','10:00',?,'COACH_LED',10,0,'PUBLISHED',?)",adviceClass,adviceSport,coach,SessionIdentityFixtures.reserve(jdbc,LocalDate.of(2026,11,3),sport));
         long facility=jdbc.queryForObject("SELECT MIN(id) FROM facility WHERE is_active=1",Long.class);
         jdbc.update("UPDATE class_session SET facility_id=? WHERE id=?",facility,adviceSession);
         jdbc.update("INSERT coach_sport(coach_id,sport_id) VALUES (?,?)",coach,adviceSport);
@@ -611,13 +641,20 @@ class TrainingWorkflowIntegrationTest {
         assertThat(writer.selfAttendance(reception,selfBooking,null).id()).isPositive();
     }
     @Test void R2_16_V37DryRunRollbackAndLegacyPreservation() throws Exception {
-        String isolated="sportify_training_probe_"+UUID.randomUUID().toString().replace("-", "");
-        String base=databaseUrl.replaceAll("(?i);databaseName=[^;]*", "");
-        try(var connection=java.sql.DriverManager.getConnection(base+";databaseName=master",databaseUser,databasePassword);var statement=connection.createStatement()) {
-            statement.executeUpdate("CREATE DATABASE ["+isolated+"]");
+        String probe=System.getenv("TRAINING_PROBE_DB_URL");
+        if(probe==null || probe.isBlank()) {
+            String isolated="sportify_training_probe_"+UUID.randomUUID().toString().replace("-", "");
+            String base=databaseUrl.replaceAll("(?i);databaseName=[^;]*", "");
+            try(var connection=java.sql.DriverManager.getConnection(base+";databaseName=master",databaseUser,databasePassword);var statement=connection.createStatement()) {
+                statement.executeUpdate("CREATE DATABASE ["+isolated+"]");
+            }
+            probe=base+";databaseName="+isolated;
+        } else if(!probe.matches("jdbc:sqlserver://[^;]+;databaseName=sportify_training_probe_[a-f0-9]{32}(;.*)?")) {
+            throw new IllegalArgumentException("A fresh isolated training migration probe is required");
         }
-        var source=new org.springframework.jdbc.datasource.DriverManagerDataSource(base+";databaseName="+isolated,databaseUser,databasePassword);
+        var source=new org.springframework.jdbc.datasource.DriverManagerDataSource(probe,databaseUser,databasePassword);
         var db=new JdbcTemplate(source);
+        assertThat(db.queryForObject("SELECT COUNT(*) FROM sys.tables",Integer.class)).isZero();
         org.flywaydb.core.Flyway.configure().dataSource(source).locations("classpath:db/migration/identity","classpath:db/migration/catalog").target("36").cleanDisabled(true).load().migrate();
         db.update("INSERT user_account(email,password_hash,full_name,role_id,status) SELECT 'legacy@training.invalid','fixture','Legacy coach',id,'ACTIVE' FROM role WHERE code='COACH'");
         db.update("INSERT coach_profile(user_id) SELECT id FROM user_account WHERE email='legacy@training.invalid'");
@@ -631,7 +668,7 @@ class TrainingWorkflowIntegrationTest {
         }
         assertThat(db.queryForObject("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='session_plan' AND COLUMN_NAME='member_id'",Integer.class)).isZero();
         assertThat(db.queryForObject("SELECT COUNT(*) FROM session_plan WHERE title='Legacy preserved'",Integer.class)).isEqualTo(1);
-        var flyway=org.flywaydb.core.Flyway.configure().dataSource(source).locations("classpath:db/migration/identity","classpath:db/migration/catalog").cleanDisabled(true).load();
+        var flyway=org.flywaydb.core.Flyway.configure().dataSource(source).locations("classpath:db/migration/identity","classpath:db/migration/catalog").target("37").cleanDisabled(true).load();
         assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
         flyway.validate();
@@ -640,8 +677,9 @@ class TrainingWorkflowIntegrationTest {
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.CsvSource({"COACH,-30","COACH,-1","COACH,1","RECEPTION,-30","RECEPTION,-1","RECEPTION,1","SELF,-1","SELF,1"})
     void R07_sql_ordinaryHistoricalAndFutureFirstMarksLeaveNoRowsOrAudit(String path,int offset) {
-        jdbc.update("UPDATE class_session SET session_date=DATEADD(day,?,'2026-11-02'),training_type=?,coach_id=? WHERE id=?",
-            offset,path.equals("SELF")?"SELF_TRAINING":"COACH_LED",path.equals("SELF")?null:coach,session);
+        SessionIdentityFixtures.moveFixture(jdbc,session,LocalDate.of(2026,11,2).plusDays(offset));
+        jdbc.update("UPDATE class_session SET training_type=?,coach_id=? WHERE id=?",
+            path.equals("SELF")?"SELF_TRAINING":"COACH_LED",path.equals("SELF")?null:coach,session);
         assertThatThrownBy(()->{
             if(path.equals("COACH"))writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
             else if(path.equals("SELF"))writer.selfAttendance(reception,booking,null);
@@ -707,7 +745,7 @@ class TrainingWorkflowIntegrationTest {
         org.springframework.security.core.context.SecurityContextHolder.setContext(context);
         try{return backfiller.backfill(id,request);}finally{org.springframework.security.core.context.SecurityContextHolder.clearContext();}
     }
-    private void pastSession(){jdbc.update("UPDATE class_session SET session_date='2026-11-01' WHERE id=?",session);}
+    private void pastSession(){SessionIdentityFixtures.moveFixture(jdbc,session,LocalDate.of(2026,11,1));}
     private AttendanceBackfillService.Workspace backfillWorkspaceAs(long id) {
         var principal=new com.sportify.identity.security.CustomUserDetails(actor(id));
         var context=org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
@@ -764,9 +802,9 @@ class TrainingWorkflowIntegrationTest {
     void R09_invalidSessionOrBookingLeavesNoMutation(String scenario) {
         pastSession();
         switch(scenario){
-            case "SAME_DAY"->jdbc.update("UPDATE class_session SET session_date='2026-11-02' WHERE id=?",session);
-            case "FUTURE"->jdbc.update("UPDATE class_session SET session_date='2026-11-03' WHERE id=?",session);
-            case "EXPIRED"->jdbc.update("UPDATE class_session SET session_date='2026-10-29' WHERE id=?",session);
+            case "SAME_DAY"->SessionIdentityFixtures.moveFixture(jdbc,session,LocalDate.of(2026,11,2));
+            case "FUTURE"->SessionIdentityFixtures.moveFixture(jdbc,session,LocalDate.of(2026,11,3));
+            case "EXPIRED"->SessionIdentityFixtures.moveFixture(jdbc,session,LocalDate.of(2026,10,29));
             case "NOT_ENDED"-> {clock.value=Instant.parse("2026-11-01T17:00:00Z");jdbc.update("UPDATE class_session SET start_time='23:00',end_time='01:00' WHERE id=?",session);}
             case "CANCELLED_SESSION"->jdbc.update("UPDATE class_session SET status='CANCELLED' WHERE id=?",session);
             case "SELF_TRAINING"->jdbc.update("UPDATE class_session SET training_type='SELF_TRAINING',coach_id=NULL WHERE id=?",session);

@@ -1,5 +1,6 @@
 package com.sportify.catalog.controller;
 
+import com.sportify.support.SessionIdentityFixtures;
 import com.sportify.AbstractIntegrationTest;
 import com.sportify.catalog.dto.BookingCreateRequest;
 import com.sportify.catalog.dto.ManagerSessionResponse;
@@ -193,9 +194,9 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
     private long insertSession(LocalDate day, LocalTime start, LocalTime end, Long coach, Long facility, String status) {
         return jdbc.queryForObject("""
                 INSERT INTO class_session(class_id, sport_id, session_date, start_time, end_time, coach_id, facility_id,
-                    training_type, capacity, booked_count, status) OUTPUT INSERTED.id
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'COACH_LED', 16, 0, ?)
-                """, Long.class, sportClass.getId(), sport.getId(), day, start, end, coach, facility, status);
+                    training_type, capacity, booked_count, status, session_code) OUTPUT INSERTED.id
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'COACH_LED', 16, 0, ?, ?)
+                """, Long.class, sportClass.getId(), sport.getId(), day, start, end, coach, facility, status, SessionIdentityFixtures.reserve(jdbc, day, sport.getId()));
     }
 
     private SessionCreateRequest single(LocalDate day, LocalTime start, LocalTime end, long coach, long facility) {
@@ -614,12 +615,12 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
         int auditsBefore = count("SELECT COUNT(*) FROM activity_log WHERE entity_id = ? AND action = 'SESSION_UPDATED'", id);
         var error = assertThrows(BusinessRuleException.class, () -> service.updateSession(id,
                 new SessionUpdateRequest(date.plusDays(3), LocalTime.of(11, 0), LocalTime.of(12, 0), facilityId, coachId, 16), manager));
-        assertEquals("The new date is outside the validity period of packages used by confirmed bookings of this session",
+        assertEquals("Session ID is permanent. Cancel and create a replacement session to change its date; bookings are not transferred.",
                 error.getMessage());
         assertEquals(date, jdbc.queryForObject("SELECT session_date FROM class_session WHERE id = ?", LocalDate.class, id));
         assertEquals(auditsBefore, count("SELECT COUNT(*) FROM activity_log WHERE entity_id = ? AND action = 'SESSION_UPDATED'", id));
-        assertEquals(date.plusDays(2), service.updateSession(id,
-                new SessionUpdateRequest(date.plusDays(2), LocalTime.of(11, 0), LocalTime.of(12, 0), facilityId, coachId, 16), manager).date());
+        assertThrows(BusinessRuleException.class, () -> service.updateSession(id,
+                new SessionUpdateRequest(date.plusDays(2), LocalTime.of(11, 0), LocalTime.of(12, 0), facilityId, coachId, 16), manager));
     }
 
     @ParameterizedTest

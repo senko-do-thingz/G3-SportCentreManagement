@@ -1,5 +1,6 @@
 package com.sportify.catalog.controller;
 
+import com.sportify.support.SessionIdentityFixtures;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sportify.ReceptionBookingDatabase;
@@ -144,9 +145,9 @@ class ReceptionBookingIntegrationTest {
     }
     private long registration(UserAccount member) { return registration(member, coachedPackage, 3); }
     private long session(LocalDate date, int capacity, boolean self) {
-        return insert("class_session", "INSERT INTO class_session(class_id,sport_id,facility_id,coach_id,training_type,session_date,start_time,end_time,capacity,booked_count,status) "
-                + "OUTPUT INSERTED.id VALUES (?,?,?,?,?,?,'12:00','13:00',?,0,'PUBLISHED')", self ? null : sportClass, sport, facility,
-                self ? null : coach.getId(), self ? "SELF_TRAINING" : "COACH_LED", date, capacity);
+        return insert("class_session", "INSERT INTO class_session(class_id,sport_id,facility_id,coach_id,training_type,session_date,start_time,end_time,capacity,booked_count,status,session_code) "
+                + "OUTPUT INSERTED.id VALUES (?,?,?,?,?,?,'12:00','13:00',?,0,'PUBLISHED',?)", self ? null : sportClass, sport, facility,
+                self ? null : coach.getId(), self ? "SELF_TRAINING" : "COACH_LED", date, capacity, SessionIdentityFixtures.reserve(jdbc, date, sport));
     }
     private long session() { return session(TODAY.plusDays(1), 10, false); }
     private long legacy(long session, UserAccount member, long registration, String status) {
@@ -462,7 +463,7 @@ class ReceptionBookingIntegrationTest {
     @ParameterizedTest @ValueSource(strings={"DRAFT","CANCELLED","COMPLETED","STARTED"})
     void hiddenSessionsKeepBE11NotFoundAndCannotBeBooked(String state) {
         long session=session(),reg=registration(memberA);
-        if(state.equals("STARTED")) jdbc.update("UPDATE class_session SET session_date=?,start_time=? WHERE id=?",TODAY,NOW.toLocalTime(),session);
+        if(state.equals("STARTED")) { SessionIdentityFixtures.moveFixture(jdbc, session, TODAY); jdbc.update("UPDATE class_session SET start_time=? WHERE id=?",NOW.toLocalTime(),session); }
         else jdbc.update("UPDATE class_session SET status=? WHERE id=?",state,session);
         assertThat(http(get("/api/v1/sessions/"+session+"/eligibility?memberId="+memberA.getId()),manager).status()).isEqualTo(404);
         assertThat(create(receptionist,memberA,session,reg).status()).isEqualTo(400);

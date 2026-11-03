@@ -1,5 +1,6 @@
 package com.sportify.catalog.controller;
 
+import com.sportify.support.SessionIdentityFixtures;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sportify.AbstractIntegrationTest;
@@ -150,8 +151,10 @@ public class CoachScheduleIntegrationTest extends AbstractIntegrationTest {
                 .totalSessions(10).remainingSessions(10).startDate(LocalDate.now(clock).minusDays(1))
                 .endDate(LocalDate.now(clock).plusDays(80)).status(PackageRegistrationStatus.ACTIVE).createdByUser(manager).build());
     }
+    // Synthetic sport metadata isolates legacy roster projections; these fixtures do not assert sport-code creation rules.
     ClassSession session(CoachProfile profile, LocalDate date, int hour, SessionStatus status) {
         return sessions.saveAndFlush(ClassSession.builder().sportClass(profile == null ? null : classA).sport(sportA)
+                .sessionCode(SessionIdentityFixtures.reserve(jdbc, date, "FOOTBALL"))
                 .coach(profile).facility(facilityA).sessionDate(date).startTime(LocalTime.of(hour, 0)).endTime(LocalTime.of(hour + 1, 0))
                 .trainingType(profile == null ? TrainingFormat.SELF_TRAINING : TrainingFormat.COACH_LED)
                 .capacity(20).status(status).build());

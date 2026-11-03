@@ -17,6 +17,20 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 public abstract class AbstractIntegrationTest {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.jdbc.core.JdbcTemplate identityFixtureJdbc;
+    private java.util.Map<String, Integer> identityCountersBefore;
+
+    @org.junit.jupiter.api.BeforeEach
+    void captureFixtureIdentityCounters() {
+        identityCountersBefore = com.sportify.support.SessionIdentityFixtures.snapshot(identityFixtureJdbc);
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void restoreFixtureIdentityCounters() {
+        com.sportify.support.SessionIdentityFixtures.restoreAfterFixtureCleanup(identityFixtureJdbc, identityCountersBefore);
+    }
+
     protected static final MSSQLServerContainer<?> MSSQL_SERVER_CONTAINER = new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2022-latest")
             .acceptLicense()
             .withPassword("YourStrong!Passw0rd");

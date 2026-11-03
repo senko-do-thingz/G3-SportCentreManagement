@@ -1,5 +1,6 @@
 package com.sportify.catalog.controller;
 
+import com.sportify.support.SessionIdentityFixtures;
 import com.jayway.jsonpath.JsonPath;
 import com.sportify.AbstractIntegrationTest;
 import com.sportify.catalog.entity.AgeGroup;
@@ -160,11 +161,11 @@ class ManagerClassIntegrationTest extends AbstractIntegrationTest {
 
     private long insertSession(long classId, long sportId, long coachId, LocalDate date, LocalTime start, LocalTime end) {
         return jdbcTemplate.queryForObject(
-                "INSERT INTO class_session (class_id, sport_id, coach_id, session_date, start_time, end_time, capacity, booked_count, status, created_at) "
+                "INSERT INTO class_session (class_id, sport_id, coach_id, session_date, start_time, end_time, capacity, booked_count, status, created_at, session_code) "
                         + "OUTPUT INSERTED.id "
-                        + "VALUES (?, ?, ?, ?, ?, ?, 20, 0, 'PUBLISHED', SYSDATETIME())",
+                        + "VALUES (?, ?, ?, ?, ?, ?, 20, 0, 'PUBLISHED', SYSDATETIME(), ?)",
                 Long.class,
-                classId, sportId, coachId, date, start, end);
+                classId, sportId, coachId, date, start, end, SessionIdentityFixtures.reserve(jdbcTemplate, date, sportId));
     }
 
     private long insertBooking(long sessionId, long memberId, String status) {

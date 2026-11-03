@@ -1,5 +1,6 @@
 package com.sportify.catalog.controller;
 
+import com.sportify.support.SessionIdentityFixtures;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sportify.AbstractIntegrationTest;
@@ -160,13 +161,14 @@ class BookingRulesIntegrationTest extends AbstractIntegrationTest {
                 total, remaining, TODAY.minusDays(2), TODAY.plusDays(40), status, manager.getId());
     }
     private long registration(UserAccount member) { return registration(member, 3, 3, "ACTIVE", TrainingFormat.COACH_LED); }
+    // Synthetic sport metadata isolates legacy booking contracts; canonical sport mapping has separate ID integration coverage.
     private long session(LocalDate date, LocalTime start, int capacity, TrainingFormat format) {
         return jdbc.queryForObject("""
                 INSERT INTO class_session(class_id, sport_id, facility_id, coach_id, training_type, session_date,
-                    start_time, end_time, capacity, booked_count, status) OUTPUT INSERTED.id
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'PUBLISHED')
+                    start_time, end_time, capacity, booked_count, status, session_code) OUTPUT INSERTED.id
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'PUBLISHED', ?)
                 """, Long.class, format == TrainingFormat.COACH_LED ? sportClass.getId() : null, sport.getId(), facilityId,
-                format == TrainingFormat.COACH_LED ? coachId : null, format.name(), date, start, start.plusMinutes(90), capacity);
+                format == TrainingFormat.COACH_LED ? coachId : null, format.name(), date, start, start.plusMinutes(90), capacity, SessionIdentityFixtures.reserve(jdbc, date, "FOOTBALL"));
     }
     private long session() { return session(TODAY.plusDays(1), LocalTime.NOON, 10, TrainingFormat.COACH_LED); }
     private long legacyBooking(long session, UserAccount member, long registration, String status) {

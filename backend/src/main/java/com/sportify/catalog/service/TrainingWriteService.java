@@ -260,7 +260,8 @@ public class TrainingWriteService {
         jdbc.update("UPDATE attendance_record SET status = ?, notes = ?, marked_at = ?, marked_by = ? WHERE id = ?",
             request.status().name(), request.notes(), now(), actorId, id);
         audit(actorId, "TRAINING_ATTENDANCE_CORRECTED", "ATTENDANCE_RECORD", id,
-            Map.of("previousStatus", previous, "newStatus", request.status().name(), "reason", request.reason().trim()));
+            Map.of("sessionId", sessionIds.getFirst(), "previousStatus", previous,
+                "newStatus", request.status().name(), "reason", request.reason().trim()));
         return new Created(id);
     }
 
