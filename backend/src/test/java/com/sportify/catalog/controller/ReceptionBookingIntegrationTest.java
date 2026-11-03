@@ -463,7 +463,11 @@ class ReceptionBookingIntegrationTest {
     @ParameterizedTest @ValueSource(strings={"DRAFT","CANCELLED","COMPLETED","STARTED"})
     void hiddenSessionsKeepBE11NotFoundAndCannotBeBooked(String state) {
         long session=session(),reg=registration(memberA);
-        if(state.equals("STARTED")) { SessionIdentityFixtures.moveFixture(jdbc, session, TODAY); jdbc.update("UPDATE class_session SET start_time=? WHERE id=?",NOW.toLocalTime(),session); }
+        if(state.equals("STARTED")) {
+            // Keep the legacy synthetic sport isolated; move its test-only FOOTBALL-shaped identity atomically.
+            String movedCode=SessionIdentityFixtures.reserve(jdbc,TODAY,"FOOTBALL");
+            jdbc.update("UPDATE class_session SET session_date=?,session_code=?,start_time=? WHERE id=?",TODAY,movedCode,NOW.toLocalTime(),session);
+        }
         else jdbc.update("UPDATE class_session SET status=? WHERE id=?",state,session);
         assertThat(http(get("/api/v1/sessions/"+session+"/eligibility?memberId="+memberA.getId()),manager).status()).isEqualTo(404);
         assertThat(create(receptionist,memberA,session,reg).status()).isEqualTo(400);
