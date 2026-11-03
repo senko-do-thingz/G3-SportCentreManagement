@@ -34,3 +34,5 @@ com.sportify.payment.FinanceMigrationCompatibilityIntegrationTest
 com.sportify.payment.CashEventIntegrationTest
 com.sportify.payment.CashMigrationIntegrationTest
 com.sportify.demoqr.DemoQrDatabaseIntegrationTest
+com.sportify.demoqr.UnifiedDemoDatabaseIntegrationTest
+com.sportify.demoqr.UnifyReconciliationIntegrationTest
