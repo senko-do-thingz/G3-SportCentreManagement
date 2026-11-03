@@ -1,4 +1,5 @@
 import { api } from './client'
+import { TRAINING_API_ROOTS } from './trainingContract'
 
 export interface TrainingSession {
   id: number
@@ -68,7 +69,7 @@ export interface ResultDetail {
   scores: SkillScore[]
 }
 
-const root = '/member/training'
+const root = TRAINING_API_ROOTS.member
 export const memberTrainingApi = {
   plans: (signal: AbortSignal) => api.get<TrainingPlan[]>(`${root}/plans`, { signal }),
   plan: (id: string, signal: AbortSignal) => api.get<PlanDetail>(`${root}/plans/${encodeURIComponent(id)}`, { signal }),

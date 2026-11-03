@@ -54,3 +54,11 @@ Not claimed as browser-executed. Use separate Coach, Member and Reception sessio
 ## Verification integrity
 
 No CI gate, failure assertion or skip policy is weakened. Local evidence is separate from GitHub checks on the final submitted SHA. CODEOWNER approval and schema-policy confirmation remain required even when all technical tests pass.
+
+## Round 03 real HTTP and combined demo coverage
+
+- R3_01: real server/JWT Coach plan and feedback creation -> immediate Member detail read; peer 404; Member write 403.
+- R3_02: real server/JWT Reception attendance -> Member own history; peer empty history; Coach result -> Member results; conflicting absence correction 409 with database state preserved.
+- R3_03: fresh dev+demo application context applies training V37 and photo V38 together, validates Flyway history and demo photos, and repeats migration with zero pending executions.
+
+See ROUND03_REMEDIATION.md for current commands, database scope and limitations. These tests use real controllers/services/SQL Server; no mocked training service. They do not represent a browser or password-login test.

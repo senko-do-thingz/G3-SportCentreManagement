@@ -28,8 +28,8 @@ import static org.assertj.core.api.Assertions.*;
 
 /** Real SQL Server, Spring transactions and audit persistence; no H2 or mocked training service. */
 @Tag("integration")
-@SpringBootTest(classes={com.sportify.SportifyApplication.class, TrainingWorkflowIntegrationTest.TimeConfig.class}, properties={"spring.jpa.show-sql=false"})
-@ActiveProfiles("dev")
+@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT, classes={com.sportify.SportifyApplication.class, TrainingWorkflowIntegrationTest.TimeConfig.class}, properties={"spring.jpa.show-sql=false"})
+@ActiveProfiles({"dev", "demo"})
 class TrainingWorkflowIntegrationTest {
     private static MSSQLServerContainer<?> container;
     private static String databaseUrl, databaseUser, databasePassword;
@@ -58,6 +58,61 @@ class TrainingWorkflowIntegrationTest {
     }
     @TestConfiguration static class TimeConfig {
         @Bean @Primary MutableClock trainingClock(){return new MutableClock();}
+    }
+    @Autowired org.springframework.boot.test.web.client.TestRestTemplate http;
+    @Autowired com.sportify.identity.security.JwtService jwt;
+    private org.springframework.http.ResponseEntity<com.fasterxml.jackson.databind.JsonNode> request(
+            long actorId, org.springframework.http.HttpMethod method, String path, Object body) {
+        var headers = new org.springframework.http.HttpHeaders();
+        headers.setBearerAuth(jwt.generateToken(new com.sportify.identity.security.CustomUserDetails(actor(actorId))));
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+        return http.exchange("/api/v1" + path, method,
+            new org.springframework.http.HttpEntity<>(body, headers), com.fasterxml.jackson.databind.JsonNode.class);
+    }
+    @Test void R3_01_coachToMemberUsesRealAuthenticatedHttpAndSql() {
+        var created=request(coach, org.springframework.http.HttpMethod.POST, "/coach/training/plans", plan());
+        assertThat(created.getStatusCode().value()).isEqualTo(201);
+        long id=created.getBody().path("id").asLong();
+        assertThat(id).isPositive();
+        var feedback=request(coach, org.springframework.http.HttpMethod.POST, "/coach/training/plans/"+id+"/feedback",
+            new TrainingWriteRequest.Feedback(4,"HTTP progress","Effort","Footwork"));
+        assertThat(feedback.getStatusCode().value()).isEqualTo(201);
+        var detail=request(member, org.springframework.http.HttpMethod.GET, "/member/training/plans/"+id, null);
+        assertThat(detail.getStatusCode().value()).isEqualTo(200);
+        assertThat(detail.getBody().path("plan").path("id").asLong()).isEqualTo(id);
+        assertThat(detail.getBody().path("feedback").get(0).path("comments").asText()).isEqualTo("HTTP progress");
+        assertThat(request(peer, org.springframework.http.HttpMethod.GET, "/member/training/plans/"+id,null)
+            .getStatusCode().value()).isEqualTo(404);
+        assertThat(request(member, org.springframework.http.HttpMethod.POST, "/coach/training/plans",plan())
+            .getStatusCode().value()).isEqualTo(403);
+    }
+    @Test void R3_02_receptionToMemberAndCoachResultUseRealAuthenticatedHttpAndSql() {
+        var marked=request(reception, org.springframework.http.HttpMethod.POST, "/reception/training/attendance",
+            attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
+        assertThat(marked.getStatusCode().value()).isEqualTo(201);
+        long id=marked.getBody().path("id").asLong();
+        var history=request(member, org.springframework.http.HttpMethod.GET, "/member/training/attendance",null);
+        assertThat(history.getStatusCode().value()).isEqualTo(200);
+        assertThat(history.getBody().get(0).path("id").asLong()).isEqualTo(id);
+        assertThat(history.getBody().get(0).path("status").asText()).isEqualTo("PRESENT");
+        var peerHistory=request(peer, org.springframework.http.HttpMethod.GET, "/member/training/attendance",null);
+        assertThat(peerHistory.getStatusCode().value()).isEqualTo(200);
+        assertThat(peerHistory.getBody().size()).isZero();
+        var saved=request(coach, org.springframework.http.HttpMethod.POST, "/coach/training/results",result());
+        assertThat(saved.getStatusCode().value()).isEqualTo(201);
+        var results=request(member, org.springframework.http.HttpMethod.GET, "/member/training/results",null);
+        assertThat(results.getStatusCode().value()).isEqualTo(200);
+        assertThat(results.getBody().get(0).path("id").asLong()).isEqualTo(saved.getBody().path("id").asLong());
+        assertThat(request(reception, org.springframework.http.HttpMethod.PUT, "/reception/training/attendance/"+id,
+            correction(TrainingWriteRequest.AttendanceStatus.ABSENT)).getStatusCode().value()).isEqualTo(409);
+        assertThat(jdbc.queryForObject("SELECT status FROM attendance_record WHERE id=?",String.class,id)).isEqualTo("PRESENT");
+    }
+    @Autowired org.flywaydb.core.Flyway flyway;
+    @Test void R3_03_freshDemoStartupValidatesCombinedMigrationSequenceAndReplay() {
+        flyway.validate();
+        assertThat(count("SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ('37','38') AND success=1")).isEqualTo(2);
+        assertThat(count("SELECT COUNT(*) FROM user_account WHERE email IN ('nam.coach@example.com','ha.coach@example.com','quan.coach@example.com') AND avatar_url LIKE '/images/coaches/%.jpg'")).isEqualTo(3);
+        assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
     @Autowired JdbcTemplate jdbc;
     @Autowired TrainingWriteService writer;

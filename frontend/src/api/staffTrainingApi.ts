@@ -1,4 +1,5 @@
 import { api } from './client'
+import { TRAINING_API_ROOTS } from './trainingContract'
 import type { TrainingPlan, TrainingSession, TrainingStep } from './memberTrainingApi'
 
 export interface TrainingClass { id: number; name: string; sportId: number }
@@ -20,8 +21,8 @@ export interface CreateResult { sessionId: number; memberId: number; notes: stri
 export type AttendanceStatus = 'PRESENT' | 'LATE' | 'ABSENT' | 'EXCUSED'
 export interface AttendanceInput { status: AttendanceStatus; notes: string | null }
 
-const coach = '/coach/training'
-const reception = '/reception/training'
+const coach = TRAINING_API_ROOTS.coach
+const reception = TRAINING_API_ROOTS.reception
 export const staffTrainingApi = {
   coachClasses: (signal: AbortSignal) => api.get<TrainingClass[]>(`${coach}/classes`, { signal }),
   bookingCandidates: (classId: string, signal: AbortSignal) => api.get<BookingCandidate[]>(`${coach}/classes/${classId}/members`, { signal }),
