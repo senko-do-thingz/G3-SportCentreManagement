@@ -31,7 +31,7 @@ public final class UnifyPreflight {
                 ? new String[]{"classpath:db/migration/identity", "classpath:db/migration/catalog", "classpath:db/demo"}
                 : new String[]{"classpath:db/migration/identity", "classpath:db/migration/catalog"};
         var flyway = Flyway.configure().dataSource(source).locations(locations).cleanDisabled(true)
-                .outOfOrder(false).baselineOnMigrate(false).load();
+                .outOfOrder(false).baselineOnMigrate(false).ignoreMigrationPatterns(new String[0]).load();
         // validate and info only: never migrate, baseline, repair or clean.
         require(flyway.validateWithResult().validationSuccessful, "FLYWAY_HISTORY_MISMATCH");
         require(flyway.info().current() != null && "40".equals(flyway.info().current().getVersion().toString())

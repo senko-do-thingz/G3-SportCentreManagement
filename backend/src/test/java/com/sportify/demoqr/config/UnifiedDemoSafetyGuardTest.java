@@ -110,7 +110,8 @@ public class UnifiedDemoSafetyGuardTest {
             "spring.flyway.jdbc-properties.serverName", "spring.flyway.schemas[0]", "spring.flyway.init-sqls[0]",
             "management.server.port", "management.server.address", "spring.flyway.target", "spring.flyway.table",
             "spring.flyway.skip-executing-migrations", "spring.flyway.skip-default-resolvers",
-            "spring.flyway.sql-migration-prefix", "spring.flyway.placeholders.database"})
+            "spring.flyway.sql-migration-prefix", "spring.flyway.placeholders.database",
+            "spring.flyway.ignore-migration-patterns", "spring.flyway.ignore-migration-patterns[0]"})
     void rejectsEveryAlternateTargetAndInitializationMechanism(String property) {
         var env = canonical(); env.setProperty(property, "unsafe"); rejects(env);
     }

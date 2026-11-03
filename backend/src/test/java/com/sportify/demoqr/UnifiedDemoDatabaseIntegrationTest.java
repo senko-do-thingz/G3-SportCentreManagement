@@ -55,6 +55,7 @@ class UnifiedDemoDatabaseIntegrationTest extends LocalDemoWorkflow {
         DataSource source = context.getBean(DataSource.class);
         assertThat(jdbcTemplate.getDataSource()).isSameAs(source);
         assertThat(context.getBean(Flyway.class).getConfiguration().getDataSource()).isSameAs(source);
+        assertThat(context.getBean(Flyway.class).getConfiguration().getIgnoreMigrationPatterns()).isEmpty();
         assertThat(jdbcTemplate.queryForObject("SELECT DB_NAME()", String.class)).isEqualTo(fixture.name());
         assertThat(context.getEnvironment().getProperty("app.training.attendance-backfill.enabled")).isEqualTo("false");
         assertThat(context.getBeansOfType(com.sportify.demoqr.service.DemoQrService.class)).isEmpty();

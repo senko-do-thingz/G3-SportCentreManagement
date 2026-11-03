@@ -62,7 +62,7 @@ public class UnifiedDemoSafetyGuard {
         require(Arrays.stream(env.getActiveProfiles()).allMatch(allowed::contains),
                 "Production, legacy simulator and unknown profiles are forbidden");
         Set<String> flywayOptions = Set.of("enabled", "locations", "cleandisabled", "outoforder",
-                "validateonmigrate", "baselineonmigrate");
+                "validateonmigrate", "baselineonmigrate", "ignoremigrationpatterns");
         Binder.get(env).bind("spring.flyway", Bindable.mapOf(String.class, Object.class)).orElseGet(java.util.Map::of)
                 .keySet().forEach(key -> require(flywayOptions.contains(key.replaceAll("[^A-Za-z0-9]", "").toLowerCase(java.util.Locale.ROOT)),
                         "Unreviewed Flyway option forbidden"));
@@ -75,7 +75,7 @@ public class UnifiedDemoSafetyGuard {
                 "spring.datasource.hikari.schema", "spring.datasource.hikari.connection-init-sql",
                 "spring.flyway.url", "spring.flyway.user", "spring.flyway.password",
                 "spring.flyway.schemas", "spring.flyway.default-schema", "spring.flyway.table",
-                "spring.flyway.init-sqls", "spring.flyway.target", "spring.flyway.ignore-migration-patterns")) {
+                "spring.flyway.init-sqls", "spring.flyway.target")) {
             require(env.getProperty(property) == null, "Alternate connection or migration option forbidden: " + property);
         }
         for (String prefix : List.of("spring.datasource.hikari.data-source-properties", "spring.flyway.jdbc-properties")) {
