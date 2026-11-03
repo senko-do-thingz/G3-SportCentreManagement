@@ -10,6 +10,7 @@ import com.sportify.core.common.SecurityUtils;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.payment.entity.Invoice;
 import com.sportify.payment.entity.Payment;
+import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.entity.PaymentStatus;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.service.PaymentVerificationService;
@@ -71,6 +72,19 @@ public class DemoPaymentReader {
     public record Snapshot(long paymentId, BigDecimal amount, String currency) { }
 
     public record SettlementOutcome(Long invoiceId, String invoiceNumber) { }
+
+    /** Canonical demonstration must not replace an existing entitlement or reuse real payment provenance. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void validateUnifiedPurchase(long paymentId, UserAccount actor) {
+        Payment payment = requireOwner(paymentId, actor);
+        if (payment.getPaymentMethod() != PaymentMethod.BANK_TRANSFER || payment.getSettlementType() != null
+                || payment.getSettlementProvider() != null || payment.getSimulatedTransactionId() != null) {
+            throw DemoQrException.unavailable();
+        }
+        cards.findByPaymentId(paymentId).ifPresent(card -> {
+            if (card.isUpgradeRequest() || card.getReplacesCard() != null) throw DemoQrException.unavailable();
+        });
+    }
 
     @Transactional(propagation = Propagation.MANDATORY, noRollbackFor = DemoQrException.class)
     public Payment requireOwner(long paymentId, UserAccount actor) {

@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.core.env.Environment;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
@@ -36,7 +36,7 @@ class LocalDemoPaymentServiceTest {
     @Mock DemoPaymentReader demoPaymentReader;
     @Mock SqlQrStore sqlQrStore;
     @Mock InvoiceRepository invoiceRepository;
-    @Mock Environment environment;
+    private MockEnvironment environment;
 
     private LocalDemoPaymentService service;
     private UserAccount memberAccount;
@@ -44,6 +44,7 @@ class LocalDemoPaymentServiceTest {
 
     @BeforeEach
     void setUp() {
+        environment = new MockEnvironment();
         service = new LocalDemoPaymentService(
                 paymentRepository,
                 demoPaymentReader,
@@ -67,18 +68,15 @@ class LocalDemoPaymentServiceTest {
     }
 
     private void configureValidEnvironment() {
-        when(environment.matchesProfiles("prod")).thenReturn(false);
-        when(environment.matchesProfiles("production")).thenReturn(false);
-        when(environment.matchesProfiles("local-demo")).thenReturn(true);
-        when(environment.getProperty("app.payment.local-demo.enabled")).thenReturn("true");
-        when(environment.getProperty("server.address")).thenReturn("127.0.0.1");
-        when(environment.getProperty("spring.datasource.url"))
-                .thenReturn("jdbc:sqlserver://localhost:1433;databaseName=sportify_qr_demo;");
+        environment.setActiveProfiles("dev", "local-demo");
+        environment.setProperty("app.payment.local-demo.enabled", "true");
+        environment.setProperty("server.address", "127.0.0.1");
+        environment.setProperty("spring.datasource.url", "jdbc:sqlserver://localhost:1433;databaseName=sportify_qr_demo;");
     }
 
     @Test
     void confirmThrowsUnavailableWhenServiceDisabled() {
-        when(environment.matchesProfiles("local-demo")).thenReturn(false);
+        environment.setActiveProfiles("dev");
 
         assertThatThrownBy(() -> service.confirmDemoPayment(52L, memberAccount))
                 .isInstanceOf(DemoQrException.class);

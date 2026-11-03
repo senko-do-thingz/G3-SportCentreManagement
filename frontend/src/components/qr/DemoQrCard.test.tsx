@@ -114,7 +114,7 @@ describe('DemoQrCard Local Demo MVP', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Simulation is unavailable in local demo mode/i)
+        screen.getByText(/Simulation is unavailable/i)
       ).toBeVisible()
     })
 

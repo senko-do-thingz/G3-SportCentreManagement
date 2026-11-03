@@ -1,0 +1,4 @@
+# Opt-in only. No demo seed location and no alternate datasource.
+# UnifiedDemoSafetyGuard validates the complete contract before Flyway opens a connection.
+server:
+  forward-headers-strategy: none

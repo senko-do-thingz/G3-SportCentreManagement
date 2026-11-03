@@ -3,6 +3,7 @@ package com.sportify.demoqr.service;
 import com.sportify.core.common.SecurityUtils;
 import com.sportify.demoqr.config.LocalDemoSafetyGuard;
 import com.sportify.demoqr.config.SimulatedSettlementEnabledCondition;
+import com.sportify.demoqr.config.UnifiedDemoSafetyGuard;
 import com.sportify.demoqr.dto.LocalDemoSettlementResponse;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.payment.entity.Invoice;
@@ -44,6 +45,9 @@ public class LocalDemoPaymentService {
             if (environment == null) {
                 return false;
             }
+            if (UnifiedDemoSafetyGuard.requested(environment)) {
+                return UnifiedDemoSafetyGuard.isEnabled(environment);
+            }
             if (environment.matchesProfiles("prod") || environment.matchesProfiles("production")) {
                 return false;
             }
@@ -73,6 +77,11 @@ public class LocalDemoPaymentService {
         if (paymentId <= 0) {
             throw DemoQrException.unavailable();
         }
+        boolean unified = UnifiedDemoSafetyGuard.isEnabled(environment);
+        if (unified && (!UnifiedDemoSafetyGuard.memberIds(environment).contains(actor.getId())
+                || actor.getEmail() == null || !actor.getEmail().matches("[a-z0-9._+-]+@unified-demo\\.invalid"))) {
+            throw DemoQrException.unavailable();
+        }
 
         if (!sqlQrStore.spend(actor.getId(), true)) {
             throw new DemoQrException(HttpStatus.TOO_MANY_REQUESTS, "SIMULATOR_RATE_LIMIT",
@@ -93,6 +102,11 @@ public class LocalDemoPaymentService {
                 if ("SIMULATED".equals(payment.getSettlementType())
                         && "SPORTIFY_SIMULATOR".equals(payment.getSettlementProvider())) {
                     List<Invoice> invoices = invoiceRepository.findByPaymentId(paymentId);
+                    if (unified && (payment.getSimulatedTransactionId() == null || invoices.size() != 1
+                            || invoices.get(0).getId() == null || invoices.get(0).getInvoiceNumber() == null
+                            || invoices.get(0).getInvoiceNumber().isBlank())) {
+                        throw DemoQrException.unavailable();
+                    }
                     Invoice invoice = invoices.isEmpty() ? null : invoices.get(0);
                     Long invoiceId = invoice != null ? invoice.getId() : null;
                     String invoiceNumber = invoice != null ? invoice.getInvoiceNumber() : null;
@@ -114,6 +128,10 @@ public class LocalDemoPaymentService {
 
             if (payment.getPaymentStatus() != PaymentStatus.PENDING) {
                 throw DemoQrException.unavailable();
+            }
+
+            if (unified) {
+                demoPaymentReader.validateUnifiedPurchase(paymentId, actor);
             }
 
             if (payment.getAmount() == null || payment.getAmount().signum() <= 0) {
