@@ -273,6 +273,9 @@ try:
                 dialog = role_page.get_by_role('dialog', name='Edit session')
                 dialog.locator('input[name=date]').fill(new_date.isoformat())
                 dialog.locator('input[name=rescheduleReason]').fill('Disposable DB-UNIFY browser regression')
+                if dialog.locator('select[name=trainingType]').input_value() == 'COACH_LED':
+                    expect(dialog.locator('select[name=coachId]')).to_be_enabled(timeout=60000)
+                    expect(dialog.locator('select[name=coachId]')).not_to_have_value('')
                 with role_page.expect_response(lambda response: response.request.method == 'PUT' and response.url.endswith('/manager/sessions/' + str(session_before['id']))) as changed:
                     dialog.get_by_role('button', name='Save session', exact=True).click()
                 check('Manager browser reschedule succeeds through real HTTP', changed.value.status == 200, httpStatus=changed.value.status, response=changed.value.json())
