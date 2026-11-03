@@ -57,9 +57,10 @@ start_time and numeric id. Ties use numeric id deterministically. The resulting
 codes and group high-water marks are then stored once. Later time/Coach/facility
 edits never reorder historical allocations.
 
-Main includes catalog V37. The separate PR #185 lineage uses demo V38 for photo
-assignment; PR #193 uses a conflicting demo V37 for the same photo data. V39
-avoids importing either excluded script. Earlier migration bytes are unchanged.
+Main includes catalog V37. The separately reviewed PR #185 and PR #193 heads
+both contain demo V38 for photo assignment. Earlier review evidence recorded
+the prior PR #193 V37 conflict; its current head has moved that script to V38.
+V39 avoids importing either excluded copy. Earlier migration bytes are unchanged.
 Future integration of those PRs still requires owner review of their migration
 lineage; the unused version 38 is not permission to enable demo/photo work.
 
