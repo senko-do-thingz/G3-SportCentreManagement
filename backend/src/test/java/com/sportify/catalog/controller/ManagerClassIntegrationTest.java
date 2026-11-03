@@ -161,9 +161,10 @@ class ManagerClassIntegrationTest extends AbstractIntegrationTest {
 
     private long insertSession(long classId, long sportId, long coachId, LocalDate date, LocalTime start, LocalTime end) {
         return jdbcTemplate.queryForObject(
-                "INSERT INTO class_session (class_id, sport_id, coach_id, session_date, start_time, end_time, capacity, booked_count, status, created_at, session_code) "
-                        + "OUTPUT INSERTED.id "
-                        + "VALUES (?, ?, ?, ?, ?, ?, 20, 0, 'PUBLISHED', SYSDATETIME(), ?)",
+                "SET NOCOUNT ON; DECLARE @created TABLE(id BIGINT); "
+                        + "INSERT INTO class_session (class_id, sport_id, coach_id, session_date, start_time, end_time, capacity, booked_count, status, created_at, session_code) "
+                        + "OUTPUT INSERTED.id INTO @created "
+                        + "VALUES (?, ?, ?, ?, ?, ?, 20, 0, 'PUBLISHED', SYSDATETIME(), ?); SELECT id FROM @created",
                 Long.class,
                 classId, sportId, coachId, date, start, end, SessionIdentityFixtures.reserve(jdbcTemplate, date, sportId));
     }

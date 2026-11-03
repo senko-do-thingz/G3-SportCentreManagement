@@ -114,7 +114,7 @@ class ReceptionBookingIntegrationTest {
     private String code() { return marker + ++serial; }
     private void remember(String table, long id) { ids.computeIfAbsent(table, ignored -> new ArrayList<>()).add(id); }
     private long insert(String table, String sql, Object... args) {
-        if (table.equals("payment") && sql.contains("OUTPUT INSERTED.id")) {
+        if ((table.equals("payment") || table.equals("class_session")) && sql.contains("OUTPUT INSERTED.id")) {
             sql = "SET NOCOUNT ON; DECLARE @cash_fixture_id TABLE(id BIGINT); "
                     + sql.replace("OUTPUT INSERTED.id", "OUTPUT INSERTED.id INTO @cash_fixture_id")
                     + "; SELECT id FROM @cash_fixture_id";
