@@ -31,7 +31,12 @@ public class AttendanceBackfillService {
     private final ObjectMapper mapper;
 
     public record Candidate(long bookingId, long sessionId, String memberName, String className,
-                            LocalDate date, LocalTime startTime, LocalTime endTime) {}
+                            LocalDate date, LocalTime startTime, LocalTime endTime,
+                            String sessionCode, String coachName, String facilityName) {
+        public Candidate(long bookingId,long sessionId,String memberName,String className,LocalDate date,LocalTime startTime,LocalTime endTime) {
+            this(bookingId,sessionId,memberName,className,date,startTime,endTime,null,null,null);
+        }
+    }
     public record Workspace(boolean enabled, String window, String message, List<Candidate> bookings) {}
 
     public Workspace workspace(long actorId) {
@@ -43,11 +48,12 @@ public class AttendanceBackfillService {
         LocalDate today = now.atZone(CENTER).toLocalDate();
         var candidates = jdbc.query("""
             SELECT TOP (200) b.id, b.session_id, u.full_name, COALESCE(c.name, sp.name) class_name,
-                   s.session_date, s.start_time, s.end_time
+                   s.session_date, s.start_time, s.end_time, s.session_code, coach.full_name coach_name, f.name facility_name
             FROM booking b JOIN class_session s ON s.id=b.session_id
             JOIN member_profile m ON m.user_id=b.member_id JOIN user_account u ON u.id=m.user_id
             JOIN role r ON r.id=u.role_id AND r.code='MEMBER'
             JOIN sport sp ON sp.id=s.sport_id LEFT JOIN sport_class c ON c.id=s.class_id
+            LEFT JOIN user_account coach ON coach.id=s.coach_id LEFT JOIN facility f ON f.id=s.facility_id
             WHERE b.status='CONFIRMED' AND s.status IN ('PUBLISHED','COMPLETED') AND s.training_type='COACH_LED'
               AND s.session_date < ?
               AND NOT EXISTS(SELECT 1 FROM attendance_record a WHERE a.session_id=b.session_id AND a.member_id=b.member_id)
@@ -55,7 +61,8 @@ public class AttendanceBackfillService {
             ORDER BY s.session_date DESC, s.end_time DESC, b.id DESC
             """, (rs, row) -> new Candidate(rs.getLong("id"), rs.getLong("session_id"), rs.getString("full_name"),
                 rs.getString("class_name"), rs.getDate("session_date").toLocalDate(),
-                rs.getTime("start_time").toLocalTime(), rs.getTime("end_time").toLocalTime()), today);
+                rs.getTime("start_time").toLocalTime(), rs.getTime("end_time").toLocalTime(),
+                rs.getString("session_code"),rs.getString("coach_name"),rs.getString("facility_name")), today);
         return new Workspace(true, window.get().toString(),
             "Manager only. The configured window is an operational setting, not an approved universal policy. Showing up to 200 recent bookings; eligibility is checked again when saved.",
             candidates.stream().filter(c -> within(now, end(c.date(), c.startTime(), c.endTime()), window.get())).toList());
@@ -74,10 +81,10 @@ public class AttendanceBackfillService {
         if (ids.isEmpty()) throw new ResourceNotFoundException("Booking not found");
         // Match ordinary attendance, result creation and cancellation: session first, then booking.
         var sessions = jdbc.query("""
-            SELECT session_date,start_time,end_time,status,training_type FROM class_session WITH (UPDLOCK,HOLDLOCK)
+            SELECT session_date,start_time,end_time,status,training_type,session_code FROM class_session WITH (UPDLOCK,HOLDLOCK)
             WHERE id=?
             """, (rs, row) -> new Session(rs.getDate(1).toLocalDate(), rs.getTime(2).toLocalTime(),
-                rs.getTime(3).toLocalTime(), rs.getString(4), rs.getString(5)), ids.getFirst());
+                rs.getTime(3).toLocalTime(), rs.getString(4), rs.getString(5), rs.getString(6)), ids.getFirst());
         if (sessions.isEmpty()) throw new ResourceNotFoundException("Session not found");
         var bookings = jdbc.query("SELECT session_id,member_id,status FROM booking WITH (UPDLOCK,HOLDLOCK) WHERE id=?",
             (rs, row) -> new Booking(rs.getLong(1), rs.getLong(2), rs.getString(3)), request.bookingId());
@@ -110,7 +117,7 @@ public class AttendanceBackfillService {
         String details;
         try {
             details = mapper.writeValueAsString(Map.of("actorId", actorId, "bookingId", request.bookingId(),
-                "sessionId", booking.sessionId(), "memberId", booking.memberId(), "status", request.status().name(),
+                "sessionId", booking.sessionId(), "sessionCode", session.code(), "memberId", booking.memberId(), "status", request.status().name(),
                 "reason", request.reason().trim(), "actionTime", actionTime.toString(), "zone", CENTER.toString()));
         } catch (JsonProcessingException failure) {
             throw new IllegalStateException("Backfill audit serialization failed", failure);
@@ -134,6 +141,6 @@ public class AttendanceBackfillService {
         try { return !now.isBefore(end) && !now.isAfter(end.plus(window)); }
         catch (DateTimeException | ArithmeticException invalid) { return false; }
     }
-    private record Session(LocalDate date, LocalTime start, LocalTime end, String status, String type) {}
+    private record Session(LocalDate date, LocalTime start, LocalTime end, String status, String type, String code) {}
     private record Booking(long sessionId, long memberId, String status) {}
 }

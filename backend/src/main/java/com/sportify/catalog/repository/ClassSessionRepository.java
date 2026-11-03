@@ -26,6 +26,8 @@ import java.util.Optional;
 
 @Repository
 public interface ClassSessionRepository extends JpaRepository<ClassSession, Long>, JpaSpecificationExecutor<ClassSession> {
+    @EntityGraph(attributePaths = {"sport", "sportClass", "facility", "coach", "coach.userAccount"})
+    Optional<ClassSession> findBySessionCode(String sessionCode);
     // To-one joins only: page/count queries cannot multiply sessions. Keep detail and list visibility identical.
     String VISIBLE_FROM = " FROM ClassSession s LEFT JOIN s.sportClass c JOIN s.facility f "
             + "LEFT JOIN s.coach co LEFT JOIN co.userAccount u LEFT JOIN u.role accountRole ";
@@ -59,7 +61,7 @@ public interface ClassSessionRepository extends JpaRepository<ClassSession, Long
     List<ClassSession> findBySportIdAndSessionDateAndStatus(Long sportId, LocalDate sessionDate, SessionStatus status);
 
     @Override
-    @EntityGraph(attributePaths = {"sportClass", "coach", "coach.userAccount", "facility"})
+    @EntityGraph(attributePaths = {"sport", "sportClass", "coach", "coach.userAccount", "facility"})
     List<ClassSession> findAll(Specification<ClassSession> specification, Sort sort);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -75,6 +75,15 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
 
     @Override
     @Transactional(readOnly = true)
+    public ManagerSessionResponse getSessionByCode(String sessionId) {
+        String code = new com.sportify.catalog.service.PublicSessionId(sessionId).value();
+        var session = sessionRepository.findBySessionCode(code)
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found"));
+        return toResponse(session, bookingCounts(List.of(session.getId())).getOrDefault(session.getId(), 0L));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<ManagerSessionResponse> listSessions(LocalDate from, LocalDate to,
             Long classId, Long coachId, Long facilityId) {
         validateRange(from, to);
@@ -280,7 +289,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
                                 : sameCoach ? SessionConflictResponse.ConflictType.COACH : SessionConflictResponse.ConflictType.FACILITY;
                         return new SessionConflictResponse(session.getId(), session.getSessionDate(), session.getSessionDate(),
                                 session.getStartTime(), session.getEndTime(), classSummary(session.getSportClass()),
-                                coachSummary(session.getCoach()), facilitySummary(session.getFacility()), type);
+                                coachSummary(session.getCoach()), facilitySummary(session.getFacility()), type, session.getSessionCode());
                     }).toList();
             throw new ScheduleConflictException(responses);
         }
@@ -394,7 +403,8 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
         return new ManagerSessionResponse(session.getId(), session.getSessionDate(), session.getStartTime(), session.getEndTime(),
                 classSummary(session.getSportClass()), coachSummary(session.getCoach()), facilitySummary(session.getFacility()),
                 session.getCapacity(), booked, session.getTrainingType(), session.getStatus(), session.getCancelReason(),
-                session.getCancelledAt(), session.getCancelledBy() == null ? null : session.getCancelledBy().getId());
+                session.getCancelledAt(), session.getCancelledBy() == null ? null : session.getCancelledBy().getId(),
+                session.getSessionCode(), session.getSport().getName());
     }
 
     private static ManagerSessionResponse.ClassSummary classSummary(SportClass sportClass) {

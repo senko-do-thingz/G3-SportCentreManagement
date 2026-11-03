@@ -1,7 +1,13 @@
 import { api } from './client'
+import type { SessionId } from './sessionIdentity'
 
 export interface TrainingSession {
   id: number
+  sessionId?: SessionId
+  sportName?: string
+  coachName?: string | null
+  facilityName?: string | null
+  trainingType?: string
   className: string
   date: string
   startTime: string

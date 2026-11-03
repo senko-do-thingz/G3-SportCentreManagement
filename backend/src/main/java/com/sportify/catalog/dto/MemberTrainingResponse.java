@@ -12,7 +12,12 @@ public final class MemberTrainingResponse {
     public record Plan(Long id, String title, String description, String className, String coachName) {}
     public record Step(Long id, int stepOrder, String title, int durationMinutes, String instructions) {}
     public record PlanDetail(Plan plan, List<Step> steps, List<Feedback> feedback) {}
-    public record Session(Long id, String className, LocalDate date, LocalTime startTime, LocalTime endTime) {}
+    public record Session(Long id, String className, LocalDate date, LocalTime startTime, LocalTime endTime, String sessionId, String sportName, String coachName, String facilityName, String trainingType) {
+        /** Transitional Java constructor; live mappers supply the persisted public identity. */
+        public Session(Long id, String className, LocalDate date, LocalTime startTime, LocalTime endTime) {
+            this(id, className, date, startTime, endTime, null, null, null, null, null);
+        }
+    }
     public record Attendance(Long id, Session session, String status, String notes,
                              Long bookingId, String bookingStatus, String sessionStatus, String recordedStatus) {}
     public record Result(Long id, Session session, String notes) {}

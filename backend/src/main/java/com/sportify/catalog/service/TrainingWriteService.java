@@ -42,9 +42,17 @@ public class TrainingWriteService {
         """;
     private static final String SESSION_SELECT = """
         SELECT s.id, s.class_id, COALESCE(c.name, sp.name) class_name, s.sport_id,
-               s.session_date, s.start_time, s.end_time, s.training_type
+               s.session_date, s.start_time, s.end_time, s.training_type, s.session_code, sp.name sport_name,
+               u.full_name coach_name, f.name facility_name, s.status,
+               COALESCE(counts.booked_count,0) booked_count, COALESCE(counts.marked_count,0) marked_count
         FROM class_session s LEFT JOIN sport_class c ON c.id = s.class_id
         JOIN sport sp ON sp.id = s.sport_id
+        LEFT JOIN user_account u ON u.id=s.coach_id LEFT JOIN facility f ON f.id=s.facility_id
+        LEFT JOIN (
+            SELECT b.session_id,COUNT(*) booked_count,COUNT(a.id) marked_count
+            FROM booking b LEFT JOIN attendance_record a ON a.session_id=b.session_id AND a.member_id=b.member_id
+            WHERE b.status='CONFIRMED' GROUP BY b.session_id
+        ) counts ON counts.session_id=s.id
         """;
     private static final String SESSION_MEMBERS_SELECT = """
         SELECT b.id booking_id, b.member_id, u.full_name member_name, a.id attendance_id, a.status, a.notes, r.id result_id
@@ -152,6 +160,22 @@ public class TrainingWriteService {
         if (!exists("SELECT COUNT(*) FROM class_session WHERE id = ?", sessionId)) throw new ResourceNotFoundException("Session not found");
         return jdbc.query(SESSION_MEMBERS_SELECT + " ORDER BY u.full_name, b.id", this::mapSessionMember, sessionId);
     }
+    public List<SessionMember> coachSessionMembersByCode(long coachId, String sessionId) {
+        return coachSessionMembers(coachId, sessionKey(sessionId));
+    }
+    public List<SessionMember> receptionSessionMembersByCode(String sessionId) {
+        return receptionSessionMembers(sessionKey(sessionId));
+    }
+    private long sessionKey(String sessionId) {
+        String code = new PublicSessionId(sessionId).value();
+        var rows = jdbc.query("SELECT id FROM class_session WHERE session_code=?", (rs,row)->rs.getLong(1), code);
+        if(rows.isEmpty()) throw new ResourceNotFoundException("Session not found");
+        return rows.getFirst();
+    }
+    @Transactional
+    public Created createResultByCode(long coachId, String sessionId, TrainingWriteRequest.ResultByCode request) {
+        return createResult(coachId, new TrainingWriteRequest.Result(sessionKey(sessionId), request.memberId(), request.notes(), request.scores()));
+    }
     public List<Metric> metrics(long sportId) {
         return jdbc.query("SELECT id, name, max_score FROM skill_metric WHERE sport_id = ? ORDER BY name, id",
             (rs, row) -> new Metric(rs.getLong("id"), rs.getString("name"), rs.getInt("max_score")), sportId);
@@ -258,8 +282,12 @@ public class TrainingWriteService {
         return correctAttendance(coachId, id, request);
     }
     private void audit(long actorId, String action, String entity, long id, Map<String, Object> details) {
+        var enriched = new java.util.LinkedHashMap<>(details);
+        if(details.get("sessionId") instanceof Number session) {
+            enriched.put("sessionCode", jdbc.queryForObject("SELECT session_code FROM class_session WHERE id=?", String.class, session.longValue()));
+        }
         audit.record(AuditEvent.builder().actor(entityManager.getReference(UserAccount.class, actorId)).action(action)
-            .entityType(entity).entityId(id).summary(action).details(details).build());
+            .entityType(entity).entityId(id).summary(action).details(enriched).build());
     }
 
     private void lockSessionBooking(long sessionId, long memberId) {
@@ -319,7 +347,9 @@ public class TrainingWriteService {
     }
     private SessionSummary mapSession(ResultSet rs, int row) throws SQLException {
         LocalDate date = rs.getDate("session_date").toLocalDate();
-        return new SessionSummary(rs.getLong("id"), rs.getObject("class_id", Long.class), rs.getString("class_name"), rs.getLong("sport_id"), date, rs.getTime("start_time").toLocalTime(), rs.getTime("end_time").toLocalTime(), rs.getString("training_type"), date.equals(LocalDate.now(clock)));
+        return new SessionSummary(rs.getLong("id"), rs.getObject("class_id", Long.class), rs.getString("class_name"), rs.getLong("sport_id"), date, rs.getTime("start_time").toLocalTime(), rs.getTime("end_time").toLocalTime(), rs.getString("training_type"), date.equals(LocalDate.now(clock)),
+            rs.getString("session_code"),rs.getString("sport_name"),rs.getString("coach_name"),rs.getString("facility_name"),rs.getString("status"),rs.getLong("booked_count"),rs.getLong("marked_count"),
+            date.isAfter(LocalDate.now(clock)) ? "UPCOMING" : date.isBefore(LocalDate.now(clock)) ? "CLOSED" : "OPEN");
     }
     private record AttendanceBooking(long sessionId, long memberId, String status, String trainingType) {}
     private record ExistingAttendance(long id, String status) {}
