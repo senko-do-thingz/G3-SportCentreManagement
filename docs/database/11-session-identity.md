@@ -64,6 +64,18 @@ V39 avoids importing either excluded copy. Earlier migration bytes are unchanged
 Future integration of those PRs still requires owner review of their migration
 lineage; the unused version 38 is not permission to enable demo/photo work.
 
+V39 is the current deployment candidate. Applying demo-photo V38 later to a
+database already migrated through V39 may violate Flyway's default version
+ordering when the demo location is enabled. Before any later photo integration,
+inspect the actual target Flyway history and every database where V38 may already
+be installed. If V38 has never been installed, an approved new forward version
+may be needed. If it is already installed anywhere, review that lineage
+separately. Do not renumber an installed script or use repair, clean, baseline,
+outOfOrder, or history edits to bypass this decision. This round does not change
+V39 or import either excluded photo migration.
+
+See the [release decision and deployment gates](../release/session-identity-release.md).
+
 Run this migration only through the approved forward upgrade on a compatible
 database. Never use Flyway repair, clean, baseline, migration rewrites or history
 edits. sportify_demo and sportify_qr_demo are not safe test targets. Integration

@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
@@ -185,14 +185,14 @@ describe('Reception training writes', () => {
     const user = userEvent.setup()
     await user.click(await screen.findByRole('button', { name: /Select session 011126SW01/ }))
     await screen.findByRole('form', { name: /attendance for Lan/ })
-    await user.selectOptions(screen.getByLabelText(/Attendance status/), 'LATE')
+    await user.click(screen.getByRole('radio', { name: 'Late' }))
     await user.type(screen.getByLabelText(/Attendance note for Lan/), 'Arrived late')
     await user.click(screen.getByRole('button', { name: 'Save attendance' }))
     expect(await screen.findByText('Attendance saved and the list updated.')).toBeInTheDocument()
     expect(calls.find(call => call.path === '/reception/training/attendance')?.body).toEqual({ bookingId: 11, status: 'LATE', notes: 'Arrived late' })
     await screen.findByRole('form', { name: /attendance for Lan/ })
     expect(screen.getByLabelText(/Attendance note for Lan/)).toHaveValue('Arrived late')
-    await user.selectOptions(screen.getByLabelText(/Attendance status/), 'PRESENT')
+    await user.click(screen.getByRole('radio', { name: 'Present' }))
     await user.click(screen.getByRole('button', { name: 'Save correction' }))
     expect(calls.some(call => call.method === 'PUT')).toBe(false)
     await user.type(screen.getByLabelText(/Correction reason for Lan/), 'Correct an incorrect record')
@@ -244,8 +244,8 @@ describe('Reception training writes', () => {
       : call.path === '/coach/training/sessions/by-code/011126SW01/members' ? json(200, [{ ...rosterMember, attendanceId: 50, resultId: 9, status: 'PRESENT' }]) : unexpected(call))
     renderApp('/coach/training/attendance')
     await userEvent.click(await screen.findByRole('button', { name: /Select session 011126SW01/ }))
-    const status = await screen.findByLabelText(/Attendance status for Lan/)
-    expect([...status.querySelectorAll('option')].map(option => option.value)).toEqual(['PRESENT', 'LATE'])
+    const status = await screen.findByRole('group', { name: /Attendance status for Lan/ })
+    expect(within(status).getAllByRole('radio').map(option => option.getAttribute('value'))).toEqual(['PRESENT', 'LATE'])
     await userEvent.type(screen.getByLabelText(/Correction reason for Lan/), '   ')
     await userEvent.click(screen.getByRole('button', { name: 'Save correction' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('meaningful correction reason')

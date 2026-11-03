@@ -8,7 +8,6 @@ import { Card } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Input } from '../../components/ui/Input'
 import { PageHeader } from '../../components/ui/PageHeader'
-import { Select } from '../../components/ui/Select'
 import { TrainingData } from '../member/TrainingData'
 import { ActionMessage } from './TrainingFormFields'
 import { attendanceLabel, attendanceOptions, useTrainingAction } from './trainingFormState'
@@ -90,6 +89,8 @@ function AttendanceRow({ member, coach, dateOpen, restoreFocus, onSaved, onActio
   const action = useTrainingAction()
   const form = useRef<HTMLFormElement>(null)
   const correcting = member.attendanceId != null
+  const options = member.resultId != null ? attendanceOptions.filter(option => option.value === 'PRESENT' || option.value === 'LATE') : attendanceOptions
+  const [status, setStatus] = useState<AttendanceStatus>(() => (options.find(option => option.value === member.status)?.value ?? 'PRESENT') as AttendanceStatus)
   useEffect(() => { if (restoreFocus) form.current?.querySelector<HTMLButtonElement>('button[type="submit"]')?.focus() }, [restoreFocus])
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -113,7 +114,16 @@ function AttendanceRow({ member, coach, dateOpen, restoreFocus, onSaved, onActio
     {!dateOpen && !correcting ? <p>Attendance not recorded. An unmarked record does not mean absent. This session is outside the ordinary attendance date.</p> : <>
       {member.resultId != null && <p role="status">A result is saved. Attendance must remain Present or Late.</p>}
       <fieldset className="attendance-row-fields" disabled={action.pending}>
-        <Select label="Attendance status" aria-label={`Attendance status for ${member.memberName}, booking ${member.bookingId}`} name="status" required defaultValue={member.status ?? 'PRESENT'} options={member.resultId != null ? attendanceOptions.filter(option => option.value === 'PRESENT' || option.value === 'LATE') : attendanceOptions} />
+        <fieldset className="attendance-status-choices" aria-label={`Attendance status for ${member.memberName}, booking ${member.bookingId}`}>
+          <legend>Attendance status</legend>
+          <div className="attendance-status-options">
+            {options.map(option => <label className="attendance-status-option" key={option.value}>
+              <input type="radio" name="status" value={option.value} checked={status === option.value} onChange={() => setStatus(option.value as AttendanceStatus)} required />
+              <span>{option.label}</span><small aria-hidden="true">Selected</small>
+            </label>)}
+          </div>
+          <p className="attendance-status-help">Choose a status, then save. Selection alone does not record attendance.</p>
+        </fieldset>
         <Input label="Attendance note" aria-label={`Attendance note for ${member.memberName}, booking ${member.bookingId}`} name="notes" maxLength={500} placeholder="Short attendance note" defaultValue={member.notes ?? ''} />
         {correcting && <Input className="attendance-correction-reason" label="Correction reason" aria-label={`Correction reason for ${member.memberName}, booking ${member.bookingId}`} name="reason" minLength={3} maxLength={500} required placeholder="Explain the correction" hint="Required: 3 to 500 characters." />}
         <Button type="submit" loading={action.pending}>{correcting ? 'Save correction' : 'Save attendance'}</Button>
