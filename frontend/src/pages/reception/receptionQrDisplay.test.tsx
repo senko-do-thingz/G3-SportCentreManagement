@@ -91,6 +91,7 @@ function renderComponent(paymentId = '101') {
 
 describe('ReceptionQrDisplayPage', () => {
   beforeEach(() => {
+    vi.stubEnv('VITE_QR_PAYMENT_DEMO', 'true')
     vi.stubGlobal('isSecureContext', true)
     vi.resetAllMocks()
   })
@@ -100,8 +101,15 @@ describe('ReceptionQrDisplayPage', () => {
     vi.clearAllTimers()
     vi.useRealTimers()
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
   })
 
+  it('keeps the simulator disabled when the environment explicitly opts out', () => {
+    vi.stubEnv('VITE_QR_PAYMENT_DEMO', 'false')
+    renderComponent()
+    expect(screen.getByText('QR Simulator Disabled')).toBeInTheDocument()
+    expect(demoQrApi.receptionDeskProjection).not.toHaveBeenCalled()
+  })
   it('renders loading spinner then displays pending projection data with informational QR', async () => {
     vi.mocked(demoQrApi.receptionDeskProjection).mockResolvedValueOnce(pendingProjection)
 

@@ -120,4 +120,7 @@ public interface ClassSessionRepository extends JpaRepository<ClassSession, Long
 
         Long getSessionCount();
     }
+    @Query("SELECT s.id" + VISIBLE_FROM + VISIBLE_WHERE + "AND s.id IN :ids")
+    List<Long> findVisibleIds(@Param("ids") Collection<Long> ids, @Param("today") LocalDate today,
+                              @Param("now") LocalTime now);
 }
