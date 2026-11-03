@@ -4,6 +4,7 @@ Uses explicit environment credentials without logging them. Creates and mutates 
 Only processes started by this script are stopped. Public evidence contains no authentication tokens.
 """
 import argparse
+import hashlib
 import datetime
 import json
 import os
@@ -59,7 +60,11 @@ if args.create_only:
     raise SystemExit(0)
 if not args.jar or not args.jar.is_file():
     parser.error('--jar must name the verified executable backend jar')
-report = {'database': args.database, 'checks': [], 'transport': 'Loopback HTTP, real SQL Server and Edge; no Docker'}
+report = {'database': args.database, 'checks': [], 'transport': 'Loopback HTTP, real SQL Server and Edge; no Docker',
+          'sourceHead': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
+          'trackedWorktreeDirty': bool(subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=no'], cwd=ROOT, text=True).strip()),
+          'jarSha256': hashlib.sha256(args.jar.read_bytes()).hexdigest(),
+          'startedAtUtc': datetime.datetime.now(datetime.timezone.utc).isoformat()}
 backend = None
 frontend = None
 frontend_log = None
@@ -72,12 +77,12 @@ def check(name, condition, **evidence):
         raise AssertionError(name)
 
 
-def request(path, body=None, token=None):
+def request(path, body=None, token=None, method=None):
     headers = {'Content-Type': 'application/json'}
     if token:
         headers['Authorization'] = 'Bearer ' + token
     req = urllib.request.Request('http://127.0.0.1:18080/api/v1' + path,
-                                 data=None if body is None else json.dumps(body).encode(), headers=headers)
+                                 data=None if body is None else json.dumps(body).encode(), headers=headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=30) as response:
             return response.status, json.load(response)
@@ -251,6 +256,32 @@ try:
             role_page.goto('http://127.0.0.1:15173' + path, wait_until='networkidle')
             expect(role_page.locator('main h1').first).to_be_visible()
             check(role + ' real browser authenticated role screen', 'Page not found' not in role_page.locator('main').inner_text())
+            if role == 'manager':
+                session_before = json.loads(sql("SELECT TOP(1) id,CONVERT(varchar(10),session_date,23) date,session_code,schedule_revision,booked_count FROM class_session WHERE class_id IS NOT NULL AND session_date>CAST(GETDATE() AS DATE) AND status='PUBLISHED' ORDER BY booked_count DESC,session_date,id FOR JSON PATH,WITHOUT_ARRAY_WRAPPER"))
+                old_date = datetime.date.fromisoformat(session_before['date'])
+                week = old_date - datetime.timedelta(days=old_date.weekday())
+                new_date = old_date + datetime.timedelta(days=14)
+                preserved_query = "SELECT (SELECT COALESCE(CHECKSUM_AGG(BINARY_CHECKSUM(*)),0) FROM booking) bookings,(SELECT COALESCE(CHECKSUM_AGG(BINARY_CHECKSUM(*)),0) FROM sport_package_registration) registrations FOR JSON PATH,WITHOUT_ARRAY_WRAPPER"
+                preserved_before = sql(preserved_query)
+                role_page.goto(f'http://127.0.0.1:15173/manager/schedule?week={week.isoformat()}', wait_until='networkidle')
+                role_page.locator('article.f2-session').filter(has_text=session_before['session_code']).get_by_role('button', name='Edit', exact=True).click()
+                dialog = role_page.get_by_role('dialog', name='Edit session')
+                dialog.locator('input[name=date]').fill(new_date.isoformat())
+                dialog.locator('input[name=rescheduleReason]').fill('Disposable DB-UNIFY browser regression')
+                with role_page.expect_response(lambda response: response.request.method == 'PUT' and response.url.endswith('/manager/sessions/' + str(session_before['id']))) as changed:
+                    dialog.get_by_role('button', name='Save session', exact=True).click()
+                check('Manager browser reschedule succeeds through real HTTP', changed.value.status == 200)
+                saved = changed.value.json()
+                expect(dialog).not_to_be_visible()
+                check('Manager date change preserves numeric key and changes persisted public ID', saved['id'] == session_before['id'] and saved['date'] == new_date.isoformat() and saved['sessionId'] != session_before['session_code'] and saved['scheduleRevision'] == session_before['schedule_revision'] + 1)
+                check('Manager date change preserves bookings and package credits', sql(preserved_query) == preserved_before and saved['bookedCount'] == session_before['booked_count'])
+                auth_status, manager_auth = request('/auth/login', {'email': 'manager@sportify.com', 'password': 'SportifyDemo2026!'})
+                check('Manager fixture authenticates for alias verification', auth_status == 200)
+                alias_status, alias = request('/manager/sessions/by-code/' + session_before['session_code'], token=manager_auth['accessToken'])
+                check('Retired public Session ID still resolves same numeric record', alias_status == 200 and alias['id'] == saved['id'])
+                stale_body = {'date': saved['date'], 'startTime': saved['startTime'], 'endTime': saved['endTime'], 'capacity': saved['capacity'], 'facilityId': saved['facility']['id'], 'coachId': saved['coach']['id'] if saved['coach'] else None, 'expectedRevision': session_before['schedule_revision']}
+                stale_status, _ = request('/manager/sessions/' + str(saved['id']), stale_body, manager_auth['accessToken'], method='PUT')
+                check('Stale schedule revision receives HTTP 409', stale_status == 409)
             for theme in ('light', 'dark'):
                 role_page.emulate_media(color_scheme=theme)
                 role_page.evaluate('(theme) => document.documentElement.setAttribute("data-theme", theme)', theme)
@@ -305,6 +336,7 @@ finally:
             backend.wait(timeout=5)
     if log:
         log.close()
+    report['finishedAtUtc'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
     (args.out / 'browser-results.json').write_text(json.dumps(report, indent=2, ensure_ascii=True) + '\n', encoding='ascii')
     print(json.dumps(report, indent=2, ensure_ascii=True))
 raise SystemExit(0 if report['status'] == 'PASS' else 1)

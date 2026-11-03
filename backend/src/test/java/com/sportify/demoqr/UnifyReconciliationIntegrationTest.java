@@ -126,4 +126,21 @@ class UnifyReconciliationIntegrationTest {
         assertThat(after.schemaFingerprint()).isEqualTo(before.schemaFingerprint());
         System.out.println("DB-UNIFY disposable backup and restore verified: " + db.name() + " -> " + restored);
     }
+
+    @Test void physicalConnectionLossRollsBackUncommittedFixtureAndFreshConnectionRecovers() throws Exception {
+        var db = DisposableUnifyDatabase.create(); flyway(db, null).migrate();
+        var before = db.jdbc().queryForObject("SELECT COUNT(*) FROM user_account", Integer.class);
+        try (var connection = db.source().getConnection()) {
+            connection.setAutoCommit(false);
+            try (var statement = connection.createStatement()) {
+                statement.executeUpdate("INSERT user_account(email,password_hash,full_name,role_id,status) SELECT 'lost-connection@unified-demo.invalid','fixture','Connection loss fixture',id,'ACTIVE' FROM role WHERE code='MEMBER'");
+            }
+            connection.abort(Runnable::run);
+            assertThat(connection.isClosed()).isTrue();
+            assertThatThrownBy(connection::createStatement).isInstanceOf(java.sql.SQLException.class);
+        }
+        assertThat(db.jdbc().queryForObject("SELECT COUNT(*) FROM user_account", Integer.class)).isEqualTo(before);
+        assertThat(db.jdbc().queryForObject("SELECT COUNT(*) FROM user_account WHERE email='lost-connection@unified-demo.invalid'", Integer.class)).isZero();
+        flyway(db, null).validate();
+    }
 }

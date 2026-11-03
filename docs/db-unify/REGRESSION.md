@@ -25,6 +25,6 @@ $testDb = 'sportify_unify_test_' + (Get-Date -Format yyyyMMddHHmmss) + '_browser
 python frontend/scripts/db-unify-check.py --database $testDb --out scratch/db-unify/browser-new --jar backend/target/G3-SportCentreManagement-0.0.1-SNAPSHOT.jar
 ```
 
-It exercises real browser login, pending non-payable QR and independent fallback decoding, keyboard confirmation, network failure and refresh, persisted receipt, real finance exclusion, and actual backend restart. Screenshots cover 1440/768/390 in both themes; desktop is the primary acceptance target. JSON/logs/screenshots stay local and must be sanitized before sharing.
+It exercises real browser login, pending non-payable QR and independent fallback decoding, keyboard confirmation, network failure and refresh, persisted receipt, real finance exclusion, actual Manager date rescheduling with alias/revision/credit checks, cross-role screens, and actual backend restart. Screenshots cover 1440/768/390 in both themes; desktop is the primary acceptance target. JSON/logs/screenshots stay local and must be sanitized before sharing.
 
 CI additionally runs the complete existing SQL integration manifest, immutable migration checks, frontend/security/package/compose gates, and the two new mandatory DB-UNIFY integration suites. A partial local selection does not replace full CI.
