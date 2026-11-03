@@ -209,7 +209,12 @@ try:
             page.emulate_media(color_scheme=theme)
             page.evaluate('(theme) => document.documentElement.setAttribute("data-theme", theme)', theme)
             check(f'Layout has no horizontal overflow at {width}px {theme}', page.evaluate('document.documentElement.scrollWidth <= innerWidth'))
-            page.screenshot(path=str(args.out / f'pending-{width}-{theme}.png'), full_page=True)
+            page.evaluate('async () => { await document.fonts.ready; await Promise.all(document.getAnimations().filter(a => a.effect?.getTiming().iterations !== Infinity).map(a => a.finished.catch(() => {}))); }')
+            themed_qr = args.out / f'qr-{width}-{theme}.png'
+            card.locator('svg[data-testid="demo-qr-svg"]').screenshot(path=str(themed_qr), animations='disabled')
+            themed_decoded = zxingcpp.read_barcode(Image.open(themed_qr))
+            check(f'Non-payable QR remains decodable at {width}px {theme}', themed_decoded is not None and themed_decoded.text == expected_payload)
+            page.screenshot(path=str(args.out / f'pending-{width}-{theme}.png'), full_page=True, animations='disabled')
         # A network failure must not display success or mutate the payment.
         page.route(f'**/api/v1/payments/{payment_id}/demo-confirm', lambda route: route.abort())
         button.click()
@@ -260,7 +265,7 @@ try:
                 session_before = json.loads(sql("SELECT TOP(1) id,CONVERT(varchar(10),session_date,23) date,session_code,schedule_revision,booked_count FROM class_session WHERE class_id IS NOT NULL AND session_date>CAST(GETDATE() AS DATE) AND status='PUBLISHED' ORDER BY booked_count DESC,session_date,id FOR JSON PATH,WITHOUT_ARRAY_WRAPPER"))
                 old_date = datetime.date.fromisoformat(session_before['date'])
                 week = old_date - datetime.timedelta(days=old_date.weekday())
-                new_date = old_date + datetime.timedelta(days=14)
+                new_date = old_date + datetime.timedelta(days=1)
                 preserved_query = "SELECT (SELECT COALESCE(CHECKSUM_AGG(BINARY_CHECKSUM(*)),0) FROM booking) bookings,(SELECT COALESCE(CHECKSUM_AGG(BINARY_CHECKSUM(*)),0) FROM sport_package_registration) registrations FOR JSON PATH,WITHOUT_ARRAY_WRAPPER"
                 preserved_before = sql(preserved_query)
                 role_page.goto(f'http://127.0.0.1:15173/manager/schedule?week={week.isoformat()}', wait_until='networkidle')
@@ -270,7 +275,7 @@ try:
                 dialog.locator('input[name=rescheduleReason]').fill('Disposable DB-UNIFY browser regression')
                 with role_page.expect_response(lambda response: response.request.method == 'PUT' and response.url.endswith('/manager/sessions/' + str(session_before['id']))) as changed:
                     dialog.get_by_role('button', name='Save session', exact=True).click()
-                check('Manager browser reschedule succeeds through real HTTP', changed.value.status == 200)
+                check('Manager browser reschedule succeeds through real HTTP', changed.value.status == 200, httpStatus=changed.value.status, response=changed.value.json())
                 saved = changed.value.json()
                 expect(dialog).not_to_be_visible()
                 check('Manager date change preserves numeric key and changes persisted public ID', saved['id'] == session_before['id'] and saved['date'] == new_date.isoformat() and saved['sessionId'] != session_before['session_code'] and saved['scheduleRevision'] == session_before['schedule_revision'] + 1)
@@ -285,7 +290,8 @@ try:
             for theme in ('light', 'dark'):
                 role_page.emulate_media(color_scheme=theme)
                 role_page.evaluate('(theme) => document.documentElement.setAttribute("data-theme", theme)', theme)
-                role_page.screenshot(path=str(args.out / f'{role}-1440-{theme}.png'), full_page=True)
+                role_page.evaluate('async () => { await document.fonts.ready; await Promise.all(document.getAnimations().filter(a => a.effect?.getTiming().iterations !== Infinity).map(a => a.finished.catch(() => {}))); }')
+                role_page.screenshot(path=str(args.out / f'{role}-1440-{theme}.png'), full_page=True, animations='disabled')
             role_context.close()
         context.close()
         browser.close()
