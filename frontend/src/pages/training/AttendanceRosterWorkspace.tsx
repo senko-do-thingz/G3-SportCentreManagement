@@ -118,7 +118,7 @@ function AttendanceRow({ member, coach, dateOpen, restoreFocus, onSaved, onActio
           <legend>Attendance status</legend>
           <div className="attendance-status-options">
             {options.map(option => <label className="attendance-status-option" key={option.value}>
-              <input type="radio" name="status" value={option.value} checked={status === option.value} onChange={() => setStatus(option.value as AttendanceStatus)} required />
+              <input type="radio" name="status" value={option.value} checked={status === option.value} onChange={() => setStatus(option.value as AttendanceStatus)} onKeyDown={event => { if (event.key === 'Enter') event.preventDefault() }} required />
               <span>{option.label}</span><small aria-hidden="true">Selected</small>
             </label>)}
           </div>
