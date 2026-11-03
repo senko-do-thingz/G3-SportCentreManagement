@@ -1,6 +1,7 @@
 package com.sportify.catalog.service;
 
 import com.sportify.core.exception.BusinessRuleException;
+import com.sportify.core.exception.ConflictException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
@@ -41,6 +42,17 @@ public class SessionCodeAllocator {
     public String reserve(LocalDate date, String sport) {
         validateDate(date);
         String code = sportCode(sport);
+        // Serialize the small allocation section, including absent-key and multi-date batches.
+        // A single database-scoped resource avoids cycles between adjacent missing key ranges.
+        Integer acquired = jdbc.queryForObject("""
+                SET NOCOUNT ON;
+                DECLARE @result INT;
+                EXEC @result=sys.sp_getapplock @Resource=?, @LockMode='Exclusive',
+                    @LockOwner='Transaction', @LockTimeout=10000;
+                SELECT @result;
+                """, Integer.class, "sportify.session-identity");
+        if (acquired == null || acquired < 0)
+            throw new ConflictException("Session ID allocation is busy. Reload and retry the complete request.");
         // The indexed key-range lock also protects a missing counter until transaction completion.
         var current = jdbc.query("SELECT last_value FROM session_code_counter WITH (UPDLOCK,HOLDLOCK) "
                 + "WHERE session_date=? AND sport_code=?", (rs,row) -> rs.getInt(1), date, code);

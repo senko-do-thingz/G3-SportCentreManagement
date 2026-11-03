@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.*;
 
 class SessionCodeAllocatorTest {
     private final LocalDate date = LocalDate.of(2026,11,3);
@@ -21,5 +23,13 @@ class SessionCodeAllocatorTest {
             assertThatThrownBy(()->SessionCodeAllocator.format(date,"FOOTBALL",n)).hasMessageContaining("99");
         assertThatThrownBy(()->SessionCodeAllocator.format(date,"Football",1)).hasMessageContaining("canonical sports");
         assertThat(SessionCodeAllocator.format(LocalDate.of(2000,2,29),"TENNIS",1)).isEqualTo("290200TE01");
+    }
+    @Test void applicationLockFailureStopsBeforeAnyCounterOrSessionWrite() {
+        var jdbc=mock(org.springframework.jdbc.core.JdbcTemplate.class);
+        when(jdbc.queryForObject(anyString(),eq(Integer.class),eq("sportify.session-identity"))).thenReturn(-1);
+        assertThatThrownBy(()->new SessionCodeAllocator(jdbc).reserve(date,"FOOTBALL"))
+            .isInstanceOf(com.sportify.core.exception.ConflictException.class).hasMessageContaining("retry the complete request");
+        verify(jdbc).queryForObject(anyString(),eq(Integer.class),eq("sportify.session-identity"));
+        verifyNoMoreInteractions(jdbc);
     }
 }

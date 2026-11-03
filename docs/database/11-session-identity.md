@@ -19,8 +19,11 @@ facility and start time. Allocation 01 through 99 is available. A 100th allocati
 fails before creating a session; it is not wrapped or expanded to another format.
 
 session_code_counter has an indexed primary key (session_date, sport_code) and
-keeps last_value. SessionCodeAllocator requires an existing transaction and reads
-the counter using UPDLOCK,HOLDLOCK, including a missing-key range. Counter update,
+keeps last_value. SessionCodeAllocator requires an existing transaction and first
+takes an exclusive transaction-owned SQL application lock on the database-scoped
+sportify.session-identity resource. This serializes the small allocation section
+across date/sport groups and avoids adjacent missing-range deadlocks in batches.
+It then reads the counter using UPDLOCK,HOLDLOCK, including a missing-key range. Counter update,
 session insertion and weekly batch work share the Manager service transaction.
 All batch dates are sorted. The public code has a database NOT NULL and UNIQUE
 constraint, with date-prefix and format checks as a final safeguard.
@@ -29,7 +32,9 @@ Cancellation does not decrement the counter. Removing a session does not remove
 its independent reservation high-water mark. There is no counter-delete API or
 cascade. A rolled-back transaction has issued no successful public identifier:
 an explicit retry can reserve its rolled-back number. Lock/deadlock failures use
-the existing Manager conflict handling and rollback; do not automatically retry
+the existing Manager conflict handling and rollback. Application-lock refusal
+returns a clear conflict before touching a counter. Retry the complete transaction
+after a confirmed rollback; do not automatically retry
 an uncertain successful create and risk a second session.
 
 SQL Server range-lock semantics are documented in the
