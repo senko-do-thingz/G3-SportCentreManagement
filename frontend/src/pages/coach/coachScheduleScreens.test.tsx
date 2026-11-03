@@ -112,3 +112,16 @@ describe('FE-10 coach schedule and roster screens', () => {
     expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
   })
 })
+
+ it('ID-04 shows public codes and resolves only an owned public-code roster', async () => {
+   const calls = setup(COACH, call => {
+     if (call.path.startsWith('/coach/sessions?')) return json(200, [{ ...session, sessionId: '201026BK01', trainingType: 'COACH_LED' }])
+     if (call.path === '/coach/sessions/by-code/201026BK01/roster') return json(200, roster)
+   })
+   renderApp('/coach/roster?sessionId=201026BK01&week=2026-10-19')
+   expect(await screen.findByText('Taylor Nguyen')).toBeInTheDocument()
+   expect(screen.getByText('201026BK01')).toBeInTheDocument()
+   expect(screen.getByText('Coach: Quan Coach')).toBeInTheDocument()
+   expect(calls.calls.some(call => call.path === '/coach/sessions/by-code/201026BK01/roster')).toBe(true)
+   expect(calls.calls.some(call => call.path === '/coach/sessions/201026BK01/roster')).toBe(false)
+ })

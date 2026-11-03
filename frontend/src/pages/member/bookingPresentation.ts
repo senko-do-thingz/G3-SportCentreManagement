@@ -1,3 +1,4 @@
+import { sessionIdText } from '../../api/sessionIdentity'
 import { ApiError } from '../../api/errors'
 import type { MemberBookingRecord } from '../../api/memberBookingsApi'
 import type { SessionDetail, SuitableRegistration } from '../../api/memberSessionsApi'
@@ -78,7 +79,7 @@ export function bookingCalendarHref(booking: MemberBookingRecord): string | null
     `UID:booking-${booking.id}@sportify`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')}`,
     `DTSTART:${start}`, `DTEND:${end}`, `SUMMARY:${escapeCalendarText(title)}`,
     ...(location ? [`LOCATION:${escapeCalendarText(location)}`] : []),
-    `DESCRIPTION:${escapeCalendarText(`Booking ${booking.bookingCode}`)}`, 'END:VEVENT', 'END:VCALENDAR', '',
+    `DESCRIPTION:${escapeCalendarText(`Booking ${booking.bookingCode}; Session ID ${sessionIdText(booking.sessionCode)}`)}`, 'END:VEVENT', 'END:VCALENDAR', '',
   ]
   return `data:text/calendar;charset=utf-8,${encodeURIComponent(lines.join('\r\n'))}`
 }

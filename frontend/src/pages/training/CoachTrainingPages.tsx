@@ -1,3 +1,6 @@
+import { SessionContext } from '../../components/SessionContext'
+import { sessionIdText, sessionRouteReference } from '../../api/sessionIdentity'
+import { formatCalendarDate } from '../../utils/date'
 import { useCallback, useState, type FormEvent } from 'react'
 import { staffTrainingApi as training, type BookingCandidate, type StaffPlan, type StaffSession, type TrainingClass, type TrainingMetric, type SessionMember, type DrillDraft, type DrillSuggestions } from '../../api/staffTrainingApi'
 import { Button } from '../../components/ui/Button'
@@ -179,7 +182,7 @@ export function CoachTrainingResultsPage() {
 
 function CoachResultsWorkspace({ sessions }: { sessions: StaffSession[] }) {
   const [sessionId, setSessionId] = useState('')
-  const session = sessions.find(item => String(item.id) === sessionId)
+  const session = sessions.find(item => sessionRouteReference(item) === sessionId)
   const load = useCallback(async (signal: AbortSignal) => {
     const [members, metrics] = await Promise.all([training.coachRoster(sessionId, signal), training.metrics(session!.sportId, signal)])
     return { members, metrics }
@@ -187,14 +190,14 @@ function CoachResultsWorkspace({ sessions }: { sessions: StaffSession[] }) {
   return (
     <Card title="Select a session">
       <Select label="Assigned session" value={sessionId} onChange={event => setSessionId(event.target.value)} placeholder="Select a session"
-        options={sessions.map(item => ({ value: String(item.id), label: `${item.className} - ${item.date} - ${item.startTime.slice(0, 5)}` }))} />
+        options={sessions.map(item => ({ value: sessionRouteReference(item), label: `${sessionIdText(item.sessionId)} - ${item.className} - ${formatCalendarDate(item.date)} - ${item.startTime.slice(0, 5)}` }))} />
       {!sessions.length && <p>You have no assigned sessions.</p>}
-      {session && <TrainingData load={load}>{data => <ResultForm key={session.id} sessionId={session.id} {...data} />}</TrainingData>}
+      {session && <><SessionContext {...session} /><TrainingData load={load}>{data => <ResultForm key={session.id} session={session} {...data} />}</TrainingData></>}
     </Card>
   )
 }
 
-function ResultForm({ sessionId, members, metrics }: { sessionId: number; members: SessionMember[]; metrics: TrainingMetric[] }) {
+function ResultForm({ session, members, metrics }: { session: StaffSession; members: SessionMember[]; metrics: TrainingMetric[] }) {
   const action = useTrainingAction()
   const [savedMemberIds, setSavedMemberIds] = useState<number[]>([])
   const saved = members.filter(member => member.resultId || savedMemberIds.includes(member.memberId))
@@ -215,7 +218,8 @@ function ResultForm({ sessionId, members, metrics }: { sessionId: number; member
       })
       if (!notes && !scores.length) throw new Error('Enter result notes or at least one skill score.')
       const memberId = Number(values.get('memberId'))
-      await training.result({ sessionId, memberId, notes: notes || null, scores })
+      if (session.sessionId) await training.resultByCode(session.sessionId, { memberId, notes: notes || null, scores })
+      else await training.result({ sessionId: session.id, memberId, notes: notes || null, scores })
       setSavedMemberIds(current => [...current, memberId])
       form.reset()
     }, 'Training results saved. The member can view them immediately.')

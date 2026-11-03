@@ -284,3 +284,22 @@ describe('Reception training writes', () => {
     expect(screen.getByRole('button', { name: 'Refresh roster' })).toBeEnabled()
   })
 })
+
+ it('ID-04 preserves the public identity through a notes-only result write', async () => {
+   const calls = signedIn('COACH', call => {
+     if (call.path === '/coach/training/sessions') return json(200, [attendanceSession])
+     if (call.path === '/coach/training/sessions/by-code/011126SW01/members') return json(200, [{ ...rosterMember, status: 'LATE', attendanceId: 20 }])
+     if (call.path === '/coach/training/metrics?sportId=1') return json(200, [])
+     if (call.path === '/coach/training/sessions/by-code/011126SW01/results') return json(201, { id: 9 })
+     return unexpected(call)
+   })
+   renderApp('/coach/training/results')
+   const user = userEvent.setup()
+   await user.selectOptions(await screen.findByLabelText('Assigned session'), '011126SW01')
+   await user.selectOptions(await screen.findByLabelText(/Member receiving results/), '42')
+   expect(screen.getByText('011126SW01')).toBeInTheDocument()
+   await user.type(screen.getByLabelText('Result notes'), 'Code-linked result')
+   await user.click(screen.getByRole('button', { name: 'Save results' }))
+   expect(await screen.findByText('Results already saved')).toBeInTheDocument()
+   expect(calls.calls.find(call => call.method === 'POST')?.body).toEqual({ memberId: 42, notes: 'Code-linked result', scores: [] })
+ })

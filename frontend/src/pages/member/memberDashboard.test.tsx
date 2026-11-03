@@ -112,7 +112,8 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
 
     const sessions = screen.getByRole('region', { name: 'Upcoming sessions' })
     expect(within(sessions).getByText('Football - Coach-led')).toBeInTheDocument()
-    expect(within(sessions).getByText('14 Oct 2026, 17:00 to 18:30 - BK-0021')).toBeInTheDocument()
+    expect(within(sessions).getByText('14/10/2026 17:00 - 18:30')).toBeInTheDocument()
+    expect(within(sessions).getByText('Booking code: BK-0021')).toBeInTheDocument()
   })
 
   it('TC-FE02-022 the hero offers Book a session when a package is active', async () => {
@@ -411,3 +412,11 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
     expect(statHint('Active packages')).toBe('Your paid sport access')
   })
 })
+
+ it('ID-04 dashboard identifies an upcoming booked session and its actual venue and Coach', async () => {
+   await openDashboard({ cards: [card()], registrations: [registration()], bookings: [booking({ sessionCode: '141026FB01', className: 'Football practice', facilityName: 'Court A', coachName: 'Quan Coach' })] })
+   const sessions = screen.getByRole('region', { name: 'Upcoming sessions' })
+   expect(within(sessions).getByText('141026FB01')).toBeInTheDocument()
+   expect(within(sessions).getByText('Facility: Court A')).toBeInTheDocument()
+   expect(within(sessions).getByText('Coach: Quan Coach')).toBeInTheDocument()
+ })

@@ -67,6 +67,10 @@ export interface PackageRegistration {
 
 /** Mirrors com.sportify.catalog.dto.BookingResponse (GET /bookings/my). */
 export interface MemberBooking {
+  sessionCode?: string
+  className?: string | null
+  coachName?: string | null
+  facilityName?: string | null
   id: number
   bookingCode: string
   sessionId: number

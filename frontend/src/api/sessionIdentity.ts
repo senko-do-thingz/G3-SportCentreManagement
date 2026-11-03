@@ -24,3 +24,16 @@ export function optionalSessionId(value: unknown): SessionId | undefined {
 export function sessionIdText(value: string | null | undefined): string {
   try { return parseSessionId(value) } catch { return 'Session ID unavailable' }
 }
+
+/** Accept old numeric bookmarks without treating their surrogate as a public Session ID. */
+export function parseSessionReference(value: string | null | undefined): SessionId | number | null {
+  if (value && /^[1-9][0-9]*$/.test(value)) {
+    const id = Number(value)
+    return Number.isSafeInteger(id) ? id : null
+  }
+  try { return parseSessionId(value) } catch { return null }
+}
+
+export function sessionRouteReference(session: { id: number; sessionId?: string | null }): string {
+  try { return parseSessionId(session.sessionId) } catch { return String(session.id) }
+}

@@ -21,6 +21,6 @@ export function SessionContext(session: SessionContextProps) {
     {session.sportName && <span>{session.sportName}</span>}
     <span>{formatCalendarDate(session.date)} {formatClockTime(session.startTime)} - {formatClockTime(session.endTime)}</span>
     <span>Facility: {session.facilityName || 'Facility not assigned'}</span>
-    <span>{session.coachName ? `Coach: ${session.coachName}` : session.trainingType === 'SELF_TRAINING' ? 'Self-training - No assigned coach' : 'Coach not assigned'}</span>
+    <span>{session.trainingType === 'SELF_TRAINING' ? 'Self-training - No assigned coach' : session.coachName ? `Coach: ${session.coachName}` : 'Coach not assigned'}</span>
   </span>
 }

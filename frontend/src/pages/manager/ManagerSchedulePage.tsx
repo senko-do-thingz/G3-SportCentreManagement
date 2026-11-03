@@ -1,3 +1,5 @@
+import { sessionIdText } from '../../api/sessionIdentity'
+import '../../components/sessionContext.css'
 import { useCallback, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../../api/errors'
@@ -129,12 +131,14 @@ function ManagerScheduleEntry({
   onCancel: () => void
 }) {
   return <article className={`f2-session f2-session--${session.status.toLowerCase()}`}>
+    <span className="session-identity">Session ID <code>{sessionIdText(session.sessionId)}</code></span>
     <strong className="f2-session__title">{session.class?.name ?? 'Unassigned class'}</strong>
+    <p className="f2-session__meta">{session.sportName}</p>
     <div className="f2-session__timing">
       <span>{session.startTime.slice(0, 5)} - {session.endTime.slice(0, 5)}</span>
       <StatusBadge status={session.status} />
     </div>
-    <p className="f2-session__meta">Coach: {session.coach?.name ?? 'Not assigned'}</p>
+    <p className="f2-session__meta">{session.trainingType === 'SELF_TRAINING' && !session.coach ? 'Self-training - No assigned coach' : `Coach: ${session.coach?.name ?? 'Coach not assigned'}`}</p>
     <p className="f2-session__meta">Facility: {session.facility?.name ?? 'Not assigned'}</p>
     <p className="f2-session__meta">{session.bookedCount} / {session.capacity} booked - {session.trainingType === 'COACH_LED' ? 'Coach-led' : 'Self-training'}</p>
     {session.status === 'CANCELLED' && <p className="f2-session__meta f2-session__reason">Reason: {session.cancelReason || 'Not provided'}</p>}

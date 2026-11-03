@@ -1,3 +1,4 @@
+import { parseSessionId } from '../../api/sessionIdentity'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -536,3 +537,15 @@ describe('FE-09 cancellation reconciliation regressions', () => {
     expect(await screen.findByRole('heading', { name: 'Booking cancelled' })).toBeInTheDocument()
   })
 })
+
+ it('ID-04 resolves code-based booking review but submits the trusted numeric surrogate', async () => {
+   const calls = api(call => {
+     if (call.path === '/sessions/by-code/051126BK01') return json(200, { ...detail, session: { ...detail.session, sessionId: parseSessionId('051126BK01') } })
+     if (call.path === '/bookings' && call.method === 'POST') return backendError(409, 'Package no longer covers the session')
+     return backendError(404, 'Unexpected request')
+   })
+   renderApp('/member/bookings/review?sessionId=051126BK01&packageRegistrationId=11')
+   expect(await screen.findByText('051126BK01')).toBeInTheDocument()
+   await userEvent.click(screen.getByRole('button', { name: 'Confirm booking' }))
+   await waitFor(() => expect(calls.calls.find(call => call.method === 'POST')?.body).toEqual({ sessionId: 5, packageRegistrationId: 11 }))
+ })

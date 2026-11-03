@@ -1,15 +1,12 @@
+import { parseSessionReference, sessionRouteReference } from '../../api/sessionIdentity'
+import { SessionContext } from '../../components/SessionContext'
+import { sessionIdText } from '../../api/sessionIdentity'
 import { useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { coachScheduleApi, type CoachRosterRecord, type CoachSessionRecord } from '../../api/coachScheduleApi'
 import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, PageLoader, Select, StatCard, StatusBadge } from '../../components/ui'
 import { useResource } from '../../hooks/useResource'
 import { browseAddDays, browseDate, browseDay, browseMonday, browseToday, validBrowseDate } from '../member/memberScheduleDates'
-
-function positiveId(value: string | null): number | null {
-  if (!value || !/^\d+$/.test(value)) return null
-  const id = Number(value)
-  return Number.isSafeInteger(id) && id > 0 ? id : null
-}
 
 function displayTime(value: string): string {
   return value.slice(0, 5)
@@ -75,10 +72,10 @@ export function CoachTeachingSchedulePage() {
               <h2>{browseDay(date)} {browseDate(date)}</h2>
               {dailySessions.length === 0 ? <p className="browse-muted">No sessions</p> : <div className="coach-day__sessions">{dailySessions.map((session) => <article className="coach-session" key={session.id}>
                 <div className="coach-session__heading"><div><p className="booking-history-card__date">{displayTime(session.startTime)} - {displayTime(session.endTime)}</p><h3>{sessionTitle(session)}</h3></div><StatusBadge status={session.status} /></div>
-                <p>{session.sportName}{session.className ? ` - ${session.className}` : ''}</p>
+                <SessionContext {...session} date={session.sessionDate} />
                 <p>Facility: {session.facilityName || 'Not provided'}</p>
                 <p>Members booked: {session.bookedCount}{session.capacity ? ` / ${session.capacity}` : ''}</p>
-                <Link className="btn btn--secondary" to={`/coach/roster?sessionId=${session.id}&week=${week}`}>View roster</Link>
+                <Link className="btn btn--secondary" to={`/coach/roster?sessionId=${sessionRouteReference(session)}&week=${week}`}>View roster</Link>
               </article>)}</div>}
             </section>
           })}
@@ -107,16 +104,16 @@ export function CoachRosterPage() {
   const [params, setParams] = useSearchParams()
   const week = sessionWeek(params)
   const weekEnd = browseAddDays(week, 6)
-  const selectedSessionId = positiveId(params.get('sessionId'))
+  const selectedSessionId = parseSessionReference(params.get('sessionId'))
   const loadSessions = useCallback((signal: AbortSignal) => coachScheduleApi.list(week, weekEnd, signal), [week, weekEnd])
   const [sessionsResource, reloadSessions] = useResource(loadSessions)
   const sessions = sessionsResource.status === 'ready' ? sessionsResource.data : []
-  const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? null
+  const selectedSession = sessions.find((session) => (session.id === selectedSessionId || session.sessionId === selectedSessionId)) ?? null
   const isOwnSession = selectedSession !== null
   const rosterLoader = useCallback((signal: AbortSignal) => selectedSessionId && isOwnSession
-    ? coachScheduleApi.roster(selectedSessionId, signal) : Promise.resolve([]), [selectedSessionId, isOwnSession])
+    ? typeof selectedSessionId === 'number' ? coachScheduleApi.roster(selectedSessionId, signal) : coachScheduleApi.rosterByCode(selectedSessionId, signal) : Promise.resolve([]), [selectedSessionId, isOwnSession])
   const [roster, reloadRoster] = useResource(rosterLoader)
-  const options = sessions.map((session) => ({ value: String(session.id), label: `${browseDate(session.sessionDate)} ${displayTime(session.startTime)} - ${sessionTitle(session)}` }))
+  const options = sessions.map((session) => ({ value: sessionRouteReference(session), label: `${sessionIdText(session.sessionId)} - ${browseDate(session.sessionDate)} ${displayTime(session.startTime)} - ${sessionTitle(session)}` }))
 
   function selectSession(value: string) {
     setParams((current) => {
@@ -132,9 +129,10 @@ export function CoachRosterPage() {
     <PageHeader eyebrow="Coach" title="Class Roster" description="Review confirmed members for a session assigned to you. Personal contact details are restricted." actions={<Button variant="secondary" disabled={!selectedSession || roster.status !== 'ready'} onClick={() => window.print()}>Print roster</Button>} />
     <Card title="Select a session">
       <div className="browse-actions coach-week-nav"><Button variant="secondary" onClick={() => setParams(changeWeekParams(params, browseAddDays(week, -7)))}>Previous week</Button><Button variant="secondary" onClick={() => setParams(changeWeekParams(params, browseMonday(browseToday())))}>This week</Button><Button variant="secondary" onClick={() => setParams(changeWeekParams(params, browseAddDays(week, 7)))}>Next week</Button><strong>{browseDate(week)} - {browseDate(weekEnd)}</strong></div>
-      {sessionsResource.status === 'error' ? <ErrorState title="We could not load your sessions" error={sessionsResource.error} onRetry={reloadSessions} /> : sessionsResource.status === 'loading' ? <PageLoader label="Loading your sessions" /> : sessions.length === 0 ? <EmptyState title="No assigned sessions this week" description="Change the week to find one of your sessions." /> : <Select label="Session" placeholder="Choose a session" value={selectedSessionId ? String(selectedSessionId) : ''} options={options} onChange={(event) => selectSession(event.target.value)} />}
+      {sessionsResource.status === 'error' ? <ErrorState title="We could not load your sessions" error={sessionsResource.error} onRetry={reloadSessions} /> : sessionsResource.status === 'loading' ? <PageLoader label="Loading your sessions" /> : sessions.length === 0 ? <EmptyState title="No assigned sessions this week" description="Change the week to find one of your sessions." /> : <Select label="Session" placeholder="Choose a session" value={selectedSession ? sessionRouteReference(selectedSession) : ''} options={options} onChange={(event) => selectSession(event.target.value)} />}
     </Card>
     {selectedSession && <Card className="coach-print" title={sessionTitle(selectedSession)} actions={<StatusBadge status={selectedSession.status} />}>
+      <SessionContext {...selectedSession} date={selectedSession.sessionDate} />
       <dl className="browse-facts coach-roster-facts"><div><dt>Date</dt><dd>{browseDate(selectedSession.sessionDate)}</dd></div><div><dt>Time</dt><dd>{displayTime(selectedSession.startTime)} - {displayTime(selectedSession.endTime)} Vietnam time</dd></div><div><dt>Sport</dt><dd>{selectedSession.sportName}</dd></div><div><dt>Facility</dt><dd>{selectedSession.facilityName || 'Not provided'}</dd></div><div><dt>Capacity</dt><dd>{selectedSession.capacity ?? 'Not provided'}</dd></div><div><dt>Confirmed bookings</dt><dd>{selectedSession.bookedCount}</dd></div></dl>
       <p className="notice notice--info coach-privacy-note">Personal contact details are restricted. This roster shows member names and package details only.</p>
       {roster.status === 'loading' ? <PageLoader label="Loading confirmed roster" /> : roster.status === 'error' ? <ErrorState title="We could not load this class roster" error={roster.error} onRetry={reloadRoster} /> : roster.data.length === 0 ? <EmptyState title="No confirmed bookings" description="There are no confirmed members on this session roster." /> : <RosterTable rows={roster.data} />}
