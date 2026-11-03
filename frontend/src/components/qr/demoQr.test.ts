@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { demoQrImageUrl, demoQrPath, demoQrPayload, demoQrSyntheticPayload } from './demoQr'
+import { demoQrPath, demoQrPayload, demoQrSyntheticPayload } from './demoQr'
 import type { DemoBank } from './demoBanks'
 
 describe('QR-03 versioned non-payable payload boundary', () => {
@@ -40,21 +40,21 @@ describe('QR-03 versioned non-payable payload boundary', () => {
     expect(demoQrPayload(52, 'vietcombank')).toBe(first)
   })
 
-  it('generates safe synthetic non-payable payload for external QR provider', () => {
+  it('generates safe synthetic non-payable payload for local QR provider', () => {
     const payload = demoQrSyntheticPayload(52)
     expect(payload).toBe('SPORTIFY_DEMO|REF=DEMO-52|NON_PAYABLE=1')
     expect(payload).not.toMatch(/https?:|TOKEN=|BEARER=|ACCOUNT=|PASSWORD=/)
 
-    const customPayload = demoQrSyntheticPayload(52, 'PAY-CUSTOM')
-    expect(customPayload).toBe('SPORTIFY_DEMO|REF=PAY-52|NON_PAYABLE=1')
+    const canonicalPayload = demoQrSyntheticPayload(52, 'PAY-1007')
+    expect(canonicalPayload).toBe('SPORTIFY_DEMO|REF=PAY-1007|NON_PAYABLE=1')
+
+    expect(demoQrSyntheticPayload(52, 'PAY-CUSTOM')).toBe('SPORTIFY_DEMO|REF=DEMO-52|NON_PAYABLE=1')
+
+    const emptyCodePayload = demoQrSyntheticPayload(52, '   ')
+    expect(emptyCodePayload).toBe('SPORTIFY_DEMO|REF=DEMO-52|NON_PAYABLE=1')
   })
 
-  it('creates valid QRServer image URL without leaking sensitive parameters', () => {
-    const payload = demoQrSyntheticPayload(52)
-    const url = demoQrImageUrl(payload, 240)
-    expect(url).toContain('https://api.qrserver.com/v1/create-qr-code/?size=240x240&format=png&data=')
-    expect(url).toContain(encodeURIComponent(payload))
-    expect(url).not.toContain('localhost')
-    expect(url).not.toContain('token')
+  it.each(['member@example.com', 'PAY-12|TOKEN=secret', 'https://localhost:8080', 'PAY-12\nACCOUNT=123'])('replaces private or injected QR references %s with a synthetic id', code => {
+    expect(demoQrSyntheticPayload(52, code)).toBe('SPORTIFY_DEMO|REF=DEMO-52|NON_PAYABLE=1')
   })
 })

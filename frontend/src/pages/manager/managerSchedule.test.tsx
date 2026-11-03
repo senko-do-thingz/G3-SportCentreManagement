@@ -346,7 +346,7 @@ describe('FE-07 schedule', () => {
     await waitFor(() => expect(within(dialog).getByLabelText(/^Coach/)).toBeEnabled())
     await user.click(within(dialog).getByRole('button', { name: 'Save session' }))
     expect(await screen.findByText(`Session ${code} saved for ${displayDate(target)}`)).toBeInTheDocument()
-    expect(screen.getByText(`${displayDate(monday(target))} - ${displayDate(addDays(monday(target), 6))}`)).toBeInTheDocument()
+    expect(await screen.findByText(`${displayDate(monday(target))} - ${displayDate(addDays(monday(target), 6))}`)).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
   it('keeps the date and reason draft after a stale revision conflict', async () => {

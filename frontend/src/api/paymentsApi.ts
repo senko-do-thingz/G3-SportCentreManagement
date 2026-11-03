@@ -49,7 +49,7 @@ export interface Payment {
   notes?: string | null
   createdAt: string | null
   updatedAt?: string | null
-  /** BE-20 history fields; GET /payments/{id} does not include an invoice association. */
+  /** Persisted receipt association, also returned by GET /payments/{id} after settlement. */
   invoiceId?: number | null
   invoiceNumber?: string | null
   referenceCode?: string | null

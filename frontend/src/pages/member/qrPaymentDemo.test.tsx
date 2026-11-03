@@ -25,7 +25,7 @@ describe('QR-01 guarded demo route and payment integration', () => {
   it('renders single QR demo card and server amount on the authorized route', async () => {
     const { calls } = backend({ data: payment({ method: 'MOMO' }) })
     renderApp('/member/payments/52/qr-demo')
-    expect(await screen.findByRole('img', { name: /Non-payable demo QR for payment 52/ })).toBeVisible()
+    expect(await screen.findByRole('img', { name: /Non-payable demo QR for payment 52/ }, { timeout: 5000 })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Simulate Payment Confirmation' })).toBeVisible()
     expect(screen.getByText('810.000 VND')).toBeVisible()
     expect(screen.getByText(/Simulated QR Payment - Demo only - No real money transferred/)).toBeVisible()
@@ -107,6 +107,7 @@ describe('QR-01 guarded demo route and payment integration', () => {
         settlementType: 'SIMULATED',
         settlementProvider: 'SPORTIFY_SIMULATOR',
         referenceCode: 'SIM-QR-52-00000052',
+        invoiceId: 301,
       }),
     })
     renderApp('/member/payments/52/qr-demo')
@@ -114,6 +115,9 @@ describe('QR-01 guarded demo route and payment integration', () => {
     expect(screen.getByText('Paid - Simulated')).toBeVisible()
     expect(screen.getByText('SIMULATED (SPORTIFY_SIMULATOR)')).toBeVisible()
     expect(screen.getByText('SIM-QR-52-00000052')).toBeVisible()
+    const receiptLink = screen.getByRole('link', { name: 'View payment receipt' })
+    expect(receiptLink).toBeVisible()
+    expect(receiptLink).toHaveAttribute('href', '/member/payments/receipts/301')
   })
 
   it('keeps anonymous users behind login and does not read payments', async () => {

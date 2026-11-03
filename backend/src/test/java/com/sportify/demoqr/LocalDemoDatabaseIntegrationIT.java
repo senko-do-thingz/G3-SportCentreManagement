@@ -8,6 +8,7 @@ import com.sportify.demoqr.dto.LocalDemoSettlementResponse;
 import com.sportify.identity.dto.AuthRequest;
 import com.sportify.identity.dto.AuthResponse;
 import com.sportify.payment.entity.PaymentMethod;
+import com.sportify.payment.dto.PaymentResponse;
 import com.sportify.payment.repository.FinanceReportRepository;
 import com.sportify.payment.service.PaymentRefundService;
 import org.junit.jupiter.api.Tag;
@@ -26,6 +27,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,13 +39,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @TestPropertySource(properties = {
         "app.payment.local-demo.enabled=true",
         "PAYMENT_LOCAL_DEMO_ENABLED=true",
-        "server.address=127.0.0.1",
-        "spring.datasource.url=jdbc:sqlserver://127.0.0.1:1433;databaseName=sportify_qr_demo;encrypt=false;trustServerCertificate=true"
+        "server.address=127.0.0.1"
 })
-class LocalDemoDatabaseIntegrationTest {
+class LocalDemoDatabaseIntegrationIT {
 
     @org.springframework.test.context.DynamicPropertySource
     static void configureEnv(org.springframework.test.context.DynamicPropertyRegistry registry) {
+        String testUrl = System.getenv("QR_LOCAL_DEMO_TEST_DB_URL");
+        if (testUrl == null || !testUrl.matches("jdbc:sqlserver://127\\.0\\.0\\.1:1433;databaseName=sportify_qr04_test_[0-9]{14};encrypt=false;trustServerCertificate=true")) {
+            throw new IllegalStateException("Explicit fresh loopback QR_LOCAL_DEMO_TEST_DB_URL is required.");
+        }
+        registry.add("spring.datasource.url", () -> testUrl);
         String dbPass = System.getenv("DB_PASSWORD");
         if (dbPass == null || dbPass.isBlank()) {
             java.io.File envFile = new java.io.File(".env");
@@ -184,7 +190,7 @@ class LocalDemoDatabaseIntegrationTest {
                 return restTemplate.exchange(
                         "/api/v1/payments/" + paymentId + "/demo-confirm",
                         HttpMethod.POST,
-                        new HttpEntity<>(authHeaders(ownerToken)),
+                        new HttpEntity<>(Map.of("amount", 1, "memberId", -1, "settlementType", "ACTUAL"), authHeaders(ownerToken)),
                         LocalDemoSettlementResponse.class
                 );
             }));
@@ -227,6 +233,18 @@ class LocalDemoDatabaseIntegrationTest {
         assertThat(repeatOutcome.simulatedTransactionId()).isEqualTo(outcome.simulatedTransactionId());
         assertThat(repeatOutcome.invoiceId()).isEqualTo(outcome.invoiceId());
         assertThat(repeatOutcome.invoiceNumber()).isEqualTo(outcome.invoiceNumber());
+
+        var refreshed = restTemplate.exchange("/api/v1/payments/" + paymentId, HttpMethod.GET,
+                new HttpEntity<>(authHeaders(ownerToken)), PaymentResponse.class);
+        assertThat(refreshed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(refreshed.getBody()).isNotNull();
+        assertThat(refreshed.getBody().getInvoiceId()).isEqualTo(outcome.invoiceId());
+        assertThat(refreshed.getBody().getInvoiceNumber()).isEqualTo(outcome.invoiceNumber());
+        assertThat(refreshed.getBody().getSettlementType()).isEqualTo("SIMULATED");
+
+        var receipt = restTemplate.exchange("/api/v1/invoices/" + outcome.invoiceId(), HttpMethod.GET,
+                new HttpEntity<>(authHeaders(ownerToken)), String.class);
+        assertThat(receipt.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         // 8. SQL Server database invariants verification
         // 8.1 Payment table
@@ -271,6 +289,10 @@ class LocalDemoDatabaseIntegrationTest {
                 paymentId
         );
         assertThat(invoiceCount).isEqualTo(1);
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM dbo.activity_log WHERE action = 'PAYMENT_CONFIRMED' AND entity_id = ?",
+                Integer.class, paymentId)).isEqualTo(1);
 
         // 8.6 Financial separation: no cash_event created!
         Integer cashEventsAfter = jdbcTemplate.queryForObject(
