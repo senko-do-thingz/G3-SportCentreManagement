@@ -1,6 +1,6 @@
 # Scope and source baseline
 
-Status: TECHNICAL_DRAFT_READY_FOR_CODEOWNER_REVIEW. All new storage and rights are PROPOSED or BLOCKED_PENDING_APPROVAL. Source baseline: `4cdc0874fde95ae0b1500f0625c1521f428a6bec` fetched from origin/main on 2026-10-26. Branch: `feat/nx-04-f4-data-model`, isolated from the user's checkout. Publication and CI do not approve implementation.
+Status: TECHNICAL_DRAFT_READY_FOR_CODEOWNER_REVIEW. All new NX-04 design storage and rights are PROPOSED or BLOCKED_PENDING_APPROVAL. Source baseline: `4cdc0874fde95ae0b1500f0625c1521f428a6bec` fetched from origin/main on 2026-10-26. Branch: `feat/nx-04-f4-data-model`, isolated from the user's checkout. Publication and CI do not approve implementation.
 
 ## Authority and read-only workbook review
 
@@ -48,11 +48,11 @@ Links use canonical Git casing (`backend`, although Windows may display `Backend
 | S10 | [backend/src/main/java/com/sportify/catalog/service/impl/CheckInServiceImpl.java#L48](../../backend/src/main/java/com/sportify/catalog/service/impl/CheckInServiceImpl.java#L48) | `public CheckInResponse recordCheckIn` | SOURCE_CONFIRMED |
 | S11 | [backend/src/main/java/com/sportify/catalog/controller/CheckInController.java#L20](../../backend/src/main/java/com/sportify/catalog/controller/CheckInController.java#L20) | `@RequestMapping` | SOURCE_CONFIRMED |
 | S12 | [backend/src/main/java/com/sportify/catalog/repository/CheckInRepository.java#L22](../../backend/src/main/java/com/sportify/catalog/repository/CheckInRepository.java#L22) | `findForDay` | SOURCE_CONFIRMED |
-| S13 | [backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java#L74](../../backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java#L74) | `public BookingResponse createBooking` | SOURCE_CONFIRMED |
-| S14 | [backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java#L327](../../backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java#L327) | `recordSelfTrainingAttendance` | SOURCE_CONFIRMED |
+| S13 | [backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java#L76](../../backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java#L76) | `public BookingResponse createBooking` | SOURCE_CONFIRMED |
+| S14 | [backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java#L329](../../backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java#L329) | `recordSelfTrainingAttendance` | SOURCE_CONFIRMED |
 | S15 | [backend/src/main/java/com/sportify/catalog/service/impl/CoachScheduleServiceImpl.java#L31](../../backend/src/main/java/com/sportify/catalog/service/impl/CoachScheduleServiceImpl.java#L31) | `public class CoachSchedule` | SOURCE_CONFIRMED |
-| S16 | [backend/src/main/java/com/sportify/catalog/repository/CoachScheduleReadRepository.java#L46](../../backend/src/main/java/com/sportify/catalog/repository/CoachScheduleReadRepository.java#L46) | `findRoster` | SOURCE_CONFIRMED |
-| S17 | [backend/src/main/java/com/sportify/catalog/repository/ClassSessionRepository.java#L67](../../backend/src/main/java/com/sportify/catalog/repository/ClassSessionRepository.java#L67) | `findForUpdate` | SOURCE_CONFIRMED |
+| S16 | [backend/src/main/java/com/sportify/catalog/repository/CoachScheduleReadRepository.java#L49](../../backend/src/main/java/com/sportify/catalog/repository/CoachScheduleReadRepository.java#L49) | `findRoster` | SOURCE_CONFIRMED |
+| S17 | [backend/src/main/java/com/sportify/catalog/repository/ClassSessionRepository.java#L69](../../backend/src/main/java/com/sportify/catalog/repository/ClassSessionRepository.java#L69) | `findForUpdate` | SOURCE_CONFIRMED |
 | S18 | [backend/src/main/java/com/sportify/identity/security/SecurityConfig.java#L27](../../backend/src/main/java/com/sportify/identity/security/SecurityConfig.java#L27) | `@EnableMethodSecurity` | SOURCE_CONFIRMED |
 | S19 | [backend/src/main/java/com/sportify/identity/security/CustomUserDetails.java#L22](../../backend/src/main/java/com/sportify/identity/security/CustomUserDetails.java#L22) | `getAuthorities` | SOURCE_CONFIRMED |
 | S20 | [backend/src/main/java/com/sportify/identity/entity/MemberProfile.java#L23](../../backend/src/main/java/com/sportify/identity/entity/MemberProfile.java#L23) | `@MapsId` | SOURCE_CONFIRMED |
@@ -71,3 +71,9 @@ Links use canonical Git casing (`backend`, although Windows may display `Backend
 | S33 | [backend/src/main/resources/db/migration/catalog/V23__add_session_cancellation_and_schedule_indexes.sql#L3](../../backend/src/main/resources/db/migration/catalog/V23__add_session_cancellation_and_schedule_indexes.sql#L3) | `ALTER TABLE` | SOURCE_CONFIRMED |
 | S34 | [backend/src/main/java/com/sportify/identity/service/impl/ActivityLogServiceImpl.java#L17](../../backend/src/main/java/com/sportify/identity/service/impl/ActivityLogServiceImpl.java#L17) | `class ActivityLogService` | SOURCE_CONFIRMED |
 | S35 | [backend/src/main/java/com/sportify/catalog/repository/SportPackageRegistrationRepository.java#L86](../../backend/src/main/java/com/sportify/catalog/repository/SportPackageRegistrationRepository.java#L86) | `consumeSession` | SOURCE_CONFIRMED |
+
+## ID source inventory refresh
+
+The separate Session ID implementation adds catalog V39 and the session_code_counter table. The mechanical inventory now records 34 migration resources and 67 CREATE TABLE declarations/names. Historical migration entries and fingerprints remain unchanged; S16/S17 links point to their current method definitions after additive identity lookups. See the [Session ID database contract](../database/11-session-identity.md) and [API compatibility contract](../api/session-identity.md).
+
+This inventory refresh records the authorized ID implementation. It does not approve, implement or change the NX-04 PROPOSED model, its BLOCKED_PENDING_APPROVAL state, field privacy decisions or role grants. The original NX-04 source baseline and historical design evidence remain retained above.

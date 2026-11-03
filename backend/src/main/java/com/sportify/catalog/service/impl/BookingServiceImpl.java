@@ -18,6 +18,7 @@ import com.sportify.catalog.repository.CheckInRepository;
 import com.sportify.catalog.repository.ClassSessionRepository;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.BookingService;
+import com.sportify.catalog.service.TrainingWriteService;
 import com.sportify.catalog.service.PackageBookingEligibility;
 import com.sportify.core.audit.AuditAction;
 import com.sportify.core.audit.AuditEvent;
@@ -66,6 +67,7 @@ public class BookingServiceImpl implements BookingService {
     private final Clock clock;
     private final EntityManager entityManager;
     private final AuditService auditService;
+    private final TrainingWriteService trainingWriteService;
 
     public static final int MEMBER_CANCELLATION_CUTOFF_MINUTES = 120;
 
@@ -325,12 +327,19 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional
     public SelfTrainingAttendanceResponse recordSelfTrainingAttendance(SelfTrainingAttendanceRequest request, UserAccount receptionist) {
+        requireActor(receptionist, false);
+        if (receptionist.getRole() == null || !("RECEPTIONIST".equals(receptionist.getRole().getCode()) || "MANAGER".equals(receptionist.getRole().getCode())))
+            throw new AccessDeniedException("Only receptionists or managers can mark self-training attendance");
+        if (request == null) throw rule("Attendance request is required", "INVALID_REQUEST");
+        requirePositiveId(request.getBookingId(), "Booking ID");
         Booking booking = bookingRepository.findById(request.getBookingId())
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found for id: " + request.getBookingId()));
 
         if (booking.getStatus() != BookingStatus.CONFIRMED) {
             throw new BusinessRuleException("Cannot mark attendance for a non-confirmed booking");
         }
+
+        trainingWriteService.selfAttendance(receptionist.getId(), booking.getId(), request.getNote());
 
         SportPackageRegistration pkg = booking.getPackageRegistration();
         int remaining = pkg != null ? pkg.getRemainingSessions() : 0;
@@ -345,7 +354,7 @@ public class BookingServiceImpl implements BookingService {
                 .remainingSessions(remaining)
                 .confirmedAt(LocalDateTime.now(clock))
                 .recordedByName(receptionist.getFullName())
-                .message("Self-training attendance acknowledged (persistence pending Flow 4 implementation)")
+                .message("Self-training attendance recorded")
                 .build();
     }
 
@@ -394,6 +403,7 @@ public class BookingServiceImpl implements BookingService {
     private void audit(Booking booking, UserAccount actor, String action) {
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("sessionId", booking.getSession().getId());
+        details.put("sessionCode", booking.getSession().getSessionCode());
         details.put("memberId", booking.getMember().getId());
         details.put("packageRegistrationId", booking.getPackageRegistration() == null ? null : booking.getPackageRegistration().getId());
         details.put("status", booking.getStatus());
@@ -417,6 +427,7 @@ public class BookingServiceImpl implements BookingService {
                 .id(b.getId())
                 .bookingCode(b.getBookingCode())
                 .sessionId(b.getSession().getId())
+                .sessionCode(b.getSession().getSessionCode())
                 .sessionDate(b.getSession().getSessionDate())
                 .startTime(b.getSession().getStartTime())
                 .endTime(b.getSession().getEndTime())

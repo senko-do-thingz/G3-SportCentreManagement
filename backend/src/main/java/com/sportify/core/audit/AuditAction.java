@@ -1,6 +1,7 @@
 package com.sportify.core.audit;
 
 public final class AuditAction {
+    public static final String SESSION_RESCHEDULED = "SESSION_RESCHEDULED";
 
     private AuditAction() {}
 

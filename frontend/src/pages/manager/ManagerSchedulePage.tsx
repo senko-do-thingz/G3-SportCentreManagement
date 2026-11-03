@@ -1,3 +1,5 @@
+import { sessionIdText } from '../../api/sessionIdentity'
+import '../../components/sessionContext.css'
 import { useCallback, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../../api/errors'
@@ -33,6 +35,13 @@ export function ManagerSchedulePage() {
   function query(key: string, value: string) { setParams((previous) => { const next = new URLSearchParams(previous); if (value) next.set(key, value); else next.delete(key); next.delete('create'); return next }) }
   function closeEditor() { setEditing(null); if (params.has('create')) query('create', '') }
   function saved() { closeEditor(); setCancelling(null); reload(); toast.success('Schedule updated') }
+  function sessionSaved(session?: ManagerSession) {
+    if (!session) { saved(); return }
+    closeEditor()
+    if (monday(session.date) !== week) query('week', monday(session.date))
+    else reload()
+    toast.success(`Session ${sessionIdText(session.sessionId)} saved for ${displayDate(session.date)}`)
+  }
   const dates = Array.from({ length: 7 }, (_, index) => addDays(week, index))
   const today = centerNow().date
   const timeSlots = sessions.status === 'ready' ? [...new Set(sessions.data.map((session) => session.startTime.slice(0, 5)))].sort() : []
@@ -110,7 +119,7 @@ export function ManagerSchedulePage() {
         )}
       </>}
     </Card>
-    {editing && classes.status === 'ready' && facilitiesUsable && <SessionEditorModal item={editing === 'new' ? undefined : editing} classes={classes.data} facilities={facilities.status === 'ready' ? facilities.data : []} manualFacility={manualFacility} classId={classId} onClose={closeEditor} onSuccess={saved} />}
+    {editing && classes.status === 'ready' && facilitiesUsable && <SessionEditorModal item={editing === 'new' ? undefined : editing} classes={classes.data} facilities={facilities.status === 'ready' ? facilities.data : []} manualFacility={manualFacility} classId={classId} onClose={closeEditor} onSuccess={sessionSaved} />}
     {cancelling && <CancelSessionModal item={cancelling} onClose={() => setCancelling(null)} onSuccess={saved} />}
   </div>
 }
@@ -129,12 +138,14 @@ function ManagerScheduleEntry({
   onCancel: () => void
 }) {
   return <article className={`f2-session f2-session--${session.status.toLowerCase()}`}>
+    <span className="session-identity">Session ID <code>{sessionIdText(session.sessionId)}</code></span>
     <strong className="f2-session__title">{session.class?.name ?? 'Unassigned class'}</strong>
+    <p className="f2-session__meta">{session.sportName}</p>
     <div className="f2-session__timing">
       <span>{session.startTime.slice(0, 5)} - {session.endTime.slice(0, 5)}</span>
       <StatusBadge status={session.status} />
     </div>
-    <p className="f2-session__meta">Coach: {session.coach?.name ?? 'Not assigned'}</p>
+    <p className="f2-session__meta">{session.trainingType === 'SELF_TRAINING' && !session.coach ? 'Self-training - No assigned coach' : `Coach: ${session.coach?.name ?? 'Coach not assigned'}`}</p>
     <p className="f2-session__meta">Facility: {session.facility?.name ?? 'Not assigned'}</p>
     <p className="f2-session__meta">{session.bookedCount} / {session.capacity} booked - {session.trainingType === 'COACH_LED' ? 'Coach-led' : 'Self-training'}</p>
     {session.status === 'CANCELLED' && <p className="f2-session__meta f2-session__reason">Reason: {session.cancelReason || 'Not provided'}</p>}

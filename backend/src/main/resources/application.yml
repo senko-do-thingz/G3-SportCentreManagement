@@ -43,6 +43,11 @@ application:
         expiration: 604800000
 
 app:
+  training:
+    attendance-backfill:
+      # Activation and a positive ISO-8601 duration both require an approved operational cutoff.
+      enabled: ${ATTENDANCE_BACKFILL_ENABLED:false}
+      window: ${ATTENDANCE_BACKFILL_WINDOW:}
   cors:
     # Comma separated list of origins allowed to call the API from a browser.
     # Empty means no cross-origin request is accepted. Overridden per profile.

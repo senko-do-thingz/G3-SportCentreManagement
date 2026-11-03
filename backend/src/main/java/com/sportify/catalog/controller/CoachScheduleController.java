@@ -29,4 +29,8 @@ public class CoachScheduleController {
     public List<CoachRosterResponse> roster(@PathVariable Long id) {
         return service.roster(id);
     }
+    @GetMapping("/by-code/{sessionId}/roster")
+    public List<CoachRosterResponse> rosterByCode(@PathVariable String sessionId) {
+        return service.rosterByCode(sessionId);
+    }
 }
