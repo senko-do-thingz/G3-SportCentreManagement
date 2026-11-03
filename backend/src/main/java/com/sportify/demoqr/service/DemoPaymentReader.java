@@ -14,12 +14,12 @@ import com.sportify.payment.entity.PaymentStatus;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.service.PaymentVerificationService;
 import com.sportify.payment.service.impl.PaymentNotes;
+import com.sportify.demoqr.config.SimulatedSettlementEnabledCondition;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Profile;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,8 +36,7 @@ import java.util.Objects;
  * and PAYMENT_CONFIRMED activity log) without creating actual cash collection tickets or cash_event rows.
  */
 @Service
-@Profile("qr-simulator & !prod & !production")
-@ConditionalOnProperty(name = "app.payment.simulator.enabled", havingValue = "true")
+@Conditional(SimulatedSettlementEnabledCondition.class)
 public class DemoPaymentReader {
     private final PaymentRepository payments;
     private final MemberCardRepository cards;
