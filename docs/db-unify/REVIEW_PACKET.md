@@ -1,0 +1,13 @@
+# CODEOWNER review packet
+
+This is a proposed isolated development candidate, not an approved architecture or live deployment. The master work authorization permits reversible development and disposable testing through Tasks01-06; operational target changes remain blocked.
+
+Read [architecture and configuration](README.md), [migration/checksum compatibility](MIGRATION_COMPATIBILITY.md), [read-only reconciliation](RECONCILIATION.md), [regression commands](REGRESSION.md) and [operator cutover and rollback](OPERATOR_CUTOVER_POWERSHELL.md). Task01/02 source inventory and design alternatives and all six private task reports remain under the original ignored tasks/DB-UNIFY (i)/NN/reports/round-001 directories; the authoritative final consolidated report is under Task06. Private instructions, AI audit records, raw logs, screenshots and database backups are not committed.
+
+Task03 adds a distinct fail-closed unified-demo profile and synthetic Member restrictions while retaining the original local-demo guard. Task04 adds read-only preflight, zero-import policy, disposable upgrades/negative fixtures and native backup/restore proof. Task05 adds shared real HTTP/SQL contract coverage, explicit safe local test fixtures, mandatory CI suites and a real browser/restart harness. Task06 supplies the cutover/recovery/retention boundary and final evidence packet.
+
+No historical SQL migration changed; V38 was not imported. No second runtime datasource or QR database was added. Production never enables the new capability. Ordinary members and unsupported methods cannot confirm synthetic payments; actual cash/revenue/refund boundaries remain enforced. No legacy row is selected for import.
+
+Before approval, inspect the exact PR HEAD checks and final local handoff for actual pass/fail/skip totals, failed attempts and unrun gates. Full CI and browser results must be from that commit. Restore proof on empty synthetic fixtures does not certify an existing user database or authorize canonical activation. Physical JDBC connection abort and real Manager browser rescheduling are included in the final regression selectors; their actual results, along with remaining manual acceptance, are recorded in the handoff. No agent waiver applies.
+
+CODEOWNER decisions: accept option A versus replacing the legacy guard or introducing schema tenancy; approve synthetic Member identity/provisioning policy; keep legacy data archived with a separately chosen retention period; authorize any exact local target only after target-specific preflight and native backup/restore rehearsal. Request Create a merge commit only if later approved. Preserve the branch. No self-approval, merge, deployment or branch deletion is performed.
