@@ -1,0 +1,63 @@
+import { useCallback, useRef, useState, type FormEvent } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { classLearningApi as learning, type LearningClass } from '../../api/classLearningApi'
+import { Button, Card, EmptyState, Input, PageHeader, Select } from '../../components/ui'
+import { TrainingData } from '../member/TrainingData'
+import { TrainingTextarea, ActionMessage } from './TrainingFormFields'
+import { attendanceLabel, useTrainingAction } from './trainingFormState'
+
+export function MemberClassesPage() {
+  return <div className="training-page"><PageHeader title="My classes" description="Class information, your participation and conversations with your coach." />
+    <TrainingData load={learning.classes}>{classes => classes.length ? <Card><ul className="training-list">{classes.map(item => <li key={item.id}><h2>{item.name}</h2><p>{item.sportName} - {item.level ?? 'All levels'} - Coach: {item.coachName ?? 'Not assigned'}</p><Link to={`/member/training/classes/${item.id}`}>View class: {item.name}</Link></li>)}</ul></Card> : <EmptyState title="No booked classes yet" action={<Link to="/member/classes">Find a class</Link>} />}</TrainingData></div>
+}
+export function MemberClassDetailPage() {
+  const { id = '' } = useParams()
+  const load = useCallback((signal: AbortSignal) => learning.detail(id, signal), [id])
+  return <TrainingData load={load}>{({ learningClass: item, sessions }) => <div className="training-page"><Link to="/member/training/classes">Back to my classes</Link><PageHeader title={item.name} description={`${item.sportName} - ${item.level ?? 'All levels'}`} /><Card title="Class information"><dl><dt>Coach</dt><dd>{item.coachName ?? 'Not assigned'}</dd><dt>Capacity</dt><dd>{item.capacity}</dd><dt>Class status</dt><dd>{item.active === false ? 'Inactive' : 'Active'}</dd></dl><Link to={`/member/training/questions?classId=${item.id}`}>Ask your coach about supplementary practice</Link></Card>
+    <Card title="My sessions and attendance"><ul className="training-list">{sessions.map(session => <li key={session.bookingId}><h3>{new Intl.DateTimeFormat('en-GB').format(new Date(`${session.date}T00:00:00`))} - {session.startTime.slice(0,5)}-{session.endTime.slice(0,5)}</h3><p>{session.trainingFormat === 'SELF_TRAINING' ? 'Self-training' : 'Coach-led'} - {session.sessionStatus} - {session.freeSeats} of {session.capacity} places available{session.freeSeats === 0 ? ' - Full' : ''}</p><p>{session.sessionStatus === 'CANCELLED' ? 'Session cancelled' : session.bookingStatus === 'CANCELLED' ? 'Booking cancelled' : attendanceLabel(session.attendanceStatus)}</p>{item.active !== false && session.sessionStatus === 'PUBLISHED' && <Link to={`/member/sessions/${session.sessionId}`}>View session availability and booking rules</Link>}{session.notes && <p>{session.notes}</p>}{session.resultId && <Link to={`/member/training/results/${session.resultId}`}>View session assessment</Link>}</li>)}</ul></Card><Link to="/member/training/plans">View assigned practice plans</Link></div>}</TrainingData>
+}
+export function ClassQuestionsPage({ coach = false }: { coach?: boolean }) {
+  const [revision, refresh] = useState(0)
+  const [selected, setSelected] = useState('')
+  const load = useCallback((signal: AbortSignal) => learning.questions(coach, signal), [coach])
+  const discussion = useCallback((signal: AbortSignal) => learning.discussion(coach, selected, signal), [coach, selected])
+  const action = useTrainingAction()
+  const operation = useSubmissionIdentity()
+  function reply(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = event.currentTarget
+    const body = String(new FormData(form).get('body')).trim()
+    void action.run(async () => { await learning.reply(coach, selected, body, operation.key([coach, selected, body])); operation.complete(); form.reset(); refresh(value => value + 1) }, 'Message sent.')
+  }
+  return <div className="training-page"><PageHeader title={coach ? 'Member practice questions' : 'Ask your coach'} description="Discuss class exercises and supplementary practice with the assigned coach." />
+    {!coach && <TrainingData load={learning.classes}>{classes => <AskForm classes={classes} onSaved={id => { setSelected(String(id)); refresh(value => value + 1) }} />}</TrainingData>}
+    <TrainingData key={revision} load={load}>{questions => questions.length ? <Card title="Conversations"><Select label="Class question" placeholder="Select a conversation" value={selected} onChange={event => setSelected(event.target.value)} options={questions.map(q => ({ value: String(q.id), label: `${q.className} - ${q.memberName} - ${q.subject}` }))} /></Card> : <EmptyState title="No class questions yet" />}</TrainingData>
+    {selected && <TrainingData key={`${selected}-${revision}`} load={discussion}>{data => <Card title={data.question.subject}><p>{data.question.description}</p><ul className="training-list">{data.messages.map(message => <li key={message.id}><strong>{message.senderName}</strong><p className="training-copy">{message.body}</p></li>)}</ul><form onSubmit={reply} className="training-form"><TrainingTextarea label={coach ? 'Coach reply and practice guidance' : 'Follow-up question'} name="body" required maxLength={2000} disabled={action.pending} /><Button type="submit" loading={action.pending}>Send message</Button></form><ActionMessage {...action} /></Card>}</TrainingData>}
+  </div>
+}
+function AskForm({ classes, onSaved }: { classes: LearningClass[]; onSaved: (id: number) => void }) {
+  const [params] = useSearchParams()
+  const action = useTrainingAction()
+  const operation = useSubmissionIdentity()
+  if (!classes.length) return null
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = event.currentTarget
+    const values = new FormData(form)
+    const request = { classId: Number(values.get('classId')), subject: String(values.get('subject')).trim(), body: String(values.get('body')).trim() }
+    void action.run(async () => { const created = await learning.ask(request, operation.key(request)); operation.complete(); form.reset(); onSaved(created.id) }, 'Question sent to your coach.')
+  }
+  return <Card title="New question"><form onSubmit={submit} className="training-form"><fieldset className="training-fieldset" disabled={action.pending}><Select label="Your class" name="classId" required defaultValue={params.get('classId') ?? ''} placeholder="Select your class" options={classes.map(c => ({ value: String(c.id), label: c.name }))} /><Input label="Question subject" name="subject" required maxLength={200} /><TrainingTextarea label="Practice question" name="body" required maxLength={2000} /><Button type="submit" loading={action.pending}>Ask coach</Button></fieldset></form><ActionMessage {...action} /></Card>
+}
+// Preserve the identity after an uncertain failure. Success or edited content starts a new operation.
+function useSubmissionIdentity() {
+  const pending = useRef<{ payload: string; id: string } | null>(null)
+  return {
+    key(payload: unknown) {
+      const serialized = JSON.stringify(payload)
+      if (pending.current?.payload !== serialized) pending.current = { payload: serialized, id: crypto.randomUUID() }
+      return pending.current.id
+    },
+    complete() { pending.current = null },
+  }
+}

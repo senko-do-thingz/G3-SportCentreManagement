@@ -97,7 +97,9 @@ describe('FE-07 schedule', () => {
     expect(screen.getAllByRole('button', { name: 'Cancel session' })).toHaveLength(12)
   })
   it('shows multiple time slots and sorts same-time sessions regardless of API order', async () => {
-    const namedSession = (id: number, name: string, sessionDate = date, startTime = '09:00:00', endTime = '10:00:00') => ({
+    // Keep both fixture days inside the selected week, including Sunday runs.
+    const sortDate = monday(date)
+    const namedSession = (id: number, name: string, sessionDate = sortDate, startTime = '09:00:00', endTime = '10:00:00') => ({
       ...session,
       id,
       date: sessionDate,
@@ -107,11 +109,11 @@ describe('FE-07 schedule', () => {
     })
     backend(false, false, [
       namedSession(30, 'Zulu class'),
-      namedSession(31, 'Next day class', addDays(date, 1)),
-      namedSession(32, 'Later class', date, '10:00:00', '11:00:00'),
+      namedSession(31, 'Next day class', addDays(sortDate, 1)),
+      namedSession(32, 'Later class', sortDate, '10:00:00', '11:00:00'),
       namedSession(33, 'Alpha class'),
     ])
-    renderApp(`/manager/schedule?week=${monday(date)}`)
+    renderApp(`/manager/schedule?week=${sortDate}`)
 
     const table = await screen.findByRole('table', { name: 'Manager weekly schedule' })
     const rows = within(table).getAllByRole('row')
