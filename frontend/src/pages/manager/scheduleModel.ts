@@ -1,3 +1,4 @@
+import { formatCalendarDate } from '../../utils/date'
 import type { DayOfWeek, ManagerSession } from '../../api/managerSessionsApi'
 
 export const WEEKDAYS: DayOfWeek[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
@@ -18,7 +19,7 @@ export function monday(value: string): string {
   const date = validDate(value) ? value : centerNow().date
   return addDays(date, -((new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7))
 }
-export function displayDate(value: string): string { return value.split('-').reverse().join('/') }
+export function displayDate(value: string): string { return formatCalendarDate(value) }
 function compareName(left: string | null | undefined, right: string | null | undefined): number {
   const a = (left ?? '').normalize('NFKC').trim().toLowerCase()
   const b = (right ?? '').normalize('NFKC').trim().toLowerCase()

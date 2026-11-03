@@ -1,3 +1,5 @@
+import { formatDateTime } from '../../utils/format'
+import { formatCalendarDate } from '../../utils/date'
 import { useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { memberTrainingApi as training, type CoachFeedback, type TrainingSession } from '../../api/memberTrainingApi'
@@ -32,7 +34,7 @@ function FeedbackList({ feedback }: { feedback: CoachFeedback[] }) {
         <li key={item.id}>
           <h3>{item.coachName} - Rating {item.rating}/5</h3>
           <p><Link to={`/member/training/plans/${item.planId}`}>{item.planTitle}</Link></p>
-          <p><time dateTime={item.createdAt}>{new Intl.DateTimeFormat('en-GB', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(item.createdAt))}</time></p>
+          <p><time dateTime={item.createdAt}>{formatDateTime(item.createdAt)}</time></p>
           <p className="training-copy">{item.comments}</p>
           {item.strengths && <p className="training-copy"><strong>Strengths: </strong>{item.strengths}</p>}
           {item.areasForImprovement && <p className="training-copy"><strong>Areas for improvement: </strong>{item.areasForImprovement}</p>}
@@ -148,7 +150,7 @@ export function TrainingResultsPage() {
                   {row.notes && <p className="training-copy">{row.notes}</p>}
                   <Link
                     to={`/member/training/results/${row.id}`}
-                    aria-label={`View session results: ${row.session.className}, ${row.session.date}, ${row.session.startTime.slice(0, 5)}`}
+                    aria-label={`View session results: ${row.session.className}, ${formatCalendarDate(row.session.date)}, ${row.session.startTime.slice(0, 5)}`}
                   >
                     View session results
                   </Link>

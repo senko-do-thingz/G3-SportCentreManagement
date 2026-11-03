@@ -185,7 +185,7 @@ export function isSingleVisitRegistration(
   return days !== null && days <= 1
 }
 
-/** "02 Oct 2026 - 31 Oct 2026", or "-" pieces when a date is missing. */
+/** "02/10/2026 - 31/10/2026", or "-" pieces when a date is missing. */
 export function validityRange(startDate: string | null, endDate: string | null): string {
   return `${formatDate(startDate)} - ${formatDate(endDate)}`
 }

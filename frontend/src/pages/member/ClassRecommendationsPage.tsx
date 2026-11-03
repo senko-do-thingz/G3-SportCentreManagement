@@ -1,3 +1,4 @@
+import { formatCalendarDate } from '../../utils/date'
 import { sessionIdText } from '../../api/sessionIdentity'
 import { useCallback, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
@@ -29,7 +30,7 @@ export function ClassRecommendationsPage() {
     </form></Card>
     <TrainingData load={load}>{data => <Card title="Recommended classes"><p>{data.mode} - {data.message}</p>
       {data.items.length ? <ul className="training-list">{data.items.map(item => <li key={item.classId}><h2>{item.className}</h2>
-        <p>{item.sportName} - {item.level} - {item.coachName ?? 'Self-training'} - {item.date} {item.startTime.slice(0,5)}-{item.endTime.slice(0,5)}</p>
+        <p>{item.sportName} - {item.level} - {item.coachName ?? 'Self-training'} - {formatCalendarDate(item.date)} {item.startTime.slice(0,5)}-{item.endTime.slice(0,5)}</p>
         <p>{item.freeSeats} available places - Preference score: {item.score}</p><ul>{item.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>
         <Link to={`/member/sessions/${item.sessionCode ?? item.sessionId}`}>View details and booking rules: {item.className} - {sessionIdText(item.sessionCode)}</Link></li>)}</ul>
         : <EmptyState title="No matching available classes" description="Try another date range or sport. A full or unpublished class is not recommended." />}

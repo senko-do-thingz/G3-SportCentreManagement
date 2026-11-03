@@ -1,3 +1,4 @@
+import { formatDateTime } from '../../utils/format'
 import { parseSessionReference, sessionRouteReference } from '../../api/sessionIdentity'
 import { SessionContext } from '../../components/SessionContext'
 import { sessionIdText } from '../../api/sessionIdentity'
@@ -86,9 +87,7 @@ export function CoachTeachingSchedulePage() {
 }
 
 function rosterBookedAt(value: string | null): string {
-  if (!value || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) return 'Not provided'
-  const [date, time] = value.split('T')
-  return `${browseDate(date)} ${time.slice(0, 5)}`
+  return formatDateTime(value)
 }
 
 function RosterTable({ rows }: { rows: CoachRosterRecord[] }) {

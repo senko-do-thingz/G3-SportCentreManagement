@@ -1,3 +1,4 @@
+import { formatDateTime } from '../../utils/format'
 import { SessionContext } from '../../components/SessionContext'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -64,7 +65,7 @@ function BookingHistoryCard({ booking, when }: { booking: MemberBookingRecord; w
     <div className="booking-history-card__heading"><div><p className="booking-history-card__date">{bookingDate(booking.sessionDate)} / {bookingTime(booking.startTime)} - {bookingTime(booking.endTime)}</p><h2>{bookingTitle(booking)}</h2></div><Badge tone={booking.status === 'CONFIRMED' ? 'success' : 'neutral'}>{booking.status === 'CONFIRMED' ? 'Confirmed' : 'Cancelled'}</Badge></div>
     <SessionContext {...booking} sessionId={booking.sessionCode} date={booking.sessionDate} />
     <p className="browse-muted">{booking.sportName || 'Sport not provided'}{!self && ` - ${booking.coachName || 'Coach not provided'}`} - {booking.facilityName || 'Facility not provided'}</p>
-    {booking.status === 'CANCELLED' && <div className="booking-cancelled-meta"><span>Cancelled by {actorName(booking)}</span>{booking.cancelledAt && <span>On {booking.cancelledAt.replace('T', ' ').slice(0, 16)}</span>}{booking.cancelReason && <span>Reason: {booking.cancelReason}</span>}</div>}
+    {booking.status === 'CANCELLED' && <div className="booking-cancelled-meta"><span>Cancelled by {actorName(booking)}</span>{booking.cancelledAt && <span>On {formatDateTime(booking.cancelledAt)}</span>}{booking.cancelReason && <span>Reason: {booking.cancelReason}</span>}</div>}
     <details className="booking-details"><summary>Booking details</summary><dl className="browse-facts"><div><dt>Booking code</dt><dd>{booking.bookingCode}</dd></div><div><dt>Training</dt><dd>{self ? 'Self-training' : 'Coach-led'}</dd></div><div><dt>Package</dt><dd>{booking.packageName || 'Not provided'}</dd></div>{!self && <div><dt>Coach</dt><dd>{booking.coachName || 'Not provided'}</dd></div>}<div><dt>Facility</dt><dd>{booking.facilityName || 'Not provided'}</dd></div></dl></details>
     <div className="browse-actions booking-actions">{when === 'UPCOMING' && booking.status === 'CONFIRMED' && <Link className={buttonClassName('secondary')} to={cancelHref}>Cancel booking</Link>}{when === 'PAST' && booking.status === 'CONFIRMED' && <span className="browse-muted">Session completed</span>}</div>
   </article>
@@ -247,7 +248,7 @@ function BookingCancelledContent({ id, memberId }: { id: number; memberId: numbe
       <h2>{bookingTitle(booking)}</h2>
       <SessionContext {...booking} sessionId={booking.sessionCode} date={booking.sessionDate} />
       <p className="booking-code">Booking code: <strong>{booking.bookingCode}</strong></p>
-      <dl className="browse-facts booking-confirmation__facts"><div><dt>Date</dt><dd>{bookingDate(booking.sessionDate)}</dd></div><div><dt>Time</dt><dd>{bookingTime(booking.startTime)} - {bookingTime(booking.endTime)} (Vietnam time)</dd></div><div><dt>Cancelled by</dt><dd>{actorName(booking)}</dd></div>{booking.cancelledAt && <div><dt>Cancelled at</dt><dd>{booking.cancelledAt.replace('T', ' ').slice(0, 16)}</dd></div>}</dl>
+      <dl className="browse-facts booking-confirmation__facts"><div><dt>Date</dt><dd>{bookingDate(booking.sessionDate)}</dd></div><div><dt>Time</dt><dd>{bookingTime(booking.startTime)} - {bookingTime(booking.endTime)} (Vietnam time)</dd></div><div><dt>Cancelled by</dt><dd>{actorName(booking)}</dd></div>{booking.cancelledAt && <div><dt>Cancelled at</dt><dd>{formatDateTime(booking.cancelledAt)}</dd></div>}</dl>
       {registration?.totalSessions === null ? <p>This package has no session limit. You can review its current status in My sport packages.</p> : registration && registration.remainingSessions !== null ? <p>Latest package balance: {registration.remainingSessions} sessions remaining.</p> : <p>The latest package balance is unavailable. Review My sport packages for the current count.</p>}
       <div className="browse-actions booking-actions"><Link className={buttonClassName()} to="/member/bookings?when=PAST">View past bookings</Link><Link className={buttonClassName('secondary')} to="/member/schedule">Browse schedule</Link><Link className={buttonClassName('secondary')} to="/member/membership">My sport packages</Link></div>
     </Card>

@@ -115,8 +115,8 @@ describe('FE-04 Membership Cards (F1-11)', () => {
     await openCards()
     const { dialog } = await openOverlay('Gold Member', 'Get card')
     expect(within(dialog).getByTestId('card-amount')).toHaveTextContent('300.000 VND')
-    expect(within(dialog).getByTestId('card-start')).toHaveTextContent('13 Oct 2026')
-    expect(within(dialog).getByTestId('card-end')).toHaveTextContent('12 Oct 2027')
+    expect(within(dialog).getByTestId('card-start')).toHaveTextContent('13/10/2026')
+    expect(within(dialog).getByTestId('card-end')).toHaveTextContent('12/10/2027')
   })
 
   it('TC-FE04-032 renew: VIP member sees Renew card, term starts the day after the current end', async () => {
@@ -126,8 +126,8 @@ describe('FE-04 Membership Cards (F1-11)', () => {
     const { dialog } = await openOverlay('VIP Member', 'Renew card')
     expect(within(dialog).getByText('Renew card')).toBeInTheDocument()
     expect(within(dialog).getByTestId('card-amount')).toHaveTextContent('600.000 VND')
-    expect(within(dialog).getByTestId('card-start')).toHaveTextContent('05 Jul 2027')
-    expect(within(dialog).getByTestId('card-end')).toHaveTextContent('04 Jul 2028')
+    expect(within(dialog).getByTestId('card-start')).toHaveTextContent('05/07/2027')
+    expect(within(dialog).getByTestId('card-end')).toHaveTextContent('04/07/2028')
     expect(within(dialog).getByText('10%')).toBeInTheDocument()
   })
 
@@ -138,17 +138,17 @@ describe('FE-04 Membership Cards (F1-11)', () => {
     expect(within(dialog).getByText('Card fee').nextElementSibling).toHaveTextContent('600.000 VND')
     expect(within(dialog).getByText('Paid with your Gold Member card').nextElementSibling).toHaveTextContent('-300.000 VND')
     expect(within(dialog).getByTestId('card-amount')).toHaveTextContent('300.000 VND')
-    expect(within(dialog).getByTestId('card-start')).toHaveTextContent('13 Oct 2026')
-    expect(within(dialog).getByTestId('card-end')).toHaveTextContent('04 Jul 2027')
+    expect(within(dialog).getByTestId('card-start')).toHaveTextContent('13/10/2026')
+    expect(within(dialog).getByTestId('card-end')).toHaveTextContent('04/07/2027')
   })
 
   it('TC-FE04-034 cheaper tier: VIP member buying Gold starts after the VIP card ends', async () => {
     await openCards({ cards: [VIP_CARD] })
-    expect(within(tier('Gold Member')).getByText(/Starts 05 Jul 2027, after your current card ends/)).toBeInTheDocument()
+    expect(within(tier('Gold Member')).getByText(/Starts 05\/07\/2027, after your current card ends/)).toBeInTheDocument()
     const { dialog } = await openOverlay('Gold Member', 'Buy after current card')
     expect(within(dialog).getByTestId('card-amount')).toHaveTextContent('300.000 VND')
-    expect(within(dialog).getByTestId('card-start')).toHaveTextContent('05 Jul 2027')
-    expect(within(dialog).getByTestId('card-end')).toHaveTextContent('04 Jul 2028')
+    expect(within(dialog).getByTestId('card-start')).toHaveTextContent('05/07/2027')
+    expect(within(dialog).getByTestId('card-end')).toHaveTextContent('04/07/2028')
   })
 
   it('TC-FE04-035 confirm sends POST /membership-cards/purchase and opens the payment summary', async () => {
@@ -189,7 +189,7 @@ describe('FE-04 Membership Cards (F1-11)', () => {
   it('TC-FE04-038 upgrade while a renewal is queued is blocked with the reason', async () => {
     const queued = card({ id: 6, tierId: 2, tierName: 'Gold Member', startDate: '2027-07-05', endDate: '2028-07-04' })
     await openCards({ cards: [GOLD_CARD, queued] })
-    expect(within(tier('Gold Member')).getByText('Starts 05 Jul 2027')).toBeInTheDocument()
+    expect(within(tier('Gold Member')).getByText('Starts 05/07/2027')).toBeInTheDocument()
     expect(within(tier('VIP Member')).getByText(/already renewed from 2027-07-05/)).toBeInTheDocument()
     expect(within(tier('VIP Member')).queryByRole('button')).not.toBeInTheDocument()
   })
@@ -251,7 +251,7 @@ describe('FE-04 My Membership and Sport Packages (F1-12)', () => {
     expect(within(item).getByText('Pending payment')).toBeInTheDocument()
     expect(within(item).getByText('Football - Coach-led')).toBeInTheDocument()
     expect(within(item).getByText('30 days - 8 sessions')).toBeInTheDocument()
-    expect(within(item).getByText('02 Oct 2026 to 31 Oct 2026')).toBeInTheDocument()
+    expect(within(item).getByText('02/10/2026 to 31/10/2026')).toBeInTheDocument()
     expect(within(item).getByText('810.000 VND')).toBeInTheDocument()
     expect(within(item).getByText('8 of 8 sessions remaining')).toBeInTheDocument()
     expect(within(item).getByRole('link', { name: 'Pay now' })).toHaveAttribute('href', '/member/payments/52')
@@ -291,7 +291,7 @@ describe('FE-04 My Membership and Sport Packages (F1-12)', () => {
     expect(screen.getByRole('tab', { name: 'Membership card' })).toHaveAttribute('aria-selected', 'true')
     const item = await screen.findByRole('listitem', { name: /CARD-0001 VIP/ })
     expect(within(item).getByText('Active')).toBeInTheDocument()
-    expect(within(item).getByText('05 Jul 2026 to 04 Jul 2027')).toBeInTheDocument()
+    expect(within(item).getByText('05/07/2026 to 04/07/2027')).toBeInTheDocument()
     expect(within(item).queryByRole('button', { name: 'Cancel request' })).not.toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'View card tiers' })[0]).toHaveAttribute('href', '/member/membership/cards')
   })

@@ -35,7 +35,7 @@ describe('shared UI components', () => {
     }
     expect(screen.getByRole('table', { name: 'Demo center accounts' })).toBeInTheDocument()
     expect(screen.getByText('1.350.000 VND')).toBeInTheDocument()
-    expect(screen.getByText('04 Jul 2027')).toBeInTheDocument()
+    expect(screen.getByText('04/07/2027')).toBeInTheDocument()
   })
 
   it('opens the modal, closes it with Escape and shows a toast', async () => {

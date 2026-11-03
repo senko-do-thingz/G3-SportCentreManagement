@@ -95,13 +95,13 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
     expect(screen.getByRole('heading', { name: 'Ready for your next session?' })).toBeInTheDocument()
     expect(screen.getByText('Welcome back, Taylor Nguyen')).toBeInTheDocument()
     expect(statValue('Membership tier')).toBe('VIP')
-    expect(statHint('Membership tier')).toBe('Active - Until 04 Jul 2027 - 10% off packages longer than a single visit')
+    expect(statHint('Membership tier')).toBe('Active - Until 04/07/2027 - 10% off packages longer than a single visit')
     expect(statValue('Active packages')).toBe('1')
     expect(statValue('Upcoming sessions')).toBe('1')
 
     const item = screen.getByRole('listitem', { name: 'Football - Coach-led' })
     expect(within(item).getByText('REG-0011')).toBeInTheDocument()
-    expect(within(item).getByText('Football 30 days - Ends 30 Oct 2026')).toBeInTheDocument()
+    expect(within(item).getByText('Football 30 days - Ends 30/10/2026')).toBeInTheDocument()
     expect(within(item).getByText('6 of 8 sessions remaining')).toBeInTheDocument()
     expect(within(item).getByText('Active')).toBeInTheDocument()
     const bar = within(item).getByRole('progressbar')
@@ -163,7 +163,7 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
   it('TC-FE02-026 a package bought in advance shows its start date', async () => {
     await openDashboard({ registrations: [registration({ startDate: '2026-10-20', endDate: '2026-11-18' })] })
     const item = screen.getByRole('listitem', { name: 'Football - Coach-led' })
-    expect(within(item).getByText('Starts 20 Oct 2026')).toBeInTheDocument()
+    expect(within(item).getByText('Starts 20/10/2026')).toBeInTheDocument()
     expect(statValue('Active packages')).toBe('1')
   })
 

@@ -231,7 +231,7 @@ describe('FE-09 member booking screens', () => {
     })
     const user = userEvent.setup()
     renderApp('/member/bookings/21/cancel')
-    expect(await screen.findByText(/Cancel by 05\/11\/2026, 15:00 Vietnam time/)).toBeInTheDocument()
+    expect(await screen.findByText(/Cancel by 05\/11\/2026 15:00 Vietnam time/)).toBeInTheDocument()
     await user.dblClick(screen.getByRole('button', { name: 'Confirm cancellation' }))
     expect(await screen.findByRole('heading', { name: 'Booking cancelled' })).toBeInTheDocument()
     expect(screen.getByText('Cancelled by', { selector: 'dt' })).toBeInTheDocument()

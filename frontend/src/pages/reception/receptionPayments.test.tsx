@@ -429,7 +429,7 @@ describe('FE-12 Verify and Record Payment (F3-05)', () => {
     const { calls } = await open('/reception/payments/41/receipt')
     expect(await screen.findByRole('heading', { name: 'Receipt INV-1041' })).toBeInTheDocument()
     const receipt = screen.getByRole('region', { name: 'Receipt' })
-    expect(within(receipt).getByText('INV-1041 / 02 Oct 2026')).toBeInTheDocument()
+    expect(within(receipt).getByText('INV-1041 / 02/10/2026')).toBeInTheDocument()
     expect(within(receipt).getByText('Taylor Nguyen / MB-0246')).toBeInTheDocument()
     expect(within(receipt).getByText('810.000 VND')).toBeInTheDocument()
     expect(within(receipt).getByText('Paid')).toBeInTheDocument()

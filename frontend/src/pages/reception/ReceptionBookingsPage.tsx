@@ -1,3 +1,4 @@
+import { formatDateTime } from '../../utils/format'
 import { SessionContext } from '../../components/SessionContext'
 import { sessionIdText, parseSessionReference, sessionRouteReference } from '../../api/sessionIdentity'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -212,8 +213,8 @@ function ReceptionBookingsContent() {
               <StatusBadge status={booking.status} />
             </div>
             <SessionContext {...booking} sessionId={booking.sessionCode} date={booking.sessionDate} /><p className="browse-muted">{booking.sportName || 'Sport not provided'}{booking.trainingType !== 'SELF_TRAINING' && ` - ${booking.coachName || 'Coach not provided'}`} - {booking.facilityName || 'Facility not provided'}</p>
-            <dl className="browse-facts booking-facts"><div><dt>Booking code</dt><dd>{booking.bookingCode}</dd></div><div><dt>Package</dt><dd>{booking.packageName || 'Not provided'}</dd></div><div><dt>Booked</dt><dd>{booking.bookedAt?.replace('T', ' ').slice(0, 16) || 'Not provided'}</dd></div></dl>
-            {booking.status === 'CANCELLED' && <p className="browse-muted">Cancelled {booking.cancelledAt ? `on ${booking.cancelledAt.replace('T', ' ').slice(0, 16)}` : ''}{booking.cancelledByName ? ` by ${booking.cancelledByName}` : ''}</p>}
+            <dl className="browse-facts booking-facts"><div><dt>Booking code</dt><dd>{booking.bookingCode}</dd></div><div><dt>Package</dt><dd>{booking.packageName || 'Not provided'}</dd></div><div><dt>Booked</dt><dd>{formatDateTime(booking.bookedAt)}</dd></div></dl>
+            {booking.status === 'CANCELLED' && <p className="browse-muted">Cancelled {booking.cancelledAt ? `on ${formatDateTime(booking.cancelledAt)}` : ''}{booking.cancelledByName ? ` by ${booking.cancelledByName}` : ''}</p>}
             {booking.status === 'CONFIRMED' && when === 'UPCOMING' && booking.id !== unverifiedCancellation?.bookingId && <div className="browse-actions booking-actions"><Button variant="danger" onClick={() => setCancelTarget({ memberId, booking })}>Cancel booking</Button></div>}
           </article>)}
         </div>}

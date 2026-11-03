@@ -80,7 +80,7 @@ function CreatePlanForm({ classId, members, onSaved }: { classId: number; member
     <form className="training-form" onSubmit={submit}>
       <fieldset disabled={action.pending} className="training-fieldset">
         <Select label="Member booking" name="bookingId" required placeholder="Select a confirmed booking" value={bookingId} onChange={event => { setBookingId(event.target.value); setSteps([blankStep()]) }}
-          options={members.map(member => ({ value: String(member.bookingId), label: `${member.memberName} - Booking #${member.bookingId} - ${member.sessionDate}` }))} />
+          options={members.map(member => ({ value: String(member.bookingId), label: `${member.memberName} - Booking #${member.bookingId} - ${formatCalendarDate(member.sessionDate)}` }))} />
         {bookingId && <CoachDrillDrafts key={bookingId} bookingId={Number(bookingId)} onUse={drafts => setSteps(drafts.map(draft => ({ title: draft.title, durationMinutes: String(draft.durationMinutes), instructions: draft.instructions })))} />}
         <Input label="Plan title" name="title" required maxLength={150} />
         <TrainingTextarea label="Plan description" name="description" maxLength={1000} />
