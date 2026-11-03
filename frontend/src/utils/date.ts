@@ -1,4 +1,15 @@
 /** Date helpers shared by every screen. */
+import { isCalendarDate } from '../api/responseValidation'
+
+/** A stored calendar date never changes with the browser timezone. */
+export function formatCalendarDate(value: string | null | undefined): string {
+  return isCalendarDate(value) ? `${value.slice(8, 10)}/${value.slice(5, 7)}/${value.slice(0, 4)}` : '-'
+}
+
+/** Stored session LocalTime fields already belong to the center calendar. */
+export function formatClockTime(value: string | null | undefined): string {
+  return value && /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d(\.\d{1,9})?)?$/.test(value) ? value.slice(0, 5) : '-'
+}
 
 /** Centre business day, matching the backend ClockConfig regardless of browser timezone. */
 export function businessDate(moment = new Date()): string {

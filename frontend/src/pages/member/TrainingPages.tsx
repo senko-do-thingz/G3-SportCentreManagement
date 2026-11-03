@@ -1,13 +1,13 @@
 import { useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { memberTrainingApi as training, type CoachFeedback, type TrainingSession } from '../../api/memberTrainingApi'
+import { SessionContext } from '../../components/SessionContext'
 import { Card } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { TrainingData } from './TrainingData'
 import './training.css'
 
-const dateFormatter = new Intl.DateTimeFormat('en-GB')
 const attendanceLabels: Record<string, string> = {
   PRESENT: 'Present',
   ABSENT: 'Absent',
@@ -18,13 +18,7 @@ const attendanceLabels: Record<string, string> = {
 }
 
 function SessionText({ session }: { session: TrainingSession }) {
-  const date = dateFormatter.format(new Date(`${session.date}T00:00:00`))
-  return (
-    <div className="training-session">
-      <strong>{session.className}</strong>
-      <span>{date} - {session.startTime.slice(0, 5)}-{session.endTime.slice(0, 5)}</span>
-    </div>
-  )
+  return <div className="training-session"><SessionContext {...session} /></div>
 }
 
 function FeedbackList({ feedback }: { feedback: CoachFeedback[] }) {

@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { businessDate, toIsoDate } from './date'
+import { businessDate, toIsoDate, formatCalendarDate, formatClockTime } from './date'
 import { validateStartDate } from '../pages/member/packagesModel'
 
 describe('DEF-003 Vietnam business calendar', () => {
+  it.each([['2028-02-29', '29/02/2028'], ['2026-01-05', '05/01/2026'], ['2026-02-29', '-'], ['', '-']])('displays a validated calendar date %s', (value, expected) => {
+    expect(formatCalendarDate(value)).toBe(expected)
+  })
+  it.each([['09:05:59', '09:05'], ['23:59', '23:59'], ['24:00', '-'], ['9:00', '-']])('displays a validated 24-hour time %s', (value, expected) => {
+    expect(formatClockTime(value)).toBe(expected)
+  })
   it.each([
     ['2026-10-19T18:00:00Z', '2026-10-20'],
     ['2026-10-19T16:59:59Z', '2026-10-19'],
