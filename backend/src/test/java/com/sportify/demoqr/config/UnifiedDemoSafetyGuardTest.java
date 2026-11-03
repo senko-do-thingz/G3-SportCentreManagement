@@ -127,6 +127,14 @@ public class UnifiedDemoSafetyGuardTest {
         var env = canonical(); env.setProperty(property, "true"); rejects(env);
     }
 
+    @ParameterizedTest @ValueSource(strings = {"yes", "on", "1", "no", "off", "0", ""})
+    void rejectsBooleanAliasesForOtherCapabilities(String value) {
+        for (String property : new String[]{"app.payment.local-demo.enabled", "app.payment.simulator.enabled",
+                "app.training.attendance-backfill.enabled"}) {
+            var env = canonical(); env.setProperty(property, value); rejects(env);
+        }
+    }
+
     @ParameterizedTest @ValueSource(strings = {"", "*", "https://remote.test", "http://127.0.0.1:5173/path",
             "http://user@127.0.0.1:5173", "http://127.0.0.1:5173,https://remote.test"})
     void rejectsNonLoopbackCors(String origin) {

@@ -105,10 +105,11 @@ public class UnifiedDemoSafetyGuard {
             require("false".equals(env.getProperty(property, "false")), "Unsafe Flyway option: " + property);
         }
         require("validate".equals(env.getProperty("spring.jpa.hibernate.ddl-auto", "validate")), "Hibernate must validate only");
-        require(!Boolean.parseBoolean(env.getProperty("app.payment.local-demo.enabled", "false"))
-                && !Boolean.parseBoolean(env.getProperty("app.payment.simulator.enabled", "false"))
-                && !Boolean.parseBoolean(env.getProperty("app.training.attendance-backfill.enabled", "false")),
-                "Legacy simulation and attendance backfill must be disabled");
+        for (String property : List.of("app.payment.local-demo.enabled", "app.payment.simulator.enabled",
+                "app.training.attendance-backfill.enabled")) {
+            require("false".equalsIgnoreCase(env.getProperty(property, "false")),
+                    "Legacy simulation and attendance backfill require literal false");
+        }
         require("none".equalsIgnoreCase(env.getProperty("server.forward-headers-strategy", "none")),
                 "Forwarded listener configuration forbidden");
         String origins = env.getProperty("app.cors.allowed-origins", "");
