@@ -19,6 +19,7 @@ import com.sportify.catalog.repository.FacilityRepository;
 import com.sportify.catalog.repository.SessionCancellationRepository;
 import com.sportify.catalog.repository.SportClassRepository;
 import com.sportify.catalog.service.ManagerSessionService;
+import com.sportify.catalog.service.SessionCodeAllocator;
 import com.sportify.core.audit.AuditAction;
 import com.sportify.core.audit.AuditEvent;
 import com.sportify.core.audit.AuditService;
@@ -70,6 +71,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
     private final SessionCancellationRepository cancellationRepository;
     private final AuditService auditService;
     private final Clock clock;
+    private final SessionCodeAllocator sessionCodeAllocator;
 
     @Override
     @Transactional(readOnly = true)
@@ -108,6 +110,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
 
             // Validate the complete batch before the first INSERT. All rows and audits share this transaction.
             List<ClassSession> sessions = dates.stream().map(date -> ClassSession.builder()
+                    .sessionCode(sessionCodeAllocator.reserve(date, sportClass.getSport().getCode()))
                     .sportClass(sportClass).sport(sportClass.getSport()).sessionDate(date)
                     .startTime(request.startTime()).endTime(request.endTime())
                     .coach(assignment.coach()).facility(assignment.facility()).capacity(request.capacity())
@@ -134,6 +137,9 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
             long booked = bookingCounts(List.of(id)).getOrDefault(id, 0L);
             validateCapacity(request.capacity(), sportClass, booked);
             LocalDate date = requireDate(request.date());
+            if (!date.equals(session.getSessionDate())) {
+                throw new BusinessRuleException("Session ID is permanent. Cancel and create a replacement session to change its date; bookings are not transferred.");
+            }
             if (booked > 0 && bookingRepository.countOutsidePackageValidity(id, BookingStatus.CONFIRMED, date) > 0) {
                 throw new BusinessRuleException(
                         "The new date is outside the validity period of packages used by confirmed bookings of this session");
@@ -343,9 +349,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
     }
 
     private LocalDate requireDate(LocalDate date) {
-        if (date == null || date.getYear() < 1 || date.getYear() > 9999) {
-            throw new BusinessRuleException("A date between 0001-01-01 and 9999-12-31 is required");
-        }
+        SessionCodeAllocator.validateDate(date);
         return date;
     }
 
@@ -369,6 +373,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
 
     private static Map<String, Object> snapshot(ClassSession session) {
         Map<String, Object> values = new LinkedHashMap<>();
+        values.put("sessionId", session.getSessionCode());
         values.put("date", session.getSessionDate());
         values.put("startTime", session.getStartTime());
         values.put("endTime", session.getEndTime());

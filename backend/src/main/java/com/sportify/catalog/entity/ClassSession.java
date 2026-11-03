@@ -22,6 +22,9 @@ public class ClassSession {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "session_code", nullable = false, unique = true, length = 10, updatable = false)
+    private String sessionCode;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "class_id")
     private SportClass sportClass;
