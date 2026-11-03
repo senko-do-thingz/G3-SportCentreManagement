@@ -23,6 +23,11 @@ keeps last_value. SessionCodeAllocator requires an existing transaction and firs
 takes an exclusive transaction-owned SQL application lock on the database-scoped
 sportify.session-identity resource. This serializes the small allocation section
 across date/sport groups and avoids adjacent missing-range deadlocks in batches.
+The lock stays held through the complete creation/batch commit or rollback.
+When JDBC has not started its implicit transaction yet, an ordinary counter-table
+read starts it before EXEC requests a transaction-owned application lock. That
+read takes no retained update/range lock. Negative application-lock return codes
+raise a runtime conflict so the enclosing Spring transaction rolls back.
 It then reads the counter using UPDLOCK,HOLDLOCK, including a missing-key range. Counter update,
 session insertion and weekly batch work share the Manager service transaction.
 All batch dates are sorted. The public code has a database NOT NULL and UNIQUE
@@ -39,6 +44,8 @@ an uncertain successful create and risk a second session.
 
 SQL Server range-lock semantics are documented in the
 [Microsoft locking guide](https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide?view=sql-server-ver17).
+Transaction-owned application-lock requirements and return codes are documented
+by [sp_getapplock](https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-getapplock-transact-sql?view=sql-server-ver17).
 
 ## Existing rows and forward-only migration
 

@@ -47,6 +47,8 @@ public class SessionCodeAllocator {
         Integer acquired = jdbc.queryForObject("""
                 SET NOCOUNT ON;
                 DECLARE @result INT;
+                -- A table read starts a lazy JDBC implicit transaction; EXEC alone does not.
+                IF @@TRANCOUNT=0 SELECT TOP(1) @result=last_value FROM session_code_counter;
                 EXEC @result=sys.sp_getapplock @Resource=?, @LockMode='Exclusive',
                     @LockOwner='Transaction', @LockTimeout=10000;
                 SELECT @result;
