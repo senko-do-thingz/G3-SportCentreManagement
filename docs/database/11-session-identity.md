@@ -64,7 +64,7 @@ V39 avoids importing either excluded copy. Earlier migration bytes are unchanged
 Future integration of those PRs still requires owner review of their migration
 lineage; the unused version 38 is not permission to enable demo/photo work.
 
-V39 is the current deployment candidate. Applying demo-photo V38 later to a
+V40 is the current deployment candidate, after unchanged V39. Applying demo-photo V38 later to a
 database already migrated through V39 may violate Flyway's default version
 ordering when the demo location is enabled. Before any later photo integration,
 inspect the actual target Flyway history and every database where V38 may already
@@ -83,14 +83,49 @@ fixtures use fresh dedicated databases or CI SQL Server containers.
 
 ## Identity edits
 
-Issued Session IDs are immutable. All session-date changes are rejected,
-including unbooked sessions. The least disruptive alternative is the existing
-controlled cancellation and creation of a replacement session, with a new ID.
-Bookings are never silently moved to it. This avoids an unsigned reallocation
-workflow and preserves references already shared with users.
+The CODEOWNER decision on 2026-11-03 supersedes the earlier permanent-date rule:
+[PR #203 decision](https://github.com/senko-do-thingz/G3-SportCentreManagement/pull/203#issuecomment-6606819198).
+Managers may reschedule DRAFT or PUBLISHED sessions that have not started, to a
+valid center date including today if the proposed start is strictly in the future.
+The sport and numeric session key remain unchanged. A date change reserves the
+next never-issued date/sport sequence using the same transaction-owned allocator.
+A time-only edit retains the current code. Confirmed bookings, registrations,
+remaining credits, attendance and result foreign keys are never recreated or moved.
+Every confirmed package must cover the proposed date. Existing resource locks,
+Coach qualifications, facility availability, conflicts and capacity limits apply.
+Cancelled, completed, started and recorded-attendance/result-backed sessions cannot
+be rescheduled; allowed check-ins also block timing changes.
 
-Allowed Coach, facility, start/end time, capacity and status changes retain the
-ID and existing authorization, resource locks, booking/package restrictions and
-audit behavior. Completed/cancelled sessions retain the existing edit restrictions.
+V40 adds schedule_revision and session_code_history. It backfills all current V39
+codes without renumbering or changing V39 or any applied migration. The registry
+has a binary unique primary key across current and retired codes. A transactional
+class_session trigger registers each issued code, retires the old code and rejects
+any reassignment, even to its original session. Imports also advance the counter.
+Cancelled codes and retired codes keep their reservations. Physical deletion leaves
+an unresolvable tombstone: session_id becomes NULL, original_session_id remains.
+An identity-reseeded row cannot inherit an old link. There is no history purge or
+counter-reset application API. Disposable test fixture cleanup is test code only.
+
+All public by-code lookups resolve the registry to the same numeric session before
+applying existing authorization/visibility rules. Responses always show the current
+canonical code. Old aliases are never redirected to another session or disclosed
+across role boundaries. Existing calendar exports use stable booking-based UIDs.
+
+Manager edits acquire the existing session lock before validation and assignment
+locks. New UI requests include expectedRevision; a mismatch returns 409. A date
+change requires this precondition. Legacy same-date numeric/JSON edits remain
+compatible and serialized; upgraded clients should always provide the revision.
+Schedule revisions increment on successful Manager updates, independent of native
+booking counters. Old-client requests carrying an old date after a reschedule are
+rejected unless they supply the current revision. No implicit stale-write retry is
+performed. Reload and deliberately reapply an edit after a conflict.
+
+SESSION_RESCHEDULED audit records contain before/after date, code and revision,
+actor, event time and the optional bounded reason. No approved policy mandates a
+new rescheduling reason, so the reason is optional with a 500-character limit.
+Registry issuance/retirement UTC timestamps and rescheduling actor/reason share
+the transaction. V39 backfill actors and new-creation registry actors may be NULL;
+existing SESSION_CREATED audits remain authoritative for creation actors.
+Audit failure rolls back date, code, revision, registry and counter together.
 No package credit, attendance cutoff/correction, Manager backfill setting,
-result permission or financial rule changes as part of identity allocation.
+result permission or financial rule changes as part of rescheduling.

@@ -23,8 +23,8 @@ date restrictions, audit rollback, credits and financial data are unchanged.
 
 ## Database and deployment gates
 
-Catalog V39 is the deployment candidate. Unmerged demo-photo V38 needs a future
-Flyway lineage decision before integration after V39. Inspect actual target
+Catalog V40 is the deployment candidate, after unchanged V39. Unmerged demo-photo V38 needs a future
+Flyway lineage decision before integration after V40. Inspect actual target
 history and whether V38 was installed in any environment. A never-installed
 script may need an approved new forward version; an already-installed script
 requires separate lineage assessment. Do not modify accepted V39, renumber an
@@ -44,3 +44,14 @@ ATTENDANCE_BACKFILL_ENABLED=false and ATTENDANCE_BACKFILL_WINDOW unset, and keep
 simulators disabled. Actual target database preflight, backup verification,
 deployment authorization and post-deployment role-based smoke testing remain
 external release gates. No production access or deployment is claimed here.
+
+
+The 2026-11-03 PR #203 CODEOWNER rescheduling decision supersedes the earlier
+permanent-date rule. Deploy backend V40 and the matching UI together. The new
+registry must retain every current/retired code. Back up before migration and verify
+history/counter ownership before enabling writes. Roll back application traffic
+using the approved database restore and coordinated application artifact; do not
+reverse V40, erase history or run the old immutable-date UI against a mutable
+identity backend as a supported configuration. Verify historical by-code links,
+unchanged numeric relationships and package balances during smoke testing.
+See [session identity storage](../database/11-session-identity.md).

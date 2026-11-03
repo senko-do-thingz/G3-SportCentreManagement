@@ -28,7 +28,7 @@ public interface CoachScheduleReadRepository extends Repository<ClassSession, Lo
 
     @Query("SELECT s.id AS id, co.id AS coachId FROM ClassSession s LEFT JOIN s.coach co WHERE s.id = :id")
     Optional<SessionOwnership> findOwnership(@Param("id") Long id);
-    @Query("SELECT s.id AS id, co.id AS coachId FROM ClassSession s LEFT JOIN s.coach co WHERE s.sessionCode = :code")
+    @Query("SELECT s.id AS id, co.id AS coachId FROM ClassSession s LEFT JOIN s.coach co WHERE EXISTS (SELECT h.sessionCode FROM SessionCodeHistory h WHERE h.sessionId=s.id AND h.sessionCode=:code)")
     Optional<SessionOwnership> findOwnershipByCode(@Param("code") String code);
 
     interface SessionOwnership {

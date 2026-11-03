@@ -43,8 +43,10 @@ class SessionIdentityIntegrationTest {
             registry.add("spring.datasource.username", () -> System.getenv("ID_TEST_DB_USER"));
             registry.add("spring.datasource.password", () -> System.getenv("ID_TEST_DB_PASSWORD"));
         } else {
-            container = new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2022-latest").acceptLicense();
-            container.start();
+            if (container == null) {
+                container = new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2022-latest").acceptLicense();
+                container.start();
+            }
             registry.add("spring.datasource.url", container::getJdbcUrl);
             registry.add("spring.datasource.username", container::getUsername);
             registry.add("spring.datasource.password", container::getPassword);

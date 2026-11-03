@@ -27,7 +27,15 @@ import java.util.Optional;
 @Repository
 public interface ClassSessionRepository extends JpaRepository<ClassSession, Long>, JpaSpecificationExecutor<ClassSession> {
     @EntityGraph(attributePaths = {"sport", "sportClass", "facility", "coach", "coach.userAccount"})
-    Optional<ClassSession> findBySessionCode(String sessionCode);
+    @Query("SELECT s FROM ClassSession s WHERE EXISTS (SELECT h.sessionCode FROM SessionCodeHistory h "
+            + "WHERE h.sessionId=s.id AND h.sessionCode=:sessionCode)")
+    Optional<ClassSession> findBySessionCode(@Param("sessionCode") String sessionCode);
+
+    @Query(value = "SELECT (SELECT COUNT(*) FROM attendance_record WHERE session_id=:id) "
+            + "+ (SELECT COUNT(*) FROM session_result WHERE session_id=:id) "
+            + "+ (SELECT COUNT(*) FROM check_in c JOIN booking b ON b.id=c.booking_id "
+            + "WHERE b.session_id=:id AND c.result='ALLOWED')", nativeQuery = true)
+    long countRecordedActivity(@Param("id") Long id);
     // To-one joins only: page/count queries cannot multiply sessions. Keep detail and list visibility identical.
     String VISIBLE_FROM = " FROM ClassSession s LEFT JOIN s.sportClass c JOIN s.facility f "
             + "LEFT JOIN s.coach co LEFT JOIN co.userAccount u LEFT JOIN u.role accountRole ";

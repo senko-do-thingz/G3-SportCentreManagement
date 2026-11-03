@@ -1,3 +1,10 @@
+> Policy supersession, 2026-11-03: The CODEOWNER decision in PR #203 comment
+> https://github.com/senko-do-thingz/G3-SportCentreManagement/pull/203#issuecomment-6606819198
+> authorizes eligible future session rescheduling with date-based public ID
+> regeneration, durable aliases and unchanged numeric relationships/bookings/credits.
+> It replaces the original permanent-date and cancel/replacement restrictions below.
+> See docs/database/11-session-identity.md for the current implemented contract.
+
 # ID-02 - Canonical Session ID API contracts
 
 ## Goal

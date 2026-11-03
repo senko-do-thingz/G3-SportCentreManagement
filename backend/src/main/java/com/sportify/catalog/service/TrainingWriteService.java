@@ -168,7 +168,7 @@ public class TrainingWriteService {
     }
     private long sessionKey(String sessionId) {
         String code = new PublicSessionId(sessionId).value();
-        var rows = jdbc.query("SELECT id FROM class_session WHERE session_code=?", (rs,row)->rs.getLong(1), code);
+        var rows = jdbc.query("SELECT s.id FROM class_session s JOIN session_code_history h ON h.session_id=s.id WHERE h.session_code=?", (rs,row)->rs.getLong(1), code);
         if(rows.isEmpty()) throw new ResourceNotFoundException("Session not found");
         return rows.getFirst();
     }

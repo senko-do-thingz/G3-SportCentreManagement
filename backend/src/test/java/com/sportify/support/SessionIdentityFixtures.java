@@ -40,22 +40,29 @@ public final class SessionIdentityFixtures {
         }
     }
 
-    /** Fixture date mutation is explicit and atomic; production rescheduling remains prohibited. */
+    /** Fixture date mutation is explicit and atomic; uses the same date/code invariant as production rescheduling. */
     public static void moveFixture(JdbcTemplate jdbc, long id, LocalDate date) {
         long sport = jdbc.queryForObject("SELECT sport_id FROM class_session WHERE id=?", Long.class, id);
         jdbc.update("UPDATE class_session SET session_date=?,session_code=? WHERE id=?", date, reserve(jdbc, date, sport), id);
     }
 
-    public static Map<String, Integer> snapshot(JdbcTemplate jdbc) {
+    public record Snapshot(Map<String, Integer> counters, java.util.Set<String> codes) { }
+
+    public static Snapshot snapshot(JdbcTemplate jdbc) {
         var result = new LinkedHashMap<String, Integer>();
         jdbc.query("SELECT session_date,sport_code,last_value FROM session_code_counter", rows -> {
             result.put(rows.getDate(1).toLocalDate() + "|" + rows.getString(2), rows.getInt(3));
         });
-        return result;
+        return new Snapshot(result, new java.util.HashSet<>(jdbc.queryForList("SELECT session_code FROM session_code_history", String.class)));
     }
 
     /** Emulate fixture rollback after owned rows are removed, retaining all prior and surviving allocations. */
-    public static void restoreAfterFixtureCleanup(JdbcTemplate jdbc, Map<String, Integer> before) {
+    public static void restoreAfterFixtureCleanup(JdbcTemplate jdbc, Snapshot snapshot) {
+        Map<String, Integer> before = snapshot.counters();
+        // Disposable fixtures only: remove newly orphaned fixture tombstones, never baseline or live history.
+        for (String code : jdbc.queryForList("SELECT session_code FROM session_code_history WHERE session_id IS NULL", String.class)) {
+            if (!snapshot.codes().contains(code)) jdbc.update("DELETE FROM session_code_history WHERE session_code=? AND session_id IS NULL", code);
+        }
         var groups = jdbc.query("SELECT session_date,sport_code FROM session_code_counter",
                 (rows, index) -> new Group(rows.getDate(1).toLocalDate(), rows.getString(2)));
         for (var group : groups) {

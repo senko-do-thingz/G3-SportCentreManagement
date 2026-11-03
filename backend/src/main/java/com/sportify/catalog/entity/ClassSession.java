@@ -22,8 +22,11 @@ public class ClassSession {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "session_code", nullable = false, unique = true, length = 10, updatable = false)
+    @Column(name = "session_code", nullable = false, unique = true, length = 10)
     private String sessionCode;
+
+    @Column(name = "schedule_revision", nullable = false)
+    private long scheduleRevision;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "class_id")

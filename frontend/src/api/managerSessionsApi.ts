@@ -8,6 +8,7 @@ export type TrainingType = 'SELF_TRAINING' | 'COACH_LED'
 export type SessionStatus = 'DRAFT' | 'PUBLISHED' | 'CANCELLED' | 'COMPLETED'
 export interface ManagerSession {
   id: number
+  scheduleRevision?: number
   sessionId?: SessionId
   sportName?: string
   date: string
@@ -26,6 +27,8 @@ export interface ManagerSession {
 }
 export type DayOfWeek = 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY'
 export interface SessionUpdate {
+  expectedRevision?: number
+  rescheduleReason?: string
   date: string
   startTime: string
   endTime: string
@@ -33,7 +36,7 @@ export interface SessionUpdate {
   coachId?: number | null
   capacity: number
 }
-export type SessionCreate = Omit<SessionUpdate, 'date'> & {
+export type SessionCreate = Omit<SessionUpdate, 'date' | 'expectedRevision' | 'rescheduleReason'> & {
   trainingType: TrainingType
 } & ({ date: string; daysOfWeek?: never; fromDate?: never; toDate?: never } | {
   date?: never; daysOfWeek: DayOfWeek[]; fromDate: string; toDate: string

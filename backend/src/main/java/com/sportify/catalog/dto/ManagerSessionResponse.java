@@ -14,7 +14,7 @@ public record ManagerSessionResponse(
         ResourceSummary coach, ResourceSummary facility,
         Integer capacity, long bookedCount, TrainingFormat trainingType, SessionStatus status,
         String cancelReason, LocalDateTime cancelledAt, Long cancelledByUserId
-, String sessionId, String sportName) {
+, String sessionId, String sportName, long scheduleRevision) {
     /** Transitional Java constructor; live mappers supply the persisted public identity. */
     public ManagerSessionResponse(
         Long id, LocalDate date, LocalTime startTime, LocalTime endTime,
@@ -23,7 +23,7 @@ public record ManagerSessionResponse(
         Integer capacity, long bookedCount, TrainingFormat trainingType, SessionStatus status,
         String cancelReason, LocalDateTime cancelledAt, Long cancelledByUserId
 ) {
-        this(id, date, startTime, endTime, sportClass, coach, facility, capacity, bookedCount, trainingType, status, cancelReason, cancelledAt, cancelledByUserId, null, null);
+        this(id, date, startTime, endTime, sportClass, coach, facility, capacity, bookedCount, trainingType, status, cancelReason, cancelledAt, cancelledByUserId, null, null, 0);
     }
 
     public record ClassSummary(Long id, String code, String name) { }

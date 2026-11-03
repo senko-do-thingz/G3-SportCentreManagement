@@ -402,30 +402,68 @@ class ManagerSessionServiceImplTest {
         ClassSession session = existing(100L);
         when(sessions.findForUpdate(100L)).thenReturn(Optional.of(session));
         confirmed(100L, 2);
-        LocalDate newDate = DATE.plusDays(7);
-        var request = new SessionUpdateRequest(newDate, START, END, 30L, 20L, 16);
-
-        var ex = assertThrows(BusinessRuleException.class, () -> service.updateSession(100L, request, manager));
-
-        assertTrue(ex.getMessage().contains("Session ID is permanent"));
+        LocalDate target = DATE.plusDays(7);
+        when(bookings.countOutsidePackageValidity(100L, BookingStatus.CONFIRMED, target)).thenReturn(1L);
+        var ex = assertThrows(BusinessRuleException.class, () -> service.updateSession(100L,
+                new SessionUpdateRequest(target, START, END, 30L, 20L, 16, 0L, null), manager));
+        assertTrue(ex.getMessage().contains("validity period"));
         assertEquals(DATE, session.getSessionDate());
-        verify(bookings, never()).countOutsidePackageValidity(anyLong(), any(), any());
         verify(sessions, never()).saveAndFlush(any());
-        verifyNoInteractions(coaches, facilities, audit);
+        verifyNoInteractions(coaches, facilities, audit, allocator);
     }
 
     @Test
-    void update_dateWithinBookedPackageValidityStillRejectsIdentityMutation() {
+    void update_dateWithinBookedPackageValidityRegeneratesCodeAndAuditsBothIdentities() {
         ClassSession session = existing(100L);
         when(sessions.findForUpdate(100L)).thenReturn(Optional.of(session));
         confirmed(100L, 2);
-        LocalDate newDate = DATE.plusDays(1);
-        var error = assertThrows(BusinessRuleException.class, () -> service.updateSession(100L,
-                new SessionUpdateRequest(newDate, START, END, 30L, 20L, 16), manager));
-        assertTrue(error.getMessage().contains("Session ID is permanent"));
-        assertEquals(DATE, session.getSessionDate());
-        verify(sessions, never()).saveAndFlush(any());
-        verifyNoInteractions(coaches, facilities, audit);
+        validAssignment();
+        LocalDate target = DATE.plusDays(1);
+        when(allocator.reserve(target, "FOOTBALL")).thenReturn("201026FB02");
+        when(sessions.saveAndFlush(session)).thenReturn(session);
+        var result = service.updateSession(100L, new SessionUpdateRequest(target, START, END, 30L, 20L, 16, 0L, "Weather"), manager);
+        assertEquals(100L, result.id());
+        assertEquals("201026FB02", result.sessionId());
+        assertEquals(2, result.bookedCount());
+        assertEquals(1, result.scheduleRevision());
+        verify(allocator).attributeReschedule("191026FB01", "201026FB02", 40L, "Weather");
+        var event = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(audit).record(event.capture());
+        assertEquals(AuditAction.SESSION_RESCHEDULED, event.getValue().getAction());
+        assertEquals("191026FB01", ((Map<?, ?>)event.getValue().getDetails().get("before")).get("sessionId"));
+        assertEquals("201026FB02", ((Map<?, ?>)event.getValue().getDetails().get("after")).get("sessionId"));
+        verifyNoInteractions(cancellations);
+    }
+
+    @Test
+    void update_reschedulingRequiresAnAuthenticatedManagerAtTheServiceBoundary() {
+        when(sessions.findForUpdate(100L)).thenReturn(Optional.of(existing(100L)));
+        var request = new SessionUpdateRequest(DATE.plusDays(1), START, END, 30L, 20L, 16, 0L, null);
+        for (UserAccount actor : Arrays.asList(null, UserAccount.builder().id(41L)
+                .role(Role.builder().code("COACH").build()).build())) {
+            assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                    () -> service.updateSession(100L, request, actor));
+        }
+        verifyNoInteractions(allocator, audit, cancellations);
+    }
+
+    @Test
+    void update_staleRevisionRejectsEvenAnOtherwiseValidSameDateEdit() {
+        when(sessions.findForUpdate(100L)).thenReturn(Optional.of(existing(100L)));
+        assertThrows(ConflictException.class, () -> service.updateSession(100L,
+                new SessionUpdateRequest(DATE, START, END, 30L, 20L, 16, 4L, null), manager));
+        verifyNoInteractions(allocator, audit, cancellations);
+    }
+
+    @Test
+    void update_recordedActivityBlocksDateAndTimeMoves() {
+        when(sessions.findForUpdate(100L)).thenReturn(Optional.of(existing(100L)));
+        when(sessions.countRecordedActivity(100L)).thenReturn(1L);
+        assertThrows(BusinessRuleException.class, () -> service.updateSession(100L,
+                new SessionUpdateRequest(DATE.plusDays(1), START, END, 30L, 20L, 16, 0L, null), manager));
+        assertThrows(BusinessRuleException.class, () -> service.updateSession(100L,
+                new SessionUpdateRequest(DATE, START.plusHours(1), END.plusHours(1), 30L, 20L, 16, 0L, null), manager));
+        verifyNoInteractions(allocator, audit, cancellations);
     }
 
     @Test
@@ -441,12 +479,12 @@ class ManagerSessionServiceImplTest {
     }
 
     @Test
-    void update_unbookedDateChangeAlsoRequiresReplacement() {
+    void update_dateChangeRequiresAnExplicitRevision() {
         ClassSession session = existing(100L);
         when(sessions.findForUpdate(100L)).thenReturn(Optional.of(session));
-        var error = assertThrows(BusinessRuleException.class, () -> service.updateSession(100L,
+        var error = assertThrows(ConflictException.class, () -> service.updateSession(100L,
                 new SessionUpdateRequest(DATE.plusDays(1), START, END, 30L, 20L, 16), manager));
-        assertTrue(error.getMessage().contains("replacement session"));
+        assertTrue(error.getMessage().contains("expectedRevision"));
         assertEquals(DATE, session.getSessionDate());
         assertEquals("191026FB01", session.getSessionCode());
         verifyNoInteractions(coaches, facilities, audit, allocator);

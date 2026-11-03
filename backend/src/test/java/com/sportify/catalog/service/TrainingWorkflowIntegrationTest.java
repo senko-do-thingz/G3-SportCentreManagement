@@ -76,7 +76,7 @@ class TrainingWorkflowIntegrationTest {
     @Autowired org.springframework.test.web.servlet.MockMvc mvc;
     long coach, otherCoach, member, peer, reception, sport, classId, session, booking;
     private final List<Long> fixtureSessions = new ArrayList<>();
-    private Map<String, Integer> fixtureCounters;
+    private SessionIdentityFixtures.Snapshot fixtureCounters;
     @AfterEach void cleanupSessionFixtures() {
         if (!fixtureSessions.isEmpty()) {
             String ids = fixtureSessions.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));

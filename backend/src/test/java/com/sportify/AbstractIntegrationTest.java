@@ -19,7 +19,7 @@ public abstract class AbstractIntegrationTest {
 
     @org.springframework.beans.factory.annotation.Autowired
     private org.springframework.jdbc.core.JdbcTemplate identityFixtureJdbc;
-    private java.util.Map<String, Integer> identityCountersBefore;
+    private com.sportify.support.SessionIdentityFixtures.Snapshot identityCountersBefore;
 
     @org.junit.jupiter.api.BeforeEach
     void captureFixtureIdentityCounters() {

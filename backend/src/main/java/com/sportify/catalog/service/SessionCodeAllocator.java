@@ -66,4 +66,11 @@ public class SessionCodeAllocator {
             jdbc.update("UPDATE session_code_counter SET last_value=? WHERE session_date=? AND sport_code=?", next, date, code);
         return identity;
     }
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void attributeReschedule(String oldCode, String newCode, Long actorId, String reason) {
+        jdbc.update("UPDATE session_code_history SET retired_by_user_id=?,retirement_reason=? WHERE session_code=?",
+                actorId, reason == null ? null : reason.strip(), oldCode);
+        jdbc.update("UPDATE session_code_history SET issued_by_user_id=? WHERE session_code=?", actorId, newCode);
+    }
+
 }

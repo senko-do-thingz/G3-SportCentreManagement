@@ -4,7 +4,7 @@ Session ID means the persisted ten-character business code, for example
 031126FB01. Numeric class_session.id remains an internal surrogate for existing
 foreign keys. No date, sport or allocation is synthesized in the browser.
 See [storage and allocation](../database/11-session-identity.md) for the date
-window, counter locking, cancellation non-reuse and permanent-date policy.
+window, counter locking, cancellation non-reuse and approved rescheduling policy.
 
 ## Compatibility matrix
 
@@ -49,7 +49,7 @@ apply before lookup. Anonymous requests are 401; unauthorized roles are 403.
 | --- | --- |
 | GET /sessions/by-code/{sessionId} | Member, Reception, Manager; same visibility and member-bound eligibility as numeric detail |
 | GET /manager/sessions/by-code/{sessionId} | Manager calendar/detail including cancelled sessions |
-| PUT /manager/sessions/by-code/{sessionId} | Existing locked edit operation; permanent date/ID preserved |
+| PUT /manager/sessions/by-code/{sessionId} | Locked edit with expectedRevision; date changes regenerate ID and retain old aliases |
 | PUT /manager/sessions/by-code/{sessionId}/cancel | Existing cancellation operation; code reservation retained |
 | GET /coach/sessions/by-code/{sessionId}/roster | Coach sees assigned session only; Manager retains existing scope; foreign Coach gets 404 |
 | GET /coach/training/sessions/by-code/{sessionId}/members | Existing assigned-Coach training roster policy |
@@ -70,7 +70,7 @@ from the server center calendar. Session history projections join only authorize
 member records and do not expose another member's private history.
 
 New identity fields use to-one joins or scalar projections. They do not introduce
-per-session repository calls. Code lookup uses the unique persisted index and
+per-session repository calls. Code lookup uses the unique current/retired registry index and
 then applies the same existing authorization/visibility checks. Legacy numeric
 booking IDs remain authoritative for attendance writes; selecting a code does
 not allow switching the booking's owner/session in the request.
@@ -78,3 +78,21 @@ not allow switching the booking's owner/session in the request.
 The catalog suggestion change is only an additional identity field on an existing
 projection. No matching/scoring, AI generation, provider, recommendation logic
 or deferred HOT-07/HOT-08/HOT-09 feature is implemented or altered.
+
+## Rescheduling request and concurrency
+
+Manager GET/create/calendar responses include scheduleRevision. Both numeric and
+by-code PUT accept expectedRevision (nonnegative) and rescheduleReason (optional,
+maximum 500 characters). Send the edited ISO date, not the original date. Date
+changes require expectedRevision; missing/stale preconditions return 409 with a
+reload message. Same-date legacy requests without a precondition remain supported.
+New clients should supply it on every edit. Invalid dates, recorded activity or
+package validity failures return the existing business-rule 400; resource conflicts
+retain their detailed 409 response. Role and visibility failures remain 401/403/404.
+
+A successful date change returns the same numeric id, new date, current sessionId
+and incremented scheduleRevision. A retired code continues to resolve this same
+session, with canonical output and the caller's original scope. Cancellation never
+releases current or retired identifiers. Rescheduling creates no booking or credit
+transaction. It does not notify members automatically. Manager audit history records
+old/new identity and date, actor/time and any supplied reason.

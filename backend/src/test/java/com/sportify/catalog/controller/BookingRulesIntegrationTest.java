@@ -164,9 +164,10 @@ class BookingRulesIntegrationTest extends AbstractIntegrationTest {
     // Synthetic sport metadata isolates legacy booking contracts; canonical sport mapping has separate ID integration coverage.
     private long session(LocalDate date, LocalTime start, int capacity, TrainingFormat format) {
         return jdbc.queryForObject("""
+                SET NOCOUNT ON; DECLARE @created TABLE(id BIGINT);
                 INSERT INTO class_session(class_id, sport_id, facility_id, coach_id, training_type, session_date,
-                    start_time, end_time, capacity, booked_count, status, session_code) OUTPUT INSERTED.id
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'PUBLISHED', ?)
+                    start_time, end_time, capacity, booked_count, status, session_code) OUTPUT INSERTED.id INTO @created
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'PUBLISHED', ?); SELECT id FROM @created;
                 """, Long.class, format == TrainingFormat.COACH_LED ? sportClass.getId() : null, sport.getId(), facilityId,
                 format == TrainingFormat.COACH_LED ? coachId : null, format.name(), date, start, start.plusMinutes(90), capacity, SessionIdentityFixtures.reserve(jdbc, date, "FOOTBALL"));
     }

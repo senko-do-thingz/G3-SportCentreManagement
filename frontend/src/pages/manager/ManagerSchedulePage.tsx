@@ -35,6 +35,13 @@ export function ManagerSchedulePage() {
   function query(key: string, value: string) { setParams((previous) => { const next = new URLSearchParams(previous); if (value) next.set(key, value); else next.delete(key); next.delete('create'); return next }) }
   function closeEditor() { setEditing(null); if (params.has('create')) query('create', '') }
   function saved() { closeEditor(); setCancelling(null); reload(); toast.success('Schedule updated') }
+  function sessionSaved(session?: ManagerSession) {
+    if (!session) { saved(); return }
+    closeEditor()
+    if (monday(session.date) !== week) query('week', monday(session.date))
+    else reload()
+    toast.success(`Session ${sessionIdText(session.sessionId)} saved for ${displayDate(session.date)}`)
+  }
   const dates = Array.from({ length: 7 }, (_, index) => addDays(week, index))
   const today = centerNow().date
   const timeSlots = sessions.status === 'ready' ? [...new Set(sessions.data.map((session) => session.startTime.slice(0, 5)))].sort() : []
@@ -112,7 +119,7 @@ export function ManagerSchedulePage() {
         )}
       </>}
     </Card>
-    {editing && classes.status === 'ready' && facilitiesUsable && <SessionEditorModal item={editing === 'new' ? undefined : editing} classes={classes.data} facilities={facilities.status === 'ready' ? facilities.data : []} manualFacility={manualFacility} classId={classId} onClose={closeEditor} onSuccess={saved} />}
+    {editing && classes.status === 'ready' && facilitiesUsable && <SessionEditorModal item={editing === 'new' ? undefined : editing} classes={classes.data} facilities={facilities.status === 'ready' ? facilities.data : []} manualFacility={manualFacility} classId={classId} onClose={closeEditor} onSuccess={sessionSaved} />}
     {cancelling && <CancelSessionModal item={cancelling} onClose={() => setCancelling(null)} onSuccess={saved} />}
   </div>
 }

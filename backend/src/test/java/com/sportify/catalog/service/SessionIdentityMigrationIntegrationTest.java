@@ -61,7 +61,16 @@ class SessionIdentityMigrationIntegrationTest {
         jdbc.update("INSERT booking(booking_code,session_id,member_id,status) VALUES ('ID-UPGRADE',?,?,'CONFIRMED')",early,member);
         jdbc.update("INSERT attendance_record(session_id,member_id,status,marked_by) VALUES (?,?,'PRESENT',?)",early,member,member);
         jdbc.update("INSERT session_result(session_id,member_id,notes) VALUES (?,?,'Preserved result')",early,member);
+        Flyway.configure().dataSource(jdbc.getDataSource())
+                .locations("classpath:db/migration/identity","classpath:db/migration/catalog")
+                .target("39").cleanDisabled(true).load().migrate();
+        var before = jdbc.queryForList("SELECT installed_rank,version,checksum FROM flyway_schema_history ORDER BY installed_rank");
         db.flyway().migrate();
+        assertThat(jdbc.queryForList("SELECT installed_rank,version,checksum FROM flyway_schema_history WHERE version<>'40' ORDER BY installed_rank")).isEqualTo(before);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM session_code_history WHERE session_id=original_session_id",Integer.class)).isEqualTo(3);
+        assertThat(jdbc.queryForObject("SELECT schedule_revision FROM class_session WHERE id=?",Long.class,early)).isZero();
+        assertThat(db.flyway().info().current().getVersion().toString()).isEqualTo("40");
+        assertThat(db.flyway().migrate().migrationsExecuted).isZero();
         assertThat(jdbc.queryForObject("SELECT session_code FROM class_session WHERE id=?",String.class,early)).isEqualTo("031126FB01");
         assertThat(jdbc.queryForObject("SELECT session_code FROM class_session WHERE id=?",String.class,cancelled)).isEqualTo("031126FB02");
         assertThat(jdbc.queryForObject("SELECT session_code FROM class_session WHERE id=?",String.class,late)).isEqualTo("031126FB03");
