@@ -22,7 +22,14 @@ state after a center-calendar midnight transition.
 Existing corrections remain separate, require meaningful reasons and permanent
 correction/audit records, and retain the saved-result consistency guard. A closed
 first-mark date does not hide historical participation or erase corrections.
-No new correction deadline or privileged backfill endpoint is implemented.
+No new correction deadline is imposed. A separate Manager-only administrative
+first-mark endpoint is implemented at
+`POST /api/v1/manager/training/attendance/backfill`. P-02 Option A approves its
+Manager-only scope; ordinary attendance permissions and existing corrections
+are unchanged. It defaults disabled with no configured window and fails closed.
+Production cutoff duration and feature activation remain PENDING_APPROVAL.
+See [Manager administrative attendance backfill](attendance-administrative-backfill.md)
+for authorization, session-state checks, audit, configuration and roster limits.
 
 The Coach session-start opening, Reception 15-minute early allowance, 48-hour
 administrative/correction limit and escalation contract remain

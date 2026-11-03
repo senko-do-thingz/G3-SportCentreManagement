@@ -708,6 +708,13 @@ class TrainingWorkflowIntegrationTest {
         try{return backfiller.backfill(id,request);}finally{org.springframework.security.core.context.SecurityContextHolder.clearContext();}
     }
     private void pastSession(){jdbc.update("UPDATE class_session SET session_date='2026-11-01' WHERE id=?",session);}
+    private AttendanceBackfillService.Workspace backfillWorkspaceAs(long id) {
+        var principal=new com.sportify.identity.security.CustomUserDetails(actor(id));
+        var context=org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(principal,null,principal.getAuthorities()));
+        org.springframework.security.core.context.SecurityContextHolder.setContext(context);
+        try{return backfiller.workspace(id);}finally{org.springframework.security.core.context.SecurityContextHolder.clearContext();}
+    }
     private void noBackfill(){
         assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?",booking)).isZero();
         assertThat(count("SELECT COUNT(*) FROM activity_log WHERE action='TRAINING_ATTENDANCE_BACKFILLED' AND JSON_VALUE(details,'$.bookingId')=?",String.valueOf(booking))).isZero();
@@ -827,6 +834,45 @@ class TrainingWorkflowIntegrationTest {
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/attendance")
             .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(peer)))))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$").isEmpty());
+    }
+    @Test void R09F01_draftConfirmedBookingIsHiddenAndRejectedByHttpWithoutMutation() throws Exception {
+        pastSession();long admin=account("MANAGER");
+        // Persisted legacy/import anomalies must not turn a draft into evidence of participation.
+        jdbc.update("UPDATE class_session SET status='DRAFT' WHERE id=?",session);
+        assertThat(count("SELECT COUNT(*) FROM booking WHERE id=? AND status='CONFIRMED'",booking)).isEqualTo(1);
+        assertThat(backfillWorkspaceAs(admin).bookings()).noneMatch(b->b.bookingId()==booking);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/manager/training/attendance/backfill")
+            .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(admin))))
+            .contentType("application/json").content("{\"bookingId\":"+booking+",\"status\":\"PRESENT\",\"reason\":\"Verified missed roll call\"}"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+        noBackfill();
+        assertThat(count("SELECT booked_count FROM class_session WHERE id=?",session)).isEqualTo(1);
+    }
+    @ParameterizedTest @ValueSource(strings={"PUBLISHED","COMPLETED"})
+    void R09F01_elapsedPublishedAndCompletedRemainEligible(String state) {
+        pastSession();long admin=account("MANAGER");
+        jdbc.update("UPDATE class_session SET status=? WHERE id=?",state,session);
+        assertThat(backfillWorkspaceAs(admin).bookings()).anyMatch(b->b.bookingId()==booking);
+        assertThat(backfillAs(admin,backfillRequest()).id()).isPositive();
+    }
+    @Test void R09F01_draftTransitionWhileWaitingForSessionLockIsRevalidated() throws Exception {
+        pastSession();long admin=account("MANAGER");
+        interleave(()->{jdbc.update("UPDATE class_session SET status='DRAFT' WHERE id=?",session);return null;},
+            ()->backfillAs(admin,backfillRequest()),BusinessRuleException.class);
+        noBackfill();
+    }
+    @Test void R09F02_candidateCapIsDiscoveryOnlyAndMayOmitAnEligibleBooking() {
+        pastSession();long admin=account("MANAGER");
+        for(int i=0;i<200;i++) {
+            long participant=account("MEMBER");
+            insert("INSERT booking(booking_code,session_id,member_id,status) VALUES (?,?,?,'CONFIRMED')",code(),session,participant);
+        }
+        var workspace=backfillWorkspaceAs(admin);
+        assertThat(workspace.bookings()).hasSize(200).noneMatch(b->b.bookingId()==booking);
+        noBackfill();
+        // Roster truncation does not grant or remove write authorization for a known booking ID.
+        assertThat(backfillAs(admin,backfillRequest()).id()).isPositive();
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE action='TRAINING_ATTENDANCE_BACKFILLED' AND actor_user_id=?",admin)).isEqualTo(1);
     }
     private void interleave(Callable<?> first,Callable<?> second,Class<? extends Throwable> failure) throws Exception {
         var held=new CountDownLatch(1);var release=new CountDownLatch(1);

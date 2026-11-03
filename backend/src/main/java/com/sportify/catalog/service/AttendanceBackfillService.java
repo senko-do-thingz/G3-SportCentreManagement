@@ -48,7 +48,7 @@ public class AttendanceBackfillService {
             JOIN member_profile m ON m.user_id=b.member_id JOIN user_account u ON u.id=m.user_id
             JOIN role r ON r.id=u.role_id AND r.code='MEMBER'
             JOIN sport sp ON sp.id=s.sport_id LEFT JOIN sport_class c ON c.id=s.class_id
-            WHERE b.status='CONFIRMED' AND s.status<>'CANCELLED' AND s.training_type='COACH_LED'
+            WHERE b.status='CONFIRMED' AND s.status IN ('PUBLISHED','COMPLETED') AND s.training_type='COACH_LED'
               AND s.session_date < ?
               AND NOT EXISTS(SELECT 1 FROM attendance_record a WHERE a.session_id=b.session_id AND a.member_id=b.member_id)
               AND NOT EXISTS(SELECT 1 FROM session_result x WHERE x.session_id=b.session_id AND x.member_id=b.member_id)
@@ -85,8 +85,10 @@ public class AttendanceBackfillService {
             throw new ConflictException("Booking changed; reload and retry");
         var booking = bookings.getFirst();
         var session = sessions.getFirst();
-        if (!booking.status().equals("CONFIRMED") || session.status().equals("CANCELLED") || !session.type().equals("COACH_LED"))
-            throw new BusinessRuleException("Backfill requires a confirmed booking for a non-cancelled coach-led session");
+        if (!booking.status().equals("CONFIRMED")
+            || (!session.status().equals("PUBLISHED") && !session.status().equals("COMPLETED"))
+            || !session.type().equals("COACH_LED"))
+            throw new BusinessRuleException("Backfill requires a confirmed booking for a published or completed coach-led session");
         if (jdbc.queryForObject("SELECT COUNT(*) FROM member_profile m JOIN user_account u ON u.id=m.user_id JOIN role r ON r.id=u.role_id WHERE m.user_id=? AND r.code='MEMBER'", Integer.class, booking.memberId()) != 1)
             throw new BusinessRuleException("A real member booking is required");
         Instant now = clock.instant();

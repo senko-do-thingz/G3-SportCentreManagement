@@ -23,6 +23,31 @@ bookings with no attendance/result, filtered by the server's current window.
 The Manager desktop page is /manager/training/attendance/backfill. The server
 revalidates every save; an earlier roster response grants no write permission.
 
+## Candidate discovery limit
+
+The query selects at most 200 matching rows before applying the end/window filter
+in Java. SQL order is session_date descending, end_time descending, then booking
+ID descending. It considers confirmed real Member bookings for PUBLISHED or
+COMPLETED past-date coached sessions without attendance or a result. This is a
+bounded discovery list, not a complete search or a total eligible count. There
+is no offset, continuation token or pagination contract.
+
+With 201 otherwise eligible bookings, the oldest row by that order can be
+omitted. Rows later excluded by the end/window filter still consume the initial
+200 slots; for example, not-yet-ended overnight sessions can hide older eligible
+rows. An empty returned list therefore does not prove that no eligible booking
+exists outside the selected subset. Sorting uses persisted dates/end times, not
+actual end instants adjusted for overnight sessions.
+
+The cap does not change POST authorization: a known booking ID is fully
+revalidated under locks even when absent from the discovery list. It does not
+authorize direct SQL, date edits, unlimited backfill or another privileged route.
+The current UI offers only this returned subset and has no further-page action.
+No production volume bound below 200 has been established. Before activating the
+feature, the operational owner must assess missed-booking volume and accept this
+limitation or request a separately scoped lookup/pagination change. No broad
+pagination or API/DTO refactoring is introduced in this follow-up.
+
 POST to the same API route accepts bookingId, status (PRESENT, LATE, ABSENT or
 EXCUSED), reason and optional notes. bookingId is authoritative; member/coach
 IDs are never used from the request. Reason must be nonblank, at least three
@@ -37,8 +62,14 @@ Disabled JWTs are rejected by the existing authentication filter; an explicitly
 disabled authenticated principal is rejected with 403. Reception is not delegated.
 
 The transaction locks the session first, then the booking, rechecking identity,
-CONFIRMED status, real Member, non-cancelled COACH_LED session and missing
-attendance. The session calendar date must be strictly before today in
+CONFIRMED status, real Member, PUBLISHED or COMPLETED COACH_LED session and missing
+attendance. DRAFT and CANCELLED are rejected, including anomalous confirmed
+bookings attached to a historical draft. Normal booking creation requires a
+PUBLISHED session, but there is no database cross-table constraint guaranteeing
+that every persisted confirmed booking is attached to one. A past date alone
+does not make a draft an actual class. Elapsed PUBLISHED sessions remain eligible
+without inventing a mandatory transition to COMPLETED. The session calendar date
+must be strictly before today in
 Asia/Ho_Chi_Minh. The persisted session end date/time is the only authoritative
 end available in the current schema; no actual-end tracking field is invented.
 An end time at/before start is interpreted as the following day for overnight
