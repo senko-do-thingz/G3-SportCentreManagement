@@ -23,13 +23,20 @@ public abstract class AbstractIntegrationTest {
 
     @org.junit.jupiter.api.BeforeEach
     void captureFixtureIdentityCounters() {
-        identityCountersBefore = com.sportify.support.SessionIdentityFixtures.snapshot(identityFixtureJdbc);
+        if (usesSessionIdentityFixtures()) {
+            identityCountersBefore = com.sportify.support.SessionIdentityFixtures.snapshot(identityFixtureJdbc);
+        }
     }
 
     @org.junit.jupiter.api.AfterEach
     void restoreFixtureIdentityCounters() {
-        com.sportify.support.SessionIdentityFixtures.restoreAfterFixtureCleanup(identityFixtureJdbc, identityCountersBefore);
+        if (identityCountersBefore != null) {
+            com.sportify.support.SessionIdentityFixtures.restoreAfterFixtureCleanup(identityFixtureJdbc, identityCountersBefore);
+        }
     }
+
+    /** Historical schema suites explicitly opt out when their target predates V39. */
+    protected boolean usesSessionIdentityFixtures() { return true; }
 
     protected static final MSSQLServerContainer<?> MSSQL_SERVER_CONTAINER = new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2022-latest")
             .acceptLicense()

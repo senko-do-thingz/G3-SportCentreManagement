@@ -236,7 +236,7 @@ class RefundPaymentLinkIntegrationTest extends AbstractIntegrationTest {
         jdbc.update("""
                 INSERT INTO class_session (sport_id, session_date, start_time, end_time, training_type, capacity, booked_count, status, session_code)
                 VALUES (?, ?, CAST('18:00' AS TIME), CAST('19:30' AS TIME), 'SELF_TRAINING', 20, ?, 'PUBLISHED', ?)
-                """, sportId, java.sql.Date.valueOf(date), bookedCount, SessionIdentityFixtures.reserve(jdbc, date, sportId));
+                """, sportId, java.sql.Date.valueOf(date), bookedCount, SessionIdentityFixtures.reserve(jdbc, date, "FOOTBALL"));
         return jdbc.queryForObject("SELECT MAX(id) FROM class_session WHERE sport_id = ?", Long.class, sportId);
     }
 

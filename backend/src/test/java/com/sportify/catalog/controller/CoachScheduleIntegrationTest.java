@@ -87,7 +87,8 @@ public class CoachScheduleIntegrationTest extends AbstractIntegrationTest {
         manager = account("MANAGER"); coachA = account("COACH"); coachB = account("COACH");
         memberA = member(); memberB = member(); memberC = member(); memberD = member();
         memberC.setPhone(null); users.saveAndFlush(memberC);
-        sportA = sport(); sportB = sport();
+        sportA = sports.findById(jdbc.queryForObject("SELECT id FROM sport WHERE code='FOOTBALL'", Long.class)).orElseThrow();
+        sportB = sports.findById(jdbc.queryForObject("SELECT id FROM sport WHERE code='BADMINTON'", Long.class)).orElseThrow();
         profileA = profile(coachA); profileB = profile(coachB);
         coachSports.saveAndFlush(CoachSport.of(coachA.getId(), sportA.getId()));
         coachSports.saveAndFlush(CoachSport.of(coachA.getId(), sportB.getId()));
@@ -126,7 +127,6 @@ public class CoachScheduleIntegrationTest extends AbstractIntegrationTest {
         members.saveAndFlush(MemberProfile.builder().userAccount(account).memberCode(code()).staffNote("Private staff note").build());
         return account;
     }
-    Sport sport() { return sports.saveAndFlush(Sport.builder().code(code()).name(code()).venueType(SportVenueType.INDOOR).build()); }
     CoachProfile profile(UserAccount account) {
         return coaches.saveAndFlush(CoachProfile.builder().userAccount(account).primarySportId(sportA.getId())
                 .bio("Private biography").isPublic(false).build());
@@ -151,7 +151,6 @@ public class CoachScheduleIntegrationTest extends AbstractIntegrationTest {
                 .totalSessions(10).remainingSessions(10).startDate(LocalDate.now(clock).minusDays(1))
                 .endDate(LocalDate.now(clock).plusDays(80)).status(PackageRegistrationStatus.ACTIVE).createdByUser(manager).build());
     }
-    // Synthetic sport metadata isolates legacy roster projections; these fixtures do not assert sport-code creation rules.
     ClassSession session(CoachProfile profile, LocalDate date, int hour, SessionStatus status) {
         return sessions.saveAndFlush(ClassSession.builder().sportClass(profile == null ? null : classA).sport(sportA)
                 .sessionCode(SessionIdentityFixtures.reserve(jdbc, date, "FOOTBALL"))
@@ -255,9 +254,12 @@ public class CoachScheduleIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test void maximumSqlDateAnd62DayCalendarAreSafe() throws Exception {
-        var maximum = session(profileA, LocalDate.of(9999, 12, 31), 9, SessionStatus.DRAFT); em.clear();
+        var maximum = session(profileA, LocalDate.of(2099, 12, 31), 9, SessionStatus.DRAFT); em.clear();
         assertThat(ids(call(get(URL).with(user(new CustomUserDetails(coachA)))
-                .param("from", "9999-12-31").param("to", "9999-12-31"), 200), "id")).containsExactly(maximum.getId());
+                .param("from", "2099-12-31").param("to", "2099-12-31"), 200), "id")).containsExactly(maximum.getId());
+        // Query bounds still accept SQL's maximum date, while stored identities stop at 2099.
+        assertThat(call(get(URL).with(user(new CustomUserDetails(coachA)))
+                .param("from", "9999-12-31").param("to", "9999-12-31"), 200)).isEmpty();
         var range = call(get(URL).with(user(new CustomUserDetails(coachA)))
                 .param("from", day.toString()).param("to", day.plusDays(61).toString()), 200);
         assertThat(ids(range, "id")).contains(outsideAfter.getId());

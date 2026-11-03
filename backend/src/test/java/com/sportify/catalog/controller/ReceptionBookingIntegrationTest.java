@@ -147,7 +147,7 @@ class ReceptionBookingIntegrationTest {
     private long session(LocalDate date, int capacity, boolean self) {
         return insert("class_session", "INSERT INTO class_session(class_id,sport_id,facility_id,coach_id,training_type,session_date,start_time,end_time,capacity,booked_count,status,session_code) "
                 + "OUTPUT INSERTED.id VALUES (?,?,?,?,?,?,'12:00','13:00',?,0,'PUBLISHED',?)", self ? null : sportClass, sport, facility,
-                self ? null : coach.getId(), self ? "SELF_TRAINING" : "COACH_LED", date, capacity, SessionIdentityFixtures.reserve(jdbc, date, sport));
+                self ? null : coach.getId(), self ? "SELF_TRAINING" : "COACH_LED", date, capacity, SessionIdentityFixtures.reserve(jdbc, date, "FOOTBALL"));
     }
     private long session() { return session(TODAY.plusDays(1), 10, false); }
     private long legacy(long session, UserAccount member, long registration, String status) {
