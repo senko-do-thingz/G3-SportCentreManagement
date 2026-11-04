@@ -61,8 +61,9 @@ class UnifyReconciliationIntegrationTest {
     @Test void oldV40CannotPassTheReleaseV46GuardOrMutateHistory() throws Exception {
         var db=DisposableUnifyDatabase.create();flyway(db,"40").migrate();
         var history=db.jdbc().queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank");
+        // Pending release migrations fail the history guard before the version check.
         assertThatThrownBy(()->UnifyPreflight.inspect(db.source(),false,UnifyPreflight.schemaFingerprint(db.source())))
-                .hasMessage("V46_REQUIRED");
+                .hasMessage("FLYWAY_HISTORY_MISMATCH");
         assertThat(db.jdbc().queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")).isEqualTo(history);
     }
 
