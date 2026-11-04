@@ -1,3 +1,4 @@
+import { businessDate } from '../../utils/date'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getErrorMessage } from '../../api/errors'
@@ -17,8 +18,7 @@ const GROUPS: { value: RevenueGroup; label: string }[] = [
 ]
 
 function today(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  return businessDate()
 }
 
 function validDate(value: string | null): value is string {

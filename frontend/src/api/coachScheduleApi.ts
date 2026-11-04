@@ -1,8 +1,11 @@
 import { api } from './client'
+import { optionalSessionId, type SessionId } from './sessionIdentity'
 import { ApiError } from './errors'
 
 export interface CoachSessionRecord {
   id: number
+  sessionId?: SessionId
+  trainingType?: string
   classId: number | null
   className: string | null
   sportId: number
@@ -63,7 +66,7 @@ function parseCoachSession(value: unknown): CoachSessionRecord {
     || !Number.isSafeInteger(session.bookedCount) || Number(session.bookedCount) < 0) {
     throw new ApiError(0, UNEXPECTED_RESPONSE)
   }
-  return session as CoachSessionRecord
+  return { ...session, sessionId: optionalSessionId(session.sessionId) } as CoachSessionRecord
 }
 
 function parseRosterRecord(value: unknown): CoachRosterRecord {
@@ -95,5 +98,8 @@ async function roster(sessionId: number, signal?: AbortSignal): Promise<CoachRos
   if (!Number.isSafeInteger(sessionId) || sessionId <= 0) throw new ApiError(0, 'Choose a valid session.')
   return asRecords(await api.get<unknown>(`/coach/sessions/${sessionId}/roster`, { signal }), parseRosterRecord)
 }
+async function rosterByCode(sessionId: SessionId, signal?: AbortSignal): Promise<CoachRosterRecord[]> {
+  return asRecords(await api.get<unknown>(`/coach/sessions/by-code/${sessionId}/roster`, { signal }), parseRosterRecord)
+}
 
-export const coachScheduleApi = { list, roster }
+export const coachScheduleApi = { list, roster, rosterByCode }

@@ -1,3 +1,6 @@
+import { formatDateTime } from '../../utils/format'
+import { SessionContext } from '../../components/SessionContext'
+import { sessionIdText, parseSessionReference, sessionRouteReference } from '../../api/sessionIdentity'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiError, getErrorMessage } from '../../api/errors'
@@ -209,9 +212,9 @@ function ReceptionBookingsContent() {
               <div><p className="booking-history-card__date">{bookingDate(booking.sessionDate)} / {bookingTime(booking.startTime)} - {bookingTime(booking.endTime)}</p><h2>{bookingTitle(booking)}</h2></div>
               <StatusBadge status={booking.status} />
             </div>
-            <p className="browse-muted">{booking.sportName || 'Sport not provided'}{booking.trainingType !== 'SELF_TRAINING' && ` - ${booking.coachName || 'Coach not provided'}`} - {booking.facilityName || 'Facility not provided'}</p>
-            <dl className="browse-facts booking-facts"><div><dt>Booking code</dt><dd>{booking.bookingCode}</dd></div><div><dt>Package</dt><dd>{booking.packageName || 'Not provided'}</dd></div><div><dt>Booked</dt><dd>{booking.bookedAt?.replace('T', ' ').slice(0, 16) || 'Not provided'}</dd></div></dl>
-            {booking.status === 'CANCELLED' && <p className="browse-muted">Cancelled {booking.cancelledAt ? `on ${booking.cancelledAt.replace('T', ' ').slice(0, 16)}` : ''}{booking.cancelledByName ? ` by ${booking.cancelledByName}` : ''}</p>}
+            <SessionContext {...booking} sessionId={booking.sessionCode} date={booking.sessionDate} /><p className="browse-muted">{booking.sportName || 'Sport not provided'}{booking.trainingType !== 'SELF_TRAINING' && ` - ${booking.coachName || 'Coach not provided'}`} - {booking.facilityName || 'Facility not provided'}</p>
+            <dl className="browse-facts booking-facts"><div><dt>Booking code</dt><dd>{booking.bookingCode}</dd></div><div><dt>Package</dt><dd>{booking.packageName || 'Not provided'}</dd></div><div><dt>Booked</dt><dd>{formatDateTime(booking.bookedAt)}</dd></div></dl>
+            {booking.status === 'CANCELLED' && <p className="browse-muted">Cancelled {booking.cancelledAt ? `on ${formatDateTime(booking.cancelledAt)}` : ''}{booking.cancelledByName ? ` by ${booking.cancelledByName}` : ''}</p>}
             {booking.status === 'CONFIRMED' && when === 'UPCOMING' && booking.id !== unverifiedCancellation?.bookingId && <div className="browse-actions booking-actions"><Button variant="danger" onClick={() => setCancelTarget({ memberId, booking })}>Cancel booking</Button></div>}
           </article>)}
         </div>}
@@ -314,7 +317,7 @@ export function ReceptionAssistedBookingPage() {
   const dateValue = params.get('week') ?? browseToday()
   const week = validBrowseDate(dateValue) ? browseMonday(dateValue) : browseMonday(browseToday())
   const weekEnd = browseAddDays(week, 6)
-  const requestedSessionId = positiveId(params.get('sessionId'))
+  const requestedSessionId = parseSessionReference(params.get('sessionId'))
   const baseLoader = useCallback(async (signal: AbortSignal) => {
     if (!memberId) throw new Error('Choose a member before booking.')
     const [member, sessions] = await Promise.all([
@@ -324,7 +327,7 @@ export function ReceptionAssistedBookingPage() {
     return { member, sessions }
   }, [memberId, week, weekEnd])
   const [base, reloadBase] = useResource(baseLoader)
-  const chosenSession = base.status === 'ready' ? base.data.sessions.find((session) => session.id === requestedSessionId) ?? null : null
+  const chosenSession = base.status === 'ready' ? base.data.sessions.find((session) => (session.id === requestedSessionId || session.sessionId === requestedSessionId)) ?? null : null
   function changeWeek(date: string) {
     setParams((current) => withQuery(current, { week: date, sessionId: null }))
   }
@@ -339,9 +342,9 @@ export function ReceptionAssistedBookingPage() {
         {base.data.sessions.length === 0 ? <EmptyState title="No sessions this week" description="Try another week to find a published session." /> : <div className="reception-session-list" role="radiogroup" aria-label="Available sessions">
           {base.data.sessions.map((session) => {
             const available = session.status === 'PUBLISHED' && !session.full && session.freeSeats > 0
-            const selected = session.id === requestedSessionId
-            return <button type="button" role="radio" aria-checked={selected} disabled={!available} className={`reception-session-choice${selected ? ' reception-session-choice--selected' : ''}`} key={session.id} onClick={() => setParams((current) => withQuery(current, { sessionId: String(session.id) }))}>
-              <span><strong>{session.className || `${session.sportName} session`}</strong><small>{browseDay(session.sessionDate)} {bookingDate(session.sessionDate)} / {bookingTime(session.startTime)} - {bookingTime(session.endTime)}</small><small>{session.sportName} - {session.trainingFormat === 'SELF_TRAINING' ? 'Self-training' : `Coach-led${session.coachName ? ` - ${session.coachName}` : ''}`} - {session.facilityName || 'Facility not provided'}</small></span>
+            const selected = (session.id === requestedSessionId || session.sessionId === requestedSessionId)
+            return <button type="button" role="radio" aria-checked={selected} disabled={!available} className={`reception-session-choice${selected ? ' reception-session-choice--selected' : ''}`} key={session.id} onClick={() => setParams((current) => withQuery(current, { sessionId: sessionRouteReference(session) }))}>
+              <span><span className="session-identity">Session ID <code>{sessionIdText(session.sessionId)}</code></span><strong>{session.className || `${session.sportName} session`}</strong><small>{browseDay(session.sessionDate)} {bookingDate(session.sessionDate)} / {bookingTime(session.startTime)} - {bookingTime(session.endTime)}</small><small>{session.sportName} - {session.trainingFormat === 'SELF_TRAINING' ? 'Self-training - No assigned coach' : `Coach-led${session.coachName ? ` - ${session.coachName}` : ''}`} - {session.facilityName || 'Facility not provided'}</small></span>
               <Badge tone={available ? 'success' : 'neutral'}>{available ? `${session.freeSeats} seats` : session.status === 'PUBLISHED' ? 'Full' : session.status}</Badge>
             </button>
           })}
@@ -378,7 +381,7 @@ export function ReceptionBookingConfirmedPage() {
       <span className="booking-confirmation__mark" aria-hidden="true" />
       <Badge tone="success">Confirmed</Badge>
       <h2>{bookingTitle(booking)}</h2>
-      <p className="booking-code">Booking {booking.bookingCode}</p>
+      <p className="booking-code">Booking {booking.bookingCode}</p><SessionContext {...booking} sessionId={booking.sessionCode} date={booking.sessionDate} />
       <dl className="browse-facts booking-confirmation__facts"><div><dt>Member</dt><dd>{booking.memberFullName || 'Member'}</dd></div><div><dt>Date</dt><dd>{bookingDate(booking.sessionDate)}</dd></div><div><dt>Time</dt><dd>{bookingTime(booking.startTime)} - {bookingTime(booking.endTime)} Vietnam time</dd></div><div><dt>Sport</dt><dd>{booking.sportName || 'Not provided'}</dd></div><div><dt>Coach</dt><dd>{booking.trainingType === 'SELF_TRAINING' ? 'Self-training' : booking.coachName || 'Not provided'}</dd></div><div><dt>Facility</dt><dd>{booking.facilityName || 'Not provided'}</dd></div><div><dt>Package</dt><dd>{booking.packageName || 'Not provided'}</dd></div><div><dt>Status</dt><dd><StatusBadge status={booking.status} /></dd></div></dl>
       <p className="browse-muted">No notification delivery is reported by the booking response. Share these booking details with the member.</p>
       <div className="browse-actions booking-actions"><Link className="btn btn--primary" to={returnTo}>Back to member bookings</Link><Link className="btn btn--secondary" to="/reception/bookings">Search another member</Link></div>

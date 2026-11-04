@@ -1,3 +1,4 @@
+import { formatCalendarDate } from '../../utils/date'
 import { businessDate } from '../../utils/date'
 
 export function validBrowseDate(value: string): boolean {
@@ -31,7 +32,7 @@ export function browseMondayFromIsoWeek(value: string): string | null {
   const monday = browseAddDays(browseMonday(`${match[1]}-01-04`), (week - 1) * 7)
   return validBrowseDate(monday) && browseIsoWeek(monday) === `${match[1]}-W${String(week).padStart(2, '0')}` ? monday : null
 }
-export function browseDate(date: string): string { return validBrowseDate(date) ? date.split('-').reverse().join('/') : 'Date unavailable' }
+export function browseDate(date: string): string { return formatCalendarDate(date) }
 export function browseDay(date: string): string { return new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${date}T00:00:00Z`)) }
 export function sessionMinutes(start: string, end: string): string {
   const seconds = (time: string) => {

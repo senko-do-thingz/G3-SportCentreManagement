@@ -607,7 +607,13 @@ class DemoQrDatabaseIntegrationTest {
         assertThat(database.queryForObject("SELECT COUNT(*) FROM sys.tables WHERE name IN ('simulated_qr_session','simulated_payment_transaction')",Integer.class)).isZero();
         assertThat(fingerprint(database)).isEqualTo(before);
         var current=Flyway.configure().dataSource(source).locations("classpath:db/migration/identity","classpath:db/migration/catalog").cleanDisabled(true).load();
-        assertThat(current.migrate().migrationsExecuted).isEqualTo(3);
+        // Later features may add migrations after the QR cohort; verify all pending work.
+        var pendingVersions = Arrays.stream(current.info().pending())
+                .map(migration -> migration.getVersion().getVersion()).toList();
+        assertThat(pendingVersions).contains("34", "35", "36");
+        assertThat(current.migrate().migrationsExecuted).isEqualTo(pendingVersions.size());
+        assertThat(database.queryForList("SELECT version FROM flyway_schema_history WHERE success=1", String.class))
+                .containsAll(pendingVersions);
         current.validate();
         assertThat(current.migrate().migrationsExecuted).isZero();
         assertThat(database.queryForObject("SELECT settlement_type FROM dbo.payment WHERE payment_code='QR04-LEGACY'", String.class)).isNull();

@@ -127,6 +127,16 @@
         </dependency>
     </dependencies>
 
+    <profiles>
+        <profile>
+            <id>qr-local-verification</id>
+            <!-- Keep verification classes separate from an active IDE's incremental compiler. -->
+            <build>
+                <directory>${project.basedir}/../scratch/qr-local-verification/backend-target</directory>
+            </build>
+        </profile>
+    </profiles>
+
     <build>
         <plugins>
             <plugin>
@@ -226,7 +236,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.15</version>
+                <version>0.8.16</version>
                 <executions>
                     <execution>
                         <goals>

@@ -1,3 +1,4 @@
+import { parseSessionId } from '../../api/sessionIdentity'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -13,7 +14,7 @@ const detail: SessionDetail = { session, memberContext: true, alreadyBooked: fal
 function backend(value: SessionDetail | number = detail, profile = MEMBER) {
   return installFakeFetch((call) => {
     if (call.path === '/users/me') return json(200, profile)
-    if (call.path === '/sessions/5') return typeof value === 'number' ? backendError(value, 'Session not found') : json(200, value)
+    if (call.path === '/sessions/5' || call.path === '/sessions/by-code/161026BK01') return typeof value === 'number' ? backendError(value, 'Session not found') : json(200, value)
     if (call.path === '/coaches/3') return json(200, { id: 3, name: 'Quan Coach', headline: null, bio: null, yearsExperience: null, specialties: null, sports: [{ id: 3, name: 'Basketball' }], certifications: [{ id: 1, name: 'Sports Coach Certificate', issuer: 'Federation', verified: false, issuedOn: '2024-01-01', expiresOn: '2025-01-01' }], upcomingSessions: { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }, email: 'private@example.com' })
     return backendError(404, 'Unexpected test request')
   })
@@ -111,3 +112,12 @@ describe('FE-08 session detail', () => {
     expect(api.calls.every((call) => call.path === '/users/me')).toBe(true)
   })
 })
+
+ it('ID-04 resolves a public code bookmark and keeps it through booking navigation', async () => {
+   const calls = backend({ ...detail, session: { ...session, sessionId: parseSessionId('161026BK01') } })
+   renderApp('/member/sessions/161026BK01')
+   expect(await screen.findByText('161026BK01')).toBeInTheDocument()
+   expect(screen.getByRole('link', { name: 'Book session' })).toHaveAttribute('href', '/member/bookings/new?sessionId=161026BK01&returnTo=%2Fmember%2Fclasses')
+   expect(calls.calls.some(call => call.path === '/sessions/by-code/161026BK01')).toBe(true)
+   expect(calls.calls.some(call => call.path === '/sessions/161026BK01')).toBe(false)
+ })

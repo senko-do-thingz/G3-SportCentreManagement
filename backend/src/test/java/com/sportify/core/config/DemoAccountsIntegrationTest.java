@@ -59,6 +59,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Import(DemoAccountsIntegrationTest.FixedClock.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class DemoAccountsIntegrationTest extends AbstractIntegrationTest {
+    @Override protected boolean usesSessionIdentityFixtures() { return false; }
     private static final String DATABASE = "be07_" + UUID.randomUUID().toString().replace("-", "");
     private static boolean databaseCreated;
 

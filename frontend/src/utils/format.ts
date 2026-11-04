@@ -1,37 +1,12 @@
 /**
- * Display formatters shared by every screen. Formats follow the Figma screens:
- * money "1.350.000 VND", date "04 Jul 2027", date and time "04 Jul 2027, 17:00".
+ * Shared presentation: money "1.350.000 VND" and center-based dates "04/07/2027 17:00".
  */
 
 const MONEY_FORMAT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 })
-const DATE_FORMAT = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-const TIME_FORMAT = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })
+export { formatDate, formatTime, formatDateTime, parseDate } from './dateDisplay'
 
-const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/
-
-/** Placeholder shown when a value is missing. */
+/** Placeholder shown when a value is missing or invalid. */
 export const EMPTY_VALUE = '-'
-
-/**
- * Parses an ISO date or date time from the backend. A date only value such as "2027-07-04"
- * (Java LocalDate) is read as a local date, so it is never shifted by the time zone.
- */
-export function parseDate(value: string | number | Date | null | undefined): Date | null {
-  if (value === null || value === undefined || value === '') {
-    return null
-  }
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? null : value
-  }
-  if (typeof value === 'string') {
-    const match = DATE_ONLY.exec(value)
-    if (match) {
-      return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
-    }
-  }
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
-}
 
 /** 1350000 becomes "1.350.000 VND". Accepts numbers or numeric strings (BigDecimal). */
 export function formatMoney(amount: number | string | null | undefined, currency = 'VND'): string {
@@ -43,24 +18,6 @@ export function formatMoney(amount: number | string | null | undefined, currency
     return EMPTY_VALUE
   }
   return `${MONEY_FORMAT.format(Math.round(value))} ${currency}`
-}
-
-/** "2027-07-04" becomes "04 Jul 2027". */
-export function formatDate(value: string | number | Date | null | undefined): string {
-  const date = parseDate(value)
-  return date ? DATE_FORMAT.format(date) : EMPTY_VALUE
-}
-
-/** "2026-10-05T17:00:00" becomes "17:00". */
-export function formatTime(value: string | number | Date | null | undefined): string {
-  const date = parseDate(value)
-  return date ? TIME_FORMAT.format(date) : EMPTY_VALUE
-}
-
-/** "2026-10-05T17:00:00" becomes "05 Oct 2026, 17:00". */
-export function formatDateTime(value: string | number | Date | null | undefined): string {
-  const date = parseDate(value)
-  return date ? `${DATE_FORMAT.format(date)}, ${TIME_FORMAT.format(date)}` : EMPTY_VALUE
 }
 
 /** "PENDING_PAYMENT" becomes "Pending payment". */
