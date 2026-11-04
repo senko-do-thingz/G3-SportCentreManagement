@@ -55,8 +55,9 @@ class ReleaseProcessRestartIntegrationTest {
         if(token!=null)request.header("Authorization","Bearer "+token);
         request.method(method,body==null?HttpRequest.BodyPublishers.noBody():HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));
         var response=client.send(request.build(),HttpResponse.BodyHandlers.ofString());
-        assertThat(response.statusCode()).as(method+" "+path).isEqualTo(expected);
-        return response.body().isBlank()?json.nullNode():json.readTree(response.body());
+        JsonNode value=response.body().isBlank()?json.nullNode():json.readTree(response.body());
+        assertThat(response.statusCode()).as(method+" "+path+" errorCode="+value.path("code").asText()+" message="+value.path("message").asText()).isEqualTo(expected);
+        return value;
     }
     private String login(String email,String password) throws Exception {return call("POST","/auth/login",null,Map.of("email",email,"password",password),200).path("accessToken").asText();}
     private static long id(JsonNode value){assertThat(value.path("id").isIntegralNumber()).isTrue();return value.path("id").asLong();}
@@ -90,7 +91,8 @@ class ReleaseProcessRestartIntegrationTest {
         long reg=id(registration);long payment=registration.path("paymentId").asLong();assertThat(registration.path("status").asText()).isEqualTo("ACTIVE");
         call("GET","/invoices/by-payment/"+payment,reception,null,200);call("GET","/invoices/by-payment/"+payment,owner,null,200);call("GET","/invoices/by-payment/"+payment,peer,null,403);
         call("GET","/members/"+member+"/overview",reception,null,200);
-        call("GET","/sessions/"+session+"/eligibility?memberId="+member,reception,null,200);
+        var eligible=call("GET","/sessions/"+session+"/eligibility?memberId="+member,reception,null,200);
+        assertThat(eligible.path("eligible").asBoolean()).as("Actual Reception booking eligibility").isTrue();
         long booking=id(call("POST","/bookings",reception,Map.of("memberId",member,"sessionId",session,"packageRegistrationId",reg),201));
         long future=id(call("POST","/bookings",owner,Map.of("sessionId",next,"packageRegistrationId",reg),201));
         call("GET","/bookings/my",owner,null,200);
