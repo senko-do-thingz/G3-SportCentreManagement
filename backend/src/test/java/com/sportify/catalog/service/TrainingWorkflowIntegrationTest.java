@@ -85,6 +85,8 @@ class TrainingWorkflowIntegrationTest {
     @Autowired ReceptionSupportService support;
     @Autowired OperationalNotificationService notifications;
     @Autowired ManagerSessionService managerSessions;
+    @Autowired SessionCodeAllocator identities;
+    @Autowired CatalogMaintenanceService catalogMaintenance;
     @Autowired BookingService bookings;
     @Autowired UserRepository users;
     @Autowired PlatformTransactionManager transactions;
@@ -142,6 +144,20 @@ class TrainingWorkflowIntegrationTest {
     private TrainingWriteRequest.Result result(){return new TrainingWriteRequest.Result(session,member,"Session assessment",List.of());}
     private TrainingWriteRequest.Attendance attendance(TrainingWriteRequest.AttendanceStatus status){return new TrainingWriteRequest.Attendance(booking,status,"Participation");}
     private TrainingWriteRequest.Correction correction(TrainingWriteRequest.AttendanceStatus status){return new TrainingWriteRequest.Correction(status,"Corrected note","Correcting a recording mistake");}
+
+    @Test void RELEASE18_allocationAndCatalogLocksPreserveJdbcUpdateCounts() {
+        var manager=actor(account("MANAGER"));
+        new TransactionTemplate(transactions).executeWithoutResult(tx->{
+            jdbc.execute("SET NOCOUNT OFF");
+            identities.reserve(LocalDate.of(2026,11,8),"BADMINTON");
+            assertThat(jdbc.queryForObject("SELECT @@OPTIONS & 512",Integer.class)).isZero();
+            var request=new com.sportify.catalog.dto.CatalogMaintenanceRequest.SportWrite("RELEASE_COUNT_"+UUID.randomUUID().toString().substring(0,8).toUpperCase(java.util.Locale.ROOT),
+                "Release connection count "+UUID.randomUUID().toString().substring(0,8),com.sportify.catalog.entity.SportVenueType.INDOOR,null,100,true);
+            catalogMaintenance.saveSport(null,request,manager);
+            assertThat(jdbc.queryForObject("SELECT @@OPTIONS & 512",Integer.class)).isZero();
+            assertThat(jdbc.update("UPDATE class_session SET booked_count=booked_count WHERE id=?",session)).isEqualTo(1);
+        });
+    }
 
     private long arrivalEntitlement() {
         long pkg=insert("INSERT sport_package(code,name,sport_id,training_format,duration_days,session_count,session_minutes,price_amount,is_active) VALUES (?, 'Arrival fixture',?,'COACH_LED',30,10,60,100,1)",code(),sport);

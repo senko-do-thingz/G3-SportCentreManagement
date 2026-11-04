@@ -31,7 +31,6 @@ public class CatalogMaintenanceService {
     // Serialize maintenance creates without holding every sport row while a scheduler locks a facility.
     private List<Sport> lockCatalog() {
         Integer acquired=jdbc.queryForObject("""
-                SET NOCOUNT ON;
                 DECLARE @result INT;
                 IF @@TRANCOUNT=0 SELECT TOP(1) @result=id FROM sport;
                 EXEC @result=sys.sp_getapplock @Resource='sportify.catalog-maintenance',
