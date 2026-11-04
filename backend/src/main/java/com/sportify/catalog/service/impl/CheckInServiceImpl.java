@@ -42,6 +42,7 @@ public class CheckInServiceImpl implements CheckInService {
     private final Clock clock;
     private final ClassSessionRepository sessionRepository;
     private final EntityManager entityManager;
+    private final com.sportify.catalog.service.OperationalMemberPolicy operationalMemberPolicy;
 
     @Override
     @Transactional
@@ -56,6 +57,7 @@ public class CheckInServiceImpl implements CheckInService {
         }
 
         MemberProfile profile = profileOpt.orElseThrow(() -> new ResourceNotFoundException("Member not found"));
+        operationalMemberPolicy.requireRealMember(profile.getId());
 
         LocalDateTime now = LocalDateTime.now(clock);
         LocalDate today = now.toLocalDate();
@@ -90,6 +92,7 @@ public class CheckInServiceImpl implements CheckInService {
             }
 
             if (targetBooking != null) {
+                operationalMemberPolicy.requireRealBooking(targetBooking.getId());
                 // Join the booking/cancellation lock order before checking mutable state or inserting ALLOWED.
                 var lockedSession = sessionRepository.findForUpdate(targetBooking.getSession().getId())
                         .orElseThrow(() -> new ResourceNotFoundException("Class session not found"));

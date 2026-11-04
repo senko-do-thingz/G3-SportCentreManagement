@@ -9,7 +9,12 @@ on:
       - backend/src/main/resources/db/migration/catalog/V34__create_simulated_qr_foundation.sql
       - backend/src/main/resources/db/migration/catalog/V35__create_simulated_qr_settlement.sql
       - frontend/scripts/qr04-*.py
+      - frontend/scripts/qr-local-demo-check.py
       - frontend/src/api/demoQrApi.ts
+      - frontend/src/api/localDemoPaymentApi.ts
+      - backend/src/test/java/com/sportify/demoqr/**
+      - backend/src/main/resources/application.yml
+      - backend/pom.xml
       - frontend/src/components/qr/**
       - frontend/src/pages/member/DemoConfirmationPage.tsx
       - frontend/src/pages/member/QrPaymentDemoPage.tsx
@@ -58,7 +63,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Build the real backend
         working-directory: backend
-        run: mvn -B -ntp package -DskipTests -DskipITs
+        run: mvn -B -ntp package -DskipUnitTests=true -DskipITs
       - name: Build the real simulator assets
         working-directory: frontend
         env:
@@ -81,6 +86,22 @@ jobs:
             --jar backend/target/G3-SportCentreManagement-0.0.1-SNAPSHOT.jar \
             --assets "$RUNNER_TEMP/qr04-assets" --axe "$RUNNER_TEMP/package/axe.min.js" \
             --out "$RUNNER_TEMP/qr04-public-evidence" --private "$RUNNER_TEMP/qr04-private"
+      - name: Verify local demo concurrency receipts and financial isolation
+        working-directory: backend
+        env:
+          SQL_CONTAINER: ${{ job.services.sql.id }}
+          DB_USERNAME: sa
+          DB_PASSWORD: Qr04CiIsolated2026!
+          JWT_SECRET: cXItbG9jYWwtZGVtby1jaS1zeW50aGV0aWMta2V5LW9ubHk=
+          SPORTIFY_PAYMENT_ACCOUNT_NAME: CI demo center
+          SPORTIFY_PAYMENT_ACCOUNT_NUMBER: NOT_AVAILABLE
+          SPORTIFY_PAYMENT_BANK: Simulation only
+        run: |
+          database="sportify_qr04_test_$(date -u +%Y%m%d%H%M%S)"
+          docker exec -e SQLCMDPASSWORD="$DB_PASSWORD" "$SQL_CONTAINER" \
+            /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -Q "CREATE DATABASE [$database];"
+          export QR_LOCAL_DEMO_TEST_DB_URL="jdbc:sqlserver://127.0.0.1:1433;databaseName=$database;encrypt=false;trustServerCertificate=true"
+          mvn -B -ntp test -Dtest=LocalDemoDatabaseIntegrationIT
       - name: Upload sanitized verification evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
