@@ -1,6 +1,26 @@
 # Operator cutover and rollback
 
-PROPOSED - PENDING CODEOWNER FINAL REVIEW. Live operations BLOCKED_FOR_CODEOWNER. Code merge, local capability enablement, schema upgrade, data import, legacy archive, production deployment and real QR integration are separate decisions. This work performs none of those live operations. No legacy import is selected.
+Round 02 status: runtime consolidation is implemented; historical data unification
+is INCOMPLETE. Zero imports do not meet a requirement that all legacy histories be
+available in sportify. Archive-only disposition is proposed and unapproved. See
+[SOURCE_HISTORY_DECISION.md](SOURCE_HISTORY_DECISION.md) for per-source/table gaps,
+retention/import options, conditional mapping design and the explicit owner gate.
+Target-specific read, backup, restored-clone rehearsal and cutover remain
+BLOCKED_FOR_CODEOWNER, independently of development CI results.
+
+Synthetic operations use an always-on default-deny policy: reserved Member IDs,
+reserved email namespace or any persisted simulator payment/transaction provenance
+quarantine the account from new bookings, check-ins, attendance, corrections,
+results, plans, feedback and class discussion writes. This also applies with demo
+profiles disabled and after email renaming. Mixed real/synthetic accounts remain
+quarantined; ordinary real members remain eligible. Cancellation and historical
+receipt reads stay available. No operational demo class namespace is approved.
+There is no exception switch. CODEOWNER must accept this operational policy before
+canonical activation. Unified SUCCESS replay validates BANK_TRANSFER, complete
+transaction/session/receipt/item/audit linkage; malformed histories are denied
+without repair. Legacy QR guard and all applied migrations remain unchanged.
+
+PROPOSED - PENDING CODEOWNER FINAL REVIEW. Live operations BLOCKED_FOR_CODEOWNER. Code merge, local capability enablement, schema upgrade, data import, legacy archive, production deployment and real QR integration are separate decisions. This work performs none of those live operations. No legacy disposition is approved; historical unification remains incomplete.
 
 ## Preflight and go or no go
 
@@ -59,3 +79,9 @@ Any unexpected financial delta, unauthorized capability, changed historical nume
 ## Legacy retention
 
 Keep sportify_demo and sportify_qr_demo untouched. Archive/decommission needs separate CODEOWNER approval of provenance reconciliation, backup and actual restore, retention period, no active connections and an explicit target inventory. Branches and private reports are preserved. If eventually approved, merge using Create a merge commit only; this work does not merge, deploy, self-approve or delete branches.
+
+Historical confirmed bookings belonging to reserved synthetic identities or persisted
+simulator owners cause read-only preflight to abort with
+`SYNTHETIC_BOOKING_REQUIRES_OWNER_DISPOSITION`. Do not automatically cancel or
+rewrite them. Owner review must determine historical retention and any separately
+authorized operational recovery before cutover.

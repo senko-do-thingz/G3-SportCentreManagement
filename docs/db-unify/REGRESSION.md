@@ -28,3 +28,25 @@ python frontend/scripts/db-unify-check.py --database $testDb --out scratch/db-un
 It exercises real browser login, pending non-payable QR and independent fallback decoding, keyboard confirmation, network failure and refresh, persisted receipt, real finance exclusion, actual Manager date rescheduling with alias/revision/credit checks, cross-role screens, and actual backend restart. Screenshots cover 1440/768/390 in both themes; desktop is the primary acceptance target. JSON/logs/screenshots stay local and must be sanitized before sharing.
 
 CI additionally runs the complete existing SQL integration manifest, immutable migration checks, frontend/security/package/compose gates, and the two new mandatory DB-UNIFY integration suites. A partial local selection does not replace full CI.
+
+Round 02 adds `OperationalMemberPolicyTest` and extends
+`UnifiedDemoDatabaseIntegrationTest` with a one-seat mixed real/synthetic fixture.
+It verifies official real payment confirmation, unchanged real capacity, roster,
+check-in, attendance, results, credit and cash/paid aggregates after simulation
+and denied API attempts; staff-assisted booking and historical booking bypasses;
+plan/attendance correction denial; persisted quarantine after flag removal/email
+rename; cancellation recovery; and ordinary real booking/cancellation.
+
+Historical replay fixtures cover CASH, mismatched transaction reference, owner,
+amount, status, missing/mismatched audit and mismatched receipt amount. Invalid
+transaction rows are inserted once in disposable fixtures, never edited around
+the immutable ledger trigger. Missing transaction linkage is rejected by the
+unchanged V36 constraint. Valid replay remains idempotent in the shared real
+HTTP workflow. Existing full payment/refund/cash suites remain mandatory.
+
+`LEGACY_SOURCE_INVENTORY.sql` is a read-only operator query template. Verify its
+syntax on a newly created fixture only unless target-specific read authorization
+has been given. Fixture evidence does not replace protected source inventories.
+See `SOURCE_HISTORY_DECISION.md`: historical unification remains incomplete
+until CODEOWNER accepts a scope change or requires and approves an archive/import
+implementation. Passing regression does not resolve that decision.

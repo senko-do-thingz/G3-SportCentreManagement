@@ -1,5 +1,25 @@
 # Proposed canonical local demonstration
 
+Round 02 status: runtime consolidation is implemented; historical data unification
+is INCOMPLETE. Zero imports do not meet a requirement that all legacy histories be
+available in sportify. Archive-only disposition is proposed and unapproved. See
+[SOURCE_HISTORY_DECISION.md](SOURCE_HISTORY_DECISION.md) for per-source/table gaps,
+retention/import options, conditional mapping design and the explicit owner gate.
+Target-specific read, backup, restored-clone rehearsal and cutover remain
+BLOCKED_FOR_CODEOWNER, independently of development CI results.
+
+Synthetic operations use an always-on default-deny policy: reserved Member IDs,
+reserved email namespace or any persisted simulator payment/transaction provenance
+quarantine the account from new bookings, check-ins, attendance, corrections,
+results, plans, feedback and class discussion writes. This also applies with demo
+profiles disabled and after email renaming. Mixed real/synthetic accounts remain
+quarantined; ordinary real members remain eligible. Cancellation and historical
+receipt reads stay available. No operational demo class namespace is approved.
+There is no exception switch. CODEOWNER must accept this operational policy before
+canonical activation. Unified SUCCESS replay validates BANK_TRANSFER, complete
+transaction/session/receipt/item/audit linkage; malformed histories are denied
+without repair. Legacy QR guard and all applied migrations remain unchanged.
+
 PROPOSED - PENDING CODEOWNER FINAL REVIEW. No live cutover is authorized by this implementation.
 
 The application continues to use one SQL Server datasource. The new `unified-demo` capability reuses the existing authenticated local confirmation API and `SIMULATED` / `SPORTIFY_SIMULATOR` transaction, receipt and audit contracts. It does not import legacy demonstration data. `LocalDemoSafetyGuard` and its throwaway allowlist remain unchanged.
