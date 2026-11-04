@@ -15,7 +15,7 @@ beforeEach(() => {
   vi.resetAllMocks()
   identity.user = { id: 1 }
   vi.mocked(checkInPassApi.issue).mockResolvedValue(pass)
-  vi.mocked(QRCode.toDataURL).mockResolvedValue('data:image/png;base64,fixture')
+  vi.mocked(QRCode.toDataURL).mockImplementation(async () => 'data:image/png;base64,fixture')
 })
 afterEach(() => vi.useRealTimers())
 
