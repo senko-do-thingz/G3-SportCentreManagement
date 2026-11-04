@@ -59,6 +59,7 @@ class ManagerSessionServiceImplTest {
     @Mock private SessionCancellationRepository cancellations;
     @Mock private AuditService audit;
     @Mock private SessionCodeAllocator allocator;
+    @Mock private com.sportify.catalog.service.OperationalNotificationService notifications;
     private ManagerSessionServiceImpl service;
     private SportClass sportClass;
     private CoachProfile coach;
@@ -68,7 +69,7 @@ class ManagerSessionServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new ManagerSessionServiceImpl(sessions, classes, coaches, qualifications, facilities,
-                bookings, cancellations, audit, CLOCK, allocator);
+                bookings, cancellations, audit, CLOCK, allocator,notifications);
         Sport sport = Sport.builder().id(1L).code("FOOTBALL").name("Football").isActive(true).build();
         sportClass = SportClass.builder().id(10L).code("CL-1000").name("Football Fundamentals")
                 .sport(sport).isActive(true).maxMembers(20).build();

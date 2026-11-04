@@ -72,6 +72,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
     private final AuditService auditService;
     private final Clock clock;
     private final SessionCodeAllocator sessionCodeAllocator;
+    private final com.sportify.catalog.service.OperationalNotificationService notifications;
 
     @Override
     @Transactional(readOnly = true)
@@ -161,6 +162,8 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
             }
             boolean timingChanged = dateChanged || !request.startTime().equals(session.getStartTime())
                     || !request.endTime().equals(session.getEndTime());
+            boolean audienceChange = timingChanged || !Objects.equals(request.coachId(),session.getCoach()==null?null:session.getCoach().getId())
+                    || !Objects.equals(request.facilityId(),session.getFacility()==null?null:session.getFacility().getId());
             if (timingChanged && sessionRepository.countRecordedActivity(id) > 0) {
                 throw new BusinessRuleException("Sessions with attendance, allowed check-ins or saved results cannot be rescheduled.");
             }
@@ -197,6 +200,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
             details.put("after", snapshot(saved));
             details.put("reason", request.rescheduleReason());
             audit(saved, actor, dateChanged ? AuditAction.SESSION_RESCHEDULED : AuditAction.SESSION_UPDATED, details);
+            if (audienceChange) notifications.changed(saved,notifications.recipients(id),false);
             return toResponse(saved, booked);
         });
     }
@@ -215,6 +219,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
             }
             Map<String, Object> before = snapshot(session);
             LocalDateTime now = LocalDateTime.now(clock);
+            List<Long> recipients = notifications.recipients(id);
             var cancellation = cancellationRepository.cancelConfirmedBookings(id, actor.getId(), request.reason(), now);
             session.setStatus(SessionStatus.CANCELLED);
             session.setCancelReason(request.reason());
@@ -222,6 +227,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
             session.setCancelledAt(now);
             session.setBookedCount(0);
             ClassSession saved = sessionRepository.saveAndFlush(session);
+            notifications.changed(saved,recipients,true);
             audit(saved, actor, AuditAction.SESSION_CANCELLED, Map.of("before", before,
                     "after", snapshot(saved), "reason", request.reason(), "bookingsCancelled", cancellation.cancelledCount(),
                     "registrations", cancellation.registrations().stream().map(row -> Map.of(

@@ -83,6 +83,8 @@ class TrainingWorkflowIntegrationTest {
     @Autowired TrainingProgressService progress;
     @Autowired ClassNoticeService notices;
     @Autowired ReceptionSupportService support;
+    @Autowired OperationalNotificationService notifications;
+    @Autowired ManagerSessionService managerSessions;
     @Autowired BookingService bookings;
     @Autowired UserRepository users;
     @Autowired PlatformTransactionManager transactions;
@@ -275,6 +277,47 @@ class TrainingWorkflowIntegrationTest {
         assertThatThrownBy(()->support.detail(reception,learning.ask(member,classId,"Private Coach question","How should I practise?"))).isInstanceOf(ResourceNotFoundException.class);
         jdbc.update("UPDATE user_account SET email=? WHERE id=?",code()+"@unified-demo.invalid",member);
         assertThatThrownBy(()->support.create(reception,request,UUID.randomUUID())).isInstanceOf(BusinessRuleException.class);
+    }
+    @Test void RELEASE15_managerChangesPersistOneEventWithCurrentPrivateScheduleAndExpiry() throws Exception {
+        long registration=arrivalEntitlement();long manager=account("MANAGER");
+        jdbc.update("UPDATE sport_package_registration SET end_date='2026-11-05' WHERE id=?",registration);
+        long facility=insert("INSERT facility(code,name,sport_id,facility_type,capacity,is_active) VALUES (?,'Release room',?,'COURT',10,1)",code(),sport);
+        jdbc.update("INSERT coach_sport(coach_id,sport_id) VALUES (?,?)",coach,sport);
+        jdbc.update("UPDATE class_session SET start_time='11:00',end_time='12:00',facility_id=? WHERE id=?",facility,session);
+        var initial=notifications.inbox(member);
+        assertThat(initial.reminders()).anyMatch(r->r.type().equals("UPCOMING_SESSION") && r.currentSchedule().id()==session);
+        assertThat(initial.reminders()).anyMatch(r->r.key().equals("PACKAGE:"+registration) && r.date().equals(LocalDate.of(2026,11,5)));
+        var request=new com.sportify.catalog.dto.SessionUpdateRequest(LocalDate.of(2026,11,2),LocalTime.NOON,LocalTime.of(13,0),facility,coach,10);
+        managerSessions.updateSession(session,request,actor(manager));
+        managerSessions.updateSession(session,request,actor(manager));
+        assertThat(notifications.inbox(member).notices()).hasSize(1);
+        assertThat(notifications.inbox(peer).notices()).isEmpty();
+        var capacityOnly=new com.sportify.catalog.dto.SessionUpdateRequest(request.date(),request.startTime(),request.endTime(),facility,coach,9);
+        managerSessions.updateSession(session,capacityOnly,actor(manager));
+        assertThat(notifications.inbox(member).notices()).hasSize(1);
+        long revision=jdbc.queryForObject("SELECT schedule_revision FROM class_session WHERE id=?",Long.class,session);
+        var moved=new com.sportify.catalog.dto.SessionUpdateRequest(LocalDate.of(2026,11,4),LocalTime.NOON,LocalTime.of(13,0),facility,coach,9,revision,"Room maintenance");
+        managerSessions.updateSession(session,moved,actor(manager));
+        var actual=notifications.inbox(member);
+        assertThat(actual.notices()).hasSize(2);
+        assertThat(actual.notices()).allMatch(n->n.currentSchedule().date().equals(LocalDate.of(2026,11,4)));
+        assertThat(actual.reminders()).filteredOn(r->r.type().equals("UPCOMING_SESSION")).hasSize(1);
+        long notice=actual.notices().getFirst().id();
+        assertThatThrownBy(()->notifications.read(peer,notice)).isInstanceOf(ResourceNotFoundException.class);
+        notifications.read(member,notice);notifications.read(member,notice);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/notifications?memberId="+member).with(as(peer)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.notices").isEmpty());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/member/notifications/"+notice+"/read").with(as(peer)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+        managerSessions.cancelSession(session,new com.sportify.catalog.dto.SessionCancelRequest("Facility closed"),actor(manager));
+        var cancelled=notifications.inbox(member);
+        assertThat(cancelled.notices()).hasSize(3);assertThat(cancelled.notices().getFirst().type()).isEqualTo("SESSION_CANCELLED");
+        assertThat(cancelled.reminders()).noneMatch(r->r.type().equals("UPCOMING_SESSION"));
+        assertThat(count("SELECT remaining_sessions FROM sport_package_registration WHERE id=?",registration)).isEqualTo(10);
+        jdbc.update("UPDATE sport_package_registration SET status='CANCELLED' WHERE id=?",registration);
+        assertThat(notifications.inbox(member).reminders()).noneMatch(r->r.key().equals("PACKAGE:"+registration));
+        assertThat(count("SELECT COUNT(*) FROM notification WHERE user_id=? AND origin_session_id=?",member,session)).isEqualTo(3);
     }
     @Test void RELEASE11_actualHttpIssueRedeemReplayAndPurposeIsolation() throws Exception {
         long registration=arrivalEntitlement();
