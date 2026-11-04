@@ -13,4 +13,6 @@ public class BankTransferInstructions {
     private String accountNumber;
     private String bank;
     private String transferContent;
+    private Boolean payable;
+    private String notice;
 }
