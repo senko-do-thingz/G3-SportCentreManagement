@@ -37,6 +37,14 @@ class TrainingWorkflowIntegrationTest {
     private static MSSQLServerContainer<?> container;
     private static String databaseUrl, databaseUser, databasePassword;
     @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
+        if (System.getenv("UNIFY_TEST_SQL_PORT") != null) {
+            var fixture = com.sportify.support.DisposableUnifyDatabase.create();
+            databaseUrl = fixture.url(); databaseUser = fixture.user(); databasePassword = fixture.password();
+            registry.add("spring.datasource.url", fixture::url);
+            registry.add("spring.datasource.username", fixture::user);
+            registry.add("spring.datasource.password", fixture::password);
+            return;
+        }
         String local=System.getenv("TRAINING_TEST_DB_URL");
         if(local!=null && !local.isBlank()) {
             if(!local.matches(".*;databaseName=sportify_training_test_[0-9]{14}(;.*)?")) throw new IllegalArgumentException("Fresh isolated training database required");
@@ -642,7 +650,9 @@ class TrainingWorkflowIntegrationTest {
     }
     @Test void R2_16_V37DryRunRollbackAndLegacyPreservation() throws Exception {
         String probe=System.getenv("TRAINING_PROBE_DB_URL");
-        if(probe==null || probe.isBlank()) {
+        if (System.getenv("UNIFY_TEST_SQL_PORT") != null) {
+            probe = com.sportify.support.DisposableUnifyDatabase.create().url();
+        } else if(probe==null || probe.isBlank()) {
             String isolated="sportify_training_probe_"+UUID.randomUUID().toString().replace("-", "");
             String base=databaseUrl.replaceAll("(?i);databaseName=[^;]*", "");
             try(var connection=java.sql.DriverManager.getConnection(base+";databaseName=master",databaseUser,databasePassword);var statement=connection.createStatement()) {

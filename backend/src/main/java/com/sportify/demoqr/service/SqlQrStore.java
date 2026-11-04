@@ -203,6 +203,75 @@ public class SqlQrStore {
         return rows.stream().findFirst();
     }
 
+    /** Read-only settlement proof, separate from current benefit availability. Never reactivate on replay. */
+    public void requireUnifiedReplay(long paymentId, long ownerId) {
+        Integer valid = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM dbo.payment p
+                JOIN dbo.simulated_payment_transaction tx ON tx.id=p.simulated_transaction_id
+                JOIN dbo.simulated_qr_session s ON s.id=tx.session_id
+                JOIN dbo.invoice i ON i.payment_id=p.id
+                WHERE p.id=? AND p.member_id=? AND p.payment_status='SUCCESS'
+                  AND p.payment_method='BANK_TRANSFER' AND p.amount>0
+                  AND p.settlement_type='SIMULATED' AND p.settlement_provider='SPORTIFY_SIMULATOR'
+                  AND tx.payment_id=p.id AND tx.member_id=p.member_id AND tx.amount=p.amount
+                  AND tx.currency='VND' AND tx.status='SUCCEEDED' AND tx.settled_at_utc IS NOT NULL
+                  AND tx.settlement_type=p.settlement_type AND tx.provider=p.settlement_provider
+                  AND tx.transaction_code=p.reference_code
+                  AND s.payment_id=p.id AND s.owner_id=p.member_id AND s.amount=p.amount
+                  AND s.currency=tx.currency AND s.bank_code=tx.bank_code AND s.state='SETTLED' AND s.active=0
+                  AND i.member_id=p.member_id AND i.status='PAID' AND i.total_amount=p.amount
+                  AND LEN(LTRIM(RTRIM(i.invoice_number)))>0
+                  AND (SELECT COUNT(*) FROM dbo.invoice WHERE payment_id=p.id)=1
+                  AND (SELECT COUNT(*) FROM dbo.member_card WHERE payment_id=p.id)
+                    + (SELECT COUNT(*) FROM dbo.sport_package_registration WHERE payment_id=p.id)=1
+                  AND (SELECT COUNT(*) FROM dbo.invoice_line WHERE invoice_id=i.id)=1
+                  AND EXISTS (SELECT 1 FROM dbo.invoice_line l WHERE l.invoice_id=i.id AND l.quantity=1
+                    AND l.line_total=i.subtotal_amount AND l.unit_price=i.subtotal_amount
+                    AND ((l.item_type='MEMBERSHIP_CARD' AND EXISTS (SELECT 1 FROM dbo.member_card c
+                        WHERE c.id=l.item_reference_id AND c.payment_id=p.id AND c.member_id=p.member_id
+                          AND (c.status='ACTIVE'
+                            OR (c.status='EXPIRED' AND c.end_date>=c.start_date
+                                AND CONVERT(date,c.updated_at)>c.end_date)
+                            OR (c.status='REPLACED' AND EXISTS (SELECT 1 FROM dbo.member_card successor
+                                WHERE successor.replaces_card_id=c.id AND successor.id<>c.id
+                                  AND successor.member_id=c.member_id AND successor.upgrade_request=1
+                                  AND successor.end_date=c.end_date
+                                  AND successor.status IN ('ACTIVE','EXPIRED','REPLACED')
+                                  AND ((successor.payment_id IS NULL AND successor.price_paid=0)
+                                    OR EXISTS (SELECT 1 FROM dbo.payment replacement_payment
+                                      JOIN dbo.invoice replacement_invoice ON replacement_invoice.payment_id=replacement_payment.id
+                                      WHERE replacement_payment.id=successor.payment_id
+                                        AND replacement_payment.member_id=c.member_id
+                                        AND replacement_payment.payment_status='SUCCESS'
+                                        AND replacement_payment.amount=successor.price_paid
+                                        AND replacement_invoice.member_id=c.member_id AND replacement_invoice.status='PAID'
+                                        AND replacement_invoice.total_amount=replacement_payment.amount)))))))
+                      OR (l.item_type='SPORT_PACKAGE' AND EXISTS (SELECT 1 FROM dbo.sport_package_registration r
+                        WHERE r.id=l.item_reference_id AND r.payment_id=p.id AND r.member_id=p.member_id
+                          AND r.activated_at IS NOT NULL
+                          AND (r.status='ACTIVE' OR (r.status='EXPIRED' AND r.end_date>=r.start_date
+                            AND CONVERT(date,r.updated_at)>r.end_date AND r.updated_at>=r.activated_at))))))
+                  AND (SELECT COUNT(*) FROM dbo.simulated_payment_transaction WHERE payment_id=p.id)=1
+                  AND (SELECT COUNT(*) FROM dbo.activity_log WHERE action='PAYMENT_CONFIRMED'
+                       AND entity_type='PAYMENT' AND entity_id=p.id)=1
+                  AND EXISTS (SELECT 1 FROM dbo.activity_log a
+                       CROSS APPLY (SELECT CASE WHEN ISJSON(a.details)=1 THEN a.details ELSE '{}' END AS body) j
+                       WHERE a.action='PAYMENT_CONFIRMED' AND a.entity_type='PAYMENT' AND a.entity_id=p.id
+                         AND a.actor_user_id=p.member_id
+                         AND JSON_VALUE(j.body,'$.method')=p.payment_method
+                         AND JSON_VALUE(j.body,'$.settlementType')=p.settlement_type
+                         AND JSON_VALUE(j.body,'$.settlementProvider')=p.settlement_provider
+                         AND TRY_CONVERT(BIGINT,JSON_VALUE(j.body,'$.simulatedTransactionId'))=tx.id
+                         AND JSON_VALUE(j.body,'$.referenceCode')=tx.transaction_code
+                         AND TRY_CONVERT(DECIMAL(38,10),JSON_VALUE(j.body,'$.amount'))=p.amount
+                         AND JSON_VALUE(j.body,'$.invoiceNumber')=i.invoice_number
+                         AND EXISTS (SELECT 1 FROM dbo.invoice_line l WHERE l.invoice_id=i.id
+                           AND l.item_type=JSON_VALUE(j.body,'$.itemType')
+                           AND l.item_reference_id=TRY_CONVERT(BIGINT,JSON_VALUE(j.body,'$.itemReferenceId'))))
+                """, Integer.class, paymentId, ownerId);
+        if (!Integer.valueOf(1).equals(valid)) throw DemoQrException.unavailable();
+    }
+
     public java.util.Optional<Session> findLatestByPayment(long paymentId) {
         var rows = jdbc.query(
                 "SELECT TOP 1 id, payment_id, owner_id, amount, currency, bank_code, created_at_utc, expires_at_utc, state, version " +

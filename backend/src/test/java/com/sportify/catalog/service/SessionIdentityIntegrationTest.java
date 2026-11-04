@@ -35,6 +35,13 @@ class SessionIdentityIntegrationTest {
     @Autowired com.sportify.identity.repository.UserRepository users;
 
     @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
+        if (System.getenv("UNIFY_TEST_SQL_PORT") != null) {
+            var fixture = com.sportify.support.DisposableUnifyDatabase.create();
+            registry.add("spring.datasource.url", fixture::url);
+            registry.add("spring.datasource.username", fixture::user);
+            registry.add("spring.datasource.password", fixture::password);
+            return;
+        }
         String local = System.getenv("ID_TEST_DB_URL");
         if (local != null && !local.isBlank()) {
             if (!local.matches("jdbc:sqlserver://[^;]+;databaseName=sportify_id_test_[0-9]{14}(;.*)?"))

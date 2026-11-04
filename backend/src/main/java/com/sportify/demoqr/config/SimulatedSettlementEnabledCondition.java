@@ -29,6 +29,6 @@ public class SimulatedSettlementEnabledCondition implements Condition {
                 && ("true".equalsIgnoreCase(env.getProperty("app.payment.local-demo.enabled"))
                 || "true".equalsIgnoreCase(env.getProperty("PAYMENT_LOCAL_DEMO_ENABLED")));
 
-        return qrSimActive || localDemoActive;
+        return qrSimActive || localDemoActive || UnifiedDemoSafetyGuard.isEnabled(env);
     }
 }

@@ -68,6 +68,7 @@ public class BookingServiceImpl implements BookingService {
     private final EntityManager entityManager;
     private final AuditService auditService;
     private final TrainingWriteService trainingWriteService;
+    private final com.sportify.catalog.service.OperationalMemberPolicy operationalMemberPolicy;
 
     public static final int MEMBER_CANCELLATION_CUTOFF_MINUTES = 120;
 
@@ -88,6 +89,7 @@ public class BookingServiceImpl implements BookingService {
             requirePositiveId(request.getPackageRegistrationId(), "Package registration ID for staff booking");
         }
         Long targetMemberId = staff ? request.getMemberId() : actor.getId();
+        operationalMemberPolicy.requireRealMember(targetMemberId);
         MemberProfile member = memberProfileRepository.findById(targetMemberId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member profile not found for id: " + targetMemberId));
         if (staff) {
@@ -141,6 +143,9 @@ public class BookingServiceImpl implements BookingService {
         }
         if (packageReg.getRemainingSessions() <= 0) {
             throw rule("Selected package registration has zero remaining sessions", "NO_SESSIONS_LEFT");
+        }
+        if (packageReg.getPayment() != null) {
+            operationalMemberPolicy.requireRealMember(packageReg.getPayment().getMember().getId());
         }
         if (sessionRepository.reserveSeat(session.getId(), now) != 1) {
             throw new ConflictException("Session is fully booked", "FULL");

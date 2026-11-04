@@ -153,8 +153,7 @@ function DemoQrCardContent({ payment, onSettled }: DemoQrCardProps) {
 
       {capability === false && (
         <Notice tone="danger">
-          Simulation is unavailable in local demo mode. Make sure the backend local-demo profile and
-          PAYMENT_LOCAL_DEMO_ENABLED are active.
+          Simulation is unavailable. Contact the demo operator to enable this action.
         </Notice>
       )}
 

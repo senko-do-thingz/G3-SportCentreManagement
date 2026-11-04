@@ -33,6 +33,7 @@ Open `http://127.0.0.1:5173`, sign in as a seeded demo Member, create a pending 
 - `GET /api/v1/payments/local-demo/capability`: authenticated Member, Receptionist, or Manager; enabled only with the explicit profile, flag, loopback binding and approved database.
 - `POST /api/v1/payments/{paymentId}/demo-confirm`: active Member and owned pending eligible purchase. Client amounts, member IDs and settlement provenance are ignored.
 - Settlement locks Payment before its item, creates a V35 session and simulated transaction, activates the entitlement, persists one invoice, and records `PAYMENT_CONFIRMED` atomically. Retries return the persisted settlement.
+- In unified mode, a verified normal expiry or linked card upgrade does not invalidate that persisted settlement. `status=SUCCESS` describes Payment, not current benefit availability. Read `/api/v1/membership-cards/my` or `/api/v1/packages/registrations/my` for current status. Replay never reactivates benefits; pending or inconsistent histories are denied. See [Round 04 state proofs and tests](db-unify/ROUND04_REPLAY_AND_ARCHIVE_DESIGN.md). The version 1 response shape is unchanged.
 - `GET /api/v1/payments/{paymentId}` includes `invoiceId` and `invoiceNumber`, preserving the receipt link after refresh.
 - Simulations remain excluded from actual paid revenue, cash events and real-money refunds. No migration is altered by this work.
 - The legacy HTTPS session API remains available under its existing simulator profile. That profile alone does not enable the local confirmation action.

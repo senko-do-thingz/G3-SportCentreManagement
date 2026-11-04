@@ -12,7 +12,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Tag("integration")
 @SpringBootTest
-@Testcontainers(disabledWithoutDocker = true)
+@org.junit.jupiter.api.condition.EnabledIf("sqlServerAvailable")
 @ActiveProfiles("dev")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 public abstract class AbstractIntegrationTest {
@@ -43,13 +43,26 @@ public abstract class AbstractIntegrationTest {
             .withPassword("YourStrong!Passw0rd");
 
     static {
-        if (org.testcontainers.DockerClientFactory.instance().isDockerAvailable()) {
+        if (System.getenv("UNIFY_TEST_SQL_PORT") == null && org.testcontainers.DockerClientFactory.instance().isDockerAvailable()) {
             MSSQL_SERVER_CONTAINER.start();
         }
     }
 
+    static boolean sqlServerAvailable() {
+        return System.getenv("UNIFY_TEST_SQL_PORT") != null || org.testcontainers.DockerClientFactory.instance().isDockerAvailable();
+    }
+
+    private static com.sportify.support.DisposableUnifyDatabase localFixture;
+
     @DynamicPropertySource
     static void mssqlProperties(DynamicPropertyRegistry registry) {
+        if (System.getenv("UNIFY_TEST_SQL_PORT") != null) {
+            if (localFixture == null) localFixture = com.sportify.support.DisposableUnifyDatabase.create();
+            registry.add("spring.datasource.url", localFixture::url);
+            registry.add("spring.datasource.username", localFixture::user);
+            registry.add("spring.datasource.password", localFixture::password);
+            return;
+        }
         registry.add("spring.datasource.url", () -> MSSQL_SERVER_CONTAINER.getJdbcUrl() + ";encrypt=false;trustServerCertificate=true");
         registry.add("spring.datasource.username", MSSQL_SERVER_CONTAINER::getUsername);
         registry.add("spring.datasource.password", MSSQL_SERVER_CONTAINER::getPassword);
