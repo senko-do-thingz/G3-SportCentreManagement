@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sportify.identity.entity.*;
 import com.sportify.identity.security.CustomUserDetails;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -21,8 +22,18 @@ class ReleaseOnboardingIntegrationTest extends AbstractIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper json;
     @Autowired com.sportify.identity.repository.UserRepository users;
+    String fixtureMarker;
+    @AfterEach void cleanupOwnedAccounts() {
+        if(fixtureMarker==null) return;
+        String owners="SELECT id FROM user_account WHERE email IN (?,?)";
+        Object[] emails={fixtureMarker+"_desk@release.invalid",fixtureMarker+"@release.invalid"};
+        jdbc.update("DELETE FROM activity_log WHERE actor_user_id IN ("+owners+")",emails);
+        jdbc.update("DELETE FROM member_profile WHERE user_id IN ("+owners+")",emails);
+        jdbc.update("DELETE FROM user_account WHERE email IN (?,?)",emails);
+    }
     @Test void receptionCreatesMemberWithDurableAuditLoginAndPrivateCodeReadback() throws Exception {
         String marker=UUID.randomUUID().toString().replace("-", "").substring(0,12);
+        fixtureMarker=marker;
         String staff=marker+"_desk@release.invalid", email=marker+"@release.invalid";
         jdbc.update("INSERT user_account(email,password_hash,full_name,role_id,status) SELECT ?,'fixture','Release reception',id,'ACTIVE' FROM role WHERE code='RECEPTIONIST'",staff);
         var receptionist=users.findByEmailIgnoreCase(staff).orElseThrow();
