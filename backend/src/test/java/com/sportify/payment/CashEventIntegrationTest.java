@@ -47,6 +47,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class CashEventIntegrationTest {
+    @DynamicPropertySource static void nativeDatabase(DynamicPropertyRegistry registry) {
+        boolean nativeSql=System.getenv("UNIFY_TEST_SQL_PORT")!=null;
+        registry.add("test.cash.native",()->nativeSql);
+        if(nativeSql) {
+            var fixture=com.sportify.support.DisposableUnifyDatabase.create();
+            registry.add("spring.datasource.url",fixture::url);
+            registry.add("spring.datasource.username",fixture::user);
+            registry.add("spring.datasource.password",fixture::password);
+        }
+    }
     static class TestClock extends Clock {
         volatile Instant value = Instant.parse("2025-12-15T03:00:00Z");
         void set(String value) { this.value = Instant.parse(value); }
@@ -57,12 +67,14 @@ class CashEventIntegrationTest {
     @TestConfiguration static class TimeConfig {
         @Bean @Primary TestClock cashTestClock() { return new TestClock(); }
         @Bean(initMethod = "start", destroyMethod = "stop")
+        @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="test.cash.native",havingValue="false",matchIfMissing=true)
         MSSQLServerContainer<?> cashSqlServer() {
             return new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2022-latest")
                     .acceptLicense().withPassword("Aa1!" + UUID.randomUUID());
         }
         // Spring initializes this dependency before any datasource property can resolve.
-        @Bean DynamicPropertyRegistrar cashDatabaseProperties(MSSQLServerContainer<?> sql) {
+        @Bean @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="test.cash.native",havingValue="false",matchIfMissing=true)
+        DynamicPropertyRegistrar cashDatabaseProperties(MSSQLServerContainer<?> sql) {
             return registry -> {
                 registry.add("spring.datasource.url", () -> sql.getJdbcUrl() + ";encrypt=false;trustServerCertificate=true");
                 registry.add("spring.datasource.username", sql::getUsername);

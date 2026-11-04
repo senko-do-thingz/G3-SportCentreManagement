@@ -54,10 +54,25 @@ public abstract class AbstractIntegrationTest {
 
     private static com.sportify.support.DisposableUnifyDatabase localFixture;
 
+    private static synchronized com.sportify.support.DisposableUnifyDatabase nativeFixture() {
+        if(localFixture==null)localFixture=com.sportify.support.DisposableUnifyDatabase.create();
+        return localFixture;
+    }
+    /** Server credentials always come from the explicit owned fixture path, never application DB_URL. */
+    protected static String suiteServerUrl() {
+        return System.getenv("UNIFY_TEST_SQL_PORT")!=null?nativeFixture().url():MSSQL_SERVER_CONTAINER.getJdbcUrl();
+    }
+    protected static String suiteServerUser() {
+        return System.getenv("UNIFY_TEST_SQL_PORT")!=null?nativeFixture().user():MSSQL_SERVER_CONTAINER.getUsername();
+    }
+    protected static String suiteServerPassword() {
+        return System.getenv("UNIFY_TEST_SQL_PORT")!=null?nativeFixture().password():MSSQL_SERVER_CONTAINER.getPassword();
+    }
+
     @DynamicPropertySource
     static void mssqlProperties(DynamicPropertyRegistry registry) {
         if (System.getenv("UNIFY_TEST_SQL_PORT") != null) {
-            if (localFixture == null) localFixture = com.sportify.support.DisposableUnifyDatabase.create();
+            nativeFixture();
             registry.add("spring.datasource.url", localFixture::url);
             registry.add("spring.datasource.username", localFixture::user);
             registry.add("spring.datasource.password", localFixture::password);

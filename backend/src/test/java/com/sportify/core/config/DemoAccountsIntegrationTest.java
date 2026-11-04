@@ -66,10 +66,11 @@ class DemoAccountsIntegrationTest extends AbstractIntegrationTest {
     @DynamicPropertySource
     static synchronized void isolatedDatabase(DynamicPropertyRegistry registry) throws Exception {
         if (!databaseCreated) {
-            try (var connection = DriverManager.getConnection(MSSQL_SERVER_CONTAINER.getJdbcUrl(),
-                    MSSQL_SERVER_CONTAINER.getUsername(), MSSQL_SERVER_CONTAINER.getPassword());
+            try (var connection = DriverManager.getConnection(suiteServerUrl(),
+                    suiteServerUser(), suiteServerPassword());
                  var statement = connection.createStatement()) {
                 statement.execute("CREATE DATABASE [" + DATABASE + "]");
+                statement.execute("ALTER DATABASE [" + DATABASE + "] SET AUTO_CLOSE OFF");
             }
             databaseCreated = true;
         }

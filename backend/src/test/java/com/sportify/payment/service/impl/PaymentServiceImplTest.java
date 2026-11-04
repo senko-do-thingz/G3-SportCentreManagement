@@ -472,6 +472,9 @@ class PaymentServiceImplTest {
         PaymentResponse responsePendingBank = paymentService.getPayment(10L, ownerUser);
         assertThat(responsePendingBank.getBankTransferInstructions()).isNotNull();
         assertThat(responsePendingBank.getBankTransferInstructions().getTransferContent()).isEqualTo("PAY-1000");
+        assertThat(responsePendingBank.getBankTransferInstructions().getPayable()).isFalse();
+        assertThat(responsePendingBank.getBankTransferInstructions().getAccountNumber()).isEqualTo("NOT CONFIGURED");
+        assertThat(responsePendingBank.getBankTransferInstructions().getNotice()).contains("DEMO NON-PAYABLE");
 
         pendingPayment.setPaymentMethod(PaymentMethod.MOMO);
         PaymentResponse responseMomo = paymentService.getPayment(10L, ownerUser);

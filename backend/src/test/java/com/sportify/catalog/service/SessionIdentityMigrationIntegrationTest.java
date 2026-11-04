@@ -21,7 +21,10 @@ class SessionIdentityMigrationIntegrationTest {
     private Database database() throws Exception {
         String configured = System.getenv("ID_MIGRATION_DB_URLS");
         String url,user,password;
-        if (configured != null && !configured.isBlank()) {
+        if(System.getenv("UNIFY_TEST_SQL_PORT")!=null) {
+            var fixture=com.sportify.support.DisposableUnifyDatabase.create();
+            url=fixture.url();user=fixture.user();password=fixture.password();
+        } else if (configured != null && !configured.isBlank()) {
             url=configured.split("\\|")[NEXT.getAndIncrement()];
             if (!url.matches("jdbc:sqlserver://[^;]+;databaseName=sportify_id_upgrade_[0-9]{14}_[0-9](;.*)?"))
                 throw new IllegalArgumentException("Fresh isolated ID upgrade database required");
@@ -42,7 +45,7 @@ class SessionIdentityMigrationIntegrationTest {
         Flyway.configure().dataSource(source).locations("classpath:db/migration/identity","classpath:db/migration/catalog")
             .target("37").cleanDisabled(true).load().migrate();
         var latest=Flyway.configure().dataSource(source).locations("classpath:db/migration/identity","classpath:db/migration/catalog")
-            .cleanDisabled(true).load();
+            .target("40").cleanDisabled(true).load();
         return new Database(latest,jdbc);
     }
     @AfterAll static void stopOwnedContainer() {if(container!=null)container.stop();}

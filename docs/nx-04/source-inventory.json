@@ -336,9 +336,48 @@
       "creates": [],
       "drops": [],
       "sha256_lf": "95435a5f47465ede8447184658fd95354ec1eee7c7ee22e27851cc7c1c3fe094"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V42__explicit_class_training_plan_scope.sql",
+      "version": 42,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "bcce69a3b4b22007c7ee5221bb50193b2df0a9d9ac435cee467e7a22317bbf3f"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V43__member_check_in_pass.sql",
+      "version": 43,
+      "creates": [
+        "member_check_in_pass"
+      ],
+      "drops": [],
+      "sha256_lf": "24358f9c23c477abb7d5fedfa2f42df2315dad6d2b55f60842e105307dd95c53"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V44__class_training_notices.sql",
+      "version": 44,
+      "creates": [
+        "class_training_notice"
+      ],
+      "drops": [],
+      "sha256_lf": "d85c947fa433ddb2b82a9252bf625ff535b71597ab3c0f45168b9d8530ff7712"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V45__reception_support_intake.sql",
+      "version": 45,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "f7de3ca71c43d6007cc130c392d155effa23df56de6a07de041047dd58fb905f"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V46__operational_notification_origins.sql",
+      "version": 46,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "b8c102dc5aafbbc823cfc7de66181ab71014f9323420c4a55ce8858e28184169"
     }
   ],
-  "create_occurrences": 68,
+  "create_occurrences": 70,
   "create_names": [
     "[activity_log]",
     "[age_group]",
@@ -395,6 +434,7 @@
     "[workout_plan_day]",
     "[workout_plan_exercise]",
     "[workout_plan_week]",
+    "class_training_notice",
     "dbo.cash_capture_ticket",
     "dbo.cash_coverage",
     "dbo.cash_event",
@@ -402,6 +442,7 @@
     "dbo.simulated_qr_rate_limit",
     "dbo.simulated_qr_session",
     "dbo.simulated_qr_transition",
+    "member_check_in_pass",
     "permission",
     "role",
     "role_permission",

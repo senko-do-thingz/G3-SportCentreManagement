@@ -42,6 +42,12 @@ public class PaymentServiceImpl implements PaymentService {
     private final CodeFormatter codeFormatter;
     private final Clock clock;
     private final CashCaptureService cashCaptureService;
+    private com.sportify.catalog.service.OperationalMemberPolicy transferMemberPolicy;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setTransferMemberPolicy(com.sportify.catalog.service.OperationalMemberPolicy policy) {
+        this.transferMemberPolicy = policy;
+    }
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
@@ -268,11 +274,16 @@ public class PaymentServiceImpl implements PaymentService {
         BankTransferInstructions instructions = null;
         if (payment.getPaymentMethod() == PaymentMethod.BANK_TRANSFER
                 && payment.getPaymentStatus() == PaymentStatus.PENDING) {
+            boolean payable = liveTransferAllowed(payment);
             instructions = BankTransferInstructions.builder()
-                    .accountName(bankProperties.getAccountName())
-                    .accountNumber(bankProperties.getAccountNumber())
-                    .bank(bankProperties.getBank())
+                    .accountName(payable ? bankProperties.getAccountName() : "DEMO NON-PAYABLE")
+                    .accountNumber(payable ? bankProperties.getAccountNumber() : "NOT CONFIGURED")
+                    .bank(payable ? bankProperties.getBank() : "DEMO NON-PAYABLE")
                     .transferContent(payment.getPaymentCode())
+                    .payable(payable)
+                    .notice(payable
+                            ? "Manual transfer instructions. Payment remains pending until staff verifies receipt."
+                            : "DEMO NON-PAYABLE. No verified beneficiary is configured.")
                     .build();
         }
 
@@ -304,5 +315,18 @@ public class PaymentServiceImpl implements PaymentService {
                 .createdAt(payment.getCreatedAt())
                 .updatedAt(payment.getUpdatedAt())
                 .build();
+    }
+
+    private boolean liveTransferAllowed(Payment payment) {
+        if (!bankProperties.isLiveInstructionsEnabled() || !bankProperties.isLiveBeneficiaryValid()
+                || transferMemberPolicy == null || payment.getMember() == null
+                || "SIMULATED".equals(payment.getSettlementType()) || payment.getSimulatedTransactionId() != null
+                || "SPORTIFY_SIMULATOR".equals(payment.getSettlementProvider())) return false;
+        try {
+            transferMemberPolicy.requireRealMember(payment.getMember().getId());
+            return true;
+        } catch (BusinessRuleException quarantined) {
+            return false;
+        }
     }
 }

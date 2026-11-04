@@ -57,6 +57,11 @@ public class CheckInServiceImpl implements CheckInService {
         }
 
         MemberProfile profile = profileOpt.orElseThrow(() -> new ResourceNotFoundException("Member not found"));
+        UserAccount member = profile.getUserAccount();
+        if (member == null || !"ACTIVE".equals(member.getStatus()) || member.getRole() == null
+                || !"MEMBER".equals(member.getRole().getCode())) {
+            throw new BusinessRuleException("An enabled Member account is required", "CHECK_IN_MEMBER_UNAVAILABLE");
+        }
         operationalMemberPolicy.requireRealMember(profile.getId());
 
         LocalDateTime now = LocalDateTime.now(clock);
@@ -147,6 +152,7 @@ public class CheckInServiceImpl implements CheckInService {
         return CheckInResponse.builder()
                 .id(checkIn.getId())
                 .memberId(profile.getId())
+                .memberCode(profile.getMemberCode())
                 .memberName(profile.getUserAccount().getFullName())
                 .bookingId(targetBooking != null ? targetBooking.getId() : null)
                 .bookingCode(targetBooking != null ? targetBooking.getBookingCode() : null)
@@ -181,6 +187,7 @@ public class CheckInServiceImpl implements CheckInService {
         return CheckInResponse.builder()
                 .id(ci.getId())
                 .memberId(ci.getMember().getId())
+                .memberCode(ci.getMember().getMemberCode())
                 .memberName(ci.getMember().getUserAccount().getFullName())
                 .membershipId(ci.getMembership() != null ? ci.getMembership().getId() : null)
                 .bookingId(ci.getBooking() != null ? ci.getBooking().getId() : null)

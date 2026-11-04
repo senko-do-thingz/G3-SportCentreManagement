@@ -22,6 +22,10 @@ public class CoachTrainingController {
     public List<ClassSummary> classes(@AuthenticationPrincipal CustomUserDetails user) { return service.coachClasses(user.getUserAccount().getId()); }
     @GetMapping("/classes/{id}/members")
     public List<BookingCandidate> members(@PathVariable long id, @AuthenticationPrincipal CustomUserDetails user) { return service.coachMembers(user.getUserAccount().getId(), id); }
+    @GetMapping("/classes/{classId}/members/{memberId}/profile")
+    public LearnerProfile learnerProfile(@PathVariable long classId,@PathVariable long memberId,@AuthenticationPrincipal CustomUserDetails user) {
+        return service.learnerProfile(user.getUserAccount().getId(),classId,memberId);
+    }
     @GetMapping("/bookings/{id}/drill-suggestions")
     public DrillSuggestions drillSuggestions(@PathVariable long id,@AuthenticationPrincipal CustomUserDetails user) { return service.drillSuggestions(user.getUserAccount().getId(),id); }
     @GetMapping("/plans")

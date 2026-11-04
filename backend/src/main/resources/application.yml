@@ -66,6 +66,9 @@ app:
       allowed-origins: ${PAYMENT_SIMULATOR_ALLOWED_ORIGINS:}
       lifetime-seconds: ${PAYMENT_SIMULATOR_LIFETIME_SECONDS:300}
     bank-transfer:
+      live-instructions-enabled: ${SPORTIFY_PAYMENT_LIVE_INSTRUCTIONS_ENABLED:false}
+      bank-bin: ${SPORTIFY_PAYMENT_BANK_BIN:}
+      bank-directory: ${SPORTIFY_PAYMENT_BANK_DIRECTORY:classpath:payment/vietqr-banks.json}
       account-name: ${SPORTIFY_PAYMENT_ACCOUNT_NAME}
       account-number: ${SPORTIFY_PAYMENT_ACCOUNT_NUMBER}
       bank: ${SPORTIFY_PAYMENT_BANK}

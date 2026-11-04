@@ -52,7 +52,7 @@ import static org.assertj.core.api.Assertions.*;
 /** Real SQL Server, private migrated database, committed tracked fixtures and independent worker transactions. */
 @Tag("integration")
 @SpringBootTest
-@Testcontainers(disabledWithoutDocker = true)
+@org.junit.jupiter.api.condition.EnabledIf("sqlServerAvailable")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Execution(ExecutionMode.SAME_THREAD)
@@ -62,6 +62,7 @@ import static org.assertj.core.api.Assertions.*;
 @Import(ScheduledMaintenanceIntegrationTest.TimeConfig.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class ScheduledMaintenanceIntegrationTest {
+    static boolean sqlServerAvailable(){return System.getenv("UNIFY_TEST_SQL_PORT")!=null || org.testcontainers.DockerClientFactory.instance().isDockerAvailable();}
     @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
         IsolatedMaintenanceDatabase.register(registry);
     }

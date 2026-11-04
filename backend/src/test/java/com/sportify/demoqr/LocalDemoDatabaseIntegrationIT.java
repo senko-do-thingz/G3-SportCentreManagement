@@ -34,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Tag("local-demo-integration")
+@Tag("integration")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles(value = {"dev", "demo", "local-demo"}, inheritProfiles = false)
 @TestPropertySource(properties = {
@@ -45,35 +46,10 @@ class LocalDemoDatabaseIntegrationIT extends LocalDemoWorkflow {
 
     @org.springframework.test.context.DynamicPropertySource
     static void configureEnv(org.springframework.test.context.DynamicPropertyRegistry registry) {
-        String testUrl = System.getenv("QR_LOCAL_DEMO_TEST_DB_URL");
-        if (testUrl == null || !testUrl.matches("jdbc:sqlserver://127\\.0\\.0\\.1:1433;databaseName=sportify_qr04_test_[0-9]{14};encrypt=false;trustServerCertificate=true")) {
-            throw new IllegalStateException("Explicit fresh loopback QR_LOCAL_DEMO_TEST_DB_URL is required.");
-        }
-        registry.add("spring.datasource.url", () -> testUrl);
-        String dbPass = System.getenv("DB_PASSWORD");
-        if (dbPass == null || dbPass.isBlank()) {
-            java.io.File envFile = new java.io.File(".env");
-            if (!envFile.exists()) {
-                envFile = new java.io.File("backend/.env");
-            }
-            if (envFile.exists()) {
-                try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(envFile))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        line = line.trim();
-                        if (line.startsWith("DB_PASSWORD=")) {
-                            dbPass = line.substring("DB_PASSWORD=".length()).trim();
-                            break;
-                        }
-                    }
-                } catch (Exception ignored) {}
-            }
-        }
-        if (dbPass != null) {
-            final String pass = dbPass;
-            registry.add("spring.datasource.password", () -> pass);
-            registry.add("DB_PASSWORD", () -> pass);
-        }
+        var fixture=com.sportify.support.DisposableUnifyDatabase.createLegacyQr();
+        registry.add("spring.datasource.url",fixture::url);
+        registry.add("spring.datasource.username",fixture::user);
+        registry.add("spring.datasource.password",fixture::password);
     }
 
 }
