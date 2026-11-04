@@ -24,7 +24,7 @@ class UnifyReconciliationIntegrationTest {
         return config.load();
     }
 
-    @Test void freshV40DryRunIsReadOnlyRepeatableAndDetectsSchemaDrift() throws Exception {
+    @Test void freshV46DryRunIsReadOnlyRepeatableAndDetectsSchemaDrift() throws Exception {
         var db = DisposableUnifyDatabase.create(); var migration = flyway(db, null);
         migration.migrate(); migration.validate();
         String hash = UnifyPreflight.schemaFingerprint(db.source());
@@ -56,6 +56,14 @@ class UnifyReconciliationIntegrationTest {
         assertThat(UnifyPreflight.schemaFingerprint(db.source())).isNotEqualTo(UnifyPreflight.schemaFingerprint(independent.source()));
         independent.jdbc().execute("CREATE INDEX ix_unify_fingerprint_probe ON dbo.user_account(full_name DESC)");
         assertThatThrownBy(() -> UnifyPreflight.inspect(independent.source(), false, hash)).hasMessage("SCHEMA_FINGERPRINT_MISMATCH");
+    }
+
+    @Test void oldV40CannotPassTheReleaseV46GuardOrMutateHistory() throws Exception {
+        var db=DisposableUnifyDatabase.create();flyway(db,"40").migrate();
+        var history=db.jdbc().queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank");
+        assertThatThrownBy(()->UnifyPreflight.inspect(db.source(),false,UnifyPreflight.schemaFingerprint(db.source())))
+                .hasMessage("V46_REQUIRED");
+        assertThat(db.jdbc().queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")).isEqualTo(history);
     }
 
     @Test void preV39UpgradePreservesNumericKeysReferencesAndInstalledChecksums() throws Exception {
