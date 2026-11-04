@@ -244,17 +244,24 @@ class CashMigrationIntegrationTest {
         var db=database(true); long member=member(db); Clock time=clock("2026-04-01T00:00:00Z");
         collect(db,member,"1.00",clock("2026-01-01T00:00:00Z"));
         tx(db).executeWithoutResult(s -> {
-            profile.stage("fixture.insert-pending", () -> db.jdbc().update("""
+            // Keep fixture statement memory bounded on SQL Express; the transaction and 50001-event boundary stay identical.
+            for(int offset=0;offset<50001;offset+=1000) {
+                int batch=Math.min(1000,50001-offset);
+                long before=db.jdbc().queryForObject("SELECT COALESCE(MAX(id),0) FROM dbo.payment",Long.class);
+                final int first=offset;
+                profile.stage("fixture.insert-pending", () -> db.jdbc().update("""
                     WITH digit(n) AS (SELECT n FROM (VALUES(0),(1),(2),(3),(4),(5),(6),(7),(8),(9)) d(n)),
-                    tally(n) AS (SELECT TOP(50001) ROW_NUMBER() OVER(ORDER BY a.n,b.n,c.n,d.n,e.n) FROM digit a CROSS JOIN digit b CROSS JOIN digit c CROSS JOIN digit d CROSS JOIN digit e)
+                    tally(n) AS (SELECT TOP(?) ROW_NUMBER() OVER(ORDER BY a.n,b.n,c.n) FROM digit a CROSS JOIN digit b CROSS JOIN digit c)
                     INSERT INTO dbo.payment(payment_code,member_id,amount,payment_method,payment_status)
-                    SELECT CONCAT('CF-LIMIT-',n),?,0.01,'CASH','PENDING' FROM tally
-                    """,member));
-            profile.stage("fixture.insert-tickets", () -> db.jdbc().update("""
+                    SELECT CONCAT('CF-LIMIT-',n+?),?,0.01,'CASH','PENDING' FROM tally OPTION(MAXDOP 1)
+                    """,batch,first,member));
+                long after=db.jdbc().queryForObject("SELECT MAX(id) FROM dbo.payment",Long.class);
+                profile.stage("fixture.insert-tickets", () -> db.jdbc().update("""
                     INSERT INTO dbo.cash_capture_ticket(transaction_id,event_type,source_id,event_time_utc)
-                    SELECT CURRENT_TRANSACTION_ID(),'COLLECTION',id,'2026-04-01T00:00:00' FROM dbo.payment WHERE payment_code LIKE 'CF-LIMIT-%'
-                    """));
-            profile.sqlStage("fixture.activate-payments", db.source(), () -> db.jdbc().update("UPDATE dbo.payment SET payment_status='SUCCESS',payment_time='2026-04-01T07:00:00' WHERE payment_code LIKE 'CF-LIMIT-%'"));
+                    SELECT CURRENT_TRANSACTION_ID(),'COLLECTION',id,'2026-04-01T00:00:00' FROM dbo.payment WHERE id>? AND id<=?
+                    """,before,after));
+                profile.sqlStage("fixture.activate-payments", db.source(), () -> db.jdbc().update("UPDATE dbo.payment SET payment_status='SUCCESS',payment_time='2026-04-01T07:00:00' WHERE id>? AND id<=?",before,after));
+            }
         });
         var repository=new CashFlowRepository(new NamedParameterJdbcTemplate(db.source()));
         var service=new CashFlowReportService(repository,time);
