@@ -1,0 +1,212 @@
+[
+  {
+    "id": "M01",
+    "requirement": "Manage Member Coach and staff accounts",
+    "selectors": "ManagerUserIntegrationTest",
+    "sql": "user_account,coach_profile",
+    "expected": "Manager operations persist; unauthorized and privileged-role changes fail"
+  },
+  {
+    "id": "M02",
+    "requirement": "Manage classes sports facilities and schedule",
+    "selectors": "ReleaseCatalogIntegrationTest,ManagerClassIntegrationTest,ManagerSessionIntegrationTest",
+    "sql": "sport,facility,sport_class,class_session",
+    "expected": "Canonical sports and valid assignments persist; duplicate and schedule conflicts fail"
+  },
+  {
+    "id": "M03",
+    "requirement": "Assign Coaches to classes",
+    "selectors": "ManagerClassIntegrationTest",
+    "sql": "sport_class,coach_sport",
+    "expected": "Only enabled qualified Coaches can be assigned"
+  },
+  {
+    "id": "M04",
+    "requirement": "Report Members class registration and revenue by period",
+    "selectors": "TrainingWorkflowIntegrationTest#RELEASE09*,FinanceReportIntegrationTest",
+    "sql": "user_account,booking,payment",
+    "expected": "Half-open bounds exclude outside and synthetic rows; authoritative finance totals agree"
+  },
+  {
+    "id": "M05",
+    "requirement": "Manage package fees and validity",
+    "selectors": "DeskSaleRollbackIntegrationTest,ReleaseTierIntegrationTest,ReleaseProcessRestartIntegrationTest",
+    "sql": "sport_package,membership_card_tier,sport_package_registration",
+    "expected": "Validated terms and paid snapshots persist; existing cards survive Tier CREATE"
+  },
+  {
+    "id": "M06",
+    "requirement": "Control access by role",
+    "selectors": "ManagerUserIntegrationTest,TrainingWorkflowIntegrationTest#RELEASE16*",
+    "sql": "role,user_account",
+    "expected": "Anonymous401 and wrong-role403; escalation rejected"
+  },
+  {
+    "id": "M07",
+    "requirement": "Read important operation history",
+    "selectors": "ActivityLogIntegrationTest",
+    "sql": "activity_log",
+    "expected": "Manager can filter immutable actor-attributed audit; other roles cannot"
+  },
+  {
+    "id": "C01",
+    "requirement": "Read assigned teaching schedule and roster",
+    "selectors": "CoachScheduleIntegrationTest",
+    "sql": "class_session,booking",
+    "expected": "Assigned enabled Coach sees actual rosters and public Session identities"
+  },
+  {
+    "id": "C02",
+    "requirement": "Read learner identity and training goals",
+    "selectors": "TrainingWorkflowIntegrationTest#RELEASE07*",
+    "sql": "member_profile,booking",
+    "expected": "Current Coach and confirmed learner relationship required; private desk notes excluded"
+  },
+  {
+    "id": "C03",
+    "requirement": "Create individual and class plans",
+    "selectors": "TrainingWorkflowIntegrationTest#RELEASE10*+R2_01*",
+    "sql": "session_plan,session_plan_step",
+    "expected": "Personal and explicit CLASS scopes preserve ownership and exactly-one retry"
+  },
+  {
+    "id": "C04",
+    "requirement": "Record post-session results",
+    "selectors": "TrainingWorkflowIntegrationTest#R2_03*+R2_04*+R2_09*",
+    "sql": "session_result,session_result_score",
+    "expected": "Ended session and PRESENT/LATE attendance required; duplicate and invalid scores fail"
+  },
+  {
+    "id": "C05",
+    "requirement": "Evaluate progress and save feedback",
+    "selectors": "TrainingWorkflowIntegrationTest#RELEASE12*+R2_01*",
+    "sql": "session_result,coach_feedback",
+    "expected": "Chronological actual scores/notes and feedback; notes-only has no invented trend"
+  },
+  {
+    "id": "C06",
+    "requirement": "Record session attendance",
+    "selectors": "TrainingWorkflowIntegrationTest#HOT00*+ID06*+R2_10*+R2_11*",
+    "sql": "attendance_record,attendance_correction",
+    "expected": "One authoritative participation row; correction/result races preserve eligibility"
+  },
+  {
+    "id": "C07",
+    "requirement": "Send homework and class notices",
+    "selectors": "TrainingWorkflowIntegrationTest#RELEASE13*",
+    "sql": "class_training_notice",
+    "expected": "Current class Coach publishes once; withdrawn/unrelated Members cannot read"
+  },
+  {
+    "id": "U01",
+    "requirement": "Register and update own profile",
+    "selectors": "MyProfileIntegrationTest,ReleaseOnboardingIntegrationTest,ReleaseProcessRestartIntegrationTest",
+    "sql": "user_account,member_profile",
+    "expected": "Registration/login and owned profile persist; immutable readable Member code"
+  },
+  {
+    "id": "U02",
+    "requirement": "Read buy and renew packages",
+    "selectors": "MembershipIntegrationTest,ReleaseProcessRestartIntegrationTest",
+    "sql": "sport_package_registration,payment",
+    "expected": "Desk purchase and Member next-period registration/verified confirmation persist"
+  },
+  {
+    "id": "U03",
+    "requirement": "Read class list and schedule",
+    "selectors": "TrainingWorkflowIntegrationTest#RELEASE05*,MemberScheduleIntegrationTest",
+    "sql": "sport_class,class_session",
+    "expected": "Actual Coach sport level location schedule and free-seat metadata"
+  },
+  {
+    "id": "U04",
+    "requirement": "Book and cancel classes",
+    "selectors": "BookingRulesIntegrationTest,ReceptionBookingIntegrationTest",
+    "sql": "booking,sport_package_registration",
+    "expected": "Eligible booking consumes one credit; authorized cancellation restores one"
+  },
+  {
+    "id": "U05",
+    "requirement": "Read own schedule and Coach information",
+    "selectors": "MemberScheduleIntegrationTest",
+    "sql": "booking,class_session,coach_profile",
+    "expected": "Owner-derived schedule and actual assigned Coach; peers denied"
+  },
+  {
+    "id": "U06",
+    "requirement": "Read own attendance and results",
+    "selectors": "TrainingWorkflowIntegrationTest#HOT00*+RELEASE12*",
+    "sql": "attendance_record,session_result",
+    "expected": "Member sees own persisted history only, including after cancellation"
+  },
+  {
+    "id": "U07",
+    "requirement": "Read own plans and Coach comments",
+    "selectors": "TrainingWorkflowIntegrationTest#RELEASE10*+R2_01*",
+    "sql": "session_plan,coach_feedback",
+    "expected": "Personal history stays private; current-enrollment CLASS scope is explicit"
+  },
+  {
+    "id": "U09",
+    "requirement": "Receive schedule and expiry notices",
+    "selectors": "TrainingWorkflowIntegrationTest#RELEASE13*+RELEASE15*",
+    "sql": "notification,class_training_notice,sport_package_registration,member_card",
+    "expected": "Real change origins with current schedule; cancelled and unrelated reminders excluded"
+  },
+  {
+    "id": "P01",
+    "requirement": "Search and read Member details",
+    "selectors": "com.sportify.identity.controller.MemberSearchIntegrationTest",
+    "sql": "user_account,member_profile",
+    "expected": "Reception queries readable Member identities within role scope"
+  },
+  {
+    "id": "P02",
+    "requirement": "Create a Member at Reception",
+    "selectors": "ReleaseOnboardingIntegrationTest",
+    "sql": "user_account,member_profile,activity_log",
+    "expected": "Real Reception create -> real Member login -> own code; duplicate/role guards"
+  },
+  {
+    "id": "P03",
+    "requirement": "Manage package registration and renewal",
+    "selectors": "DeskSaleRollbackIntegrationTest,ReleaseProcessRestartIntegrationTest",
+    "sql": "sport_package_registration,payment",
+    "expected": "Desk terms and later verified activation persist with correct actor"
+  },
+  {
+    "id": "P04",
+    "requirement": "Check Member package state and dates",
+    "selectors": "FrontDeskMemberOverviewIntegrationTest",
+    "sql": "member_card,sport_package_registration",
+    "expected": "Actual card/package status and validity shown without changing entitlements"
+  },
+  {
+    "id": "P05",
+    "requirement": "Record center arrival",
+    "selectors": "TrainingWorkflowIntegrationTest#RELEASE11*,CheckInDateIntegrationTest",
+    "sql": "check_in,member_check_in_pass",
+    "expected": "One allowed arrival per booking; secure pass replay/expiry/concurrency; no attendance or debit"
+  },
+  {
+    "id": "P06",
+    "requirement": "Book or assist class cancellation for Member",
+    "selectors": "ReceptionBookingIntegrationTest#RELEASE06*",
+    "sql": "booking,sport_package_registration",
+    "expected": "Real Reception login -> Member search -> eligible booking -> Member read -> refund"
+  },
+  {
+    "id": "P07",
+    "requirement": "Record payment and export invoice",
+    "selectors": "PaymentVerificationIntegrationTest,ReceiptIntegrationTest,DeskSaleRollbackIntegrationTest",
+    "sql": "payment,invoice,invoice_line",
+    "expected": "Verified actual confirmation alone settles; owned invoice reflects authoritative amounts"
+  },
+  {
+    "id": "P08",
+    "requirement": "Intake and record Member support requests",
+    "selectors": "TrainingWorkflowIntegrationTest#RELEASE14*",
+    "sql": "support_request,activity_log",
+    "expected": "General intake is separate from Coach Q&A; immutable creator and owner-only Member read"
+  }
+]

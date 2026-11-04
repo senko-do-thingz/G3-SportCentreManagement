@@ -116,7 +116,9 @@ class ReleaseProcessRestartIntegrationTest {
         long pendingPayment=online.path("paymentId").asLong();
         var transfer=call("GET","/payments/"+pendingPayment+"/vietqr-instructions",owner,null,200);assertThat(transfer.path("payable").asBoolean()).isFalse();
         assertThat(jdbc.queryForObject("SELECT payment_status FROM payment WHERE id=?",String.class,pendingPayment)).isEqualTo("PENDING");
-        call("PUT","/packages/registrations/"+id(online)+"/cancel",owner,null,200);
+        call("PUT","/payments/"+pendingPayment+"/confirm",reception,Map.of("method","BANK_TRANSFER","referenceCode","RELEASE-CONFIRMED-TRANSFER","amountReceived",online.path("paidAmount").decimalValue()),200);
+        assertThat(jdbc.queryForObject("SELECT status FROM sport_package_registration WHERE id=?",String.class,id(online))).isEqualTo("ACTIVE");
+        assertThat(jdbc.queryForObject("SELECT CONVERT(VARCHAR(10),start_date,23) FROM sport_package_registration WHERE id=?",String.class,id(online))).isEqualTo("2026-12-02");
         call("GET","/manager/reports/operations?from=2026-11-02&to=2026-11-02",manager,null,200);
         call("GET","/manager/activity-logs",manager,null,200);
         stopOwnedProcess();start(fixture,"2026-11-02T06:00:00Z");
