@@ -465,7 +465,7 @@ describe('FE-06 read-only activity', () => {
     const user = userEvent.setup()
     renderApp('/manager/activity')
     expect(await screen.findByText('System / unavailable actor')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'View details' }))
+    await user.click(await screen.findByRole('button', { name: 'View details for Package created by System / unavailable actor' }))
     expect(within(screen.getByRole('dialog')).getByText('PACKAGE_CREATED')).toBeInTheDocument()
     expect(within(screen.getByRole('dialog')).getByText('Package created')).toBeInTheDocument()
     expect(list).toHaveBeenCalledTimes(1)
