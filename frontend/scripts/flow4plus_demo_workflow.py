@@ -156,10 +156,12 @@ SELECT @class classId,@session sessionId,@booking bookingId,@code publicId,CONVE
             def capture(page, name, narrow=False):
                 for theme in ['light', 'dark']:
                     page.evaluate('(v)=>document.documentElement.setAttribute("data-theme",v)', theme)
+                    page.evaluate('window.scrollTo(0, 0)')
                     page.screenshot(path=str(out / f'flow4-{name}-1440-{theme}.png'), full_page=True, animations='disabled')
                     check(name + ' desktop ' + theme + ' has no horizontal overflow', page.evaluate('document.documentElement.scrollWidth<=innerWidth'))
                 if narrow:
                     page.set_viewport_size({'width': 390, 'height': 1000})
+                    page.evaluate('window.scrollTo(0, 0)')
                     page.screenshot(path=str(out / f'flow4-{name}-390-dark.png'), full_page=True, animations='disabled')
                     check(name + ' narrow smoke has no horizontal overflow', page.evaluate('document.documentElement.scrollWidth<=innerWidth'), blocking=False,
                           owner='Truc QA / original screen owner', scope='Desktop-first demo; narrow-only issues remain explicit FE follow-up')
