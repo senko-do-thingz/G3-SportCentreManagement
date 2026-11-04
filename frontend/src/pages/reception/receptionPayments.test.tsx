@@ -38,7 +38,7 @@ function pendingPayment(overrides: Record<string, unknown> = {}) {
     memberCode: 'MB-0246',
     bankTransferInstructions: null,
   })
-  return { ...base, memberFullName: 'Taylor Nguyen', itemCode: 'REG-1041', ...overrides }
+  return { ...base, memberFullName: 'Taylor Nguyen', itemCode: 'REG-1041', settlementType: 'ACTUAL', settlementProvider: 'MANUAL_TRANSFER', ...overrides }
 }
 
 const PENDING_ROWS = [
@@ -63,6 +63,8 @@ const INVOICE = {
   discountAmount: 90000,
   totalAmount: 810000,
   status: 'PAID',
+  settlementType: 'ACTUAL',
+  settlementProvider: 'MANUAL_TRANSFER',
   issueDate: '2026-10-02',
   taxAmount: 0,
   lines: [{ id: 1, itemType: 'SPORT_PACKAGE', description: 'Football / Coach-led / 30 days', quantity: 1, unitPrice: 900000, lineTotal: 900000 }],
@@ -427,7 +429,7 @@ describe('FE-12 Verify and Record Payment (F3-05)', () => {
     const { calls } = await open('/reception/payments/41/receipt')
     expect(await screen.findByRole('heading', { name: 'Receipt INV-1041' })).toBeInTheDocument()
     const receipt = screen.getByRole('region', { name: 'Receipt' })
-    expect(within(receipt).getByText('INV-1041 / 02 Oct 2026')).toBeInTheDocument()
+    expect(within(receipt).getByText('INV-1041 / 02/10/2026')).toBeInTheDocument()
     expect(within(receipt).getByText('Taylor Nguyen / MB-0246')).toBeInTheDocument()
     expect(within(receipt).getByText('810.000 VND')).toBeInTheDocument()
     expect(within(receipt).getByText('Paid')).toBeInTheDocument()
@@ -986,6 +988,7 @@ describe('FE-12 round 3 integration regressions', () => {
           status: 'SUCCESS',
           settlementType: 'SIMULATED',
           settlementProvider: 'SPORTIFY_SIMULATOR',
+          simulatedTransactionId: 41,
           paymentReference: 'SIM-QR-41-00000041',
         }),
       },
@@ -993,6 +996,7 @@ describe('FE-12 round 3 integration regressions', () => {
         ...INVOICE,
         settlementType: 'SIMULATED',
         settlementProvider: 'SPORTIFY_SIMULATOR',
+        simulatedTransactionId: 41,
         paymentReference: 'SIM-QR-41-00000041',
       }),
     })
@@ -1007,6 +1011,7 @@ describe('FE-12 round 3 integration regressions', () => {
         ...INVOICE,
         settlementType: 'SIMULATED',
         settlementProvider: 'SPORTIFY_SIMULATOR',
+        simulatedTransactionId: 41,
         paymentReference: 'SIM-QR-41-00000041',
       }),
     })

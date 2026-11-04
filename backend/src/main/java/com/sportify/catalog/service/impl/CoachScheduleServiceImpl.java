@@ -35,6 +35,18 @@ public class CoachScheduleServiceImpl implements CoachScheduleService {
     private final UserRepository users;
 
     @Override
+    public List<CoachRosterResponse> rosterByCode(String sessionId) {
+        UserAccount actor = reader();
+        Long ownId = isManager(actor) ? null : ownCoachId(actor);
+        String code = new com.sportify.catalog.service.PublicSessionId(sessionId).value();
+        var ownership = reads.findOwnershipByCode(code)
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found"));
+        if (!isManager(actor) && !Objects.equals(ownId, ownership.getCoachId()))
+            throw new ResourceNotFoundException("Session not found");
+        return roster(ownership.getId());
+    }
+
+    @Override
     public List<CoachSessionResponse> listSessions(String from, String to, Long coachId) {
         UserAccount actor = reader();
         var query = CoachScheduleQuery.parse(from, to, coachId);

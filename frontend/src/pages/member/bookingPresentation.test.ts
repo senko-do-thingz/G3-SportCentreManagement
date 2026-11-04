@@ -24,10 +24,10 @@ describe('FE-09 booking presentation helpers', () => {
 
   it('formats session dates, times and the two-hour Vietnam-time cancellation cutoff', () => {
     expect(bookingDate('2026-11-05')).toBe('05/11/2026')
-    expect(bookingDate('bad')).toBe('Date unavailable')
+    expect(bookingDate('bad')).toBe('-')
     expect(bookingTime('17:05:00')).toBe('17:05')
-    expect(bookingTime(null)).toBe('Time unavailable')
-    expect(cancellationDeadline(booking)).toBe('05/11/2026, 15:00')
+    expect(bookingTime(null)).toBe('-')
+    expect(cancellationDeadline(booking)).toBe('05/11/2026 15:00')
   })
 
   it('creates a Vietnam-time calendar file with escaped event text', () => {

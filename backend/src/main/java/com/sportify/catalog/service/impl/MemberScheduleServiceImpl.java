@@ -59,6 +59,15 @@ public class MemberScheduleServiceImpl implements MemberScheduleService {
     }
 
     @Override
+    public SessionDetailResponse getSessionByCode(String sessionId, UserAccount actor) {
+        requireReader(actor);
+        String code = new com.sportify.catalog.service.PublicSessionId(sessionId).value();
+        Long id = sessions.findBySessionCode(code).map(ClassSession::getId)
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found"));
+        return getSession(id, actor);
+    }
+
+    @Override
     public SessionDetailResponse getSession(Long id, UserAccount actor) {
         requireReader(actor);
         requirePositiveId(id, "Session id");
@@ -139,7 +148,7 @@ public class MemberScheduleServiceImpl implements MemberScheduleService {
                 c == null ? null : c.getLevel(), coach == null ? null : coach.getId(),
                 coach == null ? null : coach.getUserAccount().getFullName(),
                 facility == null ? null : facility.getId(), facility == null ? null : facility.getName(),
-                s.getSessionDate(), s.getStartTime(), s.getEndTime(), capacity, booked, free, free == 0, s.getStatus());
+                s.getSessionDate(), s.getStartTime(), s.getEndTime(), capacity, booked, free, free == 0, s.getStatus(), s.getSessionCode());
     }
 
     private static SessionDetailResponse.SuitableRegistration registrationResponse(SportPackageRegistration r) {

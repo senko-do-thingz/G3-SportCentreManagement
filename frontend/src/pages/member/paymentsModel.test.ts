@@ -106,7 +106,7 @@ describe('FE-11 paymentsModel', () => {
     expect(parseIdParam(undefined)).toBeNull()
     expect(PAYMENT_PATHS.status(52)).toBe('/member/payments/52/status')
     expect(PAYMENT_PATHS.receipt(7)).toBe('/member/payments/receipts/7')
-    expect(validityRange('2026-10-02', '2026-10-31')).toBe('02 Oct 2026 - 31 Oct 2026')
+    expect(validityRange('2026-10-02', '2026-10-31')).toBe('02/10/2026 - 31/10/2026')
   })
 
   it('TC-FE11-M10 only bank transfer can be chosen online; it is the default', () => {

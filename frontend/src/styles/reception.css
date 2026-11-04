@@ -164,7 +164,7 @@
 }
 
 .reception-checkin {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .reception-form {
@@ -288,6 +288,21 @@
   /* The receipt carries its own heading; the page hero (UI-31) is not printed with it. */
   body:has(.payment-print-receipt) .payment-hero {
     display: none;
+  }
+
+  /* Ensure warning and provenance notices survive native print media */
+  .payment-receipt .notice,
+  .payment-print-receipt .notice {
+    display: block !important;
+    border: 2px solid currentColor !important;
+    padding: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-3);
+    font-weight: 700 !important;
+  }
+
+  /* When an unverified receipt is printed natively, prominently mark it as unverified */
+  .payment-receipt:not(.payment-print-receipt) {
+    border: 2px dashed currentColor !important;
   }
 }
 

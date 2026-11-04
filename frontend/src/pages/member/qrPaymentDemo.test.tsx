@@ -10,6 +10,7 @@ function backend(options: { role?: string; status?: number; data?: ReturnType<ty
   return installFakeFetch((call) => {
     if (call.path === '/users/me') return json(200, { ...MEMBER, role: options.role ?? 'MEMBER' })
     if (call.path === '/payments/52') return options.status ? backendError(options.status, 'Access to this payment is unavailable') : json(200, options.data ?? payment())
+    if (call.path === '/payments/local-demo/capability') return json(200, { contractVersion: 1, mode: 'LOCAL_DEMO', enabled: true })
     return json(200, [])
   })
 }
@@ -21,22 +22,14 @@ describe('QR-01 guarded demo route and payment integration', () => {
   })
   afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals() })
 
-  it('keeps all four bank choices and copy actions display-only on the authorized route', async () => {
+  it('renders single QR demo card and server amount on the authorized route', async () => {
     const { calls } = backend({ data: payment({ method: 'MOMO' }) })
-    const user = userEvent.setup()
-    const write = vi.fn().mockResolvedValue(undefined)
-    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: write } })
-    vi.stubGlobal('isSecureContext', true)
     renderApp('/member/payments/52/qr-demo')
-    const select = await screen.findByRole('combobox', { name: 'Demo bank' })
-    for (const bank of ['vietcombank', 'bidv', 'techcombank', 'mb']) {
-      await user.selectOptions(select, bank)
-      await user.click(screen.getByRole('button', { name: 'Copy demo details' }))
-      expect(screen.getByRole('status')).toHaveTextContent('Demo details copied.')
-    }
-    expect(write).toHaveBeenCalledTimes(4)
-    expect(calls.every((call) => call.method === 'GET')).toBe(true)
+    expect(await screen.findByRole('img', { name: /Non-payable demo QR for payment 52/ }, { timeout: 5000 })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Simulate Payment Confirmation' })).toBeVisible()
     expect(screen.getByText('810.000 VND')).toBeVisible()
+    expect(screen.getByText(/Simulated QR Payment - Demo only - No real money transferred/)).toBeVisible()
+    expect(calls.every((call) => call.method === 'GET')).toBe(true)
   })
 
   it('opens the isolated demo without submitting a method or changing the real Continue action', async () => {
@@ -51,10 +44,7 @@ describe('QR-01 guarded demo route and payment integration', () => {
     expect(screen.getByText(/Owner confirmation finalizes this payment as Paid - Simulated and activates the purchased entitlement\./)).toBeVisible()
     expect(screen.queryByText(/Your actual payment is not changed/i)).not.toBeInTheDocument()
     expect(screen.getByText('810.000 VND')).toBeVisible()
-    expect(screen.getByText('DEMO - NOT AVAILABLE')).toBeVisible()
-    expect(screen.queryByText('0123456789')).not.toBeInTheDocument()
-    expect(screen.queryByText('SPORTIFY CENTER')).not.toBeInTheDocument()
-    expect(screen.getByText('Simulated QR Payment - No real money is transferred.')).toBeVisible()
+    expect(screen.getByText('Simulated QR Payment - Demo only - No real money transferred.')).toBeVisible()
     expect(document.querySelector('.payment-workspace-header .home-theme')).toBeInTheDocument()
     expect(document.querySelector('.payment-workspace-header select')).not.toBeInTheDocument()
     await user.click(screen.getByRole('link', { name: 'Back to Payment Summary' }))
@@ -117,6 +107,7 @@ describe('QR-01 guarded demo route and payment integration', () => {
         settlementType: 'SIMULATED',
         settlementProvider: 'SPORTIFY_SIMULATOR',
         referenceCode: 'SIM-QR-52-00000052',
+        invoiceId: 301,
       }),
     })
     renderApp('/member/payments/52/qr-demo')
@@ -124,6 +115,9 @@ describe('QR-01 guarded demo route and payment integration', () => {
     expect(screen.getByText('Paid - Simulated')).toBeVisible()
     expect(screen.getByText('SIMULATED (SPORTIFY_SIMULATOR)')).toBeVisible()
     expect(screen.getByText('SIM-QR-52-00000052')).toBeVisible()
+    const receiptLink = screen.getByRole('link', { name: 'View payment receipt' })
+    expect(receiptLink).toBeVisible()
+    expect(receiptLink).toHaveAttribute('href', '/member/payments/receipts/301')
   })
 
   it('keeps anonymous users behind login and does not read payments', async () => {

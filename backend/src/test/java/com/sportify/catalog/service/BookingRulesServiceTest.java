@@ -43,6 +43,7 @@ class BookingRulesServiceTest {
     @Mock EntityManager em;
     @Mock AuditService audit;
     @Spy Clock clock = Clock.fixed(NOW.atZone(ZoneId.of("Asia/Ho_Chi_Minh")).toInstant(), ZoneId.of("Asia/Ho_Chi_Minh"));
+    @org.mockito.Mock com.sportify.catalog.service.OperationalMemberPolicy operationalMemberPolicy;
     @InjectMocks BookingServiceImpl service;
     UserAccount actor;
     MemberProfile member;

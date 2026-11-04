@@ -1,3 +1,4 @@
+import { businessDate } from '../../utils/date'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ApiError, getErrorMessage } from '../../api/errors'
@@ -21,8 +22,7 @@ const TRANSACTION_STATUSES = [
 const PAYMENT_METHODS = ['CASH', 'CREDIT_CARD', 'BANK_TRANSFER', 'MOMO', 'VNPAY', 'ZALOPAY'].map((value) => ({ value, label: humanizeCode(value) }))
 
 function currentMonth(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  return businessDate().slice(0, 7)
 }
 
 function validMonth(value: string | null): string {

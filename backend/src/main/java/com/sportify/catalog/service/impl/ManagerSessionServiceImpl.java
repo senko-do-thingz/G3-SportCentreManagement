@@ -19,6 +19,7 @@ import com.sportify.catalog.repository.FacilityRepository;
 import com.sportify.catalog.repository.SessionCancellationRepository;
 import com.sportify.catalog.repository.SportClassRepository;
 import com.sportify.catalog.service.ManagerSessionService;
+import com.sportify.catalog.service.SessionCodeAllocator;
 import com.sportify.core.audit.AuditAction;
 import com.sportify.core.audit.AuditEvent;
 import com.sportify.core.audit.AuditService;
@@ -70,6 +71,16 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
     private final SessionCancellationRepository cancellationRepository;
     private final AuditService auditService;
     private final Clock clock;
+    private final SessionCodeAllocator sessionCodeAllocator;
+
+    @Override
+    @Transactional(readOnly = true)
+    public ManagerSessionResponse getSessionByCode(String sessionId) {
+        String code = new com.sportify.catalog.service.PublicSessionId(sessionId).value();
+        var session = sessionRepository.findBySessionCode(code)
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found"));
+        return toResponse(session, bookingCounts(List.of(session.getId())).getOrDefault(session.getId(), 0L));
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -108,6 +119,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
 
             // Validate the complete batch before the first INSERT. All rows and audits share this transaction.
             List<ClassSession> sessions = dates.stream().map(date -> ClassSession.builder()
+                    .sessionCode(sessionCodeAllocator.reserve(date, sportClass.getSport().getCode()))
                     .sportClass(sportClass).sport(sportClass.getSport()).sessionDate(date)
                     .startTime(request.startTime()).endTime(request.endTime())
                     .coach(assignment.coach()).facility(assignment.facility()).capacity(request.capacity())
@@ -134,23 +146,55 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
             long booked = bookingCounts(List.of(id)).getOrDefault(id, 0L);
             validateCapacity(request.capacity(), sportClass, booked);
             LocalDate date = requireDate(request.date());
+            validateFutureDates(List.of(date), request.startTime());
+            boolean dateChanged = !date.equals(session.getSessionDate());
+            if (dateChanged && (actor == null || actor.getId() == null || actor.getRole() == null
+                    || !"MANAGER".equals(actor.getRole().getCode()))) {
+                throw new org.springframework.security.access.AccessDeniedException("Only Managers may reschedule sessions");
+            }
+            if (dateChanged && request.expectedRevision() == null) {
+                throw new ConflictException("Reload the session and supply expectedRevision to reschedule it.");
+            }
+            if (request.expectedRevision() != null && request.expectedRevision() != session.getScheduleRevision()) {
+                throw new ConflictException("The session has changed. Reload it before saving again.");
+            }
+            boolean timingChanged = dateChanged || !request.startTime().equals(session.getStartTime())
+                    || !request.endTime().equals(session.getEndTime());
+            if (timingChanged && sessionRepository.countRecordedActivity(id) > 0) {
+                throw new BusinessRuleException("Sessions with attendance, allowed check-ins or saved results cannot be rescheduled.");
+            }
+            if (request.rescheduleReason() != null && request.rescheduleReason().length() > 500) {
+                throw new BusinessRuleException("Rescheduling reason must be at most 500 characters");
+            }
             if (booked > 0 && bookingRepository.countOutsidePackageValidity(id, BookingStatus.CONFIRMED, date) > 0) {
                 throw new BusinessRuleException(
                         "The new date is outside the validity period of packages used by confirmed bookings of this session");
             }
             Assignment assignment = lockAndValidateAssignment(sportClass, request.coachId(),
                     request.facilityId(), session.getTrainingType());
-            validateFutureDates(List.of(date), request.startTime());
             checkConflicts(List.of(request.date()), request.startTime(), request.endTime(), assignment, id);
             Map<String, Object> before = snapshot(session);
-            session.setSessionDate(request.date());
+            String oldCode = session.getSessionCode();
+            if (dateChanged) {
+                session.setSessionCode(sessionCodeAllocator.reserve(date, session.getSport().getCode()));
+            }
+            session.setSessionDate(date);
+            session.setScheduleRevision(session.getScheduleRevision() + 1);
             session.setStartTime(request.startTime());
             session.setEndTime(request.endTime());
             session.setFacility(assignment.facility());
             session.setCoach(assignment.coach());
             session.setCapacity(request.capacity());
             ClassSession saved = sessionRepository.saveAndFlush(session);
-            audit(saved, actor, AuditAction.SESSION_UPDATED, Map.of("before", before, "after", snapshot(saved)));
+            if (dateChanged) {
+                sessionCodeAllocator.attributeReschedule(oldCode, saved.getSessionCode(), actor == null ? null : actor.getId(),
+                        request.rescheduleReason());
+            }
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("before", before);
+            details.put("after", snapshot(saved));
+            details.put("reason", request.rescheduleReason());
+            audit(saved, actor, dateChanged ? AuditAction.SESSION_RESCHEDULED : AuditAction.SESSION_UPDATED, details);
             return toResponse(saved, booked);
         });
     }
@@ -274,7 +318,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
                                 : sameCoach ? SessionConflictResponse.ConflictType.COACH : SessionConflictResponse.ConflictType.FACILITY;
                         return new SessionConflictResponse(session.getId(), session.getSessionDate(), session.getSessionDate(),
                                 session.getStartTime(), session.getEndTime(), classSummary(session.getSportClass()),
-                                coachSummary(session.getCoach()), facilitySummary(session.getFacility()), type);
+                                coachSummary(session.getCoach()), facilitySummary(session.getFacility()), type, session.getSessionCode());
                     }).toList();
             throw new ScheduleConflictException(responses);
         }
@@ -343,9 +387,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
     }
 
     private LocalDate requireDate(LocalDate date) {
-        if (date == null || date.getYear() < 1 || date.getYear() > 9999) {
-            throw new BusinessRuleException("A date between 0001-01-01 and 9999-12-31 is required");
-        }
+        SessionCodeAllocator.validateDate(date);
         return date;
     }
 
@@ -369,6 +411,8 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
 
     private static Map<String, Object> snapshot(ClassSession session) {
         Map<String, Object> values = new LinkedHashMap<>();
+        values.put("sessionId", session.getSessionCode());
+        values.put("scheduleRevision", session.getScheduleRevision());
         values.put("date", session.getSessionDate());
         values.put("startTime", session.getStartTime());
         values.put("endTime", session.getEndTime());
@@ -389,7 +433,8 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
         return new ManagerSessionResponse(session.getId(), session.getSessionDate(), session.getStartTime(), session.getEndTime(),
                 classSummary(session.getSportClass()), coachSummary(session.getCoach()), facilitySummary(session.getFacility()),
                 session.getCapacity(), booked, session.getTrainingType(), session.getStatus(), session.getCancelReason(),
-                session.getCancelledAt(), session.getCancelledBy() == null ? null : session.getCancelledBy().getId());
+                session.getCancelledAt(), session.getCancelledBy() == null ? null : session.getCancelledBy().getId(),
+                session.getSessionCode(), session.getSport().getName(), session.getScheduleRevision());
     }
 
     private static ManagerSessionResponse.ClassSummary classSummary(SportClass sportClass) {
