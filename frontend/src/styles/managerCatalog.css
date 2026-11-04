@@ -1,0 +1,91 @@
+/* UI-15 catalog styling. All colors and type stay on the Sportify design tokens. */
+.manager-catalog { gap: var(--space-5); }
+.manager-catalog > .page-header { align-items: center; margin-bottom: 0; }
+.manager-catalog .page-header__text { gap: var(--space-1); }
+.manager-catalog .page-header__title { font-family: var(--font-display); font-size: var(--text-2xl); letter-spacing: -0.035em; }
+.manager-catalog .page-header__description { max-width: 58ch; font-size: var(--text-sm); }
+.manager-catalog__panel.card { padding: 0; overflow: hidden; border-radius: var(--radius-lg); box-shadow: none; }
+.manager-catalog__panel > .card__header {
+  min-height: 68px; margin: 0; padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+.manager-catalog__panel .card__title { font-size: var(--text-lg); letter-spacing: -0.02em; }
+.manager-catalog__count { color: var(--color-text-muted); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+.manager-catalog__filters.manager-filters {
+  grid-template-columns: minmax(210px, 1.65fr) repeat(3, minmax(135px, 1fr)) auto;
+  align-items: end; gap: var(--space-3); margin: 0; padding: var(--space-4) var(--space-6);
+  background: var(--color-surface); border-bottom: 1px solid var(--color-border);
+}
+.manager-catalog__filters .field { min-width: 0; }
+.manager-catalog__filters .field__hint { margin-top: var(--space-1); font-size: 0.6875rem; }
+.manager-catalog__filters > .btn { min-height: 42px; white-space: nowrap; }
+.manager-catalog__inline-error { padding: var(--space-4) var(--space-6); }
+.manager-catalog__table { padding: var(--space-3) var(--space-5) 0; }
+.manager-catalog__scroll-hint { display: none; margin: var(--space-3) var(--space-5) 0; color: var(--color-text-muted); font-size: var(--text-xs); }
+.manager-catalog__table .table { min-width: 0; table-layout: fixed; }
+.manager-catalog__table .table-scroll:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.manager-catalog__table .table th { padding: var(--space-3); background: transparent; color: var(--color-text-muted); font-size: var(--text-xs); font-weight: var(--weight-medium); letter-spacing: 0; text-transform: none; border-bottom: 1px solid var(--color-border); }
+.manager-catalog__table .table td { padding: var(--space-3); font-size: var(--text-sm); }
+.manager-catalog__table .table tbody tr:hover td { background: transparent; }
+.manager-catalog__table .table tbody tr:hover td:not([colspan]) { background: var(--color-table-hover); }
+.manager-catalog__identity, .manager-catalog__cell {
+  display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 3px; overflow-wrap: anywhere;
+}
+.manager-catalog__identity > strong {
+  color: var(--color-text); font-size: var(--text-sm); font-weight: var(--weight-semibold); line-height: 1.4;
+}
+.manager-catalog__secondary, .manager-catalog__description { color: var(--color-text-muted); font-size: var(--text-xs); line-height: 1.45; }
+.manager-catalog__description { overflow-wrap: anywhere; }
+.manager-catalog__label { display: none; color: var(--color-text-muted); font-size: 0.6875rem; font-weight: var(--weight-medium); }
+.manager-catalog__cell--amount { align-items: flex-end; }
+.manager-catalog__amount { color: var(--color-text); font-size: var(--text-sm); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.manager-catalog__actions { align-items: flex-start; }
+.manager-catalog__actions .manager-row-actions { gap: var(--space-1); }
+.manager-catalog__actions .btn { min-height: 34px; padding: 0 var(--space-2); font-size: var(--text-xs); }
+.manager-catalog__range { display: none; }
+.manager-catalog__policy {
+  display: flex; align-items: flex-start; gap: var(--space-3); margin: var(--space-3) var(--space-6) var(--space-5);
+  padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); background: var(--color-surface-muted);
+}
+.manager-catalog__policy p { margin: 0; color: var(--color-text-muted); font-size: var(--text-xs); line-height: 1.55; }
+.manager-catalog__policy-mark {
+  display: grid; flex: 0 0 20px; width: 20px; height: 20px; place-items: center;
+  border-radius: 50%; background: var(--color-primary-soft); color: var(--color-primary);
+  font-size: var(--text-xs); font-weight: var(--weight-bold);
+}
+.manager-catalog__state.card { min-height: 200px; display: grid; place-items: center; }
+.manager-catalog-form { gap: var(--space-4); }
+.manager-catalog-form__note, .manager-catalog-form__policy {
+  margin: 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); background: var(--color-surface-muted); color: var(--color-text-muted);
+  font-size: var(--text-sm); line-height: 1.55;
+}
+.manager-catalog-form__policy { font-size: var(--text-xs); }
+.manager-catalog-form .manager-form-grid { gap: var(--space-4); }
+.manager-catalog-form .field__hint { font-size: var(--text-xs); line-height: 1.4; }
+.manager-catalog-form textarea.input { min-height: 90px; resize: vertical; }
+
+@media (max-width: 1100px) {
+  .manager-catalog__filters.manager-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .manager-catalog__filters > .btn { align-self: end; }
+}
+@media (max-width: 1100px) {
+  .manager-catalog__table .table { min-width: 900px; table-layout: fixed; }
+  .manager-catalog__policy { margin-top: var(--space-4); }
+}
+@media (max-width: 900px) {
+  .manager-catalog--tiers .manager-catalog__table .table { min-width: 960px; }
+  .manager-catalog__scroll-hint { display: block; }
+}
+@media (max-width: 640px) {
+  .manager-catalog .page-header { align-items: flex-start; }
+  .manager-catalog .page-header__actions, .manager-catalog .page-header__actions .btn { width: 100%; }
+  .manager-catalog .page-header__title { font-size: var(--text-xl); }
+  .manager-catalog__panel > .card__header { min-height: 60px; padding: var(--space-4); }
+  .manager-catalog__filters.manager-filters { grid-template-columns: minmax(0, 1fr); padding: var(--space-4); }
+  .manager-catalog__filters > .btn { width: 100%; }
+  .manager-catalog__table { padding: var(--space-3) var(--space-3) 0; }
+  .manager-catalog__scroll-hint { margin-right: var(--space-3); margin-left: var(--space-3); }
+  .manager-catalog__policy { margin: var(--space-3) var(--space-4) var(--space-4); }
+}
