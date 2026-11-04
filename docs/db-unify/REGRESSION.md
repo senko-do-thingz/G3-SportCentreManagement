@@ -1,8 +1,9 @@
 # Reproducing isolated regression
 
-Round 03: see [archive contract, policy impact and scoped follow-up](ROUND03_ARCHIVE_AND_POLICY.md)
-and [machine-readable gates](status.json). Unified SUCCESS replay requires an ACTIVE
-card or an ACTIVE package with activation evidence. The executable archive contract
+Round 04: see [replay lifecycle proof and archive proposal](ROUND04_REPLAY_AND_ARCHIVE_DESIGN.md)
+and [machine-readable gates](status.json). Unified SUCCESS replay returns the
+persisted settlement after verified expiry or replacement without reactivation.
+The executable archive contract
 uses fictional disposable schemas only; production migration, historical API and
 real-source reconciliation remain unimplemented. Historical data unification is
 INCOMPLETE and account-wide quarantine acceptance remains PENDING CODEOWNER.
@@ -34,7 +35,18 @@ python frontend/scripts/db-unify-check.py --database $testDb --out scratch/db-un
 
 It exercises real browser login, pending non-payable QR and independent fallback decoding, keyboard confirmation, network failure and refresh, persisted receipt, real finance exclusion, actual Manager date rescheduling with alias/revision/credit checks, cross-role screens, and actual backend restart. Screenshots cover 1440/768/390 in both themes; desktop is the primary acceptance target. JSON/logs/screenshots stay local and must be sanitized before sharing.
 
-CI additionally runs the complete existing SQL integration manifest, immutable migration checks, frontend/security/package/compose gates, and the two new mandatory DB-UNIFY integration suites. A partial local selection does not replace full CI.
+CI additionally runs the complete existing SQL integration manifest, immutable migration checks, frontend/security/package/compose gates, and all mandatory DB-UNIFY integration suites. A partial local selection does not replace full CI.
+
+Round 04 adds required UnifiedReplayLifecycleIntegrationTest (five cases): real
+card/package purchase and settlement followed by production maintenance expiry;
+official desk card upgrade; prohibited simulated refund quote/create; and a full
+authorized actual refund. Replays compare full original settlement responses,
+historical rows, current benefit rows and global financial counts/totals. Existing
+nine corrupt pending/inactive item cases remain required and denied. Run locally:
+
+```powershell
+mvn -B -ntp -f backend/pom.xml verify '-DskipUnitTests=true' '-Dit.test=UnifiedReplayLifecycleIntegrationTest,UnifiedDemoDatabaseIntegrationTest'
+```
 
 Round 02 adds `OperationalMemberPolicyTest` and extends
 `UnifiedDemoDatabaseIntegrationTest` with a one-seat mixed real/synthetic fixture.
@@ -55,5 +67,6 @@ HTTP workflow. Existing full payment/refund/cash suites remain mandatory.
 syntax on a newly created fixture only unless target-specific read authorization
 has been given. Fixture evidence does not replace protected source inventories.
 See `SOURCE_HISTORY_DECISION.md`: historical unification remains incomplete
-until CODEOWNER accepts a scope change or requires and approves an archive/import
-implementation. Passing regression does not resolve that decision.
+until actual required source migration, historical access and independent
+reconciliation are implemented and verified. Passing regression or accepting a
+reduced runtime scope does not complete historical data unification.

@@ -97,7 +97,7 @@ public class LocalDemoPaymentService {
                 throw DemoQrException.unavailable();
             }
 
-            // Safe idempotency: if already settled as SIMULATED by this owner, return authoritative state
+            // SUCCESS describes the persisted payment, not current benefit availability. Replay never activates an item.
             if (payment.getPaymentStatus() == PaymentStatus.SUCCESS) {
                 if ("SIMULATED".equals(payment.getSettlementType())
                         && "SPORTIFY_SIMULATOR".equals(payment.getSettlementProvider())) {

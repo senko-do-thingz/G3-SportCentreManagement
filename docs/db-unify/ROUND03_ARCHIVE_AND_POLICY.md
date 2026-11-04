@@ -6,6 +6,10 @@ retired, imported, exposed by the application or classified as disposable.
 
 ## Replay lifecycle contract
 
+Historical Round 03 behavior below is superseded by Round 04's compatible
+[persisted-settlement contract](ROUND04_REPLAY_AND_ARCHIVE_DESIGN.md). It described
+the reviewed implementation; requiring ACTIVE on every retry was a regression.
+
 HTTP 200 from unified demo-confirm acknowledges a currently ACTIVE entitlement.
 A card must be ACTIVE; a package must be ACTIVE with persisted activated_at.
 PENDING_PAYMENT, CANCELLED, EXPIRED, REPLACED cards and REFUNDED packages are

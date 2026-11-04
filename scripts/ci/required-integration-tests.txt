@@ -37,3 +37,4 @@ com.sportify.demoqr.DemoQrDatabaseIntegrationTest
 com.sportify.demoqr.UnifiedDemoDatabaseIntegrationTest
 com.sportify.demoqr.UnifyReconciliationIntegrationTest
 com.sportify.demoqr.HistoricalArchiveContractIntegrationTest
+com.sportify.demoqr.UnifiedReplayLifecycleIntegrationTest

@@ -252,7 +252,7 @@ class UnifiedDemoDatabaseIntegrationTest extends LocalDemoWorkflow {
 
     @ParameterizedTest @CsvSource({"0,CARD,PENDING_PAYMENT","1,CARD,CANCELLED","2,CARD,EXPIRED","3,CARD,REPLACED",
             "4,PACKAGE,PENDING_PAYMENT","5,PACKAGE,CANCELLED","6,PACKAGE,EXPIRED","7,PACKAGE,REFUNDED","8,PACKAGE,NO_ACTIVATION"})
-    void inactiveEntitlementReplayIsDeniedWithoutRepair(int fixtureId,String type,String state) {
+    void unsupportedOrInconsistentEntitlementReplayIsDeniedWithoutRepair(int fixtureId,String type,String state) {
         String email="life"+fixtureId+"@unified-demo.invalid",token=login(email);
         long payment=type.equals("CARD")?pending(email,"BANK_TRANSFER"):purchase(token).getPaymentId();
         String path="/api/v1/payments/"+payment+"/demo-confirm";

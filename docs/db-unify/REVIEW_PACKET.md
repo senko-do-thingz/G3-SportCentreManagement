@@ -1,8 +1,9 @@
 # CODEOWNER review packet
 
-Round 03: see [archive contract, policy impact and scoped follow-up](ROUND03_ARCHIVE_AND_POLICY.md)
-and [machine-readable gates](status.json). Unified SUCCESS replay requires an ACTIVE
-card or an ACTIVE package with activation evidence. The executable archive contract
+Round 04: see [replay compatibility, mixed-identity policy and archive mapping v0.1](ROUND04_REPLAY_AND_ARCHIVE_DESIGN.md)
+and [machine-readable gates](status.json). Unified SUCCESS replay returns the
+persisted settlement after verified expiry or replacement without reactivation.
+The executable archive contract
 uses fictional disposable schemas only; production migration, historical API and
 real-source reconciliation remain unimplemented. Historical data unification is
 INCOMPLETE and account-wide quarantine acceptance remains PENDING CODEOWNER.
@@ -29,7 +30,7 @@ without repair. Legacy QR guard and all applied migrations remain unchanged.
 
 This is a proposed isolated development candidate, not an approved architecture or live deployment. The master work authorization permits reversible development and disposable testing through Tasks01-06; operational target changes remain blocked.
 
-Read [architecture and configuration](README.md), [migration/checksum compatibility](MIGRATION_COMPATIBILITY.md), [read-only reconciliation](RECONCILIATION.md), [regression commands](REGRESSION.md) and [operator cutover and rollback](OPERATOR_CUTOVER_POWERSHELL.md). Task01/02 source inventory and design alternatives and all six private task reports have Round 02 updates under ignored tasks/DB-UNIFY (i)/NN/reports/round-002 directories. Earlier Round 01 evidence is retained. The current consolidated FINAL_CODEOWNER_HANDOFF.md is under Task06/reports/round-002. Private instructions, AI audit records, raw logs, screenshots and database backups are not committed.
+Read [architecture and configuration](README.md), [migration/checksum compatibility](MIGRATION_COMPATIBILITY.md), [read-only reconciliation](RECONCILIATION.md), [regression commands](REGRESSION.md) and [operator cutover and rollback](OPERATOR_CUTOVER_POWERSHELL.md). All six private task reports have Round 04 updates under ignored tasks/DB-UNIFY (i)/NN/reports/round-004 directories. Earlier rounds remain preserved. The single consolidated FULL_CODEOWNER_HANDOFF.md is under Task06/reports/round-004. Private instructions, AI audit records, raw logs, screenshots and database backups are not committed.
 
 Task03 adds a distinct fail-closed unified-demo profile and synthetic Member restrictions while retaining the original local-demo guard. Task04 adds read-only preflight, an unaccepted zero-import proposal, disposable upgrades/negative fixtures and native backup/restore proof. Task05 adds shared real HTTP/SQL contract coverage, explicit safe local test fixtures, mandatory CI suites and a real browser/restart harness. Task06 supplies the cutover/recovery/retention boundary and final evidence packet.
 

@@ -203,7 +203,7 @@ public class SqlQrStore {
         return rows.stream().findFirst();
     }
 
-    /** Read-only historical verification. Never repair a legacy settlement on replay. */
+    /** Read-only settlement proof, separate from current benefit availability. Never reactivate on replay. */
     public void requireUnifiedReplay(long paymentId, long ownerId) {
         Integer valid = jdbc.queryForObject("""
                 SELECT COUNT(*) FROM dbo.payment p
@@ -229,10 +229,28 @@ public class SqlQrStore {
                     AND l.line_total=i.subtotal_amount AND l.unit_price=i.subtotal_amount
                     AND ((l.item_type='MEMBERSHIP_CARD' AND EXISTS (SELECT 1 FROM dbo.member_card c
                         WHERE c.id=l.item_reference_id AND c.payment_id=p.id AND c.member_id=p.member_id
-                          AND c.status='ACTIVE'))
+                          AND (c.status='ACTIVE'
+                            OR (c.status='EXPIRED' AND c.end_date>=c.start_date
+                                AND CONVERT(date,c.updated_at)>c.end_date)
+                            OR (c.status='REPLACED' AND EXISTS (SELECT 1 FROM dbo.member_card successor
+                                WHERE successor.replaces_card_id=c.id AND successor.id<>c.id
+                                  AND successor.member_id=c.member_id AND successor.upgrade_request=1
+                                  AND successor.end_date=c.end_date
+                                  AND successor.status IN ('ACTIVE','EXPIRED','REPLACED')
+                                  AND ((successor.payment_id IS NULL AND successor.price_paid=0)
+                                    OR EXISTS (SELECT 1 FROM dbo.payment replacement_payment
+                                      JOIN dbo.invoice replacement_invoice ON replacement_invoice.payment_id=replacement_payment.id
+                                      WHERE replacement_payment.id=successor.payment_id
+                                        AND replacement_payment.member_id=c.member_id
+                                        AND replacement_payment.payment_status='SUCCESS'
+                                        AND replacement_payment.amount=successor.price_paid
+                                        AND replacement_invoice.member_id=c.member_id AND replacement_invoice.status='PAID'
+                                        AND replacement_invoice.total_amount=replacement_payment.amount)))))))
                       OR (l.item_type='SPORT_PACKAGE' AND EXISTS (SELECT 1 FROM dbo.sport_package_registration r
                         WHERE r.id=l.item_reference_id AND r.payment_id=p.id AND r.member_id=p.member_id
-                          AND r.status='ACTIVE' AND r.activated_at IS NOT NULL))))
+                          AND r.activated_at IS NOT NULL
+                          AND (r.status='ACTIVE' OR (r.status='EXPIRED' AND r.end_date>=r.start_date
+                            AND CONVERT(date,r.updated_at)>r.end_date AND r.updated_at>=r.activated_at))))))
                   AND (SELECT COUNT(*) FROM dbo.simulated_payment_transaction WHERE payment_id=p.id)=1
                   AND (SELECT COUNT(*) FROM dbo.activity_log WHERE action='PAYMENT_CONFIRMED'
                        AND entity_type='PAYMENT' AND entity_id=p.id)=1
