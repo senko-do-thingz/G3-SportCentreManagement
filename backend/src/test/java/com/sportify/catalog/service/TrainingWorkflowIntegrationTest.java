@@ -319,6 +319,51 @@ class TrainingWorkflowIntegrationTest {
         assertThat(notifications.inbox(member).reminders()).noneMatch(r->r.key().equals("PACKAGE:"+registration));
         assertThat(count("SELECT COUNT(*) FROM notification WHERE user_id=? AND origin_session_id=?",member,session)).isEqualTo(3);
     }
+    @Test void RELEASE16_fourRoleAndAnonymousMatrixProtectsReleaseApis() throws Exception {
+        long manager=account("MANAGER");
+        record Route(String method,String path,String body,Set<String> roles) {}
+        List<Route> routes=List.of(
+            new Route("GET","/api/v1/manager/card-tiers",null,Set.of("MANAGER")),
+            new Route("POST","/api/v1/manager/card-tiers","{\"code\":\"RELEASE_SECURITY\",\"name\":\"Security tier\",\"price\":900000,\"durationMonths\":12,\"discountPercentage\":10,\"tierRank\":100,\"active\":true}",Set.of("MANAGER")),
+            new Route("GET","/api/v1/manager/catalog/sports",null,Set.of("MANAGER")),
+            new Route("GET","/api/v1/manager/catalog/facilities",null,Set.of("MANAGER")),
+            new Route("GET","/api/v1/manager/reports/operations",null,Set.of("MANAGER")),
+            new Route("GET","/api/v1/coach/training/classes",null,Set.of("COACH")),
+            new Route("GET","/api/v1/coach/training/classes/"+classId+"/members/"+member+"/profile",null,Set.of("COACH")),
+            new Route("GET","/api/v1/coach/training/classes/"+classId+"/members/"+member+"/progress",null,Set.of("COACH")),
+            new Route("GET","/api/v1/coach/training/class-plans",null,Set.of("COACH")),
+            new Route("GET","/api/v1/coach/training/notices",null,Set.of("COACH")),
+            new Route("POST","/api/v1/coach/training/notices","{\"classId\":"+classId+",\"type\":\"ANNOUNCEMENT\",\"title\":\"Reminder\",\"content\":\"Bring equipment\"}",Set.of("COACH")),
+            new Route("GET","/api/v1/member/training/progress",null,Set.of("MEMBER")),
+            new Route("GET","/api/v1/member/training/notices",null,Set.of("MEMBER")),
+            new Route("GET","/api/v1/member/notifications",null,Set.of("MEMBER")),
+            new Route("GET","/api/v1/member/support-requests",null,Set.of("MEMBER")),
+            new Route("POST","/api/v1/member/check-in-pass",null,Set.of("MEMBER")),
+            new Route("POST","/api/v1/reception/check-in-pass/redeem","{\"token\":\"SCIN1."+"A".repeat(43)+"\"}",Set.of("RECEPTIONIST")),
+            new Route("GET","/api/v1/reception/support-requests",null,Set.of("RECEPTIONIST")),
+            new Route("POST","/api/v1/reception/support-requests","{\"memberId\":"+member+",\"category\":\"GENERAL\",\"subject\":\"Help\",\"description\":\"Opening hours\"}",Set.of("RECEPTIONIST")),
+            new Route("GET","/api/v1/payments/vietqr-banks",null,Set.of("MEMBER","RECEPTIONIST","MANAGER")));
+        Map<String,Long> actors=Map.of("MEMBER",member,"COACH",coach,"RECEPTIONIST",reception,"MANAGER",manager);
+        int checks=0;
+        for(var route:routes) {
+            var anonymous=org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request(org.springframework.http.HttpMethod.valueOf(route.method()),route.path())
+                .header("Idempotency-Key",UUID.randomUUID()).contentType("application/json");
+            if(route.body()!=null)anonymous.content(route.body());
+            mvc.perform(anonymous).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());checks++;
+            for(var entry:actors.entrySet()) if(!route.roles().contains(entry.getKey())) {
+                var wrong=org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request(org.springframework.http.HttpMethod.valueOf(route.method()),route.path())
+                    .with(as(entry.getValue())).header("Idempotency-Key",UUID.randomUUID()).contentType("application/json");
+                if(route.body()!=null)wrong.content(route.body());
+                mvc.perform(wrong).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());checks++;
+            }
+        }
+        assertThat(checks).isEqualTo(78);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/reception/support-requests?memberId=-1").with(as(reception)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/coach/training/notices").with(as(coach)).contentType("application/json")
+            .content("{\"classId\":"+classId+",\"type\":\"ANNOUNCEMENT\",\"title\":\"Help\",\"content\":\"Bring equipment\"}"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+    }
     @Test void RELEASE11_actualHttpIssueRedeemReplayAndPurposeIsolation() throws Exception {
         long registration=arrivalEntitlement();
         var issued=mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/member/check-in-pass").with(as(member)))
