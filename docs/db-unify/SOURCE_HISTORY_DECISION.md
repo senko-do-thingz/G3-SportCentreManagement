@@ -1,5 +1,12 @@
 # Historical data coverage and CODEOWNER decision
 
+Round 03: see [archive contract, policy impact and scoped follow-up](ROUND03_ARCHIVE_AND_POLICY.md)
+and [machine-readable gates](status.json). Unified SUCCESS replay requires an ACTIVE
+card or an ACTIVE package with activation evidence. The executable archive contract
+uses fictional disposable schemas only; production migration, historical API and
+real-source reconciliation remain unimplemented. Historical data unification is
+INCOMPLETE and account-wide quarantine acceptance remains PENDING CODEOWNER.
+
 PROPOSED - PENDING CODEOWNER FINAL REVIEW. Data unification is NOT COMPLETE.
 
 One runtime datasource is implemented and tested. Zero imported rows means zero
@@ -54,8 +61,10 @@ an inventory checklist and gap matrix, not a claim about protected source conten
 | B: Historical archive namespace inside sportify (recommended if single-DB history required) | Potentially, after implementation and reconciliation | Authorized snapshots, approved mapping/retention design, disposable importer tests, historical UI/API acceptance | Keep sources/backups; disable archive reader; retain immutable import batches, no destructive undo |
 | C: Merge legacy rows into live operational tables | Not currently implemented or recommended | Explicit domain-by-domain authority, identity/credit/cash reconciliation, operational isolation and restore rehearsal | Coordinated backup/application restore; no ledger rewriting or row-delete rollback |
 
-CODEOWNER must choose A with an explicit scope change, or require B/C before
-calling data unification complete. Until then: DATA_UNIFICATION=INCOMPLETE,
+CODEOWNER may separately accept a reduced runtime-only scope under A; that does
+not complete historical unification. Only implemented and independently verified
+historical migration/reconciliation can close that requirement. Until then:
+DATA_UNIFICATION=INCOMPLETE,
 IMPORT_EXECUTION=DISABLED, TARGET_READ/BACKUP/CLONE/CUTOVER=BLOCKED.
 
 ## Conditional importer design (not a write-enabled importer)

@@ -1,5 +1,12 @@
 # CODEOWNER review packet
 
+Round 03: see [archive contract, policy impact and scoped follow-up](ROUND03_ARCHIVE_AND_POLICY.md)
+and [machine-readable gates](status.json). Unified SUCCESS replay requires an ACTIVE
+card or an ACTIVE package with activation evidence. The executable archive contract
+uses fictional disposable schemas only; production migration, historical API and
+real-source reconciliation remain unimplemented. Historical data unification is
+INCOMPLETE and account-wide quarantine acceptance remains PENDING CODEOWNER.
+
 Round 02 status: runtime consolidation is implemented; historical data unification
 is INCOMPLETE. Zero imports do not meet a requirement that all legacy histories be
 available in sportify. Archive-only disposition is proposed and unapproved. See
