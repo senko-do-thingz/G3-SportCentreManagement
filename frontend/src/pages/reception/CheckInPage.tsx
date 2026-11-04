@@ -114,11 +114,11 @@ export function CheckInPage() {
   ]
 
   return (
-    <div className="page reception-page">
+    <div className="page reception-page reception-ui18-page home-page">
       <PageHeader
         eyebrow="Front desk"
         title="Check-in"
-        description="Verify paid training access and the session reservation."
+        description="Record member arrivals and review today's check-ins."
       />
       <div className="reception-checkin">
         <Card title="Record arrival">
@@ -161,9 +161,6 @@ export function CheckInPage() {
             </div>
           </form>
           {last && <CheckInResult record={last.record} identifier={last.identifier} />}
-          <p className="notice notice--info">
-            Check-in records the arrival. Session usage and coach attendance must not deduct the same visit twice.
-          </p>
         </Card>
         <Card
           title="Today's check-ins"
