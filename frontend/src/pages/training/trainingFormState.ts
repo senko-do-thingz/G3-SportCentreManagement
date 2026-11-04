@@ -25,7 +25,13 @@ export function useTrainingAction() {
     }
   }
 
-  return { pending, error, success, run }
+  function reset() {
+    if (running.current) return
+    setError(null)
+    setSuccess(null)
+  }
+
+  return { pending, error, success, run, reset }
 }
 
 export const attendanceOptions = [
