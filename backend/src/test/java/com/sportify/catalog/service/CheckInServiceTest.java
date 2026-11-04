@@ -78,7 +78,7 @@ public class CheckInServiceTest {
         recRole.setCode("RECEPTIONIST");
         receptionist = UserAccount.builder().id(2L).role(recRole).build();
 
-        UserAccount memberUser = UserAccount.builder().id(1L).fullName("Test Member").build();
+        UserAccount memberUser = UserAccount.builder().id(1L).fullName("Test Member").role(Role.builder().code("MEMBER").build()).build();
         memberProfile = MemberProfile.builder().id(1L).userAccount(memberUser).memberCode("MEM-123").build();
 
         sport = Sport.builder().id(10L).name("Badminton").build();
@@ -90,6 +90,30 @@ public class CheckInServiceTest {
                 .status(BookingStatus.CONFIRMED)
                 .build();
         org.mockito.Mockito.lenient().when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(classSession));
+    }
+
+    @Test
+    void disabledMemberCannotUseManualArrivalFallback() {
+        memberProfile.getUserAccount().setStatus("INACTIVE");
+        var request=stubAllowedArrivalForAccountGuard();
+        assertThrows(com.sportify.core.exception.BusinessRuleException.class,()->checkInService.recordCheckIn(request,receptionist));
+    }
+
+    @Test
+    void alternateRoleCannotUseRetainedMemberProfileForArrival() {
+        memberProfile.getUserAccount().setRole(Role.builder().code("COACH").build());
+        var request=stubAllowedArrivalForAccountGuard();
+        assertThrows(com.sportify.core.exception.BusinessRuleException.class,()->checkInService.recordCheckIn(request,receptionist));
+    }
+
+    private CheckInRequest stubAllowedArrivalForAccountGuard() {
+        var request=new CheckInRequest(); request.setIdentifier("MEM-123");
+        when(memberProfileRepository.findByMemberCode("MEM-123")).thenReturn(Optional.of(memberProfile));
+        todayBooking.setPackageRegistration(SportPackageRegistration.builder().id(40L).status(PackageRegistrationStatus.ACTIVE)
+                .startDate(LocalDate.of(2026,10,1)).endDate(LocalDate.of(2026,10,31)).build());
+        org.mockito.Mockito.lenient().when(bookingRepository.findTodayBookingsForMember(eq(1L),eq(LocalDate.of(2026,10,5)),eq(BookingStatus.CONFIRMED))).thenReturn(List.of(todayBooking));
+        org.mockito.Mockito.lenient().when(checkInRepository.save(any(CheckIn.class))).thenAnswer(i->{CheckIn c=i.getArgument(0);c.setId(100L);return c;});
+        return request;
     }
 
     @Test

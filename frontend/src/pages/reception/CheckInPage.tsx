@@ -6,6 +6,7 @@ import { Badge, Button, Card, Input, PageHeader, Table, type TableColumn } from 
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { useResource } from '../../hooks/useResource'
 import { formatTime } from '../../utils/format'
+import { CheckInPassReader } from './CheckInPassReader'
 import {
   CHECK_IN_IDENTIFIER_MAX,
   checkInVerdict,
@@ -120,6 +121,10 @@ export function CheckInPage() {
         title="Check-in"
         description="Record member arrivals and review today's check-ins."
       />
+      <CheckInPassReader onRecorded={(record) => {
+        setLast({ record, identifier: record.memberCode ?? String(record.memberId ?? '') })
+        reloadToday()
+      }} />
       <div className="reception-checkin">
         <Card title="Record arrival">
           <form className="reception-form" onSubmit={submit} noValidate aria-label="Check-in">
