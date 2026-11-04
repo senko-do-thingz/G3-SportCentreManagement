@@ -127,7 +127,7 @@ export const RECEPTIONIST_AREA: RoleArea = {
           label: 'Check-in',
           path: 'check-in',
           title: 'Check-in',
-          description: 'Verify paid training access and the session reservation.',
+          description: "Record member arrivals and review today's check-ins.",
           task: 'FE-05',
           screens: ['F1-15'],
         },
