@@ -139,6 +139,29 @@ class TrainingWorkflowIntegrationTest {
         assertThat(reader.attendance(member)).hasSize(1);
     }
 
+    @Test void RELEASE05_memberClassDetailsAndCoachScheduleUseActualSqlMetadata() throws Exception {
+        Long facility=jdbc.queryForObject("SELECT MIN(id) FROM facility WHERE sport_id=?",Long.class,sport);
+        assertThat(facility).isNotNull();
+        jdbc.update("UPDATE class_session SET facility_id=? WHERE id=?",facility,session);
+        String facilityName=jdbc.queryForObject("SELECT name FROM facility WHERE id=?",String.class,facility);
+        String sessionCode=jdbc.queryForObject("SELECT session_code FROM class_session WHERE id=?",String.class,session);
+        var detail=learning.memberClass(member,classId);
+        assertThat(detail.learningClass().name()).isEqualTo("Round02 class");
+        assertThat(detail.learningClass().coachName()).isEqualTo("COACH");
+        assertThat(detail.learningClass().sportName()).isNotBlank();
+        assertThat(detail.learningClass().level()).isNotBlank();
+        assertThat(detail.sessions().getFirst().facilityName()).isEqualTo(facilityName);
+        assertThat(detail.sessions().getFirst().sessionCode()).isEqualTo(sessionCode);
+        assertThat(detail.sessions().getFirst().freeSeats()).isEqualTo(9);
+        assertThatThrownBy(()->learning.memberClass(peer,classId)).isInstanceOf(ResourceNotFoundException.class);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/classes/"+classId)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(member)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sessions[0].facilityName").value(facilityName))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sessions[0].coachName").value("COACH"));
+        assertThat(writer.coachSessions(coach)).anyMatch(s->s.id()==session && s.facilityName().equals(facilityName) && s.sessionId().equals(sessionCode));
+    }
+
     @Test void HOT00_realCoachToMemberAndReceptionToMemberContracts() throws Exception {
         var coachUser = org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
             new com.sportify.identity.security.CustomUserDetails(actor(coach)));

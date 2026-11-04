@@ -128,6 +128,19 @@ class ManagerSessionServiceImplTest {
     }
 
     @Test
+    void facilitySportMismatchIsRejectedBeforePublishing() {
+        validClass(); validAssignment();
+        facility.setSport(Sport.builder().id(2L).code("SWIMMING").build());
+        assertThrows(BusinessRuleException.class,()->service.createSessions(10L,single(),manager));
+    }
+
+    @Test
+    void facilityCapacityCannotBeExceeded() {
+        validClass(); validAssignment(); facility.setCapacity(10);
+        assertThrows(BusinessRuleException.class,()->service.createSessions(10L,single(),manager));
+    }
+
+    @Test
     void singleCreate_publishesAndLocksResourcesBeforeCheckingConflictsAndAudits() {
         validClass();
         validAssignment();

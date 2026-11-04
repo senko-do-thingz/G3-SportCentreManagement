@@ -114,6 +114,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
             }
             Assignment assignment = lockAndValidateAssignment(sportClass, request.coachId(),
                     request.facilityId(), request.trainingType());
+            validateFacilityCapacityAndSport(sportClass, assignment.facility(), request.capacity());
             validateFutureDates(dates, request.startTime());
             checkConflicts(dates, request.startTime(), request.endTime(), assignment, null);
 
@@ -172,6 +173,7 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
             }
             Assignment assignment = lockAndValidateAssignment(sportClass, request.coachId(),
                     request.facilityId(), session.getTrainingType());
+            validateFacilityCapacityAndSport(sportClass, assignment.facility(), request.capacity());
             checkConflicts(List.of(request.date()), request.startTime(), request.endTime(), assignment, id);
             Map<String, Object> before = snapshot(session);
             String oldCode = session.getSessionCode();
@@ -321,6 +323,15 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
                                 coachSummary(session.getCoach()), facilitySummary(session.getFacility()), type, session.getSessionCode());
                     }).toList();
             throw new ScheduleConflictException(responses);
+        }
+    }
+
+    private void validateFacilityCapacityAndSport(SportClass sportClass, Facility facility, int capacity) {
+        if (facility.getSport() != null && !Objects.equals(facility.getSport().getId(), sportClass.getSport().getId())) {
+            throw new BusinessRuleException("Facility is assigned to a different sport");
+        }
+        if (facility.getCapacity() != null && capacity > facility.getCapacity()) {
+            throw new BusinessRuleException("Session capacity cannot exceed facility capacity");
         }
     }
 
