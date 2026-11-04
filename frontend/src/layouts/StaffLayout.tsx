@@ -5,6 +5,7 @@ import { useAuth } from '../auth/useAuth'
 import { findActiveItem, itemHref, STAFF_AREAS } from './navigation'
 import { PaymentWorkspaceHeader } from './PaymentWorkspaceHeader'
 import { WorkspaceHeader } from './WorkspaceHeader'
+import { WorkflowSurface } from '../components/WorkflowSurface'
 
 /** Coach, reception and manager workspaces share a Home-branded header and role-aware sidebar. */
 export function StaffLayout() {
@@ -12,6 +13,9 @@ export function StaffLayout() {
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
   const refundRoute = useMatch('/reception/refunds/*')
+  const workflowRoute = location.pathname === '/manager/schedule'
+    || /^\/(coach|reception)\/training(?:\/|$)/.test(location.pathname)
+    || /^\/reception\/payments\/[^/]+\/(qr-display|receipt)$/.test(location.pathname)
 
   // RequireRole guarantees a staff role here; fall back to the manager menu for type safety only.
   const area = role && role !== 'MEMBER' ? STAFF_AREAS[role] : STAFF_AREAS.MANAGER
@@ -62,7 +66,7 @@ export function StaffLayout() {
       <div className="staff-main">
         <main className="staff-content" id="main-content">
           <AccountSwitchNotice />
-          <Outlet />
+          {workflowRoute ? <WorkflowSurface><Outlet /></WorkflowSurface> : <Outlet />}
         </main>
       </div>
     </div>
