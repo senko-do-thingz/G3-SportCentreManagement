@@ -530,3 +530,20 @@
 .reception-page .table th { background: var(--color-primary-soft); color: var(--color-primary); border-bottom: 2px solid var(--color-primary); }
 .reception-page .table tbody tr:hover td { background: var(--color-primary-soft); }
 @media (max-width: 640px) { .reception-page .page-header { padding: var(--space-5); } .reception-page .page-header__title { font-size: var(--text-2xl); } .reception-page .card { padding: var(--space-4); } }
+
+/* UI-17 member search/profile uses the same square surfaces as the payment workspace. */
+.reception-member-search-page :is(
+  .page-header,
+  .card,
+  .table-scroll,
+  .member-results__item,
+  .package-item,
+  .input,
+  .select,
+  .btn
+) {
+  border-radius: 0;
+}
+
+.reception-member-search-page :is(.page-header, .card) { box-shadow: none; }
+.reception-member-search__modal { border-radius: 0; }
