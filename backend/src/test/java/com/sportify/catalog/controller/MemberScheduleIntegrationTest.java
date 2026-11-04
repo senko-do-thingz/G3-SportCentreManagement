@@ -1,5 +1,6 @@
 package com.sportify.catalog.controller;
 
+import com.sportify.support.SessionIdentityFixtures;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sportify.AbstractIntegrationTest;
@@ -145,7 +146,14 @@ class MemberScheduleIntegrationTest extends AbstractIntegrationTest {
                 .trainingType(TrainingFormat.COACH_LED).status(SessionStatus.PUBLISHED).capacity(10).bookedCount(0).build());
     }
 
-    private ClassSession save(ClassSession session) { return sessions.saveAndFlush(session); }
+    // Synthetic sport metadata isolates legacy discovery filters. Canonical creation is covered by ID tests.
+    private ClassSession save(ClassSession session) {
+        var stored = session.getId() == null ? java.util.List.<String>of() : jdbc.query("SELECT session_code FROM class_session WHERE id=? AND session_date=?", (rs, row) -> rs.getString(1), session.getId(), session.getSessionDate());
+        String code = stored.isEmpty() ? SessionIdentityFixtures.reserve(jdbc, session.getSessionDate(), "FOOTBALL") : stored.getFirst();
+        if (session.getId() != null && stored.isEmpty()) jdbc.update("UPDATE class_session SET session_date=?,session_code=? WHERE id=?", session.getSessionDate(), code, session.getId());
+        session.setSessionCode(code);
+        return sessions.saveAndFlush(session);
+    }
 
     private SportPackageRegistration registration(UserAccount owner, Sport sport, TrainingFormat format,
             String status, LocalDate start, LocalDate end, int remaining) {

@@ -6,7 +6,7 @@ import { backendError, installFakeFetch, json, MEMBER, type RecordedCall } from 
 import { renderApp } from '../../test/renderApp'
 
 const path = '/manager/training/attendance/backfill'
-const booking = { bookingId: 11, sessionId: 5, memberName: 'Test member', className: 'Swimming', date: '2026-11-01', startTime: '08:00:00', endTime: '09:00:00' }
+const booking = { bookingId: 11, sessionId: 5, sessionCode: '011126SW01', coachName: 'Test Coach', facilityName: 'Pool 1', memberName: 'Test member', className: 'Swimming', date: '2026-11-01', startTime: '08:00:00', endTime: '09:00:00' }
 const workspace = { enabled: true, window: 'PT48H', message: 'Manager only', bookings: [booking] }
 function signedIn(role: string, handler: (call: RecordedCall) => Response) {
   tokenStorage.startSession({ accessToken: 'fixture-token', refreshToken: 'refresh' })
@@ -31,7 +31,9 @@ describe('Manager controlled attendance backfill', () => {
     renderApp(path)
     const user = userEvent.setup()
     await user.selectOptions(await screen.findByLabelText(/^Missed booking/), '11')
-    expect(screen.getByText(/Session #5: 2026-11-01/)).toHaveTextContent('Current attendance: Unmarked')
+    expect(screen.getByText('011126SW01')).toBeInTheDocument()
+    expect(screen.getByText('Current attendance: Unmarked.')).toBeInTheDocument()
+    expect(screen.getByText('Facility: Pool 1')).toBeInTheDocument()
     await user.selectOptions(screen.getByLabelText(/^Backfill status/), 'LATE')
     await user.type(screen.getByLabelText('Administrative reason'), ' Verified missed roll call ')
     await user.type(screen.getByLabelText('Attendance notes'), 'Operator note')

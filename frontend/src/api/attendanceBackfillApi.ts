@@ -1,7 +1,9 @@
 import { api } from './client'
+import type { SessionId } from './sessionIdentity'
 import type { AttendanceStatus } from './staffTrainingApi'
 
 export interface BackfillBooking {
+  sessionCode?: SessionId; coachName?: string | null; facilityName?: string | null
   bookingId: number; sessionId: number; memberName: string; className: string
   date: string; startTime: string; endTime: string
 }

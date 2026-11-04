@@ -25,13 +25,15 @@ public class MemberTrainingService {
         WHERE p.is_template = 0 AND p.member_id = ?
         """;
     private static final String SESSION_COLUMNS = """
-        s.id session_id, COALESCE(c.name, sp.name) class_name,
+        s.id session_id, s.session_code, sp.name sport_name, u.full_name coach_name, f.name facility_name,
+        s.training_type, COALESCE(c.name, sp.name) class_name,
         s.session_date, s.start_time, s.end_time
         """;
     private static final String SESSION_JOINS = """
         JOIN class_session s ON s.id = r.session_id
         LEFT JOIN sport_class c ON c.id = s.class_id
         JOIN sport sp ON sp.id = s.sport_id
+        LEFT JOIN user_account u ON u.id=s.coach_id LEFT JOIN facility f ON f.id=s.facility_id
         """;
     private static final String RESULT_SELECT = "SELECT r.id, r.notes, " + SESSION_COLUMNS
         + " FROM session_result r " + SESSION_JOINS + " WHERE r.member_id = ?";
@@ -70,6 +72,7 @@ public class MemberTrainingService {
                  AND (r.booking_id IS NULL OR r.booking_id=b.id)
              JOIN class_session s ON s.id=COALESCE(b.session_id,r.session_id)
              LEFT JOIN sport_class c ON c.id=s.class_id JOIN sport sp ON sp.id=s.sport_id
+             LEFT JOIN user_account u ON u.id=s.coach_id LEFT JOIN facility f ON f.id=s.facility_id
              WHERE COALESCE(b.member_id,r.member_id)=?
              ORDER BY s.session_date DESC,s.start_time DESC,s.id DESC,b.id DESC,r.id DESC
             """, (rs, row) -> new Attendance(rs.getObject("id", Long.class), session(rs), rs.getString("status"), rs.getString("notes"),
@@ -112,6 +115,7 @@ public class MemberTrainingService {
     }
     private Session session(ResultSet rs) throws SQLException {
         return new Session(rs.getLong("session_id"), rs.getString("class_name"),
-            rs.getDate("session_date").toLocalDate(), rs.getTime("start_time").toLocalTime(), rs.getTime("end_time").toLocalTime());
+            rs.getDate("session_date").toLocalDate(), rs.getTime("start_time").toLocalTime(), rs.getTime("end_time").toLocalTime(),
+            rs.getString("session_code"),rs.getString("sport_name"),rs.getString("coach_name"),rs.getString("facility_name"),rs.getString("training_type"));
     }
 }

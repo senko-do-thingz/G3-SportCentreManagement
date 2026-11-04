@@ -8,7 +8,14 @@ public final class ClassLearningResponse {
     public record LearningClass(long id, String name, String sportName, String coachName, String level, int capacity, boolean active) {}
     public record Participation(long bookingId, long sessionId, LocalDate date, LocalTime startTime, LocalTime endTime,
         String bookingStatus, String attendanceStatus, String notes, Long resultId,
-        String sessionStatus, String trainingFormat, int capacity, int freeSeats) {}
+        String sessionStatus, String trainingFormat, int capacity, int freeSeats, String sessionCode, String coachName, String facilityName, String sportName) {
+        /** Transitional Java constructor; live mappers supply the persisted public identity. */
+        public Participation(long bookingId, long sessionId, LocalDate date, LocalTime startTime, LocalTime endTime,
+            String bookingStatus, String attendanceStatus, String notes, Long resultId,
+            String sessionStatus, String trainingFormat, int capacity, int freeSeats) {
+            this(bookingId, sessionId, date, startTime, endTime, bookingStatus, attendanceStatus, notes, resultId, sessionStatus, trainingFormat, capacity, freeSeats, null, null, null, null);
+        }
+    }
     public record ClassDetail(LearningClass learningClass, List<Participation> sessions) {}
     public record Question(long id, long classId, String className, String memberName, String subject, String description,
         String status, LocalDateTime createdAt) {}

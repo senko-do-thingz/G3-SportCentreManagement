@@ -31,6 +31,7 @@ public class ClassLearningService {
     private final Clock clock;
     private final AuditService audit;
     private final jakarta.persistence.EntityManager entityManager;
+    private final OperationalMemberPolicy operationalMemberPolicy;
     private static final String CLASSES = "SELECT c.id,c.name,sp.name sport_name,u.full_name coach_name,c.level,c.max_members,c.is_active FROM sport_class c JOIN sport sp ON sp.id=c.sport_id LEFT JOIN user_account u ON u.id=c.coach_id ";
     private static final String QUESTIONS = "SELECT q.id,c.id class_id,c.name class_name,u.full_name member_name,q.subject,q.description,q.status,q.created_at FROM support_request q JOIN sport_class c ON q.category=CONCAT('TRAINING_CLASS_',c.id) JOIN user_account u ON u.id=q.member_id ";
     public List<LearningClass> memberClasses(long memberId) {
@@ -40,16 +41,19 @@ public class ClassLearningService {
         var classes = memberClasses(memberId).stream().filter(c -> c.id()==classId).toList();
         if (classes.isEmpty()) throw new ResourceNotFoundException("Class not found");
         var rows = jdbc.query("""
-            SELECT b.id booking_id,s.id session_id,s.session_date,s.start_time,s.end_time,b.status booking_status,
+            SELECT b.id booking_id,s.id session_id,s.session_code,s.session_date,s.start_time,s.end_time,b.status booking_status,
+            u.full_name coach_name,f.name facility_name,sp.name sport_name,
             a.status attendance_status,a.notes,r.id result_id,s.status session_status,s.training_type,s.capacity,
             CASE WHEN s.capacity>s.booked_count THEN s.capacity-s.booked_count ELSE 0 END free_seats
             FROM booking b JOIN class_session s ON s.id=b.session_id
+            JOIN sport sp ON sp.id=s.sport_id LEFT JOIN user_account u ON u.id=s.coach_id LEFT JOIN facility f ON f.id=s.facility_id
             LEFT JOIN attendance_record a ON a.session_id=s.id AND a.member_id=b.member_id
             LEFT JOIN session_result r ON r.session_id=s.id AND r.member_id=b.member_id
             WHERE b.member_id=? AND s.class_id=? ORDER BY s.session_date DESC,s.start_time DESC,b.id
             """, (rs,row) -> new Participation(rs.getLong("booking_id"),rs.getLong("session_id"),rs.getDate("session_date").toLocalDate(),
             rs.getTime("start_time").toLocalTime(),rs.getTime("end_time").toLocalTime(),rs.getString("booking_status"),rs.getString("attendance_status"),rs.getString("notes"),rs.getObject("result_id",Long.class),
-            rs.getString("session_status"),rs.getString("training_type"),rs.getInt("capacity"),rs.getInt("free_seats")),memberId,classId);
+            rs.getString("session_status"),rs.getString("training_type"),rs.getInt("capacity"),rs.getInt("free_seats"),
+            rs.getString("session_code"),rs.getString("coach_name"),rs.getString("facility_name"),rs.getString("sport_name")),memberId,classId);
         return new ClassDetail(classes.getFirst(),rows);
     }
     public List<Question> questions(long actorId, boolean coach) {
@@ -67,6 +71,7 @@ public class ClassLearningService {
     }
     @Transactional
     public long ask(long memberId,long classId,String subject,String body,UUID operationId) {
+        operationalMemberPolicy.requireRealMember(memberId);
         lockQuestionClass(classId);
         // A question requires an existing confirmed coached booking, never a fabricated enrollment.
         if(jdbc.queryForObject("SELECT COUNT(*) FROM booking b JOIN class_session s ON s.id=b.session_id JOIN sport_class c ON c.id=s.class_id WHERE b.member_id=? AND c.id=? AND b.status='CONFIRMED' AND s.status<>'CANCELLED' AND c.coach_id IS NOT NULL",Integer.class,memberId,classId)==0)
@@ -88,6 +93,8 @@ public class ClassLearningService {
     @Transactional
     public long reply(long actorId,boolean coach,long id,String body,UUID operationId) {
         var current=discussion(actorId,coach,id);
+        jdbc.queryForList("SELECT member_id FROM support_request WHERE id=?",Long.class,id)
+            .forEach(operationalMemberPolicy::requireRealMember);
         lockQuestionClass(current.question().classId());
         // Serialize conversation writes and repeat ownership validation after the lock.
         jdbc.update("UPDATE support_request SET updated_at=updated_at WHERE id=?",id);

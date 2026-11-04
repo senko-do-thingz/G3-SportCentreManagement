@@ -22,6 +22,8 @@ public final class TrainingWriteRequest {
                          @NotNull @Size(max = 100) List<@NotNull @Valid Score> scores) {}
     public record Attendance(@NotNull @Positive Long bookingId, @NotNull AttendanceStatus status,
                              @Size(max = 500) String notes) {}
+    public record ResultByCode(@NotNull @Positive Long memberId, @Size(max = 1000) String notes,
+                              @NotNull @Size(max = 100) List<@NotNull @Valid Score> scores) {}
     public record Correction(@NotNull AttendanceStatus status, @Size(max = 500) String notes,
                              @NotBlank @Size(max = 500) String reason) {}
 }

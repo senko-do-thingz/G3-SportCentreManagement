@@ -1,3 +1,6 @@
+import { SessionContext } from '../../components/SessionContext'
+import { sessionIdText } from '../../api/sessionIdentity'
+import { formatCalendarDate } from '../../utils/date'
 import { useState, type FormEvent } from 'react'
 import { attendanceBackfillApi as api, type BackfillWorkspace } from '../../api/attendanceBackfillApi'
 import type { AttendanceStatus } from '../../api/staffTrainingApi'
@@ -43,8 +46,8 @@ function BackfillForm({ workspace, onSaved }: { workspace: BackfillWorkspace; on
       : <form className="training-form" onSubmit={submit}>
         <fieldset className="training-fieldset" disabled={action.pending}>
           <Select label="Missed booking" required value={bookingId} onChange={event => select(event.target.value)} placeholder="Select a member and session"
-            options={workspace.bookings.map(item => ({ value: String(item.bookingId), label: `${item.memberName} - ${item.className} - ${item.date} - Booking #${item.bookingId}` }))} />
-          {booking && <p>Session #{booking.sessionId}: {booking.date}, {booking.startTime.slice(0, 5)} to {booking.endTime.slice(0, 5)} (Asia/Ho_Chi_Minh). Current attendance: Unmarked.</p>}
+            options={workspace.bookings.map(item => ({ value: String(item.bookingId), label: `${sessionIdText(item.sessionCode)} - ${item.memberName} - ${item.className} - ${formatCalendarDate(item.date)} - Booking #${item.bookingId}` }))} />
+          {booking && <><SessionContext {...booking} sessionId={booking.sessionCode} /><p>Current attendance: Unmarked.</p></>}
           <Select label="Backfill status" name="status" required defaultValue="PRESENT" options={attendanceOptions} />
           <TrainingTextarea label="Administrative reason" name="reason" required minLength={3} maxLength={500} />
           <TrainingTextarea label="Attendance notes" name="notes" maxLength={500} />

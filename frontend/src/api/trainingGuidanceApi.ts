@@ -1,9 +1,11 @@
 import { api } from './client'
+import type { SessionId } from './sessionIdentity'
 
 export interface RecommendationPreferences {
   sportId?: number; level?: string; goal?: string; from?: string; to?: string; earliest?: string; latest?: string; page?: number; size?: number
 }
 export interface ClassRecommendation {
+  sessionCode?: SessionId
   classId: number; sessionId: number; sportId: number; className: string; sportName: string; level: string
   coachName: string | null; trainingFormat: string; date: string; startTime: string; endTime: string
   freeSeats: number; score: number; reasons: string[]

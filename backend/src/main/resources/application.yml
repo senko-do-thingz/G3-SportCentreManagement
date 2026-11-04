@@ -53,6 +53,12 @@ app:
     # Empty means no cross-origin request is accepted. Overridden per profile.
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
   payment:
+    unified-demo:
+      enabled: ${PAYMENT_UNIFIED_DEMO_ENABLED:false}
+      test-enabled: ${PAYMENT_UNIFIED_DEMO_TEST_ENABLED:false}
+      member-ids: ${PAYMENT_UNIFIED_DEMO_MEMBER_IDS:}
+    local-demo:
+      enabled: ${PAYMENT_LOCAL_DEMO_ENABLED:false}
     simulator:
       # QR-04 is intent-only. Also requires the isolated qr-simulator profile; QR-05 owns settlement.
       enabled: ${PAYMENT_SIMULATOR_ENABLED:false}

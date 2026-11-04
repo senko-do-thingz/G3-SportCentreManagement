@@ -47,7 +47,7 @@ public class TrainingGuidanceService {
             throw new BusinessRuleException("Use a future date range of at most 30 days, valid times and page size 1-20");
         StringBuilder sql = new StringBuilder("""
             SELECT c.id class_id,c.name class_name,sp.id sport_id,sp.name sport_name,c.level,u.full_name coach_name,
-                s.id session_id,s.training_type,s.session_date,s.start_time,s.end_time,s.capacity-s.booked_count free_seats,
+                s.id session_id,s.session_code,s.training_type,s.session_date,s.start_time,s.end_time,s.capacity-s.booked_count free_seats,
                 CASE WHEN EXISTS(SELECT 1 FROM attendance_record a JOIN class_session h ON h.id=a.session_id
                     WHERE a.member_id=? AND h.sport_id=sp.id AND a.status IN ('PRESENT','LATE')) THEN 1 ELSE 0 END familiar
             FROM sport_class c JOIN sport sp ON sp.id=c.sport_id JOIN class_session s ON s.class_id=c.id
@@ -84,7 +84,7 @@ public class TrainingGuidanceService {
             }
             return new ClassRecommendation(rs.getLong("class_id"),rs.getLong("session_id"),rs.getLong("sport_id"),rs.getString("class_name"),
                 rs.getString("sport_name"),rs.getString("level"),rs.getString("coach_name"),rs.getString("training_type"),
-                rs.getDate("session_date").toLocalDate(),start,end,rs.getInt("free_seats"),score,List.copyOf(reasons));
+                rs.getDate("session_date").toLocalDate(),start,end,rs.getInt("free_seats"),score,List.copyOf(reasons),rs.getString("session_code"));
         }, values.toArray());
         var visibleIds=visibility.filter(candidates.stream().map(ClassRecommendation::sessionId).toList());
         candidates.removeIf(candidate->!visibleIds.contains(candidate.sessionId()));

@@ -1,3 +1,5 @@
+import { SessionContext } from '../../components/SessionContext'
+import { sessionIdText } from '../../api/sessionIdentity'
 import { useCallback, useRef, useState } from 'react'
 import type { Facility } from '../../api/facilitiesApi'
 import { managerClassesApi, type ManagerClass } from '../../api/managerClassesApi'
@@ -7,12 +9,13 @@ import { ManagerError } from './ManagerShared'
 import { addDays, centerNow, displayDate, repeatDates, validDate, WEEKDAYS } from './scheduleModel'
 import { useManagerForm, useResource } from './useManagerTools'
 
-const FIELDS = ['classId', 'date', 'startTime', 'endTime', 'facilityId', 'coachId', 'capacity', 'trainingType', 'daysOfWeek', 'fromDate', 'toDate'] as const
-export function SessionEditorModal({ item, classes, facilities, manualFacility = false, classId, onClose, onSuccess }: { item?: ManagerSession; classes: ManagerClass[]; facilities: Facility[]; manualFacility?: boolean; classId?: number; onClose: () => void; onSuccess: () => void }) {
+const FIELDS = ['classId', 'date', 'startTime', 'endTime', 'facilityId', 'coachId', 'capacity', 'trainingType', 'daysOfWeek', 'fromDate', 'toDate', 'rescheduleReason', 'expectedRevision'] as const
+export function SessionEditorModal({ item, classes, facilities, manualFacility = false, classId, onClose, onSuccess }: { item?: ManagerSession; classes: ManagerClass[]; facilities: Facility[]; manualFacility?: boolean; classId?: number; onClose: () => void; onSuccess: (saved?: ManagerSession) => void }) {
   const ref = useRef<HTMLFormElement>(null)
+  const savedSession = useRef<ManagerSession | undefined>(undefined)
   const today = centerNow().date
   const initialClass = classes.find((entry) => entry.id === (item?.class?.id ?? classId))
-  const [draft, setDraft] = useState({ classId: String(initialClass?.id ?? ''), date: item?.date ?? addDays(today, 1), startTime: item?.startTime.slice(0, 5) ?? '09:00', endTime: item?.endTime.slice(0, 5) ?? '10:00', facilityId: String(item?.facility?.id ?? ''), coachId: String(item?.coach?.id ?? initialClass?.coachId ?? ''), capacity: String(item?.capacity ?? initialClass?.maxMembers ?? 20), trainingType: item?.trainingType ?? 'COACH_LED', fromDate: addDays(today, 1), toDate: addDays(today, 7) })
+  const [draft, setDraft] = useState({ classId: String(initialClass?.id ?? ''), date: item?.date ?? addDays(today, 1), rescheduleReason: '', startTime: item?.startTime.slice(0, 5) ?? '09:00', endTime: item?.endTime.slice(0, 5) ?? '10:00', facilityId: String(item?.facility?.id ?? ''), coachId: String(item?.coach?.id ?? initialClass?.coachId ?? ''), capacity: String(item?.capacity ?? initialClass?.maxMembers ?? 20), trainingType: item?.trainingType ?? 'COACH_LED', fromDate: addDays(today, 1), toDate: addDays(today, 7) })
   const [weekly, setWeekly] = useState(false)
   const [days, setDays] = useState<DayOfWeek[]>([])
   const [conflicts, setConflicts] = useState<ScheduleConflict[]>([])
@@ -42,11 +45,14 @@ export function SessionEditorModal({ item, classes, facilities, manualFacility =
     setConflicts([])
     const values = { startTime: `${draft.startTime}:00`, endTime: `${draft.endTime}:00`, facilityId: Number(draft.facilityId), coachId: draft.trainingType === 'COACH_LED' ? Number(draft.coachId) : null, capacity: Number(draft.capacity) }
     try {
-      if (item) return await managerSessionsApi.update(item.id, { ...values, date: draft.date })
+      if (item) {
+        savedSession.current = await managerSessionsApi.update(item.id, { ...values, date: draft.date, expectedRevision: item.scheduleRevision, rescheduleReason: draft.rescheduleReason.trim() || undefined })
+        return savedSession.current
+      }
       const body: SessionCreate = { ...values, trainingType: draft.trainingType as TrainingType, ...(weekly ? { daysOfWeek: days, fromDate: draft.fromDate, toDate: draft.toDate } : { date: draft.date }) }
       return await managerSessionsApi.create(Number(draft.classId), body)
     } catch (error) { setConflicts(scheduleConflicts(error)); throw error }
-  }, onSuccess)
+  }, () => onSuccess(savedSession.current))
   function change(key: keyof typeof draft, value: string) {
     setDraft((previous) => {
       const nextClass = key === 'classId' ? classes.find((entry) => entry.id === Number(value)) : undefined
@@ -59,7 +65,7 @@ export function SessionEditorModal({ item, classes, facilities, manualFacility =
     <Modal open size="lg" title={item ? 'Edit session' : 'Create session'} description="All times are Vietnam time (UTC+7). A weekly batch is saved only if every session is valid." onClose={onClose} dismissible={!form.saving}>
       <form ref={ref} onSubmit={form.submit} noValidate className="manager-form">
         {form.error && !conflicts.length && <p role="alert" className="notice notice--danger">{form.error}</p>}
-        {item && <p className="notice notice--info">Editing does not notify booked members. Class and training type cannot be changed.</p>}
+        {item && <><SessionContext sessionId={item.sessionId} className={item.class?.name} sportName={item.sportName} date={item.date} startTime={item.startTime} endTime={item.endTime} coachName={item.coach?.name} facilityName={item.facility?.name} trainingType={item.trainingType} /><p className="notice notice--info">Changing the date generates a new Session ID. Previous IDs continue to identify this session. Confirmed bookings and package credits are preserved. Editing does not notify booked members.</p></>}
         <fieldset disabled={form.saving} className="manager-form-grid">
           <Select label="Class" name="classId" placeholder="Choose a class" disabled={Boolean(item)} value={draft.classId} options={classes.filter((entry) => entry.active || entry.id === item?.class?.id).map((entry) => ({ value: String(entry.id), label: entry.name }))} onChange={(event) => change('classId', event.target.value)} error={form.errors.classId} required />
           <Select label="Training type" name="trainingType" disabled={Boolean(item)} value={draft.trainingType} options={[{ value: 'COACH_LED', label: 'Coach-led' }, { value: 'SELF_TRAINING', label: 'Self-training' }]} onChange={(event) => change('trainingType', event.target.value)} error={form.errors.trainingType} required />
@@ -68,6 +74,7 @@ export function SessionEditorModal({ item, classes, facilities, manualFacility =
           <Input label="End time" name="endTime" type="time" value={draft.endTime} onChange={(event) => change('endTime', event.target.value)} error={form.errors.endTime} required />
           {manualFacility ? <Input label="Facility ID" name="facilityId" type="number" min="1" step="1" value={draft.facilityId} onChange={(event) => change('facilityId', event.target.value)} error={form.errors.facilityId} hint={item?.facility ? `Current facility: ${item.facility.name}. The backend validates availability.` : 'Enter a known facility ID from your center. The backend validates availability.'} required /> : <Select label="Facility" name="facilityId" placeholder="Choose a facility" value={draft.facilityId} options={facilities.filter((entry) => entry.active !== false).map((entry) => ({ value: String(entry.id), label: entry.name }))} onChange={(event) => change('facilityId', event.target.value)} error={form.errors.facilityId} required />}
           <Select label="Coach" name="coachId" placeholder="Choose a qualified coach" disabled={draft.trainingType !== 'COACH_LED' || coaches.status !== 'ready'} value={draft.trainingType === 'COACH_LED' ? draft.coachId : ''} options={coaches.status === 'ready' ? coaches.data.map((entry) => ({ value: String(entry.id), label: entry.fullName })) : []} onChange={(event) => change('coachId', event.target.value)} error={form.errors.coachId} required={draft.trainingType === 'COACH_LED'} />
+          {item && draft.date !== item.date && <Input label="Rescheduling reason (optional)" name="rescheduleReason" maxLength={500} value={draft.rescheduleReason} onChange={(event) => change('rescheduleReason', event.target.value)} hint="Recorded in the audit history. Maximum 500 characters." />}
           <Input label="Capacity" name="capacity" type="number" min={Math.max(1, item?.bookedCount ?? 0)} max={selectedClass?.maxMembers} step="1" value={draft.capacity} onChange={(event) => change('capacity', event.target.value)} error={form.errors.capacity} required />
           {!item && <Checkbox label="Repeat weekly" checked={weekly} onChange={(event) => setWeekly(event.target.checked)} />}
           {weekly && <><Input label="From date" name="fromDate" type="date" min={today} value={draft.fromDate} onChange={(event) => change('fromDate', event.target.value)} error={form.errors.fromDate} required /><Input label="To date" name="toDate" type="date" min={draft.fromDate} value={draft.toDate} onChange={(event) => change('toDate', event.target.value)} error={form.errors.toDate} required /><div className="manager-form-full"><fieldset><legend>Repeat on</legend><div className="f2-weekdays">{WEEKDAYS.map((day) => <Checkbox key={day} label={day.slice(0, 3)} checked={days.includes(day)} onChange={(event) => { setDays((previous) => event.target.checked ? [...previous, day] : previous.filter((entry) => entry !== day)); form.clear('daysOfWeek') }} />)}</div></fieldset>{form.errors.daysOfWeek && <p role="alert" className="field__error">{form.errors.daysOfWeek}</p>}<p>{dates.length > 100 ? 'More than 100 sessions - shorten the date range.' : `${dates.length} sessions will be created.`}</p></div></>}
@@ -79,7 +86,7 @@ export function SessionEditorModal({ item, classes, facilities, manualFacility =
     </Modal>
     {!!conflicts.length && <Modal open title="Schedule Conflict" description="Nothing was saved. Change the time, coach or facility and try again." onClose={editConflict} footer={<Button onClick={editConflict}>Edit session</Button>}>
       <p role="alert">{conflicts.length} conflicting sessions</p>
-      {[...conflicts].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)).map((conflict, index) => <div className="f2-conflict" key={`${conflict.sessionId}-${index}`}><strong>{displayDate(conflict.date)} {conflict.startTime.slice(0, 5)} - {conflict.endTime.slice(0, 5)}</strong><p>Session #{conflict.sessionId}: {conflict.class?.name ?? 'Unassigned class'}</p><p>Coach: {conflict.coach?.name ?? 'Not assigned'} - Facility: {conflict.facility?.name ?? 'Not assigned'}</p><p>Conflict: {conflict.conflictType === 'BOTH' ? 'Coach and facility' : conflict.conflictType === 'COACH' ? 'Coach' : 'Facility'}</p></div>)}
+      {[...conflicts].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)).map((conflict, index) => <div className="f2-conflict" key={`${conflict.sessionId}-${index}`}><strong>{displayDate(conflict.date)} {conflict.startTime.slice(0, 5)} - {conflict.endTime.slice(0, 5)}</strong><p>Session ID {sessionIdText(conflict.sessionCode)}: {conflict.class?.name ?? 'Unassigned class'}</p><p>Coach: {conflict.coach?.name ?? 'Not assigned'} - Facility: {conflict.facility?.name ?? 'Not assigned'}</p><p>Conflict: {conflict.conflictType === 'BOTH' ? 'Coach and facility' : conflict.conflictType === 'COACH' ? 'Coach' : 'Facility'}</p></div>)}
     </Modal>}
   </>
 }

@@ -36,6 +36,10 @@ public class CoachTrainingController {
     public List<SessionSummary> sessions(@AuthenticationPrincipal CustomUserDetails user) { return service.coachSessions(user.getUserAccount().getId()); }
     @GetMapping("/sessions/{id}/members")
     public List<SessionMember> sessionMembers(@PathVariable long id, @AuthenticationPrincipal CustomUserDetails user) { return service.coachSessionMembers(user.getUserAccount().getId(), id); }
+    @GetMapping("/sessions/by-code/{sessionId}/members")
+    public List<SessionMember> membersByCode(@PathVariable String sessionId, @AuthenticationPrincipal CustomUserDetails user) { return service.coachSessionMembersByCode(user.getUserAccount().getId(), sessionId); }
+    @PostMapping("/sessions/by-code/{sessionId}/results") @ResponseStatus(HttpStatus.CREATED)
+    public Created resultByCode(@PathVariable String sessionId, @Valid @RequestBody TrainingWriteRequest.ResultByCode request, @AuthenticationPrincipal CustomUserDetails user) { return service.createResultByCode(user.getUserAccount().getId(), sessionId, request); }
     @GetMapping("/metrics")
     public List<Metric> metrics(@RequestParam long sportId) { return service.metrics(sportId); }
     @PostMapping("/results") @ResponseStatus(HttpStatus.CREATED)

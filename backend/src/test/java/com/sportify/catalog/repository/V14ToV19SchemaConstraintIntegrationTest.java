@@ -1,5 +1,6 @@
 package com.sportify.catalog.repository;
 
+import com.sportify.support.SessionIdentityFixtures;
 import com.sportify.AbstractIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -554,9 +555,9 @@ class V14ToV19SchemaConstraintIntegrationTest extends AbstractIntegrationTest {
             return existing.get(0);
         }
         jdbc.update("""
-                INSERT INTO class_session (class_id, sport_id, coach_id, session_date, start_time, end_time, capacity, booked_count, status)
-                VALUES (?, ?, ?, '2026-10-15', '09:00', '10:30', 20, 0, 'PUBLISHED')
-                """, classId, sportId, coachId);
+                INSERT INTO class_session (class_id, sport_id, coach_id, session_date, start_time, end_time, capacity, booked_count, status, session_code)
+                VALUES (?, ?, ?, '2026-10-15', '09:00', '10:30', 20, 0, 'PUBLISHED', ?)
+                """, classId, sportId, coachId, SessionIdentityFixtures.reserve(jdbc, java.time.LocalDate.of(2026, 10, 15), sportId));
         return jdbc.queryForObject("SELECT TOP 1 id FROM class_session WHERE class_id = ? ORDER BY id DESC", Long.class, classId);
     }
 }

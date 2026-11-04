@@ -11,7 +11,14 @@ public final class TrainingWriteResponse {
     public record BookingCandidate(long bookingId, long memberId, String memberName, LocalDate sessionDate) {}
     public record SessionSummary(long id, Long classId, String className, long sportId,
                                  LocalDate date, LocalTime startTime, LocalTime endTime, String trainingType,
-                                 boolean attendanceDateOpen) {}
+                                 boolean attendanceDateOpen, String sessionId, String sportName, String coachName, String facilityName, String status, long bookedCount, long markedCount, String attendanceState) {
+        /** Transitional Java constructor; live mappers supply the persisted public identity. */
+        public SessionSummary(long id, Long classId, String className, long sportId,
+                                     LocalDate date, LocalTime startTime, LocalTime endTime, String trainingType,
+                                     boolean attendanceDateOpen) {
+            this(id, classId, className, sportId, date, startTime, endTime, trainingType, attendanceDateOpen, null, null, null, null, null, 0, 0, attendanceDateOpen ? "OPEN" : "CLOSED");
+        }
+    }
     public record SessionMember(long bookingId, long memberId, String memberName, Long attendanceId, String status, String notes, Long resultId) {}
     public record CoachPlan(long id, String title, String description, long classId, String className,
                             long memberId, String memberName, String coachName) {}

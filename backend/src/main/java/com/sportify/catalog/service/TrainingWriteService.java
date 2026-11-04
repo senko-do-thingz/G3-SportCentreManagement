@@ -32,6 +32,7 @@ public class TrainingWriteService {
     private final Clock clock;
     private final AuditService audit;
     private final jakarta.persistence.EntityManager entityManager;
+    private final OperationalMemberPolicy operationalMemberPolicy;
 
     private static final String PLAN_SELECT = """
         SELECT p.id, p.title, p.description, p.class_id, c.name class_name, p.member_id,
@@ -42,9 +43,17 @@ public class TrainingWriteService {
         """;
     private static final String SESSION_SELECT = """
         SELECT s.id, s.class_id, COALESCE(c.name, sp.name) class_name, s.sport_id,
-               s.session_date, s.start_time, s.end_time, s.training_type
+               s.session_date, s.start_time, s.end_time, s.training_type, s.session_code, sp.name sport_name,
+               u.full_name coach_name, f.name facility_name, s.status,
+               COALESCE(counts.booked_count,0) booked_count, COALESCE(counts.marked_count,0) marked_count
         FROM class_session s LEFT JOIN sport_class c ON c.id = s.class_id
         JOIN sport sp ON sp.id = s.sport_id
+        LEFT JOIN user_account u ON u.id=s.coach_id LEFT JOIN facility f ON f.id=s.facility_id
+        LEFT JOIN (
+            SELECT b.session_id,COUNT(*) booked_count,COUNT(a.id) marked_count
+            FROM booking b LEFT JOIN attendance_record a ON a.session_id=b.session_id AND a.member_id=b.member_id
+            WHERE b.status='CONFIRMED' GROUP BY b.session_id
+        ) counts ON counts.session_id=s.id
         """;
     private static final String SESSION_MEMBERS_SELECT = """
         SELECT b.id booking_id, b.member_id, u.full_name member_name, a.id attendance_id, a.status, a.notes, r.id result_id
@@ -132,6 +141,7 @@ public class TrainingWriteService {
     @Transactional
     public Created feedback(long coachId, long planId, TrainingWriteRequest.Feedback request) {
         var plan = coachPlan(coachId, planId).plan();
+        operationalMemberPolicy.requireRealMember(plan.memberId());
         long id = insert("INSERT INTO coach_feedback(plan_id, session_id, member_id, coach_id, rating, comments, strengths, areas_for_improvement, created_at) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?)",
             planId, plan.memberId(), coachId, request.rating(), request.comments().trim(), request.strengths(), request.areasForImprovement(), now());
         audit(coachId, "TRAINING_FEEDBACK_CREATED", "COACH_FEEDBACK", id, Map.of("planId", planId, "memberId", plan.memberId()));
@@ -151,6 +161,22 @@ public class TrainingWriteService {
     public List<SessionMember> receptionSessionMembers(long sessionId) {
         if (!exists("SELECT COUNT(*) FROM class_session WHERE id = ?", sessionId)) throw new ResourceNotFoundException("Session not found");
         return jdbc.query(SESSION_MEMBERS_SELECT + " ORDER BY u.full_name, b.id", this::mapSessionMember, sessionId);
+    }
+    public List<SessionMember> coachSessionMembersByCode(long coachId, String sessionId) {
+        return coachSessionMembers(coachId, sessionKey(sessionId));
+    }
+    public List<SessionMember> receptionSessionMembersByCode(String sessionId) {
+        return receptionSessionMembers(sessionKey(sessionId));
+    }
+    private long sessionKey(String sessionId) {
+        String code = new PublicSessionId(sessionId).value();
+        var rows = jdbc.query("SELECT s.id FROM class_session s JOIN session_code_history h ON h.session_id=s.id WHERE h.session_code=?", (rs,row)->rs.getLong(1), code);
+        if(rows.isEmpty()) throw new ResourceNotFoundException("Session not found");
+        return rows.getFirst();
+    }
+    @Transactional
+    public Created createResultByCode(long coachId, String sessionId, TrainingWriteRequest.ResultByCode request) {
+        return createResult(coachId, new TrainingWriteRequest.Result(sessionKey(sessionId), request.memberId(), request.notes(), request.scores()));
     }
     public List<Metric> metrics(long sportId) {
         return jdbc.query("SELECT id, name, max_score FROM skill_metric WHERE sport_id = ? ORDER BY name, id",
@@ -200,6 +226,7 @@ public class TrainingWriteService {
             (rs, row) -> new AttendanceBooking(rs.getLong("session_id"), rs.getLong("member_id"), rs.getString("status"), rs.getString("training_type")), request.bookingId());
         if (rows.isEmpty() || !rows.getFirst().status().equals("CONFIRMED")) throw new BusinessRuleException("A confirmed booking for a non-cancelled session is required");
         var booking = rows.getFirst();
+        operationalMemberPolicy.requireRealMember(booking.memberId());
         if (selfOnly && !booking.trainingType().equals("SELF_TRAINING")) throw new BusinessRuleException("Booking is not for self-training");
         requireAttendanceDate(booking.sessionId(), selfOnly);
         // Within an eligible day attendance time stays flexible; results wait until session end.
@@ -221,6 +248,10 @@ public class TrainingWriteService {
             throw new BusinessRuleException("Provide a meaningful correction reason of at least 3 characters");
         var sessionIds = jdbc.query("SELECT session_id FROM attendance_record WHERE id = ?", (rs, row) -> rs.getLong("session_id"), id);
         if (sessionIds.isEmpty()) throw new ResourceNotFoundException("Attendance not found");
+        jdbc.queryForList("SELECT member_id FROM attendance_record WHERE id=?", Long.class, id)
+                .forEach(operationalMemberPolicy::requireRealMember);
+        jdbc.queryForList("SELECT booking_id FROM attendance_record WHERE id=? AND booking_id IS NOT NULL", Long.class, id)
+                .forEach(operationalMemberPolicy::requireRealBooking);
         // Match result creation/cancellation: session first, then participation row.
         lockSession(sessionIds.getFirst());
         if (!exists("SELECT COUNT(*) FROM attendance_record a JOIN booking b ON b.id=a.booking_id JOIN class_session s ON s.id=a.session_id WHERE a.id=? AND b.status='CONFIRMED' AND s.status<>'CANCELLED'", id))
@@ -236,7 +267,8 @@ public class TrainingWriteService {
         jdbc.update("UPDATE attendance_record SET status = ?, notes = ?, marked_at = ?, marked_by = ? WHERE id = ?",
             request.status().name(), request.notes(), now(), actorId, id);
         audit(actorId, "TRAINING_ATTENDANCE_CORRECTED", "ATTENDANCE_RECORD", id,
-            Map.of("previousStatus", previous, "newStatus", request.status().name(), "reason", request.reason().trim()));
+            Map.of("sessionId", sessionIds.getFirst(), "previousStatus", previous,
+                "newStatus", request.status().name(), "reason", request.reason().trim()));
         return new Created(id);
     }
 
@@ -258,16 +290,22 @@ public class TrainingWriteService {
         return correctAttendance(coachId, id, request);
     }
     private void audit(long actorId, String action, String entity, long id, Map<String, Object> details) {
+        var enriched = new java.util.LinkedHashMap<>(details);
+        if(details.get("sessionId") instanceof Number session) {
+            enriched.put("sessionCode", jdbc.queryForObject("SELECT session_code FROM class_session WHERE id=?", String.class, session.longValue()));
+        }
         audit.record(AuditEvent.builder().actor(entityManager.getReference(UserAccount.class, actorId)).action(action)
-            .entityType(entity).entityId(id).summary(action).details(details).build());
+            .entityType(entity).entityId(id).summary(action).details(enriched).build());
     }
 
     private void lockSessionBooking(long sessionId, long memberId) {
+        operationalMemberPolicy.requireRealMember(memberId);
         lockSession(sessionId);
         if (jdbc.update("UPDATE booking SET status = status WHERE session_id = ? AND member_id = ? AND status = 'CONFIRMED'", sessionId, memberId) == 0)
             throw new BusinessRuleException("Member does not have a confirmed booking for this session");
     }
     private void lockBooking(long bookingId) {
+        operationalMemberPolicy.requireRealBooking(bookingId);
         var sessions = jdbc.query("SELECT session_id FROM booking WHERE id = ?", (rs, row) -> rs.getLong("session_id"), bookingId);
         if (sessions.isEmpty()) throw new ResourceNotFoundException("Booking not found");
         lockSession(sessions.getFirst());
@@ -319,7 +357,9 @@ public class TrainingWriteService {
     }
     private SessionSummary mapSession(ResultSet rs, int row) throws SQLException {
         LocalDate date = rs.getDate("session_date").toLocalDate();
-        return new SessionSummary(rs.getLong("id"), rs.getObject("class_id", Long.class), rs.getString("class_name"), rs.getLong("sport_id"), date, rs.getTime("start_time").toLocalTime(), rs.getTime("end_time").toLocalTime(), rs.getString("training_type"), date.equals(LocalDate.now(clock)));
+        return new SessionSummary(rs.getLong("id"), rs.getObject("class_id", Long.class), rs.getString("class_name"), rs.getLong("sport_id"), date, rs.getTime("start_time").toLocalTime(), rs.getTime("end_time").toLocalTime(), rs.getString("training_type"), date.equals(LocalDate.now(clock)),
+            rs.getString("session_code"),rs.getString("sport_name"),rs.getString("coach_name"),rs.getString("facility_name"),rs.getString("status"),rs.getLong("booked_count"),rs.getLong("marked_count"),
+            date.isAfter(LocalDate.now(clock)) ? "UPCOMING" : date.isBefore(LocalDate.now(clock)) ? "CLOSED" : "OPEN");
     }
     private record AttendanceBooking(long sessionId, long memberId, String status, String trainingType) {}
     private record ExistingAttendance(long id, String status) {}
