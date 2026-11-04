@@ -77,6 +77,7 @@ class TrainingWorkflowIntegrationTest {
     @Autowired ClassLearningService learning;
     @Autowired TrainingGuidanceService guidance;
     @Autowired CenterConsultationService consultation;
+    @Autowired com.sportify.payment.service.OperationsReportService operationsReports;
     @Autowired BookingService bookings;
     @Autowired UserRepository users;
     @Autowired PlatformTransactionManager transactions;
@@ -190,6 +191,32 @@ class TrainingWorkflowIntegrationTest {
         assertThat(writer.learnerProfile(otherCoach,classId,member).memberId()).isEqualTo(member);
         jdbc.update("UPDATE user_account SET status='INACTIVE' WHERE id=?",otherCoach);
         assertThatThrownBy(()->writer.learnerProfile(otherCoach,classId,member)).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test void RELEASE09_managerPeriodCountsUseHalfOpenBoundsAndDoNotDuplicateRescheduledBookings() throws Exception {
+        var from=LocalDate.of(2026,11,2); long manager=account("MANAGER");
+        jdbc.update("UPDATE user_account SET created_at=? WHERE id=?",from.atStartOfDay(),member);
+        jdbc.update("UPDATE user_account SET created_at=? WHERE id=?",from.plusDays(1).atStartOfDay(),peer);
+        jdbc.update("UPDATE booking SET booked_at=? WHERE id=?",from.atStartOfDay(),booking);
+        jdbc.update("INSERT booking(booking_code,session_id,member_id,status,booked_at) VALUES (?,?,?,'CANCELLED',?)",code(),session,member,from.atTime(23,59,59));
+        jdbc.update("INSERT booking(booking_code,session_id,member_id,status,booked_at) VALUES (?,?,?,'CANCELLED',?)",code(),session,peer,from.plusDays(1).atStartOfDay());
+        var report=operationsReports.report(from,from);
+        assertThat(report.registeredMembers()).isEqualTo(1); assertThat(report.currentlyEnabledMembersRegistered()).isEqualTo(1);
+        assertThat(report.classBookings().total()).isEqualTo(2); assertThat(report.classBookings().confirmed()).isEqualTo(1);
+        assertThat(report.classBookings().cancelled()).isEqualTo(1);
+        String moved=com.sportify.support.SessionIdentityFixtures.reserve(jdbc,from.plusDays(2),sport);
+        jdbc.update("UPDATE class_session SET session_date=?,session_code=? WHERE id=?",from.plusDays(2),moved,session);
+        assertThat(operationsReports.report(from,from).classBookings().total()).isEqualTo(2);
+        String path="/api/v1/manager/reports/operations?from="+from+"&to="+from;
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(manager)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.classBookings.total").value(2));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(reception)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        assertThatThrownBy(()->operationsReports.report(from.plusDays(1),from)).isInstanceOf(BusinessRuleException.class);
+        assertThatThrownBy(()->operationsReports.report(from,from.plusDays(366))).isInstanceOf(BusinessRuleException.class);
     }
 
     @Test void HOT00_realCoachToMemberAndReceptionToMemberContracts() throws Exception {
