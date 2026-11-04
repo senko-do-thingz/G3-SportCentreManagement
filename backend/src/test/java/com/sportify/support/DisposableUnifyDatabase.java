@@ -32,7 +32,8 @@ public record DisposableUnifyDatabase(String name, String url, String user, Stri
         String prefix = "jdbc:sqlserver://127.0.0.1:" + port + ";databaseName=";
         String suffix = ";encrypt=false;trustServerCertificate=true";
         var admin = new JdbcTemplate(new DriverManagerDataSource(prefix + "master" + suffix, user, password));
-        admin.execute("CREATE DATABASE [" + name + "]");
+        // Match the declared canonical fingerprint on Windows and container SQL instances.
+        admin.execute("CREATE DATABASE [" + name + "] COLLATE Latin1_General_CI_AS");
         var source = new DriverManagerDataSource(prefix + name + suffix, user, password);
         if (new JdbcTemplate(source).queryForObject("SELECT COUNT(*) FROM sys.tables", Integer.class) != 0)
             throw new IllegalStateException("Disposable database must be empty");

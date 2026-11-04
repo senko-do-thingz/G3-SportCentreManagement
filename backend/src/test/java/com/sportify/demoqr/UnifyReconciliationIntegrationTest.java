@@ -28,11 +28,15 @@ class UnifyReconciliationIntegrationTest {
         var db = DisposableUnifyDatabase.create(); var migration = flyway(db, null);
         migration.migrate(); migration.validate();
         String hash = UnifyPreflight.schemaFingerprint(db.source());
+        var independent = DisposableUnifyDatabase.create(); flyway(independent, null).migrate();
+        assertThat(UnifyPreflight.schemaFingerprint(independent.source())).isEqualTo(hash);
+        assertThat(hash).isEqualTo(Files.readString(Path.of("../docs/db-unify/schema-fingerprint.txt")).trim());
         var before = UnifyPreflight.inspect(db.source(), false, hash);
         assertThat(UnifyPreflight.inspect(db.source(), false, hash)).isEqualTo(before);
         assertThat(before.proposedImports()).isZero();
         assertThat(before.getDataUnification()).isEqualTo("INCOMPLETE_LEGACY_HISTORY_DECISION_PENDING");
         assertThat(before.getProtectedSourceCoverage()).isEqualTo("UNKNOWN_NOT_AUTHORIZED_BY_THIS_REPORT");
+        assertThat(before.getSchemaFingerprintFormat()).isEqualTo("DB_UNIFY_SCHEMA_V2");
         assertThat(before.liveCutover()).isEqualTo("BLOCKED_FOR_CODEOWNER");
         assertThat(migration.migrate().migrationsExecuted).isZero();
         Path evidence = Path.of("target/db-unify"); Files.createDirectories(evidence);
@@ -40,6 +44,18 @@ class UnifyReconciliationIntegrationTest {
         Files.writeString(evidence.resolve("fresh-preflight.json"), new com.fasterxml.jackson.databind.ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(before));
         db.jdbc().execute("CREATE TABLE dbo.unapproved_drift(id int NOT NULL)");
         assertThatThrownBy(() -> UnifyPreflight.inspect(db.source(), false, hash)).hasMessage("SCHEMA_FINGERPRINT_MISMATCH");
+        independent.jdbc().execute("CREATE TABLE dbo.unapproved_drift(id int NOT NULL)");
+        for (var fixture : new DisposableUnifyDatabase[]{db, independent}) {
+            fixture.jdbc().execute("CREATE TABLE dbo.unify_fingerprint_left(id int NULL)");
+            fixture.jdbc().execute("CREATE TABLE dbo.unify_fingerprint_right(id int NULL)");
+        }
+        assertThat(UnifyPreflight.schemaFingerprint(db.source())).isEqualTo(UnifyPreflight.schemaFingerprint(independent.source()));
+        db.jdbc().execute("ALTER TABLE dbo.unify_fingerprint_left ADD extra int NULL");
+        independent.jdbc().execute("ALTER TABLE dbo.unify_fingerprint_right ADD extra int NULL");
+        // Duplicate JDBC column labels must never erase which table owns a column.
+        assertThat(UnifyPreflight.schemaFingerprint(db.source())).isNotEqualTo(UnifyPreflight.schemaFingerprint(independent.source()));
+        independent.jdbc().execute("CREATE INDEX ix_unify_fingerprint_probe ON dbo.user_account(full_name DESC)");
+        assertThatThrownBy(() -> UnifyPreflight.inspect(independent.source(), false, hash)).hasMessage("SCHEMA_FINGERPRINT_MISMATCH");
     }
 
     @Test void preV39UpgradePreservesNumericKeysReferencesAndInstalledChecksums() throws Exception {

@@ -26,6 +26,20 @@ The proposed architecture moves zero legacy records. Canonical business data is 
 
 The schema fingerprint covers columns, FK topology, checks/defaults, indexes, triggers and views. Differences require investigation, never automatic repair. The optional demo history is accepted only on timestamped disposable fixtures. Canonical preflight rejects installed V28/V29 missing from its catalog as well as V38; do not broaden runtime Flyway locations to force compatibility.
 
+Round 02 corrects fingerprint reproducibility: SQL Server-generated PK/UQ names
+are represented by constraint type and their complete ordered column signature.
+Explicit names, index type, uniqueness, disabled state, key/include columns,
+directions and filters remain checked. Module CRLF/LF checkout differences are
+normalized. Two independently migrated fresh canonical databases must match the
+committed fingerprint; a new named index or table must still fail preflight.
+Compare hashes only with their generating source SHA. Updating this repository
+fingerprint from fresh fixtures does not change any database or Flyway history.
+Format `DB_UNIFY_SCHEMA_V2` includes database/column collation and column position,
+sorts normalized metadata independently of server catalog ordering, and uses
+`Latin1_General_CI_AS` on newly created disposable canonical reference databases.
+A protected target's collation remains UNKNOWN until authorized inspection. A
+different target collation is a review blocker; never alter it merely to pass.
+
 Example on a newly created fixture after explicit credential setup:
 
 ```powershell

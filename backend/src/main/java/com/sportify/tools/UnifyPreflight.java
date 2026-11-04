@@ -23,6 +23,7 @@ public final class UnifyPreflight {
                            long proposedImports, String liveCutover) {
         public String getDataUnification() { return "INCOMPLETE_LEGACY_HISTORY_DECISION_PENDING"; }
         public String getProtectedSourceCoverage() { return "UNKNOWN_NOT_AUTHORIZED_BY_THIS_REPORT"; }
+        public String getSchemaFingerprintFormat() { return "DB_UNIFY_SCHEMA_V2"; }
     }
 
     public static Snapshot inspect(DataSource source, boolean disposableDemo, String expectedSchema) throws Exception {
@@ -77,16 +78,43 @@ public final class UnifyPreflight {
         var jdbc = new JdbcTemplate(source);
         jdbc.setQueryTimeout(30);
         List<String> queries = List.of(
-                "SELECT t.name,c.name,TYPE_NAME(c.user_type_id) typ,c.max_length,c.precision,c.scale,c.collation_name,c.is_nullable,c.is_identity,c.is_computed FROM sys.tables t JOIN sys.columns c ON c.object_id=t.object_id WHERE t.is_ms_shipped=0 ORDER BY t.name,c.column_id",
+                "SELECT t.name table_name,c.column_id,c.name column_name,TYPE_NAME(c.user_type_id) typ,c.max_length,c.precision,c.scale,c.collation_name,c.is_nullable,c.is_identity,c.is_computed FROM sys.tables t JOIN sys.columns c ON c.object_id=t.object_id WHERE t.is_ms_shipped=0 ORDER BY t.name,c.column_id",
                 "SELECT OBJECT_NAME(f.parent_object_id) parent_table,COL_NAME(f.parent_object_id,f.parent_column_id) parent_column,OBJECT_NAME(f.referenced_object_id) referenced_table,COL_NAME(f.referenced_object_id,f.referenced_column_id) referenced_column FROM sys.foreign_key_columns f ORDER BY parent_table,parent_column,referenced_table,referenced_column",
                 "SELECT OBJECT_NAME(parent_object_id) parent_table,definition FROM sys.check_constraints ORDER BY parent_table,definition",
                 "SELECT OBJECT_NAME(parent_object_id) parent_table,COL_NAME(parent_object_id,parent_column_id) col,definition FROM sys.default_constraints ORDER BY parent_table,col",
-                "SELECT OBJECT_NAME(i.object_id) parent_table,i.name,i.is_unique,i.filter_definition,c.key_ordinal,c.is_included_column,COL_NAME(c.object_id,c.column_id) col FROM sys.indexes i JOIN sys.index_columns c ON c.object_id=i.object_id AND c.index_id=i.index_id JOIN sys.tables t ON t.object_id=i.object_id WHERE t.is_ms_shipped=0 AND i.is_hypothetical=0 ORDER BY parent_table,i.name,c.index_column_id",
+                """
+                SELECT OBJECT_NAME(i.object_id) parent_table,
+                  CASE WHEN k.is_system_named=1 THEN CONCAT('SYSTEM_',k.type,':',shape.signature)
+                       ELSE i.name END COLLATE Latin1_General_100_BIN2 AS index_name,
+                  i.type_desc,i.is_unique,i.is_primary_key,i.is_unique_constraint,i.is_disabled,
+                  i.filter_definition,c.key_ordinal,c.is_included_column,c.is_descending_key,
+                  COL_NAME(c.object_id,c.column_id) col
+                FROM sys.indexes i JOIN sys.index_columns c ON c.object_id=i.object_id AND c.index_id=i.index_id
+                JOIN sys.tables t ON t.object_id=i.object_id
+                LEFT JOIN sys.key_constraints k ON k.parent_object_id=i.object_id AND k.unique_index_id=i.index_id
+                OUTER APPLY (SELECT (SELECT COL_NAME(ic.object_id,ic.column_id) col,
+                    ic.key_ordinal,ic.is_included_column,ic.is_descending_key
+                    FROM sys.index_columns ic WHERE ic.object_id=i.object_id AND ic.index_id=i.index_id
+                    ORDER BY ic.index_column_id FOR JSON PATH) AS signature) shape
+                WHERE t.is_ms_shipped=0 AND i.is_hypothetical=0
+                ORDER BY parent_table,index_name,c.index_column_id
+                """,
                 "SELECT t.name,t.is_disabled,m.definition FROM sys.triggers t JOIN sys.sql_modules m ON m.object_id=t.object_id WHERE t.is_ms_shipped=0 ORDER BY t.name",
                 "SELECT v.name,m.definition FROM sys.views v JOIN sys.sql_modules m ON m.object_id=v.object_id WHERE v.is_ms_shipped=0 ORDER BY v.name");
         var digest = MessageDigest.getInstance("SHA-256");
+        digest.update("DB_UNIFY_SCHEMA_V2\n".getBytes(StandardCharsets.US_ASCII));
+        digest.update(jdbc.queryForObject("SELECT CONVERT(varchar(128),DATABASEPROPERTYEX(DB_NAME(),'Collation'))",
+                String.class).getBytes(StandardCharsets.UTF_8));
+        var mapper = new ObjectMapper();
         for (String sql : queries) {
-            String data = new ObjectMapper().writeValueAsString(jdbc.queryForList(sql));
+            var rows = jdbc.queryForList(sql);
+            // SQL module text retains checkout line endings; this is not a schema difference.
+            rows.forEach(row -> row.replaceAll((key, value) -> key.equalsIgnoreCase("definition")
+                    && value instanceof String definition ? definition.replace("\r\n", "\n") : value));
+            var canonicalRows = new java.util.ArrayList<String>();
+            for (var row : rows) canonicalRows.add(mapper.writeValueAsString(row));
+            java.util.Collections.sort(canonicalRows);
+            String data = mapper.writeValueAsString(canonicalRows);
             digest.update(data.getBytes(StandardCharsets.UTF_8));
         }
         return HexFormat.of().formatHex(digest.digest());
