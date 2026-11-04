@@ -67,7 +67,7 @@ export function RegisterRenewPage() {
   }
 
   return (
-    <div className="page">
+    <div className="page reception-page">
       <PageHeader
         eyebrow="Front desk"
         title="Register and Renew"
