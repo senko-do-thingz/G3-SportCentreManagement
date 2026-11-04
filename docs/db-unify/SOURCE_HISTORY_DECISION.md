@@ -1,8 +1,9 @@
 # Historical data coverage and CODEOWNER decision
 
-Round 03: see [archive contract, policy impact and scoped follow-up](ROUND03_ARCHIVE_AND_POLICY.md)
-and [machine-readable gates](status.json). Unified SUCCESS replay requires an ACTIVE
-card or an ACTIVE package with activation evidence. The executable archive contract
+Round 04: see [historical replay compatibility and archive mapping v0.1](ROUND04_REPLAY_AND_ARCHIVE_DESIGN.md)
+and [machine-readable gates](status.json). Unified SUCCESS replay returns the
+persisted settlement after verified expiry or replacement without reactivation.
+The executable archive contract
 uses fictional disposable schemas only; production migration, historical API and
 real-source reconciliation remain unimplemented. Historical data unification is
 INCOMPLETE and account-wide quarantine acceptance remains PENDING CODEOWNER.
