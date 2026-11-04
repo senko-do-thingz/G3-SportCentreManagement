@@ -10,6 +10,8 @@ on:
       - backend/src/main/resources/db/migration/catalog/V35__create_simulated_qr_settlement.sql
       - frontend/scripts/qr04-*.py
       - frontend/scripts/qr-local-demo-check.py
+      - frontend/scripts/db-unify-check.py
+      - frontend/scripts/flow4plus_demo_workflow.py
       - frontend/src/api/demoQrApi.ts
       - frontend/src/api/localDemoPaymentApi.ts
       - backend/src/test/java/com/sportify/demoqr/**
