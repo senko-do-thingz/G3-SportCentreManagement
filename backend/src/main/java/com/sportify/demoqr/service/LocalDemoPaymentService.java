@@ -102,10 +102,8 @@ public class LocalDemoPaymentService {
                 if ("SIMULATED".equals(payment.getSettlementType())
                         && "SPORTIFY_SIMULATOR".equals(payment.getSettlementProvider())) {
                     List<Invoice> invoices = invoiceRepository.findByPaymentId(paymentId);
-                    if (unified && (payment.getSimulatedTransactionId() == null || invoices.size() != 1
-                            || invoices.get(0).getId() == null || invoices.get(0).getInvoiceNumber() == null
-                            || invoices.get(0).getInvoiceNumber().isBlank())) {
-                        throw DemoQrException.unavailable();
+                    if (unified) {
+                        sqlQrStore.requireUnifiedReplay(paymentId, actor.getId());
                     }
                     Invoice invoice = invoices.isEmpty() ? null : invoices.get(0);
                     Long invoiceId = invoice != null ? invoice.getId() : null;

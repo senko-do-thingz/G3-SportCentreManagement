@@ -31,6 +31,8 @@ class UnifyReconciliationIntegrationTest {
         var before = UnifyPreflight.inspect(db.source(), false, hash);
         assertThat(UnifyPreflight.inspect(db.source(), false, hash)).isEqualTo(before);
         assertThat(before.proposedImports()).isZero();
+        assertThat(before.getDataUnification()).isEqualTo("INCOMPLETE_LEGACY_HISTORY_DECISION_PENDING");
+        assertThat(before.getProtectedSourceCoverage()).isEqualTo("UNKNOWN_NOT_AUTHORIZED_BY_THIS_REPORT");
         assertThat(before.liveCutover()).isEqualTo("BLOCKED_FOR_CODEOWNER");
         assertThat(migration.migrate().migrationsExecuted).isZero();
         Path evidence = Path.of("target/db-unify"); Files.createDirectories(evidence);
@@ -52,6 +54,8 @@ class UnifyReconciliationIntegrationTest {
         jdbc.update("INSERT session_result(session_id,member_id,notes) VALUES (?,?,'Preserved fixture')", id, member);
         var history = jdbc.queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank");
         flyway(db, "39").migrate(); var latest = flyway(db, null); latest.migrate(); latest.validate();
+        assertThatThrownBy(() -> UnifyPreflight.inspect(db.source(), false, UnifyPreflight.schemaFingerprint(db.source())))
+                .hasMessage("SYNTHETIC_BOOKING_REQUIRES_OWNER_DISPOSITION");
         assertThat(jdbc.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE TRY_CONVERT(int,version)<=37 ORDER BY installed_rank")).isEqualTo(history);
         assertThat(jdbc.queryForObject("SELECT session_code FROM class_session WHERE id=?", String.class, id)).isEqualTo("031126FB01");
         for (String table : new String[]{"booking", "attendance_record", "session_result"})

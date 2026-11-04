@@ -29,6 +29,7 @@ public class AttendanceBackfillService {
     private final Clock clock;
     private final AttendanceBackfillPolicy policy;
     private final ObjectMapper mapper;
+    private final OperationalMemberPolicy operationalMemberPolicy;
 
     public record Candidate(long bookingId, long sessionId, String memberName, String className,
                             LocalDate date, LocalTime startTime, LocalTime endTime,
@@ -91,6 +92,7 @@ public class AttendanceBackfillService {
         if (bookings.isEmpty() || bookings.getFirst().sessionId() != ids.getFirst())
             throw new ConflictException("Booking changed; reload and retry");
         var booking = bookings.getFirst();
+        operationalMemberPolicy.requireRealBooking(request.bookingId());
         var session = sessions.getFirst();
         if (!booking.status().equals("CONFIRMED")
             || (!session.status().equals("PUBLISHED") && !session.status().equals("COMPLETED"))

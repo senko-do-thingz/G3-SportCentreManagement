@@ -4,6 +4,8 @@ import com.sportify.support.DisposableUnifyDatabase;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
@@ -33,12 +35,14 @@ class UnifiedDemoDatabaseIntegrationTest extends LocalDemoWorkflow {
                 .cleanDisabled(true).load().migrate();
         // These are new, owned fixtures, never an existing user's identities.
         jdbc.update("UPDATE user_account SET email=REPLACE(email,'@example.com','@unified-demo.invalid') WHERE email IN ('an.gold@example.com','mai.standard@example.com')");
-        for (String local : new String[]{"rollback", "unsupported", "ordinary"}) {
+        for (String local : new String[]{"rollback", "unsupported", "ordinary", "ops", "fault0", "fault1", "fault2", "fault3", "fault4", "fault5", "fault6", "fault7", "fault8"}) {
             jdbc.update("INSERT user_account(email,password_hash,full_name,role_id,status) SELECT ?,password_hash,'Synthetic unify fixture',role_id,'ACTIVE' FROM user_account WHERE email='an.gold@unified-demo.invalid'", local + "@unified-demo.invalid");
             jdbc.update("INSERT member_profile(user_id,member_code) SELECT id,? FROM user_account WHERE email=?", "UNIFY-" + local, local + "@unified-demo.invalid");
         }
         String ids = String.join(",", jdbc.queryForList("SELECT CONVERT(varchar(20),id) FROM user_account WHERE email LIKE '%@unified-demo.invalid' ORDER BY id", String.class));
         jdbc.update("UPDATE user_account SET email='ordinary@example.test' WHERE email='ordinary@unified-demo.invalid'");
+        jdbc.update("INSERT user_account(email,password_hash,full_name,role_id,status) SELECT 'live@example.test',password_hash,'Real paid fixture',role_id,'ACTIVE' FROM user_account WHERE email='an.gold@unified-demo.invalid'");
+        jdbc.update("INSERT member_profile(user_id,member_code) SELECT id,'UNIFY-LIVE' FROM user_account WHERE email='live@example.test'");
         registry.add("spring.datasource.url", fixture::url);
         registry.add("spring.datasource.username", fixture::user);
         registry.add("spring.datasource.password", fixture::password);
@@ -104,5 +108,142 @@ class UnifiedDemoDatabaseIntegrationTest extends LocalDemoWorkflow {
         for (String table : new String[]{"simulated_payment_transaction", "invoice"})
             assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table + " WHERE payment_id=?", Integer.class, payment)).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM activity_log WHERE action='PAYMENT_CONFIRMED' AND entity_id=?", Integer.class, payment)).isEqualTo(1);
+    }
+
+    private ResponseEntity<String> write(String path, HttpMethod method, Object body, String token) {
+        return restTemplate.exchange(path, method, new HttpEntity<>(body, authHeaders(token)), String.class);
+    }
+
+    private com.sportify.catalog.dto.PackageRegistrationResponse purchase(String token) {
+        var response = restTemplate.exchange("/api/v1/packages/registrations", HttpMethod.POST,
+                new HttpEntity<>(Map.of("packageId", jdbcTemplate.queryForObject("SELECT MIN(p.id) FROM sport_package p JOIN sport s ON s.id=p.sport_id WHERE s.code='BADMINTON' AND p.training_format='COACH_LED' AND p.duration_days>=14 AND p.price_amount>0",Long.class), "paymentMethod", "BANK_TRANSFER"), authHeaders(token)),
+                com.sportify.catalog.dto.PackageRegistrationResponse.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        return response.getBody();
+    }
+
+    private Map<String,Object> operationalSnapshot(long session, long realRegistration) {
+        return jdbcTemplate.queryForMap("""
+                SELECT s.booked_count, r.remaining_sessions,
+                  (SELECT COUNT(*) FROM booking WHERE session_id=s.id) bookings,
+                  (SELECT COUNT(*) FROM check_in) checkins,
+                  (SELECT COUNT(*) FROM attendance_record) attendance,
+                  (SELECT COUNT(*) FROM session_result) results,
+                  (SELECT CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM booking WHERE session_id=s.id) roster_checksum,
+                  (SELECT CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM check_in) checkin_checksum,
+                  (SELECT CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM attendance_record) attendance_checksum,
+                  (SELECT CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM session_result) result_checksum,
+                  (SELECT CHECKSUM_AGG(BINARY_CHECKSUM(*)) FROM sport_package_registration WHERE id=r.id) real_entitlement_checksum,
+                  (SELECT COUNT(*) FROM cash_event) cash,
+                  (SELECT SUM(amount) FROM payment WHERE payment_status='SUCCESS'
+                    AND ISNULL(settlement_type,'ACTUAL')<>'SIMULATED') actual_paid
+                FROM class_session s CROSS JOIN sport_package_registration r WHERE s.id=? AND r.id=?
+                """, session, realRegistration);
+    }
+
+    @Test void syntheticSettlementCannotConsumeRealCapacityOrWriteOperationalRecords() throws Exception {
+        String synthetic = login("ops@unified-demo.invalid"), real = login("live@example.test");
+        String reception = login("lan.reception@example.com"), coach = login("quan.coach@example.com");
+        var simulated = purchase(synthetic); var actual = purchase(real);
+        long owner = jdbcTemplate.queryForObject("SELECT id FROM user_account WHERE email='ops@unified-demo.invalid'", Long.class);
+        var amount = jdbcTemplate.queryForObject("SELECT amount FROM payment WHERE id=?", java.math.BigDecimal.class, actual.getPaymentId());
+        assertThat(write("/api/v1/payments/" + actual.getPaymentId() + "/confirm", HttpMethod.PUT,
+                Map.of("method", "BANK_TRANSFER", "referenceCode", "UNIFY-REAL-PAID", "amountReceived", amount), reception).getStatusCode()).isEqualTo(HttpStatus.OK);
+        // A normal operational class with one seat, a real receipt and paid entitlement in the same database.
+        jdbcTemplate.update("INSERT facility(code,name,sport_id,facility_type,is_active) SELECT 'UNIFY-OPS','Operational fixture court',sport_id,'COURT',1 FROM sport_package WHERE id=(SELECT package_id FROM sport_package_registration WHERE id=?)", actual.getId());
+        jdbcTemplate.update("""
+                INSERT class_session(class_id,sport_id,session_date,start_time,end_time,facility_id,coach_id,training_type,capacity,booked_count,status)
+                SELECT TOP 1 s.class_id,s.sport_id,DATEADD(day,7,CAST(GETDATE() AS date)),'04:00','05:00',
+                  (SELECT id FROM facility WHERE code='UNIFY-OPS'),s.coach_id,s.training_type,1,0,'PUBLISHED'
+                FROM class_session s JOIN sport_package p ON p.sport_id=s.sport_id AND p.training_format=s.training_type
+                WHERE p.id=(SELECT package_id FROM sport_package_registration WHERE id=?) AND s.coach_id=(SELECT id FROM user_account WHERE email='quan.coach@example.com') ORDER BY s.id
+                """, actual.getId());
+        long session = jdbcTemplate.queryForObject("SELECT id FROM class_session WHERE facility_id=(SELECT id FROM facility WHERE code='UNIFY-OPS')", Long.class);
+        var baseline = operationalSnapshot(session, actual.getId());
+        assertThat(confirm(simulated.getPaymentId(), "ops@unified-demo.invalid").getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<String,Object> syntheticBooking = Map.of("sessionId",session,"packageRegistrationId",simulated.getId());
+        for (var attempt : new Object[][]{{syntheticBooking,synthetic},
+                {Map.of("sessionId",session,"packageRegistrationId",simulated.getId(),"memberId",owner),reception}}) {
+            var denied = write("/api/v1/bookings", HttpMethod.POST, attempt[0], (String)attempt[1]);
+            assertThat(denied.getBody()).contains("SYNTHETIC_OPERATION_DENIED");
+            assertThat(denied.getStatusCode().is4xxClientError()).isTrue();
+        }
+        assertThat(write("/api/v1/check-ins",HttpMethod.POST,Map.of("identifier",Long.toString(owner)),reception).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
+        assertThat(operationalSnapshot(session, actual.getId())).isEqualTo(baseline);
+        // A historical contaminated booking is not authority for attendance or result creation.
+        jdbcTemplate.update("INSERT booking(booking_code,session_id,member_id,package_registration_id,status) VALUES ('UNIFY-HISTORIC',?,?,?,'CONFIRMED')",session,owner,simulated.getId());
+        long historic = jdbcTemplate.queryForObject("SELECT id FROM booking WHERE booking_code='UNIFY-HISTORIC'",Long.class);
+        var historicalBaseline = operationalSnapshot(session,actual.getId());
+        for(String path : new String[]{"/api/v1/reception/training/attendance","/api/v1/coach/training/attendance"})
+            assertThat(write(path,HttpMethod.POST,Map.of("bookingId",historic,"status","PRESENT"),path.contains("coach")?coach:reception).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
+        assertThat(write("/api/v1/bookings/self-training/attendance",HttpMethod.POST,Map.of("bookingId",historic),reception).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
+        assertThat(write("/api/v1/coach/training/results",HttpMethod.POST,Map.of("sessionId",session,"memberId",owner,"notes","Historical bypass attempt","scores",java.util.List.of()),coach).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
+        assertThat(operationalSnapshot(session,actual.getId())).isEqualTo(historicalBaseline);
+        long classId=jdbcTemplate.queryForObject("SELECT class_id FROM class_session WHERE id=?",Long.class,session);
+        assertThat(write("/api/v1/coach/training/plans",HttpMethod.POST,
+                Map.of("classId",classId,"memberId",owner,"bookingId",historic,"title","Synthetic plan attempt",
+                        "steps",java.util.List.of(Map.of("title","Warmup","durationMinutes",5))),coach).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
+        jdbcTemplate.update("INSERT attendance_record(session_id,member_id,booking_id,status,marked_at,marked_by) VALUES (?,?,?,'PRESENT',GETDATE(),(SELECT id FROM user_account WHERE email='lan.reception@example.com'))",session,owner,historic);
+        long attendance=jdbcTemplate.queryForObject("SELECT id FROM attendance_record WHERE booking_id=?",Long.class,historic);
+        for(String role : new String[]{"coach","reception"})
+            assertThat(write("/api/v1/"+role+"/training/attendance/"+attendance,HttpMethod.PUT,
+                    Map.of("status","LATE","reason","Synthetic correction attempt"),role.equals("coach")?coach:reception).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM attendance_correction WHERE attendance_record_id=?",Integer.class,attendance)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM attendance_record WHERE id=?",String.class,attendance)).isEqualTo("PRESENT");
+        // Profile/flag changes and an email rename cannot launder persisted simulator provenance.
+        jdbcTemplate.update("UPDATE user_account SET email='renamed-ops@example.test' WHERE id=?",owner);
+        var disabledPolicy = new com.sportify.catalog.service.OperationalMemberPolicy(jdbcTemplate,
+                new org.springframework.mock.env.MockEnvironment().withProperty("app.payment.unified-demo.enabled","false"));
+        assertThatThrownBy(() -> disabledPolicy.requireRealMember(owner)).hasMessageContaining("Synthetic");
+        long realOwner = jdbcTemplate.queryForObject("SELECT id FROM user_account WHERE email='live@example.test'",Long.class);
+        disabledPolicy.requireRealMember(realOwner);
+        // Cancel the retained historical booking via the official flow; this releases its seat.
+        jdbcTemplate.update("UPDATE class_session SET booked_count=1 WHERE id=?",session);
+        assertThat(write("/api/v1/bookings/"+historic,HttpMethod.DELETE,null,reception).getStatusCode()).isEqualTo(HttpStatus.OK);
+        var booked = write("/api/v1/bookings",HttpMethod.POST,Map.of("sessionId",session,"packageRegistrationId",actual.getId()),real);
+        assertThat(booked.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        long booking = new com.fasterxml.jackson.databind.ObjectMapper().readTree(booked.getBody()).get("id").asLong();
+        assertThat(jdbcTemplate.queryForObject("SELECT booked_count FROM class_session WHERE id=?",Integer.class,session)).isEqualTo(1);
+        assertThat(write("/api/v1/bookings/"+booking,HttpMethod.DELETE,null,real).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(jdbcTemplate.queryForObject("SELECT remaining_sessions FROM sport_package_registration WHERE id=?",Integer.class,actual.getId())).isEqualTo(baseline.get("remaining_sessions"));
+    }
+
+    @ParameterizedTest @ValueSource(ints={0,1,2,3,4,5,6,7})
+    void malformedHistoricalReplayFailsWithoutRepair(int fault) {
+        String email="fault"+fault+"@unified-demo.invalid";
+        long payment=pending(email,fault==0?"CASH":"BANK_TRANSFER");
+        var store=context.getBean(com.sportify.demoqr.service.SqlQrStore.class);
+        store.transaction(() -> {
+            var actor=context.getBean(com.sportify.identity.repository.UserRepository.class).findByEmailIgnoreCase(email).orElseThrow();
+            var id=store.insert(payment,actor.getId(),new java.math.BigDecimal("100"),com.sportify.demoqr.service.DemoQrService.Bank.VIETCOMBANK_DEMO,
+                    java.util.UUID.randomUUID().toString().replace("-","")+java.util.UUID.randomUUID().toString().replace("-",""),java.util.UUID.randomUUID(),300);
+            var session=store.findId(id,actor.getId());
+            // Invalid legacy transaction fixtures are inserted once, never edited around the immutable ledger trigger.
+            jdbcTemplate.update("""
+                    INSERT simulated_payment_transaction(transaction_code,payment_id,session_id,member_id,amount,currency,bank_code,settlement_type,provider,status,settled_at_utc)
+                    VALUES (?,?,?, ?,?,'VND','VIETCOMBANK_DEMO','SIMULATED','SPORTIFY_SIMULATOR',?,SYSUTCDATETIME())
+                    ""","SIM-HIST-"+payment,payment,id.toString(),fault==2?jdbcTemplate.queryForObject("SELECT id FROM user_account WHERE email='mai.standard@unified-demo.invalid'",Long.class):actor.getId(),fault==3?99:100,fault==4?"FAILED":"SUCCEEDED");
+            long tx=jdbcTemplate.queryForObject("SELECT id FROM simulated_payment_transaction WHERE payment_id=?",Long.class,payment);
+            context.getBean(com.sportify.demoqr.service.DemoPaymentReader.class).settle(payment,actor,"VIETCOMBANK_DEMO",tx,"SIM-HIST-"+payment);
+            if(fault!=2 && fault!=3 && fault!=4) store.settle(session);
+            if(fault==1) jdbcTemplate.update("UPDATE payment SET reference_code='MISSING-TRANSACTION-REFERENCE' WHERE id=?",payment);
+            if(fault==5) jdbcTemplate.update("DELETE activity_log WHERE action='PAYMENT_CONFIRMED' AND entity_id=?",payment);
+            if(fault==6) jdbcTemplate.update("UPDATE activity_log SET details=JSON_MODIFY(details,'$.simulatedTransactionId',-1) WHERE action='PAYMENT_CONFIRMED' AND entity_id=?",payment);
+            if(fault==7) jdbcTemplate.update("UPDATE invoice SET total_amount=99 WHERE payment_id=?",payment);
+            return null;
+        });
+        var before=jdbcTemplate.queryForMap("SELECT p.*,i.invoice_number,i.total_amount FROM payment p JOIN invoice i ON i.payment_id=p.id WHERE p.id=?",payment);
+        int audit=jdbcTemplate.queryForObject("SELECT COUNT(*) FROM activity_log WHERE entity_type='PAYMENT' AND entity_id=?",Integer.class,payment);
+        assertThat(confirm(payment,email).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(jdbcTemplate.queryForMap("SELECT p.*,i.invoice_number,i.total_amount FROM payment p JOIN invoice i ON i.payment_id=p.id WHERE p.id=?",payment)).isEqualTo(before);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM activity_log WHERE entity_type='PAYMENT' AND entity_id=?",Integer.class,payment)).isEqualTo(audit);
+    }
+
+    @Test void missingTransactionIsRejectedByUnchangedDatabaseConstraints() {
+        long payment=pending("fault8@unified-demo.invalid","BANK_TRANSFER");
+        assertThat(confirm(payment,"fault8@unified-demo.invalid").getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThatThrownBy(() -> jdbcTemplate.update("UPDATE payment SET simulated_transaction_id=NULL WHERE id=?",payment))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThat(confirm(payment,"fault8@unified-demo.invalid").getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 }

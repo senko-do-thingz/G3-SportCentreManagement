@@ -31,6 +31,7 @@ public class ClassLearningService {
     private final Clock clock;
     private final AuditService audit;
     private final jakarta.persistence.EntityManager entityManager;
+    private final OperationalMemberPolicy operationalMemberPolicy;
     private static final String CLASSES = "SELECT c.id,c.name,sp.name sport_name,u.full_name coach_name,c.level,c.max_members,c.is_active FROM sport_class c JOIN sport sp ON sp.id=c.sport_id LEFT JOIN user_account u ON u.id=c.coach_id ";
     private static final String QUESTIONS = "SELECT q.id,c.id class_id,c.name class_name,u.full_name member_name,q.subject,q.description,q.status,q.created_at FROM support_request q JOIN sport_class c ON q.category=CONCAT('TRAINING_CLASS_',c.id) JOIN user_account u ON u.id=q.member_id ";
     public List<LearningClass> memberClasses(long memberId) {
@@ -70,6 +71,7 @@ public class ClassLearningService {
     }
     @Transactional
     public long ask(long memberId,long classId,String subject,String body,UUID operationId) {
+        operationalMemberPolicy.requireRealMember(memberId);
         lockQuestionClass(classId);
         // A question requires an existing confirmed coached booking, never a fabricated enrollment.
         if(jdbc.queryForObject("SELECT COUNT(*) FROM booking b JOIN class_session s ON s.id=b.session_id JOIN sport_class c ON c.id=s.class_id WHERE b.member_id=? AND c.id=? AND b.status='CONFIRMED' AND s.status<>'CANCELLED' AND c.coach_id IS NOT NULL",Integer.class,memberId,classId)==0)
@@ -91,6 +93,8 @@ public class ClassLearningService {
     @Transactional
     public long reply(long actorId,boolean coach,long id,String body,UUID operationId) {
         var current=discussion(actorId,coach,id);
+        jdbc.queryForList("SELECT member_id FROM support_request WHERE id=?",Long.class,id)
+            .forEach(operationalMemberPolicy::requireRealMember);
         lockQuestionClass(current.question().classId());
         // Serialize conversation writes and repeat ownership validation after the lock.
         jdbc.update("UPDATE support_request SET updated_at=updated_at WHERE id=?",id);

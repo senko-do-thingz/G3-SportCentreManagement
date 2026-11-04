@@ -20,7 +20,10 @@ public final class UnifyPreflight {
     public record Snapshot(String database, String sqlVersion, String schemaFingerprint,
                            List<Map<String, Object>> migrations, Map<String, Count> tables,
                            long actualCashEvents, String actualCashAmount, long actualPaidRows,
-                           long proposedImports, String liveCutover) { }
+                           long proposedImports, String liveCutover) {
+        public String getDataUnification() { return "INCOMPLETE_LEGACY_HISTORY_DECISION_PENDING"; }
+        public String getProtectedSourceCoverage() { return "UNKNOWN_NOT_AUTHORIZED_BY_THIS_REPORT"; }
+    }
 
     public static Snapshot inspect(DataSource source, boolean disposableDemo, String expectedSchema) throws Exception {
         var jdbc = new JdbcTemplate(source);
@@ -47,6 +50,14 @@ public final class UnifyPreflight {
         require(zero(jdbc, "SELECT COUNT(*) FROM dbo.payment p LEFT JOIN dbo.simulated_payment_transaction t ON t.id=p.simulated_transaction_id WHERE p.settlement_type='SIMULATED' AND (t.id IS NULL OR t.payment_id<>p.id OR t.member_id<>p.member_id OR t.amount<>p.amount OR t.currency<>'VND' OR t.provider<>'SPORTIFY_SIMULATOR' OR t.status<>'SUCCEEDED')"), "SIMULATED_PROVENANCE_MISMATCH");
         require(zero(jdbc, "SELECT COUNT(*) FROM dbo.payment p WHERE p.payment_status='SUCCESS' AND p.settlement_type='SIMULATED' AND NOT EXISTS(SELECT 1 FROM dbo.member_card c WHERE c.payment_id=p.id) AND NOT EXISTS(SELECT 1 FROM dbo.sport_package_registration r WHERE r.payment_id=p.id)"), "SIMULATED_ENTITLEMENT_MISSING");
         require(zero(jdbc, "SELECT COUNT(*) FROM dbo.cash_event e JOIN dbo.payment p ON p.id=e.payment_id WHERE p.settlement_type='SIMULATED'"), "SIMULATED_CASH_EVENT");
+        require(zero(jdbc, """
+                SELECT COUNT(*) FROM dbo.booking b JOIN dbo.user_account u ON u.id=b.member_id
+                WHERE b.status='CONFIRMED' AND (LOWER(u.email) LIKE '%@unified-demo.invalid'
+                  OR EXISTS (SELECT 1 FROM dbo.payment p WHERE p.member_id=b.member_id AND
+                    (p.settlement_type='SIMULATED' OR p.settlement_provider='SPORTIFY_SIMULATOR'
+                     OR p.simulated_transaction_id IS NOT NULL))
+                  OR EXISTS (SELECT 1 FROM dbo.simulated_payment_transaction t WHERE t.member_id=b.member_id))
+                """), "SYNTHETIC_BOOKING_REQUIRES_OWNER_DISPOSITION");
         require(zero(jdbc, "SELECT COUNT(*) FROM dbo.class_session s LEFT JOIN dbo.session_code_history h ON h.session_code=s.session_code WHERE h.session_id IS NULL OR h.session_id<>s.id OR h.original_session_id<>s.id OR h.retired_at_utc IS NOT NULL"), "SESSION_IDENTITY_MISMATCH");
         Map<String, Count> counts = new LinkedHashMap<>();
         for (String table : jdbc.queryForList("SELECT name FROM sys.tables WHERE schema_id=SCHEMA_ID('dbo') AND is_ms_shipped=0 ORDER BY name", String.class)) {
