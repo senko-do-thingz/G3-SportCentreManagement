@@ -110,9 +110,9 @@ describe('UI-16 manager activity log', () => {
     expect(screen.queryByRole('button', { name: /Filters1/ })).not.toBeInTheDocument()
 
     setDesktop(true)
-    expect(screen.getByRole('button', { name: 'Filters' })).toHaveAttribute('aria-expanded', 'true')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Filters' })).toHaveAttribute('aria-expanded', 'true'))
     setDesktop(false)
-    expect(screen.getByRole('button', { name: 'Filters' })).toHaveAttribute('aria-expanded', 'false')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Filters' })).toHaveAttribute('aria-expanded', 'false'))
   })
 
   it('starts expanded on desktop and follows the 900/901 pixel breakpoint', async () => {
@@ -126,9 +126,9 @@ describe('UI-16 manager activity log', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByLabelText('Action')).toBeVisible()
     setDesktop(false)
-    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-expanded', 'false'))
     setDesktop(true)
-    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-expanded', 'true'))
   })
 
   it('shows loading for the new activity query instead of a stale error', async () => {
