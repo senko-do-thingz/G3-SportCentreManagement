@@ -81,6 +81,7 @@ class TrainingWorkflowIntegrationTest {
     @Autowired ClassPlanService classPlans;
     @Autowired MemberCheckInPassService arrivalPasses;
     @Autowired TrainingProgressService progress;
+    @Autowired ClassNoticeService notices;
     @Autowired BookingService bookings;
     @Autowired UserRepository users;
     @Autowired PlatformTransactionManager transactions;
@@ -185,6 +186,45 @@ class TrainingWorkflowIntegrationTest {
     }
     private org.springframework.test.web.servlet.request.RequestPostProcessor as(long id) {
         return org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(id)));
+    }
+    @Test void RELEASE13_homeworkAndAnnouncementsReachOnlyCurrentEnrolledMembers() throws Exception {
+        UUID operation=UUID.randomUUID();
+        var request=new ClassNoticeService.Request(classId,ClassNoticeService.Type.HOMEWORK,"Footwork practice","Practise the assigned steps",LocalDate.of(2026,11,3));
+        long id=notices.create(coach,request,operation).id();
+        assertThat(notices.create(coach,request,operation).id()).isEqualTo(id);
+        assertThat(count("SELECT COUNT(*) FROM class_training_notice WHERE coach_id=? AND operation_id=?",coach,operation.toString())).isEqualTo(1);
+        assertThatThrownBy(()->notices.create(coach,new ClassNoticeService.Request(classId,ClassNoticeService.Type.HOMEWORK,"Changed","Changed",request.dueDate()),operation)).isInstanceOf(ConflictException.class);
+        assertThat(notices.member(member)).extracting(ClassNoticeService.Notice::id).contains(id);
+        assertThat(notices.member(peer)).isEmpty();assertThat(notices.coach(otherCoach)).isEmpty();
+        assertThatThrownBy(()->notices.cancel(otherCoach,id)).isInstanceOf(ResourceNotFoundException.class);
+        String body="{\"classId\":"+classId+",\"type\":\"ANNOUNCEMENT\",\"title\":\"Class reminder\",\"content\":\"Bring the required equipment\"}";
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/coach/training/notices").with(as(coach)).header("Idempotency-Key",UUID.randomUUID()).contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/notices").with(as(member)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$[0].className").value("Round02 class"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$[0].coachName").value("COACH"));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/coach/training/notices").with(as(reception)).header("Idempotency-Key",UUID.randomUUID()).contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        jdbc.update("UPDATE booking SET status='CANCELLED' WHERE id=?",booking);assertThat(notices.member(member)).isEmpty();
+        jdbc.update("UPDATE booking SET status='CONFIRMED' WHERE id=?",booking);
+        jdbc.update("UPDATE sport_class SET coach_id=? WHERE id=?",otherCoach,classId);assertThat(notices.member(member)).isEmpty();
+        assertThatThrownBy(()->notices.cancel(coach,id)).isInstanceOf(ResourceNotFoundException.class);
+        jdbc.update("UPDATE sport_class SET coach_id=? WHERE id=?",coach,classId);
+        assertThat(notices.cancel(coach,id).status()).isEqualTo("CANCELLED");notices.cancel(coach,id);
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE action='CLASS_NOTICE_CANCELLED' AND entity_id=?",id)).isEqualTo(1);
+        assertThat(notices.member(member)).noneMatch(n->n.id()==id);
+    }
+    @Test void RELEASE13_validationAndConcurrentRetryDoNotPublishDuplicates() throws Exception {
+        assertThatThrownBy(()->notices.create(coach,new ClassNoticeService.Request(classId,ClassNoticeService.Type.HOMEWORK,"Missing due date","Practice",null),UUID.randomUUID())).isInstanceOf(BusinessRuleException.class);
+        assertThatThrownBy(()->notices.create(coach,new ClassNoticeService.Request(classId,ClassNoticeService.Type.ANNOUNCEMENT,"Wrong due date","Notice",LocalDate.of(2026,11,3)),UUID.randomUUID())).isInstanceOf(BusinessRuleException.class);
+        var request=new ClassNoticeService.Request(classId,ClassNoticeService.Type.ANNOUNCEMENT,"Concurrent reminder","Bring equipment",null);UUID operation=UUID.randomUUID();
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            var start=new CountDownLatch(1);Callable<Long> publish=()->{start.await();return notices.create(coach,request,operation).id();};
+            var a=pool.submit(publish);var b=pool.submit(publish);start.countDown();assertThat(a.get(60,TimeUnit.SECONDS)).isEqualTo(b.get(60,TimeUnit.SECONDS));
+        }
+        assertThat(count("SELECT COUNT(*) FROM class_training_notice WHERE coach_id=? AND operation_id=?",coach,operation.toString())).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE actor_user_id=? AND action='CLASS_NOTICE_PUBLISHED'",coach)).isEqualTo(1);
     }
     @Test void RELEASE11_actualHttpIssueRedeemReplayAndPurposeIsolation() throws Exception {
         long registration=arrivalEntitlement();
