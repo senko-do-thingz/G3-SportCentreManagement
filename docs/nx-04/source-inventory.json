@@ -329,6 +329,13 @@
       ],
       "drops": [],
       "sha256_lf": "dd75a6ed51135717364f8fb21bd6e55c41dc25c99e1d4cac2f98c5128f752e02"
+    },
+    {
+      "path": "backend/src/main/resources/db/demo/V41__assign_demo_coach_photos.sql",
+      "version": 41,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "95435a5f47465ede8447184658fd95354ec1eee7c7ee22e27851cc7c1c3fe094"
     }
   ],
   "create_occurrences": 68,
