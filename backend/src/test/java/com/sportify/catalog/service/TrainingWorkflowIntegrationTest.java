@@ -80,6 +80,7 @@ class TrainingWorkflowIntegrationTest {
     @Autowired com.sportify.payment.service.OperationsReportService operationsReports;
     @Autowired ClassPlanService classPlans;
     @Autowired MemberCheckInPassService arrivalPasses;
+    @Autowired TrainingProgressService progress;
     @Autowired BookingService bookings;
     @Autowired UserRepository users;
     @Autowired PlatformTransactionManager transactions;
@@ -87,6 +88,7 @@ class TrainingWorkflowIntegrationTest {
     @Autowired org.springframework.test.web.servlet.MockMvc mvc;
     long coach, otherCoach, member, peer, reception, sport, classId, session, booking;
     private final List<Long> fixtureSessions = new ArrayList<>();
+    private final List<Long> fixtureMetrics = new ArrayList<>();
     private SessionIdentityFixtures.Snapshot fixtureCounters;
     @AfterEach void cleanupSessionFixtures() {
         jdbc.update("DELETE FROM member_check_in_pass WHERE member_id IN (?,?)", member,peer);
@@ -105,6 +107,7 @@ class TrainingWorkflowIntegrationTest {
             jdbc.update("DELETE FROM class_session WHERE id IN (" + ids + ")");
         }
         if (fixtureCounters != null) SessionIdentityFixtures.restoreAfterFixtureCleanup(jdbc, fixtureCounters);
+        for(long metric:fixtureMetrics) jdbc.update("DELETE FROM skill_metric WHERE id=?",metric);
     }
     @AfterAll static void stopOwnedContainer() { if (container != null) container.stop(); }
     @BeforeEach void fixture() {
@@ -140,6 +143,45 @@ class TrainingWorkflowIntegrationTest {
         long registration=insert("INSERT sport_package_registration(registration_code,member_id,package_id,channel,original_price,discount_percentage,paid_amount,total_sessions,remaining_sessions,start_date,end_date,status,activated_at,created_by_user_id) VALUES (?,?,?,'RECEPTION',100,0,100,10,9,'2026-11-01','2026-11-30','ACTIVE',SYSDATETIME(),?)",code(),member,pkg,reception);
         jdbc.update("UPDATE booking SET package_registration_id=? WHERE id=?",registration,booking);
         return registration;
+    }
+    @Test void RELEASE12_multipleActualSessionsHaveChronologicalPrivateProgress() throws Exception {
+        long metric=insert("INSERT skill_metric(sport_id,name,max_score) VALUES (?,'Release accuracy',10)",sport);fixtureMetrics.add(metric);
+        long second=session("COACH_LED");
+        jdbc.update("UPDATE class_session SET start_time='07:00',end_time='08:00' WHERE id=?",second);
+        long otherBooking=insert("INSERT booking(booking_code,session_id,member_id,status) VALUES (?,?,?,'CONFIRMED')",code(),second,member);
+        writer.coachAttendance(coach,new TrainingWriteRequest.Attendance(otherBooking,TrainingWriteRequest.AttendanceStatus.PRESENT,"First session"));
+        writer.createResult(coach,new TrainingWriteRequest.Result(second,member,"First recorded score",List.of(new TrainingWriteRequest.Score(metric,new java.math.BigDecimal("4.00")))));
+        writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
+        long result=writer.createResult(coach,new TrainingWriteRequest.Result(session,member,"Later recorded score",List.of(new TrainingWriteRequest.Score(metric,new java.math.BigDecimal("6.00"))))).id();
+        long plan=writer.createPlan(coach,plan()).id();
+        writer.feedback(coach,plan,new TrainingWriteRequest.Feedback(4,"Actual Coach feedback","Improved placement","Keep practising"));
+        var actual=progress.coach(coach,classId,member);
+        assertThat(actual.sessions()).extracting(TrainingProgressService.Outcome::notes).containsExactly("First recorded score","Later recorded score");
+        assertThat(actual.sessions()).allMatch(s->!s.notesOnly() && s.scores().getFirst().metricId()==metric);
+        assertThat(actual.sessions().getLast().scores().getFirst().score()).isEqualByComparingTo("6.00");
+        assertThat(actual.feedback()).hasSize(1);assertThat(actual.feedback().getFirst().rating()).isEqualTo(4);
+        assertThat(progress.member(member).sessions()).hasSize(2);assertThat(progress.member(peer).sessions()).isEmpty();
+        assertThatThrownBy(()->progress.coach(otherCoach,classId,member)).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(()->writer.coachCorrection(coach,jdbc.queryForObject("SELECT id FROM attendance_record WHERE booking_id=?",Long.class,booking),correction(TrainingWriteRequest.AttendanceStatus.ABSENT))).isInstanceOf(ConflictException.class);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/coach/training/classes/"+classId+"/members/"+member+"/progress").with(as(coach)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sessions[1].scores[0].score").value(6));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/progress?memberId="+member).with(as(peer)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sessions").isEmpty());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/progress").with(as(reception)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        assertThat(reader.result(member,result).scores()).hasSize(1);
+    }
+    @Test void RELEASE12_notesOnlyProgressHasNoFabricatedScoreOrTrend() {
+        writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
+        writer.createResult(coach,result());
+        var actual=progress.coach(coach,classId,member);
+        assertThat(actual.sessions()).hasSize(1);assertThat(actual.sessions().getFirst().notesOnly()).isTrue();
+        assertThat(actual.sessions().getFirst().scores()).isEmpty();assertThat(actual.interpretation()).contains("no numeric trend");
+        jdbc.update("UPDATE booking SET status='CANCELLED' WHERE id=?",booking);
+        assertThatThrownBy(()->progress.coach(coach,classId,member)).isInstanceOf(ResourceNotFoundException.class);
+        assertThat(progress.member(member).sessions()).hasSize(1);
     }
     private org.springframework.test.web.servlet.request.RequestPostProcessor as(long id) {
         return org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(id)));
