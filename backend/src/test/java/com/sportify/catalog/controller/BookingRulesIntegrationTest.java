@@ -121,6 +121,7 @@ class BookingRulesIntegrationTest extends AbstractIntegrationTest {
         // UUID-scoped rows only. Every concurrent writer is stopped in its test's finally block first.
         String own = "SELECT id FROM user_account WHERE email LIKE ?";
         jdbc.update("DELETE FROM activity_log WHERE actor_user_id IN (" + own + ")", marker + "%");
+        jdbc.update("DELETE FROM notification WHERE user_id IN (" + own + ")", marker + "%");
         jdbc.update("DELETE FROM check_in WHERE member_id IN (" + own + ")", marker + "%");
         jdbc.update("DELETE FROM booking WHERE member_id IN (" + own + ")", marker + "%");
         jdbc.update("DELETE FROM class_session WHERE sport_id = ?", sport.getId());
