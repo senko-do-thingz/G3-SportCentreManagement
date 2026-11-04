@@ -266,7 +266,10 @@ describe('auth flow', () => {
 
     async function signedInAsManager() {
       tokenStorage.startSession({ accessToken: 'manager-access', refreshToken: 'manager-refresh' })
-      const profiles: Record<string, typeof MANAGER> = { 'manager-access': MANAGER, 'member-access': MEMBER }
+      // A rotated manager token remains valid for delayed dashboard requests too.
+      const profiles: Record<string, typeof MANAGER> = {
+        'manager-access': MANAGER, 'manager-access-2': MANAGER, 'member-access': MEMBER,
+      }
       const delays: Record<string, number> = {}
       const { calls } = installFakeFetch(async (call) => {
         const token = call.authorization?.replace('Bearer ', '') ?? ''

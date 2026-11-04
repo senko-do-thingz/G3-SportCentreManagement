@@ -1,3 +1,4 @@
+import { sessionIdText, sessionRouteReference } from '../../api/sessionIdentity'
 import { useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { coachProfilesApi } from '../../api/coachProfilesApi'
@@ -20,7 +21,7 @@ export function CoachProfileModal({ coachId, onClose }: { coachId: number; onClo
         {!certifications.length && <p className="browse-muted">No certifications listed.</p>}
         {certifications.map((certificate) => <article className="browse-certificate" key={certificate.id}><h4>{certificate.name}</h4><p>{certificate.issuer || 'Issuer not provided'}</p><Badge tone={certificate.verified ? 'success' : 'neutral'}>{certificate.verified ? 'Verified' : 'Not verified'}</Badge>{certificate.issuedOn && <p>Issued: {browseDate(certificate.issuedOn)}</p>}{certificate.expiresOn && <p>Expires: {browseDate(certificate.expiresOn)} {certificate.expiresOn < browseToday() ? '(Expired)' : ''}</p>}</article>)}
         <h3>Upcoming sessions</h3>
-        {upcomingSessions.length ? <ul>{upcomingSessions.map((session) => <li key={session.id}><Link to={`/member/sessions/${session.id}?${new URLSearchParams({ returnTo: `/member/classes?coachId=${coachId}` })}`}>{session.className || session.sportName} - {browseDate(session.sessionDate)} {session.startTime.slice(0, 5)}</Link></li>)}</ul> : <p className="browse-muted">No upcoming sessions.</p>}
+        {upcomingSessions.length ? <ul>{upcomingSessions.map((session) => <li key={session.id}><Link to={`/member/sessions/${sessionRouteReference(session)}?${new URLSearchParams({ returnTo: `/member/classes?coachId=${coachId}` })}`}>{sessionIdText(session.sessionId)} - {session.className || session.sportName} - {browseDate(session.sessionDate)} {session.startTime.slice(0, 5)}</Link></li>)}</ul> : <p className="browse-muted">No upcoming sessions.</p>}
         <Link className={buttonClassName('secondary')} to={`/member/classes?coachId=${coachId}`}>Find this coach's sessions</Link>
       </section>
     </div>}

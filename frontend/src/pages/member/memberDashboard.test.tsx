@@ -95,13 +95,13 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
     expect(screen.getByRole('heading', { name: 'Ready for your next session?' })).toBeInTheDocument()
     expect(screen.getByText('Welcome back, Taylor Nguyen')).toBeInTheDocument()
     expect(statValue('Membership tier')).toBe('VIP')
-    expect(statHint('Membership tier')).toBe('Active - Until 04 Jul 2027 - 10% off packages longer than a single visit')
+    expect(statHint('Membership tier')).toBe('Active - Until 04/07/2027 - 10% off packages longer than a single visit')
     expect(statValue('Active packages')).toBe('1')
     expect(statValue('Upcoming sessions')).toBe('1')
 
     const item = screen.getByRole('listitem', { name: 'Football - Coach-led' })
     expect(within(item).getByText('REG-0011')).toBeInTheDocument()
-    expect(within(item).getByText('Football 30 days - Ends 30 Oct 2026')).toBeInTheDocument()
+    expect(within(item).getByText('Football 30 days - Ends 30/10/2026')).toBeInTheDocument()
     expect(within(item).getByText('6 of 8 sessions remaining')).toBeInTheDocument()
     expect(within(item).getByText('Active')).toBeInTheDocument()
     const bar = within(item).getByRole('progressbar')
@@ -112,7 +112,8 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
 
     const sessions = screen.getByRole('region', { name: 'Upcoming sessions' })
     expect(within(sessions).getByText('Football - Coach-led')).toBeInTheDocument()
-    expect(within(sessions).getByText('14 Oct 2026, 17:00 to 18:30 - BK-0021')).toBeInTheDocument()
+    expect(within(sessions).getByText('14/10/2026 17:00 - 18:30')).toBeInTheDocument()
+    expect(within(sessions).getByText('Booking code: BK-0021')).toBeInTheDocument()
   })
 
   it('TC-FE02-022 the hero offers Book a session when a package is active', async () => {
@@ -162,7 +163,7 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
   it('TC-FE02-026 a package bought in advance shows its start date', async () => {
     await openDashboard({ registrations: [registration({ startDate: '2026-10-20', endDate: '2026-11-18' })] })
     const item = screen.getByRole('listitem', { name: 'Football - Coach-led' })
-    expect(within(item).getByText('Starts 20 Oct 2026')).toBeInTheDocument()
+    expect(within(item).getByText('Starts 20/10/2026')).toBeInTheDocument()
     expect(statValue('Active packages')).toBe('1')
   })
 
@@ -411,3 +412,11 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
     expect(statHint('Active packages')).toBe('Your paid sport access')
   })
 })
+
+ it('ID-04 dashboard identifies an upcoming booked session and its actual venue and Coach', async () => {
+   await openDashboard({ cards: [card()], registrations: [registration()], bookings: [booking({ sessionCode: '141026FB01', className: 'Football practice', facilityName: 'Court A', coachName: 'Quan Coach' })] })
+   const sessions = screen.getByRole('region', { name: 'Upcoming sessions' })
+   expect(within(sessions).getByText('141026FB01')).toBeInTheDocument()
+   expect(within(sessions).getByText('Facility: Court A')).toBeInTheDocument()
+   expect(within(sessions).getByText('Coach: Quan Coach')).toBeInTheDocument()
+ })

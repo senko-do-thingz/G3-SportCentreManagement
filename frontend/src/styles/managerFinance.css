@@ -70,6 +70,7 @@
   .finance-review-summary > div { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
   .finance-review-result { align-items: flex-start; flex-direction: column; }
   .finance-review-result .btn { width: 100%; }
-  .finance-report-total { grid-template-columns: minmax(115px, 1fr) repeat(3, minmax(90px, auto)); gap: var(--space-2); padding-inline: var(--space-2); font-size: var(--text-xs); }
+  .finance-report-total { grid-template-columns: minmax(0, 1fr) repeat(3, minmax(0, .8fr)); gap: var(--space-2); padding-inline: var(--space-2); font-size: var(--text-xs); }
+  .finance-report-total > * { min-width: 0; overflow-wrap: anywhere; }
   .finance-revenue-chart__category { font-size: 11px; }
 }

@@ -1,4 +1,5 @@
 import { api } from './client'
+import { optionalSessionId, type SessionId } from './sessionIdentity'
 import { ApiError } from './errors'
 
 export interface SessionResource { id: number; name: string }
@@ -7,6 +8,9 @@ export type TrainingType = 'SELF_TRAINING' | 'COACH_LED'
 export type SessionStatus = 'DRAFT' | 'PUBLISHED' | 'CANCELLED' | 'COMPLETED'
 export interface ManagerSession {
   id: number
+  scheduleRevision?: number
+  sessionId?: SessionId
+  sportName?: string
   date: string
   startTime: string
   endTime: string
@@ -23,6 +27,8 @@ export interface ManagerSession {
 }
 export type DayOfWeek = 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY'
 export interface SessionUpdate {
+  expectedRevision?: number
+  rescheduleReason?: string
   date: string
   startTime: string
   endTime: string
@@ -30,7 +36,7 @@ export interface SessionUpdate {
   coachId?: number | null
   capacity: number
 }
-export type SessionCreate = Omit<SessionUpdate, 'date'> & {
+export type SessionCreate = Omit<SessionUpdate, 'date' | 'expectedRevision' | 'rescheduleReason'> & {
   trainingType: TrainingType
 } & ({ date: string; daysOfWeek?: never; fromDate?: never; toDate?: never } | {
   date?: never; daysOfWeek: DayOfWeek[]; fromDate: string; toDate: string
@@ -43,6 +49,7 @@ export interface SessionFilters {
   facilityId?: number
 }
 export interface ScheduleConflict {
+  sessionCode?: SessionId
   sessionId: number
   requestedDate: string
   date: string
@@ -70,7 +77,7 @@ export function scheduleConflicts(error: unknown): ScheduleConflict[] {
       || !['COACH', 'FACILITY', 'BOTH'].includes(String(item.conflictType))) return []
     const sessionClass = resource(item.class)
     return [{
-      sessionId: item.sessionId, requestedDate: typeof item.requestedDate === 'string' ? item.requestedDate : item.date,
+      sessionId: item.sessionId, sessionCode: optionalSessionId(item.sessionCode), requestedDate: typeof item.requestedDate === 'string' ? item.requestedDate : item.date,
       date: item.date, startTime: item.startTime, endTime: item.endTime,
       class: sessionClass ? { ...sessionClass, code: record(item.class) && typeof item.class.code === 'string' ? item.class.code : '' } : null,
       coach: resource(item.coach), facility: resource(item.facility),
@@ -80,6 +87,9 @@ export function scheduleConflicts(error: unknown): ScheduleConflict[] {
 }
 
 export const managerSessionsApi = {
+  byCode: (id: SessionId, signal?: AbortSignal) => api.get<ManagerSession>(`/manager/sessions/by-code/${id}`, { signal }),
+  updateByCode: (id: SessionId, body: SessionUpdate) => api.put<ManagerSession>(`/manager/sessions/by-code/${id}`, body),
+  cancelByCode: (id: SessionId, reason: string) => api.put<ManagerSession>(`/manager/sessions/by-code/${id}/cancel`, { reason: reason.trim() }),
   list: (filters: SessionFilters, signal?: AbortSignal) => api.get<ManagerSession[]>('/manager/sessions', { query: { ...filters }, signal }),
   create: (classId: number, body: SessionCreate) => api.post<ManagerSession[]>(`/manager/classes/${classId}/sessions`, body),
   update: (id: number, body: SessionUpdate) => api.put<ManagerSession>(`/manager/sessions/${id}`, body),

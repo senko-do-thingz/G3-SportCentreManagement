@@ -1,0 +1,31 @@
+# Deterministic training guidance
+
+Class recommendations use GET /api/v1/member/training/recommendations for enabled Members. Optional preferences are sportId, level, goal, from, to, earliest, latest, page and size. Supported levels and goals match Member profile values. Omitted level and goal use the signed-in Member's saved profile. Dates use center time in Asia/Ho_Chi_Minh. The default range is 14 days; a selected range can span at most 30 days. Pages contain 1-20 classes.
+
+Only active sports/classes with published upcoming sessions and positive remaining capacity qualify. Already-booked sessions are excluded. Coach-led sessions require the current assigned active coach. Available times restrict the complete session. One session is selected per class after scoring and stable sorting by score descending, date, start time, class ID and session ID.
+
+Every candidate also passes the existing session catalog's authoritative visibility predicate before ranking or pagination. This includes an active facility, a valid time interval, an active Coach account with the COACH role and the required coach-sport qualification. Candidate IDs are checked in bounded batches to preserve SQL Server's parameter limit. Recommendation detail links therefore use the same visibility policy as GET /api/v1/sessions/{id}.
+
+The class-rules-v1 score adds 50 for a selected sport, 20 for the selected or saved level, 5 for the Member's own recorded participation in that sport, and 15 for a goal match. BUILD_SKILLS matches coached sessions, COMPETITION matches advanced coached sessions, and IMPROVE_FITNESS matches sessions lasting at least 60 minutes. These are transparent product heuristics and do not assert fitness or medical outcomes.
+
+The response declares mode RULE_BASED, ruleVersion class-rules-v1 and bookingEligibilityChecked false. Items include real class/session IDs, capacity snapshots, scores and reasons. Session details and the existing booking service remain authoritative for package eligibility and capacity. A recommendation creates no booking, invoice, credit debit or assigned plan.
+
+No model-provider integration or third-party data transfer is used. Genuine LLM integration remains unavailable until a provider and data contract are approved. These rules do not imply CODEOWNER approval of pending release policies.
+
+## Automated center consultation
+
+POST /api/v1/member/training/consultation accepts question (1-500 characters) and optIn. Only enabled Members can use it. The response declares mode KNOWLEDGE_BASED, a status (ANSWERED, NO_ANSWER, CONSENT_REQUIRED or UNAVAILABLE), answer, historyStored false and source records with kind, ID, title, detail and application path.
+
+Supported intents are published session availability, active sport-package base prices in VND, and existing booking guidance. The service reads live catalog rows; it shows at most five results and names the date window or price scope. It does not infer eligibility or confirm payment. Unknown/private instructions receive NO_ANSWER; personal training questions link to the human Coach conversation. Input is never executed as SQL or as a provider prompt.
+
+Session sources pass the canonical session-detail visibility predicate before the five-result limit is applied. Missing or inactive facilities and unqualified Coaches cannot produce unavailable detail links, and invalid earlier rows cannot hide valid later results.
+
+Questions and answers are ephemeral. No conversation tables are written and no chat history is transferred between accounts. UI opt-in resets on navigation/reload. Set app.training.consultation.enabled=false on the backend or VITE_TRAINING_CONSULTATION_ENABLED=false on the frontend to disable consultation. Backend opt-in and feature-off handling query no catalog data. There is no configured LLM fallback; the knowledge service remains explicit about its limits.
+
+## Coach reviewed drill drafts
+
+GET /api/v1/coach/training/bookings/{id}/drill-suggestions requires an enabled Coach assigned to both the confirmed booking session and its class. It reads that booking's actual sport, class level, saved Member goal, latest own Coach feedback and available assessment metrics. It returns RULE_BASED, ruleVersion curated-drills-v1, requiresCoachReview true and persisted false.
+
+The internal template set covers football, badminton and basketball with conservative control, passing and movement practice. Unknown sports/levels return an empty list. Beginner/intermediate/advanced drafts propose 5/7/8 minutes for review. Matching Coach feedback focus ranks before an assessment-metric match. Free text only matches fixed focus keywords; it cannot become instructions or a provider prompt. Templates are application drafts requiring professional Coach review, not medical advice or approved treatment.
+
+Preview performs no writes. The Coach selects drafts, loads them into the existing editable plan form, reviews/edits them and explicitly selects Assign plan. Only the canonical POST /api/v1/coach/training/plans persists the reviewed steps. Changing the chosen booking clears draft steps. Existing ownership, cancellation and duplicate-plan guards remain authoritative. No workout-plan publication path, automatic assignment, invoice or credit mutation is introduced.

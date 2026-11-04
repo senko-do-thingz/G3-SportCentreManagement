@@ -8,7 +8,15 @@ import java.time.LocalTime;
 public record CoachSessionResponse(Long id, Long classId, String className,
         Long sportId, String sportName, Long coachId, String coachName,
         Long facilityId, String facilityName, LocalDate sessionDate, LocalTime startTime,
+        LocalTime endTime, Integer capacity, long bookedCount, SessionStatus status, String sessionId, String trainingType) {
+    /** Transitional Java constructor; live mappers supply the persisted public identity. */
+    public CoachSessionResponse(Long id, Long classId, String className,
+        Long sportId, String sportName, Long coachId, String coachName,
+        Long facilityId, String facilityName, LocalDate sessionDate, LocalTime startTime,
         LocalTime endTime, Integer capacity, long bookedCount, SessionStatus status) {
+        this(id, classId, className, sportId, sportName, coachId, coachName, facilityId, facilityName, sessionDate, startTime, endTime, capacity, bookedCount, status, null, null);
+    }
+
     public CoachSessionResponse(Long id, Long classId, String className, Long sportId, String sportName,
             Long coachId, String coachName, Long facilityId, String facilityName, LocalDate sessionDate,
             LocalTime startTime, LocalTime endTime, Integer capacity, SessionStatus status) {
@@ -18,6 +26,6 @@ public record CoachSessionResponse(Long id, Long classId, String className,
 
     public CoachSessionResponse withBookedCount(long count) {
         return new CoachSessionResponse(id, classId, className, sportId, sportName, coachId, coachName,
-                facilityId, facilityName, sessionDate, startTime, endTime, capacity, count, status);
+                facilityId, facilityName, sessionDate, startTime, endTime, capacity, count, status, sessionId, trainingType);
     }
 }

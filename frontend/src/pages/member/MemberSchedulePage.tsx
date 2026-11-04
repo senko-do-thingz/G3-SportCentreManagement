@@ -1,3 +1,5 @@
+import { sessionIdText, sessionRouteReference } from '../../api/sessionIdentity'
+import '../../components/sessionContext.css'
 import { useCallback, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { memberSessionsApi, type BrowseSession } from '../../api/memberSessionsApi'
@@ -203,14 +205,15 @@ function ScheduleEntry({ session, returnTo }: { session: BrowseSession; returnTo
   const selfTraining = session.trainingFormat === 'SELF_TRAINING'
   const title = session.className || `${session.sportName} ${selfTraining ? 'Self-training' : 'Session'}`
   const format = selfTraining ? 'Self-training' : 'Coach-led'
-  const details = `/member/sessions/${session.id}?${new URLSearchParams({ returnTo })}`
+  const details = `/member/sessions/${sessionRouteReference(session)}?${new URLSearchParams({ returnTo })}`
 
   return (
     <article className="schedule-entry">
+      <span className="session-identity">Session ID <code>{sessionIdText(session.sessionId)}</code></span>
       <Link className="schedule-entry__title" to={details}>{title}</Link>
       <p className="schedule-entry__meta">{session.startTime.slice(0, 5)} - {session.endTime.slice(0, 5)}</p>
       <p className="schedule-entry__meta">{session.sportName} - {format}{session.level ? ` / ${session.level[0] + session.level.slice(1).toLowerCase()}` : ''}</p>
-      {!selfTraining && <p className="schedule-entry__meta">Coach: {session.coachName || 'Not provided'}</p>}
+      <p className="schedule-entry__meta">{selfTraining ? 'Self-training - No assigned coach' : `Coach: ${session.coachName || 'Coach not assigned'}`}</p>
       <p className="schedule-entry__meta">{session.facilityName || 'Facility not provided'}</p>
       <Badge tone={session.full || session.freeSeats <= 0 ? 'warning' : 'success'}>
         {session.full || session.freeSeats <= 0 ? 'Fully booked' : `${session.freeSeats} ${session.freeSeats === 1 ? 'spot' : 'spots'} left`}

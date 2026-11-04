@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface ManagerSessionService {
+    ManagerSessionResponse getSessionByCode(String sessionId);
     List<ManagerSessionResponse> listSessions(LocalDate from, LocalDate to, Long classId, Long coachId, Long facilityId);
     List<ManagerSessionResponse> createSessions(Long classId, SessionCreateRequest request, UserAccount actor);
     ManagerSessionResponse updateSession(Long id, SessionUpdateRequest request, UserAccount actor);

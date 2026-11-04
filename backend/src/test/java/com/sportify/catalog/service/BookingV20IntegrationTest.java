@@ -1,5 +1,6 @@
 package com.sportify.catalog.service;
 
+import com.sportify.support.SessionIdentityFixtures;
 import com.sportify.AbstractIntegrationTest;
 import com.sportify.catalog.dto.BookingCreateRequest;
 import com.sportify.catalog.dto.BookingResponse;
@@ -237,9 +238,9 @@ class BookingV20IntegrationTest extends AbstractIntegrationTest {
                 OUTPUT INSERTED.id VALUES (?, 'Booking V20 test court', 'COURT', ?, 1)
                 """, Long.class, "v20-" + UUID.randomUUID().toString().substring(0, 12), sportId);
         jdbc.update("""
-                INSERT INTO class_session (sport_id, facility_id, session_date, start_time, end_time, training_type, capacity, booked_count, status)
-                VALUES (?, ?, ?, CAST('18:00' AS TIME), CAST('19:30' AS TIME), 'SELF_TRAINING', ?, ?, 'PUBLISHED')
-                """, sportId, facilityId, java.sql.Date.valueOf(date), capacity, bookedCount);
+                INSERT INTO class_session (sport_id, facility_id, session_date, start_time, end_time, training_type, capacity, booked_count, status, session_code)
+                VALUES (?, ?, ?, CAST('18:00' AS TIME), CAST('19:30' AS TIME), 'SELF_TRAINING', ?, ?, 'PUBLISHED', ?)
+                """, sportId, facilityId, java.sql.Date.valueOf(date), capacity, bookedCount, SessionIdentityFixtures.reserve(jdbc, date, sportId));
         return jdbc.queryForObject("SELECT MAX(id) FROM class_session WHERE sport_id = ?", Long.class, sportId);
     }
 
