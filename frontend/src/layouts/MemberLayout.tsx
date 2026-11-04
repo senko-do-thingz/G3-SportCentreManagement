@@ -6,6 +6,7 @@ import { PaymentWorkspaceHeader } from './PaymentWorkspaceHeader'
 import { WorkspaceHeader } from './WorkspaceHeader'
 import { MemberAssistantLink } from '../pages/member/MemberAssistantPage'
 import { TrainingNavigation } from '../pages/member/TrainingNavigation'
+import { WorkflowSurface } from '../components/WorkflowSurface'
 
 /** Member workspace with a Home-branded header and role-specific tab navigation. */
 export function MemberLayout() {
@@ -51,8 +52,7 @@ export function MemberLayout() {
       {paymentRoute ? <PaymentWorkspaceHeader {...headerProps} /> : <WorkspaceHeader {...headerProps} />}
       <main className="member-main container" id="main-content">
         <AccountSwitchNotice />
-        {trainingRoute && <TrainingNavigation />}
-        <Outlet />
+        {trainingRoute ? <WorkflowSurface><TrainingNavigation /><Outlet /></WorkflowSurface> : <Outlet />}
       </main>
     </div>
   )

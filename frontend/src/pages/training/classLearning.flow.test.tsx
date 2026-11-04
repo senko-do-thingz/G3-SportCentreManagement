@@ -1,16 +1,77 @@
-import { screen } from '@testing-library/react'
+import { act, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
 import { backendError, installFakeFetch, json, MEMBER, type RecordedCall } from '../../test/fakeBackend'
 import { renderApp } from '../../test/renderApp'
 const learningClass = { id: 1, name: 'Class skills', sportName: 'Badminton', coachName: 'Quan', level: 'BEGINNER', capacity: 10, active: true }
-function login(role: string, handler: (call: RecordedCall) => Response) {
+function login(role: string, handler: (call: RecordedCall) => Response | Promise<Response>) {
   tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
   return installFakeFetch(call => call.path === '/users/me' ? json(200, { ...MEMBER, role }) : handler(call))
 }
 afterEach(() => vi.unstubAllGlobals())
 describe('Class learning Round 02', () => {
+  it('keeps the current conversation fixed until its reply finishes saving', async () => {
+    const question = { id: 7, classId: 1, className: 'Class skills', memberName: 'Member', subject: 'Footwork', description: 'How to practise?', status: 'OPEN', createdAt: '2026-11-02T10:00:00' }
+    let finish!: (response: Response) => void
+    const { calls } = login('COACH', call => {
+      if (call.method === 'POST') return new Promise<Response>(resolve => { finish = resolve })
+      return call.path.endsWith('/7') ? json(200, { question, messages: [] }) : json(200, [question])
+    })
+    renderApp('/coach/training/questions')
+    const user = userEvent.setup()
+    await user.selectOptions(await screen.findByLabelText('Class question'), '7')
+    await user.type(await screen.findByLabelText('Coach reply and practice guidance'), 'Review the assigned plan.')
+    await user.click(screen.getByRole('button', { name: 'Send message' }))
+    expect(screen.getByLabelText('Class question')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Refresh conversations' })).toBeDisabled()
+    await act(async () => finish(json(201, { id: 9 })))
+    expect(await screen.findByText('Message sent.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Coach reply and practice guidance')).toHaveValue('')
+    expect(screen.getByLabelText('Class question')).toBeEnabled()
+    expect(calls.filter(call => call.method === 'POST').map(call => call.path)).toEqual(['/coach/training/questions/7/messages'])
+  })
+
+  it('refreshes a coach reply while preserving the member follow-up draft', async () => {
+    const question = { id: 7, classId: 1, className: 'Class skills', memberName: 'Member', subject: 'Footwork', description: 'How to practise?', status: 'OPEN', createdAt: '2026-11-02T10:00:00' }
+    let messages: { id: number; senderName: string; body: string }[] = []
+    const { calls } = login('MEMBER', call => {
+      if (call.path === '/member/training/classes') return json(200, [learningClass])
+      if (call.path === '/member/training/questions') return json(200, [question])
+      return json(200, { question, messages })
+    })
+    renderApp('/member/training/questions')
+    const user = userEvent.setup()
+    await user.selectOptions(await screen.findByLabelText('Class question'), '7')
+    await user.type(await screen.findByLabelText('Follow-up question'), 'My unsent follow-up')
+    messages = [{ id: 9, senderName: 'Quan', body: 'Review the footwork steps in your assigned plan.' }]
+    await user.click(screen.getByRole('button', { name: 'Refresh conversations' }))
+    expect(await screen.findByText('Review the footwork steps in your assigned plan.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Follow-up question')).toHaveValue('My unsent follow-up')
+    expect(screen.getByLabelText('Class question')).toHaveValue('7')
+    expect(calls.every(call => call.method === 'GET')).toBe(true)
+  })
+
+  it('clears reply feedback and draft when choosing another conversation', async () => {
+    const questions = [7, 8].map(id => ({ id, classId: 1, className: 'Class skills', memberName: 'Member', subject: `Practice ${id}`, description: `Question ${id}`, status: 'OPEN', createdAt: '2026-11-02T10:00:00' }))
+    login('COACH', call => {
+      if (call.method === 'POST') return backendError(503, 'Reply could not be saved')
+      const question = questions.find(item => call.path.endsWith(`/${item.id}`))
+      return question ? json(200, { question, messages: [] }) : json(200, questions)
+    })
+    renderApp('/coach/training/questions')
+    const user = userEvent.setup()
+    await user.selectOptions(await screen.findByLabelText('Class question'), '7')
+    await user.type(await screen.findByLabelText('Coach reply and practice guidance'), 'Draft for first member question')
+    await user.click(screen.getByRole('button', { name: 'Send message' }))
+    expect(await screen.findByText('Reply could not be saved')).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Class question'), '8')
+    expect(await screen.findByText('Question 8')).toBeInTheDocument()
+    expect(screen.getByLabelText('Coach reply and practice guidance')).toHaveValue('')
+    expect(screen.queryByText('Reply could not be saved')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled()
+  })
+
   it('R2-FE-01 shows actual class information and personal attendance', async () => {
     login('MEMBER', () => json(200, { learningClass, sessions: [{ bookingId: 3, sessionId: 5, date: '2026-11-02', startTime: '09:00', endTime: '10:00', bookingStatus: 'CONFIRMED', attendanceStatus: 'LATE', notes: 'Arrived late', resultId: 9, sessionStatus: 'PUBLISHED', trainingFormat: 'COACH_LED', capacity: 10, freeSeats: 0 }] }))
     renderApp('/member/training/classes/1')
