@@ -1,3 +1,5 @@
+import { parseSessionReference, type SessionId } from '../../api/sessionIdentity'
+import { SessionContext } from '../../components/SessionContext'
 import { useCallback, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ApiError, StaleSessionError } from '../../api/errors'
@@ -8,7 +10,7 @@ import { useAuth } from '../../auth/useAuth'
 import { Badge, Button, Card, PageHeader, PageLoader, buttonClassName } from '../../components/ui'
 import { BrowseError } from './BrowseError'
 import { MemberScheduleNav } from './MemberScheduleNav'
-import { browseId, safeBrowseReturn } from './scheduleFilters'
+import { safeBrowseReturn } from './scheduleFilters'
 import { ELIGIBILITY_COPY, resolveSessionDetailState } from './sessionEligibility'
 import { useMemberResource } from './useMemberResource'
 import { bookingCalendarHref, bookingDate, bookingErrorMessage, bookingTime, eligibleRegistrations } from './bookingPresentation'
@@ -31,26 +33,26 @@ interface VerifiedBooking {
 function SessionFacts({ detail }: { detail: SessionDetail }) {
   const { session } = detail
   const self = session.trainingFormat === 'SELF_TRAINING'
-  return <dl className="browse-facts booking-facts">
+  return <><SessionContext {...session} date={session.sessionDate} trainingType={session.trainingFormat} /><dl className="browse-facts booking-facts">
     <div><dt>Date</dt><dd>{bookingDate(session.sessionDate)}</dd></div>
     <div><dt>Time</dt><dd>{bookingTime(session.startTime)} - {bookingTime(session.endTime)}</dd></div>
     <div><dt>Sport</dt><dd>{session.sportName}</dd></div>
     <div><dt>Training</dt><dd>{self ? 'Self-training' : 'Coach-led'}</dd></div>
     {!self && <div><dt>Coach</dt><dd>{session.coachName || 'Not provided'}</dd></div>}
     <div><dt>Facility</dt><dd>{session.facilityName || 'Not provided'}</dd></div>
-  </dl>
+  </dl></>
 }
 
 export function BookingOptionsPage() {
   const [params] = useSearchParams()
-  const sessionId = browseId(params.get('sessionId'))
+  const sessionId = parseSessionReference(params.get('sessionId'))
   const returnTo = safeBrowseReturn(params.get('returnTo'))
   if (!sessionId) return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Booking unavailable" /><Card><p role="alert">Choose a valid session from the schedule before booking.</p><Link className={buttonClassName()} to={returnTo}>Back to schedule</Link></Card></div>
   return <BookingOptionsContent key={sessionId} sessionId={sessionId} returnTo={returnTo} />
 }
 
-function BookingOptionsContent({ sessionId, returnTo }: { sessionId: number; returnTo: string }) {
-  const loader = useCallback((signal: AbortSignal) => memberSessionsApi.detail(sessionId, signal), [sessionId])
+function BookingOptionsContent({ sessionId, returnTo }: { sessionId: number | SessionId; returnTo: string }) {
+  const loader = useCallback((signal: AbortSignal) => typeof sessionId === 'number' ? memberSessionsApi.detail(sessionId, signal) : memberSessionsApi.detailByCode(sessionId, signal), [sessionId])
   const [resource, reload] = useMemberResource(loader)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   if (resource.status === 'loading') return <div className="page browse-page"><MemberScheduleNav /><PageLoader label="Checking session eligibility" /></div>
@@ -97,18 +99,18 @@ function BookingOptionsContent({ sessionId, returnTo }: { sessionId: number; ret
 
 export function BookingReviewPage() {
   const [params] = useSearchParams()
-  const sessionId = routeId(params.get('sessionId'))
+  const sessionId = parseSessionReference(params.get('sessionId'))
   const registrationId = routeId(params.get('packageRegistrationId'))
   const returnTo = safeBrowseReturn(params.get('returnTo'))
   if (!sessionId || !registrationId) return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Booking review unavailable" /><Card><p role="alert">Return to the session and choose an eligible package before reviewing.</p><Link className={buttonClassName()} to={returnTo}>Back to schedule</Link></Card></div>
   return <BookingReviewContent key={`${sessionId}-${registrationId}`} sessionId={sessionId} registrationId={registrationId} returnTo={returnTo} />
 }
 
-function BookingReviewContent({ sessionId, registrationId, returnTo }: { sessionId: number; registrationId: number; returnTo: string }) {
+function BookingReviewContent({ sessionId, registrationId, returnTo }: { sessionId: number | SessionId; registrationId: number; returnTo: string }) {
   const { user } = useAuth()
   const memberId = user?.id ?? null
   const navigate = useNavigate()
-  const loader = useCallback((signal: AbortSignal) => memberSessionsApi.detail(sessionId, signal), [sessionId])
+  const loader = useCallback((signal: AbortSignal) => typeof sessionId === 'number' ? memberSessionsApi.detail(sessionId, signal) : memberSessionsApi.detailByCode(sessionId, signal), [sessionId])
   const [resource, reload] = useMemberResource(loader)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -128,7 +130,7 @@ function BookingReviewContent({ sessionId, registrationId, returnTo }: { session
     setRetryAllowed(false)
     try {
       if (memberId === null) throw new ApiError(0, 'The current member account could not be confirmed.')
-      const existing = await memberBookingsApi.findUpcomingForSession(sessionId, memberId)
+      const existing = await memberBookingsApi.findUpcomingForSession(resource.status === 'ready' ? resource.data.session.id : 0, memberId)
       if (existing) {
         navigate(`/member/bookings/confirmed/${existing.id}`, { replace: true, state: { returnTo } })
         return
@@ -144,7 +146,7 @@ function BookingReviewContent({ sessionId, registrationId, returnTo }: { session
   }
 
   async function confirmBooking() {
-    if (submitted.current || checkingStatus || (outcomeUnknown && !retryAllowed)) return
+    if (resource.status !== 'ready' || submitted.current || checkingStatus || (outcomeUnknown && !retryAllowed)) return
     submitted.current = true
     setSubmitting(true)
     setError(null)
@@ -152,7 +154,7 @@ function BookingReviewContent({ sessionId, registrationId, returnTo }: { session
     setRetryAllowed(false)
     setStatusCheckFailed(false)
     try {
-      const booking = await memberBookingsApi.create({ sessionId, packageRegistrationId: registrationId })
+      const booking = await memberBookingsApi.create({ sessionId: resource.data.session.id, packageRegistrationId: registrationId })
       navigate(`/member/bookings/confirmed/${booking.id}`, { replace: true, state: { returnTo } })
     } catch (cause) {
       submitted.current = false
@@ -238,6 +240,7 @@ export function BookingConfirmedPage() {
       <div className="booking-confirmation__mark" aria-hidden="true" />
       <Badge tone="success">Confirmed</Badge>
       <h2>{booking.className || `${booking.sportName || 'Sport'} session`}</h2>
+      <SessionContext {...booking} sessionId={booking.sessionCode} date={booking.sessionDate} />
       <p className="booking-code">Booking code: <strong>{booking.bookingCode}</strong></p>
       <dl className="browse-facts booking-confirmation__facts">
         <div><dt>Date</dt><dd>{bookingDate(booking.sessionDate)}</dd></div>

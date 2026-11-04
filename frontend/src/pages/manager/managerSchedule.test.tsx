@@ -9,13 +9,13 @@ import { addDays, centerNow, displayDate, monday } from './scheduleModel'
 
 const date = addDays(monday(centerNow().date), 7)
 const item = { id: 5, code: 'CL-005', name: 'Badminton foundations', sportId: 1, sportName: 'Badminton', ageGroupId: 1, ageGroupLabel: 'Adults', level: 'BEGINNER', coachId: 3, coachName: 'Quan Coach', maxMembers: 20, upcomingSessions: 1, active: true }
-const session = { id: 7, date, startTime: '09:00:00', endTime: '10:00:00', class: { id: 5, code: item.code, name: item.name }, coach: { id: 3, name: 'Quan Coach' }, facility: { id: 1, name: 'Court A' }, capacity: 20, bookedCount: 2, trainingType: 'COACH_LED', status: 'PUBLISHED', cancelReason: null }
+const session = { id: 7, scheduleRevision: 2, date, startTime: '09:00:00', endTime: '10:00:00', class: { id: 5, code: item.code, name: item.name }, coach: { id: 3, name: 'Quan Coach' }, facility: { id: 1, name: 'Court A' }, capacity: 20, bookedCount: 2, trainingType: 'COACH_LED', status: 'PUBLISHED', cancelReason: null }
 const cancelledSession = { ...session, id: 8, status: 'CANCELLED', cancelReason: 'Maintenance' }
 const tokensCss = readFileSync('src/styles/tokens.css', 'utf8')
 const scheduleCss = readFileSync('src/styles/managerSchedule.css', 'utf8')
 let injectedStyles: HTMLStyleElement
 
-function backend(conflict = false, facilitiesMissing: boolean | number = false, schedule: unknown[] = [session, cancelledSession]) {
+function backend(conflict = false, facilitiesMissing: boolean | number = false, schedule: unknown[] = [session, cancelledSession], editResult: unknown = session) {
   return installFakeFetch((call) => {
     const path = call.path.split('?')[0]
     if (path === '/users/me') return json(200, MANAGER)
@@ -24,7 +24,8 @@ function backend(conflict = false, facilitiesMissing: boolean | number = false, 
     if (path === '/facilities') return facilitiesMissing ? backendError(typeof facilitiesMissing === 'number' ? facilitiesMissing : 404, 'Facility endpoint unavailable') : json(200, [{ id: 1, name: 'Court A', active: true }])
     if (path === '/manager/sessions') return json(200, schedule)
     if (path === '/manager/classes/5/sessions' && call.method === 'POST') return conflict ? json(409, { status: 409, message: 'Schedule conflict', details: { conflicts: [{ sessionId: 7, requestedDate: date, date, startTime: '09:00:00', endTime: '10:00:00', class: session.class, coach: session.coach, facility: session.facility, conflictType: 'BOTH' }, { sessionId: 9, requestedDate: date, date, startTime: '09:15:00', endTime: '10:15:00', class: null, coach: null, facility: null, conflictType: 'FACILITY' }] } }) : json(201, [session])
-    if (path === '/manager/sessions/7/cancel' || path === '/manager/sessions/7') return json(200, session)
+    if (path === '/manager/sessions/7/cancel') return json(200, session)
+    if (path === '/manager/sessions/7') return editResult instanceof Response ? editResult : json(200, editResult)
     return backendError(404, 'Unexpected test request')
   })
 }
@@ -97,7 +98,9 @@ describe('FE-07 schedule', () => {
     expect(screen.getAllByRole('button', { name: 'Cancel session' })).toHaveLength(12)
   })
   it('shows multiple time slots and sorts same-time sessions regardless of API order', async () => {
-    const namedSession = (id: number, name: string, sessionDate = date, startTime = '09:00:00', endTime = '10:00:00') => ({
+    // Keep both fixture days inside the selected week, including Sunday runs.
+    const sortDate = monday(date)
+    const namedSession = (id: number, name: string, sessionDate = sortDate, startTime = '09:00:00', endTime = '10:00:00') => ({
       ...session,
       id,
       date: sessionDate,
@@ -107,11 +110,11 @@ describe('FE-07 schedule', () => {
     })
     backend(false, false, [
       namedSession(30, 'Zulu class'),
-      namedSession(31, 'Next day class', addDays(date, 1)),
-      namedSession(32, 'Later class', date, '10:00:00', '11:00:00'),
+      namedSession(31, 'Next day class', addDays(sortDate, 1)),
+      namedSession(32, 'Later class', sortDate, '10:00:00', '11:00:00'),
       namedSession(33, 'Alpha class'),
     ])
-    renderApp(`/manager/schedule?week=${monday(date)}`)
+    renderApp(`/manager/schedule?week=${sortDate}`)
 
     const table = await screen.findByRole('table', { name: 'Manager weekly schedule' })
     const rows = within(table).getAllByRole('row')
@@ -254,7 +257,7 @@ describe('FE-07 schedule', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Create schedule' }))
     const conflict = await screen.findByRole('dialog', { name: 'Schedule Conflict' })
     expect(within(conflict).getByText('2 conflicting sessions')).toBeInTheDocument()
-    expect(within(conflict).getByText('Session #9: Unassigned class')).toBeInTheDocument()
+    expect(within(conflict).getByText('Session ID Session ID unavailable: Unassigned class')).toBeInTheDocument()
     await user.click(within(conflict).getByRole('button', { name: 'Edit session' }))
     expect(within(dialog).getByLabelText(/^Date/)).toHaveValue(date)
     expect(api.calls.filter((call) => call.method === 'POST')).toHaveLength(1)
@@ -302,6 +305,8 @@ describe('FE-07 schedule', () => {
     const dialog = screen.getByRole('dialog', { name: 'Edit session' })
     expect(within(dialog).getByLabelText(/^Class/)).toBeDisabled()
     expect(within(dialog).getByLabelText(/^Training type/)).toBeDisabled()
+    expect(within(dialog).getByLabelText(/^Date/)).toBeEnabled()
+    expect(within(dialog).getByText(/Changing the date generates a new Session ID/)).toBeInTheDocument()
     fireEvent.change(within(dialog).getByLabelText(/^Capacity/), { target: { value: '1' } })
     await user.click(within(dialog).getByRole('button', { name: 'Save session' }))
     expect(await within(dialog).findByText('Capacity must be a whole number from 2 to 20.')).toBeInTheDocument()
@@ -311,4 +316,54 @@ describe('FE-07 schedule', () => {
     await waitFor(() => expect(api.calls.some((call) => call.path === '/manager/sessions/7' && call.method === 'PUT')).toBe(true))
     expect(api.calls.find((call) => call.method === 'PUT')?.body).not.toHaveProperty('trainingType')
   })
+  it('submits the edited date, revision and optional reason while preserving the numeric session', async () => {
+    const api = backend()
+    const user = userEvent.setup()
+    renderApp(`/manager/schedule?week=${monday(date)}`)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit session' })
+    fireEvent.change(within(dialog).getByLabelText(/^Date/), { target: { value: addDays(date, 2) } })
+    await user.type(within(dialog).getByLabelText('Rescheduling reason (optional)'), 'Facility maintenance')
+    await waitFor(() => expect(within(dialog).getByLabelText(/^Coach/)).toBeEnabled())
+    await user.click(within(dialog).getByRole('button', { name: 'Save session' }))
+    await waitFor(() => expect(api.calls.find((call) => call.method === 'PUT')?.body).toMatchObject({
+      date: addDays(date, 2), expectedRevision: 2, rescheduleReason: 'Facility maintenance', capacity: 20,
+    }))
+    expect(api.calls.find((call) => call.method === 'PUT')?.path).toBe('/manager/sessions/7')
+  })
+
+  it('shows the regenerated code and follows a move outside the displayed week', async () => {
+    const target = addDays(date, 8)
+    const code = `${target.slice(8, 10)}${target.slice(5, 7)}${target.slice(2, 4)}BM02`
+    backend(false, false, [session], { ...session, date: target, sessionId: code, scheduleRevision: 3 })
+    const user = userEvent.setup()
+    renderApp(`/manager/schedule?week=${monday(date)}`)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit session' })
+    fireEvent.change(within(dialog).getByLabelText(/^Date/), { target: { value: target } })
+    await waitFor(() => expect(within(dialog).getByLabelText(/^Coach/)).toBeEnabled())
+    await user.click(within(dialog).getByRole('button', { name: 'Save session' }))
+    expect(await screen.findByText(`Session ${code} saved for ${displayDate(target)}`)).toBeInTheDocument()
+    expect(await screen.findByText(`${displayDate(monday(target))} - ${displayDate(addDays(monday(target), 6))}`)).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+  it('keeps the date and reason draft after a stale revision conflict', async () => {
+    backend(false, false, [session], backendError(409, 'The session has changed. Reload it before saving again.'))
+    const user = userEvent.setup()
+    renderApp(`/manager/schedule?week=${monday(date)}`)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit session' })
+    fireEvent.change(within(dialog).getByLabelText(/^Date/), { target: { value: addDays(date, 1) } })
+    await user.type(within(dialog).getByLabelText('Rescheduling reason (optional)'), 'Member availability')
+    await waitFor(() => expect(within(dialog).getByLabelText(/^Coach/)).toBeEnabled())
+    await user.click(within(dialog).getByRole('button', { name: 'Save session' }))
+    expect(await within(dialog).findByText(/The session has changed/)).toBeInTheDocument()
+    expect(within(dialog).getByLabelText(/^Date/)).toHaveValue(addDays(date, 1))
+    expect(within(dialog).getByLabelText('Rescheduling reason (optional)')).toHaveValue('Member availability')
+    expect(screen.queryByText('Schedule updated')).not.toBeInTheDocument()
+  })
+
 })

@@ -277,6 +277,9 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         PaymentItemResolver.PaymentItemSummary summary = itemResolver.summarize(payment);
+        var invoiceOpt = itemResolver.findInvoice(payment.getId());
+        Long invoiceId = invoiceOpt.map(com.sportify.payment.entity.Invoice::getId).orElse(null);
+        String invoiceNumber = invoiceOpt.map(com.sportify.payment.entity.Invoice::getInvoiceNumber).orElse(null);
 
         return PaymentResponse.builder()
                 .id(payment.getId())
@@ -294,6 +297,8 @@ public class PaymentServiceImpl implements PaymentService {
                 .settlementType(payment.getSettlementType())
                 .settlementProvider(payment.getSettlementProvider())
                 .simulatedTransactionId(payment.getSimulatedTransactionId())
+                .invoiceId(invoiceId)
+                .invoiceNumber(invoiceNumber)
                 .notes(payment.getNotes())
                 .paymentTime(payment.getPaymentTime())
                 .createdAt(payment.getCreatedAt())

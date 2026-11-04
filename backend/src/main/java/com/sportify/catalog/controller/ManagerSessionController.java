@@ -33,6 +33,25 @@ import java.util.List;
 public class ManagerSessionController {
     private final ManagerSessionService managerSessionService;
 
+    @GetMapping("/sessions/by-code/{sessionId}")
+    public ResponseEntity<ManagerSessionResponse> getByCode(@PathVariable String sessionId) {
+        return ResponseEntity.ok(managerSessionService.getSessionByCode(sessionId));
+    }
+
+    @PutMapping("/sessions/by-code/{sessionId}")
+    public ResponseEntity<ManagerSessionResponse> updateByCode(@PathVariable String sessionId,
+            @Valid @RequestBody SessionUpdateRequest request, @AuthenticationPrincipal CustomUserDetails principal) {
+        return ResponseEntity.ok(managerSessionService.updateSession(
+                managerSessionService.getSessionByCode(sessionId).id(), request, actor(principal)));
+    }
+
+    @PutMapping("/sessions/by-code/{sessionId}/cancel")
+    public ResponseEntity<ManagerSessionResponse> cancelByCode(@PathVariable String sessionId,
+            @Valid @RequestBody SessionCancelRequest request, @AuthenticationPrincipal CustomUserDetails principal) {
+        return ResponseEntity.ok(managerSessionService.cancelSession(
+                managerSessionService.getSessionByCode(sessionId).id(), request, actor(principal)));
+    }
+
     @GetMapping("/sessions")
     public ResponseEntity<List<ManagerSessionResponse>> listSessions(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

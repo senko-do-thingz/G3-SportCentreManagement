@@ -12,14 +12,14 @@ describe('format', () => {
   })
 
   it('formats LocalDate values without a time zone shift', () => {
-    expect(formatDate('2027-07-04')).toBe('04 Jul 2027')
-    expect(parseDate('2026-01-01')?.getDate()).toBe(1)
+    expect(formatDate('2027-07-04')).toBe('04/07/2027')
+    expect(parseDate('2026-01-01')?.toISOString()).toBe('2025-12-31T17:00:00.000Z')
     expect(formatDate(undefined)).toBe('-')
     expect(formatDate('not a date')).toBe('-')
   })
 
   it('formats LocalDateTime values', () => {
-    expect(formatDateTime('2026-10-05T17:00:00')).toBe('05 Oct 2026, 17:00')
+    expect(formatDateTime('2026-10-05T17:00:00')).toBe('05/10/2026 17:00')
     expect(formatTime('2026-10-05T18:30:00')).toBe('18:30')
   })
 

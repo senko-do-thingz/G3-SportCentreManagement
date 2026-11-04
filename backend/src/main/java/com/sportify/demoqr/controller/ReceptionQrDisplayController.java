@@ -1,6 +1,7 @@
 package com.sportify.demoqr.controller;
 
 import com.sportify.core.common.SecurityUtils;
+import com.sportify.demoqr.config.SimulatedSettlementEnabledCondition;
 import com.sportify.demoqr.service.DemoQrException;
 import com.sportify.demoqr.service.DemoQrService;
 import com.sportify.demoqr.service.SqlQrStore;
@@ -12,8 +13,7 @@ import com.sportify.payment.entity.PaymentStatus;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.service.impl.PaymentItemResolver;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Profile;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,8 +36,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/payments/simulated-qr/desk-projection")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('RECEPTIONIST', 'MANAGER')")
-@Profile("qr-simulator & !prod & !production")
-@ConditionalOnProperty(name = "app.payment.simulator.enabled", havingValue = "true")
+@Conditional(SimulatedSettlementEnabledCondition.class)
 public class ReceptionQrDisplayController {
 
     private final PaymentRepository paymentRepository;

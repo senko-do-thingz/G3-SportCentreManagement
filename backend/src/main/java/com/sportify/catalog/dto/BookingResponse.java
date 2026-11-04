@@ -16,7 +16,10 @@ import java.time.LocalTime;
 public class BookingResponse {
     private Long id;
     private String bookingCode;
+    /** Deprecated numeric session reference retained for existing v1 consumers. */
+    @Deprecated
     private Long sessionId;
+    private String sessionCode;
     private LocalDate sessionDate;
     private LocalTime startTime;
     private LocalTime endTime;

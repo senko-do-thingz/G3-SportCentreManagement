@@ -1,3 +1,7 @@
+import { formatDateTime } from '../../utils/format'
+import { formatCalendarDate, formatClockTime } from '../../utils/date'
+import { isCalendarDate } from '../../api/responseValidation'
+import { sessionIdText } from '../../api/sessionIdentity'
 import { ApiError } from '../../api/errors'
 import type { MemberBookingRecord } from '../../api/memberBookingsApi'
 import type { SessionDetail, SuitableRegistration } from '../../api/memberSessionsApi'
@@ -18,22 +22,20 @@ export function eligibleRegistrations(detail: SessionDetail): SuitableRegistrati
 }
 
 export function bookingDate(value: string): string {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.split('-').reverse().join('/') : 'Date unavailable'
+  return formatCalendarDate(value)
 }
 
 export function bookingTime(value: string | null): string {
-  return value && /^(?:[01]\d|2[0-3]):[0-5]\d/.test(value) ? value.slice(0, 5) : 'Time unavailable'
+  return formatClockTime(value)
 }
 
 /** The backend allows member cancellation until two hours before the local session start. */
 export function cancellationDeadline(booking: Pick<MemberBookingRecord, 'sessionDate' | 'startTime'>): string | null {
-  if (!booking.startTime || !/^\d{4}-\d{2}-\d{2}$/.test(booking.sessionDate) || !/^([01]\d|2[0-3]):[0-5]\d/.test(booking.startTime)) return null
+  if (!booking.startTime || !isCalendarDate(booking.sessionDate) || !/^([01]\d|2[0-3]):[0-5]\d/.test(booking.startTime)) return null
   const [year, month, day] = booking.sessionDate.split('-').map(Number)
   const [hour, minute] = booking.startTime.split(':').map(Number)
   const deadline = new Date(Date.UTC(year, month - 1, day, hour - 2, minute) - 7 * 60 * 60 * 1000)
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).format(deadline)
+  return formatDateTime(deadline)
 }
 
 export function bookingErrorMessage(error: unknown): string {
@@ -56,7 +58,7 @@ export function bookingErrorMessage(error: unknown): string {
 }
 
 function calendarStamp(date: string, time: string): string | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^([01]\d|2[0-3]):[0-5]\d/.test(time)) return null
+  if (!isCalendarDate(date) || !/^([01]\d|2[0-3]):[0-5]\d/.test(time)) return null
   const [year, month, day] = date.split('-').map(Number)
   const [hour, minute] = time.split(':').map(Number)
   const value = new Date(Date.UTC(year, month - 1, day, hour - 7, minute))
@@ -78,7 +80,7 @@ export function bookingCalendarHref(booking: MemberBookingRecord): string | null
     `UID:booking-${booking.id}@sportify`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')}`,
     `DTSTART:${start}`, `DTEND:${end}`, `SUMMARY:${escapeCalendarText(title)}`,
     ...(location ? [`LOCATION:${escapeCalendarText(location)}`] : []),
-    `DESCRIPTION:${escapeCalendarText(`Booking ${booking.bookingCode}`)}`, 'END:VEVENT', 'END:VCALENDAR', '',
+    `DESCRIPTION:${escapeCalendarText(`Booking ${booking.bookingCode}; Session ID ${sessionIdText(booking.sessionCode)}`)}`, 'END:VEVENT', 'END:VCALENDAR', '',
   ]
   return `data:text/calendar;charset=utf-8,${encodeURIComponent(lines.join('\r\n'))}`
 }

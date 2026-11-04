@@ -1,3 +1,5 @@
+import { sessionIdText, sessionRouteReference } from '../../api/sessionIdentity'
+import '../../components/sessionContext.css'
 import { Link } from 'react-router-dom'
 import type { BrowseSession } from '../../api/memberSessionsApi'
 import { Badge, buttonClassName } from '../../components/ui'
@@ -34,13 +36,14 @@ export function SessionCard({ session, returnTo }: { session: BrowseSession; ret
         <h3>{session.className || `${session.sportName} ${self ? 'Self-training' : 'Session'}`}</h3>
       </div>
       <div className="class-session-card__details">
-        <p><span className="class-session-card__detail-label">When</span>{browseDate(session.sessionDate)} · {session.startTime.slice(0, 5)}–{session.endTime.slice(0, 5)}</p>
-        <p><span className="class-session-card__detail-label">Coach</span>{self ? 'No coach required' : session.coachName || 'Not provided'}</p>
-        <p><span className="class-session-card__detail-label">Facility</span>{session.facilityName || 'Not provided'}</p>
+        <span className="session-identity">Session ID <code>{sessionIdText(session.sessionId)}</code></span>
+        <p><span className="class-session-card__detail-label">When</span>{browseDate(session.sessionDate)} - {session.startTime.slice(0, 5)}-{session.endTime.slice(0, 5)}</p>
+        <p><span className="class-session-card__detail-label">Coach</span>{self ? 'Self-training - No assigned coach' : session.coachName || 'Not provided'}</p>
+        <p><span className="class-session-card__detail-label">Facility</span>{session.facilityName || 'Facility not assigned'}</p>
       </div>
       <div className="class-session-card__footer">
         <Badge tone={session.full || session.freeSeats <= 0 ? 'warning' : 'success'}>{session.full || session.freeSeats <= 0 ? 'Fully booked' : `${session.freeSeats} ${session.freeSeats === 1 ? 'spot' : 'spots'} left`}</Badge>
-        <Link className={buttonClassName('secondary')} to={`/member/sessions/${session.id}?${new URLSearchParams({ returnTo })}`}>View session</Link>
+        <Link className={buttonClassName('secondary')} to={`/member/sessions/${sessionRouteReference(session)}?${new URLSearchParams({ returnTo })}`}>View session</Link>
       </div>
     </div>
   </article>

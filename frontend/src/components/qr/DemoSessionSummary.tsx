@@ -1,3 +1,4 @@
+import { formatDateTime } from '../../utils/format'
 import { useEffect, useState } from 'react'
 import type { DemoSession } from '../../api/demoQrApi'
 import { formatPaymentMoney, PAYMENT_PATHS } from '../../pages/member/paymentsModel'
@@ -29,7 +30,7 @@ export function DemoSessionSummary({ session, onDeadline }: { session: DemoSessi
       {session.transactionCode && <div><dt>Simulated transaction</dt><dd>{session.transactionCode}</dd></div>}
       {session.settlementType && <div><dt>Settlement provenance</dt><dd>{session.settlementType} ({session.settlementProvider ?? 'SPORTIFY_SIMULATOR'})</dd></div>}
       {session.invoiceNumber && <div><dt>Invoice</dt><dd>{session.invoiceNumber}</dd></div>}
-      <div><dt>Expires at (your local time)</dt><dd>{new Date(session.expiresAt).toLocaleString('en-GB')}</dd></div>
+      <div><dt>Expires at (Vietnam time)</dt><dd>{formatDateTime(session.expiresAt)}</dd></div>
     </dl>
     {session.state === 'PENDING' && <p>Time remaining: <span role="timer" aria-live="off">{remaining ?? '-'} seconds</span>. The server decides expiry.</p>}
     {session.state === 'AUTHORIZED_PENDING_SETTLEMENT' && <p className="notice notice--info">Legacy simulation state; refresh simulation status.</p>}
