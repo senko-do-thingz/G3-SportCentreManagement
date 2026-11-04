@@ -66,7 +66,7 @@ export function MemberSearchPage() {
   )
 
   return (
-    <div className="page reception-page">
+    <div className="page reception-page reception-member-search-page">
       <PageHeader
         eyebrow="Front desk"
         title="Member Search and Profile"
@@ -302,6 +302,7 @@ function PaymentHandoffModal({
       open
       onClose={onClose}
       title="Review payment request"
+      className="reception-member-search__modal"
       description={`${member.fullName} - ${code}`}
       footer={
         <>
@@ -441,7 +442,7 @@ function CreateMemberModal({
 
   if (created) {
     return (
-      <Modal key="created-member" open onClose={close} title="Member created" description="Give the temporary sign-in details to the member securely.">
+      <Modal key="created-member" open onClose={close} title="Member created" description="Give the temporary sign-in details to the member securely." className="reception-member-search__modal">
         <p>Member code: {created.member.memberCode ?? '-'}</p>
         <p>The temporary password is available only in this dialog. Ask the member to change it after signing in.</p>
         <Input label="Temporary password" type={revealed ? 'text' : 'password'} value={created.temporaryPassword} readOnly autoComplete="off" />
@@ -457,6 +458,7 @@ function CreateMemberModal({
     <Modal
       open={open}
       onClose={close}
+      className="reception-member-search__modal"
       dismissible={!saving}
       size="lg"
       title="Create member"
