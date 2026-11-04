@@ -218,7 +218,7 @@ describe('FE-07 schedule', () => {
     const region = screen.getByRole('region', { name: 'Weekly session timetable' })
     const table = within(region).getByRole('table', { name: 'Manager weekly schedule' })
     expect(getComputedStyle(region).overflowX).toBe('auto')
-    expect(getComputedStyle(table).minWidth).toBe('900px')
+    expect(getComputedStyle(table).minWidth).toBe('1280px')
     region.focus()
     expect(region).toHaveFocus()
     await user.tab()

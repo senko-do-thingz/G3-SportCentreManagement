@@ -1,4 +1,5 @@
 import { sessionIdText } from '../../api/sessionIdentity'
+import { SessionIdGuide } from '../../components/SessionIdGuide'
 import '../../components/sessionContext.css'
 import { useCallback, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -59,9 +60,10 @@ export function ManagerSchedulePage() {
   const facilitiesUsable = manualFacility || (facilities.status === 'ready' && facilities.data.some((item) => item.active !== false))
   const available = classes.status === 'ready' && facilitiesUsable && classes.data.some((item) => item.active)
   return <div className="page manager-page">
-    <PageHeader eyebrow="Class management" title="Schedule & Coach Assignment" description="Plan single sessions or a weekly schedule. Times use Vietnam time (UTC+7)." actions={<Button disabled={!available} onClick={() => setEditing('new')}>+ Create session</Button>} />
+    <PageHeader title="Schedule & Coach Assignment" description="Plan single sessions or a weekly schedule. Times use Vietnam time (UTC+7)." actions={<Button disabled={!available} onClick={() => setEditing('new')}>+ Create session</Button>} />
     <PreviewNotice />
     <Card title="Weekly schedule">
+      <SessionIdGuide />
       <div className="manager-filters">
         <Select label="Class" placeholder="All classes" value={classId ? String(classId) : ''} options={classes.status === 'ready' ? classes.data.map((item) => ({ value: String(item.id), label: `${item.name}${item.active ? '' : ' (Inactive)'}` })) : []} onChange={(event) => query('classId', event.target.value)} />
         <Select label="Coach" placeholder="All coaches" value={coachId ? String(coachId) : ''} options={coaches.status === 'ready' ? coaches.data.map((item) => ({ value: String(item.id), label: item.fullName })) : []} onChange={(event) => query('coachId', event.target.value)} />

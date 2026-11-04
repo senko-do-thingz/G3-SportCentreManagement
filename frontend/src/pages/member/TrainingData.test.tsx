@@ -10,6 +10,31 @@ import { TrainingPlanDetailPage } from './TrainingPages'
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Training request lifecycle', () => {
+  it('refreshes saved training data without navigating away', async () => {
+    let latest = 'Initial attendance'
+    const load = vi.fn(async () => latest)
+    render(<TrainingData load={load} refreshLabel="Refresh attendance">{value => <p>{value}</p>}</TrainingData>)
+    expect(await screen.findByText('Initial attendance')).toBeInTheDocument()
+    latest = 'Attendance updated by reception'
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh attendance' }))
+    expect(await screen.findByText('Attendance updated by reception')).toBeInTheDocument()
+    expect(screen.queryByText('Initial attendance')).not.toBeInTheDocument()
+    expect(load).toHaveBeenCalledTimes(2)
+  })
+
+  it('allows retry after a refresh fails without leaving the training page', async () => {
+    const load = vi.fn()
+      .mockResolvedValueOnce('Saved result')
+      .mockRejectedValueOnce(new Error('Training service unavailable'))
+      .mockResolvedValueOnce('Latest result')
+    render(<TrainingData load={load} refreshLabel="Refresh results">{value => <p>{String(value)}</p>}</TrainingData>)
+    await screen.findByText('Saved result')
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh results' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Training service unavailable')
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByText('Latest result')).toBeInTheDocument()
+  })
+
   it('hides the previous data immediately when the requested resource changes', async () => {
     const first = vi.fn(async () => 'First plan')
     let completeNext!: (value: string) => void
