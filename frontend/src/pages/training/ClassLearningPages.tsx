@@ -20,23 +20,30 @@ export function MemberClassDetailPage() {
 export function ClassQuestionsPage({ coach = false }: { coach?: boolean }) {
   const [revision, refresh] = useState(0)
   const [selected, setSelected] = useState('')
+  const [replyBody, setReplyBody] = useState('')
   const load = useCallback((signal: AbortSignal) => learning.questions(coach, signal), [coach])
   const discussion = useCallback((signal: AbortSignal) => learning.discussion(coach, selected, signal), [coach, selected])
   const action = useTrainingAction()
   const operation = useSubmissionIdentity()
   function reply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const form = event.currentTarget
-    const body = String(new FormData(form).get('body')).trim()
-    void action.run(async () => { await learning.reply(coach, selected, body, operation.key([coach, selected, body])); operation.complete(); form.reset(); refresh(value => value + 1) }, 'Message sent.')
+    const body = replyBody.trim()
+    if (!body) return
+    void action.run(async () => { await learning.reply(coach, selected, body, operation.key([coach, selected, body])); operation.complete(); setReplyBody(''); refresh(value => value + 1) }, 'Message sent.')
+  }
+  function selectQuestion(id: string) {
+    setSelected(id)
+    setReplyBody('')
+    action.reset()
   }
   return <div className="training-page"><PageHeader title={coach ? 'Member practice questions' : 'Ask your coach'} description="Discuss class exercises and supplementary practice with the assigned coach." />
-    {!coach && <TrainingData load={learning.classes}>{classes => <AskForm classes={classes} onSaved={id => { setSelected(String(id)); refresh(value => value + 1) }} />}</TrainingData>}
-    <TrainingData key={revision} load={load}>{questions => questions.length ? <Card title="Conversations"><Select label="Class question" placeholder="Select a conversation" value={selected} onChange={event => setSelected(event.target.value)} options={questions.map(q => ({ value: String(q.id), label: `${q.className} - ${q.memberName} - ${q.subject}` }))} /></Card> : <EmptyState title="No class questions yet" />}</TrainingData>
-    {selected && <TrainingData key={`${selected}-${revision}`} load={discussion}>{data => <Card title={data.question.subject}><p>{data.question.description}</p><ul className="training-list">{data.messages.map(message => <li key={message.id}><strong>{message.senderName}</strong><p className="training-copy">{message.body}</p></li>)}</ul><form onSubmit={reply} className="training-form"><TrainingTextarea label={coach ? 'Coach reply and practice guidance' : 'Follow-up question'} name="body" required maxLength={2000} disabled={action.pending} /><Button type="submit" loading={action.pending}>Send message</Button></form><ActionMessage {...action} /></Card>}</TrainingData>}
+    {!coach && <TrainingData load={learning.classes}>{classes => <AskForm classes={classes} disabled={action.pending} onSaved={id => { selectQuestion(String(id)); refresh(value => value + 1) }} />}</TrainingData>}
+    <div className="training-actions"><Button variant="secondary" disabled={action.pending} onClick={() => { action.reset(); refresh(value => value + 1) }}>Refresh conversations</Button></div>
+    <TrainingData key={revision} load={load}>{questions => questions.length ? <Card title="Conversations"><Select label="Class question" placeholder="Select a conversation" value={selected} disabled={action.pending} onChange={event => selectQuestion(event.target.value)} options={questions.map(q => ({ value: String(q.id), label: `${q.className} - ${q.memberName} - ${q.subject}` }))} /></Card> : <EmptyState title="No class questions yet" />}</TrainingData>
+    {selected && <TrainingData key={`${selected}-${revision}`} load={discussion}>{data => <Card title={data.question.subject}><p>{data.question.description}</p><ul className="training-list">{data.messages.map(message => <li key={message.id}><strong>{message.senderName}</strong><p className="training-copy">{message.body}</p></li>)}</ul><form onSubmit={reply} className="training-form"><TrainingTextarea label={coach ? 'Coach reply and practice guidance' : 'Follow-up question'} name="body" required maxLength={2000} value={replyBody} onChange={event => setReplyBody(event.target.value)} disabled={action.pending} /><Button type="submit" disabled={!replyBody.trim()} loading={action.pending}>Send message</Button></form><ActionMessage {...action} /></Card>}</TrainingData>}
   </div>
 }
-function AskForm({ classes, onSaved }: { classes: LearningClass[]; onSaved: (id: number) => void }) {
+function AskForm({ classes, onSaved, disabled }: { classes: LearningClass[]; onSaved: (id: number) => void; disabled: boolean }) {
   const [params] = useSearchParams()
   const action = useTrainingAction()
   const operation = useSubmissionIdentity()
@@ -48,7 +55,7 @@ function AskForm({ classes, onSaved }: { classes: LearningClass[]; onSaved: (id:
     const request = { classId: Number(values.get('classId')), subject: String(values.get('subject')).trim(), body: String(values.get('body')).trim() }
     void action.run(async () => { const created = await learning.ask(request, operation.key(request)); operation.complete(); form.reset(); onSaved(created.id) }, 'Question sent to your coach.')
   }
-  return <Card title="New question"><form onSubmit={submit} className="training-form"><fieldset className="training-fieldset" disabled={action.pending}><Select label="Your class" name="classId" required defaultValue={params.get('classId') ?? ''} placeholder="Select your class" options={classes.map(c => ({ value: String(c.id), label: c.name }))} /><Input label="Question subject" name="subject" required maxLength={200} /><TrainingTextarea label="Practice question" name="body" required maxLength={2000} /><Button type="submit" loading={action.pending}>Ask coach</Button></fieldset></form><ActionMessage {...action} /></Card>
+  return <Card title="New question"><form onSubmit={submit} className="training-form"><fieldset className="training-fieldset" disabled={action.pending || disabled}><Select label="Your class" name="classId" required defaultValue={params.get('classId') ?? ''} placeholder="Select your class" options={classes.map(c => ({ value: String(c.id), label: c.name }))} /><Input label="Question subject" name="subject" required maxLength={200} /><TrainingTextarea label="Practice question" name="body" required maxLength={2000} /><Button type="submit" loading={action.pending}>Ask coach</Button></fieldset></form><ActionMessage {...action} /></Card>
 }
 // Preserve the identity after an uncertain failure. Success or edited content starts a new operation.
 function useSubmissionIdentity() {
