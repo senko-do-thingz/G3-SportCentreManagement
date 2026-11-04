@@ -164,7 +164,7 @@
 }
 
 .reception-checkin {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .reception-form {
@@ -513,7 +513,6 @@
     grid-template-columns: 1fr;
   }
 }
-
 /* Front desk look aligned with the Manager workspace (.reception-page: Member Search, Register and Renew, Check-in). */
 .reception-page { gap: var(--space-6); }
 .reception-page .page-header { align-items: center; padding: var(--space-8); border: 0; border-radius: var(--radius-xl); background: linear-gradient(120deg, var(--color-hero-deep) 0%, var(--color-navy) 45%, var(--color-primary) 100%); box-shadow: var(--shadow-md); }

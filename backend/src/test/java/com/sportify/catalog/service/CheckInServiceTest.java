@@ -62,6 +62,7 @@ public class CheckInServiceTest {
     @org.mockito.Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-10-05T00:00:00Z"), ZoneId.of("UTC"));
 
+    @org.mockito.Mock com.sportify.catalog.service.OperationalMemberPolicy operationalMemberPolicy;
     @InjectMocks
     private CheckInServiceImpl checkInService;
 

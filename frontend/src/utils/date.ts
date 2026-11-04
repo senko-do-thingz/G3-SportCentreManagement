@@ -1,4 +1,5 @@
 /** Date helpers shared by every screen. */
+export { formatCalendarDate, formatClockTime } from './dateDisplay'
 
 /** Centre business day, matching the backend ClockConfig regardless of browser timezone. */
 export function businessDate(moment = new Date()): string {

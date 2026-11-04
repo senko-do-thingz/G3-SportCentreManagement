@@ -1,4 +1,5 @@
 import { api } from './client'
+import { optionalSessionId, type SessionId, type SessionSurrogateId } from './sessionIdentity'
 import { ApiError } from './errors'
 import { parsePage } from './page'
 import type { PageResponse } from './types'
@@ -11,7 +12,8 @@ const SCHEDULE_CHANGED_MESSAGE = 'The schedule changed while loading. Refresh to
 export type BrowseFormat = 'SELF_TRAINING' | 'COACH_LED'
 export type BrowseLevel = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'
 export interface BrowseSession {
-  id: number
+  id: SessionSurrogateId
+  sessionId?: SessionId
   sportId: number
   sportName: string
   classId: number | null
@@ -87,7 +89,7 @@ function asBrowseSession(value: unknown): BrowseSession {
     || value.freeSeats !== Math.max(0, value.capacity - value.bookedCount) || value.full !== (value.freeSeats === 0)) {
     throw new ApiError(0, 'Session details could not be read. Refresh availability and try again.')
   }
-  return { ...value, classId: value.classId ?? null, className: value.className ?? null, coachId: value.coachId ?? null, coachName: value.coachName ?? null, facilityId: value.facilityId ?? null, facilityName: value.facilityName ?? null, level: value.level ?? null } as unknown as BrowseSession
+  return { ...value, sessionId: optionalSessionId(value.sessionId), classId: value.classId ?? null, className: value.className ?? null, coachId: value.coachId ?? null, coachName: value.coachName ?? null, facilityId: value.facilityId ?? null, facilityName: value.facilityName ?? null, level: value.level ?? null } as unknown as BrowseSession
 }
 
 /** Complete a bounded calendar/lookup query. Failure never returns a misleading partial list. */
@@ -115,6 +117,10 @@ async function detail(id: number, signal?: AbortSignal): Promise<SessionDetail> 
   return asSessionDetail(value)
 }
 
+async function detailByCode(sessionId: SessionId, signal?: AbortSignal): Promise<SessionDetail> {
+  return asSessionDetail(await api.get<unknown>(`/sessions/by-code/${encodeURIComponent(sessionId)}`, { signal }))
+}
+
 async function eligibilityForMember(id: number, memberId: number, signal?: AbortSignal): Promise<SessionDetail> {
   if (!Number.isSafeInteger(id) || id <= 0 || !Number.isSafeInteger(memberId) || memberId <= 0) {
     throw new ApiError(0, 'Choose a valid member and session.')
@@ -140,4 +146,4 @@ function asSessionDetail(value: unknown): SessionDetail {
     || ![session.capacity, session.bookedCount, session.freeSeats].every((number) => Number.isFinite(number))) throw new ApiError(0, 'Session details could not be read. Refresh availability and try again.')
   return { ...detail, session }
 }
-export const memberSessionsApi = { list, all, detail, eligibilityForMember }
+export const memberSessionsApi = { list, all, detail, detailByCode, eligibilityForMember }

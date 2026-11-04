@@ -63,7 +63,32 @@ class DemoClassesIntegrationTest extends AbstractIntegrationTest {
         registry.add("spring.datasource.hikari.catalog", () -> DATABASE);
     }
 
+    private static JdbcTemplate historicalReplayJdbc;
     @Autowired JdbcTemplate jdbc;
+
+    @org.junit.jupiter.api.BeforeEach
+    void chooseReplaySchema(org.junit.jupiter.api.TestInfo test) throws Exception {
+        if (!test.getTags().contains("historical-seed")) return;
+        // Replay the immutable V29 script against its compatible pre-identity schema.
+        // Latest-schema bootstrap and HTTP contracts remain on the application V39 database.
+        synchronized (DemoClassesIntegrationTest.class) {
+            if (historicalReplayJdbc == null) {
+                String catalog = "be15_history_" + UUID.randomUUID().toString().replace("-", "");
+                try (var connection = DriverManager.getConnection(MSSQL_SERVER_CONTAINER.getJdbcUrl(),
+                        MSSQL_SERVER_CONTAINER.getUsername(), MSSQL_SERVER_CONTAINER.getPassword());
+                     var statement = connection.createStatement()) {
+                    statement.execute("CREATE DATABASE [" + catalog + "]");
+                }
+                String url = MSSQL_SERVER_CONTAINER.getJdbcUrl().replaceAll("(?i);databaseName=[^;]*", "") + ";databaseName=" + catalog;
+                var source = new org.springframework.jdbc.datasource.DriverManagerDataSource(url,
+                        MSSQL_SERVER_CONTAINER.getUsername(), MSSQL_SERVER_CONTAINER.getPassword());
+                Flyway.configure().dataSource(source).locations("classpath:db/migration/identity", "classpath:db/migration/catalog", "classpath:db/demo")
+                        .target("37").cleanDisabled(true).load().migrate();
+                historicalReplayJdbc = new JdbcTemplate(source);
+            }
+        }
+        jdbc = historicalReplayJdbc;
+    }
     @Autowired PlatformTransactionManager transactions;
     @Autowired Flyway flyway;
     @Autowired MockMvc mvc;
@@ -98,7 +123,7 @@ class DemoClassesIntegrationTest extends AbstractIntegrationTest {
         return call(request, 200);
     }
     void rollback(Runnable action) {
-        new TransactionTemplate(transactions).executeWithoutResult(status -> { status.setRollbackOnly(); action.run(); });
+        new TransactionTemplate(jdbc == historicalReplayJdbc ? new org.springframework.jdbc.datasource.DataSourceTransactionManager(jdbc.getDataSource()) : transactions).executeWithoutResult(status -> { status.setRollbackOnly(); action.run(); });
     }
     void replay() { SqlServerScriptReplay.execute(jdbc, SQL); }
     void failure(int error, Runnable action) {
@@ -116,6 +141,9 @@ class DemoClassesIntegrationTest extends AbstractIntegrationTest {
                 .doesNotHaveDuplicates().containsSubsequence("27", "28", "29", "30");
         assertThat(count("SELECT COUNT(*) FROM flyway_schema_history WHERE version = '29' AND script = 'V29__seed_demo_classes_and_sessions.sql' AND success = 1")).isEqualTo(1);
         assertShape();
+        assertThat(count("SELECT COUNT(*) FROM class_session WHERE class_id IN (SELECT id FROM sport_class WHERE code LIKE 'DEMO-CL-%') AND session_code IS NOT NULL")).isEqualTo(48);
+        assertThat(count("SELECT COUNT(DISTINCT session_code) FROM class_session WHERE class_id IN (SELECT id FROM sport_class WHERE code LIKE 'DEMO-CL-%')")).isEqualTo(48);
+        assertThat(count("SELECT COUNT(*) FROM flyway_schema_history WHERE version='39' AND success=1")).isEqualTo(1);
     }
 
     @Test
@@ -183,6 +211,7 @@ class DemoClassesIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @org.junit.jupiter.api.Tag("historical-seed")
     void repeatFlywayStartupAndStandaloneSqlReplayDoNotChangeRowsOrCredits() {
         String before = snapshot(jdbc);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
@@ -192,6 +221,7 @@ class DemoClassesIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @org.junit.jupiter.api.Tag("historical-seed")
     void seedReplaysSerializeWithoutDuplicateRowsOrDoubleConsumption() throws Exception {
         String before = snapshot(jdbc);
         try (var pool = Executors.newFixedThreadPool(2)) {
@@ -203,6 +233,7 @@ class DemoClassesIntegrationTest extends AbstractIntegrationTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"class", "session", "class-coach", "facility", "package", "registration", "booking-debited", "booking-refunded"})
+    @org.junit.jupiter.api.Tag("historical-seed")
     void reconstructablePartialStatesRepairOnlyMissingFixtures(String missing) {
         rollback(() -> {
             switch (missing) {
@@ -243,6 +274,7 @@ class DemoClassesIntegrationTest extends AbstractIntegrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"class-name", "class-coach", "inactive-class", "session-capacity", "session-status", "duplicate-session",
             "package-price", "registration-owner", "credit-corruption", "counter-corruption", "coach-link", "facility-inactive", "booking-owner"})
+    @org.junit.jupiter.api.Tag("historical-seed")
     void conflictingOrAmbiguousStatesFailAtomically(String conflict) {
         int expected = switch (conflict) {
             case "coach-link", "facility-inactive" -> 51501;
@@ -272,6 +304,7 @@ class DemoClassesIntegrationTest extends AbstractIntegrationTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"coach-DRAFT", "coach-PUBLISHED", "facility-DRAFT", "facility-PUBLISHED"})
+    @org.junit.jupiter.api.Tag("historical-seed")
     void existingBlockingSessionsRejectWholeSeedRepair(String scenario) {
         failure(51503, () -> {
             boolean coachConflict = scenario.startsWith("coach-");
@@ -288,6 +321,7 @@ class DemoClassesIntegrationTest extends AbstractIntegrationTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"CANCELLED", "COMPLETED", "ADJACENT"})
+    @org.junit.jupiter.api.Tag("historical-seed")
     void nonBlockingOrAdjacentExistingSessionsRemainUntouched(String scenario) {
         rollback(() -> {
             long target = session("DEMO-CL-BAD-BEG", 0, "COACH_LED");
@@ -302,6 +336,7 @@ class DemoClassesIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @org.junit.jupiter.api.Tag("historical-seed")
     void missingPastSessionIsRejectedRatherThanMovingScheduleForward() {
         failure(51505, () -> {
             // Move the complete empty fixture backward while preserving the shared persisted anchor.

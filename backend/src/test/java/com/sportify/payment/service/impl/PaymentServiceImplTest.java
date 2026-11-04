@@ -661,6 +661,8 @@ class PaymentServiceImplTest {
         PaymentResponse response = paymentService.getPayment(10L, ownerUser);
 
         assertThat(response.getItemDescription()).isEqualTo("Invoice INV-1001");
+        assertThat(response.getInvoiceId()).isEqualTo(40L);
+        assertThat(response.getInvoiceNumber()).isEqualTo("INV-1001");
         assertThat(response.getOriginalPrice()).isEqualByComparingTo(BigDecimal.valueOf(900000.00));
         assertThat(response.getDiscount()).isEqualByComparingTo(BigDecimal.valueOf(90000.00));
     }
@@ -690,6 +692,8 @@ class PaymentServiceImplTest {
         PaymentResponse response = paymentService.getPayment(10L, ownerUser);
 
         assertThat(response.getItemDescription()).isEqualTo("Invoice INV-0042");
+        assertThat(response.getInvoiceId()).isEqualTo(42L);
+        assertThat(response.getInvoiceNumber()).isEqualTo("INV-0042");
         assertThat(response.getOriginalPrice()).isEqualByComparingTo(BigDecimal.valueOf(420000.00));
         assertThat(response.getDiscount()).isEqualByComparingTo(BigDecimal.valueOf(42000.00));
     }

@@ -1,3 +1,4 @@
+import { SessionContext } from '../../components/SessionContext'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { memberApi, type MemberBooking, type MemberCard, type PackageRegistration } from '../../api/memberApi'
@@ -21,7 +22,6 @@ import {
   registrationTitle,
   remainingSessionCount,
   sessionShare,
-  shortTime,
   STANDARD_TIER_NAME,
   startsLater,
   toIsoDate,
@@ -448,11 +448,8 @@ function UpcomingSessionsCard({
                 {booking.sportName ?? 'Session'}
                 {booking.trainingType ? ` - ${trainingFormatLabel(booking.trainingType)}` : ''}
               </p>
-              <p className="dashboard-list__meta">
-                {formatDate(booking.sessionDate)}
-                {booking.startTime ? `, ${shortTime(booking.startTime)}` : ''}
-                {booking.endTime ? ` to ${shortTime(booking.endTime)}` : ''} - {booking.bookingCode}
-              </p>
+              <SessionContext {...booking} sessionId={booking.sessionCode} date={booking.sessionDate} />
+              <p className="dashboard-list__meta">Booking code: {booking.bookingCode}</p>
             </div>
             <StatusBadge status={booking.status} />
           </li>

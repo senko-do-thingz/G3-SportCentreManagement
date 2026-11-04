@@ -43,7 +43,7 @@ class ReceptionBookingServiceTest {
     SportPackageRegistration registration;
 
     @BeforeEach void setup() {
-        service = new BookingServiceImpl(bookings, sessions, registrations, members, checkIns, codes, CLOCK, em, audit);
+        service = new BookingServiceImpl(bookings, sessions, registrations, members, checkIns, codes, CLOCK, em, audit, mock(TrainingWriteService.class), mock(OperationalMemberPolicy.class));
         member = MemberProfile.builder().id(2L).memberCode("MEM-2").userAccount(account("MEMBER", 2)).build();
         session = session();
         registration = registration(200); registration.setMember(member);

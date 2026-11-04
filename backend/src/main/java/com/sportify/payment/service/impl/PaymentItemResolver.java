@@ -98,6 +98,15 @@ public class PaymentItemResolver {
         return items;
     }
 
+    /** Find the primary invoice for a payment, if one exists. */
+    public Optional<Invoice> findInvoice(Long paymentId) {
+        if (paymentId == null) {
+            return Optional.empty();
+        }
+        return invoiceRepository.findByPaymentId(paymentId).stream()
+                .min(Comparator.comparing(Invoice::getId, Comparator.nullsLast(Comparator.naturalOrder())));
+    }
+
     /**
      * Summary of one payment, for GET /api/v1/payments/{id}: the item if there is one, otherwise the first invoice,
      * otherwise the payment itself.

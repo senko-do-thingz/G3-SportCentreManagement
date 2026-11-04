@@ -35,6 +35,8 @@ public class PaymentResponse {
     private String settlementType;
     private String settlementProvider;
     private Long simulatedTransactionId;
+    private Long invoiceId;
+    private String invoiceNumber;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

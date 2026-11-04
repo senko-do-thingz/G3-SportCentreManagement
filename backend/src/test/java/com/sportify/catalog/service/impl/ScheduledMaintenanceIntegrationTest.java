@@ -1,5 +1,6 @@
 package com.sportify.catalog.service.impl;
 
+import com.sportify.support.SessionIdentityFixtures;
 import com.sportify.IsolatedMaintenanceDatabase;
 import com.sportify.catalog.entity.*;
 import com.sportify.catalog.repository.*;
@@ -308,7 +309,7 @@ class ScheduledMaintenanceIntegrationTest {
         long line = id("INSERT INTO invoice_line(invoice_id,item_type,item_reference_id,description,quantity,"
                 + "unit_price,line_total) OUTPUT INSERTED.id VALUES (?,'SPORT_PACKAGE',?,'BE06 snapshot',1,100,100)", invoice, expiredReg);
         long session = id("INSERT INTO class_session(sport_id,session_date,start_time,end_time,training_type,"
-                + "booked_count,status) OUTPUT INSERTED.id VALUES (?,?,'09:00','10:00','SELF_TRAINING',1,'COMPLETED')", sport, TODAY.minusDays(2));
+                + "booked_count,status,session_code) OUTPUT INSERTED.id VALUES (?,?,'09:00','10:00','SELF_TRAINING',1,'COMPLETED',?)", sport, TODAY.minusDays(2), SessionIdentityFixtures.reserve(jdbc, TODAY.minusDays(2), "FOOTBALL"));
         long booking = id("INSERT INTO booking(booking_code,session_id,member_id,package_registration_id) "
                 + "OUTPUT INSERTED.id VALUES (?,?,?,?)", code(), session, member, expiredReg);
         long attendance = id("INSERT INTO check_in(member_id,recorded_by,booking_id,result) "

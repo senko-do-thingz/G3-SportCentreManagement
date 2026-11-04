@@ -23,7 +23,8 @@ import java.util.Map;
         DemoQrController.class,
         LegacyDemoQrController.class,
         SimulatorCapabilityController.class,
-        ReceptionQrDisplayController.class
+        ReceptionQrDisplayController.class,
+        LocalDemoPaymentController.class
 })
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class DemoQrAdvice implements ResponseBodyAdvice<Object> {

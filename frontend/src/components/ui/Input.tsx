@@ -1,4 +1,5 @@
 import { useId, type InputHTMLAttributes, type ReactNode } from 'react'
+import { formatCalendarDate, formatMonthRange, formatWeekRange } from '../../utils/dateDisplay'
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: ReactNode
@@ -15,7 +16,7 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 
 export function Input({
   label,
-  hint,
+  hint: suppliedHint,
   error,
   reserveErrorSpace = false,
   labelAction,
@@ -28,6 +29,12 @@ export function Input({
 }: InputProps) {
   const generatedId = useId()
   const inputId = id ?? generatedId
+  const selectedValue = rest.value ?? rest.defaultValue
+  const calendarValue = typeof selectedValue === 'string' ? selectedValue : ''
+  const dateHint = rest.type === 'date' ? (calendarValue ? `Selected date: ${formatCalendarDate(calendarValue)}` : 'Date format: dd/MM/yyyy')
+    : rest.type === 'month' && calendarValue ? `Selected period: ${formatMonthRange(calendarValue)}`
+      : rest.type === 'week' && calendarValue ? `Selected week: ${formatWeekRange(calendarValue)}` : null
+  const hint = suppliedHint && dateHint ? <>{suppliedHint}<br />{' '}{dateHint}</> : suppliedHint || dateHint
   const hintId = hint ? `${inputId}-hint` : undefined
   const errorId = error ? `${inputId}-error` : undefined
   const describedBy = [hintId, errorId, extraDescribedBy].filter(Boolean).join(' ') || undefined

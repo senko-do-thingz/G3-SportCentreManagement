@@ -304,9 +304,34 @@
       "creates": [],
       "drops": [],
       "sha256_lf": "1250cf917a2b750417f7d19d7c8fe93481f828b9547ba2e1f30dcdc9da618715"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V37__personal_member_training.sql",
+      "version": 37,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "e516fa2d1324fa885ad2c4ad6a96a239ea797a21bf2dc0d3cdba57efb94cd77e"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V39__canonical_session_identity.sql",
+      "version": 39,
+      "creates": [
+        "session_code_counter"
+      ],
+      "drops": [],
+      "sha256_lf": "df04f898fe9d5d813977612ab63230fb63a0f05f9b997ae54b05cfe37400c59b"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V40__session_rescheduling_history.sql",
+      "version": 40,
+      "creates": [
+        "session_code_history"
+      ],
+      "drops": [],
+      "sha256_lf": "dd75a6ed51135717364f8fb21bd6e55c41dc25c99e1d4cac2f98c5128f752e02"
     }
   ],
-  "create_occurrences": 66,
+  "create_occurrences": 68,
   "create_names": [
     "[activity_log]",
     "[age_group]",
@@ -373,6 +398,8 @@
     "permission",
     "role",
     "role_permission",
+    "session_code_counter",
+    "session_code_history",
     "user_account"
   ],
   "drop_occurrences": [],
@@ -441,6 +468,12 @@
       "path": "backend/src/main/java/com/sportify/catalog/entity/RefundRequest.java",
       "tables": [
         "refund_request"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/catalog/entity/SessionCodeHistory.java",
+      "tables": [
+        "session_code_history"
       ]
     },
     {
@@ -598,7 +631,7 @@
     {
       "id": "S10",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/CheckInServiceImpl.java",
-      "line": 48,
+      "line": 49,
       "definition": "public CheckInResponse recordCheckIn"
     },
     {
@@ -616,13 +649,13 @@
     {
       "id": "S13",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java",
-      "line": 74,
+      "line": 77,
       "definition": "public BookingResponse createBooking"
     },
     {
       "id": "S14",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java",
-      "line": 327,
+      "line": 334,
       "definition": "recordSelfTrainingAttendance"
     },
     {
@@ -634,13 +667,13 @@
     {
       "id": "S16",
       "path": "backend/src/main/java/com/sportify/catalog/repository/CoachScheduleReadRepository.java",
-      "line": 46,
+      "line": 49,
       "definition": "findRoster"
     },
     {
       "id": "S17",
       "path": "backend/src/main/java/com/sportify/catalog/repository/ClassSessionRepository.java",
-      "line": 67,
+      "line": 77,
       "definition": "findForUpdate"
     },
     {
@@ -706,7 +739,7 @@
     {
       "id": "S28",
       "path": "backend/pom.xml",
-      "line": 181,
+      "line": 191,
       "definition": "maven-surefire-plugin"
     },
     {
