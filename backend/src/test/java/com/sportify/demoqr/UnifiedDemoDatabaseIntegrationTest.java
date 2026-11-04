@@ -151,13 +151,16 @@ class UnifiedDemoDatabaseIntegrationTest extends LocalDemoWorkflow {
                 Map.of("method", "BANK_TRANSFER", "referenceCode", "UNIFY-REAL-PAID", "amountReceived", amount), reception).getStatusCode()).isEqualTo(HttpStatus.OK);
         // A normal operational class with one seat, a real receipt and paid entitlement in the same database.
         jdbcTemplate.update("INSERT facility(code,name,sport_id,facility_type,is_active) SELECT 'UNIFY-OPS','Operational fixture court',sport_id,'COURT',1 FROM sport_package WHERE id=(SELECT package_id FROM sport_package_registration WHERE id=?)", actual.getId());
+        long sport=jdbcTemplate.queryForObject("SELECT p.sport_id FROM sport_package p JOIN sport_package_registration r ON r.package_id=p.id WHERE r.id=?",Long.class,actual.getId());
+        var date=jdbcTemplate.queryForObject("SELECT CAST(DATEADD(day,7,GETDATE()) AS date)",java.sql.Date.class);
+        String code=com.sportify.support.SessionIdentityFixtures.reserve(jdbcTemplate,date.toLocalDate(),sport);
         jdbcTemplate.update("""
-                INSERT class_session(class_id,sport_id,session_date,start_time,end_time,facility_id,coach_id,training_type,capacity,booked_count,status)
-                SELECT TOP 1 s.class_id,s.sport_id,DATEADD(day,7,CAST(GETDATE() AS date)),'04:00','05:00',
-                  (SELECT id FROM facility WHERE code='UNIFY-OPS'),s.coach_id,s.training_type,1,0,'PUBLISHED'
+                INSERT class_session(class_id,sport_id,session_date,start_time,end_time,facility_id,coach_id,training_type,capacity,booked_count,status,session_code)
+                SELECT TOP 1 s.class_id,s.sport_id,?,'04:00','05:00',
+                  (SELECT id FROM facility WHERE code='UNIFY-OPS'),s.coach_id,s.training_type,1,0,'PUBLISHED',?
                 FROM class_session s JOIN sport_package p ON p.sport_id=s.sport_id AND p.training_format=s.training_type
                 WHERE p.id=(SELECT package_id FROM sport_package_registration WHERE id=?) AND s.coach_id=(SELECT id FROM user_account WHERE email='quan.coach@example.com') ORDER BY s.id
-                """, actual.getId());
+                """, date, code, actual.getId());
         long session = jdbcTemplate.queryForObject("SELECT id FROM class_session WHERE facility_id=(SELECT id FROM facility WHERE code='UNIFY-OPS')", Long.class);
         var baseline = operationalSnapshot(session, actual.getId());
         assertThat(confirm(simulated.getPaymentId(), "ops@unified-demo.invalid").getStatusCode()).isEqualTo(HttpStatus.OK);
