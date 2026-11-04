@@ -1,0 +1,7 @@
+# Reception support intake
+
+Enabled Receptionists create, search and review `/api/v1/reception/support-requests`. A POST takes an existing Member ID, category GENERAL, FACILITY, BOOKING, MEMBERSHIP or PAYMENT, bounded subject/description and optional booking ID owned by that Member. Select the Member through the existing Reception search. A paid package is not required to request help, and a disabled Member may receive account support. Synthetic Members remain excluded. A mandatory UUID Idempotency-Key deduplicates retries for the creating Receptionist; altered content conflicts.
+
+GET supports Member ID and status filters, with a maximum of 100 newest records. An individual staff detail includes readable Member code/name and the current public Session code for an optional booking. No contact details or credentials are returned. The original creator remains immutable; the current handling Receptionist is recorded separately and in audit.
+
+PUT `/{id}/status` allows OPEN -> IN_PROGRESS or CLOSED, IN_PROGRESS -> RESOLVED or CLOSED, and RESOLVED -> CLOSED. Resolving/closing requires meaningful resolution notes. CLOSED is terminal. An identical retry records no second transition. The Member's `/api/v1/member/support-requests` is owner-derived, with no Member ID accepted. Training class Q&A is excluded from these APIs. Existing support storage is extended by V45; no chatbot, CRM, attachment or external messaging is added.

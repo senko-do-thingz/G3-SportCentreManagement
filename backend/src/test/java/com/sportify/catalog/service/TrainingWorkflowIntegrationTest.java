@@ -82,6 +82,7 @@ class TrainingWorkflowIntegrationTest {
     @Autowired MemberCheckInPassService arrivalPasses;
     @Autowired TrainingProgressService progress;
     @Autowired ClassNoticeService notices;
+    @Autowired ReceptionSupportService support;
     @Autowired BookingService bookings;
     @Autowired UserRepository users;
     @Autowired PlatformTransactionManager transactions;
@@ -97,6 +98,7 @@ class TrainingWorkflowIntegrationTest {
             String ids = fixtureSessions.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
             String bookings = "SELECT id FROM booking WHERE session_id IN (" + ids + ")";
             String plans = "SELECT id FROM session_plan WHERE booking_id IN (" + bookings + ")";
+            jdbc.update("DELETE FROM support_request WHERE intake_booking_id IN ("+bookings+")");
             jdbc.update("DELETE FROM coach_feedback WHERE session_id IN (" + ids + ") OR plan_id IN (" + plans + ")");
             jdbc.update("DELETE FROM session_plan WHERE booking_id IN (" + bookings + ")");
             jdbc.update("DELETE FROM attendance_correction WHERE attendance_record_id IN (SELECT id FROM attendance_record WHERE session_id IN (" + ids + "))");
@@ -225,6 +227,54 @@ class TrainingWorkflowIntegrationTest {
         }
         assertThat(count("SELECT COUNT(*) FROM class_training_notice WHERE coach_id=? AND operation_id=?",coach,operation.toString())).isEqualTo(1);
         assertThat(count("SELECT COUNT(*) FROM activity_log WHERE actor_user_id=? AND action='CLASS_NOTICE_PUBLISHED'",coach)).isEqualTo(1);
+    }
+    @Test void RELEASE14_receptionIntakeSearchStatusAndPrivateMemberReadback() throws Exception {
+        UUID operation=UUID.randomUUID();
+        var request=new ReceptionSupportService.Intake(member,ReceptionSupportService.Category.BOOKING,"Booking question","Please confirm the booked class location",booking);
+        long id=support.create(reception,request,operation).id();
+        assertThat(support.create(reception,request,operation).id()).isEqualTo(id);
+        assertThat(support.staff(reception,member,ReceptionSupportService.Status.OPEN)).extracting(ReceptionSupportService.Ticket::id).contains(id);
+        assertThat(support.detail(reception,id).sessionCode()).isEqualTo(jdbc.queryForObject("SELECT session_code FROM class_session WHERE id=?",String.class,session));
+        assertThat(support.member(member)).hasSize(1);assertThat(support.member(peer)).isEmpty();
+        assertThatThrownBy(()->support.create(coach,request,UUID.randomUUID())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThatThrownBy(()->support.create(reception,new ReceptionSupportService.Intake(peer,request.category(),request.subject(),request.description(),booking),UUID.randomUUID())).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(()->support.create(reception,new ReceptionSupportService.Intake(member,request.category(),"Changed",request.description(),booking),operation)).isInstanceOf(ConflictException.class);
+        assertThatThrownBy(()->support.update(reception,id,new ReceptionSupportService.Update(ReceptionSupportService.Status.RESOLVED,"Done"))).isInstanceOf(ConflictException.class);
+        support.update(reception,id,new ReceptionSupportService.Update(ReceptionSupportService.Status.IN_PROGRESS,null));
+        assertThatThrownBy(()->support.update(reception,id,new ReceptionSupportService.Update(ReceptionSupportService.Status.RESOLVED," "))).isInstanceOf(BusinessRuleException.class);
+        support.update(reception,id,new ReceptionSupportService.Update(ReceptionSupportService.Status.RESOLVED,"Location confirmed with Member"));
+        support.update(reception,id,new ReceptionSupportService.Update(ReceptionSupportService.Status.CLOSED,"Member acknowledged resolution"));
+        support.update(reception,id,new ReceptionSupportService.Update(ReceptionSupportService.Status.CLOSED,"Member acknowledged resolution"));
+        assertThatThrownBy(()->support.update(reception,id,new ReceptionSupportService.Update(ReceptionSupportService.Status.OPEN,null))).isInstanceOf(ConflictException.class);
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE entity_id=? AND action='RECEPTION_SUPPORT_CREATED' AND actor_user_id=?",id,reception)).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE entity_id=? AND action='RECEPTION_SUPPORT_STATUS_CHANGED'",id)).isEqualTo(3);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/support-requests?memberId="+member).with(as(peer)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$").isEmpty());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/reception/support-requests/"+id).with(as(member)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/reception/support-requests?memberId="+member+"&status=CLOSED").with(as(reception)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$[0].createdBy").value(reception));
+    }
+    @Test void RELEASE14_actualHttpValidationAndConcurrentRetryAreBounded() throws Exception {
+        String body="{\"memberId\":"+member+",\"category\":\"GENERAL\",\"subject\":\"Desk assistance\",\"description\":\"Please clarify opening hours\"}";
+        UUID operation=UUID.randomUUID();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/reception/support-requests").with(as(reception)).header("Idempotency-Key",operation).contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/reception/support-requests").with(as(reception)).header("Idempotency-Key",operation).contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/reception/support-requests").with(as(reception)).header("Idempotency-Key",UUID.randomUUID()).contentType("application/json").content(body.replace("Desk assistance"," ")))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+        var request=new ReceptionSupportService.Intake(member,ReceptionSupportService.Category.MEMBERSHIP,"Renewal question","Please explain renewal dates",null);UUID key=UUID.randomUUID();
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            var start=new CountDownLatch(1);Callable<Long> create=()->{start.await();return support.create(reception,request,key).id();};
+            var a=pool.submit(create);var b=pool.submit(create);start.countDown();assertThat(a.get(60,TimeUnit.SECONDS)).isEqualTo(b.get(60,TimeUnit.SECONDS));
+        }
+        assertThat(count("SELECT COUNT(*) FROM support_request WHERE intake_created_by=?",reception)).isEqualTo(2);
+        assertThatThrownBy(()->support.detail(reception,learning.ask(member,classId,"Private Coach question","How should I practise?"))).isInstanceOf(ResourceNotFoundException.class);
+        jdbc.update("UPDATE user_account SET email=? WHERE id=?",code()+"@unified-demo.invalid",member);
+        assertThatThrownBy(()->support.create(reception,request,UUID.randomUUID())).isInstanceOf(BusinessRuleException.class);
     }
     @Test void RELEASE11_actualHttpIssueRedeemReplayAndPurposeIsolation() throws Exception {
         long registration=arrivalEntitlement();
