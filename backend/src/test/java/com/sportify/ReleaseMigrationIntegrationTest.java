@@ -14,7 +14,7 @@ class ReleaseMigrationIntegrationTest {
         var fixture=DisposableUnifyDatabase.create();var jdbc=fixture.jdbc();
         String[] locations=demo?new String[]{"classpath:db/migration/identity","classpath:db/migration/catalog","classpath:db/demo"}
                 :new String[]{"classpath:db/migration/identity","classpath:db/migration/catalog"};
-        var before=Flyway.configure().dataSource(fixture.source()).locations(locations).target("41").cleanDisabled(true).validateOnMigrate(true).load();
+        var before=Flyway.configure().dataSource(fixture.source()).locations(locations).target(demo?"41":"40").cleanDisabled(true).validateOnMigrate(true).load();
         before.migrate();
         var history=jdbc.queryForList("SELECT version,checksum,description FROM flyway_schema_history ORDER BY installed_rank");
         var accounts=jdbc.queryForList("SELECT id,email,status,role_id,version,avatar_url FROM user_account ORDER BY id");
