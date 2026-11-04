@@ -200,10 +200,18 @@ class TrainingWorkflowIntegrationTest {
         jdbc.update("UPDATE booking SET booked_at=? WHERE id=?",from.atStartOfDay(),booking);
         jdbc.update("INSERT booking(booking_code,session_id,member_id,status,booked_at) VALUES (?,?,?,'CANCELLED',?)",code(),session,member,from.atTime(23,59,59));
         jdbc.update("INSERT booking(booking_code,session_id,member_id,status,booked_at) VALUES (?,?,?,'CANCELLED',?)",code(),session,peer,from.plusDays(1).atStartOfDay());
+        long synthetic=account("MEMBER");
+        jdbc.update("UPDATE user_account SET email=?,created_at=? WHERE id=?",code()+"@unified-demo.invalid",from.atTime(12,0),synthetic);
+        jdbc.update("INSERT booking(booking_code,session_id,member_id,status,booked_at) VALUES (?,?,?,'CONFIRMED',?)",code(),session,synthetic,from.atTime(12,0));
+        jdbc.update("UPDATE class_session SET booked_count=2 WHERE id=?",session);
         var report=operationsReports.report(from,from);
         assertThat(report.registeredMembers()).isEqualTo(1); assertThat(report.currentlyEnabledMembersRegistered()).isEqualTo(1);
         assertThat(report.classBookings().total()).isEqualTo(2); assertThat(report.classBookings().confirmed()).isEqualTo(1);
         assertThat(report.classBookings().cancelled()).isEqualTo(1);
+        jdbc.update("UPDATE user_account SET status='INACTIVE' WHERE id=?",member);
+        assertThat(operationsReports.report(from,from).registeredMembers()).isEqualTo(1);
+        assertThat(operationsReports.report(from,from).currentlyEnabledMembersRegistered()).isZero();
+        jdbc.update("UPDATE user_account SET status='ACTIVE' WHERE id=?",member);
         String moved=com.sportify.support.SessionIdentityFixtures.reserve(jdbc,from.plusDays(2),sport);
         jdbc.update("UPDATE class_session SET session_date=?,session_code=? WHERE id=?",from.plusDays(2),moved,session);
         assertThat(operationsReports.report(from,from).classBookings().total()).isEqualTo(2);
