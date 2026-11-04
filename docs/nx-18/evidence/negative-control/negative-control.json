@@ -1,0 +1,65 @@
+[
+ {
+  "label": "clean",
+  "exitCode": 0,
+  "firstFailure": null,
+  "resultLine": "RESULT: all required checks passed. NX-18 is NOT complete: see BLOCKED.",
+  "ok": true
+ },
+ {
+  "label": "inject-overflow",
+  "exitCode": 1,
+  "firstFailure": "FAIL horizontal overflow coach-schedule@1440/light",
+  "resultLine": "RESULT: FAIL, 2 required check(s) failed",
+  "ok": true
+ },
+ {
+  "label": "inject-h1",
+  "exitCode": 1,
+  "firstFailure": "FAIL expected exactly one h1, found 0 coach-schedule@1440/light",
+  "resultLine": "RESULT: FAIL, 2 required check(s) failed",
+  "ok": true
+ },
+ {
+  "label": "inject-axe",
+  "exitCode": 1,
+  "firstFailure": "FAIL axe serious or critical: image-alt coach-schedule@1440/light",
+  "resultLine": "RESULT: FAIL, 2 required check(s) failed",
+  "ok": true
+ },
+ {
+  "label": "inject-focus",
+  "exitCode": 1,
+  "firstFailure": "FAIL 12 focus stop(s) without a visible ring coach-schedule@1440/light",
+  "resultLine": "RESULT: FAIL, 2 required check(s) failed",
+  "ok": true
+ },
+ {
+  "label": "inject-console",
+  "exitCode": 1,
+  "firstFailure": "FAIL 1 console error(s) coach-schedule@1440/light",
+  "resultLine": "RESULT: FAIL, 2 required check(s) failed",
+  "ok": true
+ },
+ {
+  "label": "inject-error-alert",
+  "exitCode": 1,
+  "firstFailure": "FAIL error state without alert and retry coach-schedule@1440/light",
+  "resultLine": "RESULT: FAIL, 2 required check(s) failed",
+  "ok": true
+ },
+ {
+  "label": "inject-forbidden-alert",
+  "exitCode": 1,
+  "firstFailure": "FAIL forbidden state without alert coach-schedule@1440/light",
+  "resultLine": "RESULT: FAIL, 2 required check(s) failed",
+  "ok": true
+ },
+ {
+  "label": "inject-empty-panel",
+  "exitCode": 1,
+  "firstFailure": "FAIL empty state without an empty panel coach-schedule@1440/light",
+  "resultLine": "RESULT: FAIL, 2 required check(s) failed",
+  "ok": true
+ }
+]

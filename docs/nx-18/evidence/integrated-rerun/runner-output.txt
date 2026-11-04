@@ -1,0 +1,24 @@
+captures: 24, state checks: 48
+FAIL axe serious or critical: label-content-name-mismatch coach-schedule@390/light
+FAIL axe serious or critical: label-content-name-mismatch coach-schedule@768/light
+FAIL axe serious or critical: label-content-name-mismatch coach-roster@390/light
+FAIL axe serious or critical: label-content-name-mismatch coach-roster@768/light
+FAIL axe serious or critical: label-content-name-mismatch coach-schedule@390/dark
+FAIL axe serious or critical: label-content-name-mismatch coach-schedule@768/dark
+FAIL axe serious or critical: label-content-name-mismatch coach-roster@390/dark
+FAIL axe serious or critical: label-content-name-mismatch coach-roster@768/dark
+FAIL axe serious or critical: label-content-name-mismatch reception-member-search@390/light
+FAIL axe serious or critical: label-content-name-mismatch reception-member-search@768/light
+FAIL axe serious or critical: label-content-name-mismatch reception-check-in@390/light
+FAIL axe serious or critical: label-content-name-mismatch reception-check-in@768/light
+FAIL axe serious or critical: label-content-name-mismatch reception-member-search@390/dark
+FAIL axe serious or critical: label-content-name-mismatch reception-member-search@768/dark
+FAIL axe serious or critical: label-content-name-mismatch reception-check-in@390/dark
+FAIL axe serious or critical: label-content-name-mismatch reception-check-in@768/dark
+BLOCKED (not covered by this run, never counted as passed):
+ - NX-11, NX-12, NX-13: the Coach plan editor, outcomes and feedback screens and the attendance UI are not on main
+ - Member training screens (NX-14, NX-15) are not on main; they are checked against PR 185 by a separate run
+ - FE/BE contract compatibility: docs/nx-03 is an unsigned draft and no end-to-end run against a backend was made
+ - Cross-role workflows (a coach records an outcome and the member sees it) need the backend
+ - Sign-off by Hung and Phat is not given by this tool
+RESULT: FAIL, 16 required check(s) failed
