@@ -177,7 +177,7 @@ function ReceptionBookingsContent() {
     }
   }
 
-  return <div className="page reception-bookings-page">
+  return <div className="page reception-page reception-ui25-page home-page reception-bookings-page">
     <PageHeader eyebrow="Front desk / Flow 2" title="Member Booking Search" description="Find a member to review or manage their session bookings." />
     <Card title="Find member">
       <MemberPicker
@@ -332,8 +332,8 @@ export function ReceptionAssistedBookingPage() {
     setParams((current) => withQuery(current, { week: date, sessionId: null }))
   }
 
-  if (!memberId) return <div className="page reception-bookings-page"><PageHeader eyebrow="Front desk / Flow 2" title="Book for member" /><Card><ErrorState title="Choose a member first" message="Search for a member before creating a booking." /><Link className="btn btn--primary" to="/reception/bookings">Member booking search</Link></Card></div>
-  return <div className="page reception-bookings-page">
+  if (!memberId) return <div className="page reception-page reception-ui25-page home-page reception-bookings-page"><PageHeader eyebrow="Front desk / Flow 2" title="Book for member" /><Card><ErrorState title="Choose a member first" message="Search for a member before creating a booking." /><Link className="btn btn--primary" to="/reception/bookings">Member booking search</Link></Card></div>
+  return <div className="page reception-page reception-ui25-page home-page reception-bookings-page">
     <PageHeader eyebrow="Front desk / Flow 2" title="Book for Member" description="Choose an available session and a package that covers it. Booking uses Vietnam time (UTC+7)." actions={<Link className="btn btn--secondary" to={`/reception/bookings?${new URLSearchParams({ memberId: String(memberId), q: query })}`}>Back to bookings</Link>} />
       {base.status === 'loading' ? <PageLoader label="Loading member and session options" /> : base.status === 'error' ? <ErrorState title="We could not load booking options" error={base.error} onRetry={reloadBase} /> : <>
       <Card title="Member"><MemberHeader member={base.data.member} /><p className="browse-muted">The selected member is attached to the booking request. Package credits are checked again when the booking is submitted.</p></Card>
@@ -370,12 +370,12 @@ export function ReceptionBookingConfirmedPage() {
 
   const returnTo = typeof stateValue.returnTo === 'string' && stateValue.returnTo.startsWith('/reception/bookings')
     ? stateValue.returnTo : memberId ? `/reception/bookings?${new URLSearchParams({ memberId: String(memberId), q: params.get('q') ?? '' })}` : '/reception/bookings'
-  if (resource.status === 'loading') return <div className="page reception-bookings-page"><PageLoader label="Loading booking confirmation" /></div>
-  if (resource.status === 'error') return <div className="page reception-bookings-page"><PageHeader title="Booking confirmation" /><ErrorState title="We could not load the booking confirmation" error={resource.error} onRetry={reloadConfirmation} /><Link className="btn btn--primary" to={returnTo}>Back to member bookings</Link></div>
-  if (!resource.data) return <div className="page reception-bookings-page"><PageHeader title="Booking confirmation" /><Card><EmptyState title="Booking not verified" description="We could not verify this booking as confirmed for the selected member. It may have been cancelled or may no longer be listed. Check member history before confirming with them." /><Link className="btn btn--primary" to={returnTo}>Back to member bookings</Link></Card></div>
+  if (resource.status === 'loading') return <div className="page reception-page reception-ui25-page home-page reception-bookings-page"><PageLoader label="Loading booking confirmation" /></div>
+  if (resource.status === 'error') return <div className="page reception-page reception-ui25-page home-page reception-bookings-page"><PageHeader title="Booking confirmation" /><ErrorState title="We could not load the booking confirmation" error={resource.error} onRetry={reloadConfirmation} /><Link className="btn btn--primary" to={returnTo}>Back to member bookings</Link></div>
+  if (!resource.data) return <div className="page reception-page reception-ui25-page home-page reception-bookings-page"><PageHeader title="Booking confirmation" /><Card><EmptyState title="Booking not verified" description="We could not verify this booking as confirmed for the selected member. It may have been cancelled or may no longer be listed. Check member history before confirming with them." /><Link className="btn btn--primary" to={returnTo}>Back to member bookings</Link></Card></div>
 
   const booking = resource.data
-  return <div className="page reception-bookings-page">
+  return <div className="page reception-page reception-ui25-page home-page reception-bookings-page">
     <PageHeader eyebrow="Front desk / Flow 2" title="Booking Confirmed" description="The member's session reservation is confirmed." />
     <Card className="booking-confirmation">
       <span className="booking-confirmation__mark" aria-hidden="true" />

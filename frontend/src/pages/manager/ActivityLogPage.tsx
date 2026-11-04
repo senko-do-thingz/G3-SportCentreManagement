@@ -30,6 +30,7 @@ export function ActivityLogPage() {
     const media = window.matchMedia?.('(min-width: 901px)')
     if (!media) return
     const sync = () => setFiltersOpen(media.matches)
+    sync()
     media.addEventListener('change', sync)
     return () => media.removeEventListener('change', sync)
   }, [])
