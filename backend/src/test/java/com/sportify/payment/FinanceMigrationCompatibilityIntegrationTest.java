@@ -42,11 +42,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Each path owns a newly created database inside this test's ephemeral SQL Server, never an external target. */
 @Tag("integration")
-@Testcontainers
 class FinanceMigrationCompatibilityIntegrationTest {
-    @Container
-    private static final MSSQLServerContainer<?> SQL = new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2022-latest")
-            .acceptLicense().withPassword("Aa1!" + UUID.randomUUID());
     private static final LocalDate FROM = LocalDate.of(2001, 3, 1);
     private static final LocalDate TO = LocalDate.of(2001, 3, 31);
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2001-03-15T03:00:00Z"), ZoneId.of("Asia/Ho_Chi_Minh"));
@@ -54,24 +50,8 @@ class FinanceMigrationCompatibilityIntegrationTest {
     record Database(String name, DataSource source, JdbcTemplate jdbc) { }
 
     private Database newDatabase() throws SQLException {
-        String name = "finance_" + UUID.randomUUID().toString().replace("-", "");
-        try (var connection = DriverManager.getConnection(SQL.getJdbcUrl(), SQL.getUsername(), SQL.getPassword());
-             var statement = connection.createStatement()) {
-            statement.execute("CREATE DATABASE [" + name + "]");
-        }
-        DataSource source = new AbstractDataSource() {
-            @Override
-            public Connection getConnection() throws SQLException {
-                return getConnection(SQL.getUsername(), SQL.getPassword());
-            }
-
-            @Override
-            public Connection getConnection(String username, String password) throws SQLException {
-                Connection connection = DriverManager.getConnection(SQL.getJdbcUrl(), username, password);
-                connection.setCatalog(name);
-                return connection;
-            }
-        };
+        var fixture=com.sportify.support.DisposableUnifyDatabase.create();
+        String name=fixture.name();DataSource source=fixture.source();
         var database = new Database(name, source, new JdbcTemplate(source));
         assertThat(database.jdbc().queryForObject("SELECT DB_NAME()", String.class)).isEqualTo(name);
         return database;

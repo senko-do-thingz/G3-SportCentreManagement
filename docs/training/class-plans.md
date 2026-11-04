@@ -11,7 +11,7 @@ Steps use the existing title, durationMinutes and instructions contract. The cur
 active assigned Coach alone can create/list/read. A retry with the same key/content
 returns the same plan. Reusing the key for changed content returns 409.
 
-Migration V41 adds explicit scope and operation receipts to session_plan. Every existing
+Migration V42 adds explicit scope and operation receipts to session_plan. Every existing
 row defaults to INDIVIDUAL. A null legacy Member never implies CLASS visibility.
 A CLASS plan stores one row for the class, not one copy per learner.
 

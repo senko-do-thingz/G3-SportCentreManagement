@@ -22,25 +22,15 @@ import java.util.*;
 import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.*;
 
-@Tag("integration") @Testcontainers
+@Tag("integration")
 class CashMigrationIntegrationTest {
     private CashFixtureProfile profile;
     @BeforeEach void startProfile(TestInfo info) { profile = new CashFixtureProfile(info.getDisplayName()); }
     @AfterEach void finishProfile() { profile.close(); }
-    @Container static final MSSQLServerContainer<?> SQL = new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2022-latest")
-            .acceptLicense().withPassword("Aa1!" + UUID.randomUUID());
     record Database(DataSource source, JdbcTemplate jdbc) { }
     Database database(boolean migrate) throws Exception {
-        String name = "cash_" + UUID.randomUUID().toString().replace("-", "");
-        try (var c = DriverManager.getConnection(SQL.getJdbcUrl(), SQL.getUsername(), SQL.getPassword()); var s = c.createStatement()) {
-            s.execute("CREATE DATABASE [" + name + "]");
-        }
-        DataSource source = new AbstractDataSource() {
-            public Connection getConnection() throws SQLException { return getConnection(SQL.getUsername(), SQL.getPassword()); }
-            public Connection getConnection(String user, String credential) throws SQLException {
-                var c = DriverManager.getConnection(SQL.getJdbcUrl(), user, credential); c.setCatalog(name); return c;
-            }
-        };
+        var fixture=com.sportify.support.DisposableUnifyDatabase.create();
+        DataSource source=fixture.source();
         var db = new Database(source, new JdbcTemplate(source));
         if (migrate) profile.stage("database.migrate", () -> flyway(db, false, null).migrate());
         return db;
