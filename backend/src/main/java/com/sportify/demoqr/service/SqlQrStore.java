@@ -228,9 +228,11 @@ public class SqlQrStore {
                   AND EXISTS (SELECT 1 FROM dbo.invoice_line l WHERE l.invoice_id=i.id AND l.quantity=1
                     AND l.line_total=i.subtotal_amount AND l.unit_price=i.subtotal_amount
                     AND ((l.item_type='MEMBERSHIP_CARD' AND EXISTS (SELECT 1 FROM dbo.member_card c
-                        WHERE c.id=l.item_reference_id AND c.payment_id=p.id AND c.member_id=p.member_id))
+                        WHERE c.id=l.item_reference_id AND c.payment_id=p.id AND c.member_id=p.member_id
+                          AND c.status='ACTIVE'))
                       OR (l.item_type='SPORT_PACKAGE' AND EXISTS (SELECT 1 FROM dbo.sport_package_registration r
-                        WHERE r.id=l.item_reference_id AND r.payment_id=p.id AND r.member_id=p.member_id))))
+                        WHERE r.id=l.item_reference_id AND r.payment_id=p.id AND r.member_id=p.member_id
+                          AND r.status='ACTIVE' AND r.activated_at IS NOT NULL))))
                   AND (SELECT COUNT(*) FROM dbo.simulated_payment_transaction WHERE payment_id=p.id)=1
                   AND (SELECT COUNT(*) FROM dbo.activity_log WHERE action='PAYMENT_CONFIRMED'
                        AND entity_type='PAYMENT' AND entity_id=p.id)=1
