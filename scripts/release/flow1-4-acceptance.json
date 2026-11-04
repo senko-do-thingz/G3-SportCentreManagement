@@ -128,7 +128,7 @@
   {
     "id": "U05",
     "requirement": "Read own schedule and Coach information",
-    "selectors": "MemberScheduleIntegrationTest",
+    "selectors": "MemberScheduleIntegrationTest,ReceptionBookingIntegrationTest#RELEASE06*",
     "sql": "booking,class_session,coach_profile",
     "expected": "Owner-derived schedule and actual assigned Coach; peers denied"
   },
