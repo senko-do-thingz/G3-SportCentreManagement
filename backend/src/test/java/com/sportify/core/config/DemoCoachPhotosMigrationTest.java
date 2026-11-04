@@ -9,7 +9,7 @@ import static com.sportify.core.config.DemoSeedSource.resource;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DemoCoachPhotosMigrationTest {
-    private static final String MIGRATION = "db/demo/V38__assign_demo_coach_photos.sql";
+    private static final String MIGRATION = "db/demo/V41__assign_demo_coach_photos.sql";
     private static final String SQL = resource(MIGRATION);
 
     @Test
