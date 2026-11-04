@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { receptionPaymentsApi } from '../../api/receptionPaymentsApi'
 import { PaymentHero } from '../../components/PaymentHero'
+import { PaymentWorkspace } from '../../components/PaymentWorkspace'
 import { Button, Card, EmptyState, ErrorState } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
@@ -20,6 +21,10 @@ const EYEBROW = 'Receptionist / Payments and reports'
  * has them, and only a PAID or REFUNDED invoice can be printed.
  */
 export function ReceptionReceiptPage() {
+  return <PaymentWorkspace><ReceptionReceiptRoute /></PaymentWorkspace>
+}
+
+function ReceptionReceiptRoute() {
   const { paymentId } = useParams()
   const id = positiveId(paymentId)
   const load = useCallback(
