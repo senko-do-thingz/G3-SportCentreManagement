@@ -21,7 +21,7 @@ public final class UnifyPreflight {
                            List<Map<String, Object>> migrations, Map<String, Count> tables,
                            long actualCashEvents, String actualCashAmount, long actualPaidRows,
                            long proposedImports, String liveCutover) {
-        public String getDataUnification() { return "INCOMPLETE_LEGACY_HISTORY_DECISION_PENDING"; }
+        public String getDataUnification() { return "INCOMPLETE_HISTORY_OUT_OF_RELEASE_SCOPE"; }
         public String getProtectedSourceCoverage() { return "UNKNOWN_NOT_AUTHORIZED_BY_THIS_REPORT"; }
         public String getSchemaFingerprintFormat() { return "DB_UNIFY_SCHEMA_V2"; }
     }

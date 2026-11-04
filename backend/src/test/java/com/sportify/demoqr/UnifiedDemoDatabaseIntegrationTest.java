@@ -62,6 +62,24 @@ class UnifiedDemoDatabaseIntegrationTest extends LocalDemoWorkflow {
         DataSource source = context.getBean(DataSource.class);
         assertThat(jdbcTemplate.getDataSource()).isSameAs(source);
         assertThat(context.getBean(Flyway.class).getConfiguration().getDataSource()).isSameAs(source);
+        assertThat(context.getBeansOfType(jakarta.persistence.EntityManagerFactory.class)).hasSize(1);
+        var factory = context.getBean(jakarta.persistence.EntityManagerFactory.class);
+        assertThat(factory.getMetamodel().getEntities()).extracting(entity -> entity.getJavaType().getSimpleName())
+                .contains("UserAccount", "MemberProfile", "MemberCard", "SportPackageRegistration", "Payment", "Invoice");
+        assertThat(context.getBeansOfType(org.springframework.transaction.PlatformTransactionManager.class)).hasSize(1);
+        var manager = context.getBean(org.springframework.orm.jpa.JpaTransactionManager.class);
+        assertThat(manager.getDataSource()).isSameAs(source);
+        assertThat(manager.getEntityManagerFactory()).isSameAs(factory);
+        context.getBeansOfType(org.springframework.jdbc.core.JdbcTemplate.class).values()
+                .forEach(template -> assertThat(template.getDataSource()).isSameAs(source));
+        context.getBeansOfType(org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate.class).values()
+                .forEach(template -> assertThat(template.getJdbcTemplate().getDataSource()).isSameAs(source));
+        var entityManager = factory.createEntityManager();
+        try {
+            assertThat(entityManager.createNativeQuery("SELECT DB_NAME()").getSingleResult()).isEqualTo(fixture.name());
+        } finally {
+            entityManager.close();
+        }
         assertThat(context.getBean(Flyway.class).getConfiguration().getIgnoreMigrationPatterns()).isEmpty();
         assertThat(jdbcTemplate.queryForObject("SELECT DB_NAME()", String.class)).isEqualTo(fixture.name());
         assertThat(context.getEnvironment().getProperty("app.training.attendance-backfill.enabled")).isEqualTo("false");

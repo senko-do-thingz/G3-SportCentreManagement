@@ -1,5 +1,12 @@
 # Read-only reconciliation and recovery
 
+CODEOWNER fast-track scope update: this release is RUNTIME DATABASE UNIFICATION.
+Historical migration/import/archive/API work is OUT OF SCOPE. Historical data
+unification remains INCOMPLETE and is not a runtime release acceptance criterion.
+Preserve all legacy databases and records. Protected-target access/activation is
+not authorized. Use [current runtime configuration and checklist](RUNTIME_STARTUP_POWERSHELL.md).
+Earlier-round historical proposals below are context, not current work instructions.
+
 Round 02 status: runtime consolidation is implemented; historical data unification
 is INCOMPLETE. Zero imports do not meet a requirement that all legacy histories be
 available in sportify. Archive-only disposition is proposed and unapproved. See

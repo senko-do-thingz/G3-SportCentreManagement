@@ -1,5 +1,12 @@
 # Round 03 - archive contract and release policy
 
+CODEOWNER fast-track scope update: this release is RUNTIME DATABASE UNIFICATION.
+Historical migration/import/archive/API work is OUT OF SCOPE. Historical data
+unification remains INCOMPLETE and is not a runtime release acceptance criterion.
+Preserve all legacy databases and records. Protected-target access/activation is
+not authorized. Use [current runtime configuration and checklist](RUNTIME_STARTUP_POWERSHELL.md).
+Earlier-round historical proposals below are context, not current work instructions.
+
 PROPOSED - PENDING CODEOWNER REVIEW. Historical data unification is INCOMPLETE.
 Option B is an engineering recommendation, not approval. No legacy source is
 retired, imported, exposed by the application or classified as disposable.

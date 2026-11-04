@@ -1,5 +1,12 @@
 # Round 04 - replay compatibility and historical archive design v0.1
 
+CODEOWNER fast-track scope update: this release is RUNTIME DATABASE UNIFICATION.
+Historical migration/import/archive/API work is OUT OF SCOPE. Historical data
+unification remains INCOMPLETE and is not a runtime release acceptance criterion.
+Preserve all legacy databases and records. Protected-target access/activation is
+not authorized. Use [current runtime configuration and checklist](RUNTIME_STARTUP_POWERSHELL.md).
+Earlier-round historical proposals below are context, not current work instructions.
+
 PROPOSED - PENDING CODEOWNER REVIEW. Historical data unification is INCOMPLETE.
 No protected source was accessed, imported, modified or retired. Actual schemas,
 row populations and migration histories for sportify, sportify_demo and

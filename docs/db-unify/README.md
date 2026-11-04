@@ -1,52 +1,81 @@
-# Proposed canonical local demonstration
+# Runtime database unification
 
-Round 04: see [historical replay compatibility and proposed archive mapping v0.1](ROUND04_REPLAY_AND_ARCHIVE_DESIGN.md)
-and [machine-readable gates](status.json). Unified SUCCESS replay acknowledges a
-persisted settlement after verified normal expiry or card replacement, without
-reactivating the item. ACTIVE packages still require activation evidence. Pending,
-unsupported or inconsistent histories are denied without repair. The executable archive contract
-uses fictional disposable schemas only; production migration, historical API and
-real-source reconciliation remain unimplemented. Historical data unification is
-INCOMPLETE and account-wide quarantine acceptance remains PENDING CODEOWNER.
+The CODEOWNER fast-track decision narrows this release to RUNTIME DATABASE
+UNIFICATION: Flow 1-3, Flow 4+ and QR Local Demo share one SQL Server database
+named sportify. Historical migration is OUT OF SCOPE. No production historical
+importer, archive, historical API or additional prototype is part of this release.
+Preserve sportify_demo, sportify_qr_demo and every legacy record unchanged.
+Historical data unification remains INCOMPLETE; it is not the runtime acceptance
+criterion. Earlier archive proposals are retained as prior-round context only.
 
-Round 02 status: runtime consolidation is implemented; historical data unification
-is INCOMPLETE. Zero imports do not meet a requirement that all legacy histories be
-available in sportify. Archive-only disposition is proposed and unapproved. See
-[SOURCE_HISTORY_DECISION.md](SOURCE_HISTORY_DECISION.md) for per-source/table gaps,
-retention/import options, conditional mapping design and the explicit owner gate.
-Target-specific read, backup, restored-clone rehearsal and cutover remain
-BLOCKED_FOR_CODEOWNER, independently of development CI results.
+See [exact configuration, PowerShell startup and checklist](RUNTIME_STARTUP_POWERSHELL.md),
+[regression commands](REGRESSION.md), [review packet](REVIEW_PACKET.md) and
+[machine-readable scope/gates](status.json). Protected databases were not accessed
+or started by this work. Configuration and implementation are verified on
+disposable databases; actual canonical activation requires separate authorization.
 
-Synthetic operations use an always-on default-deny policy: reserved Member IDs,
-reserved email namespace or any persisted simulator payment/transaction provenance
-quarantine the account from new bookings, check-ins, attendance, corrections,
-results, plans, feedback and class discussion writes. This also applies with demo
-profiles disabled and after email renaming. Mixed real/synthetic accounts remain
-quarantined; ordinary real members remain eligible. Cancellation and historical
-receipt reads stay available. No operational demo class namespace is approved.
-There is no exception switch. CODEOWNER must accept this operational policy before
-canonical activation. Unified SUCCESS replay validates BANK_TRANSFER, complete
-transaction/session/receipt/item/audit linkage; malformed histories are denied
-without repair. Legacy QR guard and all applied migrations remain unchanged.
+## One runtime datasource
 
-PROPOSED - PENDING CODEOWNER FINAL REVIEW. No live cutover is authorized by this implementation.
+| Module | Connection and transaction path |
+| --- | --- |
+| Flow 1-3 identity, roles and profiles | Shared JPA EntityManagerFactory and JpaTransactionManager |
+| Flow 4+ catalog, scheduling, booking, training and payment | Same JPA context; injected JdbcTemplate/NamedParameterJdbcTemplate use the same datasource |
+| Unified QR Local Demo | LocalDemoPaymentService and SqlQrStore reuse that datasource and transaction manager |
+| Flyway | Boot's same datasource, identity/catalog migration locations only |
 
-The application continues to use one SQL Server datasource. The new `unified-demo` capability reuses the existing authenticated local confirmation API and `SIMULATED` / `SPORTIFY_SIMULATOR` transaction, receipt and audit contracts. It does not import legacy demonstration data. `LocalDemoSafetyGuard` and its throwaway allowlist remain unchanged.
+application.yml defines the single spring.datasource. application-unified-demo.yml
+does not define another connection. The offline UnifyPreflight command is not a
+Spring runtime bean or an importer. No historical test prototype is a runtime
+component. UnifiedDemoDatabaseIntegrationTest asserts one datasource, one JPA
+factory, one transaction manager, shared Flyway/JDBC wiring, the identity/catalog/
+payment metamodel and matching JPA/JDBC DB_NAME() on a fresh disposable fixture.
 
-Canonical configuration requires exactly `dev,unified-demo`, `PAYMENT_UNIFIED_DEMO_ENABLED=true`, `SERVER_ADDRESS=127.0.0.1`, an explicit loopback CORS origin, and this URL grammar (a numeric port and Boolean TLS settings):
+Canonical local configuration requires exactly dev,unified-demo, explicit opt-in,
+numeric loopback binding and an approved positive synthetic Member allowlist.
+The canonical URL is:
 
 ```text
 jdbc:sqlserver://127.0.0.1:1433;databaseName=sportify;encrypt=false;trustServerCertificate=true
 ```
 
-IPv6 `[::1]` is also accepted. Named instances, hostname resolution, URL aliases/escaping, duplicate properties and extra JDBC parameters are deliberately unsupported. Configure credentials through the normal datasource properties, never inside the JDBC URL. Alternate Hikari/JNDI/Flyway connections, migration locations, unsafe Flyway options, Hibernate writes, other profiles, legacy simulation flags and attendance backfill are rejected before database singleton initialization. A separate management listener and forwarded-header strategy are forbidden.
+The unified guard rejects production/unknown/legacy profiles, demo seeds,
+sportify_demo/sportify_qr_demo, alternate Hikari/JNDI/Flyway connections, unsafe
+Flyway options, Hibernate writes, forwarded/separate listeners and attendance
+backfill before database initialization. Test mode has separate explicit controls
+and accepts only new sportify_unify_test_TIMESTAMP names, never sportify.
+Production security and the original LocalDemoSafetyGuard are unchanged.
 
-`PAYMENT_UNIFIED_DEMO_MEMBER_IDS` must list reviewed positive Member IDs with no duplicates. Each confirming account must also be ACTIVE, have role MEMBER and an email in `@unified-demo.invalid`. Provisioning identities or enabling this mode on an existing database requires separate operational authorization and a restored backup rehearsal. There is no automatic canonical seed. Ordinary members cannot confirm a simulation. Only owned pending BANK_TRANSFER purchases with clean settlement provenance can settle; card upgrades are excluded. Authoritative amount and ownership come from the database.
+## Synthetic identities and policy impact
 
-The unified profile also clears Flyway's default future-migration ignore pattern. Any attempt to restore a nonempty ignore list is rejected, so unknown future history cannot silently pass startup validation.
+Use dedicated ACTIVE MEMBER accounts with member profiles, emails ending in
+@unified-demo.invalid and reviewed IDs in PAYMENT_UNIFIED_DEMO_MEMBER_IDS.
+Do not repurpose a real Member or staff identity. No automatic canonical seed or
+provisioning is supplied. Existing owned pending positive BANK_TRANSFER card or
+package purchases can simulate; initial card upgrades are excluded. Scanning
+cannot settle. SIMULATED/SPORTIFY_SIMULATOR receipts and audit provenance persist;
+actual revenue, cash events and real-money refunds exclude simulations.
 
-The existing frontend `VITE_QR_PAYMENT_DEMO=true` and capability version 1 `LOCAL_DEMO` contract are retained. The server decides whether confirmation is available. QR contains only a non-payable synthetic reference, scanning cannot settle, and no real bank callback is introduced. Disable `PAYMENT_UNIFIED_DEMO_ENABLED` and restart to remove the capability.
+Always-on account-wide quarantine prevents synthetic operations from affecting
+real class capacity, attendance, results and training writes. It also blocks a
+legitimate Member's separately paid operational benefits if that account has any
+simulated history, even after disabling simulation or renaming its email. Own
+receipt reads and cancellation remain available; paid history/credits are not
+rewritten. No exemption, transfer or automatic recovery exists. This side effect
+remains PENDING CODEOWNER POLICY ACCEPTANCE before rollout; the scope decision
+does not approve it. Dedicated identities prevent creating new mixed accounts.
 
-Test mode additionally requires `unified-demo-test`, `PAYMENT_UNIFIED_DEMO_TEST_ENABLED=true`, and `sportify_unify_test_YYYYMMDDHHMMSS[_suffix]`. The test pair never accepts `sportify`. The optional `demo` seed profile is allowed only in this disposable mode. SQL tests create new databases, reject name reuse, and leave them for inspection. CI uses SQL Server containers; local verification requires an explicit loopback test port and credentials. No protected application database is a test target.
+Historical replay returns the original version 1 settlement after verified normal
+expiry or linked replacement without reactivation. Complete payment/transaction/
+session/invoice/line/audit consistency remains required. Existing date evidence
+is not a cryptographic lifecycle-event audit. See the retained Round 04 replay
+section for that limit; its archive proposal is outside this release.
 
-History remains forward-only through V40. V37, V39 and V40 are unchanged; the separate unmerged demo-photo V38 is excluded. Installed V38 or unexpected checksums are blockers, never repaired or renumbered. See the reconciliation and operator guides for the read-only preflight and cutover boundary.
+## Migration and operational boundary
+
+Flyway validation and Hibernate validate remain enabled; clean is disabled,
+baseline/out-of-order are false and future migration ignore patterns are empty.
+Applied migrations and their checksums remain immutable through V40. Unknown V38,
+future history, checksum or schema drift must fail closed. Never repair, clean,
+baseline, renumber or rewrite history. Disposable migration/schema/backup tests
+do not certify any protected target. No merge, deployment, protected connection,
+legacy modification/deletion or live cutover is performed by this work.

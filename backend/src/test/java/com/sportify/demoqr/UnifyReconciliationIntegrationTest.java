@@ -34,7 +34,7 @@ class UnifyReconciliationIntegrationTest {
         var before = UnifyPreflight.inspect(db.source(), false, hash);
         assertThat(UnifyPreflight.inspect(db.source(), false, hash)).isEqualTo(before);
         assertThat(before.proposedImports()).isZero();
-        assertThat(before.getDataUnification()).isEqualTo("INCOMPLETE_LEGACY_HISTORY_DECISION_PENDING");
+        assertThat(before.getDataUnification()).isEqualTo("INCOMPLETE_HISTORY_OUT_OF_RELEASE_SCOPE");
         assertThat(before.getProtectedSourceCoverage()).isEqualTo("UNKNOWN_NOT_AUTHORIZED_BY_THIS_REPORT");
         assertThat(before.getSchemaFingerprintFormat()).isEqualTo("DB_UNIFY_SCHEMA_V2");
         assertThat(before.liveCutover()).isEqualTo("BLOCKED_FOR_CODEOWNER");

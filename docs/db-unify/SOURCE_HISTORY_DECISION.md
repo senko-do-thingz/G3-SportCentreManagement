@@ -1,5 +1,12 @@
 # Historical data coverage and CODEOWNER decision
 
+CODEOWNER fast-track scope update: this release is RUNTIME DATABASE UNIFICATION.
+Historical migration/import/archive/API work is OUT OF SCOPE. Historical data
+unification remains INCOMPLETE and is not a runtime release acceptance criterion.
+Preserve all legacy databases and records. Protected-target access/activation is
+not authorized. Use [current runtime configuration and checklist](RUNTIME_STARTUP_POWERSHELL.md).
+Earlier-round historical proposals below are context, not current work instructions.
+
 Round 04: see [historical replay compatibility and archive mapping v0.1](ROUND04_REPLAY_AND_ARCHIVE_DESIGN.md)
 and [machine-readable gates](status.json). Unified SUCCESS replay returns the
 persisted settlement after verified expiry or replacement without reactivation.
