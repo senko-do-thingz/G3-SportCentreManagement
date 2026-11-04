@@ -34,6 +34,9 @@ public record DisposableUnifyDatabase(String name, String url, String user, Stri
         var admin = new JdbcTemplate(new DriverManagerDataSource(prefix + "master" + suffix, user, password));
         // Match the declared canonical fingerprint on Windows and container SQL instances.
         admin.execute("CREATE DATABASE [" + name + "] COLLATE Latin1_General_CI_AS");
+        // SQL Express can inherit AUTO_CLOSE=ON. Prevent repeated closure/reset between fixture bootstrap connections.
+        // This setting targets only the database just created above, never an existing/shared database.
+        admin.execute("ALTER DATABASE [" + name + "] SET AUTO_CLOSE OFF");
         var source = new DriverManagerDataSource(prefix + name + suffix, user, password);
         if (new JdbcTemplate(source).queryForObject("SELECT COUNT(*) FROM sys.tables", Integer.class) != 0)
             throw new IllegalStateException("Disposable database must be empty");

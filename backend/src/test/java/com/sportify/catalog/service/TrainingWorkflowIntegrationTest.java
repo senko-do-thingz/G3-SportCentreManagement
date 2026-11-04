@@ -78,6 +78,7 @@ class TrainingWorkflowIntegrationTest {
     @Autowired TrainingGuidanceService guidance;
     @Autowired CenterConsultationService consultation;
     @Autowired com.sportify.payment.service.OperationsReportService operationsReports;
+    @Autowired ClassPlanService classPlans;
     @Autowired BookingService bookings;
     @Autowired UserRepository users;
     @Autowired PlatformTransactionManager transactions;
@@ -225,6 +226,68 @@ class TrainingWorkflowIntegrationTest {
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
         assertThatThrownBy(()->operationsReports.report(from.plusDays(1),from)).isInstanceOf(BusinessRuleException.class);
         assertThatThrownBy(()->operationsReports.report(from,from.plusDays(366))).isInstanceOf(BusinessRuleException.class);
+    }
+
+    @Test void RELEASE10_classPlanHasExplicitScopeSharedReadbackAndRetryPrivacy() throws Exception {
+        var personalRequest=plan(); long personal=writer.createPlan(coach,personalRequest).id();
+        assertThatThrownBy(()->writer.createPlan(coach,personalRequest)).isInstanceOf(ConflictException.class);
+        jdbc.update("INSERT session_plan(class_id,coach_id,title,is_template) VALUES (?,?,'Legacy unassigned plan',0)",classId,coach);
+        var request=new ClassPlanService.Request(classId,code(),"Shared class preparation",List.of(new TrainingWriteRequest.Step("Warm up",10,"Follow the coach")));
+        UUID operation=UUID.randomUUID();
+        String endpoint="/api/v1/coach/training/class-plans";
+        String body=new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(request);
+        var response=mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(endpoint)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(coach))))
+                .header("Idempotency-Key",operation.toString()).contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated()).andReturn();
+        long createdId=new com.fasterxml.jackson.databind.ObjectMapper().readTree(response.getResponse().getContentAsString()).path("plan").path("id").asLong();
+        var created=classPlans.detail(coach,createdId);
+        long id=created.plan().id();
+        assertThat(created.plan().scope()).isEqualTo("CLASS"); assertThat(created.steps()).hasSize(1);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(endpoint)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(member))))
+                .header("Idempotency-Key",UUID.randomUUID().toString()).contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(endpoint)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(coach))))
+                .header("Idempotency-Key",UUID.randomUUID().toString()).contentType("application/json")
+                .content("{\"classId\":"+classId+",\"title\":\" \",\"steps\":[]}"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+        assertThat(classPlans.create(coach,request,operation).plan().id()).isEqualTo(id);
+        assertThatThrownBy(()->classPlans.create(coach,new ClassPlanService.Request(classId,"Changed",null,request.steps()),operation)).isInstanceOf(ConflictException.class);
+        assertThatThrownBy(()->classPlans.create(otherCoach,request,UUID.randomUUID())).isInstanceOf(ResourceNotFoundException.class);
+        assertThat(reader.plans(member)).extracting(p->p.id()).containsExactlyInAnyOrder(personal,id);
+        assertThat(reader.plans(peer)).isEmpty();
+        long peerBooking=insert("INSERT booking(booking_code,session_id,member_id,status) VALUES (?,?,?,'CONFIRMED')",code(),session,peer);
+        jdbc.update("UPDATE class_session SET booked_count=2 WHERE id=?",session);
+        assertThat(reader.plans(peer)).extracting(p->p.id()).containsExactly(id);
+        assertThatThrownBy(()->reader.plan(peer,personal)).isInstanceOf(ResourceNotFoundException.class);
+        String peerEmail=jdbc.queryForObject("SELECT email FROM user_account WHERE id=?",String.class,peer);
+        jdbc.update("UPDATE user_account SET email=? WHERE id=?",code()+"@unified-demo.invalid",peer);
+        assertThat(reader.plans(peer)).isEmpty();
+        jdbc.update("UPDATE user_account SET email=? WHERE id=?",peerEmail,peer);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/plans/"+id)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(peer)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.plan.scope").value("CLASS"));
+        jdbc.update("UPDATE booking SET status='CANCELLED' WHERE id=?",peerBooking);
+        assertThatThrownBy(()->reader.plan(peer,id)).isInstanceOf(ResourceNotFoundException.class);
+        jdbc.update("UPDATE sport_class SET coach_id=? WHERE id=?",otherCoach,classId);
+        assertThatThrownBy(()->classPlans.detail(coach,id)).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(()->reader.plan(member,id)).isInstanceOf(ResourceNotFoundException.class);
+        assertThat(reader.plan(member,personal).plan().id()).isEqualTo(personal);
+        assertThat(count("SELECT COUNT(*) FROM session_plan WHERE operation_id=?",operation.toString())).isEqualTo(1);
+    }
+
+    @Test void RELEASE10_concurrentClassPlanRetryCreatesOnePlan() throws Exception {
+        var request=new ClassPlanService.Request(classId,code(),null,List.of(new TrainingWriteRequest.Step("Practice",10,null)));
+        UUID operation=UUID.randomUUID(); var pool=Executors.newFixedThreadPool(2); var start=new CountDownLatch(1);
+        try {
+            Callable<Long> create=()->{start.await();return classPlans.create(coach,request,operation).plan().id();};
+            var first=pool.submit(create);var second=pool.submit(create);start.countDown();
+            assertThat(first.get(60,TimeUnit.SECONDS)).isEqualTo(second.get(60,TimeUnit.SECONDS));
+            assertThat(count("SELECT COUNT(*) FROM session_plan WHERE operation_id=?",operation.toString())).isEqualTo(1);
+        } finally {pool.shutdownNow();assertThat(pool.awaitTermination(10,TimeUnit.SECONDS)).isTrue();}
     }
 
     @Test void HOT00_realCoachToMemberAndReceptionToMemberContracts() throws Exception {
