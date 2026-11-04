@@ -99,11 +99,10 @@ jobs:
           SPORTIFY_PAYMENT_ACCOUNT_NUMBER: NOT_AVAILABLE
           SPORTIFY_PAYMENT_BANK: Simulation only
         run: |
-          database="sportify_qr04_test_$(date -u +%Y%m%d%H%M%S)"
-          docker exec -e SQLCMDPASSWORD="$DB_PASSWORD" "$SQL_CONTAINER" \
-            /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -Q "CREATE DATABASE [$database];"
-          export QR_LOCAL_DEMO_TEST_DB_URL="jdbc:sqlserver://127.0.0.1:1433;databaseName=$database;encrypt=false;trustServerCertificate=true"
-          mvn -B -ntp test -Dtest=LocalDemoDatabaseIntegrationIT
+          export UNIFY_TEST_SQL_PORT=1433
+          export UNIFY_TEST_DB_USER="$DB_USERNAME"
+          export UNIFY_TEST_DB_PASSWORD="$DB_PASSWORD"
+          mvn -B -ntp verify -DskipUnitTests=true -Dit.test=LocalDemoDatabaseIntegrationIT
       - name: Upload sanitized verification evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

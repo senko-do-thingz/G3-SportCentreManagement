@@ -23,7 +23,7 @@ def main():
     # ALL runs every integration regression, including finance/migrations and negative paths.
     selector = '*' if options.requirement == 'ALL' else selected[0]['selectors']
     print('Acceptance IDs: ' + ','.join(r['id'] for r in selected), flush=True)
-    command = ['mvn.cmd' if os.name == 'nt' else 'mvn', '-B', '-ntp', '-DskipUnitTests=true', '-Dit.test=' + selector, 'verify']
+    command = ['mvn.cmd' if os.name == 'nt' else 'mvn', '-B', '-ntp', '-Dspring.test.context.cache.maxSize=8', '-DskipUnitTests=true', '-Dit.test=' + selector, 'verify']
     process = subprocess.Popen(command, cwd=root / 'backend', env=env, stdout=subprocess.PIPE,
                                stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace')
     for line in process.stdout:

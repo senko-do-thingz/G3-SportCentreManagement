@@ -35,7 +35,8 @@ class ReleaseProcessRestartIntegrationTest {
         String classpath=System.getProperty("surefire.test.class.path",System.getProperty("java.class.path"));
         Path args=evidence.resolve("process-"+(++generation)+".args").toAbsolutePath();
         Files.writeString(args,"-cp\n\""+classpath.replace('\\','/')+"\"\ncom.sportify.support.ReleaseProcessApplication\n--server.address=127.0.0.1\n--server.port="+port+"\n--spring.profiles.active=dev\n--spring.jpa.show-sql=false\n--logging.level.root=WARN\n");
-        var builder=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java.exe").toString(),"@"+args);
+        String executable=System.getProperty("os.name").startsWith("Windows")?"java.exe":"java";
+        var builder=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin",executable).toString(),"@"+args);
         builder.environment().put("DB_URL",fixture.url());builder.environment().put("DB_USERNAME",fixture.user());builder.environment().put("DB_PASSWORD",fixture.password());
         builder.environment().put("SPORTIFY_RELEASE_TEST_TIME",time);
         builder.environment().put("PAYMENT_UNIFIED_DEMO_ENABLED","false");builder.environment().put("PAYMENT_LOCAL_DEMO_ENABLED","false");
