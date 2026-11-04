@@ -14,8 +14,35 @@ export function MemberClassesPage() {
 export function MemberClassDetailPage() {
   const { id = '' } = useParams()
   const load = useCallback((signal: AbortSignal) => learning.detail(id, signal), [id])
-  return <TrainingData load={load}>{({ learningClass: item, sessions }) => <div className="training-page"><Link to="/member/training/classes">Back to my classes</Link><PageHeader title={item.name} description={`${item.sportName} - ${item.level ?? 'All levels'}`} /><Card title="Class information"><dl><dt>Coach</dt><dd>{item.coachName ?? 'Not assigned'}</dd><dt>Capacity</dt><dd>{item.capacity}</dd><dt>Class status</dt><dd>{item.active === false ? 'Inactive' : 'Active'}</dd></dl><Link to={`/member/training/questions?classId=${item.id}`}>Ask your coach about supplementary practice</Link></Card>
-    <Card title="My sessions and attendance"><ul className="training-list">{sessions.map(session => <li key={session.bookingId}><SessionContext {...session} sessionId={session.sessionCode} className={item.name} trainingType={session.trainingFormat} /><p>{session.trainingFormat === 'SELF_TRAINING' ? 'Self-training' : 'Coach-led'} - {session.sessionStatus} - {session.freeSeats} of {session.capacity} places available{session.freeSeats === 0 ? ' - Full' : ''}</p><p>{session.sessionStatus === 'CANCELLED' ? 'Session cancelled' : session.bookingStatus === 'CANCELLED' ? 'Booking cancelled' : attendanceLabel(session.attendanceStatus)}</p>{item.active !== false && session.sessionStatus === 'PUBLISHED' && <Link to={`/member/sessions/${session.sessionCode ?? session.sessionId}`}>View session availability and booking rules</Link>}{session.notes && <p>{session.notes}</p>}{session.resultId && <Link to={`/member/training/results/${session.resultId}`}>View session assessment</Link>}</li>)}</ul></Card><Link to="/member/training/plans">View assigned practice plans</Link></div>}</TrainingData>
+  return <TrainingData load={load}>{({ learningClass: item, sessions }) => (
+    <div className="training-page">
+      <Link to="/member/training/classes">Back to my classes</Link>
+      <PageHeader title={item.name} description={`${item.sportName} - ${item.level ?? 'All levels'}`} />
+      <Card title="Class information">
+        <dl className="class-facts">
+          <div><dt>Coach</dt><dd>{item.coachName ?? 'Not assigned'}</dd></div>
+          <div><dt>Capacity</dt><dd>{item.capacity}</dd></div>
+          <div><dt>Class status</dt><dd>{item.active === false ? 'Inactive' : 'Active'}</dd></div>
+        </dl>
+        <Link to={`/member/training/questions?classId=${item.id}`}>Ask your coach about supplementary practice</Link>
+      </Card>
+      <Card title="My sessions and attendance">
+        <ul className="training-list class-participation">{sessions.map(session => (
+          <li key={session.bookingId}>
+            <SessionContext {...session} sessionId={session.sessionCode} className={item.name} trainingType={session.trainingFormat} />
+            <p>{session.trainingFormat === 'SELF_TRAINING' ? 'Self-training' : 'Coach-led'} - {session.sessionStatus} - {session.freeSeats} of {session.capacity} places available{session.freeSeats === 0 ? ' - Full' : ''}</p>
+            <p><strong>{session.sessionStatus === 'CANCELLED' ? 'Session cancelled' : session.bookingStatus === 'CANCELLED' ? 'Booking cancelled' : attendanceLabel(session.attendanceStatus)}</strong></p>
+            {session.notes && <p className="training-copy">{session.notes}</p>}
+            <div className="training-actions">
+              {item.active !== false && session.sessionStatus === 'PUBLISHED' && <Link to={`/member/sessions/${session.sessionCode ?? session.sessionId}`}>View session availability and booking rules</Link>}
+              {session.resultId && <Link to={`/member/training/results/${session.resultId}`}>View session assessment</Link>}
+            </div>
+          </li>
+        ))}</ul>
+      </Card>
+      <Link to="/member/training/plans">View assigned practice plans</Link>
+    </div>
+  )}</TrainingData>
 }
 export function ClassQuestionsPage({ coach = false }: { coach?: boolean }) {
   const [revision, refresh] = useState(0)

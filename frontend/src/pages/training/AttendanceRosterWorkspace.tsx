@@ -3,6 +3,7 @@ import { staffTrainingApi as training, type AttendanceStatus, type SessionMember
 import { sessionIdText } from '../../api/sessionIdentity'
 import { formatCalendarDate } from '../../utils/date'
 import { SessionContext } from '../../components/SessionContext'
+import { SessionIdGuide } from '../../components/SessionIdGuide'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -32,14 +33,15 @@ function AttendanceBrowser({ coach }: { coach: boolean }) {
     <PageHeader title="Session attendance" description={coach
       ? 'Record participation for your assigned sessions. Corrections require a reason. Saved results require Present or Late attendance.'
       : 'Record attendance using confirmed member bookings. Enter a reason when correcting a saved record to keep an audit history.'} />
-    {message && <p role="status" aria-live="polite">{message}</p>}
+    {message && <p className="notice notice--success" role="status" aria-live="polite">{message}</p>}
     <TrainingData key={revision} load={coach ? training.coachSessions : training.receptionSessions}>{sessions => {
       const ordered = [...sessions].sort((a, b) => Number(actionable(b)) - Number(actionable(a)))
       const active = ordered.find(session => key(session) === selected) || (!selected ? ordered.find(actionable) : undefined)
       const query = search.trim().toLowerCase()
       const visible = ordered.filter(session => [session.sessionId, session.className, session.sportName, session.coachName, session.facilityName, formatCalendarDate(session.date), session.date].some(value => value?.toLowerCase().includes(query)))
-      return <>
-        <Card title="Select a session">
+      return <div className="attendance-layout">
+        <Card title="Select a session" className="attendance-selector">
+          <SessionIdGuide />
           <Input label="Search sessions" type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Session ID, class, Coach or facility" />
           <p className="attendance-help">Sessions with attendance to record today appear first. Counts reflect confirmed bookings. Unmarked does not mean absent.</p>
           {!sessions.length ? <EmptyState title="No sessions available" /> : !visible.length ? <EmptyState title="No matching sessions" description="Search by Session ID, class, Coach or facility." /> : <ul className="attendance-session-list" aria-label="Attendance sessions">
@@ -64,7 +66,7 @@ function AttendanceBrowser({ coach }: { coach: boolean }) {
           onRefresh={() => refresh(value => value + 1)}
           onSaved={(bookingId, correcting) => { setFocusBooking(bookingId); setMessage(correcting ? 'Attendance corrected and the reason saved. The roster is updated.' : 'Attendance saved and the list updated.'); select(key(active)); refresh(value => value + 1) }} />
           : <EmptyState title="Choose a session to view its member roster" />}
-      </>
+      </div>
     }}</TrainingData>
   </div>
 }
@@ -74,7 +76,7 @@ function AttendanceWorkspace({ session, coach, focusBooking, onSaved, onRefresh,
 }) {
   const load = useCallback((signal: AbortSignal) => (coach ? training.coachRoster : training.receptionRoster)(key(session), signal), [session, coach])
   const dateOpen = session.attendanceDateOpen === true
-  return <Card title={`Member roster - ${sessionIdText(session.sessionId)}`}>
+  return <Card title={`Member roster - ${sessionIdText(session.sessionId)}`} className="attendance-workspace">
     <div className="attendance-roster-heading"><SessionContext {...session} /><Button variant="secondary" onClick={onRefresh}>Refresh roster</Button></div>
     {!dateOpen && <p role="status">Initial attendance is closed for this session. Ordinary attendance is recorded only on the session date in Asia/Ho_Chi_Minh. Saved records remain visible; existing corrections require a reason.</p>}
     <TrainingData load={load}>{members => !members.length ? <EmptyState title="No valid bookings for this session" /> : <ul className="attendance-roster" aria-label="Member attendance roster">

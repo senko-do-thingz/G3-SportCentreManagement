@@ -2,6 +2,16 @@
 @media (max-width: 900px) { .f2-editor-layout { grid-template-columns: minmax(0, 1fr); } }
 .f2-schedule-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--color-border); border-radius: 10px; overscroll-behavior-x: contain; }
 .f2-schedule-table { width: 100%; min-width: 900px; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
+.workflow-surface .f2-schedule-table-wrap { max-height: 70vh; overflow: auto; border-radius: 0; scrollbar-gutter: stable; }
+.workflow-surface .f2-schedule-table { min-width: 1280px; }
+.workflow-surface .f2-session .session-identity code { white-space: nowrap; }
+.workflow-surface .f2-schedule-table thead th { position: sticky; top: 0; z-index: 2; }
+.workflow-surface .f2-schedule-table tbody th { position: sticky; left: 0; z-index: 1; }
+.workflow-surface .f2-schedule-table thead th:first-child { left: 0; z-index: 3; }
+.workflow-surface .f2-session { border-left-width: 1px; border-radius: 0; }
+.workflow-surface .f2-conflict { border-left-width: 1px; }
+.workflow-surface .f2-session__title { font-size: 13px; line-height: 1.45; }
+.workflow-surface .f2-session__meta { font-size: 12px; line-height: 1.5; }
 .f2-schedule-table th, .f2-schedule-table td { padding: 8px; border-right: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); vertical-align: top; }
 .f2-schedule-table tr > :last-child { border-right: 0; }
 .f2-schedule-table tbody tr:last-child > * { border-bottom: 0; }

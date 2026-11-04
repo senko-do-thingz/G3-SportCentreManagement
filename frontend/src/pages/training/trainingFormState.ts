@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { getErrorMessage } from '../../api/errors'
+import { ApiError, getErrorMessage } from '../../api/errors'
 
 /** Keep form values on failure; retry is the same explicit submit action. */
 export function useTrainingAction() {
@@ -7,6 +7,7 @@ export function useTrainingAction() {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [conflict, setConflict] = useState(false)
 
   async function run(action: () => Promise<void>, message: string) {
     if (running.current) return
@@ -14,11 +15,13 @@ export function useTrainingAction() {
     setPending(true)
     setError(null)
     setSuccess(null)
+    setConflict(false)
     try {
       await action()
       setSuccess(message)
     } catch (failure) {
       setError(getErrorMessage(failure))
+      setConflict(failure instanceof ApiError && failure.status === 409)
     } finally {
       running.current = false
       setPending(false)
@@ -29,9 +32,10 @@ export function useTrainingAction() {
     if (running.current) return
     setError(null)
     setSuccess(null)
+    setConflict(false)
   }
 
-  return { pending, error, success, run, reset }
+  return { pending, error, success, conflict, run, reset }
 }
 
 export const attendanceOptions = [
