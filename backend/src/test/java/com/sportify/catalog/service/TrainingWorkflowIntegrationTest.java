@@ -162,6 +162,36 @@ class TrainingWorkflowIntegrationTest {
         assertThat(writer.coachSessions(coach)).anyMatch(s->s.id()==session && s.facilityName().equals(facilityName) && s.sessionId().equals(sessionCode));
     }
 
+    @Test void RELEASE07_goalsAreLimitedToTheCurrentAssignedCoachAndConfirmedLearner() throws Exception {
+        jdbc.update("UPDATE member_profile SET main_goal='FITNESS',current_level='INTERMEDIATE',staff_note='Private desk note' WHERE user_id=?",member);
+        var profile=writer.learnerProfile(coach,classId,member);
+        assertThat(profile.mainGoal()).isEqualTo("FITNESS"); assertThat(profile.currentLevel()).isEqualTo("INTERMEDIATE");
+        assertThatThrownBy(()->writer.learnerProfile(otherCoach,classId,member)).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(()->writer.learnerProfile(coach,classId,peer)).isInstanceOf(ResourceNotFoundException.class);
+        String path="/api/v1/coach/training/classes/"+classId+"/members/"+member+"/profile";
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(coach)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.mainGoal").value("FITNESS"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.staffNote").doesNotExist())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.email").doesNotExist())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.phone").doesNotExist())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.passwordHash").doesNotExist());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(member)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        jdbc.update("UPDATE booking SET status='CANCELLED' WHERE id=?",booking);
+        assertThatThrownBy(()->writer.learnerProfile(coach,classId,member)).isInstanceOf(ResourceNotFoundException.class);
+        jdbc.update("UPDATE booking SET status='CONFIRMED' WHERE id=?",booking);
+        jdbc.update("UPDATE sport_class SET coach_id=? WHERE id=?",otherCoach,classId);
+        assertThatThrownBy(()->writer.learnerProfile(coach,classId,member)).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(()->writer.learnerProfile(otherCoach,classId,member)).isInstanceOf(ResourceNotFoundException.class);
+        jdbc.update("UPDATE class_session SET coach_id=? WHERE id=?",otherCoach,session);
+        assertThat(writer.learnerProfile(otherCoach,classId,member).memberId()).isEqualTo(member);
+        jdbc.update("UPDATE user_account SET status='INACTIVE' WHERE id=?",otherCoach);
+        assertThatThrownBy(()->writer.learnerProfile(otherCoach,classId,member)).isInstanceOf(ResourceNotFoundException.class);
+    }
+
     @Test void HOT00_realCoachToMemberAndReceptionToMemberContracts() throws Exception {
         var coachUser = org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
             new com.sportify.identity.security.CustomUserDetails(actor(coach)));
