@@ -23,6 +23,7 @@ import { ReceiptPage } from '../pages/member/ReceiptPage'
 import { SportPackagesPage } from '../pages/member/SportPackagesPage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
 import { CheckInPage } from '../pages/reception/CheckInPage'
+import { SupportRequestsPage } from '../pages/reception/SupportRequestsPage'
 import { MemberSearchPage } from '../pages/reception/MemberSearchPage'
 import { PaymentRequestsPage } from '../pages/reception/PaymentRequestsPage'
 import { ReceptionPaymentPage } from '../pages/reception/ReceptionPaymentPage'
@@ -98,6 +99,7 @@ const SCREENS: Record<string, ReactNode> = {
   '/member/payments': <MyPaymentsPage />,
   '/member/schedule': <MemberSchedulePage />,
   '/reception': <MemberSearchPage />,
+  '/reception/support': <SupportRequestsPage />,
   '/reception/bookings': <ReceptionBookingsPage />,
   '/reception/register': <RegisterRenewPage />,
   '/reception/check-in': <CheckInPage />,

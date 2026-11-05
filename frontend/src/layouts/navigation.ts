@@ -107,6 +107,7 @@ export const RECEPTIONIST_AREA: RoleArea = {
     {
       heading: 'Front desk',
       items: [
+        { label: 'Support requests', path: 'support', title: 'Support requests', description: 'Record and resolve member support requests.', task: 'R11-01', screens: ['F1-16'] },
         {
           label: 'Member search',
           path: '',
