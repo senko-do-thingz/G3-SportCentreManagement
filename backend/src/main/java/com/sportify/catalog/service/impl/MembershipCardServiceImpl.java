@@ -13,6 +13,7 @@ import com.sportify.catalog.repository.MemberCardRepository;
 import com.sportify.catalog.repository.MembershipCardTierRepository;
 import com.sportify.catalog.service.MembershipCardService;
 import com.sportify.catalog.service.DeskSaleCharge;
+import com.sportify.catalog.service.MemberAccountEligibility;
 import com.sportify.core.audit.AuditAction;
 import com.sportify.core.audit.AuditEvent;
 import com.sportify.core.audit.AuditService;
@@ -73,6 +74,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     private final CodeFormatter codeFormatter;
     private final AuditService auditService;
     private final Clock clock;
+    private final MemberAccountEligibility memberAccountEligibility;
     private final EntityManager entityManager;
     /** Resolved on use: PaymentVerificationService itself depends on this service. */
     private final ObjectProvider<PaymentVerificationService> paymentVerificationService;
@@ -262,6 +264,8 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         } else {
             targetMemberId = request.getMemberId() != null ? request.getMemberId() : actor.getId();
         }
+        // E2E-BUG-04: the target account must be ACTIVE before any card, payment or invoice is written.
+        memberAccountEligibility.requireActiveForPurchase(targetMemberId);
 
         MemberProfile member = memberProfileRepository.findById(targetMemberId).orElse(null);
         if (member == null) {

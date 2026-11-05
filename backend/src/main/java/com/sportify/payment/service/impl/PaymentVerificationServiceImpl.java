@@ -29,6 +29,7 @@ import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.repository.PaymentSpecifications;
 import com.sportify.payment.service.PaymentService;
 import com.sportify.payment.service.PaymentVerificationService;
+import com.sportify.catalog.service.MemberAccountEligibility;
 import com.sportify.payment.service.impl.PaymentItemResolver.PaymentItem;
 import com.sportify.payment.service.impl.PaymentItemResolver.PaymentItemSummary;
 import lombok.RequiredArgsConstructor;
@@ -73,6 +74,7 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
     private final AuditService auditService;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
+    private final MemberAccountEligibility memberAccountEligibility;
 
     @Override
     @Transactional(readOnly = true)
@@ -133,6 +135,9 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
 
         Payment payment = lockPayment(paymentId);
         requirePending(payment, "confirmed");
+        // E2E-BUG-04: lock order payment row, then the target member account row. The rejection rolls back, so the
+        // payment and its card or registration stay pending and no invoice is created.
+        memberAccountEligibility.requireActiveForPurchase(payment.getMember().getId());
 
         BigDecimal amountReceived = request.getAmountReceived();
         if (amountReceived.compareTo(payment.getAmount()) != 0) {
