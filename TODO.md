@@ -1,6 +1,14 @@
 # TODO - Sportify Center (G3)
 
-State on 2026-10-08: `main` has migrations V1-V20 (58 tables), PR #5 (Figma schema) and PR #6 (card payment flow, V20) merged, CI green.
+## Current Release 1.1 candidate - 2026-11-05
+
+R11-00 was accepted by CODEOWNER. R11-01 support, R11-02 operations, R11-04 Manager attendance and R11-05 Coach progress are implemented on the consolidated candidate branch. R11-03 verification is repeated at the final candidate SHA. R11-09 documentation, R11-10 traceability/demo and R11-11 acceptance preparation record actual evidence in their task reports. None is automatically marked merged or approved by the agent.
+
+Remaining review gates: full candidate test and exact-HEAD CI results, real four-role desktop rehearsal, and CODEOWNER review. See [traceability](docs/release-1.1/REQUIREMENT_TRACEABILITY.md). Fixed roles are retained; Waitlist and dynamic RBAC are deferred; deprecated legacy membership remains. No mobile, AI Audit Log or Flow 5-6 implementation is required for this release.
+
+## Archived planning snapshot - 2026-10-08
+
+The task tables below are historical planning rows, not the current implementation backlog. Their owners and estimates are historical. At that date main had migrations V1-V20; the accepted R11-00 audit found current source through V46. Use the current release reports for implementation and test status.
 
 Owners are a suggestion: backend = Bao, Dat, Truc; frontend = Phat, Hung. Change them in the group chat if needed.
 
@@ -9,7 +17,7 @@ Priority:
 - P2 = should have for the next review
 - P3 = later or nice to have
 
-Rule for every task: one branch per task (`feat/...` or `fix/...`), unit tests included, `mvn clean verify` green, PR into `main`, update `CHANGELOG.md` and the AI Audit Log.
+Release 1.1 follows CODEOWNER's consolidated branch/PR authorization, focused and full verification, updated CHANGELOG and technical reports. Do not merge or deploy from agent execution.
 
 ---
 
@@ -32,7 +40,7 @@ Backend already has: card tiers, card purchase / activate / cancel, package list
 ## Flow 2 - Classes, sessions and booking
 
 Backend already has: create booking, cancel booking, my bookings, today's bookings, self-training attendance.
-Missing: everything the manager needs to create classes and sessions.
+Current source has Manager class/session APIs and desktop scheduling; the rows below retain the original planning context.
 
 | ID | Task | Owner | Priority | Depends on |
 |---|---|---|---|---|
@@ -50,7 +58,7 @@ Missing: everything the manager needs to create classes and sessions.
 
 ## Flow 3 - Payments, invoices, refunds and reports
 
-Database already has `payment`, `invoice`, `invoice_line` (V14). No entity, service or endpoint yet.
+Current source has payment/invoice entities, services, secured endpoints and desktop pages. The rows below retain the original V14 planning context.
 Backend already has: refund request, review, complete.
 
 | ID | Task | Owner | Priority | Depends on |

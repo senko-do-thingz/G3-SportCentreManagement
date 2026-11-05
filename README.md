@@ -2,7 +2,20 @@
 
 [![CI/CD](https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/workflows/ci.yml/badge.svg)](https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/workflows/ci.yml)
 
-Web system for **Sportify Center**, a multi-sport facility. It manages user accounts and roles, sport packages, membership cards, class bookings, check-in and refunds. Payment, invoice, refund and legacy financial-report workflows are implemented. Training progress, AI workout recommendation, AI support and notifications remain planned workflows.
+Web system for **Sportify Center**, a multi-sport facility. It manages accounts and fixed roles, sport packages, membership cards, class bookings, arrival check-in, attendance, training plans, results, feedback, payments, invoices, refunds and notifications.
+
+## Flow 1-4 Release 1.1 candidate
+
+This branch adds the missing desktop support, operations, Manager attendance and Coach progress pages. It is a release candidate awaiting CODEOWNER review, not a merged release or deployment. See [release traceability](docs/release-1.1/REQUIREMENT_TRACEABILITY.md) and the [12-minute desktop demo](docs/release-1.1/DESKTOP_DEMO.md) for routes, contracts, tests and limitations. Per-task evidence is under `tasks/Flow1-4 - Release 1.1 (i)/tasks/R11-xx/reports/`.
+
+| Scope | Desktop behavior |
+|---|---|
+| Flow 1, required | Existing account/card/package flows plus Reception support intake, search/filter, details and status transitions at `/reception/support` |
+| Flow 2, required | Existing class/session administration, booking/cancellation, public Session IDs, Coach rosters and personal schedules |
+| Flow 3, required | Existing payment/refund/CSV semantics plus date-scoped registration and booking counters at `/manager/reports` |
+| Flow 4, included optional scope | Existing plans, results, feedback and attendance plus read-only `/manager/training/attendance` and `/coach/training/progress` |
+
+Roles stay fixed; Waitlist and dynamic role changes are deferred. Deprecated legacy membership compatibility remains. Mobile, AI Audit Log and Flow 5-6 implementation are outside this release. No schema migration or financial calculation is changed by Release 1.1. Final verification and demo readiness must be read from the exact-SHA reports, not inferred from this feature list.
 
 This is a monorepo with two applications:
 
@@ -55,12 +68,12 @@ The Spring Boot project used to live in the repository root. After you pull the 
 |---|---|
 | **Identity & Access** | Implemented - register, login, token refresh, current user, member search, manager user and staff account management, fixed roles (MEMBER, COACH, RECEPTIONIST, MANAGER), strong password validation, audit logging |
 | **Catalog & Membership** | Implemented - sports, sport packages and registrations, membership cards (tiers, purchase, renewal, upgrade, activation, cancellation), check-in, refund requests. The plan-based membership flow (`/api/v1/memberships`) is legacy and deprecated |
-| **Classes & Booking** | Implemented - class/session management, member discovery and schedules, booking create/cancel/list, reception check-in and coach roster reads. Waitlist and coach attendance mutation remain planned |
+| **Classes & Booking** | Implemented - class/session management, member discovery and schedules, booking create/cancel/list, reception arrival and Coach roster/attendance. Waitlist remains deferred |
 | **Payments & Reports** | Implemented - payment confirmation, invoices, refund payout and legacy finance UI/API. Cash-flow reporting endpoints exist; FE-13 cash-flow adaptation is pending |
-| **Training & Progress** | Schema only (V16) |
+| **Training & Progress** | Implemented - personal/class plans, results, attendance/corrections, feedback, private progress APIs; this candidate adds Manager overview and Coach progress readers |
 | **AI Assistant & Support** | Schema only (V17) |
 | **AI Workout Recommendation** | Schema only (V18) |
-| **Notifications & System** | Schema only (V19) |
+| **Notifications & System** | Implemented scoped operational notifications and important action history; no external messaging integration in Release 1.1 |
 | **Frontend** | Implemented React/TypeScript app with public Home, auth, four role dashboards and System/Light/Dark preferences in the current working tree |
 
 The open tasks for every flow are listed in [TODO.md](TODO.md).
