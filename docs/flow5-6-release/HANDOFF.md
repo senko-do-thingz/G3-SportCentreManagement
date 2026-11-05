@@ -9,7 +9,7 @@ Latest verified parent `main` before #221: `f22464ee8e16a9235f54c06460c8d8babaf5
 | Task | PR | Squash commit on `main` | Evidence |
 | --- | --- | --- | --- |
 | Release 1.1 desktop baseline | #217 | `373cc2f4bbac445d63d105ff81d6a2c17a93aca7` | main CI 42003835180 success |
-| F56-00 baseline | #213 | `93da5a63494d0177e80c60d4d86e571e214a07` | main CI 42015181268 success |
+| F56-00 baseline | #213 | `93da5a63494d0177e80c60d4ad65aabfb6d97604` | main CI 42015181268 success |
 | F56-01 drill drafts | #214 | `95e1cb710cbdffc61f7f84f2642f123700ebde13` | main CI 42019256823 success |
 | F56-02 review and assign | #215 | `ada1411f95841578329d7e7a3f29a0895a6c4bea` | main CI 42021875490 success |
 | F56-03 curated FAQ | #216 | `a2212362d789f2473036d7c54840318216d9981f` | main CI 42026542003 success |
