@@ -27,7 +27,6 @@ export interface DrillSuggestions {
 }
 
 const coach = '/coach/training'
-const reception = '/reception/training'
 export const staffTrainingApi = {
   coachClasses: (signal: AbortSignal) => api.get<TrainingClass[]>(`${coach}/classes`, { signal }),
   bookingCandidates: (classId: string, signal: AbortSignal) => api.get<BookingCandidate[]>(`${coach}/classes/${classId}/members`, { signal }),
@@ -41,10 +40,6 @@ export const staffTrainingApi = {
   metrics: (sportId: number, signal: AbortSignal) => api.get<TrainingMetric[]>(`${coach}/metrics`, { query: { sportId }, signal }),
   result: (body: CreateResult) => api.post<{ id: number }>(`${coach}/results`, body),
   resultByCode: (sessionId: SessionId, body: Omit<CreateResult, 'sessionId'>) => api.post<{ id: number }>(`${coach}/sessions/by-code/${sessionId}/results`, body),
-  receptionSessions: (signal: AbortSignal) => api.get<StaffSession[]>(`${reception}/sessions`, { signal }),
-  receptionRoster: (id: string, signal: AbortSignal) => api.get<SessionMember[]>(`${reception}/sessions/${/^\d+$/.test(id) ? id : `by-code/${parseSessionId(id)}`}/members`, { signal }),
-  attendance: (bookingId: number, body: AttendanceInput) => api.post<{ id: number }>(`${reception}/attendance`, { bookingId, ...body }),
   coachAttendance: (bookingId: number, body: AttendanceInput) => api.post<{ id: number }>(`${coach}/attendance`, { bookingId, ...body }),
   coachCorrectAttendance: (id: number, body: AttendanceInput & { reason: string }) => api.put<{ id: number }>(`${coach}/attendance/${id}`, body),
-  correctAttendance: (id: number, body: AttendanceInput & { reason: string }) => api.put<{ id: number }>(`${reception}/attendance/${id}`, body),
 }

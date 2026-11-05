@@ -181,22 +181,12 @@ public class TrainingWriteService {
     public List<SessionSummary> coachSessions(long coachId) {
         return jdbc.query(SESSION_SELECT + " WHERE s.coach_id = ? AND s.status <> 'CANCELLED' ORDER BY s.session_date DESC, s.start_time DESC, s.id DESC", this::mapSession, coachId);
     }
-    public List<SessionSummary> receptionSessions() {
-        return jdbc.query(SESSION_SELECT + " WHERE s.status <> 'CANCELLED' ORDER BY s.session_date DESC, s.start_time DESC, s.id DESC", this::mapSession);
-    }
     public List<SessionMember> coachSessionMembers(long coachId, long sessionId) {
         requireCoachSession(coachId, sessionId);
         return jdbc.query(SESSION_MEMBERS_SELECT + " AND s.coach_id = ? ORDER BY u.full_name, b.id", this::mapSessionMember, sessionId, coachId);
     }
-    public List<SessionMember> receptionSessionMembers(long sessionId) {
-        if (!exists("SELECT COUNT(*) FROM class_session WHERE id = ?", sessionId)) throw new ResourceNotFoundException("Session not found");
-        return jdbc.query(SESSION_MEMBERS_SELECT + " ORDER BY u.full_name, b.id", this::mapSessionMember, sessionId);
-    }
     public List<SessionMember> coachSessionMembersByCode(long coachId, String sessionId) {
         return coachSessionMembers(coachId, sessionKey(sessionId));
-    }
-    public List<SessionMember> receptionSessionMembersByCode(String sessionId) {
-        return receptionSessionMembers(sessionKey(sessionId));
     }
     private long sessionKey(String sessionId) {
         String code = new PublicSessionId(sessionId).value();
@@ -243,10 +233,6 @@ public class TrainingWriteService {
     }
 
     @Transactional
-    public Created attendance(long actorId, TrainingWriteRequest.Attendance request) {
-        return recordAttendance(actorId, request, false);
-    }
-    @Transactional
     public Created selfAttendance(long actorId, long bookingId, String notes) {
         return recordAttendance(actorId, new TrainingWriteRequest.Attendance(bookingId, TrainingWriteRequest.AttendanceStatus.PRESENT, notes), true);
     }
@@ -272,8 +258,7 @@ public class TrainingWriteService {
         return new Created(id);
     }
 
-    @Transactional
-    public Created correctAttendance(long actorId, long id, TrainingWriteRequest.Correction request) {
+    private Created correctAttendance(long actorId, long id, TrainingWriteRequest.Correction request) {
         if (request.reason() == null || request.reason().trim().length() < 3)
             throw new BusinessRuleException("Provide a meaningful correction reason of at least 3 characters");
         var sessionIds = jdbc.query("SELECT session_id FROM attendance_record WHERE id = ?", (rs, row) -> rs.getLong("session_id"), id);

@@ -51,12 +51,12 @@ class TrainingWriteControllersTest {
             mvc.perform(post("/api/v1/coach/training/results").with(user(account(role))).contentType(MediaType.APPLICATION_JSON).content(RESULT)).andExpect(status().isForbidden());
             mvc.perform(post("/api/v1/coach/training/plans/1/feedback").with(user(account(role))).contentType(MediaType.APPLICATION_JSON).content("{\"rating\":4,\"comments\":\"Progress\"}")).andExpect(status().isForbidden());
         }
-        for (String role : List.of("MEMBER", "COACH", "MANAGER")) {
-            for (String path : List.of("sessions", "sessions/1/members"))
+        for (String role : List.of("MEMBER", "COACH", "MANAGER", "RECEPTIONIST")) {
+            for (String path : List.of("sessions", "sessions/1/members", "sessions/by-code/011126SW01/members"))
                 mvc.perform(get("/api/v1/reception/training/" + path).with(user(account(role)))).andExpect(status().isForbidden());
             mvc.perform(post("/api/v1/reception/training/attendance").with(user(account(role))).contentType(MediaType.APPLICATION_JSON).content("{\"bookingId\":1,\"status\":\"PRESENT\"}")).andExpect(status().isForbidden());
             mvc.perform(put("/api/v1/reception/training/attendance/1").with(user(account(role))).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"LATE\",\"reason\":\"Correction\"}")).andExpect(status().isForbidden());
-            if (!role.equals("MANAGER"))
+            if (!role.equals("MANAGER") && !role.equals("RECEPTIONIST"))
             mvc.perform(post("/api/v1/bookings/self-training/attendance").with(user(account(role))).contentType(MediaType.APPLICATION_JSON).content("{\"bookingId\":1}")).andExpect(status().isForbidden());
         }
         verifyNoInteractions(service, bookingService);
@@ -96,8 +96,8 @@ class TrainingWriteControllersTest {
         mvc.perform(post("/api/v1/coach/training/plans").with(user(account("COACH"))).contentType(MediaType.APPLICATION_JSON).content(PLAN.replace("\"durationMinutes\":10", "\"durationMinutes\":0"))).andExpect(status().isBadRequest());
         mvc.perform(post("/api/v1/coach/training/plans").with(user(account("COACH"))).contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isBadRequest());
         mvc.perform(post("/api/v1/coach/training/plans/1/feedback").with(user(account("COACH"))).contentType(MediaType.APPLICATION_JSON).content("{\"rating\":6,\"comments\":\"Progress\"}")).andExpect(status().isBadRequest());
-        mvc.perform(post("/api/v1/reception/training/attendance").with(user(account("RECEPTIONIST"))).contentType(MediaType.APPLICATION_JSON).content("{\"bookingId\":1,\"status\":\"INVALID\"}")).andExpect(status().isBadRequest());
-        mvc.perform(put("/api/v1/reception/training/attendance/1").with(user(account("RECEPTIONIST"))).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"LATE\",\"reason\":\" \"}")).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/v1/coach/training/attendance").with(user(account("COACH"))).contentType(MediaType.APPLICATION_JSON).content("{\"bookingId\":1,\"status\":\"INVALID\"}")).andExpect(status().isBadRequest());
+        mvc.perform(put("/api/v1/coach/training/attendance/1").with(user(account("COACH"))).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"LATE\",\"reason\":\" \"}")).andExpect(status().isBadRequest());
         verifyNoInteractions(service);
     }
     @Test void coachCreateUsesAuthenticatedCoachAndReturnsCreatedId() throws Exception {
@@ -112,13 +112,15 @@ class TrainingWriteControllersTest {
         verify(service).feedback(eq(10L), eq(100L), any());
         verifyNoMoreInteractions(service);
     }
-    @Test void receptionWritesUseAuthenticatedActor() throws Exception {
-        when(service.attendance(eq(10L), any())).thenReturn(new Created(1));
-        when(service.correctAttendance(eq(10L), eq(1L), any())).thenReturn(new Created(1));
-        mvc.perform(post("/api/v1/reception/training/attendance?actorId=99").with(user(account("RECEPTIONIST"))).contentType(MediaType.APPLICATION_JSON).content("{\"bookingId\":1,\"status\":\"PRESENT\"}")).andExpect(status().isCreated()).andExpect(jsonPath("$.id").value(1));
-        mvc.perform(put("/api/v1/reception/training/attendance/1?actorId=99").with(user(account("RECEPTIONIST"))).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"LATE\",\"reason\":\"Correction\"}")).andExpect(status().isOk());
-        verify(service).attendance(eq(10L), any());
-        verify(service).correctAttendance(eq(10L), eq(1L), any());
+    @Test void coachAttendanceWritesUseAuthenticatedCoachAndDenyReceptionSessionAttendance() throws Exception {
+        when(service.coachAttendance(eq(10L), any())).thenReturn(new Created(1));
+        when(service.coachCorrection(eq(10L), eq(1L), any())).thenReturn(new Created(1));
+        mvc.perform(post("/api/v1/reception/training/attendance?actorId=99").with(user(account("RECEPTIONIST"))).contentType(MediaType.APPLICATION_JSON).content("{\"bookingId\":1,\"status\":\"PRESENT\"}")).andExpect(status().isForbidden());
+        mvc.perform(put("/api/v1/reception/training/attendance/1?actorId=99").with(user(account("RECEPTIONIST"))).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"LATE\",\"reason\":\"Correction\"}")).andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/coach/training/attendance?coachId=99").with(user(account("COACH"))).contentType(MediaType.APPLICATION_JSON).content("{\"bookingId\":1,\"status\":\"PRESENT\"}")).andExpect(status().isCreated()).andExpect(jsonPath("$.id").value(1));
+        mvc.perform(put("/api/v1/coach/training/attendance/1?coachId=99").with(user(account("COACH"))).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"LATE\",\"reason\":\"Correction\"}")).andExpect(status().isOk());
+        verify(service).coachAttendance(eq(10L), any());
+        verify(service).coachCorrection(eq(10L), eq(1L), any());
         verifyNoMoreInteractions(service);
     }
     @Test void R2_API_04_coachAttendanceAndCorrectionEnforceRole() throws Exception {

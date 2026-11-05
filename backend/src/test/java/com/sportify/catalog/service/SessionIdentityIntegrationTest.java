@@ -171,7 +171,7 @@ class SessionIdentityIntegrationTest {
         mvc.perform(get("/api/v1/coach/sessions?from="+d+"&to="+d,coach)).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$[0].sessionId").value(code));
         mvc.perform(get("/api/v1/coach/sessions/by-code/"+code+"/roster",other)).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
-        mvc.perform(get("/api/v1/reception/training/sessions/by-code/"+code+"/members",reception)).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+        mvc.perform(get("/api/v1/reception/training/sessions/by-code/"+code+"/members",reception)).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
         mvc.perform(get("/api/v1/member/training/attendance",member)).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$[0].session.sessionId").value(code));
     }

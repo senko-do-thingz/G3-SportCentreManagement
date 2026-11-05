@@ -452,7 +452,7 @@ class TrainingWorkflowIntegrationTest {
 
     @Test void ID06_correctionAuditIncludesThePersistedPublicSessionIdentity() {
         long id=writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)).id();
-        writer.correctAttendance(reception,id,correction(TrainingWriteRequest.AttendanceStatus.LATE));
+        writer.coachCorrection(coach,id,correction(TrainingWriteRequest.AttendanceStatus.LATE));
         String code=jdbc.queryForObject("SELECT session_code FROM class_session WHERE id=?",String.class,session);
         assertThat(jdbc.queryForObject("SELECT JSON_VALUE(details,'$.sessionCode') FROM activity_log WHERE action='TRAINING_ATTENDANCE_CORRECTED' AND entity_id=?",String.class,id)).isEqualTo(code);
         assertThat(reader.attendance(member)).hasSize(1);
@@ -670,6 +670,9 @@ class TrainingWorkflowIntegrationTest {
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$[0].coachName").value("COACH"));
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/reception/training/attendance")
             .with(receptionUser).contentType("application/json").content("{\"bookingId\":" + booking + ",\"status\":\"LATE\"}"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/coach/training/attendance")
+            .with(coachUser).contentType("application/json").content("{\"bookingId\":" + booking + ",\"status\":\"LATE\"}"))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated());
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/attendance").with(memberUser))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
@@ -1303,7 +1306,7 @@ class TrainingWorkflowIntegrationTest {
         long attendance=writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)).id();
         long result=writer.createResult(coach,result()).id();
         assertThatThrownBy(()->writer.createResult(coach,result())).isInstanceOf(ConflictException.class);
-        assertThatThrownBy(()->writer.correctAttendance(reception,attendance,correction(TrainingWriteRequest.AttendanceStatus.ABSENT))).isInstanceOf(ConflictException.class);
+        assertThatThrownBy(()->writer.coachCorrection(coach,attendance,correction(TrainingWriteRequest.AttendanceStatus.ABSENT))).isInstanceOf(ConflictException.class);
         assertThat(count("SELECT COUNT(*) FROM attendance_correction WHERE attendance_record_id=?",attendance)).isZero();
         assertThat(jdbc.queryForObject("SELECT status FROM attendance_record WHERE id=?",String.class,attendance)).isEqualTo("PRESENT");
         assertThat(reader.result(member,result).result().id()).isEqualTo(result);
@@ -1312,7 +1315,7 @@ class TrainingWorkflowIntegrationTest {
     }
     @ParameterizedTest @ValueSource(longs={-3601,-3600,-1,0,1})
     void R2_04_resultTimeBoundaryUsesCenterTimezone(long secondsFromEnd) {
-        writer.attendance(reception,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
+        writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
         clock.value=Instant.parse("2026-11-02T03:00:00Z").plusSeconds(secondsFromEnd);
         if(secondsFromEnd<0)assertThatThrownBy(()->writer.createResult(coach,result())).isInstanceOf(BusinessRuleException.class).hasMessageContaining("session ends");
         else assertThat(writer.createResult(coach,result()).id()).isPositive();
@@ -1354,7 +1357,7 @@ class TrainingWorkflowIntegrationTest {
         assertThatThrownBy(()->learning.discussion(otherCoach,true,question)).isInstanceOf(ResourceNotFoundException.class);
     }
     @Test void R2_09_concurrentResultsHaveOneWinner() throws Exception {
-        writer.attendance(reception,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
+        writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
         try(var pool=Executors.newFixedThreadPool(2)){
             var gate=new CountDownLatch(1);
             Callable<Boolean> create=()->{gate.await();try{writer.createResult(coach,result());return true;}catch(ConflictException expected){return false;}};
@@ -1364,13 +1367,13 @@ class TrainingWorkflowIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM session_result WHERE session_id=? AND member_id=?",session,member)).isEqualTo(1);
     }
     @Test void R2_10_resultWinsInterleavingAndConflictingCorrectionRollsBack() throws Exception {
-        long id=writer.attendance(reception,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)).id();
-        interleave(()->writer.createResult(coach,result()),()->writer.correctAttendance(reception,id,correction(TrainingWriteRequest.AttendanceStatus.ABSENT)),ConflictException.class);
+        long id=writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)).id();
+        interleave(()->writer.createResult(coach,result()),()->writer.coachCorrection(coach,id,correction(TrainingWriteRequest.AttendanceStatus.ABSENT)),ConflictException.class);
         assertThat(count("SELECT COUNT(*) FROM attendance_correction WHERE attendance_record_id=?",id)).isZero();
     }
     @Test void R2_11_correctionWinsInterleavingAndResultIsRejected() throws Exception {
-        long id=writer.attendance(reception,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)).id();
-        interleave(()->writer.correctAttendance(reception,id,correction(TrainingWriteRequest.AttendanceStatus.ABSENT)),()->writer.createResult(coach,result()),BusinessRuleException.class);
+        long id=writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)).id();
+        interleave(()->writer.coachCorrection(coach,id,correction(TrainingWriteRequest.AttendanceStatus.ABSENT)),()->writer.createResult(coach,result()),BusinessRuleException.class);
         assertThat(count("SELECT COUNT(*) FROM session_result WHERE session_id=?",session)).isZero();
     }
     @Test void R2_12_cancellationFirstPreventsStalePlanCreation() throws Exception {
@@ -1388,7 +1391,7 @@ class TrainingWorkflowIntegrationTest {
     @ParameterizedTest @ValueSource(longs={-3601,-3600,-1,0,1})
     void R2_17_receptionAndSelfAttendanceStayFlexibleAtTimeBoundaries(long secondsFromEnd) {
         clock.value=Instant.parse("2026-11-02T03:00:00Z").plusSeconds(secondsFromEnd);
-        assertThat(writer.attendance(reception,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)).id()).isPositive();
+        assertThat(writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)).id()).isPositive();
         long self=session("SELF_TRAINING");
         long selfBooking=insert("INSERT booking(booking_code,session_id,member_id,status) VALUES (?,?,?,'CONFIRMED')",code(),self,member);
         assertThat(bookings.recordSelfTrainingAttendance(SelfTrainingAttendanceRequest.builder().bookingId(selfBooking).build(),actor(reception)).getBookingId()).isEqualTo(selfBooking);
@@ -1438,30 +1441,27 @@ class TrainingWorkflowIntegrationTest {
         assertThat(db.queryForObject("SELECT COUNT(*) FROM session_plan WHERE title='Legacy preserved' AND member_id IS NULL",Integer.class)).isEqualTo(1);
     }
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.CsvSource({"COACH,-30","COACH,-1","COACH,1","RECEPTION,-30","RECEPTION,-1","RECEPTION,1","SELF,-1","SELF,1"})
+    @org.junit.jupiter.params.provider.CsvSource({"COACH,-30","COACH,-1","COACH,1","SELF,-1","SELF,1"})
     void R07_sql_ordinaryHistoricalAndFutureFirstMarksLeaveNoRowsOrAudit(String path,int offset) {
         SessionIdentityFixtures.moveFixture(jdbc,session,LocalDate.of(2026,11,2).plusDays(offset));
         jdbc.update("UPDATE class_session SET training_type=?,coach_id=? WHERE id=?",
             path.equals("SELF")?"SELF_TRAINING":"COACH_LED",path.equals("SELF")?null:coach,session);
         assertThatThrownBy(()->{
             if(path.equals("COACH"))writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
-            else if(path.equals("SELF"))writer.selfAttendance(reception,booking,null);
-            else writer.attendance(reception,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
+            else writer.selfAttendance(reception,booking,null);
         }).isInstanceOf(BusinessRuleException.class);
         assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?",booking)).isZero();
         assertThat(count("SELECT COUNT(*) FROM activity_log WHERE actor_user_id IN (?,?) AND action='TRAINING_ATTENDANCE_CREATED'",coach,reception)).isZero();
     }
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.CsvSource({"COACH,2026-11-01T16:59:59Z,false","COACH,2026-11-01T17:00:00Z,true","COACH,2026-11-02T01:59:59Z,true","COACH,2026-11-02T02:00:00Z,true","COACH,2026-11-02T02:00:01Z,true","COACH,2026-11-02T16:59:59Z,true","COACH,2026-11-02T17:00:00Z,false","RECEPTION,2026-11-01T16:59:59Z,false","RECEPTION,2026-11-01T17:00:00Z,true","RECEPTION,2026-11-02T01:59:59Z,true","RECEPTION,2026-11-02T02:00:00Z,true","RECEPTION,2026-11-02T02:00:01Z,true","RECEPTION,2026-11-02T16:59:59Z,true","RECEPTION,2026-11-02T17:00:00Z,false"})
+    @org.junit.jupiter.params.provider.CsvSource({"COACH,2026-11-01T16:59:59Z,false","COACH,2026-11-01T17:00:00Z,true","COACH,2026-11-02T01:59:59Z,true","COACH,2026-11-02T02:00:00Z,true","COACH,2026-11-02T02:00:01Z,true","COACH,2026-11-02T16:59:59Z,true","COACH,2026-11-02T17:00:00Z,false"})
     void R07_sql_centerDayAndSessionStartBoundary(String path,String instant,boolean allowed) {
         clock.value=Instant.parse(instant);
-        var action=(Callable<Object>)()->path.equals("COACH")?writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)):
-            writer.attendance(reception,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
+        var action=(Callable<Object>)()->writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
         if(allowed)assertThatCode(()->action.call()).doesNotThrowAnyException();
         else assertThatThrownBy(()->action.call()).isInstanceOf(BusinessRuleException.class);
         assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?",booking)).isEqualTo(allowed?1:0);
         assertThat(writer.coachSessions(coach).stream().filter(row->row.id()==session).findFirst().orElseThrow().attendanceDateOpen()).isEqualTo(allowed);
-        assertThat(writer.receptionSessions().stream().filter(row->row.id()==session).findFirst().orElseThrow().attendanceDateOpen()).isEqualTo(allowed);
     }
     @Test void R07_sql_existingHistoricalCorrectionsRemainAuditedWithoutInventingACutoff() {
         long id=writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)).id();
