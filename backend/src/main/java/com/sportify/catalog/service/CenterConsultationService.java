@@ -15,6 +15,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /** A bounded knowledge service: no provider, arbitrary query execution or persisted conversation. */
 @Service
@@ -37,19 +38,57 @@ public class CenterConsultationService {
         String intent=intent(text);
         if(intent.equals("COACH"))return response("NO_ANSWER","I cannot assess personal training or health concerns. Ask your assigned human coach about your practice plan.",
             List.of(new ConsultationSource("HUMAN_COACH",0,"Ask your coach","Private human conversation; no automated coach reply.","/member/training/questions")));
-        if(intent.equals("UNKNOWN"))return response("NO_ANSWER","I do not have a grounded answer to that question. I can show published sessions, active package prices, or explain how to check booking eligibility. Contact reception for other center information.",List.of());
+        if(intent.equals("UNKNOWN"))return response("NO_ANSWER","I do not have a grounded answer to that question. I can show published sessions, active package prices, explain how to check booking eligibility, or answer a few general exercise questions such as warming up. Contact reception for other center information.",List.of());
+        if(intent.equals("FAQ")) {
+            var faq=faq(text);
+            return response("ANSWERED","General exercise FAQ (curated center guidance, not personal or medical advice): "+faq.answer(),
+                List.of(new ConsultationSource("CURATED_FAQ",faq.id(),"Center FAQ: "+faq.title(),
+                    "Fixed answer from the curated center FAQ ("+FAQ_VERSION+"). Ask your coach for advice about your own training.","/member/training/questions")));
+        }
         if(intent.equals("BOOKING"))return response("ANSWERED","Open a session, check its current availability and suitable sport packages, then review and confirm in the booking flow. Use My bookings to check cancellation eligibility. This consultation never books, cancels, takes payment or issues refunds.",
             List.of(new ConsultationSource("PRODUCT_GUIDANCE",0,"Session and booking workflow","Eligibility and credits are checked by the existing booking service.","/member/classes")));
         Long sportId=matchingSport(text);
         return intent.equals("PACKAGES")?packages(sportId):sessions(sportId,text.contains("tomorrow"));
     }
     static String intent(String text) {
-        if(contains(text,"password","secret","token","sql","ignore previous","other member","book for me","cancel for me","refund me"))return "UNKNOWN";
-        if(contains(text,"injury","pain","medical","exercise","drill","training plan"))return "COACH";
+        if(contains(text,"password","secret","token","sql","ignore previous","other member","book for me","cancel for me","refund me",
+            "ignore all","ignore your","ignore the","disregard","system prompt","jailbreak","developer mode","another member","member's",
+            "drop table","delete from","insert into","select *","phone number","home address","email address")
+            || matchesWord(text,PRIVATE_WORDS))return "UNKNOWN";
+        // Personal health and injury questions always go to a human, even when they mention an FAQ topic.
+        if(contains(text,"injury","injured","pain","hurt","sore","medical","doctor","sick","illness","pregnan","heart","blood pressure",
+            "asthma","diabetes","medication","medicine","diet","weight loss","lose weight","rehab","sprain","dizzy","surgery","physio"))return "COACH";
+        if(faq(text)!=null)return "FAQ";
+        if(contains(text,"exercise","drill","training plan","workout plan"))return "COACH";
         if(contains(text,"package","price","cost"))return "PACKAGES";
         if(contains(text,"how to book","how do i book","booking rules","cancel","refund","payment"))return "BOOKING";
         if(contains(text,"class","session","schedule","available"))return "SESSIONS";
         return "UNKNOWN";
+    }
+    /** Whole-word privacy and instruction terms, so "contact" never matches "act as". */
+    private static final Pattern PRIVATE_WORDS=Pattern.compile("\\b(act as|pretend|admin|administrator|password|passwords)\\b");
+    private static boolean matchesWord(String text,Pattern pattern){return pattern.matcher(text).find();}
+    static final String FAQ_VERSION="center-faq-v1";
+    record Faq(int id,String title,String answer,List<String> keywords) {}
+    /** Small curated general-exercise FAQ with fixed, conservative answers. Never personal, medical or generated text. */
+    static final List<Faq> FAQS=List.of(
+        new Faq(1,"Warming up","Spend about 5 to 10 minutes warming up: start with easy movement such as walking or light jogging, add gentle dynamic movements such as arm circles and leg swings, then a few slow movements from your sport. In class, follow your coach's warm-up.",
+            List.of("warm up","warm-up","warmup","warming up")),
+        new Faq(2,"Cooling down and stretching","After practice, slow down gradually with about 5 minutes of easy movement, then do gentle stretches you already know. Hold each stretch comfortably without bouncing, and stop any stretch that feels uncomfortable. Your coach can show stretches for your sport.",
+            List.of("cool down","cool-down","cooldown","cooling down","stretch")),
+        new Faq(3,"Drinking water","Bring your own water bottle and drink small amounts regularly before practice, during breaks and afterwards. Take a break whenever you feel unwell and tell your coach or reception.",
+            List.of("water","hydrat","drink")),
+        new Faq(4,"What to wear and bring","Wear comfortable sports clothing and clean indoor sports shoes suited to your sport, and bring a water bottle and a towel. Ask reception about equipment for a specific session.",
+            List.of("wear","bring","shoes","clothes","clothing")),
+        new Faq(5,"How often to practise","Many people practise a few times a week and keep rest days between harder sessions. Increase time or intensity gradually. This is general guidance, not a personal plan; your coach can advise a schedule for you.",
+            List.of("how often","rest day","rest days","rest between","times a week","times per week")),
+        new Faq(6,"Your first class","For your first class, arrive about 10 to 15 minutes early, check in at reception, and tell the coach it is your first session. Open My bookings to confirm the date and time.",
+            List.of("first class","first session","first time","first lesson")),
+        new Faq(7,"Building good technique","Practise controlled technique at a comfortable pace before adding speed, distance or force, and pause to reset between repetitions. Ask your coach to check your technique during class.",
+            List.of("technique","good form","proper form")));
+    static Faq faq(String text) {
+        for(var item:FAQS)for(var keyword:item.keywords())if(text.contains(keyword))return item;
+        return null;
     }
     private static boolean contains(String text,String... words) {
         for(String word:words)if(text.contains(word))return true;
