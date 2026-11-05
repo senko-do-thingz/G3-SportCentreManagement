@@ -20,7 +20,7 @@ Supported intents are published session availability, active sport-package base 
 
 Session sources pass the canonical session-detail visibility predicate before the five-result limit is applied. Missing or inactive facilities and unqualified Coaches cannot produce unavailable detail links, and invalid earlier rows cannot hide valid later results.
 
-Questions and answers are ephemeral. No conversation tables are written and no chat history is transferred between accounts. UI opt-in resets on navigation/reload. Set app.training.consultation.enabled=false on the backend or VITE_TRAINING_CONSULTATION_ENABLED=false on the frontend to disable consultation. Backend opt-in and feature-off handling query no catalog data. There is no configured LLM fallback; the knowledge service remains explicit about its limits.
+Questions and answers are ephemeral. No conversation tables are written and no chat history is transferred between accounts. UI opt-in resets on navigation/reload, logout and account switch. The page offers three click-to-fill examples (sessions in the next two weeks, package prices, warming up) that are enabled only after opt-in, labels each source type (live session or package catalog, booking guidance, curated center FAQ, human coach) and shows a human handoff note for NO_ANSWER. Set app.training.consultation.enabled=false on the backend or VITE_TRAINING_CONSULTATION_ENABLED=false on the frontend to disable consultation. Backend opt-in and feature-off handling query no catalog data. There is no configured LLM fallback; the knowledge service remains explicit about its limits.
 
 ## Coach reviewed drill drafts
 
