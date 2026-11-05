@@ -85,7 +85,7 @@ public class ManagerAttendanceReadService {
     }
 
     static void validateRange(LocalDate from, LocalDate to, Long classId, Long coachId) {
-        if (from == null || to == null || to.isBefore(from) || to.isAfter(from.plusDays(30)))
+        if (from == null || to == null || from.getYear() < 1 || to.getYear() > 9999 || to.isBefore(from) || to.isAfter(from.plusDays(30)))
             throw new BusinessRuleException("Choose a date range of at most 31 days");
         if ((classId != null && classId <= 0) || (coachId != null && coachId <= 0))
             throw new BusinessRuleException("Class and Coach filters must be positive IDs");

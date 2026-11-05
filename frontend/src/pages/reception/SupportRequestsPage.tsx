@@ -29,7 +29,7 @@ export function SupportRequestsPage() {
         {tickets.length === 0 ? <p role="status">No support requests match these filters.</p> : <table className="table"><caption>Member support requests</caption><thead><tr><th>Request</th><th>Member</th><th>Category</th><th>Status</th><th>Action</th></tr></thead><tbody>{tickets.map(ticket => <tr key={ticket.id}><td>{ticket.code}: {ticket.subject}</td><td>{ticket.memberName}</td><td>{ticket.category}</td><td>{ticket.status}</td><td><Button variant="secondary" onClick={() => select(ticket.id)}>View {ticket.code}</Button></td></tr>)}</tbody></table>}
       </>}</TrainingData>
     </Card>
-    {selected !== null && <TrainingData key={`${selected}-${revision}`} load={detail}>{ticket => <TicketDetail ticket={ticket} onSaved={() => refresh(value => value + 1)} />}</TrainingData>}
+    {selected !== null && <TrainingData key={`${selected}-${revision}`} load={detail} refreshLabel="Refresh request details">{ticket => <TicketDetail ticket={ticket} onSaved={() => refresh(value => value + 1)} />}</TrainingData>}
     <CreateTicket onSaved={ticket => { select(ticket.id); refresh(value => value + 1) }} />
   </div>
 }

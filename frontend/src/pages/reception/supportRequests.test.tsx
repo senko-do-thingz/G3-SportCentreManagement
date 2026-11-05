@@ -43,6 +43,10 @@ describe('Reception support desktop', () => {
     expect(keys[0]).toMatch(/^[0-9a-f-]{36}$/)
     expect(keys[1]).toBe(keys[0])
     expect(await screen.findByLabelText('Next status')).toHaveValue('IN_PROGRESS')
+    const before = calls.filter(call => call.path === '/reception/support-requests/8').length
+    await user.click(screen.getByRole('button', { name: 'Refresh request details' }))
+    await screen.findByText('Request SR-8')
+    expect(calls.filter(call => call.path === '/reception/support-requests/8')).toHaveLength(before + 1)
   })
   it('loads empty results and passes status filters to the server', async () => {
     const { calls } = setup()

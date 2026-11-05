@@ -69,10 +69,10 @@ The Spring Boot project used to live in the repository root. After you pull the 
 | **Identity & Access** | Implemented - register, login, token refresh, current user, member search, manager user and staff account management, fixed roles (MEMBER, COACH, RECEPTIONIST, MANAGER), strong password validation, audit logging |
 | **Catalog & Membership** | Implemented - sports, sport packages and registrations, membership cards (tiers, purchase, renewal, upgrade, activation, cancellation), check-in, refund requests. The plan-based membership flow (`/api/v1/memberships`) is legacy and deprecated |
 | **Classes & Booking** | Implemented - class/session management, member discovery and schedules, booking create/cancel/list, reception arrival and Coach roster/attendance. Waitlist remains deferred |
-| **Payments & Reports** | Implemented - payment confirmation, invoices, refund payout and legacy finance UI/API. Cash-flow reporting endpoints exist; FE-13 cash-flow adaptation is pending |
+| **Payments & Reports** | Implemented - payment confirmation, invoices, refund review/payout, revenue reports/CSV and cash-flow read APIs. This candidate adds operations counters to the existing desktop report |
 | **Training & Progress** | Implemented - personal/class plans, results, attendance/corrections, feedback, private progress APIs; this candidate adds Manager overview and Coach progress readers |
-| **AI Assistant & Support** | Schema only (V17) |
-| **AI Workout Recommendation** | Schema only (V18) |
+| **AI Assistant** | Outside Release 1.1 acceptance; no model/provider implementation in this candidate |
+| **AI Workout Recommendation** | Outside Release 1.1 acceptance; no Flow 5 implementation in this candidate |
 | **Notifications & System** | Implemented scoped operational notifications and important action history; no external messaging integration in Release 1.1 |
 | **Frontend** | Implemented React/TypeScript app with public Home, auth, four role dashboards and System/Light/Dark preferences in the current working tree |
 

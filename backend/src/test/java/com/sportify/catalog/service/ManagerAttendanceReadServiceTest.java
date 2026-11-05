@@ -17,5 +17,7 @@ class ManagerAttendanceReadServiceTest {
         assertThatThrownBy(() -> ManagerAttendanceReadService.validateRange(from,from.plusDays(31),null,null)).isInstanceOf(BusinessRuleException.class);
         assertThatThrownBy(() -> ManagerAttendanceReadService.validateRange(from,from.minusDays(1),null,null)).isInstanceOf(BusinessRuleException.class);
         assertThatThrownBy(() -> ManagerAttendanceReadService.validateRange(from,from,0L,null)).isInstanceOf(BusinessRuleException.class);
+        assertThatThrownBy(() -> ManagerAttendanceReadService.validateRange(LocalDate.MAX,LocalDate.MAX,null,null)).isInstanceOf(BusinessRuleException.class);
+        assertThatThrownBy(() -> ManagerAttendanceReadService.validateRange(LocalDate.of(0,1,1),LocalDate.of(0,1,2),null,null)).isInstanceOf(BusinessRuleException.class);
     }
 }
