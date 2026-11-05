@@ -83,6 +83,9 @@ public class BookingServiceImplTest {
     private Clock clock = Clock.fixed(Instant.parse("2026-10-06T00:00:00Z"), ZoneId.of("Asia/Ho_Chi_Minh"));
 
     @org.mockito.Mock com.sportify.catalog.service.OperationalMemberPolicy operationalMemberPolicy;
+    @Mock
+    private MemberBookingLock memberBookingLock;
+
     @InjectMocks
     private BookingServiceImpl bookingService;
 

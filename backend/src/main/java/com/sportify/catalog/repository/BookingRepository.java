@@ -149,4 +149,18 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                                        @Param("actorId") Long actorId,
                                        @Param("reason") String reason,
                                        @Param("now") LocalDateTime now);
+
+    /**
+     * E2E-BUG-01: session codes of the member's other CONFIRMED bookings whose non-cancelled session intersects the
+     * requested time on the same date (strict intersection, so back-to-back sessions do not conflict).
+     */
+    @Query(value = "SELECT s.session_code FROM booking b JOIN class_session s ON s.id = b.session_id "
+            + "WHERE b.member_id = :memberId AND b.status = 'CONFIRMED' AND s.id <> :sessionId AND s.status <> 'CANCELLED' "
+            + "AND s.session_date = :sessionDate AND s.start_time < CAST(:endTime AS time) AND s.end_time > CAST(:startTime AS time) "
+            + "ORDER BY s.start_time, s.id", nativeQuery = true)
+    java.util.List<String> findOverlappingConfirmedSessionCodes(@Param("memberId") Long memberId,
+                                                              @Param("sessionId") Long sessionId,
+                                                              @Param("sessionDate") LocalDate sessionDate,
+                                                              @Param("startTime") java.time.LocalTime startTime,
+                                                              @Param("endTime") java.time.LocalTime endTime);
 }
