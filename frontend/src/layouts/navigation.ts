@@ -107,6 +107,7 @@ export const RECEPTIONIST_AREA: RoleArea = {
     {
       heading: 'Front desk',
       items: [
+        { label: 'Support requests', path: 'support', title: 'Support requests', description: 'Record and resolve member support requests.', task: 'R11-01', screens: ['F1-16'] },
         {
           label: 'Member search',
           path: '',
@@ -226,6 +227,7 @@ export const MANAGER_AREA: RoleArea = {
           task: 'FE-07',
           screens: ['F2-03'],
         },
+        { label: 'Attendance overview', path: 'training/attendance', title: 'Attendance overview', description: 'Review session attendance and confirmed rosters.', task: 'R11-04', screens: ['F4-10'] },
         { label: 'Missed attendance', path: 'training/attendance/backfill', title: 'Missed attendance', description: 'Manager-only recovery of a missing record with a required reason and audit.', task: 'Training attendance', screens: [] },
       ],
     },
@@ -271,6 +273,7 @@ export const COACH_AREA: RoleArea = {
       items: [
         { label: 'Session attendance', path: 'training/attendance', title: 'Session attendance', description: 'Record participation for assigned sessions.', task: 'Class learning', screens: ['F4-02'] },
         { label: 'Member questions', path: 'training/questions', title: 'Member practice questions', description: 'Reply to supplementary practice questions.', task: 'Class learning', screens: [] },
+        { label: 'Member progress', path: 'training/progress', title: 'Member progress', description: 'Review goals and recorded outcomes in your assigned classes.', task: 'R11-05', screens: ['F4-05'] },
         { label: 'Plans and feedback', path: 'training/plans', title: 'Assign plans and feedback', description: 'Assign personal plans from confirmed bookings and provide member feedback.', task: 'Training plans', screens: [] },
         { label: 'Record training results', path: 'training/results', title: 'Record training results', description: 'Record session results and skill scores.', task: 'Training results', screens: [] },
       ],

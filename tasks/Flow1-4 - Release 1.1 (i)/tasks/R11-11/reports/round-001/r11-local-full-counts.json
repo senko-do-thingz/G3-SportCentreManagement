@@ -1,0 +1,14 @@
+{
+  "surefire-reports": {
+    "tests": 2268,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "failsafe-reports": {
+    "tests": 1040,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  }
+}
