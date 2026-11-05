@@ -116,7 +116,13 @@ public class TrainingWriteService {
         // Same message for every miss so a Coach cannot probe other Coaches' bookings or account states.
         if(context.isEmpty())throw new ResourceNotFoundException("Assigned member booking not found");
         var current=context.getFirst();
-        operationalMemberPolicy.requireRealMember(current.memberId());
+        try {
+            operationalMemberPolicy.requireRealMember(current.memberId());
+        } catch(BusinessRuleException synthetic) {
+            // This read-only preview reports a quarantined synthetic Member like any other denied booking,
+            // so the account state is not revealed. The shared policy keeps its own error for write paths.
+            throw new ResourceNotFoundException("Assigned member booking not found");
+        }
         var feedback=jdbc.query("""
             SELECT TOP(1) f.areas_for_improvement FROM coach_feedback f JOIN session_plan p ON p.id=f.plan_id
             WHERE f.coach_id=? AND f.member_id=? AND p.class_id=? ORDER BY f.created_at DESC,f.id DESC
