@@ -25,6 +25,58 @@ it('requires opt-in, shows grounded sources and clears ephemeral answers when di
   expect(screen.queryByText('120000 VND base price.')).not.toBeInTheDocument()
   expect(screen.getByRole('textbox', { name: /Center question/ })).toHaveValue('')
 })
+it('fills example questions only after opt-in and labels curated FAQ sources without calling the API early', async () => {
+  tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
+  const { calls } = installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER) : json(200, {
+    mode: 'KNOWLEDGE_BASED', status: 'ANSWERED', answer: 'General exercise FAQ (curated center guidance, not personal or medical advice): Warm up gradually.', historyStored: false,
+    sources: [{ kind: 'CURATED_FAQ', id: 1, title: 'Center FAQ: Warming up', detail: 'Fixed answer from the curated center FAQ (center-faq-v1).', path: '/member/training/questions' }],
+  }))
+  renderApp('/member/assistant')
+  const examples = ['Which classes are available in the next two weeks?', 'What are the package prices?', 'How should I warm up before practice?']
+  for (const example of examples) expect(await screen.findByRole('button', { name: example })).toBeDisabled()
+  await userEvent.click(screen.getByLabelText('Enable automated center consultation'))
+  await userEvent.click(screen.getByRole('button', { name: 'Which classes are available in the next two weeks?' }))
+  expect(screen.getByRole('textbox', { name: /Center question/ })).toHaveValue('Which classes are available in the next two weeks?')
+  await userEvent.click(screen.getByRole('button', { name: 'How should I warm up before practice?' }))
+  expect(screen.getByRole('textbox', { name: /Center question/ })).toHaveValue('How should I warm up before practice?')
+  expect(calls.filter(call => call.path.includes('/consultation'))).toHaveLength(0)
+  await userEvent.click(screen.getByRole('button', { name: 'Ask center assistant' }))
+  expect(await screen.findByText(/^KNOWLEDGE_BASED - General exercise FAQ/)).toBeInTheDocument()
+  expect(screen.getByText('Source type: Curated center FAQ (fixed text)')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Open source: Center FAQ: Warming up' })).toHaveAttribute('href', '/member/training/questions')
+  expect(calls.filter(call => call.path.includes('/consultation'))).toHaveLength(1)
+})
+it('shows a human handoff for NO_ANSWER and submits with Enter from the question field', async () => {
+  tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
+  const { calls } = installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER) : json(200, {
+    mode: 'KNOWLEDGE_BASED', status: 'NO_ANSWER', answer: 'I cannot assess personal training or health concerns. Ask your assigned human coach about your practice plan.', historyStored: false,
+    sources: [{ kind: 'HUMAN_COACH', id: 0, title: 'Ask your coach', detail: 'Private human conversation; no automated coach reply.', path: '/member/training/questions' }],
+  }))
+  renderApp('/member/assistant')
+  await userEvent.click(await screen.findByLabelText('Enable automated center consultation'))
+  await userEvent.type(screen.getByRole('textbox', { name: /Center question/ }), 'My knee hurts after practice{Enter}')
+  expect(await screen.findByText('Answer unavailable')).toBeInTheDocument()
+  expect(screen.getByText('This assistant does not answer personal, medical or private questions. Ask your human coach or reception.')).toBeInTheDocument()
+  expect(screen.getByText('Source type: Human coach')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Open source: Ask your coach' })).toHaveAttribute('href', '/member/training/questions')
+  expect(calls.find(call => call.path.includes('/consultation'))?.body).toEqual({ question: 'My knee hurts after practice', optIn: true })
+})
+it('does not keep a previous answer after leaving the assistant route', async () => {
+  tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
+  installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER) : call.path.includes('/consultation') ? json(200, {
+    mode: 'KNOWLEDGE_BASED', status: 'ANSWERED', answer: 'Booking guidance answer.', historyStored: false, sources: [],
+  }) : json(200, []))
+  renderApp('/member/assistant')
+  await userEvent.click(await screen.findByLabelText('Enable automated center consultation'))
+  await userEvent.type(screen.getByRole('textbox', { name: /Center question/ }), 'How do I book?')
+  await userEvent.click(screen.getByRole('button', { name: 'Ask center assistant' }))
+  expect(await screen.findByText('KNOWLEDGE_BASED - Booking guidance answer.')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('link', { name: 'Back to previous page' }))
+  await userEvent.click((await screen.findAllByRole('link', { name: 'Open center assistant' }))[0])
+  expect(await screen.findByLabelText('Enable automated center consultation')).not.toBeChecked()
+  expect(screen.queryByText('KNOWLEDGE_BASED - Booking guidance answer.')).not.toBeInTheDocument()
+  expect(screen.getByRole('textbox', { name: /Center question/ })).toHaveValue('')
+})
 it('makes no consultation request when the feature flag is off', async () => {
   vi.stubEnv('VITE_TRAINING_CONSULTATION_ENABLED', 'false')
   tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
