@@ -198,8 +198,8 @@ class UnifiedDemoDatabaseIntegrationTest extends LocalDemoWorkflow {
         jdbcTemplate.update("INSERT booking(booking_code,session_id,member_id,package_registration_id,status) VALUES ('UNIFY-HISTORIC',?,?,?,'CONFIRMED')",session,owner,simulated.getId());
         long historic = jdbcTemplate.queryForObject("SELECT id FROM booking WHERE booking_code='UNIFY-HISTORIC'",Long.class);
         var historicalBaseline = operationalSnapshot(session,actual.getId());
-        for(String path : new String[]{"/api/v1/reception/training/attendance","/api/v1/coach/training/attendance"})
-            assertThat(write(path,HttpMethod.POST,Map.of("bookingId",historic,"status","PRESENT"),path.contains("coach")?coach:reception).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
+        assertThat(write("/api/v1/reception/training/attendance",HttpMethod.POST,Map.of("bookingId",historic,"status","PRESENT"),reception).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(write("/api/v1/coach/training/attendance",HttpMethod.POST,Map.of("bookingId",historic,"status","PRESENT"),coach).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
         assertThat(write("/api/v1/bookings/self-training/attendance",HttpMethod.POST,Map.of("bookingId",historic),reception).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
         assertThat(write("/api/v1/coach/training/results",HttpMethod.POST,Map.of("sessionId",session,"memberId",owner,"notes","Historical bypass attempt","scores",java.util.List.of()),coach).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
         assertThat(operationalSnapshot(session,actual.getId())).isEqualTo(historicalBaseline);
@@ -209,9 +209,10 @@ class UnifiedDemoDatabaseIntegrationTest extends LocalDemoWorkflow {
                         "steps",java.util.List.of(Map.of("title","Warmup","durationMinutes",5))),coach).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
         jdbcTemplate.update("INSERT attendance_record(session_id,member_id,booking_id,status,marked_at,marked_by) VALUES (?,?,?,'PRESENT',GETDATE(),(SELECT id FROM user_account WHERE email='lan.reception@example.com'))",session,owner,historic);
         long attendance=jdbcTemplate.queryForObject("SELECT id FROM attendance_record WHERE booking_id=?",Long.class,historic);
-        for(String role : new String[]{"coach","reception"})
-            assertThat(write("/api/v1/"+role+"/training/attendance/"+attendance,HttpMethod.PUT,
-                    Map.of("status","LATE","reason","Synthetic correction attempt"),role.equals("coach")?coach:reception).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
+        assertThat(write("/api/v1/reception/training/attendance/"+attendance,HttpMethod.PUT,
+                Map.of("status","LATE","reason","Synthetic correction attempt"),reception).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(write("/api/v1/coach/training/attendance/"+attendance,HttpMethod.PUT,
+                Map.of("status","LATE","reason","Synthetic correction attempt"),coach).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM attendance_correction WHERE attendance_record_id=?",Integer.class,attendance)).isZero();
         assertThat(jdbcTemplate.queryForObject("SELECT status FROM attendance_record WHERE id=?",String.class,attendance)).isEqualTo("PRESENT");
         // Profile/flag changes and an email rename cannot launder persisted simulator provenance.

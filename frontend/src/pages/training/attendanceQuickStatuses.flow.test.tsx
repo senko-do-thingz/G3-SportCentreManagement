@@ -6,13 +6,13 @@ import { backendError, installFakeFetch, json, MEMBER } from '../../test/fakeBac
 import { renderApp } from '../../test/renderApp'
 import type { AttendanceStatus, SessionMember } from '../../api/staffTrainingApi'
 
-const roles = ['COACH', 'RECEPTIONIST'] as const
+const roles = ['COACH'] as const
 const statuses = [['PRESENT', 'Present'], ['LATE', 'Late'], ['ABSENT', 'Absent'], ['EXCUSED', 'Excused']] as const
 const session = { id: 5, sessionId: '031126BM01', classId: 1, className: 'Badminton practice', sportId: 2, sportName: 'Badminton', date: '2026-11-03', startTime: '08:00:00', endTime: '09:00:00', trainingType: 'COACH_LED', coachName: 'An', facilityName: 'Court 1', status: 'PUBLISHED', attendanceDateOpen: true, attendanceState: 'OPEN', bookedCount: 1, markedCount: 0 }
 const member: SessionMember = { bookingId: 11, memberId: 42, memberName: 'Lan', attendanceId: null, status: null, notes: null, resultId: null }
 
 function setup(role: typeof roles[number], initial: SessionMember = member) {
-  const root = role === 'COACH' ? '/coach' : '/reception'
+  const root = '/coach'
   let rows = [{ ...initial }]
   let fail = false
   let finish: (() => void) | undefined

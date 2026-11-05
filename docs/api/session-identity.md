@@ -53,7 +53,6 @@ apply before lookup. Anonymous requests are 401; unauthorized roles are 403.
 | PUT /manager/sessions/by-code/{sessionId}/cancel | Existing cancellation operation; code reservation retained |
 | GET /coach/sessions/by-code/{sessionId}/roster | Coach sees assigned session only; Manager retains existing scope; foreign Coach gets 404 |
 | GET /coach/training/sessions/by-code/{sessionId}/members | Existing assigned-Coach training roster policy |
-| GET /reception/training/sessions/by-code/{sessionId}/members | Existing Reception session roster policy |
 | POST /coach/training/sessions/by-code/{sessionId}/results | Existing result validation/locking, member ownership and attendance rules; resolves the persisted code internally |
 
 No endpoint above creates bookings, transfers bookings, grants a role, changes

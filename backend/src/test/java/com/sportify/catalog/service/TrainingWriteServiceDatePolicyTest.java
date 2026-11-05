@@ -26,7 +26,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class TrainingWriteServiceDatePolicyTest {
-    enum Path { COACH, RECEPTION, SELF_TRAINING }
+    enum Path { COACH, SELF_TRAINING }
     JdbcTemplate jdbc;
     AuditService audit;
     EntityManager entityManager;
@@ -67,7 +67,7 @@ class TrainingWriteServiceDatePolicyTest {
         var service=new TrainingWriteService(jdbc,Clock.fixed(time,ZoneId.of("Asia/Ho_Chi_Minh")),audit,entityManager, mock(OperationalMemberPolicy.class));
         if(path==Path.SELF_TRAINING){when(row.getString("training_type")).thenReturn("SELF_TRAINING");return service.selfAttendance(5L,11L,null).id();}
         var request=new TrainingWriteRequest.Attendance(11L,TrainingWriteRequest.AttendanceStatus.PRESENT,"Unit date boundary");
-        return path==Path.COACH?service.coachAttendance(5L,request).id():service.attendance(5L,request).id();
+        return service.coachAttendance(5L,request).id();
     }
     @ParameterizedTest @MethodSource("boundaries")
     void R07_unit_dateBoundariesUseCenterCalendarAndPreserveUnsignedStartWindow(Path path,String instant,boolean allowed) throws Exception {

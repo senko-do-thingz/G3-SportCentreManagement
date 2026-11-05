@@ -1,13 +1,15 @@
 # Ordinary attendance session date policy
 
-Ordinary Coach and Reception first attendance writes require the session calendar
+Ordinary Coach first attendance writes require the session calendar
 date in the server Clock's Asia/Ho_Chi_Minh zone. A future or earlier session date
 returns HTTP 400 without an attendance row or successful-write audit event. The
 existing confirmed-booking, current-Coach assignment, cancellation, locking and
 financial checks remain in force. Self-training retains its same-day behavior.
+Receptionists do not have Flow 4 session attendance permissions and are restricted
+to front-desk arrival check-in (`/api/v1/check-ins`) and self-training acknowledgment.
 
-GET /api/v1/coach/training/sessions and GET /api/v1/reception/training/sessions now
-include the additive boolean `attendanceDateOpen` in each session summary. It
+GET /api/v1/coach/training/sessions now
+includes the additive boolean `attendanceDateOpen` in each session summary. It
 reports only whether the date is eligible for an ordinary first mark at the time
 the server reads the session. It does not grant role/booking authorization or
 permit an incompatible correction. Existing clients may ignore this field. The

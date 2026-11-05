@@ -99,12 +99,6 @@ export const RECEPTIONIST_AREA: RoleArea = {
   workspaceLabel: 'Receptionist workspace',
   sections: [
     {
-      heading: 'Training',
-      items: [
-        { label: 'Session attendance', path: 'training/attendance', title: 'Session attendance', description: 'Record attendance and corrections with a reason.', task: 'Training attendance', screens: [] },
-      ],
-    },
-    {
       heading: 'Front desk',
       items: [
         { label: 'Support requests', path: 'support', title: 'Support requests', description: 'Record and resolve member support requests.', task: 'R11-01', screens: ['F1-16'] },
