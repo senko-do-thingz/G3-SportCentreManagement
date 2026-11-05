@@ -1,0 +1,16 @@
+{
+  "reportedSnapshot": "aedd882012d893f8759a2c7f80d105271196efe7",
+  "ciSource": "9184e9132946b78d85d958de9800da03433b2fad",
+  "integrationMerge": "8d62a3aec5c9affcce695b2753dca23593e36973",
+  "applicationPaths": [
+    "backend/src",
+    "frontend/src",
+    "backend/pom.xml",
+    "frontend/package.json",
+    "frontend/package-lock.json",
+    "frontend/vite.config.ts"
+  ],
+  "changedApplicationPathsSinceCi": [],
+  "localFullSource": "d17c785b6d6871dd766c55c9ff77e5d0c8893557",
+  "finalAffectedRerunsSource": "9184e9132946b78d85d958de9800da03433b2fad"
+}
