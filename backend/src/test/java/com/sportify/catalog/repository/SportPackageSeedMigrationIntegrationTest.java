@@ -42,6 +42,7 @@ class SportPackageSeedMigrationIntegrationTest extends AbstractIntegrationTest {
         if (!catalogCreated) {
             try (var connection = sharedCatalogConnection(); var statement = connection.createStatement()) {
                 statement.execute("CREATE DATABASE [" + SEED_CATALOG + "]");
+                statement.execute("ALTER DATABASE [" + SEED_CATALOG + "] SET AUTO_CLOSE OFF");
             }
             catalogCreated = true;
         }
@@ -50,8 +51,8 @@ class SportPackageSeedMigrationIntegrationTest extends AbstractIntegrationTest {
     }
 
     private static java.sql.Connection sharedCatalogConnection() throws SQLException {
-        return DriverManager.getConnection(MSSQL_SERVER_CONTAINER.getJdbcUrl(),
-                MSSQL_SERVER_CONTAINER.getUsername(), MSSQL_SERVER_CONTAINER.getPassword());
+        return DriverManager.getConnection(suiteServerUrl(),
+                suiteServerUser(), suiteServerPassword());
     }
 
     private static DataSource catalogSource(String catalog) {
@@ -62,7 +63,7 @@ class SportPackageSeedMigrationIntegrationTest extends AbstractIntegrationTest {
                 return connection;
             }
             @Override public java.sql.Connection getConnection(String username, String password) throws SQLException {
-                var connection = DriverManager.getConnection(MSSQL_SERVER_CONTAINER.getJdbcUrl(), username, password);
+                var connection = DriverManager.getConnection(suiteServerUrl(), username, password);
                 connection.setCatalog(catalog);
                 return connection;
             }
@@ -82,6 +83,7 @@ class SportPackageSeedMigrationIntegrationTest extends AbstractIntegrationTest {
         String otherCatalog = SEED_CATALOG + "_other";
         try (var connection = sharedCatalogConnection(); var statement = connection.createStatement()) {
             statement.execute("CREATE DATABASE [" + otherCatalog + "]");
+                statement.execute("ALTER DATABASE [" + otherCatalog + "] SET AUTO_CLOSE OFF");
         }
         DataSource other = catalogSource(otherCatalog);
         Flyway.configure().dataSource(other).locations("classpath:db/migration/identity", "classpath:db/migration/catalog")

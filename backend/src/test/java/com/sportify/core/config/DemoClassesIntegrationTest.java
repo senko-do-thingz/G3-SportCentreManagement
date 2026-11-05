@@ -53,10 +53,11 @@ class DemoClassesIntegrationTest extends AbstractIntegrationTest {
     @DynamicPropertySource
     static synchronized void isolatedDatabase(DynamicPropertyRegistry registry) throws Exception {
         if (!databaseCreated) {
-            try (var connection = DriverManager.getConnection(MSSQL_SERVER_CONTAINER.getJdbcUrl(),
-                    MSSQL_SERVER_CONTAINER.getUsername(), MSSQL_SERVER_CONTAINER.getPassword());
+            try (var connection = DriverManager.getConnection(suiteServerUrl(),
+                    suiteServerUser(), suiteServerPassword());
                  var statement = connection.createStatement()) {
                 statement.execute("CREATE DATABASE [" + DATABASE + "]");
+                statement.execute("ALTER DATABASE [" + DATABASE + "] SET AUTO_CLOSE OFF");
             }
             databaseCreated = true;
         }
@@ -74,14 +75,15 @@ class DemoClassesIntegrationTest extends AbstractIntegrationTest {
         synchronized (DemoClassesIntegrationTest.class) {
             if (historicalReplayJdbc == null) {
                 String catalog = "be15_history_" + UUID.randomUUID().toString().replace("-", "");
-                try (var connection = DriverManager.getConnection(MSSQL_SERVER_CONTAINER.getJdbcUrl(),
-                        MSSQL_SERVER_CONTAINER.getUsername(), MSSQL_SERVER_CONTAINER.getPassword());
+                try (var connection = DriverManager.getConnection(suiteServerUrl(),
+                        suiteServerUser(), suiteServerPassword());
                      var statement = connection.createStatement()) {
                     statement.execute("CREATE DATABASE [" + catalog + "]");
+                statement.execute("ALTER DATABASE [" + catalog + "] SET AUTO_CLOSE OFF");
                 }
-                String url = MSSQL_SERVER_CONTAINER.getJdbcUrl().replaceAll("(?i);databaseName=[^;]*", "") + ";databaseName=" + catalog;
+                String url = suiteServerUrl().replaceAll("(?i);databaseName=[^;]*", "") + ";databaseName=" + catalog;
                 var source = new org.springframework.jdbc.datasource.DriverManagerDataSource(url,
-                        MSSQL_SERVER_CONTAINER.getUsername(), MSSQL_SERVER_CONTAINER.getPassword());
+                        suiteServerUser(), suiteServerPassword());
                 Flyway.configure().dataSource(source).locations("classpath:db/migration/identity", "classpath:db/migration/catalog", "classpath:db/demo")
                         .target("37").cleanDisabled(true).load().migrate();
                 historicalReplayJdbc = new JdbcTemplate(source);
@@ -352,9 +354,10 @@ class DemoClassesIntegrationTest extends AbstractIntegrationTest {
     @ValueSource(strings = {"package-conflict", "late-credit-write"})
     void standaloneLateFailureRollsBackAllEarlierClassSessionAndFacilityInserts(String mode) throws Exception {
         String catalog = "be15_rollback_" + UUID.randomUUID().toString().replace("-", "");
-        try (var connection = DriverManager.getConnection(MSSQL_SERVER_CONTAINER.getJdbcUrl(),
-                MSSQL_SERVER_CONTAINER.getUsername(), MSSQL_SERVER_CONTAINER.getPassword())) {
-            try (var statement = connection.createStatement()) { statement.execute("CREATE DATABASE [" + catalog + "]"); }
+        try (var connection = DriverManager.getConnection(suiteServerUrl(),
+                suiteServerUser(), suiteServerPassword())) {
+            try (var statement = connection.createStatement()) { statement.execute("CREATE DATABASE [" + catalog + "]");
+                statement.execute("ALTER DATABASE [" + catalog + "] SET AUTO_CLOSE OFF"); }
             connection.setCatalog(catalog);
             var source = new SingleConnectionDataSource(connection, true);
             Flyway.configure().dataSource(source).locations("classpath:db/migration/identity", "classpath:db/migration/catalog", "classpath:db/demo")
@@ -387,9 +390,10 @@ class DemoClassesIntegrationTest extends AbstractIntegrationTest {
     @Test
     void ordinaryMigrationLocationsActuallyApplyNoDemoRows() throws Exception {
         String catalog = "be15_ordinary_" + UUID.randomUUID().toString().replace("-", "");
-        try (var connection = DriverManager.getConnection(MSSQL_SERVER_CONTAINER.getJdbcUrl(),
-                MSSQL_SERVER_CONTAINER.getUsername(), MSSQL_SERVER_CONTAINER.getPassword())) {
-            try (var statement = connection.createStatement()) { statement.execute("CREATE DATABASE [" + catalog + "]"); }
+        try (var connection = DriverManager.getConnection(suiteServerUrl(),
+                suiteServerUser(), suiteServerPassword())) {
+            try (var statement = connection.createStatement()) { statement.execute("CREATE DATABASE [" + catalog + "]");
+                statement.execute("ALTER DATABASE [" + catalog + "] SET AUTO_CLOSE OFF"); }
             connection.setCatalog(catalog);
             var source = new SingleConnectionDataSource(connection, true);
             Flyway.configure().dataSource(source).locations("classpath:db/migration/identity", "classpath:db/migration/catalog")

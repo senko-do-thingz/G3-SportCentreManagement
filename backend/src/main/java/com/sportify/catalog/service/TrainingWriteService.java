@@ -82,6 +82,25 @@ public class TrainingWriteService {
                 rs.getString("member_name"), rs.getDate("session_date").toLocalDate()), coachId, classId);
     }
 
+    public LearnerProfile learnerProfile(long coachId, long classId, long memberId) {
+        var profiles=jdbc.query("""
+            SELECT m.user_id,m.member_code,u.full_name,m.main_goal,m.current_level
+            FROM member_profile m JOIN user_account u ON u.id=m.user_id JOIN role ur ON ur.id=u.role_id
+            WHERE m.user_id=? AND u.status='ACTIVE' AND ur.code='MEMBER' AND EXISTS (
+                SELECT 1 FROM booking b JOIN class_session s ON s.id=b.session_id
+                JOIN sport_class c ON c.id=s.class_id
+                JOIN user_account ca ON ca.id=c.coach_id AND ca.status='ACTIVE'
+                JOIN role cr ON cr.id=ca.role_id AND cr.code='COACH'
+                WHERE b.member_id=m.user_id AND b.status='CONFIRMED' AND s.status<>'CANCELLED'
+                    AND c.id=? AND c.is_active=1 AND c.coach_id=? AND s.coach_id=?
+                    AND s.training_type='COACH_LED')
+            """,(rs,row)->new LearnerProfile(rs.getLong("user_id"),rs.getString("member_code"),
+                rs.getString("full_name"),rs.getString("main_goal"),rs.getString("current_level")),memberId,classId,coachId,coachId);
+        if(profiles.isEmpty()) throw new ResourceNotFoundException("Assigned learner not found");
+        operationalMemberPolicy.requireRealMember(memberId);
+        return profiles.getFirst();
+    }
+
     public DrillSuggestions drillSuggestions(long coachId,long bookingId) {
         var context=jdbc.query("""
             SELECT b.member_id,c.id class_id,c.level,sp.code sport_code,sp.name sport_name,m.main_goal

@@ -34,7 +34,7 @@ class DemoQrServiceTest {
         when(store.transaction(any())).thenAnswer(call -> ((Supplier<?>) call.getArgument(0)).get());
     }
 
-    @ParameterizedTest @NullAndEmptySource @ValueSource(strings={"x","../secret","token=52"})
+    @ParameterizedTest @NullAndEmptySource @ValueSource(strings={"x","../secret","token=52","SCIN1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","000201010212VietQR"})
     void malformedTokensSpendPersistentBudgetWithoutLookup(String token) {
         assertThatThrownBy(() -> service.preview(token, owner)).isInstanceOf(DemoQrException.class);
         verify(store).spend(2, false);

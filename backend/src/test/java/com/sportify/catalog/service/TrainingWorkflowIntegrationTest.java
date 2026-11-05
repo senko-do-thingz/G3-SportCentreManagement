@@ -77,6 +77,16 @@ class TrainingWorkflowIntegrationTest {
     @Autowired ClassLearningService learning;
     @Autowired TrainingGuidanceService guidance;
     @Autowired CenterConsultationService consultation;
+    @Autowired com.sportify.payment.service.OperationsReportService operationsReports;
+    @Autowired ClassPlanService classPlans;
+    @Autowired MemberCheckInPassService arrivalPasses;
+    @Autowired TrainingProgressService progress;
+    @Autowired ClassNoticeService notices;
+    @Autowired ReceptionSupportService support;
+    @Autowired OperationalNotificationService notifications;
+    @Autowired ManagerSessionService managerSessions;
+    @Autowired SessionCodeAllocator identities;
+    @Autowired CatalogMaintenanceService catalogMaintenance;
     @Autowired BookingService bookings;
     @Autowired UserRepository users;
     @Autowired PlatformTransactionManager transactions;
@@ -84,12 +94,15 @@ class TrainingWorkflowIntegrationTest {
     @Autowired org.springframework.test.web.servlet.MockMvc mvc;
     long coach, otherCoach, member, peer, reception, sport, classId, session, booking;
     private final List<Long> fixtureSessions = new ArrayList<>();
+    private final List<Long> fixtureMetrics = new ArrayList<>();
     private SessionIdentityFixtures.Snapshot fixtureCounters;
     @AfterEach void cleanupSessionFixtures() {
+        jdbc.update("DELETE FROM member_check_in_pass WHERE member_id IN (?,?)", member,peer);
         if (!fixtureSessions.isEmpty()) {
             String ids = fixtureSessions.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
             String bookings = "SELECT id FROM booking WHERE session_id IN (" + ids + ")";
             String plans = "SELECT id FROM session_plan WHERE booking_id IN (" + bookings + ")";
+            jdbc.update("DELETE FROM support_request WHERE intake_booking_id IN ("+bookings+")");
             jdbc.update("DELETE FROM coach_feedback WHERE session_id IN (" + ids + ") OR plan_id IN (" + plans + ")");
             jdbc.update("DELETE FROM session_plan WHERE booking_id IN (" + bookings + ")");
             jdbc.update("DELETE FROM attendance_correction WHERE attendance_record_id IN (SELECT id FROM attendance_record WHERE session_id IN (" + ids + "))");
@@ -101,6 +114,7 @@ class TrainingWorkflowIntegrationTest {
             jdbc.update("DELETE FROM class_session WHERE id IN (" + ids + ")");
         }
         if (fixtureCounters != null) SessionIdentityFixtures.restoreAfterFixtureCleanup(jdbc, fixtureCounters);
+        for(long metric:fixtureMetrics) jdbc.update("DELETE FROM skill_metric WHERE id=?",metric);
     }
     @AfterAll static void stopOwnedContainer() { if (container != null) container.stop(); }
     @BeforeEach void fixture() {
@@ -131,12 +145,466 @@ class TrainingWorkflowIntegrationTest {
     private TrainingWriteRequest.Attendance attendance(TrainingWriteRequest.AttendanceStatus status){return new TrainingWriteRequest.Attendance(booking,status,"Participation");}
     private TrainingWriteRequest.Correction correction(TrainingWriteRequest.AttendanceStatus status){return new TrainingWriteRequest.Correction(status,"Corrected note","Correcting a recording mistake");}
 
+    @Test void RELEASE18_allocationAndCatalogLocksPreserveJdbcUpdateCounts() {
+        var manager=actor(account("MANAGER"));
+        new TransactionTemplate(transactions).executeWithoutResult(tx->{
+            jdbc.execute("SET NOCOUNT OFF");
+            identities.reserve(LocalDate.of(2026,11,8),"BADMINTON");
+            assertThat(jdbc.queryForObject("SELECT @@OPTIONS & 512",Integer.class)).isZero();
+            var request=new com.sportify.catalog.dto.CatalogMaintenanceRequest.SportWrite("RELEASE_COUNT_"+UUID.randomUUID().toString().substring(0,8).toUpperCase(java.util.Locale.ROOT),
+                "Release connection count "+UUID.randomUUID().toString().substring(0,8),com.sportify.catalog.entity.SportVenueType.INDOOR,null,100,true);
+            catalogMaintenance.saveSport(null,request,manager);
+            assertThat(jdbc.queryForObject("SELECT @@OPTIONS & 512",Integer.class)).isZero();
+            assertThat(jdbc.update("UPDATE class_session SET booked_count=booked_count WHERE id=?",session)).isEqualTo(1);
+        });
+    }
+
+    private long arrivalEntitlement() {
+        long pkg=insert("INSERT sport_package(code,name,sport_id,training_format,duration_days,session_count,session_minutes,price_amount,is_active) VALUES (?, 'Arrival fixture',?,'COACH_LED',30,10,60,100,1)",code(),sport);
+        long registration=insert("INSERT sport_package_registration(registration_code,member_id,package_id,channel,original_price,discount_percentage,paid_amount,total_sessions,remaining_sessions,start_date,end_date,status,activated_at,created_by_user_id) VALUES (?,?,?,'RECEPTION',100,0,100,10,9,'2026-11-01','2026-11-30','ACTIVE',SYSDATETIME(),?)",code(),member,pkg,reception);
+        jdbc.update("UPDATE booking SET package_registration_id=? WHERE id=?",registration,booking);
+        return registration;
+    }
+    @Test void RELEASE12_multipleActualSessionsHaveChronologicalPrivateProgress() throws Exception {
+        long metric=insert("INSERT skill_metric(sport_id,name,max_score) VALUES (?,'Release accuracy',10)",sport);fixtureMetrics.add(metric);
+        long second=session("COACH_LED");
+        jdbc.update("UPDATE class_session SET start_time='07:00',end_time='08:00' WHERE id=?",second);
+        long otherBooking=insert("INSERT booking(booking_code,session_id,member_id,status) VALUES (?,?,?,'CONFIRMED')",code(),second,member);
+        writer.coachAttendance(coach,new TrainingWriteRequest.Attendance(otherBooking,TrainingWriteRequest.AttendanceStatus.PRESENT,"First session"));
+        writer.createResult(coach,new TrainingWriteRequest.Result(second,member,"First recorded score",List.of(new TrainingWriteRequest.Score(metric,new java.math.BigDecimal("4.00")))));
+        writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
+        long result=writer.createResult(coach,new TrainingWriteRequest.Result(session,member,"Later recorded score",List.of(new TrainingWriteRequest.Score(metric,new java.math.BigDecimal("6.00"))))).id();
+        long plan=writer.createPlan(coach,plan()).id();
+        writer.feedback(coach,plan,new TrainingWriteRequest.Feedback(4,"Actual Coach feedback","Improved placement","Keep practising"));
+        var actual=progress.coach(coach,classId,member);
+        assertThat(actual.sessions()).extracting(TrainingProgressService.Outcome::notes).containsExactly("First recorded score","Later recorded score");
+        assertThat(actual.sessions()).allMatch(s->!s.notesOnly() && s.scores().getFirst().metricId()==metric);
+        assertThat(actual.sessions().getLast().scores().getFirst().score()).isEqualByComparingTo("6.00");
+        assertThat(actual.feedback()).hasSize(1);assertThat(actual.feedback().getFirst().rating()).isEqualTo(4);
+        assertThat(progress.member(member).sessions()).hasSize(2);assertThat(progress.member(peer).sessions()).isEmpty();
+        assertThatThrownBy(()->progress.coach(otherCoach,classId,member)).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(()->writer.coachCorrection(coach,jdbc.queryForObject("SELECT id FROM attendance_record WHERE booking_id=?",Long.class,booking),correction(TrainingWriteRequest.AttendanceStatus.ABSENT))).isInstanceOf(ConflictException.class);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/coach/training/classes/"+classId+"/members/"+member+"/progress").with(as(coach)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sessions[1].scores[0].score").value(6));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/progress?memberId="+member).with(as(peer)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sessions").isEmpty());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/progress").with(as(reception)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        assertThat(reader.result(member,result).scores()).hasSize(1);
+    }
+    @Test void RELEASE12_notesOnlyProgressHasNoFabricatedScoreOrTrend() {
+        writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT));
+        writer.createResult(coach,result());
+        var actual=progress.coach(coach,classId,member);
+        assertThat(actual.sessions()).hasSize(1);assertThat(actual.sessions().getFirst().notesOnly()).isTrue();
+        assertThat(actual.sessions().getFirst().scores()).isEmpty();assertThat(actual.interpretation()).contains("no numeric trend");
+        jdbc.update("UPDATE booking SET status='CANCELLED' WHERE id=?",booking);
+        assertThatThrownBy(()->progress.coach(coach,classId,member)).isInstanceOf(ResourceNotFoundException.class);
+        assertThat(progress.member(member).sessions()).hasSize(1);
+    }
+    private org.springframework.test.web.servlet.request.RequestPostProcessor as(long id) {
+        return org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(id)));
+    }
+    @Test void RELEASE13_homeworkAndAnnouncementsReachOnlyCurrentEnrolledMembers() throws Exception {
+        UUID operation=UUID.randomUUID();
+        var request=new ClassNoticeService.Request(classId,ClassNoticeService.Type.HOMEWORK,"Footwork practice","Practise the assigned steps",LocalDate.of(2026,11,3));
+        long id=notices.create(coach,request,operation).id();
+        assertThat(notices.create(coach,request,operation).id()).isEqualTo(id);
+        assertThat(count("SELECT COUNT(*) FROM class_training_notice WHERE coach_id=? AND operation_id=?",coach,operation.toString())).isEqualTo(1);
+        assertThatThrownBy(()->notices.create(coach,new ClassNoticeService.Request(classId,ClassNoticeService.Type.HOMEWORK,"Changed","Changed",request.dueDate()),operation)).isInstanceOf(ConflictException.class);
+        assertThat(notices.member(member)).extracting(ClassNoticeService.Notice::id).contains(id);
+        assertThat(notices.member(peer)).isEmpty();assertThat(notices.coach(otherCoach)).isEmpty();
+        assertThatThrownBy(()->notices.cancel(otherCoach,id)).isInstanceOf(ResourceNotFoundException.class);
+        String body="{\"classId\":"+classId+",\"type\":\"ANNOUNCEMENT\",\"title\":\"Class reminder\",\"content\":\"Bring the required equipment\"}";
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/coach/training/notices").with(as(coach)).header("Idempotency-Key",UUID.randomUUID()).contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/notices").with(as(member)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$[0].className").value("Round02 class"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$[0].coachName").value("COACH"));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/coach/training/notices").with(as(reception)).header("Idempotency-Key",UUID.randomUUID()).contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        jdbc.update("UPDATE booking SET status='CANCELLED' WHERE id=?",booking);assertThat(notices.member(member)).isEmpty();
+        jdbc.update("UPDATE booking SET status='CONFIRMED' WHERE id=?",booking);
+        jdbc.update("UPDATE sport_class SET coach_id=? WHERE id=?",otherCoach,classId);assertThat(notices.member(member)).isEmpty();
+        assertThatThrownBy(()->notices.cancel(coach,id)).isInstanceOf(ResourceNotFoundException.class);
+        jdbc.update("UPDATE sport_class SET coach_id=? WHERE id=?",coach,classId);
+        assertThat(notices.cancel(coach,id).status()).isEqualTo("CANCELLED");notices.cancel(coach,id);
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE action='CLASS_NOTICE_CANCELLED' AND entity_id=?",id)).isEqualTo(1);
+        assertThat(notices.member(member)).noneMatch(n->n.id()==id);
+    }
+    @Test void RELEASE13_validationAndConcurrentRetryDoNotPublishDuplicates() throws Exception {
+        assertThatThrownBy(()->notices.create(coach,new ClassNoticeService.Request(classId,ClassNoticeService.Type.HOMEWORK,"Missing due date","Practice",null),UUID.randomUUID())).isInstanceOf(BusinessRuleException.class);
+        assertThatThrownBy(()->notices.create(coach,new ClassNoticeService.Request(classId,ClassNoticeService.Type.ANNOUNCEMENT,"Wrong due date","Notice",LocalDate.of(2026,11,3)),UUID.randomUUID())).isInstanceOf(BusinessRuleException.class);
+        var request=new ClassNoticeService.Request(classId,ClassNoticeService.Type.ANNOUNCEMENT,"Concurrent reminder","Bring equipment",null);UUID operation=UUID.randomUUID();
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            var start=new CountDownLatch(1);Callable<Long> publish=()->{start.await();return notices.create(coach,request,operation).id();};
+            var a=pool.submit(publish);var b=pool.submit(publish);start.countDown();assertThat(a.get(60,TimeUnit.SECONDS)).isEqualTo(b.get(60,TimeUnit.SECONDS));
+        }
+        assertThat(count("SELECT COUNT(*) FROM class_training_notice WHERE coach_id=? AND operation_id=?",coach,operation.toString())).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE actor_user_id=? AND action='CLASS_NOTICE_PUBLISHED'",coach)).isEqualTo(1);
+    }
+    @Test void RELEASE14_receptionIntakeSearchStatusAndPrivateMemberReadback() throws Exception {
+        UUID operation=UUID.randomUUID();
+        var request=new ReceptionSupportService.Intake(member,ReceptionSupportService.Category.BOOKING,"Booking question","Please confirm the booked class location",booking);
+        long id=support.create(reception,request,operation).id();
+        assertThat(support.create(reception,request,operation).id()).isEqualTo(id);
+        assertThat(support.staff(reception,member,ReceptionSupportService.Status.OPEN)).extracting(ReceptionSupportService.Ticket::id).contains(id);
+        assertThat(support.detail(reception,id).sessionCode()).isEqualTo(jdbc.queryForObject("SELECT session_code FROM class_session WHERE id=?",String.class,session));
+        assertThat(support.member(member)).hasSize(1);assertThat(support.member(peer)).isEmpty();
+        assertThatThrownBy(()->support.create(coach,request,UUID.randomUUID())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThatThrownBy(()->support.create(reception,new ReceptionSupportService.Intake(peer,request.category(),request.subject(),request.description(),booking),UUID.randomUUID())).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(()->support.create(reception,new ReceptionSupportService.Intake(member,request.category(),"Changed",request.description(),booking),operation)).isInstanceOf(ConflictException.class);
+        assertThatThrownBy(()->support.update(reception,id,new ReceptionSupportService.Update(ReceptionSupportService.Status.RESOLVED,"Done"))).isInstanceOf(ConflictException.class);
+        support.update(reception,id,new ReceptionSupportService.Update(ReceptionSupportService.Status.IN_PROGRESS,null));
+        assertThatThrownBy(()->support.update(reception,id,new ReceptionSupportService.Update(ReceptionSupportService.Status.RESOLVED," "))).isInstanceOf(BusinessRuleException.class);
+        support.update(reception,id,new ReceptionSupportService.Update(ReceptionSupportService.Status.RESOLVED,"Location confirmed with Member"));
+        support.update(reception,id,new ReceptionSupportService.Update(ReceptionSupportService.Status.CLOSED,"Member acknowledged resolution"));
+        support.update(reception,id,new ReceptionSupportService.Update(ReceptionSupportService.Status.CLOSED,"Member acknowledged resolution"));
+        assertThatThrownBy(()->support.update(reception,id,new ReceptionSupportService.Update(ReceptionSupportService.Status.OPEN,null))).isInstanceOf(ConflictException.class);
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE entity_id=? AND action='RECEPTION_SUPPORT_CREATED' AND actor_user_id=?",id,reception)).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE entity_id=? AND action='RECEPTION_SUPPORT_STATUS_CHANGED'",id)).isEqualTo(3);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/support-requests?memberId="+member).with(as(peer)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$").isEmpty());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/reception/support-requests/"+id).with(as(member)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/reception/support-requests?memberId="+member+"&status=CLOSED").with(as(reception)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$[0].createdBy").value(reception));
+    }
+    @Test void RELEASE14_actualHttpValidationAndConcurrentRetryAreBounded() throws Exception {
+        String body="{\"memberId\":"+member+",\"category\":\"GENERAL\",\"subject\":\"Desk assistance\",\"description\":\"Please clarify opening hours\"}";
+        UUID operation=UUID.randomUUID();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/reception/support-requests").with(as(reception)).header("Idempotency-Key",operation).contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/reception/support-requests").with(as(reception)).header("Idempotency-Key",operation).contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/reception/support-requests").with(as(reception)).header("Idempotency-Key",UUID.randomUUID()).contentType("application/json").content(body.replace("Desk assistance"," ")))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+        var request=new ReceptionSupportService.Intake(member,ReceptionSupportService.Category.MEMBERSHIP,"Renewal question","Please explain renewal dates",null);UUID key=UUID.randomUUID();
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            var start=new CountDownLatch(1);Callable<Long> create=()->{start.await();return support.create(reception,request,key).id();};
+            var a=pool.submit(create);var b=pool.submit(create);start.countDown();assertThat(a.get(60,TimeUnit.SECONDS)).isEqualTo(b.get(60,TimeUnit.SECONDS));
+        }
+        assertThat(count("SELECT COUNT(*) FROM support_request WHERE intake_created_by=?",reception)).isEqualTo(2);
+        assertThatThrownBy(()->support.detail(reception,learning.ask(member,classId,"Private Coach question","How should I practise?"))).isInstanceOf(ResourceNotFoundException.class);
+        jdbc.update("UPDATE user_account SET email=? WHERE id=?",code()+"@unified-demo.invalid",member);
+        assertThatThrownBy(()->support.create(reception,request,UUID.randomUUID())).isInstanceOf(BusinessRuleException.class);
+    }
+    @Test void RELEASE15_managerChangesPersistOneEventWithCurrentPrivateScheduleAndExpiry() throws Exception {
+        long registration=arrivalEntitlement();long manager=account("MANAGER");
+        jdbc.update("UPDATE sport_package_registration SET end_date='2026-11-05' WHERE id=?",registration);
+        long facility=insert("INSERT facility(code,name,sport_id,facility_type,capacity,is_active) VALUES (?,'Release room',?,'COURT',10,1)",code(),sport);
+        jdbc.update("INSERT coach_sport(coach_id,sport_id) VALUES (?,?)",coach,sport);
+        jdbc.update("UPDATE class_session SET start_time='11:00',end_time='12:00',facility_id=? WHERE id=?",facility,session);
+        var initial=notifications.inbox(member);
+        assertThat(initial.reminders()).anyMatch(r->r.type().equals("UPCOMING_SESSION") && r.currentSchedule().id()==session);
+        assertThat(initial.reminders()).anyMatch(r->r.key().equals("PACKAGE:"+registration) && r.date().equals(LocalDate.of(2026,11,5)));
+        var request=new com.sportify.catalog.dto.SessionUpdateRequest(LocalDate.of(2026,11,2),LocalTime.NOON,LocalTime.of(13,0),facility,coach,10);
+        managerSessions.updateSession(session,request,actor(manager));
+        managerSessions.updateSession(session,request,actor(manager));
+        assertThat(notifications.inbox(member).notices()).hasSize(1);
+        assertThat(notifications.inbox(peer).notices()).isEmpty();
+        var capacityOnly=new com.sportify.catalog.dto.SessionUpdateRequest(request.date(),request.startTime(),request.endTime(),facility,coach,9);
+        managerSessions.updateSession(session,capacityOnly,actor(manager));
+        assertThat(notifications.inbox(member).notices()).hasSize(1);
+        long revision=jdbc.queryForObject("SELECT schedule_revision FROM class_session WHERE id=?",Long.class,session);
+        var moved=new com.sportify.catalog.dto.SessionUpdateRequest(LocalDate.of(2026,11,4),LocalTime.NOON,LocalTime.of(13,0),facility,coach,9,revision,"Room maintenance");
+        managerSessions.updateSession(session,moved,actor(manager));
+        var actual=notifications.inbox(member);
+        assertThat(actual.notices()).hasSize(2);
+        assertThat(actual.notices()).allMatch(n->n.currentSchedule().date().equals(LocalDate.of(2026,11,4)));
+        assertThat(actual.reminders()).filteredOn(r->r.type().equals("UPCOMING_SESSION")).hasSize(1);
+        long notice=actual.notices().getFirst().id();
+        assertThatThrownBy(()->notifications.read(peer,notice)).isInstanceOf(ResourceNotFoundException.class);
+        notifications.read(member,notice);notifications.read(member,notice);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/notifications?memberId="+member).with(as(peer)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.notices").isEmpty());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/member/notifications/"+notice+"/read").with(as(peer)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+        managerSessions.cancelSession(session,new com.sportify.catalog.dto.SessionCancelRequest("Facility closed"),actor(manager));
+        var cancelled=notifications.inbox(member);
+        assertThat(cancelled.notices()).hasSize(3);assertThat(cancelled.notices().getFirst().type()).isEqualTo("SESSION_CANCELLED");
+        assertThat(cancelled.reminders()).noneMatch(r->r.type().equals("UPCOMING_SESSION"));
+        assertThat(count("SELECT remaining_sessions FROM sport_package_registration WHERE id=?",registration)).isEqualTo(10);
+        jdbc.update("UPDATE sport_package_registration SET status='CANCELLED' WHERE id=?",registration);
+        assertThat(notifications.inbox(member).reminders()).noneMatch(r->r.key().equals("PACKAGE:"+registration));
+        assertThat(count("SELECT COUNT(*) FROM notification WHERE user_id=? AND origin_session_id=?",member,session)).isEqualTo(3);
+    }
+    @Test void RELEASE16_fourRoleAndAnonymousMatrixProtectsReleaseApis() throws Exception {
+        long manager=account("MANAGER");
+        record Route(String method,String path,String body,Set<String> roles) {}
+        List<Route> routes=List.of(
+            new Route("GET","/api/v1/manager/card-tiers",null,Set.of("MANAGER")),
+            new Route("POST","/api/v1/manager/card-tiers","{\"code\":\"RELEASE_SECURITY\",\"name\":\"Security tier\",\"price\":900000,\"durationMonths\":12,\"discountPercentage\":10,\"tierRank\":100,\"active\":true}",Set.of("MANAGER")),
+            new Route("GET","/api/v1/manager/catalog/sports",null,Set.of("MANAGER")),
+            new Route("GET","/api/v1/manager/catalog/facilities",null,Set.of("MANAGER")),
+            new Route("GET","/api/v1/manager/reports/operations",null,Set.of("MANAGER")),
+            new Route("GET","/api/v1/coach/training/classes",null,Set.of("COACH")),
+            new Route("GET","/api/v1/coach/training/classes/"+classId+"/members/"+member+"/profile",null,Set.of("COACH")),
+            new Route("GET","/api/v1/coach/training/classes/"+classId+"/members/"+member+"/progress",null,Set.of("COACH")),
+            new Route("GET","/api/v1/coach/training/class-plans",null,Set.of("COACH")),
+            new Route("GET","/api/v1/coach/training/notices",null,Set.of("COACH")),
+            new Route("POST","/api/v1/coach/training/notices","{\"classId\":"+classId+",\"type\":\"ANNOUNCEMENT\",\"title\":\"Reminder\",\"content\":\"Bring equipment\"}",Set.of("COACH")),
+            new Route("GET","/api/v1/member/training/progress",null,Set.of("MEMBER")),
+            new Route("GET","/api/v1/member/training/notices",null,Set.of("MEMBER")),
+            new Route("GET","/api/v1/member/notifications",null,Set.of("MEMBER")),
+            new Route("GET","/api/v1/member/support-requests",null,Set.of("MEMBER")),
+            new Route("POST","/api/v1/member/check-in-pass",null,Set.of("MEMBER")),
+            new Route("POST","/api/v1/reception/check-in-pass/redeem","{\"token\":\"SCIN1."+"A".repeat(43)+"\"}",Set.of("RECEPTIONIST")),
+            new Route("GET","/api/v1/reception/support-requests",null,Set.of("RECEPTIONIST")),
+            new Route("POST","/api/v1/reception/support-requests","{\"memberId\":"+member+",\"category\":\"GENERAL\",\"subject\":\"Help\",\"description\":\"Opening hours\"}",Set.of("RECEPTIONIST")),
+            new Route("GET","/api/v1/payments/vietqr-banks",null,Set.of("MEMBER","RECEPTIONIST","MANAGER")));
+        Map<String,Long> actors=Map.of("MEMBER",member,"COACH",coach,"RECEPTIONIST",reception,"MANAGER",manager);
+        int checks=0;
+        for(var route:routes) {
+            var anonymous=org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request(org.springframework.http.HttpMethod.valueOf(route.method()),route.path())
+                .header("Idempotency-Key",UUID.randomUUID()).contentType("application/json");
+            if(route.body()!=null)anonymous.content(route.body());
+            mvc.perform(anonymous).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());checks++;
+            for(var entry:actors.entrySet()) if(!route.roles().contains(entry.getKey())) {
+                var wrong=org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request(org.springframework.http.HttpMethod.valueOf(route.method()),route.path())
+                    .with(as(entry.getValue())).header("Idempotency-Key",UUID.randomUUID()).contentType("application/json");
+                if(route.body()!=null)wrong.content(route.body());
+                mvc.perform(wrong).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());checks++;
+            }
+        }
+        assertThat(checks).isEqualTo(78);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/reception/support-requests?memberId=-1").with(as(reception)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/coach/training/notices").with(as(coach)).contentType("application/json")
+            .content("{\"classId\":"+classId+",\"type\":\"ANNOUNCEMENT\",\"title\":\"Help\",\"content\":\"Bring equipment\"}"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+    }
+    @Test void RELEASE11_actualHttpIssueRedeemReplayAndPurposeIsolation() throws Exception {
+        long registration=arrivalEntitlement();
+        var issued=mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/member/check-in-pass").with(as(member)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control","no-store"))
+            .andReturn().getResponse().getContentAsString();
+        var json=new com.fasterxml.jackson.databind.ObjectMapper().readTree(issued);
+        assertThat(json.size()).isEqualTo(4);
+        String token=json.get("token").asText(); assertThat(token).matches("SCIN1\\.[A-Za-z0-9_-]{43}");
+        String path="/api/v1/reception/check-in-pass/redeem";
+        String body="{\"token\":\""+token+"\",\"bookingId\":"+booking+"}";
+        for(long forbidden:new long[]{member,coach,account("MANAGER")}) {
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path).with(as(forbidden)).contentType("application/json").content(body))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        }
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path).contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/member/check-in-pass").with(as(reception)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path).with(as(reception)).contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.result").value("ALLOWED"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.memberCode").value(json.get("memberCode").asText()));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path).with(as(reception)).contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict());
+        assertThat(count("SELECT COUNT(*) FROM check_in WHERE booking_id=? AND result='ALLOWED'",booking)).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?",booking)).isZero();
+        assertThat(count("SELECT remaining_sessions FROM sport_package_registration WHERE id=?",registration)).isEqualTo(9);
+        String audit=String.join("",jdbc.queryForList("SELECT COALESCE(details,'') FROM activity_log WHERE actor_user_id IN (?,?)",String.class,member,reception));
+        assertThat(audit).doesNotContain(token).doesNotContain(jdbc.queryForObject("SELECT token_hash FROM member_check_in_pass WHERE member_id=?",String.class,member));
+        for(String invalid:List.of("000201010212VietQR","eyJhbGciOiJIUzI1NiJ9.payload.signature", "SCIN1."+"A".repeat(43)))
+            assertThatThrownBy(()->arrivalPasses.redeem(invalid,booking,actor(reception))).isInstanceOf(BusinessRuleException.class);
+    }
+    @Test void RELEASE11_expiryAccountVersionAndQuarantineFailClosed() {
+        arrivalEntitlement();
+        var pass=arrivalPasses.issue(member); clock.value=clock.value.plusSeconds(120);
+        assertThatThrownBy(()->arrivalPasses.redeem(pass.token(),booking,actor(reception))).isInstanceOf(BusinessRuleException.class);
+        clock.value=clock.value.minusSeconds(120); var beforeDisable=arrivalPasses.issue(member);
+        jdbc.update("UPDATE user_account SET status='INACTIVE',version=version+1 WHERE id=?",member);
+        assertThatThrownBy(()->arrivalPasses.redeem(beforeDisable.token(),booking,actor(reception))).isInstanceOf(BusinessRuleException.class);
+        jdbc.update("UPDATE user_account SET status='ACTIVE',version=version+1 WHERE id=?",member);
+        assertThatThrownBy(()->arrivalPasses.redeem(beforeDisable.token(),booking,actor(reception))).isInstanceOf(BusinessRuleException.class);
+        var beforeRole=arrivalPasses.issue(member);
+        jdbc.update("UPDATE user_account SET role_id=(SELECT id FROM role WHERE code='COACH'),version=version+1 WHERE id=?",member);
+        assertThatThrownBy(()->arrivalPasses.redeem(beforeRole.token(),booking,actor(reception))).isInstanceOf(BusinessRuleException.class);
+        jdbc.update("UPDATE user_account SET role_id=(SELECT id FROM role WHERE code='MEMBER'),version=version+1,email=? WHERE id=?",code()+"@unified-demo.invalid",member);
+        assertThatThrownBy(()->arrivalPasses.issue(member)).isInstanceOf(BusinessRuleException.class);
+        assertThat(count("SELECT COUNT(*) FROM check_in WHERE member_id=?",member)).isZero();
+    }
+    @Test void RELEASE11_concurrentReceptionScansHaveOneDurableWinner() throws Exception {
+        arrivalEntitlement(); var pass=arrivalPasses.issue(member); long second=account("RECEPTIONIST");
+        var firstActor=actor(reception);var secondActor=actor(second);
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            var start=new CountDownLatch(1);
+            Callable<Boolean> one=()->{start.await();try{arrivalPasses.redeem(pass.token(),booking,firstActor);return true;}catch(ConflictException used){return false;}};
+            Callable<Boolean> two=()->{start.await();try{arrivalPasses.redeem(pass.token(),booking,secondActor);return true;}catch(ConflictException used){return false;}};
+            var a=pool.submit(one);var b=pool.submit(two);start.countDown();
+            assertThat(List.of(a.get(60,TimeUnit.SECONDS),b.get(60,TimeUnit.SECONDS))).containsExactlyInAnyOrder(true,false);
+        }
+        assertThat(count("SELECT COUNT(*) FROM check_in WHERE booking_id=?",booking)).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM member_check_in_pass WHERE member_id=? AND redeemed_at_utc IS NOT NULL",member)).isEqualTo(1);
+    }
+    @Test void RELEASE11_cancelledBookingProducesDeniedArrivalWithoutAttendanceOrDebit() {
+        long registration=arrivalEntitlement();var pass=arrivalPasses.issue(member);
+        jdbc.update("UPDATE booking SET status='CANCELLED' WHERE id=?",booking);
+        assertThat(arrivalPasses.redeem(pass.token(),booking,actor(reception)).getResult()).isEqualTo("DENIED");
+        assertThat(count("SELECT remaining_sessions FROM sport_package_registration WHERE id=?",registration)).isEqualTo(9);
+        assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?",booking)).isZero();
+    }
+
     @Test void ID06_correctionAuditIncludesThePersistedPublicSessionIdentity() {
         long id=writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)).id();
         writer.correctAttendance(reception,id,correction(TrainingWriteRequest.AttendanceStatus.LATE));
         String code=jdbc.queryForObject("SELECT session_code FROM class_session WHERE id=?",String.class,session);
         assertThat(jdbc.queryForObject("SELECT JSON_VALUE(details,'$.sessionCode') FROM activity_log WHERE action='TRAINING_ATTENDANCE_CORRECTED' AND entity_id=?",String.class,id)).isEqualTo(code);
         assertThat(reader.attendance(member)).hasSize(1);
+    }
+
+    @Test void RELEASE05_memberClassDetailsAndCoachScheduleUseActualSqlMetadata() throws Exception {
+        Long facility=jdbc.queryForObject("SELECT MIN(id) FROM facility WHERE sport_id=?",Long.class,sport);
+        assertThat(facility).isNotNull();
+        jdbc.update("UPDATE class_session SET facility_id=? WHERE id=?",facility,session);
+        String facilityName=jdbc.queryForObject("SELECT name FROM facility WHERE id=?",String.class,facility);
+        String sessionCode=jdbc.queryForObject("SELECT session_code FROM class_session WHERE id=?",String.class,session);
+        var detail=learning.memberClass(member,classId);
+        assertThat(detail.learningClass().name()).isEqualTo("Round02 class");
+        assertThat(detail.learningClass().coachName()).isEqualTo("COACH");
+        assertThat(detail.learningClass().sportName()).isNotBlank();
+        assertThat(detail.learningClass().level()).isNotBlank();
+        assertThat(detail.sessions().getFirst().facilityName()).isEqualTo(facilityName);
+        assertThat(detail.sessions().getFirst().sessionCode()).isEqualTo(sessionCode);
+        assertThat(detail.sessions().getFirst().freeSeats()).isEqualTo(9);
+        assertThatThrownBy(()->learning.memberClass(peer,classId)).isInstanceOf(ResourceNotFoundException.class);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/classes/"+classId)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(member)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sessions[0].facilityName").value(facilityName))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sessions[0].coachName").value("COACH"));
+        assertThat(writer.coachSessions(coach)).anyMatch(s->s.id()==session && s.facilityName().equals(facilityName) && s.sessionId().equals(sessionCode));
+    }
+
+    @Test void RELEASE07_goalsAreLimitedToTheCurrentAssignedCoachAndConfirmedLearner() throws Exception {
+        jdbc.update("UPDATE member_profile SET main_goal='FITNESS',current_level='INTERMEDIATE',staff_note='Private desk note' WHERE user_id=?",member);
+        var profile=writer.learnerProfile(coach,classId,member);
+        assertThat(profile.mainGoal()).isEqualTo("FITNESS"); assertThat(profile.currentLevel()).isEqualTo("INTERMEDIATE");
+        assertThatThrownBy(()->writer.learnerProfile(otherCoach,classId,member)).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(()->writer.learnerProfile(coach,classId,peer)).isInstanceOf(ResourceNotFoundException.class);
+        String path="/api/v1/coach/training/classes/"+classId+"/members/"+member+"/profile";
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(coach)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.mainGoal").value("FITNESS"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.staffNote").doesNotExist())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.email").doesNotExist())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.phone").doesNotExist())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.passwordHash").doesNotExist());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(member)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        jdbc.update("UPDATE booking SET status='CANCELLED' WHERE id=?",booking);
+        assertThatThrownBy(()->writer.learnerProfile(coach,classId,member)).isInstanceOf(ResourceNotFoundException.class);
+        jdbc.update("UPDATE booking SET status='CONFIRMED' WHERE id=?",booking);
+        jdbc.update("UPDATE sport_class SET coach_id=? WHERE id=?",otherCoach,classId);
+        assertThatThrownBy(()->writer.learnerProfile(coach,classId,member)).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(()->writer.learnerProfile(otherCoach,classId,member)).isInstanceOf(ResourceNotFoundException.class);
+        jdbc.update("UPDATE class_session SET coach_id=? WHERE id=?",otherCoach,session);
+        assertThat(writer.learnerProfile(otherCoach,classId,member).memberId()).isEqualTo(member);
+        jdbc.update("UPDATE user_account SET status='INACTIVE' WHERE id=?",otherCoach);
+        assertThatThrownBy(()->writer.learnerProfile(otherCoach,classId,member)).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test void RELEASE09_managerPeriodCountsUseHalfOpenBoundsAndDoNotDuplicateRescheduledBookings() throws Exception {
+        var from=LocalDate.of(2026,11,2); long manager=account("MANAGER");
+        jdbc.update("UPDATE user_account SET created_at=? WHERE id=?",from.atStartOfDay(),member);
+        jdbc.update("UPDATE user_account SET created_at=? WHERE id=?",from.plusDays(1).atStartOfDay(),peer);
+        jdbc.update("UPDATE booking SET booked_at=? WHERE id=?",from.atStartOfDay(),booking);
+        jdbc.update("INSERT booking(booking_code,session_id,member_id,status,booked_at) VALUES (?,?,?,'CANCELLED',?)",code(),session,member,from.atTime(23,59,59));
+        jdbc.update("INSERT booking(booking_code,session_id,member_id,status,booked_at) VALUES (?,?,?,'CANCELLED',?)",code(),session,peer,from.plusDays(1).atStartOfDay());
+        long synthetic=account("MEMBER");
+        jdbc.update("UPDATE user_account SET email=?,created_at=? WHERE id=?",code()+"@unified-demo.invalid",from.atTime(12,0),synthetic);
+        jdbc.update("INSERT booking(booking_code,session_id,member_id,status,booked_at) VALUES (?,?,?,'CONFIRMED',?)",code(),session,synthetic,from.atTime(12,0));
+        jdbc.update("UPDATE class_session SET booked_count=2 WHERE id=?",session);
+        var report=operationsReports.report(from,from);
+        assertThat(report.registeredMembers()).isEqualTo(1); assertThat(report.currentlyEnabledMembersRegistered()).isEqualTo(1);
+        assertThat(report.classBookings().total()).isEqualTo(2); assertThat(report.classBookings().confirmed()).isEqualTo(1);
+        assertThat(report.classBookings().cancelled()).isEqualTo(1);
+        jdbc.update("UPDATE user_account SET status='INACTIVE' WHERE id=?",member);
+        assertThat(operationsReports.report(from,from).registeredMembers()).isEqualTo(1);
+        assertThat(operationsReports.report(from,from).currentlyEnabledMembersRegistered()).isZero();
+        jdbc.update("UPDATE user_account SET status='ACTIVE' WHERE id=?",member);
+        String moved=com.sportify.support.SessionIdentityFixtures.reserve(jdbc,from.plusDays(2),sport);
+        jdbc.update("UPDATE class_session SET session_date=?,session_code=? WHERE id=?",from.plusDays(2),moved,session);
+        assertThat(operationsReports.report(from,from).classBookings().total()).isEqualTo(2);
+        String path="/api/v1/manager/reports/operations?from="+from+"&to="+from;
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(manager)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.classBookings.total").value(2));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(reception)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        assertThatThrownBy(()->operationsReports.report(from.plusDays(1),from)).isInstanceOf(BusinessRuleException.class);
+        assertThatThrownBy(()->operationsReports.report(from,from.plusDays(366))).isInstanceOf(BusinessRuleException.class);
+    }
+
+    @Test void RELEASE10_classPlanHasExplicitScopeSharedReadbackAndRetryPrivacy() throws Exception {
+        var personalRequest=plan(); long personal=writer.createPlan(coach,personalRequest).id();
+        assertThatThrownBy(()->writer.createPlan(coach,personalRequest)).isInstanceOf(ConflictException.class);
+        jdbc.update("INSERT session_plan(class_id,coach_id,title,is_template) VALUES (?,?,'Legacy unassigned plan',0)",classId,coach);
+        var request=new ClassPlanService.Request(classId,code(),"Shared class preparation",List.of(new TrainingWriteRequest.Step("Warm up",10,"Follow the coach")));
+        UUID operation=UUID.randomUUID();
+        String endpoint="/api/v1/coach/training/class-plans";
+        String body=new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(request);
+        var response=mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(endpoint)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(coach))))
+                .header("Idempotency-Key",operation.toString()).contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated()).andReturn();
+        long createdId=new com.fasterxml.jackson.databind.ObjectMapper().readTree(response.getResponse().getContentAsString()).path("plan").path("id").asLong();
+        var created=classPlans.detail(coach,createdId);
+        long id=created.plan().id();
+        assertThat(created.plan().scope()).isEqualTo("CLASS"); assertThat(created.steps()).hasSize(1);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(endpoint)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(member))))
+                .header("Idempotency-Key",UUID.randomUUID().toString()).contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(endpoint)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(coach))))
+                .header("Idempotency-Key",UUID.randomUUID().toString()).contentType("application/json")
+                .content("{\"classId\":"+classId+",\"title\":\" \",\"steps\":[]}"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+        assertThat(classPlans.create(coach,request,operation).plan().id()).isEqualTo(id);
+        assertThatThrownBy(()->classPlans.create(coach,new ClassPlanService.Request(classId,"Changed",null,request.steps()),operation)).isInstanceOf(ConflictException.class);
+        assertThatThrownBy(()->classPlans.create(otherCoach,request,UUID.randomUUID())).isInstanceOf(ResourceNotFoundException.class);
+        assertThat(reader.plans(member)).extracting(p->p.id()).containsExactlyInAnyOrder(personal,id);
+        assertThat(reader.plans(peer)).isEmpty();
+        long peerBooking=insert("INSERT booking(booking_code,session_id,member_id,status) VALUES (?,?,?,'CONFIRMED')",code(),session,peer);
+        jdbc.update("UPDATE class_session SET booked_count=2 WHERE id=?",session);
+        assertThat(reader.plans(peer)).extracting(p->p.id()).containsExactly(id);
+        assertThatThrownBy(()->reader.plan(peer,personal)).isInstanceOf(ResourceNotFoundException.class);
+        String peerEmail=jdbc.queryForObject("SELECT email FROM user_account WHERE id=?",String.class,peer);
+        jdbc.update("UPDATE user_account SET email=? WHERE id=?",code()+"@unified-demo.invalid",peer);
+        assertThat(reader.plans(peer)).isEmpty();
+        jdbc.update("UPDATE user_account SET email=? WHERE id=?",peerEmail,peer);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/plans/"+id)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(peer)))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.plan.scope").value("CLASS"));
+        jdbc.update("UPDATE booking SET status='CANCELLED' WHERE id=?",peerBooking);
+        assertThatThrownBy(()->reader.plan(peer,id)).isInstanceOf(ResourceNotFoundException.class);
+        jdbc.update("UPDATE sport_class SET coach_id=? WHERE id=?",otherCoach,classId);
+        assertThatThrownBy(()->classPlans.detail(coach,id)).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(()->reader.plan(member,id)).isInstanceOf(ResourceNotFoundException.class);
+        assertThat(reader.plan(member,personal).plan().id()).isEqualTo(personal);
+        assertThat(count("SELECT COUNT(*) FROM session_plan WHERE operation_id=?",operation.toString())).isEqualTo(1);
+    }
+
+    @Test void RELEASE10_concurrentClassPlanRetryCreatesOnePlan() throws Exception {
+        var request=new ClassPlanService.Request(classId,code(),null,List.of(new TrainingWriteRequest.Step("Practice",10,null)));
+        UUID operation=UUID.randomUUID(); var pool=Executors.newFixedThreadPool(2); var start=new CountDownLatch(1);
+        try {
+            Callable<Long> create=()->{start.await();return classPlans.create(coach,request,operation).plan().id();};
+            var first=pool.submit(create);var second=pool.submit(create);start.countDown();
+            assertThat(first.get(60,TimeUnit.SECONDS)).isEqualTo(second.get(60,TimeUnit.SECONDS));
+            assertThat(count("SELECT COUNT(*) FROM session_plan WHERE operation_id=?",operation.toString())).isEqualTo(1);
+        } finally {pool.shutdownNow();assertThat(pool.awaitTermination(10,TimeUnit.SECONDS)).isTrue();}
     }
 
     @Test void HOT00_realCoachToMemberAndReceptionToMemberContracts() throws Exception {

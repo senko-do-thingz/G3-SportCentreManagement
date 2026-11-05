@@ -4,6 +4,8 @@ import com.sportify.catalog.dto.CardTierResponse;
 import com.sportify.catalog.dto.MemberCardPurchaseRequest;
 import com.sportify.catalog.dto.MemberCardResponse;
 import com.sportify.catalog.dto.MembershipCardTierUpdateRequest;
+import com.sportify.catalog.dto.MembershipCardTierCreateRequest;
+import com.sportify.core.exception.ConflictException;
 import com.sportify.catalog.entity.CardStatus;
 import com.sportify.catalog.entity.MemberCard;
 import com.sportify.catalog.entity.MembershipCardTier;
@@ -99,6 +101,33 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         return tierRepository.findAll(Sort.by(Sort.Direction.ASC, "id")).stream()
                 .map(this::mapToTierResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public CardTierResponse createTier(MembershipCardTierCreateRequest request, UserAccount actor) {
+        String code = request.code().trim().toUpperCase(java.util.Locale.ROOT);
+        String name = request.name().trim();
+        // Share the update lock order so uniqueness and price ordering are checked atomically.
+        List<MembershipCardTier> tiers = tierRepository.findAllForUpdate();
+        if (STANDARD_TIER_CODE.equals(code)) {
+            throw new ConflictException("The standard account tier already exists", "TIER_CONFLICT");
+        }
+        if (tiers.stream().anyMatch(t -> t.getCode().equalsIgnoreCase(code)
+                || t.getName().trim().equalsIgnoreCase(name)
+                || t.getEffectiveRank() == request.tierRank())) {
+            throw new ConflictException("Tier code, name and rank must be unique", "TIER_CONFLICT");
+        }
+        MembershipCardTier tier = MembershipCardTier.builder().code(code).name(name)
+                .price(request.price()).durationMonths(request.durationMonths())
+                .discountPercentage(request.discountPercentage()).description(request.description())
+                .tierRank(request.tierRank()).isActive(request.active()).build();
+        if (request.active()) validateTierPriceMonotonicity(tier, request.price());
+        MembershipCardTier saved = tierRepository.saveAndFlush(tier);
+        auditService.record(AuditEvent.builder().actor(actor).action("CARD_TIER_CREATED")
+                .entityType("MEMBERSHIP_CARD_TIER").entityId(saved.getId()).entityCode(saved.getCode())
+                .summary("Membership card tier created").details(Map.of("after", snapshotTier(saved))).build());
+        return mapToTierResponse(saved);
     }
 
     @Override
@@ -214,6 +243,8 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     private Map<String, Object> snapshotTier(MembershipCardTier t) {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("name", t.getName());
+        map.put("code", t.getCode());
+        map.put("tierRank", t.getTierRank());
         map.put("price", t.getPrice());
         map.put("durationMonths", t.getDurationMonths());
         map.put("discountPercentage", t.getDiscountPercentage());

@@ -13,6 +13,7 @@ import { MembershipCardsPage } from '../pages/member/MembershipCardsPage'
 import { MyMembershipPage } from '../pages/member/MyMembershipPage'
 import { MyPaymentsPage } from '../pages/member/MyPaymentsPage'
 import { MyProfilePage } from '../pages/member/MyProfilePage'
+import { CheckInPassPage } from '../pages/member/CheckInPassPage'
 import { PackageDetailPage } from '../pages/member/PackageDetailPage'
 import { PaymentStatusPage } from '../pages/member/PaymentStatusPage'
 import { PaymentSummaryPage } from '../pages/member/PaymentSummaryPage'
@@ -130,6 +131,7 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
     { path: 'classes/:classId/edit', element: <ClassEditorPage /> },
   ],
   '/member': [
+    { path: 'check-in-pass', element: <CheckInPassPage /> },
     { path: 'training/classes', element: <MemberClassesPage /> },
     { path: 'training/classes/:id', element: <MemberClassDetailPage /> },
     { path: 'training/questions', element: <ClassQuestionsPage /> },

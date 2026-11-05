@@ -125,6 +125,7 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
     void cleanUp() {
         String userIds = "SELECT id FROM user_account WHERE email LIKE ?";
         String classIds = "SELECT id FROM sport_class WHERE code LIKE ?";
+        jdbc.update("DELETE FROM notification WHERE user_id IN ("+userIds+")",marker+"%");
         jdbc.update("DELETE FROM activity_log WHERE actor_user_id IN (" + userIds + ")", marker + "%");
         jdbc.update("DELETE FROM booking WHERE session_id IN (SELECT id FROM class_session WHERE class_id IN (" + classIds + "))", marker + "%");
         jdbc.update("DELETE FROM class_session WHERE class_id IN (" + classIds + ")", marker + "%");

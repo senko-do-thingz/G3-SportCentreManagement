@@ -57,6 +57,7 @@ class FrontDeskMemberServiceImplTest {
     @Mock private RoleRepository roles;
     @Mock private TemporaryPasswordGenerator passwords;
     @Mock private PasswordEncoder encoder;
+    @Mock private com.sportify.core.audit.AuditService audit;
     private FrontDeskMemberServiceImpl service;
     private final LocalDate today = LocalDate.of(2026, 10, 15);
     private final MemberCreateRequest request = new MemberCreateRequest(" Alice Smith ", " 0901234567 ", " ALICE@EXAMPLE.COM ");
@@ -66,7 +67,7 @@ class FrontDeskMemberServiceImplTest {
     void setUp() {
         service = new FrontDeskMemberServiceImpl(members, users, roles,
                 Mappers.getMapper(FrontDeskMemberMapper.class), passwords, encoder, new CodeFormatter(),
-                Clock.fixed(today.atStartOfDay().toInstant(ZoneOffset.UTC), ZoneOffset.UTC));
+                Clock.fixed(today.atStartOfDay().toInstant(ZoneOffset.UTC), ZoneOffset.UTC), audit);
         profile = MemberProfile.builder().id(7L).memberCode("MEM-0007").userAccount(
                 UserAccount.builder().id(7L).fullName("Alice Smith").email("alice@example.com")
                         .phone("0901234567").passwordHash("never-return-this-hash").build()).build();

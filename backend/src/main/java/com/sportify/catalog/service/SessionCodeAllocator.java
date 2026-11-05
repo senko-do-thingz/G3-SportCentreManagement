@@ -45,7 +45,6 @@ public class SessionCodeAllocator {
         // Serialize the small allocation section, including absent-key and multi-date batches.
         // A single database-scoped resource avoids cycles between adjacent missing key ranges.
         Integer acquired = jdbc.queryForObject("""
-                SET NOCOUNT ON;
                 DECLARE @result INT;
                 -- A table read starts a lazy JDBC implicit transaction; EXEC alone does not.
                 IF @@TRANCOUNT=0 SELECT TOP(1) @result=last_value FROM session_code_counter;
