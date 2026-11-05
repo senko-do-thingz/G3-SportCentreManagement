@@ -511,6 +511,51 @@ class TrainingWorkflowIntegrationTest {
         assertThatThrownBy(()->writer.learnerProfile(otherCoach,classId,member)).isInstanceOf(ResourceNotFoundException.class);
     }
 
+    @Test void R11_managerAttendanceReadsConfirmedRosterWithoutChangingBookingsOrAudit() throws Exception {
+        long admin=account("MANAGER");
+        jdbc.update("UPDATE class_session SET status='COMPLETED' WHERE id=?",session);
+        insert("INSERT booking(booking_code,session_id,member_id,status) VALUES (?,?,?,'CONFIRMED')",code(),session,peer);
+        insert("INSERT booking(booking_code,session_id,member_id,status) VALUES (?,?,?,'CANCELLED')",code(),session,member);
+        jdbc.update("INSERT attendance_record(session_id,member_id,booking_id,status,marked_by) VALUES (?,?,?,'PRESENT',?)",session,member,booking,coach);
+        var date=jdbc.queryForObject("SELECT session_date FROM class_session WHERE id=?",java.sql.Date.class,session).toLocalDate();
+        String code=jdbc.queryForObject("SELECT session_code FROM class_session WHERE id=?",String.class,session);
+        int before=count("SELECT COUNT(*) FROM activity_log");
+        String path="/api/v1/manager/training/attendance/overview?from="+date+"&to="+date+"&classId="+classId+"&coachId="+coach;
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).with(as(admin)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sessions[0].confirmed").value(2))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sessions[0].unmarked").value(1))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sessions[0].attendanceRate").value(50.0));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/manager/training/attendance/sessions/"+code).with(as(admin)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.members.length()").value(3));
+        assertThat(count("SELECT COUNT(*) FROM activity_log")).isEqualTo(before);
+        assertThat(count("SELECT COUNT(*) FROM booking WHERE session_id="+session)).isEqualTo(3);
+        assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE session_id="+session)).isEqualTo(1);
+    }
+
+    @Test void R11_managerAttendanceRejectsOtherRolesAnonymousAndDisabledManager() throws Exception {
+        String path="/api/v1/manager/training/attendance/overview?from=2026-11-01&to=2026-11-02";
+        for(long actor:List.of(coach,member,reception)) mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).with(as(actor)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());
+        long admin=account("MANAGER");var stale=as(admin);
+        jdbc.update("UPDATE user_account SET status='LOCKED' WHERE id=?",admin);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).with(stale))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+    }
+
+    @Test void R11_managerAttendanceBoundsAndMissingSessionAreTruthful() throws Exception {
+        long admin=account("MANAGER");
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/manager/training/attendance/overview?from=2026-11-02&to=2026-11-01").with(as(admin)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/manager/training/attendance/overview?from=2026-11-01&to=2026-12-02").with(as(admin)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/manager/training/attendance/sessions/010100FB99").with(as(admin)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+    }
+
     @Test void RELEASE09_managerPeriodCountsUseHalfOpenBoundsAndDoNotDuplicateRescheduledBookings() throws Exception {
         var from=LocalDate.of(2026,11,2); long manager=account("MANAGER");
         jdbc.update("UPDATE user_account SET created_at=? WHERE id=?",from.atStartOfDay(),member);

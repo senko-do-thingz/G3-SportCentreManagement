@@ -138,6 +138,6 @@ export function CoachRosterPage() {
     </Card>}
     {sessionsResource.status === 'ready' && selectedSessionId && !selectedSession && <Card><ErrorState title="Session is not in this week's schedule" message="Choose a session from your schedule, or change the week and select it again." /></Card>}
     {sessionsResource.status === 'ready' && !selectedSessionId && sessions.length > 0 && <EmptyState title="Choose a session to view its roster" description="Only your assigned sessions are available in this coach workspace." />}
-    {sessionsResource.status === 'ready' && selectedSession && roster.status === 'ready' && roster.data.length > 0 && <div className="coach-print-hidden"><Link className="btn btn--secondary" to={`/coach?week=${week}`}>Back to teaching schedule</Link></div>}
+    {sessionsResource.status === 'ready' && selectedSession && roster.status === 'ready' && roster.data.length > 0 && <div className="coach-print-hidden"><Link className="btn btn--secondary" to={`/coach?week=${week}`}>Back to teaching schedule</Link>{selectedSession.classId && <Link className="btn btn--secondary" to={`/coach/training/progress?classId=${selectedSession.classId}`}>View class member progress</Link>}</div>}
   </div>
 }

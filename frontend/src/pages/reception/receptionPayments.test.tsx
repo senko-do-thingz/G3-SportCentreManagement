@@ -232,7 +232,20 @@ describe('FE-12 Payment Requests (F3-04)', () => {
     const heading = screen.getByRole('heading', { level: 1, name: 'Payment Requests' })
     const hero = heading.closest('header') as HTMLElement
     expect(hero).toHaveClass('payment-hero')
+    expect(document.querySelector('.payment-workspace')).toBeInTheDocument()
+    expect(document.querySelector('.staff-layout')).toHaveClass('payment-area')
+    expect(document.querySelector('.staff-layout')).not.toHaveClass('home-page')
     expect(within(hero).getByRole('link', { name: 'Refund requests' })).toHaveAttribute('href', '/reception/refunds')
+  })
+
+  it('UI-30 keeps the refund route sidebar on the standard receptionist shell', async () => {
+    await open('/reception/refunds')
+    const layout = document.querySelector('.staff-layout')
+    const sidebar = screen.getByRole('complementary', { name: 'Receptionist workspace' })
+    expect(layout).toHaveClass('payment-area')
+    expect(layout).not.toHaveClass('home-page')
+    expect(within(sidebar).getByRole('link', { name: 'Member search' })).toBeInTheDocument()
+    expect(within(sidebar).getByRole('link', { name: 'Refund requests' })).toHaveClass('sidebar__link--active')
   })
 
   it('UI-30 keeps the backend order and gives every row one status badge and exactly one action', async () => {

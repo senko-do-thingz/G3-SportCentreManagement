@@ -25,6 +25,7 @@ parser.add_argument('--jar', type=Path)
 parser.add_argument('--flow4', action='store_true', help='Also exercise the existing Flow 4 cross-role demo on this new fixture')
 parser.add_argument('--flow4-only', action='store_true', help='Focused Flow 4 diagnostic; does not replace full QR regression')
 parser.add_argument('--flow4-prepare-only', action='store_true', help='Prepare a new untouched training fixture for the committee; no browser training writes')
+parser.add_argument('--release11', action='store_true', help='Run desktop Release 1.1 acceptance on a newly created owned fixture')
 args = parser.parse_args()
 if args.flow4_only or args.flow4_prepare_only:
     args.flow4 = True
@@ -159,7 +160,7 @@ try:
         report['status'] = 'PREPARED_NOT_EXECUTED'
         raise SystemExit(0)
     frontend_environment = os.environ.copy()
-    frontend_environment.update({'VITE_QR_PAYMENT_DEMO': 'true', 'VITE_API_BASE_URL': 'http://127.0.0.1:18080/api/v1'})
+    frontend_environment.update({'VITE_QR_PAYMENT_DEMO': 'false' if args.release11 else 'true', 'VITE_API_BASE_URL': 'http://127.0.0.1:18080/api/v1'})
     frontend_log = (args.out / 'browser-frontend.log').open('w', encoding='utf8')
     frontend = subprocess.Popen(['node', str(ROOT / 'frontend/node_modules/vite/bin/vite.js'),
                                  '--host', '127.0.0.1', '--port', '15173', '--strictPort'],
@@ -177,6 +178,18 @@ try:
         time.sleep(1)
     else:
         raise TimeoutError('Loopback frontend did not become ready')
+    if args.release11:
+        from flow4plus_demo_workflow import exercise_flow4
+        from r11_release_workflow import exercise_release11, verify_restart
+        report['mode'] = 'RELEASE_1_1_DESKTOP_ONLY'
+        exercise_flow4(sql, request, args.out, report['sourceHead'], prepare_only=True)
+        report['release11'] = exercise_release11(sql, request, args.out, report['sourceHead'])
+        backend.terminate()
+        backend.wait(timeout=30)
+        backend = start_unified()
+        report['restart'] = verify_restart(sql, request, args.out)
+        report['status'] = 'PASS'
+        raise SystemExit(0)
     if args.flow4_only:
         from flow4plus_demo_workflow import exercise_flow4, verify_restart
         report['mode'] = 'FLOW4_ONLY_QR_REGRESSION_NOT_RUN'

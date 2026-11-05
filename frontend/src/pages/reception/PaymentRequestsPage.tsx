@@ -2,6 +2,7 @@ import { useCallback, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { receptionPaymentsApi, type StaffPayment } from '../../api/receptionPaymentsApi'
 import { PaymentHero } from '../../components/PaymentHero'
+import { PaymentWorkspace } from '../../components/PaymentWorkspace'
 import {
   Button,
   Card,
@@ -127,7 +128,7 @@ export function PaymentRequestsPage() {
   ]
 
   return (
-    <div className="page">
+    <PaymentWorkspace>
       <PaymentHero
         eyebrow="Receptionist / Payments and reports"
         title="Payment Requests"
@@ -194,6 +195,6 @@ export function PaymentRequestsPage() {
           Open the existing registration from Flow 1 or Flow 2. Do not create it again.
         </p>
       </Card>
-    </div>
+    </PaymentWorkspace>
   )
 }
