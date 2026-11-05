@@ -1,39 +1,29 @@
 # Flow 5-6 release - CODEOWNER handoff (F56-07)
 
-Status: PRELIMINARY - CODEOWNER GO/NO_GO PENDING. Only the CODEOWNER approves and
-squash-merges. This document is refreshed again after #219 and #220 merge, when
-this PR is retargeted to `main` and reduced to `HANDOFF.md` only.
+Status: INTEGRATED FOR CODEOWNER MANUAL DESKTOP ACCEPTANCE. CODEOWNER authorized the sequential squash merge of #219, #220 and #221 on 2026-11-05. Runtime acceptance and production approval remain separate decisions.
 
 ## Provenance on `main`
 
-Latest `main`: `33561ca79729899f11a31599ba0dc7d826be7020` (CI run 42026737762,
-success).
+Latest verified parent `main` before #221: `f22464ee8e16a9235f54c06460c8d8babaf5fe6c`. #221's eventual squash SHA is in its GitHub PR. Check post-merge main CI separately; PR CI alone does not prove post-merge success.
 
-| Task | PR | Squash commit on `main` | CI on that `main` commit |
+| Task | PR | Squash commit on `main` | Evidence |
 | --- | --- | --- | --- |
-| Release 1.1 desktop (Flow 1-4) | #217 | `373cc2f4bbac445d63d105ff81d6a2c17a93aca7` | 42003835180 success |
-| F56-00 baseline | #213 | `93da5a63494d0177e80c60d4ad65aabfb6d97604` | 42015181268 success (docs-only) |
-| F56-01 drill drafts | #214 | `95e1cb710cbdffc61f7f84f2642f123700ebde13` | 42019256823 success |
-| F56-02 review and assign | #215 | `ada1411f95841578329d7e7a3f29a0895a6c4bea` | 42021875490 success |
-| F56-03 curated FAQ | #216 | `a2212362d789f2473036d7c54840318216d9981f` | 42026542003 success |
-| F56-04 Member desktop UX | #218 | `33561ca79729899f11a31599ba0dc7d826be7020` | 42026737762 success |
+| Release 1.1 desktop baseline | #217 | `373cc2f4bbac445d63d105ff81d6a2c17a93aca7` | main CI 42003835180 success |
+| F56-00 baseline | #213 | `93da5a63494d0177e80c60d4d86e571e214a07` | main CI 42015181268 success |
+| F56-01 drill drafts | #214 | `95e1cb710cbdffc61f7f84f2642f123700ebde13` | main CI 42019256823 success |
+| F56-02 review and assign | #215 | `ada1411f95841578329d7e7a3f29a0895a6c4bea` | main CI 42021875490 success |
+| F56-03 curated FAQ | #216 | `a2212362d789f2473036d7c54840318216d9981f` | main CI 42026542003 success |
+| F56-04 Member desktop UX | #218 | `33561ca79729899f11a31599ba0dc7d826be7020` | main CI 42026737762 success |
+| F56-05 integration gate | #219 | `893ee5f1d77f2f48b5b5086cc1da5551fd16c46f` | PR HEAD `8787ae26`, CI 42033243522 success |
+| F56-06 demo tooling | #220 | `f22464ee8e16a9235f54c06460c8d8babaf5fe6c` | PR HEAD `905a3e9c`, CI 42034830142 success |
+| F56-07 handoff | #221 | See #221 merge record | docs-only CI 42038505494 on prior HEAD; check CI for final HEAD |
 
-## Open pull requests
+## Integration and dependency record
 
-| Task | PR | Base | Exact HEAD | CI (exact HEAD) | Own files (diff against base) | State |
-| --- | --- | --- | --- | --- | --- | --- |
-| F56-05 integration gate | #219 | `main` (`33561ca7`) | `8787ae26e4a069e2e8c8e18f9d04ace8b9491c1d` | 42033243522 success | `TrainingWorkflowIntegrationTest.java` (one test), `RELEASE_GATE.md` | synchronized with `main`; exact-HEAD CI passed; ready for CODEOWNER re-review |
-| F56-06 demo tooling | #220 | #219 branch (`8787ae26`) | `905a3e9c1be1c156e9517c784f3d5fe7b485bfd8` | 42034830142 success | `f56-flow56-demo.mjs`, `DEMO_SCRIPT.md` | process/port cleanup fixed and verified on Windows (SIGINT/SIGTERM/SIGBREAK + failed rehearsal Edge cleanup); exact-HEAD CI passed; ready for CODEOWNER re-review |
-| F56-07 handoff | #221 | #220 branch (`905a3e9c`) | see PR | see PR (docs-only) | `HANDOFF.md` | synchronized with #220; ready for CODEOWNER review |
-
-## Remaining squash-merge order
-
-1. #219 -> `main`.
-2. Retarget #220 to `main`, confirm the diff is only its two files, rerun CI, merge.
-3. Retarget this PR to `main`, confirm the diff is only `HANDOFF.md`, record the final
-   merged SHAs, latest-main CI and final four-minute demo result, then merge.
-
-Never merge #220 or this PR before their parents.
+- #219 squash-merged to main first, followed by #220 retargeted to main and squash-merged. #221 is retargeted to main after #220.
+- The stacked parent HEADs and their squash commits on main have matching Git trees. The #220 squash commit contains only `DEMO_SCRIPT.md` and `f56-flow56-demo.mjs`, with no duplicated parent code.
+- The only intended own-scope file in #221 is this `HANDOFF.md`.
+- Historical CHANGES_REQUESTED reviews remain visible and were dismissed under an explicit CODEOWNER merge decision. This does not convert unperformed manual checks into passed checks.
 
 ## Rollback
 
@@ -64,9 +54,10 @@ optional and Coaches can type exercises manually.
     `prepare`, and `serve`): `13/13` checks PASS on fresh owned databases
     (`sportify_f56_demo_20261105201931`, `sportify_f56_demo_20261105202926`), including
     paced 1280x720 (161 s total, 151 s to last answer), fast 1440x900 (11 s), backend
-    restart readback, no-sessions fallback, and verified Windows process/port cleanup
-    (`18080`, `15173`, and headless Edge processes) on normal stop, Ctrl+C/SIGINT/SIGTERM,
-    and rehearsal failures.
+    restart readback and no-sessions fallback. Complete Windows process/port cleanup
+    testing (ports `18080` and `15173`, headless Edge, Ctrl+C/SIGINT, SIGTERM/SIGBREAK,
+    normal stop and rehearsal failures) is PENDING manual CODEOWNER acceptance.
+    The author reported this verification had not been fully performed.
 
 ## Known limits
 
@@ -78,10 +69,9 @@ optional and Coaches can type exercises manually.
 
 ## CODEOWNER decision
 
-- GO / NO_GO: pending CODEOWNER final approval.
-- Open items:
-  1. Re-review and squash-merge #219 (`8787ae26`, CI `42033243522` success).
-  2. Retarget/re-review and squash-merge #220 (`905a3e9c`, CI `42034830142` success).
-  3. Retarget and squash-merge #221 (`HANDOFF.md`).
-  4. Decide whether a follow-up task is wanted for `OperationalMemberPolicy.requireRealMember` in `createPlan`.
-  5. Approve the non-generative MVP wording in `DEMO_SCRIPT.md` and run a human presenter rehearsal.
+- INTEGRATION: Authorized on 2026-11-05. #219 and #220 were squash-merged; #221 is being merged as the final docs-only handoff.
+- DESKTOP DEMO GO / NO_GO: PENDING direct CODEOWNER tests. This document is not evidence of a human presenter rehearsal or of verified Windows cleanup.
+- Required manual checks: prepare/serve/rehearse on disposable SQL database; login as Coach and Member; assign/re-read training plan; live published sessions, package prices and fixed FAQ; medical handoff; Ctrl+C and error cleanup; no orphaned Java/Vite/Edge processes; ports 18080 and 15173 released; 1280x720 and 1440x900.
+- Remaining non-blocking technical follow-up: consider `OperationalMemberPolicy.requireRealMember` for `createPlan` (existing scope).
+- No generative AI model is integrated; all assistant/draft outputs in this demo use fixed curated/rule-based logic.
+
