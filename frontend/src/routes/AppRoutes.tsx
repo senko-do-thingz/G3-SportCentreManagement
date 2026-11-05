@@ -71,6 +71,7 @@ import { ClassQuestionsPage, MemberClassesPage, MemberClassDetailPage } from '..
 import { ReceptionTrainingAttendancePage, CoachTrainingAttendancePage } from '../pages/training/ReceptionTrainingPages'
 import { ManagerAttendanceBackfillPage } from '../pages/training/ManagerAttendanceBackfillPage'
 import { ManagerAttendanceOverviewPage } from '../pages/training/ManagerAttendanceOverviewPage'
+import { CoachProgressPage } from '../pages/training/CoachProgressPage'
 
 /**
  * Real screens by full path. Later tasks register their page here, for example
@@ -79,6 +80,7 @@ import { ManagerAttendanceOverviewPage } from '../pages/training/ManagerAttendan
 const SCREENS: Record<string, ReactNode> = {
   '/member/training/plans': <TrainingPlansPage />,
   '/coach/training/plans': <CoachTrainingPlansPage />,
+  '/coach/training/progress': <CoachProgressPage />,
   '/coach/training/results': <CoachTrainingResultsPage />,
   '/coach/training/attendance': <CoachTrainingAttendancePage />,
   '/coach/training/questions': <ClassQuestionsPage coach />,
