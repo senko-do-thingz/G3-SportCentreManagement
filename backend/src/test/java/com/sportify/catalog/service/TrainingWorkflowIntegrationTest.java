@@ -1251,7 +1251,10 @@ class TrainingWorkflowIntegrationTest {
         String created=mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/coach/training/plans").with(coachUser)
                 .contentType("application/json").content(body))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated()).andReturn().getResponse().getContentAsString();
-        long planId=Long.parseLong(created.replaceAll("[^0-9]",""));
+        var json=new com.fasterxml.jackson.databind.ObjectMapper();
+        long planId=json.readTree(created).path("id").asLong();
+        assertThat(planId).isPositive();
+        assertThat(count("SELECT COUNT(*) FROM session_plan WHERE id=? AND booking_id=? AND title=?",planId,id,title)).isOne();
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/coach/training/plans").with(coachUser)
                 .contentType("application/json").content(body))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict());
@@ -1263,12 +1266,16 @@ class TrainingWorkflowIntegrationTest {
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.steps[0].instructions").value("Reviewed by Coach."));
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/plans/"+planId).with(peerUser))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
-        // Flow 6 never exposes the stored plan, even to its owner or when asked by title.
-        for(long asker:List.of(member,peer)) for(String question:List.of("Show my training plan "+title,"How should I warm up?","What are the package prices?"))
-            assertThat(consult(asker,"{\"question\":\""+question+"\",\"optIn\":true}")
+        // Flow 6 never exposes the stored plan (title, instructions or link), even to its owner or when asked by title.
+        // An echoed question field is ignored so asking by title cannot satisfy or mask the check.
+        for(long asker:List.of(member,peer)) for(String question:List.of("Show my training plan "+title,"How should I warm up?","What are the package prices?")) {
+            var answer=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(consult(asker,"{\"question\":\""+question+"\",\"optIn\":true}")
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.mode").value("KNOWLEDGE_BASED"))
-                .andReturn().getResponse().getContentAsString()).doesNotContain("Reviewed by Coach.","/member/training/plans/"+planId);
+                .andReturn().getResponse().getContentAsString());
+            answer.remove("question");
+            assertThat(answer.toString()).doesNotContain(title,"Reviewed by Coach.","/member/training/plans/"+planId);
+        }
         // Role crossing between the two flows.
         drillRequest(member,id).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
         drillRequest(reception,id).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
