@@ -664,6 +664,48 @@ public class SportPackageServiceImplTest {
     }
 
     @Test
+    void activateRegistration_WithUnsupportedStoredOrActualMethod_ThrowsBusinessRuleExceptionWithoutSideEffects() {
+        Payment payment = Payment.builder()
+                .id(88L)
+                .paymentCode("PAY-0088")
+                .paymentStatus(PaymentStatus.PENDING)
+                .paymentMethod(PaymentMethod.MOMO)
+                .build();
+        SportPackageRegistration reg = SportPackageRegistration.builder()
+                .id(88L)
+                .registrationCode("REG-PKG-0088")
+                .member(memberProfile)
+                .sportPackage(sportPackage)
+                .status(PackageRegistrationStatus.PENDING_PAYMENT)
+                .payment(payment)
+                .startDate(LocalDate.now(clock))
+                .endDate(LocalDate.now(clock).plusDays(29))
+                .build();
+        when(registrationRepository.findById(88L)).thenReturn(Optional.of(reg));
+
+        for (PaymentMethod unsupported : List.of(
+                PaymentMethod.CREDIT_CARD,
+                PaymentMethod.MOMO,
+                PaymentMethod.VNPAY,
+                PaymentMethod.ZALOPAY
+        )) {
+            payment.setPaymentMethod(unsupported);
+            assertThrows(BusinessRuleException.class,
+                    () -> sportPackageService.activateRegistration(88L, receptionistUser, null));
+            assertEquals(PackageRegistrationStatus.PENDING_PAYMENT, reg.getStatus());
+
+            payment.setPaymentMethod(PaymentMethod.BANK_TRANSFER);
+            assertThrows(BusinessRuleException.class,
+                    () -> sportPackageService.activateRegistration(88L, receptionistUser, unsupported));
+            assertEquals(PackageRegistrationStatus.PENDING_PAYMENT, reg.getStatus());
+        }
+
+        verify(registrationRepository, never()).save(any(SportPackageRegistration.class));
+        verify(paymentService, never()).markPaymentSuccess(any(), any(), any());
+        org.mockito.Mockito.verifyNoInteractions(paymentVerificationService);
+    }
+
+    @Test
     void activateRegistrationForPaymentConfirmation_ActivatesWithoutIssuingTheReceipt() {
         Payment payment = Payment.builder()
                 .id(88L)

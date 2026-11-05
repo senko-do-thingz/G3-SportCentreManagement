@@ -77,7 +77,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     /**
      * Money taken at the desk (BE-19): the payment is created already SUCCESS, with payment_time now, the method and
-     * reference the receptionist recorded and confirmed_by_user_id. Any method is allowed at the desk, cash included.
+     * reference the receptionist recorded and confirmed_by_user_id. Supported desk methods are CASH and BANK_TRANSFER.
      */
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
@@ -148,13 +148,12 @@ public class PaymentServiceImpl implements PaymentService {
                     + payment.getPaymentStatus() + ", expected PENDING");
         }
 
-        if (actualMethod != null) {
-            if (!SUPPORTED_PAYMENT_METHODS.contains(actualMethod)) {
-                throw new BusinessRuleException("Payment method " + actualMethod
-                        + " is not supported. Supported methods: " + SUPPORTED_PAYMENT_METHODS);
-            }
-            payment.setPaymentMethod(actualMethod);
+        PaymentMethod effectiveMethod = actualMethod != null ? actualMethod : payment.getPaymentMethod();
+        if (effectiveMethod == null || !SUPPORTED_PAYMENT_METHODS.contains(effectiveMethod)) {
+            throw new BusinessRuleException("Payment method " + effectiveMethod
+                    + " is not supported. Supported methods: " + SUPPORTED_PAYMENT_METHODS);
         }
+        payment.setPaymentMethod(effectiveMethod);
 
         var capturedAt = cashCaptureService.prepareCollection(paymentId);
         LocalDateTime now = capturedAt == null ? LocalDateTime.now(clock) : LocalDateTime.ofInstant(capturedAt, clock.getZone());

@@ -785,6 +785,47 @@ public class MembershipCardServiceImplTest {
     }
 
     @Test
+    void activateCard_WithUnsupportedStoredOrActualMethod_ThrowsBusinessRuleExceptionWithoutSideEffects() {
+        Payment payment = Payment.builder()
+                .id(99L)
+                .paymentCode("PAY-0099")
+                .paymentStatus(PaymentStatus.PENDING)
+                .paymentMethod(PaymentMethod.MOMO)
+                .build();
+        MemberCard pending = MemberCard.builder()
+                .id(42L)
+                .cardCode("CARD-42")
+                .member(memberProfile)
+                .tier(goldTier)
+                .status(CardStatus.PENDING_PAYMENT)
+                .payment(payment)
+                .pricePaid(goldTier.getPrice())
+                .build();
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+
+        for (PaymentMethod unsupported : List.of(
+                PaymentMethod.CREDIT_CARD,
+                PaymentMethod.MOMO,
+                PaymentMethod.VNPAY,
+                PaymentMethod.ZALOPAY
+        )) {
+            payment.setPaymentMethod(unsupported);
+            assertThrows(BusinessRuleException.class,
+                    () -> membershipCardService.activateCard(42L, receptionistUser, null));
+            assertEquals(CardStatus.PENDING_PAYMENT, pending.getStatus());
+
+            payment.setPaymentMethod(PaymentMethod.BANK_TRANSFER);
+            assertThrows(BusinessRuleException.class,
+                    () -> membershipCardService.activateCard(42L, receptionistUser, unsupported));
+            assertEquals(CardStatus.PENDING_PAYMENT, pending.getStatus());
+        }
+
+        verify(memberCardRepository, never()).save(any(MemberCard.class));
+        verify(paymentService, never()).markPaymentSuccess(anyLong(), any(), any());
+        org.mockito.Mockito.verifyNoInteractions(paymentVerificationService);
+    }
+
+    @Test
     void activateCardForPaymentConfirmation_ActivatesWithoutIssuingTheReceipt() {
         Payment payment = Payment.builder()
                 .id(99L)

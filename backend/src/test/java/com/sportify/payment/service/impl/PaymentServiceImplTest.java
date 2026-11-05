@@ -274,6 +274,65 @@ class PaymentServiceImplTest {
     }
 
     @Test
+    @DisplayName("Mark payment success rejects unsupported stored method when actualMethod is null")
+    void markPaymentSuccess_WhenStoredMethodUnsupportedAndActualMethodNull_ThrowsBusinessRuleException() {
+        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+
+        for (PaymentMethod unsupported : List.of(
+                PaymentMethod.CREDIT_CARD,
+                PaymentMethod.MOMO,
+                PaymentMethod.VNPAY,
+                PaymentMethod.ZALOPAY
+        )) {
+            pendingPayment.setPaymentMethod(unsupported);
+            assertThatThrownBy(() -> paymentService.markPaymentSuccess(10L, receptionistUser, null))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("is not supported");
+            assertThat(pendingPayment.getPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
+            assertThat(pendingPayment.getPaymentTime()).isNull();
+        }
+
+        pendingPayment.setPaymentMethod(null);
+        assertThatThrownBy(() -> paymentService.markPaymentSuccess(10L, receptionistUser, null))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("is not supported");
+        verify(paymentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Mark payment success rejects explicitly unsupported actualMethod")
+    void markPaymentSuccess_WhenActualMethodUnsupported_ThrowsBusinessRuleException() {
+        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+
+        for (PaymentMethod unsupported : List.of(
+                PaymentMethod.CREDIT_CARD,
+                PaymentMethod.MOMO,
+                PaymentMethod.VNPAY,
+                PaymentMethod.ZALOPAY
+        )) {
+            assertThatThrownBy(() -> paymentService.markPaymentSuccess(10L, receptionistUser, unsupported))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("is not supported");
+            assertThat(pendingPayment.getPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
+            assertThat(pendingPayment.getPaymentMethod()).isEqualTo(PaymentMethod.BANK_TRANSFER);
+        }
+        verify(paymentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Mark payment success replaces legacy unsupported stored method when supported actualMethod is provided")
+    void markPaymentSuccess_WhenStoredMethodLegacyAndActualMethodSupported_UpdatesAndSucceeds() {
+        pendingPayment.setPaymentMethod(PaymentMethod.MOMO);
+        when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Payment success = paymentService.markPaymentSuccess(10L, receptionistUser, PaymentMethod.BANK_TRANSFER);
+
+        assertThat(success.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(success.getPaymentMethod()).isEqualTo(PaymentMethod.BANK_TRANSFER);
+    }
+
+    @Test
     @DisplayName("Mark payment success with non-staff confirmedBy throws BusinessRuleException before repository lookup or mutation")
     void markPaymentSuccess_WithNonStaffConfirmedBy_ThrowsBusinessRuleException() {
         assertThatThrownBy(() -> paymentService.markPaymentSuccess(10L, ownerUser))
