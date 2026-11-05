@@ -1,0 +1,5 @@
+# Class homework and announcements
+
+An enabled currently assigned Coach can list and publish `/api/v1/coach/training/notices`. POST requires a UUID `Idempotency-Key`, class ID, HOMEWORK or ANNOUNCEMENT type, title and bounded plain text. Homework requires a due date today or later in the center timezone. Announcements have no homework due date. The same key and content returns the original notice; changed content conflicts. Repeated `PUT /api/v1/coach/training/notices/{id}/cancel` is idempotent and records one cancellation audit.
+
+`GET /api/v1/member/training/notices` returns published notices only for the signed-in real enabled Member's confirmed, non-cancelled coached class enrollment with the current Coach. Withdrawal, class deactivation and Coach reassignment remove access. This conservative policy does not retain former class notice access. Notice responses expose class and Coach names, text, due date and creation time. They do not attach private learner notes. No uploads, AI, email or push workflow is added. Migration V44 is pending database-owner review; only owned disposable fixtures are used for validation.

@@ -45,7 +45,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 /** Real HTTP authorization, real audit writes and independent SQL Server booking transactions. */
 @Tag("integration")
 @SpringBootTest
-@Testcontainers(disabledWithoutDocker = true)
+@org.junit.jupiter.api.condition.EnabledIf("sqlServerAvailable")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @AutoConfigureMockMvc
 @ActiveProfiles(value = {"dev", "test"}, inheritProfiles = false)
@@ -56,6 +56,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @Execution(ExecutionMode.SAME_THREAD)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class ReceptionBookingIntegrationTest {
+    static boolean sqlServerAvailable() {
+        return System.getenv("UNIFY_TEST_SQL_PORT") != null || org.testcontainers.DockerClientFactory.instance().isDockerAvailable();
+    }
     static final LocalDate TODAY = LocalDate.of(2026, 10, 16);
     static final LocalDateTime NOW = TODAY.atTime(10, 0);
     static final String AUDIT_TRIGGER = "trg_be13_audit_failure";
@@ -78,6 +81,7 @@ class ReceptionBookingIntegrationTest {
     @Autowired ScheduledAnnotationBeanPostProcessor scheduling;
     @Autowired jakarta.persistence.EntityManagerFactory emf;
     @Autowired jakarta.persistence.EntityManager em;
+    @Autowired org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     private final AtomicInteger cases = new AtomicInteger();
     private Map<String, Long> baseline;
     private Map<String, List<Long>> ids;
@@ -419,6 +423,32 @@ class ReceptionBookingIntegrationTest {
         assertThat(seats(session)).isZero(); assertThat(credits(reg)).isEqualTo(3);
         assertThat(create(memberA,null,session,reg).status()).isEqualTo(201);
         assertThat(credits(reg)).isEqualTo(2); assertThat(seats(session)).isEqualTo(1);
+    }
+
+    @Test void RELEASE06_receptionLoginSearchBookMemberReadbackAndCancelRefund() throws Exception {
+        long session=session(), reg=registration(memberA);
+        String password="ReleaseOnly"+UUID.randomUUID().toString().replace("-","");
+        jdbc.update("UPDATE user_account SET password_hash=? WHERE id IN (?,?)",passwordEncoder.encode(password),receptionist.getId(),memberA.getId());
+        var login=http(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("email",receptionist.getEmail(),"password",password))),null);
+        assertThat(login.status()).isEqualTo(200);
+        String bearer="Bearer "+login.body().path("accessToken").asText();
+        var found=http(get("/api/v1/members").param("query",memberA.getEmail()).header("Authorization",bearer),null);
+        assertThat(found.status()).isEqualTo(200);
+        assertThat(found.body().path("content")).anyMatch(row->row.path("userId").asLong()==memberA.getId() || row.path("id").asLong()==memberA.getId());
+        var eligible=http(get("/api/v1/sessions/"+session+"/eligibility").param("memberId",memberA.getId().toString()).header("Authorization",bearer),null);
+        assertThat(eligible.status()).isEqualTo(200); assertThat(eligible.body().path("eligible").asBoolean()).isTrue();
+        String body=json.writeValueAsString(Map.of("sessionId",session,"packageRegistrationId",reg,"memberId",memberA.getId()));
+        var booked=http(post("/api/v1/bookings").header("Authorization",bearer).contentType(MediaType.APPLICATION_JSON).content(body),null);
+        assertThat(booked.status()).isEqualTo(201); long id=booked.body().path("id").asLong();
+        assertThat(credits(reg)).isEqualTo(2); assertThat(seats(session)).isEqualTo(1);
+        var memberLogin=http(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("email",memberA.getEmail(),"password",password))),null);
+        assertThat(memberLogin.status()).isEqualTo(200);
+        var owned=http(get("/api/v1/bookings/my").header("Authorization","Bearer "+memberLogin.body().path("accessToken").asText()),null);
+        assertThat(owned.status()).isEqualTo(200); assertThat(owned.body()).anyMatch(row->row.path("id").asLong()==id);
+        assertThat(http(delete("/api/v1/bookings/"+id).header("Authorization",bearer),null).status()).isEqualTo(200);
+        assertThat(credits(reg)).isEqualTo(3); assertThat(seats(session)).isZero();
     }
 
     @Test void realAuditFailureRollsBackBookingSeatCreditAndAudit() {

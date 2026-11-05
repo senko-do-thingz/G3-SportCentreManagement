@@ -22,7 +22,12 @@ parser.add_argument('--database', required=True)
 parser.add_argument('--out', type=Path, required=True)
 parser.add_argument('--create-only', action='store_true')
 parser.add_argument('--jar', type=Path)
+parser.add_argument('--flow4', action='store_true', help='Also exercise the existing Flow 4 cross-role demo on this new fixture')
+parser.add_argument('--flow4-only', action='store_true', help='Desktop Flow 4 QA at 1440x900; does not replace full QR regression')
+parser.add_argument('--flow4-prepare-only', action='store_true', help='Prepare a new untouched training fixture for the committee; no browser training writes')
 args = parser.parse_args()
+if args.flow4_only or args.flow4_prepare_only:
+    args.flow4 = True
 if not re.fullmatch(r'sportify_unify_test_[0-9]{14}(?:_[a-z0-9]+)?', args.database):
     parser.error('Only a timestamped sportify_unify_test database is permitted')
 args.out.mkdir(parents=True, exist_ok=True)
@@ -135,7 +140,8 @@ try:
         process.terminate()
         raise TimeoutError('Unified backend did not become ready')
     backend = start_unified()
-    check('Fresh schema includes upstream V40', sql('SELECT MAX(TRY_CONVERT(int,version)) FROM flyway_schema_history WHERE success=1;') == '40')
+    check('Fresh schema includes release V46', sql('SELECT MAX(TRY_CONVERT(int,version)) FROM flyway_schema_history WHERE success=1;') == '46')
+    check('All five additive release migrations applied', sql('SELECT COUNT(*) FROM flyway_schema_history WHERE TRY_CONVERT(int,version) BETWEEN 42 AND 46 AND success=1;') == '5')
     status, auth = request('/auth/login', {'email': 'an.gold@unified-demo.invalid', 'password': 'SportifyDemo2026!'})
     check('Demo Member authenticates', status == 200)
     token = auth['accessToken']
@@ -144,6 +150,14 @@ try:
     payment_id = registration['paymentId']
     before = json.loads(sql('SELECT (SELECT COUNT(*) FROM cash_event) cashEvents, '
                             '(SELECT COUNT(*) FROM vw_paid_payment) actualPaid FOR JSON PATH, WITHOUT_ARRAY_WRAPPER'))
+    if args.flow4_prepare_only:
+        from flow4plus_demo_workflow import exercise_flow4
+        report['mode'] = 'PREPARATION_ONLY_NOT_BROWSER_ACCEPTANCE'
+        report['runtime'] = {'profiles': 'dev,demo,unified-demo,unified-demo-test', 'syntheticMemberIds': member_ids,
+                             'apiOrigin': 'http://127.0.0.1:18080', 'frontendOrigin': 'http://127.0.0.1:15173'}
+        report['flow4'] = exercise_flow4(sql, request, args.out, report['sourceHead'], prepare_only=True)
+        report['status'] = 'PREPARED_NOT_EXECUTED'
+        raise SystemExit(0)
     frontend_environment = os.environ.copy()
     frontend_environment.update({'VITE_QR_PAYMENT_DEMO': 'true', 'VITE_API_BASE_URL': 'http://127.0.0.1:18080/api/v1'})
     frontend_log = (args.out / 'browser-frontend.log').open('w', encoding='utf8')
@@ -163,6 +177,16 @@ try:
         time.sleep(1)
     else:
         raise TimeoutError('Loopback frontend did not become ready')
+    if args.flow4_only:
+        from flow4plus_demo_workflow import exercise_flow4, verify_restart
+        report['mode'] = 'FLOW4_ONLY_QR_REGRESSION_NOT_RUN'
+        report['flow4'] = exercise_flow4(sql, request, args.out, report['sourceHead'], desktop_only=True)
+        backend.terminate()
+        backend.wait(timeout=30)
+        backend = start_unified()
+        report['flow4'] = verify_restart(sql, request, args.out)
+        report['status'] = 'PASS'
+        raise SystemExit(0)
     from playwright.sync_api import sync_playwright, expect
     from PIL import Image
     import zxingcpp
@@ -307,6 +331,11 @@ try:
                              f"(SELECT COUNT(*) FROM activity_log WHERE entity_id=p.id AND action='PAYMENT_CONFIRMED') auditCount "
                              f"FROM payment p WHERE id={int(payment_id)} FOR JSON PATH, WITHOUT_ARRAY_WRAPPER"))
     check('One durable transaction invoice and audit entry', outcome['transactionCount'] == outcome['invoiceCount'] == outcome['auditCount'] == 1, payment=outcome)
+    flow4 = None
+    if args.flow4:
+        from flow4plus_demo_workflow import exercise_flow4
+        flow4 = exercise_flow4(sql, request, args.out, report['sourceHead'])
+        report['flow4'] = flow4
     status, payment_before_restart = request(f'/payments/{payment_id}', token=token)
     backend.terminate()
     backend.wait(timeout=30)
@@ -317,6 +346,9 @@ try:
     check('Receipt and simulated transaction persist after actual process restart', status == 200
           and payment_before_restart['invoiceId'] == payment_after_restart['invoiceId']
           and payment_before_restart['simulatedTransactionId'] == payment_after_restart['simulatedTransactionId'])
+    if flow4:
+        from flow4plus_demo_workflow import verify_restart
+        report['flow4'] = verify_restart(sql, request, args.out)
     report['status'] = 'PASS'
 except Exception as error:
     try:

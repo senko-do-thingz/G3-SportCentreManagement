@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { paymentsApi, type Invoice } from '../../api/paymentsApi'
 import { PaymentHero } from '../../components/PaymentHero'
+import { PaymentWorkspace } from '../../components/PaymentWorkspace'
 import { Button, Card, EmptyState, ErrorState, StatusBadge } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
@@ -24,6 +25,10 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
  * buttons and wraps receipt content at a readable print size on A4.
  */
 export function ReceiptPage() {
+  return <PaymentWorkspace><ReceiptRoute /></PaymentWorkspace>
+}
+
+function ReceiptRoute() {
   const { invoiceId } = useParams()
   const id = parseIdParam(invoiceId)
   if (id === null) {

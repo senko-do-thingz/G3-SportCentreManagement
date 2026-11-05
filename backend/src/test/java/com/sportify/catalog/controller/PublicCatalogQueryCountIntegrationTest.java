@@ -68,6 +68,13 @@ class PublicCatalogQueryCountIntegrationTest {
 
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry properties) {
+        if(System.getenv("UNIFY_TEST_SQL_PORT")!=null) {
+            var fixture=com.sportify.support.DisposableUnifyDatabase.create();
+            properties.add("spring.datasource.url",fixture::url);
+            properties.add("spring.datasource.username",fixture::user);
+            properties.add("spring.datasource.password",fixture::password);
+            return;
+        }
         String local = System.getenv("BE_MAINT_TEST_DB_URL");
         if (local != null) {
             if (!local.matches("jdbc:sqlserver://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?;.*databaseName=be_maint_01_[a-zA-Z0-9_]+(;.*)?")) {

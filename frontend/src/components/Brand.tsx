@@ -9,11 +9,11 @@ export interface BrandProps {
 export function Brand({ to = '/', compact = false }: BrandProps) {
   return (
     <Link to={to} className="brand" aria-label="Sportify Sports center home">
-      <span className="brand__mark" aria-hidden="true" />
+      <span className="brand__mark" aria-hidden="true">
+        S
+      </span>
       <span className="brand__text">
         <span className="brand__name">Sportify</span>
-        {/* A text space keeps the visible words equal to the accessible name (WCAG 2.5.3); it takes no room in the flex column. */}
-        {!compact && ' '}
         {!compact && <span className="brand__tagline">Sports center</span>}
       </span>
     </Link>

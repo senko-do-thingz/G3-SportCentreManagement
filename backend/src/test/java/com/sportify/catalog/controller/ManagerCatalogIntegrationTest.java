@@ -826,24 +826,9 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("TC-BE03-70 Migration V21 to V22: predecessor verification, historical prices and idempotency")
     void testMigrationV22_backfillUpgradeChainAndIdempotency() throws Exception {
-        String testDbName = "sportify_mig_v22_" + System.currentTimeMillis();
-        jdbcTemplate.execute("CREATE DATABASE " + testDbName);
-
-        String masterUrl = MSSQL_SERVER_CONTAINER.getJdbcUrl();
-        String testDbUrl;
-        if (masterUrl.contains("databaseName=")) {
-            testDbUrl = masterUrl.replaceAll("databaseName=[^;]+", "databaseName=" + testDbName);
-        } else {
-            testDbUrl = masterUrl + ";databaseName=" + testDbName;
-        }
-
-        DriverManagerDataSource testDs = new DriverManagerDataSource();
-        testDs.setDriverClassName("com.microsoft.sqlserver.jdbc.SQLServerDriver");
-        testDs.setUrl(testDbUrl);
-        testDs.setUsername(MSSQL_SERVER_CONTAINER.getUsername());
-        testDs.setPassword(MSSQL_SERVER_CONTAINER.getPassword());
-
-        JdbcTemplate testJdbc = new JdbcTemplate(testDs);
+        var migrationFixture=com.sportify.support.DisposableUnifyDatabase.create();
+        var testDs=migrationFixture.source();
+        JdbcTemplate testJdbc=migrationFixture.jdbc();
 
         try {
             // 1. Programmatically migrate to target V21 using configured flyway locations
@@ -1056,10 +1041,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                     "SELECT COUNT(*) FROM sys.indexes WHERE name = 'ux_member_card_replaces_in_force'", Integer.class);
             assertEquals(1, finalIndexCount, "Index ux_member_card_replaces_in_force must be recreated exactly once");
         } finally {
-            try {
-                jdbcTemplate.execute("ALTER DATABASE [" + testDbName + "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [" + testDbName + "];");
-            } catch (Exception ignored) {
-            }
+            // Retain this newly owned migration fixture and its history for review.
         }
     }
 

@@ -59,7 +59,10 @@ class DemoQrDatabaseIntegrationTest {
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) {
         String local = System.getenv("QR04_TEST_DB_URL");
-        if (local != null && !local.isBlank()) {
+        if(System.getenv("UNIFY_TEST_SQL_PORT")!=null) {
+            var fixture=com.sportify.support.DisposableUnifyDatabase.create();
+            url=fixture.url();username=fixture.user();password=fixture.password();
+        } else if (local != null && !local.isBlank()) {
             if (!local.matches(".*;databaseName=sportify_qr04_test_[0-9]{14}(;.*)?")) throw new IllegalArgumentException("Requires a new isolated QR-04 test database");
             url=local; username=System.getenv("QR04_TEST_DB_USER"); password=System.getenv("QR04_TEST_DB_PASSWORD");
         } else {
@@ -75,7 +78,7 @@ class DemoQrDatabaseIntegrationTest {
     @BeforeEach
     void seedIsolatedFixture() {
         String database = jdbc.queryForObject("SELECT DB_NAME()", String.class);
-        assertThat(container != null ? container.isRunning() : database.matches("sportify_qr04_test_[0-9]{14}")).isTrue();
+        assertThat(container != null ? container.isRunning() : database.matches("sportify_qr04_test_[0-9]{14}|sportify_unify_test_[0-9]{14}_[a-f0-9]{32}")).isTrue();
         ownerId=member(); otherId=member(); paymentId=payment(ownerId);
         owner=users.findByEmailIgnoreCase(jdbc.queryForObject("SELECT email FROM user_account WHERE id=?",String.class,ownerId)).orElseThrow();
         ownerToken=login(owner.getEmail());

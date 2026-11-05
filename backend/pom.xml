@@ -214,6 +214,7 @@
                     <groups>integration</groups>
                     <includes>
                         <include>**/*Test.java</include>
+                        <include>**/*IT.java</include>
                     </includes>
                     <!-- Keep the same Jupiter tag semantics as Surefire; do not auto-add Vintage. -->
                     <properties>

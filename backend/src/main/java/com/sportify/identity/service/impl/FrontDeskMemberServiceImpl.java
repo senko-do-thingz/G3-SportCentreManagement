@@ -40,6 +40,7 @@ public class FrontDeskMemberServiceImpl implements FrontDeskMemberService {
     private final PasswordEncoder encoder;
     private final CodeFormatter codes;
     private final Clock clock;
+    private final com.sportify.core.audit.AuditService audit;
 
     @Override
     @Transactional
@@ -57,6 +58,14 @@ public class FrontDeskMemberServiceImpl implements FrontDeskMemberService {
         try {
             UserAccount saved = users.saveAndFlush(user);
             MemberProfile member = members.saveAndFlush(mapper.toMember(saved, code, LocalDate.now(clock)));
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            UserAccount actor = authentication != null && authentication.getPrincipal() instanceof CustomUserDetails details
+                    ? details.getUserAccount() : null;
+            audit.record(com.sportify.core.audit.AuditEvent.builder().actor(actor)
+                    .action(com.sportify.core.audit.AuditAction.USER_CREATED).entityType("USER_ACCOUNT")
+                    .entityId(saved.getId()).entityCode(member.getMemberCode())
+                    .summary("Member enrolled at reception")
+                    .details(java.util.Map.of("role", MEMBER_ROLE, "source", "FRONT_DESK")).build());
             // Both writes have been flushed; this accountability log runs before transaction commit.
             log.info("Staff {} created member id={} code={}", actingStaffUsername(), member.getId(), member.getMemberCode());
             return mapper.toCreated(member, temporaryPassword);

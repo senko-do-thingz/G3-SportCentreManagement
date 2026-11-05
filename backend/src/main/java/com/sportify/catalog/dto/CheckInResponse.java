@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 public class CheckInResponse {
     private Long id;
     private Long memberId;
+    private String memberCode;
     private String memberName;
     private Long membershipId;
     private Long bookingId;

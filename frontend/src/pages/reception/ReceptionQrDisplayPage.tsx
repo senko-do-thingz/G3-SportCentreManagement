@@ -244,7 +244,7 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
               style={{
                 marginTop: 'var(--space-3)',
                 padding: 'var(--space-3)',
-                background: 'var(--color-surface-subtle)',
+                background: 'var(--color-surface-muted)',
                 borderRadius: 'var(--radius-md)',
               }}
             >
@@ -256,7 +256,7 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
                   margin: 0,
                   paddingLeft: 'var(--space-4)',
                   fontSize: 'var(--text-sm)',
-                  color: 'var(--color-muted)',
+                  color: 'var(--color-text-muted)',
                 }}
               >
                 <li>Customer signs in at <code>/login</code> with their Sportify Member account.</li>
@@ -270,7 +270,7 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
                 style={{
                   marginTop: 'var(--space-3)',
                   fontSize: 'var(--text-xs)',
-                  color: 'var(--color-muted)',
+                  color: 'var(--color-text-muted)',
                 }}
               >
                 {bankSession.statusNotice}
@@ -293,7 +293,7 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
                   display: 'block',
                   fontSize: 'var(--text-xs)',
                   fontWeight: 600,
-                  color: 'var(--color-muted)',
+                  color: 'var(--color-text-muted)',
                   marginBottom: 'var(--space-1)',
                 }}
               >
@@ -306,7 +306,7 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
                 style={{
                   margin: 'var(--space-1) 0 0',
                   fontSize: 'var(--text-xs)',
-                  color: 'var(--color-muted)',
+                  color: 'var(--color-text-muted)',
                 }}
               >
                 Bank selection is locked to the customer active session. Front desk cannot modify the session bank.
@@ -345,7 +345,7 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
               >
                 QR Code Inactive - Payment is {presentation.statusBadgeLabel}
               </p>
-              <p style={{ color: 'var(--color-muted)', fontSize: 'var(--text-sm)', margin: 0 }}>
+              <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', margin: 0 }}>
                 This payment has reached a terminal state ({presentation.statusBadgeLabel}). Payment instructions and QR code are no longer active.
               </p>
             </div>
@@ -453,7 +453,7 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
               <span
                 style={{
                   fontSize: 'var(--text-xs)',
-                  color: 'var(--color-muted)',
+                  color: 'var(--color-text-muted)',
                   marginLeft: 'var(--space-3)',
                 }}
               >
@@ -548,7 +548,7 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
               <p
                 style={{
                   fontSize: 'var(--text-sm)',
-                  color: 'var(--color-muted)',
+                  color: 'var(--color-text-muted)',
                   margin: 0,
                 }}
               >
@@ -559,7 +559,7 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
               <p
                 style={{
                   fontSize: 'var(--text-sm)',
-                  color: 'var(--color-muted)',
+                  color: 'var(--color-text-muted)',
                   margin: 0,
                 }}
               >

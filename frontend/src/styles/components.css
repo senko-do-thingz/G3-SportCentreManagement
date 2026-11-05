@@ -47,11 +47,6 @@
   font-weight: var(--weight-bold);
 }
 
-/* The letter is drawn here, not typed in the markup: a visible letter inside an aria-hidden span still counts as visible text for WCAG 2.5.3 and made the link name mismatch. */
-.brand__mark::before {
-  content: "S";
-}
-
 .brand__text {
   display: flex;
   flex-direction: column;

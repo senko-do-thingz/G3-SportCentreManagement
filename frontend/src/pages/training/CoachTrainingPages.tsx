@@ -227,7 +227,7 @@ function ResultForm({ session, members, metrics }: { session: StaffSession; memb
   return (
     <form className="training-form" onSubmit={submit}>
       {saved.length > 0 && <p role="status">Results already saved for: {saved.map(member => member.memberName).join(', ')}</p>}
-      <fieldset className="training-fieldset" disabled={action.pending}>
+      <fieldset className="training-fieldset training-result-fields" disabled={action.pending}>
         <Select label="Member receiving results" name="memberId" required placeholder="Select a member"
           options={eligible.map(member => ({ value: String(member.memberId), label: `${member.memberName} - ${attendanceLabel(member.status)}` }))} />
         <TrainingTextarea label="Result notes" name="notes" maxLength={1000} required={!metrics.length} />

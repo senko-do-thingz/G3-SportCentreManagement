@@ -15,6 +15,8 @@ export class ApiError extends Error {
   readonly code: string | null
   /** The raw details value of the body, for errors whose details are not field messages. */
   readonly details: unknown
+  /** The correlation ID returned by the server, if present. */
+  readonly correlationId: string | null
 
   constructor(
     status: number,
@@ -22,6 +24,7 @@ export class ApiError extends Error {
     fieldErrors: Record<string, string> = {},
     code: string | null = null,
     details: unknown = undefined,
+    correlationId: string | null = null,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -29,6 +32,7 @@ export class ApiError extends Error {
     this.fieldErrors = fieldErrors
     this.code = code
     this.details = details
+    this.correlationId = correlationId
   }
 
   /** True when the request never reached the server (offline, DNS, CORS, server down). */
@@ -90,7 +94,7 @@ function toFieldErrors(details: unknown): Record<string, string> {
 }
 
 /** Builds an ApiError from a parsed response body (or null when the body was not JSON). */
-export function apiErrorFromBody(status: number, body: unknown): ApiError {
+export function apiErrorFromBody(status: number, body: unknown, correlationId: string | null = null): ApiError {
   if (body && typeof body === 'object') {
     const record = body as Record<string, unknown>
     const message =
@@ -98,9 +102,9 @@ export function apiErrorFromBody(status: number, body: unknown): ApiError {
         ? record.message
         : defaultMessage(status)
     const code = typeof record.code === 'string' && record.code.trim().length > 0 ? record.code : null
-    return new ApiError(status, message, toFieldErrors(record.details), code, record.details)
+    return new ApiError(status, message, toFieldErrors(record.details), code, record.details, correlationId)
   }
-  return new ApiError(status, defaultMessage(status))
+  return new ApiError(status, defaultMessage(status), {}, null, undefined, correlationId)
 }
 
 /** Returns a user friendly message for any thrown value. */
