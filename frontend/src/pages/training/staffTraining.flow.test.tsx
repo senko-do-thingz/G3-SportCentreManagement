@@ -47,6 +47,46 @@ describe('Coach training writes', () => {
     expect(await screen.findByText('Plan assigned. The member can view it immediately.')).toBeInTheDocument()
     expect(calls.find(call => call.method === 'POST')?.body).toMatchObject({ title: 'Reviewed passing', steps: [{ title: draft.title, durationMinutes: 5, instructions: draft.instructions + ' Coach reviewed.' }] })
   })
+  it('clears drafts and every plan field when the Coach switches to another member booking, and surfaces duplicate rejection', async () => {
+    const draft = { title: 'Walking shadow footwork', goal: 'Court movement', durationMinutes: 5, instructions: 'Walk between court positions.', reason: 'Matches the Badminton class at beginner level. Coach review is required.', level: 'BEGINNER' }
+    const otherBooking = { bookingId: 12, memberId: 43, memberName: 'Minh', sessionDate: '2026-11-01' }
+    const { calls } = signedIn('COACH', call => {
+      if (call.path === '/coach/training/classes') return json(200, [{ ...trainingClass, name: 'Badminton class' }])
+      if (call.path === '/coach/training/classes/1/members') return json(200, [bookingCandidate, otherBooking])
+      if (call.path === '/coach/training/plans' && call.method === 'GET') return json(200, [])
+      if (call.path === '/coach/training/bookings/11/drill-suggestions') return json(200, { mode: 'RULE_BASED', ruleVersion: 'curated-drills-v1', requiresCoachReview: true, persisted: false, bookingId: 11, memberId: 42, classId: 1, sportName: 'Badminton', level: 'BEGINNER', drafts: [draft] })
+      if (call.path === '/coach/training/plans' && call.method === 'POST') return backendError(409, 'A plan with this title already exists for this booking; choose a distinct title for a new plan')
+      return unexpected(call)
+    })
+    renderApp('/coach/training/plans')
+    const user = userEvent.setup()
+    await user.selectOptions(await screen.findByLabelText('Assigned class'), '1')
+    await user.selectOptions(await screen.findByLabelText(/Member booking/), '11')
+    await user.click(screen.getByRole('button', { name: 'Suggest practice drills' }))
+    expect(await screen.findByText('Mode: RULE_BASED, rule version curated-drills-v1. Drafts are not saved.')).toBeInTheDocument()
+    await user.click(screen.getByLabelText('Select draft: Walking shadow footwork'))
+    await user.click(screen.getByRole('button', { name: 'Review selected drafts in plan form' }))
+    expect(screen.getByText('1 draft copied into the exercise fields below. Edit them, then select Assign plan. Nothing is assigned yet.')).toBeInTheDocument()
+    await user.type(screen.getByLabelText(/Plan title/), 'Lan footwork plan')
+    await user.type(screen.getByLabelText('Plan description'), 'For Lan only')
+    expect(screen.getByLabelText(/Exercise title 1/)).toHaveValue(draft.title)
+    expect(calls.filter(call => call.method === 'POST')).toHaveLength(0)
+
+    await user.selectOptions(screen.getByLabelText(/Member booking/), '12')
+    expect(screen.getByLabelText(/Plan title/)).toHaveValue('')
+    expect(screen.getByLabelText('Plan description')).toHaveValue('')
+    expect(screen.getByLabelText(/Exercise title 1/)).toHaveValue('')
+    expect(screen.queryByText('Select draft: Walking shadow footwork')).not.toBeInTheDocument()
+    expect(screen.queryByText(/copied into the exercise fields/)).not.toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText(/Member booking/), '11')
+    await user.type(screen.getByLabelText(/Plan title/), 'Lan footwork plan')
+    await user.type(screen.getByLabelText(/Exercise title 1/), 'Warm-up')
+    await user.click(screen.getByRole('button', { name: 'Assign plan' }))
+    expect(await screen.findByText(/already exists for this booking/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Plan title/)).toHaveValue('Lan footwork plan')
+    expect(calls.filter(call => call.method === 'POST')).toHaveLength(1)
+  })
   it('assigns an individual plan then publishes plan feedback without waiting for a session result', async () => {
     let created = false
     const { calls } = signedIn('COACH', call => {
