@@ -259,11 +259,10 @@
 .payment-workspace-navigation .member-nav__link--active { color: var(--color-on-hero); }
 .payment-workspace-navigation .member-nav__link--active::after { background: var(--h-accent); height: 2px; }
 .staff-layout.payment-area { grid-template-rows: auto 1fr; }
-.payment-area .sidebar { top: 96px; height: calc(100dvh - 96px); background: var(--color-navy); border-color: var(--color-navy); }
-.payment-area .sidebar__nav { margin-top: 0; }
-.payment-area .sidebar__link { border-radius: 0; min-height: 44px; padding: 12px; font-size: 16px; font-weight: 600; line-height: 1.4; }
-.payment-area .sidebar__link--active { background: var(--h-primary); color: var(--color-on-hero); }
-.payment-area .sidebar__link--active::before { background: var(--h-accent); border-radius: 0; }
+.payment-area .sidebar {
+  top: var(--home-header-height, 96px);
+  height: calc(100dvh - var(--home-header-height, 96px));
+}
 
 @media (max-width: 1100px) {
   .payment-workspace-navigation { display: none; }
@@ -272,7 +271,7 @@
   .staff-layout.payment-area { grid-template-columns: minmax(0, 1fr); }
   .payment-area .sidebar { display: none; position: static; height: auto; }
   .payment-area.staff-layout--menu-open .sidebar { display: flex; position: fixed; top: var(--home-header-height); left: 0; right: 0; z-index: var(--z-header); max-height: calc(100dvh - var(--home-header-height)); overflow-y: auto; }
-  .payment-area.staff-layout--menu-open .sidebar__nav { display: flex; max-height: 50dvh; margin-top: 0; overflow-y: auto; }
+  .payment-area.staff-layout--menu-open .sidebar__nav { display: flex; max-height: 50dvh; margin-top: var(--space-4); overflow-y: auto; }
 }
 
 @media (max-width: 960px) {
@@ -312,11 +311,3 @@
 .payment-workspace .table { background: var(--h-surface); color: var(--h-ink); }
 .payment-workspace .table-scroll,
 .payment-workspace .table :is(th, td) { border-color: var(--h-border); }
-.payment-area .sidebar__link { color: var(--color-on-hero); }
-.payment-area .sidebar__link:hover { background: var(--h-primary); color: var(--color-on-hero); }
-.payment-area .sidebar__link:focus-visible { outline-color: var(--color-on-hero); }
-.payment-area .sidebar__heading,
-.payment-area .sidebar__workspace,
-.payment-area .sidebar__footer-title,
-.payment-area .sidebar__footer-text { color: var(--color-on-hero-muted); }
-.payment-area .sidebar__footer { border-color: color-mix(in srgb, var(--color-on-hero) 10%, transparent); }

@@ -1,0 +1,87 @@
+{
+  "sourceHead": "cb4565d21dadada24ce15082d57d706121cce5ad",
+  "moduleSha256": "8cc1f5f7a89e5cb25513f86efc9cc1daa7c471bca6623f82fb919a619b058dc1",
+  "checks": [
+    {
+      "name": "Flow 4 refuses protected target names",
+      "status": "PASS",
+      "blocking": true
+    },
+    {
+      "name": "Fixture identity authenticates: flow4.member@demo.test",
+      "status": "PASS",
+      "blocking": true
+    },
+    {
+      "name": "Fixture identity authenticates: flow4.peer@demo.test",
+      "status": "PASS",
+      "blocking": true
+    },
+    {
+      "name": "Fixture identity authenticates: quan.coach@example.com",
+      "status": "PASS",
+      "blocking": true
+    },
+    {
+      "name": "Fixture identity authenticates: lan.reception@example.com",
+      "status": "PASS",
+      "blocking": true
+    },
+    {
+      "name": "Official purchase creates the real training entitlement",
+      "status": "PASS",
+      "blocking": true
+    },
+    {
+      "name": "Member reads authoritative pending amount",
+      "status": "PASS",
+      "blocking": true
+    },
+    {
+      "name": "Reception confirms an ACTUAL training payment",
+      "status": "PASS",
+      "blocking": true
+    },
+    {
+      "name": "Training identity has no simulated provenance",
+      "status": "PASS",
+      "blocking": true
+    },
+    {
+      "name": "Fixture starts with no fabricated training record",
+      "status": "PASS",
+      "blocking": true
+    }
+  ],
+  "status": "PREPARED_NOT_EXECUTED",
+  "scope": "Personal plan, distinct arrival/attendance, result and feedback; optional previews only",
+  "setup": "New owned fixture only; ended-today booking emulates an earlier paid reservation. No date rules changed.",
+  "startedAtUtc": "2026-11-05T08:53:39.074058+00:00",
+  "fixture": {
+    "classId": 7,
+    "sessionId": 49,
+    "bookingId": 6,
+    "publicId": "051126BM01",
+    "date": "2026-11-05",
+    "memberId": 9,
+    "coachId": 3,
+    "registrationId": 6,
+    "paymentId": 2,
+    "memberEmail": "flow4.member@demo.test",
+    "peerEmail": "flow4.peer@demo.test",
+    "coachEmail": "quan.coach@example.com",
+    "receptionEmail": "lan.reception@example.com",
+    "memberCode": "F4DEMO01"
+  },
+  "financialAndCreditBaseline": {
+    "remaining": 7,
+    "bookedCount": 1,
+    "confirmedBookings": 1,
+    "cashEvents": 0,
+    "cashAmount": 0.0,
+    "actualPayments": 1,
+    "actualAmount": 850000.0,
+    "invoices": 1
+  },
+  "finishedAtUtc": "2026-11-05T08:53:42.886062+00:00"
+}
