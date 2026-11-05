@@ -55,3 +55,61 @@
 .manager-preview-login { display: grid; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-primary-soft); }
 @media (max-width: 1100px) { .manager-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .manager-tier-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .manager-filters, .manager-form-grid, .manager-tier-grid { grid-template-columns: minmax(0, 1fr); } .manager-form-full { grid-column: auto; } .manager-photo-field { grid-template-columns: minmax(0, 1fr); } .manager-page .page-header__title { font-size: var(--text-2xl); } .manager-page .card { padding: var(--space-4); } .manager-details > div { gap: var(--space-3); } .manager-page .table { min-width: 780px; } .manager-sport-options { grid-template-columns: minmax(0, 1fr); } .manager-tier-heading { margin-bottom: var(--space-4); } }
+
+/* User Management readability (scoped to .manager-page--users): use the available width and larger type on desktop screens. */
+.staff-content:has(> .manager-page--users) { max-width: 1640px; padding: var(--space-10) var(--space-12); }
+.manager-page--users { gap: var(--space-6); }
+.manager-page--users .page-header { align-items: center; padding-bottom: var(--space-5); border-bottom: 1px solid var(--color-border); margin-bottom: 0; }
+.manager-page--users .page-header__title { font-family: var(--font-display); font-size: var(--text-3xl); letter-spacing: -0.03em; }
+.manager-page--users .page-header__description { font-size: var(--text-base); line-height: 1.6; }
+.manager-page--users .page-header__actions .btn { height: 48px; padding: 0 var(--space-6); font-size: var(--text-base); box-shadow: var(--shadow-sm); }
+.manager-page--users .card { padding: var(--space-8); border-radius: var(--radius-xl); box-shadow: var(--shadow-md); }
+.manager-page--users .card__header { margin-bottom: var(--space-6); }
+.manager-page--users .card__title { font-size: var(--text-xl); letter-spacing: -0.02em; }
+.manager-page--users .field__label { font-size: var(--text-md); }
+.manager-page--users .input, .manager-page--users .select { height: 48px; font-size: var(--text-base); padding-left: var(--space-4); }
+.manager-page--users .manager-filters { grid-template-columns: minmax(280px, 2.4fr) repeat(2, minmax(180px, 1fr)) auto; gap: var(--space-5); padding: var(--space-5); margin-bottom: var(--space-6); background: var(--color-surface-muted); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+.manager-page--users .manager-filters .field > .btn, .manager-page--users .manager-filters > .btn { height: 48px; padding: 0 var(--space-5); font-size: var(--text-md); }
+.manager-page--users .table-scroll { border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+.manager-page--users .table { font-size: var(--text-base); }
+.manager-page--users .table th { padding: var(--space-4) var(--space-5); font-size: var(--text-sm); }
+.manager-page--users .table td { padding: var(--space-5); }
+.manager-page--users .table tbody tr:nth-child(even) td { background: var(--color-surface-muted); }
+.manager-page--users .table tbody tr:hover td { background: var(--color-table-hover); }
+.manager-page--users .manager-cell { gap: 2px; }
+.manager-page--users .manager-cell strong, .manager-page--users .manager-cell-primary { font-size: var(--text-base); font-weight: var(--weight-semibold); }
+.manager-page--users .manager-cell > span:not(.manager-cell-primary) { font-size: var(--text-md); }
+.manager-page--users .manager-row-actions .btn { height: 38px; padding: 0 var(--space-4); font-size: var(--text-md); }
+.manager-page--users .badge { height: 28px; padding: 0 var(--space-3); font-size: var(--text-sm); }
+.manager-page--users .pagination { padding-top: var(--space-2); }
+.manager-page--users .pagination__summary { font-size: var(--text-md); }
+.manager-page--users .pagination__page { min-width: 40px; height: 40px; font-size: var(--text-md); }
+.manager-page--users .manager-footnote { margin-top: var(--space-6); padding-top: var(--space-5); border-top: 1px solid var(--color-border); font-size: var(--text-md); line-height: 1.6; }
+@media (max-width: 1100px) { .manager-page--users .manager-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .staff-content:has(> .manager-page--users) { padding: var(--space-8); } }
+@media (max-width: 640px) { .staff-content:has(> .manager-page--users) { padding: var(--space-4); } .manager-page--users .manager-filters { grid-template-columns: minmax(0, 1fr); padding: var(--space-4); } .manager-page--users .card { padding: var(--space-4); } .manager-page--users .page-header__title { font-size: var(--text-2xl); } }
+
+/* User Management colour (scoped): navy-to-royal header band, gold call to action, tinted table. */
+.manager-page--users .page-header { padding: var(--space-8); border: 0; border-radius: var(--radius-xl); background: linear-gradient(120deg, var(--color-hero-deep) 0%, var(--color-navy) 45%, var(--color-primary) 100%); box-shadow: var(--shadow-md); }
+.manager-page--users .page-header .eyebrow { color: var(--color-hero-highlight); }
+.manager-page--users .page-header__title { color: var(--color-on-hero); }
+.manager-page--users .page-header__description { color: var(--color-on-hero-muted); }
+.manager-page--users .page-header__actions .btn--primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-on-accent); }
+.manager-page--users .page-header__actions .btn--primary:hover:not(:disabled) { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
+.manager-page--users .card { border-top: 4px solid var(--color-primary); }
+.manager-page--users .card__title { color: var(--color-primary); }
+.manager-page--users .manager-filters { background: var(--color-primary-soft); border-color: var(--color-primary-soft-hover); }
+.manager-page--users .manager-filters .field__label { color: var(--color-text); }
+.manager-page--users .manager-filters > .btn--ghost { background: var(--color-surface); border-color: var(--color-border-strong); color: var(--color-primary); }
+.manager-page--users .manager-filters > .btn--ghost:hover:not(:disabled) { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
+.manager-page--users .table-scroll { border-color: var(--color-primary-soft-hover); }
+.manager-page--users .table th { background: var(--color-primary-soft); color: var(--color-primary); border-bottom: 2px solid var(--color-primary); }
+.manager-page--users .table tbody tr:nth-child(even) td { background: var(--color-surface-muted); }
+.manager-page--users .table tbody tr:hover td { background: var(--color-primary-soft); }
+.manager-page--users .manager-cell strong { color: var(--color-navy); }
+.manager-page--users .manager-row-actions .btn--secondary { background: var(--color-surface); border-color: var(--color-primary); color: var(--color-primary); }
+.manager-page--users .manager-row-actions .btn--secondary:hover:not(:disabled) { background: var(--color-primary); color: var(--color-on-primary); }
+.manager-page--users .pagination__page--active { background: var(--color-primary); color: var(--color-on-primary); box-shadow: var(--shadow-sm); }
+.manager-page--users .manager-footnote { color: var(--color-text-muted); border-top-color: var(--color-primary-soft-hover); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .manager-page--users .manager-cell strong { color: var(--color-text); } }
+:root[data-theme="dark"] .manager-page--users .manager-cell strong { color: var(--color-text); }
+@media (max-width: 640px) { .manager-page--users .page-header { padding: var(--space-5); } }

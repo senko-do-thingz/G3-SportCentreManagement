@@ -7,6 +7,7 @@ import { SessionContext } from '../../components/SessionContext'
 import { Card } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { Button } from '../../components/ui/Button'
 import { TrainingData } from './TrainingData'
 import './training.css'
 
@@ -48,7 +49,7 @@ export function TrainingPlansPage() {
   return (
     <div className="training-page">
       <PageHeader title="Training plans" description="View the personal plans and exercise instructions assigned by your coach." />
-      <TrainingData load={training.plans}>
+      <TrainingData load={training.plans} refreshLabel="Refresh training plans">
         {plans => plans.length ? (
           <Card>
             <ul className="training-list">
@@ -76,9 +77,12 @@ export function TrainingPlanDetailPage() {
 
   return (
     <TrainingData load={load}>
-      {({ plan, steps, feedback }) => (
+      {({ plan, steps, feedback }, refresh) => (
         <div className="training-page">
-          <Link to="/member/training/plans">Back to training plans</Link>
+          <div className="training-actions">
+            <Link to="/member/training/plans">Back to training plans</Link>
+            <Button variant="secondary" onClick={refresh}>Refresh plan and feedback</Button>
+          </div>
           <PageHeader title={plan.title} description={`${plan.className} - Coach ${plan.coachName} - Read only`} />
           {plan.description && <p className="training-copy">{plan.description}</p>}
           <Card title="Exercises">
@@ -105,7 +109,7 @@ export function CoachFeedbackPage() {
   return (
     <div className="training-page">
       <PageHeader title="Coach feedback" description="Personal feedback, progress ratings and guidance from your coach." />
-      <TrainingData load={training.feedback}>
+      <TrainingData load={training.feedback} refreshLabel="Refresh coach feedback">
         {feedback => <Card title="Progress rating"><FeedbackList feedback={feedback} /></Card>}
       </TrainingData>
     </div>
@@ -116,7 +120,7 @@ export function AttendancePage() {
   return (
     <div className="training-page">
       <PageHeader title="Attendance history" description="View your session dates, times and attendance status." />
-      <TrainingData load={training.attendance}>
+      <TrainingData load={training.attendance} refreshLabel="Refresh attendance history">
         {rows => rows.length ? (
           <Card>
             <ul className="training-list">
@@ -140,7 +144,7 @@ export function TrainingResultsPage() {
   return (
     <div className="training-page">
       <PageHeader title="Training results" description="View your session results, skill scores and coach feedback." />
-      <TrainingData load={training.results}>
+      <TrainingData load={training.results} refreshLabel="Refresh training results">
         {rows => rows.length ? (
           <Card>
             <ul className="training-list">
@@ -170,9 +174,12 @@ export function TrainingResultDetailPage() {
 
   return (
     <TrainingData load={load}>
-      {({ result, scores }) => (
+      {({ result, scores }, refresh) => (
         <div className="training-page">
-          <Link to="/member/training/results">Back to training results</Link>
+          <div className="training-actions">
+            <Link to="/member/training/results">Back to training results</Link>
+            <Button variant="secondary" onClick={refresh}>Refresh session results</Button>
+          </div>
           <PageHeader title="Session result details" />
           <SessionText session={result.session} />
           {result.notes && <p className="training-copy">{result.notes}</p>}

@@ -20,6 +20,8 @@ public class InvoiceResponse {
 
     private Long id;
     private String invoiceNumber;
+    @Builder.Default
+    private String issuerName = "Sportify Sports Center";
     private InvoiceStatus status;
     private LocalDateTime issueDate;
 

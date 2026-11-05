@@ -90,6 +90,7 @@ export function MyProfilePage() {
         eyebrow="Your sport, your way"
         title="My Profile"
         description="Update your personal details, training preferences and password."
+        actions={profile.status === 'ready' && roleOf(profile.data) === 'MEMBER' ? <Link className={buttonClassName('secondary')} to="/member/check-in-pass">Open check-in pass</Link> : undefined}
       />
       {profile.status === 'loading' && <Spinner label="Loading your profile" />}
       {profile.status === 'error' && (

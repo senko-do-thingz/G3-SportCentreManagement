@@ -160,6 +160,17 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, "Required parameter '" + ex.getParameterName() + "' is missing", null);
     }
 
+    @ExceptionHandler(org.springframework.web.bind.MissingRequestHeaderException.class)
+    public ResponseEntity<Map<String,Object>> handleMissingHeader(org.springframework.web.bind.MissingRequestHeaderException ex) {
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Required header '"+ex.getHeaderName()+"' is missing", null);
+    }
+
+    @ExceptionHandler({jakarta.validation.ConstraintViolationException.class,
+            org.springframework.web.method.annotation.HandlerMethodValidationException.class})
+    public ResponseEntity<Map<String,Object>> handleParameterValidation(Exception ex) {
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Request parameter validation failed", null);
+    }
+
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<Map<String, Object>> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
         return buildErrorResponse(HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed", null);

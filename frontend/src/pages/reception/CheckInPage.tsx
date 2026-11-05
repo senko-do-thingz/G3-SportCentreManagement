@@ -6,6 +6,7 @@ import { Badge, Button, Card, Input, PageHeader, Table, type TableColumn } from 
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { useResource } from '../../hooks/useResource'
 import { formatTime } from '../../utils/format'
+import { CheckInPassReader } from './CheckInPassReader'
 import {
   CHECK_IN_IDENTIFIER_MAX,
   checkInVerdict,
@@ -114,12 +115,16 @@ export function CheckInPage() {
   ]
 
   return (
-    <div className="page">
+    <div className="page reception-page reception-ui18-page home-page">
       <PageHeader
         eyebrow="Front desk"
         title="Check-in"
-        description="Verify paid training access and the session reservation."
+        description="Record member arrivals and review today's check-ins."
       />
+      <CheckInPassReader onRecorded={(record) => {
+        setLast({ record, identifier: record.memberCode ?? String(record.memberId ?? '') })
+        reloadToday()
+      }} />
       <div className="reception-checkin">
         <Card title="Record arrival">
           <form className="reception-form" onSubmit={submit} noValidate aria-label="Check-in">
@@ -161,9 +166,6 @@ export function CheckInPage() {
             </div>
           </form>
           {last && <CheckInResult record={last.record} identifier={last.identifier} />}
-          <p className="notice notice--info">
-            Check-in records the arrival. Session usage and coach attendance must not deduct the same visit twice.
-          </p>
         </Card>
         <Card
           title="Today's check-ins"

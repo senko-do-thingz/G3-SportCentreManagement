@@ -16,13 +16,21 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class MemberTrainingService {
     private final JdbcTemplate jdbc;
+    private final OperationalMemberPolicy operational;
 
-    // Ownership survives leaving a class. A booking/attendance never grants another member's plan.
+    // Personal ownership survives withdrawal. Only explicit CLASS scope grants current class visibility.
     private static final String PLAN_SELECT = """
-        SELECT p.id, p.title, p.description, c.name class_name, u.full_name coach_name
+        SELECT p.id, p.title, p.description, c.name class_name, u.full_name coach_name, p.plan_scope
         FROM session_plan p JOIN sport_class c ON c.id = p.class_id
         JOIN user_account u ON u.id = p.coach_id
-        WHERE p.is_template = 0 AND p.member_id = ?
+        CROSS JOIN (SELECT CAST(? AS BIGINT) member_id,CAST(? AS BIT) allow_class) viewer
+        WHERE p.is_template=0 AND (
+            (p.plan_scope='INDIVIDUAL' AND p.member_id=viewer.member_id)
+            OR (p.plan_scope='CLASS' AND viewer.allow_class=1 AND c.coach_id=p.coach_id AND c.is_active=1 AND u.status='ACTIVE'
+                AND EXISTS(SELECT 1 FROM role cr WHERE cr.id=u.role_id AND cr.code='COACH')
+                AND EXISTS(SELECT 1 FROM booking b JOIN class_session s ON s.id=b.session_id
+                    WHERE b.member_id=viewer.member_id AND s.class_id=p.class_id AND b.status='CONFIRMED'
+                        AND s.status<>'CANCELLED' AND s.training_type='COACH_LED' AND s.coach_id=c.coach_id)))
         """;
     private static final String SESSION_COLUMNS = """
         s.id session_id, s.session_code, sp.name sport_name, u.full_name coach_name, f.name facility_name,
@@ -47,11 +55,11 @@ public class MemberTrainingService {
     private static final String FEEDBACK_ORDER = " ORDER BY r.created_at DESC, r.id DESC";
 
     public List<Plan> plans(long memberId) {
-        return jdbc.query(PLAN_SELECT + " ORDER BY p.created_at DESC, p.id DESC", this::plan, memberId);
+        return jdbc.query(PLAN_SELECT + " ORDER BY p.created_at DESC, p.id DESC", this::plan, memberId,allowClassPlans(memberId));
     }
 
     public PlanDetail plan(long memberId, long id) {
-        var plans = jdbc.query(PLAN_SELECT + " AND p.id = ?", this::plan, memberId, id);
+        var plans = jdbc.query(PLAN_SELECT + " AND p.id = ?", this::plan, memberId,allowClassPlans(memberId), id);
         if (plans.isEmpty()) throw new ResourceNotFoundException("Training plan not found");
         var steps = jdbc.query("""
             SELECT id, step_order, title, duration_minutes, instructions FROM session_plan_step
@@ -108,7 +116,12 @@ public class MemberTrainingService {
 
     private Plan plan(ResultSet rs, int row) throws SQLException {
         return new Plan(rs.getLong("id"), rs.getString("title"), rs.getString("description"),
-            rs.getString("class_name"), rs.getString("coach_name"));
+            rs.getString("class_name"), rs.getString("coach_name"), rs.getString("plan_scope"));
+    }
+
+    private boolean allowClassPlans(long memberId) {
+        try { operational.requireRealMember(memberId); return true; }
+        catch(com.sportify.core.exception.BusinessRuleException quarantined) { return false; }
     }
     private Result result(ResultSet rs, int row) throws SQLException {
         return new Result(rs.getLong("id"), session(rs), rs.getString("notes"));

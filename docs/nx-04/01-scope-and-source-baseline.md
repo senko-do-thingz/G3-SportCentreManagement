@@ -77,3 +77,8 @@ Links use canonical Git casing (`backend`, although Windows may display `Backend
 The separate Session ID implementation adds catalog V39 and the session_code_counter table. The mechanical inventory now records 34 migration resources and 67 CREATE TABLE declarations/names. Historical migration entries and fingerprints remain unchanged; S16/S17 links point to their current method definitions after additive identity lookups. See the [Session ID database contract](../database/11-session-identity.md) and [API compatibility contract](../api/session-identity.md).
 
 This inventory refresh records the authorized ID implementation. It does not approve, implement or change the NX-04 PROPOSED model, its BLOCKED_PENDING_APPROVAL state, field privacy decisions or role grants. The original NX-04 source baseline and historical design evidence remain retained above.
+
+
+## Flow 1 to 4 release source inventory addendum
+
+The source inventory appends the proposed non-AI release migrations V42-V46 after upstream demo V41. Historical entries, hashes and the design baseline are unchanged. The additional source tables hold secure arrival capabilities and class training notices; other release changes extend existing tables. This source census update does not approve the NX-04 proposed implementation or authorize any database operation. The design contract remains PROPOSED and BLOCKED_PENDING_APPROVAL. CODEOWNER review of the release migrations is still required.

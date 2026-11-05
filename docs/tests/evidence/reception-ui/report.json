@@ -1,0 +1,326 @@
+[
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "member-search",
+  "w": "390",
+  "over": false,
+  "path": "/reception",
+  "hasBand": false
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "member-search",
+  "w": "768",
+  "over": false,
+  "path": "/reception",
+  "hasBand": false
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "member-search",
+  "w": "1440",
+  "over": false,
+  "path": "/reception",
+  "hasBand": false
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "register",
+  "w": "390",
+  "over": false,
+  "path": "/reception/register",
+  "hasBand": false
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "register",
+  "w": "768",
+  "over": false,
+  "path": "/reception/register",
+  "hasBand": false
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "register",
+  "w": "1440",
+  "over": false,
+  "path": "/reception/register",
+  "hasBand": false
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "check-in",
+  "w": "390",
+  "over": true,
+  "path": "/reception/check-in",
+  "hasBand": false
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "check-in",
+  "w": "768",
+  "over": false,
+  "path": "/reception/check-in",
+  "hasBand": false
+ },
+ {
+  "side": "before",
+  "scheme": "light",
+  "name": "check-in",
+  "w": "1440",
+  "over": false,
+  "path": "/reception/check-in",
+  "hasBand": false
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "member-search",
+  "w": "390",
+  "over": false,
+  "path": "/reception",
+  "hasBand": false
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "member-search",
+  "w": "768",
+  "over": false,
+  "path": "/reception",
+  "hasBand": false
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "member-search",
+  "w": "1440",
+  "over": false,
+  "path": "/reception",
+  "hasBand": false
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "register",
+  "w": "390",
+  "over": false,
+  "path": "/reception/register",
+  "hasBand": false
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "register",
+  "w": "768",
+  "over": false,
+  "path": "/reception/register",
+  "hasBand": false
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "register",
+  "w": "1440",
+  "over": false,
+  "path": "/reception/register",
+  "hasBand": false
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "check-in",
+  "w": "390",
+  "over": true,
+  "path": "/reception/check-in",
+  "hasBand": false
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "check-in",
+  "w": "768",
+  "over": false,
+  "path": "/reception/check-in",
+  "hasBand": false
+ },
+ {
+  "side": "before",
+  "scheme": "dark",
+  "name": "check-in",
+  "w": "1440",
+  "over": false,
+  "path": "/reception/check-in",
+  "hasBand": false
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "member-search",
+  "w": "390",
+  "over": false,
+  "path": "/reception",
+  "hasBand": true
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "member-search",
+  "w": "768",
+  "over": false,
+  "path": "/reception",
+  "hasBand": true
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "member-search",
+  "w": "1440",
+  "over": false,
+  "path": "/reception",
+  "hasBand": true
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "register",
+  "w": "390",
+  "over": false,
+  "path": "/reception/register",
+  "hasBand": true
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "register",
+  "w": "768",
+  "over": false,
+  "path": "/reception/register",
+  "hasBand": true
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "register",
+  "w": "1440",
+  "over": false,
+  "path": "/reception/register",
+  "hasBand": true
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "check-in",
+  "w": "390",
+  "over": true,
+  "path": "/reception/check-in",
+  "hasBand": true
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "check-in",
+  "w": "768",
+  "over": false,
+  "path": "/reception/check-in",
+  "hasBand": true
+ },
+ {
+  "side": "after",
+  "scheme": "light",
+  "name": "check-in",
+  "w": "1440",
+  "over": false,
+  "path": "/reception/check-in",
+  "hasBand": true
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "member-search",
+  "w": "390",
+  "over": false,
+  "path": "/reception",
+  "hasBand": true
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "member-search",
+  "w": "768",
+  "over": false,
+  "path": "/reception",
+  "hasBand": true
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "member-search",
+  "w": "1440",
+  "over": false,
+  "path": "/reception",
+  "hasBand": true
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "register",
+  "w": "390",
+  "over": false,
+  "path": "/reception/register",
+  "hasBand": true
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "register",
+  "w": "768",
+  "over": false,
+  "path": "/reception/register",
+  "hasBand": true
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "register",
+  "w": "1440",
+  "over": false,
+  "path": "/reception/register",
+  "hasBand": true
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "check-in",
+  "w": "390",
+  "over": true,
+  "path": "/reception/check-in",
+  "hasBand": true
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "check-in",
+  "w": "768",
+  "over": false,
+  "path": "/reception/check-in",
+  "hasBand": true
+ },
+ {
+  "side": "after",
+  "scheme": "dark",
+  "name": "check-in",
+  "w": "1440",
+  "over": false,
+  "path": "/reception/check-in",
+  "hasBand": true
+ }
+]

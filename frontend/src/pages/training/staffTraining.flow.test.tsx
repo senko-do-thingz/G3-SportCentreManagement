@@ -280,6 +280,8 @@ describe('Reception training writes', () => {
     await userEvent.type(await screen.findByLabelText(/Attendance note for Lan/), 'Keep this note')
     await userEvent.click(screen.getByRole('button', { name: 'Save attendance' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Attendance changed')
+    expect(screen.getByRole('alert')).toHaveClass('notice--warning')
+    expect(screen.getByText('Record changed')).toBeInTheDocument()
     expect(screen.getByLabelText(/Attendance note for Lan/)).toHaveValue('Keep this note')
     expect(screen.getByRole('button', { name: 'Refresh roster' })).toBeEnabled()
   })

@@ -10,12 +10,22 @@ import java.util.UUID;
 public final class ReceptionBookingDatabase {
     private static final String NAME = "be13_" + UUID.randomUUID().toString().replace("-", "");
     private static String url;
+    private static com.sportify.support.DisposableUnifyDatabase nativeFixture;
 
     private ReceptionBookingDatabase() { }
 
-    public static String name() { return NAME; }
+    public static String name() { return nativeFixture == null ? NAME : nativeFixture.name(); }
 
     public static void register(DynamicPropertyRegistry registry) {
+        if (System.getenv("UNIFY_TEST_SQL_PORT") != null) {
+            synchronized (ReceptionBookingDatabase.class) {
+                if (nativeFixture == null) nativeFixture = com.sportify.support.DisposableUnifyDatabase.create();
+            }
+            registry.add("spring.datasource.url", nativeFixture::url);
+            registry.add("spring.datasource.username", nativeFixture::user);
+            registry.add("spring.datasource.password", nativeFixture::password);
+            return;
+        }
         registry.add("spring.datasource.url", ReceptionBookingDatabase::url);
         registry.add("spring.datasource.username", () -> AbstractIntegrationTest.MSSQL_SERVER_CONTAINER.getUsername());
         registry.add("spring.datasource.password", () -> AbstractIntegrationTest.MSSQL_SERVER_CONTAINER.getPassword());

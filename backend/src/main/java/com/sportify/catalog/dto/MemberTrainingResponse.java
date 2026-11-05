@@ -9,7 +9,11 @@ import java.util.List;
 /** Read models for the signed-in member; no member id is accepted from the browser. */
 public final class MemberTrainingResponse {
     private MemberTrainingResponse() {}
-    public record Plan(Long id, String title, String description, String className, String coachName) {}
+    public record Plan(Long id, String title, String description, String className, String coachName, String scope) {
+        public Plan(Long id,String title,String description,String className,String coachName) {
+            this(id,title,description,className,coachName,"INDIVIDUAL");
+        }
+    }
     public record Step(Long id, int stepOrder, String title, int durationMinutes, String instructions) {}
     public record PlanDetail(Plan plan, List<Step> steps, List<Feedback> feedback) {}
     public record Session(Long id, String className, LocalDate date, LocalTime startTime, LocalTime endTime, String sessionId, String sportName, String coachName, String facilityName, String trainingType) {
