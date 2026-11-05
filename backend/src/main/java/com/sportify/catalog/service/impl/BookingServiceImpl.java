@@ -198,6 +198,11 @@ public class BookingServiceImpl implements BookingService {
         if (checkInRepository.existsByBookingIdAndResult(bookingId, CheckInResult.ALLOWED)) {
             throw rule("Cannot cancel booking that has already been checked in", "ALREADY_CHECKED_IN");
         }
+        // E2E-BUG-02 (PROVISIONAL, E2E-D3 pending): recorded participation consumes the session credit. Checked under
+        // the session lock that attendance writes also take, so neither race order can restore an attended credit.
+        if (bookingRepository.countParticipation(bookingId) > 0) {
+            throw rule("Attendance was already recorded for this booking, so it cannot be cancelled and its session credit is not returned", "ALREADY_ATTENDED");
+        }
         if (session.getSessionDate().isBefore(now.toLocalDate())) {
             throw rule("Cannot cancel a past session booking", "SESSION_STARTED");
         }
@@ -218,6 +223,9 @@ public class BookingServiceImpl implements BookingService {
         if (changed != 1) {
             if (checkInRepository.existsByBookingIdAndResult(bookingId, CheckInResult.ALLOWED)) {
                 throw rule("Cannot cancel booking that has already been checked in", "ALREADY_CHECKED_IN");
+            }
+            if (bookingRepository.countParticipation(bookingId) > 0) {
+                throw rule("Attendance was already recorded for this booking, so it cannot be cancelled and its session credit is not returned", "ALREADY_ATTENDED");
             }
             throw rule("Booking is already cancelled", "ALREADY_CANCELLED");
         }
