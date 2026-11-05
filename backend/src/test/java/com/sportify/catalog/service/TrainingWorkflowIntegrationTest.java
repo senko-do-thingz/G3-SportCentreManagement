@@ -1151,6 +1151,23 @@ class TrainingWorkflowIntegrationTest {
         assertThatThrownBy(()->writer.drillSuggestions(coach,id)).isInstanceOf(ResourceNotFoundException.class);
         drillRequest(coach,id).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
     }
+    @Test void F56_01_syntheticMemberBookingIsTheSamePrivacySafeNotFoundWithoutWrites() throws Exception {
+        long id=badmintonDrillBooking();
+        String unknown=drillRequest(coach,Long.MAX_VALUE).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound())
+            .andReturn().getResponse().getContentAsString();
+        // Quarantine only this test's own Member in the isolated fixture database.
+        jdbc.update("UPDATE user_account SET email=?,version=version+1 WHERE id=?",code().toLowerCase(java.util.Locale.ROOT)+"@unified-demo.invalid",member);
+        var before=drillSideEffectSnapshot();
+        String synthetic=drillRequest(coach,id).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound())
+            .andReturn().getResponse().getContentAsString();
+        String memberName=jdbc.queryForObject("SELECT full_name FROM user_account WHERE id=?",String.class,member);
+        assertThat(synthetic).doesNotContain("SYNTHETIC","Synthetic",memberName,"Walking shadow footwork","\"memberId\"");
+        assertThat(synthetic.replaceAll("\"(timestamp|path|correlationId|traceId)\":\"[^\"]*\"","")).isEqualTo(unknown.replaceAll("\"(timestamp|path|correlationId|traceId)\":\"[^\"]*\"",""));
+        assertThatThrownBy(()->writer.drillSuggestions(coach,id)).isInstanceOf(ResourceNotFoundException.class);
+        assertThat(drillSideEffectSnapshot()).isEqualTo(before);
+        // The shared policy keeps its own error on other operational reads.
+        assertThatThrownBy(()->writer.learnerProfile(coach,classId,member)).isInstanceOf(BusinessRuleException.class);
+    }
     @Test void F56_01_unsupportedLevelOrUnsetGoalGivesAnHonestEmptyOrUngoaledResult() {
         long id=badmintonDrillBooking();
         // booking.member_id references member_profile (fk_bk_member), so an unset goal is the only incomplete profile case.
