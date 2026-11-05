@@ -227,6 +227,7 @@ export const MANAGER_AREA: RoleArea = {
           task: 'FE-07',
           screens: ['F2-03'],
         },
+        { label: 'Attendance overview', path: 'training/attendance', title: 'Attendance overview', description: 'Review session attendance and confirmed rosters.', task: 'R11-04', screens: ['F4-10'] },
         { label: 'Missed attendance', path: 'training/attendance/backfill', title: 'Missed attendance', description: 'Manager-only recovery of a missing record with a required reason and audit.', task: 'Training attendance', screens: [] },
       ],
     },
