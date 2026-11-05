@@ -23,6 +23,7 @@ import { ReceiptPage } from '../pages/member/ReceiptPage'
 import { SportPackagesPage } from '../pages/member/SportPackagesPage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
 import { CheckInPage } from '../pages/reception/CheckInPage'
+import { SupportRequestsPage } from '../pages/reception/SupportRequestsPage'
 import { MemberSearchPage } from '../pages/reception/MemberSearchPage'
 import { PaymentRequestsPage } from '../pages/reception/PaymentRequestsPage'
 import { ReceptionPaymentPage } from '../pages/reception/ReceptionPaymentPage'
@@ -69,6 +70,8 @@ import { CoachTrainingPlansPage, CoachTrainingResultsPage } from '../pages/train
 import { ClassQuestionsPage, MemberClassesPage, MemberClassDetailPage } from '../pages/training/ClassLearningPages'
 import { ReceptionTrainingAttendancePage, CoachTrainingAttendancePage } from '../pages/training/ReceptionTrainingPages'
 import { ManagerAttendanceBackfillPage } from '../pages/training/ManagerAttendanceBackfillPage'
+import { ManagerAttendanceOverviewPage } from '../pages/training/ManagerAttendanceOverviewPage'
+import { CoachProgressPage } from '../pages/training/CoachProgressPage'
 
 /**
  * Real screens by full path. Later tasks register their page here, for example
@@ -77,6 +80,7 @@ import { ManagerAttendanceBackfillPage } from '../pages/training/ManagerAttendan
 const SCREENS: Record<string, ReactNode> = {
   '/member/training/plans': <TrainingPlansPage />,
   '/coach/training/plans': <CoachTrainingPlansPage />,
+  '/coach/training/progress': <CoachProgressPage />,
   '/coach/training/results': <CoachTrainingResultsPage />,
   '/coach/training/attendance': <CoachTrainingAttendancePage />,
   '/coach/training/questions': <ClassQuestionsPage coach />,
@@ -88,6 +92,7 @@ const SCREENS: Record<string, ReactNode> = {
   '/manager/classes': <ManagerClassesPage />,
   '/manager/schedule': <ManagerSchedulePage />,
   '/manager/training/attendance/backfill': <ManagerAttendanceBackfillPage />,
+  '/manager/training/attendance': <ManagerAttendanceOverviewPage />,
   '/manager/finance': <ManagerFinancialOverviewPage />,
   '/manager/transactions': <ManagerTransactionsPage />,
   '/manager/reports': <ManagerRevenueReportsPage />,
@@ -98,6 +103,7 @@ const SCREENS: Record<string, ReactNode> = {
   '/member/payments': <MyPaymentsPage />,
   '/member/schedule': <MemberSchedulePage />,
   '/reception': <MemberSearchPage />,
+  '/reception/support': <SupportRequestsPage />,
   '/reception/bookings': <ReceptionBookingsPage />,
   '/reception/register': <RegisterRenewPage />,
   '/reception/check-in': <CheckInPage />,

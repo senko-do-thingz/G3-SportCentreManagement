@@ -13,6 +13,7 @@ export function StaffLayout() {
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
   const refundRoute = useMatch('/reception/refunds/*')
+  const paymentWorkspaceRoute = Boolean(refundRoute) || location.pathname === '/reception/payments'
   const workflowRoute = location.pathname === '/manager/schedule'
     || /^\/(coach|reception)\/training(?:\/|$)/.test(location.pathname)
     || /^\/reception\/payments\/[^/]+\/(qr-display|receipt)$/.test(location.pathname)
@@ -32,8 +33,8 @@ export function StaffLayout() {
   )
 
   return (
-    <div className={'staff-layout' + (menuOpen ? ' staff-layout--menu-open' : '') + (refundRoute ? ' home-page payment-area' : '')}>
-      {refundRoute
+    <div className={'staff-layout' + (menuOpen ? ' staff-layout--menu-open' : '') + (paymentWorkspaceRoute ? ' payment-area' : '')}>
+      {paymentWorkspaceRoute
         ? <PaymentWorkspaceHeader menuId={menuId} menuOpen={menuOpen} onMenuChange={setMenuOpen} menuLabel={area.workspaceLabel} />
         : <WorkspaceHeader variant="staff" menuId={menuId} menuOpen={menuOpen} onMenuChange={setMenuOpen} menuLabel={area.workspaceLabel} context={breadcrumb} />}
       <aside className="sidebar" aria-label={area.workspaceLabel}>

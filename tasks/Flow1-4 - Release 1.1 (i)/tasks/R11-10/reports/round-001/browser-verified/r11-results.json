@@ -1,0 +1,166 @@
+{
+  "sourceHead": "aedd882012d893f8759a2c7f80d105271196efe7",
+  "viewport": "1440x900",
+  "fixture": {
+    "classId": 7,
+    "sessionId": 49,
+    "bookingId": 6,
+    "publicId": "051126BM01",
+    "date": "2026-11-05",
+    "memberId": 9,
+    "coachId": 3,
+    "registrationId": 6,
+    "paymentId": 2,
+    "memberEmail": "flow4.member@demo.test",
+    "peerEmail": "flow4.peer@demo.test",
+    "coachEmail": "quan.coach@example.com",
+    "receptionEmail": "lan.reception@example.com",
+    "memberCode": "F4DEMO01"
+  },
+  "checks": [
+    {
+      "name": "Owned fixture only",
+      "passed": true
+    },
+    {
+      "name": "API login for synthetic fixture actor",
+      "passed": true
+    },
+    {
+      "name": "API login for synthetic fixture actor",
+      "passed": true
+    },
+    {
+      "name": "API login for synthetic fixture actor",
+      "passed": true
+    },
+    {
+      "name": "API login for synthetic fixture actor",
+      "passed": true
+    },
+    {
+      "name": "Existing Coach attendance write succeeds",
+      "passed": true
+    },
+    {
+      "name": "Existing personal plan write succeeds",
+      "passed": true
+    },
+    {
+      "name": "Existing feedback write succeeds",
+      "passed": true
+    },
+    {
+      "name": "Existing notes-only result write succeeds",
+      "passed": true
+    },
+    {
+      "name": "reception real form login",
+      "passed": true
+    },
+    {
+      "name": "support-empty desktop has no document overflow",
+      "passed": true
+    },
+    {
+      "name": "Support UI persists real request",
+      "passed": true
+    },
+    {
+      "name": "support desktop has no document overflow",
+      "passed": true
+    },
+    {
+      "name": "manager real form login",
+      "passed": true
+    },
+    {
+      "name": "Operations API returns selected dates",
+      "passed": true
+    },
+    {
+      "name": "Operations registration count agrees with owned SQL",
+      "passed": true
+    },
+    {
+      "name": "operations desktop has no document overflow",
+      "passed": true
+    },
+    {
+      "name": "operations-invalid-range desktop has no document overflow",
+      "passed": true
+    },
+    {
+      "name": "attendance desktop has no document overflow",
+      "passed": true
+    },
+    {
+      "name": "Attendance reads confirmed SQL fixture accurately",
+      "passed": true
+    },
+    {
+      "name": "attendance-empty desktop has no document overflow",
+      "passed": true
+    },
+    {
+      "name": "coach real form login",
+      "passed": true
+    },
+    {
+      "name": "progress desktop has no document overflow",
+      "passed": true
+    },
+    {
+      "name": "member real form login",
+      "passed": true
+    },
+    {
+      "name": "member-results desktop has no document overflow",
+      "passed": true
+    },
+    {
+      "name": "member-staff-route-denied desktop has no document overflow",
+      "passed": true
+    },
+    {
+      "name": "Member direct Manager overview denied",
+      "passed": true
+    },
+    {
+      "name": "Coach direct Reception support denied",
+      "passed": true
+    },
+    {
+      "name": "Anonymous Manager report denied",
+      "passed": true
+    },
+    {
+      "name": "Invalid terminal support transition rejected",
+      "passed": true
+    },
+    {
+      "name": "API login for synthetic fixture actor",
+      "passed": true
+    },
+    {
+      "name": "Peer cannot read owner progress through self API",
+      "passed": true
+    },
+    {
+      "name": "API login for synthetic fixture actor",
+      "passed": true
+    },
+    {
+      "name": "Other Coach cannot read the assigned learner",
+      "passed": true
+    },
+    {
+      "name": "All training writes and reads preserve remaining credit",
+      "passed": true
+    }
+  ],
+  "status": "PASS",
+  "resultId": 1,
+  "browserVersion": "156.0.4314.58",
+  "ticketId": 1
+}

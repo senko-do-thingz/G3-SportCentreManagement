@@ -13,7 +13,7 @@
 // Prerequisites: Java 25, sqlcmd, Node 22+, Microsoft Edge (rehearse only), `mvn -B -ntp package -DskipTests`
 // in backend/ and `npm ci` in frontend/. No Docker, Python, model provider or API key is used.
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -58,20 +58,33 @@ async function login(email) {
   if (result.status !== 200) throw new Error('Login failed for ' + email)
   return result.body.accessToken
 }
-function stop(child) { if (child && child.exitCode === null) spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F']) }
+// Every process this script starts (backend, frontend, headless Edge) is registered here so that a normal
+// finish, a failed step, Ctrl+C (SIGINT), SIGTERM, SIGBREAK or process exit all stop the whole tree exactly once.
+const owned = new Map()
+function own(child, label, onStop) { owned.set(child, { label, onStop }); return child }
+function stop(child) {
+  const entry = child && owned.get(child)
+  if (!entry) return
+  owned.delete(child)
+  if (child.exitCode === null && child.signalCode === null) spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' })
+  try { entry.onStop?.() } catch { /* best effort */ }
+}
+function stopAll() { for (const child of [...owned.keys()].reverse()) stop(child) }
+process.on('exit', stopAll)
 async function startBackend(extra = []) {
   const jar = join(ROOT, 'backend/target/G3-SportCentreManagement-0.0.1-SNAPSHOT.jar')
   if (!existsSync(jar)) throw new Error('Package the backend first: ' + jar)
   const log = openSync(join(OUT, `backend-${Date.now()}.log`), 'w')
-  const child = spawn('java', ['-Xmx768m', '-jar', jar, '--spring.profiles.active=dev,demo', `--server.port=${API_PORT}`, '--server.address=127.0.0.1', ...extra], {
+  const child = own(spawn('java', ['-Xmx768m', '-jar', jar, '--spring.profiles.active=dev,demo', `--server.port=${API_PORT}`, '--server.address=127.0.0.1', ...extra], {
     stdio: ['ignore', log, log], env: { ...process.env, DB_URL: `jdbc:sqlserver://127.0.0.1:1433;databaseName=${DB};encrypt=false;trustServerCertificate=true`,
       DB_USERNAME: process.env.F56_SQL_USER, DB_PASSWORD: process.env.F56_SQL_PASSWORD, CORS_ALLOWED_ORIGINS: WEB,
-      SPORTIFY_PAYMENT_ACCOUNT_NAME: 'Demo center', SPORTIFY_PAYMENT_ACCOUNT_NUMBER: 'NOT_AVAILABLE', SPORTIFY_PAYMENT_BANK: 'Demo only' } })
+      SPORTIFY_PAYMENT_ACCOUNT_NAME: 'Demo center', SPORTIFY_PAYMENT_ACCOUNT_NUMBER: 'NOT_AVAILABLE', SPORTIFY_PAYMENT_BANK: 'Demo only' } }), 'backend')
   for (let i = 0; i < 240; i++) {
-    if (child.exitCode !== null) throw new Error('Backend exited; see ' + OUT)
+    if (child.exitCode !== null) { stop(child); throw new Error('Backend exited; see ' + OUT) }
     try { if ((await api('/auth/login', { body: { email: 'invalid@example.test', password: 'invalid' } })).status === 401) return child } catch { /* starting */ }
     await sleep(1000)
   }
+  stop(child)
   throw new Error('Backend not ready')
 }
 async function startFrontend() {
@@ -80,8 +93,9 @@ async function startFrontend() {
     { cwd: frontend, encoding: 'utf8', env: { ...process.env, VITE_API_BASE_URL: API } })
   if (build.status !== 0) throw new Error('Frontend build failed: ' + build.stderr.slice(0, 400))
   const log = openSync(join(OUT, 'frontend.log'), 'w')
-  const child = spawn(process.execPath, [join(frontend, 'node_modules/vite/bin/vite.js'), 'preview', '--host', '127.0.0.1', '--port', String(WEB_PORT), '--strictPort', '--outDir', dist], { cwd: frontend, stdio: ['ignore', log, log] })
+  const child = own(spawn(process.execPath, [join(frontend, 'node_modules/vite/bin/vite.js'), 'preview', '--host', '127.0.0.1', '--port', String(WEB_PORT), '--strictPort', '--outDir', dist], { cwd: frontend, stdio: ['ignore', log, log] }), 'frontend')
   for (let i = 0; i < 60; i++) { try { if ((await fetch(WEB + '/login')).status === 200) return child } catch { /* starting */ } await sleep(500) }
+  stop(child)
   throw new Error('Frontend not ready')
 }
 const snapshot = () => one(`SELECT (SELECT COUNT(*) FROM booking) bookings,(SELECT SUM(booked_count) FROM class_session) seats,
@@ -126,19 +140,26 @@ async function prepare() {
 // Minimal Chrome DevTools Protocol driver for the rehearsal (no browser automation dependency).
 async function browser(width, height) {
   const profile = mkdtempSync(join(tmpdir(), 'f56-demo-edge-'))
-  const edge = spawn('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--disable-gpu', 'about:blank'], { stdio: 'ignore' })
-  let port
-  for (let i = 0; i < 100 && !port; i++) { const f = join(profile, 'DevToolsActivePort'); if (existsSync(f)) port = readFileSync(f, 'utf8').split('\n')[0].trim(); else await sleep(100) }
-  let target
-  for (let i = 0; i < 50 && !target; i++) { target = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find(t => t.type === 'page'); if (!target) await sleep(100) }
-  const socket = new WebSocket(target.webSocketDebuggerUrl)
-  await new Promise((done, fail) => { socket.onopen = done; socket.onerror = fail })
+  let socket
+  const edge = own(spawn('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--disable-gpu', 'about:blank'], { stdio: 'ignore' }),
+    'edge', () => { try { socket?.close() } catch { /* closed */ } try { rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }) } catch { /* locked profile is left in tmp */ } })
+  const close = () => stop(edge)
+  try {
+    let port
+    for (let i = 0; i < 100 && !port; i++) { const f = join(profile, 'DevToolsActivePort'); if (existsSync(f)) port = readFileSync(f, 'utf8').split('\n')[0].trim(); else await sleep(100) }
+    if (!port) throw new Error('Edge did not open a DevTools port')
+    let target
+    for (let i = 0; i < 50 && !target; i++) { target = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find(t => t.type === 'page'); if (!target) await sleep(100) }
+    if (!target) throw new Error('Edge did not expose a page target')
+    socket = new WebSocket(target.webSocketDebuggerUrl)
+    await new Promise((done, fail) => { socket.onopen = done; socket.onerror = fail })
+  } catch (error) { close(); throw error }
   let id = 0
   const pending = new Map()
   socket.onmessage = event => { const m = JSON.parse(event.data); if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id) } }
   const send = (method, params = {}) => new Promise((done, fail) => { const n = ++id; const timer = setTimeout(() => fail(new Error('CDP timeout ' + method)), 30000)
     pending.set(n, m => { clearTimeout(timer); if (m.error) fail(new Error(m.error.message)); else done(m.result) }); socket.send(JSON.stringify({ id: n, method, params })) })
-  await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
+  try { await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false }) } catch (error) { close(); throw error }
   const helpers = `const norm=t=>(t||'').replace(/\\s+/g,' ').replace(/\\s*\\*$/,'').trim();
     const control=l=>{for(const x of document.querySelectorAll('label')){if(norm(x.innerText)===l){const c=x.control||x.querySelector('input,select,textarea');if(c)return c}}throw new Error('No control '+l)};
     const fill=(l,v)=>{const c=control(l);if(c.type==='checkbox'){if(c.checked!==v)c.click();return true}
@@ -158,7 +179,7 @@ async function browser(width, height) {
   return { evaluate, until, async go(url) { await send('Page.navigate', { url }); await until('document.readyState==="complete"') },
     async shot(name) { const { data } = await send('Page.captureScreenshot', { format: 'png' }); writeFileSync(join(OUT, name), Buffer.from(data, 'base64')) },
     async login(email) { await this.go(WEB + '/login'); await until(`!!document.querySelector('input[type=password]')`); await evaluate(`fill('Email address',args[0])&&fill('Password',args[1])&&(document.querySelector('form button[type=submit]').click(),true)`, email, PASSWORD); await until(`!location.pathname.startsWith('/login')`) },
-    close() { try { socket.close() } catch { /* closed */ } spawnSync('taskkill', ['/PID', String(edge.pid), '/T', '/F']) } }
+    close }
 }
 
 async function rehearse(manifest, backend, width, height, pace) {
@@ -167,35 +188,39 @@ async function rehearse(manifest, backend, width, height, pace) {
   const mark = label => marks.push({ label, seconds: Math.round((Date.now() - started) / 1000) })
   const say = seconds => sleep(seconds * pace * 1000)
   const coach = await browser(width, height)
-  await coach.login(COACH); await coach.go(WEB + '/coach/training/plans'); mark('Coach plans page'); await say(15)
-  await coach.until(`!!document.querySelector('select')`)
-  await coach.evaluate(`fill('Assigned class',args[0])`, manifest.className)
-  await coach.until(`[...control('Member booking').options].length>1`)
-  await coach.evaluate(`fill('Member booking',args[0])`, `Booking #${manifest.bookingId}`); await say(10)
-  await coach.evaluate(`click('Suggest practice drills')`); await coach.until(`document.body.innerText.includes('Drafts are not saved.')`); mark('Drafts shown'); await say(25)
-  await coach.shot(`rehearsal-${width}-1-drafts.png`)
-  const title = `Committee badminton plan ${stamp}-${width}`
-  await coach.evaluate(`fill('Select draft: '+args[0],true)&&fill('Select draft: '+args[1],true)&&click('Review selected drafts in plan form')`, manifest.draftTitles[0], manifest.draftTitles[1])
-  await coach.evaluate(`fill('Plan title',args[0])&&fill('Exercise duration 1 (minutes)','6')`, title); mark('Drafts reviewed and edited'); await say(15)
-  const plansBefore = sql(`SELECT COUNT(*) FROM session_plan WHERE booking_id=${manifest.bookingId}`)
-  await coach.evaluate(`click('Assign plan')`); await coach.until(`document.body.innerText.includes('Plan assigned.')`); mark('Plan assigned'); await say(5)
-  await coach.shot(`rehearsal-${width}-2-assigned.png`); coach.close()
-  const plan = one(`SELECT id,(SELECT COUNT(*) FROM session_plan_step WHERE plan_id=p.id) steps FROM session_plan p WHERE booking_id=${manifest.bookingId} AND title='${title}'`)
+  let plan, title, plansBefore
+  try {
+    await coach.login(COACH); await coach.go(WEB + '/coach/training/plans'); mark('Coach plans page'); await say(15)
+    await coach.until(`!!document.querySelector('select')`)
+    await coach.evaluate(`fill('Assigned class',args[0])`, manifest.className)
+    await coach.until(`[...control('Member booking').options].length>1`)
+    await coach.evaluate(`fill('Member booking',args[0])`, `Booking #${manifest.bookingId}`); await say(10)
+    await coach.evaluate(`click('Suggest practice drills')`); await coach.until(`document.body.innerText.includes('Drafts are not saved.')`); mark('Drafts shown'); await say(25)
+    await coach.shot(`rehearsal-${width}-1-drafts.png`)
+    title = `Committee badminton plan ${stamp}-${width}`
+    await coach.evaluate(`fill('Select draft: '+args[0],true)&&fill('Select draft: '+args[1],true)&&click('Review selected drafts in plan form')`, manifest.draftTitles[0], manifest.draftTitles[1])
+    await coach.evaluate(`fill('Plan title',args[0])&&fill('Exercise duration 1 (minutes)','6')`, title); mark('Drafts reviewed and edited'); await say(15)
+    plansBefore = sql(`SELECT COUNT(*) FROM session_plan WHERE booking_id=${manifest.bookingId}`)
+    await coach.evaluate(`click('Assign plan')`); await coach.until(`document.body.innerText.includes('Plan assigned.')`); mark('Plan assigned'); await say(5)
+    await coach.shot(`rehearsal-${width}-2-assigned.png`)
+  } finally { coach.close() }
+  plan = one(`SELECT id,(SELECT COUNT(*) FROM session_plan_step WHERE plan_id=p.id) steps FROM session_plan p WHERE booking_id=${manifest.bookingId} AND title='${title}'`)
   check('T06-04', `Coach assignment persisted one plan with two steps (${width}x${height})`, Number(plansBefore) + 1 === Number(sql(`SELECT COUNT(*) FROM session_plan WHERE booking_id=${manifest.bookingId}`)) && plan.steps === 2, plan)
   const member = await browser(width, height)
-  await member.login(MEMBER); await member.go(WEB + `/member/training/plans/${plan.id}`); await member.until(`document.body.innerText.includes(args[0])`, title)
-  mark('Member reads plan'); await say(15); await member.shot(`rehearsal-${width}-3-member-plan.png`)
-  await member.go(WEB + '/member/assistant'); await member.until(`document.body.innerText.includes('Enable automated center consultation')`); mark('Assistant opened'); await say(15)
-  await member.evaluate(`fill('Enable automated center consultation',true)`)
-  for (const [topic, wait] of [['sessions', 15], ['packages', 10], ['faq', 15], ['refusal', 10]]) {
-    const question = QUESTIONS[topic]
-    await member.until(`!control('Center question').disabled`)
-    await member.evaluate(`fill('Center question',args[0])`, question)
-    await member.evaluate(`click('Ask center assistant')`)
-    await member.until(`![...document.querySelectorAll('button')].some(b=>b.getAttribute('aria-busy')==='true') && document.body.innerText.includes(args[0])`, topic === 'refusal' ? 'does not answer personal, medical or private questions' : topic === 'faq' ? 'General exercise FAQ' : topic === 'packages' ? 'Current active package base prices' : 'Published sessions with available places')
-    mark('Answer: ' + topic); await say(wait); await member.shot(`rehearsal-${width}-4-${topic}.png`)
-  }
-  member.close()
+  try {
+    await member.login(MEMBER); await member.go(WEB + `/member/training/plans/${plan.id}`); await member.until(`document.body.innerText.includes(args[0])`, title)
+    mark('Member reads plan'); await say(15); await member.shot(`rehearsal-${width}-3-member-plan.png`)
+    await member.go(WEB + '/member/assistant'); await member.until(`document.body.innerText.includes('Enable automated center consultation')`); mark('Assistant opened'); await say(15)
+    await member.evaluate(`fill('Enable automated center consultation',true)`)
+    for (const [topic, wait] of [['sessions', 15], ['packages', 10], ['faq', 15], ['refusal', 10]]) {
+      const question = QUESTIONS[topic]
+      await member.until(`!control('Center question').disabled`)
+      await member.evaluate(`fill('Center question',args[0])`, question)
+      await member.evaluate(`click('Ask center assistant')`)
+      await member.until(`![...document.querySelectorAll('button')].some(b=>b.getAttribute('aria-busy')==='true') && document.body.innerText.includes(args[0])`, topic === 'refusal' ? 'does not answer personal, medical or private questions' : topic === 'faq' ? 'General exercise FAQ' : topic === 'packages' ? 'Current active package base prices' : 'Published sessions with available places')
+      mark('Answer: ' + topic); await say(wait); await member.shot(`rehearsal-${width}-4-${topic}.png`)
+    }
+  } finally { member.close() }
   const seconds = Math.round((Date.now() - started) / 1000)
   // Restart readback: the plan survives a backend restart, chat state does not exist server side.
   stop(backend); await sleep(2000)
@@ -205,14 +230,28 @@ async function rehearse(manifest, backend, width, height, pace) {
   return { seconds, marks, backend: restarted }
 }
 
+// Ctrl+C / SIGTERM / SIGBREAK: in serve mode release the wait so the normal finally block runs; during any other
+// step stop every owned process immediately and exit, because the in-flight step may never return.
+let interrupted = null, releaseServe = null
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGBREAK']) process.on(signal, () => {
+  if (interrupted) return
+  interrupted = signal
+  console.log(`Received ${signal}; stopping backend, frontend and browser processes.`)
+  process.exitCode = signal === 'SIGINT' ? 130 : 143
+  if (releaseServe) { releaseServe(); return }
+  stopAll()
+  try { writeFileSync(join(OUT, 'checks.json'), JSON.stringify({ database: DB, mode, interrupted, checks }, null, 2)) } catch { /* best effort */ }
+  process.exit()
+})
+
 let backend, frontend
 try {
   const prepared = await prepare()
   backend = prepared.backend
-  if (mode === 'serve') {
+  if (mode === 'serve' && !interrupted) {
     frontend = await startFrontend()
     console.log(`Demo ready: ${WEB} (backend ${API}, database ${DB}). Press Ctrl+C to stop both processes.`)
-    await new Promise(() => {})
+    await new Promise(done => { releaseServe = done; if (interrupted) done() })
   }
   if (mode === 'rehearse') {
     frontend = await startFrontend()
@@ -231,11 +270,11 @@ try {
     check('T06-08', 'Without published sessions the assistant returns a truthful NO_ANSWER and packages still answer', none.status === 'NO_ANSWER' && /No matching published sessions/.test(none.answer) && prices.status === 'ANSWERED', { none: none.answer })
     writeFileSync(join(OUT, 'rehearsal.json'), JSON.stringify({ database: DB, timings, checks }, null, 2))
   }
-  console.log('RESULT PASS ' + DB)
+  console.log(interrupted ? `RESULT STOPPED (${interrupted}) ${DB}` : 'RESULT PASS ' + DB)
 } catch (error) {
   console.error('RESULT FAIL ' + DB + ': ' + (error.stack || error))
   process.exitCode = 1
 } finally {
-  writeFileSync(join(OUT, 'checks.json'), JSON.stringify({ database: DB, mode, checks }, null, 2))
-  stop(frontend); stop(backend)
+  writeFileSync(join(OUT, 'checks.json'), JSON.stringify({ database: DB, mode, interrupted, checks }, null, 2))
+  stopAll()
 }

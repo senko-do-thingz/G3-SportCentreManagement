@@ -1,0 +1,1148 @@
+{
+  "base": "1827a05b7393eb069ece5ae77c8f65d2a354466a",
+  "reviewedSource": "aedd882012d893f8759a2c7f80d105271196efe7",
+  "localFullSuiteSource": "d17c785b6d6871dd766c55c9ff77e5d0c8893557",
+  "unit": {
+    "tests": 2268,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "passed": 2268
+  },
+  "nativeSql": {
+    "tests": 1040,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "passed": 1040
+  },
+  "frontend": {
+    "numTotalTests": 1942,
+    "numPassedTests": 1942,
+    "numFailedTests": 0,
+    "numPendingTests": 0
+  },
+  "browserSource": "aedd882012d893f8759a2c7f80d105271196efe7",
+  "browserStatus": "PASS",
+  "ci": {
+    "conclusion": "success",
+    "headSha": "9184e9132946b78d85d958de9800da03433b2fad",
+    "jobs": [
+      {
+        "completedAt": "2026-11-05T07:40:34Z",
+        "conclusion": "success",
+        "databaseId": 127115990507,
+        "name": "Project conventions and workflow lint",
+        "startedAt": "2026-11-05T07:40:13Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-11-05T07:40:14Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-11-05T07:40:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:20Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 2,
+            "startedAt": "2026-11-05T07:40:14Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:20Z",
+            "conclusion": "success",
+            "name": "Check forbidden characters in added lines",
+            "number": 3,
+            "startedAt": "2026-11-05T07:40:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:31Z",
+            "conclusion": "success",
+            "name": "Test CI selectors, gates and infrastructure negative controls",
+            "number": 4,
+            "startedAt": "2026-11-05T07:40:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:32Z",
+            "conclusion": "success",
+            "name": "Lint GitHub workflows",
+            "number": 5,
+            "startedAt": "2026-11-05T07:40:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:32Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 10,
+            "startedAt": "2026-11-05T07:40:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:32Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 11,
+            "startedAt": "2026-11-05T07:40:32Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41988848995/job/127115990507"
+      },
+      {
+        "completedAt": "2026-11-05T07:40:24Z",
+        "conclusion": "success",
+        "databaseId": 127115990623,
+        "name": "Change impact",
+        "startedAt": "2026-11-05T07:40:13Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-11-05T07:40:15Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-11-05T07:40:14Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:20Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 2,
+            "startedAt": "2026-11-05T07:40:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:20Z",
+            "conclusion": "success",
+            "name": "Classify immutable PR merge-base diff",
+            "number": 3,
+            "startedAt": "2026-11-05T07:40:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:21Z",
+            "conclusion": "success",
+            "name": "Publish impact evidence",
+            "number": 4,
+            "startedAt": "2026-11-05T07:40:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:21Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 8,
+            "startedAt": "2026-11-05T07:40:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:22Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-11-05T07:40:21Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41988848995/job/127115990623"
+      },
+      {
+        "completedAt": "2026-11-05T07:44:06Z",
+        "conclusion": "success",
+        "databaseId": 127116075519,
+        "name": "Frontend checks and build",
+        "startedAt": "2026-11-05T07:40:26Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-11-05T07:40:28Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-11-05T07:40:27Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:31Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 2,
+            "startedAt": "2026-11-05T07:40:28Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:33Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
+            "number": 3,
+            "startedAt": "2026-11-05T07:40:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:41:11Z",
+            "conclusion": "success",
+            "name": "Install dependencies",
+            "number": 4,
+            "startedAt": "2026-11-05T07:40:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:41:13Z",
+            "conclusion": "success",
+            "name": "Audit frontend dependencies",
+            "number": 5,
+            "startedAt": "2026-11-05T07:41:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:41:30Z",
+            "conclusion": "success",
+            "name": "Lint frontend",
+            "number": 6,
+            "startedAt": "2026-11-05T07:41:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:43:50Z",
+            "conclusion": "success",
+            "name": "Test frontend",
+            "number": 7,
+            "startedAt": "2026-11-05T07:41:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:44:02Z",
+            "conclusion": "success",
+            "name": "Build frontend",
+            "number": 8,
+            "startedAt": "2026-11-05T07:43:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:44:04Z",
+            "conclusion": "success",
+            "name": "Upload frontend test and timing evidence",
+            "number": 9,
+            "startedAt": "2026-11-05T07:44:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:44:04Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
+            "number": 17,
+            "startedAt": "2026-11-05T07:44:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:44:04Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 18,
+            "startedAt": "2026-11-05T07:44:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:44:04Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-11-05T07:44:04Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41988848995/job/127116075519"
+      },
+      {
+        "completedAt": "2026-11-05T07:42:04Z",
+        "conclusion": "success",
+        "databaseId": 127116075606,
+        "name": "Unit tests (no Docker)",
+        "startedAt": "2026-11-05T07:40:26Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-11-05T07:40:28Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-11-05T07:40:27Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:32Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 2,
+            "startedAt": "2026-11-05T07:40:28Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:34Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad",
+            "number": 3,
+            "startedAt": "2026-11-05T07:40:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:41:59Z",
+            "conclusion": "success",
+            "name": "Run unit tests",
+            "number": 4,
+            "startedAt": "2026-11-05T07:40:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:41:59Z",
+            "conclusion": "success",
+            "name": "Fail on skipped tests",
+            "number": 5,
+            "startedAt": "2026-11-05T07:41:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:41:59Z",
+            "conclusion": "success",
+            "name": "Verify unit isolation and test totals",
+            "number": 6,
+            "startedAt": "2026-11-05T07:41:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:00Z",
+            "conclusion": "success",
+            "name": "Summarize unit counts and slow suites",
+            "number": 7,
+            "startedAt": "2026-11-05T07:41:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:01Z",
+            "conclusion": "success",
+            "name": "Publish test report",
+            "number": 8,
+            "startedAt": "2026-11-05T07:42:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:02Z",
+            "conclusion": "success",
+            "name": "Upload surefire reports",
+            "number": 9,
+            "startedAt": "2026-11-05T07:42:01Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:02Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad",
+            "number": 17,
+            "startedAt": "2026-11-05T07:42:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:03Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 18,
+            "startedAt": "2026-11-05T07:42:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:03Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-11-05T07:42:03Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41988848995/job/127116075606"
+      },
+      {
+        "completedAt": "2026-11-05T07:54:32Z",
+        "conclusion": "success",
+        "databaseId": 127116075633,
+        "name": "Integration tests (Testcontainers, SQL Server 2022)",
+        "startedAt": "2026-11-05T07:40:27Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-11-05T07:40:32Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-11-05T07:40:28Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:40Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 2,
+            "startedAt": "2026-11-05T07:40:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:44Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad",
+            "number": 3,
+            "startedAt": "2026-11-05T07:40:40Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:56Z",
+            "conclusion": "success",
+            "name": "Pre-pull SQL Server image",
+            "number": 4,
+            "startedAt": "2026-11-05T07:40:44Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:22Z",
+            "conclusion": "success",
+            "name": "Run full SQL integration tests and package",
+            "number": 5,
+            "startedAt": "2026-11-05T07:40:56Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:22Z",
+            "conclusion": "success",
+            "name": "Verify executed integration suites and counts",
+            "number": 6,
+            "startedAt": "2026-11-05T07:54:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:22Z",
+            "conclusion": "success",
+            "name": "Fail on skipped tests",
+            "number": 7,
+            "startedAt": "2026-11-05T07:54:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:22Z",
+            "conclusion": "success",
+            "name": "Summarize integration counts and slow suites",
+            "number": 8,
+            "startedAt": "2026-11-05T07:54:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:23Z",
+            "conclusion": "success",
+            "name": "Publish test report",
+            "number": 9,
+            "startedAt": "2026-11-05T07:54:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:25Z",
+            "conclusion": "success",
+            "name": "Upload failsafe reports",
+            "number": 10,
+            "startedAt": "2026-11-05T07:54:23Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:25Z",
+            "conclusion": "skipped",
+            "name": "Upload fixture timing and SQL plans",
+            "number": 11,
+            "startedAt": "2026-11-05T07:54:25Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:25Z",
+            "conclusion": "success",
+            "name": "Bind verified integration jar to this source",
+            "number": 12,
+            "startedAt": "2026-11-05T07:54:25Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:29Z",
+            "conclusion": "success",
+            "name": "Upload same-run backend build",
+            "number": 13,
+            "startedAt": "2026-11-05T07:54:25Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:29Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad",
+            "number": 25,
+            "startedAt": "2026-11-05T07:54:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:29Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 26,
+            "startedAt": "2026-11-05T07:54:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:29Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 27,
+            "startedAt": "2026-11-05T07:54:29Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41988848995/job/127116075633"
+      },
+      {
+        "completedAt": "2026-11-05T07:40:34Z",
+        "conclusion": "success",
+        "databaseId": 127116075733,
+        "name": "Security / Dependency review",
+        "startedAt": "2026-11-05T07:40:26Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-11-05T07:40:28Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-11-05T07:40:27Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:31Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 2,
+            "startedAt": "2026-11-05T07:40:28Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:32Z",
+            "conclusion": "success",
+            "name": "Run actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294",
+            "number": 3,
+            "startedAt": "2026-11-05T07:40:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:32Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 6,
+            "startedAt": "2026-11-05T07:40:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:32Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 7,
+            "startedAt": "2026-11-05T07:40:32Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41988848995/job/127116075733"
+      },
+      {
+        "completedAt": "2026-11-05T07:42:51Z",
+        "conclusion": "success",
+        "databaseId": 127116075735,
+        "name": "Compose smoke / Compose template smoke test",
+        "startedAt": "2026-11-05T07:40:26Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-11-05T07:40:27Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-11-05T07:40:26Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:30Z",
+            "conclusion": "success",
+            "name": "Checkout",
+            "number": 2,
+            "startedAt": "2026-11-05T07:40:27Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:30Z",
+            "conclusion": "success",
+            "name": "Create temporary test .env",
+            "number": 3,
+            "startedAt": "2026-11-05T07:40:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:30Z",
+            "conclusion": "success",
+            "name": "Assert compose config requires IMAGE_TAG",
+            "number": 4,
+            "startedAt": "2026-11-05T07:40:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:48Z",
+            "conclusion": "success",
+            "name": "Assert password policy violation makes sqlserver exit",
+            "number": 5,
+            "startedAt": "2026-11-05T07:40:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:05Z",
+            "conclusion": "success",
+            "name": "Build backend container image",
+            "number": 6,
+            "startedAt": "2026-11-05T07:40:48Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:10Z",
+            "conclusion": "success",
+            "name": "Start sqlserver service and wait for healthcheck",
+            "number": 7,
+            "startedAt": "2026-11-05T07:42:05Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:11Z",
+            "conclusion": "success",
+            "name": "Run db-init service",
+            "number": 8,
+            "startedAt": "2026-11-05T07:42:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:12Z",
+            "conclusion": "success",
+            "name": "Assert database sportify exists and sa login succeeds",
+            "number": 9,
+            "startedAt": "2026-11-05T07:42:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:12Z",
+            "conclusion": "success",
+            "name": "Assert port 1433 is not published on host",
+            "number": 10,
+            "startedAt": "2026-11-05T07:42:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:13Z",
+            "conclusion": "success",
+            "name": "Assert db-init idempotency by running a second time",
+            "number": 11,
+            "startedAt": "2026-11-05T07:42:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:19Z",
+            "conclusion": "success",
+            "name": "Assert non-sa DB_USERNAME causes backend connection failure",
+            "number": 12,
+            "startedAt": "2026-11-05T07:42:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:24Z",
+            "conclusion": "success",
+            "name": "Assert unedited JWT_SECRET placeholder causes backend startup failure",
+            "number": 13,
+            "startedAt": "2026-11-05T07:42:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:39Z",
+            "conclusion": "success",
+            "name": "Start backend service and wait for actuator health UP",
+            "number": 14,
+            "startedAt": "2026-11-05T07:42:24Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:39Z",
+            "conclusion": "success",
+            "name": "Assert Flyway migrations were applied to sportify database",
+            "number": 15,
+            "startedAt": "2026-11-05T07:42:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:39Z",
+            "conclusion": "skipped",
+            "name": "Dump compose logs on failure",
+            "number": 16,
+            "startedAt": "2026-11-05T07:42:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:50Z",
+            "conclusion": "success",
+            "name": "Cleanup compose stack",
+            "number": 17,
+            "startedAt": "2026-11-05T07:42:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:50Z",
+            "conclusion": "success",
+            "name": "Post Checkout",
+            "number": 34,
+            "startedAt": "2026-11-05T07:42:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:50Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 35,
+            "startedAt": "2026-11-05T07:42:50Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41988848995/job/127116075735"
+      },
+      {
+        "completedAt": "2026-11-05T07:43:43Z",
+        "conclusion": "success",
+        "databaseId": 127116075819,
+        "name": "Security / CodeQL analysis",
+        "startedAt": "2026-11-05T07:40:26Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-11-05T07:40:28Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-11-05T07:40:27Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:31Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 2,
+            "startedAt": "2026-11-05T07:40:28Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:33Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad",
+            "number": 3,
+            "startedAt": "2026-11-05T07:40:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:49Z",
+            "conclusion": "success",
+            "name": "Run github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370",
+            "number": 4,
+            "startedAt": "2026-11-05T07:40:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:42:32Z",
+            "conclusion": "success",
+            "name": "Compile production and test sources for CodeQL tracing",
+            "number": 5,
+            "startedAt": "2026-11-05T07:40:49Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:43:40Z",
+            "conclusion": "success",
+            "name": "Run github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370",
+            "number": 6,
+            "startedAt": "2026-11-05T07:42:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:43:40Z",
+            "conclusion": "success",
+            "name": "Post Run github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370",
+            "number": 9,
+            "startedAt": "2026-11-05T07:43:40Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:43:41Z",
+            "conclusion": "success",
+            "name": "Post Run github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370",
+            "number": 10,
+            "startedAt": "2026-11-05T07:43:40Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:43:41Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad",
+            "number": 11,
+            "startedAt": "2026-11-05T07:43:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:43:41Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 12,
+            "startedAt": "2026-11-05T07:43:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:43:41Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 13,
+            "startedAt": "2026-11-05T07:43:41Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41988848995/job/127116075819"
+      },
+      {
+        "completedAt": "2026-11-05T07:41:40Z",
+        "conclusion": "success",
+        "databaseId": 127116075823,
+        "name": "Security / Frontend CodeQL analysis",
+        "startedAt": "2026-11-05T07:40:27Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-11-05T07:40:29Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-11-05T07:40:28Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:32Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 2,
+            "startedAt": "2026-11-05T07:40:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:50Z",
+            "conclusion": "success",
+            "name": "Run github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370",
+            "number": 3,
+            "startedAt": "2026-11-05T07:40:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:41:35Z",
+            "conclusion": "success",
+            "name": "Run github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370",
+            "number": 4,
+            "startedAt": "2026-11-05T07:40:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:41:35Z",
+            "conclusion": "success",
+            "name": "Post Run github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370",
+            "number": 6,
+            "startedAt": "2026-11-05T07:41:35Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:41:36Z",
+            "conclusion": "success",
+            "name": "Post Run github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370",
+            "number": 7,
+            "startedAt": "2026-11-05T07:41:35Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:41:36Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 8,
+            "startedAt": "2026-11-05T07:41:36Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:41:36Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-11-05T07:41:36Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41988848995/job/127116075823"
+      },
+      {
+        "completedAt": "2026-11-05T07:40:34Z",
+        "conclusion": "success",
+        "databaseId": 127116075865,
+        "name": "Flyway migration guard",
+        "startedAt": "2026-11-05T07:40:26Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-11-05T07:40:28Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-11-05T07:40:27Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:31Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 2,
+            "startedAt": "2026-11-05T07:40:28Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:31Z",
+            "conclusion": "success",
+            "name": "Guard immutable migrations and version ordering",
+            "number": 3,
+            "startedAt": "2026-11-05T07:40:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:31Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 6,
+            "startedAt": "2026-11-05T07:40:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:40:31Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 7,
+            "startedAt": "2026-11-05T07:40:31Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41988848995/job/127116075865"
+      },
+      {
+        "completedAt": "2026-11-05T07:43:51Z",
+        "conclusion": "success",
+        "databaseId": 127117310949,
+        "name": "Security / Security gate",
+        "startedAt": "2026-11-05T07:43:45Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-11-05T07:43:47Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-11-05T07:43:46Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:43:50Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 2,
+            "startedAt": "2026-11-05T07:43:47Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:43:50Z",
+            "conclusion": "success",
+            "name": "Validate expected security outcomes",
+            "number": 3,
+            "startedAt": "2026-11-05T07:43:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:43:50Z",
+            "conclusion": "skipped",
+            "name": "Reject workflow cancellation",
+            "number": 4,
+            "startedAt": "2026-11-05T07:43:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:43:50Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 8,
+            "startedAt": "2026-11-05T07:43:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:43:50Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-11-05T07:43:50Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41988848995/job/127117310949"
+      },
+      {
+        "completedAt": "2026-11-05T07:54:51Z",
+        "conclusion": "success",
+        "databaseId": 127121407019,
+        "name": "Package application",
+        "startedAt": "2026-11-05T07:54:36Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-11-05T07:54:38Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-11-05T07:54:37Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:41Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 2,
+            "startedAt": "2026-11-05T07:54:38Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:45Z",
+            "conclusion": "success",
+            "name": "Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
+            "number": 3,
+            "startedAt": "2026-11-05T07:54:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:45Z",
+            "conclusion": "success",
+            "name": "Verify source and checksums without rebuilding",
+            "number": 4,
+            "startedAt": "2026-11-05T07:54:45Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:49Z",
+            "conclusion": "success",
+            "name": "Upload validated jar",
+            "number": 5,
+            "startedAt": "2026-11-05T07:54:45Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:49Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 10,
+            "startedAt": "2026-11-05T07:54:49Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:49Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 11,
+            "startedAt": "2026-11-05T07:54:49Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41988848995/job/127121407019"
+      },
+      {
+        "completedAt": "2026-11-05T07:55:01Z",
+        "conclusion": "success",
+        "databaseId": 127121523320,
+        "name": "CI gate",
+        "startedAt": "2026-11-05T07:54:54Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-11-05T07:54:55Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-11-05T07:54:55Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:58Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 2,
+            "startedAt": "2026-11-05T07:54:55Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:59Z",
+            "conclusion": "success",
+            "name": "Reject failures, cancellations, missing checks and unexpected skips",
+            "number": 3,
+            "startedAt": "2026-11-05T07:54:58Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:59Z",
+            "conclusion": "skipped",
+            "name": "Reject workflow cancellation",
+            "number": 4,
+            "startedAt": "2026-11-05T07:54:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:59Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 8,
+            "startedAt": "2026-11-05T07:54:59Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-05T07:54:59Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-11-05T07:54:59Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41988848995/job/127121523320"
+      }
+    ],
+    "status": "completed",
+    "url": "https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41988848995"
+  },
+  "pr": "https://github.com/senko-do-thingz/G3-SportCentreManagement/pull/217",
+  "integrationMergeSha": "8d62a3aec5c9affcce695b2753dca23593e36973",
+  "affectedReruns": {
+    "source": "9184e9132946b78d85d958de9800da03433b2fad",
+    "supportFrontend": 3,
+    "backendUnit": 3,
+    "nativeSql": 3,
+    "failed": 0,
+    "skipped": 0
+  }
+}

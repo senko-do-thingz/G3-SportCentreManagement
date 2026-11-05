@@ -1,3 +1,14 @@
+## 2026-11-05 - Flow 1-4 Release 1.1 candidate
+
+- Integrate main c9c50da94423f8540de328855f9a7efd0878b1f1 without conflict, preserving the Reception payment workspace fix from PR #212. Fresh frontend and four-role desktop verification is recorded in round-002; prior results retain their original SHAs.
+
+- Add Reception support desktop intake, member/status filters, detail and bounded state transitions through the existing idempotent API.
+- Add date-scoped Manager member-registration and class-booking counters alongside the existing revenue report and CSV export.
+- Add Manager-only read-only attendance overview and session details with explicit confirmed, unmarked and cancelled rules, bounded queries and existing Session ID history resolution. No schema migration or backfill policy change.
+- Add assigned-class Coach profile/goals, chronological recorded results and saved feedback reads, with links from existing roster/plan workflows. Keep current ownership denials and feedback writes.
+- Synchronize status, requirements, deferred decisions and the four-role desktop demo. Local focused verification includes 143 baseline SQL training cases, three new SQL attendance cases and three new backend unit/controller cases. Final full-suite, exact-SHA CI and real browser evidence are recorded in the per-task release reports; this entry is not a release acceptance or merge claim.
+- No mobile, AI Audit Log, Flow 5-6, Waitlist, dynamic RBAC, legacy removal, financial calculation or migration work is included.
+
 ## 2026-10-28 - Align payment summary status and refunds with merged Home
 
 - UI-27, UI-28 and UI-32 reuse Home's scoped palette, display fonts, square controls and cards, gold navigation marks and spacing through PaymentWorkspace. Rounded gradient payment banners are replaced by functional Home-style section headings on these routes only.
