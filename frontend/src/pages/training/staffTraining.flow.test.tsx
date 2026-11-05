@@ -185,13 +185,12 @@ describe('Coach training writes', () => {
   })
 })
 
-describe('Reception training writes', () => {
-  it.each(['COACH', 'RECEPTIONIST'] as const)('R07 shows server-closed dates without treating unmarked as absent for %s', async role => {
-    const root = role === 'COACH' ? '/coach' : '/reception'
-    const { calls } = signedIn(role, call => call.path === `${root}/training/sessions`
+describe('Coach session attendance writes and role boundaries', () => {
+  it('R07 shows server-closed dates without treating unmarked as absent for COACH', async () => {
+    const { calls } = signedIn('COACH', call => call.path === '/coach/training/sessions'
       ? json(200, [{ ...attendanceSession, attendanceDateOpen: false }])
-      : call.path === `${root}/training/sessions/by-code/011126SW01/members` ? json(200, [rosterMember]) : unexpected(call))
-    renderApp(`${root}/training/attendance`)
+      : call.path === '/coach/training/sessions/by-code/011126SW01/members' ? json(200, [rosterMember]) : unexpected(call))
+    renderApp('/coach/training/attendance')
     await userEvent.click(await screen.findByRole('button', { name: /Select session 011126SW01/ }))
     expect(await screen.findByText(/Initial attendance is closed/)).toBeInTheDocument()
     await screen.findByRole('form', { name: /attendance for Lan/ })
@@ -200,12 +199,11 @@ describe('Reception training writes', () => {
     expect(screen.queryByRole('button', { name: 'Save attendance' })).not.toBeInTheDocument()
     expect(calls.some(call => call.method === 'POST')).toBe(false)
   })
-  it.each(['COACH', 'RECEPTIONIST'] as const)('R07 retains saved history and reasoned correction when initial date is closed for %s', async role => {
-    const root = role === 'COACH' ? '/coach' : '/reception'
-    signedIn(role, call => call.path === `${root}/training/sessions`
+  it('R07 retains saved history and reasoned correction when initial date is closed for COACH', async () => {
+    signedIn('COACH', call => call.path === '/coach/training/sessions'
       ? json(200, [{ ...attendanceSession, attendanceDateOpen: false }])
-      : call.path === `${root}/training/sessions/by-code/011126SW01/members` ? json(200, [{ ...rosterMember, attendanceId: 50, status: 'PRESENT', notes: 'Saved historical attendance' }]) : unexpected(call))
-    renderApp(`${root}/training/attendance`)
+      : call.path === '/coach/training/sessions/by-code/011126SW01/members' ? json(200, [{ ...rosterMember, attendanceId: 50, status: 'PRESENT', notes: 'Saved historical attendance' }]) : unexpected(call))
+    renderApp('/coach/training/attendance')
     await userEvent.click(await screen.findByRole('button', { name: /Select session 011126SW01/ }))
     await screen.findByRole('form', { name: /attendance for Lan/ })
     expect(screen.getByLabelText(/Attendance note for Lan/)).toHaveValue('Saved historical attendance')
@@ -214,14 +212,14 @@ describe('Reception training writes', () => {
   })
   it('records attendance and requires an audit reason for a correction', async () => {
     let row = { ...rosterMember }
-    const { calls } = signedIn('RECEPTIONIST', call => {
-      if (call.path === '/reception/training/sessions') return json(200, [attendanceSession])
-      if (call.path === '/reception/training/sessions/by-code/011126SW01/members') return json(200, [row])
-      if (call.path === '/reception/training/attendance') { row = { ...row, attendanceId: 50, status: 'LATE', notes: 'Arrived late' }; return json(201, { id: 50 }) }
-      if (call.path === '/reception/training/attendance/50') { row = { ...row, status: 'PRESENT' }; return json(200, { id: 50 }) }
+    const { calls } = signedIn('COACH', call => {
+      if (call.path === '/coach/training/sessions') return json(200, [attendanceSession])
+      if (call.path === '/coach/training/sessions/by-code/011126SW01/members') return json(200, [row])
+      if (call.path === '/coach/training/attendance') { row = { ...row, attendanceId: 50, status: 'LATE', notes: 'Arrived late' }; return json(201, { id: 50 }) }
+      if (call.path === '/coach/training/attendance/50') { row = { ...row, status: 'PRESENT' }; return json(200, { id: 50 }) }
       return unexpected(call)
     })
-    renderApp('/reception/training/attendance')
+    renderApp('/coach/training/attendance')
     const user = userEvent.setup()
     await user.click(await screen.findByRole('button', { name: /Select session 011126SW01/ }))
     await screen.findByRole('form', { name: /attendance for Lan/ })
@@ -229,7 +227,7 @@ describe('Reception training writes', () => {
     await user.type(screen.getByLabelText(/Attendance note for Lan/), 'Arrived late')
     await user.click(screen.getByRole('button', { name: 'Save attendance' }))
     expect(await screen.findByText('Attendance saved and the list updated.')).toBeInTheDocument()
-    expect(calls.find(call => call.path === '/reception/training/attendance')?.body).toEqual({ bookingId: 11, status: 'LATE', notes: 'Arrived late' })
+    expect(calls.find(call => call.path === '/coach/training/attendance')?.body).toEqual({ bookingId: 11, status: 'LATE', notes: 'Arrived late' })
     await screen.findByRole('form', { name: /attendance for Lan/ })
     expect(screen.getByLabelText(/Attendance note for Lan/)).toHaveValue('Arrived late')
     await user.click(screen.getByRole('radio', { name: 'Present' }))
@@ -240,9 +238,13 @@ describe('Reception training writes', () => {
     await waitFor(() => expect(calls.find(call => call.method === 'PUT')?.body).toEqual({ status: 'PRESENT', notes: 'Arrived late', reason: 'Correct an incorrect record' }))
   })
 
-  it('blocks Member access to staff write routes before fetching staff data', async () => {
-    const { calls } = signedIn('MEMBER', unexpected)
-    renderApp('/reception/training/attendance')
+  it.each([
+    ['MEMBER', '/coach/training/attendance'],
+    ['RECEPTIONIST', '/coach/training/attendance'],
+    ['RECEPTIONIST', '/reception/training/attendance'],
+  ] as const)('blocks %s access to %s before fetching session attendance data', async (role, path) => {
+    const { calls } = signedIn(role, unexpected)
+    renderApp(path)
     expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
     expect(calls.map(call => call.path)).toEqual(['/users/me'])
   })
@@ -268,10 +270,10 @@ describe('Reception training writes', () => {
   })
 
   it('labels a server-upcoming session and never offers a first-marking write', async () => {
-    const { calls } = signedIn('RECEPTIONIST', call => call.path === '/reception/training/sessions'
+    const { calls } = signedIn('COACH', call => call.path === '/coach/training/sessions'
       ? json(200, [{ ...attendanceSession, attendanceDateOpen: false, attendanceState: 'UPCOMING' }])
-      : call.path === '/reception/training/sessions/by-code/011126SW01/members' ? json(200, [rosterMember]) : unexpected(call))
-    renderApp('/reception/training/attendance')
+      : call.path === '/coach/training/sessions/by-code/011126SW01/members' ? json(200, [rosterMember]) : unexpected(call))
+    renderApp('/coach/training/attendance')
     await userEvent.click(await screen.findByRole('button', { name: /Select session 011126SW01/ }))
     expect(screen.getByText('Upcoming - first marking is not open')).toBeInTheDocument()
     expect(await screen.findByText(/Attendance not recorded\./)).toBeInTheDocument()
@@ -295,13 +297,13 @@ describe('Reception training writes', () => {
   it('guards duplicate per-row submissions, refreshes counts and restores focus after saving', async () => {
     let saved = false
     let finish: ((response: Response) => void) | undefined
-    const { calls } = signedIn('RECEPTIONIST', call => {
-      if (call.path === '/reception/training/sessions') return json(200, [{ ...attendanceSession, markedCount: saved ? 1 : 0 }])
-      if (call.path === '/reception/training/sessions/by-code/011126SW01/members') return json(200, [{ ...rosterMember, attendanceId: saved ? 50 : null, status: saved ? 'PRESENT' : null }])
-      if (call.path === '/reception/training/attendance') return new Promise<Response>(resolve => { finish = response => { saved = true; resolve(response) } })
+    const { calls } = signedIn('COACH', call => {
+      if (call.path === '/coach/training/sessions') return json(200, [{ ...attendanceSession, markedCount: saved ? 1 : 0 }])
+      if (call.path === '/coach/training/sessions/by-code/011126SW01/members') return json(200, [{ ...rosterMember, attendanceId: saved ? 50 : null, status: saved ? 'PRESENT' : null }])
+      if (call.path === '/coach/training/attendance') return new Promise<Response>(resolve => { finish = response => { saved = true; resolve(response) } })
       return unexpected(call)
     })
-    renderApp('/reception/training/attendance')
+    renderApp('/coach/training/attendance')
     const button = await screen.findByRole('button', { name: 'Save attendance' })
     await userEvent.dblClick(button)
     expect(calls.filter(call => call.method === 'POST')).toHaveLength(1)
@@ -313,10 +315,10 @@ describe('Reception training writes', () => {
   })
 
   it('keeps per-row input and feedback after a stale write conflict', async () => {
-    signedIn('RECEPTIONIST', call => call.path === '/reception/training/sessions' ? json(200, [attendanceSession])
-      : call.path === '/reception/training/sessions/by-code/011126SW01/members' ? json(200, [rosterMember])
-        : call.path === '/reception/training/attendance' ? backendError(409, 'Attendance changed. Refresh the roster.') : unexpected(call))
-    renderApp('/reception/training/attendance')
+    signedIn('COACH', call => call.path === '/coach/training/sessions' ? json(200, [attendanceSession])
+      : call.path === '/coach/training/sessions/by-code/011126SW01/members' ? json(200, [rosterMember])
+        : call.path === '/coach/training/attendance' ? backendError(409, 'Attendance changed. Refresh the roster.') : unexpected(call))
+    renderApp('/coach/training/attendance')
     await userEvent.type(await screen.findByLabelText(/Attendance note for Lan/), 'Keep this note')
     await userEvent.click(screen.getByRole('button', { name: 'Save attendance' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Attendance changed')

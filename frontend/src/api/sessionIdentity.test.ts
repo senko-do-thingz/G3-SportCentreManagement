@@ -33,7 +33,7 @@ describe('canonical public Session ID', () => {
     const signal = new AbortController().signal
     await staffTrainingApi.coachRoster('031126BM01', signal)
     expect(get).toHaveBeenCalledWith('/coach/training/sessions/by-code/031126BM01/members', { signal })
-    await staffTrainingApi.attendance(12, { status: 'PRESENT', notes: null })
-    expect(post).toHaveBeenCalledWith('/reception/training/attendance', { bookingId: 12, status: 'PRESENT', notes: null })
+    await staffTrainingApi.coachAttendance(12, { status: 'PRESENT', notes: null })
+    expect(post).toHaveBeenCalledWith('/coach/training/attendance', { bookingId: 12, status: 'PRESENT', notes: null })
   })
 })

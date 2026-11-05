@@ -1,1 +1,1 @@
-export { CoachTrainingAttendancePage, ReceptionTrainingAttendancePage } from './AttendanceRosterWorkspace'
+export { CoachTrainingAttendancePage } from './AttendanceRosterWorkspace'

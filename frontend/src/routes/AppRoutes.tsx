@@ -68,7 +68,7 @@ import { MemberAssistantPage } from '../pages/member/MemberAssistantPage'
 import { ClassRecommendationsPage } from '../pages/member/ClassRecommendationsPage'
 import { CoachTrainingPlansPage, CoachTrainingResultsPage } from '../pages/training/CoachTrainingPages'
 import { ClassQuestionsPage, MemberClassesPage, MemberClassDetailPage } from '../pages/training/ClassLearningPages'
-import { ReceptionTrainingAttendancePage, CoachTrainingAttendancePage } from '../pages/training/ReceptionTrainingPages'
+import { CoachTrainingAttendancePage } from '../pages/training/ReceptionTrainingPages'
 import { ManagerAttendanceBackfillPage } from '../pages/training/ManagerAttendanceBackfillPage'
 import { ManagerAttendanceOverviewPage } from '../pages/training/ManagerAttendanceOverviewPage'
 import { CoachProgressPage } from '../pages/training/CoachProgressPage'
@@ -84,7 +84,6 @@ const SCREENS: Record<string, ReactNode> = {
   '/coach/training/results': <CoachTrainingResultsPage />,
   '/coach/training/attendance': <CoachTrainingAttendancePage />,
   '/coach/training/questions': <ClassQuestionsPage coach />,
-  '/reception/training/attendance': <ReceptionTrainingAttendancePage />,
   '/manager': <UserManagementPage />,
   '/manager/packages': <ManagerPackagesPage />,
   '/manager/cards': <MembershipCardsManagementPage />,
@@ -164,6 +163,7 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
     { path: 'payments/receipts/:invoiceId', element: <ReceiptPage /> },
   ],
   '/reception': [
+    { path: 'training/attendance', element: <ForbiddenPage /> },
     { path: 'bookings/new', element: <ReceptionAssistedBookingPage /> },
     { path: 'bookings/confirmed/:bookingId', element: <ReceptionBookingConfirmedPage /> },
     { path: 'payments/:paymentId', element: <ReceptionPaymentPage /> },
