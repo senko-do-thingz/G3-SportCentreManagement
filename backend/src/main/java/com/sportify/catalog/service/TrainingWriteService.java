@@ -105,13 +105,18 @@ public class TrainingWriteService {
         var context=jdbc.query("""
             SELECT b.member_id,c.id class_id,c.level,sp.code sport_code,sp.name sport_name,m.main_goal
             FROM booking b JOIN class_session s ON s.id=b.session_id JOIN sport_class c ON c.id=s.class_id
-            JOIN sport sp ON sp.id=s.sport_id JOIN member_profile m ON m.user_id=b.member_id
+            JOIN sport sp ON sp.id=s.sport_id
+            JOIN user_account mu ON mu.id=b.member_id AND mu.status='ACTIVE'
+            JOIN role mr ON mr.id=mu.role_id AND mr.code='MEMBER'
+            JOIN member_profile m ON m.user_id=b.member_id
             WHERE b.id=? AND b.status='CONFIRMED' AND s.status<>'CANCELLED' AND s.training_type='COACH_LED'
-                AND s.coach_id=? AND c.coach_id=?
+                AND s.coach_id=? AND c.coach_id=? AND c.is_active=1
             """,(rs,row)->new DrillContext(rs.getLong("member_id"),rs.getLong("class_id"),rs.getString("level"),
                 rs.getString("sport_code"),rs.getString("sport_name"),rs.getString("main_goal")),bookingId,coachId,coachId);
+        // Same message for every miss so a Coach cannot probe other Coaches' bookings or account states.
         if(context.isEmpty())throw new ResourceNotFoundException("Assigned member booking not found");
         var current=context.getFirst();
+        operationalMemberPolicy.requireRealMember(current.memberId());
         var feedback=jdbc.query("""
             SELECT TOP(1) f.areas_for_improvement FROM coach_feedback f JOIN session_plan p ON p.id=f.plan_id
             WHERE f.coach_id=? AND f.member_id=? AND p.class_id=? ORDER BY f.created_at DESC,f.id DESC
@@ -124,7 +129,7 @@ public class TrainingWriteService {
                     AND a.actor_user_id=? AND a.action='TRAINING_RESULT_CREATED')
             ORDER BY r.created_at DESC,r.id DESC,sc.score/NULLIF(m.max_score,0),m.id
             """,(rs,row)->rs.getString("name"),coachId,current.memberId(),current.classId(),coachId);
-        var drafts=TrainingDrillCatalog.suggest(current.sportCode(),current.level(),feedback.isEmpty()?null:feedback.getFirst(),
+        var drafts=TrainingDrillCatalog.suggest(current.sportCode(),current.sportName(),current.level(),feedback.isEmpty()?null:feedback.getFirst(),
             metrics.isEmpty()?null:metrics.getFirst(),current.goal());
         return new DrillSuggestions("RULE_BASED","curated-drills-v1",true,false,bookingId,current.memberId(),current.classId(),current.sportName(),current.level(),drafts);
     }

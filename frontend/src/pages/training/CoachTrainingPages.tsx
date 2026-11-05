@@ -46,30 +46,37 @@ const blankStep = () => ({ title: '', durationMinutes: '10', instructions: '' })
 function CreatePlanForm({ classId, members, onSaved }: { classId: number; members: BookingCandidate[]; onSaved: () => void }) {
   const [steps, setSteps] = useState([blankStep()])
   const [bookingId, setBookingId] = useState('')
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
   const action = useTrainingAction()
   if (!members.length) return <EmptyState title="No confirmed bookings" description="A confirmed booking in this class is required to assign a plan." />
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const form = event.currentTarget
-    const values = new FormData(form)
+    const values = new FormData(event.currentTarget)
     void action.run(async () => {
-      const title = String(values.get('title')).trim()
+      const planTitle = title.trim()
       const candidate = members.find(member => member.bookingId === Number(values.get('bookingId')))
       if (!candidate) throw new Error('Select a booking for the member receiving this plan.')
-      if (!title || steps.some(step => !step.title.trim() || !Number.isInteger(Number(step.durationMinutes)) || Number(step.durationMinutes) <= 0 || Number(step.durationMinutes) > 1440)) {
+      if (!planTitle || steps.some(step => !step.title.trim() || !Number.isInteger(Number(step.durationMinutes)) || Number(step.durationMinutes) <= 0 || Number(step.durationMinutes) > 1440)) {
         throw new Error('Enter a plan title, exercise titles and durations between 1 and 1440 minutes.')
       }
       await training.createPlan({
-        bookingId: candidate.bookingId, classId, memberId: candidate.memberId, title,
-        description: String(values.get('description')).trim() || null,
+        bookingId: candidate.bookingId, classId, memberId: candidate.memberId, title: planTitle,
+        description: description.trim() || null,
         steps: steps.map(step => ({ title: step.title.trim(), durationMinutes: Number(step.durationMinutes), instructions: step.instructions.trim() || null })),
       })
-      form.reset()
-      setBookingId('')
-      setSteps([blankStep()])
+      chooseBooking('')
       onSaved()
     }, 'Plan assigned. The member can view it immediately.')
+  }
+
+  // A new booking starts from an empty form so one Member's plan text is never reused for another.
+  function chooseBooking(value: string) {
+    setBookingId(value)
+    setTitle('')
+    setDescription('')
+    setSteps([blankStep()])
   }
 
   function updateStep(index: number, field: keyof ReturnType<typeof blankStep>, value: string) {
@@ -79,11 +86,11 @@ function CreatePlanForm({ classId, members, onSaved }: { classId: number; member
   return (
     <form className="training-form" onSubmit={submit}>
       <fieldset disabled={action.pending} className="training-fieldset">
-        <Select label="Member booking" name="bookingId" required placeholder="Select a confirmed booking" value={bookingId} onChange={event => { setBookingId(event.target.value); setSteps([blankStep()]) }}
+        <Select label="Member booking" name="bookingId" required placeholder="Select a confirmed booking" value={bookingId} onChange={event => chooseBooking(event.target.value)}
           options={members.map(member => ({ value: String(member.bookingId), label: `${member.memberName} - Booking #${member.bookingId} - ${formatCalendarDate(member.sessionDate)}` }))} />
         {bookingId && <CoachDrillDrafts key={bookingId} bookingId={Number(bookingId)} onUse={drafts => setSteps(drafts.map(draft => ({ title: draft.title, durationMinutes: String(draft.durationMinutes), instructions: draft.instructions })))} />}
-        <Input label="Plan title" name="title" required maxLength={150} />
-        <TrainingTextarea label="Plan description" name="description" maxLength={1000} />
+        <Input label="Plan title" name="title" required maxLength={150} value={title} onChange={event => setTitle(event.target.value)} />
+        <TrainingTextarea label="Plan description" name="description" maxLength={1000} value={description} onChange={event => setDescription(event.target.value)} />
         {steps.map((step, index) => (
           <fieldset key={index} className="training-step-form">
             <legend>Exercise {index + 1}</legend>
@@ -106,15 +113,18 @@ function CreatePlanForm({ classId, members, onSaved }: { classId: number; member
 function CoachDrillDrafts({ bookingId, onUse }: { bookingId: number; onUse: (drafts: DrillDraft[]) => void }) {
   const [suggestions, setSuggestions] = useState<DrillSuggestions | null>(null)
   const [selected, setSelected] = useState<number[]>([])
+  const [copied, setCopied] = useState(0)
   const action = useTrainingAction()
   return <div className="training-form"><h3>Supplementary drill drafts</h3>
     <p>RULE_BASED drafts use this booking's sport, level and available feedback. Nothing is assigned until you review the plan and select Assign plan.</p>
-    <Button variant="secondary" loading={action.pending} onClick={() => { void action.run(async () => { setSuggestions(await training.drillSuggestions(bookingId)); setSelected([]) }, 'Drafts loaded for Coach review. Nothing assigned.') }}>Suggest practice drills</Button>
+    <Button variant="secondary" loading={action.pending} onClick={() => { void action.run(async () => { setSuggestions(await training.drillSuggestions(bookingId)); setSelected([]); setCopied(0) }, 'Drafts loaded for Coach review. Nothing assigned.') }}>Suggest practice drills</Button>
     <ActionMessage {...action} />
+    {suggestions && <p>Mode: {suggestions.mode}, rule version {suggestions.ruleVersion}. Drafts are not saved.</p>}
     {suggestions && (suggestions.drafts.length ? <><ul className="training-list">{suggestions.drafts.map((draft,index) => <li key={draft.title}>
       <label><input type="checkbox" checked={selected.includes(index)} onChange={event => setSelected(current => event.target.checked ? [...current,index] : current.filter(value => value !== index))} /> Select draft: {draft.title}</label>
       <p>{draft.goal} - {draft.level} - {draft.durationMinutes} minutes</p><p>{draft.instructions}</p><p>{draft.reason}</p>
-    </li>)}</ul><Button variant="secondary" disabled={!selected.length} onClick={() => onUse(suggestions.drafts.filter((_,index) => selected.includes(index)))}>Review selected drafts in plan form</Button></>
+    </li>)}</ul><Button variant="secondary" disabled={!selected.length} onClick={() => { const chosen = suggestions.drafts.filter((_,index) => selected.includes(index)); onUse(chosen); setCopied(chosen.length) }}>Review selected drafts in plan form</Button>
+      {copied > 0 && <p role="status">{copied === 1 ? '1 draft' : copied + ' drafts'} copied into the exercise fields below. Edit them, then select Assign plan. Nothing is assigned yet.</p>}</>
       : <EmptyState title="No curated drafts for this sport and level" description="Create a Coach-authored plan using the exercise fields below." />)}
   </div>
 }
