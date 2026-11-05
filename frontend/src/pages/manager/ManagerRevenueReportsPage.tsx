@@ -9,6 +9,7 @@ import { ManagerError, PreviewNotice } from './ManagerShared'
 import { FinanceRevenueChart } from './FinanceRevenueChart'
 import { formatMoney } from '../../utils/format'
 import { tokenStorage } from '../../api/tokenStorage'
+import { OperationsSummary } from './OperationsSummary'
 import '../../styles/managerFinance.css'
 
 const GROUPS: { value: RevenueGroup; label: string }[] = [
@@ -151,6 +152,7 @@ export function ManagerRevenueReportsPage() {
       </div>
     </Card>
 
+    <OperationsSummary from={from} to={to} />
     {report.status === 'loading' ? <PageLoader label="Loading revenue report" /> : report.status === 'error' ? <ManagerError error={report.error} onRetry={reloadReport} /> : <>
       <section className="finance-kpis" aria-label="Revenue report totals">
         <StatCard label="Revenue" value={formatMoney(report.data.totalRevenue)} />

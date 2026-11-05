@@ -1,0 +1,41 @@
+{
+  "database": "sportify_unify_test_20261105155228_r11main",
+  "checks": [
+    {
+      "name": "Fresh schema includes release V46",
+      "status": "PASS"
+    },
+    {
+      "name": "All five additive release migrations applied",
+      "status": "PASS"
+    },
+    {
+      "name": "Demo Member authenticates",
+      "status": "PASS"
+    },
+    {
+      "name": "Official registration creates pending payment",
+      "status": "PASS"
+    }
+  ],
+  "transport": "Loopback HTTP, real SQL Server and Edge; no Docker",
+  "sourceHead": "cb4565d21dadada24ce15082d57d706121cce5ad",
+  "trackedWorktreeDirty": false,
+  "jarSha256": "cfec37d1b8a784b828a8256928fb9e9fbf61c27db77f1447457a30a6e53713d1",
+  "startedAtUtc": "2026-11-05T08:52:29.279574+00:00",
+  "mode": "RELEASE_1_1_DESKTOP_ONLY",
+  "release11": {
+    "status": "PASS",
+    "checks": 35,
+    "evidence": "r11-results.json"
+  },
+  "restart": {
+    "status": "PASS",
+    "checks": [
+      "Owned backend restart retains Coach result",
+      "SQL support status remains CLOSED"
+    ]
+  },
+  "status": "PASS",
+  "finishedAtUtc": "2026-11-05T08:54:50.825296+00:00"
+}

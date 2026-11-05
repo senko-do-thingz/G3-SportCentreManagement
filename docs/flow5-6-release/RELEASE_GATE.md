@@ -1,25 +1,27 @@
 # Flow 5-6 integration and security regression gate (F56-05)
 
-Status: stacked, pending CODEOWNER review. This branch is an integration
-check only. It merges the two task lanes onto main and adds one cross-flow real
-SQL test. Do not squash-merge this branch instead of the task PRs.
+Status: standalone release-gate branch synchronized onto latest `main`, pending
+CODEOWNER review. All parent Flow 5 and Flow 6 task PRs (#213, #214, #215, #216,
+#218) and Release 1.1 (#217) are merged on `main`, so this PR retains only the
+F56-05 cross-flow SQL integration test and this release-gate document.
 
-- main: 1827a05b7393eb069ece5ae77c8f65d2a354466a
-- Flow 5 lane: PR #214 (F56-01, e57e1c38) -> PR #215 (F56-02, 4484b400)
-- Flow 6 lane: PR #216 (F56-03, 005c3213) -> PR #218 (F56-04, fde8a57f)
-- Both lanes merged without conflicts (git auto-merged
-  TrainingWorkflowIntegrationTest.java and docs/training-guidance.md).
+## Provenance on `main`
 
-## Recommended squash-merge order
+- Latest `main`: `33561ca79729899f11a31599ba0dc7d826be7020`
+- Release 1.1 desktop baseline: PR #217 (`373cc2f4bbac445d63d105ff81d6a2c17a93aca7`)
+- F56-00 release baseline: PR #213 (`93da5a63494d0177e80c60d4ad65aabfb6d97604`)
+- Flow 5 lane merged to `main`:
+  - PR #214 (F56-01, branch HEAD `6574ab4b`, squash-merged as `95e1cb710cbdffc61f7f84f2642f123700ebde13`)
+  - PR #215 (F56-02, branch HEAD `5de0f076`, squash-merged as `ada1411f95841578329d7e7a3f29a0895a6c4bea`)
+- Flow 6 lane merged to `main`:
+  - PR #216 (F56-03, branch HEAD `005c3213`, squash-merged as `a2212362d789f2473036d7c54840318216d9981f`)
+  - PR #218 (F56-04, branch HEAD `fde8a57f`, squash-merged as `33561ca79729899f11a31599ba0dc7d826be7020`)
 
-1. #213 F56-00 baseline (docs only)
-2. #214 F56-01, then retarget #215 to main and merge F56-02
-3. #216 F56-03, then retarget #218 to main and merge F56-04
-4. This branch (F56-05 cross-flow test and this document) after rebasing onto
-   the new main so it contains only its own commit
-5. F56-06 demo tooling, then F56-07 handoff
+## Remaining merge order
 
-Lanes 2 and 3 are independent and may be merged in either order.
+1. Merge #219 (`test/f56-05-release-gates` -> `main`): F56-05 cross-flow SQL test and `RELEASE_GATE.md` only
+2. Retarget/synchronize #220 (`docs/f56-06-committee-demo`) and merge F56-06 demo tooling and `DEMO_SCRIPT.md`
+3. Retarget/synchronize #221 (`docs/f56-07-release-handoff`) and merge F56-07 final `HANDOFF.md`
 
 ## Gate contents
 
