@@ -18,8 +18,8 @@ import type { PageResponse, SpringPage } from './types'
  * BE-19 records paid sales atomically. FE-12 owns confirmation and receipts.
  */
 
-/** Payment methods of com.sportify.payment.entity.PaymentMethod. */
-export const PAYMENT_METHODS = ['CASH', 'CREDIT_CARD', 'BANK_TRANSFER', 'MOMO', 'VNPAY', 'ZALOPAY'] as const
+/** Supported payment methods at the desk (CASH and BANK_TRANSFER). */
+export const PAYMENT_METHODS = ['CASH', 'BANK_TRANSFER'] as const
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number]
 
 /** One row of GET /members (com.sportify.identity.dto.MemberSearchResponse). */

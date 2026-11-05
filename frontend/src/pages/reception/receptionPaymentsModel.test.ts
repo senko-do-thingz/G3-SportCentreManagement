@@ -96,7 +96,8 @@ describe('FE-12 receptionPaymentsModel - verify and confirm', () => {
     expect(canConfirm(cash, DUE)).toBe(true)
     expect(canConfirm({ ...cash, verified: false }, DUE)).toBe(false)
     expect(canConfirm({ ...VALID_TRANSFER, reference: '  ' }, DUE)).toBe(false)
-    expect(initialConfirmForm('MOMO').method).toBe('MOMO')
+    expect(initialConfirmForm('CASH').method).toBe('CASH')
+    expect(initialConfirmForm('MOMO').method).toBe('BANK_TRANSFER')
     expect(initialConfirmForm(null).method).toBe('BANK_TRANSFER')
   })
 
@@ -267,7 +268,7 @@ describe('FE-12 receptionPaymentsModel - refunds', () => {
 })
 
 describe('FE-12 round 3 backend amount contract', () => {
-  it.each(['CASH', 'BANK_TRANSFER', 'CREDIT_CARD', 'MOMO', 'VNPAY', 'ZALOPAY'])(
+  it.each(['CASH', 'BANK_TRANSFER'])(
     '%s confirms only the exact amount and requires verification', (method) => {
       const form = { ...VALID_TRANSFER, method, reference: method === 'CASH' ? '' : 'TEST-REFERENCE' }
       expect(canConfirm(form, DUE)).toBe(true)

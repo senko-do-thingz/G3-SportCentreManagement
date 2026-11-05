@@ -77,7 +77,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     /**
      * Money taken at the desk (BE-19): the payment is created already SUCCESS, with payment_time now, the method and
-     * reference the receptionist recorded and confirmed_by_user_id. Any method is allowed at the desk, cash included.
+     * reference the receptionist recorded and confirmed_by_user_id. Supported desk methods are CASH and BANK_TRANSFER.
      */
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
@@ -86,6 +86,10 @@ public class PaymentServiceImpl implements PaymentService {
         validateNewPayment(member, amount);
         if (method == null) {
             throw new BusinessRuleException("Payment method is required for a desk payment");
+        }
+        if (!SUPPORTED_PAYMENT_METHODS.contains(method)) {
+            throw new BusinessRuleException("Payment method " + method
+                    + " is not supported. Supported methods: " + SUPPORTED_PAYMENT_METHODS);
         }
         if (confirmedBy == null || !SecurityUtils.isStaff(confirmedBy)) {
             throw new BusinessRuleException("Only staff users can record a desk payment");
@@ -144,9 +148,12 @@ public class PaymentServiceImpl implements PaymentService {
                     + payment.getPaymentStatus() + ", expected PENDING");
         }
 
-        if (actualMethod != null) {
-            payment.setPaymentMethod(actualMethod);
+        PaymentMethod effectiveMethod = actualMethod != null ? actualMethod : payment.getPaymentMethod();
+        if (effectiveMethod == null || !SUPPORTED_PAYMENT_METHODS.contains(effectiveMethod)) {
+            throw new BusinessRuleException("Payment method " + effectiveMethod
+                    + " is not supported. Supported methods: " + SUPPORTED_PAYMENT_METHODS);
         }
+        payment.setPaymentMethod(effectiveMethod);
 
         var capturedAt = cashCaptureService.prepareCollection(paymentId);
         LocalDateTime now = capturedAt == null ? LocalDateTime.now(clock) : LocalDateTime.ofInstant(capturedAt, clock.getZone());
@@ -258,6 +265,10 @@ public class PaymentServiceImpl implements PaymentService {
         if (!isStaffUser && !ONLINE_ALLOWED_PAYMENT_METHODS.contains(newMethod)) {
             throw new BusinessRuleException("Payment method " + newMethod
                     + " is not allowed for online payment. Allowed methods: " + ONLINE_ALLOWED_PAYMENT_METHODS);
+        }
+        if (isStaffUser && !SUPPORTED_PAYMENT_METHODS.contains(newMethod)) {
+            throw new BusinessRuleException("Payment method " + newMethod
+                    + " is not supported. Supported methods: " + SUPPORTED_PAYMENT_METHODS);
         }
 
         payment.setPaymentMethod(newMethod);

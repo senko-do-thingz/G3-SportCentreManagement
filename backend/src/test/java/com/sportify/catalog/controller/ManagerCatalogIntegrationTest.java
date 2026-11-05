@@ -733,7 +733,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         MemberCardPurchaseRequest purchaseReq = MemberCardPurchaseRequest.builder()
                 .memberId(memberProfile.getId())
                 .tierId(testTier.getId())
-                .paymentMethod(PaymentMethod.VNPAY)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
         MemberCardResponse response = membershipCardService.purchaseCard(purchaseReq, memberUser);
 

@@ -19,7 +19,7 @@ const TRANSACTION_STATUSES = [
   { value: 'FAILED', label: 'Failed' },
   { value: 'REFUNDED', label: 'Refunded' },
 ]
-const PAYMENT_METHODS = ['CASH', 'CREDIT_CARD', 'BANK_TRANSFER', 'MOMO', 'VNPAY', 'ZALOPAY'].map((value) => ({ value, label: humanizeCode(value) }))
+const PAYMENT_METHODS = ['CASH', 'BANK_TRANSFER'].map((value) => ({ value, label: humanizeCode(value) }))
 
 function currentMonth(): string {
   return businessDate().slice(0, 7)

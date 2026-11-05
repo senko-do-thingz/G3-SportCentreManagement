@@ -341,6 +341,15 @@ public class SportPackageServiceImpl implements SportPackageService {
         if (actualMethod != null && registration.getPayment() == null) {
             throw new BusinessRuleException("Cannot specify payment method for a registration with no linked payment");
         }
+        if (actualMethod != null && !PaymentService.SUPPORTED_PAYMENT_METHODS.contains(actualMethod)) {
+            throw new BusinessRuleException("Payment method " + actualMethod
+                    + " is not supported. Supported methods: " + PaymentService.SUPPORTED_PAYMENT_METHODS);
+        }
+        if (actualMethod == null && registration.getPayment() != null && registration.getPayment().getPaymentMethod() != null
+                && !PaymentService.SUPPORTED_PAYMENT_METHODS.contains(registration.getPayment().getPaymentMethod())) {
+            throw new BusinessRuleException("Payment method " + registration.getPayment().getPaymentMethod()
+                    + " is not supported. Supported methods: " + PaymentService.SUPPORTED_PAYMENT_METHODS);
+        }
 
         LocalDate today = LocalDate.now(clock);
         if (registration.getStartDate().isBefore(today)) {

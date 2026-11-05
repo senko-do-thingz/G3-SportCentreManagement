@@ -812,13 +812,35 @@ class PaymentVerificationServiceImplTest {
     }
 
     @Test
-    @DisplayName("Desk sale by card with a different amount: 409, only cash may be more")
+    @DisplayName("Desk sale by bank transfer with a different amount: 409, only cash may be more")
     void recordDeskPayment_NonCashDifferent_Mismatch() {
-        assertThatThrownBy(() -> service.recordDeskPayment(member, new BigDecimal("380000.00"), PaymentMethod.CREDIT_CARD,
-                "SLIP-1", new BigDecimal("400000"), receptionist))
+        assertThatThrownBy(() -> service.recordDeskPayment(member, new BigDecimal("380000.00"), PaymentMethod.BANK_TRANSFER,
+                "FT-SLIP-1", new BigDecimal("400000"), receptionist))
                 .isInstanceOf(PaymentAmountMismatchException.class)
                 .hasMessageContaining("only cash can be more");
         verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    @DisplayName("Confirm payment and desk sale reject unsupported payment methods (CREDIT_CARD, MOMO, VNPAY, ZALOPAY)")
+    void unsupportedMethods_RejectedInConfirmAndDeskSale() {
+        for (PaymentMethod unsupported : List.of(
+                PaymentMethod.CREDIT_CARD,
+                PaymentMethod.MOMO,
+                PaymentMethod.VNPAY,
+                PaymentMethod.ZALOPAY
+        )) {
+            assertThatThrownBy(() -> service.confirmPayment(1L,
+                    confirmRequest(unsupported, "REF-1", "380000"), receptionist))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("is not supported");
+
+            assertThatThrownBy(() -> service.recordDeskPayment(member, new BigDecimal("380000.00"), unsupported,
+                    "REF-1", new BigDecimal("380000"), receptionist))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("is not supported");
+        }
+        verifyNoInteractions(paymentRepository);
     }
 
     @Test

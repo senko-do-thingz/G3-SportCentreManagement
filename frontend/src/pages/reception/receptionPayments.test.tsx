@@ -873,7 +873,7 @@ describe('FE-12 access', () => {
 })
 
 describe('FE-12 round 3 integration regressions', () => {
-  it.each([['CASH', '800000'], ['CREDIT_CARD', '800000'], ['CREDIT_CARD', '820000']])(
+  it.each([['CASH', '800000'], ['BANK_TRANSFER', '800000'], ['BANK_TRANSFER', '820000']])(
     '%s amount %s cannot submit a mismatch', async (method, amount) => {
       const { calls } = await open('/reception/payments/41')
       const { user, form } = await fillTransfer(amount, method === 'CASH' ? '' : 'TEST-REFERENCE')

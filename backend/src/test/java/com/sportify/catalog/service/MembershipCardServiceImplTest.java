@@ -618,13 +618,13 @@ public class MembershipCardServiceImplTest {
     void purchaseCard_AsMember_CreatesPendingPaymentAndSetsPaymentId() {
         MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
                 .tierId(2L)
-                .paymentMethod(PaymentMethod.MOMO)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
         when(tierRepository.findById(2L)).thenReturn(Optional.of(goldTier));
         when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of());
         stubNewCard(25L);
-        when(paymentService.createPendingPayment(eq(memberProfile), eq(goldTier.getPrice()), eq(PaymentMethod.MOMO)))
+        when(paymentService.createPendingPayment(eq(memberProfile), eq(goldTier.getPrice()), eq(PaymentMethod.BANK_TRANSFER)))
                 .thenReturn(Payment.builder().id(50L).paymentCode("PAY-1005").paymentStatus(PaymentStatus.PENDING).build());
 
         MemberCardResponse res = membershipCardService.purchaseCard(req, memberUser);
@@ -782,6 +782,47 @@ public class MembershipCardServiceImplTest {
 
         assertEquals(CardStatus.ACTIVE, res.getStatus());
         verify(paymentService).markPaymentSuccess(99L, receptionistUser, PaymentMethod.CASH);
+    }
+
+    @Test
+    void activateCard_WithUnsupportedStoredOrActualMethod_ThrowsBusinessRuleExceptionWithoutSideEffects() {
+        Payment payment = Payment.builder()
+                .id(99L)
+                .paymentCode("PAY-0099")
+                .paymentStatus(PaymentStatus.PENDING)
+                .paymentMethod(PaymentMethod.MOMO)
+                .build();
+        MemberCard pending = MemberCard.builder()
+                .id(42L)
+                .cardCode("CARD-42")
+                .member(memberProfile)
+                .tier(goldTier)
+                .status(CardStatus.PENDING_PAYMENT)
+                .payment(payment)
+                .pricePaid(goldTier.getPrice())
+                .build();
+        when(memberCardRepository.findById(42L)).thenReturn(Optional.of(pending));
+
+        for (PaymentMethod unsupported : List.of(
+                PaymentMethod.CREDIT_CARD,
+                PaymentMethod.MOMO,
+                PaymentMethod.VNPAY,
+                PaymentMethod.ZALOPAY
+        )) {
+            payment.setPaymentMethod(unsupported);
+            assertThrows(BusinessRuleException.class,
+                    () -> membershipCardService.activateCard(42L, receptionistUser, null));
+            assertEquals(CardStatus.PENDING_PAYMENT, pending.getStatus());
+
+            payment.setPaymentMethod(PaymentMethod.BANK_TRANSFER);
+            assertThrows(BusinessRuleException.class,
+                    () -> membershipCardService.activateCard(42L, receptionistUser, unsupported));
+            assertEquals(CardStatus.PENDING_PAYMENT, pending.getStatus());
+        }
+
+        verify(memberCardRepository, never()).save(any(MemberCard.class));
+        verify(paymentService, never()).markPaymentSuccess(anyLong(), any(), any());
+        org.mockito.Mockito.verifyNoInteractions(paymentVerificationService);
     }
 
     @Test
@@ -1106,13 +1147,13 @@ public class MembershipCardServiceImplTest {
         when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class))).thenReturn(List.of());
         when(memberCardRepository.getNextCardCodeSequence()).thenReturn(99L);
         when(codeFormatter.formatCardCode(99L)).thenReturn("CARD-0099");
-        when(paymentService.createPendingPayment(eq(memberProfile), any(BigDecimal.class), eq(PaymentMethod.VNPAY)))
+        when(paymentService.createPendingPayment(eq(memberProfile), any(BigDecimal.class), eq(PaymentMethod.BANK_TRANSFER)))
                 .thenReturn(Payment.builder().id(501L).paymentCode("PAY-0501").build());
         when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
 
         MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
                 .tierId(2L)
-                .paymentMethod(PaymentMethod.VNPAY)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
 
         MemberCardResponse res = membershipCardService.purchaseCard(req, memberUser);
@@ -1475,13 +1516,13 @@ public class MembershipCardServiceImplTest {
                 .thenReturn(List.of(activeSilverCard));
         when(memberCardRepository.getNextCardCodeSequence()).thenReturn(105L);
         when(codeFormatter.formatCardCode(105L)).thenReturn("CARD-0105");
-        when(paymentService.createPendingPayment(eq(memberProfile), any(BigDecimal.class), eq(PaymentMethod.VNPAY)))
+        when(paymentService.createPendingPayment(eq(memberProfile), any(BigDecimal.class), eq(PaymentMethod.BANK_TRANSFER)))
                 .thenReturn(Payment.builder().id(301L).build());
         when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
 
         MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
                 .tierId(3L)
-                .paymentMethod(PaymentMethod.VNPAY)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
 
         MemberCardResponse res = membershipCardService.purchaseCard(req, memberUser);
@@ -1534,13 +1575,13 @@ public class MembershipCardServiceImplTest {
                 .thenReturn(List.of(activeGoldCard));
         when(memberCardRepository.getNextCardCodeSequence()).thenReturn(106L);
         when(codeFormatter.formatCardCode(106L)).thenReturn("CARD-0106");
-        when(paymentService.createPendingPayment(eq(memberProfile), any(BigDecimal.class), eq(PaymentMethod.VNPAY)))
+        when(paymentService.createPendingPayment(eq(memberProfile), any(BigDecimal.class), eq(PaymentMethod.BANK_TRANSFER)))
                 .thenReturn(Payment.builder().id(302L).build());
         when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
 
         MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
                 .tierId(2L)
-                .paymentMethod(PaymentMethod.VNPAY)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
 
         MemberCardResponse res = membershipCardService.purchaseCard(req, memberUser);
@@ -1803,13 +1844,13 @@ public class MembershipCardServiceImplTest {
                 .thenReturn(List.of(cardB));
         when(memberCardRepository.getNextCardCodeSequence()).thenReturn(120L);
         when(codeFormatter.formatCardCode(120L)).thenReturn("CARD-0120");
-        when(paymentService.createPendingPayment(eq(memberProfile), any(BigDecimal.class), eq(PaymentMethod.VNPAY)))
+        when(paymentService.createPendingPayment(eq(memberProfile), any(BigDecimal.class), eq(PaymentMethod.BANK_TRANSFER)))
                 .thenReturn(Payment.builder().id(402L).build());
         when(memberCardRepository.save(any(MemberCard.class))).thenAnswer(i -> i.getArgument(0));
 
         MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
                 .tierId(30L)
-                .paymentMethod(PaymentMethod.VNPAY)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
 
         MemberCardResponse res = membershipCardService.purchaseCard(req, memberUser);
@@ -1870,7 +1911,7 @@ public class MembershipCardServiceImplTest {
 
         MemberCardPurchaseRequest req = MemberCardPurchaseRequest.builder()
                 .tierId(3L)
-                .paymentMethod(PaymentMethod.MOMO)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
 
         BusinessRuleException ex = assertThrows(BusinessRuleException.class,

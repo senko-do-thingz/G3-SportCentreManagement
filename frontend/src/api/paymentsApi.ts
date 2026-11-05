@@ -15,10 +15,10 @@ export const PAYMENT_STATUSES = ['PENDING', 'SUCCESS', 'FAILED', 'REFUNDED'] as 
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number]
 
 /**
- * Methods a member may choose online: PaymentService.ONLINE_ALLOWED_PAYMENT_METHODS. CASH and
- * CREDIT_CARD are staff only and are rejected with a 400 for a member.
+ * Methods a member may choose online: PaymentService.ONLINE_ALLOWED_PAYMENT_METHODS. CASH is
+ * staff only and is rejected with a 400 for a member.
  */
-export const ONLINE_PAYMENT_METHODS = ['BANK_TRANSFER', 'MOMO', 'VNPAY', 'ZALOPAY'] as const
+export const ONLINE_PAYMENT_METHODS = ['BANK_TRANSFER'] as const
 export type OnlinePaymentMethod = (typeof ONLINE_PAYMENT_METHODS)[number]
 
 /** Mirrors com.sportify.payment.dto.BankTransferInstructions. */

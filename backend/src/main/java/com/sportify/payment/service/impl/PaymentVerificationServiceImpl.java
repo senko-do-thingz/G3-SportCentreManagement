@@ -124,6 +124,10 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
             throw new BusinessRuleException("Amount received must be greater than zero");
         }
         PaymentMethod method = request.getMethod();
+        if (!PaymentService.SUPPORTED_PAYMENT_METHODS.contains(method)) {
+            throw new BusinessRuleException("Payment method " + method
+                    + " is not supported. Supported methods: " + PaymentService.SUPPORTED_PAYMENT_METHODS);
+        }
         String reference = requireReference(method, request.getReferenceCode());
         String note = trimToNull(request.getNote());
 
@@ -172,6 +176,10 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
                                      BigDecimal amountReceived, UserAccount actor) {
         requireStaff(actor);
         PaymentMethod chosen = method != null ? method : PaymentMethod.CASH;
+        if (!PaymentService.SUPPORTED_PAYMENT_METHODS.contains(chosen)) {
+            throw new BusinessRuleException("Payment method " + chosen
+                    + " is not supported. Supported methods: " + PaymentService.SUPPORTED_PAYMENT_METHODS);
+        }
         String reference = requireReference(chosen, referenceCode);
         BigDecimal received = amountReceived != null ? amountReceived : amount;
         if (received == null || received.signum() <= 0) {

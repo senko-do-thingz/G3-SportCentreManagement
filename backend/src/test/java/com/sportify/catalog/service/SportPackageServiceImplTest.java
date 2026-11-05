@@ -552,14 +552,14 @@ public class SportPackageServiceImplTest {
     void registerPackage_AsMember_CreatesPendingPaymentAndSetsPaymentId() {
         PackageRegistrationRequest req = PackageRegistrationRequest.builder()
                 .packageId(10L)
-                .paymentMethod(PaymentMethod.VNPAY)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
         when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(sportPackage));
         when(registrationRepository.getNextRegistrationCodeSequence()).thenReturn(77L);
         when(codeFormatter.formatPackageRegCode(77L)).thenReturn("REG-PKG-0077");
-        when(paymentService.createPendingPayment(eq(memberProfile), any(BigDecimal.class), eq(PaymentMethod.VNPAY)))
+        when(paymentService.createPendingPayment(eq(memberProfile), any(BigDecimal.class), eq(PaymentMethod.BANK_TRANSFER)))
                 .thenReturn(Payment.builder().id(777L).paymentCode("PAY-1077").paymentStatus(PaymentStatus.PENDING).build());
         when(registrationRepository.save(any(SportPackageRegistration.class))).thenAnswer(i -> i.getArgument(0));
 
@@ -661,6 +661,48 @@ public class SportPackageServiceImplTest {
 
         assertEquals(PackageRegistrationStatus.ACTIVE, res.getStatus());
         verify(paymentService).markPaymentSuccess(88L, receptionistUser, PaymentMethod.CASH);
+    }
+
+    @Test
+    void activateRegistration_WithUnsupportedStoredOrActualMethod_ThrowsBusinessRuleExceptionWithoutSideEffects() {
+        Payment payment = Payment.builder()
+                .id(88L)
+                .paymentCode("PAY-0088")
+                .paymentStatus(PaymentStatus.PENDING)
+                .paymentMethod(PaymentMethod.MOMO)
+                .build();
+        SportPackageRegistration reg = SportPackageRegistration.builder()
+                .id(88L)
+                .registrationCode("REG-PKG-0088")
+                .member(memberProfile)
+                .sportPackage(sportPackage)
+                .status(PackageRegistrationStatus.PENDING_PAYMENT)
+                .payment(payment)
+                .startDate(LocalDate.now(clock))
+                .endDate(LocalDate.now(clock).plusDays(29))
+                .build();
+        when(registrationRepository.findById(88L)).thenReturn(Optional.of(reg));
+
+        for (PaymentMethod unsupported : List.of(
+                PaymentMethod.CREDIT_CARD,
+                PaymentMethod.MOMO,
+                PaymentMethod.VNPAY,
+                PaymentMethod.ZALOPAY
+        )) {
+            payment.setPaymentMethod(unsupported);
+            assertThrows(BusinessRuleException.class,
+                    () -> sportPackageService.activateRegistration(88L, receptionistUser, null));
+            assertEquals(PackageRegistrationStatus.PENDING_PAYMENT, reg.getStatus());
+
+            payment.setPaymentMethod(PaymentMethod.BANK_TRANSFER);
+            assertThrows(BusinessRuleException.class,
+                    () -> sportPackageService.activateRegistration(88L, receptionistUser, unsupported));
+            assertEquals(PackageRegistrationStatus.PENDING_PAYMENT, reg.getStatus());
+        }
+
+        verify(registrationRepository, never()).save(any(SportPackageRegistration.class));
+        verify(paymentService, never()).markPaymentSuccess(any(), any(), any());
+        org.mockito.Mockito.verifyNoInteractions(paymentVerificationService);
     }
 
     @Test

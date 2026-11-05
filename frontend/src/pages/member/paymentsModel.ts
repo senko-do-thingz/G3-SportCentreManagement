@@ -21,8 +21,7 @@ export const PAYMENT_PATHS = {
 } as const
 
 /**
- * Methods a member can pay with online today. The backend also accepts MOMO, VNPAY and ZALOPAY,
- * but none of them has a checkout yet, so the summary shows them disabled ("Not available yet").
+ * Methods a member can pay with online today. Only BANK_TRANSFER is supported online.
  */
 export const AVAILABLE_ONLINE_METHODS: readonly string[] = ['BANK_TRANSFER']
 
@@ -35,11 +34,7 @@ export function isMethodAvailable(method: string): boolean {
 
 const METHOD_LABELS: Record<string, string> = {
   BANK_TRANSFER: 'Bank transfer',
-  MOMO: 'MoMo',
-  VNPAY: 'VNPay',
-  ZALOPAY: 'ZaloPay',
   CASH: 'Cash',
-  CREDIT_CARD: 'Credit card',
 }
 
 const STATUS_LABELS: Record<string, string> = {

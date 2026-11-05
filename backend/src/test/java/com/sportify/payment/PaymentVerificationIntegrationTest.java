@@ -635,6 +635,181 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("PUT /membership-cards/{id}/activate rejects legacy PENDING unsupported method with empty body and explicit unsupported method, then succeeds with CASH or BANK_TRANSFER")
+    void activateCardEndpoint_UnsupportedMethodsRejectedWithoutSideEffects_SupportedMethodsSucceed() throws Exception {
+        Long[] cashIds = pendingCard();
+        Long[] transferIds = pendingCard();
+        UserAccount receptionist = tx().execute(s -> newUser("RECEPTIONIST"));
+
+        for (PaymentMethod unsupported : List.of(
+                PaymentMethod.MOMO,
+                PaymentMethod.VNPAY,
+                PaymentMethod.ZALOPAY,
+                PaymentMethod.CREDIT_CARD
+        )) {
+            jdbcTemplate.update("UPDATE payment SET payment_method = ? WHERE id = ?", unsupported.name(), cashIds[0]);
+
+            // (a) Legacy PENDING unsupported method with missing request body and empty JSON body
+            mockMvc.perform(put("/api/v1/membership-cards/" + cashIds[1] + "/activate")
+                            .with(user(new CustomUserDetails(receptionist))))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("is not supported")));
+
+            mockMvc.perform(put("/api/v1/membership-cards/" + cashIds[1] + "/activate")
+                            .with(user(new CustomUserDetails(receptionist)))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("is not supported")));
+
+            assertPendingCardUnchangedWithoutSettlementSideEffects(cashIds[0], cashIds[1], unsupported);
+
+            // (b) Explicitly unsupported method in request body against both legacy and supported stored methods
+            jdbcTemplate.update("UPDATE payment SET payment_method = 'BANK_TRANSFER' WHERE id = ?", cashIds[0]);
+            mockMvc.perform(put("/api/v1/membership-cards/" + cashIds[1] + "/activate")
+                            .with(user(new CustomUserDetails(receptionist)))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"paymentMethod\":\"" + unsupported.name() + "\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("is not supported")));
+
+            assertPendingCardUnchangedWithoutSettlementSideEffects(cashIds[0], cashIds[1], PaymentMethod.BANK_TRANSFER);
+        }
+
+        // (c) Supported CASH or BANK_TRANSFER replacement method succeeds
+        jdbcTemplate.update("UPDATE payment SET payment_method = 'MOMO' WHERE id = ?", cashIds[0]);
+        mockMvc.perform(put("/api/v1/membership-cards/" + cashIds[1] + "/activate")
+                        .with(user(new CustomUserDetails(receptionist)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"paymentMethod\":\"CASH\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+        assertReceiptIssued(cashIds[0], InvoiceItemType.MEMBERSHIP_CARD, cashIds[1], "1200000");
+
+        jdbcTemplate.update("UPDATE payment SET payment_method = 'VNPAY' WHERE id = ?", transferIds[0]);
+        mockMvc.perform(put("/api/v1/membership-cards/" + transferIds[1] + "/activate")
+                        .with(user(new CustomUserDetails(receptionist)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"paymentMethod\":\"BANK_TRANSFER\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+        assertReceiptIssuedWithMethod(transferIds[0], InvoiceItemType.MEMBERSHIP_CARD, transferIds[1], "1200000", PaymentMethod.BANK_TRANSFER);
+
+        Long[] defaultTransferIds = pendingCard();
+        mockMvc.perform(put("/api/v1/membership-cards/" + defaultTransferIds[1] + "/activate")
+                        .with(user(new CustomUserDetails(receptionist))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+        assertReceiptIssuedWithMethod(defaultTransferIds[0], InvoiceItemType.MEMBERSHIP_CARD, defaultTransferIds[1], "1200000", PaymentMethod.BANK_TRANSFER);
+    }
+
+    @Test
+    @DisplayName("PUT /packages/registrations/{id}/activate rejects legacy PENDING unsupported method with empty body and explicit unsupported method, then succeeds with CASH or BANK_TRANSFER")
+    void activateRegistrationEndpoint_UnsupportedMethodsRejectedWithoutSideEffects_SupportedMethodsSucceed() throws Exception {
+        Long[] cashIds = pendingRegistration();
+        Long[] transferIds = pendingRegistration();
+        UserAccount receptionist = tx().execute(s -> newUser("RECEPTIONIST"));
+
+        for (PaymentMethod unsupported : List.of(
+                PaymentMethod.MOMO,
+                PaymentMethod.VNPAY,
+                PaymentMethod.ZALOPAY,
+                PaymentMethod.CREDIT_CARD
+        )) {
+            jdbcTemplate.update("UPDATE payment SET payment_method = ? WHERE id = ?", unsupported.name(), cashIds[0]);
+
+            // (a) Legacy PENDING unsupported method with missing request body and empty JSON body
+            mockMvc.perform(put("/api/v1/packages/registrations/" + cashIds[1] + "/activate")
+                            .with(user(new CustomUserDetails(receptionist))))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("is not supported")));
+
+            mockMvc.perform(put("/api/v1/packages/registrations/" + cashIds[1] + "/activate")
+                            .with(user(new CustomUserDetails(receptionist)))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("is not supported")));
+
+            assertPendingRegistrationUnchangedWithoutSettlementSideEffects(cashIds[0], cashIds[1], unsupported);
+
+            // (b) Explicitly unsupported method in request body against both legacy and supported stored methods
+            jdbcTemplate.update("UPDATE payment SET payment_method = 'BANK_TRANSFER' WHERE id = ?", cashIds[0]);
+            mockMvc.perform(put("/api/v1/packages/registrations/" + cashIds[1] + "/activate")
+                            .with(user(new CustomUserDetails(receptionist)))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"paymentMethod\":\"" + unsupported.name() + "\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("is not supported")));
+
+            assertPendingRegistrationUnchangedWithoutSettlementSideEffects(cashIds[0], cashIds[1], PaymentMethod.BANK_TRANSFER);
+        }
+
+        // (c) Supported CASH or BANK_TRANSFER replacement method succeeds
+        jdbcTemplate.update("UPDATE payment SET payment_method = 'ZALOPAY' WHERE id = ?", cashIds[0]);
+        mockMvc.perform(put("/api/v1/packages/registrations/" + cashIds[1] + "/activate")
+                        .with(user(new CustomUserDetails(receptionist)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"paymentMethod\":\"CASH\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+        assertReceiptIssued(cashIds[0], InvoiceItemType.SPORT_PACKAGE, cashIds[1], "380000");
+
+        jdbcTemplate.update("UPDATE payment SET payment_method = 'CREDIT_CARD' WHERE id = ?", transferIds[0]);
+        mockMvc.perform(put("/api/v1/packages/registrations/" + transferIds[1] + "/activate")
+                        .with(user(new CustomUserDetails(receptionist)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"paymentMethod\":\"BANK_TRANSFER\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+        assertReceiptIssuedWithMethod(transferIds[0], InvoiceItemType.SPORT_PACKAGE, transferIds[1], "380000", PaymentMethod.BANK_TRANSFER);
+
+        Long[] defaultTransferIds = pendingRegistration();
+        mockMvc.perform(put("/api/v1/packages/registrations/" + defaultTransferIds[1] + "/activate")
+                        .with(user(new CustomUserDetails(receptionist))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+        assertReceiptIssuedWithMethod(defaultTransferIds[0], InvoiceItemType.SPORT_PACKAGE, defaultTransferIds[1], "380000", PaymentMethod.BANK_TRANSFER);
+    }
+
+    private void assertPendingCardUnchangedWithoutSettlementSideEffects(Long paymentId, Long cardId, PaymentMethod expectedStoredMethod) {
+        tx().executeWithoutResult(s -> {
+            Payment payment = paymentRepository.findById(paymentId).orElseThrow();
+            assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
+            assertThat(payment.getPaymentMethod()).isEqualTo(expectedStoredMethod);
+            assertThat(payment.getPaymentTime()).isNull();
+            assertThat(payment.getConfirmedByUser()).isNull();
+            MemberCard card = memberCardRepository.findById(cardId).orElseThrow();
+            assertThat(card.getStatus()).isEqualTo(CardStatus.PENDING_PAYMENT);
+            assertThat(invoiceRepository.findByPaymentId(paymentId)).isEmpty();
+            assertThat(activityRows(payment.getPaymentCode(), "PAYMENT_CONFIRMED")).isZero();
+            Integer paymentAuditRows = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM activity_log WHERE entity_type = 'PAYMENT' AND entity_id = ?",
+                    Integer.class, paymentId);
+            assertThat(paymentAuditRows).isZero();
+        });
+    }
+
+    private void assertPendingRegistrationUnchangedWithoutSettlementSideEffects(Long paymentId, Long registrationId, PaymentMethod expectedStoredMethod) {
+        tx().executeWithoutResult(s -> {
+            Payment payment = paymentRepository.findById(paymentId).orElseThrow();
+            assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
+            assertThat(payment.getPaymentMethod()).isEqualTo(expectedStoredMethod);
+            assertThat(payment.getPaymentTime()).isNull();
+            assertThat(payment.getConfirmedByUser()).isNull();
+            SportPackageRegistration reg = registrationRepository.findById(registrationId).orElseThrow();
+            assertThat(reg.getStatus()).isEqualTo(PackageRegistrationStatus.PENDING_PAYMENT);
+            assertThat(reg.getActivatedAt()).isNull();
+            assertThat(invoiceRepository.findByPaymentId(paymentId)).isEmpty();
+            assertThat(activityRows(payment.getPaymentCode(), "PAYMENT_CONFIRMED")).isZero();
+            Integer paymentAuditRows = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM activity_log WHERE entity_type = 'PAYMENT' AND entity_id = ?",
+                    Integer.class, paymentId);
+            assertThat(paymentAuditRows).isZero();
+        });
+    }
+
+    @Test
     @DisplayName("Fail cancels the card request, payment FAILED with the reason, activity log written")
     void failCard_CancelsRequest() {
         Long[] ids = pendingCard();
@@ -702,10 +877,14 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void assertReceiptIssued(Long paymentId, InvoiceItemType type, Long itemId, String total) {
+        assertReceiptIssuedWithMethod(paymentId, type, itemId, total, PaymentMethod.CASH);
+    }
+
+    private void assertReceiptIssuedWithMethod(Long paymentId, InvoiceItemType type, Long itemId, String total, PaymentMethod expectedMethod) {
         tx().executeWithoutResult(s -> {
             Payment payment = paymentRepository.findById(paymentId).orElseThrow();
             assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
-            assertThat(payment.getPaymentMethod()).isEqualTo(PaymentMethod.CASH);
+            assertThat(payment.getPaymentMethod()).isEqualTo(expectedMethod);
             List<Invoice> invoices = invoiceRepository.findByPaymentId(paymentId);
             assertThat(invoices).hasSize(1);
             assertThat(invoices.get(0).getStatus()).isEqualTo(InvoiceStatus.PAID);
@@ -1093,7 +1272,7 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("BE-19: desk card sale by credit card with less than the price answers 409 and creates nothing")
+    @DisplayName("BE-19: desk card sale by bank transfer with less than the price answers 409 and creates nothing")
     void deskCardSale_NonCashAmountDiffers_ConflictAndNothingCreated() throws Exception {
         MemberProfile member = tx().execute(st -> newMember());
         Long tierId = newTier();
@@ -1103,7 +1282,7 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
                         .with(user(new CustomUserDetails(receptionist)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"memberId\":" + member.getId() + ",\"tierId\":" + tierId
-                                + ",\"paymentMethod\":\"CREDIT_CARD\",\"referenceCode\":\"SLIP-BE19-1\""
+                                + ",\"paymentMethod\":\"BANK_TRANSFER\",\"referenceCode\":\"FT-BE19-1\""
                                 + ",\"amountReceived\":1100000}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("PAYMENT_AMOUNT_MISMATCH"));
