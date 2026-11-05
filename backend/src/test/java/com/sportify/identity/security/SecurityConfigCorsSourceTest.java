@@ -59,7 +59,8 @@ class SecurityConfigCorsSourceTest {
         CorsConfiguration configuration = configurationFor("http://localhost:5173");
 
         assertEquals(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"), configuration.getAllowedMethods());
-        assertEquals(List.of("Authorization", "Content-Type", "Idempotency-Key"), configuration.getAllowedHeaders());
+        assertEquals(List.of("Authorization", "Content-Type", "Idempotency-Key", "X-Correlation-Id"), configuration.getAllowedHeaders());
+        assertEquals(List.of("X-Correlation-Id"), configuration.getExposedHeaders());
         assertFalse(Boolean.TRUE.equals(configuration.getAllowCredentials()));
         assertEquals(3600L, configuration.getMaxAge());
     }

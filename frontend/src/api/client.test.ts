@@ -378,4 +378,63 @@ describe('api client', () => {
       unsubscribe()
     })
   })
+
+  describe('D07 correlation ID propagation', () => {
+    it('generates and sends an X-Correlation-Id header on outbound requests', async () => {
+      const { calls } = installFakeFetch(() => json(200, { ok: true }))
+      await api.get('/users/me')
+      expect(calls).toHaveLength(1)
+      expect(calls[0].correlationId).toBeDefined()
+      expect(calls[0].correlationId).toMatch(/^[a-zA-Z0-9_-]{1,64}$/)
+    })
+
+    it('preserves a caller-supplied X-Correlation-Id header', async () => {
+      const { calls } = installFakeFetch(() => json(200, { ok: true }))
+      await api.get('/users/me', { headers: { 'X-Correlation-Id': 'custom-corr-12345' } })
+      expect(calls[0].correlationId).toBe('custom-corr-12345')
+    })
+
+    it('preserves the exact same correlation ID across 401 token refresh retries', async () => {
+      const { calls } = installFakeFetch((call) => {
+        if (call.path === '/auth/refresh') {
+          return json(200, { accessToken: 'access-2', refreshToken: 'refresh-2' })
+        }
+        return call.authorization === 'Bearer access-2'
+          ? json(200, { ok: true })
+          : backendError(401, 'Unauthorized')
+      })
+
+      await api.get('/users/me')
+      expect(calls.map((c) => c.path)).toEqual(['/users/me', '/auth/refresh', '/users/me'])
+      const initialCorrId = calls[0].correlationId
+      expect(initialCorrId).toBeDefined()
+      // Refresh request has its own correlation ID
+      expect(calls[1].correlationId).toBeDefined()
+      // Retried request preserves the initial correlation ID
+      expect(calls[2].correlationId).toBe(initialCorrId)
+    })
+
+    it('propagates server correlation ID into ApiError on failed responses', async () => {
+      installFakeFetch(() =>
+        backendError(404, 'Not Found', null, { 'X-Correlation-Id': 'server-error-cid-999' }),
+      )
+      const error = await api.get('/missing').catch((err: unknown) => err)
+      expect(error).toBeInstanceOf(ApiError)
+      expect((error as ApiError).correlationId).toBe('server-error-cid-999')
+    })
+
+    it('captures server correlation ID in ApiDownload result', async () => {
+      installFakeFetch(() =>
+        new Response('data', {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/plain',
+            'X-Correlation-Id': 'download-cid-888',
+          },
+        }),
+      )
+      const download = await api.getDownload('/export')
+      expect(download.correlationId).toBe('download-cid-888')
+    })
+  })
 })
