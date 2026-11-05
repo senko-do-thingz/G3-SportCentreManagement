@@ -119,11 +119,11 @@ class PaymentServiceImplTest {
         when(codeFormatter.formatPaymentCode(1001L)).thenReturn("PAY-1001");
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Payment payment = paymentService.createPendingPayment(ownerProfile, BigDecimal.valueOf(300000.00), PaymentMethod.MOMO);
+        Payment payment = paymentService.createPendingPayment(ownerProfile, BigDecimal.valueOf(300000.00), PaymentMethod.BANK_TRANSFER);
 
         assertThat(payment).isNotNull();
         assertThat(payment.getPaymentCode()).isEqualTo("PAY-1001");
-        assertThat(payment.getPaymentMethod()).isEqualTo(PaymentMethod.MOMO);
+        assertThat(payment.getPaymentMethod()).isEqualTo(PaymentMethod.BANK_TRANSFER);
         assertThat(payment.getPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(payment.getPaymentTime()).isNull();
     }
@@ -174,13 +174,17 @@ class PaymentServiceImplTest {
     @Test
     @DisplayName("Create pending payment with disallowed online methods throws BusinessRuleException")
     void createPendingPayment_DisallowedOnlineMethod_ThrowsBusinessRuleException() {
-        assertThatThrownBy(() -> paymentService.createPendingPayment(ownerProfile, BigDecimal.valueOf(100000.00), PaymentMethod.CASH))
-                .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("not allowed for online requests");
-
-        assertThatThrownBy(() -> paymentService.createPendingPayment(ownerProfile, BigDecimal.valueOf(100000.00), PaymentMethod.CREDIT_CARD))
-                .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("not allowed for online requests");
+        for (PaymentMethod unsupportedOnline : List.of(
+                PaymentMethod.CASH,
+                PaymentMethod.CREDIT_CARD,
+                PaymentMethod.MOMO,
+                PaymentMethod.VNPAY,
+                PaymentMethod.ZALOPAY
+        )) {
+            assertThatThrownBy(() -> paymentService.createPendingPayment(ownerProfile, BigDecimal.valueOf(100000.00), unsupportedOnline))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("not allowed for online requests");
+        }
     }
 
     @Test
@@ -476,9 +480,9 @@ class PaymentServiceImplTest {
         assertThat(responsePendingBank.getBankTransferInstructions().getAccountNumber()).isEqualTo("NOT CONFIGURED");
         assertThat(responsePendingBank.getBankTransferInstructions().getNotice()).contains("DEMO NON-PAYABLE");
 
-        pendingPayment.setPaymentMethod(PaymentMethod.MOMO);
-        PaymentResponse responseMomo = paymentService.getPayment(10L, ownerUser);
-        assertThat(responseMomo.getBankTransferInstructions()).isNull();
+        pendingPayment.setPaymentMethod(PaymentMethod.CASH);
+        PaymentResponse responseCash = paymentService.getPayment(10L, ownerUser);
+        assertThat(responseCash.getBankTransferInstructions()).isNull();
 
         pendingPayment.setPaymentMethod(PaymentMethod.BANK_TRANSFER);
         pendingPayment.setPaymentStatus(PaymentStatus.SUCCESS);
@@ -487,20 +491,21 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    @DisplayName("PUT payment method by owner when pending updates method")
+    @DisplayName("PUT payment method by owner when pending updates method to BANK_TRANSFER")
     void updatePaymentMethod_OwnerPending_UpdatesMethod() {
+        pendingPayment.setPaymentMethod(PaymentMethod.CASH);
         when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
         when(memberCardRepository.findByPaymentId(10L)).thenReturn(Optional.empty());
         when(sportPackageRegistrationRepository.findByPaymentId(10L)).thenReturn(Optional.empty());
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
-                .paymentMethod(PaymentMethod.MOMO)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
 
         PaymentResponse response = paymentService.updatePaymentMethod(10L, request, ownerUser);
 
-        assertThat(response.getMethod()).isEqualTo(PaymentMethod.MOMO);
+        assertThat(response.getMethod()).isEqualTo(PaymentMethod.BANK_TRANSFER);
         assertThat(response.getNotes()).isNull();
         verify(paymentRepository).save(pendingPayment);
     }
@@ -530,7 +535,7 @@ class PaymentServiceImplTest {
         when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
 
         UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
-                .paymentMethod(PaymentMethod.MOMO)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
 
         assertThatThrownBy(() -> paymentService.updatePaymentMethod(10L, request, otherUser))
@@ -545,7 +550,7 @@ class PaymentServiceImplTest {
         when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
 
         UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
-                .paymentMethod(PaymentMethod.MOMO)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
 
         assertThatThrownBy(() -> paymentService.updatePaymentMethod(10L, request, ownerUser))
@@ -561,7 +566,7 @@ class PaymentServiceImplTest {
         when(memberCardRepository.findByPaymentId(10L)).thenReturn(Optional.of(activeCard));
 
         UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
-                .paymentMethod(PaymentMethod.MOMO)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
 
         assertThatThrownBy(() -> paymentService.updatePaymentMethod(10L, request, ownerUser))
@@ -578,7 +583,7 @@ class PaymentServiceImplTest {
         when(sportPackageRegistrationRepository.findByPaymentId(10L)).thenReturn(Optional.of(activeReg));
 
         UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
-                .paymentMethod(PaymentMethod.MOMO)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
 
         assertThatThrownBy(() -> paymentService.updatePaymentMethod(10L, request, ownerUser))
@@ -587,17 +592,40 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    @DisplayName("PUT payment method by member with cash or credit card throws BusinessRuleException")
+    @DisplayName("PUT payment method with unsupported or disallowed method throws BusinessRuleException")
     void updatePaymentMethod_DisallowedMethod_ThrowsBusinessRuleException() {
         when(paymentRepository.findById(10L)).thenReturn(Optional.of(pendingPayment));
 
-        UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
-                .paymentMethod(PaymentMethod.CASH)
-                .build();
+        for (PaymentMethod disallowedForMember : List.of(
+                PaymentMethod.CASH,
+                PaymentMethod.CREDIT_CARD,
+                PaymentMethod.MOMO,
+                PaymentMethod.VNPAY,
+                PaymentMethod.ZALOPAY
+        )) {
+            UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
+                    .paymentMethod(disallowedForMember)
+                    .build();
 
-        assertThatThrownBy(() -> paymentService.updatePaymentMethod(10L, request, ownerUser))
-                .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("not allowed for online payment");
+            assertThatThrownBy(() -> paymentService.updatePaymentMethod(10L, request, ownerUser))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("not allowed for online payment");
+        }
+
+        for (PaymentMethod unsupportedForStaff : List.of(
+                PaymentMethod.CREDIT_CARD,
+                PaymentMethod.MOMO,
+                PaymentMethod.VNPAY,
+                PaymentMethod.ZALOPAY
+        )) {
+            UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
+                    .paymentMethod(unsupportedForStaff)
+                    .build();
+
+            assertThatThrownBy(() -> paymentService.updatePaymentMethod(10L, request, receptionistUser))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("is not supported");
+        }
     }
 
     @Test

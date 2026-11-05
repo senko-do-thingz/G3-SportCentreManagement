@@ -10,7 +10,7 @@ describe('FE-12 backend-compatible JSON transport', () => {
     ['CASH', '', '', null, null],
     ['CASH', ' CASH-TEST ', ' checked ', 'CASH-TEST', 'checked'],
     ['BANK_TRANSFER', ' BANK-TEST ', '', 'BANK-TEST', null],
-    ['CREDIT_CARD', ' CARD-TEST ', ' checked ', 'CARD-TEST', 'checked'],
+    ['BANK_TRANSFER', ' BANK-TEST ', ' checked ', 'BANK-TEST', 'checked'],
   ] as const)('serializes %s aliases accepted by ConfirmPaymentRequest', async (method, reference, note, sentReference, sentNote) => {
     const { calls, fetchMock } = installFakeFetch(() => json(200, { id: 41, code: 'PAY-TEST', status: 'SUCCESS' }))
     const form = { ...initialConfirmForm(method), reference, note, amountReceived: '100.25', verified: true }
@@ -25,7 +25,7 @@ describe('FE-12 backend-compatible JSON transport', () => {
     expect(Object.keys(calls[0].body as object).sort()).toEqual(['amountReceived', 'note', 'paymentMethod', 'paymentReference'])
   })
 
-  it.each(['BANK_TRANSFER', 'CREDIT_CARD'])('blocks %s with missing or blank required reference', (method) => {
+  it.each(['BANK_TRANSFER'])('blocks %s with missing or blank required reference', (method) => {
     for (const reference of ['', '   ']) {
       const form = { ...initialConfirmForm(method), reference, amountReceived: '100', verified: true }
       expect(validateConfirmForm(form, 100).reference).toBe('Reference code is required for this method')

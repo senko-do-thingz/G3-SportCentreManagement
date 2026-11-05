@@ -140,23 +140,18 @@ describe('FE-11 Payment Summary (F3-01, S3-Single)', () => {
     expect(calls.some((call) => call.method === 'PUT')).toBe(false)
   })
 
-  it('TC-FE11-005 wallets are shown disabled; a wallet payment is switched to bank transfer by Continue', async () => {
+  it('TC-FE11-005 only bank transfer is offered online; a non-bank-transfer payment is switched to bank transfer by Continue', async () => {
     const user = userEvent.setup()
     const { calls } = paymentsBackend({
-      payments: [payment({ method: 'MOMO', bankTransferInstructions: null }), payment()],
+      payments: [payment({ method: 'CASH', bankTransferInstructions: null }), payment()],
     })
     renderApp('/member/payments/52')
     const order = await screen.findByRole('region', { name: 'Order summary' })
     expect(within(order).getByRole('radio', { name: 'Bank transfer' })).toBeChecked()
-    for (const wallet of ['MoMo', 'VNPay', 'ZaloPay']) {
-      const radio = within(order).getByRole('radio', { name: wallet })
-      expect(radio).toBeDisabled()
-      expect(radio).not.toBeChecked()
-      expect(radio).toHaveAccessibleDescription('Not available yet')
+    expect(within(order).getAllByRole('radio')).toHaveLength(1)
+    for (const unsupported of ['MoMo', 'VNPay', 'ZaloPay', 'Credit card']) {
+      expect(within(order).queryByRole('radio', { name: unsupported })).not.toBeInTheDocument()
     }
-    expect(within(order).getAllByText('Not available yet')).toHaveLength(3)
-    await user.click(within(order).getByRole('radio', { name: 'MoMo' }))
-    expect(within(order).getByRole('radio', { name: 'Bank transfer' })).toBeChecked()
 
     await user.click(within(order).getByRole('button', { name: 'Continue to payment' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Payment Instructions and Status' })).toBeInTheDocument()
@@ -170,7 +165,7 @@ describe('FE-11 Payment Summary (F3-01, S3-Single)', () => {
   it('TC-FE11-006 a rejected method change shows the backend message and stays on the summary', async () => {
     const user = userEvent.setup()
     paymentsBackend({
-      payments: [payment({ method: 'VNPAY', bankTransferInstructions: null })],
+      payments: [payment({ method: 'CASH', bankTransferInstructions: null })],
       onMethod: () => backendError(400, 'Only pending payments can have their payment method updated'),
     })
     renderApp('/member/payments/52')
@@ -528,13 +523,13 @@ describe('FE-11 Payment Instructions and Status (F3-02)', () => {
     await waitFor(() => expect(paymentGets(calls)).toHaveLength(3))
   })
 
-  it('TC-FE11-021 a wallet method without bank details shows the reference to give at reception', async () => {
-    paymentsBackend({ payments: [payment({ method: 'ZALOPAY', bankTransferInstructions: null })] })
+  it('TC-FE11-021 a non-bank-transfer method without bank details shows the reference to give at reception', async () => {
+    paymentsBackend({ payments: [payment({ method: 'CASH', bankTransferInstructions: null })] })
     renderApp('/member/payments/52/status')
     const instructions = await screen.findByRole('region', { name: 'Payment instructions' })
-    expect(within(instructions).getByRole('heading', { name: 'ZaloPay' })).toBeInTheDocument()
+    expect(within(instructions).getByRole('heading', { name: 'Cash' })).toBeInTheDocument()
     expect(within(instructions).getByText('PAY-0052')).toBeInTheDocument()
-    expect(instructions).toHaveTextContent('ZaloPay has no online checkout yet')
+    expect(instructions).toHaveTextContent('Cash has no online checkout yet')
     expect(within(instructions).getByRole('link', { name: 'Switch to bank transfer' })).toHaveAttribute('href', '/member/payments/52')
   })
 

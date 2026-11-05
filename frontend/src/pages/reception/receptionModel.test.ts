@@ -89,10 +89,12 @@ describe('FE-05 receptionModel - desk payment', () => {
     expect(errors.reference).toBe('Payment reference is required for this method')
     expect(errors.amountReceived).toBe('Amount received must equal the amount payable for this method')
     expect(changeDue({ method: 'BANK_TRANSFER', reference: 'FT1', amountReceived: '900000' }, 810000)).toBe(0)
-    expect(validateDeskPayment({ method: 'MOMO', reference: 'MM-1', amountReceived: '810000' }, 810000)).toEqual({})
-    expect(validateDeskPayment({ method: 'CHEQUE', reference: '', amountReceived: '1' }, 1).method).toBe(
-      'Choose a payment method',
-    )
+    expect(validateDeskPayment({ method: 'BANK_TRANSFER', reference: 'FT-1', amountReceived: '810000' }, 810000)).toEqual({})
+    for (const unsupported of ['MOMO', 'VNPAY', 'ZALOPAY', 'CREDIT_CARD', 'CHEQUE']) {
+      expect(validateDeskPayment({ method: unsupported, reference: 'REF-1', amountReceived: '810000' }, 810000).method).toBe(
+        'Choose a payment method',
+      )
+    }
   })
 
   it('TC-FE05-006 parseAmount accepts plain digits or groups of three with one separator only', () => {

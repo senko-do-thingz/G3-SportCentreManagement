@@ -80,11 +80,7 @@ export function positiveId(value: string | null | undefined): number | null {
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   CASH: 'Cash',
-  CREDIT_CARD: 'Card (POS)',
   BANK_TRANSFER: 'Bank transfer',
-  MOMO: 'MoMo',
-  VNPAY: 'VNPay',
-  ZALOPAY: 'ZaloPay',
 }
 
 export const PAYMENT_METHOD_OPTIONS = PAYMENT_METHODS.map((value) => ({ value, label: PAYMENT_METHOD_LABELS[value] }))

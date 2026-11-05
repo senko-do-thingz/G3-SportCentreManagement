@@ -16,10 +16,12 @@ import java.util.Set;
 public interface PaymentService {
 
     Set<PaymentMethod> ONLINE_ALLOWED_PAYMENT_METHODS = Set.of(
-            PaymentMethod.BANK_TRANSFER,
-            PaymentMethod.MOMO,
-            PaymentMethod.VNPAY,
-            PaymentMethod.ZALOPAY
+            PaymentMethod.BANK_TRANSFER
+    );
+
+    Set<PaymentMethod> SUPPORTED_PAYMENT_METHODS = Set.of(
+            PaymentMethod.CASH,
+            PaymentMethod.BANK_TRANSFER
     );
 
     @Transactional(propagation = Propagation.MANDATORY)

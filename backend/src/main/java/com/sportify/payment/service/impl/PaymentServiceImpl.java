@@ -87,6 +87,10 @@ public class PaymentServiceImpl implements PaymentService {
         if (method == null) {
             throw new BusinessRuleException("Payment method is required for a desk payment");
         }
+        if (!SUPPORTED_PAYMENT_METHODS.contains(method)) {
+            throw new BusinessRuleException("Payment method " + method
+                    + " is not supported. Supported methods: " + SUPPORTED_PAYMENT_METHODS);
+        }
         if (confirmedBy == null || !SecurityUtils.isStaff(confirmedBy)) {
             throw new BusinessRuleException("Only staff users can record a desk payment");
         }
@@ -145,6 +149,10 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         if (actualMethod != null) {
+            if (!SUPPORTED_PAYMENT_METHODS.contains(actualMethod)) {
+                throw new BusinessRuleException("Payment method " + actualMethod
+                        + " is not supported. Supported methods: " + SUPPORTED_PAYMENT_METHODS);
+            }
             payment.setPaymentMethod(actualMethod);
         }
 
@@ -258,6 +266,10 @@ public class PaymentServiceImpl implements PaymentService {
         if (!isStaffUser && !ONLINE_ALLOWED_PAYMENT_METHODS.contains(newMethod)) {
             throw new BusinessRuleException("Payment method " + newMethod
                     + " is not allowed for online payment. Allowed methods: " + ONLINE_ALLOWED_PAYMENT_METHODS);
+        }
+        if (isStaffUser && !SUPPORTED_PAYMENT_METHODS.contains(newMethod)) {
+            throw new BusinessRuleException("Payment method " + newMethod
+                    + " is not supported. Supported methods: " + SUPPORTED_PAYMENT_METHODS);
         }
 
         payment.setPaymentMethod(newMethod);

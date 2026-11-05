@@ -1093,7 +1093,7 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("BE-19: desk card sale by credit card with less than the price answers 409 and creates nothing")
+    @DisplayName("BE-19: desk card sale by bank transfer with less than the price answers 409 and creates nothing")
     void deskCardSale_NonCashAmountDiffers_ConflictAndNothingCreated() throws Exception {
         MemberProfile member = tx().execute(st -> newMember());
         Long tierId = newTier();
@@ -1103,7 +1103,7 @@ class PaymentVerificationIntegrationTest extends AbstractIntegrationTest {
                         .with(user(new CustomUserDetails(receptionist)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"memberId\":" + member.getId() + ",\"tierId\":" + tierId
-                                + ",\"paymentMethod\":\"CREDIT_CARD\",\"referenceCode\":\"SLIP-BE19-1\""
+                                + ",\"paymentMethod\":\"BANK_TRANSFER\",\"referenceCode\":\"FT-BE19-1\""
                                 + ",\"amountReceived\":1100000}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("PAYMENT_AMOUNT_MISMATCH"));

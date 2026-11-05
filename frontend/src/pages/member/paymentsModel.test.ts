@@ -43,7 +43,7 @@ describe('FE-11 paymentsModel', () => {
 
   it('TC-FE11-M03 method labels', () => {
     expect(methodLabel('BANK_TRANSFER')).toBe('Bank transfer')
-    expect(methodLabel('MOMO')).toBe('MoMo')
+    expect(methodLabel('CASH')).toBe('Cash')
     expect(methodLabel(null)).toBe('Not chosen')
     expect(methodLabel('NEW_WALLET')).toBe('NEW_WALLET')
   })

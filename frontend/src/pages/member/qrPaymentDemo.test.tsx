@@ -23,7 +23,7 @@ describe('QR-01 guarded demo route and payment integration', () => {
   afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals() })
 
   it('renders single QR demo card and server amount on the authorized route', async () => {
-    const { calls } = backend({ data: payment({ method: 'MOMO' }) })
+    const { calls } = backend({ data: payment({ method: 'BANK_TRANSFER' }) })
     renderApp('/member/payments/52/qr-demo')
     expect(await screen.findByRole('img', { name: /Non-payable demo QR for payment 52/ }, { timeout: 5000 })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Simulate Payment Confirmation' })).toBeVisible()
@@ -33,12 +33,12 @@ describe('QR-01 guarded demo route and payment integration', () => {
   })
 
   it('opens the isolated demo without submitting a method or changing the real Continue action', async () => {
-    const { calls } = backend({ data: payment({ method: 'MOMO' }) })
+    const { calls } = backend({ data: payment({ method: 'BANK_TRANSFER' }) })
     const user = userEvent.setup()
     renderApp('/member/payments/52')
     const demo = await screen.findByRole('link', { name: 'Pay with QR (Simulation)' })
     expect(screen.getByRole('button', { name: 'Continue to payment' })).toBeEnabled()
-    expect(screen.getByRole('radio', { name: 'MoMo' })).toBeDisabled()
+    expect(screen.getByRole('radio', { name: 'Bank transfer' })).toBeChecked()
     await user.click(demo)
     expect(await screen.findByRole('img', { name: /Non-payable demo QR for payment 52/ })).toBeVisible()
     expect(screen.getByText(/Owner confirmation finalizes this payment as Paid - Simulated and activates the purchased entitlement\./)).toBeVisible()

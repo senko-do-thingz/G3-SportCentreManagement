@@ -120,15 +120,15 @@ public class PaymentControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/payments/{id} for pending MOMO omits bank instructions and has null paymentTime")
-    void getPayment_WhenPendingMomo_OmitsBankTransferInstructionsAndHasNullPaymentTime() throws Exception {
+    @DisplayName("GET /api/v1/payments/{id} for pending CASH omits bank instructions and has null paymentTime")
+    void getPayment_WhenPendingCash_OmitsBankTransferInstructionsAndHasNullPaymentTime() throws Exception {
         CustomUserDetails member = createUserDetails(100L, "MEMBER", "Taylor Nguyen");
         PaymentResponse response = PaymentResponse.builder()
                 .id(2L)
                 .code("PAY-1001")
                 .status(PaymentStatus.PENDING)
                 .amount(BigDecimal.valueOf(500000.00))
-                .method(PaymentMethod.MOMO)
+                .method(PaymentMethod.CASH)
                 .itemDescription("Gym Membership")
                 .paymentTime(null)
                 .bankTransferInstructions(null)
@@ -141,7 +141,7 @@ public class PaymentControllerTest {
                         .with(user(member)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("PAY-1001"))
-                .andExpect(jsonPath("$.method").value("MOMO"))
+                .andExpect(jsonPath("$.method").value("CASH"))
                 .andExpect(jsonPath("$.status").value("PENDING"))
                 .andExpect(jsonPath("$.paymentTime").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.bankTransferInstructions").doesNotExist());
@@ -218,7 +218,7 @@ public class PaymentControllerTest {
     void updatePaymentMethod_AsMember_Returns200WithUpdatedMethod() throws Exception {
         CustomUserDetails member = createUserDetails(100L, "MEMBER", "Taylor Nguyen");
         UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
-                .paymentMethod(PaymentMethod.MOMO)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
 
         PaymentResponse response = PaymentResponse.builder()
@@ -226,7 +226,7 @@ public class PaymentControllerTest {
                 .code("PAY-1000")
                 .status(PaymentStatus.PENDING)
                 .amount(BigDecimal.valueOf(810000.00))
-                .method(PaymentMethod.MOMO)
+                .method(PaymentMethod.BANK_TRANSFER)
                 .build();
 
         when(paymentService.updatePaymentMethod(eq(1L), any(UpdatePaymentMethodRequest.class), any(UserAccount.class)))
@@ -237,7 +237,7 @@ public class PaymentControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.method").value("MOMO"));
+                .andExpect(jsonPath("$.method").value("BANK_TRANSFER"));
     }
 
     @Test
@@ -245,7 +245,7 @@ public class PaymentControllerTest {
     void updatePaymentMethod_AsOtherMember_Returns404NotFound() throws Exception {
         CustomUserDetails otherMember = createUserDetails(200L, "MEMBER", "Other Member");
         UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
-                .paymentMethod(PaymentMethod.MOMO)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
 
         when(paymentService.updatePaymentMethod(eq(1L), any(UpdatePaymentMethodRequest.class), any(UserAccount.class)))
@@ -263,7 +263,7 @@ public class PaymentControllerTest {
     void updatePaymentMethod_AsStaff_Returns200() throws Exception {
         CustomUserDetails receptionist = createUserDetails(300L, "RECEPTIONIST", "Receptionist User");
         UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
-                .paymentMethod(PaymentMethod.VNPAY)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
 
         PaymentResponse response = PaymentResponse.builder()
@@ -271,7 +271,7 @@ public class PaymentControllerTest {
                 .code("PAY-1000")
                 .status(PaymentStatus.PENDING)
                 .amount(BigDecimal.valueOf(810000.00))
-                .method(PaymentMethod.VNPAY)
+                .method(PaymentMethod.BANK_TRANSFER)
                 .build();
 
         when(paymentService.updatePaymentMethod(eq(1L), any(UpdatePaymentMethodRequest.class), any(UserAccount.class)))
@@ -282,7 +282,7 @@ public class PaymentControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.method").value("VNPAY"));
+                .andExpect(jsonPath("$.method").value("BANK_TRANSFER"));
     }
 
     @Test
@@ -390,7 +390,7 @@ public class PaymentControllerTest {
     void updatePaymentMethod_WhenOptimisticLockConflict_Returns409Conflict() throws Exception {
         CustomUserDetails member = createUserDetails(100L, "MEMBER", "Taylor Nguyen");
         UpdatePaymentMethodRequest request = UpdatePaymentMethodRequest.builder()
-                .paymentMethod(PaymentMethod.MOMO)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
 
         when(paymentService.updatePaymentMethod(eq(1L), any(UpdatePaymentMethodRequest.class), any(UserAccount.class)))

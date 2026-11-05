@@ -552,14 +552,14 @@ public class SportPackageServiceImplTest {
     void registerPackage_AsMember_CreatesPendingPaymentAndSetsPaymentId() {
         PackageRegistrationRequest req = PackageRegistrationRequest.builder()
                 .packageId(10L)
-                .paymentMethod(PaymentMethod.VNPAY)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .build();
 
         when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
         when(sportPackageRepository.findById(10L)).thenReturn(Optional.of(sportPackage));
         when(registrationRepository.getNextRegistrationCodeSequence()).thenReturn(77L);
         when(codeFormatter.formatPackageRegCode(77L)).thenReturn("REG-PKG-0077");
-        when(paymentService.createPendingPayment(eq(memberProfile), any(BigDecimal.class), eq(PaymentMethod.VNPAY)))
+        when(paymentService.createPendingPayment(eq(memberProfile), any(BigDecimal.class), eq(PaymentMethod.BANK_TRANSFER)))
                 .thenReturn(Payment.builder().id(777L).paymentCode("PAY-1077").paymentStatus(PaymentStatus.PENDING).build());
         when(registrationRepository.save(any(SportPackageRegistration.class))).thenAnswer(i -> i.getArgument(0));
 
