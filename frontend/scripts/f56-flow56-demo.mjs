@@ -146,15 +146,18 @@ async function browser(width, height) {
       if(c.tagName==='SELECT'){const o=[...c.options].find(o=>o.text.includes(v));if(!o)throw new Error('No option '+v);v=o.value}
       Object.getOwnPropertyDescriptor(p,'value').set.call(c,v);c.dispatchEvent(new Event('input',{bubbles:true}));c.dispatchEvent(new Event('change',{bubbles:true}));return true};
     const click=n=>{const b=[...document.querySelectorAll('button,a')].find(e=>norm(e.innerText)===n);if(!b||b.disabled)throw new Error('Cannot click '+n);b.click();return true};`
-  const evaluate = async expression => {
-    const r = await send('Runtime.evaluate', { expression: `(async()=>{${helpers};return (${expression})})()`, awaitPromise: true, returnByValue: true })
+  // Page code is always a constant from this file; every data value is passed as a CDP call argument.
+  const evaluate = async (expression, ...args) => {
+    const { result: global } = await send('Runtime.evaluate', { expression: 'globalThis' })
+    const r = await send('Runtime.callFunctionOn', { objectId: global.objectId, functionDeclaration: `async function(...args){${helpers};return (${expression})}`,
+      arguments: args.map(value => ({ value })), awaitPromise: true, returnByValue: true })
     if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text)
     return r.result.value
   }
-  const until = async (expression, timeout = 20000) => { const end = Date.now() + timeout; while (Date.now() < end) { try { if (await evaluate(expression)) return } catch { /* not yet */ } await sleep(150) } throw new Error('Timed out: ' + expression) }
+  const until = async (expression, ...args) => { const end = Date.now() + 20000; while (Date.now() < end) { try { if (await evaluate(expression, ...args)) return } catch { /* not yet */ } await sleep(150) } throw new Error('Timed out: ' + expression) }
   return { evaluate, until, async go(url) { await send('Page.navigate', { url }); await until('document.readyState==="complete"') },
     async shot(name) { const { data } = await send('Page.captureScreenshot', { format: 'png' }); writeFileSync(join(OUT, name), Buffer.from(data, 'base64')) },
-    async login(email) { await this.go(WEB + '/login'); await until(`!!document.querySelector('input[type=password]')`); await evaluate(`fill('Email address',${JSON.stringify(email)})&&fill('Password',${JSON.stringify(PASSWORD)})&&(document.querySelector('form button[type=submit]').click(),true)`); await until(`!location.pathname.startsWith('/login')`) },
+    async login(email) { await this.go(WEB + '/login'); await until(`!!document.querySelector('input[type=password]')`); await evaluate(`fill('Email address',args[0])&&fill('Password',args[1])&&(document.querySelector('form button[type=submit]').click(),true)`, email, PASSWORD); await until(`!location.pathname.startsWith('/login')`) },
     close() { try { socket.close() } catch { /* closed */ } spawnSync('taskkill', ['/PID', String(edge.pid), '/T', '/F']) } }
 }
 
@@ -166,30 +169,30 @@ async function rehearse(manifest, backend, width, height, pace) {
   const coach = await browser(width, height)
   await coach.login(COACH); await coach.go(WEB + '/coach/training/plans'); mark('Coach plans page'); await say(15)
   await coach.until(`!!document.querySelector('select')`)
-  await coach.evaluate(`fill('Assigned class',${JSON.stringify(manifest.className)})`)
+  await coach.evaluate(`fill('Assigned class',args[0])`, manifest.className)
   await coach.until(`[...control('Member booking').options].length>1`)
-  await coach.evaluate(`fill('Member booking','Booking #${manifest.bookingId}')`); await say(10)
+  await coach.evaluate(`fill('Member booking',args[0])`, `Booking #${manifest.bookingId}`); await say(10)
   await coach.evaluate(`click('Suggest practice drills')`); await coach.until(`document.body.innerText.includes('Drafts are not saved.')`); mark('Drafts shown'); await say(25)
   await coach.shot(`rehearsal-${width}-1-drafts.png`)
   const title = `Committee badminton plan ${stamp}-${width}`
-  await coach.evaluate(`fill('Select draft: ${manifest.draftTitles[0]}',true)&&fill('Select draft: ${manifest.draftTitles[1]}',true)&&click('Review selected drafts in plan form')`)
-  await coach.evaluate(`fill('Plan title',${JSON.stringify(title)})&&fill('Exercise duration 1 (minutes)','6')`); mark('Drafts reviewed and edited'); await say(15)
+  await coach.evaluate(`fill('Select draft: '+args[0],true)&&fill('Select draft: '+args[1],true)&&click('Review selected drafts in plan form')`, manifest.draftTitles[0], manifest.draftTitles[1])
+  await coach.evaluate(`fill('Plan title',args[0])&&fill('Exercise duration 1 (minutes)','6')`, title); mark('Drafts reviewed and edited'); await say(15)
   const plansBefore = sql(`SELECT COUNT(*) FROM session_plan WHERE booking_id=${manifest.bookingId}`)
   await coach.evaluate(`click('Assign plan')`); await coach.until(`document.body.innerText.includes('Plan assigned.')`); mark('Plan assigned'); await say(5)
   await coach.shot(`rehearsal-${width}-2-assigned.png`); coach.close()
   const plan = one(`SELECT id,(SELECT COUNT(*) FROM session_plan_step WHERE plan_id=p.id) steps FROM session_plan p WHERE booking_id=${manifest.bookingId} AND title='${title}'`)
   check('T06-04', `Coach assignment persisted one plan with two steps (${width}x${height})`, Number(plansBefore) + 1 === Number(sql(`SELECT COUNT(*) FROM session_plan WHERE booking_id=${manifest.bookingId}`)) && plan.steps === 2, plan)
   const member = await browser(width, height)
-  await member.login(MEMBER); await member.go(WEB + `/member/training/plans/${plan.id}`); await member.until(`document.body.innerText.includes(${JSON.stringify(title)})`)
+  await member.login(MEMBER); await member.go(WEB + `/member/training/plans/${plan.id}`); await member.until(`document.body.innerText.includes(args[0])`, title)
   mark('Member reads plan'); await say(15); await member.shot(`rehearsal-${width}-3-member-plan.png`)
   await member.go(WEB + '/member/assistant'); await member.until(`document.body.innerText.includes('Enable automated center consultation')`); mark('Assistant opened'); await say(15)
   await member.evaluate(`fill('Enable automated center consultation',true)`)
   for (const [topic, wait] of [['sessions', 15], ['packages', 10], ['faq', 15], ['refusal', 10]]) {
     const question = QUESTIONS[topic]
     await member.until(`!control('Center question').disabled`)
-    await member.evaluate(`fill('Center question',${JSON.stringify(question)})`)
+    await member.evaluate(`fill('Center question',args[0])`, question)
     await member.evaluate(`click('Ask center assistant')`)
-    await member.until(`![...document.querySelectorAll('button')].some(b=>b.getAttribute('aria-busy')==='true') && document.body.innerText.includes(${JSON.stringify(topic === 'refusal' ? 'does not answer personal, medical or private questions' : topic === 'faq' ? 'General exercise FAQ' : topic === 'packages' ? 'Current active package base prices' : 'Published sessions with available places')})`)
+    await member.until(`![...document.querySelectorAll('button')].some(b=>b.getAttribute('aria-busy')==='true') && document.body.innerText.includes(args[0])`, topic === 'refusal' ? 'does not answer personal, medical or private questions' : topic === 'faq' ? 'General exercise FAQ' : topic === 'packages' ? 'Current active package base prices' : 'Published sessions with available places')
     mark('Answer: ' + topic); await say(wait); await member.shot(`rehearsal-${width}-4-${topic}.png`)
   }
   member.close()
