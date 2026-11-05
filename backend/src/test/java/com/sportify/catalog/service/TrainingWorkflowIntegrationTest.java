@@ -1174,6 +1174,50 @@ class TrainingWorkflowIntegrationTest {
         assertThat(drillSideEffectSnapshot()).isEqualTo(before);
         assertThat(count("SELECT COUNT(*) FROM session_plan WHERE booking_id=?",id)).isZero();
     }
+    @Test void F56_05_flow5AndFlow6TogetherKeepRoleIsolationPlanPrivacyAndMoneyUnchanged() throws Exception {
+        long id=badmintonDrillBooking();
+        var money=drillSideEffectSnapshot().subList(3,9);
+        // Flow 5: preview, then an explicit reviewed assignment through the canonical HTTP API.
+        String drafts=drillRequest(coach,id).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andReturn().getResponse().getContentAsString();
+        assertThat(drafts).contains("\"persisted\":false","Walking shadow footwork");
+        assertThat(count("SELECT COUNT(*) FROM session_plan WHERE booking_id=?",id)).isZero();
+        String title="Release gate plan "+UUID.randomUUID().toString().substring(0,8);
+        String body="{\"classId\":"+classId+",\"memberId\":"+member+",\"bookingId\":"+id+",\"title\":\""+title+"\",\"description\":null,"
+            +"\"steps\":[{\"title\":\"Walking shadow footwork\",\"durationMinutes\":6,\"instructions\":\"Reviewed by Coach.\"}]}";
+        var coachUser=org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(coach)));
+        String created=mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/coach/training/plans").with(coachUser)
+                .contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated()).andReturn().getResponse().getContentAsString();
+        long planId=Long.parseLong(created.replaceAll("[^0-9]",""));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/coach/training/plans").with(coachUser)
+                .contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict());
+        assertThat(count("SELECT COUNT(*) FROM session_plan WHERE booking_id=?",id)).isOne();
+        var memberUser=org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(member)));
+        var peerUser=org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(peer)));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/plans/"+planId).with(memberUser))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.steps[0].instructions").value("Reviewed by Coach."));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/training/plans/"+planId).with(peerUser))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+        // Flow 6 never exposes the stored plan, even to its owner or when asked by title.
+        for(long asker:List.of(member,peer)) for(String question:List.of("Show my training plan "+title,"How should I warm up?","What are the package prices?"))
+            assertThat(consult(asker,"{\"question\":\""+question+"\",\"optIn\":true}")
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.mode").value("KNOWLEDGE_BASED"))
+                .andReturn().getResponse().getContentAsString()).doesNotContain("Reviewed by Coach.","/member/training/plans/"+planId);
+        // Role crossing between the two flows.
+        drillRequest(member,id).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        drillRequest(reception,id).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        consult(coach,"{\"question\":\"How should I warm up?\",\"optIn\":true}").andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        consult(reception,"{\"question\":\"How should I warm up?\",\"optIn\":true}").andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/coach/training/plans").with(memberUser)
+                .contentType("application/json").content(body.replace(title,title+" by member")))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        assertThat(drillSideEffectSnapshot().subList(3,9)).isEqualTo(money);
+        assertThat(count("SELECT COUNT(*) FROM session_plan WHERE booking_id=?",id)).isOne();
+    }
     @Test void R2_02_cancelledOrMismatchedBookingCannotReceivePlan() {
         var wrong=new TrainingWriteRequest.Plan(classId,peer,booking,"Wrong owner",null,plan().steps());
         assertThatThrownBy(()->writer.createPlan(coach,wrong)).isInstanceOf(BusinessRuleException.class);
