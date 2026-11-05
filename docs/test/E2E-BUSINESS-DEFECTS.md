@@ -268,3 +268,5 @@ Chạy lại trên máy (cần Docker, hoặc đặt `UNIFY_TEST_SQL_PORT`, `UNI
 cd backend
 mvn verify -Dtest=NONE -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=E2eBusinessDefectsIntegrationTest
 ```
+
+Kết quả CI đầu tiên trên PR [#224](https://github.com/senko-do-thingz/G3-SportCentreManagement/pull/224), run [42050853981](https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/42050853981): job Integration chạy 1058 test, trong đó **đúng 8 test fail và đều là test của báo cáo này**. Toàn bộ 1050 test còn lại pass. Các job unit test, CodeQL, security và kiểm tra convention đều pass.
