@@ -18,8 +18,8 @@ final class TrainingDrillCatalog {
             new Template("Stationary ball control","Ball handling","control","In a clear area selected by your coach, practise stationary dribbling with each hand at a comfortable pace. Pause to reset and ask your coach to check control."),
             new Template("Short target passing","Passing accuracy","passing","Use a target and short distance selected by your coach. Practise controlled passes, pausing between attempts. Review accuracy with your coach before changing distance.")));
 
-    static List<DrillDraft> suggest(String sport,String level,String feedback,String metric,String goal) {
-        if(!Set.of("BEGINNER","INTERMEDIATE","ADVANCED").contains(level))return List.of();
+    static List<DrillDraft> suggest(String sport,String sportName,String level,String feedback,String metric,String goal) {
+        if(level==null || sport==null || !Set.of("BEGINNER","INTERMEDIATE","ADVANCED").contains(level))return List.of();
         var templates=TEMPLATES.getOrDefault(sport,List.of());
         String feedbackText=feedback==null?"":feedback.toLowerCase(Locale.ROOT);
         String metricText=metric==null?"":metric.toLowerCase(Locale.ROOT);
@@ -28,7 +28,8 @@ final class TrainingDrillCatalog {
         ranked.sort(Comparator.comparingInt((Template item)->
             (feedbackText.contains(item.focus())?2:0)+(metricText.contains(item.focus())?1:0)).reversed());
         return ranked.stream().map(item->{
-            String reason="Matches "+sport+" and class level "+level+". Coach review is required.";
+            String label=sportName==null || sportName.isBlank()?sport:sportName;
+            String reason="Matches the "+label+" class at "+level.toLowerCase(Locale.ROOT)+" level. Coach review is required.";
             if(feedbackText.contains(item.focus()))reason+=" Matches the coach feedback focus: "+item.focus()+".";
             if(metricText.contains(item.focus()))reason+=" Matches a recorded assessment metric: "+item.focus()+".";
             if(goal!=null && Set.of("BUILD_SKILLS","COMPETITION","IMPROVE_FITNESS").contains(goal))reason+=" Saved member goal: "+goal+".";
