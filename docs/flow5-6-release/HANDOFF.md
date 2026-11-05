@@ -50,19 +50,28 @@ optional and Coaches can type exercises manually.
     `156` passed including `F56_05_flow5AndFlow6TogetherKeepRoleIsolationPlanPrivacyAndMoneyUnchanged`)
     on fresh owned disposable databases.
   - Frontend Vitest (`1947` passed across `112` test files), ESLint clean, Vite production build clean.
-  - Four-minute committee demo (`node frontend/scripts/f56-flow56-demo.mjs rehearse`,
-    `prepare`, and `serve`): `13/13` checks PASS on fresh owned databases
-    (`sportify_f56_demo_20261105201931`, `sportify_f56_demo_20261105202926`), including
-    paced 1280x720 (161 s total, 151 s to last answer), fast 1440x900 (11 s), backend
-    restart readback and no-sessions fallback. Complete Windows process/port cleanup
-    testing (ports `18080` and `15173`, headless Edge, Ctrl+C/SIGINT, SIGTERM/SIGBREAK,
-    normal stop and rehearsal failures) is PENDING manual CODEOWNER acceptance.
-    The author reported this verification had not been fully performed.
+  - Four-minute committee demo on merged `main` `f22464ee`
+    (`node frontend/scripts/f56-flow56-demo.mjs rehearse`, 2026-11-05 21:03 +07:00):
+    `13/13` checks PASS on the fresh owned database `sportify_f56_demo_20261105210344`,
+    including paced 1280x720 (158 s total, 147 s to the last answer), fast 1440x900
+    (6 s), backend restart readback and the no-sessions fallback. Afterwards no backend,
+    Vite or headless Edge process remained, ports `18080` and `15173` were free and the
+    Edge temp profiles were removed. An earlier 13/13 rehearsal on the pre-fix script
+    (`sportify_f56_demo_20261105193958`, 157 s / 6 s) is superseded. Earlier revisions
+    of this document cited `sportify_f56_demo_20261105201931` and `…202926` with
+    161 s / 11 s; no such databases or logs exist, so those figures are withdrawn.
+  - Author Windows cleanup evidence for #220 head `905a3e9c` (2026-11-05 20:50 +07:00,
+    PR #220 comment): a real console CTRL_C_EVENT during `serve` (after "Demo ready") and
+    during `rehearse` (while headless Edge was driving the Coach page), plus a rehearsal
+    with an injected failure after the Coach login. All three ended with no leftover
+    processes, ports `18080`/`15173` free and new Edge profiles removed. SIGTERM and
+    SIGBREAK were not exercised separately. Windows cleanup remains PENDING the
+    CODEOWNER's direct acceptance test.
 
 ## Known limits
 
 - Desktop only (1280x720 and 1440x900); no mobile layout in this release.
-- The four-minute demo was measured by the automated paced rehearsal (155-161 s total);
+- The four-minute demo was measured by the automated paced rehearsal (157-158 s total);
   a human presenter rehearsal is still required before the committee.
 - `createPlan` does not apply `OperationalMemberPolicy.requireRealMember`
   (pre-existing, out of scope).
