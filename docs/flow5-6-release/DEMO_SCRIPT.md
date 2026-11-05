@@ -29,6 +29,14 @@ work without writing money or booking data, writes `fixture-manifest.json` to th
 OS temp folder (`f56-demo/<database>`) and keeps the app running at
 http://127.0.0.1:15173 until Ctrl+C. Every reset is a new `serve` run.
 
+Stopping: Ctrl+C (SIGINT), SIGTERM or SIGBREAK stops the backend, the frontend
+and any headless Edge started by the script, then exits (130 for Ctrl+C). A failed
+precheck or rehearsal step also closes its Edge clients and stops both servers.
+Cleanup is idempotent and also runs on process exit, so ports 18080 and 15173 are
+free for the next run. To confirm after stopping:
+`Get-NetTCPConnection -LocalPort 18080,15173 -State Listen -ErrorAction SilentlyContinue`
+should print nothing.
+
 Accounts (repository demo seed, public demo password from backend/src/main/resources/db/demo):
 Coach `quan.coach@example.com`, Member `mai.standard@example.com`.
 
