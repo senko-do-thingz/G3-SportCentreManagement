@@ -8,7 +8,6 @@ import json
 import os
 from pathlib import Path
 import re
-import uuid
 
 BASE = 'http://127.0.0.1:15173'
 API = 'http://127.0.0.1:18080/api/v1'
@@ -67,11 +66,14 @@ def exercise_release11(sql, request, out, head):
                 return page
 
             def capture(page, name):
+                page.evaluate('window.scrollTo(0, 0)')
                 page.screenshot(path=str(out / f'r11-{name}-1440x900.png'), full_page=True)
                 check(name + ' desktop has no document overflow', page.evaluate('document.documentElement.scrollWidth <= innerWidth'))
 
             rp = screen(fixture['receptionEmail'], 'reception')
             rp.goto(BASE + '/reception/support')
+            expect(rp.get_by_text('No support requests match these filters.', exact=True)).to_be_visible()
+            capture(rp, 'support-empty')
             rp.get_by_label('Search existing member', exact=True).fill(fixture['memberEmail'])
             rp.get_by_role('button', name='Search members', exact=True).click()
             rp.get_by_label(re.compile(r'^Member(?:\s+\*)?$')).select_option(str(fixture['memberId']))
@@ -105,6 +107,10 @@ def exercise_release11(sql, request, out, head):
             check('Operations registration count agrees with owned SQL', operations['registeredMembers'] == expected_members)
             expect(mp.get_by_text('Members registered in range', exact=True).locator('..')).to_contain_text(str(operations['registeredMembers']))
             capture(mp, 'operations')
+            tomorrow = (datetime.date.fromisoformat(today) + datetime.timedelta(days=1)).isoformat()
+            mp.goto(BASE + '/manager/reports?from=' + tomorrow + '&to=' + today)
+            expect(mp.get_by_role('alert').first).to_be_visible()
+            capture(mp, 'operations-invalid-range')
             mp.goto(BASE + '/manager/training/attendance')
             mp.get_by_label('Class', exact=True).select_option(str(fixture['classId']))
             expect(mp.get_by_role('button', name='View ' + fixture['publicId'], exact=True)).to_be_visible()
@@ -114,6 +120,10 @@ def exercise_release11(sql, request, out, head):
             status, overview = request(f"/manager/training/attendance/overview?from={today}&to={today}&classId={fixture['classId']}", token=manager)
             row = next(item for item in overview['sessions'] if item['id'] == session)
             check('Attendance reads confirmed SQL fixture accurately', status == 200 and row['confirmed'] == 1 and row['present'] == 1 and row['unmarked'] == 0)
+            mp.get_by_label('From date', exact=True).fill(tomorrow)
+            mp.get_by_label('To date', exact=True).fill(tomorrow)
+            expect(mp.get_by_text('No sessions match these filters.', exact=True)).to_be_visible()
+            capture(mp, 'attendance-empty')
 
             cp = screen(fixture['coachEmail'], 'coach')
             cp.goto(BASE + f"/coach/training/progress?classId={fixture['classId']}&memberId={fixture['memberId']}")
@@ -124,11 +134,16 @@ def exercise_release11(sql, request, out, head):
             up.goto(BASE + '/member/training/results')
             expect(up.get_by_text('Release 1.1 recorded outcome', exact=True)).to_be_visible()
             capture(up, 'member-results')
+            up.goto(BASE + '/reception/support')
+            expect(up.get_by_role('heading', name='Access denied', exact=True)).to_be_visible()
+            capture(up, 'member-staff-route-denied')
             check('Member direct Manager overview denied', request('/manager/training/attendance/overview?from=' + today + '&to=' + today, token=member)[0] == 403)
             check('Coach direct Reception support denied', request('/reception/support-requests', token=coach)[0] == 403)
             check('Anonymous Manager report denied', request('/manager/reports/operations')[0] == 401)
             check('Invalid terminal support transition rejected', request(f"/reception/support-requests/{ticket['id']}/status", {'status': 'OPEN', 'resolutionNotes': None}, reception, method='PUT')[0] == 409)
             check('Peer cannot read owner progress through self API', request('/member/training/progress', token=login(fixture['peerEmail']))[1]['sessions'] == [])
+            other_coach_email = sql(f"SELECT TOP(1) u.email FROM user_account u JOIN role r ON r.id=u.role_id WHERE r.code='COACH' AND u.id<>{fixture['coachId']} ORDER BY u.id")
+            check('Other Coach cannot read the assigned learner', request(f"/coach/training/classes/{fixture['classId']}/members/{fixture['memberId']}/progress", token=login(other_coach_email))[0] == 404)
             check('All training writes and reads preserve remaining credit', sql(f"SELECT remaining_sessions FROM sport_package_registration WHERE id={fixture['registrationId']}") == before_credit)
             browser.close()
         report['status'] = 'PASS'
