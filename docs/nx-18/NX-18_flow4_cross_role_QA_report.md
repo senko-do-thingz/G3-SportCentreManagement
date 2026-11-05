@@ -16,18 +16,26 @@ The old fixture screenshots and runner are excluded from this change.
 | Account and role isolation | BLOCKED | Peer Member cannot open private plan or result, anonymous reads are denied, and wrong-role endpoints reject access. |
 | Restart and persistence | BLOCKED | Read the same owned data after restarting the backend. |
 
-No isolated SQL Server was listening at 127.0.0.1:1433 in the verification
-environment. The 17 historical evaluator tests passed locally on b485c35.
-Those tests only check the old QA verdict logic. The earlier real desktop SQL
-rehearsal is reported in PR #206 and used 1440x1000.
+## Execution status and CI evidence
 
-Historical GitHub CI passed on PR #174 at b485c35 (2,243 unit and 997
-integration tests) and on main at 1827a05, including frontend build and the CI
-gate. These runs precede this change. Final-head CI is pending.
+The desktop run did not start. The local environment had no SQL Server
+listener at 127.0.0.1:1433 and no built backend JAR. The configured viewport
+is 1440x900. The observed viewport, exit code, check count, failed check names,
+and post-restart readback are unavailable. All required scenarios above
+remain BLOCKED.
 
-- PR CI: https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41800926039
-- Main CI: https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41968012911
-- Prior real Flow 4 rehearsal: https://github.com/senko-do-thingz/G3-SportCentreManagement/pull/206
+GitHub CI passed on reviewed runner commit e4edb7e, including frontend build,
+packaging and the CI gate. All 2,265 unit and 1,037 integration tests passed
+with zero failed or skipped. The QR browser workflow passed on the same commit
+and executes qr04-ci-verification.py. The desktop --flow4-only command is a
+separate acceptance check. PR #206 provides historical browser coverage
+at 1440x1000. Revalidate the desktop command on the final HEAD.
+
+- Repository CI: https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41980923772
+- QR browser CI: https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41980923831
+- Prior Flow 4 rehearsal: https://github.com/senko-do-thingz/G3-SportCentreManagement/pull/206
+
+## Reproduction
 
 Run from the repository root with the Java 25 backend JAR already built, frontend
 dependencies installed, local SQL Server, sqlcmd, and Python Playwright with
