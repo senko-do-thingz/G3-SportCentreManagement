@@ -511,6 +511,51 @@ class TrainingWorkflowIntegrationTest {
         assertThatThrownBy(()->writer.learnerProfile(otherCoach,classId,member)).isInstanceOf(ResourceNotFoundException.class);
     }
 
+    @Test void R11_managerAttendanceReadsConfirmedRosterWithoutChangingBookingsOrAudit() throws Exception {
+        long admin=account("MANAGER");
+        jdbc.update("UPDATE class_session SET status='COMPLETED' WHERE id=?",session);
+        insert("INSERT booking(booking_code,session_id,member_id,status) VALUES (?,?,?,'CONFIRMED')",code(),session,peer);
+        insert("INSERT booking(booking_code,session_id,member_id,status) VALUES (?,?,?,'CANCELLED')",code(),session,member);
+        jdbc.update("INSERT attendance_record(session_id,member_id,booking_id,status,marked_by) VALUES (?,?,?,'PRESENT',?)",session,member,booking,coach);
+        var date=jdbc.queryForObject("SELECT session_date FROM class_session WHERE id=?",java.sql.Date.class,session).toLocalDate();
+        String code=jdbc.queryForObject("SELECT session_code FROM class_session WHERE id=?",String.class,session);
+        int before=count("SELECT COUNT(*) FROM activity_log");
+        String path="/api/v1/manager/training/attendance/overview?from="+date+"&to="+date+"&classId="+classId+"&coachId="+coach;
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).with(as(admin)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sessions[0].confirmed").value(2))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sessions[0].unmarked").value(1))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sessions[0].attendanceRate").value(50.0));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/manager/training/attendance/sessions/"+code).with(as(admin)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.members.length()").value(3));
+        assertThat(count("SELECT COUNT(*) FROM activity_log")).isEqualTo(before);
+        assertThat(count("SELECT COUNT(*) FROM booking WHERE session_id="+session)).isEqualTo(3);
+        assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE session_id="+session)).isEqualTo(1);
+    }
+
+    @Test void R11_managerAttendanceRejectsOtherRolesAnonymousAndDisabledManager() throws Exception {
+        String path="/api/v1/manager/training/attendance/overview?from=2026-11-01&to=2026-11-02";
+        for(long actor:List.of(coach,member,reception)) mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).with(as(actor)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnauthorized());
+        long admin=account("MANAGER");var stale=as(admin);
+        jdbc.update("UPDATE user_account SET status='LOCKED' WHERE id=?",admin);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).with(stale))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+    }
+
+    @Test void R11_managerAttendanceBoundsAndMissingSessionAreTruthful() throws Exception {
+        long admin=account("MANAGER");
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/manager/training/attendance/overview?from=2026-11-02&to=2026-11-01").with(as(admin)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/manager/training/attendance/overview?from=2026-11-01&to=2026-12-02").with(as(admin)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/manager/training/attendance/sessions/010100FB99").with(as(admin)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+    }
+
     @Test void RELEASE09_managerPeriodCountsUseHalfOpenBoundsAndDoNotDuplicateRescheduledBookings() throws Exception {
         var from=LocalDate.of(2026,11,2); long manager=account("MANAGER");
         jdbc.update("UPDATE user_account SET created_at=? WHERE id=?",from.atStartOfDay(),member);
@@ -1078,6 +1123,118 @@ class TrainingWorkflowIntegrationTest {
         long unsupported=jdbc.queryForObject("SELECT id FROM sport WHERE code='SWIMMING'",Long.class);
         jdbc.update("UPDATE class_session SET sport_id=? WHERE id=?",unsupported,session);
         assertThat(writer.drillSuggestions(coach,booking).drafts()).isEmpty();
+    }
+    private org.springframework.test.web.servlet.ResultActions drillRequest(long actorId,long bookingId) throws Exception {
+        return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/coach/training/bookings/"+bookingId+"/drill-suggestions")
+            .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(actorId)))));
+    }
+    private long badmintonDrillBooking() {
+        long badminton=jdbc.queryForObject("SELECT id FROM sport WHERE code='BADMINTON'",Long.class);
+        jdbc.update("UPDATE sport_class SET sport_id=?,level='BEGINNER' WHERE id=?",badminton,classId);
+        jdbc.update("UPDATE class_session SET sport_id=? WHERE id=?",badminton,session);
+        return booking;
+    }
+    private List<Object> drillSideEffectSnapshot() {
+        return List.of(count("SELECT COUNT(*) FROM session_plan"),count("SELECT COUNT(*) FROM session_plan_step"),
+            count("SELECT COUNT(*) FROM coach_feedback"),count("SELECT COUNT(*) FROM booking"),
+            jdbc.queryForObject("SELECT status FROM booking WHERE id=?",String.class,booking),
+            jdbc.queryForObject("SELECT booked_count FROM class_session WHERE id=?",Integer.class,session),
+            count("SELECT COALESCE(SUM(remaining_sessions),0) FROM sport_package_registration"),
+            count("SELECT COUNT(*) FROM payment"),count("SELECT COUNT(*) FROM invoice"),
+            count("SELECT COUNT(*) FROM activity_log"),count("SELECT COUNT(*) FROM attendance_record"));
+    }
+    @Test void F56_01_assignedCoachReceivesTheExactRuleBasedContractForTheBadmintonDemoCase() throws Exception {
+        long id=badmintonDrillBooking();
+        drillRequest(coach,id)
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.mode").value("RULE_BASED"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.ruleVersion").value("curated-drills-v1"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.requiresCoachReview").value(true))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.persisted").value(false))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.bookingId").value(id))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.memberId").value(member))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.classId").value(classId))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.level").value("BEGINNER"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.drafts.length()").value(2))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.drafts[0].title").value("Walking shadow footwork"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.drafts[1].title").value("Controlled racket contact"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.drafts[0].durationMinutes").value(5))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.drafts[0].instructions").isNotEmpty())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.drafts[0].reason")
+                .value(org.hamcrest.Matchers.startsWith("Matches the Badminton class at beginner level. Coach review is required.")));
+    }
+    @Test void F56_01_otherCoachesAndOtherRolesCannotReadDraftsOrLearnAboutTheBooking() throws Exception {
+        long id=badmintonDrillBooking();
+        // An unknown booking and another Coach's booking are indistinguishable 404 responses.
+        String foreign=drillRequest(otherCoach,id).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound())
+            .andReturn().getResponse().getContentAsString();
+        String unknown=drillRequest(otherCoach,Long.MAX_VALUE).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound())
+            .andReturn().getResponse().getContentAsString();
+        String memberName=jdbc.queryForObject("SELECT full_name FROM user_account WHERE id=?",String.class,member);
+        assertThat(foreign).doesNotContain(memberName,"Walking shadow footwork","\"memberId\"");
+        assertThat(foreign.replaceAll("\"(timestamp|path|correlationId|traceId)\":\"[^\"]*\"","")).isEqualTo(unknown.replaceAll("\"(timestamp|path|correlationId|traceId)\":\"[^\"]*\"",""));
+        for(long wrongRole:List.of(member,peer,reception,account("MANAGER")))
+            drillRequest(wrongRole,id).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        jdbc.update("UPDATE user_account SET status='INACTIVE',version=version+1 WHERE id=?",coach);
+        drillRequest(coach,id).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        jdbc.update("UPDATE user_account SET status='ACTIVE',version=version+1 WHERE id=?",coach);
+        drillRequest(coach,id).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+    }
+    @Test void F56_01_cancelledInactiveOrUnassignedBookingsFailClosedWithoutDrafts() throws Exception {
+        long id=badmintonDrillBooking();
+        assertThatThrownBy(()->writer.drillSuggestions(coach,0L)).isInstanceOf(ResourceNotFoundException.class);
+        jdbc.update("UPDATE user_account SET status='INACTIVE',version=version+1 WHERE id=?",member);
+        assertThatThrownBy(()->writer.drillSuggestions(coach,id)).isInstanceOf(ResourceNotFoundException.class);
+        jdbc.update("UPDATE user_account SET status='ACTIVE',version=version+1 WHERE id=?",member);
+        jdbc.update("UPDATE sport_class SET is_active=0 WHERE id=?",classId);
+        assertThatThrownBy(()->writer.drillSuggestions(coach,id)).isInstanceOf(ResourceNotFoundException.class);
+        jdbc.update("UPDATE sport_class SET is_active=1 WHERE id=?",classId);
+        long selfSession=session("SELF_TRAINING");
+        long selfBooking=insert("INSERT booking(booking_code,session_id,member_id,status) VALUES (?,?,?,'CONFIRMED')",code(),selfSession,peer);
+        assertThatThrownBy(()->writer.drillSuggestions(coach,selfBooking)).isInstanceOf(ResourceNotFoundException.class);
+        jdbc.update("UPDATE booking SET status='CANCELLED' WHERE id=?",id);
+        assertThatThrownBy(()->writer.drillSuggestions(coach,id)).isInstanceOf(ResourceNotFoundException.class);
+        drillRequest(coach,id).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+    }
+    @Test void F56_01_syntheticMemberBookingIsTheSamePrivacySafeNotFoundWithoutWrites() throws Exception {
+        long id=badmintonDrillBooking();
+        String unknown=drillRequest(coach,Long.MAX_VALUE).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound())
+            .andReturn().getResponse().getContentAsString();
+        // Quarantine only this test's own Member in the isolated fixture database.
+        jdbc.update("UPDATE user_account SET email=?,version=version+1 WHERE id=?",code().toLowerCase(java.util.Locale.ROOT)+"@unified-demo.invalid",member);
+        var before=drillSideEffectSnapshot();
+        String synthetic=drillRequest(coach,id).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound())
+            .andReturn().getResponse().getContentAsString();
+        String memberName=jdbc.queryForObject("SELECT full_name FROM user_account WHERE id=?",String.class,member);
+        assertThat(synthetic).doesNotContain("SYNTHETIC","Synthetic",memberName,"Walking shadow footwork","\"memberId\"");
+        assertThat(synthetic.replaceAll("\"(timestamp|path|correlationId|traceId)\":\"[^\"]*\"","")).isEqualTo(unknown.replaceAll("\"(timestamp|path|correlationId|traceId)\":\"[^\"]*\"",""));
+        assertThatThrownBy(()->writer.drillSuggestions(coach,id)).isInstanceOf(ResourceNotFoundException.class);
+        assertThat(drillSideEffectSnapshot()).isEqualTo(before);
+        // The shared policy keeps its own error on other operational reads.
+        assertThatThrownBy(()->writer.learnerProfile(coach,classId,member)).isInstanceOf(BusinessRuleException.class);
+    }
+    @Test void F56_01_unsupportedLevelOrUnsetGoalGivesAnHonestEmptyOrUngoaledResult() {
+        long id=badmintonDrillBooking();
+        // booking.member_id references member_profile (fk_bk_member), so an unset goal is the only incomplete profile case.
+        jdbc.update("UPDATE member_profile SET main_goal=NULL WHERE user_id=?",member);
+        var withoutProfile=writer.drillSuggestions(coach,id);
+        assertThat(withoutProfile.drafts()).hasSize(2).allSatisfy(item->assertThat(item.reason()).doesNotContain("Saved member goal"));
+        jdbc.update("UPDATE sport_class SET level='ALL_LEVELS' WHERE id=?",classId);
+        var unsupported=writer.drillSuggestions(coach,id);
+        assertThat(unsupported.mode()).isEqualTo("RULE_BASED");
+        assertThat(unsupported.persisted()).isFalse();
+        assertThat(unsupported.drafts()).isEmpty();
+    }
+    @Test void F56_01_replayingTheSameRequestIsDeterministicAndWritesNothing() throws Exception {
+        long id=badmintonDrillBooking();
+        var before=drillSideEffectSnapshot();
+        var first=writer.drillSuggestions(coach,id);
+        for(int replay=0;replay<3;replay++) {
+            assertThat(writer.drillSuggestions(coach,id)).isEqualTo(first);
+            drillRequest(coach,id).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+        }
+        assertThat(drillSideEffectSnapshot()).isEqualTo(before);
+        assertThat(count("SELECT COUNT(*) FROM session_plan WHERE booking_id=?",id)).isZero();
     }
     @Test void R2_02_cancelledOrMismatchedBookingCannotReceivePlan() {
         var wrong=new TrainingWriteRequest.Plan(classId,peer,booking,"Wrong owner",null,plan().steps());

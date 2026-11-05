@@ -1,0 +1,70 @@
+{
+  "base": "c9c50da94423f8540de328855f9a7efd0878b1f1",
+  "combinedApplicationSource": "cb4565d21dadada24ce15082d57d706121cce5ad",
+  "previousFullyVerifiedSource": "8536d83ca17597b3ab565207bfc4e7d9bacc0122",
+  "backendSourceUnchangedSince": "9184e9132946b78d85d958de9800da03433b2fad",
+  "inheritedMainChanges": [
+    "frontend/src/layouts/StaffLayout.tsx",
+    "frontend/src/pages/reception/PaymentRequestsPage.tsx",
+    "frontend/src/pages/reception/receptionPayments.test.tsx",
+    "frontend/src/styles/base.css",
+    "frontend/src/styles/paymentWorkspace.css"
+  ],
+  "frontend": {
+    "numTotalTests": 1943,
+    "numPassedTests": 1943,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "success": true
+  },
+  "frontendExits": {
+    "typescript": 0,
+    "source": "cb4565d21dadada24ce15082d57d706121cce5ad",
+    "build": 0,
+    "tests": 0,
+    "lint": 0
+  },
+  "browser": {
+    "database": "sportify_unify_test_20261105155228_r11main",
+    "checks": [
+      {
+        "name": "Fresh schema includes release V46",
+        "status": "PASS"
+      },
+      {
+        "name": "All five additive release migrations applied",
+        "status": "PASS"
+      },
+      {
+        "name": "Demo Member authenticates",
+        "status": "PASS"
+      },
+      {
+        "name": "Official registration creates pending payment",
+        "status": "PASS"
+      }
+    ],
+    "transport": "Loopback HTTP, real SQL Server and Edge; no Docker",
+    "sourceHead": "cb4565d21dadada24ce15082d57d706121cce5ad",
+    "trackedWorktreeDirty": false,
+    "jarSha256": "cfec37d1b8a784b828a8256928fb9e9fbf61c27db77f1447457a30a6e53713d1",
+    "startedAtUtc": "2026-11-05T08:52:29.279574+00:00",
+    "mode": "RELEASE_1_1_DESKTOP_ONLY",
+    "release11": {
+      "status": "PASS",
+      "checks": 35,
+      "evidence": "r11-results.json"
+    },
+    "restart": {
+      "status": "PASS",
+      "checks": [
+        "Owned backend restart retains Coach result",
+        "SQL support status remains CLOSED"
+      ]
+    },
+    "status": "PASS",
+    "finishedAtUtc": "2026-11-05T08:54:50.825296+00:00"
+  },
+  "sourceCiRun": "https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/41997764307",
+  "note": "Final submitted-head CI is recorded separately after the report commit; no result is inferred."
+}
