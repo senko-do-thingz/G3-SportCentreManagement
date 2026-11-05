@@ -1,5 +1,7 @@
 ## 2026-11-05 - Flow 1-4 Release 1.1 candidate
 
+- Integrate main c9c50da94423f8540de328855f9a7efd0878b1f1 without conflict, preserving the Reception payment workspace fix from PR #212. Fresh frontend and four-role desktop verification is recorded in round-002; prior results retain their original SHAs.
+
 - Add Reception support desktop intake, member/status filters, detail and bounded state transitions through the existing idempotent API.
 - Add date-scoped Manager member-registration and class-booking counters alongside the existing revenue report and CSV export.
 - Add Manager-only read-only attendance overview and session details with explicit confirmed, unmarked and cancelled rules, bounded queries and existing Session ID history resolution. No schema migration or backfill policy change.

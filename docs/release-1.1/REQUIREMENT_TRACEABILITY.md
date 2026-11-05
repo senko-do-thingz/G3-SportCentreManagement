@@ -1,5 +1,7 @@
 # Release 1.1 requirement traceability
 
+Source integration follow-up: candidate cb4565d21dadada24ce15082d57d706121cce5ad incorporates main c9c50da94423f8540de328855f9a7efd0878b1f1. The 30-requirement mapping below is unchanged; current exact-SHA verification is in R11-11/reports/round-002.
+
 Source: original `TOPIC 4.xlsx`, Project!A5:G5. Workbook SHA256: 188f8aa5bc04c606e2b3d2488ac1acac3d8eacacbe1611430fda41f406e1ade7. Project!E5 contains the actor requirements, F5 requires Flows 1-3 and G5 makes Flow 4 optional. CODEOWNER included Flow 4 and accepted R11-00. The 30 rows below translate the non-AI actor bullets; they are local trace IDs, not invented official worksheet IDs. Optional AI bullets remain excluded.
 
 All routes and endpoints are relative to the frontend root and `/api/v1`, respectively. Controller names refer to backend source under `com/sportify`. Existing behavior is regression scope; the four missing desktop readers/workflows are the new implementation. Verification must be read from the exact candidate SHA reports, not from source presence alone.

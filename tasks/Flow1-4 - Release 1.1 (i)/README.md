@@ -1,5 +1,7 @@
 # Sportify Center - Flow 1-4 Release 1.1
 
+Latest integration: main c9c50da94423f8540de328855f9a7efd0878b1f1 was incorporated as cb4565d21dadada24ce15082d57d706121cce5ad. Current handoff and repeated checks are in tasks/R11-11/reports/round-002. Earlier rounds retain their original SHAs.
+
 Execution status: Release 1.1 candidate prepared for CODEOWNER review in https://github.com/senko-do-thingz/G3-SportCentreManagement/pull/217. R11-00 was accepted; R11-01/02/04/05 are implemented and R11-03/09/10/11 have verification, documentation and acceptance packets. Per-task reports and the tracker record actual source SHAs and evidence. No merge, self-approval or deployment was performed.
 
 EXECUTION_AUTHORIZATION.md records the CODEOWNER override for continuous sequential execution and one consolidated PR. The initial planning statuses and original execution order below are historical package context; current review status is in the tracker and reports. R11-06/07/08 remain scope decisions only.

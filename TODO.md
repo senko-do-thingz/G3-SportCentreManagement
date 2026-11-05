@@ -2,6 +2,8 @@
 
 ## Current Release 1.1 candidate - 2026-11-05
 
+The candidate includes the subsequent main update c9c50da94423f8540de328855f9a7efd0878b1f1. R11-11 round-002 records repeat verification after that integration. CODEOWNER review and post-merge acceptance remain pending.
+
 R11-00 was accepted by CODEOWNER. R11-01 support, R11-02 operations, R11-04 Manager attendance and R11-05 Coach progress are implemented on the consolidated candidate branch. R11-03 verification is repeated at the final candidate SHA. R11-09 documentation, R11-10 traceability/demo and R11-11 acceptance preparation record actual evidence in their task reports. None is automatically marked merged or approved by the agent.
 
 Remaining review gates: full candidate test and exact-HEAD CI results, real four-role desktop rehearsal, and CODEOWNER review. See [traceability](docs/release-1.1/REQUIREMENT_TRACEABILITY.md). Fixed roles are retained; Waitlist and dynamic RBAC are deferred; deprecated legacy membership remains. No mobile, AI Audit Log or Flow 5-6 implementation is required for this release.

@@ -1,5 +1,7 @@
 # CODEOWNER Release 1.1 merge and demonstration gates
 
+Latest-main follow-up: main advanced to c9c50da94423f8540de328855f9a7efd0878b1f1 and was incorporated as cb4565d21dadada24ce15082d57d706121cce5ad. Round-002 records the fresh frontend/desktop results and final submitted-head CI after that integration. Historical round-001 results remain bound to their recorded SHAs. Owner-only review/post-merge gates remain unchecked.
+
 A source review or a green workflow alone does not authorize a merge/deployment.
 
 Candidate update: R11-00 accepted; source CI 41988848995 passed for head 9184e9132946b78d85d958de9800da03433b2fad and integration merge 8d62a3aec5c9affcce695b2753dca23593e36973. Local full verification passed 2268 unit, 1040 native SQL and 1942 frontend cases with zero failures/skips; affected final fixes were rerun. The final desktop SQL/browser rerun passed 35 checks and restart readback. R11-11/reports/round-001 contains the complete packet. Gate B/D review and post-merge items remain CODEOWNER checks; final submitted-head checks are attached to PR #217.

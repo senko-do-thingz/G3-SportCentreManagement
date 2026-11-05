@@ -1,5 +1,7 @@
 # Release 1.1 task board
 
+Latest-main follow-up: candidate cb4565d21dadada24ce15082d57d706121cce5ad includes main c9c50da94423f8540de328855f9a7efd0878b1f1. R11-03, R11-10 and R11-11 round-002 record repeat verification. All implementation tasks remain IN_REVIEW; scope decisions and R11-00 acceptance are unchanged.
+
 Execution update: R11-00 accepted. CODEOWNER authorized one consolidated branch `feat/release-1-1-desktop`, sequential automatic continuation and one PR (EXECUTION_AUTHORIZATION.md). Implemented tasks are IN_REVIEW, not self-approved or merged. R11-06/07/08 retain decision-only scope. Final evidence and blockers are under R11-11/reports; the workbook carries per-task status and evidence links.
 
 Status definitions: READY, PLANNED, IN_PROGRESS, IN_REVIEW, CHANGES_REQUESTED, PASSED, MERGED, ALREADY_DONE, BLOCKED, DEFERRED_DECISION_ONLY.

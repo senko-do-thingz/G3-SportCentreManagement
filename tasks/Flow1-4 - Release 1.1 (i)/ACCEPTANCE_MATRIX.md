@@ -1,5 +1,7 @@
 # Topic 4 Flow 1-4 Release 1.1 acceptance matrix
 
+Latest integration is cb4565d21dadada24ce15082d57d706121cce5ad over main c9c50da94423f8540de328855f9a7efd0878b1f1. The requirement mapping is unchanged. See R11-11/reports/round-002 for follow-up exact-SHA evidence after the payment workspace update.
+
 Execution update: R11-00 ACCEPTED by CODEOWNER. The consolidated candidate implements R11-01/02/04/05; verification, documentation and rehearsal evidence are in each task round. See EXECUTION_AUTHORIZATION.md for the authorized continuous execution and consolidated PR override, and docs/release-1.1/REQUIREMENT_TRACEABILITY.md at repository root for all 30 non-AI actor bullets. No agent approval, merge or deployment is implied.
 
 Scope mapping is derived from the user assessment, not a newly reinterpreted official TOPIC_4.xlsx. Agent must locate the original workbook and Figma assets in its workspace and record actual file/cell/asset provenance before claiming official completeness.

@@ -6,6 +6,8 @@ Web system for **Sportify Center**, a multi-sport facility. It manages accounts 
 
 ## Flow 1-4 Release 1.1 candidate
 
+Latest-main synchronization: the candidate includes main c9c50da94423f8540de328855f9a7efd0878b1f1 and preserves PR #212 payment workspace changes. Follow-up verification and the current handoff are under R11-11/reports/round-002; round-001 remains the original evidence snapshot.
+
 This branch adds the missing desktop support, operations, Manager attendance and Coach progress pages. It is a release candidate awaiting CODEOWNER review, not a merged release or deployment. See [release traceability](docs/release-1.1/REQUIREMENT_TRACEABILITY.md) and the [12-minute desktop demo](docs/release-1.1/DESKTOP_DEMO.md) for routes, contracts, tests and limitations. Per-task evidence is under `tasks/Flow1-4 - Release 1.1 (i)/tasks/R11-xx/reports/`.
 
 | Scope | Desktop behavior |
