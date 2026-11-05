@@ -57,11 +57,16 @@ def exercise_release11(sql, request, out, head):
                 page = context.new_page()
                 pages.append(page)
                 page.set_default_timeout(30000)
-                page.goto(BASE + '/login')
+                page.goto(BASE + '/login', wait_until='domcontentloaded')
                 page.locator('input[name=email]').fill(email)
                 page.locator('input[name=password]').fill(password)
                 page.get_by_role('button', name='Log in', exact=True).click()
-                page.wait_for_url(re.compile('/' + role + r'(?:/|$)'))
+                try:
+                    page.wait_for_url(re.compile('/' + role + r'(?:[/?#]|$)'), wait_until='domcontentloaded')
+                except Exception:
+                    report['navigationFailure'] = {'role': role, 'url': page.url, 'body': page.locator('body').inner_text(timeout=3000)[:1500]}
+                    page.screenshot(path=str(out / f'r11-navigation-failure-{role}.png'), full_page=True)
+                    raise
                 check(role + ' real form login', True)
                 return page
 
