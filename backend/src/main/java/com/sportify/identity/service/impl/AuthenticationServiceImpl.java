@@ -28,6 +28,9 @@ import com.sportify.core.exception.ConflictException;
 import com.sportify.core.exception.ResourceNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import com.sportify.identity.entity.MemberProfile;
+import com.sportify.identity.entity.UserRefreshToken;
+import com.sportify.identity.repository.UserRefreshTokenRepository;
+import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +49,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final AuthenticationManager authenticationManager;
     private final CodeFormatter codeFormatter;
     private final Clock clock;
+    private final UserRefreshTokenRepository userRefreshTokenRepository;
 
     @Override
     @Transactional
@@ -100,6 +104,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         CustomUserDetails userDetails = new CustomUserDetails(savedUser);
         String jwtToken = jwtService.generateToken(userDetails);
         String refreshToken = jwtService.generateRefreshToken(userDetails);
+        saveRefreshToken(savedUser, refreshToken);
 
         return AuthResponse.builder()
                 .accessToken(jwtToken)
@@ -141,6 +146,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         CustomUserDetails userDetails = new CustomUserDetails(user);
         String jwtToken = jwtService.generateToken(userDetails);
         String refreshToken = jwtService.generateRefreshToken(userDetails);
+        saveRefreshToken(user, refreshToken);
 
         return AuthResponse.builder()
                 .accessToken(jwtToken)
@@ -149,26 +155,73 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     @Override
+    @Transactional
     public AuthResponse refreshToken(RefreshTokenRequest request) {
         String token = request.getRefreshToken();
-        String userEmail = jwtService.extractUsername(token);
-        if (userEmail != null) {
-            UserAccount user = repository.findByEmailIgnoreCase(userEmail)
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-            CustomUserDetails userDetails = new CustomUserDetails(user);
-            if ("refresh".equals(jwtService.extractTokenType(token)) && jwtService.isTokenValid(token, userDetails)) {
-                if (!"ACTIVE".equals(user.getStatus())) {
-                    throw new org.springframework.security.authentication.DisabledException("Account is disabled");
-                }
-                String accessToken = jwtService.generateToken(userDetails);
-                String newRefreshToken = jwtService.generateRefreshToken(userDetails);
-                
-                return AuthResponse.builder()
-                        .accessToken(accessToken)
-                        .refreshToken(newRefreshToken)
-                        .build();
-            }
+        if (token == null || token.isBlank()) {
+            throw new org.springframework.security.authentication.BadCredentialsException("Invalid refresh token");
         }
-        throw new org.springframework.security.authentication.BadCredentialsException("Invalid refresh token");
+        String userEmail;
+        try {
+            userEmail = jwtService.extractUsername(token);
+        } catch (Exception ex) {
+            throw new org.springframework.security.authentication.BadCredentialsException("Invalid refresh token");
+        }
+        if (userEmail == null) {
+            throw new org.springframework.security.authentication.BadCredentialsException("Invalid refresh token");
+        }
+
+        UserAccount user = repository.findByEmailIgnoreCase(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        CustomUserDetails userDetails = new CustomUserDetails(user);
+
+        if (!"refresh".equals(jwtService.extractTokenType(token)) || !jwtService.isTokenValid(token, userDetails)) {
+            throw new org.springframework.security.authentication.BadCredentialsException("Invalid refresh token");
+        }
+        if (!"ACTIVE".equals(user.getStatus())) {
+            throw new org.springframework.security.authentication.DisabledException("Account is disabled");
+        }
+
+        String tokenHash = JwtService.hashToken(token);
+        UserRefreshToken tokenRecord = userRefreshTokenRepository.findByTokenHash(tokenHash)
+                .orElseThrow(() -> new org.springframework.security.authentication.BadCredentialsException("Invalid refresh token"));
+
+        if (tokenRecord.getRevokedAt() != null) {
+            throw new org.springframework.security.authentication.BadCredentialsException("Refresh token is revoked");
+        }
+        if (tokenRecord.getConsumedAt() != null) {
+            throw new org.springframework.security.authentication.BadCredentialsException("Refresh token has already been consumed");
+        }
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (tokenRecord.getExpiresAt().isBefore(now)) {
+            throw new org.springframework.security.authentication.BadCredentialsException("Refresh token is expired");
+        }
+
+        int updated = userRefreshTokenRepository.consumeToken(tokenHash, now);
+        if (updated == 0) {
+            throw new org.springframework.security.authentication.BadCredentialsException("Refresh token has already been consumed");
+        }
+
+        String accessToken = jwtService.generateToken(userDetails);
+        String newRefreshToken = jwtService.generateRefreshToken(userDetails);
+        saveRefreshToken(user, newRefreshToken);
+
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(newRefreshToken)
+                .build();
+    }
+
+    private void saveRefreshToken(UserAccount user, String refreshToken) {
+        String tokenHash = JwtService.hashToken(refreshToken);
+        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDateTime expiresAt = now.plusSeconds(jwtService.getRefreshExpiration() / 1000);
+        UserRefreshToken record = UserRefreshToken.builder()
+                .user(user)
+                .tokenHash(tokenHash)
+                .expiresAt(expiresAt)
+                .createdAt(now)
+                .build();
+        userRefreshTokenRepository.save(record);
     }
 }

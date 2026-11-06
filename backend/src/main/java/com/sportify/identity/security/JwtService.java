@@ -21,7 +21,9 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Service
@@ -81,7 +83,25 @@ public class JwtService {
     public String generateRefreshToken(UserDetails userDetails) {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("type", "refresh");
+        extraClaims.put(Claims.ID, UUID.randomUUID().toString());
         return buildToken(extraClaims, userDetails, refreshExpiration);
+    }
+
+    public long getRefreshExpiration() {
+        return refreshExpiration;
+    }
+
+    public static String hashToken(String token) {
+        if (token == null) {
+            return null;
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (GeneralSecurityException ex) {
+            throw new IllegalStateException("Cannot compute token hash", ex);
+        }
     }
 
     private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails, long expiration) {
