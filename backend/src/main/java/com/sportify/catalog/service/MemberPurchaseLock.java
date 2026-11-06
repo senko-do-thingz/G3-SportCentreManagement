@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * E2E-BUG-06 (PROVISIONAL, E2E-D8 pending): serializes online pending package orders per member, so two identical
+ * E2E-BUG-06 (E2E-D8 APPROVED 2026-11-06): serializes online pending package orders per member, so two identical
  * concurrent submissions cannot both pass the duplicate check and create two pending orders and payments.
  *
  * <p>A transaction-owned SQL Server application lock on the caller's JPA connection, released at commit or rollback.

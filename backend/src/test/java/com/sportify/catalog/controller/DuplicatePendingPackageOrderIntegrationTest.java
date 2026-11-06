@@ -33,8 +33,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 /**
  * E2E-BUG-06 (Flow 1 + Flow 3): one online pending order per member, package and start date.
- * PROVISIONAL: the expected results follow E2E-D8 key K2 with "identical request returns the existing order (200),
- * incompatible request gets 409", PENDING CODEOWNER approval. No new expiry (E2E-D8b): the existing daily maintenance
+ * E2E-D8 APPROVED (2026-11-06): key K2; an identical request returns the existing order (200),
+ * an incompatible request gets 409 PENDING_ORDER_EXISTS. No new expiry (E2E-D8b): the existing daily maintenance
  * job already cancels pending registrations older than 7 days. Real SQL Server transactions and HTTP security.
  */
 @AutoConfigureMockMvc

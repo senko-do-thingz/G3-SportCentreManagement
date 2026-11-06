@@ -237,7 +237,7 @@ public class SportPackageServiceImpl implements SportPackageService {
             throw new BusinessRuleException("Payment amount must be greater than zero. Attempted package price: " + paidAmount);
         }
 
-        // E2E-BUG-06 (PROVISIONAL, E2E-D8 pending): one online pending order per member, package and start date (K2).
+        // E2E-BUG-06 (E2E-D8 APPROVED 2026-11-06): one online pending order per member, package and start date (K2).
         // Same channel rule as below: members and non-staff order online; staff only when they choose a non-desk channel.
         boolean pendingOnline = !SecurityUtils.isStaff(actor)
                 || (request.getChannel() != null && request.getChannel() != RegistrationChannel.RECEPTION);

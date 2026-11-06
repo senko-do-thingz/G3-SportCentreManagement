@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 @Builder
 public class PackageRegistrationResponse {
     /**
-     * E2E-BUG-06 (PROVISIONAL, E2E-D8 pending): true when an identical online order was already waiting for payment and
+     * E2E-BUG-06 (E2E-D8 APPROVED 2026-11-06): true when an identical online order was already waiting for payment and
      * is returned instead of a new one. Omitted for a newly created order.
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)

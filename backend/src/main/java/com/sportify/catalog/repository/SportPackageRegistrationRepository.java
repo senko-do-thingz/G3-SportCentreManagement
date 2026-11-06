@@ -118,7 +118,7 @@ public interface SportPackageRegistrationRepository extends JpaRepository<SportP
     Long getNextRegistrationCodeSequence();
 
     /**
-     * E2E-BUG-06 (PROVISIONAL, E2E-D8 option K2 pending): the member's online orders that still wait for payment for the
+     * E2E-BUG-06 (E2E-D8 APPROVED, key K2): the member's online orders that still wait for payment for the
      * same package and start date. The caller holds the member purchase lock, so the result cannot change before its
      * own insert commits.
      */
