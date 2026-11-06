@@ -9,8 +9,8 @@ import com.anthropic.models.messages.StructuredTextBlock;
 import com.anthropic.services.blocking.MessageService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.sportify.catalog.service.ClaudeDrillGenerator.ProposedDrill;
-import com.sportify.catalog.service.ClaudeDrillGenerator.ProposedDrills;
+import com.sportify.catalog.service.AiDrillPolicy.ProposedDrill;
+import com.sportify.catalog.service.AiDrillPolicy.ProposedDrills;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -37,7 +37,7 @@ class ClaudeDrillGeneratorTest {
 
     @Test
     void keepsTheTotalWithinTheSessionDuration() {
-        var drafts = ClaudeDrillGenerator.toDrafts(new ProposedDrills(List.of(drill("A", 20), drill("B", 20), drill("C", 10), drill("D", 5))), "BEGINNER", 45);
+        var drafts = AiDrillPolicy.toDrafts(new ProposedDrills(List.of(drill("A", 20), drill("B", 20), drill("C", 10), drill("D", 5))), "BEGINNER", 45);
         assertThat(drafts).extracting(d -> d.title()).containsExactly("A", "B", "D");
         assertThat(drafts.stream().mapToInt(d -> d.durationMinutes()).sum()).isLessThanOrEqualTo(45);
     }
@@ -56,7 +56,7 @@ class ClaudeDrillGeneratorTest {
 
     @Test
     void keepsValidDraftsAndUsesTheMemberLevel() {
-        var drafts = ClaudeDrillGenerator.toDrafts(new ProposedDrills(List.of(drill("Six-corner shadow footwork", 10))), "ADVANCED");
+        var drafts = AiDrillPolicy.toDrafts(new ProposedDrills(List.of(drill("Six-corner shadow footwork", 10))), "ADVANCED");
         assertThat(drafts).singleElement().satisfies(d -> {
             assertThat(d.title()).isEqualTo("Six-corner shadow footwork");
             assertThat(d.durationMinutes()).isEqualTo(10);
@@ -67,7 +67,7 @@ class ClaudeDrillGeneratorTest {
 
     @Test
     void dropsDraftsACoachPlanCouldNotStore() {
-        var drafts = ClaudeDrillGenerator.toDrafts(new ProposedDrills(List.of(
+        var drafts = AiDrillPolicy.toDrafts(new ProposedDrills(List.of(
                 drill("Too short", 2),
                 drill("Too long", 31),
                 drill("x".repeat(151), 10),
@@ -80,15 +80,15 @@ class ClaudeDrillGeneratorTest {
     @Test
     void limitsToFourDraftsAndTruncatesLongReasons() {
         var many = List.of(drill("A", 5), drill("B", 5), drill("C", 5), drill("D", 5), drill("E", 5));
-        assertThat(ClaudeDrillGenerator.toDrafts(new ProposedDrills(many), "BEGINNER")).hasSize(4);
+        assertThat(AiDrillPolicy.toDrafts(new ProposedDrills(many), "BEGINNER")).hasSize(4);
         var longReason = new ProposedDrill("A", "g", 5, "Do it.", "r".repeat(600));
-        assertThat(ClaudeDrillGenerator.toDrafts(new ProposedDrills(List.of(longReason)), "BEGINNER").getFirst().reason()).hasSize(500);
+        assertThat(AiDrillPolicy.toDrafts(new ProposedDrills(List.of(longReason)), "BEGINNER").getFirst().reason()).hasSize(500);
     }
 
     @Test
     void emptyOrMissingProposalGivesNoDrafts() {
-        assertThat(ClaudeDrillGenerator.toDrafts(null, "BEGINNER")).isEmpty();
-        assertThat(ClaudeDrillGenerator.toDrafts(new ProposedDrills(null), "BEGINNER")).isEmpty();
+        assertThat(AiDrillPolicy.toDrafts(null, "BEGINNER")).isEmpty();
+        assertThat(AiDrillPolicy.toDrafts(new ProposedDrills(null), "BEGINNER")).isEmpty();
     }
 
     @Test

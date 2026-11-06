@@ -45,10 +45,13 @@ application:
 app:
   training:
     ai-drills:
-      # Flow 5: Claude drafts Coach drill suggestions from the member's goal, level and recorded results.
-      # Off by default; needs ANTHROPIC_API_KEY. Any failure falls back to the rule-based catalog.
+      # Flow 5: AI drafts Coach drill suggestions from the member's goal, level and recorded results.
+      # Off by default; needs the key of the selected provider. Any failure falls back to the rule-based catalog.
       enabled: ${AI_DRILLS_ENABLED:false}
+      # claude (ANTHROPIC_API_KEY) or gemini (GEMINI_API_KEY). Both share one prompt and one validation policy.
+      provider: ${AI_DRILLS_PROVIDER:claude}
       model: ${AI_DRILLS_MODEL:claude-opus-5-5}
+      gemini-model: ${AI_DRILLS_GEMINI_MODEL:gemini-flash-lite-latest}
       timeout-seconds: ${AI_DRILLS_TIMEOUT_SECONDS:30}
     attendance-backfill:
       # Activation and a positive ISO-8601 duration both require an approved operational cutoff.

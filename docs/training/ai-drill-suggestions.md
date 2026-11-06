@@ -47,14 +47,29 @@ copies selected drafts into the new "Create a class plan" form, which assigns a 
 `POST /api/v1/coach/training/class-plans` with an `Idempotency-Key`. Members with a confirmed booking in the class
 see class plans in their existing plan list.
 
+## Providers
+
+Two interchangeable providers implement the same `DrillGenerator` contract, share one prompt, output shape and validation policy (`AiDrillPolicy`), and are selected with `AI_DRILLS_PROVIDER`:
+
+| Provider | Key | Default model | Notes |
+|---|---|---|---|
+| `claude` (default) | `ANTHROPIC_API_KEY` | `claude-opus-5-5` | Paid API; structured output through the Anthropic Java SDK |
+| `gemini` | `GEMINI_API_KEY` (aistudio.google.com) | `gemini-flash-lite-latest` | Free tier available; JSON response schema over the REST API with the JDK HttpClient (no extra dependency); the key is sent in the `x-goog-api-key` header, never in the URL |
+
+On the Gemini free tier, `gemini-flash-latest` was measured as overloaded (HTTP 503 or more than two minutes per call) while `gemini-flash-lite-latest` answered the same structured request in about 2 seconds, so the Lite alias is the default. On the free tier Google may use submitted content to improve its products; only the de-identified training context described above is sent.
+
+Live check (2026-11-06, Gemini, disposable database with the demo seed): an individual preview with focus "footwork recovery" and 45 minutes returned AI_GENERATED drafts in 3.0 s at the member's ADVANCED level totalling 45 minutes; a class preview with 60 minutes returned drafts in 2.4 s at the class BEGINNER level for 3 members; a Member got 403 and another Coach 404; no session_plan row was written.
+
 ## Configuration
 
 | Property | Environment / `backend/.env` | Default |
 |---|---|---|
 | `app.training.ai-drills.enabled` | `AI_DRILLS_ENABLED` | `false` |
-| `app.training.ai-drills.model` | `AI_DRILLS_MODEL` | `claude-opus-5-5` |
+| `app.training.ai-drills.provider` | `AI_DRILLS_PROVIDER` | `claude` |
+| `app.training.ai-drills.model` | `AI_DRILLS_MODEL` (Claude) | `claude-opus-5-5` |
+| `app.training.ai-drills.gemini-model` | `AI_DRILLS_GEMINI_MODEL` | `gemini-flash-lite-latest` |
 | `app.training.ai-drills.timeout-seconds` | `AI_DRILLS_TIMEOUT_SECONDS` | `30` |
-| API key | `ANTHROPIC_API_KEY` | none |
+| API key | `ANTHROPIC_API_KEY` or `GEMINI_API_KEY` | none |
 
 To enable locally, add to `backend/.env` (never commit the key):
 
