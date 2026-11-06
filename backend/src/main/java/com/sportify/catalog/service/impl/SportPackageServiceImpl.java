@@ -18,6 +18,7 @@ import com.sportify.catalog.repository.SportRepository;
 import com.sportify.catalog.service.MembershipCardService;
 import com.sportify.catalog.service.SportPackageService;
 import com.sportify.catalog.service.DeskSaleCharge;
+import com.sportify.catalog.service.MemberAccountEligibility;
 import com.sportify.core.audit.AuditAction;
 import com.sportify.core.audit.AuditEvent;
 import com.sportify.core.audit.AuditService;
@@ -73,6 +74,7 @@ public class SportPackageServiceImpl implements SportPackageService {
     private final CodeFormatter codeFormatter;
     private final AuditService auditService;
     private final Clock clock;
+    private final MemberAccountEligibility memberAccountEligibility;
     private final EntityManager entityManager;
     /** Resolved on use: PaymentVerificationService itself depends on this service. */
     private final ObjectProvider<PaymentVerificationService> paymentVerificationService;
@@ -181,6 +183,8 @@ public class SportPackageServiceImpl implements SportPackageService {
         } else {
             targetMemberId = request.getMemberId() != null ? request.getMemberId() : actor.getId();
         }
+        // E2E-BUG-04: the target account must be ACTIVE before any registration, payment or invoice is written.
+        memberAccountEligibility.requireActiveForPurchase(targetMemberId);
 
         MemberProfile member = memberProfileRepository.findById(targetMemberId).orElse(null);
         if (member == null) {
@@ -338,6 +342,9 @@ public class SportPackageServiceImpl implements SportPackageService {
         if (registration.getStatus() != PackageRegistrationStatus.PENDING_PAYMENT) {
             throw new BusinessRuleException("Cannot activate package registration with status: " + registration.getStatus() + ". Only PENDING_PAYMENT registrations can be activated.");
         }
+        // E2E-BUG-04 / E2E-D11: every settlement path (direct staff activation and payment confirmation) requires the
+        // TARGET account to be ACTIVE. Lock order payment -> item -> account; nothing is written before this check.
+        memberAccountEligibility.requireActiveForPurchase(registration.getMember().getId());
         if (actualMethod != null && registration.getPayment() == null) {
             throw new BusinessRuleException("Cannot specify payment method for a registration with no linked payment");
         }

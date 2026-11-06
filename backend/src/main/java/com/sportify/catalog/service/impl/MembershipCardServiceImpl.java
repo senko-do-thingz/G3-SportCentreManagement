@@ -13,6 +13,7 @@ import com.sportify.catalog.repository.MemberCardRepository;
 import com.sportify.catalog.repository.MembershipCardTierRepository;
 import com.sportify.catalog.service.MembershipCardService;
 import com.sportify.catalog.service.DeskSaleCharge;
+import com.sportify.catalog.service.MemberAccountEligibility;
 import com.sportify.core.audit.AuditAction;
 import com.sportify.core.audit.AuditEvent;
 import com.sportify.core.audit.AuditService;
@@ -73,6 +74,7 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     private final CodeFormatter codeFormatter;
     private final AuditService auditService;
     private final Clock clock;
+    private final MemberAccountEligibility memberAccountEligibility;
     private final EntityManager entityManager;
     /** Resolved on use: PaymentVerificationService itself depends on this service. */
     private final ObjectProvider<PaymentVerificationService> paymentVerificationService;
@@ -262,6 +264,8 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         } else {
             targetMemberId = request.getMemberId() != null ? request.getMemberId() : actor.getId();
         }
+        // E2E-BUG-04: the target account must be ACTIVE before any card, payment or invoice is written.
+        memberAccountEligibility.requireActiveForPurchase(targetMemberId);
 
         MemberProfile member = memberProfileRepository.findById(targetMemberId).orElse(null);
         if (member == null) {
@@ -406,6 +410,9 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             throw new BusinessRuleException("Cannot activate membership card with status: " + card.getStatus()
                     + ". Only PENDING_PAYMENT cards can be activated.");
         }
+        // E2E-BUG-04 / E2E-D11: every settlement path (direct staff activation and payment confirmation) requires the
+        // TARGET account to be ACTIVE. Lock order payment -> item -> account; nothing is written before this check.
+        memberAccountEligibility.requireActiveForPurchase(card.getMember().getId());
         if (actualMethod != null && card.getPayment() == null) {
             throw new BusinessRuleException("Cannot specify payment method for a card with no linked payment");
         }

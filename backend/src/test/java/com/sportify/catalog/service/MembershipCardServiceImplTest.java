@@ -194,6 +194,9 @@ public class MembershipCardServiceImplTest {
     @Mock
     private PaymentVerificationService paymentVerificationService;
 
+    @Mock
+    private MemberAccountEligibility memberAccountEligibility;
+
     @InjectMocks
     private MembershipCardServiceImpl membershipCardService;
 
