@@ -121,8 +121,8 @@ class DuplicatePendingPackageOrderIntegrationTest extends AbstractIntegrationTes
 
     @Test
     void b06_03_aDifferentStartDateIsALegitimateSeparateOrder() {
-        Outcome today = order(LocalDate.now());
-        Outcome nextWeek = order(LocalDate.now().plusDays(7));
+        Outcome today = order(LocalDate.now().plusDays(1));
+        Outcome nextWeek = order(LocalDate.now().plusDays(8));
 
         assertThat(today.status()).isEqualTo(201);
         assertThat(nextWeek.status()).isEqualTo(201);
