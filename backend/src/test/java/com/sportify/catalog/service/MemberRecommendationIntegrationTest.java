@@ -81,6 +81,24 @@ class MemberRecommendationIntegrationTest extends AbstractIntegrationTest {
         otherMember = member("BEGINNER");
     }
 
+    /** CI shares one SQL Server database across suites: remove every marker-scoped row so catalog counts stay exact. */
+    @org.junit.jupiter.api.AfterEach
+    void cleanup() {
+        String users = "SELECT id FROM user_account WHERE email LIKE ?";
+        String sports = "SELECT id FROM sport WHERE code LIKE ?";
+        String like = marker + "%";
+        jdbc.update("DELETE FROM saved_recommendation WHERE member_id IN (" + users + ")", like);
+        jdbc.update("DELETE FROM member_sport_level WHERE member_id IN (" + users + ")", like);
+        jdbc.update("DELETE FROM booking WHERE member_id IN (" + users + ")", like);
+        jdbc.update("DELETE FROM class_session WHERE sport_id IN (" + sports + ")", like);
+        jdbc.update("DELETE FROM sport_class WHERE sport_id IN (" + sports + ")", like);
+        jdbc.update("DELETE FROM age_group WHERE code LIKE ?", like);
+        jdbc.update("DELETE FROM facility WHERE sport_id IN (" + sports + ")", like);
+        jdbc.update("DELETE FROM member_profile WHERE user_id IN (" + users + ")", like);
+        jdbc.update("DELETE FROM user_account WHERE email LIKE ?", like);
+        jdbc.update("DELETE FROM sport WHERE code LIKE ?", like);
+    }
+
     @Test
     void sessionsOverlappingAConfirmedBookingAreNotRecommendedButTouchingOnesAre() {
         long booked = classOf(sportA, "BEGINNER", null);
