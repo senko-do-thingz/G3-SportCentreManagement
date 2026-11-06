@@ -296,12 +296,11 @@ function PersonalInfoCard({ initial, onSaved }: { initial: UserProfile; onSaved:
 }
 
 function ChangePasswordCard() {
-  const toast = useToast()
+  const { logout } = useAuth()
   const rulesId = useId()
   const [form, setForm] = useState<PasswordForm>(EMPTY_PASSWORD_FORM)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [formError, setFormError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const sendingRef = useRef(false)
   const formRef = useRef<HTMLFormElement>(null)
@@ -317,7 +316,6 @@ function ChangePasswordCard() {
       delete next[field]
       return next
     })
-    setSuccess(null)
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -326,7 +324,6 @@ function ChangePasswordCard() {
       return
     }
     setFormError(null)
-    setSuccess(null)
     const errors = validatePasswordChange(form)
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) {
@@ -338,8 +335,10 @@ function ChangePasswordCard() {
     try {
       await memberApi.changePassword(toChangePasswordRequest(form))
       setForm(EMPTY_PASSWORD_FORM)
-      setSuccess(PASSWORD_CHANGED_MESSAGE)
-      toast.success('Password changed', PASSWORD_CHANGED_MESSAGE)
+      // E2E-BUG-05 / E2E-D7a: the backend has revoked every earlier token, including this browser's. End the
+      // session here too (both tokens are cleared); the route guard opens Log in, which shows the confirmation
+      // kept by the auth state, so it is not lost when this page unmounts. Failures never reach this line.
+      logout(PASSWORD_CHANGED_MESSAGE)
     } catch (error) {
       const failure = passwordFailure(error)
       setFieldErrors(failure.fields)
@@ -357,10 +356,6 @@ function ChangePasswordCard() {
 
   return (
     <Card title="Change password">
-      {success && (
-        // Not a live region: the success toast is the single announcement for screen readers.
-        <p className="notice notice--success">{success}</p>
-      )}
       {formError && (
         <p className="notice notice--danger" role="alert">
           {formError}

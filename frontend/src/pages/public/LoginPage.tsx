@@ -62,7 +62,7 @@ function loginErrorMessage(error: unknown): string {
 
 /** Log in screen (Figma F1-05). */
 export function LoginPage() {
-  const { status, user, login, sessionExpired, signedOutElsewhere } = useAuth()
+  const { status, user, login, sessionExpired, signedOutElsewhere, signOutNotice } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   // History state is read once and kept here; the effect below removes the prefill values from
@@ -176,6 +176,11 @@ export function LoginPage() {
       {signedOutElsewhere && !sessionExpired && !formError && (
         <p className="notice notice--warning" role="status">
           {SIGNED_OUT_ELSEWHERE_MESSAGE}
+        </p>
+      )}
+      {signOutNotice && !sessionExpired && !formError && (
+        <p className="notice notice--success" role="status">
+          {signOutNotice}
         </p>
       )}
       {infoMessage && !formError && (
