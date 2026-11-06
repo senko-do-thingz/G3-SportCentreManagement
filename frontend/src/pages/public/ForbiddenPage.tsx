@@ -24,7 +24,7 @@ export function ForbiddenPage() {
               Go to my home page
             </Link>
           )}
-          <button type="button" className={buttonClassName('secondary')} onClick={logout}>
+          <button type="button" className={buttonClassName('secondary')} onClick={() => logout()}>
             Log in with another account
           </button>
         </>

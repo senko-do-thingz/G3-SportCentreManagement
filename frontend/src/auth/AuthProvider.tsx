@@ -20,6 +20,7 @@ interface AuthState {
   user: UserProfile | null
   sessionExpired: boolean
   signedOutElsewhere: boolean
+  signOutNotice: string | null
   accountSwitched: AccountSwitch | null
   loadError: unknown
 }
@@ -29,6 +30,7 @@ const ANONYMOUS: AuthState = {
   user: null,
   sessionExpired: false,
   signedOutElsewhere: false,
+  signOutNotice: null,
   accountSwitched: null,
   loadError: null,
 }
@@ -86,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           user,
           sessionExpired: false,
           signedOutElsewhere: false,
+          signOutNotice: null,
           accountSwitched: switched ? { userId: user.id, fullName: user.fullName, seq } : previous.accountSwitched,
           loadError: null,
         }))
@@ -178,6 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         sessionExpired: false,
         signedOutElsewhere: false,
+        signOutNotice: null,
         accountSwitched: null,
         loadError: null,
       })
@@ -235,11 +239,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [startSession],
   )
 
-  const logout = useCallback(() => {
+  const logout = useCallback((notice?: string) => {
     // The backend has no logout endpoint; dropping the tokens ends the session on this device.
     loadCounter.current += 1
     tokenStorage.clear()
-    setState(ANONYMOUS)
+    setState({ ...ANONYMOUS, signOutNotice: notice ?? null })
   }, [])
 
   const dismissAccountSwitch = useCallback(() => {
@@ -261,6 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: roleOf(state.user),
       sessionExpired: state.sessionExpired,
       signedOutElsewhere: state.signedOutElsewhere,
+      signOutNotice: state.signOutNotice,
       accountSwitched: state.accountSwitched,
       dismissAccountSwitch,
       loadError: state.loadError,
