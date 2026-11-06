@@ -223,6 +223,8 @@ class UnifiedDemoDatabaseIntegrationTest extends LocalDemoWorkflow {
         long realOwner = jdbcTemplate.queryForObject("SELECT id FROM user_account WHERE email='live@example.test'",Long.class);
         disabledPolicy.requireRealMember(realOwner);
         // Cancel the retained historical booking via the official flow; this releases its seat.
+        // E2E-BUG-02 (PROVISIONAL D3): PRESENT/LATE attendance now blocks ordinary cancellation; ABSENT stays cancellable.
+        jdbcTemplate.update("UPDATE attendance_record SET status='ABSENT' WHERE id=?",attendance);
         jdbcTemplate.update("UPDATE class_session SET booked_count=1 WHERE id=?",session);
         assertThat(write("/api/v1/bookings/"+historic,HttpMethod.DELETE,null,reception).getStatusCode()).isEqualTo(HttpStatus.OK);
         var booked = write("/api/v1/bookings",HttpMethod.POST,Map.of("sessionId",session,"packageRegistrationId",actual.getId()),real);

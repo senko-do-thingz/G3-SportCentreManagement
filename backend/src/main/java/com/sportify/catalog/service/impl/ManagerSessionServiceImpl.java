@@ -219,6 +219,12 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
             }
             Map<String, Object> before = snapshot(session);
             LocalDateTime now = LocalDateTime.now(clock);
+            // E2E-BUG-02 / E2E-D5 (PROVISIONAL Option A, policy pending): never refund participation automatically.
+            int attended = cancellationRepository.countBookingsWithParticipation(id);
+            if (attended > 0) {
+                throw new ConflictException("Session has " + attended + " booking(s) with recorded attendance or check-in;"
+                        + " cancelling it would refund attended sessions", "SESSION_HAS_PARTICIPATION");
+            }
             List<Long> recipients = notifications.recipients(id);
             var cancellation = cancellationRepository.cancelConfirmedBookings(id, actor.getId(), request.reason(), now);
             session.setStatus(SessionStatus.CANCELLED);
