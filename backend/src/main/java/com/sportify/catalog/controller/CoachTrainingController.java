@@ -2,6 +2,7 @@ package com.sportify.catalog.controller;
 
 import com.sportify.catalog.dto.TrainingWriteRequest;
 import com.sportify.catalog.dto.TrainingWriteResponse.*;
+import com.sportify.catalog.service.DrillGenerator;
 import com.sportify.catalog.service.TrainingWriteService;
 import com.sportify.identity.security.CustomUserDetails;
 import jakarta.validation.Valid;
@@ -27,7 +28,15 @@ public class CoachTrainingController {
         return service.learnerProfile(user.getUserAccount().getId(),classId,memberId);
     }
     @GetMapping("/bookings/{id}/drill-suggestions")
-    public DrillSuggestions drillSuggestions(@PathVariable long id,@AuthenticationPrincipal CustomUserDetails user) { return service.drillSuggestions(user.getUserAccount().getId(),id); }
+    public DrillSuggestions drillSuggestions(@PathVariable long id,@RequestParam(required = false) String focus,
+                                             @RequestParam(required = false) Integer sessionMinutes,@AuthenticationPrincipal CustomUserDetails user) {
+        return service.drillSuggestions(user.getUserAccount().getId(),id,DrillGenerator.Options.of(focus,sessionMinutes));
+    }
+    @GetMapping("/classes/{id}/drill-suggestions")
+    public ClassDrillSuggestions classDrillSuggestions(@PathVariable long id,@RequestParam(required = false) String focus,
+                                                       @RequestParam(required = false) Integer sessionMinutes,@AuthenticationPrincipal CustomUserDetails user) {
+        return service.classDrillSuggestions(user.getUserAccount().getId(),id,DrillGenerator.Options.of(focus,sessionMinutes));
+    }
     @GetMapping("/plans")
     public List<CoachPlan> plans(@AuthenticationPrincipal CustomUserDetails user) { return service.coachPlans(user.getUserAccount().getId()); }
     @GetMapping("/plans/{id}")

@@ -26,6 +26,27 @@ training history. This feature adds Claude-generated drafts to the existing Coac
    Failures are logged with the exception class only, never with member data or model output.
 6. The preview runs without a database transaction, so no connection is held while Claude is called.
 
+## Coach inputs and context (F5-06, F5-07)
+
+- `focus` (optional, at most 200 characters) is the Coach's current focus for the session and
+  `sessionMinutes` (optional, 15 to 180) is the session length. Both are query parameters of the preview, are
+  passed to Claude, and limit the result: drills that would push the total beyond `sessionMinutes` are dropped,
+  for AI drafts and for rule-catalog drafts. Invalid values return 400 before any provider call.
+- The Coach plan page shows a "Member training context" panel next to the inputs (goal, member level, sessions
+  reviewed, latest scores and latest areas for improvement), read from the existing Coach profile and progress
+  endpoints, so the Coach sees what the drafts are based on.
+
+## Whole-class drafts (plan scope "Whole class")
+
+`GET /api/v1/coach/training/classes/{classId}/drill-suggestions?focus=&sessionMinutes=` previews drills for a whole
+class the Coach is assigned to (active class only; any other Coach gets 404, Members 403). The generator receives
+only aggregates: the number of members with a confirmed booking in the class, how many are at each level and have
+each goal, and the class average of each recorded skill metric (results recorded by this Coach). No individual
+row, name or id is sent. The response is `ClassDrillSuggestions` with `memberCount`; nothing is saved. The Coach
+copies selected drafts into the new "Create a class plan" form, which assigns a class plan through the existing
+`POST /api/v1/coach/training/class-plans` with an `Idempotency-Key`. Members with a confirmed booking in the class
+see class plans in their existing plan list.
+
 ## Configuration
 
 | Property | Environment / `backend/.env` | Default |
@@ -58,8 +79,12 @@ cheaper model, for example `claude-haiku-5-5`, without a code change.
 
 ## Tests
 
-- `ClaudeDrillGeneratorTest`: validation limits, member-level selection, refusal handling, request content,
-  start-up without a key (Anthropic client mocked).
+- `ClaudeDrillGeneratorTest`: validation limits, session-duration budget, Coach input validation, member-level
+  selection, refusal handling, request content, start-up without a key (Anthropic client mocked).
 - `AiDrillSuggestionIntegrationTest` (SQL Server): de-identified context, `AI_GENERATED` response with nothing
-  saved, fallback on failure and on an empty result, authorization before any generator call, HTTP response.
-- `staffTraining.flow.test.tsx`: the Coach UI labels AI drafts and still assigns nothing before review.
+  saved, focus and duration passed through and applied to rule drafts, class scope built from counts and averages
+  only, fallback on failure and on an empty result, authorization before any generator call, HTTP 400 for invalid
+  inputs, HTTP responses for both scopes.
+- `staffTraining.flow.test.tsx`: AI label, member training context panel, focus and duration query parameters,
+  client-side duration check, whole-class draft and class plan assignment with an idempotency key, and nothing
+  assigned before review.

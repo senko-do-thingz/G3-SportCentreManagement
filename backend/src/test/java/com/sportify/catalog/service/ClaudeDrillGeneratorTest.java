@@ -27,12 +27,31 @@ import static org.mockito.Mockito.when;
 
 /** No network: the Anthropic client is mocked. */
 class ClaudeDrillGeneratorTest {
-    private static final DrillGenerator.Input INPUT = new DrillGenerator.Input("Badminton", "BEGINNER", "ADVANCED",
+    private static final DrillGenerator.Input INPUT = new DrillGenerator.Input(DrillGenerator.SCOPE_INDIVIDUAL, "Badminton", "BEGINNER", "ADVANCED",
             "COMPETITION", 6, List.of(new DrillGenerator.RecentScore("Footwork", new BigDecimal("4.50"), 10, LocalDate.of(2027, 3, 9))),
-            "Strong serve", "Footwork recovery");
+            "Strong serve", "Footwork recovery", "Net kills", 45, null);
 
     private static ProposedDrill drill(String title, int minutes) {
         return new ProposedDrill(title, "Footwork", minutes, "Shadow the six corners, then reset.", "Footwork scored 4.5/10.");
+    }
+
+    @Test
+    void keepsTheTotalWithinTheSessionDuration() {
+        var drafts = ClaudeDrillGenerator.toDrafts(new ProposedDrills(List.of(drill("A", 20), drill("B", 20), drill("C", 10), drill("D", 5))), "BEGINNER", 45);
+        assertThat(drafts).extracting(d -> d.title()).containsExactly("A", "B", "D");
+        assertThat(drafts.stream().mapToInt(d -> d.durationMinutes()).sum()).isLessThanOrEqualTo(45);
+    }
+
+    @Test
+    void validatesCoachInputs() {
+        assertThat(DrillGenerator.Options.of("  Net kills  ", 60)).isEqualTo(new DrillGenerator.Options("Net kills", 60));
+        assertThat(DrillGenerator.Options.of(" ", null)).isEqualTo(DrillGenerator.Options.NONE);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> DrillGenerator.Options.of("x".repeat(201), null))
+                .isInstanceOf(com.sportify.core.exception.BusinessRuleException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> DrillGenerator.Options.of(null, 14))
+                .isInstanceOf(com.sportify.core.exception.BusinessRuleException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> DrillGenerator.Options.of(null, 181))
+                .isInstanceOf(com.sportify.core.exception.BusinessRuleException.class);
     }
 
     @Test
@@ -108,7 +127,7 @@ class ClaudeDrillGeneratorTest {
         ArgumentCaptor<StructuredMessageCreateParams<ProposedDrills>> sent = ArgumentCaptor.forClass(StructuredMessageCreateParams.class);
         verify(messages).create(sent.capture());
         String body = sent.getValue().rawParams().toString();
-        assertThat(body).contains("claude-opus-5-5", "COMPETITION", "Footwork recovery", "ADVANCED");
+        assertThat(body).contains("claude-opus-5-5", "COMPETITION", "Footwork recovery", "ADVANCED", "Net kills", "INDIVIDUAL");
     }
 
     @Test

@@ -141,8 +141,82 @@ class AiDrillSuggestionIntegrationTest extends AbstractIntegrationTest {
         assertThat(input.toString()).doesNotContain(email, "AI member");
         // The context type itself carries no identifier field (no member id, code, name, e-mail or phone).
         assertThat(java.util.Arrays.stream(DrillGenerator.Input.class.getRecordComponents()).map(c -> c.getName()))
-                .containsExactly("sport", "classLevel", "memberLevel", "goal", "attendedSessions", "recentScores",
-                        "latestStrengths", "latestAreasForImprovement");
+                .containsExactly("scope", "sport", "classLevel", "memberLevel", "goal", "attendedSessions", "recentScores",
+                        "latestStrengths", "latestAreasForImprovement", "focus", "sessionMinutes", "group");
+        assertThat(input.scope()).isEqualTo(DrillGenerator.SCOPE_INDIVIDUAL);
+        assertThat(input.group()).isNull();
+    }
+
+    @Test
+    void coachFocusAndSessionDurationReachTheGeneratorAndLimitRuleDrafts() {
+        when(generator.generate(any())).thenReturn(List.of(AI_DRAFT));
+        training.drillSuggestions(coach, futureBooking, DrillGenerator.Options.of("Net kills", 45));
+        ArgumentCaptor<DrillGenerator.Input> sent = ArgumentCaptor.forClass(DrillGenerator.Input.class);
+        verify(generator).generate(sent.capture());
+        assertThat(sent.getValue().focus()).isEqualTo("Net kills");
+        assertThat(sent.getValue().sessionMinutes()).isEqualTo(45);
+
+        when(generator.generate(any())).thenReturn(List.of());
+        var rules = training.drillSuggestions(coach, futureBooking, DrillGenerator.Options.of(null, 15));
+        assertThat(rules.mode()).isEqualTo("RULE_BASED");
+        assertThat(rules.drafts().stream().mapToInt(d -> d.durationMinutes()).sum()).isLessThanOrEqualTo(15);
+    }
+
+    @Test
+    void classScopeUsesOnlyCountsAndClassAveragesAndSavesNothing() {
+        long second = account("MEMBER");
+        jdbc.update("INSERT INTO member_profile(user_id, member_code, current_level, main_goal, joined_on) VALUES (?, ?, 'BEGINNER', 'IMPROVE_FITNESS', ?)",
+                second, code(), TODAY);
+        long upcoming = jdbc.queryForObject("SELECT session_id FROM booking WHERE id = ?", Long.class, futureBooking);
+        jdbc.update("INSERT INTO booking(booking_code, session_id, member_id, status, booked_at) VALUES (?, ?, ?, 'CONFIRMED', ?)",
+                code(), upcoming, second, NOW.minusDays(1));
+        when(generator.generate(any())).thenReturn(List.of(AI_DRAFT));
+        int plans = count("SELECT COUNT(*) FROM session_plan WHERE class_id = ?", classId);
+
+        var result = training.classDrillSuggestions(coach, classId, DrillGenerator.Options.of("Footwork", 60));
+
+        assertThat(result.mode()).isEqualTo("AI_GENERATED");
+        assertThat(result.persisted()).isFalse();
+        assertThat(result.memberCount()).isEqualTo(2);
+        assertThat(result.level()).isEqualTo("BEGINNER");
+        assertThat(count("SELECT COUNT(*) FROM session_plan WHERE class_id = ?", classId)).isEqualTo(plans);
+        ArgumentCaptor<DrillGenerator.Input> sent = ArgumentCaptor.forClass(DrillGenerator.Input.class);
+        verify(generator).generate(sent.capture());
+        var input = sent.getValue();
+        assertThat(input.scope()).isEqualTo(DrillGenerator.SCOPE_CLASS);
+        assertThat(input.memberLevel()).isNull();
+        assertThat(input.goal()).isNull();
+        assertThat(input.recentScores()).isEmpty();
+        assertThat(input.focus()).isEqualTo("Footwork");
+        assertThat(input.sessionMinutes()).isEqualTo(60);
+        assertThat(input.group().members()).isEqualTo(2);
+        assertThat(input.group().levels()).containsEntry("ADVANCED", 1).containsEntry("BEGINNER", 1);
+        assertThat(input.group().goals()).containsEntry("COMPETITION", 1).containsEntry("IMPROVE_FITNESS", 1);
+        assertThat(input.group().averages()).singleElement().satisfies(average -> {
+            assertThat(average.metric()).isEqualTo("Footwork " + marker);
+            assertThat(average.averageScore()).isEqualByComparingTo("4.50");
+            assertThat(average.samples()).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void classScopeIsLimitedToTheAssignedCoachAndFallsBackToRules() {
+        assertThatThrownBy(() -> training.classDrillSuggestions(otherCoach, classId, DrillGenerator.Options.NONE))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(generator, never()).generate(any());
+        when(generator.generate(any())).thenThrow(new IllegalStateException("provider down"));
+        var rules = training.classDrillSuggestions(coach, classId, DrillGenerator.Options.NONE);
+        assertThat(rules.mode()).isEqualTo("RULE_BASED");
+        assertThat(rules.drafts()).isNotEmpty();
+    }
+
+    @Test
+    void invalidCoachInputsAreRejectedOverHttp() throws Exception {
+        mvc.perform(get("/api/v1/coach/training/bookings/" + futureBooking + "/drill-suggestions").param("sessionMinutes", "5").with(user(details(coach))))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/coach/training/classes/" + classId + "/drill-suggestions").param("focus", "x".repeat(201)).with(user(details(coach))))
+                .andExpect(status().isBadRequest());
+        verify(generator, never()).generate(any());
     }
 
     @Test
@@ -178,6 +252,13 @@ class AiDrillSuggestionIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.persisted").value(false))
                 .andExpect(jsonPath("$.drafts[0].title").value(AI_DRAFT.title()));
         mvc.perform(get("/api/v1/coach/training/bookings/" + futureBooking + "/drill-suggestions").with(user(details(member))))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/coach/training/classes/" + classId + "/drill-suggestions").param("sessionMinutes", "60").with(user(details(coach))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("AI_GENERATED"))
+                .andExpect(jsonPath("$.memberCount").value(1))
+                .andExpect(jsonPath("$.persisted").value(false));
+        mvc.perform(get("/api/v1/coach/training/classes/" + classId + "/drill-suggestions").with(user(details(member))))
                 .andExpect(status().isForbidden());
     }
 

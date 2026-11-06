@@ -26,12 +26,26 @@ export interface DrillSuggestions {
   mode: 'RULE_BASED' | 'AI_GENERATED'; ruleVersion: string; requiresCoachReview: true; persisted: false
   bookingId: number; memberId: number; classId: number; sportName: string; level: string; drafts: DrillDraft[]
 }
+/** Whole-class preview: drafts built from class counts and averages only; nothing is saved. */
+export interface ClassDrillSuggestions {
+  mode: 'RULE_BASED' | 'AI_GENERATED'; ruleVersion: string; requiresCoachReview: true; persisted: false
+  classId: number; sportName: string; level: string; memberCount: number; drafts: DrillDraft[]
+}
+/** Optional Coach inputs for a drill preview; omitted values are not sent. */
+export interface DrillOptions { focus?: string; sessionMinutes?: number }
+export interface CreateClassPlan {
+  classId: number; title: string; description: string | null
+  steps: { title: string; durationMinutes: number; instructions: string | null }[]
+}
 
+const drillQuery = (options: DrillOptions = {}) => ({ focus: options.focus || undefined, sessionMinutes: options.sessionMinutes })
 const coach = '/coach/training'
 export const staffTrainingApi = {
   coachClasses: (signal: AbortSignal) => api.get<TrainingClass[]>(`${coach}/classes`, { signal }),
   bookingCandidates: (classId: string, signal: AbortSignal) => api.get<BookingCandidate[]>(`${coach}/classes/${classId}/members`, { signal }),
-  drillSuggestions: (bookingId: number) => api.get<DrillSuggestions>(`${coach}/bookings/${bookingId}/drill-suggestions`),
+  drillSuggestions: (bookingId: number, options?: DrillOptions) => api.get<DrillSuggestions>(`${coach}/bookings/${bookingId}/drill-suggestions`, { query: drillQuery(options) }),
+  classDrillSuggestions: (classId: number, options?: DrillOptions) => api.get<ClassDrillSuggestions>(`${coach}/classes/${classId}/drill-suggestions`, { query: drillQuery(options) }),
+  createClassPlan: (body: CreateClassPlan, operationKey: string) => api.post<{ plan: { id: number } }>(`${coach}/class-plans`, body, { headers: { 'Idempotency-Key': operationKey } }),
   plans: (signal: AbortSignal) => api.get<StaffPlan[]>(`${coach}/plans`, { signal }),
   plan: (id: string, signal: AbortSignal) => api.get<{ plan: StaffPlan; steps: TrainingStep[] }>(`${coach}/plans/${id}`, { signal }),
   createPlan: (body: CreatePlan) => api.post<{ id: number }>(`${coach}/plans`, body),

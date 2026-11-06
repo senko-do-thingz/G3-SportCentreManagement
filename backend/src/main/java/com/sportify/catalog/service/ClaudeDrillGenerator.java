@@ -40,15 +40,21 @@ class ClaudeDrillGenerator implements DrillGenerator {
             You draft practice drills for a coach at a multi-sport center. The coach reviews, edits and \
             assigns every draft; nothing you write reaches the member without that review.
 
-            Use the training context in the user message: the sport, the member's level, the member's \
-            training goal, how many sessions the member attended, recent skill scores and the coach's \
-            latest feedback. Choose drills that address the weakest recent scores and the areas for \
-            improvement, at a difficulty that matches the member's level, and that serve the stated goal. \
-            When there are no recent results, rely on the level and the goal.
+            The user message holds a training context with a "scope".
+            - INDIVIDUAL: one member. Use the sport, the member's level, the member's training goal, how many \
+            sessions the member attended, recent skill scores and the coach's latest feedback. Choose drills that \
+            address the weakest recent scores and the areas for improvement, at a difficulty that matches the \
+            member's level, and that serve the stated goal.
+            - CLASS: a whole class. "group" gives the number of members, how many are at each level, how many \
+            have each goal, and the class average of each recorded skill metric. Choose drills the whole group can \
+            do together at the class level, targeting the lowest class averages and the most common goals.
+            When there are no recorded results, rely on the level and the goal.
+            If "focus" is present, it is the coach's current focus for this session: prioritise it.
+            If "sessionMinutes" is present, the total duration of all drills must not exceed it.
 
             Return 2 to 4 drills for the given sport only. Each drill lasts 3 to 30 minutes. Write the \
             instructions as short, safe, step-by-step guidance that a coach can supervise in a normal \
-            session. In "reason", say which goal, level, score or feedback the drill responds to.
+            session. In "reason", say which goal, level, focus, score or feedback the drill responds to.
 
             Do not give medical, injury, rehabilitation, diet or weight-loss advice. Do not invent scores \
             or facts that are not in the context. Write in English.""";
@@ -135,13 +141,22 @@ class ClaudeDrillGenerator implements DrillGenerator {
                 .map(text -> text.text())
                 .filter(Objects::nonNull)
                 .findFirst();
-        return toDrafts(proposed.orElse(null), DrillGenerator.effectiveLevel(input.memberLevel(), input.classLevel()));
+        String level = DrillGenerator.SCOPE_CLASS.equals(input.scope()) ? input.classLevel()
+                : DrillGenerator.effectiveLevel(input.memberLevel(), input.classLevel());
+        return toDrafts(proposed.orElse(null), level, input.sessionMinutes());
     }
 
-    /** Validates Claude's proposal; anything outside the limits Coach plans accept is dropped. */
     static List<DrillDraft> toDrafts(ProposedDrills proposed, String level) {
+        return toDrafts(proposed, level, null);
+    }
+
+    /**
+     * Validates Claude's proposal; anything outside the limits Coach plans accept is dropped, and when a session
+     * duration is given, drills that would push the total beyond it are dropped too.
+     */
+    static List<DrillDraft> toDrafts(ProposedDrills proposed, String level, Integer sessionMinutes) {
         if (proposed == null || proposed.drills() == null) return List.of();
-        return proposed.drills().stream()
+        var valid = proposed.drills().stream()
                 .filter(Objects::nonNull)
                 .filter(drill -> drill.durationMinutes() >= MIN_MINUTES && drill.durationMinutes() <= MAX_MINUTES)
                 .map(drill -> new DrillDraft(
@@ -152,8 +167,16 @@ class ClaudeDrillGenerator implements DrillGenerator {
                         truncate(drill.reason(), MAX_REASON),
                         level))
                 .filter(draft -> draft.title() != null && draft.instructions() != null)
-                .limit(MAX_DRILLS)
                 .toList();
+        var kept = new java.util.ArrayList<DrillDraft>();
+        int total = 0;
+        for (var draft : valid) {
+            if (kept.size() == MAX_DRILLS) break;
+            if (sessionMinutes != null && total + draft.durationMinutes() > sessionMinutes) continue;
+            kept.add(draft);
+            total += draft.durationMinutes();
+        }
+        return List.copyOf(kept);
     }
 
     private String context(Input input) {
