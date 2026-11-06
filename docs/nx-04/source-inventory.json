@@ -703,7 +703,7 @@
     {
       "id": "S14",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java",
-      "line": 346,
+      "line": 354,
       "definition": "recordSelfTrainingAttendance"
     },
     {

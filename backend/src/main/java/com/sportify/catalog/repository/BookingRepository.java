@@ -142,7 +142,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Query(value = "UPDATE booking SET status = 'CANCELLED', cancelled_by_user_id = :actorId, cancelled_at = :now, "
             + "cancel_reason = :reason, updated_at = :now "
             + "WHERE id IN (:bookingIds) AND session_id = :sessionId AND status = 'CONFIRMED' "
-            + "AND NOT EXISTS (SELECT 1 FROM check_in c WHERE c.booking_id = booking.id AND c.result = 'ALLOWED')",
+            + "AND NOT EXISTS (SELECT 1 FROM check_in c WHERE c.booking_id = booking.id AND c.result = 'ALLOWED') "
+            + "AND NOT EXISTS (SELECT 1 FROM attendance_record a WHERE a.session_id = booking.session_id "
+            + "AND a.member_id = booking.member_id AND a.status IN ('PRESENT', 'LATE'))",
             nativeQuery = true)
     int cancelConfirmedSessionBookings(@Param("bookingIds") Collection<Long> bookingIds,
                                        @Param("sessionId") Long sessionId,
@@ -163,4 +165,14 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                                                               @Param("sessionDate") LocalDate sessionDate,
                                                               @Param("startTime") java.time.LocalTime startTime,
                                                               @Param("endTime") java.time.LocalTime endTime);
+
+    /**
+     * E2E-BUG-02: 1 when the member of this booking has PRESENT or LATE attendance for the booked session. Attendance
+     * is unique per (session, member) and is written under the same session row lock as cancellation, so a caller that
+     * holds the session lock sees the committed participation state.
+     */
+    @Query(value = "SELECT CASE WHEN EXISTS (SELECT 1 FROM attendance_record a JOIN booking b ON b.session_id = a.session_id "
+            + "AND b.member_id = a.member_id WHERE b.id = :bookingId AND a.status IN ('PRESENT', 'LATE')) THEN 1 ELSE 0 END",
+            nativeQuery = true)
+    int countParticipation(@Param("bookingId") Long bookingId);
 }
