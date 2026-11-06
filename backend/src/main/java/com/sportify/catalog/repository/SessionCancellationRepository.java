@@ -48,6 +48,22 @@ public class SessionCancellationRepository {
         return new CancellationResult(cancelled, registrations);
     }
 
+    /**
+     * E2E-BUG-02 / E2E-D5 (PROVISIONAL, policy pending): confirmed bookings of the session with participation
+     * evidence, meaning PRESENT or LATE attendance or an ALLOWED front-desk check-in. The caller holds the session row
+     * lock, which attendance and check-in writes for this session also take.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public int countBookingsWithParticipation(Long sessionId) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM booking b WHERE b.session_id = ? AND b.status = 'CONFIRMED' AND (
+                    EXISTS (SELECT 1 FROM attendance_record a WHERE a.session_id = b.session_id
+                            AND a.member_id = b.member_id AND a.status IN ('PRESENT', 'LATE'))
+                    OR EXISTS (SELECT 1 FROM check_in c WHERE c.booking_id = b.id AND c.result = 'ALLOWED'))
+                """, Integer.class, sessionId);
+        return count == null ? 0 : count;
+    }
+
     /** Counts linked bookings before cancellation, not the credits actually restored. */
     public record PackageBookings(Long registrationId, int packageBookings) {
     }
