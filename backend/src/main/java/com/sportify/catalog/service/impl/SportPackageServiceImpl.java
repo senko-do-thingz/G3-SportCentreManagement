@@ -342,6 +342,9 @@ public class SportPackageServiceImpl implements SportPackageService {
         if (registration.getStatus() != PackageRegistrationStatus.PENDING_PAYMENT) {
             throw new BusinessRuleException("Cannot activate package registration with status: " + registration.getStatus() + ". Only PENDING_PAYMENT registrations can be activated.");
         }
+        // E2E-BUG-04 / E2E-D11: every settlement path (direct staff activation and payment confirmation) requires the
+        // TARGET account to be ACTIVE. Lock order payment -> item -> account; nothing is written before this check.
+        memberAccountEligibility.requireActiveForPurchase(registration.getMember().getId());
         if (actualMethod != null && registration.getPayment() == null) {
             throw new BusinessRuleException("Cannot specify payment method for a registration with no linked payment");
         }

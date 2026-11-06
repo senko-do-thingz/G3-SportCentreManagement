@@ -410,6 +410,9 @@ public class MembershipCardServiceImpl implements MembershipCardService {
             throw new BusinessRuleException("Cannot activate membership card with status: " + card.getStatus()
                     + ". Only PENDING_PAYMENT cards can be activated.");
         }
+        // E2E-BUG-04 / E2E-D11: every settlement path (direct staff activation and payment confirmation) requires the
+        // TARGET account to be ACTIVE. Lock order payment -> item -> account; nothing is written before this check.
+        memberAccountEligibility.requireActiveForPurchase(card.getMember().getId());
         if (actualMethod != null && card.getPayment() == null) {
             throw new BusinessRuleException("Cannot specify payment method for a card with no linked payment");
         }

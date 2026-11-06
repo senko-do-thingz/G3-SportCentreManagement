@@ -9,8 +9,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * E2E-BUG-04 (PROVISIONAL, E2E-D11 pending confirmation): the TARGET member account, not the staff actor, must be
- * ACTIVE when a sale or a pending payment confirmation creates benefits, a successful payment or an invoice.
+ * E2E-BUG-04 (E2E-D11 APPROVED 2026-11-06): the TARGET member account, not the staff actor, must be
+ * ACTIVE when a sale, a pending payment confirmation or a direct staff activation creates benefits, a successful payment or an invoice.
  *
  * <p>The check reads the target user_account row WITH (UPDLOCK) inside the caller's transaction. Deactivation updates
  * that same row, so the two serialize: a deactivation that commits first is seen here and the purchase is rejected; a

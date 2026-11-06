@@ -33,9 +33,9 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 
 /**
- * E2E-BUG-04 (Flow 1 + Flow 3): the TARGET member must be ACTIVE for desk package and card sales and for confirming a
- * pending payment. PROVISIONAL: the error code MEMBER_INACTIVE and the "pending stays pending" handling follow the
- * working proposal of E2E-D11, PENDING CODEOWNER confirmation. Real SQL Server transactions and HTTP security.
+ * E2E-BUG-04 (Flow 1 + Flow 3): the TARGET member must be ACTIVE for desk package and card sales, for confirming a
+ * pending payment and for direct staff activation of a pending card or registration. E2E-D11 APPROVED: MEMBER_INACTIVE
+ * (400), pending orders stay pending, no partial side effects. Real SQL Server transactions and HTTP security.
  */
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -235,6 +235,93 @@ class InactiveMemberSalesIntegrationTest extends AbstractIntegrationTest {
         assertThat(deskPackageSale(member).code()).isEqualTo("MEMBER_INACTIVE");
     }
 
+    // ---------------------------------------------------------------- B04-06..09 direct staff activation (D11)
+
+    @Test
+    void b04_06_directPackageActivationIsRejectedForAnInactiveMemberWithoutAnySideEffect() {
+        long payment = onlinePendingPackage(member);
+        long registration = registrationForPayment(payment);
+        deactivate(member);
+        Ledger before = ledger();
+
+        Outcome activation = activateRegistration(registration);
+
+        assertThat(activation.status()).as(activation.body().toString()).isEqualTo(400);
+        assertThat(activation.code()).isEqualTo("MEMBER_INACTIVE");
+        assertThat(ledger()).isEqualTo(before);
+        assertThat(paymentStatus(payment)).isEqualTo("PENDING");
+        assertThat(registrationStatusForPayment(payment)).isEqualTo("PENDING_PAYMENT");
+        assertThat(before.invoices()).isZero();
+    }
+
+    @Test
+    void b04_07_directCardActivationIsRejectedForAnInactiveMemberWithoutAnySideEffect() {
+        long card = onlinePendingCard(member);
+        long payment = cardPayment(card);
+        deactivate(member);
+        Ledger before = ledger();
+
+        Outcome activation = activateCard(card);
+
+        assertThat(activation.status()).as(activation.body().toString()).isEqualTo(400);
+        assertThat(activation.code()).isEqualTo("MEMBER_INACTIVE");
+        assertThat(ledger()).isEqualTo(before);
+        assertThat(paymentStatus(payment)).isEqualTo("PENDING");
+        assertThat(cardStatus(card)).isEqualTo("PENDING_PAYMENT");
+        assertThat(before.invoices()).isZero();
+    }
+
+    @Test
+    void b04_08_directActivationStillSucceedsForAnActiveMember() {
+        long payment = onlinePendingPackage(member);
+        long registration = registrationForPayment(payment);
+        long card = onlinePendingCard(member);
+
+        Outcome packageActivation = activateRegistration(registration);
+        Outcome cardActivation = activateCard(card);
+
+        assertThat(packageActivation.status()).as(packageActivation.body().toString()).isEqualTo(200);
+        assertThat(cardActivation.status()).as(cardActivation.body().toString()).isEqualTo(200);
+        assertThat(registrationStatusForPayment(payment)).isEqualTo("ACTIVE");
+        assertThat(cardStatus(card)).isEqualTo("ACTIVE");
+        Ledger after = ledger();
+        assertThat(after.successfulPayments()).isEqualTo(2);
+        assertThat(after.invoices()).isEqualTo(2);
+    }
+
+    @Test @Timeout(100)
+    void b04_09_deactivationCommitsFirst_directActivationWaitsThenIsRejected() throws Exception {
+        long payment = onlinePendingPackage(member);
+        long registration = registrationForPayment(payment);
+        var held = new CountDownLatch(1); var release = new CountDownLatch(1);
+        var firstSpid = new AtomicInteger(); var secondSpid = new AtomicInteger();
+        var pool = newWorkerPool();
+        try {
+            Future<Integer> deactivation = pool.submit(() -> writer().execute(status -> {
+                firstSpid.set(count("SELECT @@SPID"));
+                int changed = jdbc.update("UPDATE user_account SET status = 'INACTIVE' WHERE id = ?", member.getId());
+                held.countDown(); await(release);
+                return changed;
+            }));
+            await(held);
+            Future<Outcome> activation = pool.submit(() -> inWriter(() -> {
+                secondSpid.set(count("SELECT @@SPID"));
+                return activateRegistration(registration);
+            }));
+            awaitBlocked(secondSpid, firstSpid, "user_account");
+            release.countDown();
+
+            assertThat(deactivation.get(60, TimeUnit.SECONDS)).isEqualTo(1);
+            Outcome rejected = activation.get(60, TimeUnit.SECONDS);
+            assertThat(rejected.status()).isEqualTo(400);
+            assertThat(rejected.code()).isEqualTo("MEMBER_INACTIVE");
+        } finally { release.countDown(); stop(pool); }
+
+        assertThat(paymentStatus(payment)).isEqualTo("PENDING");
+        assertThat(registrationStatusForPayment(payment)).isEqualTo("PENDING_PAYMENT");
+        assertThat(ledger().invoices()).isZero();
+    }
+
     // ---------------------------------------------------------------- fixtures and helpers
 
     private record Ledger(int registrations, int activeRegistrations, int cards, int payments, int successfulPayments,
@@ -292,6 +379,33 @@ class InactiveMemberSalesIntegrationTest extends AbstractIntegrationTest {
         assertThat(payment).isNotNull();
         assertThat(paymentStatus(payment)).isEqualTo("PENDING");
         return payment;
+    }
+    /** Online card request by the member while ACTIVE: PENDING_PAYMENT card and PENDING payment. */
+    private long onlinePendingCard(UserAccount target) {
+        Outcome order = http(post("/api/v1/membership-cards/purchase").contentType(MediaType.APPLICATION_JSON).content(write(Map.of(
+                "tierId", goldTierId, "paymentMethod", "BANK_TRANSFER"))), target);
+        assertThat(order.status()).as(order.body().toString()).isEqualTo(201);
+        long card = order.body().path("id").asLong();
+        assertThat(cardStatus(card)).isEqualTo("PENDING_PAYMENT");
+        assertThat(paymentStatus(cardPayment(card))).isEqualTo("PENDING");
+        return card;
+    }
+    private long cardPayment(long card) {
+        return Objects.requireNonNull(jdbc.queryForObject("SELECT payment_id FROM member_card WHERE id = ?", Long.class, card));
+    }
+    private String cardStatus(long card) {
+        return jdbc.queryForObject("SELECT status FROM member_card WHERE id = ?", String.class, card);
+    }
+    private long registrationForPayment(long payment) {
+        return Objects.requireNonNull(jdbc.queryForObject("SELECT id FROM sport_package_registration WHERE payment_id = ?", Long.class, payment));
+    }
+    private Outcome activateRegistration(long registration) {
+        return http(put("/api/v1/packages/registrations/" + registration + "/activate").contentType(MediaType.APPLICATION_JSON)
+                .content(write(Map.of("paymentMethod", "BANK_TRANSFER"))), receptionist);
+    }
+    private Outcome activateCard(long card) {
+        return http(put("/api/v1/membership-cards/" + card + "/activate").contentType(MediaType.APPLICATION_JSON)
+                .content(write(Map.of("paymentMethod", "BANK_TRANSFER"))), receptionist);
     }
     private Map<String, Object> confirmBody(long payment) {
         return Map.of("method", "BANK_TRANSFER", "referenceCode", "FT" + marker.toUpperCase(Locale.ROOT),
