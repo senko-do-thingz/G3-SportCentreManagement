@@ -12,6 +12,7 @@ import com.sportify.payment.entity.PaymentMethod;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -55,11 +56,13 @@ public class SportPackageController {
 
     @PostMapping("/registrations")
     @PreAuthorize("hasAnyRole('MEMBER', 'RECEPTIONIST', 'MANAGER')")
-    @ResponseStatus(HttpStatus.CREATED)
-    public PackageRegistrationResponse registerPackage(
+    public ResponseEntity<PackageRegistrationResponse> registerPackage(
             @Valid @RequestBody PackageRegistrationRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return sportPackageService.registerPackage(request, userDetails.getUserAccount());
+        PackageRegistrationResponse response = sportPackageService.registerPackage(request, userDetails.getUserAccount());
+        // E2E-BUG-06: an identical pending online order is returned with 200 instead of creating a second one.
+        return Boolean.TRUE.equals(response.getExistingPendingOrder())
+                ? ResponseEntity.ok(response) : ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/registrations/my")

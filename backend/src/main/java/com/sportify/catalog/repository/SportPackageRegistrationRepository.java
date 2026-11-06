@@ -116,4 +116,16 @@ public interface SportPackageRegistrationRepository extends JpaRepository<SportP
 
     @Query(value = "SELECT NEXT VALUE FOR seq_package_reg_code", nativeQuery = true)
     Long getNextRegistrationCodeSequence();
+
+    /**
+     * E2E-BUG-06 (E2E-D8 APPROVED, key K2): the member's online orders that still wait for payment for the
+     * same package and start date. The caller holds the member purchase lock, so the result cannot change before its
+     * own insert commits.
+     */
+    @Query("SELECT r FROM SportPackageRegistration r WHERE r.member.id = :memberId AND r.sportPackage.id = :packageId "
+            + "AND r.startDate = :startDate AND r.status = com.sportify.catalog.entity.PackageRegistrationStatus.PENDING_PAYMENT "
+            + "AND r.channel = com.sportify.catalog.entity.RegistrationChannel.ONLINE ORDER BY r.id")
+    List<SportPackageRegistration> findPendingOnlineOrders(@Param("memberId") Long memberId,
+                                                          @Param("packageId") Long packageId,
+                                                          @Param("startDate") LocalDate startDate);
 }

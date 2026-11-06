@@ -18,6 +18,7 @@ import com.sportify.catalog.repository.SportRepository;
 import com.sportify.catalog.service.MembershipCardService;
 import com.sportify.catalog.service.SportPackageService;
 import com.sportify.catalog.service.DeskSaleCharge;
+import com.sportify.catalog.service.MemberPurchaseLock;
 import com.sportify.catalog.service.MemberAccountEligibility;
 import com.sportify.core.audit.AuditAction;
 import com.sportify.core.audit.AuditEvent;
@@ -25,6 +26,7 @@ import com.sportify.core.audit.AuditService;
 import com.sportify.core.common.CodeFormatter;
 import com.sportify.core.common.SecurityUtils;
 import com.sportify.core.exception.BusinessRuleException;
+import com.sportify.core.exception.ConflictException;
 import com.sportify.core.exception.ResourceNotFoundException;
 import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
@@ -33,6 +35,7 @@ import com.sportify.identity.repository.UserRepository;
 import com.sportify.payment.entity.Invoice;
 import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
+import com.sportify.payment.entity.PaymentStatus;
 import com.sportify.payment.service.PaymentService;
 import com.sportify.payment.service.PaymentVerificationService;
 import jakarta.persistence.EntityManager;
@@ -52,6 +55,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -74,6 +78,7 @@ public class SportPackageServiceImpl implements SportPackageService {
     private final CodeFormatter codeFormatter;
     private final AuditService auditService;
     private final Clock clock;
+    private final MemberPurchaseLock memberPurchaseLock;
     private final MemberAccountEligibility memberAccountEligibility;
     private final EntityManager entityManager;
     /** Resolved on use: PaymentVerificationService itself depends on this service. */
@@ -236,6 +241,26 @@ public class SportPackageServiceImpl implements SportPackageService {
             throw new BusinessRuleException("Payment amount must be greater than zero. Attempted package price: " + paidAmount);
         }
 
+        // E2E-BUG-06 (E2E-D8 APPROVED 2026-11-06): one online pending order per member, package and start date (K2).
+        // Same channel rule as below: members and non-staff order online; staff only when they choose a non-desk channel.
+        boolean pendingOnline = !SecurityUtils.isStaff(actor)
+                || (request.getChannel() != null && request.getChannel() != RegistrationChannel.RECEPTION);
+        if (pendingOnline) {
+            memberPurchaseLock.acquire(member.getId());
+            var waiting = registrationRepository.findPendingOnlineOrders(member.getId(), pkg.getId(), startDate);
+            if (!waiting.isEmpty()) {
+                SportPackageRegistration order = waiting.getFirst();
+                if (isSamePendingOrder(order, originalPrice, discountPercentage, paidAmount, request.getPaymentMethod())) {
+                    PackageRegistrationResponse replay = mapToRegistrationResponse(order);
+                    replay.setExistingPendingOrder(true);
+                    return replay;
+                }
+                throw new ConflictException("An order for this package and start date is already waiting for payment ("
+                        + order.getRegistrationCode() + ") with different payment details. Pay or cancel it before ordering again.",
+                        "PENDING_ORDER_EXISTS");
+            }
+        }
+
         long seq = registrationRepository.getNextRegistrationCodeSequence();
         String regCode = codeFormatter.formatPackageRegCode(seq);
 
@@ -304,6 +329,20 @@ public class SportPackageServiceImpl implements SportPackageService {
                     .recordPaymentConfirmed(registration.getPayment().getId(), actor, null));
         }
         return response;
+    }
+
+    /**
+     * Material fields of an equivalent order: the price and discount snapshot, the amount to pay, and a payment still
+     * PENDING with the same method (an omitted method means the online default, BANK_TRANSFER).
+     */
+    private static boolean isSamePendingOrder(SportPackageRegistration order, BigDecimal originalPrice, int discountPercentage,
+                                              BigDecimal paidAmount, PaymentMethod requestedMethod) {
+        Payment payment = order.getPayment();
+        PaymentMethod method = requestedMethod != null ? requestedMethod : PaymentMethod.BANK_TRANSFER;
+        return payment != null && payment.getPaymentStatus() == PaymentStatus.PENDING && payment.getPaymentMethod() == method
+                && order.getOriginalPrice().compareTo(originalPrice) == 0
+                && Objects.equals(order.getDiscountPercentage(), discountPercentage)
+                && order.getPaidAmount().compareTo(paidAmount) == 0;
     }
 
     @Override
