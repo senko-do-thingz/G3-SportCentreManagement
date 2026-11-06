@@ -3,6 +3,7 @@ package com.sportify.catalog.dto;
 import com.sportify.catalog.entity.PackageRegistrationStatus;
 import com.sportify.catalog.entity.RegistrationChannel;
 import com.sportify.catalog.entity.TrainingFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -15,6 +16,13 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class PackageRegistrationResponse {
+    /**
+     * E2E-BUG-06 (E2E-D8 APPROVED 2026-11-06): true when an identical online order was already waiting for payment and
+     * is returned instead of a new one. Omitted for a newly created order.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Boolean existingPendingOrder;
+
     private Long id;
     private String registrationCode;
     private Long memberId;

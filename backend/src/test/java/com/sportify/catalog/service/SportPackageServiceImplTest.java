@@ -103,6 +103,9 @@ public class SportPackageServiceImplTest {
     private PaymentVerificationService paymentVerificationService;
 
     @Mock
+    private MemberPurchaseLock memberPurchaseLock;
+
+    @Mock
     private MemberAccountEligibility memberAccountEligibility;
 
     @InjectMocks
