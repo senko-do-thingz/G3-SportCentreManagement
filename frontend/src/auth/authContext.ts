@@ -41,6 +41,11 @@ export interface AuthContextValue {
    */
   signedOutElsewhere: boolean
   /**
+   * Confirmation set by logout(notice) when this tab ended its own session for a reason the user should
+   * read on the Log in page, such as a password change (E2E-BUG-05). Cleared on the next login or logout.
+   */
+  signOutNotice: string | null
+  /**
    * Not null right after another tab signed a different account in and this tab followed it.
    * The app then opens the new user's home page and shows a notice. Cleared by
    * dismissAccountSwitch, the next login, sign up, logout, or the next switch.
@@ -55,7 +60,8 @@ export interface AuthContextValue {
    * returned tokens (remembered on this device) and loads the profile.
    */
   register(request: RegisterRequest): Promise<UserProfile>
-  logout(): void
+  /** Ends the session on this device. The optional notice is shown on the Log in page. */
+  logout(notice?: string): void
   /** Reloads GET /users/me, for example after the profile was edited or to retry after an error. */
   reloadUser(): Promise<UserProfile | null>
 }

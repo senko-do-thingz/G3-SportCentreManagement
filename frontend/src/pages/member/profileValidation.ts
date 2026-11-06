@@ -17,7 +17,7 @@ import type { SelectOption } from '../../components/ui/Select'
  */
 
 export const PROFILE_SAVED_MESSAGE = 'Your profile was saved.'
-export const PASSWORD_CHANGED_MESSAGE = 'Your password was changed. For your security, every signed-in session, including this one, now ends. Log in again with the new password.'
+export const PASSWORD_CHANGED_MESSAGE = 'Your password was changed. For your security, every signed-in session, including this one, has ended. Log in with your new password.'
 
 export { FULL_NAME_MAX_LENGTH }
 export const ADDRESS_MAX_LENGTH = 255
