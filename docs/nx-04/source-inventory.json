@@ -375,9 +375,19 @@
       "creates": [],
       "drops": [],
       "sha256_lf": "b8c102dc5aafbbc823cfc7de66181ab71014f9323420c4a55ce8858e28184169"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V47__member_sport_level_and_saved_recommendation.sql",
+      "version": 47,
+      "creates": [
+        "member_sport_level",
+        "saved_recommendation"
+      ],
+      "drops": [],
+      "sha256_lf": "aab2855d0af60805a8f0a75b056e26782888eca8819193074da5b1a19a854562"
     }
   ],
-  "create_occurrences": 70,
+  "create_occurrences": 72,
   "create_names": [
     "[activity_log]",
     "[age_group]",
@@ -443,9 +453,11 @@
     "dbo.simulated_qr_session",
     "dbo.simulated_qr_transition",
     "member_check_in_pass",
+    "member_sport_level",
     "permission",
     "role",
     "role_permission",
+    "saved_recommendation",
     "session_code_counter",
     "session_code_history",
     "user_account"

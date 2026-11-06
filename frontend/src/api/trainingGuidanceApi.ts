@@ -19,7 +19,22 @@ export interface Consultation {
   answer: string; historyStored: false
   sources: { kind: string; id: number; title: string; detail: string; path: string }[]
 }
+/** F5-01: the Member's level for one sport; null means the general profile level is used. */
+export interface SportLevel { sportId: number; sportName: string; level: string | null }
+/** F5-05: a bookmarked class. It is not a booking; the next session is recomputed on every read. */
+export interface SavedRecommendation {
+  id: number; classId: number; className: string; sportName: string; level: string; coachName: string | null
+  reason: string | null; savedAt: string
+  nextSession: { sessionId: number; sessionCode: SessionId | null; date: string; startTime: string; endTime: string; freeSeats: number } | null
+}
+const training = '/member/training'
 export const trainingGuidanceApi = {
   recommendations: (preferences: RecommendationPreferences, signal: AbortSignal) => api.get<Recommendations>('/member/training/recommendations', { query: { ...preferences }, signal }),
+  sportLevels: (signal: AbortSignal) => api.get<SportLevel[]>(`${training}/sport-levels`, { signal }),
+  saveSportLevel: (sportId: number, level: string) => api.put<SportLevel>(`${training}/sport-levels/${sportId}`, { level }),
+  clearSportLevel: (sportId: number) => api.delete<void>(`${training}/sport-levels/${sportId}`),
+  savedRecommendations: (signal: AbortSignal) => api.get<SavedRecommendation[]>(`${training}/saved-recommendations`, { signal }),
+  saveRecommendation: (classId: number, reason: string | null) => api.post<SavedRecommendation>(`${training}/saved-recommendations`, { classId, reason }),
+  removeSavedRecommendation: (id: number) => api.delete<void>(`${training}/saved-recommendations/${id}`),
   consult: (question: string) => api.post<Consultation>('/member/training/consultation', { question, optIn: true }),
 }
