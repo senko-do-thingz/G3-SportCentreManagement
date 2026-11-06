@@ -88,6 +88,7 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
     private static final SecureRandom RANDOM = new SecureRandom();
     @Autowired private ManagerSessionService service;
     @Autowired private BookingService bookingService;
+    @Autowired private com.sportify.catalog.service.MemberBookingLock memberBookingLock;
     @Autowired private ClassSessionRepository sessions;
     @Autowired private BookingRepository bookingRepository;
     @Autowired private SportPackageRegistrationRepository registrations;
@@ -235,6 +236,8 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
                 assertEquals(available, registrations.findById(registrationId).orElseThrow().getRemainingSessions());
                 snapshotsRead.countDown();
                 await(snapshotsRead);
+                // E2E-BUG-01: real booking takes the member booking lock before any session or registration lock.
+                memberBookingLock.acquire(memberId);
                 sessions.findForUpdate(firstId).orElseThrow();
                 holdRegistrationForRace(registrationId);
                 registrationLocked.countDown();
@@ -249,7 +252,9 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
                 return bookingService.createBooking(secondRequest, manager);
             }));
             assertTrue(registrationLocked.await(20, TimeUnit.SECONDS), "Both snapshots precede the shared registration lock");
-            awaitRegistrationUpdateBlocked(secondSpid.get(), firstSpid.get());
+            // E2E-BUG-01: the same member's second booking now waits on the member lock (xp_userlock), before any
+            // registration update; the credit is still consumed exactly once.
+            awaitBlockedOn(secondSpid.get(), firstSpid.get(), "xp_userlock");
             release.countDown();
             assertNotNull(first.get(20, TimeUnit.SECONDS));
             if (available == 2) {
@@ -399,6 +404,10 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void awaitRegistrationUpdateBlocked(int waitingSpid, int blockingSpid) {
+        awaitBlockedOn(waitingSpid, blockingSpid, "UPDATE sport_package_registration");
+    }
+
+    private void awaitBlockedOn(int waitingSpid, int blockingSpid, String sqlFragment) {
         assertEquals(1, count("SELECT IS_SRVROLEMEMBER('sysadmin')"), "CI uses the container sa login for DMV visibility");
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         do {
@@ -406,8 +415,8 @@ class ManagerSessionIntegrationTest extends AbstractIntegrationTest {
                     SELECT COUNT(*) FROM sys.dm_exec_requests r
                     CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) t
                     WHERE r.session_id = ? AND r.blocking_session_id = ?
-                        AND t.text LIKE '%UPDATE sport_package_registration%'
-                    """, waitingSpid, blockingSpid) > 0) {
+                        AND t.text LIKE ?
+                    """, waitingSpid, blockingSpid, "%" + sqlFragment + "%") > 0) {
                 return;
             }
         } while (System.nanoTime() < deadline);

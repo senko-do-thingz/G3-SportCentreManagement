@@ -352,9 +352,9 @@ class MyProfileIntegrationTest extends AbstractIntegrationTest {
         assertThat(((Number) log.get("entity_id")).longValue()).isEqualTo(owner.getId());
         assertThat(log.get("summary")).isEqualTo("Password changed");
         assertThat(log.get("details")).isNull();
-        // Existing stateless tokens deliberately retain their established lifetime.
-        call(get("/api/v1/users/me").header("Authorization", "Bearer " + tokenPair.path("accessToken").asText()), 200);
-        call(body(post("/api/v1/auth/refresh"), Map.of("refreshToken", tokenPair.path("refreshToken").asText())), 200);
+        // E2E-BUG-05 (PROVISIONAL, E2E-D7a pending): a password change now revokes earlier access and refresh tokens.
+        call(get("/api/v1/users/me").header("Authorization", "Bearer " + tokenPair.path("accessToken").asText()), 401);
+        call(body(post("/api/v1/auth/refresh"), Map.of("refreshToken", tokenPair.path("refreshToken").asText())), 401);
     }
 
     @ParameterizedTest

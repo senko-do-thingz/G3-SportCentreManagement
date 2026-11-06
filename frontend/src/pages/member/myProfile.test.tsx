@@ -87,6 +87,22 @@ async function expectSingleAnnouncement(message: string) {
   expect(liveRegionsWith(message)[0]).toHaveAttribute('aria-live', 'polite')
 }
 
+/**
+ * E2E-BUG-05 / E2E-D7a: a successful password change ends this browser session too. Both tokens are cleared,
+ * the profile is left for Log in, and the confirmation is announced once there.
+ */
+async function expectSignedOutAfterPasswordChange() {
+  expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: 'My Profile' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('form', { name: 'Change password' })).not.toBeInTheDocument()
+  expect(tokenStorage.getAccessToken()).toBeNull()
+  expect(tokenStorage.getRefreshToken()).toBeNull()
+  expect(tokenStorage.hasSession()).toBe(false)
+  const notice = screen.getByText(PASSWORD_CHANGED_MESSAGE, { selector: '.notice' })
+  expect(notice).toHaveAttribute('role', 'status')
+  expect(liveRegionsWith(PASSWORD_CHANGED_MESSAGE)).toHaveLength(1)
+}
+
 function personalForm() {
   return screen.getByRole('form', { name: 'Personal information' })
 }
@@ -351,17 +367,16 @@ describe('FE-02 My Profile (F1-08) - change password', () => {
     return form
   }
 
-  it('TC-FE02-060 a valid change sends PUT /users/me/password, shows success and clears the form', async () => {
+  it('TC-FE02-060 a valid change sends PUT /users/me/password, ends the session and confirms on Log in', async () => {
     const { calls } = await openProfile()
-    const form = await fillPassword('Demo123!', 'NewPass2026', 'NewPass2026')
+    await fillPassword('Demo123!', 'NewPass2026', 'NewPass2026')
 
-    await expectSingleAnnouncement(PASSWORD_CHANGED_MESSAGE)
+    await expectSignedOutAfterPasswordChange()
     const put = calls.find((call) => call.path === '/users/me/password')
     expect(put?.method).toBe('PUT')
     expect(put?.body).toEqual({ currentPassword: 'Demo123!', newPassword: 'NewPass2026', confirmPassword: 'NewPass2026' })
-    expect(within(form).getByLabelText(/Current password/)).toHaveValue('')
-    expect(within(form).getByLabelText(/^New password/)).toHaveValue('')
-    expect(within(form).getByLabelText(/Confirm new password/)).toHaveValue('')
+    // The typed passwords are not carried to the Log in page.
+    expect(screen.getByLabelText(/^Password/)).toHaveValue('')
   })
 
   it('TC-FE02-061 a 400 with details.currentPassword is shown under Current password', async () => {
@@ -371,6 +386,10 @@ describe('FE-02 My Profile (F1-08) - change password', () => {
     const form = await fillPassword('Wrong123', 'NewPass2026', 'NewPass2026')
     expect(await within(form).findByText('Current password is incorrect')).toBeInTheDocument()
     expect(screen.queryByText(PASSWORD_CHANGED_MESSAGE, { selector: '.notice' })).not.toBeInTheDocument()
+    // A rejected change keeps the session: no sign-out, same tokens, still on My Profile.
+    expect(tokenStorage.getAccessToken()).toBe('member-access')
+    expect(tokenStorage.getRefreshToken()).toBe('member-refresh')
+    expect(screen.getByRole('heading', { name: 'My Profile' })).toBeInTheDocument()
     await waitFor(() => expect(within(form).getByLabelText(/Current password/)).toHaveFocus())
     // The typed values stay so the member can fix only the wrong field.
     expect(within(form).getByLabelText(/^New password/)).toHaveValue('NewPass2026')
@@ -456,15 +475,12 @@ describe('FE-02 My Profile (F1-08) - change password', () => {
       onPassword: (call) =>
         call.authorization === 'Bearer member-access-2' ? new Response(null, { status: 204 }) : backendError(401, 'Unauthorized'),
     })
-    const form = await fillPassword('Demo123!', 'NewPass2026', 'NewPass2026')
+    await fillPassword('Demo123!', 'NewPass2026', 'NewPass2026')
 
-    await expectSingleAnnouncement(PASSWORD_CHANGED_MESSAGE)
+    await expectSignedOutAfterPasswordChange()
     expect(calls.filter((call) => call.path === '/auth/refresh')).toHaveLength(1)
     expect(calls.filter((call) => call.path === '/users/me/password')).toHaveLength(2)
-    expect(tokenStorage.getAccessToken()).toBe('member-access-2')
-    expect(tokenStorage.getRefreshToken()).toBe('member-refresh-2')
-    expect(within(form).queryByText(CURRENT_PASSWORD_REJECTED_MESSAGE)).not.toBeInTheDocument()
-    expect(within(form).getByLabelText(/Current password/)).toHaveValue('')
+    expect(screen.queryByText(CURRENT_PASSWORD_REJECTED_MESSAGE)).not.toBeInTheDocument()
   })
 
   it('TC-FE02-081 a rejected refresh token signs the member out like any other request', async () => {

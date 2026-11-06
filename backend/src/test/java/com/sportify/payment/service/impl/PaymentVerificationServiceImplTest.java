@@ -101,7 +101,8 @@ class PaymentVerificationServiceImplTest {
         paymentService = new PaymentServiceImpl(paymentRepository, memberCardRepository, registrationRepository,
                 resolver, bankProperties, new CodeFormatter(), clock, org.mockito.Mockito.mock(com.sportify.payment.service.impl.CashCaptureService.class));
         service = new PaymentVerificationServiceImpl(paymentRepository, invoiceRepository, resolver,
-                paymentService, membershipCardService, sportPackageService, auditService, new CodeFormatter(), clock);
+                paymentService, membershipCardService, sportPackageService, auditService, new CodeFormatter(), clock,
+                org.mockito.Mockito.mock(com.sportify.catalog.service.MemberAccountEligibility.class));
 
         receptionist = UserAccount.builder().id(7L).fullName("Rita Reception")
                 .role(Role.builder().code("RECEPTIONIST").name("Receptionist").build()).build();

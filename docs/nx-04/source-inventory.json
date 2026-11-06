@@ -697,13 +697,13 @@
     {
       "id": "S13",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java",
-      "line": 77,
+      "line": 79,
       "definition": "public BookingResponse createBooking"
     },
     {
       "id": "S14",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java",
-      "line": 342,
+      "line": 354,
       "definition": "recordSelfTrainingAttendance"
     },
     {
