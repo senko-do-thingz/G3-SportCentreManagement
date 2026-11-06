@@ -1,0 +1,65 @@
+# Flow 5 - AI drill suggestions for Coaches
+
+Requirement (Coach): use AI to suggest suitable exercises based on the member's training goal, level and
+training history. This feature adds Claude-generated drafts to the existing Coach drill preview
+(`GET /api/v1/coach/training/bookings/{bookingId}/drill-suggestions`).
+
+## Behaviour
+
+1. Authorization is unchanged and runs first: only the Coach assigned to the class and session of a confirmed
+   coach-led booking gets a preview. Every other Coach gets the uniform 404, and Members get 403. The generator is
+   never called for a rejected request.
+2. When AI drafting is enabled, the service builds a de-identified training context and asks Claude for 2 to 4
+   drills, constrained to a JSON schema:
+   - sport and class level;
+   - the member's own level (`member_profile.current_level`) and training goal (`main_goal`);
+   - the number of PRESENT or LATE sessions in this class;
+   - up to 10 recent skill scores (metric, score, maximum, date) recorded by this Coach for this class;
+   - this Coach's latest strengths and areas for improvement for the member in this class.
+   No name, e-mail, phone number, member code or database id is sent.
+3. Each returned drill is validated before the Coach sees it: 3 to 30 minutes, a title of at most 150 characters
+   and instructions of at most 1000 characters (the limits a Coach plan accepts), at most 4 drills.
+4. The response has `mode: "AI_GENERATED"` and `ruleVersion` set to the model id. `persisted` stays `false` and
+   `requiresCoachReview` stays `true`: nothing is stored until the Coach reviews, edits and selects Assign plan.
+5. If AI drafting is disabled, the key is missing or invalid, the provider times out or fails, Claude declines, or
+   no drill passes validation, the existing rule catalog is used (`mode: "RULE_BASED"`, `curated-drills-v1`).
+   Failures are logged with the exception class only, never with member data or model output.
+6. The preview runs without a database transaction, so no connection is held while Claude is called.
+
+## Configuration
+
+| Property | Environment / `backend/.env` | Default |
+|---|---|---|
+| `app.training.ai-drills.enabled` | `AI_DRILLS_ENABLED` | `false` |
+| `app.training.ai-drills.model` | `AI_DRILLS_MODEL` | `claude-opus-5-5` |
+| `app.training.ai-drills.timeout-seconds` | `AI_DRILLS_TIMEOUT_SECONDS` | `30` |
+| API key | `ANTHROPIC_API_KEY` | none |
+
+To enable locally, add to `backend/.env` (never commit the key):
+
+```properties
+AI_DRILLS_ENABLED=true
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+CI keeps the feature disabled; all automated tests use a mocked generator and never call the provider.
+
+## Cost and model choice
+
+Each preview sends roughly 1-2K input tokens and returns roughly 1K output tokens. With `claude-opus-5-5`
+($4 / $20 per million input / output tokens) that is about USD 0.03 per preview. `AI_DRILLS_MODEL` can name a
+cheaper model, for example `claude-haiku-5-5`, without a code change.
+
+## Open decisions for CODEOWNER
+
+- Approve sending the de-identified training context listed above to the Claude API.
+- Choose the default model and whether the feature is enabled for the committee demo.
+- Decide whether the member-facing class recommendations (F5-01 to F5-05) also need AI; they remain rule based.
+
+## Tests
+
+- `ClaudeDrillGeneratorTest`: validation limits, member-level selection, refusal handling, request content,
+  start-up without a key (Anthropic client mocked).
+- `AiDrillSuggestionIntegrationTest` (SQL Server): de-identified context, `AI_GENERATED` response with nothing
+  saved, fallback on failure and on an empty result, authorization before any generator call, HTTP response.
+- `staffTraining.flow.test.tsx`: the Coach UI labels AI drafts and still assigns nothing before review.

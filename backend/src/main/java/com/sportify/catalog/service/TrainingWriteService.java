@@ -101,9 +101,14 @@ public class TrainingWriteService {
         return profiles.getFirst();
     }
 
+    /**
+     * Read-only drill preview for the assigned Coach. Runs without a transaction so that no database connection is
+     * held while the optional AI generator is called; each query below is a single read.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public DrillSuggestions drillSuggestions(long coachId,long bookingId) {
         var context=jdbc.query("""
-            SELECT b.member_id,c.id class_id,c.level,sp.code sport_code,sp.name sport_name,m.main_goal
+            SELECT b.member_id,c.id class_id,c.level,sp.code sport_code,sp.name sport_name,m.main_goal,m.current_level
             FROM booking b JOIN class_session s ON s.id=b.session_id JOIN sport_class c ON c.id=s.class_id
             JOIN sport sp ON sp.id=s.sport_id
             JOIN user_account mu ON mu.id=b.member_id AND mu.status='ACTIVE'
@@ -112,7 +117,7 @@ public class TrainingWriteService {
             WHERE b.id=? AND b.status='CONFIRMED' AND s.status<>'CANCELLED' AND s.training_type='COACH_LED'
                 AND s.coach_id=? AND c.coach_id=? AND c.is_active=1
             """,(rs,row)->new DrillContext(rs.getLong("member_id"),rs.getLong("class_id"),rs.getString("level"),
-                rs.getString("sport_code"),rs.getString("sport_name"),rs.getString("main_goal")),bookingId,coachId,coachId);
+                rs.getString("sport_code"),rs.getString("sport_name"),rs.getString("main_goal"),rs.getString("current_level")),bookingId,coachId,coachId);
         // Same message for every miss so a Coach cannot probe other Coaches' bookings or account states.
         if(context.isEmpty())throw new ResourceNotFoundException("Assigned member booking not found");
         var current=context.getFirst();
@@ -135,9 +140,59 @@ public class TrainingWriteService {
                     AND a.actor_user_id=? AND a.action='TRAINING_RESULT_CREATED')
             ORDER BY r.created_at DESC,r.id DESC,sc.score/NULLIF(m.max_score,0),m.id
             """,(rs,row)->rs.getString("name"),coachId,current.memberId(),current.classId(),coachId);
+        if(drillGenerator!=null) {
+            var ai=aiDrafts(coachId,current);
+            if(!ai.isEmpty())return new DrillSuggestions("AI_GENERATED",drillGenerator.version(),true,false,bookingId,current.memberId(),
+                current.classId(),current.sportName(),DrillGenerator.effectiveLevel(current.memberLevel(),current.level()),ai);
+        }
         var drafts=TrainingDrillCatalog.suggest(current.sportCode(),current.sportName(),current.level(),feedback.isEmpty()?null:feedback.getFirst(),
             metrics.isEmpty()?null:metrics.getFirst(),current.goal());
         return new DrillSuggestions("RULE_BASED","curated-drills-v1",true,false,bookingId,current.memberId(),current.classId(),current.sportName(),current.level(),drafts);
+    }
+
+    /** Optional Flow 5 AI drafting; absent unless app.training.ai-drills.enabled=true. */
+    private DrillGenerator drillGenerator;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setDrillGenerator(DrillGenerator drillGenerator) { this.drillGenerator = drillGenerator; }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TrainingWriteService.class);
+
+    /**
+     * Builds the de-identified context (goal, levels, attendance, and the scores and feedback this Coach recorded for
+     * this class) and asks the generator for drafts. Any failure returns an empty list so the rule catalog is used.
+     */
+    private List<DrillDraft> aiDrafts(long coachId,DrillContext current) {
+        try {
+            var scores=jdbc.query("""
+                SELECT TOP(10) m.name,sc.score,m.max_score,s.session_date FROM session_result r
+                JOIN class_session s ON s.id=r.session_id JOIN session_result_score sc ON sc.result_id=r.id
+                JOIN skill_metric m ON m.id=sc.metric_id
+                WHERE s.coach_id=? AND r.member_id=? AND s.class_id=?
+                    AND EXISTS(SELECT 1 FROM activity_log a WHERE a.entity_type='SESSION_RESULT' AND a.entity_id=r.id
+                        AND a.actor_user_id=? AND a.action='TRAINING_RESULT_CREATED')
+                ORDER BY s.session_date DESC,r.id DESC,m.id
+                """,(rs,row)->new DrillGenerator.RecentScore(rs.getString("name"),rs.getBigDecimal("score"),
+                    rs.getObject("max_score",Integer.class),rs.getDate("session_date").toLocalDate()),
+                coachId,current.memberId(),current.classId(),coachId);
+            var feedback=jdbc.query("""
+                SELECT TOP(1) f.strengths,f.areas_for_improvement FROM coach_feedback f JOIN session_plan p ON p.id=f.plan_id
+                WHERE f.coach_id=? AND f.member_id=? AND p.class_id=? ORDER BY f.created_at DESC,f.id DESC
+                """,(rs,row)->new String[]{rs.getString("strengths"),rs.getString("areas_for_improvement")},
+                coachId,current.memberId(),current.classId());
+            Integer attended=jdbc.queryForObject("""
+                SELECT COUNT(*) FROM attendance_record a JOIN class_session s ON s.id=a.session_id
+                WHERE a.member_id=? AND s.class_id=? AND a.status IN ('PRESENT','LATE')
+                """,Integer.class,current.memberId(),current.classId());
+            var input=new DrillGenerator.Input(current.sportName(),current.level(),current.memberLevel(),current.goal(),
+                attended==null?0:attended,scores,feedback.isEmpty()?null:feedback.getFirst()[0],
+                feedback.isEmpty()?null:feedback.getFirst()[1]);
+            return drillGenerator.generate(input);
+        } catch(RuntimeException failure) {
+            // Never log member data or model output; the exception class is enough to diagnose provider failures.
+            log.warn("AI drill drafting failed, using the rule catalog: {}",failure.getClass().getSimpleName());
+            return List.of();
+        }
     }
 
     @Transactional
@@ -378,5 +433,5 @@ public class TrainingWriteService {
     }
     private record AttendanceBooking(long sessionId, long memberId, String status, String trainingType) {}
     private record ExistingAttendance(long id, String status) {}
-    private record DrillContext(long memberId,long classId,String level,String sportCode,String sportName,String goal) {}
+    private record DrillContext(long memberId,long classId,String level,String sportCode,String sportName,String goal,String memberLevel) {}
 }
