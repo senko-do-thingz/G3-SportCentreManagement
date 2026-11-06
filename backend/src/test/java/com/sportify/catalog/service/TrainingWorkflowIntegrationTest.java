@@ -1494,15 +1494,17 @@ class TrainingWorkflowIntegrationTest {
             ()->writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)),BusinessRuleException.class);
         assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?",booking)).isZero();
     }
-    @Test void R07_sql_attendanceBeforeCancellationPreservesHistoricalParticipation() throws Exception {
+    // E2E-BUG-02 (PROVISIONAL, E2E-D3 pending): this order previously cancelled the attended booking and restored its
+    // credit. Recorded PRESENT/LATE participation now rejects the waiting cancellation; participation is preserved.
+    @Test void R07_sql_attendanceBeforeCancellationRejectsTheCancellationAndPreservesParticipation() throws Exception {
         clock.value=Instant.parse("2026-11-02T01:00:00Z");
         var actor=actor(reception);
         interleave(()->writer.coachAttendance(coach,attendance(TrainingWriteRequest.AttendanceStatus.PRESENT)),
-            ()->bookings.cancelBooking(booking,actor),null);
+            ()->bookings.cancelBooking(booking,actor),BusinessRuleException.class);
         assertThat(count("SELECT COUNT(*) FROM attendance_record WHERE booking_id=?",booking)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT status FROM booking WHERE id=?",String.class,booking)).isEqualTo("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT status FROM booking WHERE id=?",String.class,booking)).isEqualTo("CONFIRMED");
         assertThat(reader.attendance(member)).anySatisfy(row->{
-            assertThat(row.status()).isEqualTo("CANCELLED");assertThat(row.recordedStatus()).isEqualTo("PRESENT");
+            assertThat(row.status()).isEqualTo("PRESENT");assertThat(row.recordedStatus()).isEqualTo("PRESENT");
         });
     }
     private com.sportify.catalog.dto.AttendanceBackfillRequest backfillRequest() {
