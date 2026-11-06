@@ -34,6 +34,7 @@ import static org.mockito.Mockito.*;
 class BookingRulesServiceTest {
     static final LocalDate TODAY = LocalDate.of(2026, 10, 16);
     static final LocalDateTime NOW = TODAY.atTime(10, 0);
+    @Mock MemberBookingLock memberBookingLock;
     @Mock BookingRepository bookings;
     @Mock ClassSessionRepository sessions;
     @Mock SportPackageRegistrationRepository registrations;

@@ -20,6 +20,7 @@ import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.BookingService;
 import com.sportify.catalog.service.TrainingWriteService;
 import com.sportify.catalog.service.PackageBookingEligibility;
+import com.sportify.catalog.service.MemberBookingLock;
 import com.sportify.core.audit.AuditAction;
 import com.sportify.core.audit.AuditEvent;
 import com.sportify.core.audit.AuditService;
@@ -69,6 +70,7 @@ public class BookingServiceImpl implements BookingService {
     private final AuditService auditService;
     private final TrainingWriteService trainingWriteService;
     private final com.sportify.catalog.service.OperationalMemberPolicy operationalMemberPolicy;
+    private final MemberBookingLock memberBookingLock;
 
     public static final int MEMBER_CANCELLATION_CUTOFF_MINUTES = 120;
 
@@ -97,7 +99,9 @@ public class BookingServiceImpl implements BookingService {
             requireActor(member.getUserAccount(), true);
         }
 
-        // Preserve BE-10/BE-21: session first, booking checks next, then registration mutation.
+        // E2E-BUG-01: member application lock first, so two bookings of one member for different sessions cannot both
+        // pass the overlap check below. Then preserve BE-10/BE-21: session, booking checks, registration mutation.
+        memberBookingLock.acquire(member.getId());
         ClassSession session = sessionRepository.findForUpdate(request.getSessionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Class session not found for id: " + request.getSessionId()));
         entityManager.refresh(session);
@@ -107,6 +111,14 @@ public class BookingServiceImpl implements BookingService {
         }
         if (bookingRepository.findBySessionIdAndMemberIdAndStatus(session.getId(), member.getId(), BookingStatus.CONFIRMED).isPresent()) {
             throw new ConflictException(DUPLICATE_BOOKING_MESSAGE, "ALREADY_BOOKED");
+        }
+        // E2E-BUG-01 (PROVISIONAL, E2E-D1 Option A pending): no two CONFIRMED bookings of one member may intersect in
+        // time on the same date, for coach-led and SELF_TRAINING sessions alike. Touching end and start is allowed.
+        var overlapping = bookingRepository.findOverlappingConfirmedSessionCodes(member.getId(), session.getId(),
+                session.getSessionDate(), session.getStartTime(), session.getEndTime());
+        if (!overlapping.isEmpty()) {
+            throw new ConflictException("You already have a booking at an overlapping time (session "
+                    + overlapping.getFirst() + ")", "TIME_CONFLICT");
         }
         if (session.getSessionDate().isBefore(now.toLocalDate())) {
             throw rule("Cannot book a session in the past", "SESSION_STARTED");

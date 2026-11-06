@@ -68,6 +68,7 @@ class BookingRulesIntegrationTest extends AbstractIntegrationTest {
         }
     }
     @Autowired BookingService service;
+    @Autowired com.sportify.catalog.service.MemberBookingLock memberBookingLock;
     @Autowired MemberScheduleService schedule;
     @Autowired ManagerSessionService managerSessions;
     @Autowired BookingRepository bookings;
@@ -279,7 +280,8 @@ class BookingRulesIntegrationTest extends AbstractIntegrationTest {
         try {
             Future<Outcome> first = pool.submit(() -> inWriter(() -> {
                 firstSpid.set(count("SELECT @@SPID")); assertThat(registrations.findById(reg).orElseThrow().getRemainingSessions()).isEqualTo(1);
-                snapshots.countDown(); await(snapshots); sessions.findForUpdate(firstSession).orElseThrow();
+                // E2E-BUG-01: real booking takes the member booking lock before any session or registration lock.
+                snapshots.countDown(); await(snapshots); memberBookingLock.acquire(memberA.getId()); sessions.findForUpdate(firstSession).orElseThrow();
                 jdbc.update("UPDATE sport_package_registration SET remaining_sessions = remaining_sessions WHERE id = ?", reg);
                 held.countDown(); await(release); return postBooking(memberA, firstSession, reg);
             }));
@@ -287,7 +289,8 @@ class BookingRulesIntegrationTest extends AbstractIntegrationTest {
                 secondSpid.set(count("SELECT @@SPID")); assertThat(registrations.findById(reg).orElseThrow().getRemainingSessions()).isEqualTo(1);
                 snapshots.countDown(); await(held); entered.countDown(); return postBooking(memberA, secondSession, reg);
             }));
-            await(held); await(entered); awaitBlocked(secondSpid.get(), firstSpid.get(), "UPDATE sport_package_registration"); release.countDown();
+            // The same member's second booking now waits on the member lock (xp_userlock), before any registration update.
+            await(held); await(entered); awaitBlocked(secondSpid.get(), firstSpid.get(), "xp_userlock"); release.countDown();
             assertThat(first.get(30, TimeUnit.SECONDS).status()).isEqualTo(201);
             var loser = second.get(30, TimeUnit.SECONDS); assertThat(loser.status()).isEqualTo(400); assertThat(loser.code()).isEqualTo("NO_SESSIONS_LEFT");
             assertThat(balance(reg)).isZero(); assertThat(seats(firstSession)).isEqualTo(1); assertThat(seats(secondSession)).isZero();

@@ -153,6 +153,20 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                                        @Param("now") LocalDateTime now);
 
     /**
+     * E2E-BUG-01: session codes of the member's other CONFIRMED bookings whose non-cancelled session intersects the
+     * requested time on the same date (strict intersection, so back-to-back sessions do not conflict).
+     */
+    @Query(value = "SELECT s.session_code FROM booking b JOIN class_session s ON s.id = b.session_id "
+            + "WHERE b.member_id = :memberId AND b.status = 'CONFIRMED' AND s.id <> :sessionId AND s.status <> 'CANCELLED' "
+            + "AND s.session_date = :sessionDate AND s.start_time < CAST(:endTime AS time) AND s.end_time > CAST(:startTime AS time) "
+            + "ORDER BY s.start_time, s.id", nativeQuery = true)
+    java.util.List<String> findOverlappingConfirmedSessionCodes(@Param("memberId") Long memberId,
+                                                              @Param("sessionId") Long sessionId,
+                                                              @Param("sessionDate") LocalDate sessionDate,
+                                                              @Param("startTime") java.time.LocalTime startTime,
+                                                              @Param("endTime") java.time.LocalTime endTime);
+
+    /**
      * E2E-BUG-02: 1 when the member of this booking has PRESENT or LATE attendance for the booked session. Attendance
      * is unique per (session, member) and is written under the same session row lock as cancellation, so a caller that
      * holds the session lock sees the committed participation state.
