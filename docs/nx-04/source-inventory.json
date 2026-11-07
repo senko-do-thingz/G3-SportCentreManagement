@@ -803,7 +803,7 @@
     {
       "id": "S28",
       "path": "backend/pom.xml",
-      "line": 191,
+      "line": 197,
       "definition": "maven-surefire-plugin"
     },
     {
