@@ -12,14 +12,16 @@ const drafts = [
   { title: 'First-touch passing', goal: 'Ball control', durationMinutes: 25, instructions: 'Short passes.', reason: 'Current skill focus.', level: 'BEGINNER' },
 ]
 
-function coachApp() {
+/** AI_GENERATED when a provider is enabled; RULE_BASED is the default with AI disabled (AI_DRILLS_ENABLED=false). */
+function coachApp(mode: 'AI_GENERATED' | 'RULE_BASED' = 'AI_GENERATED') {
   tokenStorage.startSession({ accessToken: 'staff-token', refreshToken: 'refresh' })
+  const ruleVersion = mode === 'AI_GENERATED' ? 'gemini-flash-lite-latest' : 'curated-drills-v2'
   return installFakeFetch((call: RecordedCall) => {
     if (call.path === '/users/me') return json(200, { ...MEMBER, role: 'COACH' })
     if (call.path === '/coach/training/classes') return json(200, [{ id: 1, name: 'Football Fundamentals', sportId: 1 }])
     if (call.path === '/coach/training/classes/1/members') return json(200, [{ bookingId: 11, memberId: 42, memberName: 'Taylor', sessionDate: '2026-11-05' }])
     if (call.path === '/coach/training/plans' && call.method === 'GET') return json(200, [])
-    if (call.path.startsWith('/coach/training/bookings/11/drill-suggestions')) return json(200, { mode: 'AI_GENERATED', ruleVersion: 'gemini-flash-lite-latest', requiresCoachReview: true, persisted: false, bookingId: 11, memberId: 42, classId: 1, sportName: 'Football', level: 'BEGINNER', drafts })
+    if (call.path.startsWith('/coach/training/bookings/11/drill-suggestions')) return json(200, { mode, ruleVersion, requiresCoachReview: true, persisted: false, bookingId: 11, memberId: 42, classId: 1, sportName: 'Football', level: 'BEGINNER', drafts })
     if (call.path === '/coach/training/plans' && call.method === 'POST') return json(201, { id: 9 })
     return backendError(404, 'Not used in this test')
   })
@@ -74,4 +76,30 @@ it('F5-08 shows a "Draft / Not shared" summary that follows the plan form until 
   await user.click(screen.getByRole('button', { name: 'Assign plan' }))
   expect(await screen.findByText('Plan assigned. The member can view it immediately.')).toBeInTheDocument()
   expect(calls.filter(call => call.method === 'POST' && call.path === '/coach/training/plans')).toHaveLength(1)
+})
+
+it('AI disabled: rule-based drafts use the same review table and nothing is saved before Assign plan', async () => {
+  const { calls } = coachApp('RULE_BASED')
+  const user = userEvent.setup()
+  renderApp('/coach/training/plans')
+  await user.selectOptions(await screen.findByLabelText('Assigned class'), '1')
+  await user.selectOptions(await screen.findByLabelText(/Member booking/), '11')
+  await user.click(screen.getByRole('button', { name: 'Suggest practice drills' }))
+  const table = await screen.findByRole('table', { name: 'Suggested exercises for review' })
+  expect(screen.getByText(/Mode: RULE_BASED, rule version curated-drills-v2\. Drafts are not saved\./)).toBeInTheDocument()
+  expect(screen.queryByText('AI draft')).not.toBeInTheDocument()
+  expect(within(table).getByText('Prepare movement.')).toBeInTheDocument()
+
+  await user.click(screen.getByLabelText('Select draft: Warm-up and mobility'))
+  await user.click(screen.getByRole('button', { name: 'Review selected drafts in plan form' }))
+  await user.type(screen.getByLabelText(/^Plan title/), 'Rule-based week 1')
+  const summary = screen.getByRole('region', { name: 'Training plan draft' })
+  expect(within(summary).getByText('Draft / Not shared')).toBeInTheDocument()
+  expect(within(summary).getByText('15 minutes in 1 exercise')).toBeInTheDocument()
+  expect(calls.some(call => call.method !== 'GET')).toBe(false)
+
+  await user.click(screen.getByRole('button', { name: 'Assign plan' }))
+  expect(await screen.findByText('Plan assigned. The member can view it immediately.')).toBeInTheDocument()
+  expect(calls.filter(call => call.method === 'POST' && call.path === '/coach/training/plans')).toHaveLength(1)
+  expect(calls.filter(call => call.method !== 'GET')).toHaveLength(1)
 })
