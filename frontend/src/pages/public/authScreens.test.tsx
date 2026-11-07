@@ -287,13 +287,22 @@ describe('F1-05 Log in', () => {
 })
 
 describe('F1-06 Sign up', () => {
-  it('creates the account, logs in and opens the member dashboard', async () => {
+  it('creates the account, shows Registration Successful! and opens the dashboard only from Go to Dashboard', async () => {
     const { calls } = installFakeFetch(authBackend())
     const user = userEvent.setup()
     renderApp('/register')
 
     await fillRegisterForm(user, { fullName: '  Jamie Tran ', phone: '0901 234 599', email: ' jamie@sportify.demo ' })
     await user.click(screen.getByRole('button', { name: 'Create account' }))
+
+    expect(await screen.findByRole('heading', { name: 'Registration Successful!' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Welcome to Sportify, Jamie Tran.')
+    // Nothing redirects on its own: the success screen stays until the member chooses the button.
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(screen.queryByRole('heading', { name: 'Member Dashboard' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Continue where you left off' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Go to Dashboard' })).toHaveAttribute('href', '/member')
+    await user.click(screen.getByRole('link', { name: 'Go to Dashboard' }))
 
     expect(await screen.findByRole('heading', { name: 'Member Dashboard' })).toBeInTheDocument()
     expect(calls[0]).toMatchObject({
@@ -346,6 +355,7 @@ describe('F1-06 Sign up', () => {
     await waitFor(() => expect(email).toHaveFocus())
     expect(tokenStorage.hasSession()).toBe(false)
     expect(screen.getByRole('button', { name: 'Create account' })).toBeEnabled()
+    expect(screen.queryByRole('heading', { name: 'Registration Successful!' })).not.toBeInTheDocument()
   })
 
   it('blocks a weak password with the backend StrongPassword message and sends nothing', async () => {
@@ -453,6 +463,7 @@ describe('F1-06 Sign up', () => {
 
     expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('Your account was created, but we could not sign you in.')
+    expect(screen.queryByRole('heading', { name: 'Registration Successful!' })).not.toBeInTheDocument()
     expect(screen.getByLabelText(/email address/i)).toHaveValue('jamie@sportify.demo')
     expect(calls.filter((call) => call.path === '/auth/register')).toHaveLength(1)
     expect(tokenStorage.hasSession()).toBe(false)
@@ -479,6 +490,23 @@ describe('F1-06 Sign up', () => {
     renderApp('/register')
 
     expect(await screen.findByRole('heading', { name: 'Member Dashboard' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Registration Successful!' })).not.toBeInTheDocument()
+  })
+
+  it('never shows a success screen again after a reload and never sends the registration twice', async () => {
+    const { calls } = installFakeFetch(authBackend())
+    const user = userEvent.setup()
+    const first = renderApp('/register')
+    await fillRegisterForm(user)
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+    expect(await screen.findByRole('heading', { name: 'Registration Successful!' })).toBeInTheDocument()
+
+    // A reload starts a new page with only the stored session: no success message, no second account.
+    first.unmount()
+    renderApp('/register')
+    expect(await screen.findByRole('heading', { name: 'Member Dashboard' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Registration Successful!' })).not.toBeInTheDocument()
+    expect(calls.filter((call) => call.path === '/auth/register')).toHaveLength(1)
   })
 
   it('links back to the log in page', async () => {

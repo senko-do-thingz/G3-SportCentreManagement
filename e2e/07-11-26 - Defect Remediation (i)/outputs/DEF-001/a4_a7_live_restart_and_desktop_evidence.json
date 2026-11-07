@@ -1,0 +1,36 @@
+{
+  "executedAt": "2026-11-07T04:21:31.113714+00:00",
+  "sqlInstance": "127.0.0.1:57385 (SQLEXPRESS01)",
+  "database": "sportify",
+  "cases": {
+    "A4_true_jvm_restart": {
+      "verdict": "PASS",
+      "jvm1Pid": 12032,
+      "jvm1ExitCode": 1,
+      "jvm2Pid": 6988,
+      "rt1HashPrefix": "09b542492847a24e",
+      "rt2HashPrefix": "78f3c91f780b3c62",
+      "rt3HashPrefix": "d5b8215f45e1b6d5",
+      "jvm1FirstRefreshStatus": 200,
+      "jvm1ImmediateReplayStatus": 401,
+      "sqlStateBeforeRestart": {
+        "rt1": "CONSUMED",
+        "rt2": "ACTIVE"
+      },
+      "jvm2ReplayConsumedRt1Status": 401,
+      "jvm2UseRotatedRt2Status": 200,
+      "jvm2ReplayConsumedRt2Status": 401
+    },
+    "A7_desktop_playwright_rotation_and_401": {
+      "verdict": "PASS",
+      "viewport": "1440x900",
+      "initialRefreshTokenHashPrefix": "355509a5866d396c",
+      "rotatedRefreshTokenHashPrefix": "a041d068220115fd",
+      "refreshRotatedInBrowserStorage": true,
+      "consumedTokenRefreshCallStatuses": [
+        401
+      ],
+      "redirectedToLoginOnConsumedReplay": true
+    }
+  }
+}

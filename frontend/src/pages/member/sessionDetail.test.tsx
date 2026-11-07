@@ -22,7 +22,7 @@ function backend(value: SessionDetail | number = detail, profile = MEMBER) {
 beforeEach(() => { vi.stubEnv('VITE_MANAGER_PREVIEW', 'false'); tokenStorage.startSession({ accessToken: 'member-test', refreshToken: 'refresh-test' }) })
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 describe('FE-08 session detail', () => {
-  it.each<[EligibilityReason, string]>([['FULL', 'Session Fully Booked'], ['NO_PACKAGE', 'No Eligible Sport Package'], ['NO_SESSIONS_LEFT', 'No Eligible Sport Package'], ['PACKAGE_EXPIRED_BY_THEN', 'Package Does Not Cover This Date'], ['PACKAGE_NOT_STARTED_BY_THEN', 'Package Has Not Started'], ['ALREADY_BOOKED', 'Already Booked'], ['CAPACITY_UNAVAILABLE', 'Availability Cannot Be Confirmed']])('renders backend %s state and never books', async (reason, heading) => {
+  it.each<[EligibilityReason, string]>([['FULL', 'Session Fully Booked'], ['NO_PACKAGE', 'No Eligible Sport Package'], ['NO_SESSIONS_LEFT', 'No Eligible Sport Package'], ['PACKAGE_EXPIRED_BY_THEN', 'Package Does Not Cover This Date'], ['PACKAGE_NOT_STARTED_BY_THEN', 'Package Has Not Started'], ['ALREADY_BOOKED', 'Already Booked'], ['CAPACITY_UNAVAILABLE', 'Availability Cannot Be Confirmed'], ['SYNTHETIC_OPERATION_DENIED', 'Demo Account Restricted']])('renders backend %s state and never books', async (reason, heading) => {
     const api = backend({ ...detail, eligible: false, reason, suitableRegistrations: [] })
     renderApp('/member/sessions/5?returnTo=%2Fmember%2Fclasses%3Flevel%3DBEGINNER')
     expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeInTheDocument()

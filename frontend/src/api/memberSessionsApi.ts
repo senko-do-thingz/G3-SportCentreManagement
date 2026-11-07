@@ -33,7 +33,7 @@ export interface BrowseSession {
   full: boolean
   status: string
 }
-export type EligibilityReason = 'NO_PACKAGE' | 'NO_SESSIONS_LEFT' | 'PACKAGE_EXPIRED_BY_THEN' | 'PACKAGE_NOT_STARTED_BY_THEN' | 'FULL' | 'ALREADY_BOOKED' | 'CAPACITY_UNAVAILABLE'
+export type EligibilityReason = 'NO_PACKAGE' | 'NO_SESSIONS_LEFT' | 'PACKAGE_EXPIRED_BY_THEN' | 'PACKAGE_NOT_STARTED_BY_THEN' | 'FULL' | 'ALREADY_BOOKED' | 'CAPACITY_UNAVAILABLE' | 'SYNTHETIC_OPERATION_DENIED'
 export interface SuitableRegistration {
   registrationId: number
   registrationCode: string

@@ -53,6 +53,7 @@ export function bookingErrorMessage(error: unknown): string {
     case 'SESSION_STARTED': return 'This session has already started and can no longer be booked.'
     case 'CANCELLATION_CUTOFF': return 'The cancellation deadline has passed. This booking was not cancelled.'
     case 'CANNOT_CANCEL': return 'This booking can no longer be cancelled.'
+    case 'SYNTHETIC_OPERATION_DENIED': return 'Synthetic members cannot use operational classes or training records.'
     default: return error.message || 'The request could not be completed. Please try again.'
   }
 }

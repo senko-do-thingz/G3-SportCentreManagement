@@ -34,6 +34,18 @@ public class OperationalMemberPolicy {
         }
     }
 
+    public boolean isSyntheticMember(long memberId) {
+        try {
+            requireRealMember(memberId);
+            return false;
+        } catch (BusinessRuleException ex) {
+            if ("SYNTHETIC_OPERATION_DENIED".equals(ex.getCode())) {
+                return true;
+            }
+            throw ex;
+        }
+    }
+
     public void requireRealBooking(long bookingId) {
         jdbc.queryForList("SELECT member_id FROM dbo.booking WHERE id=?", Long.class, bookingId)
                 .forEach(this::requireRealMember);
