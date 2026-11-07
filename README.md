@@ -2,27 +2,28 @@
 
 [![CI/CD](https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/workflows/ci.yml/badge.svg)](https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/workflows/ci.yml)
 
-Web system for **Sportify Center**, a multi-sport facility. It manages accounts and fixed roles, sport packages, membership cards, class bookings, arrival check-in, attendance, training plans, results, feedback, payments, invoices, refunds and notifications.
+Web system for **Sportify Center**, a multi-sport facility. It is the G3 university project for Topic 4 (sport centre management), built and demonstrated as a **desktop web application**. It is a course demo, not a production release.
 
-## Flow 1-4 Release 1.1 candidate
+The system manages accounts and fixed roles, sport packages, membership cards, classes and sessions, bookings, arrival check-in, attendance, training plans, results, feedback, a member assistant, support requests, payments, invoices, refunds, reports and notifications.
 
-Latest-main synchronization: the candidate includes main c9c50da94423f8540de328855f9a7efd0878b1f1 and preserves PR #212 payment workspace changes. Follow-up verification and the current handoff are under R11-11/reports/round-002; round-001 remains the original evidence snapshot.
+## Project Status
 
-This branch adds the missing desktop support, operations, Manager attendance and Coach progress pages. It is a release candidate awaiting CODEOWNER review, not a merged release or deployment. See [release traceability](docs/release-1.1/REQUIREMENT_TRACEABILITY.md) and the [12-minute desktop demo](docs/release-1.1/DESKTOP_DEMO.md) for routes, contracts, tests and limitations. Per-task evidence is under `tasks/Flow1-4 - Release 1.1 (i)/tasks/R11-xx/reports/`.
+This README describes the `main` branch. Everything listed under "Implemented" is merged into `main`. Open pull requests are not part of `main` until a CODEOWNER merges them.
 
-| Scope | Desktop behavior |
+| Area | Status on `main` |
 |---|---|
-| Flow 1, required | Existing account/card/package flows, a Registration Successful screen with a Go to Dashboard button after sign-up (no auto-redirect, never shown on failure or reload), plus Reception support intake, search/filter, details and status transitions at `/reception/support` |
-| Flow 2, required | Existing class/session administration, booking/cancellation, public Session IDs, Coach rosters and personal schedules. Member My Schedule at `/member/schedule` shows only the member's CONFIRMED bookings; Find Classes at `/member/classes` lists the whole centre |
-| Flow 3, required | Existing payment/refund/CSV semantics plus date-scoped registration and booking counters at `/manager/reports` |
-| Flow 4, included optional scope | Existing plans, results, feedback and attendance plus read-only `/manager/training/attendance` and `/coach/training/progress` |
+| Flow 1 - Accounts, cards, packages | Implemented. Register -> Registration Successful screen with a Go to Dashboard button (no auto-redirect, never shown on failure, reload or direct visit), login with single-use refresh token rotation, membership cards, sport packages, Reception sales and activation |
+| Flow 2 - Classes, sessions, booking | Implemented. Manager class/session administration, public Session IDs, session rescheduling with history, booking and cancellation, Reception arrival and check-in pass, Coach teaching schedule and rosters. Member **My Schedule** (`/member/schedule`) shows only the member's own CONFIRMED bookings; **Find Classes** (`/member/classes`) lists every bookable session in the centre |
+| Flow 3 - Payments and reports | Implemented. Staff-confirmed payments, VietQR transfer instructions, opt-in simulated QR demo, invoices and receipts, refunds, revenue report and CSV, operations counters |
+| Flow 4 - Training and progress | Implemented. Personal and class plans, Coach and Reception attendance recording and correction, results, feedback, member progress, Manager attendance overview, class notices and questions |
+| Flow 5 - Recommendations and drills | Implemented. Member class recommendations, sport levels and saved recommendations. Coach drill suggestions from a rule-based catalog, with optional Gemini drafts (off by default) |
+| Flow 6 - Assistant and support | Implemented. Member center assistant that answers only from center data (KNOWLEDGE_BASED keyword rules by default; an optional AI step, off by default, only classifies the question). Member support requests and Reception support intake and replies |
+| Notifications | Implemented in-app operational notifications. No e-mail, SMS or push delivery |
+| Deferred | Waitlist, dynamic roles, mobile app, external payment gateway callbacks. See [Known Gaps](#known-gaps) |
 
-Roles stay fixed; Waitlist and dynamic role changes are deferred. Deprecated legacy membership compatibility remains. Mobile, AI Audit Log and Flow 5-6 implementation are outside this release. No schema migration or financial calculation is changed by Release 1.1. Final verification and demo readiness must be read from the exact-SHA reports, not inferred from this feature list.
+Roles are fixed: MEMBER, COACH, RECEPTIONIST, MANAGER.
 
-This is a monorepo with two applications:
-
-- `backend/` - Spring Boot REST API (Java 25, Maven, SQL Server). Secured with JWT. The schema is managed by Flyway and validated by Hibernate on startup.
-- `frontend/` - React web app (Vite, TypeScript, React Router). Includes public Home, authentication, role dashboards, catalog, scheduling, payments and global appearance preferences.
+**AI features.** Both AI integrations are optional, server-side only and disabled unless an operator sets the matching environment variables. With AI off, the assistant and drill suggestions still work from rules and center data. No AI key is ever sent to the frontend. See [member assistant](docs/training/member-assistant-ai.md) and [AI drill suggestions](docs/training/ai-drill-suggestions.md).
 
 ## Repository Layout
 
@@ -30,161 +31,63 @@ This is a monorepo with two applications:
 G3-SportCentreManagement/
   backend/                 Spring Boot API. Run every mvn and docker compose command here.
     src/main/java/com/sportify/      core/, identity/, catalog/, payment/ modules
-    src/main/resources/              application*.yml, versioned Flyway migrations
+    src/main/resources/              application*.yml, Flyway migrations (db/migration), demo-only seeds (db/demo)
     src/test/java/com/sportify/      mirrors src/main exactly
     scripts/                         smoke test and local helper SQL
-    pom.xml
-    docker-compose.yml               local SQL Server
+    docker-compose.yml               optional local SQL Server
     .env.example                     copy to backend/.env
-  frontend/                Web app. Run every npm command here.
-    README.md
-  docs/                    database design, architecture notes
+  frontend/                React web app. Run every npm command here.
+  docs/                    database, API, training, payment, CI and test documentation
+  scripts/demo-data/       manual demo SQL for disposable databases only
   context/                 exported Figma screens, grouped by flow and role
-  .github/                 CI workflow and CODEOWNERS
-  CHANGELOG.md             what changed and what is not done yet
-  TODO.md                  task list per flow with owners and priorities
-  README.md
+  .github/                 CI workflows and CODEOWNERS
+  CHANGELOG.md             what changed
+  TODO.md                  task list per flow
 ```
-
-Where to run what:
-
-| Task | Folder | Example |
-|---|---|---|
-| Build, test, run the API | `backend/` | `mvn clean verify`, `mvn spring-boot:run` |
-| Start the local database | `backend/` | `docker compose up -d` |
-| Run the web app | `frontend/` | `npm install`, `npm run dev` |
-| Edit docs | repository root | `docs/` |
-
-### Upgrading from the old layout
-
-The Spring Boot project used to live in the repository root. After you pull the split:
-
-1. Run `git pull origin main`.
-2. Move your local `.env` into `backend/.env` (it is git-ignored, so git does not move it for you).
-3. Run all `mvn` commands inside `backend/` from now on.
-4. Delete old leftovers in the root (`target/`, `logs/`, `.env`) if your IDE still shows them.
-
-## Module Status
-
-| Module | Status |
-|---|---|
-| **Identity & Access** | Implemented - register, login, token refresh, current user, member search, manager user and staff account management, fixed roles (MEMBER, COACH, RECEPTIONIST, MANAGER), strong password validation, audit logging |
-| **Catalog & Membership** | Implemented - sports, sport packages and registrations, membership cards (tiers, purchase, renewal, upgrade, activation, cancellation), check-in, refund requests. The plan-based membership flow (`/api/v1/memberships`) is legacy and deprecated |
-| **Classes & Booking** | Implemented - class/session management, member discovery and schedules, booking create/cancel/list, reception arrival and Coach roster/attendance. Waitlist remains deferred |
-| **Payments & Reports** | Implemented - payment confirmation, invoices, refund review/payout, revenue reports/CSV and cash-flow read APIs. This candidate adds operations counters to the existing desktop report |
-| **Training & Progress** | Implemented - personal/class plans, results, attendance/corrections, feedback, private progress APIs; this candidate adds Manager overview and Coach progress readers |
-| **AI Assistant** | Outside Release 1.1 acceptance; no model/provider implementation in this candidate |
-| **AI Workout Recommendation** | Outside Release 1.1 acceptance; no Flow 5 implementation in this candidate |
-| **Notifications & System** | Implemented scoped operational notifications and important action history; no external messaging integration in Release 1.1 |
-| **Frontend** | Implemented React/TypeScript app with public Home, auth, four role dashboards and System/Light/Dark preferences in the current working tree |
-
-The open tasks for every flow are listed in [TODO.md](TODO.md).
 
 ## Technology Stack
 
-**Backend (`backend/`)**
-
-- **Language:** Java 25
-- **Framework:** Spring Boot 3.5.16 (Spring Web, Spring Data JPA with Hibernate, Bean Validation)
-- **Security:** Spring Security, JWT (jjwt 0.11.5), method-level role checks with `@PreAuthorize`
-- **Database:** Microsoft SQL Server 2022
-- **Database migrations:** Flyway (`flyway-core`, `flyway-sqlserver`)
-- **Utilities:** MapStruct, Lombok
+- **Backend:** Java 25, Spring Boot 3.5.16 (Web, Data JPA with Hibernate, Validation, Security), JWT (jjwt), MapStruct, Lombok
+- **Database:** Microsoft SQL Server 2022, schema managed by Flyway and validated by Hibernate (`ddl-auto: validate`)
+- **Frontend:** React, TypeScript, Vite, React Router, Vitest
 - **Testing:** JUnit 5, Spring Security Test, Testcontainers (MSSQL), JaCoCo
-
-**Frontend (`frontend/`)**
-
-- React, TypeScript, Vite, React Router
-
-**Tooling**
-
-- GitHub Actions for CI, Docker Compose for the local database
-
-## Backend Structure
-
-The code is grouped by business module, not by technical layer. Every module uses the same sub-packages: `controller`, `dto`, `entity`, `mapper`, `repository`, `service` and `service/impl`.
-
-```text
-backend/src/main/java/com/sportify/
-  SportifyApplication.java
-  core/            audit, common, config, exception, validation
-  identity/        accounts, profiles, roles, JWT security
-  catalog/         sports, packages, membership cards, check-in, refunds, booking
-backend/src/main/resources/
-  application.yml, application-dev.yml, application-prod.yml
-  db/migration/identity/   V1 to V4
-  db/migration/catalog/    V5 to V20 (V7 and V8 do not exist)
-backend/src/test/java/com/sportify/   mirrors src/main exactly
-```
-
-Booking code currently lives inside `catalog/`; payment code has its own `payment/` module. `docs/architecture/project_structure.md` describes the planned target layout, including separate `booking` and `training` modules.
-
-## Documentation
-
-- [Database Design](docs/database/README.md) - document index, conventions, module overview and ERD
-  - [Database schema reference](docs/database/schema/README.md) - every table with its status, generated from migrations V1 to V20
-  - [Business rules and state machines](docs/database/09-business-rules-and-state-machines.md)
-  - [SQL Server DDL](docs/database/10-ddl-sqlserver.md)
-  - [JPA mapping guide](docs/database/11-jpa-mapping-guide.md)
-  - [Screen traceability](docs/database/12-screen-traceability.md)
-  - [Figma to schema gap analysis](docs/database/13-figma-schema-gap-analysis.md)
-  - ERD source: `docs/database/Sportify_ERD.drawio`
-- [Architecture and Project Structure Guidelines](docs/architecture/project_structure.md)
-- [Changelog](CHANGELOG.md) - latest changes and the list of work not done yet
-- [TODO](TODO.md) - tasks per flow, owners and priorities
-- [Frontend guide](frontend/README.md)
+- **CI:** GitHub Actions (`.github/workflows/ci.yml`)
 
 ## Getting Started
 
+The normal setup uses **one** operational database named `sportify`.
+
 ### Prerequisites
 
-- JDK 25 and Maven 3.9+ (backend)
-- Node.js ^22.13.0, ^24.0.0 or >=26.0.0 and npm (see frontend/package.json)
-- Docker and Docker Compose (optional: local database and integration tests)
+- JDK 25 and Maven 3.9+
+- Node.js `^22.13.0 || ^24.0.0 || >=26.0.0` and npm (see `frontend/package.json`)
+- SQL Server 2022 reachable on port 1433 (local install, or Docker as an alternative)
 
-### 1. Configure the backend
+### 1. Create the database
 
-Copy `backend/.env.example` to `backend/.env` and fill in the values. The application reads `.env` from its working directory, so always start it from inside `backend/`. `.env` is git-ignored and must never be committed.
+Create an empty database once: `CREATE DATABASE sportify;`. With a local SQL Server, enable SQL Server authentication, enable TCP/IP on port 1433 and restart the service. As an alternative, `cd backend` then `docker compose up -d` starts SQL Server 2022 and creates `sportify`.
+
+### 2. Configure the backend
+
+Copy `backend/.env.example` to `backend/.env` and fill it in. `.env` is git-ignored and must never be committed. The backend reads it from its working directory, so always start it from `backend/`.
 
 | Variable | Description |
 |---|---|
-| `DB_URL` | JDBC URL, for example `jdbc:sqlserver://localhost:1433;databaseName=sportify;encrypt=true;trustServerCertificate=true` |
-| `DB_USERNAME` | Database user (default `sa`) |
-| `DB_PASSWORD` | Database password (required) |
-| `JWT_SECRET` | Base64 signing key for tokens (required). Generate one with `openssl rand -base64 32` |
-| `CORS_ALLOWED_ORIGINS` | Comma separated origins allowed to call the API from a browser. `dev` defaults to `http://localhost:5173,http://localhost:3000`. Required in `prod` (no default), for example `https://app.example.com` |
+| `DB_URL` | For example `jdbc:sqlserver://localhost:1433;databaseName=sportify;encrypt=true;trustServerCertificate=true` |
+| `DB_USERNAME`, `DB_PASSWORD` | SQL Server login |
+| `JWT_SECRET` | Base64 signing key, for example from `openssl rand -base64 32` |
+| `CORS_ALLOWED_ORIGINS` | Optional in `dev` (defaults to `http://localhost:5173,http://localhost:3000`), required in `prod` |
 
-### 2. Start the database
-
-**Option A: Local SQL Server**
-
-1. Enable **SQL Server and Windows Authentication mode** in SSMS (Server Properties -> Security).
-2. Enable the `sa` account and set a password: `ALTER LOGIN sa ENABLE; ALTER LOGIN sa WITH PASSWORD = 'YourPassword';`
-3. Create the database: `CREATE DATABASE sportify;`
-4. Enable TCP/IP on port 1433 in SQL Server Configuration Manager.
-5. Restart the SQL Server service.
-6. Put the same password in `DB_PASSWORD` in `backend/.env`.
-
-**Option B: Docker Compose**
+### 3. Run the backend
 
 ```bash
 cd backend
-docker compose up -d
-```
-
-This starts SQL Server 2022 (`sportify-sqlserver`) on port 1433 and creates the `sportify` database through the `db-init` service. The container uses `DB_PASSWORD` from `backend/.env` as the `sa` password.
-
-### 3. Build, test and run the backend
-
-```bash
-cd backend
-mvn clean verify
 mvn spring-boot:run
 ```
 
-The API listens on `http://localhost:8080`. Flyway applies all migrations on startup and Hibernate validates the schema (`ddl-auto: validate`).
-
-The `dev` profile is active by default in `application.yml`. It prints SQL and enables development-only endpoints such as `POST /api/v1/dev/memberships/{id}/activate`. For production set `SPRING_PROFILES_ACTIVE=prod`.
+- The API listens on `http://localhost:8080`, under `/api/v1`.
+- The `dev` profile is active by default (`application.yml`). Use `SPRING_PROFILES_ACTIVE=prod` for a production-like run.
+- **Flyway applies all pending migrations at startup.** Back up the `sportify` database before you pull and start a newer version. Never edit or delete a migration that has already been applied.
 
 ### 4. Run the frontend
 
@@ -194,247 +97,120 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`. The backend must be running. CORS for `http://localhost:5173` and `http://localhost:3000` is enabled by default in the `dev` profile (see `CORS_ALLOWED_ORIGINS` in `backend/.env.example`). The API base URL comes from `VITE_API_BASE_URL` in `frontend/.env`, which is not committed.
+Open `http://localhost:5173`. The API base URL defaults to `http://localhost:8080/api/v1`. Override it with `VITE_API_BASE_URL` in `frontend/.env` (see `frontend/.env.example`). More detail is in the [frontend guide](frontend/README.md).
 
-### Seeded data
+### Seeded data in `sportify`
 
-Migrations seed the four roles, sports, membership plans, sport packages, card tiers and one manager account (`manager@sportify.com`, created in `V4__seed_manager_account.sql`). Change that account password before using the system outside local development.
+Normal migrations seed only reference data: roles, sports, facilities, membership plans, sport packages, card tiers and one manager account (`manager@sportify.com`, from `V4__seed_manager_account.sql`). Change that password before any shared use. Create other staff accounts from the Manager users screen.
 
-## Shared coach and receptionist demo data
+## Demo and Test Databases
 
-To give every team member the same six coaches (one per sport, with photos on the Home page) and two
-receptionists on their own local database, run the two scripts in [`scripts/demo-data`](scripts/demo-data/README.md)
-once in SSMS after starting the backend. They are manual scripts, not migrations, so `dev` and `prod` startup never
-adds these accounts on their own. Password: `SportifyDemo2026!`.
+Demo seeds and test fixtures are for **disposable databases only**. Never run them against the shared `sportify` database, and never point a demo profile at a database holding real data.
 
-## Demo Accounts
+| Option | What it does | Where to read more |
+|---|---|---|
+| `dev,demo` profiles | Adds `db/demo` migrations (V28 accounts, V29 classes and sessions, V41 coach photos) to a **fresh, isolated** database. A guard rejects `prod` and `demo` together, but it cannot detect that a connection points at shared data | [BE-07 test cases](docs/tests/BE-07_test_cases.md), [BE-15 test cases](docs/tests/BE-15_test_cases.md) |
+| `unified-demo` profile | Canonical demo contract validated by a safety guard before Flyway runs | [db-unify](docs/db-unify/README.md) |
+| `qr-demo` profile | Non-payable simulated QR payment demo, opt-in only | [QR local demo](docs/qr-local-demo.md) |
+| `scripts/demo-data` | Manual SQL that adds shared demo coaches and receptionists | [demo data README](scripts/demo-data/README.md) |
+| Integration tests | Run in Testcontainers or a separate test database, never `sportify` | [Testing](#testing) |
 
-These seven accounts are for isolated local demonstrations only. Never enable the `demo` profile against a production or shared database. The profile guard rejects simultaneous `prod` and `demo` activation before Flyway initializes; it cannot determine whether a connection points to a production database.
+Demo account passwords are documented only in the linked test case files and apply only to those disposable databases.
 
-Common demo password: `SportifyDemo2026!`
+## Documentation
 
-| Display name | Email | Role | Demo password | Scenario |
-|---|---|---|---|---|
-| Nguyen Thi Lan | lan.reception@example.com | RECEPTIONIST | SportifyDemo2026! | Front desk |
-| Tran Minh Quan | quan.coach@example.com | COACH | SportifyDemo2026! | BADMINTON primary sport |
-| Le Hoang Nam | nam.coach@example.com | COACH | SportifyDemo2026! | SWIMMING primary sport |
-| Pham Thu Ha | ha.coach@example.com | COACH | SportifyDemo2026! | BASKETBALL primary sport |
-| Nguyen Van An | an.gold@example.com | MEMBER | SportifyDemo2026! | GOLD physical card, 5% multi-day package discount |
-| Tran Thi Mai | mai.standard@example.com | MEMBER | SportifyDemo2026! | STANDARD physical card, free and permanent, 0% discount |
-| Le Quoc Bao | bao.nocard@example.com | MEMBER | SportifyDemo2026! | Member profile with no physical card, 0% discount |
+- **Database:** [design index](docs/database/README.md), [schema reference](docs/database/schema/README.md), [business rules and state machines](docs/database/09-business-rules-and-state-machines.md)
+- **API contracts:** [session identity](docs/api/session-identity.md), [attendance session date](docs/api/attendance-session-date.md), [attendance backfill](docs/api/attendance-administrative-backfill.md), [front desk](docs/api/BE-05-front-desk.md), [facility lookup](docs/api/BE-10-facility-lookup.md)
+- **Training and support:** [plans](docs/training/class-plans.md), [progress](docs/training/progress.md), [Manager attendance overview](docs/training/manager-attendance-overview.md), [class notices](docs/training/class-notices.md), [check-in pass](docs/training/member-check-in-pass.md), [notifications](docs/training/operational-notifications.md), [Reception support](docs/training/reception-support.md), [member assistant](docs/training/member-assistant-ai.md), [AI drill suggestions](docs/training/ai-drill-suggestions.md)
+- **Payments:** [VietQR transfer instructions](docs/payment/VietQR-transfer-instructions.md), [operations report](docs/payment/Operations-report.md), [QR local demo](docs/qr-local-demo.md)
+- **Architecture and CI:** [project structure](docs/architecture/project_structure.md), [CI routing](docs/CI-OPT-01.md), [CI/CD](docs/ci-cd.md)
+- [Changelog](CHANGELOG.md), [TODO](TODO.md), [frontend guide](frontend/README.md)
 
-To enable the seed, create a fresh isolated SQL Server demonstration database and point the backend's existing database environment settings to it. In PowerShell, from `backend/`:
+**Historical evidence (not current status):** [Release 1.1 traceability](docs/release-1.1/REQUIREMENT_TRACEABILITY.md), [Release 1.1 desktop demo](docs/release-1.1/DESKTOP_DEMO.md), [Flow 5-6 release handoff](docs/flow5-6-release/HANDOFF.md), and the per-task `docs/tests/BE-xx_test_cases.md` files. They record the state at the time they were written.
 
-```powershell
-$env:SPRING_PROFILES_ACTIVE = 'dev,demo'
-mvn spring-boot:run
+## Backend Structure
+
+Code is grouped by business module. Each module uses `controller`, `dto`, `entity`, `mapper`, `repository`, `service` and `service/impl`.
+
+```text
+backend/src/main/java/com/sportify/
+  core/       audit, common, config, exception, validation
+  identity/   accounts, profiles, roles, JWT security, refresh tokens
+  catalog/    sports, packages, cards, classes, sessions, booking, training, support, assistant
+  payment/    payments, invoices, refunds, QR, finance and operations reports
+backend/src/main/resources/db/
+  migration/identity/   identity schema versions
+  migration/catalog/    all other schema versions
+  demo/                 demo-only seeds, loaded only by the demo profile
 ```
 
-The explicit `demo` profile adds `classpath:db/demo` after the ordinary identity/catalog locations. `V28__seed_demo_accounts.sql` creates the accounts and profiles. Ordinary startup, including `dev` and `prod`, does not discover this migration. Keep demonstration databases on the demo configuration and never repurpose them as production databases. Removing a previously used migration location can fail Flyway validation. Use a fresh demo database when enabling the seed after newer shared migrations: `out-of-order=false` is preserved, and V28 cannot be retroactively inserted into a later migration history. Existing applied migrations and the production profile configuration are unchanged.
-
-The GOLD term is fixed at **2026-10-01 through 2027-09-30**, inclusive. After that window it no longer grants benefits even if its stored status remains ACTIVE. STANDARD starts on 2026-10-01 and has no end date. Before these start dates, neither card grants benefits. The two cards are imported demo entitlement snapshots (`DEMO-CARD-GOLD`, `DEMO-CARD-STANDARD`) with prices 300000 VND and 0 VND, respectively, and nullable `payment_id`; they are not sales and have no payment, receipt, or invoice. Purchase/confirmation behavior is unchanged. Single-visit packages never receive card discounts.
-
-Member codes use the existing `seq_member_code` and `MEM-%04d` convention (MEM-0001, MEM-0002, MEM-0003 on a completely fresh database); existing profiles keep their codes. Card codes use a separate namespace and do not consume or reset `seq_card_code`. SQL replay inserts only missing records and rejects conflicting demo identities, disabled accounts, primary sports, tier terms or card scenarios. It preserves existing hashes, personal/profile fields, certifications, payments and unrelated cards. If a demo account's password was previously changed, the existing password remains in effect. Flyway applies V28 once; independent SQL replay joins a caller transaction or opens its own transaction and is covered by the CI integration suite. SQL Server sequence allocations are not rolled back, so failed attempts can leave harmless code gaps.
-
-See [BE-07 test cases](docs/tests/BE-07_test_cases.md) for verification and lifecycle limits.
-
-## Demo Classes and Sessions (BE-15)
-
-The same explicit `dev,demo` opt-in also applies
-`db/demo/V29__seed_demo_classes_and_sessions.sql`, after BE-07 V28. Use a fresh
-isolated demonstration database with all migrations in order. Ordinary `dev`
-and `prod` startup excludes both demo migrations. Never point the demo profile at
-a production/shared database; the existing prod/demo guard remains enabled.
-
-V29 creates six adult classes across three sports, three levels and all three
-BE-07 demo coaches. Each class has four weekly coach-led sessions (90 minutes)
-and four weekly self-training sessions (60 minutes, null session coach):
-
-| Class identity | Class name | Sport/level | Class and coach-led coach | Facility | First day offset | Coach-led / self-training times |
-| --- | --- | --- | --- | --- | --- | --- |
-| DEMO-CL-BAD-BEG | Badminton Foundations - Small Group | BADMINTON / BEGINNER | quan.coach@example.com | DEMO-BADMINTON | 2 | 09:00-10:30 / 11:00-12:00 |
-| DEMO-CL-BAD-INT | Badminton Rally and Footwork | BADMINTON / INTERMEDIATE | quan.coach@example.com | DEMO-BADMINTON | 4 | 18:00-19:30 / 20:00-21:00 |
-| DEMO-CL-SWIM-BEG | Swimming Water Confidence | SWIMMING / BEGINNER | nam.coach@example.com | INDOOR_POOL | 3 | 07:00-08:30 / 10:00-11:00 |
-| DEMO-CL-SWIM-ADV | Swimming Endurance and Technique | SWIMMING / ADVANCED | nam.coach@example.com | INDOOR_POOL | 6 | 09:00-10:30 / 11:00-12:00 |
-| DEMO-CL-BB-INT | Basketball Passing and Team Play | BASKETBALL / INTERMEDIATE | ha.coach@example.com | BB_COURT_A | 1 | 17:00-18:30 / 19:00-20:00 |
-| DEMO-CL-BB-ADV | Basketball Advanced Game Skills | BASKETBALL / ADVANCED | ha.coach@example.com | BB_COURT_B | 7 | 09:00-10:30 / 11:00-12:00 |
-
-There are **48 PUBLISHED sessions: 24 coach-led and 24 self-training**, spread over
-days 1-28 from the SQL Server date at first application. Each listed offset repeats
-at +7, +14 and +21 days. The seed reuses the three existing pool/basketball facilities
-and creates one sport-specific `DEMO-BADMINTON` court. BE-10 has no additional
-operating-hour or coach-availability calendar; this plan uses 07:00-21:00 slots and
-checks strict overlaps against DRAFT/PUBLISHED sessions. Conflicts fail the entire
-seed with a BE-15 error; dates are never silently shifted.
-
-The first coach-led `DEMO-CL-BAD-BEG` session is full (capacity 3, three confirmed
-bookings, zero free seats). The first coach-led `DEMO-CL-BAD-INT` session is nearly
-full (capacity 3, two confirmed bookings, one free seat). The other 46 sessions
-initially have no bookings. An, Mai and Bao occupy the full session; An and Mai
-occupy the nearly full session, so Bao can demonstrate booking its last seat.
-
-Two clearly named, demo-only complimentary packages (`DEMO-PKG-BAD-COACH` and
-`DEMO-PKG-BAD-SELF`) provide eight credits over 30 inclusive days. Four ACTIVE
-RECEPTION registrations are created by the BE-07 receptionist: coached packages
-for all three members and a self-training package for Bao. Initial coached
-balances are An 6, Mai 6 and Bao 7; Bao's self-training balance is 8. This follows
-the existing supported free staff-registration path: all prices are zero and
-there are no fake payments, invoices, receipts or payment audit records. Existing
-paid catalog packages, demo membership cards and account credentials are preserved.
-
-Flyway applies V29 once. Restarting the app does **not move** dates forward or
-recreate the full badges after teacher interactions. Logical SQL replay preserves
-the original anchor and consistent existing bookings/credits. It repairs only
-unambiguous missing fixtures and rejects conflicting metadata, unexplained credit
-or counter changes, and missing past/today sessions. Regenerating a future window
-requires a **fresh isolated demonstration database**; do not delete migration
-history, enable out-of-order migration or replay the SQL as a recurring startup job.
-
-Start from `backend/` using the BE-07 environment setup above:
-
-```powershell
-$env:SPRING_PROFILES_ACTIVE = 'dev,demo'
-mvn spring-boot:run
-```
-
-Sign in using an existing BE-07 demo member/receptionist account. In the frontend,
-open Find Classes (`/member/classes`), filter by sport, level, format, coach and date, and inspect
-the two small-group badminton sessions. For direct API verification with an access
-token already stored in a task-specific environment variable:
-
-```powershell
-$demoHeaders = @{ Authorization = "Bearer $env:DEMO_ACCESS_TOKEN" }
-$demoSessions = Invoke-RestMethod 'http://localhost:8080/api/v1/sessions?size=100' -Headers $demoHeaders
-$demoSessions.content | Select-Object className, sessionDate, trainingFormat, coachName, capacity, bookedCount, freeSeats, full
-```
-
-`GET /api/v1/sessions` requires MEMBER, RECEPTIONIST or MANAGER, not COACH. Standard
-BE-11 filters and zero-based pagination are unchanged. Read-only SQL inspection and
-the complete test/CI plan are in [BE-15 test cases](docs/tests/BE-15_test_cases.md).
-The original V28-only account replay suite remains targeted to V28; the new full-demo
-suite validates V28 + V29 together, including all seven account logins. SQL Server
-integration execution is required in GitHub CI and is not claimed from local compilation.
-
-## Manager Activity Log (BE-04)
-
-`GET /api/v1/manager/activity-logs` is a read-only MANAGER endpoint. Optional
-`actorId`, `action`, `from`, `to` and `search` filters combine with AND before
-zero-based database pagination (`page=0`, `size=20`, maximum 100). Results sort
-by `createdAt DESC, id DESC` and use the existing PageResponse shape.
-
-Dates accept `YYYY-MM-DD` or local `YYYY-MM-DDTHH:mm:ss` without an offset;
-calendar end dates include the complete final day. Actor names and roles reflect
-current accounts. Responses contain a safe action-derived short detail; free-form
-summary/JSON metadata are neither returned nor searchable. The audit table,
-AuditService and existing writers are unchanged. See the full contract, clock
-limitations, examples and CI test plan in [BE-04 test cases](docs/tests/BE-04_test_cases.md).
-
-## Coach Teaching Schedule and Roster (BE-14)
-
-`GET /api/v1/coach/sessions?from=YYYY-MM-DD&to=YYYY-MM-DD` is available to
-COACH and MANAGER. Both inclusive dates are required, with a 62-day maximum;
-the complete array retains past/all statuses and sorts by date/start/id.
-Coaches see their own assignments. Managers can filter by `coachId`, or omit it
-to view all coach-assigned sessions. Counts use actual CONFIRMED bookings.
-
-`GET /api/v1/coach/sessions/{id}/roster` returns only CONFIRMED bookings with
-member code/name/phone, the selected package registration and booking time.
-Coaches require session ownership; managers may also read coachless rosters.
-No scheduling, credit or profile state changes on either read. See the complete
-[BE-14 contract and test cases](docs/tests/BE-14_test_cases.md) for privacy,
-nullable fields, validation and pending SQL Server CI requirements.
+Version numbers are shared across both migration folders and have gaps. List the folders to see the current inventory instead of relying on a fixed range.
 
 ## API Overview
 
-All paths start with `/api/v1`. Send the access token as `Authorization: Bearer <token>`. Access tokens last 15 minutes and refresh tokens last 7 days.
+All paths start with `/api/v1`. Send the access token as `Authorization: Bearer <token>`. Every endpoint checks roles on the server. This is a map, not a full contract; follow the links for details.
 
-**Public (no token)**
-
-| Method | Path | Purpose |
+| Area | Main paths | Roles |
 |---|---|---|
-| POST | `/auth/register`, `/auth/login`, `/auth/refresh` | Sign up, log in, refresh the token |
-| GET | `/sports`, `/plans`, `/plans/{id}`, `/packages`, `/packages/sport/{sportId}`, `/membership-cards/tiers` | Browse the catalog |
-
-**Authenticated**
-
-| Area | Endpoints | Roles |
-|---|---|---|
-| Users | `GET /users/me` | Any logged-in user |
-| Members | `GET /members` (search) | MANAGER, RECEPTIONIST |
-| Sport packages | `POST /packages` | MANAGER |
-| | `POST /packages/registrations` | MEMBER, RECEPTIONIST, MANAGER |
-| | `GET /packages/registrations/my` | MEMBER |
-| | `GET /packages/registrations/member/{memberId}` | RECEPTIONIST, MANAGER |
-| | `PUT /packages/registrations/{id}/activate` | RECEPTIONIST, MANAGER |
-| Membership cards | `POST /membership-cards/purchase` | MEMBER, RECEPTIONIST, MANAGER |
-| | `PUT /membership-cards/{id}/activate` | RECEPTIONIST, MANAGER |
-| | `PUT /membership-cards/{id}/cancel` | MEMBER, RECEPTIONIST, MANAGER |
-| | `GET /membership-cards/my` | MEMBER |
-| | `GET /membership-cards/member/{memberId}` | RECEPTIONIST, MANAGER |
-| Bookings | `POST /bookings`, `DELETE /bookings/{id}` | MEMBER, RECEPTIONIST, MANAGER |
-| | `GET /bookings/my` | MEMBER |
-| | `GET /bookings/member/{memberId}`, `GET /bookings/today/{memberId}` | RECEPTIONIST, MANAGER |
-| | `POST /bookings/self-training/attendance` | RECEPTIONIST, MANAGER |
-| Check-in | `POST /check-ins`, `GET /check-ins` | RECEPTIONIST, MANAGER |
-| Refunds | `POST /refunds` | MEMBER, RECEPTIONIST, MANAGER |
-| | `GET /refunds/my` | MEMBER |
-| | `GET /refunds/member/{memberId}` | RECEPTIONIST, MANAGER |
-| | `GET /refunds/pending`, `PUT /refunds/{id}/review` | MANAGER |
-| | `PUT /refunds/{id}/complete` | RECEPTIONIST, MANAGER |
-| Manager plans | `GET`, `POST`, `PUT /{id}`, `PATCH /{id}/status` under `/manager/plans` | MANAGER |
-| Manager users | `GET /manager/users` (filter by role and status, search, page), `POST /manager/users` (staff account), `PATCH /manager/users/{id}/status` | MANAGER |
-| Legacy memberships | `POST /memberships`, `GET /memberships/me` | MEMBER |
-| | `POST /memberships/{id}/cancel` | MEMBER, RECEPTIONIST, MANAGER |
-| | `POST /memberships/register-for-member` | RECEPTIONIST, MANAGER |
-| Dev only | `POST /dev/memberships/{id}/activate` | MANAGER (profile `dev` only) |
-
-Business rules behind these endpoints (card renewal and upgrade, end-date calculation, state machines) are described in `docs/database/09-business-rules-and-state-machines.md`.
+| Auth | `POST /auth/register`, `/auth/login`, `/auth/refresh` (single-use refresh token) | Public |
+| Catalog | `GET /sports`, `/packages`, `/membership-cards/tiers`, `/facilities/public`, `/coaches/public` | Public |
+| Profile | `GET/PUT /users/me`, `PUT /users/me/password` | Any signed-in user |
+| Cards and packages | `/membership-cards/...`, `/packages/registrations/...` | MEMBER, RECEPTIONIST, MANAGER |
+| Sessions | `GET /sessions`, `/sessions/{id}`, `/sessions/by-code/{sessionId}`, `/sessions/{id}/eligibility` | MEMBER, RECEPTIONIST, MANAGER |
+| Session admin and rescheduling | `/manager/classes/...`, `/manager/sessions/...` including `PUT /manager/sessions/by-code/{sessionId}` | MANAGER |
+| Bookings | `POST /bookings`, `DELETE /bookings/{id}`, `GET /bookings/my` (My Schedule), `/bookings/member/{memberId}` | MEMBER, RECEPTIONIST, MANAGER |
+| Coach schedule | `GET /coach/sessions`, `/coach/sessions/{id}/roster` | COACH, MANAGER |
+| Attendance | `POST /coach/training/attendance`, `PUT /coach/training/attendance/{id}`, same under `/reception/training/attendance`, Manager overview at `/manager/training/attendance/...` | COACH, RECEPTIONIST, MANAGER |
+| Training and progress | `/member/training/...`, `/coach/training/...` (plans, results, feedback, progress, notices, questions) | MEMBER, COACH |
+| Recommendations | `/member/training/recommendations`, `/member/training/sport-levels`, `/member/training/saved-recommendations` | MEMBER |
+| Assistant | `POST /member/training/consultation` | MEMBER |
+| Support | `/member/support-requests/...`, `/reception/support-requests/...` | MEMBER, RECEPTIONIST |
+| Payments | `/payments/{id}`, `/payments/my`, `/payments/{id}/confirm`, `/payments/{id}/vietqr-instructions`, `/invoices/...`, `/refunds/...` | Role-scoped |
+| Reports | `/manager/finance/...`, `/manager/reports/operations`, `/manager/activity-logs` | MANAGER |
+| Notifications | `GET /member/notifications`, `PUT /member/notifications/{id}/read` | MEMBER |
+| Legacy (deprecated) | `/memberships/...` plan-based membership | Kept for compatibility |
 
 ## Testing
 
 ```bash
 cd backend
-mvn clean verify
+mvn clean verify          # unit tests plus SQL Server integration tests (needs Docker for Testcontainers)
+mvn clean verify -DskipITs  # unit and web-layer tests only
+
+cd frontend
+npm test                  # Vitest
+npm run lint
+npm run build
 ```
 
-- Unit and web-layer tests run without any external service.
-- Integration tests require Docker and an isolated Testcontainers MSSQL container. Without Docker, use `mvn clean verify -DskipITs` for non-integration tests. CI requires real SQL integration evidence and does not accept skipped mandatory suites.
-- The JaCoCo coverage report is written to `backend/target/site/jacoco/index.html`.
-- `backend/scripts/step2-smoke-test.ps1` is a PowerShell smoke test for a running local instance. Run `backend/scripts/dev/create-orphan-member.sql` first (local development only) so the orphan-member scenario can log in.
-
-CI (`.github/workflows/ci.yml`) uses a conservative PR change-impact policy and an always-present aggregate gate. Relevant backend changes require all non-Docker unit and real SQL integration tests with JDK 25; relevant frontend changes require all frontend tests, lint, typecheck/build and security checks. Main/manual/release/weekly runs are full. Security and Compose are required reusable children when applicable. Test reports are artifacts. See `docs/CI-OPT-01.md` for exact routing, failure handling and required-status enforcement.
+- Integration tests use an isolated Testcontainers SQL Server, never `sportify`.
+- Coverage report: `backend/target/site/jacoco/index.html`.
+- CI routes each PR by changed paths and always reports the `CI gate` check. Documentation-only changes run the lightweight checks. See [CI routing](docs/CI-OPT-01.md).
 
 ## Development Guidelines
 
-- **One folder per concern:** `mvn` and `docker compose` run only in `backend/`, `npm` runs only in `frontend/`. Do not put Java code in `frontend/` or Node files in `backend/`.
-- **MapStruct:** use MapStruct for all DTO and entity mapping. No manual mapping in services or controllers.
-- **Service layer:** strict separation of interface and implementation (for example `UserService` and `UserServiceImpl`).
-- **Test mirroring:** every test class must sit in the same package as the class it tests.
-- **Migrations:** never edit a migration that has been merged. Add a new `V<next>__description.sql` in `backend/src/main/resources/db/migration/`. Hibernate only validates the schema, it never changes it.
-- **Data rules:** no physical delete for business data, use a `status` column. Enums are stored as strings. Money is `DECIMAL(14,2)` in VND (`BigDecimal`).
-- **Frontend files:** commit `package-lock.json`, never commit `node_modules/` or `dist/`.
-- **Language and style:** code, comments, commit messages and documentation are 100% English. Use `-` instead of an em dash, no emoji, and no special symbols (write `->` instead of an arrow symbol).
-- **Branches and commits:** one branch per task (`feat/...`, `fix/...`, `chore/...`). Use Conventional Commits with `feat`, `fix`, `chore`, `build`, `docs` and `test` prefixes. Each task group has its own commit.
-- **Pull requests:** every change to `main` goes through a pull request that is reviewed by the code owner (@senko-do-thingz) before merging. Update `CHANGELOG.md` in the same PR.
+- `mvn` and `docker compose` run in `backend/`, `npm` runs in `frontend/`.
+- Use MapStruct for DTO mapping and keep service interfaces separate from implementations.
+- Test classes mirror the package of the class they test.
+- **Migrations:** never edit a merged migration. Add a new `V<next>__description.sql`. Hibernate only validates the schema.
+- **Data rules:** no physical delete for business data, enums stored as strings, money is `DECIMAL(14,2)` VND.
+- Commit `package-lock.json`, never `node_modules/` or `dist/`.
+- Code, comments, commits and docs are in English. Use `-` and `->`, no emoji or decorative symbols.
+- One branch per task, Conventional Commits, and every change to `main` goes through a PR reviewed by the code owner (@senko-do-thingz). Update `CHANGELOG.md` in the same PR.
+- AI Audit Log documents are private local files and stay out of Git (see `.gitignore`).
 
 ## Known Gaps
 
-Tracked in [CHANGELOG.md](CHANGELOG.md) and [TODO.md](TODO.md):
-
-- Training/progress, AI/support, notifications and waitlist workflows remain planned.
-- Coach roster reads are implemented; coach attendance mutation remains planned.
-- External payment processor callbacks remain planned; current payment confirmation is staff-driven.
-- The legacy membership service still computes `end = start + duration` (deprecated flow).
-- Cash-flow backend endpoints exist, but the finance frontend still uses the legacy reporting contract.
-- Uncommitted Home/Theme work requires owner review and exact-source CI before publication.
+- Waitlist is not implemented (the table exists from an early migration, no API or screen).
+- Roles are fixed; there is no dynamic role or permission management.
+- Desktop only; no mobile app or mobile-specific layout work.
+- No external payment gateway callbacks; payments are confirmed by staff. The QR flow is a non-payable simulation.
+- Notifications are in-app only; no e-mail, SMS or push delivery.
+- AI features are off by default and need an operator-provided key; provider and model choices need CODEOWNER approval.
+- Cash-flow endpoints (`/manager/finance/cash-flow/...`) exist, but no frontend screen uses them yet.
+- The deprecated plan-based membership flow (`/memberships`) still computes `end = start + duration`.
 
 ## Team
 
 - **Author:** Senko ([@senko-do-thingz](https://github.com/senko-do-thingz))
 - **Contributors:** see the [contributors graph](https://github.com/senko-do-thingz/G3-SportCentreManagement/graphs/contributors)
-
-## Local-only AI Audit Log documents
-
-AI Audit Log documents are private local working files. Keep `docs/AI_Audit_Log.docx`, `docs/AI_Audit_Log.md`, and `docs/audit/*_AI_Audit_Log.docx` / `docs/audit/*_AI_Audit_Log.md` out of the Git index. Their precise .gitignore rules preserve unrelated business audit documentation, Java sources, tests and database migrations. Do not use force-add for these documents. When removing existing tracking, verify local existence and checksums, then use `git rm --cached -- "exact/path"`; preserve the working-tree copy. Inspect staged paths/status only and exclude confidential deletion bodies from exported implementation patches and reports. Historical Git revisions are outside this policy's approved cleanup scope.
-
-BE-06 reuses the existing midnight Vietnam maintenance trigger for four guarded bulk lifecycle updates. See [scheduled-job rules](docs/database/09-business-rules-and-state-machines.md#scheduled-jobs) and [BE-06 verification](docs/tests/BE-06_test_cases.md). Round 2 applies the owner-approved activation safeguard: payment first, then locked item refresh before status validation. SQL Server verification remains required in CI.

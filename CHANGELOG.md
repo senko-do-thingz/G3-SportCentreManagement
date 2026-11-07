@@ -1,3 +1,11 @@
+## 2026-11-07 - Root README aligned with current main
+
+- Replace the Release 1.1 candidate header with a main-branch project overview and per-flow status, including My Schedule and the Registration Successful screen.
+- Correct Known Gaps and module status: Coach and Reception attendance writes, the KNOWLEDGE_BASED member assistant, Reception support and optional off-by-default AI are all on main.
+- Simplify onboarding to one `sportify` database, separate disposable demo and test databases, and warn to back up before Flyway upgrades.
+- Replace fixed migration ranges and the long endpoint list with a module map and links to focused docs. Label Release 1.1 and Flow 5-6 documents as historical evidence.
+- Documentation only. No code, migration or behavior change.
+
 ## 2026-11-05 - Flow 1-4 Release 1.1 candidate
 
 - Integrate main c9c50da94423f8540de328855f9a7efd0878b1f1 without conflict, preserving the Reception payment workspace fix from PR #212. Fresh frontend and four-role desktop verification is recorded in round-002; prior results retain their original SHAs.
