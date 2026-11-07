@@ -21,13 +21,14 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Drafts Coach drill suggestions with the Google Gemini API (Flow 5), as an alternative to Claude.
- * Active when app.training.ai-drills.enabled=true and app.training.ai-drills.provider=gemini; the key comes from
- * GEMINI_API_KEY and is sent in the x-goog-api-key header, never in the URL. It uses the same prompt, output shape
- * and validation as Claude ({@link AiDrillPolicy}); the response is constrained with a JSON response schema.
+ * Drafts Coach drill suggestions with the Google Gemini API (Flow 5), the CODEOWNER-approved and only AI provider.
+ * Active only when app.training.ai-drills.enabled=true and app.training.ai-drills.provider=gemini; any other provider
+ * value activates no generator, so the rule catalog is used. The key comes from GEMINI_API_KEY and is sent in the
+ * x-goog-api-key header, never in the URL. Prompt, output shape and validation live in {@link AiDrillPolicy}; the
+ * response is constrained with a JSON response schema. Every failure falls back to the rule catalog.
  */
 @Service
-@ConditionalOnExpression("${app.training.ai-drills.enabled:false} and '${app.training.ai-drills.provider:claude}'.equalsIgnoreCase('gemini')")
+@ConditionalOnExpression("${app.training.ai-drills.enabled:false} and '${app.training.ai-drills.provider:gemini}'.equalsIgnoreCase('gemini')")
 class GeminiDrillGenerator implements DrillGenerator {
     static final String DEFAULT_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/";
     private static final Pattern MODEL = Pattern.compile("[a-z0-9][a-z0-9.\\-]{0,63}");
@@ -61,7 +62,7 @@ class GeminiDrillGenerator implements DrillGenerator {
     private final ObjectMapper json;
 
     @Autowired
-    GeminiDrillGenerator(@Value("${app.training.ai-drills.gemini-model:gemini-flash-lite-latest}") String model,
+    GeminiDrillGenerator(@Value("${app.training.ai-drills.gemini-model:gemini-3.5-flash-lite}") String model,
                          @Value("${app.training.ai-drills.timeout-seconds:30}") long timeoutSeconds,
                          @Value("${GEMINI_API_KEY:}") String apiKey,
                          ObjectMapper json) {
@@ -80,7 +81,7 @@ class GeminiDrillGenerator implements DrillGenerator {
         this.json = json;
     }
 
-    private static Transport httpTransport(long timeoutSeconds) {
+    static Transport httpTransport(long timeoutSeconds) {
         HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(Math.min(10, timeoutSeconds))).build();
         return (uri, key, body, timeout) -> client.send(HttpRequest.newBuilder(uri).timeout(timeout)
                 .header("Content-Type", "application/json")

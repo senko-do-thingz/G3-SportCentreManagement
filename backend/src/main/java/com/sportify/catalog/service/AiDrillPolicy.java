@@ -16,7 +16,8 @@ import java.util.regex.Pattern;
 
 /**
  * Provider-independent part of Flow 5 AI drill drafting: one prompt, one output shape and one validation policy,
- * shared by every {@link DrillGenerator} provider so Claude and Gemini drafts obey exactly the same limits.
+ * used by the CODEOWNER-approved Gemini provider ({@link GeminiDrillGenerator}); any future provider must use the
+ * same {@link #safeContext} boundary and {@link #toDrafts} acceptance gate.
  */
 final class AiDrillPolicy {
     private AiDrillPolicy() {}

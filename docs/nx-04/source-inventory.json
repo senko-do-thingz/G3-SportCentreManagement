@@ -384,9 +384,19 @@
       ],
       "drops": [],
       "sha256_lf": "cc12e8207da90854df0cc9f0cc3fafc4637b796e2b02f5aa850158d5bc7e1edf"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V48__member_sport_level_and_saved_recommendation.sql",
+      "version": 48,
+      "creates": [
+        "member_sport_level",
+        "saved_recommendation"
+      ],
+      "drops": [],
+      "sha256_lf": "aab2855d0af60805a8f0a75b056e26782888eca8819193074da5b1a19a854562"
     }
   ],
-  "create_occurrences": 71,
+  "create_occurrences": 73,
   "create_names": [
     "[activity_log]",
     "[age_group]",
@@ -453,9 +463,11 @@
     "dbo.simulated_qr_session",
     "dbo.simulated_qr_transition",
     "member_check_in_pass",
+    "member_sport_level",
     "permission",
     "role",
     "role_permission",
+    "saved_recommendation",
     "session_code_counter",
     "session_code_history",
     "user_account"
@@ -803,7 +815,7 @@
     {
       "id": "S28",
       "path": "backend/pom.xml",
-      "line": 197,
+      "line": 199,
       "definition": "maven-surefire-plugin"
     },
     {
