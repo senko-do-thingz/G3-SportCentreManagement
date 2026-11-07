@@ -8,7 +8,7 @@ The system manages accounts and fixed roles, sport packages, membership cards, c
 
 ## Project Status
 
-This README describes the `main` branch. Everything listed under "Implemented" is merged into `main`. Open pull requests are not part of `main` until a CODEOWNER merges them.
+This README describes the `main` branch. Everything listed under "Implemented" is merged into `main`. Work in open pull requests, including any Flow 5-6 follow-ups, is not part of `main` until a CODEOWNER merges it. Check the GitHub pull request list for work in progress.
 
 | Area | Status on `main` |
 |---|---|
@@ -18,7 +18,7 @@ This README describes the `main` branch. Everything listed under "Implemented" i
 | Flow 4 - Training and progress | Implemented. Personal and class plans, Coach and Reception attendance recording and correction, results, feedback, member progress, Manager attendance overview, class notices and questions |
 | Flow 5 - Recommendations and drills | Implemented. Member class recommendations, sport levels and saved recommendations. Coach drill suggestions from a rule-based catalog, with optional Gemini drafts (off by default) |
 | Flow 6 - Assistant and support | Implemented. Member center assistant that answers only from center data (KNOWLEDGE_BASED keyword rules by default; an optional AI step, off by default, only classifies the question). Member support requests and Reception support intake and replies |
-| Notifications | Implemented in-app operational notifications. No e-mail, SMS or push delivery |
+| Notifications | Backend member inbox API (schedule change notices and expiry reminders). No member notification screen yet, and no e-mail, SMS or push delivery |
 | Deferred | Waitlist, dynamic roles, mobile app, external payment gateway callbacks. See [Known Gaps](#known-gaps) |
 
 Roles are fixed: MEMBER, COACH, RECEPTIONIST, MANAGER.
@@ -63,11 +63,7 @@ The normal setup uses **one** operational database named `sportify`.
 - Node.js `^22.13.0 || ^24.0.0 || >=26.0.0` and npm (see `frontend/package.json`)
 - SQL Server 2022 reachable on port 1433 (local install, or Docker as an alternative)
 
-### 1. Create the database
-
-Create an empty database once: `CREATE DATABASE sportify;`. With a local SQL Server, enable SQL Server authentication, enable TCP/IP on port 1433 and restart the service. As an alternative, `cd backend` then `docker compose up -d` starts SQL Server 2022 and creates `sportify`.
-
-### 2. Configure the backend
+### 1. Configure the backend
 
 Copy `backend/.env.example` to `backend/.env` and fill it in. `.env` is git-ignored and must never be committed. The backend reads it from its working directory, so always start it from `backend/`.
 
@@ -77,6 +73,10 @@ Copy `backend/.env.example` to `backend/.env` and fill it in. `.env` is git-igno
 | `DB_USERNAME`, `DB_PASSWORD` | SQL Server login |
 | `JWT_SECRET` | Base64 signing key, for example from `openssl rand -base64 32` |
 | `CORS_ALLOWED_ORIGINS` | Optional in `dev` (defaults to `http://localhost:5173,http://localhost:3000`), required in `prod` |
+
+### 2. Prepare local SQL Server
+
+Create the database once: `CREATE DATABASE sportify;`. Enable SQL Server authentication, enable TCP/IP on port 1433 and restart the service. Use the same login in `backend/.env`. As an alternative to a local install, `cd backend` then `docker compose up -d` starts SQL Server 2022 and creates `sportify`.
 
 ### 3. Run the backend
 
@@ -183,7 +183,7 @@ npm run lint
 npm run build
 ```
 
-- Integration tests use an isolated Testcontainers SQL Server, never `sportify`.
+- Integration tests never use `sportify`. They run in a Testcontainers SQL Server, or, when `UNIFY_TEST_SQL_PORT` is set, in a new uniquely named throwaway database that the test fixture creates on that local server.
 - Coverage report: `backend/target/site/jacoco/index.html`.
 - CI routes each PR by changed paths and always reports the `CI gate` check. Documentation-only changes run the lightweight checks. See [CI routing](docs/CI-OPT-01.md).
 
@@ -205,7 +205,7 @@ npm run build
 - Roles are fixed; there is no dynamic role or permission management.
 - Desktop only; no mobile app or mobile-specific layout work.
 - No external payment gateway callbacks; payments are confirmed by staff. The QR flow is a non-payable simulation.
-- Notifications are in-app only; no e-mail, SMS or push delivery.
+- Member notifications exist only as a backend API; there is no member notification screen, and no e-mail, SMS or push delivery.
 - AI features are off by default and need an operator-provided key; provider and model choices need CODEOWNER approval.
 - Cash-flow endpoints (`/manager/finance/cash-flow/...`) exist, but no frontend screen uses them yet.
 - The deprecated plan-based membership flow (`/memberships`) still computes `end = start + duration`.
