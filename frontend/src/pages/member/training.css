@@ -25,3 +25,6 @@
 .training-actions { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); }
 .training-actions .field { flex: 1 1 240px; }
 .training-textarea { resize: vertical; min-height: 96px; }
+/* Flow 6: support request excerpts and reception counts. */
+.training-excerpt { white-space: pre-wrap; overflow-wrap: anywhere; margin: var(--space-2) 0; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md, 8px); background: var(--color-surface-muted, transparent); font: inherit; }
+.support-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4); }

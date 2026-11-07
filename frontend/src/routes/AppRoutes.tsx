@@ -65,6 +65,7 @@ import {
   TrainingResultDetailPage,
 } from '../pages/member/TrainingPages'
 import { MemberAssistantPage } from '../pages/member/MemberAssistantPage'
+import { MemberSupportPage } from '../pages/member/MemberSupportPage'
 import { ClassRecommendationsPage } from '../pages/member/ClassRecommendationsPage'
 import { CoachTrainingPlansPage, CoachTrainingResultsPage } from '../pages/training/CoachTrainingPages'
 import { ClassQuestionsPage, MemberClassesPage, MemberClassDetailPage } from '../pages/training/ClassLearningPages'
@@ -147,6 +148,7 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
     { path: 'training/results/:id', element: <TrainingResultDetailPage /> },
     { path: 'training/recommendations', element: <ClassRecommendationsPage /> },
     { path: 'assistant', element: <MemberAssistantPage /> },
+    { path: 'support', element: <MemberSupportPage /> },
     { path: 'classes', element: <FindClassesPage /> },
     { path: 'sessions/:sessionId', element: <SessionDetailPage /> },
     { path: 'bookings', element: <MemberBookingsPage /> },
