@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, getErrorMessage, splitFieldErrors } from '../../api/errors'
 import { AccountCreatedError } from '../../auth/authContext'
@@ -78,7 +78,7 @@ export function RegisterPage() {
   // Kept only in this page's memory: a refresh or a direct visit never shows a success it did not see.
   const [created, setCreated] = useState<UserProfile | null>(null)
 
-  if (created) return <RegistrationSuccess member={created} returnTo={returnState?.from} />
+  if (created && status === 'authenticated') return <RegistrationSuccess member={created} returnTo={returnState?.from} />
   if (status === 'authenticated' && user && !submitting) {
     return <Navigate to={postLoginPath(user, returnState?.from)} replace />
   }
@@ -224,7 +224,7 @@ export function RegisterPage() {
   )
 }
 
-export const REGISTRATION_SUCCESS_TITLE = 'Registration Successful!'
+const REGISTRATION_SUCCESS_TITLE = 'Registration Successful!'
 
 /**
  * Shown once, right after the backend created the account and the new session is signed in. The member leaves only by
@@ -233,6 +233,9 @@ export const REGISTRATION_SUCCESS_TITLE = 'Registration Successful!'
 function RegistrationSuccess({ member, returnTo }: { member: UserProfile; returnTo: unknown }) {
   const dashboard = homePathFor(member)
   const resume = postLoginPath(member, returnTo)
+  const dashboardLink = useRef<HTMLAnchorElement>(null)
+  // The form and its submit button are gone: move focus so keyboard and screen reader users land on the next step.
+  useEffect(() => dashboardLink.current?.focus(), [])
   return (
     <AuthShell className="auth-shell--register" title={REGISTRATION_SUCCESS_TITLE} subtitle="Your Sportify account is ready.">
       <div className="auth-success" role="status">
@@ -241,7 +244,7 @@ function RegistrationSuccess({ member, returnTo }: { member: UserProfile; return
         </p>
         <p>Browse classes, buy a sport package and book your first session from your dashboard.</p>
       </div>
-      <Link className={buttonClassName('primary', 'lg', true)} to={dashboard} replace>
+      <Link ref={dashboardLink} className={buttonClassName('primary', 'lg', true)} to={dashboard} replace>
         Go to Dashboard
       </Link>
       {resume !== dashboard && (
