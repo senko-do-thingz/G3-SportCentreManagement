@@ -183,7 +183,7 @@ try:
                                         serialization.PublicFormat.SubjectPublicKeyInfo)).digest()).decode()
     tls = ssl.create_default_context(cafile=str(args.private / 'tls-cert.pem'))
     first_pid = start_backend()
-    check('Fresh isolated SQL migrated through release V46', sql('SELECT MAX(TRY_CONVERT(int,version)) FROM flyway_schema_history WHERE success=1;') == '46')
+    check('Fresh isolated SQL migrated through release V48', sql('SELECT MAX(TRY_CONVERT(int,version)) FROM flyway_schema_history WHERE success=1;') == '48')
     check('All five additive release migrations applied', sql('SELECT COUNT(*) FROM flyway_schema_history WHERE TRY_CONVERT(int,version) BETWEEN 42 AND 46 AND success=1;') == '5')
     check('Canonical session identity migration applied once',
           sql("SELECT COUNT(*) FROM flyway_schema_history WHERE version='39' AND success=1;") == '1')

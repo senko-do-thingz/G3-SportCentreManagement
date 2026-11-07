@@ -29,4 +29,7 @@ public final class TrainingWriteResponse {
     public record DrillDraft(String title, String goal, int durationMinutes, String instructions, String reason, String level) {}
     public record DrillSuggestions(String mode, String ruleVersion, boolean requiresCoachReview, boolean persisted,
         long bookingId, long memberId, long classId, String sportName, String level, List<DrillDraft> drafts) {}
+    /** Class-scope drill preview: drafts for the whole class, built from counts and class averages only. */
+    public record ClassDrillSuggestions(String mode, String ruleVersion, boolean requiresCoachReview, boolean persisted,
+        long classId, String sportName, String level, int memberCount, List<DrillDraft> drafts) {}
 }

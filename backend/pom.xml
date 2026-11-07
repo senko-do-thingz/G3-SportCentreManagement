@@ -16,6 +16,8 @@
     <properties>
         <java.version>25</java.version>
         <skipUnitTests>false</skipUnitTests>
+        <!-- live-smoke tests call real external providers; run them only locally with -DunitExcludedGroups=integration. -->
+        <unitExcludedGroups>integration,live-smoke</unitExcludedGroups>
         <org.mapstruct.version>1.6.3</org.mapstruct.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <lombok.version>1.18.48</lombok.version>
@@ -25,6 +27,12 @@
         <tomcat.version>10.1.59</tomcat.version>
     </properties>
     <dependencies>
+        <!-- Flow 6: optional Claude classification of Member assistant questions (disabled unless AI_ASSISTANT_ENABLED=true). -->
+        <dependency>
+            <groupId>com.anthropic</groupId>
+            <artifactId>anthropic-java</artifactId>
+            <version>3.2.0</version>
+        </dependency>
         <!-- Spring Boot Starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -193,7 +201,7 @@
                 <configuration>
                     <argLine>@{argLine}</argLine>
                     <skipTests>${skipUnitTests}</skipTests>
-                    <excludedGroups>integration</excludedGroups>
+                    <excludedGroups>${unitExcludedGroups}</excludedGroups>
                     <!-- Surefire 3.6.1 auto-detects transitive JUnit 4 and switches groups to Vintage categories.
                          Disable Vintage auto-addition so integration is interpreted as a Jupiter tag. -->
                     <properties>

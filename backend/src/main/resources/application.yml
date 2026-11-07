@@ -44,10 +44,30 @@ application:
 
 app:
   training:
+    ai-drills:
+      # Flow 5: AI drafts Coach drill suggestions from AiDrillPolicy.safeContext (allowlisted codes, counts, scores).
+      # OFF by default and in CI; a key alone never enables it. CODEOWNER-approved provider: Google Gemini, the only
+      # implementation (GeminiDrillGenerator, GEMINI_API_KEY). Any other provider value activates no generator, and
+      # every failure falls back to the rule-based catalog; there is no fallback to another AI provider.
+      enabled: ${AI_DRILLS_ENABLED:false}
+      provider: ${AI_DRILLS_PROVIDER:gemini}
+      gemini-model: ${AI_DRILLS_GEMINI_MODEL:gemini-3.5-flash-lite}
+      timeout-seconds: ${AI_DRILLS_TIMEOUT_SECONDS:30}
     attendance-backfill:
       # Activation and a positive ISO-8601 duration both require an approved operational cutoff.
       enabled: ${ATTENDANCE_BACKFILL_ENABLED:false}
       window: ${ATTENDANCE_BACKFILL_WINDOW:}
+  assistant:
+    ai:
+      # Flow 6: AI works out what a Member's assistant question asks (English or Vietnamese). Answers still come
+      # only from center data. Off by default; any failure uses the keyword rules. Only the question text, with
+      # e-mail addresses and phone numbers removed, is sent. Private and health questions are never sent.
+      enabled: ${AI_ASSISTANT_ENABLED:false}
+      # claude (ANTHROPIC_API_KEY) or gemini (GEMINI_API_KEY). Provider and model need CODEOWNER approval.
+      provider: ${AI_ASSISTANT_PROVIDER:claude}
+      model: ${AI_ASSISTANT_MODEL:claude-opus-5-5}
+      gemini-model: ${AI_ASSISTANT_GEMINI_MODEL:gemini-flash-lite-latest}
+      timeout-seconds: ${AI_ASSISTANT_TIMEOUT_SECONDS:15}
   cors:
     # Comma separated list of origins allowed to call the API from a browser.
     # Empty means no cross-origin request is accepted. Overridden per profile.
