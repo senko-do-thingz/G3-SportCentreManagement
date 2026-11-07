@@ -78,7 +78,7 @@ Earlier live check (2026-11-06, Gemini, disposable database with the demo seed):
 | Explicit assignment | Preview writes no plan. At assignment time the booking, active Member role, active Coach role and active class are checked again; the Member sees a plan only after the Coach assigns it. |
 | Individual context | Member level wins when supported, otherwise class level. Goal and attendance/score history influence AI input; the six-sport local fallback uses the goal to rank drafts. Raw free text never crosses the provider boundary. |
 | Class context | The same eligible real Members supply cohort counts and scores. External AI needs at least three Members; a metric needs scores from at least three distinct Members, and a level/goal distribution with a bucket below three is withheld. |
-| Provider response | A complete 2–4 drill response must fit duration/text limits and pass the conservative content and sport-name gates. Otherwise use the local fallback; the Coach still reviews and edits. |
+| Provider response | A complete 2-4 drill response must fit duration/text limits and pass the conservative content and sport-name gates. Otherwise use the local fallback; the Coach still reviews and edits. |
 
 External AI remains disabled by default. Provider/privacy authority, retention and live model safety still require a product-owner decision; code validation cannot prove that arbitrary generated exercise advice is suitable for every person.
 
