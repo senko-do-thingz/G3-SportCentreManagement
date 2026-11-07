@@ -4,7 +4,7 @@ import { buttonClassName } from '../../components/ui/buttonClassName'
 
 function actionDescription(path: string) {
   if (path.startsWith('/member/classes')) return 'Sign in to explore current classes with your selected filters.'
-  if (path.startsWith('/member/schedule')) return 'Sign in to view the member schedule and current sessions.'
+  if (path.startsWith('/member/schedule')) return 'Sign in to view the sessions you have booked.'
   if (path.startsWith('/member/membership/cards')) return 'Sign in to view membership card options in your Member workspace.'
   return 'Sign in to review package options in your Member workspace. Registration requires your confirmation.'
 }

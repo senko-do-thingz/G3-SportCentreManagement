@@ -209,7 +209,7 @@ export function BookingConfirmedPage() {
   const { bookingId: rawBookingId } = useParams()
   const bookingId = routeId(rawBookingId ?? null)
   const stateData = state && typeof state === 'object' ? state as { returnTo?: unknown } : {}
-  const returnTo = safeBrowseReturn(typeof stateData.returnTo === 'string' ? stateData.returnTo : '/member/schedule')
+  const returnTo = safeBrowseReturn(typeof stateData.returnTo === 'string' ? stateData.returnTo : '/member/classes')
   const loader = useCallback(async (signal: AbortSignal) => {
     if (!bookingId) throw new ApiError(0, 'Choose a valid booking confirmation.')
     if (memberId === null) return null

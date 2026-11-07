@@ -265,7 +265,7 @@ describe('FE-04 My Membership and Sport Packages (F1-12)', () => {
     expect(within(item).getByText('Active')).toBeInTheDocument()
     expect(within(item).getByText('6 of 8 sessions remaining')).toBeInTheDocument()
     expect(within(item).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '6')
-    expect(within(item).getByRole('link', { name: 'Book a session' })).toHaveAttribute('href', '/member/schedule')
+    expect(within(item).getByRole('link', { name: 'Book a session' })).toHaveAttribute('href', '/member/classes')
     expect(within(item).getByRole('link', { name: 'Renew package' })).toHaveAttribute('href', '/member/packages')
   })
 
