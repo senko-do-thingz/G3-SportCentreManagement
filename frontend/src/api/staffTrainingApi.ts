@@ -22,7 +22,7 @@ export type AttendanceStatus = 'PRESENT' | 'LATE' | 'ABSENT' | 'EXCUSED'
 export interface AttendanceInput { status: AttendanceStatus; notes: string | null }
 export interface DrillDraft { title: string; goal: string; durationMinutes: number; instructions: string; reason: string; level: string }
 export interface DrillSuggestions {
-  /** RULE_BASED: curated catalog. AI_GENERATED: Claude drafts (ruleVersion holds the model id); both need Coach review. */
+  /** RULE_BASED: curated catalog. AI_GENERATED: Gemini drafts (ruleVersion holds the model id); both need Coach review. */
   mode: 'RULE_BASED' | 'AI_GENERATED'; ruleVersion: string; requiresCoachReview: true; persisted: false
   bookingId: number; memberId: number; classId: number; sportName: string; level: string; drafts: DrillDraft[]
 }
