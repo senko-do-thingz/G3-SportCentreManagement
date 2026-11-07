@@ -19,9 +19,11 @@ export interface Recommendations {
   page: number; size: number; totalMatches: number; items: ClassRecommendation[]
 }
 export interface Consultation {
-  mode: 'KNOWLEDGE_BASED'; status: 'ANSWERED' | 'NO_ANSWER' | 'CONSENT_REQUIRED' | 'UNAVAILABLE'
+  mode: 'KNOWLEDGE_BASED' | 'AI_ASSISTED'; status: 'ANSWERED' | 'NO_ANSWER' | 'CONSENT_REQUIRED' | 'UNAVAILABLE'
   answer: string; historyStored: false
   sources: { kind: string; id: number; title: string; detail: string; path: string }[]
+  /** 'vi' when the question was Vietnamese and the answer text is Vietnamese. */
+  language?: 'vi' | 'en'
 }
 /** F5-01: the Member's level for one sport; null means the general profile level is used. */
 export interface SportLevel { sportId: number; sportName: string; level: string | null }

@@ -25,7 +25,7 @@
         <tomcat.version>10.1.59</tomcat.version>
     </properties>
     <dependencies>
-        <!-- Flow 5: optional Claude drafting of Coach drill suggestions (disabled unless AI_DRILLS_ENABLED=true). -->
+        <!-- Flow 6: optional Claude classification of Member assistant questions (disabled unless AI_ASSISTANT_ENABLED=true). -->
         <dependency>
             <groupId>com.anthropic</groupId>
             <artifactId>anthropic-java</artifactId>
