@@ -14,7 +14,7 @@ This README describes the `main` branch. Everything listed under "Implemented" i
 |---|---|
 | Flow 1 - Accounts, cards, packages | Implemented. Register -> Registration Successful screen with a Go to Dashboard button (no auto-redirect, never shown on failure, reload or direct visit), login with single-use refresh token rotation, membership cards, sport packages, Reception sales and activation |
 | Flow 2 - Classes, sessions, booking | Implemented. Manager class/session administration, public Session IDs, session rescheduling with history, booking and cancellation, Reception arrival and check-in pass, Coach teaching schedule and rosters. Member **My Schedule** (`/member/schedule`) shows only the member's own CONFIRMED bookings; **Find Classes** (`/member/classes`) lists every bookable session in the centre |
-| Flow 3 - Payments and reports | Implemented. Staff-confirmed payments, VietQR transfer instructions, opt-in simulated QR demo, invoices and receipts, refunds, revenue report and CSV, operations counters |
+| Flow 3 - Payments and reports | Implemented. Staff-confirmed payments, optional VietQR bank-transfer instructions for pending real payments, a separate opt-in non-payable QR simulation, invoices and receipts, refunds, revenue report and CSV, operations counters |
 | Flow 4 - Training and progress | Implemented. Personal and class plans, Coach and Reception attendance recording and correction, results, feedback, member progress, Manager attendance overview, class notices and questions |
 | Flow 5 - Recommendations and drills | Implemented. Member class recommendations, sport levels and saved recommendations. Coach drill suggestions from a rule-based catalog, with optional Gemini drafts (off by default) |
 | Flow 6 - Assistant and support | Implemented. Member center assistant that answers only from center data (KNOWLEDGE_BASED keyword rules by default; an optional AI step, off by default, only classifies the question). Member support requests and Reception support intake and replies |
@@ -103,17 +103,22 @@ Open `http://localhost:5173`. The API base URL defaults to `http://localhost:808
 
 Normal migrations seed only reference data: roles, sports, facilities, membership plans, sport packages, card tiers and one manager account (`manager@sportify.com`, from `V4__seed_manager_account.sql`). Change that password before any shared use. Create other staff accounts from the Manager users screen.
 
-## Demo and Test Databases
+## Demo Modes and Test Databases
 
-Demo seeds and test fixtures are for **disposable databases only**. Never run them against the shared `sportify` database, and never point a demo profile at a database holding real data.
+There are two different kinds of demo setup. Do not confuse them.
+
+**A. Demo seeds and test databases - disposable databases only.** These load synthetic fixtures or create their own databases. Never point them at the shared `sportify` database or at any database holding real data.
 
 | Option | What it does | Where to read more |
 |---|---|---|
-| `dev,demo` profiles | Adds `db/demo` migrations (V28 accounts, V29 classes and sessions, V41 coach photos) to a **fresh, isolated** database. A guard rejects `prod` and `demo` together, but it cannot detect that a connection points at shared data | [BE-07 test cases](docs/tests/BE-07_test_cases.md), [BE-15 test cases](docs/tests/BE-15_test_cases.md) |
-| `unified-demo` profile | Canonical demo contract validated by a safety guard before Flyway runs | [db-unify](docs/db-unify/README.md) |
-| `qr-demo` profile | Non-payable simulated QR payment demo, opt-in only | [QR local demo](docs/qr-local-demo.md) |
-| `scripts/demo-data` | Manual SQL that adds shared demo coaches and receptionists | [demo data README](scripts/demo-data/README.md) |
-| Integration tests | Run in Testcontainers or a separate test database, never `sportify` | [Testing](#testing) |
+| `dev,demo` profiles | Adds `db/demo` seed migrations (V28 accounts, V29 classes and sessions, V41 coach photos) to a **fresh, isolated** database. A guard rejects `prod` and `demo` together, but it cannot detect that a connection points at shared data | [BE-07 test cases](docs/tests/BE-07_test_cases.md), [BE-15 test cases](docs/tests/BE-15_test_cases.md) |
+| `qr-demo` profile | Separate standalone non-payable QR demo, opt-in only, not used with `sportify` | [QR local demo](docs/qr-local-demo.md) |
+| `scripts/demo-data` | Manual SQL that adds demo coaches and receptionists | [demo data README](scripts/demo-data/README.md) |
+| Integration tests | Run in Testcontainers or a new throwaway test database, never `sportify` | [Testing](#testing) |
+
+**B. Guarded `dev,unified-demo` runtime - uses the existing `sportify` database.** This is the CODEOWNER-approved runtime mode for the desktop demo. It runs against the one existing `sportify` database, with no second database and no demo seed migrations. It needs explicit opt-in settings, numeric loopback binding and an approved allowlist of synthetic Member accounts, and a safety guard checks this before Flyway runs. The QR Local Demo inside this mode gives a non-payable synthetic QR with SIMULATED settlement that is never counted as real revenue. Follow [db-unify](docs/db-unify/README.md) and [runtime startup](docs/db-unify/RUNTIME_STARTUP_POWERSHELL.md) exactly.
+
+Before starting a newer backend on an existing shared `sportify` database in either normal or unified-demo mode, back up the database and check `flyway_schema_history` for unexpected entries. For committee rehearsal, use the unified-demo runtime above; do not run demo scripts that create new databases.
 
 Demo account passwords are documented only in the linked test case files and apply only to those disposable databases.
 
@@ -204,7 +209,7 @@ npm run build
 - Waitlist is not implemented (the table exists from an early migration, no API or screen).
 - Roles are fixed; there is no dynamic role or permission management.
 - Desktop only; no mobile app or mobile-specific layout work.
-- No external payment gateway callbacks; payments are confirmed by staff. The QR flow is a non-payable simulation.
+- No external payment gateway: there is no automatic bank callback or reconciliation, and staff confirm real payments. Two QR features are separate. VietQR transfer instructions show bank-transfer details for a pending real payment (when configured); the payment still waits for staff confirmation. The QR Local Demo shows a non-payable synthetic QR whose SIMULATED settlement is never real revenue or a bank receipt. Scanning a QR code never confirms a real payment by itself.
 - Member notifications exist only as a backend API; there is no member notification screen, and no e-mail, SMS or push delivery.
 - AI features are off by default and need an operator-provided key; provider and model choices need CODEOWNER approval.
 - Cash-flow endpoints (`/manager/finance/cash-flow/...`) exist, but no frontend screen uses them yet.
