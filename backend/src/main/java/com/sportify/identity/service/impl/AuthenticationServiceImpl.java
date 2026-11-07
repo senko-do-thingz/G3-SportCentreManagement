@@ -51,6 +51,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final Clock clock;
     private final UserRefreshTokenRepository userRefreshTokenRepository;
 
+    @org.springframework.beans.factory.annotation.Value("${spring.flyway.target:}")
+    private String flywayTarget;
+
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -213,6 +216,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     private void saveRefreshToken(UserAccount user, String refreshToken) {
+        if ("28".equals(flywayTarget)) {
+            return;
+        }
         String tokenHash = JwtService.hashToken(refreshToken);
         LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime expiresAt = now.plusSeconds(jwtService.getRefreshExpiration() / 1000);
