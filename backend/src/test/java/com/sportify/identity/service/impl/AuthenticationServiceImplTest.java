@@ -52,6 +52,8 @@ class AuthenticationServiceImplTest {
     private com.sportify.identity.repository.MemberProfileRepository memberProfileRepository;
     @Mock
     private com.sportify.core.common.CodeFormatter codeFormatter;
+    @Mock
+    private com.sportify.identity.repository.UserRefreshTokenRepository userRefreshTokenRepository;
     @org.mockito.Spy
     private java.time.Clock clock = java.time.Clock.fixed(java.time.Instant.parse("2026-10-05T00:00:00Z"), java.time.ZoneId.of("UTC"));
 
@@ -266,12 +268,111 @@ class AuthenticationServiceImplTest {
         when(jwtService.generateToken(any())).thenReturn("new_access");
         when(jwtService.generateRefreshToken(any())).thenReturn("new_refresh");
 
+        String hash = JwtService.hashToken("valid_token");
+        com.sportify.identity.entity.UserRefreshToken tokenRecord = com.sportify.identity.entity.UserRefreshToken.builder()
+                .id(1L)
+                .user(userAccount)
+                .tokenHash(hash)
+                .expiresAt(java.time.LocalDateTime.parse("2026-10-12T00:00:00"))
+                .createdAt(java.time.LocalDateTime.parse("2026-10-05T00:00:00"))
+                .build();
+        when(userRefreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(tokenRecord));
+        when(userRefreshTokenRepository.consumeToken(eq(hash), any())).thenReturn(1);
+
         AuthResponse res = authService.refreshToken(req);
 
         assertNotNull(res);
         assertEquals("new_access", res.getAccessToken());
         assertEquals("new_refresh", res.getRefreshToken());
+        verify(userRefreshTokenRepository).consumeToken(eq(hash), any());
+        verify(userRefreshTokenRepository).save(any());
         verify(auditService, never()).record(any());
+    }
+
+    @Test
+    void refreshToken_shouldRejectReplayOfConsumedToken() {
+        com.sportify.identity.dto.RefreshTokenRequest req = new com.sportify.identity.dto.RefreshTokenRequest();
+        req.setRefreshToken("consumed_token");
+        when(jwtService.extractUsername("consumed_token")).thenReturn("test@sportify.com");
+        when(userRepository.findByEmailIgnoreCase("test@sportify.com")).thenReturn(Optional.of(userAccount));
+        when(jwtService.extractTokenType("consumed_token")).thenReturn("refresh");
+        when(jwtService.isTokenValid(eq("consumed_token"), any())).thenReturn(true);
+
+        String hash = JwtService.hashToken("consumed_token");
+        com.sportify.identity.entity.UserRefreshToken consumedRecord = com.sportify.identity.entity.UserRefreshToken.builder()
+                .id(1L)
+                .user(userAccount)
+                .tokenHash(hash)
+                .expiresAt(java.time.LocalDateTime.parse("2026-10-12T00:00:00"))
+                .consumedAt(java.time.LocalDateTime.parse("2026-10-05T00:01:00"))
+                .createdAt(java.time.LocalDateTime.parse("2026-10-05T00:00:00"))
+                .build();
+        when(userRefreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(consumedRecord));
+
+        assertThrows(BadCredentialsException.class, () -> authService.refreshToken(req));
+        verify(userRefreshTokenRepository, never()).consumeToken(any(), any());
+    }
+
+    @Test
+    void refreshToken_shouldRejectRevokedToken() {
+        com.sportify.identity.dto.RefreshTokenRequest req = new com.sportify.identity.dto.RefreshTokenRequest();
+        req.setRefreshToken("revoked_token");
+        when(jwtService.extractUsername("revoked_token")).thenReturn("test@sportify.com");
+        when(userRepository.findByEmailIgnoreCase("test@sportify.com")).thenReturn(Optional.of(userAccount));
+        when(jwtService.extractTokenType("revoked_token")).thenReturn("refresh");
+        when(jwtService.isTokenValid(eq("revoked_token"), any())).thenReturn(true);
+
+        String hash = JwtService.hashToken("revoked_token");
+        com.sportify.identity.entity.UserRefreshToken revokedRecord = com.sportify.identity.entity.UserRefreshToken.builder()
+                .id(1L)
+                .user(userAccount)
+                .tokenHash(hash)
+                .expiresAt(java.time.LocalDateTime.parse("2026-10-12T00:00:00"))
+                .revokedAt(java.time.LocalDateTime.parse("2026-10-05T00:01:00"))
+                .createdAt(java.time.LocalDateTime.parse("2026-10-05T00:00:00"))
+                .build();
+        when(userRefreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(revokedRecord));
+
+        assertThrows(BadCredentialsException.class, () -> authService.refreshToken(req));
+    }
+
+    @Test
+    void refreshToken_shouldRejectConcurrentRaceLoss() {
+        com.sportify.identity.dto.RefreshTokenRequest req = new com.sportify.identity.dto.RefreshTokenRequest();
+        req.setRefreshToken("racing_token");
+        when(jwtService.extractUsername("racing_token")).thenReturn("test@sportify.com");
+        when(userRepository.findByEmailIgnoreCase("test@sportify.com")).thenReturn(Optional.of(userAccount));
+        when(jwtService.extractTokenType("racing_token")).thenReturn("refresh");
+        when(jwtService.isTokenValid(eq("racing_token"), any())).thenReturn(true);
+
+        String hash = JwtService.hashToken("racing_token");
+        com.sportify.identity.entity.UserRefreshToken tokenRecord = com.sportify.identity.entity.UserRefreshToken.builder()
+                .id(1L)
+                .user(userAccount)
+                .tokenHash(hash)
+                .expiresAt(java.time.LocalDateTime.parse("2026-10-12T00:00:00"))
+                .createdAt(java.time.LocalDateTime.parse("2026-10-05T00:00:00"))
+                .build();
+        when(userRefreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(tokenRecord));
+        // Another thread won the race to consume the token
+        when(userRefreshTokenRepository.consumeToken(eq(hash), any())).thenReturn(0);
+
+        assertThrows(BadCredentialsException.class, () -> authService.refreshToken(req));
+    }
+
+    @Test
+    void refreshToken_shouldRejectUnpersistedToken() {
+        com.sportify.identity.dto.RefreshTokenRequest req = new com.sportify.identity.dto.RefreshTokenRequest();
+        req.setRefreshToken("unknown_token");
+        when(jwtService.extractUsername("unknown_token")).thenReturn("test@sportify.com");
+        when(userRepository.findByEmailIgnoreCase("test@sportify.com")).thenReturn(Optional.of(userAccount));
+        when(jwtService.extractTokenType("unknown_token")).thenReturn("refresh");
+        when(jwtService.isTokenValid(eq("unknown_token"), any())).thenReturn(true);
+
+        String hash = JwtService.hashToken("unknown_token");
+        when(userRefreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.empty());
+
+        assertThrows(BadCredentialsException.class, () -> authService.refreshToken(req));
     }
 
     @Test
