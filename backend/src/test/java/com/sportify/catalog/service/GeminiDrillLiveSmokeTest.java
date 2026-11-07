@@ -2,6 +2,7 @@ package com.sportify.catalog.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
@@ -18,11 +19,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Manual, synthetic-only LIVE smoke check of the approved Gemini provider. Never runs in CI: it is skipped unless
- * GEMINI_LIVE_SMOKE=true and GEMINI_API_KEY are set in the local environment. It sends one made-up training context
+ * Manual, synthetic-only LIVE smoke check of the approved Gemini provider. Never runs in CI: the live-smoke tag is
+ * excluded from Surefire by default, and even when selected it runs only if GEMINI_LIVE_SMOKE=true and GEMINI_API_KEY
+ * are set in the local environment. It sends one made-up training context
  * (no real Member data) and prints only non-sensitive evidence: model, HTTP status, timings, the number of accepted
  * drafts and the fallback outcome. It never prints the key, the request or the model's text.
  */
+@Tag("live-smoke")
 @EnabledIfEnvironmentVariable(named = "GEMINI_LIVE_SMOKE", matches = "true")
 class GeminiDrillLiveSmokeTest {
     private static final ObjectMapper JSON = new ObjectMapper().registerModule(new JavaTimeModule());
