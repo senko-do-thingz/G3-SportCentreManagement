@@ -45,8 +45,8 @@ final class AssistantAiPolicy {
             - UNKNOWN: anything else, or when you are not sure.
 
             sport: copy exactly one name from the provided list when the question is about that sport \
-            (for example "bong da" or "bóng đá" means Football), otherwise an empty string.
-            day: TODAY or TOMORROW when the question asks about that day ("hôm nay", "ngày mai"), otherwise UPCOMING.
+            (for example "bong da" or "b\u00F3ng \u0111\u00E1" means Football), otherwise an empty string.
+            day: TODAY or TOMORROW when the question asks about that day ("h\u00F4m nay", "ng\u00E0y mai"), otherwise UPCOMING.
             faqTopic: 1 to 7 for FAQ, otherwise 0.""";
 
     /** The structured result the model must return. */
