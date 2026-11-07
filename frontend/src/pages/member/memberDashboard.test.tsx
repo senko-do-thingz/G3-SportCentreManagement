@@ -107,7 +107,7 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
     const bar = within(item).getByRole('progressbar')
     expect(bar).toHaveAttribute('aria-valuenow', '6')
     expect(bar).toHaveAttribute('aria-valuemax', '8')
-    expect(within(item).getByRole('link', { name: 'Book a session' })).toHaveAttribute('href', '/member/schedule')
+    expect(within(item).getByRole('link', { name: 'Book a session' })).toHaveAttribute('href', '/member/classes')
     expect(within(item).getByRole('link', { name: 'Renew package' })).toHaveAttribute('href', '/member/packages')
 
     const sessions = screen.getByRole('region', { name: 'Upcoming sessions' })
@@ -119,7 +119,7 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
   it('TC-FE02-022 the hero offers Book a session when a package is active', async () => {
     await openDashboard({ registrations: [registration()] })
     const hero = screen.getByRole('region', { name: 'Ready for your next session?' })
-    expect(within(hero).getByRole('link', { name: 'Book a session' })).toHaveAttribute('href', '/member/schedule')
+    expect(within(hero).getByRole('link', { name: 'Book a session' })).toHaveAttribute('href', '/member/classes')
   })
 
   it('TC-FE02-023 a pending package links to its payment summary', async () => {
@@ -299,7 +299,7 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
       registrations: [registration({ id: 1, remainingSessions: 0 }), registration({ id: 2, sportName: 'Swimming' })],
     })
     const hero = screen.getByRole('region', { name: 'Ready for your next session?' })
-    expect(within(hero).getByRole('link', { name: 'Book a session' })).toHaveAttribute('href', '/member/schedule')
+    expect(within(hero).getByRole('link', { name: 'Book a session' })).toHaveAttribute('href', '/member/classes')
   })
 
   it('TC-FE02-038 with only a pending payment the hero asks to complete it and links to its summary', async () => {

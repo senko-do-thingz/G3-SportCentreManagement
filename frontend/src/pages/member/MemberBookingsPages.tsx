@@ -50,10 +50,10 @@ export function MemberBookingsPage() {
         <button type="button" role="tab" aria-selected={when === 'UPCOMING'} className={`booking-tab${when === 'UPCOMING' ? ' booking-tab--active' : ''}`} onClick={() => setParams({ when: 'UPCOMING' })}>Upcoming</button>
         <button type="button" role="tab" aria-selected={when === 'PAST'} className={`booking-tab${when === 'PAST' ? ' booking-tab--active' : ''}`} onClick={() => setParams({ when: 'PAST' })}>Past</button>
       </div>
-      {resource.status === 'loading' ? <PageLoader label={`Loading ${when.toLowerCase()} bookings`} /> : resource.status === 'error' ? <BrowseError error={resource.error} onRetry={reload} /> : resource.data.length === 0 ? <EmptyState title={when === 'UPCOMING' ? 'No upcoming bookings' : 'No past bookings'} description={when === 'UPCOMING' ? 'Browse the schedule and reserve a place in a session.' : 'Completed and cancelled bookings will appear here.'} action={when === 'UPCOMING' ? <Link className={buttonClassName()} to="/member/schedule">Browse schedule</Link> : undefined} /> : <div className="booking-list">
+      {resource.status === 'loading' ? <PageLoader label={`Loading ${when.toLowerCase()} bookings`} /> : resource.status === 'error' ? <BrowseError error={resource.error} onRetry={reload} /> : resource.data.length === 0 ? <EmptyState title={when === 'UPCOMING' ? 'No upcoming bookings' : 'No past bookings'} description={when === 'UPCOMING' ? 'Find a class and reserve a place in a session.' : 'Completed and cancelled bookings will appear here.'} action={when === 'UPCOMING' ? <Link className={buttonClassName()} to="/member/classes">Find Classes</Link> : undefined} /> : <div className="booking-list">
         {resource.data.map((booking) => <BookingHistoryCard booking={booking} when={when} key={booking.id} />)}
       </div>}
-      <div className="browse-actions booking-actions"><Button variant="ghost" onClick={reload}>Refresh bookings</Button>{when === 'UPCOMING' && <Link className={buttonClassName('secondary')} to="/member/schedule">Browse schedule</Link>}</div>
+      <div className="browse-actions booking-actions"><Button variant="ghost" onClick={reload}>Refresh bookings</Button>{when === 'UPCOMING' && <Link className={buttonClassName('secondary')} to="/member/classes">Find Classes</Link>}</div>
     </Card>
   </div>
 }
@@ -250,7 +250,7 @@ function BookingCancelledContent({ id, memberId }: { id: number; memberId: numbe
       <p className="booking-code">Booking code: <strong>{booking.bookingCode}</strong></p>
       <dl className="browse-facts booking-confirmation__facts"><div><dt>Date</dt><dd>{bookingDate(booking.sessionDate)}</dd></div><div><dt>Time</dt><dd>{bookingTime(booking.startTime)} - {bookingTime(booking.endTime)} (Vietnam time)</dd></div><div><dt>Cancelled by</dt><dd>{actorName(booking)}</dd></div>{booking.cancelledAt && <div><dt>Cancelled at</dt><dd>{formatDateTime(booking.cancelledAt)}</dd></div>}</dl>
       {registration?.totalSessions === null ? <p>This package has no session limit. You can review its current status in My sport packages.</p> : registration && registration.remainingSessions !== null ? <p>Latest package balance: {registration.remainingSessions} sessions remaining.</p> : <p>The latest package balance is unavailable. Review My sport packages for the current count.</p>}
-      <div className="browse-actions booking-actions"><Link className={buttonClassName()} to="/member/bookings?when=PAST">View past bookings</Link><Link className={buttonClassName('secondary')} to="/member/schedule">Browse schedule</Link><Link className={buttonClassName('secondary')} to="/member/membership">My sport packages</Link></div>
+      <div className="browse-actions booking-actions"><Link className={buttonClassName()} to="/member/bookings?when=PAST">View past bookings</Link><Link className={buttonClassName('secondary')} to="/member/classes">Find Classes</Link><Link className={buttonClassName('secondary')} to="/member/membership">My sport packages</Link></div>
     </Card>
   </div>
 }
