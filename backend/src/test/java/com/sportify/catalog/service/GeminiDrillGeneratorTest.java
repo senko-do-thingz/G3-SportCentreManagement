@@ -46,9 +46,7 @@ class GeminiDrillGeneratorTest {
     void sendsTheSharedPromptSchemaAndKeyHeaderAndValidatesTheReply() throws Exception {
         var sent = new ArrayList<Sent>();
         String drills = "{\"drills\":[{\"title\":\"Six-corner shadow footwork\",\"goal\":\"Footwork\",\"durationMinutes\":20,\"instructions\":\"Shadow the six corners.\",\"reason\":\"Footwork scored 4.5/10.\"},"
-                + "{\"title\":\"Net kill feed\",\"goal\":\"Net play\",\"durationMinutes\":20,\"instructions\":\"Feed and kill at the net.\",\"reason\":\"Coach focus: net kills.\"},"
-                + "{\"title\":\"Too long\",\"goal\":\"x\",\"durationMinutes\":31,\"instructions\":\"x\",\"reason\":\"x\"},"
-                + "{\"title\":\"Over budget\",\"goal\":\"x\",\"durationMinutes\":10,\"instructions\":\"x\",\"reason\":\"x\"}]}";
+                 + "{\"title\":\"Net kill feed\",\"goal\":\"Net play\",\"durationMinutes\":20,\"instructions\":\"Feed and kill at the net.\",\"reason\":\"Coach focus: net kills.\"}]}";
         var drafts = generator(sent, 200, reply("STOP", drills)).generate(INPUT);
 
         assertThat(drafts).extracting(d -> d.title()).containsExactly("Six-corner shadow footwork", "Net kill feed");
@@ -61,7 +59,8 @@ class GeminiDrillGeneratorTest {
         assertThat(body.path("generationConfig").path("responseMimeType").asText()).isEqualTo("application/json");
         assertThat(body.path("generationConfig").path("responseSchema").path("properties").has("drills")).isTrue();
         String context = body.path("contents").path(0).path("parts").path(0).path("text").asText();
-        assertThat(context).contains("COMPETITION", "Footwork recovery", "Net kills", "INDIVIDUAL");
+        assertThat(context).contains("COMPETITION", "footwork", "INDIVIDUAL");
+        assertThat(context).doesNotContain("Footwork recovery", "Strong serve", "Net kills");
         assertThat(request.body()).doesNotContain("test-key");
     }
 
@@ -79,8 +78,8 @@ class GeminiDrillGeneratorTest {
         String body = JSON.writeValueAsString(java.util.Map.of("candidates", List.of(java.util.Map.of("finishReason", "STOP",
                 "content", java.util.Map.of("parts", List.of(
                         java.util.Map.of("text", "thinking...", "thought", true),
-                        java.util.Map.of("text", "{\"drills\":[{\"title\":\"Shadow\",\"goal\":\"g\",\"durationMinutes\":5,\"instructions\":\"i\",\"reason\":\"r\"}]}")))))));
-        assertThat(generator(new ArrayList<>(), 200, body).generate(INPUT)).extracting(d -> d.title()).containsExactly("Shadow");
+                         java.util.Map.of("text", "{\"drills\":[{\"title\":\"Shadow\",\"goal\":\"g\",\"durationMinutes\":5,\"instructions\":\"i\",\"reason\":\"r\"},{\"title\":\"Reset\",\"goal\":\"g\",\"durationMinutes\":5,\"instructions\":\"i\",\"reason\":\"r\"}]}")))))));
+        assertThat(generator(new ArrayList<>(), 200, body).generate(INPUT)).extracting(d -> d.title()).containsExactly("Shadow", "Reset");
     }
 
     @Test
@@ -100,7 +99,7 @@ class GeminiDrillGeneratorTest {
     void classScopeDraftsUseTheClassLevel() throws Exception {
         var group = new DrillGenerator.GroupSummary(6, java.util.Map.of("BEGINNER", 4, "ADVANCED", 2), java.util.Map.of("BUILD_SKILLS", 6), List.of());
         var classInput = new DrillGenerator.Input(DrillGenerator.SCOPE_CLASS, "Badminton", "BEGINNER", null, null, 0, List.of(), null, null, null, null, group);
-        var drafts = generator(new ArrayList<>(), 200, reply("STOP", "{\"drills\":[{\"title\":\"Relay\",\"goal\":\"g\",\"durationMinutes\":10,\"instructions\":\"i\",\"reason\":\"r\"}]}")).generate(classInput);
-        assertThat(drafts).singleElement().satisfies(d -> assertThat(d.level()).isEqualTo("BEGINNER"));
+        var drafts = generator(new ArrayList<>(), 200, reply("STOP", "{\"drills\":[{\"title\":\"Relay\",\"goal\":\"g\",\"durationMinutes\":10,\"instructions\":\"i\",\"reason\":\"r\"},{\"title\":\"Reset\",\"goal\":\"g\",\"durationMinutes\":10,\"instructions\":\"i\",\"reason\":\"r\"}]}")).generate(classInput);
+        assertThat(drafts).hasSize(2).allSatisfy(d -> assertThat(d.level()).isEqualTo("BEGINNER"));
     }
 }

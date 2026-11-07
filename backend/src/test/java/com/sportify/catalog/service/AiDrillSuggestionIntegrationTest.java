@@ -170,6 +170,11 @@ class AiDrillSuggestionIntegrationTest extends AbstractIntegrationTest {
         long upcoming = jdbc.queryForObject("SELECT session_id FROM booking WHERE id = ?", Long.class, futureBooking);
         jdbc.update("INSERT INTO booking(booking_code, session_id, member_id, status, booked_at) VALUES (?, ?, ?, 'CONFIRMED', ?)",
                 code(), upcoming, second, NOW.minusDays(1));
+        long third = account("MEMBER");
+        jdbc.update("INSERT INTO member_profile(user_id, member_code, current_level, main_goal, joined_on) VALUES (?, ?, 'BEGINNER', 'BUILD_SKILLS', ?)",
+                third, code(), TODAY);
+        jdbc.update("INSERT INTO booking(booking_code, session_id, member_id, status, booked_at) VALUES (?, ?, ?, 'CONFIRMED', ?)",
+                code(), upcoming, third, NOW.minusDays(1));
         when(generator.generate(any())).thenReturn(List.of(AI_DRAFT));
         int plans = count("SELECT COUNT(*) FROM session_plan WHERE class_id = ?", classId);
 
@@ -177,7 +182,7 @@ class AiDrillSuggestionIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(result.mode()).isEqualTo("AI_GENERATED");
         assertThat(result.persisted()).isFalse();
-        assertThat(result.memberCount()).isEqualTo(2);
+        assertThat(result.memberCount()).isEqualTo(3);
         assertThat(result.level()).isEqualTo("BEGINNER");
         assertThat(count("SELECT COUNT(*) FROM session_plan WHERE class_id = ?", classId)).isEqualTo(plans);
         ArgumentCaptor<DrillGenerator.Input> sent = ArgumentCaptor.forClass(DrillGenerator.Input.class);
@@ -189,14 +194,10 @@ class AiDrillSuggestionIntegrationTest extends AbstractIntegrationTest {
         assertThat(input.recentScores()).isEmpty();
         assertThat(input.focus()).isEqualTo("Footwork");
         assertThat(input.sessionMinutes()).isEqualTo(60);
-        assertThat(input.group().members()).isEqualTo(2);
-        assertThat(input.group().levels()).containsEntry("ADVANCED", 1).containsEntry("BEGINNER", 1);
-        assertThat(input.group().goals()).containsEntry("COMPETITION", 1).containsEntry("IMPROVE_FITNESS", 1);
-        assertThat(input.group().averages()).singleElement().satisfies(average -> {
-            assertThat(average.metric()).isEqualTo("Footwork " + marker);
-            assertThat(average.averageScore()).isEqualByComparingTo("4.50");
-            assertThat(average.samples()).isEqualTo(1);
-        });
+        assertThat(input.group().members()).isEqualTo(3);
+        assertThat(input.group().levels()).containsEntry("ADVANCED", 1).containsEntry("BEGINNER", 2);
+        assertThat(input.group().goals()).containsEntry("COMPETITION", 1).containsEntry("IMPROVE_FITNESS", 1).containsEntry("BUILD_SKILLS", 1);
+        assertThat(input.group().averages()).isEmpty(); // One recorded score cannot be reported as a class average.
     }
 
     @Test
@@ -226,7 +227,7 @@ class AiDrillSuggestionIntegrationTest extends AbstractIntegrationTest {
         var result = training.drillSuggestions(coach, futureBooking);
 
         assertThat(result.mode()).isEqualTo("RULE_BASED");
-        assertThat(result.ruleVersion()).isEqualTo("curated-drills-v1");
+        assertThat(result.ruleVersion()).isEqualTo("curated-drills-v2");
         assertThat(result.drafts()).isNotEmpty();
     }
 
@@ -255,7 +256,7 @@ class AiDrillSuggestionIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/coach/training/classes/" + classId + "/drill-suggestions").param("sessionMinutes", "60").with(user(details(coach))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.mode").value("AI_GENERATED"))
+                .andExpect(jsonPath("$.mode").value("RULE_BASED"))
                 .andExpect(jsonPath("$.memberCount").value(1))
                 .andExpect(jsonPath("$.persisted").value(false));
         mvc.perform(get("/api/v1/coach/training/classes/" + classId + "/drill-suggestions").with(user(details(member))))

@@ -964,6 +964,17 @@ class TrainingWorkflowIntegrationTest {
         jdbc.update("UPDATE sport_class SET is_active=0 WHERE id=?",classId);
         assertThat(guidance.recommendations(peer,request).items()).noneMatch(item->item.sessionId()==session);
     }
+    @Test void FLOW5_assignmentRechecksMemberAndClassState() {
+        jdbc.update("UPDATE user_account SET status='INACTIVE' WHERE id=?",member);
+        assertThatThrownBy(()->writer.createPlan(coach,plan())).isInstanceOf(BusinessRuleException.class);
+        jdbc.update("UPDATE user_account SET status='ACTIVE' WHERE id=?",member);
+        jdbc.update("UPDATE sport_class SET is_active=0 WHERE id=?",classId);
+        assertThatThrownBy(()->writer.createPlan(coach,plan())).isInstanceOf(BusinessRuleException.class);
+        jdbc.update("UPDATE sport_class SET is_active=1 WHERE id=?",classId);
+        jdbc.update("UPDATE user_account SET status='INACTIVE' WHERE id=?",coach);
+        assertThatThrownBy(()->writer.createPlan(coach,plan())).isInstanceOf(BusinessRuleException.class);
+        jdbc.update("UPDATE user_account SET status='ACTIVE' WHERE id=?",coach);
+    }
     @Test void HOT07_invalidPreferencesAreRejectedWithoutSqlSideEffects() {
         for(var request:List.of(
             new com.sportify.catalog.dto.TrainingGuidanceRequest.Preferences(sport,"' OR 1=1 --",null,null,null,null,null,0,10),
@@ -1151,14 +1162,14 @@ class TrainingWorkflowIntegrationTest {
         drillRequest(coach,id)
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.mode").value("RULE_BASED"))
-            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.ruleVersion").value("curated-drills-v1"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.ruleVersion").value("curated-drills-v2"))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.requiresCoachReview").value(true))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.persisted").value(false))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.bookingId").value(id))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.memberId").value(member))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.classId").value(classId))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.level").value("BEGINNER"))
-            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.drafts.length()").value(2))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.drafts.length()").value(3))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.drafts[0].title").value("Walking shadow footwork"))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.drafts[1].title").value("Controlled racket contact"))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.drafts[0].durationMinutes").value(5))
@@ -1221,8 +1232,9 @@ class TrainingWorkflowIntegrationTest {
         // booking.member_id references member_profile (fk_bk_member), so an unset goal is the only incomplete profile case.
         jdbc.update("UPDATE member_profile SET main_goal=NULL WHERE user_id=?",member);
         var withoutProfile=writer.drillSuggestions(coach,id);
-        assertThat(withoutProfile.drafts()).hasSize(2).allSatisfy(item->assertThat(item.reason()).doesNotContain("Saved member goal"));
+        assertThat(withoutProfile.drafts()).hasSize(3).allSatisfy(item->assertThat(item.reason()).doesNotContain("Saved member goal"));
         jdbc.update("UPDATE sport_class SET level='ALL_LEVELS' WHERE id=?",classId);
+        jdbc.update("UPDATE member_profile SET current_level='EXPERT' WHERE user_id=?",member);
         var unsupported=writer.drillSuggestions(coach,id);
         assertThat(unsupported.mode()).isEqualTo("RULE_BASED");
         assertThat(unsupported.persisted()).isFalse();

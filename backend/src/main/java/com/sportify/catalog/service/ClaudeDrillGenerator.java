@@ -98,6 +98,6 @@ class ClaudeDrillGenerator implements DrillGenerator {
                 .map(text -> text.text())
                 .filter(Objects::nonNull)
                 .findFirst();
-        return AiDrillPolicy.toDrafts(proposed.orElse(null), AiDrillPolicy.level(input), input.sessionMinutes());
+        return AiDrillPolicy.toDrafts(proposed.orElse(null), AiDrillPolicy.level(input), input.sessionMinutes(), input.sport());
     }
 }
