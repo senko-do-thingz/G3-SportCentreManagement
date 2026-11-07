@@ -272,7 +272,7 @@ export function HomePage() {
 
         <section className="home-section" id="sports" aria-labelledby="sports-title">
           <div className="home-wrap">
-            <div className="home-head"><div><span className="home-kicker">Sports offered</span><h2 id="sports-title">Choose your <span>sport</span></h2></div>{memberAction('/member/schedule', 'View schedule', 'secondary', undefined, 'home-more')}</div>
+            <div className="home-head"><div><span className="home-kicker">Sports offered</span><h2 id="sports-title">Choose your <span>sport</span></h2></div>{memberAction('/member/classes', 'Browse all classes', 'secondary', undefined, 'home-more')}</div>
             <div className="home-sports">
               {HOME_SPORTS.map((sport) => {
                 const record = sportFor(sport.name)

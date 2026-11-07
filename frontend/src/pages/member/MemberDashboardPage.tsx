@@ -213,7 +213,7 @@ function heroContent(
         eyebrow: `Welcome back, ${name}`,
         title: 'Ready for your next session?',
         text: 'Book a session with your active sport package.',
-        action: { label: 'Book a session', to: MEMBER_PATHS.schedule },
+        action: { label: 'Book a session', to: MEMBER_PATHS.findClasses },
       }
     case 'pay':
       return {
@@ -393,7 +393,7 @@ function PackageItem({ registration, today }: { registration: PackageRegistratio
       )}
       <div className="package-item__actions">
         {bookable && (
-          <Link className={buttonClassName('primary', 'sm')} to={MEMBER_PATHS.schedule}>
+          <Link className={buttonClassName('primary', 'sm')} to={MEMBER_PATHS.findClasses}>
             Book a session
           </Link>
         )}
@@ -479,7 +479,7 @@ function ProfileCard() {
 const QUICK_LINKS = [
   { to: MEMBER_PATHS.membershipCard, label: 'My membership card', hint: 'Tier, benefits and renewal' },
   { to: MEMBER_PATHS.packages, label: 'Sport packages', hint: 'Prices by sport and training style' },
-  { to: MEMBER_PATHS.schedule, label: 'My schedule', hint: 'Book and manage sessions' },
+  { to: MEMBER_PATHS.schedule, label: 'My schedule', hint: 'Your booked sessions' },
   { to: MEMBER_PATHS.payments, label: 'My payments', hint: 'Payment status and receipts' },
 ] as const
 

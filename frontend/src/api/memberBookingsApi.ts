@@ -71,6 +71,11 @@ async function my(when: BookingWhen, signal?: AbortSignal): Promise<MemberBookin
   return parseMemberBookings(await api.get<unknown>('/bookings/my', { query: { when }, signal }))
 }
 
+/** Every booking of the signed-in member (GET /bookings/my without a filter); session date and time are read live from the session. */
+async function mine(signal?: AbortSignal): Promise<MemberBookingRecord[]> {
+  return parseMemberBookings(await api.get<unknown>('/bookings/my', { signal }))
+}
+
 async function create(request: CreateMemberBookingRequest): Promise<MemberBookingRecord> {
   const booking = parseMemberBooking(await api.post<unknown>('/bookings', request))
   if (booking.status !== 'CONFIRMED') throw new ApiError(0, 'The server did not confirm this booking.')
@@ -98,4 +103,4 @@ async function findUpcomingForSession(sessionId: number, memberId: number, signa
   return upcoming.find((booking) => booking.memberId === memberId && booking.sessionId === sessionId && booking.status === 'CONFIRMED') ?? null
 }
 
-export const memberBookingsApi = { my, create, cancel, findMine, findUpcomingForSession }
+export const memberBookingsApi = { my, mine, create, cancel, findMine, findUpcomingForSession }
