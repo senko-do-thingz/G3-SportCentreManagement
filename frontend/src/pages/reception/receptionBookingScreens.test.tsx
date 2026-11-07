@@ -691,4 +691,26 @@ describe('FE-10 HTTP 408 mutation reconciliation', () => {
     expect(screen.queryByText('Cancellation was rejected')).not.toBeInTheDocument()
     expect(writes(calls, 'DELETE').map((call) => call.path)).toEqual(['/bookings/21'])
   })
+
+  it('blocks assisted booking when member eligibility is SYNTHETIC_OPERATION_DENIED', async () => {
+    const { calls } = setup((call) => call.path.startsWith('/sessions/5/eligibility')
+      ? json(200, {
+        ...eligibility,
+        eligible: false,
+        reason: 'SYNTHETIC_OPERATION_DENIED',
+        suitableRegistrations: [],
+      })
+      : undefined, null)
+    const user = userEvent.setup()
+    renderApp('/reception/bookings/new?memberId=2&q=Taylor&week=2026-10-19')
+
+    await user.click(await screen.findByRole('radio', { name: /Basketball Foundations/ }))
+
+    expect(await screen.findByText('Demo Account Restricted')).toBeInTheDocument()
+    expect(
+      screen.getByText('Synthetic members cannot use operational classes or training records. Simulated packages cannot be used to book live sessions.'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirm booking' })).toBeDisabled()
+    expect(writes(calls, 'POST')).toHaveLength(0)
+  })
 })

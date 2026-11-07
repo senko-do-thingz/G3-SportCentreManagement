@@ -13,7 +13,7 @@ public record SessionDetailResponse(SessionResponse session, boolean memberConte
 
     public enum EligibilityReason {
         NO_PACKAGE, NO_SESSIONS_LEFT, PACKAGE_EXPIRED_BY_THEN, PACKAGE_NOT_STARTED_BY_THEN,
-        FULL, ALREADY_BOOKED, CAPACITY_UNAVAILABLE
+        FULL, ALREADY_BOOKED, CAPACITY_UNAVAILABLE, SYNTHETIC_OPERATION_DENIED
     }
 
     public record SuitableRegistration(Long registrationId, String registrationCode,
