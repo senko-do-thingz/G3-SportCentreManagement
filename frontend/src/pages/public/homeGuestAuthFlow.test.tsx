@@ -92,7 +92,7 @@ describe('Home guest authentication gate', () => {
 
   it.each([
     ...SPORTS.map((sport) => [`Explore ${sport.name}`, /current classes/]),
-    ['View schedule', /member schedule/], ['Membership offers', /membership card options/], ['View cards', /membership card options/],
+    ['Browse all classes', /current classes/], ['Membership offers', /membership card options/], ['View cards', /membership card options/],
     ...PACKAGES.map((pkg) => [`View options for ${pkg.name}`, /review package options/]),
   ] as [string, RegExp][])('gates %s on Home with the shared contextual dialog', async (name, description) => {
     const { calls } = installFakeFetch(catalogue)
@@ -219,6 +219,7 @@ describe('Home guest authentication gate', () => {
     await user.click(screen.getByRole('link', { name: 'Sign up' }))
     expect(JSON.parse(screen.getByLabelText('Route state').textContent!)).toEqual({ from: '/member/packages/81' })
     await registration(user)
+    await user.click(await screen.findByRole('link', { name: 'Continue where you left off' }))
     await waitFor(() => expect(screen.getByLabelText('Current location')).toHaveTextContent('/member/packages/81'))
     await screen.findByRole('button', { name: /Confirm registration/ })
     expect(screen.queryByRole('heading', { name: 'We could not load the package' })).not.toBeInTheDocument()

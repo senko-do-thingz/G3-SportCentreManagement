@@ -28,8 +28,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.sportify.identity.repository.UserRefreshTokenRepository;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -44,6 +46,7 @@ public class UserServiceImpl implements UserService {
     private final AuditService auditService;
     private final EntityManager entityManager;
     private final Clock clock;
+    private final UserRefreshTokenRepository userRefreshTokenRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -104,6 +107,7 @@ public class UserServiceImpl implements UserService {
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         // Flush the versioned update first: a stale check cannot commit or emit a successful audit.
         users.flush();
+        userRefreshTokenRepository.revokeAllForUser(user.getId(), LocalDateTime.now(clock));
         auditService.record(AuditEvent.builder().actor(user).action(AuditAction.PASSWORD_CHANGED)
                 .entityType("USER_ACCOUNT").entityId(user.getId()).summary("Password changed").build());
     }

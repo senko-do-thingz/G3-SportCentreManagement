@@ -377,8 +377,17 @@
       "sha256_lf": "b8c102dc5aafbbc823cfc7de66181ab71014f9323420c4a55ce8858e28184169"
     },
     {
-      "path": "backend/src/main/resources/db/migration/catalog/V47__member_sport_level_and_saved_recommendation.sql",
+      "path": "backend/src/main/resources/db/migration/identity/V47__user_refresh_token.sql",
       "version": 47,
+      "creates": [
+        "[user_refresh_token]"
+      ],
+      "drops": [],
+      "sha256_lf": "cc12e8207da90854df0cc9f0cc3fafc4637b796e2b02f5aa850158d5bc7e1edf"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V48__member_sport_level_and_saved_recommendation.sql",
+      "version": 48,
       "creates": [
         "member_sport_level",
         "saved_recommendation"
@@ -387,7 +396,7 @@
       "sha256_lf": "aab2855d0af60805a8f0a75b056e26782888eca8819193074da5b1a19a854562"
     }
   ],
-  "create_occurrences": 72,
+  "create_occurrences": 73,
   "create_names": [
     "[activity_log]",
     "[age_group]",
@@ -438,6 +447,7 @@
     "[support_request_message]",
     "[system_setting]",
     "[user_avatar]",
+    "[user_refresh_token]",
     "[waitlist_entry]",
     "[workout_plan]",
     "[workout_plan_candidate]",
@@ -612,6 +622,12 @@
       "path": "backend/src/main/java/com/sportify/identity/entity/UserAccount.java",
       "tables": [
         "user_account"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/sportify/identity/entity/UserRefreshToken.java",
+      "tables": [
+        "user_refresh_token"
       ]
     },
     {

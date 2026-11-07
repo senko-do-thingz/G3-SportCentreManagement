@@ -92,7 +92,7 @@ afterEach(() => {
 /** Home actions that need a Member session, with the destination each one must resume. */
 const HOME_ACTIONS: { name: string; link: RegExp | string; nth?: number; destination: string }[] = [
   { name: 'Membership offers in the hero strip', link: 'Membership offers', destination: '/member/membership/cards' },
-  { name: 'View schedule in the sports section', link: 'View schedule', destination: '/member/schedule' },
+  { name: 'Browse all classes in the sports section', link: 'Browse all classes', destination: '/member/classes' },
   { name: 'View options on a package card', link: 'View options for Football Independent', destination: '/member/packages/81' },
   { name: 'View cards in the membership band', link: 'View cards', destination: '/member/membership/cards' },
 ]
@@ -120,6 +120,9 @@ describe('UI-05 guest return navigation matrix', () => {
     await user.click(within(screen.getByRole('dialog')).getByRole('link', { name: 'Create account' }))
     await screen.findByRole('heading', { name: 'Create your account' })
     await signUp(user)
+    expect(await screen.findByRole('heading', { name: 'Registration Successful!' })).toBeInTheDocument()
+    expect(location()).toBe('/register')
+    await user.click(screen.getByRole('link', { name: 'Continue where you left off' }))
     await waitFor(() => expect(location()).toBe(destination))
     expect(calls.filter((call) => call.method !== 'GET').map((call) => call.path)).toEqual(['/auth/register'])
   })
@@ -128,10 +131,10 @@ describe('UI-05 guest return navigation matrix', () => {
     memberBackend()
     const user = userEvent.setup()
     app()
-    await user.click(await screen.findByRole('link', { name: 'View schedule' }))
+    await user.click(await screen.findByRole('link', { name: 'Browse all classes' }))
     await user.click(within(screen.getByRole('dialog')).getByRole('link', { name: 'Log in' }))
     await logIn(user)
-    await waitFor(() => expect(location()).toBe('/member/schedule'))
+    await waitFor(() => expect(location()).toBe('/member/classes'))
     await user.click(screen.getByRole('button', { name: 'Test browser Back' }))
     await waitFor(() => expect(location()).toBe('/'))
     expect(screen.queryByRole('heading', { name: 'Welcome back' })).not.toBeInTheDocument()
