@@ -64,6 +64,7 @@ describe('Home account navigation', () => {
     expect(screen.getByRole('button', { name: 'Switch to light mode' })).toBeInTheDocument()
     await fillRegistration(user)
     await user.click(screen.getByRole('button', { name: 'Create account' }))
+    await user.click(await screen.findByRole('link', { name: 'Go to Dashboard' }))
     await screen.findByRole('heading', { name: 'Member Dashboard' })
     expect(document.documentElement.dataset.theme).toBe('dark')
     expect(calls.filter((call) => call.path === '/auth/register')).toHaveLength(1)
