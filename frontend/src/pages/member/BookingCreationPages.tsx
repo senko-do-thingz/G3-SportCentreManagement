@@ -80,7 +80,7 @@ function BookingOptionsContent({ sessionId, returnTo }: { sessionId: number | Se
         </div>
       </Card>
       <Card title="Choose a package">
-        {!canContinue ? <div className="booking-empty"><p>No eligible package registration is available for this session.</p><Link className={buttonClassName()} to={`/member/packages?${new URLSearchParams({ sport: String(detail.session.sportId), format: detail.session.trainingFormat })}`}>View other packages</Link></div> : <fieldset className="booking-package-options">
+        {!canContinue ? <div className="booking-empty"><p>{status === 'SYNTHETIC_OPERATION_DENIED' ? 'Operational booking is unavailable for synthetic or demo member accounts.' : 'No eligible package registration is available for this session.'}</p>{status !== 'SYNTHETIC_OPERATION_DENIED' && <Link className={buttonClassName()} to={`/member/packages?${new URLSearchParams({ sport: String(detail.session.sportId), format: detail.session.trainingFormat })}`}>View other packages</Link>}</div> : <fieldset className="booking-package-options">
           <legend className="visually-hidden">Eligible packages</legend>
           {options.map((registration) => <label className={`booking-package${selected.registrationId === registration.registrationId ? ' booking-package--selected' : ''}`} key={registration.registrationId}>
             <input type="radio" name="packageRegistrationId" value={registration.registrationId} checked={selected.registrationId === registration.registrationId} onChange={() => setSelectedId(registration.registrationId)} />

@@ -185,6 +185,21 @@ class UnifiedDemoDatabaseIntegrationTest extends LocalDemoWorkflow {
         long session = jdbcTemplate.queryForObject("SELECT id FROM class_session WHERE facility_id=(SELECT id FROM facility WHERE code='UNIFY-OPS')", Long.class);
         var baseline = operationalSnapshot(session, actual.getId());
         assertThat(confirm(simulated.getPaymentId(), "ops@unified-demo.invalid").getStatusCode()).isEqualTo(HttpStatus.OK);
+        for (String path : java.util.List.of("/api/v1/sessions/" + session, "/api/v1/sessions/by-code/" + code)) {
+            var detail = restTemplate.exchange(path, HttpMethod.GET, new HttpEntity<>(authHeaders(synthetic)), String.class);
+            assertThat(detail.getStatusCode()).isEqualTo(HttpStatus.OK);
+            var json = new com.fasterxml.jackson.databind.ObjectMapper().readTree(detail.getBody());
+            assertThat(json.path("eligible").asBoolean()).isFalse();
+            assertThat(json.path("reason").asText()).isEqualTo("SYNTHETIC_OPERATION_DENIED");
+            assertThat(json.path("suitableRegistrations")).isEmpty();
+        }
+        var staffEligibility = restTemplate.exchange("/api/v1/sessions/" + session + "/eligibility?memberId=" + owner,
+                HttpMethod.GET, new HttpEntity<>(authHeaders(reception)), String.class);
+        assertThat(staffEligibility.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var staffJson = new com.fasterxml.jackson.databind.ObjectMapper().readTree(staffEligibility.getBody());
+        assertThat(staffJson.path("eligible").asBoolean()).isFalse();
+        assertThat(staffJson.path("reason").asText()).isEqualTo("SYNTHETIC_OPERATION_DENIED");
+        assertThat(staffJson.path("suitableRegistrations")).isEmpty();
         Map<String,Object> syntheticBooking = Map.of("sessionId",session,"packageRegistrationId",simulated.getId());
         for (var attempt : new Object[][]{{syntheticBooking,synthetic},
                 {Map.of("sessionId",session,"packageRegistrationId",simulated.getId(),"memberId",owner),reception}}) {
@@ -237,7 +252,13 @@ class UnifiedDemoDatabaseIntegrationTest extends LocalDemoWorkflow {
     }
 
     private void assertPaidMemberImpactWithSimulationDisabled(long session,
-            com.sportify.catalog.dto.PackageRegistrationResponse actual, String real, String reception) {
+            com.sportify.catalog.dto.PackageRegistrationResponse actual, String real, String reception) throws Exception {
+        var realEligible = restTemplate.exchange("/api/v1/sessions/" + session, HttpMethod.GET, new HttpEntity<>(authHeaders(real)), String.class);
+        assertThat(realEligible.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var realBeforeJson = new com.fasterxml.jackson.databind.ObjectMapper().readTree(realEligible.getBody());
+        assertThat(realBeforeJson.path("eligible").asBoolean()).isTrue();
+        assertThat(realBeforeJson.path("reason").isNull()).isTrue();
+        assertThat(realBeforeJson.path("suitableRegistrations")).isNotEmpty();
         String control=login("control@example.test"); var controlRegistration=purchase(control);
         var amount=jdbcTemplate.queryForObject("SELECT amount FROM payment WHERE id=?",java.math.BigDecimal.class,controlRegistration.getPaymentId());
         assertThat(write("/api/v1/payments/"+controlRegistration.getPaymentId()+"/confirm",HttpMethod.PUT,
@@ -259,6 +280,12 @@ class UnifiedDemoDatabaseIntegrationTest extends LocalDemoWorkflow {
                 Map.of("app.payment.unified-demo.enabled","false")));
         try {
             assertThat(context.getBean(com.sportify.demoqr.service.LocalDemoPaymentService.class).isEnabled()).isFalse();
+            var realAfter = restTemplate.exchange("/api/v1/sessions/" + session, HttpMethod.GET, new HttpEntity<>(authHeaders(real)), String.class);
+            assertThat(realAfter.getStatusCode()).isEqualTo(HttpStatus.OK);
+            var realAfterJson = new com.fasterxml.jackson.databind.ObjectMapper().readTree(realAfter.getBody());
+            assertThat(realAfterJson.path("eligible").asBoolean()).isFalse();
+            assertThat(realAfterJson.path("reason").asText()).isEqualTo("SYNTHETIC_OPERATION_DENIED");
+            assertThat(realAfterJson.path("suitableRegistrations")).isEmpty();
             assertThat(write("/api/v1/bookings",HttpMethod.POST,Map.of("sessionId",session,"packageRegistrationId",actual.getId()),real).getBody()).contains("SYNTHETIC_OPERATION_DENIED");
             assertThat(operationalSnapshot(session,actual.getId())).isEqualTo(before);
             long invoice=jdbcTemplate.queryForObject("SELECT id FROM invoice WHERE payment_id=?",Long.class,actual.getPaymentId());
