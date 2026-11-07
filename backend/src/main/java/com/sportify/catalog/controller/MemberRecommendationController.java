@@ -24,6 +24,22 @@ import java.util.List;
 public class MemberRecommendationController {
     private final MemberRecommendationService service;
 
+    @GetMapping("/context")
+    public MemberRecommendationService.TrainingContext context(@AuthenticationPrincipal CustomUserDetails user) {
+        return service.context(user.getUserAccount().getId());
+    }
+
+    @PutMapping("/preferred-sports")
+    public MemberRecommendationService.TrainingContext preferredSports(@Valid @RequestBody MemberRecommendationService.PreferredSports request,
+                                                                       @AuthenticationPrincipal CustomUserDetails user) {
+        return service.savePreferredSports(user.getUserAccount().getId(), request.sportIds());
+    }
+
+    @GetMapping("/recommendations/classes/{classId}/sessions")
+    public MemberRecommendationService.SuitableSessions suitableSessions(@PathVariable long classId, @AuthenticationPrincipal CustomUserDetails user) {
+        return service.suitableSessions(user.getUserAccount().getId(), classId);
+    }
+
     @GetMapping("/sport-levels")
     public List<SportLevel> sportLevels(@AuthenticationPrincipal CustomUserDetails user) {
         return service.sportLevels(user.getUserAccount().getId());

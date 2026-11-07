@@ -62,7 +62,7 @@ it('removes a saved recommendation and shows when no session is available', asyn
     return json(200, [])
   })
   renderApp('/member/training/recommendations')
-  expect(await screen.findByText('No upcoming session with available places right now.')).toBeInTheDocument()
+  expect(await screen.findByText(/^No upcoming session you can book right now/)).toBeInTheDocument()
   expect(screen.getByText('Swimming - Beginner - Self-training')).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'Remove saved recommendation: Morning swim' }))
   expect(await screen.findByText('No saved recommendations')).toBeInTheDocument()

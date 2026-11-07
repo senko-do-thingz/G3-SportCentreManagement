@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -89,6 +90,7 @@ class MemberRecommendationIntegrationTest extends AbstractIntegrationTest {
         String like = marker + "%";
         jdbc.update("DELETE FROM saved_recommendation WHERE member_id IN (" + users + ")", like);
         jdbc.update("DELETE FROM member_sport_level WHERE member_id IN (" + users + ")", like);
+        jdbc.update("DELETE FROM member_sport_interest WHERE member_id IN (" + users + ")", like);
         jdbc.update("DELETE FROM booking WHERE member_id IN (" + users + ")", like);
         jdbc.update("DELETE FROM class_session WHERE sport_id IN (" + sports + ")", like);
         jdbc.update("DELETE FROM sport_class WHERE sport_id IN (" + sports + ")", like);
@@ -181,6 +183,88 @@ class MemberRecommendationIntegrationTest extends AbstractIntegrationTest {
 
         jdbc.update("UPDATE sport_class SET is_active = 0 WHERE id = ?", saved);
         mvc.perform(post("/api/v1/member/training/saved-recommendations").with(user(details(member))).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void savedNextSessionUsesTheBookingFiltersAndRetiredClassesAreFlagged() {
+        long saved = classOf(sportA, "BEGINNER", null);
+        long next = session(saved, sportA, facilityA, LocalTime.of(14, 0), LocalTime.of(15, 0));
+        recommendations.save(member, new MemberRecommendationService.SaveRequest(saved, null));
+        assertThat(recommendations.saved(member)).singleElement().satisfies(item -> {
+            assertThat(item.available()).isTrue();
+            assertThat(item.nextSession().sessionId()).isEqualTo(next);
+        });
+        // A confirmed booking in another class at an overlapping time hides that session, as the booking rule would reject it.
+        long other = classOf(sportA, "BEGINNER", null);
+        long overlapping = session(other, sportA, facility(sportA), LocalTime.of(14, 30), LocalTime.of(15, 30));
+        jdbc.update("INSERT INTO booking(booking_code, session_id, member_id, status) VALUES (?, ?, ?, 'CONFIRMED')", code(), overlapping, member);
+        assertThat(recommendations.saved(member)).singleElement().satisfies(item -> assertThat(item.nextSession()).isNull());
+        jdbc.update("DELETE FROM booking WHERE session_id = ? AND member_id = ?", overlapping, member);
+        // A class retired after saving stays listed for removal, without a session to book.
+        jdbc.update("UPDATE sport_class SET is_active = 0 WHERE id = ?", saved);
+        assertThat(recommendations.saved(member)).singleElement().satisfies(item -> {
+            assertThat(item.available()).isFalse();
+            assertThat(item.nextSession()).isNull();
+        });
+    }
+
+    @Test
+    void preferredSportsAreReplacedValidatedAndRaiseRecommendations() throws Exception {
+        assertThat(recommendations.context(member).preferredSportIds()).isEmpty();
+        assertThat(recommendations.savePreferredSports(member, List.of(sportB, sportA, sportB)).preferredSportIds()).containsExactlyInAnyOrder(sportA, sportB);
+        assertThat(recommendations.savePreferredSports(member, List.of(sportB)).preferredSportIds()).containsExactly(sportB);
+        assertThat(recommendations.context(otherMember).preferredSportIds()).isEmpty();
+        mvc.perform(put("/api/v1/member/training/preferred-sports").with(user(details(member))).contentType(MediaType.APPLICATION_JSON).content("{\"sportIds\":[" + Long.MAX_VALUE + "]}"))
+                .andExpect(status().isNotFound());
+        assertThat(recommendations.context(member).preferredSportIds()).containsExactly(sportB);
+
+        long preferredClass = classOf(sportB, "BEGINNER", null);
+        session(preferredClass, sportB, facilityB, LocalTime.of(9, 0), LocalTime.of(10, 0));
+        var items = guidance.recommendations(member, new Preferences(null, null, null, TOMORROW, TOMORROW, null, null, 0, 20)).items();
+        assertThat(items).filteredOn(item -> item.classId() == preferredClass).singleElement()
+                .satisfies(item -> assertThat(item.reasons()).contains("One of your preferred sports"));
+    }
+
+    @Test
+    void formatAndDayFiltersNarrowRecommendations() {
+        long selfClass = classOf(sportA, "BEGINNER", null);
+        session(selfClass, sportA, facilityA, LocalTime.of(9, 0), LocalTime.of(10, 0));
+        var coachOnly = guidance.recommendations(member, new Preferences(sportA, null, null, TOMORROW, TOMORROW, null, null, 0, 20, "COACH_LED", null)).items();
+        assertThat(coachOnly).noneMatch(item -> item.classId() == selfClass);
+        var otherDay = java.util.EnumSet.complementOf(java.util.EnumSet.of(TOMORROW.getDayOfWeek()));
+        assertThat(guidance.recommendations(member, new Preferences(sportA, null, null, TOMORROW, TOMORROW, null, null, 0, 20, null, otherDay)).items())
+                .noneMatch(item -> item.classId() == selfClass);
+        assertThat(guidance.recommendations(member, new Preferences(sportA, null, null, TOMORROW, TOMORROW, null, null, 0, 20, "SELF_TRAINING", java.util.EnumSet.of(TOMORROW.getDayOfWeek()))).items())
+                .anyMatch(item -> item.classId() == selfClass);
+        assertThatThrownBy(() -> guidance.recommendations(member, new Preferences(sportA, null, null, TOMORROW, TOMORROW, null, null, 0, 20, "GROUP", null)))
+                .isInstanceOf(com.sportify.core.exception.BusinessRuleException.class);
+    }
+
+    @Test
+    void suitableSessionsExplainAvailabilityAndPackageAccessWithoutBooking() throws Exception {
+        long recommended = classOf(sportA, "BEGINNER", null);
+        long open = session(recommended, sportA, facilityA, LocalTime.of(8, 0), LocalTime.of(9, 0));
+        long full = session(recommended, sportA, facilityA, LocalTime.of(10, 0), LocalTime.of(11, 0));
+        jdbc.update("UPDATE class_session SET booked_count = capacity WHERE id = ?", full);
+        long mine = session(recommended, sportA, facilityA, LocalTime.of(12, 0), LocalTime.of(13, 0));
+        jdbc.update("INSERT INTO booking(booking_code, session_id, member_id, status) VALUES (?, ?, ?, 'CONFIRMED')", code(), mine, member);
+        long clash = session(recommended, sportA, facilityA, LocalTime.of(16, 0), LocalTime.of(17, 0));
+        long elsewhere = session(classOf(sportA, "BEGINNER", null), sportA, facility(sportA), LocalTime.of(16, 30), LocalTime.of(17, 30));
+        jdbc.update("INSERT INTO booking(booking_code, session_id, member_id, status) VALUES (?, ?, ?, 'CONFIRMED')", code(), elsewhere, member);
+        int bookings = count("SELECT COUNT(*) FROM booking WHERE member_id = ?", member);
+
+        var result = recommendations.suitableSessions(member, recommended);
+        var byId = result.sessions().stream().collect(java.util.stream.Collectors.toMap(MemberRecommendationService.SuitableSession::sessionId, s -> s));
+        assertThat(byId.get(open).availability()).isEqualTo("AVAILABLE");
+        assertThat(byId.get(full).availability()).isEqualTo("FULL");
+        assertThat(byId.get(mine).availability()).isEqualTo("BOOKED");
+        assertThat(byId.get(clash).availability()).isEqualTo("OVERLAP");
+        assertThat(byId.get(open).packageCheck()).isEqualTo("NO_PACKAGE");
+        assertThat(count("SELECT COUNT(*) FROM booking WHERE member_id = ?", member)).isEqualTo(bookings);
+
+        jdbc.update("UPDATE sport_class SET is_active = 0 WHERE id = ?", recommended);
+        mvc.perform(get("/api/v1/member/training/recommendations/classes/" + recommended + "/sessions").with(user(details(member))))
                 .andExpect(status().isNotFound());
     }
 

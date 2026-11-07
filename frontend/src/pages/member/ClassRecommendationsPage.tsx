@@ -1,7 +1,9 @@
 import { formatCalendarDate } from '../../utils/date'
 import { sessionIdText } from '../../api/sessionIdentity'
 import { useCallback, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import { RecommendationTabs } from './RecommendationTabs'
+import { FORMAT_OPTIONS, WEEKDAYS } from './trainingAvailability'
 import { trainingGuidanceApi, type ClassRecommendation, type RecommendationPreferences, type SavedRecommendation, type SportLevel } from '../../api/trainingGuidanceApi'
 import { packagesApi } from '../../api/packagesApi'
 import { Button, Card, EmptyState, Input, PageHeader, Select } from '../../components/ui'
@@ -15,25 +17,43 @@ const loadSportLevels = (signal: AbortSignal) => trainingGuidanceApi.sportLevels
 const loadSaved = (signal: AbortSignal) => trainingGuidanceApi.savedRecommendations(signal)
 const levelLabel = (value: string | null) => LEVEL_OPTIONS.find(option => option.value === value)?.label ?? value ?? ''
 
+/** Filters handed over from My goals (F5-01) in the query string; anything unexpected is ignored. */
+function initialPreferences(params: URLSearchParams): RecommendationPreferences {
+  const format = params.get('format')
+  const days = (params.get('days') ?? '').split(',').filter(day => WEEKDAYS.some(item => item.value === day))
+  const time = (key: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(params.get(key) ?? '') ? params.get(key)! : undefined
+  return { page: 0, size: 10, ...(format === 'COACH_LED' || format === 'SELF_TRAINING' ? { format } : {}),
+    ...(days.length ? { days: days.join(',') } : {}), ...(time('earliest') ? { earliest: time('earliest') } : {}), ...(time('latest') ? { latest: time('latest') } : {}) }
+}
+
 export function ClassRecommendationsPage() {
-  const [preferences, setPreferences] = useState<RecommendationPreferences>({ page: 0, size: 10 })
+  const [params] = useSearchParams()
+  const [initial] = useState(() => initialPreferences(params))
+  const [preferences, setPreferences] = useState<RecommendationPreferences>(initial)
   const [savedRevision, refreshSaved] = useState(0)
   const load = useCallback((signal: AbortSignal) => trainingGuidanceApi.recommendations(preferences, signal), [preferences])
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const values = new FormData(event.currentTarget)
     const text = (key: string) => String(values.get(key) ?? '').trim() || undefined
+    const days = values.getAll('days').map(String)
     setPreferences({ sportId: text('sportId') ? Number(text('sportId')) : undefined, level: text('level'), goal: text('goal'),
-      from: text('from'), to: text('to'), earliest: text('earliest'), latest: text('latest'), page: 0, size: 10 })
+      from: text('from'), to: text('to'), earliest: text('earliest'), latest: text('latest'), page: 0, size: 10,
+      ...(text('format') ? { format: text('format') } : {}), ...(days.length ? { days: days.join(',') } : {}) })
   }
-  return <div className="training-page"><PageHeader title="Class recommendations" description="RULE_BASED suggestions from published center sessions. Saved level and goal are used when left blank. No generative AI provider is configured." />
+  const initialDays = initial.days?.split(',') ?? []
+  return <div className="training-page"><RecommendationTabs /><PageHeader title="Class recommendations" description="RULE_BASED suggestions from published center sessions. Saved level and goal are used when left blank. No generative AI provider is configured." />
     <Card title="Your preferences"><form className="training-form" onSubmit={submit}>
       <TrainingData load={loadSports}>{sports => <Select label="Preferred sport" name="sportId" placeholder="All sports" options={sports.map(s => ({ value: String(s.id), label: s.name }))} />}</TrainingData>
       <Select label="Preferred level" name="level" placeholder="Use saved level" options={LEVEL_OPTIONS} />
       <Select label="Training goal" name="goal" placeholder="Use saved goal" options={GOAL_OPTIONS} />
+      <Select label="Training format" name="format" placeholder="Coach-led or self-training" options={FORMAT_OPTIONS} defaultValue={initial.format ?? ''} />
+      <fieldset><legend>Available days (leave all unticked for any day)</legend><div className="training-actions">
+        {WEEKDAYS.map(day => <label key={day.value}><input type="checkbox" name="days" value={day.value} defaultChecked={initialDays.includes(day.value)} /> {day.label}</label>)}
+      </div></fieldset>
       <Input label="Available from date" name="from" type="date" /><Input label="Available to date" name="to" type="date" />
-      <Input label="Earliest start time" name="earliest" type="time" /><Input label="Latest end time" name="latest" type="time" />
-      <p>Use a future range of up to 30 days. Times use Vietnam time (UTC+7).</p><Button type="submit">Find recommendations</Button>
+      <Input label="Earliest start time" name="earliest" type="time" defaultValue={initial.earliest} /><Input label="Latest end time" name="latest" type="time" defaultValue={initial.latest} />
+      <p>Use a future range of up to 30 days. Times use Vietnam time (UTC+7). Set your goals, preferred sports and usual availability in <Link to="/member/training/goals">My goals</Link>.</p><Button type="submit">Find recommendations</Button>
     </form></Card>
     <Card title="Your level per sport">
       <p>Set a level for a sport you train. When Preferred level is left blank, recommendations for that sport use it instead of your general profile level.</p>
@@ -44,11 +64,13 @@ export function ClassRecommendationsPage() {
         <p>{item.sportName} - {item.level} - {item.coachName ?? 'Self-training'} - {formatCalendarDate(item.date)} {item.startTime.slice(0,5)}-{item.endTime.slice(0,5)}</p>
         <p>{item.freeSeats} available places - Preference score: {item.score}</p><ul>{item.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>
         <Link to={`/member/sessions/${item.sessionCode ?? item.sessionId}`}>View details and booking rules: {item.className} - {sessionIdText(item.sessionCode)}</Link>
+        {' '}<Link to={`/member/training/recommendations/classes/${item.classId}`}>All suitable sessions: {item.className}</Link>
         <SaveRecommendationButton item={item} onSaved={() => refreshSaved(value => value + 1)} /></li>)}</ul>
         : <EmptyState title="No matching available classes" description="Try another date range or sport. A full or unpublished class is not recommended." />}
       <div className="training-actions"><Button variant="secondary" disabled={data.page === 0} onClick={() => setPreferences(p => ({ ...p, page: data.page - 1 }))}>Previous recommendations</Button>
         <Button variant="secondary" disabled={(data.page+1)*data.size >= data.totalMatches} onClick={() => setPreferences(p => ({ ...p, page: data.page + 1 }))}>Next recommendations</Button></div>
     </Card>}</TrainingData>
+    <div id="saved" />
     <Card title="Saved recommendations">
       <p>Saved recommendations are not bookings. Availability, schedule and package eligibility are checked again when you choose a session.</p>
       <TrainingData key={savedRevision} load={loadSaved}>{saved => <SavedRecommendations saved={saved} onChanged={() => refreshSaved(value => value + 1)} />}</TrainingData>
@@ -104,9 +126,11 @@ function SavedRecommendations({ saved, onChanged }: { saved: SavedRecommendation
     <ul className="training-list">{saved.map(item => <li key={item.id}><h3>{item.className}</h3>
       <p>{item.sportName} - {levelLabel(item.level)} - {item.coachName ?? 'Self-training'}</p>
       {item.reason && <p>Why saved: {item.reason}</p>}
-      {item.nextSession
-        ? <Link to={`/member/sessions/${item.nextSession.sessionCode ?? item.nextSession.sessionId}`}>Next session: {item.className} - {formatCalendarDate(item.nextSession.date)} {item.nextSession.startTime.slice(0,5)}-{item.nextSession.endTime.slice(0,5)} - {item.nextSession.freeSeats} available places</Link>
-        : <p>No upcoming session with available places right now.</p>}
+      {item.available === false
+        ? <p role="status">This class is no longer offered. Remove it from your saved recommendations.</p>
+        : item.nextSession
+          ? <Link to={`/member/sessions/${item.nextSession.sessionCode ?? item.nextSession.sessionId}`}>Next session: {item.className} - {formatCalendarDate(item.nextSession.date)} {item.nextSession.startTime.slice(0,5)}-{item.nextSession.endTime.slice(0,5)} - {item.nextSession.freeSeats} available places</Link>
+          : <p>No upcoming session you can book right now (already booked, overlapping one of your bookings, outside the age group or full).</p>}
       <div className="training-actions"><Button variant="secondary" disabled={action.pending} onClick={() => { void action.run(async () => {
         await trainingGuidanceApi.removeSavedRecommendation(item.id)
         onChanged()

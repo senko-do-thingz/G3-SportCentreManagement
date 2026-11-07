@@ -25,6 +25,7 @@ public class TrainingGuidanceService {
     private final VisibleTrainingSessions visibility;
     private static final Set<String> LEVELS = Set.of("BEGINNER", "INTERMEDIATE", "ADVANCED");
     private static final Set<String> GOALS = Set.of("IMPROVE_FITNESS", "BUILD_SKILLS", "COMPETITION");
+    private static final Set<String> FORMATS = Set.of("COACH_LED", "SELF_TRAINING");
 
     public Recommendations recommendations(long memberId, Preferences request) {
         var profile = jdbc.query("""
@@ -49,12 +50,16 @@ public class TrainingGuidanceService {
             || request.sportId() != null && request.sportId() <= 0
             || request.earliest() != null && request.latest() != null && !request.earliest().isBefore(request.latest()))
             throw new BusinessRuleException("Use a future date range of at most 30 days, valid times and page size 1-20");
+        String format = optional(request.format());
+        if (format != null && !FORMATS.contains(format)) throw new BusinessRuleException("Select a supported training format: COACH_LED or SELF_TRAINING");
+        var days = request.days() == null || request.days().isEmpty() ? null : Set.copyOf(request.days());
         // Sessions overlapping a CONFIRMED booking of this member are never recommended: the booking rule (E2E-BUG-01)
         // would reject them. Same strict intersection as BookingRepository.findOverlappingConfirmedSessionCodes.
         StringBuilder sql = new StringBuilder("""
             SELECT c.id class_id,c.name class_name,sp.id sport_id,sp.name sport_name,c.level,u.full_name coach_name,
                 s.id session_id,s.session_code,s.training_type,s.session_date,s.start_time,s.end_time,s.capacity-s.booked_count free_seats,
                 msl.level sport_level,ag.label age_label,ag.min_age,ag.max_age,
+                CASE WHEN EXISTS(SELECT 1 FROM member_sport_interest msi WHERE msi.member_id=? AND msi.sport_id=sp.id) THEN 1 ELSE 0 END preferred,
                 CASE WHEN EXISTS(SELECT 1 FROM attendance_record a JOIN class_session h ON h.id=a.session_id
                     WHERE a.member_id=? AND h.sport_id=sp.id AND a.status IN ('PRESENT','LATE')) THEN 1 ELSE 0 END familiar
             FROM sport_class c JOIN sport sp ON sp.id=c.sport_id JOIN class_session s ON s.class_id=c.id
@@ -69,9 +74,10 @@ public class TrainingGuidanceService {
                     WHERE ob.member_id=? AND ob.status='CONFIRMED' AND os.status<>'CANCELLED'
                         AND os.session_date=s.session_date AND os.start_time<s.end_time AND os.end_time>s.start_time)
             """);
-        var values = new ArrayList<Object>(List.of(memberId, memberId, Date.valueOf(from), Date.valueOf(to), Date.valueOf(today),
+        var values = new ArrayList<Object>(List.of(memberId, memberId, memberId, Date.valueOf(from), Date.valueOf(to), Date.valueOf(today),
             Time.valueOf(LocalTime.now(clock)), memberId, memberId));
         if (request.sportId() != null) { sql.append(" AND sp.id=?"); values.add(request.sportId()); }
+        if (format != null) { sql.append(" AND s.training_type=?"); values.add(format); }
         // Level: an explicit request wins; otherwise the saved level for the session's sport, then the general level.
         if (explicitLevel != null) { sql.append(" AND c.level=?"); values.add(explicitLevel); }
         else if (profileLevel != null) { sql.append(" AND c.level=COALESCE(msl.level,?)"); values.add(profileLevel); }
@@ -82,6 +88,7 @@ public class TrainingGuidanceService {
         final String generalLevel = profileLevel;
         var candidates = new ArrayList<>(jdbc.query(sql.toString(), (rs,row) -> {
             LocalDate date = rs.getDate("session_date").toLocalDate();
+            if (days != null && !days.contains(date.getDayOfWeek())) return null;
             String ageLabel = rs.getString("age_label");
             if (ageLabel != null && dateOfBirth != null && !fitsAge(dateOfBirth, date,
                     rs.getObject("min_age", Integer.class), rs.getObject("max_age", Integer.class))) return null;
@@ -89,6 +96,9 @@ public class TrainingGuidanceService {
             reasons.add("Published upcoming session with " + rs.getInt("free_seats") + " available places");
             int score = 0;
             if (request.sportId() != null) { score += 50; reasons.add("Matches your selected sport"); }
+            else if (rs.getBoolean("preferred")) { score += 10; reasons.add("One of your preferred sports"); }
+            if (format != null) reasons.add(format.equals("COACH_LED") ? "Coach-led, as you prefer" : "Self-training, as you prefer");
+            if (days != null) reasons.add("On one of your available days (" + date.getDayOfWeek().getDisplayName(java.time.format.TextStyle.FULL, Locale.ENGLISH) + ")");
             String sportLevel = rs.getString("sport_level");
             if (explicitLevel != null) { score += 20; reasons.add("Matches your selected level: " + explicitLevel); }
             else if (sportLevel != null) { score += 20; reasons.add("Matches your saved " + rs.getString("sport_name") + " level: " + sportLevel); }

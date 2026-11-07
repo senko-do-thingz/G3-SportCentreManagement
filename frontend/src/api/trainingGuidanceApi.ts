@@ -3,6 +3,10 @@ import type { SessionId } from './sessionIdentity'
 
 export interface RecommendationPreferences {
   sportId?: number; level?: string; goal?: string; from?: string; to?: string; earliest?: string; latest?: string; page?: number; size?: number
+  /** COACH_LED or SELF_TRAINING; omitted means both. */
+  format?: string
+  /** Comma-separated weekday codes such as MON,THU; omitted means any day. */
+  days?: string
 }
 export interface ClassRecommendation {
   sessionCode?: SessionId
@@ -25,10 +29,30 @@ export interface SportLevel { sportId: number; sportName: string; level: string 
 export interface SavedRecommendation {
   id: number; classId: number; className: string; sportName: string; level: string; coachName: string | null
   reason: string | null; savedAt: string
+  /** False once the class or its sport is no longer offered. Older servers omit it. */
+  available?: boolean
   nextSession: { sessionId: number; sessionCode: SessionId | null; date: string; startTime: string; endTime: string; freeSeats: number } | null
+}
+export interface ContextPackage { sportName: string; packageName: string; trainingFormat: string; remainingSessions: number; totalSessions: number; endDate: string }
+export interface TrainingContext {
+  memberName: string; mainGoal: string | null; currentLevel: string | null; dateOfBirthKnown: boolean
+  preferredSportIds: number[]; activePackages: ContextPackage[]
+}
+export type SessionAvailability = 'AVAILABLE' | 'FULL' | 'BOOKED' | 'OVERLAP' | 'AGE'
+export type PackageCheck = 'ELIGIBLE' | 'NO_PACKAGE' | 'NO_SESSIONS_LEFT' | 'OUTSIDE_VALIDITY'
+export interface SuitableSession {
+  sessionId: number; sessionCode: SessionId | null; date: string; startTime: string; endTime: string; trainingType: string
+  facilityName: string | null; freeSeats: number; availability: SessionAvailability; packageCheck: PackageCheck
+}
+export interface SuitableSessions {
+  classId: number; className: string; sportName: string; level: string | null; coachName: string | null; ageGroup: string | null
+  sessions: SuitableSession[]; packages: ContextPackage[]
 }
 const training = '/member/training'
 export const trainingGuidanceApi = {
+  context: (signal: AbortSignal) => api.get<TrainingContext>(`${training}/context`, { signal }),
+  savePreferredSports: (sportIds: number[]) => api.put<TrainingContext>(`${training}/preferred-sports`, { sportIds }),
+  suitableSessions: (classId: number, signal: AbortSignal) => api.get<SuitableSessions>(`${training}/recommendations/classes/${classId}/sessions`, { signal }),
   recommendations: (preferences: RecommendationPreferences, signal: AbortSignal) => api.get<Recommendations>('/member/training/recommendations', { query: { ...preferences }, signal }),
   sportLevels: (signal: AbortSignal) => api.get<SportLevel[]>(`${training}/sport-levels`, { signal }),
   saveSportLevel: (sportId: number, level: string) => api.put<SportLevel>(`${training}/sport-levels/${sportId}`, { level }),
