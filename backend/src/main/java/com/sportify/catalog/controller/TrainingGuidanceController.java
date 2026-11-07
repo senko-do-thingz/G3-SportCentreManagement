@@ -21,9 +21,9 @@ public class TrainingGuidanceController {
     private final TrainingGuidanceService service;
     private final CenterConsultationService consultation;
     @PostMapping("/consultation")
-    public com.sportify.catalog.dto.TrainingGuidanceResponse.Consultation consult(
+    public com.sportify.catalog.dto.TrainingGuidanceResponse.Consultation consult(@AuthenticationPrincipal CustomUserDetails user,
         @Valid @RequestBody com.sportify.catalog.dto.TrainingGuidanceRequest.Consultation request) {
-        return consultation.answer(request.question(),request.optIn());
+        return consultation.answer(user.getUserAccount().getId(),request.question(),request.optIn());
     }
     @GetMapping("/recommendations")
     public Recommendations recommendations(@AuthenticationPrincipal CustomUserDetails user,

@@ -25,6 +25,16 @@ it('requires opt-in, shows grounded sources and clears ephemeral answers when di
   expect(screen.queryByText('120000 VND base price.')).not.toBeInTheDocument()
   expect(screen.getByRole('textbox', { name: /Center question/ })).toHaveValue('')
 })
+it('discloses external AI processing separately from opting into local automated answers', async () => {
+  tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
+  installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER) : json(200, []))
+  renderApp('/member/assistant')
+  const disclosure = await screen.findByLabelText('External AI disclosure')
+  expect(disclosure).toHaveTextContent('turning on consultation does not share your question with any outside company')
+  expect(disclosure).toHaveTextContent('your question text is never sent')
+  expect(disclosure).toHaveTextContent('Names, contact details, numbers and health details are never sent')
+  expect(screen.queryByText(/only your question text/)).not.toBeInTheDocument()
+})
 it('fills example questions only after opt-in and labels curated FAQ sources without calling the API early', async () => {
   tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
   const { calls } = installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER) : json(200, {
@@ -84,4 +94,20 @@ it('makes no consultation request when the feature flag is off', async () => {
   renderApp('/member/assistant')
   expect(await screen.findByText('Automated consultation is disabled')).toBeInTheDocument()
   expect(calls.filter(call => call.path.includes('/consultation'))).toHaveLength(0)
+})
+it('labels a Vietnamese answer in Vietnamese', async () => {
+  tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
+  installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER) : json(200, {
+    mode: 'AI_ASSISTED', status: 'ANSWERED', answer: 'Gói tập và thẻ thành viên đang hoạt động của bạn.', historyStored: false, language: 'vi',
+    sources: [{ kind: 'MY_PACKAGE', id: 5, title: 'Gói cầu lông', detail: 'Cầu lông: còn 6/8 buổi.', path: '/member/membership' }],
+  }))
+  renderApp('/member/assistant')
+  await userEvent.click(await screen.findByLabelText('Enable automated center consultation'))
+  await userEvent.type(screen.getByRole('textbox', { name: /Center question/ }), 'Gói của tôi còn bao nhiêu buổi?')
+  await userEvent.click(screen.getByRole('button', { name: 'Ask center assistant' }))
+  expect(await screen.findByText('Câu trả lời từ dữ liệu trung tâm')).toBeInTheDocument()
+  expect(screen.getByText('Cách tìm ra câu trả lời: AI đã hiểu câu hỏi của bạn.')).toBeInTheDocument()
+  expect(screen.getByText('Loại nguồn: Gói tập của bạn')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Mở nguồn: Gói cầu lông' })).toHaveAttribute('href', '/member/membership')
+  expect(screen.getByRole('link', { name: 'Liên hệ lễ tân về câu trả lời này' })).toBeInTheDocument()
 })
