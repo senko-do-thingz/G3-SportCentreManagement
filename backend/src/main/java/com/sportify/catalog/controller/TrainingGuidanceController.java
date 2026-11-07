@@ -31,7 +31,22 @@ public class TrainingGuidanceController {
         @RequestParam(required=false) String goal, @RequestParam(required=false) LocalDate from,
         @RequestParam(required=false) LocalDate to, @RequestParam(required=false) LocalTime earliest,
         @RequestParam(required=false) LocalTime latest, @RequestParam(defaultValue="0") int page,
-        @RequestParam(defaultValue="10") int size) {
-        return service.recommendations(user.getUserAccount().getId(), new Preferences(sportId,level,goal,from,to,earliest,latest,page,size));
+        @RequestParam(defaultValue="10") int size, @RequestParam(required=false) String format,
+        @RequestParam(required=false) String days) {
+        return service.recommendations(user.getUserAccount().getId(),
+            new Preferences(sportId,level,goal,from,to,earliest,latest,page,size,format,parseDays(days)));
+    }
+
+    /** Comma-separated weekdays such as MON,THU; anything else is a 400. */
+    static java.util.Set<java.time.DayOfWeek> parseDays(String days) {
+        if (days == null || days.isBlank()) return null;
+        var parsed = java.util.EnumSet.noneOf(java.time.DayOfWeek.class);
+        for (String part : days.split(",")) {
+            String code = part.trim().toUpperCase(java.util.Locale.ROOT);
+            var match = java.util.Arrays.stream(java.time.DayOfWeek.values()).filter(day -> day.name().startsWith(code) && code.length() >= 3).findFirst();
+            if (match.isEmpty()) throw new com.sportify.core.exception.BusinessRuleException("Use weekday codes such as MON,THU for available days");
+            parsed.add(match.get());
+        }
+        return parsed;
     }
 }
