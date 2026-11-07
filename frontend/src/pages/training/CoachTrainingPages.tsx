@@ -1,7 +1,7 @@
 import { SessionContext } from '../../components/SessionContext'
 import { sessionIdText, sessionRouteReference } from '../../api/sessionIdentity'
 import { formatCalendarDate } from '../../utils/date'
-import { useCallback, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { staffTrainingApi as training, type BookingCandidate, type StaffPlan, type StaffSession, type TrainingClass, type TrainingMetric, type SessionMember, type DrillDraft, type DrillSuggestions, type DrillOptions } from '../../api/staffTrainingApi'
 import { Button } from '../../components/ui/Button'
@@ -115,10 +115,13 @@ function CreatePlanForm({ classId, members, onSaved }: { classId: number; member
           intro="Drafts use this member's training goal, level, recorded results and your latest feedback. When AI drafting is unavailable, RULE_BASED drafts from the curated catalog are shown. Nothing is assigned until you review the plan and select Assign plan."
           context={<MemberTrainingContext classId={classId} memberId={selectedMemberId} />}
           load={options => training.drillSuggestions(Number(bookingId), options)}
-          onUse={drafts => setSteps(draftSteps(drafts))} />}
+          onUse={(drafts, adjustments) => { setSteps(draftSteps(drafts)); setDescription(current => withAdjustments(current, adjustments)) }} />}
         <Input label="Plan title" name="title" required maxLength={150} value={title} onChange={event => setTitle(event.target.value)} />
         <TrainingTextarea label="Plan description" name="description" maxLength={1000} value={description} onChange={event => setDescription(event.target.value)} />
         <StepFields steps={steps} setSteps={setSteps} />
+        {bookingId && <PlanDraftSummary title={title} steps={steps}
+          audience={(() => { const member = members.find(item => item.bookingId === Number(bookingId)); return member ? `${member.memberName} / Individual draft (booking #${member.bookingId}, ${formatCalendarDate(member.sessionDate)})` : 'Individual draft' })()}
+          shareLabel="Assign plan" />}
         <div className="training-actions">
           <Button variant="secondary" disabled={steps.length >= 100} onClick={() => setSteps(current => [...current, blankStep()])}>Add exercise</Button>
           <Button type="submit" loading={action.pending}>Assign plan</Button>
@@ -156,10 +159,11 @@ function CreateClassPlanForm({ classId }: { classId: number }) {
         <CoachDrillDrafts
           intro="Class drafts use the number of members at each level and with each goal, and the class averages of recorded skills. No individual member data is used. Nothing is assigned until you review the plan and select Assign class plan."
           load={options => training.classDrillSuggestions(classId, options)}
-          onUse={drafts => setSteps(draftSteps(drafts))} />
+          onUse={(drafts, adjustments) => { setSteps(draftSteps(drafts)); setDescription(current => withAdjustments(current, adjustments)) }} />
         <Input label="Plan title" name="title" required maxLength={150} value={title} onChange={event => setTitle(event.target.value)} />
         <TrainingTextarea label="Plan description" name="description" maxLength={1000} value={description} onChange={event => setDescription(event.target.value)} />
         <StepFields steps={steps} setSteps={setSteps} />
+        <PlanDraftSummary title={title} steps={steps} audience="Whole class / Class draft" shareLabel="Assign class plan" />
         <div className="training-actions">
           <Button variant="secondary" disabled={steps.length >= 100} onClick={() => setSteps(current => [...current, blankStep()])}>Add exercise</Button>
           <Button type="submit" loading={action.pending}>Assign class plan</Button>
@@ -192,13 +196,24 @@ function MemberTrainingContext({ classId, memberId }: { classId: number; memberI
 }
 
 interface DrillPreview { mode: DrillSuggestions['mode']; ruleVersion: string; drafts: DrillDraft[]; memberCount?: number }
-function CoachDrillDrafts({ intro, context, load, onUse }: { intro: string; context?: ReactNode; load: (options: DrillOptions) => Promise<DrillPreview>; onUse: (drafts: DrillDraft[]) => void }) {
+/** F5-07 Review Suggested Exercises: drafts as a table, Coach adjustments, then add to the plan or revise the inputs. */
+function CoachDrillDrafts({ intro, context, load, onUse }: { intro: string; context?: ReactNode; load: (options: DrillOptions) => Promise<DrillPreview>; onUse: (drafts: DrillDraft[], adjustments: string) => void }) {
   const [suggestions, setSuggestions] = useState<DrillPreview | null>(null)
   const [selected, setSelected] = useState<number[]>([])
   const [copied, setCopied] = useState(0)
   const [focus, setFocus] = useState('')
   const [sessionMinutes, setSessionMinutes] = useState('')
+  const [adjustments, setAdjustments] = useState('')
+  const focusBox = useRef<HTMLDivElement>(null)
   const action = useTrainingAction()
+  const chosenMinutes = suggestions ? suggestions.drafts.filter((_, index) => selected.includes(index)).reduce((sum, draft) => sum + draft.durationMinutes, 0) : 0
+  function revise() {
+    setSuggestions(null)
+    setSelected([])
+    setCopied(0)
+    action.reset()
+    focusBox.current?.querySelector("input")?.focus()
+  }
   function suggest() {
     void action.run(async () => {
       const minutes = sessionMinutes.trim() ? Number(sessionMinutes) : undefined
@@ -211,7 +226,7 @@ function CoachDrillDrafts({ intro, context, load, onUse }: { intro: string; cont
   return <div className="training-form"><h3>Supplementary drill drafts</h3>
     <p>{intro}</p>
     {context}
-    <Input label="Current focus (optional)" maxLength={200} value={focus} onChange={event => setFocus(event.target.value)} />
+    <div ref={focusBox}><Input label="Current focus (optional)" maxLength={200} value={focus} onChange={event => setFocus(event.target.value)} /></div>
     <Input label="Session duration in minutes (optional)" type="number" min={15} max={180} step={1} value={sessionMinutes} onChange={event => setSessionMinutes(event.target.value)} />
     <Button variant="secondary" loading={action.pending} onClick={suggest}>Suggest practice drills</Button>
     <ActionMessage {...action} />
@@ -219,13 +234,56 @@ function CoachDrillDrafts({ intro, context, load, onUse }: { intro: string; cont
       ? <p role="note"><strong>AI draft</strong> generated by {suggestions.ruleVersion} for review. Check every exercise for safety and suitability before assigning. Drafts are not saved.</p>
       : <p>Mode: {suggestions.mode}, rule version {suggestions.ruleVersion}. Drafts are not saved.</p>)}
     {suggestions?.memberCount !== undefined && <p>Based on {suggestions.memberCount === 1 ? '1 member' : `${suggestions.memberCount} members`} with a confirmed booking in this class.</p>}
-    {suggestions && (suggestions.drafts.length ? <><ul className="training-list">{suggestions.drafts.map((draft,index) => <li key={draft.title}>
-      <label><input type="checkbox" checked={selected.includes(index)} onChange={event => setSelected(current => event.target.checked ? [...current,index] : current.filter(value => value !== index))} /> Select draft: {draft.title}</label>
-      <p>{draft.goal} - {draft.level} - {draft.durationMinutes} minutes</p><p>{draft.instructions}</p><p>{draft.reason}</p>
-    </li>)}</ul><Button variant="secondary" disabled={!selected.length} onClick={() => { const chosen = suggestions.drafts.filter((_,index) => selected.includes(index)); onUse(chosen); setCopied(chosen.length) }}>Review selected drafts in plan form</Button>
+    {suggestions && (suggestions.drafts.length ? <>
+      <table className="table"><caption>Suggested exercises for review</caption>
+        <thead><tr><th>Select</th><th>Exercise</th><th>Time</th><th>Target</th><th>Why suggested</th></tr></thead>
+        <tbody>{suggestions.drafts.map((draft, index) => <tr key={draft.title}>
+          <td><label><input type="checkbox" checked={selected.includes(index)} onChange={event => setSelected(current => event.target.checked ? [...current, index] : current.filter(value => value !== index))} /> Select draft: {draft.title}</label></td>
+          <td><strong>{draft.title}</strong><p>{draft.instructions}</p></td>
+          <td>{draft.durationMinutes} min</td>
+          <td>{`${draft.goal} - ${draft.level} - ${draft.durationMinutes} minutes`}</td>
+          <td>{draft.reason}</td>
+        </tr>)}</tbody>
+      </table>
+      <p>Selected: {selected.length === 1 ? '1 exercise' : `${selected.length} exercises`}, {chosenMinutes} minutes{sessionMinutes.trim() ? ` of a ${sessionMinutes.trim()}-minute session` : ''}.</p>
+      <TrainingTextarea label="Coach adjustments (optional)" maxLength={500} value={adjustments} onChange={event => setAdjustments(event.target.value)} />
+      <p>AI and the curated catalog only provide suggestions. You approve content, duration and intensity before sharing.</p>
+      <div className="training-actions">
+        <Button variant="secondary" disabled={!selected.length} onClick={() => { const chosen = suggestions.drafts.filter((_, index) => selected.includes(index)); onUse(chosen, adjustments.trim()); setCopied(chosen.length) }}>Review selected drafts in plan form</Button>
+        <Button variant="ghost" onClick={revise}>Revise inputs</Button>
+      </div>
       {copied > 0 && <p role="status">{copied === 1 ? '1 draft' : copied + ' drafts'} copied into the exercise fields below. Edit them, then select Assign plan. Nothing is assigned yet.</p>}</>
-      : <EmptyState title="No curated drafts for this sport and level" description="Create a Coach-authored plan using the exercise fields below." />)}
+      : <><EmptyState title="No curated drafts for this sport and level" description="Create a Coach-authored plan using the exercise fields below." />
+        <Button variant="ghost" onClick={revise}>Revise inputs</Button></>)}
   </div>
+}
+
+/** Coach adjustments are added to the plan description once, under their own heading. */
+function withAdjustments(description: string, adjustments: string) {
+  if (!adjustments) return description
+  const note = `Coach adjustments: ${adjustments}`
+  if (description.includes(note)) return description
+  return (description.trim() ? `${description.trim()}\n${note}` : note).slice(0, 1000)
+}
+
+/** F5-08 Training Plan Draft: what will be shared, before anything is saved or visible to the member. */
+function PlanDraftSummary({ title, steps, audience, shareLabel }: { title: string; steps: DraftStep[]; audience: string; shareLabel: string }) {
+  const filled = steps.filter(step => step.title.trim())
+  if (!title.trim() && !filled.length) return null
+  const total = filled.reduce((sum, step) => sum + (Number.isInteger(Number(step.durationMinutes)) ? Number(step.durationMinutes) : 0), 0)
+  return <section className="training-context" aria-label="Training plan draft">
+    <h4>Training plan draft</h4>
+    <p><span className="badge badge--warning">Draft / Not shared</span></p>
+    <dl className="browse-facts">
+      <div><dt>Plan</dt><dd>{title.trim() || 'Untitled plan'}</dd></div>
+      <div><dt>For</dt><dd>{audience}</dd></div>
+      <div><dt>Duration</dt><dd>{total} minutes in {filled.length === 1 ? '1 exercise' : `${filled.length} exercises`}</dd></div>
+    </dl>
+    {filled.length > 0 && <table className="table"><caption>Exercises in this draft</caption><thead><tr><th>Exercise</th><th>Time</th></tr></thead>
+      <tbody>{filled.map((step, index) => <tr key={index}><td>{step.title.trim()}</td><td>{step.durationMinutes} min</td></tr>)}</tbody></table>}
+    <p>Before sharing: check every exercise, the member or class and the session. Nothing is saved and the member sees nothing until you select {shareLabel}.</p>
+    <p>Member visibility: Not shared yet.</p>
+  </section>
 }
 
 function OwnPlans({ plans }: { plans: StaffPlan[] }) {
