@@ -219,6 +219,7 @@ describe('Home guest authentication gate', () => {
     await user.click(screen.getByRole('link', { name: 'Sign up' }))
     expect(JSON.parse(screen.getByLabelText('Route state').textContent!)).toEqual({ from: '/member/packages/81' })
     await registration(user)
+    await user.click(await screen.findByRole('link', { name: 'Continue where you left off' }))
     await waitFor(() => expect(screen.getByLabelText('Current location')).toHaveTextContent('/member/packages/81'))
     await screen.findByRole('button', { name: /Confirm registration/ })
     expect(screen.queryByRole('heading', { name: 'We could not load the package' })).not.toBeInTheDocument()

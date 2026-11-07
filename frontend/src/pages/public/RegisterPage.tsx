@@ -15,10 +15,12 @@ import {
   type RegisterForm,
   type RegisterFormState,
 } from '../../auth/registerValidation'
-import { loginReturnState, postLoginPath } from '../../auth/roles'
+import { homePathFor, loginReturnState, postLoginPath } from '../../auth/roles'
+import type { UserProfile } from '../../api/types'
 import { useAuth } from '../../auth/useAuth'
 import { PasswordRules } from '../../components/PasswordRules'
 import { Button } from '../../components/ui/Button'
+import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Checkbox } from '../../components/ui/Checkbox'
 import { Input } from '../../components/ui/Input'
 import { PasswordInput } from '../../components/ui/PasswordInput'
@@ -73,7 +75,10 @@ export function RegisterPage() {
   const formRef = useRef<HTMLFormElement>(null)
   const focusFirstInvalid = useFocusFirstInvalid(formRef)
   const sendingRef = useRef(false)
+  // Kept only in this page's memory: a refresh or a direct visit never shows a success it did not see.
+  const [created, setCreated] = useState<UserProfile | null>(null)
 
+  if (created) return <RegistrationSuccess member={created} returnTo={returnState?.from} />
   if (status === 'authenticated' && user && !submitting) {
     return <Navigate to={postLoginPath(user, returnState?.from)} replace />
   }
@@ -100,8 +105,7 @@ export function RegisterPage() {
     sendingRef.current = true
     setSubmitting(true)
     try {
-      const member = await register(toRegisterRequest(form))
-      navigate(postLoginPath(member, returnState?.from), { replace: true })
+      setCreated(await register(toRegisterRequest(form)))
     } catch (error) {
       if (error instanceof AccountCreatedError) {
         const state: LoginPrefillState = { ...returnState, email: form.email.trim(), notice: error.message }
@@ -216,6 +220,35 @@ export function RegisterPage() {
         <span>Already have an account?</span>
         <Link to="/login" state={returnState}>Log in</Link>
       </p>
+    </AuthShell>
+  )
+}
+
+export const REGISTRATION_SUCCESS_TITLE = 'Registration Successful!'
+
+/**
+ * Shown once, right after the backend created the account and the new session is signed in. The member leaves only by
+ * choosing a button; nothing redirects on its own.
+ */
+function RegistrationSuccess({ member, returnTo }: { member: UserProfile; returnTo: unknown }) {
+  const dashboard = homePathFor(member)
+  const resume = postLoginPath(member, returnTo)
+  return (
+    <AuthShell className="auth-shell--register" title={REGISTRATION_SUCCESS_TITLE} subtitle="Your Sportify account is ready.">
+      <div className="auth-success" role="status">
+        <p className="notice notice--success">
+          Welcome to Sportify, {member.fullName}. Your account has been created and you are signed in.
+        </p>
+        <p>Browse classes, buy a sport package and book your first session from your dashboard.</p>
+      </div>
+      <Link className={buttonClassName('primary', 'lg', true)} to={dashboard} replace>
+        Go to Dashboard
+      </Link>
+      {resume !== dashboard && (
+        <p className="auth-panel__footer">
+          <Link to={resume} replace>Continue where you left off</Link>
+        </p>
+      )}
     </AuthShell>
   )
 }
