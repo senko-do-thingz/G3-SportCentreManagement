@@ -40,6 +40,7 @@ class UserServiceImplTest {
     @Mock CoachSportRepository coachSports;
     @Mock AuditService audit;
     @Mock EntityManager entityManager;
+    @Mock UserRefreshTokenRepository userRefreshTokenRepository;
     final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
     final Clock clock = Clock.fixed(Instant.parse("2026-10-16T00:00:00Z"), ZoneOffset.UTC);
     final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
@@ -50,7 +51,7 @@ class UserServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new UserServiceImpl(Mappers.getMapper(UserMapper.class), users, members, cards,
-                coachSports, encoder, audit, entityManager, clock);
+                coachSports, encoder, audit, entityManager, clock, userRefreshTokenRepository);
         user = UserAccount.builder().id(10L).email("self@example.test").fullName("Original Name")
                 .phone("0901234567").address("Original address").dateOfBirth(LocalDate.of(2000, 1, 1))
                 .role(Role.builder().code("MANAGER").build()).status("ACTIVE")

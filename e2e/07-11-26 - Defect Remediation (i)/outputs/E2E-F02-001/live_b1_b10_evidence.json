@@ -1,0 +1,347 @@
+{
+  "startedAt": "2026-11-07T02:47:58.719332+00:00",
+  "baseUrl": "http://127.0.0.1:15173",
+  "apiBase": "http://127.0.0.1:18080/api/v1",
+  "sqlServer": "127.0.0.1,57385",
+  "database": "sportify",
+  "viewport": "1440x900",
+  "cases": {
+    "B2": {
+      "id": "B2",
+      "title": "Forced direct POST /api/v1/bookings for synthetic Member returns 400 SYNTHETIC_OPERATION_DENIED with zero booking or credit side effects",
+      "status": "PASS",
+      "timestamp": "2026-11-07T02:48:01.940112+00:00",
+      "evidence": {
+        "httpStatus": 400,
+        "response": {
+          "code": "SYNTHETIC_OPERATION_DENIED",
+          "message": "Synthetic members cannot use operational classes or training records",
+          "timestamp": "2026-11-07T09:48:01.8782339",
+          "status": 400
+        },
+        "sqlBefore": {
+          "confirmedBookings": 0,
+          "bookedCount": 0,
+          "remainingSessions": 8
+        },
+        "sqlAfter": {
+          "confirmedBookings": 0,
+          "bookedCount": 0,
+          "remainingSessions": 8
+        }
+      }
+    },
+    "B4": {
+      "id": "B4",
+      "title": "Operational ACTIVE Member with only a PENDING_PAYMENT package registration is ineligible (NO_PACKAGE, empty suitableRegistrations) and blocked from booking",
+      "status": "PASS",
+      "timestamp": "2026-11-07T02:48:02.049278+00:00",
+      "evidence": {
+        "registrationStatus": "PENDING_PAYMENT",
+        "httpStatus": 200,
+        "eligible": false,
+        "reason": "NO_PACKAGE",
+        "suitableRegistrations": [],
+        "forcedPostStatus": 400,
+        "forcedPostBody": {
+          "code": "NO_PACKAGE",
+          "message": "Package registration is not active: PENDING_PAYMENT",
+          "timestamp": "2026-11-07T09:48:02.0470762",
+          "status": 400
+        }
+      }
+    },
+    "B5": {
+      "id": "B5",
+      "title": "Numeric session ID, current public session code, and rescheduled code alias agree on eligibility for both synthetic and operational members",
+      "status": "PASS",
+      "timestamp": "2026-11-07T02:48:02.242754+00:00",
+      "evidence": {
+        "sessionId": 138,
+        "currentSessionCode": "221126BM15",
+        "retiredAliasCode": "211126BM43",
+        "syntheticByNumericId": {
+          "eligible": false,
+          "reason": "SYNTHETIC_OPERATION_DENIED"
+        },
+        "syntheticByCurrentCode": {
+          "eligible": false,
+          "reason": "SYNTHETIC_OPERATION_DENIED"
+        },
+        "syntheticByRetiredAlias": {
+          "eligible": false,
+          "reason": "SYNTHETIC_OPERATION_DENIED"
+        },
+        "operationalByNumericId": {
+          "eligible": true,
+          "reason": null
+        },
+        "operationalByCurrentCode": {
+          "eligible": true,
+          "reason": null
+        },
+        "operationalByRetiredAlias": {
+          "eligible": true,
+          "reason": null
+        }
+      }
+    },
+    "B1": {
+      "id": "B1",
+      "title": "Synthetic Member with simulated-paid package is reported ineligible across all read paths and blocked in desktop UI at session detail and booking options",
+      "status": "PASS",
+      "timestamp": "2026-11-07T02:48:09.604699+00:00",
+      "evidence": {
+        "memberId": 9,
+        "syntheticRegistration": {
+          "id": 128,
+          "status": "ACTIVE",
+          "remaining_sessions": 8,
+          "payment_id": 125
+        },
+        "byNumericId": {
+          "status": 200,
+          "eligible": false,
+          "reason": "SYNTHETIC_OPERATION_DENIED",
+          "suitableRegistrations": []
+        },
+        "byPublicCode": {
+          "status": 200,
+          "eligible": false,
+          "reason": "SYNTHETIC_OPERATION_DENIED",
+          "suitableRegistrations": []
+        },
+        "byEligibilityEndpoint": {
+          "status": 200,
+          "eligible": false,
+          "reason": "SYNTHETIC_OPERATION_DENIED",
+          "suitableRegistrations": []
+        },
+        "screenshots": [
+          "screenshots/01_b1_synthetic_session_detail_blocked_1440x900.png",
+          "screenshots/02_b1_synthetic_booking_options_blocked_1440x900.png"
+        ]
+      }
+    },
+    "B9": {
+      "id": "B9",
+      "title": "Simulation receipt remains accessible with Paid - Simulated provenance and zero impact on real finance tables",
+      "status": "PASS",
+      "timestamp": "2026-11-07T02:48:09.604699+00:00",
+      "evidence": {
+        "payment": {
+          "id": 125,
+          "payment_code": "PAY-1123",
+          "payment_status": "SUCCESS",
+          "settlement_type": "SIMULATED",
+          "settlement_provider": "SPORTIFY_SIMULATOR"
+        },
+        "financeBefore": {
+          "cashEvents": 0,
+          "paidPayments": 65
+        },
+        "financeAfter": {
+          "cashEvents": 0,
+          "paidPayments": 65
+        },
+        "screenshot": "screenshots/03_b9_synthetic_simulated_receipt_1440x900.png"
+      }
+    },
+    "B6": {
+      "id": "B6",
+      "title": "Receptionist on-behalf eligibility mirrors final booking guard, disables Confirm booking in desktop UI, and preserves RBAC",
+      "status": "PASS",
+      "timestamp": "2026-11-07T02:48:12.151897+00:00",
+      "evidence": {
+        "receptionSyntheticEligibility": {
+          "status": 200,
+          "eligible": false,
+          "reason": "SYNTHETIC_OPERATION_DENIED"
+        },
+        "receptionOperationalEligibility": {
+          "status": 200,
+          "eligible": true,
+          "reason": null
+        },
+        "crossMemberEligibilityForbiddenStatus": 403,
+        "receptionForcedPostSynthetic": {
+          "status": 400,
+          "body": {
+            "code": "SYNTHETIC_OPERATION_DENIED",
+            "message": "Synthetic members cannot use operational classes or training records",
+            "timestamp": "2026-11-07T09:48:02.362748",
+            "status": 400
+          }
+        },
+        "screenshot": "screenshots/04_b6_reception_assisted_synthetic_blocked_1440x900.png"
+      }
+    },
+    "B3": {
+      "id": "B3",
+      "title": "Operational ACTIVE Member with valid paid package is eligible and completes booking in desktop UI with exact booked_count and credit updates",
+      "status": "PASS",
+      "timestamp": "2026-11-07T02:48:15.657426+00:00",
+      "evidence": {
+        "bookingId": 53,
+        "bookingCode": "BK-1022",
+        "sqlBefore": {
+          "bookedCount": 0,
+          "remainingSessions": 8
+        },
+        "sqlAfter": {
+          "bookedCount": 1,
+          "remainingSessions": 7
+        },
+        "screenshots": [
+          "screenshots/05_b3_operational_session_detail_eligible_1440x900.png",
+          "screenshots/06_b3_operational_booking_confirmed_1440x900.png"
+        ]
+      }
+    },
+    "B7": {
+      "id": "B7",
+      "title": "Capacity FULL/CAPACITY_UNAVAILABLE, overlapping booking rejection, ALREADY_BOOKED, and stale schedule_revision (409) remain intact",
+      "status": "PASS",
+      "timestamp": "2026-11-07T02:48:15.986329+00:00",
+      "evidence": {
+        "fullEligibility": {
+          "status": 200,
+          "eligible": false,
+          "reason": "CAPACITY_UNAVAILABLE"
+        },
+        "fullPostStatus": 400,
+        "overlapPostStatus": 409,
+        "overlapPostBody": {
+          "code": "TIME_CONFLICT",
+          "message": "You already have a booking at an overlapping time (session 211126BM44)",
+          "timestamp": "2026-11-07T09:48:15.8979394",
+          "status": 409
+        },
+        "alreadyBookedEligibility": {
+          "status": 200,
+          "eligible": false,
+          "reason": "ALREADY_BOOKED"
+        },
+        "staleRevisionPutStatus": 409
+      }
+    },
+    "B8": {
+      "id": "B8",
+      "title": "When Member eligibility state changes between page load and confirmation, backend refuses with 400 and desktop displays clear error without false confirmation or SQL state change",
+      "status": "PASS",
+      "timestamp": "2026-11-07T02:48:22.107147+00:00",
+      "evidence": {
+        "creditExhaustedStatus": 400,
+        "creditExhaustedResponse": {
+          "code": "NO_SESSIONS_LEFT",
+          "message": "Selected package registration has zero remaining sessions",
+          "timestamp": "2026-11-07T09:48:18.7545035",
+          "status": 400
+        },
+        "syntheticGuardStatus": 400,
+        "syntheticGuardResponse": {
+          "code": "SYNTHETIC_OPERATION_DENIED",
+          "message": "Synthetic members cannot use operational classes or training records",
+          "timestamp": "2026-11-07T09:48:21.5242559",
+          "status": 400
+        },
+        "sqlBefore": {
+          "confirmedBookings": 0,
+          "bookedCount": 0
+        },
+        "sqlAfter": {
+          "confirmedBookings": 0,
+          "bookedCount": 0
+        },
+        "screenshot": "screenshots/07_b8_toctou_write_rejected_error_visible_1440x900.png"
+      }
+    },
+    "B10": {
+      "id": "B10",
+      "title": "Desktop Playwright path with real login, session details, package selection, Receptionist assisted booking, simulated receipt, and operational booking confirmation passes with zero 404s, page errors, or horizontal overflow",
+      "status": "PASS",
+      "timestamp": "2026-11-07T02:48:22.135706+00:00",
+      "evidence": {
+        "screenshotsCount": 7,
+        "screenshots": [
+          {
+            "file": "screenshots/01_b1_synthetic_session_detail_blocked_1440x900.png",
+            "url": "http://127.0.0.1:15173/member/sessions/221126BM15",
+            "noHorizontalOverflow": true
+          },
+          {
+            "file": "screenshots/02_b1_synthetic_booking_options_blocked_1440x900.png",
+            "url": "http://127.0.0.1:15173/member/bookings/new?sessionId=221126BM15",
+            "noHorizontalOverflow": true
+          },
+          {
+            "file": "screenshots/03_b9_synthetic_simulated_receipt_1440x900.png",
+            "url": "http://127.0.0.1:15173/member/payments/receipts/84",
+            "noHorizontalOverflow": true
+          },
+          {
+            "file": "screenshots/04_b6_reception_assisted_synthetic_blocked_1440x900.png",
+            "url": "http://127.0.0.1:15173/reception/bookings/new?memberId=9&week=2026-11-16&sessionId=221126BM15",
+            "noHorizontalOverflow": true
+          },
+          {
+            "file": "screenshots/05_b3_operational_session_detail_eligible_1440x900.png",
+            "url": "http://127.0.0.1:15173/member/sessions/211126BM44",
+            "noHorizontalOverflow": true
+          },
+          {
+            "file": "screenshots/06_b3_operational_booking_confirmed_1440x900.png",
+            "url": "http://127.0.0.1:15173/member/bookings/confirmed/53",
+            "noHorizontalOverflow": true
+          },
+          {
+            "file": "screenshots/07_b8_toctou_write_rejected_error_visible_1440x900.png",
+            "url": "http://127.0.0.1:15173/member/bookings/review?sessionId=221126BM15&packageRegistrationId=128&returnTo=%2Fmember%2Fclasses",
+            "noHorizontalOverflow": true
+          }
+        ],
+        "pageErrorsCount": 0
+      }
+    }
+  },
+  "screenshots": [
+    {
+      "file": "screenshots/01_b1_synthetic_session_detail_blocked_1440x900.png",
+      "url": "http://127.0.0.1:15173/member/sessions/221126BM15",
+      "noHorizontalOverflow": true
+    },
+    {
+      "file": "screenshots/02_b1_synthetic_booking_options_blocked_1440x900.png",
+      "url": "http://127.0.0.1:15173/member/bookings/new?sessionId=221126BM15",
+      "noHorizontalOverflow": true
+    },
+    {
+      "file": "screenshots/03_b9_synthetic_simulated_receipt_1440x900.png",
+      "url": "http://127.0.0.1:15173/member/payments/receipts/84",
+      "noHorizontalOverflow": true
+    },
+    {
+      "file": "screenshots/04_b6_reception_assisted_synthetic_blocked_1440x900.png",
+      "url": "http://127.0.0.1:15173/reception/bookings/new?memberId=9&week=2026-11-16&sessionId=221126BM15",
+      "noHorizontalOverflow": true
+    },
+    {
+      "file": "screenshots/05_b3_operational_session_detail_eligible_1440x900.png",
+      "url": "http://127.0.0.1:15173/member/sessions/211126BM44",
+      "noHorizontalOverflow": true
+    },
+    {
+      "file": "screenshots/06_b3_operational_booking_confirmed_1440x900.png",
+      "url": "http://127.0.0.1:15173/member/bookings/confirmed/53",
+      "noHorizontalOverflow": true
+    },
+    {
+      "file": "screenshots/07_b8_toctou_write_rejected_error_visible_1440x900.png",
+      "url": "http://127.0.0.1:15173/member/bookings/review?sessionId=221126BM15&packageRegistrationId=128&returnTo=%2Fmember%2Fclasses",
+      "noHorizontalOverflow": true
+    }
+  ],
+  "pageErrors": [],
+  "consoleErrors": [],
+  "finishedAt": "2026-11-07T02:48:22.135706+00:00"
+}

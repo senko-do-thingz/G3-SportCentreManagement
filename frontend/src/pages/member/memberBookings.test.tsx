@@ -79,6 +79,33 @@ describe('FE-09 member booking screens', () => {
     expect(backend.calls.find((call) => call.method === 'POST')?.body).toEqual({ sessionId: 5, packageRegistrationId: 11 })
   })
 
+  it('blocks booking progression on options and review when member is synthetic (SYNTHETIC_OPERATION_DENIED)', async () => {
+    const backend = api((call) => call.path === '/sessions/5'
+      ? json(200, { ...detail, eligible: false, reason: 'SYNTHETIC_OPERATION_DENIED', suitableRegistrations: [] })
+      : backendError(404, 'Unexpected request'))
+    renderApp('/member/bookings/new?sessionId=5&returnTo=%2Fmember%2Fclasses')
+    expect(await screen.findByText('Demo Account Restricted')).toBeInTheDocument()
+    expect(screen.getByText(/Synthetic members cannot use operational classes or training records/)).toBeInTheDocument()
+    expect(screen.getByText('Operational booking is unavailable for synthetic or demo member accounts.')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Review booking' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'View other packages' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/sessions after booking/)).not.toBeInTheDocument()
+    expect(backend.calls.some((call) => call.method === 'POST')).toBe(false)
+  })
+
+  it('displays clear error if member becomes synthetic between review load and confirmation', async () => {
+    api((call) => {
+      if (call.path === '/sessions/5') return json(200, detail)
+      if (call.path === '/bookings' && call.method === 'POST') return json(400, { message: 'Synthetic members cannot use operational classes or training records', code: 'SYNTHETIC_OPERATION_DENIED' })
+      return backendError(404, 'Unexpected request')
+    })
+    const user = userEvent.setup()
+    renderApp('/member/bookings/review?sessionId=5&packageRegistrationId=11')
+    await user.click(await screen.findByRole('button', { name: 'Confirm booking' }))
+    expect(await screen.findByText('Synthetic members cannot use operational classes or training records.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Booking confirmed' })).not.toBeInTheDocument()
+  })
+
   it('does not submit when the selected registration is no longer eligible', async () => {
     const backend = api((call) => call.path === '/sessions/5'
       ? json(200, { ...detail, eligible: false, reason: 'NO_SESSIONS_LEFT', suitableRegistrations: [] })
