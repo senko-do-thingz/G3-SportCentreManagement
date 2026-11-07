@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
@@ -97,6 +97,35 @@ describe('My Schedule shows only the member own CONFIRMED bookings', () => {
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByText("You don't have any scheduled sessions yet.")).toBeInTheDocument()
     expect(document.querySelector('.member-main:has(.member-schedule-theme)')).toBeInTheDocument()
+  })
+
+  it('never shows the previous account bookings after another tab switches members', async () => {
+    let releaseFirst: (response: Response) => void = () => undefined
+    const { calls } = installFakeFetch((call) => {
+      const second = call.authorization === 'Bearer second-member'
+      if (call.path === '/users/me') return json(200, second ? { ...MEMBER, id: 3, fullName: 'Second member' } : MEMBER)
+      if (call.path === '/bookings/my') {
+        if (second) return json(200, [])
+        return new Promise<Response>((resolve) => { releaseFirst = resolve })
+      }
+      return json(200, [])
+    })
+    const user = userEvent.setup()
+    renderApp('/member/schedule?date=2026-10-16')
+    await waitFor(() => expect(calls.some((call) => call.path === '/bookings/my')).toBe(true))
+    const oldSession = tokenStorage.getSessionId()
+    await act(async () => {
+      localStorage.setItem(tokenStorage.accessKey, 'second-member')
+      localStorage.setItem(tokenStorage.refreshKey, 'second-refresh')
+      localStorage.setItem(tokenStorage.sessionKey, 'second-session')
+      window.dispatchEvent(new StorageEvent('storage', { key: tokenStorage.sessionKey, oldValue: oldSession, newValue: 'second-session' }))
+    })
+    expect(await screen.findByRole('heading', { name: 'Member Dashboard' })).toBeInTheDocument()
+    await act(async () => releaseFirst(json(200, [confirmed])))
+    await user.click(screen.getAllByRole('link', { name: /My Schedule/i })[0])
+    expect(await screen.findByText("You don't have any scheduled sessions yet.")).toBeInTheDocument()
+    expect(screen.queryByText('Basketball Foundations')).not.toBeInTheDocument()
+    expect(calls.filter((call) => call.path === '/bookings/my' && call.authorization === 'Bearer second-member').length).toBeGreaterThan(0)
   })
 
   it('rejects manager access to the member schedule before any booking request', async () => {
