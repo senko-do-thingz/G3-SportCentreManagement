@@ -1134,9 +1134,14 @@ class TrainingWorkflowIntegrationTest {
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/coach/training/bookings/"+booking+"/drill-suggestions")
             .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(new com.sportify.identity.security.CustomUserDetails(actor(member)))))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
-        long unsupported=jdbc.queryForObject("SELECT id FROM sport WHERE code='SWIMMING'",Long.class);
-        jdbc.update("UPDATE class_session SET sport_id=? WHERE id=?",unsupported,session);
-        assertThat(writer.drillSuggestions(coach,booking).drafts()).isEmpty();
+        // curated-drills-v2 covers all six sports: Swimming now gets its own drafts, still unsaved and for review.
+        long swimming=jdbc.queryForObject("SELECT id FROM sport WHERE code='SWIMMING'",Long.class);
+        jdbc.update("UPDATE class_session SET sport_id=? WHERE id=?",swimming,session);
+        var swimDrafts=writer.drillSuggestions(coach,booking);
+        assertThat(swimDrafts.persisted()).isFalse();
+        assertThat(swimDrafts.drafts()).isNotEmpty()
+            .allSatisfy(item->assertThat(item.reason()).contains("Swimming").contains("Coach review is required"));
+        assertThat(count("SELECT COUNT(*) FROM session_plan")).isEqualTo(plansBefore+1);
     }
     private org.springframework.test.web.servlet.ResultActions drillRequest(long actorId,long bookingId) throws Exception {
         return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/coach/training/bookings/"+bookingId+"/drill-suggestions")
