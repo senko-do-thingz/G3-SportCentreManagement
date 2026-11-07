@@ -101,9 +101,20 @@ public class TrainingWriteService {
         return profiles.getFirst();
     }
 
+    /** Individual preview without Coach inputs. Not transactional, see the overload below. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public DrillSuggestions drillSuggestions(long coachId,long bookingId) {
+        return drillSuggestions(coachId,bookingId,DrillGenerator.Options.NONE);
+    }
+
+    /**
+     * Read-only drill preview for the assigned Coach of one member booking. Runs without a transaction so that no
+     * database connection is held while the optional AI generator is called; each query below is a single read.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    public DrillSuggestions drillSuggestions(long coachId,long bookingId,DrillGenerator.Options options) {
         var context=jdbc.query("""
-            SELECT b.member_id,c.id class_id,c.level,sp.code sport_code,sp.name sport_name,m.main_goal
+            SELECT b.member_id,c.id class_id,c.level,sp.code sport_code,sp.name sport_name,m.main_goal,m.current_level
             FROM booking b JOIN class_session s ON s.id=b.session_id JOIN sport_class c ON c.id=s.class_id
             JOIN sport sp ON sp.id=s.sport_id
             JOIN user_account mu ON mu.id=b.member_id AND mu.status='ACTIVE'
@@ -112,7 +123,7 @@ public class TrainingWriteService {
             WHERE b.id=? AND b.status='CONFIRMED' AND s.status<>'CANCELLED' AND s.training_type='COACH_LED'
                 AND s.coach_id=? AND c.coach_id=? AND c.is_active=1
             """,(rs,row)->new DrillContext(rs.getLong("member_id"),rs.getLong("class_id"),rs.getString("level"),
-                rs.getString("sport_code"),rs.getString("sport_name"),rs.getString("main_goal")),bookingId,coachId,coachId);
+                rs.getString("sport_code"),rs.getString("sport_name"),rs.getString("main_goal"),rs.getString("current_level")),bookingId,coachId,coachId);
         // Same message for every miss so a Coach cannot probe other Coaches' bookings or account states.
         if(context.isEmpty())throw new ResourceNotFoundException("Assigned member booking not found");
         var current=context.getFirst();
@@ -135,9 +146,148 @@ public class TrainingWriteService {
                     AND a.actor_user_id=? AND a.action='TRAINING_RESULT_CREATED')
             ORDER BY r.created_at DESC,r.id DESC,sc.score/NULLIF(m.max_score,0),m.id
             """,(rs,row)->rs.getString("name"),coachId,current.memberId(),current.classId(),coachId);
-        var drafts=TrainingDrillCatalog.suggest(current.sportCode(),current.sportName(),current.level(),feedback.isEmpty()?null:feedback.getFirst(),
-            metrics.isEmpty()?null:metrics.getFirst(),current.goal());
-        return new DrillSuggestions("RULE_BASED","curated-drills-v1",true,false,bookingId,current.memberId(),current.classId(),current.sportName(),current.level(),drafts);
+        if(drillGenerator!=null) {
+            var ai=generateDrafts(()->individualInput(coachId,current,options));
+            if(!ai.isEmpty())return new DrillSuggestions("AI_GENERATED",drillGenerator.version(),true,false,bookingId,current.memberId(),
+                current.classId(),current.sportName(),DrillGenerator.effectiveLevel(current.memberLevel(),current.level()),ai);
+        }
+        String effectiveLevel=DrillGenerator.effectiveLevel(current.memberLevel(),current.level());
+        var drafts=fitToSession(TrainingDrillCatalog.suggest(current.sportCode(),current.sportName(),effectiveLevel,
+            joinText(options.focus(),feedback.isEmpty()?null:feedback.getFirst()),metrics.isEmpty()?null:metrics.getFirst(),current.goal()),
+            options.sessionMinutes());
+        return new DrillSuggestions("RULE_BASED","curated-drills-v2",true,false,bookingId,current.memberId(),current.classId(),current.sportName(),effectiveLevel,drafts);
+    }
+
+    /**
+     * Read-only drill preview for a whole class the Coach is assigned to (Flow 5 plan scope "class"). Only counts and
+     * class averages are used: no individual member row, name or id reaches the generator. Nothing is saved.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    public ClassDrillSuggestions classDrillSuggestions(long coachId,long classId,DrillGenerator.Options options) {
+        var classes=jdbc.query("""
+            SELECT c.level,sp.code sport_code,sp.name sport_name FROM sport_class c JOIN sport sp ON sp.id=c.sport_id
+            JOIN user_account u ON u.id=c.coach_id JOIN role cr ON cr.id=u.role_id AND cr.code='COACH'
+            WHERE c.id=? AND c.coach_id=? AND c.is_active=1 AND u.status='ACTIVE'
+            """,(rs,row)->new String[]{rs.getString("level"),rs.getString("sport_code"),rs.getString("sport_name")},classId,coachId);
+        if(classes.isEmpty())throw new ResourceNotFoundException("Assigned active class not found");
+        String level=classes.getFirst()[0], sportCode=classes.getFirst()[1], sportName=classes.getFirst()[2];
+        var members=new java.util.ArrayList<>(jdbc.query("""
+            SELECT m.user_id,m.current_level,m.main_goal FROM member_profile m JOIN user_account u ON u.id=m.user_id
+            JOIN role r ON r.id=u.role_id AND r.code='MEMBER'
+            WHERE u.status='ACTIVE' AND LOWER(u.email) NOT LIKE '%@unified-demo.invalid'
+                AND m.user_id IN (SELECT b.member_id FROM booking b JOIN class_session s ON s.id=b.session_id
+                    WHERE s.class_id=? AND s.coach_id=? AND b.status='CONFIRMED' AND s.status<>'CANCELLED'
+                        AND s.training_type='COACH_LED')
+            """,(rs,row)->new ClassMember(rs.getLong("user_id"),rs.getString("current_level"),rs.getString("main_goal")),classId,coachId));
+        members.removeIf(member -> {
+            try { operationalMemberPolicy.requireRealMember(member.id()); return false; }
+            catch(BusinessRuleException synthetic) { return true; }
+        });
+        List<DrillGenerator.MetricAverage> averages=List.of();
+        if(members.size()>=3 && members.size()<=2000) {
+            String placeholders=String.join(",",java.util.Collections.nCopies(members.size(),"?"));
+            String averageSql="""
+            SELECT TOP(10) m.name,CAST(ROUND(AVG(CAST(sc.score AS DECIMAL(9,2))),2) AS DECIMAL(9,2)) average_score,
+                m.max_score,COUNT(DISTINCT r.member_id) samples
+            FROM session_result r JOIN class_session s ON s.id=r.session_id JOIN session_result_score sc ON sc.result_id=r.id
+            JOIN skill_metric m ON m.id=sc.metric_id
+            WHERE s.class_id=? AND s.coach_id=? AND r.member_id IN (%s)
+                AND EXISTS(SELECT 1 FROM activity_log a WHERE a.entity_type='SESSION_RESULT' AND a.entity_id=r.id
+                    AND a.actor_user_id=? AND a.action='TRAINING_RESULT_CREATED')
+            GROUP BY m.id,m.name,m.max_score
+            HAVING COUNT(DISTINCT r.member_id)>=3
+            ORDER BY AVG(CAST(sc.score AS DECIMAL(9,2)))/NULLIF(m.max_score,0),m.id
+            """.formatted(placeholders);
+            var values=new java.util.ArrayList<Object>();
+            values.add(classId); values.add(coachId);
+            members.forEach(member->values.add(member.id()));
+            values.add(coachId);
+            averages=jdbc.query(averageSql,(rs,row)->new DrillGenerator.MetricAverage(rs.getString("name"),rs.getBigDecimal("average_score"),
+                rs.getObject("max_score",Integer.class),rs.getInt("samples")),values.toArray());
+        }
+        var group=new DrillGenerator.GroupSummary(members.size(),countBy(members,false,"UNKNOWN"),countBy(members,true,"NOT_SET"),averages);
+        if(drillGenerator!=null && members.size()>=3 && members.size()<=2000) {
+            var ai=generateDrafts(()->new DrillGenerator.Input(DrillGenerator.SCOPE_CLASS,sportName,level,null,null,0,List.of(),
+                null,null,options.focus(),options.sessionMinutes(),group));
+            if(!ai.isEmpty())return new ClassDrillSuggestions("AI_GENERATED",drillGenerator.version(),true,false,classId,sportName,level,members.size(),ai);
+        }
+        var drafts=fitToSession(TrainingDrillCatalog.suggest(sportCode,sportName,level,options.focus(),
+            averages.isEmpty()?null:averages.getFirst().metric(),null),options.sessionMinutes());
+        return new ClassDrillSuggestions("RULE_BASED","curated-drills-v2",true,false,classId,sportName,level,members.size(),drafts);
+    }
+
+    /** Optional Flow 5 AI drafting; absent unless app.training.ai-drills.enabled=true. */
+    private DrillGenerator drillGenerator;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setDrillGenerator(DrillGenerator drillGenerator) { this.drillGenerator = drillGenerator; }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TrainingWriteService.class);
+
+    /** Calls the generator; any failure returns an empty list so the rule catalog is used. */
+    private List<DrillDraft> generateDrafts(java.util.function.Supplier<DrillGenerator.Input> input) {
+        try {
+            return drillGenerator.generate(input.get());
+        } catch(RuntimeException failure) {
+            // Never log member data or model output; the exception class is enough to diagnose provider failures.
+            log.warn("AI drill drafting failed, using the rule catalog: {}",failure.getClass().getSimpleName());
+            return List.of();
+        }
+    }
+
+    /**
+     * De-identified individual context: goal, levels, attendance, and the scores and feedback this Coach recorded for
+     * this member in this class, plus the Coach's optional focus and session duration.
+     */
+    private DrillGenerator.Input individualInput(long coachId,DrillContext current,DrillGenerator.Options options) {
+        var scores=jdbc.query("""
+            SELECT TOP(10) m.name,sc.score,m.max_score,s.session_date FROM session_result r
+            JOIN class_session s ON s.id=r.session_id JOIN session_result_score sc ON sc.result_id=r.id
+            JOIN skill_metric m ON m.id=sc.metric_id
+            WHERE s.coach_id=? AND r.member_id=? AND s.class_id=?
+                AND EXISTS(SELECT 1 FROM activity_log a WHERE a.entity_type='SESSION_RESULT' AND a.entity_id=r.id
+                    AND a.actor_user_id=? AND a.action='TRAINING_RESULT_CREATED')
+            ORDER BY s.session_date DESC,r.id DESC,m.id
+            """,(rs,row)->new DrillGenerator.RecentScore(rs.getString("name"),rs.getBigDecimal("score"),
+                rs.getObject("max_score",Integer.class),rs.getDate("session_date").toLocalDate()),
+            coachId,current.memberId(),current.classId(),coachId);
+        var feedback=jdbc.query("""
+            SELECT TOP(1) f.strengths,f.areas_for_improvement FROM coach_feedback f JOIN session_plan p ON p.id=f.plan_id
+            WHERE f.coach_id=? AND f.member_id=? AND p.class_id=? ORDER BY f.created_at DESC,f.id DESC
+            """,(rs,row)->new String[]{rs.getString("strengths"),rs.getString("areas_for_improvement")},
+            coachId,current.memberId(),current.classId());
+        Integer attended=jdbc.queryForObject("""
+            SELECT COUNT(*) FROM attendance_record a JOIN class_session s ON s.id=a.session_id
+            WHERE a.member_id=? AND s.class_id=? AND a.status IN ('PRESENT','LATE')
+            """,Integer.class,current.memberId(),current.classId());
+        return new DrillGenerator.Input(DrillGenerator.SCOPE_INDIVIDUAL,current.sportName(),current.level(),current.memberLevel(),
+            current.goal(),attended==null?0:attended,scores,feedback.isEmpty()?null:feedback.getFirst()[0],
+            feedback.isEmpty()?null:feedback.getFirst()[1],options.focus(),options.sessionMinutes(),null);
+    }
+
+    /** Keeps rule-catalog drafts, in order, while their total fits the optional session duration. */
+    static List<DrillDraft> fitToSession(List<DrillDraft> drafts,Integer sessionMinutes) {
+        if(sessionMinutes==null)return drafts;
+        var kept=new java.util.ArrayList<DrillDraft>();
+        int total=0;
+        for(var draft:drafts) if(total+draft.durationMinutes()<=sessionMinutes){kept.add(draft);total+=draft.durationMinutes();}
+        return List.copyOf(kept);
+    }
+
+    private static String joinText(String first,String second) {
+        if(first==null)return second;
+        return second==null?first:first+" "+second;
+    }
+
+    /** Counts members per value of one column; a missing value is counted under the given label. */
+    private record ClassMember(long id,String level,String goal) {}
+    private static Map<String,Integer> countBy(List<ClassMember> rows,boolean goal,String missing) {
+        var counts=new java.util.TreeMap<String,Integer>();
+        for(var row:rows) {
+            String value=goal?row.goal():row.level();
+            counts.merge(value==null?missing:value,1,Integer::sum);
+        }
+        return counts;
     }
 
     @Transactional
@@ -145,7 +295,7 @@ public class TrainingWriteService {
         requireCoachClass(coachId, request.classId());
         // Follow the existing session-first booking/cancellation lock order.
         lockBooking(request.bookingId());
-        if (!exists("SELECT COUNT(*) FROM booking b JOIN class_session s ON s.id = b.session_id JOIN sport_class c ON c.id = s.class_id WHERE b.id = ? AND b.member_id = ? AND s.class_id = ? AND c.coach_id = ? AND s.coach_id = c.coach_id AND b.status = 'CONFIRMED' AND s.status <> 'CANCELLED' AND s.training_type = 'COACH_LED'",
+        if (!exists("SELECT COUNT(*) FROM booking b JOIN class_session s ON s.id = b.session_id JOIN sport_class c ON c.id = s.class_id JOIN user_account m ON m.id=b.member_id JOIN role mr ON mr.id=m.role_id JOIN user_account u ON u.id=c.coach_id JOIN role cr ON cr.id=u.role_id WHERE b.id = ? AND b.member_id = ? AND s.class_id = ? AND c.coach_id = ? AND s.coach_id = c.coach_id AND b.status = 'CONFIRMED' AND s.status <> 'CANCELLED' AND s.training_type = 'COACH_LED' AND c.is_active=1 AND m.status='ACTIVE' AND mr.code='MEMBER' AND u.status='ACTIVE' AND cr.code='COACH'",
                 request.bookingId(), request.memberId(), request.classId(), coachId))
             throw new BusinessRuleException("Select a confirmed booking belonging to this member and class");
         if (exists("SELECT COUNT(*) FROM session_plan WHERE booking_id=? AND member_id=? AND coach_id=? AND title=? AND is_template=0",
@@ -378,5 +528,5 @@ public class TrainingWriteService {
     }
     private record AttendanceBooking(long sessionId, long memberId, String status, String trainingType) {}
     private record ExistingAttendance(long id, String status) {}
-    private record DrillContext(long memberId,long classId,String level,String sportCode,String sportName,String goal) {}
+    private record DrillContext(long memberId,long classId,String level,String sportCode,String sportName,String goal,String memberLevel) {}
 }

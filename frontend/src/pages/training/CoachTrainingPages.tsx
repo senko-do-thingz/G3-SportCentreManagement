@@ -1,9 +1,9 @@
 import { SessionContext } from '../../components/SessionContext'
 import { sessionIdText, sessionRouteReference } from '../../api/sessionIdentity'
 import { formatCalendarDate } from '../../utils/date'
-import { useCallback, useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { staffTrainingApi as training, type BookingCandidate, type StaffPlan, type StaffSession, type TrainingClass, type TrainingMetric, type SessionMember, type DrillDraft, type DrillSuggestions } from '../../api/staffTrainingApi'
+import { staffTrainingApi as training, type BookingCandidate, type StaffPlan, type StaffSession, type TrainingClass, type TrainingMetric, type SessionMember, type DrillDraft, type DrillSuggestions, type DrillOptions } from '../../api/staffTrainingApi'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -13,28 +13,35 @@ import { Select } from '../../components/ui/Select'
 import { TrainingData } from '../member/TrainingData'
 import { ActionMessage, TrainingTextarea } from './TrainingFormFields'
 import { attendanceLabel, useTrainingAction } from './trainingFormState'
+import { coachProgress } from '../../api/coachProgressApi'
+import { GOAL_OPTIONS, LEVEL_OPTIONS } from '../member/profileValidation'
 import '../member/training.css'
 
 export function CoachTrainingPlansPage() {
   return (
     <div className="training-page">
-      <PageHeader title="Assign plans and feedback" description="Assign a personal plan using a confirmed booking in a class you coach. Members can view plans and feedback as soon as you save them." />
+      <PageHeader title="Assign plans and feedback" description="Assign a personal plan using a confirmed booking in a class you coach, or a plan for the whole class. Members can view plans and feedback as soon as you save them." />
       <TrainingData load={training.coachClasses}>{classes => <CoachPlansWorkspace classes={classes} />}</TrainingData>
     </div>
   )
 }
 
+type PlanScope = 'INDIVIDUAL' | 'CLASS'
 function CoachPlansWorkspace({ classes }: { classes: TrainingClass[] }) {
   const [classId, setClassId] = useState('')
+  const [scope, setScope] = useState<PlanScope>('INDIVIDUAL')
   const [revision, refresh] = useState(0)
   const loadMembers = useCallback((signal: AbortSignal) => training.bookingCandidates(classId, signal), [classId])
   return (
     <>
-      <Card title="Create a personal plan">
+      <Card title={scope === 'CLASS' ? 'Create a class plan' : 'Create a personal plan'}>
+        <Select label="Plan scope" value={scope} onChange={event => setScope(event.target.value as PlanScope)}
+          options={[{ value: 'INDIVIDUAL', label: 'Individual member' }, { value: 'CLASS', label: 'Whole class' }]} />
         <Select label="Assigned class" value={classId} onChange={event => setClassId(event.target.value)} placeholder="Select a class"
           options={classes.map(item => ({ value: String(item.id), label: item.name }))} />
         {!classes.length && <p>You have no assigned classes.</p>}
-        {classId && <TrainingData load={loadMembers}>{members => <CreatePlanForm key={classId} classId={Number(classId)} members={members} onSaved={() => refresh(value => value + 1)} />}</TrainingData>}
+        {classId && scope === 'INDIVIDUAL' && <TrainingData load={loadMembers}>{members => <CreatePlanForm key={classId} classId={Number(classId)} members={members} onSaved={() => refresh(value => value + 1)} />}</TrainingData>}
+        {classId && scope === 'CLASS' && <CreateClassPlanForm key={classId} classId={Number(classId)} />}
       </Card>
       <Card title="Assigned plans">
         <TrainingData key={revision} load={training.plans}>{plans => <OwnPlans plans={plans} />}</TrainingData>
@@ -43,7 +50,27 @@ function CoachPlansWorkspace({ classes }: { classes: TrainingClass[] }) {
   )
 }
 
+type DraftStep = ReturnType<typeof blankStep>
 const blankStep = () => ({ title: '', durationMinutes: '10', instructions: '' })
+const draftSteps = (drafts: DrillDraft[]) => drafts.map(draft => ({ title: draft.title, durationMinutes: String(draft.durationMinutes), instructions: draft.instructions }))
+const invalidSteps = (title: string, steps: DraftStep[]) => !title || steps.some(step => !step.title.trim() || !Number.isInteger(Number(step.durationMinutes)) || Number(step.durationMinutes) <= 0 || Number(step.durationMinutes) > 1440)
+const stepBody = (steps: DraftStep[]) => steps.map(step => ({ title: step.title.trim(), durationMinutes: Number(step.durationMinutes), instructions: step.instructions.trim() || null }))
+
+function StepFields({ steps, setSteps }: { steps: DraftStep[]; setSteps: (update: (current: DraftStep[]) => DraftStep[]) => void }) {
+  function updateStep(index: number, field: keyof DraftStep, value: string) {
+    setSteps(current => current.map((step, position) => position === index ? { ...step, [field]: value } : step))
+  }
+  return <>{steps.map((step, index) => (
+    <fieldset key={index} className="training-step-form">
+      <legend>Exercise {index + 1}</legend>
+      <Input label={`Exercise title ${index + 1}`} value={step.title} required maxLength={150} onChange={event => updateStep(index, 'title', event.target.value)} />
+      <Input label={`Exercise duration ${index + 1} (minutes)`} type="number" min={1} max={1440} step={1} required value={step.durationMinutes} onChange={event => updateStep(index, 'durationMinutes', event.target.value)} />
+      <TrainingTextarea label={`Exercise instructions ${index + 1}`} value={step.instructions} maxLength={1000} onChange={event => updateStep(index, 'instructions', event.target.value)} />
+      {steps.length > 1 && <Button variant="secondary" onClick={() => setSteps(current => current.filter((_, position) => position !== index))}>Remove exercise {index + 1}</Button>}
+    </fieldset>
+  ))}</>
+}
+
 function CreatePlanForm({ classId, members, onSaved }: { classId: number; members: BookingCandidate[]; onSaved: () => void }) {
   const [steps, setSteps] = useState([blankStep()])
   const [bookingId, setBookingId] = useState('')
@@ -59,13 +86,10 @@ function CreatePlanForm({ classId, members, onSaved }: { classId: number; member
       const planTitle = title.trim()
       const candidate = members.find(member => member.bookingId === Number(values.get('bookingId')))
       if (!candidate) throw new Error('Select a booking for the member receiving this plan.')
-      if (!planTitle || steps.some(step => !step.title.trim() || !Number.isInteger(Number(step.durationMinutes)) || Number(step.durationMinutes) <= 0 || Number(step.durationMinutes) > 1440)) {
-        throw new Error('Enter a plan title, exercise titles and durations between 1 and 1440 minutes.')
-      }
+      if (invalidSteps(planTitle, steps)) throw new Error('Enter a plan title, exercise titles and durations between 1 and 1440 minutes.')
       await training.createPlan({
         bookingId: candidate.bookingId, classId, memberId: candidate.memberId, title: planTitle,
-        description: description.trim() || null,
-        steps: steps.map(step => ({ title: step.title.trim(), durationMinutes: Number(step.durationMinutes), instructions: step.instructions.trim() || null })),
+        description: description.trim() || null, steps: stepBody(steps),
       })
       chooseBooking('')
       onSaved()
@@ -80,28 +104,21 @@ function CreatePlanForm({ classId, members, onSaved }: { classId: number; member
     setSteps([blankStep()])
   }
 
-  function updateStep(index: number, field: keyof ReturnType<typeof blankStep>, value: string) {
-    setSteps(current => current.map((step, position) => position === index ? { ...step, [field]: value } : step))
-  }
-
+  const selectedMemberId = members.find(item => item.bookingId === Number(bookingId))?.memberId
   return (
     <form className="training-form" onSubmit={submit}>
       <fieldset disabled={action.pending} className="training-fieldset">
         <Select label="Member booking" name="bookingId" required placeholder="Select a confirmed booking" value={bookingId} onChange={event => chooseBooking(event.target.value)}
           options={members.map(member => ({ value: String(member.bookingId), label: `${member.memberName} - Booking #${member.bookingId} - ${formatCalendarDate(member.sessionDate)}` }))} />
-        {bookingId && <Link className="btn btn--secondary" to={`/coach/training/progress?classId=${classId}&memberId=${members.find(item => item.bookingId === Number(bookingId))?.memberId ?? ''}`}>View selected member progress</Link>}
-        {bookingId && <CoachDrillDrafts key={bookingId} bookingId={Number(bookingId)} onUse={drafts => setSteps(drafts.map(draft => ({ title: draft.title, durationMinutes: String(draft.durationMinutes), instructions: draft.instructions })))} />}
+        {bookingId && <Link className="btn btn--secondary" to={`/coach/training/progress?classId=${classId}&memberId=${selectedMemberId ?? ''}`}>View selected member progress</Link>}
+        {bookingId && selectedMemberId !== undefined && <CoachDrillDrafts key={bookingId}
+          intro="Drafts use this member's training goal, level, recorded results and your latest feedback. When AI drafting is unavailable, RULE_BASED drafts from the curated catalog are shown. Nothing is assigned until you review the plan and select Assign plan."
+          context={<MemberTrainingContext classId={classId} memberId={selectedMemberId} />}
+          load={options => training.drillSuggestions(Number(bookingId), options)}
+          onUse={drafts => setSteps(draftSteps(drafts))} />}
         <Input label="Plan title" name="title" required maxLength={150} value={title} onChange={event => setTitle(event.target.value)} />
         <TrainingTextarea label="Plan description" name="description" maxLength={1000} value={description} onChange={event => setDescription(event.target.value)} />
-        {steps.map((step, index) => (
-          <fieldset key={index} className="training-step-form">
-            <legend>Exercise {index + 1}</legend>
-            <Input label={`Exercise title ${index + 1}`} value={step.title} required maxLength={150} onChange={event => updateStep(index, 'title', event.target.value)} />
-            <Input label={`Exercise duration ${index + 1} (minutes)`} type="number" min={1} max={1440} step={1} required value={step.durationMinutes} onChange={event => updateStep(index, 'durationMinutes', event.target.value)} />
-            <TrainingTextarea label={`Exercise instructions ${index + 1}`} value={step.instructions} maxLength={1000} onChange={event => updateStep(index, 'instructions', event.target.value)} />
-            {steps.length > 1 && <Button variant="secondary" onClick={() => setSteps(current => current.filter((_, position) => position !== index))}>Remove exercise {index + 1}</Button>}
-          </fieldset>
-        ))}
+        <StepFields steps={steps} setSteps={setSteps} />
         <div className="training-actions">
           <Button variant="secondary" disabled={steps.length >= 100} onClick={() => setSteps(current => [...current, blankStep()])}>Add exercise</Button>
           <Button type="submit" loading={action.pending}>Assign plan</Button>
@@ -112,16 +129,96 @@ function CreatePlanForm({ classId, members, onSaved }: { classId: number; member
   )
 }
 
-function CoachDrillDrafts({ bookingId, onUse }: { bookingId: number; onUse: (drafts: DrillDraft[]) => void }) {
-  const [suggestions, setSuggestions] = useState<DrillSuggestions | null>(null)
+function CreateClassPlanForm({ classId }: { classId: number }) {
+  const [steps, setSteps] = useState([blankStep()])
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  // One key per intended plan: a retried submit of the same plan is not duplicated by the server.
+  const [operationKey, setOperationKey] = useState(() => crypto.randomUUID())
+  const action = useTrainingAction()
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    void action.run(async () => {
+      const planTitle = title.trim()
+      if (invalidSteps(planTitle, steps)) throw new Error('Enter a plan title, exercise titles and durations between 1 and 1440 minutes.')
+      await training.createClassPlan({ classId, title: planTitle, description: description.trim() || null, steps: stepBody(steps) }, operationKey)
+      setTitle('')
+      setDescription('')
+      setSteps([blankStep()])
+      setOperationKey(crypto.randomUUID())
+    }, 'Class plan assigned. Members with a confirmed booking in this class can view it.')
+  }
+
+  return (
+    <form className="training-form" onSubmit={submit}>
+      <fieldset disabled={action.pending} className="training-fieldset">
+        <CoachDrillDrafts
+          intro="Class drafts use the number of members at each level and with each goal, and the class averages of recorded skills. No individual member data is used. Nothing is assigned until you review the plan and select Assign class plan."
+          load={options => training.classDrillSuggestions(classId, options)}
+          onUse={drafts => setSteps(draftSteps(drafts))} />
+        <Input label="Plan title" name="title" required maxLength={150} value={title} onChange={event => setTitle(event.target.value)} />
+        <TrainingTextarea label="Plan description" name="description" maxLength={1000} value={description} onChange={event => setDescription(event.target.value)} />
+        <StepFields steps={steps} setSteps={setSteps} />
+        <div className="training-actions">
+          <Button variant="secondary" disabled={steps.length >= 100} onClick={() => setSteps(current => [...current, blankStep()])}>Add exercise</Button>
+          <Button type="submit" loading={action.pending}>Assign class plan</Button>
+        </div>
+      </fieldset>
+      <ActionMessage {...action} />
+    </form>
+  )
+}
+
+/** F5-06 "Member training context": what the drafts are based on, shown next to the suggestion inputs. */
+function MemberTrainingContext({ classId, memberId }: { classId: number; memberId: number }) {
+  const load = useCallback((signal: AbortSignal) => coachProgress(classId, memberId, signal), [classId, memberId])
+  return <section className="training-context" aria-label="Member training context"><h4>Member training context</h4>
+    <TrainingData load={load}>{({ profile, progress }) => {
+      const recent = progress.sessions.slice(-3).reverse()
+      const latestScores = recent.find(session => session.scores.length)?.scores ?? []
+      const latestFeedback = [...progress.feedback].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+      const goal = GOAL_OPTIONS.find(option => option.value === profile.mainGoal)?.label ?? profile.mainGoal
+      const level = LEVEL_OPTIONS.find(option => option.value === profile.currentLevel)?.label ?? profile.currentLevel
+      return <dl className="browse-facts">
+        <div><dt>Goal</dt><dd>{goal || 'Not set'}</dd></div>
+        <div><dt>Member level</dt><dd>{level || 'Not set'}</dd></div>
+        <div><dt>Sessions reviewed</dt><dd>{recent.length ? recent.map(session => formatCalendarDate(session.date)).join(' / ') : 'No recorded results yet'}</dd></div>
+        <div><dt>Recent results</dt><dd>{latestScores.length ? latestScores.map(score => `${score.metricName} ${score.score}/${score.maxScore}`).join(', ') : 'No recorded scores yet'}</dd></div>
+        <div><dt>Latest areas for improvement</dt><dd>{latestFeedback?.areasForImprovement || 'None recorded'}</dd></div>
+      </dl>
+    }}</TrainingData>
+  </section>
+}
+
+interface DrillPreview { mode: DrillSuggestions['mode']; ruleVersion: string; drafts: DrillDraft[]; memberCount?: number }
+function CoachDrillDrafts({ intro, context, load, onUse }: { intro: string; context?: ReactNode; load: (options: DrillOptions) => Promise<DrillPreview>; onUse: (drafts: DrillDraft[]) => void }) {
+  const [suggestions, setSuggestions] = useState<DrillPreview | null>(null)
   const [selected, setSelected] = useState<number[]>([])
   const [copied, setCopied] = useState(0)
+  const [focus, setFocus] = useState('')
+  const [sessionMinutes, setSessionMinutes] = useState('')
   const action = useTrainingAction()
+  function suggest() {
+    void action.run(async () => {
+      const minutes = sessionMinutes.trim() ? Number(sessionMinutes) : undefined
+      if (minutes !== undefined && (!Number.isInteger(minutes) || minutes < 15 || minutes > 180)) throw new Error('Session duration must be a whole number between 15 and 180 minutes.')
+      setSuggestions(await load({ focus: focus.trim() || undefined, sessionMinutes: minutes }))
+      setSelected([])
+      setCopied(0)
+    }, 'Drafts loaded for Coach review. Nothing assigned.')
+  }
   return <div className="training-form"><h3>Supplementary drill drafts</h3>
-    <p>RULE_BASED drafts use this booking's sport, level and available feedback. Nothing is assigned until you review the plan and select Assign plan.</p>
-    <Button variant="secondary" loading={action.pending} onClick={() => { void action.run(async () => { setSuggestions(await training.drillSuggestions(bookingId)); setSelected([]); setCopied(0) }, 'Drafts loaded for Coach review. Nothing assigned.') }}>Suggest practice drills</Button>
+    <p>{intro}</p>
+    {context}
+    <Input label="Current focus (optional)" maxLength={200} value={focus} onChange={event => setFocus(event.target.value)} />
+    <Input label="Session duration in minutes (optional)" type="number" min={15} max={180} step={1} value={sessionMinutes} onChange={event => setSessionMinutes(event.target.value)} />
+    <Button variant="secondary" loading={action.pending} onClick={suggest}>Suggest practice drills</Button>
     <ActionMessage {...action} />
-    {suggestions && <p>Mode: {suggestions.mode}, rule version {suggestions.ruleVersion}. Drafts are not saved.</p>}
+    {suggestions && (suggestions.mode === 'AI_GENERATED'
+      ? <p role="note"><strong>AI draft</strong> generated by {suggestions.ruleVersion} for review. Check every exercise for safety and suitability before assigning. Drafts are not saved.</p>
+      : <p>Mode: {suggestions.mode}, rule version {suggestions.ruleVersion}. Drafts are not saved.</p>)}
+    {suggestions?.memberCount !== undefined && <p>Based on {suggestions.memberCount === 1 ? '1 member' : `${suggestions.memberCount} members`} with a confirmed booking in this class.</p>}
     {suggestions && (suggestions.drafts.length ? <><ul className="training-list">{suggestions.drafts.map((draft,index) => <li key={draft.title}>
       <label><input type="checkbox" checked={selected.includes(index)} onChange={event => setSelected(current => event.target.checked ? [...current,index] : current.filter(value => value !== index))} /> Select draft: {draft.title}</label>
       <p>{draft.goal} - {draft.level} - {draft.durationMinutes} minutes</p><p>{draft.instructions}</p><p>{draft.reason}</p>

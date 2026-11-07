@@ -815,7 +815,7 @@
     {
       "id": "S28",
       "path": "backend/pom.xml",
-      "line": 197,
+      "line": 199,
       "definition": "maven-surefire-plugin"
     },
     {

@@ -17,6 +17,15 @@ function signedIn(role: 'COACH' | 'RECEPTIONIST' | 'MEMBER', handler: (call: Rec
   return installFakeFetch(call => call.path === '/users/me' ? json(200, { ...MEMBER, role }) : handler(call))
 }
 const unexpected = (call: RecordedCall) => backendError(404, `Unexpected endpoint: ${call.method} ${call.path}`)
+// Member training context shown next to the drill inputs (F5-06): profile and recorded progress of member 42 in class 1.
+const learnerProfile = { memberId: 42, memberCode: 'MEM-0042', memberName: 'Lan', mainGoal: 'BUILD_SKILLS', currentLevel: 'INTERMEDIATE' }
+const learnerProgress = {
+  learner: learnerProfile, interpretation: 'Chronological recorded outcomes.',
+  sessions: [{ resultId: 3, sessionId: 5, sessionCode: '011126SW01', date: '2026-11-01', notes: null, attendanceStatus: 'PRESENT', notesOnly: false, scores: [{ metricId: 9, metricName: 'Kick technique', maxScore: 10, score: 4.5 }] }],
+  feedback: [{ id: 1, planId: 7, planTitle: 'Personal plan', coachName: 'An', rating: 4, comments: 'Good effort', strengths: 'Breathing', areasForImprovement: 'Kick timing', createdAt: '2026-11-02T08:00:00' }],
+}
+const learnerContext = (call: RecordedCall) => call.path === '/coach/training/classes/1/members/42/profile' ? json(200, learnerProfile)
+  : call.path === '/coach/training/classes/1/members/42/progress' ? json(200, learnerProgress) : null
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Coach training writes', () => {
@@ -26,7 +35,7 @@ describe('Coach training writes', () => {
       if (call.path === '/coach/training/classes') return json(200, [{ ...trainingClass, name: 'Football class' }])
       if (call.path === '/coach/training/classes/1/members') return json(200, [bookingCandidate])
       if (call.path === '/coach/training/plans' && call.method === 'GET') return json(200, [])
-      if (call.path === '/coach/training/bookings/11/drill-suggestions') return json(200, { mode: 'RULE_BASED', ruleVersion: 'curated-drills-v1', requiresCoachReview: true, persisted: false, bookingId: 11, memberId: 42, classId: 1, sportName: 'Football', level: 'BEGINNER', drafts: [draft] })
+      if (call.path === '/coach/training/bookings/11/drill-suggestions') return json(200, { mode: 'RULE_BASED', ruleVersion: 'curated-drills-v2', requiresCoachReview: true, persisted: false, bookingId: 11, memberId: 42, classId: 1, sportName: 'Football', level: 'BEGINNER', drafts: [draft] })
       if (call.path === '/coach/training/plans' && call.method === 'POST') return json(201, { id: 8 })
       return unexpected(call)
     })
@@ -47,6 +56,96 @@ describe('Coach training writes', () => {
     expect(await screen.findByText('Plan assigned. The member can view it immediately.')).toBeInTheDocument()
     expect(calls.find(call => call.method === 'POST')?.body).toMatchObject({ title: 'Reviewed passing', steps: [{ title: draft.title, durationMinutes: 5, instructions: draft.instructions + ' Coach reviewed.' }] })
   })
+  it('shows the member training context and sends the Coach focus and session duration with the preview', async () => {
+    const draft = { title: 'Flutter kick timing', goal: 'Kick technique', durationMinutes: 10, instructions: 'Kick along the wall, then reset.', reason: 'Kick technique scored 4.5/10.', level: 'INTERMEDIATE' }
+    const { calls } = signedIn('COACH', call => {
+      if (call.path === '/coach/training/classes') return json(200, [trainingClass])
+      if (call.path === '/coach/training/classes/1/members') return json(200, [bookingCandidate])
+      if (call.path === '/coach/training/plans' && call.method === 'GET') return json(200, [])
+      if (call.path.startsWith('/coach/training/bookings/11/drill-suggestions')) return json(200, { mode: 'AI_GENERATED', ruleVersion: 'gemini-3.5-flash-lite', requiresCoachReview: true, persisted: false, bookingId: 11, memberId: 42, classId: 1, sportName: 'Swimming', level: 'INTERMEDIATE', drafts: [draft] })
+      return learnerContext(call) ?? unexpected(call)
+    })
+    renderApp('/coach/training/plans')
+    const user = userEvent.setup()
+    await user.selectOptions(await screen.findByLabelText('Assigned class'), '1')
+    await user.selectOptions(await screen.findByLabelText(/Member booking/), '11')
+    const context = await screen.findByRole('region', { name: 'Member training context' })
+    expect(await within(context).findByText('Kick technique 4.5/10')).toBeInTheDocument()
+    expect(within(context).getByText('Kick timing')).toBeInTheDocument()
+    expect(within(context).getByText('Intermediate')).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Current focus (optional)'), 'Kick timing')
+    await user.type(screen.getByLabelText('Session duration in minutes (optional)'), '45')
+    await user.click(screen.getByRole('button', { name: 'Suggest practice drills' }))
+    expect(await screen.findByText('Select draft: Flutter kick timing')).toBeInTheDocument()
+    expect(calls.find(call => call.path.startsWith('/coach/training/bookings/11/drill-suggestions'))?.path)
+      .toBe('/coach/training/bookings/11/drill-suggestions?focus=Kick+timing&sessionMinutes=45')
+  })
+  it('rejects a session duration outside 15 to 180 minutes before calling the server', async () => {
+    const { calls } = signedIn('COACH', call => {
+      if (call.path === '/coach/training/classes') return json(200, [trainingClass])
+      if (call.path === '/coach/training/classes/1/members') return json(200, [bookingCandidate])
+      if (call.path === '/coach/training/plans' && call.method === 'GET') return json(200, [])
+      return learnerContext(call) ?? unexpected(call)
+    })
+    renderApp('/coach/training/plans')
+    const user = userEvent.setup()
+    await user.selectOptions(await screen.findByLabelText('Assigned class'), '1')
+    await user.selectOptions(await screen.findByLabelText(/Member booking/), '11')
+    await user.type(screen.getByLabelText('Session duration in minutes (optional)'), '200')
+    await user.click(screen.getByRole('button', { name: 'Suggest practice drills' }))
+    expect(await screen.findByText('Session duration must be a whole number between 15 and 180 minutes.')).toBeInTheDocument()
+    expect(calls.some(call => call.path.includes('drill-suggestions'))).toBe(false)
+  })
+  it('drafts and assigns a whole-class plan from class-level suggestions with an idempotency key', async () => {
+    const draft = { title: 'Group relay kicks', goal: 'Kick technique', durationMinutes: 15, instructions: 'Relay along the lane.', reason: 'Lowest class average: kick technique.', level: 'BEGINNER' }
+    const { calls, fetchMock } = signedIn('COACH', call => {
+      if (call.path === '/coach/training/classes') return json(200, [trainingClass])
+      if (call.path === '/coach/training/plans' && call.method === 'GET') return json(200, [])
+      if (call.path.startsWith('/coach/training/classes/1/drill-suggestions')) return json(200, { mode: 'AI_GENERATED', ruleVersion: 'gemini-3.5-flash-lite', requiresCoachReview: true, persisted: false, classId: 1, sportName: 'Swimming', level: 'BEGINNER', memberCount: 6, drafts: [draft] })
+      if (call.path === '/coach/training/class-plans' && call.method === 'POST') return json(201, { plan: { id: 30 }, steps: [] })
+      return unexpected(call)
+    })
+    renderApp('/coach/training/plans')
+    const user = userEvent.setup()
+    await user.selectOptions(await screen.findByLabelText('Plan scope'), 'CLASS')
+    await user.selectOptions(screen.getByLabelText('Assigned class'), '1')
+    expect(screen.getByText(/No individual member data is used/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Suggest practice drills' }))
+    expect(await screen.findByText('Based on 6 members with a confirmed booking in this class.')).toBeInTheDocument()
+    await user.click(screen.getByLabelText('Select draft: Group relay kicks'))
+    await user.click(screen.getByRole('button', { name: 'Review selected drafts in plan form' }))
+    await user.type(screen.getByLabelText(/Plan title/), 'Week 3 class plan')
+    expect(calls.filter(call => call.method === 'POST')).toHaveLength(0)
+    await user.click(screen.getByRole('button', { name: 'Assign class plan' }))
+    expect(await screen.findByText('Class plan assigned. Members with a confirmed booking in this class can view it.')).toBeInTheDocument()
+    const post = calls.find(call => call.method === 'POST' && call.path === '/coach/training/class-plans')
+    expect(post?.body).toMatchObject({ classId: 1, title: 'Week 3 class plan', steps: [{ title: draft.title, durationMinutes: 15, instructions: draft.instructions }] })
+    const keys = fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST').map(([, init]) => new Headers(init?.headers).get('Idempotency-Key'))
+    expect(keys).toHaveLength(1)
+    expect(keys[0]).toMatch(/^[0-9a-f-]{36}$/)
+  })
+  it('labels AI drafts, shows why each fits the member, and still assigns nothing until the Coach reviews', async () => {
+    const draft = { title: 'Six-corner shadow footwork', goal: 'Footwork', durationMinutes: 10, instructions: 'Shadow the six corners, then reset.', reason: 'Footwork scored 4.5/10 and is the latest area for improvement.', level: 'ADVANCED' }
+    const { calls } = signedIn('COACH', call => {
+      if (call.path === '/coach/training/classes') return json(200, [{ ...trainingClass, name: 'Badminton class' }])
+      if (call.path === '/coach/training/classes/1/members') return json(200, [bookingCandidate])
+      if (call.path === '/coach/training/plans' && call.method === 'GET') return json(200, [])
+      if (call.path === '/coach/training/bookings/11/drill-suggestions') return json(200, { mode: 'AI_GENERATED', ruleVersion: 'gemini-3.5-flash-lite', requiresCoachReview: true, persisted: false, bookingId: 11, memberId: 42, classId: 1, sportName: 'Badminton', level: 'ADVANCED', drafts: [draft] })
+      return unexpected(call)
+    })
+    renderApp('/coach/training/plans')
+    const user = userEvent.setup()
+    await user.selectOptions(await screen.findByLabelText('Assigned class'), '1')
+    await user.selectOptions(await screen.findByLabelText(/Member booking/), '11')
+    await user.click(screen.getByRole('button', { name: 'Suggest practice drills' }))
+    expect(await screen.findByRole('note')).toHaveTextContent('AI draft generated by gemini-3.5-flash-lite for review. Check every exercise for safety and suitability before assigning. Drafts are not saved.')
+    expect(screen.getByText(draft.reason)).toBeInTheDocument()
+    expect(screen.getByText('Footwork - ADVANCED - 10 minutes')).toBeInTheDocument()
+    await user.click(screen.getByLabelText('Select draft: Six-corner shadow footwork'))
+    await user.click(screen.getByRole('button', { name: 'Review selected drafts in plan form' }))
+    expect(screen.getByLabelText(/Exercise title 1/)).toHaveValue(draft.title)
+    expect(calls.filter(call => call.method === 'POST')).toHaveLength(0)
+  })
   it('clears drafts and every plan field when the Coach switches to another member booking, and surfaces duplicate rejection', async () => {
     const draft = { title: 'Walking shadow footwork', goal: 'Court movement', durationMinutes: 5, instructions: 'Walk between court positions.', reason: 'Matches the Badminton class at beginner level. Coach review is required.', level: 'BEGINNER' }
     const otherBooking = { bookingId: 12, memberId: 43, memberName: 'Minh', sessionDate: '2026-11-01' }
@@ -54,7 +153,7 @@ describe('Coach training writes', () => {
       if (call.path === '/coach/training/classes') return json(200, [{ ...trainingClass, name: 'Badminton class' }])
       if (call.path === '/coach/training/classes/1/members') return json(200, [bookingCandidate, otherBooking])
       if (call.path === '/coach/training/plans' && call.method === 'GET') return json(200, [])
-      if (call.path === '/coach/training/bookings/11/drill-suggestions') return json(200, { mode: 'RULE_BASED', ruleVersion: 'curated-drills-v1', requiresCoachReview: true, persisted: false, bookingId: 11, memberId: 42, classId: 1, sportName: 'Badminton', level: 'BEGINNER', drafts: [draft] })
+      if (call.path === '/coach/training/bookings/11/drill-suggestions') return json(200, { mode: 'RULE_BASED', ruleVersion: 'curated-drills-v2', requiresCoachReview: true, persisted: false, bookingId: 11, memberId: 42, classId: 1, sportName: 'Badminton', level: 'BEGINNER', drafts: [draft] })
       if (call.path === '/coach/training/plans' && call.method === 'POST') return backendError(409, 'A plan with this title already exists for this booking; choose a distinct title for a new plan')
       return unexpected(call)
     })
@@ -63,7 +162,7 @@ describe('Coach training writes', () => {
     await user.selectOptions(await screen.findByLabelText('Assigned class'), '1')
     await user.selectOptions(await screen.findByLabelText(/Member booking/), '11')
     await user.click(screen.getByRole('button', { name: 'Suggest practice drills' }))
-    expect(await screen.findByText('Mode: RULE_BASED, rule version curated-drills-v1. Drafts are not saved.')).toBeInTheDocument()
+    expect(await screen.findByText('Mode: RULE_BASED, rule version curated-drills-v2. Drafts are not saved.')).toBeInTheDocument()
     await user.click(screen.getByLabelText('Select draft: Walking shadow footwork'))
     await user.click(screen.getByRole('button', { name: 'Review selected drafts in plan form' }))
     expect(screen.getByText('1 draft copied into the exercise fields below. Edit them, then select Assign plan. Nothing is assigned yet.')).toBeInTheDocument()
@@ -123,7 +222,7 @@ describe('Coach training writes', () => {
       if (call.path === '/coach/training/classes/1/members') return json(200, [bookingCandidate])
       if (call.path === '/coach/training/plans' && call.method === 'GET') return json(200, [])
       if (call.path === '/coach/training/plans' && call.method === 'POST') return backendError(409, 'Booking has been cancelled')
-      return unexpected(call)
+      return learnerContext(call) ?? unexpected(call)
     })
     renderApp('/coach/training/plans')
     const user = userEvent.setup()
