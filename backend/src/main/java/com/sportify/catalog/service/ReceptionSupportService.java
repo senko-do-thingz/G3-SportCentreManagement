@@ -229,9 +229,10 @@ public class ReceptionSupportService {
         boolean allowed=switch(from){case OPEN->to==Status.IN_PROGRESS || to==Status.CLOSED;case IN_PROGRESS->to==Status.RESOLVED || to==Status.CLOSED;case RESOLVED->to==Status.CLOSED;case CLOSED->false;};
         if(!allowed)throw new ConflictException("Support status transition is not allowed","SUPPORT_STATE_CONFLICT");
         if((to==Status.RESOLVED || to==Status.CLOSED) && (notes==null || notes.length()<3))throw new BusinessRuleException("Provide resolution notes before resolving or closing a request","SUPPORT_RESOLUTION_REQUIRED");
-        // A Member who asked in writing must receive a written answer before the request counts as resolved.
-        if(to==Status.RESOLVED && current.memberSubmitted() && current.replyCount()==0)
-            throw new BusinessRuleException("Send a reply to the Member before resolving a request they submitted","SUPPORT_REPLY_REQUIRED");
+        // A Member who asked in writing must receive a written answer before the request reaches either terminal
+        // status: closing must not bypass the reply that resolving requires.
+        if((to==Status.RESOLVED || to==Status.CLOSED) && current.memberSubmitted() && current.replyCount()==0)
+            throw new BusinessRuleException("Send a reply to the Member before resolving or closing a request they submitted","SUPPORT_REPLY_REQUIRED");
         jdbc.update("UPDATE support_request SET status=?,resolution_notes=?,assigned_staff_id=?,updated_at=? WHERE id=?",to.name(),notes,actor,LocalDateTime.now(clock),id);
         if(to==Status.RESOLVED || to==Status.CLOSED)
             notifyMember(current,eventPrefix(id)+"STATUS:"+to.name(),"SUPPORT_STATUS","Support request "+current.code()+" "+(to==Status.RESOLVED?"resolved":"closed"),

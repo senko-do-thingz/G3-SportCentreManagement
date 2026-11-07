@@ -20,8 +20,8 @@ import java.util.function.Supplier;
 
 /**
  * Classifies Flow 6 assistant questions with Claude. Active when app.assistant.ai.enabled=true and
- * app.assistant.ai.provider is claude; the key comes from ANTHROPIC_API_KEY. Only the redacted question text and the
- * active sport names are sent.
+ * app.assistant.ai.provider is claude; the key comes from ANTHROPIC_API_KEY. Only the allowlisted keywords found in the
+ * question and the active sport names are sent; the question text is never sent.
  */
 @Service
 @ConditionalOnExpression("${app.assistant.ai.enabled:false} and '${app.assistant.ai.provider:claude}'.equalsIgnoreCase('claude')")
@@ -73,13 +73,13 @@ class ClaudeAssistantClassifier implements AssistantIntentClassifier {
     }
 
     @Override
-    public Classification classify(String question, List<String> sports) {
+    public Classification classify(List<String> keywords, List<String> sports) {
         StructuredMessageCreateParams<ProposedIntent> params = MessageCreateParams.builder()
                 .model(model)
                 .maxTokens(1024L)
                 .system(AssistantAiPolicy.SYSTEM_PROMPT)
                 .outputConfig(ProposedIntent.class)
-                .addUserMessage(AssistantAiPolicy.userMessage(json, question, sports))
+                .addUserMessage(AssistantAiPolicy.userMessage(json, keywords, sports))
                 .build();
         StructuredMessage<ProposedIntent> message = client().messages().create(params);
         if (message.stopReason().filter(StopReason.REFUSAL::equals).isPresent()) return AssistantAiPolicy.unknown();

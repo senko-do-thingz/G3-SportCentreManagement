@@ -11,7 +11,14 @@ AI drill drafting of PR #233.
 |---|---|---|
 | `POST /api/v1/member/training/consultation` (existing, extended) | MEMBER | Answers come only from center data; read-only; personal answers are scoped to the signed-in Member. |
 | `GET/POST /api/v1/member/support-requests`, `GET /api/v1/member/support-requests/{id}`, `PUT .../{id}/read` | MEMBER | Create a request (with `Idempotency-Key`) and read replies to the Member's own requests only; `/member/support` page. |
-| `GET /api/v1/reception/support-requests`, `.../summary`, `.../{id}`, `POST .../{id}/replies`, `PUT .../{id}/status` | RECEPTIONIST | List, count, reply and resolve. No migration: reuses `support_request_message` and `notification`. |
+| `GET /api/v1/reception/support-requests`, `.../summary`, `.../{id}`, `POST .../{id}/replies`, `PUT .../{id}/status` | RECEPTIONIST | List, count, reply, resolve and close. No migration: reuses `support_request_message` and `notification`. |
+
+## Support request completion rule
+
+A request a Member submitted must receive at least one member-facing Reception reply before it reaches **either**
+terminal status, `RESOLVED` or `CLOSED` (OPEN -> CLOSED, IN_PROGRESS -> RESOLVED and IN_PROGRESS -> CLOSED are all
+refused with `SUPPORT_REPLY_REQUIRED` while there is no reply; the status and notifications are unchanged).
+Resolution notes stay internal. Requests created by Reception on a Member's behalf keep the earlier rule (notes only).
 
 ## Order of checks for one question
 
@@ -23,24 +30,32 @@ AI drill drafting of PR #233.
    - personal health, injury, diet and weight-loss questions are sent to the human Coach (`HUMAN_COACH`).
    A guarded question never reaches the database or the AI classifier.
 4. Keyword rules choose an intent.
-5. Only if AI is enabled, the caller is a signed-in Member and the per-Member limit (20 calls per 10 minutes) is not
-   exceeded: the redacted question is classified by the provider. Anonymous questions never use AI.
+5. Only if AI is enabled and the caller is a signed-in Member: `AssistantAiPolicy.keywords` extracts the allowlisted
+   service phrases from the question. **If none is found, no provider call is made** (fail closed). Otherwise, within
+   the per-Member limit (20 calls per 10 minutes), the keywords are classified by the provider. Anonymous questions
+   never use AI.
 6. The answer is always built from center records by the existing services. The model never writes the answer.
 
 ## Exactly what is sent to the provider (AI enabled only)
 
+The question text is **never** sent. The classifier contract is `classify(List<String> keywords, List<String> sports)`,
+so a provider implementation cannot receive it.
+
 - The system prompt in `AssistantAiPolicy.SYSTEM_PROMPT` (fixed text, no data).
 - The list of active sport names (`sport.name` where `is_active=1`).
-- The question text after `AssistantAiPolicy.redact`: control characters removed, e-mail addresses replaced with
-  `[email removed]`, phone-like numbers (7+ digits) replaced with `[number removed]`, cut to 500 characters.
+- At most 12 keywords: phrases from the fixed `AssistantAiPolicy.ALLOWED_PHRASES` list (English and unaccented
+  Vietnamese service words such as "price", "tomorrow", "lich tap", "ngay mai", "bong da") or an active sport name,
+  found as whole words in the question, in order. `AssistantAiPolicy.userMessage` refuses anything else.
 
-Nothing else is sent: no member id, name, e-mail, package, booking, training result or conversation history.
-The provider reply is limited to a fixed intent list, one sport from the supplied list, a day keyword and an FAQ
-topic number; anything else becomes `UNKNOWN` and the keyword rules are used. Failures are logged with the exception
-class only.
+Names, addresses, e-mail, phone and other numbers, health descriptions and injected instructions are not on the list
+and therefore never leave the server. Single words that are also common Vietnamese given names ("an", "mai", "dat",
+"huy", "nam", "long", "gia") are not keywords on their own; they only count inside longer phrases such as "ngay mai".
+The provider reply is limited to a fixed intent list, one sport from the supplied list, a day keyword and an FAQ topic
+number; anything else becomes `UNKNOWN` and the keyword rules are used. Failures are logged with the exception class
+only.
 
-Known limitation: a person's name typed inside an otherwise allowed question (for example "is coach An teaching
-tomorrow?") is not removed. It is still covered by the opt-in, the guard and the disabled-by-default setting.
+The Member assistant page shows this separately from the consultation opt-in: turning on automated consultation
+does not share the question with any outside company.
 
 ## Configuration
 
@@ -63,12 +78,16 @@ With AI disabled (the default and the CI setting) the assistant runs on keyword 
 
 ## Tests
 
-- `CenterConsultationAssistantTest` (no network, no database): English and Vietnamese routing; health questions
-  and private, injection and transaction requests (English and Vietnamese) answered without any database or
-  classifier call; only the redacted question reaches the classifier; out-of-list provider values become
-  `UNKNOWN`; failures fall back to the rules; per-Member rate limit; anonymous questions never use AI; Gemini
-  reply parsing and blocked replies.
+- `AssistantAiReleaseGateTest` (no network): for English and Vietnamese questions carrying names, street addresses,
+  phone numbers, an injected instruction and a health detail the guard does not catch, the **actual** outgoing Claude
+  request and Gemini HTTP body contain only the expected keywords and none of that text; `userMessage` refuses
+  non-allowlisted words; common given names are never keywords on their own.
+- `CenterConsultationAssistantTest` (no network, no database): English and Vietnamese routing; health questions and
+  private, injection and transaction requests answered without any database or classifier call; only allowlisted
+  keywords reach the classifier; a question with no allowlisted keyword never reaches it; out-of-list provider values
+  become `UNKNOWN`; failures fall back to the rules; per-Member rate limit; anonymous questions never use AI.
 - `TrainingWorkflowIntegrationTest` (SQL Server): `F6_memberSubmitsReceptionRepliesAndInternalNotesStayPrivate`,
-  `F6_resolvingNeedsAReplyAndOpenSelfSubmittedRequestsAreLimited`, `F6_assistantAnswersFromTheMembersOwnBookingsAndHomeworkOnly`.
-- `memberSupport.test.tsx`, `supportRequests.test.tsx`, `MemberAssistantPage.test.tsx`: Member to reception to
-  reply flow on the desktop UI.
+  `F6_resolvingNeedsAReplyAndOpenSelfSubmittedRequestsAreLimited` (OPEN -> CLOSED and IN_PROGRESS -> CLOSED refused
+  without a reply, allowed after one), `F6_assistantAnswersFromTheMembersOwnBookingsAndHomeworkOnly`.
+- `MemberAssistantPage.test.tsx` (external AI disclosure), `memberSupport.test.tsx`, `supportRequests.test.tsx`:
+  Member to reception to reply flow on the desktop UI.

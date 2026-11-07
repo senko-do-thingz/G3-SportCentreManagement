@@ -25,6 +25,16 @@ it('requires opt-in, shows grounded sources and clears ephemeral answers when di
   expect(screen.queryByText('120000 VND base price.')).not.toBeInTheDocument()
   expect(screen.getByRole('textbox', { name: /Center question/ })).toHaveValue('')
 })
+it('discloses external AI processing separately from opting into local automated answers', async () => {
+  tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
+  installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER) : json(200, []))
+  renderApp('/member/assistant')
+  const disclosure = await screen.findByLabelText('External AI disclosure')
+  expect(disclosure).toHaveTextContent('turning on consultation does not share your question with any outside company')
+  expect(disclosure).toHaveTextContent('your question text is never sent')
+  expect(disclosure).toHaveTextContent('Names, contact details, numbers and health details are never sent')
+  expect(screen.queryByText(/only your question text/)).not.toBeInTheDocument()
+})
 it('fills example questions only after opt-in and labels curated FAQ sources without calling the API early', async () => {
   tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
   const { calls } = installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER) : json(200, {

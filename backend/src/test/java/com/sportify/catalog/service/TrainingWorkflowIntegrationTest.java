@@ -343,8 +343,23 @@ class TrainingWorkflowIntegrationTest {
         support.update(reception,first.id(),new ReceptionSupportService.Update(ReceptionSupportService.Status.IN_PROGRESS,null));
         assertThatThrownBy(()->support.update(reception,first.id(),new ReceptionSupportService.Update(ReceptionSupportService.Status.RESOLVED,"Answered at the desk")))
             .isInstanceOf(BusinessRuleException.class);
-        // Closing without a written reply stays possible, for example for a duplicate request.
+        // Closing is a terminal status too: IN_PROGRESS -> CLOSED without a reply is refused and nothing changes.
+        int statusNotices=count("SELECT COUNT(*) FROM notification WHERE user_id=? AND type='SUPPORT_STATUS'",member);
+        assertThatThrownBy(()->support.update(reception,first.id(),new ReceptionSupportService.Update(ReceptionSupportService.Status.CLOSED,"Duplicate of an earlier request")))
+            .isInstanceOf(BusinessRuleException.class).hasMessageContaining("reply");
+        assertThat(jdbc.queryForObject("SELECT status FROM support_request WHERE id=?",String.class,first.id())).isEqualTo("IN_PROGRESS");
+        // OPEN -> CLOSED without a reply is refused as well.
+        var unanswered=support.memberCreate(member,new ReceptionSupportService.MemberIntake(ReceptionSupportService.Category.GENERAL,"Parking","Is there parking?",null,null),UUID.randomUUID());
+        assertThatThrownBy(()->support.update(reception,unanswered.id(),new ReceptionSupportService.Update(ReceptionSupportService.Status.CLOSED,"Duplicate of an earlier request")))
+            .isInstanceOf(BusinessRuleException.class).hasMessageContaining("reply");
+        assertThat(jdbc.queryForObject("SELECT status FROM support_request WHERE id=?",String.class,unanswered.id())).isEqualTo("OPEN");
+        assertThat(count("SELECT COUNT(*) FROM notification WHERE user_id=? AND type='SUPPORT_STATUS'",member)).isEqualTo(statusNotices);
+        // With a member-facing reply both requests can be closed.
+        support.reply(reception,first.id(),new ReceptionSupportService.ReplyRequest("This duplicates your earlier request; we answered it there."));
         support.update(reception,first.id(),new ReceptionSupportService.Update(ReceptionSupportService.Status.CLOSED,"Duplicate of an earlier request"));
+        support.reply(reception,unanswered.id(),new ReceptionSupportService.ReplyRequest("Yes, free parking is behind the main hall."));
+        support.update(reception,unanswered.id(),new ReceptionSupportService.Update(ReceptionSupportService.Status.CLOSED,"Answered in writing"));
+        assertThat(jdbc.queryForList("SELECT status FROM support_request WHERE id IN (?,?)",String.class,first.id(),unanswered.id())).containsOnly("CLOSED");
         for(int i=0;i<ReceptionSupportService.MAX_OPEN_MEMBER_REQUESTS;i++)
             support.memberCreate(member,new ReceptionSupportService.MemberIntake(ReceptionSupportService.Category.GENERAL,"Question "+i,"Details "+i,null,null),UUID.randomUUID());
         assertThatThrownBy(()->support.memberCreate(member,new ReceptionSupportService.MemberIntake(ReceptionSupportService.Category.GENERAL,"One more","Details",null,null),UUID.randomUUID()))

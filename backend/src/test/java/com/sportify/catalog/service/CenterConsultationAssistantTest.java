@@ -101,29 +101,41 @@ class CenterConsultationAssistantTest {
         verifyNoInteractions(jdbc);
     }
 
-    @Test void aiClassificationIsUsedAndOnlyTheRedactedQuestionLeavesTheServer() {
+    @Test void aiClassificationIsUsedAndOnlyAllowlistedKeywordsLeaveTheServer() {
         var jdbc = mock(JdbcTemplate.class);
         when(jdbc.queryForList(anyString(), eq(String.class))).thenReturn(List.of("Football", "Badminton"));
-        var sent = new AtomicReference<String>();
+        var sent = new AtomicReference<List<String>>();
         AssistantIntentClassifier classifier = new AssistantIntentClassifier() {
             public String version() { return "test-model"; }
-            public Classification classify(String question, List<String> sports) {
-                sent.set(question);
+            public Classification classify(List<String> keywords, List<String> sports) {
+                sent.set(keywords);
                 assertThat(sports).containsExactly("Football", "Badminton");
                 return new Classification("FAQ", null, "UPCOMING", 3);
             }
         };
-        var answer = service(jdbc, classifier).answer(7L, "M\u00ECnh n\u00EAn u\u1ED1ng bao nhi\u00EAu? mail me at an@example.com or 0901 234 567", true);
+        // "Minh nen uong nuoc bao nhieu? Lan o 12 Le Loi, mail an@example.com, 0901 234 567"
+        var answer = service(jdbc, classifier).answer(7L, "M\u00ECnh n\u00EAn u\u1ED1ng n\u01B0\u1EDBc bao nhi\u00EAu? Lan \u1EDF 12 L\u00EA L\u1EE3i, mail an@example.com, 0901 234 567", true);
         assertThat(answer.mode()).isEqualTo("AI_ASSISTED");
         assertThat(answer.status()).isEqualTo("ANSWERED");
         assertThat(answer.sources()).singleElement().satisfies(source -> assertThat(source.id()).isEqualTo(3));
-        assertThat(sent.get()).doesNotContain("an@example.com").doesNotContain("0901 234 567").contains("[email removed]").contains("[number removed]");
+        assertThat(sent.get()).containsExactly("uong nuoc");
+    }
+
+    @Test void questionsWithoutAnAllowlistedKeywordNeverReachTheProvider() {
+        var jdbc = mock(JdbcTemplate.class);
+        when(jdbc.queryForList(anyString(), eq(String.class))).thenReturn(List.of("Football"));
+        var classifier = mock(AssistantIntentClassifier.class);
+        var service = service(jdbc, classifier);
+        // A name and a street address with no service phrase, in English and Vietnamese.
+        service.answer(7L, "Is An Nguyen at 12 Le Loi street around?", true);
+        service.answer(7L, "Anh Tu\u1EA5n \u1EDF 34 Tr\u1EA7n H\u01B0ng \u0110\u1EA1o c\u00F3 \u0111\u00F3 kh\u00F4ng?", true);
+        verifyNoInteractions(classifier);
     }
 
     @Test void aiPrivateOrCoachResultsAreHonoured() {
         var jdbc = mock(JdbcTemplate.class);
         var classifier = mock(AssistantIntentClassifier.class);
-        when(classifier.classify(anyString(), anyList())).thenReturn(new AssistantIntentClassifier.Classification("PRIVATE", null, "UPCOMING", 0));
+        when(classifier.classify(anyList(), anyList())).thenReturn(new AssistantIntentClassifier.Classification("PRIVATE", null, "UPCOMING", 0));
         var answer = service(jdbc, classifier).answer(7L, "what classes are available", true);
         assertThat(answer.mode()).isEqualTo("AI_ASSISTED");
         assertThat(answer.status()).isEqualTo("NO_ANSWER");
@@ -133,13 +145,13 @@ class CenterConsultationAssistantTest {
     @Test void aiFailureOrUnknownFallsBackToTheKeywordRules() {
         var jdbc = mock(JdbcTemplate.class);
         var failing = mock(AssistantIntentClassifier.class);
-        when(failing.classify(anyString(), anyList())).thenThrow(new IllegalStateException("provider down"));
+        when(failing.classify(anyList(), anyList())).thenThrow(new IllegalStateException("provider down"));
         var answer = service(jdbc, failing).answer(7L, "How should I warm up?", true);
         assertThat(answer.mode()).isEqualTo("KNOWLEDGE_BASED");
         assertThat(answer.sources()).singleElement().satisfies(source -> assertThat(source.kind()).isEqualTo("CURATED_FAQ"));
 
         var unsure = mock(AssistantIntentClassifier.class);
-        when(unsure.classify(anyString(), anyList())).thenReturn(AssistantAiPolicy.unknown());
+        when(unsure.classify(anyList(), anyList())).thenReturn(AssistantAiPolicy.unknown());
         var fallback = service(jdbc, unsure).answer(7L, "How do I book a session?", true);
         assertThat(fallback.mode()).isEqualTo("KNOWLEDGE_BASED");
         assertThat(fallback.sources()).singleElement().satisfies(source -> assertThat(source.kind()).isEqualTo("PRODUCT_GUIDANCE"));
@@ -148,7 +160,7 @@ class CenterConsultationAssistantTest {
     @Test void aiCallsArePerMemberRateLimitedAndAnonymousQuestionsNeverUseAi() {
         var jdbc = mock(JdbcTemplate.class);
         var classifier = mock(AssistantIntentClassifier.class);
-        when(classifier.classify(anyString(), anyList())).thenReturn(new AssistantIntentClassifier.Classification("BOOKING", null, "UPCOMING", 0));
+        when(classifier.classify(anyList(), anyList())).thenReturn(new AssistantIntentClassifier.Classification("BOOKING", null, "UPCOMING", 0));
         var service = service(jdbc, classifier);
         for (int i = 0; i < CenterConsultationService.AI_CALLS_PER_WINDOW; i++)
             assertThat(service.answer(7L, "How do I book?", true).mode()).isEqualTo("AI_ASSISTED");
@@ -157,7 +169,7 @@ class CenterConsultationAssistantTest {
         assertThat(limited.status()).isEqualTo("ANSWERED");
         assertThat(service.answer(8L, "How do I book?", true).mode()).isEqualTo("AI_ASSISTED");
         assertThat(service.answer("How do I book?", true).mode()).isEqualTo("KNOWLEDGE_BASED");
-        verify(classifier, times(CenterConsultationService.AI_CALLS_PER_WINDOW + 1)).classify(anyString(), anyList());
+        verify(classifier, times(CenterConsultationService.AI_CALLS_PER_WINDOW + 1)).classify(anyList(), anyList());
     }
 
     @Test void policyRejectsValuesOutsideTheAllowedLists() {

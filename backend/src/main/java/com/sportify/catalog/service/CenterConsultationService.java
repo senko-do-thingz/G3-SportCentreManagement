@@ -30,7 +30,8 @@ import java.util.regex.Pattern;
  *   <li>Feature switch, Member consent and length checks.</li>
  *   <li>Keyword guard: private, injection and transaction requests are refused, and health questions go to a human
  *       Coach. These questions are never sent to an AI provider.</li>
- *   <li>Optional AI classification ({@link AssistantIntentClassifier}) of the redacted question; any failure or an
+ *   <li>Optional AI classification ({@link AssistantIntentClassifier}) from allowlisted keywords only
+ *       ({@link AssistantAiPolicy#keywords}); the question text never leaves the server; any failure or an
  *       UNKNOWN result uses the keyword rules instead.</li>
  *   <li>The answer is built from center data. Personal answers read only the signed-in Member's own records.</li>
  * </ol>
@@ -84,10 +85,12 @@ public class CenterConsultationService {
         String day=day(raw,plain);
         Faq faq=faq(raw,plain);
         String aiSport=null;
-        if(classifier!=null && aiAllowed(memberId)) {
+        if(classifier!=null && memberId!=null) {
             try {
                 var sports=jdbc.queryForList("SELECT name FROM sport WHERE is_active=1 ORDER BY id",String.class);
-                var result=classifier.classify(AssistantAiPolicy.redact(question),sports);
+                // Fail closed: only allowlisted service keywords may leave the server, and none means no provider call.
+                var keywords=AssistantAiPolicy.keywords(question,sports);
+                var result=keywords.isEmpty() || !aiAllowed(memberId)?null:classifier.classify(keywords,sports);
                 if(result!=null && !"UNKNOWN".equals(result.intent())) {
                     mode=AI_MODE;intent=result.intent();day=result.day();aiSport=result.sport();
                     if(intent.equals("FAQ"))faq=FAQS.stream().filter(item->item.id()==result.faqId()).findFirst().orElse(null);

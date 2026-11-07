@@ -86,11 +86,11 @@ class GeminiAssistantClassifier implements AssistantIntentClassifier {
     }
 
     @Override
-    public Classification classify(String question, List<String> sports) {
+    public Classification classify(List<String> keywords, List<String> sports) {
         if (apiKey.isEmpty()) throw new IllegalStateException("GEMINI_API_KEY is not configured");
         Map<String, Object> request = Map.of(
                 "systemInstruction", Map.of("parts", List.of(Map.of("text", AssistantAiPolicy.SYSTEM_PROMPT))),
-                "contents", List.of(Map.of("role", "user", "parts", List.of(Map.of("text", AssistantAiPolicy.userMessage(json, question, sports))))),
+                "contents", List.of(Map.of("role", "user", "parts", List.of(Map.of("text", AssistantAiPolicy.userMessage(json, keywords, sports))))),
                 "generationConfig", Map.of(
                         "responseMimeType", "application/json",
                         "responseSchema", RESPONSE_SCHEMA,

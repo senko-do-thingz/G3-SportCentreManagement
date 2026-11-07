@@ -14,10 +14,11 @@ public interface AssistantIntentClassifier {
     String version();
 
     /**
-     * Classifies one question. {@code question} has already had e-mail addresses and long numbers removed;
-     * {@code sports} lists the active sport names the answer may be filtered by.
+     * Classifies one question from its allowlisted keywords only ({@link AssistantAiPolicy#keywords}); the question
+     * text itself never reaches an implementation. {@code sports} lists the active sport names the answer may be
+     * filtered by.
      */
-    Classification classify(String question, List<String> sports);
+    Classification classify(List<String> keywords, List<String> sports);
 
     /**
      * @param intent one of {@link AssistantAiPolicy#INTENTS}
