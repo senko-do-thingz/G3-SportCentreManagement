@@ -27,12 +27,13 @@ class ReceptionEligibilityServiceTest {
     @Mock BookingRepository bookings;
     @Mock SportPackageRegistrationRepository registrations;
     @Mock MemberProfileRepository members;
+    @Mock com.sportify.catalog.service.OperationalMemberPolicy operationalMemberPolicy;
     MemberScheduleServiceImpl service;
     MemberProfile member;
     ClassSession session;
 
     @BeforeEach void setup() {
-        service = new MemberScheduleServiceImpl(sessions, bookings, registrations, members, CLOCK);
+        service = new MemberScheduleServiceImpl(sessions, bookings, registrations, members, CLOCK, operationalMemberPolicy);
         member = MemberProfile.builder().id(2L).userAccount(account("MEMBER", 2)).build();
         session = session();
     }
@@ -69,13 +70,15 @@ class ReceptionEligibilityServiceTest {
         verify(sessions, never()).reserveSeat(any(), any());
         verify(bookings, never()).save(any()); verify(members, never()).save(any());
     }
-    @ParameterizedTest @CsvSource({"FULL,FULL", "CACHED,CAPACITY_UNAVAILABLE", "DUPLICATE,ALREADY_BOOKED"})
+    @ParameterizedTest @CsvSource({"FULL,FULL", "CACHED,CAPACITY_UNAVAILABLE", "DUPLICATE,ALREADY_BOOKED", "SYNTHETIC,SYNTHETIC_OPERATION_DENIED"})
     void capacityAndDuplicatePrecedenceIsShared(String scenario, SessionDetailResponse.EligibilityReason expected) {
         visible();
         if (scenario.equals("FULL")) when(bookings.countBySessionIds(List.of(100L), BookingStatus.CONFIRMED)).thenReturn(List.of(count(100, 10)));
         if (scenario.equals("CACHED")) session.setBookedCount(10);
         if (scenario.equals("DUPLICATE")) when(bookings.findBySessionIdAndMemberIdAndStatus(100L, 2L, BookingStatus.CONFIRMED))
                 .thenReturn(Optional.of(Booking.builder().id(300L).build()));
+        if (scenario.equals("SYNTHETIC")) doThrow(new BusinessRuleException("Synthetic members cannot use operational classes or training records",
+                "SYNTHETIC_OPERATION_DENIED")).when(operationalMemberPolicy).requireRealMember(2L);
         var assisted = service.getMemberEligibility(100L, 2L, account("MANAGER", 9));
         assertThat(assisted).isEqualTo(service.getSession(100L, member.getUserAccount()));
         assertThat(assisted.reason()).isEqualTo(expected); verifyNoInteractions(registrations);
