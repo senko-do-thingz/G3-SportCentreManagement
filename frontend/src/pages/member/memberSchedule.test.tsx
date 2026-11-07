@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
@@ -126,6 +126,19 @@ describe('My Schedule shows only the member own CONFIRMED bookings', () => {
     expect(await screen.findByText("You don't have any scheduled sessions yet.")).toBeInTheDocument()
     expect(screen.queryByText('Basketball Foundations')).not.toBeInTheDocument()
     expect(calls.filter((call) => call.path === '/bookings/my' && call.authorization === 'Bearer second-member').length).toBeGreaterThan(0)
+  })
+
+  it('labels sessions before today as past and later ones as booked', async () => {
+    backend([{ ...confirmed, sessionDate: '2000-01-04' }, { ...selfTraining, sessionDate: '2000-01-05' }])
+    renderApp('/member/schedule?date=2000-01-05')
+    expect(await screen.findByText('Basketball Foundations')).toBeInTheDocument()
+    expect(screen.getAllByText('Past session')).toHaveLength(2)
+    expect(screen.queryByText('Booked')).not.toBeInTheDocument()
+    cleanup()
+    backend([{ ...confirmed, sessionDate: '2099-01-06' }])
+    renderApp('/member/schedule?date=2099-01-06')
+    expect(await screen.findByText('Booked')).toBeInTheDocument()
+    expect(screen.queryByText('Past session')).not.toBeInTheDocument()
   })
 
   it('rejects manager access to the member schedule before any booking request', async () => {

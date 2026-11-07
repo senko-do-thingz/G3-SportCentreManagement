@@ -155,7 +155,7 @@ function WeeklyScheduleTable({ bookings, days, today, returnTo }: {
                     <td className={day === today ? 'schedule-table__today' : undefined} key={day}>
                       {entries.length > 0 ? (
                         <div className="schedule-table__entries">
-                          {entries.map((booking) => <ScheduleEntry booking={booking} returnTo={returnTo} key={booking.id} />)}
+                          {entries.map((booking) => <ScheduleEntry booking={booking} past={booking.sessionDate < today} returnTo={returnTo} key={booking.id} />)}
                         </div>
                       ) : <span className="schedule-table__empty-cell" aria-label="No sessions">-</span>}
                     </td>
@@ -170,7 +170,7 @@ function WeeklyScheduleTable({ bookings, days, today, returnTo }: {
   )
 }
 
-function ScheduleEntry({ booking, returnTo }: { booking: MemberBookingRecord; returnTo: string }) {
+function ScheduleEntry({ booking, past, returnTo }: { booking: MemberBookingRecord; past: boolean; returnTo: string }) {
   const selfTraining = booking.trainingType === 'SELF_TRAINING'
   const sport = booking.sportName || 'Sport'
   const title = booking.className || `${sport} ${selfTraining ? 'Self-training' : 'Session'}`
@@ -184,7 +184,7 @@ function ScheduleEntry({ booking, returnTo }: { booking: MemberBookingRecord; re
       <p className="schedule-entry__meta">{sport} - {selfTraining ? 'Self-training' : 'Coach-led'}</p>
       <p className="schedule-entry__meta">{selfTraining ? 'Self-training - No assigned coach' : `Coach: ${booking.coachName || 'Coach not assigned'}`}</p>
       <p className="schedule-entry__meta">{booking.facilityName || 'Facility not provided'}</p>
-      <Badge tone="success">Booked</Badge>
+      {past ? <Badge>Past session</Badge> : <Badge tone="success">Booked</Badge>}
     </article>
   )
 }
