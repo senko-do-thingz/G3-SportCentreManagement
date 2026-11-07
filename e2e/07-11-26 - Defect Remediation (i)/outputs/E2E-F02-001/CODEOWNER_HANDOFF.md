@@ -1,4 +1,4 @@
-# E2E-F02-001 — CODEOWNER Handoff
+# E2E-F02-001 - CODEOWNER Handoff
 
 ## 1. PR & Branch Metadata
 
@@ -54,7 +54,7 @@
 | Backend SQL Server ITs | `mvn verify -DskipUnitTests=true "-Dit.test=UnifiedDemoDatabaseIntegrationTest,MemberScheduleIntegrationTest,SessionIdentityIntegrationTest,SessionReschedulingIntegrationTest"` (Port `57385`) | **PASS** (`103/103`) |
 | Frontend Unit Tests | `npm test -- --run` | **PASS** (`112/112` suites, `1,934/1,934` tests) |
 | Frontend Build | `npm run build` | **PASS** (`tsc -b && vite build`, exit code `0`) |
-| Live API + SQL + Desktop Playwright (`B1`–`B10`) | `verify_e2e_f02_001.py` (`1440x900`) | **PASS** (`10/10` cases `B1`–`B10` passed) |
+| Live API + SQL + Desktop Playwright (`B1`-`B10`) | `verify_e2e_f02_001.py` (`1440x900`) | **PASS** (`10/10` cases `B1`-`B10` passed) |
 
 ---
 

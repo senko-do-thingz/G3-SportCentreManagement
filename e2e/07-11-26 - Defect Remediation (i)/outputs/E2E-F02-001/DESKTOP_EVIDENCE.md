@@ -1,4 +1,4 @@
-# E2E-F02-001 — Desktop Playwright Verification Evidence (`1440x900`)
+# E2E-F02-001 - Desktop Playwright Verification Evidence (`1440x900`)
 
 All desktop browser assertions and screenshots were captured at `1440x900` against the live full-stack application (`http://127.0.0.1:15173` -> `http://127.0.0.1:18080/api/v1` -> `127.0.0.1:57385/sportify`). Every screen passed with `noHorizontalOverflow: true`, `0` uncaught page errors, and `0` unexpected 404 pages.
 

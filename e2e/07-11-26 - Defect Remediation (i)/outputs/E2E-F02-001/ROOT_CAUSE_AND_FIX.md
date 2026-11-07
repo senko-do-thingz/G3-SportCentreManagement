@@ -1,4 +1,4 @@
-# E2E-F02-001 — Root Cause Analysis and Single-Policy Remediation Design
+# E2E-F02-001 - Root Cause Analysis and Single-Policy Remediation Design
 
 ## 1. Defect Identification
 
@@ -17,14 +17,14 @@ In `backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.j
 Long targetMemberId = resolveTargetMemberId(request, actor);
 operationalMemberPolicy.requireRealMember(targetMemberId);
 ```
-`OperationalMemberPolicy.requireRealMember(long memberId)` (`backend/src/main/java/com/sportify/catalog/service/OperationalMemberPolicy.java`, lines 16–35) enforces the center's strict quarantine between synthetic/demo QR payment settlement and live operational classes/training records. Specifically, it throws `BusinessRuleException("Synthetic members cannot use operational classes or training records", "SYNTHETIC_OPERATION_DENIED")` whenever any of the following hold for `memberId`:
+`OperationalMemberPolicy.requireRealMember(long memberId)` (`backend/src/main/java/com/sportify/catalog/service/OperationalMemberPolicy.java`, lines 16-35) enforces the center's strict quarantine between synthetic/demo QR payment settlement and live operational classes/training records. Specifically, it throws `BusinessRuleException("Synthetic members cannot use operational classes or training records", "SYNTHETIC_OPERATION_DENIED")` whenever any of the following hold for `memberId`:
 1. `memberId` is listed in `app.payment.unified-demo.member-ids`,
 2. `dbo.user_account.email` matches `%@unified-demo.invalid`,
 3. `dbo.payment` contains any row for `member_id` with `settlement_type = 'SIMULATED'`, `settlement_provider = 'SPORTIFY_SIMULATOR'`, or `simulated_transaction_id IS NOT NULL`, or
 4. `dbo.simulated_payment_transaction` contains any row for `member_id`.
 
 ### 2.2 Read Path (`MemberScheduleServiceImpl.eligibility`)
-In `backend/src/main/java/com/sportify/catalog/service/impl/MemberScheduleServiceImpl.java` (lines 108–125 on `origin/main`), `MemberScheduleServiceImpl` did **not** inject or consult `OperationalMemberPolicy`. Instead, `eligibility(ClassSession session, SessionResponse common, Long memberId)` checked only:
+In `backend/src/main/java/com/sportify/catalog/service/impl/MemberScheduleServiceImpl.java` (lines 108-125 on `origin/main`), `MemberScheduleServiceImpl` did **not** inject or consult `OperationalMemberPolicy`. Instead, `eligibility(ClassSession session, SessionResponse common, Long memberId)` checked only:
 1. `alreadyBooked` (`ALREADY_BOOKED`),
 2. `common.full()` (`FULL`) and `session.getBookedCount() >= session.getCapacity()` (`CAPACITY_UNAVAILABLE`), and
 3. `PackageBookingEligibility.matching(...)` / `PackageBookingEligibility.usable(...)` against `dbo.sport_package_registration`.

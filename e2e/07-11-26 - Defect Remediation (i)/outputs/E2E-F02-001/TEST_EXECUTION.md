@@ -1,4 +1,4 @@
-# E2E-F02-001 — Test Execution Report
+# E2E-F02-001 - Test Execution Report
 
 ## 1. Execution Environment
 
@@ -66,7 +66,7 @@ npm run build
 ```
 - **Exit Code**: `0` (`tsc -b && vite build` completed in `765ms`)
 
-### 2.5 Live Full-Stack HTTP + SQL + Desktop Playwright Verification (`B1`–`B10`)
+### 2.5 Live Full-Stack HTTP + SQL + Desktop Playwright Verification (`B1`-`B10`)
 ```powershell
 python "C:\Users\TIEN DAT\.gemini\antigravity-cli\brain\89c7db9c-0c5d-4a84-9577-2f82792dfbac\scratch\verify_e2e_f02_001.py"
 ```
