@@ -130,14 +130,67 @@ class TokenRevocationAfterPasswordChangeIntegrationTest extends AbstractIntegrat
     }
 
     @Test
-    void d7b_notImplemented_aRefreshTokenIsStillReusableUntilThePasswordChanges() {
-        // E2E-D7b (PENDING) is out of scope: single-use rotation and reuse detection need a token store.
+    void a1_a2_singleUseRotationEnforced_firstRefreshSucceedsReplayFailsAndRotatedTokenWorks() {
         Tokens tokens = login(member.getEmail(), PASSWORD);
-        assertThat(refresh(tokens.refresh()).status()).isEqualTo(200);
-        assertThat(refresh(tokens.refresh()).status()).as("remaining exposure until D7b").isEqualTo(200);
+        Outcome firstRefresh = refresh(tokens.refresh());
+        assertThat(firstRefresh.status()).as("A1: first refresh with valid token").isEqualTo(200);
 
-        assertThat(changePassword(tokens.access(), PASSWORD, "Changed4567")).isEqualTo(204);
-        assertThat(refresh(tokens.refresh()).status()).as("but a password change ends it").isEqualTo(401);
+        // Replay of the original consumed token must be rejected with 401 without password change
+        Outcome replay = refresh(tokens.refresh());
+        assertThat(replay.status()).as("A1: replay of original refresh token rejected with 401").isEqualTo(401);
+
+        // A2: rotated refresh token works once and rotates again
+        String rotatedToken = firstRefresh.body().path("refreshToken").asText();
+        assertThat(rotatedToken).isNotBlank().isNotEqualTo(tokens.refresh());
+        Outcome secondRefresh = refresh(rotatedToken);
+        assertThat(secondRefresh.status()).as("A2: rotated token works once").isEqualTo(200);
+
+        // Replaying the second rotated token also fails with 401
+        assertThat(refresh(rotatedToken).status()).as("A2: replay of rotated token rejected with 401").isEqualTo(401);
+
+        // Successor from second refresh works
+        String thirdToken = secondRefresh.body().path("refreshToken").asText();
+        assertThat(refresh(thirdToken).status()).isEqualTo(200);
+    }
+
+    @Test @Timeout(60)
+    void a3_concurrentRefreshRaceWithSameTokenResultsInExactlyOneSuccessAndOne401() throws Exception {
+        Tokens tokens = login(member.getEmail(), PASSWORD);
+        var start = new CyclicBarrier(2);
+        var pool = Executors.newFixedThreadPool(2);
+        List<Outcome> outcomes;
+        try {
+            Future<Outcome> a = pool.submit(() -> { start.await(20, TimeUnit.SECONDS); return refresh(tokens.refresh()); });
+            Future<Outcome> b = pool.submit(() -> { start.await(20, TimeUnit.SECONDS); return refresh(tokens.refresh()); });
+            outcomes = List.of(a.get(40, TimeUnit.SECONDS), b.get(40, TimeUnit.SECONDS));
+        } finally {
+            pool.shutdown();
+            assertThat(pool.awaitTermination(20, TimeUnit.SECONDS)).isTrue();
+        }
+
+        long succeeded = outcomes.stream().filter(o -> o.status() == 200).count();
+        long rejected = outcomes.stream().filter(o -> o.status() == 401).count();
+        assertThat(succeeded).as("A3: exactly one concurrent refresh succeeded").isEqualTo(1L);
+        assertThat(rejected).as("A3: exactly one concurrent refresh rejected with 401").isEqualTo(1L);
+
+        Outcome winner = outcomes.stream().filter(o -> o.status() == 200).findFirst().orElseThrow();
+        String successorRefresh = winner.body().path("refreshToken").asText();
+        assertThat(refresh(successorRefresh).status()).as("A3: successor token of winner is usable").isEqualTo(200);
+    }
+
+    @Test
+    void a4_consumedRefreshTokenRemainsDeniedPersistedInDatabase() {
+        Tokens tokens = login(member.getEmail(), PASSWORD);
+        Outcome firstRefresh = refresh(tokens.refresh());
+        assertThat(firstRefresh.status()).isEqualTo(200);
+
+        // Verify token row exists in DB with consumed_at NOT NULL
+        Integer consumedCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM user_refresh_token WHERE consumed_at IS NOT NULL", Integer.class);
+        assertThat(consumedCount).isNotNull().isGreaterThan(0);
+
+        // Replay of consumed token still rejected with 401
+        assertThat(refresh(tokens.refresh()).status()).as("A4: persisted consumed token still denied 401").isEqualTo(401);
     }
 
     // ---------------------------------------------------------------- helpers
