@@ -12,8 +12,8 @@ This branch adds the missing desktop support, operations, Manager attendance and
 
 | Scope | Desktop behavior |
 |---|---|
-| Flow 1, required | Existing account/card/package flows plus Reception support intake, search/filter, details and status transitions at `/reception/support` |
-| Flow 2, required | Existing class/session administration, booking/cancellation, public Session IDs, Coach rosters and personal schedules |
+| Flow 1, required | Existing account/card/package flows, a Registration Successful screen with a Go to Dashboard button after sign-up (no auto-redirect, never shown on failure or reload), plus Reception support intake, search/filter, details and status transitions at `/reception/support` |
+| Flow 2, required | Existing class/session administration, booking/cancellation, public Session IDs, Coach rosters and personal schedules. Member My Schedule at `/member/schedule` shows only the member's CONFIRMED bookings; Find Classes at `/member/classes` lists the whole centre |
 | Flow 3, required | Existing payment/refund/CSV semantics plus date-scoped registration and booking counters at `/manager/reports` |
 | Flow 4, included optional scope | Existing plans, results, feedback and attendance plus read-only `/manager/training/attendance` and `/coach/training/progress` |
 
@@ -298,7 +298,7 @@ mvn spring-boot:run
 ```
 
 Sign in using an existing BE-07 demo member/receptionist account. In the frontend,
-open the member schedule, filter by sport, level, format, coach and date, and inspect
+open Find Classes (`/member/classes`), filter by sport, level, format, coach and date, and inspect
 the two small-group badminton sessions. For direct API verification with an access
 token already stored in a task-specific environment variable:
 
