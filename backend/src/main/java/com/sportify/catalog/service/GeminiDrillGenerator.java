@@ -131,7 +131,7 @@ class GeminiDrillGenerator implements DrillGenerator {
             }
             if (text.isEmpty()) return List.of();
             ProposedDrills proposed = json.readValue(text.toString(), ProposedDrills.class);
-            return AiDrillPolicy.toDrafts(proposed, AiDrillPolicy.level(input), input.sessionMinutes());
+            return AiDrillPolicy.toDrafts(proposed, AiDrillPolicy.level(input), input.sessionMinutes(), input.sport());
         } catch (IOException unparsable) {
             return List.of();
         }
