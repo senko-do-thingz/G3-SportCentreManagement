@@ -11,6 +11,7 @@ import com.sportify.catalog.repository.BookingRepository;
 import com.sportify.catalog.repository.ClassSessionRepository;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.MemberScheduleService;
+import com.sportify.catalog.service.OperationalMemberPolicy;
 import com.sportify.catalog.service.PackageBookingEligibility;
 import com.sportify.core.common.PagingDefaults;
 import com.sportify.core.common.SecurityUtils;
@@ -45,6 +46,7 @@ public class MemberScheduleServiceImpl implements MemberScheduleService {
     private final SportPackageRegistrationRepository registrations;
     private final MemberProfileRepository members;
     private final Clock clock;
+    private final OperationalMemberPolicy operationalMemberPolicy;
 
     @Override
     public PageResponse<SessionResponse> listSessions(SessionSearchQuery query, UserAccount actor) {
@@ -106,6 +108,9 @@ public class MemberScheduleServiceImpl implements MemberScheduleService {
     }
 
     private SessionDetailResponse eligibility(ClassSession session, SessionResponse common, Long memberId) {
+        if (isSyntheticMember(memberId)) {
+            return rejected(common, false, SYNTHETIC_OPERATION_DENIED);
+        }
         Long id = session.getId();
         boolean alreadyBooked = bookings.findBySessionIdAndMemberIdAndStatus(id, memberId, BookingStatus.CONFIRMED).isPresent();
         if (alreadyBooked) return rejected(common, true, ALREADY_BOOKED);
@@ -122,6 +127,19 @@ public class MemberScheduleServiceImpl implements MemberScheduleService {
                 .map(MemberScheduleServiceImpl::registrationResponse).toList();
         if (!usable.isEmpty()) return new SessionDetailResponse(common, true, null, false, true, null, usable);
         return rejected(common, false, PackageBookingEligibility.rejection(matching, date));
+    }
+
+    private boolean isSyntheticMember(Long memberId) {
+        if (operationalMemberPolicy == null || memberId == null) return false;
+        try {
+            operationalMemberPolicy.requireRealMember(memberId);
+            return false;
+        } catch (BusinessRuleException ex) {
+            if ("SYNTHETIC_OPERATION_DENIED".equals(ex.getCode())) {
+                return true;
+            }
+            throw ex;
+        }
     }
 
     private static SessionDetailResponse rejected(SessionResponse session, boolean booked,
