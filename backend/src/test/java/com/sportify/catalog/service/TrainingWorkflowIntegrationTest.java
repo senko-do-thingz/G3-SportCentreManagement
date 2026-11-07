@@ -294,6 +294,91 @@ class TrainingWorkflowIntegrationTest {
         jdbc.update("UPDATE user_account SET email=? WHERE id=?",code()+"@unified-demo.invalid",member);
         assertThatThrownBy(()->support.create(reception,request,UUID.randomUUID())).isInstanceOf(BusinessRuleException.class);
     }
+    @Test void F6_memberSubmitsReceptionRepliesAndInternalNotesStayPrivate() throws Exception {
+        UUID key=UUID.randomUUID();
+        var request=new ReceptionSupportService.MemberIntake(ReceptionSupportService.Category.PAYMENT,"Discount question","Does my card discount apply?",booking,"Football package 900000 VND base price");
+        var created=support.memberCreate(member,request,key);
+        long id=created.id();
+        assertThat(created.code()).startsWith("SUP-");
+        assertThat(created.status()).isEqualTo("OPEN");
+        assertThat(created.submittedByMe()).isTrue();
+        assertThat(created.description()).startsWith("Does my card discount apply?").contains("Assistant answer shared by the member (not verified by staff):").contains("900000 VND");
+        assertThat(support.memberCreate(member,request,key).id()).isEqualTo(id);
+        assertThatThrownBy(()->support.memberCreate(member,new ReceptionSupportService.MemberIntake(request.category(),"Changed",request.description(),booking,null),key)).isInstanceOf(ConflictException.class);
+        assertThatThrownBy(()->support.memberCreate(peer,request,UUID.randomUUID())).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(()->support.memberDetail(peer,id)).isInstanceOf(ResourceNotFoundException.class);
+        assertThat(support.detail(reception,id).memberSubmitted()).isTrue();
+        assertThat(support.detail(reception,id).assignedStaffId()).isNull();
+
+        var replied=support.reply(reception,id,new ReceptionSupportService.ReplyRequest("Your Gold card gives 5% off this package."));
+        assertThat(replied.status()).isEqualTo("IN_PROGRESS");
+        assertThat(replied.assignedStaffId()).isEqualTo(reception);
+        assertThat(replied.replies()).singleElement().satisfies(reply->assertThat(reply.message()).isEqualTo("Your Gold card gives 5% off this package."));
+        assertThat(support.reply(reception,id,new ReceptionSupportService.ReplyRequest("Your Gold card gives 5% off this package.")).replies()).hasSize(1);
+        assertThat(count("SELECT COUNT(*) FROM notification WHERE user_id=? AND type='SUPPORT_REPLY'",member)).isEqualTo(1);
+        assertThat(support.member(member)).singleElement().satisfies(ticket->assertThat(ticket.unreadReplies()).isEqualTo(1));
+
+        support.update(reception,id,new ReceptionSupportService.Update(ReceptionSupportService.Status.RESOLVED,"Checked tier record internally"));
+        assertThatThrownBy(()->support.reply(reception,id,new ReceptionSupportService.ReplyRequest("Late reply"))).isInstanceOf(ConflictException.class);
+        assertThat(count("SELECT COUNT(*) FROM notification WHERE user_id=? AND type='SUPPORT_STATUS'",member)).isEqualTo(1);
+        var mine=support.memberDetail(member,id);
+        assertThat(mine.status()).isEqualTo("RESOLVED");
+        assertThat(mine.replies()).extracting(ReceptionSupportService.MemberReply::message).containsExactly("Your Gold card gives 5% off this package.");
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/support-requests/"+id).with(as(member)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.resolutionNotes").doesNotExist())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.assignedStaffId").doesNotExist())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.replies[0].staffName").doesNotExist())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("internally"))));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/member/support-requests/"+id).with(as(peer)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/member/support-requests/"+id+"/read").with(as(member)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNoContent());
+        assertThat(support.member(member).getFirst().unreadReplies()).isZero();
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE entity_id=? AND action='MEMBER_SUPPORT_SUBMITTED' AND actor_user_id=?",id,member)).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE entity_id=? AND action='RECEPTION_SUPPORT_REPLIED'",id)).isEqualTo(1);
+    }
+    @Test void F6_resolvingNeedsAReplyAndOpenSelfSubmittedRequestsAreLimited() throws Exception {
+        var first=support.memberCreate(member,new ReceptionSupportService.MemberIntake(ReceptionSupportService.Category.GENERAL,"Opening hours","When do you open?",null,null),UUID.randomUUID());
+        support.update(reception,first.id(),new ReceptionSupportService.Update(ReceptionSupportService.Status.IN_PROGRESS,null));
+        assertThatThrownBy(()->support.update(reception,first.id(),new ReceptionSupportService.Update(ReceptionSupportService.Status.RESOLVED,"Answered at the desk")))
+            .isInstanceOf(BusinessRuleException.class);
+        // Closing without a written reply stays possible, for example for a duplicate request.
+        support.update(reception,first.id(),new ReceptionSupportService.Update(ReceptionSupportService.Status.CLOSED,"Duplicate of an earlier request"));
+        for(int i=0;i<ReceptionSupportService.MAX_OPEN_MEMBER_REQUESTS;i++)
+            support.memberCreate(member,new ReceptionSupportService.MemberIntake(ReceptionSupportService.Category.GENERAL,"Question "+i,"Details "+i,null,null),UUID.randomUUID());
+        assertThatThrownBy(()->support.memberCreate(member,new ReceptionSupportService.MemberIntake(ReceptionSupportService.Category.GENERAL,"One more","Details",null,null),UUID.randomUUID()))
+            .isInstanceOf(ConflictException.class);
+        assertThatThrownBy(()->support.memberCreate(member,new ReceptionSupportService.MemberIntake(ReceptionSupportService.Category.GENERAL,"Too long","x".repeat(1500),null,"y".repeat(900)),UUID.randomUUID()))
+            .isInstanceOf(BusinessRuleException.class);
+        String body="{\"category\":\"FACILITY\",\"subject\":\"Locker\",\"description\":\"Locker 12 is broken\"}";
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/member/support-requests").with(as(peer)).header("Idempotency-Key",UUID.randomUUID()).contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.submittedByMe").value(true));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/member/support-requests").with(as(reception)).header("Idempotency-Key",UUID.randomUUID()).contentType("application/json").content(body))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/reception/support-requests/summary").with(as(reception)))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.open").isNumber());
+        String code=support.member(peer).getFirst().code();
+        assertThat(support.staff(reception,null,null,code)).extracting(ReceptionSupportService.Ticket::code).containsExactly(code);
+        assertThat(support.verification(reception,support.member(peer).getFirst().id()).memberStatus()).isEqualTo("ACTIVE");
+    }
+    @Test void F6_assistantAnswersFromTheMembersOwnBookingsAndHomeworkOnly() {
+        long upcoming=insert("INSERT class_session(class_id,sport_id,session_date,start_time,end_time,coach_id,training_type,capacity,booked_count,status,session_code) VALUES (?,?,'2026-11-04','09:00','10:00',?,'COACH_LED',10,1,'PUBLISHED',?)",classId,sport,coach,SessionIdentityFixtures.reserve(jdbc,LocalDate.of(2026,11,4),sport));
+        long upcomingBooking=insert("INSERT booking(booking_code,session_id,member_id,status) VALUES (?,?,?,'CONFIRMED')",code(),upcoming,member);
+        notices.create(coach,new ClassNoticeService.Request(classId,ClassNoticeService.Type.HOMEWORK,"Footwork drill","Practise ten minutes a day",LocalDate.of(2026,11,5)),UUID.randomUUID());
+        var bookingsAnswer=consultation.answer(member,"show my bookings",true);
+        assertThat(bookingsAnswer.status()).isEqualTo("ANSWERED");
+        assertThat(bookingsAnswer.sources()).extracting(s->s.id()).contains(upcomingBooking);
+        assertThat(consultation.answer(peer,"show my bookings",true).sources()).extracting(s->s.kind()).doesNotContain("MY_BOOKING");
+        var homework=consultation.answer(member,"bài tập về nhà của tôi là gì?",true);
+        assertThat(homework.sources()).anySatisfy(s->{assertThat(s.kind()).isEqualTo("HOMEWORK");assertThat(s.title()).contains("Footwork drill");});
+        assertThat(consultation.answer(peer,"what is my homework",true).sources()).extracting(s->s.kind()).doesNotContain("HOMEWORK");
+        var packages=consultation.answer(member,"gói của tôi còn bao nhiêu buổi?",true);
+        assertThat(packages.status()).isEqualTo("ANSWERED");
+        assertThat(packages.historyStored()).isFalse();
+    }
     @Test void RELEASE15_managerChangesPersistOneEventWithCurrentPrivateScheduleAndExpiry() throws Exception {
         long registration=arrivalEntitlement();long manager=account("MANAGER");
         jdbc.update("UPDATE sport_package_registration SET end_date='2026-11-05' WHERE id=?",registration);

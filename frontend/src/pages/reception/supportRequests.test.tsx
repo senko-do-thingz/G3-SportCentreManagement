@@ -54,6 +54,40 @@ describe('Reception support desktop', () => {
     await userEvent.setup().selectOptions(screen.getByLabelText('Status filter'), 'CLOSED')
     await waitFor(() => expect(calls.some(call => call.path === '/reception/support-requests?status=CLOSED')).toBe(true))
   })
+  it('replies to a member-submitted request, keeps notes internal and requires a reply before resolving', async () => {
+    tokenStorage.startSession({ accessToken: 'support-test', refreshToken: 'refresh' })
+    const memberTicket = { ...ticket, id: 9, code: 'SUP-1009', memberCode: 'M42', status: 'IN_PROGRESS', memberSubmitted: true, replyCount: 0, replies: [] as unknown[] }
+    let replied = false
+    const { calls } = installFakeFetch(call => {
+      if (call.path === '/users/me') return json(200, { ...MEMBER, role: 'RECEPTIONIST' })
+      if (call.path.startsWith('/members?')) return json(200, { content: [], totalElements: 0, totalPages: 0, number: 0, size: 10 })
+      if (call.path === '/reception/support-requests/summary') return json(200, { open: 3, inProgress: 2, resolved: 8, closed: 1 })
+      if (call.path === '/reception/support-requests/9/verification') return json(200, { memberCode: 'M42', memberName: 'Lan', memberStatus: 'ACTIVE', cardTier: 'Gold Member', cardDiscount: 5, cardEndDate: '2027-10-01', activePackages: [] })
+      if (call.path === '/reception/support-requests/9/replies') { replied = true; return json(200, memberTicket) }
+      if (call.path === '/reception/support-requests/9') return json(200, replied
+        ? { ...memberTicket, replyCount: 1, replies: [{ id: 1, message: 'Your Gold card gives 5% off.', staffName: 'Jamie', createdAt: '2026-11-06T11:00:00' }] }
+        : memberTicket)
+      if (call.path.startsWith('/reception/support-requests')) return json(200, [memberTicket])
+      return backendError(404, 'Not found')
+    })
+    const user = userEvent.setup()
+    renderApp('/reception/support')
+    expect(await screen.findByText('Resolved')).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Find request code, member or subject'), 'SUP-1009')
+    await user.click(screen.getByRole('button', { name: 'Search requests' }))
+    await waitFor(() => expect(calls.some(call => call.path === '/reception/support-requests?q=SUP-1009')).toBe(true))
+    await user.click(await screen.findByRole('button', { name: 'View SUP-1009' }))
+    expect(await screen.findByText(/Gold Member, 5% discount/)).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Next status'), 'RESOLVED')
+    await user.type(screen.getByLabelText(/^Internal outcome note/), 'Checked tier')
+    await user.click(screen.getByRole('button', { name: 'Update status' }))
+    expect(await screen.findByText('Send a reply to the member before resolving a request they submitted.')).toBeInTheDocument()
+    expect(calls.some(call => call.method === 'PUT')).toBe(false)
+    await user.type(screen.getByLabelText(/^Reply to member/), 'Your Gold card gives 5% off.')
+    await user.click(screen.getByRole('button', { name: 'Send reply' }))
+    expect(await screen.findByText('Your Gold card gives 5% off.')).toBeInTheDocument()
+    expect(calls.find(call => call.path === '/reception/support-requests/9/replies')?.body).toEqual({ message: 'Your Gold card gives 5% off.' })
+  })
   it('blocks a Member from the staff screen', async () => {
     const { calls } = setup('MEMBER')
     expect(await screen.findByRole('heading', { name: /access denied|forbidden/i })).toBeInTheDocument()

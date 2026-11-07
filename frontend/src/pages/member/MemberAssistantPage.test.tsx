@@ -85,3 +85,19 @@ it('makes no consultation request when the feature flag is off', async () => {
   expect(await screen.findByText('Automated consultation is disabled')).toBeInTheDocument()
   expect(calls.filter(call => call.path.includes('/consultation'))).toHaveLength(0)
 })
+it('labels a Vietnamese answer in Vietnamese', async () => {
+  tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
+  installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER) : json(200, {
+    mode: 'AI_ASSISTED', status: 'ANSWERED', answer: 'Gói tập và thẻ thành viên đang hoạt động của bạn.', historyStored: false, language: 'vi',
+    sources: [{ kind: 'MY_PACKAGE', id: 5, title: 'Gói cầu lông', detail: 'Cầu lông: còn 6/8 buổi.', path: '/member/membership' }],
+  }))
+  renderApp('/member/assistant')
+  await userEvent.click(await screen.findByLabelText('Enable automated center consultation'))
+  await userEvent.type(screen.getByRole('textbox', { name: /Center question/ }), 'Gói của tôi còn bao nhiêu buổi?')
+  await userEvent.click(screen.getByRole('button', { name: 'Ask center assistant' }))
+  expect(await screen.findByText('Câu trả lời từ dữ liệu trung tâm')).toBeInTheDocument()
+  expect(screen.getByText('Cách tìm ra câu trả lời: AI đã hiểu câu hỏi của bạn.')).toBeInTheDocument()
+  expect(screen.getByText('Loại nguồn: Gói tập của bạn')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Mở nguồn: Gói cầu lông' })).toHaveAttribute('href', '/member/membership')
+  expect(screen.getByRole('link', { name: 'Liên hệ lễ tân về câu trả lời này' })).toBeInTheDocument()
+})
