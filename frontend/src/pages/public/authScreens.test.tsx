@@ -302,6 +302,8 @@ describe('F1-06 Sign up', () => {
     expect(screen.queryByRole('heading', { name: 'Member Dashboard' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Continue where you left off' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Go to Dashboard' })).toHaveAttribute('href', '/member')
+    // The form is gone, so focus moves to the next step for keyboard and screen reader users.
+    expect(screen.getByRole('link', { name: 'Go to Dashboard' })).toHaveFocus()
     await user.click(screen.getByRole('link', { name: 'Go to Dashboard' }))
 
     expect(await screen.findByRole('heading', { name: 'Member Dashboard' })).toBeInTheDocument()
@@ -491,6 +493,23 @@ describe('F1-06 Sign up', () => {
 
     expect(await screen.findByRole('heading', { name: 'Member Dashboard' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Registration Successful!' })).not.toBeInTheDocument()
+  })
+
+  it('drops the success screen when another tab signs this account out', async () => {
+    installFakeFetch(authBackend())
+    const user = userEvent.setup()
+    renderApp('/register')
+    await fillRegisterForm(user)
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+    expect(await screen.findByRole('heading', { name: 'Registration Successful!' })).toBeInTheDocument()
+    const oldSession = tokenStorage.getSessionId()
+    await act(async () => {
+      localStorage.removeItem(tokenStorage.accessKey)
+      localStorage.removeItem(tokenStorage.refreshKey)
+      localStorage.removeItem(tokenStorage.sessionKey)
+      window.dispatchEvent(new StorageEvent('storage', { key: tokenStorage.sessionKey, oldValue: oldSession, newValue: null }))
+    })
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Registration Successful!' })).not.toBeInTheDocument())
   })
 
   it('never shows a success screen again after a reload and never sends the registration twice', async () => {
