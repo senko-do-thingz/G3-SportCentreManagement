@@ -21,6 +21,8 @@ export const MEMBER_PATHS = {
   /** Membership Cards (F1-11, FE-04), a sub page of My Membership. */
   membershipCards: '/member/membership/cards',
   schedule: '/member/schedule',
+  /** Find Classes (F2-04): every bookable class of the centre. */
+  findClasses: '/member/classes',
   payments: '/member/payments',
 } as const
 

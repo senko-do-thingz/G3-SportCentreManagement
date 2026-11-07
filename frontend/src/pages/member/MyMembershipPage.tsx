@@ -237,7 +237,7 @@ function RegistrationActions({
     return (
       <div className="package-item__actions">
         {!exhausted && (
-          <Link className={buttonClassName('primary', 'sm')} to={MEMBER_PATHS.schedule}>
+          <Link className={buttonClassName('primary', 'sm')} to={MEMBER_PATHS.findClasses}>
             Book a session
           </Link>
         )}
