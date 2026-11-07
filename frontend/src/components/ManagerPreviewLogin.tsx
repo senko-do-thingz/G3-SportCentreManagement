@@ -23,6 +23,6 @@ export function ManagerPreviewLogin() {
     <p><strong>FE-06 frontend preview</strong></p>
     <p className="manager-muted">Review manager screens with sample data. No backend account or password is needed.</p>
     {error && <p className="notice notice--danger" role="alert">{error}</p>}
-    <div className="manager-row-actions"><Button variant="secondary" disabled={busy} onClick={() => void open('manager')}>Open manager preview</Button><Button variant="ghost" disabled={busy} onClick={() => void open('member')}>Check member access</Button><Button variant="secondary" disabled={busy} onClick={() => void open('member', '/member/schedule')}>Open member browse preview</Button></div>
+    <div className="manager-row-actions"><Button variant="secondary" disabled={busy} onClick={() => void open('manager')}>Open manager preview</Button><Button variant="ghost" disabled={busy} onClick={() => void open('member')}>Check member access</Button><Button variant="secondary" disabled={busy} onClick={() => void open('member', '/member/classes')}>Open member browse preview</Button></div>
   </section>
 }

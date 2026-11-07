@@ -71,7 +71,7 @@ export const MEMBER_AREA: RoleArea = {
           label: 'My Schedule',
           path: 'schedule',
           title: 'My Schedule',
-          description: 'Find classes, book sessions and manage your bookings.',
+          description: 'The sessions you have booked, week by week.',
           task: 'FE-08',
           screens: ['F2-04', 'F2-05', 'F2-06'],
         },

@@ -92,7 +92,7 @@ describe('Home guest authentication gate', () => {
 
   it.each([
     ...SPORTS.map((sport) => [`Explore ${sport.name}`, /current classes/]),
-    ['View schedule', /member schedule/], ['Membership offers', /membership card options/], ['View cards', /membership card options/],
+    ['Browse all classes', /current classes/], ['Membership offers', /membership card options/], ['View cards', /membership card options/],
     ...PACKAGES.map((pkg) => [`View options for ${pkg.name}`, /review package options/]),
   ] as [string, RegExp][])('gates %s on Home with the shared contextual dialog', async (name, description) => {
     const { calls } = installFakeFetch(catalogue)
