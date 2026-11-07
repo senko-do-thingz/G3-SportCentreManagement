@@ -372,10 +372,10 @@ class TrainingWorkflowIntegrationTest {
         assertThat(bookingsAnswer.status()).isEqualTo("ANSWERED");
         assertThat(bookingsAnswer.sources()).extracting(s->s.id()).contains(upcomingBooking);
         assertThat(consultation.answer(peer,"show my bookings",true).sources()).extracting(s->s.kind()).doesNotContain("MY_BOOKING");
-        var homework=consultation.answer(member,"bài tập về nhà của tôi là gì?",true);
+        var homework=consultation.answer(member,"b\u00E0i t\u1EADp v\u1EC1 nh\u00E0 c\u1EE7a t\u00F4i l\u00E0 g\u00EC?",true);
         assertThat(homework.sources()).anySatisfy(s->{assertThat(s.kind()).isEqualTo("HOMEWORK");assertThat(s.title()).contains("Footwork drill");});
         assertThat(consultation.answer(peer,"what is my homework",true).sources()).extracting(s->s.kind()).doesNotContain("HOMEWORK");
-        var packages=consultation.answer(member,"gói của tôi còn bao nhiêu buổi?",true);
+        var packages=consultation.answer(member,"g\u00F3i c\u1EE7a t\u00F4i c\u00F2n bao nhi\u00EAu bu\u1ED5i?",true);
         assertThat(packages.status()).isEqualTo("ANSWERED");
         assertThat(packages.historyStored()).isFalse();
     }

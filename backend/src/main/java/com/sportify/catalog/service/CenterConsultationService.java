@@ -67,9 +67,9 @@ public class CenterConsultationService {
     public Consultation answer(Long memberId,String question,boolean optIn) {
         boolean early=question!=null && vietnamese(question);
         if(!enabled)return response(early,RULES_MODE,"UNAVAILABLE",t(early,"Automated center consultation is disabled.",
-            "Tư vấn tự động của trung tâm đang tắt."),List.of());
+            "T\u01B0 v\u1EA5n t\u1EF1 \u0111\u1ED9ng c\u1EE7a trung t\u00E2m \u0111ang t\u1EAFt."),List.of());
         if(!optIn)return response(early,RULES_MODE,"CONSENT_REQUIRED",t(early,"Enable automated consultation before asking a question. No conversation history is stored.",
-            "Hãy bật tư vấn tự động trước khi đặt câu hỏi. Hệ thống không lưu lịch sử trò chuyện."),List.of());
+            "H\u00E3y b\u1EADt t\u01B0 v\u1EA5n t\u1EF1 \u0111\u1ED9ng tr\u01B0\u1EDBc khi \u0111\u1EB7t c\u00E2u h\u1ECFi. H\u1EC7 th\u1ED1ng kh\u00F4ng l\u01B0u l\u1ECBch s\u1EED tr\u00F2 chuy\u1EC7n."),List.of());
         if(question==null || question.isBlank() || question.length()>500)
             throw new BusinessRuleException("Enter a center question of 1-500 characters");
         // NFC so that accented keywords match whether the browser sent composed or decomposed characters.
@@ -102,13 +102,13 @@ public class CenterConsultationService {
             case "COACH" -> coach(vi,mode);
             case "FAQ" -> faq==null?unknown(vi,mode):faqAnswer(vi,mode,faq);
             case "BOOKING" -> response(vi,mode,"ANSWERED",t(vi,"Open a session, check its current availability and suitable sport packages, then review and confirm in the booking flow. Use My bookings to check cancellation eligibility. This consultation never books, cancels, takes payment or issues refunds.",
-                    "Mở một buổi học, kiểm tra số chỗ còn trống và gói tập phù hợp, rồi xem lại và xác nhận trong bước đặt chỗ. Vào My bookings để xem buổi nào còn được hủy. Trợ lý này không bao giờ tự đặt chỗ, hủy, thanh toán hay hoàn tiền."),
-                List.of(new ConsultationSource("PRODUCT_GUIDANCE",0,t(vi,"Session and booking workflow","Quy trình đặt buổi học"),
-                    t(vi,"Eligibility and credits are checked by the existing booking service.","Điều kiện đặt và số buổi trong gói được kiểm tra khi đặt chỗ."),"/member/classes")));
+                    "M\u1EDF m\u1ED9t bu\u1ED5i h\u1ECDc, ki\u1EC3m tra s\u1ED1 ch\u1ED7 c\u00F2n tr\u1ED1ng v\u00E0 g\u00F3i t\u1EADp ph\u00F9 h\u1EE3p, r\u1ED3i xem l\u1EA1i v\u00E0 x\u00E1c nh\u1EADn trong b\u01B0\u1EDBc \u0111\u1EB7t ch\u1ED7. V\u00E0o My bookings \u0111\u1EC3 xem bu\u1ED5i n\u00E0o c\u00F2n \u0111\u01B0\u1EE3c h\u1EE7y. Tr\u1EE3 l\u00FD n\u00E0y kh\u00F4ng bao gi\u1EDD t\u1EF1 \u0111\u1EB7t ch\u1ED7, h\u1EE7y, thanh to\u00E1n hay ho\u00E0n ti\u1EC1n."),
+                List.of(new ConsultationSource("PRODUCT_GUIDANCE",0,t(vi,"Session and booking workflow","Quy tr\u00ECnh \u0111\u1EB7t bu\u1ED5i h\u1ECDc"),
+                    t(vi,"Eligibility and credits are checked by the existing booking service.","\u0110i\u1EC1u ki\u1EC7n \u0111\u1EB7t v\u00E0 s\u1ED1 bu\u1ED5i trong g\u00F3i \u0111\u01B0\u1EE3c ki\u1EC3m tra khi \u0111\u1EB7t ch\u1ED7."),"/member/classes")));
             case "CONTACT" -> response(vi,mode,"ANSWERED",t(vi,"Reception can help with questions the assistant cannot answer, such as account, payment or discount checks. Send a support request and reception will reply to you in My support requests.",
-                    "Lễ tân có thể giúp những câu trợ lý không trả lời được, như tài khoản, thanh toán hay kiểm tra giảm giá. Hãy gửi yêu cầu hỗ trợ, lễ tân sẽ trả lời bạn trong mục My support requests."),
-                List.of(new ConsultationSource("SUPPORT",0,t(vi,"Contact reception","Liên hệ lễ tân"),
-                    t(vi,"Opens the support request form. Nothing is sent until you submit it.","Mở form yêu cầu hỗ trợ. Chưa có gì được gửi cho đến khi bạn bấm gửi."),"/member/support")));
+                    "L\u1EC5 t\u00E2n c\u00F3 th\u1EC3 gi\u00FAp nh\u1EEFng c\u00E2u tr\u1EE3 l\u00FD kh\u00F4ng tr\u1EA3 l\u1EDDi \u0111\u01B0\u1EE3c, nh\u01B0 t\u00E0i kho\u1EA3n, thanh to\u00E1n hay ki\u1EC3m tra gi\u1EA3m gi\u00E1. H\u00E3y g\u1EEDi y\u00EAu c\u1EA7u h\u1ED7 tr\u1EE3, l\u1EC5 t\u00E2n s\u1EBD tr\u1EA3 l\u1EDDi b\u1EA1n trong m\u1EE5c My support requests."),
+                List.of(new ConsultationSource("SUPPORT",0,t(vi,"Contact reception","Li\u00EAn h\u1EC7 l\u1EC5 t\u00E2n"),
+                    t(vi,"Opens the support request form. Nothing is sent until you submit it.","M\u1EDF form y\u00EAu c\u1EA7u h\u1ED7 tr\u1EE3. Ch\u01B0a c\u00F3 g\u00EC \u0111\u01B0\u1EE3c g\u1EEDi cho \u0111\u1EBFn khi b\u1EA1n b\u1EA5m g\u1EEDi."),"/member/support")));
             case "MY_PACKAGES" -> memberId==null?signIn(vi,mode):myPackages(vi,mode,memberId);
             case "MY_BOOKINGS" -> memberId==null?signIn(vi,mode):myBookings(vi,mode,memberId);
             case "MY_TRAINING" -> memberId==null?signIn(vi,mode):myTraining(vi,mode,memberId);
@@ -161,29 +161,29 @@ public class CenterConsultationService {
         return guard!=null?guard:rules(text,plain);
     }
 
-    /** Lower-cased text without Vietnamese diacritics, so "bóng đá" and "bong da" match the same keyword. */
+    /** Lower-cased text without Vietnamese diacritics, so "b\u00F3ng \u0111\u00E1" and "bong da" match the same keyword. */
     static String plain(String text) {
-        String stripped=Normalizer.normalize(text.replace('đ','d').replace('Đ','d'),Normalizer.Form.NFD).replaceAll("\\p{M}+","");
+        String stripped=Normalizer.normalize(text.replace('\u0111','d').replace('\u0110','d'),Normalizer.Form.NFD).replaceAll("\\p{M}+","");
         return stripped.toLowerCase(Locale.ROOT);
     }
 
     /**
      * Returns UNKNOWN for private, injection and transaction requests, COACH for health questions, or null.
      * Accented keywords are matched on the original text; unaccented Vietnamese keywords on whole words of the plain
-     * text, so that short words that differ only in accents ("đau" pain, "đầu" head) are not confused.
+     * text, so that short words that differ only in accents ("\u0111au" pain, "\u0111\u1EA7u" head) are not confused.
      */
     static String guard(String raw,String plain) {
         if(contains(raw,"password","secret","token","sql","ignore previous","other member","book for me","cancel for me","refund me",
             "ignore all","ignore your","ignore the","disregard","system prompt","jailbreak","developer mode","another member","member's",
             "drop table","delete from","insert into","select *","phone number","home address","email address",
-            "mật khẩu","thành viên khác","người khác","số điện thoại","địa chỉ nhà","bỏ qua hướng dẫn","bỏ qua mọi","đặt giúp","đặt hộ",
-            "hủy giúp","huỷ giúp","hủy hộ","huỷ hộ","hoàn tiền cho tôi","thanh toán giúp","thanh toán hộ")
+            "m\u1EADt kh\u1EA9u","th\u00E0nh vi\u00EAn kh\u00E1c","ng\u01B0\u1EDDi kh\u00E1c","s\u1ED1 \u0111i\u1EC7n tho\u1EA1i","\u0111\u1ECBa ch\u1EC9 nh\u00E0","b\u1ECF qua h\u01B0\u1EDBng d\u1EABn","b\u1ECF qua m\u1ECDi","\u0111\u1EB7t gi\u00FAp","\u0111\u1EB7t h\u1ED9",
+            "h\u1EE7y gi\u00FAp","hu\u1EF7 gi\u00FAp","h\u1EE7y h\u1ED9","hu\u1EF7 h\u1ED9","ho\u00E0n ti\u1EC1n cho t\u00F4i","thanh to\u00E1n gi\u00FAp","thanh to\u00E1n h\u1ED9")
             || matchesWord(raw,PRIVATE_WORDS) || matchesWord(plain,PRIVATE_PLAIN))return "UNKNOWN";
         // Personal health and injury questions always go to a human, even when they mention an FAQ topic.
         if(contains(raw,"injury","injured","pain","hurt","sore","medical","doctor","sick","illness","pregnan","heart","blood pressure",
             "asthma","diabetes","medication","medicine","diet","weight loss","lose weight","rehab","sprain","dizzy","surgery","physio",
-            "đau","chấn thương","bị thương","bệnh","bác sĩ","thuốc","ăn kiêng","giảm cân","chóng mặt","phẫu thuật","mang thai","có bầu",
-            "tim mạch","huyết áp","hen suyễn","tiểu đường","trị liệu","bong gân","ốm")
+            "\u0111au","ch\u1EA5n th\u01B0\u01A1ng","b\u1ECB th\u01B0\u01A1ng","b\u1EC7nh","b\u00E1c s\u0129","thu\u1ED1c","\u0103n ki\u00EAng","gi\u1EA3m c\u00E2n","ch\u00F3ng m\u1EB7t","ph\u1EABu thu\u1EADt","mang thai","c\u00F3 b\u1EA7u",
+            "tim m\u1EA1ch","huy\u1EBFt \u00E1p","hen suy\u1EC5n","ti\u1EC3u \u0111\u01B0\u1EDDng","tr\u1ECB li\u1EC7u","bong g\u00E2n","\u1ED1m")
             || matchesWord(plain,HEALTH_PLAIN))return "COACH";
         return null;
     }
@@ -192,33 +192,33 @@ public class CenterConsultationService {
     static String rules(String raw,String plain) {
         if(faq(raw,plain)!=null)return "FAQ";
         if(contains(raw,"homework","coach feedback","my feedback","my training","my progress","my results","my result",
-            "bài tập về nhà","nhận xét","phản hồi của","kết quả tập","tiến độ")
+            "b\u00E0i t\u1EADp v\u1EC1 nh\u00E0","nh\u1EADn x\u00E9t","ph\u1EA3n h\u1ED3i c\u1EE7a","k\u1EBFt qu\u1EA3 t\u1EADp","ti\u1EBFn \u0111\u1ED9")
             || matchesWord(plain,MY_TRAINING_PLAIN))return "MY_TRAINING";
         if(contains(raw,"my package","sessions left","sessions do i have","remaining sessions","sessions remaining","my membership",
-            "my card","gói của tôi","gói tập của tôi","còn bao nhiêu buổi","còn mấy buổi","số buổi còn lại","thẻ của tôi","thẻ thành viên của tôi")
+            "my card","g\u00F3i c\u1EE7a t\u00F4i","g\u00F3i t\u1EADp c\u1EE7a t\u00F4i","c\u00F2n bao nhi\u00EAu bu\u1ED5i","c\u00F2n m\u1EA5y bu\u1ED5i","s\u1ED1 bu\u1ED5i c\u00F2n l\u1EA1i","th\u1EBB c\u1EE7a t\u00F4i","th\u1EBB th\u00E0nh vi\u00EAn c\u1EE7a t\u00F4i")
             || matchesWord(plain,MY_PACKAGES_PLAIN))return "MY_PACKAGES";
         if(contains(raw,"my booking","my next session","my next class","my upcoming","i booked","my schedule",
-            "lịch của tôi","buổi đã đặt","lịch đã đặt","lớp đã đặt","buổi tới của tôi")
+            "l\u1ECBch c\u1EE7a t\u00F4i","bu\u1ED5i \u0111\u00E3 \u0111\u1EB7t","l\u1ECBch \u0111\u00E3 \u0111\u1EB7t","l\u1EDBp \u0111\u00E3 \u0111\u1EB7t","bu\u1ED5i t\u1EDBi c\u1EE7a t\u00F4i")
             || matchesWord(plain,MY_BOOKINGS_PLAIN))return "MY_BOOKINGS";
-        if(contains(raw,"exercise","drill","training plan","workout plan","bài tập","giáo án","kế hoạch tập")
+        if(contains(raw,"exercise","drill","training plan","workout plan","b\u00E0i t\u1EADp","gi\u00E1o \u00E1n","k\u1EBF ho\u1EA1ch t\u1EADp")
             || matchesWord(plain,COACH_PLAIN))return "COACH";
         if(contains(raw,"contact reception","talk to reception","talk to staff","speak to staff","human support","support request","complain",
-            "liên hệ","lễ tân","gặp nhân viên","khiếu nại","hỗ trợ")
+            "li\u00EAn h\u1EC7","l\u1EC5 t\u00E2n","g\u1EB7p nh\u00E2n vi\u00EAn","khi\u1EBFu n\u1EA1i","h\u1ED7 tr\u1EE3")
             || matchesWord(plain,CONTACT_PLAIN))return "CONTACT";
-        if(contains(raw,"package","price","cost","giá","gói","học phí","chi phí","bao nhiêu tiền")
+        if(contains(raw,"package","price","cost","gi\u00E1","g\u00F3i","h\u1ECDc ph\u00ED","chi ph\u00ED","bao nhi\u00EAu ti\u1EC1n")
             || matchesWord(plain,PACKAGES_PLAIN))return "PACKAGES";
         if(contains(raw,"how to book","how do i book","booking rules","cancel","refund","payment",
-            "cách đặt","đặt chỗ","đặt lịch","hủy","huỷ","hoàn tiền","thanh toán")
+            "c\u00E1ch \u0111\u1EB7t","\u0111\u1EB7t ch\u1ED7","\u0111\u1EB7t l\u1ECBch","h\u1EE7y","hu\u1EF7","ho\u00E0n ti\u1EC1n","thanh to\u00E1n")
             || matchesWord(plain,BOOKING_PLAIN))return "BOOKING";
-        if(contains(raw,"class","session","schedule","available","lịch","buổi","lớp","còn chỗ","khung giờ")
+        if(contains(raw,"class","session","schedule","available","l\u1ECBch","bu\u1ED5i","l\u1EDBp","c\u00F2n ch\u1ED7","khung gi\u1EDD")
             || matchesWord(plain,SESSIONS_PLAIN))return "SESSIONS";
         return "UNKNOWN";
     }
 
     /** TODAY, TOMORROW or UPCOMING (the next 14 days). */
     static String day(String raw,String plain) {
-        if(contains(raw,"tomorrow","ngày mai") || matchesWord(plain,Pattern.compile("\\bngay mai\\b")))return "TOMORROW";
-        if(contains(raw,"today","hôm nay") || matchesWord(plain,Pattern.compile("\\bhom nay\\b")))return "TODAY";
+        if(contains(raw,"tomorrow","ng\u00E0y mai") || matchesWord(plain,Pattern.compile("\\bngay mai\\b")))return "TOMORROW";
+        if(contains(raw,"today","h\u00F4m nay") || matchesWord(plain,Pattern.compile("\\bhom nay\\b")))return "TODAY";
         return "UPCOMING";
     }
 
@@ -246,25 +246,25 @@ public class CenterConsultationService {
     static final List<Faq> FAQS=List.of(
         new Faq(1,"Warming up","Spend about 5 to 10 minutes warming up: start with easy movement such as walking or light jogging, add gentle dynamic movements such as arm circles and leg swings, then a few slow movements from your sport. In class, follow your coach's warm-up.",
             List.of("warm up","warm-up","warmup","warming up","khoi dong"),
-            "Khởi động","Dành khoảng 5 đến 10 phút khởi động: bắt đầu bằng vận động nhẹ như đi bộ hoặc chạy chậm, thêm các động tác nhẹ nhàng như xoay tay, đá chân, rồi vài động tác chậm của môn bạn tập. Trong lớp, hãy khởi động theo hướng dẫn của Coach."),
+            "Kh\u1EDFi \u0111\u1ED9ng","D\u00E0nh kho\u1EA3ng 5 \u0111\u1EBFn 10 ph\u00FAt kh\u1EDFi \u0111\u1ED9ng: b\u1EAFt \u0111\u1EA7u b\u1EB1ng v\u1EADn \u0111\u1ED9ng nh\u1EB9 nh\u01B0 \u0111i b\u1ED9 ho\u1EB7c ch\u1EA1y ch\u1EADm, th\u00EAm c\u00E1c \u0111\u1ED9ng t\u00E1c nh\u1EB9 nh\u00E0ng nh\u01B0 xoay tay, \u0111\u00E1 ch\u00E2n, r\u1ED3i v\u00E0i \u0111\u1ED9ng t\u00E1c ch\u1EADm c\u1EE7a m\u00F4n b\u1EA1n t\u1EADp. Trong l\u1EDBp, h\u00E3y kh\u1EDFi \u0111\u1ED9ng theo h\u01B0\u1EDBng d\u1EABn c\u1EE7a Coach."),
         new Faq(2,"Cooling down and stretching","After practice, slow down gradually with about 5 minutes of easy movement, then do gentle stretches you already know. Hold each stretch comfortably without bouncing, and stop any stretch that feels uncomfortable. Your coach can show stretches for your sport.",
             List.of("cool down","cool-down","cooldown","cooling down","stretch","gian co","tha long"),
-            "Thả lỏng và giãn cơ","Sau buổi tập, giảm dần cường độ với khoảng 5 phút vận động nhẹ, rồi giãn cơ nhẹ nhàng bằng những động tác bạn đã biết. Giữ mỗi động tác ở mức thoải mái, không nhún, và dừng ngay nếu thấy khó chịu. Coach có thể hướng dẫn động tác giãn cơ cho môn của bạn."),
+            "Th\u1EA3 l\u1ECFng v\u00E0 gi\u00E3n c\u01A1","Sau bu\u1ED5i t\u1EADp, gi\u1EA3m d\u1EA7n c\u01B0\u1EDDng \u0111\u1ED9 v\u1EDBi kho\u1EA3ng 5 ph\u00FAt v\u1EADn \u0111\u1ED9ng nh\u1EB9, r\u1ED3i gi\u00E3n c\u01A1 nh\u1EB9 nh\u00E0ng b\u1EB1ng nh\u1EEFng \u0111\u1ED9ng t\u00E1c b\u1EA1n \u0111\u00E3 bi\u1EBFt. Gi\u1EEF m\u1ED7i \u0111\u1ED9ng t\u00E1c \u1EDF m\u1EE9c tho\u1EA3i m\u00E1i, kh\u00F4ng nh\u00FAn, v\u00E0 d\u1EEBng ngay n\u1EBFu th\u1EA5y kh\u00F3 ch\u1ECBu. Coach c\u00F3 th\u1EC3 h\u01B0\u1EDBng d\u1EABn \u0111\u1ED9ng t\u00E1c gi\u00E3n c\u01A1 cho m\u00F4n c\u1EE7a b\u1EA1n."),
         new Faq(3,"Drinking water","Bring your own water bottle and drink small amounts regularly before practice, during breaks and afterwards. Take a break whenever you feel unwell and tell your coach or reception.",
             List.of("water","hydrat","drink","uong nuoc"),
-            "Uống nước","Mang theo bình nước riêng và uống từng ngụm nhỏ đều đặn trước buổi tập, trong giờ nghỉ và sau khi tập. Hãy nghỉ ngay khi thấy không khỏe và báo cho Coach hoặc lễ tân."),
+            "U\u1ED1ng n\u01B0\u1EDBc","Mang theo b\u00ECnh n\u01B0\u1EDBc ri\u00EAng v\u00E0 u\u1ED1ng t\u1EEBng ng\u1EE5m nh\u1ECF \u0111\u1EC1u \u0111\u1EB7n tr\u01B0\u1EDBc bu\u1ED5i t\u1EADp, trong gi\u1EDD ngh\u1EC9 v\u00E0 sau khi t\u1EADp. H\u00E3y ngh\u1EC9 ngay khi th\u1EA5y kh\u00F4ng kh\u1ECFe v\u00E0 b\u00E1o cho Coach ho\u1EB7c l\u1EC5 t\u00E2n."),
         new Faq(4,"What to wear and bring","Wear comfortable sports clothing and clean indoor sports shoes suited to your sport, and bring a water bottle and a towel. Ask reception about equipment for a specific session.",
             List.of("wear","bring","shoes","clothes","clothing","mac gi","mang gi","quan ao","giay the thao"),
-            "Trang phục và đồ cần mang","Mặc đồ thể thao thoải mái, đi giày thể thao trong nhà sạch, phù hợp với môn tập, mang theo bình nước và khăn. Hỏi lễ tân về dụng cụ cho từng buổi cụ thể."),
+            "Trang ph\u1EE5c v\u00E0 \u0111\u1ED3 c\u1EA7n mang","M\u1EB7c \u0111\u1ED3 th\u1EC3 thao tho\u1EA3i m\u00E1i, \u0111i gi\u00E0y th\u1EC3 thao trong nh\u00E0 s\u1EA1ch, ph\u00F9 h\u1EE3p v\u1EDBi m\u00F4n t\u1EADp, mang theo b\u00ECnh n\u01B0\u1EDBc v\u00E0 kh\u0103n. H\u1ECFi l\u1EC5 t\u00E2n v\u1EC1 d\u1EE5ng c\u1EE5 cho t\u1EEBng bu\u1ED5i c\u1EE5 th\u1EC3."),
         new Faq(5,"How often to practise","Many people practise a few times a week and keep rest days between harder sessions. Increase time or intensity gradually. This is general guidance, not a personal plan; your coach can advise a schedule for you.",
             List.of("how often","rest day","rest days","rest between","times a week","times per week","may buoi mot tuan","bao nhieu lan mot tuan","nghi ngoi"),
-            "Tập bao lâu một lần","Nhiều người tập vài lần mỗi tuần và có ngày nghỉ giữa các buổi tập nặng. Hãy tăng thời gian hoặc cường độ từ từ. Đây là hướng dẫn chung, không phải kế hoạch cá nhân; Coach có thể tư vấn lịch tập cho riêng bạn."),
+            "T\u1EADp bao l\u00E2u m\u1ED9t l\u1EA7n","Nhi\u1EC1u ng\u01B0\u1EDDi t\u1EADp v\u00E0i l\u1EA7n m\u1ED7i tu\u1EA7n v\u00E0 c\u00F3 ng\u00E0y ngh\u1EC9 gi\u1EEFa c\u00E1c bu\u1ED5i t\u1EADp n\u1EB7ng. H\u00E3y t\u0103ng th\u1EDDi gian ho\u1EB7c c\u01B0\u1EDDng \u0111\u1ED9 t\u1EEB t\u1EEB. \u0110\u00E2y l\u00E0 h\u01B0\u1EDBng d\u1EABn chung, kh\u00F4ng ph\u1EA3i k\u1EBF ho\u1EA1ch c\u00E1 nh\u00E2n; Coach c\u00F3 th\u1EC3 t\u01B0 v\u1EA5n l\u1ECBch t\u1EADp cho ri\u00EAng b\u1EA1n."),
         new Faq(6,"Your first class","For your first class, arrive about 10 to 15 minutes early, check in at reception, and tell the coach it is your first session. Open My bookings to confirm the date and time.",
             List.of("first class","first session","first time","first lesson","buoi dau tien","lan dau"),
-            "Buổi học đầu tiên","Với buổi học đầu tiên, hãy đến sớm khoảng 10 đến 15 phút, check-in tại quầy lễ tân và báo Coach đây là buổi đầu của bạn. Mở My bookings để xác nhận ngày giờ."),
+            "Bu\u1ED5i h\u1ECDc \u0111\u1EA7u ti\u00EAn","V\u1EDBi bu\u1ED5i h\u1ECDc \u0111\u1EA7u ti\u00EAn, h\u00E3y \u0111\u1EBFn s\u1EDBm kho\u1EA3ng 10 \u0111\u1EBFn 15 ph\u00FAt, check-in t\u1EA1i qu\u1EA7y l\u1EC5 t\u00E2n v\u00E0 b\u00E1o Coach \u0111\u00E2y l\u00E0 bu\u1ED5i \u0111\u1EA7u c\u1EE7a b\u1EA1n. M\u1EDF My bookings \u0111\u1EC3 x\u00E1c nh\u1EADn ng\u00E0y gi\u1EDD."),
         new Faq(7,"Building good technique","Practise controlled technique at a comfortable pace before adding speed, distance or force, and pause to reset between repetitions. Ask your coach to check your technique during class.",
             List.of("technique","good form","proper form","ky thuat"),
-            "Tập đúng kỹ thuật","Tập kỹ thuật có kiểm soát ở tốc độ thoải mái trước khi tăng tốc độ, khoảng cách hay lực, và nghỉ để chỉnh lại tư thế giữa các lần lặp. Nhờ Coach kiểm tra kỹ thuật của bạn trong giờ học."));
+            "T\u1EADp \u0111\u00FAng k\u1EF9 thu\u1EADt","T\u1EADp k\u1EF9 thu\u1EADt c\u00F3 ki\u1EC3m so\u00E1t \u1EDF t\u1ED1c \u0111\u1ED9 tho\u1EA3i m\u00E1i tr\u01B0\u1EDBc khi t\u0103ng t\u1ED1c \u0111\u1ED9, kho\u1EA3ng c\u00E1ch hay l\u1EF1c, v\u00E0 ngh\u1EC9 \u0111\u1EC3 ch\u1EC9nh l\u1EA1i t\u01B0 th\u1EBF gi\u1EEFa c\u00E1c l\u1EA7n l\u1EB7p. Nh\u1EDD Coach ki\u1EC3m tra k\u1EF9 thu\u1EADt c\u1EE7a b\u1EA1n trong gi\u1EDD h\u1ECDc."));
     static Faq faq(String text) { return faq(text,plain(text)); }
     static Faq faq(String raw,String plain) {
         for(var item:FAQS)for(var keyword:item.keywords())if(raw.contains(keyword) || plain.contains(keyword))return item;
@@ -299,14 +299,14 @@ public class CenterConsultationService {
         if(sportId!=null){sql+=" AND p.sport_id=?";values.add(sportId);}
         sql+=" ORDER BY p.price_amount,p.id";
         var sources=jdbc.query(sql,(rs,row)->new ConsultationSource("SPORT_PACKAGE",rs.getLong("id"),rs.getString("name"),
-            vi?rs.getString("sport_name")+": giá gốc "+price(true,rs.getBigDecimal("price_amount"))+" VND, "+rs.getInt("session_count")+" buổi, hiệu lực "+rs.getInt("duration_days")+" ngày. Giảm giá và thanh toán được kiểm tra khi mua gói."
+            vi?rs.getString("sport_name")+": gi\u00E1 g\u1ED1c "+price(true,rs.getBigDecimal("price_amount"))+" VND, "+rs.getInt("session_count")+" bu\u1ED5i, hi\u1EC7u l\u1EF1c "+rs.getInt("duration_days")+" ng\u00E0y. Gi\u1EA3m gi\u00E1 v\u00E0 thanh to\u00E1n \u0111\u01B0\u1EE3c ki\u1EC3m tra khi mua g\u00F3i."
               :rs.getString("sport_name")+": "+rs.getBigDecimal("price_amount").toPlainString()+" VND base price, "+rs.getInt("session_count")+" sessions, valid "+rs.getInt("duration_days")+" days. Discounts and payment status are checked in the purchase flow.",
             "/member/packages/"+rs.getLong("id")),values.toArray());
         return response(vi,mode,sources.isEmpty()?"NO_ANSWER":"ANSWERED",sources.isEmpty()
             ?t(vi,"No matching active packages are available in the current catalog. Reception can confirm future offers.",
-                "Hiện không có gói tập phù hợp đang mở bán. Lễ tân có thể cho bạn biết các ưu đãi sắp tới.")
+                "Hi\u1EC7n kh\u00F4ng c\u00F3 g\u00F3i t\u1EADp ph\u00F9 h\u1EE3p \u0111ang m\u1EDF b\u00E1n. L\u1EC5 t\u00E2n c\u00F3 th\u1EC3 cho b\u1EA1n bi\u1EBFt c\u00E1c \u01B0u \u0111\u00E3i s\u1EAFp t\u1EDBi.")
             :t(vi,"Current active package base prices from the center catalog (up to 5, lowest price first). These are catalog prices, not a payment confirmation.",
-                "Giá gốc các gói tập đang mở bán của trung tâm (tối đa 5 gói, giá thấp nhất trước). Đây là giá niêm yết, chưa phải xác nhận thanh toán."),sources);
+                "Gi\u00E1 g\u1ED1c c\u00E1c g\u00F3i t\u1EADp \u0111ang m\u1EDF b\u00E1n c\u1EE7a trung t\u00E2m (t\u1ED1i \u0111a 5 g\u00F3i, gi\u00E1 th\u1EA5p nh\u1EA5t tr\u01B0\u1EDBc). \u0110\u00E2y l\u00E0 gi\u00E1 ni\u00EAm y\u1EBFt, ch\u01B0a ph\u1EA3i x\u00E1c nh\u1EADn thanh to\u00E1n."),sources);
     }
     private Consultation sessions(boolean vi,String mode,Long sportId,String day) {
         LocalDate today=LocalDate.now(clock);
@@ -326,18 +326,18 @@ public class CenterConsultationService {
         if(sportId!=null){sql+=" AND s.sport_id=?";values.add(sportId);}
         sql+=" ORDER BY s.session_date,s.start_time,s.id";
         var sources=jdbc.query(sql,(rs,row)->new ConsultationSource("CLASS_SESSION",rs.getLong("id"),
-            rs.getString("name")==null?rs.getString("sport_name")+t(vi," practice"," - tự tập"):rs.getString("name"),
-            vi?rs.getString("sport_name")+": "+date(true,rs.getDate("session_date"))+" "+time(true,rs.getTime("start_time"))+"-"+time(true,rs.getTime("end_time"))+" (giờ Việt Nam), còn "+rs.getInt("free_seats")+" chỗ. Chưa kiểm tra gói tập của bạn."
+            rs.getString("name")==null?rs.getString("sport_name")+t(vi," practice"," - t\u1EF1 t\u1EADp"):rs.getString("name"),
+            vi?rs.getString("sport_name")+": "+date(true,rs.getDate("session_date"))+" "+time(true,rs.getTime("start_time"))+"-"+time(true,rs.getTime("end_time"))+" (gi\u1EDD Vi\u1EC7t Nam), c\u00F2n "+rs.getInt("free_seats")+" ch\u1ED7. Ch\u01B0a ki\u1EC3m tra g\u00F3i t\u1EADp c\u1EE7a b\u1EA1n."
               :rs.getString("sport_name")+": "+rs.getDate("session_date")+" "+rs.getTime("start_time")+"-"+rs.getTime("end_time")+" (Vietnam time), "+rs.getInt("free_seats")+" places remaining. Package eligibility has not been checked.",
             "/member/sessions/"+rs.getLong("id")),values.toArray());
         var visibleIds=visibility.filter(sources.stream().map(ConsultationSource::id).toList());
         var visible=sources.stream().filter(source->visibleIds.contains(source.id())).limit(5).toList();
-        String range=vi?"từ "+from.format(VI_DATE)+" đến "+to.format(VI_DATE):"for "+from+" through "+to;
+        String range=vi?"t\u1EEB "+from.format(VI_DATE)+" \u0111\u1EBFn "+to.format(VI_DATE):"for "+from+" through "+to;
         return response(vi,mode,visible.isEmpty()?"NO_ANSWER":"ANSWERED",visible.isEmpty()
             ?t(vi,"No matching published sessions with available places were found "+range+". Reception can confirm other dates.",
-                "Không tìm thấy buổi học đã công bố còn chỗ "+range+". Lễ tân có thể kiểm tra giúp các ngày khác.")
+                "Kh\u00F4ng t\u00ECm th\u1EA5y bu\u1ED5i h\u1ECDc \u0111\u00E3 c\u00F4ng b\u1ED1 c\u00F2n ch\u1ED7 "+range+". L\u1EC5 t\u00E2n c\u00F3 th\u1EC3 ki\u1EC3m tra gi\u00FAp c\u00E1c ng\u00E0y kh\u00E1c.")
             :t(vi,"Published sessions with available places "+range+" (up to 5, earliest first). Open the source to check current eligibility.",
-                "Các buổi học đã công bố còn chỗ "+range+" (tối đa 5 buổi, sớm nhất trước). Mở từng buổi để kiểm tra điều kiện đặt."),visible);
+                "C\u00E1c bu\u1ED5i h\u1ECDc \u0111\u00E3 c\u00F4ng b\u1ED1 c\u00F2n ch\u1ED7 "+range+" (t\u1ED1i \u0111a 5 bu\u1ED5i, s\u1EDBm nh\u1EA5t tr\u01B0\u1EDBc). M\u1EDF t\u1EEBng bu\u1ED5i \u0111\u1EC3 ki\u1EC3m tra \u0111i\u1EC1u ki\u1EC7n \u0111\u1EB7t."),visible);
     }
 
     /** F6-04: the Member's own active packages, membership card and number of upcoming bookings. */
@@ -348,7 +348,7 @@ public class CenterConsultationService {
             FROM sport_package_registration r JOIN sport_package p ON p.id=r.package_id JOIN sport sp ON sp.id=p.sport_id
             WHERE r.member_id=? AND r.status='ACTIVE' AND r.end_date>=? ORDER BY r.end_date,r.id
             """,(rs,row)->new ConsultationSource("MY_PACKAGE",rs.getLong("id"),rs.getString("name"),
-                vi?rs.getString("sport_name")+": còn "+rs.getInt("remaining_sessions")+"/"+rs.getInt("total_sessions")+" buổi, hiệu lực đến "+date(true,rs.getDate("end_date"))+"."
+                vi?rs.getString("sport_name")+": c\u00F2n "+rs.getInt("remaining_sessions")+"/"+rs.getInt("total_sessions")+" bu\u1ED5i, hi\u1EC7u l\u1EF1c \u0111\u1EBFn "+date(true,rs.getDate("end_date"))+"."
                   :rs.getString("sport_name")+": "+rs.getInt("remaining_sessions")+" of "+rs.getInt("total_sessions")+" sessions available, valid until "+rs.getDate("end_date")+".",
                 "/member/membership"),memberId,today));
         sources.addAll(jdbc.query("""
@@ -356,7 +356,7 @@ public class CenterConsultationService {
             WHERE c.member_id=? AND c.status='ACTIVE' AND c.start_date<=? AND (c.end_date IS NULL OR c.end_date>=?)
             ORDER BY t.discount_percentage DESC,c.end_date DESC
             """,(rs,row)->new ConsultationSource("MY_CARD",rs.getLong("id"),rs.getString("name"),
-                vi?"Giảm "+rs.getInt("discount_percentage")+"% khi mua gói tập"+(rs.getDate("end_date")==null?", không thời hạn.":", hiệu lực đến "+date(true,rs.getDate("end_date"))+".")
+                vi?"Gi\u1EA3m "+rs.getInt("discount_percentage")+"% khi mua g\u00F3i t\u1EADp"+(rs.getDate("end_date")==null?", kh\u00F4ng th\u1EDDi h\u1EA1n.":", hi\u1EC7u l\u1EF1c \u0111\u1EBFn "+date(true,rs.getDate("end_date"))+".")
                   :rs.getInt("discount_percentage")+"% package discount"+(rs.getDate("end_date")==null?", no end date.":", valid until "+rs.getDate("end_date")+"."),
                 "/member/membership/cards"),memberId,today,today));
         Integer upcoming=jdbc.queryForObject("""
@@ -366,12 +366,12 @@ public class CenterConsultationService {
             """,Integer.class,memberId,Date.valueOf(today),Date.valueOf(today),Time.valueOf(LocalTime.now(clock)));
         int count=upcoming==null?0:upcoming;
         if(sources.isEmpty())return response(vi,mode,"ANSWERED",t(vi,"You have no active sport package or membership card. Browse the package catalog to buy one.",
-                "Bạn chưa có gói tập hay thẻ thành viên nào đang hoạt động. Hãy xem danh mục gói tập để mua."),
-            List.of(new ConsultationSource("PRODUCT_GUIDANCE",0,t(vi,"Sport packages","Gói tập"),t(vi,"Current packages and prices.","Các gói tập và giá hiện tại."),"/member/packages")));
+                "B\u1EA1n ch\u01B0a c\u00F3 g\u00F3i t\u1EADp hay th\u1EBB th\u00E0nh vi\u00EAn n\u00E0o \u0111ang ho\u1EA1t \u0111\u1ED9ng. H\u00E3y xem danh m\u1EE5c g\u00F3i t\u1EADp \u0111\u1EC3 mua."),
+            List.of(new ConsultationSource("PRODUCT_GUIDANCE",0,t(vi,"Sport packages","G\u00F3i t\u1EADp"),t(vi,"Current packages and prices.","C\u00E1c g\u00F3i t\u1EADp v\u00E0 gi\u00E1 hi\u1EC7n t\u1EA1i."),"/member/packages")));
         return response(vi,mode,"ANSWERED",t(vi,"Your active packages and card from your own records. You also have "+count
             +" upcoming confirmed booking(s); a session is used from your package when your attendance is recorded.",
-            "Gói tập và thẻ thành viên đang hoạt động của bạn, lấy từ dữ liệu của chính bạn. Bạn có "+count
-            +" buổi đã đặt sắp tới; mỗi buổi chỉ bị trừ vào gói khi bạn được điểm danh."),sources);
+            "G\u00F3i t\u1EADp v\u00E0 th\u1EBB th\u00E0nh vi\u00EAn \u0111ang ho\u1EA1t \u0111\u1ED9ng c\u1EE7a b\u1EA1n, l\u1EA5y t\u1EEB d\u1EEF li\u1EC7u c\u1EE7a ch\u00EDnh b\u1EA1n. B\u1EA1n c\u00F3 "+count
+            +" bu\u1ED5i \u0111\u00E3 \u0111\u1EB7t s\u1EAFp t\u1EDBi; m\u1ED7i bu\u1ED5i ch\u1EC9 b\u1ECB tr\u1EEB v\u00E0o g\u00F3i khi b\u1EA1n \u0111\u01B0\u1EE3c \u0111i\u1EC3m danh."),sources);
     }
 
     /** F6-04: the Member's own next confirmed bookings. */
@@ -384,14 +384,14 @@ public class CenterConsultationService {
                 AND (s.session_date>? OR (s.session_date=? AND s.start_time>CAST(? AS time)))
             ORDER BY s.session_date,s.start_time,b.id
             """,(rs,row)->new ConsultationSource("MY_BOOKING",rs.getLong("id"),rs.getString("class_name"),
-                vi?date(true,rs.getDate("session_date"))+" "+time(true,rs.getTime("start_time"))+"-"+time(true,rs.getTime("end_time"))+" (giờ Việt Nam), mã buổi "+rs.getString("session_code")+"."
+                vi?date(true,rs.getDate("session_date"))+" "+time(true,rs.getTime("start_time"))+"-"+time(true,rs.getTime("end_time"))+" (gi\u1EDD Vi\u1EC7t Nam), m\u00E3 bu\u1ED5i "+rs.getString("session_code")+"."
                   :rs.getDate("session_date")+" "+rs.getTime("start_time")+"-"+rs.getTime("end_time")+" (Vietnam time), session "+rs.getString("session_code")+".",
                 "/member/bookings"),memberId,Date.valueOf(today),Date.valueOf(today),Time.valueOf(LocalTime.now(clock)));
         return response(vi,mode,"ANSWERED",sources.isEmpty()
-                ?t(vi,"You have no upcoming confirmed bookings. Find a class to book one.","Bạn chưa có buổi nào đã đặt sắp tới. Hãy tìm lớp để đặt.")
-                :t(vi,"Your next confirmed bookings from your own records (up to 5, earliest first).","Các buổi bạn đã đặt sắp tới, lấy từ dữ liệu của chính bạn (tối đa 5 buổi, sớm nhất trước)."),
-            sources.isEmpty()?List.of(new ConsultationSource("PRODUCT_GUIDANCE",0,t(vi,"Find a class","Tìm lớp học"),
-                t(vi,"Published classes with available places.","Các lớp đã công bố còn chỗ."),"/member/classes")):sources);
+                ?t(vi,"You have no upcoming confirmed bookings. Find a class to book one.","B\u1EA1n ch\u01B0a c\u00F3 bu\u1ED5i n\u00E0o \u0111\u00E3 \u0111\u1EB7t s\u1EAFp t\u1EDBi. H\u00E3y t\u00ECm l\u1EDBp \u0111\u1EC3 \u0111\u1EB7t.")
+                :t(vi,"Your next confirmed bookings from your own records (up to 5, earliest first).","C\u00E1c bu\u1ED5i b\u1EA1n \u0111\u00E3 \u0111\u1EB7t s\u1EAFp t\u1EDBi, l\u1EA5y t\u1EEB d\u1EEF li\u1EC7u c\u1EE7a ch\u00EDnh b\u1EA1n (t\u1ED1i \u0111a 5 bu\u1ED5i, s\u1EDBm nh\u1EA5t tr\u01B0\u1EDBc)."),
+            sources.isEmpty()?List.of(new ConsultationSource("PRODUCT_GUIDANCE",0,t(vi,"Find a class","T\u00ECm l\u1EDBp h\u1ECDc"),
+                t(vi,"Published classes with available places.","C\u00E1c l\u1EDBp \u0111\u00E3 c\u00F4ng b\u1ED1 c\u00F2n ch\u1ED7."),"/member/classes")):sources);
     }
 
     /** F6-04: the Member's latest coach feedback and open homework, shown as recorded by the Coach. */
@@ -402,7 +402,7 @@ public class CenterConsultationService {
             FROM coach_feedback r JOIN session_plan p ON p.id=r.plan_id AND p.member_id=r.member_id JOIN user_account u ON u.id=r.coach_id
             WHERE r.member_id=? AND p.is_template=0 ORDER BY r.created_at DESC,r.id DESC
             """,(rs,row)->new ConsultationSource("COACH_FEEDBACK",rs.getLong("id"),
-                vi?"Nhận xét gần nhất của Coach ("+rs.getTimestamp("created_at").toLocalDateTime().toLocalDate().format(VI_DATE)+")"
+                vi?"Nh\u1EADn x\u00E9t g\u1EA7n nh\u1EA5t c\u1EE7a Coach ("+rs.getTimestamp("created_at").toLocalDateTime().toLocalDate().format(VI_DATE)+")"
                   :"Latest coach feedback ("+rs.getTimestamp("created_at").toLocalDateTime().toLocalDate()+")",
                 rs.getString("coach_name")+": "+rs.getString("comments"),"/member/training/feedback"),memberId));
         sources.addAll(jdbc.query("""
@@ -414,40 +414,40 @@ public class CenterConsultationService {
                 WHERE b.member_id=? AND b.status='CONFIRMED' AND s.status<>'CANCELLED'
                     AND s.class_id=n.class_id AND s.coach_id=n.coach_id AND s.training_type='COACH_LED')
             ORDER BY n.due_date,n.id
-            """,(rs,row)->new ConsultationSource("HOMEWORK",rs.getLong("id"),t(vi,"Homework: ","Bài tập về nhà: ")+rs.getString("title"),
-                vi?rs.getString("class_name")+", hạn "+date(true,rs.getDate("due_date"))+". "+rs.getString("content")
+            """,(rs,row)->new ConsultationSource("HOMEWORK",rs.getLong("id"),t(vi,"Homework: ","B\u00E0i t\u1EADp v\u1EC1 nh\u00E0: ")+rs.getString("title"),
+                vi?rs.getString("class_name")+", h\u1EA1n "+date(true,rs.getDate("due_date"))+". "+rs.getString("content")
                   :rs.getString("class_name")+", due "+rs.getDate("due_date")+". "+rs.getString("content"),
                 "/member/training/classes/"+rs.getLong("class_id")),Date.valueOf(today),memberId));
         return response(vi,mode,"ANSWERED",sources.isEmpty()
-                ?t(vi,"No coach feedback or open homework is recorded for you yet.","Chưa có nhận xét hay bài tập về nhà nào của Coach dành cho bạn.")
+                ?t(vi,"No coach feedback or open homework is recorded for you yet.","Ch\u01B0a c\u00F3 nh\u1EADn x\u00E9t hay b\u00E0i t\u1EADp v\u1EC1 nh\u00E0 n\u00E0o c\u1EE7a Coach d\u00E0nh cho b\u1EA1n.")
                 :t(vi,"Your latest coach feedback and open homework, shown as your coach recorded them. Ask your coach if you need clarification.",
-                    "Nhận xét gần nhất và bài tập về nhà còn hạn của bạn, giữ nguyên văn như Coach đã ghi. Hãy hỏi Coach nếu cần giải thích thêm."),
+                    "Nh\u1EADn x\u00E9t g\u1EA7n nh\u1EA5t v\u00E0 b\u00E0i t\u1EADp v\u1EC1 nh\u00E0 c\u00F2n h\u1EA1n c\u1EE7a b\u1EA1n, gi\u1EEF nguy\u00EAn v\u0103n nh\u01B0 Coach \u0111\u00E3 ghi. H\u00E3y h\u1ECFi Coach n\u1EBFu c\u1EA7n gi\u1EA3i th\u00EDch th\u00EAm."),
             sources.isEmpty()?List.of(askCoach(vi)):sources);
     }
 
     private static ConsultationSource askCoach(boolean vi) {
-        return new ConsultationSource("HUMAN_COACH",0,t(vi,"Ask your coach","Hỏi Coach của bạn"),
-            t(vi,"Private human conversation; no automated coach reply.","Trao đổi riêng với Coach; không có trả lời tự động."),"/member/training/questions");
+        return new ConsultationSource("HUMAN_COACH",0,t(vi,"Ask your coach","H\u1ECFi Coach c\u1EE7a b\u1EA1n"),
+            t(vi,"Private human conversation; no automated coach reply.","Trao \u0111\u1ED5i ri\u00EAng v\u1EDBi Coach; kh\u00F4ng c\u00F3 tr\u1EA3 l\u1EDDi t\u1EF1 \u0111\u1ED9ng."),"/member/training/questions");
     }
     private static Consultation faqAnswer(boolean vi,String mode,Faq faq) {
-        return response(vi,mode,"ANSWERED",vi?"Câu hỏi chung về tập luyện (hướng dẫn cố định của trung tâm, không phải tư vấn cá nhân hay y tế): "+faq.viAnswer()
+        return response(vi,mode,"ANSWERED",vi?"C\u00E2u h\u1ECFi chung v\u1EC1 t\u1EADp luy\u1EC7n (h\u01B0\u1EDBng d\u1EABn c\u1ED1 \u0111\u1ECBnh c\u1EE7a trung t\u00E2m, kh\u00F4ng ph\u1EA3i t\u01B0 v\u1EA5n c\u00E1 nh\u00E2n hay y t\u1EBF): "+faq.viAnswer()
                 :"General exercise FAQ (curated center guidance, not personal or medical advice): "+faq.answer(),
-            List.of(new ConsultationSource("CURATED_FAQ",faq.id(),vi?"FAQ trung tâm: "+faq.viTitle():"Center FAQ: "+faq.title(),
-                vi?"Câu trả lời cố định từ FAQ của trung tâm ("+FAQ_VERSION+"). Hãy hỏi Coach để được tư vấn cho riêng bạn."
+            List.of(new ConsultationSource("CURATED_FAQ",faq.id(),vi?"FAQ trung t\u00E2m: "+faq.viTitle():"Center FAQ: "+faq.title(),
+                vi?"C\u00E2u tr\u1EA3 l\u1EDDi c\u1ED1 \u0111\u1ECBnh t\u1EEB FAQ c\u1EE7a trung t\u00E2m ("+FAQ_VERSION+"). H\u00E3y h\u1ECFi Coach \u0111\u1EC3 \u0111\u01B0\u1EE3c t\u01B0 v\u1EA5n cho ri\u00EAng b\u1EA1n."
                   :"Fixed answer from the curated center FAQ ("+FAQ_VERSION+"). Ask your coach for advice about your own training.","/member/training/questions")));
     }
     private static Consultation coach(boolean vi,String mode) {
         return response(vi,mode,"NO_ANSWER",t(vi,"I cannot assess personal training or health concerns. Ask your assigned human coach about your practice plan.",
-                "Trợ lý không đánh giá được vấn đề tập luyện cá nhân hay sức khỏe. Hãy hỏi Coach phụ trách của bạn về kế hoạch tập."),
+                "Tr\u1EE3 l\u00FD kh\u00F4ng \u0111\u00E1nh gi\u00E1 \u0111\u01B0\u1EE3c v\u1EA5n \u0111\u1EC1 t\u1EADp luy\u1EC7n c\u00E1 nh\u00E2n hay s\u1EE9c kh\u1ECFe. H\u00E3y h\u1ECFi Coach ph\u1EE5 tr\u00E1ch c\u1EE7a b\u1EA1n v\u1EC1 k\u1EBF ho\u1EA1ch t\u1EADp."),
             List.of(askCoach(vi)));
     }
     private static Consultation unknown(boolean vi,String mode) {
         return response(vi,mode,"NO_ANSWER",t(vi,"I do not have a grounded answer to that question. I can show published sessions, active package prices, your own packages, bookings and coach feedback, explain how to check booking eligibility, or answer a few general exercise questions such as warming up. Contact reception for other center information.",
-            "Tôi không có câu trả lời dựa trên dữ liệu của trung tâm cho câu hỏi này. Tôi có thể cho bạn xem các buổi học đã công bố, giá gói tập, gói tập, lịch đã đặt và nhận xét của Coach dành cho bạn, hướng dẫn cách kiểm tra điều kiện đặt chỗ, hoặc trả lời vài câu hỏi chung như cách khởi động. Hãy liên hệ lễ tân để biết thông tin khác."),List.of());
+            "T\u00F4i kh\u00F4ng c\u00F3 c\u00E2u tr\u1EA3 l\u1EDDi d\u1EF1a tr\u00EAn d\u1EEF li\u1EC7u c\u1EE7a trung t\u00E2m cho c\u00E2u h\u1ECFi n\u00E0y. T\u00F4i c\u00F3 th\u1EC3 cho b\u1EA1n xem c\u00E1c bu\u1ED5i h\u1ECDc \u0111\u00E3 c\u00F4ng b\u1ED1, gi\u00E1 g\u00F3i t\u1EADp, g\u00F3i t\u1EADp, l\u1ECBch \u0111\u00E3 \u0111\u1EB7t v\u00E0 nh\u1EADn x\u00E9t c\u1EE7a Coach d\u00E0nh cho b\u1EA1n, h\u01B0\u1EDBng d\u1EABn c\u00E1ch ki\u1EC3m tra \u0111i\u1EC1u ki\u1EC7n \u0111\u1EB7t ch\u1ED7, ho\u1EB7c tr\u1EA3 l\u1EDDi v\u00E0i c\u00E2u h\u1ECFi chung nh\u01B0 c\u00E1ch kh\u1EDFi \u0111\u1ED9ng. H\u00E3y li\u00EAn h\u1EC7 l\u1EC5 t\u00E2n \u0111\u1EC3 bi\u1EBFt th\u00F4ng tin kh\u00E1c."),List.of());
     }
     private static Consultation signIn(boolean vi,String mode) {
         return response(vi,mode,"NO_ANSWER",t(vi,"Sign in as a Member to ask about your own packages, bookings or training.",
-            "Hãy đăng nhập bằng tài khoản Member để hỏi về gói tập, lịch đã đặt hay việc tập luyện của bạn."),List.of());
+            "H\u00E3y \u0111\u0103ng nh\u1EADp b\u1EB1ng t\u00E0i kho\u1EA3n Member \u0111\u1EC3 h\u1ECFi v\u1EC1 g\u00F3i t\u1EADp, l\u1ECBch \u0111\u00E3 \u0111\u1EB7t hay vi\u1EC7c t\u1EADp luy\u1EC7n c\u1EE7a b\u1EA1n."),List.of());
     }
     private static Consultation response(boolean vi,String mode,String status,String answer,List<ConsultationSource> sources) {
         return new Consultation(mode,status,answer,false,sources,vi?"vi":"en");
