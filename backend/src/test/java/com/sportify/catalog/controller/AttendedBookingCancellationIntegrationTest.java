@@ -228,8 +228,7 @@ class AttendedBookingCancellationIntegrationTest extends AbstractIntegrationTest
     @ParameterizedTest(name = "B02-07 manager cannot cancel a session with {0} evidence")
     @ValueSource(strings = {"PRESENT", "LATE", "CHECK_IN"})
     void managerCannotCancelSessionWithParticipationEvidence(String evidence) {
-        // 10:30 start, now 10:00: inside the 60-minute check-in window and still before the start.
-        long session = session(LocalTime.of(10, 30));
+        long session = session(LocalTime.of(14, 0));
         long regA = registration(memberA), regB = registration(memberB);
         long attended = bookViaApi(memberA, session, regA);
         long ordinary = bookViaApi(memberB, session, regB);
@@ -344,10 +343,10 @@ class AttendedBookingCancellationIntegrationTest extends AbstractIntegrationTest
         assertThat(after.seats()).isZero();
     }
 
-    // ---------------------------------------------------------------- arrival window (E2E-D6 decided) and E2E-D9
+    // ---------------------------------------------------------------- preserved policies (E2E-D6, E2E-D9)
 
     @Test
-    void d6_frontDeskCheckInAfterTheSessionEndIsDeniedAsEnded() {
+    void d6_frontDeskCheckInAfterTheSessionEndOnTheSameDateIsStillAllowed() {
         long session = session(LocalTime.of(8, 0)); // ended at 09:30, now 10:00 on the same date
         long reg = registration(memberA);
         long booking = bookedFixture(session, memberA, reg);
@@ -355,20 +354,7 @@ class AttendedBookingCancellationIntegrationTest extends AbstractIntegrationTest
         Outcome checkIn = checkIn(memberA, booking);
 
         assertThat(checkIn.status()).isEqualTo(201);
-        assertThat(checkIn.body().path("result").asText()).isEqualTo("DENIED");
-        assertThat(checkIn.body().path("denialReason").asText()).isEqualTo("The booked session has already ended");
-    }
-
-    @Test
-    void d6_frontDeskCheckInMoreThanSixtyMinutesBeforeTheStartIsDenied() {
-        long session = session(LocalTime.of(11, 1)); // opens 10:01, now 10:00
-        long reg = registration(memberA);
-        long booking = bookedFixture(session, memberA, reg);
-
-        Outcome checkIn = checkIn(memberA, booking);
-
-        assertThat(checkIn.body().path("result").asText()).isEqualTo("DENIED");
-        assertThat(checkIn.body().path("denialReason").asText()).startsWith("Check-in opens at 10:01");
+        assertThat(checkIn.body().path("result").asText()).isEqualTo("ALLOWED");
     }
 
     // ---------------------------------------------------------------- fixtures and helpers

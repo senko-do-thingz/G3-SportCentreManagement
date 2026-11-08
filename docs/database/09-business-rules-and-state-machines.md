@@ -170,11 +170,11 @@ Front desk check-in validates member arrival at the center:
 1. **Today's Confirmed Booking Required:** The member MUST have at least one confirmed session booking for the current day (the current date in Asia/Ho_Chi_Minh from the application Clock, `status = 'CONFIRMED'`).
 2. **Active Package Coverage:** The booked package registration must be ACTIVE and valid today (start_date <= today <= end_date).
 3. **No Duplicate Check-in:** The member must not have already checked in for the same session today.
-   - **Automatic booking choice:** when no booking ID is supplied, today's not-checked-in bookings are ordered by session start time (then booking id). The earliest session that has not ended yet is used; only when every remaining session has ended is the earliest of them chosen (and then denied as ended).
-   - **Arrival window (E2E-D6 decided):** check-in opens `app.check-in.opens-minutes-before` (default 60) minutes before the session start, inclusive, and closes at the session end, exclusive. Earlier: `DENIED` "Check-in opens at HH:mm, 60 minutes before the session starts". At or after the end: `DENIED` "The booked session has already ended" (a no-show; the credit is not restored). A late arrival during the session is `ALLOWED` and the Coach records LATE. With the 120-minute Member cancellation cutoff, a Member can never cancel inside the check-in window.
+   - **Automatic booking choice:** when no booking ID is supplied, the first not-checked-in booking of today in session start order (then booking id) is used, so the choice never depends on database row order.
+   - **Same-day arrival (E2E-D6, CODEOWNER decision 2026-11-05, Option A / NO_FIX_REQUIRED):** check-in is permitted on the same local business date, including after the booked session has ended. There is no opening window and no rejection solely because the session ended.
 4. **Attendance Independence:** Front desk check-in does not mark session attendance and does not double-deduct remaining package sessions (attendance is separately recorded by coaches in classes or receptionists in self-training slots).
 5. **Result & Denial Reasons:**
-   - If conditions 1 and 2 are satisfied and the arrival is inside the window, result is `ALLOWED`.
+   - If conditions 1 and 2 are satisfied, result is `ALLOWED`.
    - If no confirmed booking exists for today, result is `DENIED` with reason `"No confirmed booking for today"`.
    - If a specific booking ID is provided in request but is not found, not confirmed, or not scheduled for today, result is `DENIED` with reason `"Specified booking is not scheduled for today or is not confirmed"`.
    - If all confirmed bookings for today have already been checked in, result is `DENIED` with reason `"All confirmed bookings for today have already been checked in"`.

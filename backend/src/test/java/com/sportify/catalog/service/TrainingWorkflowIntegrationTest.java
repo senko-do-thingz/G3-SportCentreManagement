@@ -516,8 +516,6 @@ class TrainingWorkflowIntegrationTest {
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
     }
     @Test void RELEASE11_actualHttpIssueRedeemReplayAndPurposeIsolation() throws Exception {
-        // 09:30 centre time: inside the arrival window of the 09:00-10:00 session (closes at its end).
-        clock.value=Instant.parse("2026-11-02T02:30:00Z");
         long registration=arrivalEntitlement();
         var issued=mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/member/check-in-pass").with(as(member)))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())

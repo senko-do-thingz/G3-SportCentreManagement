@@ -501,13 +501,11 @@ class BookingRulesIntegrationTest extends AbstractIntegrationTest {
 
     @ParameterizedTest @ValueSource(strings = {"CHECKIN_FIRST", "CANCEL_FIRST"}) @Timeout(100)
     void cancellationAndCheckInSerializeWithoutAllowedCheckInOnCancelledBooking(String order) throws Exception {
-        // 10:30 start, now 10:00: inside the 60-minute check-in window. Reception cancels, so a cancellation that wins the
-        // race restores the credit (a Member's late cancellation here would forfeit it).
-        long session = session(TODAY, LocalTime.of(10, 30), 10, TrainingFormat.COACH_LED), reg = registration(memberA);
+        long session = session(TODAY, LocalTime.NOON, 10, TrainingFormat.COACH_LED), reg = registration(memberA);
         long booking = service.createBooking(request(session, reg), memberA).getId();
         var held = new CountDownLatch(1); var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
         var firstSpid = new AtomicInteger(); var secondSpid = new AtomicInteger(); var pool = newWorkerPool();
-        java.util.function.Supplier<Outcome> cancel = () -> http(delete("/api/v1/bookings/" + booking), receptionist);
+        java.util.function.Supplier<Outcome> cancel = () -> http(delete("/api/v1/bookings/" + booking), memberA);
         java.util.function.Supplier<Outcome> checkIn = () -> http(post("/api/v1/check-ins").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"identifier\":\"" + memberA.getId() + "\",\"bookingId\":" + booking + "}"), receptionist);
         try {

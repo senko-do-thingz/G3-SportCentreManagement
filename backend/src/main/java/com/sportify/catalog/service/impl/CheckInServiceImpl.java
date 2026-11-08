@@ -22,7 +22,6 @@ import com.sportify.identity.entity.MemberProfile;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.identity.repository.MemberProfileRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,26 +48,6 @@ public class CheckInServiceImpl implements CheckInService {
     private static final Comparator<Booking> BY_SESSION_START = Comparator
             .comparing((Booking b) -> b.getSession().getStartTime())
             .thenComparing(Booking::getId);
-
-    static final String SESSION_ENDED_REASON = "The booked session has already ended";
-    private static final java.time.format.DateTimeFormatter HH_MM = java.time.format.DateTimeFormatter.ofPattern("HH:mm");
-
-    /**
-     * Arrival window (E2E-D6 decision, replacing the former same-day rule): check-in opens this many minutes before the
-     * session start (inclusive) and closes at the session end (exclusive). A late arrival during the session is still
-     * accepted; the Coach records LATE. After the end the booking counts as a no-show.
-     */
-    @Value("${app.check-in.opens-minutes-before:60}")
-    private int opensMinutesBefore = 60;
-
-    private static boolean hasEnded(Booking booking, LocalDateTime now) {
-        return !now.isBefore(LocalDateTime.of(booking.getSession().getSessionDate(), booking.getSession().getEndTime()));
-    }
-
-    private LocalDateTime opensAt(Booking booking) {
-        return LocalDateTime.of(booking.getSession().getSessionDate(), booking.getSession().getStartTime())
-                .minusMinutes(Math.max(0, opensMinutesBefore));
-    }
 
     @Override
     @Transactional
@@ -112,17 +91,14 @@ public class CheckInServiceImpl implements CheckInService {
                     denialReason = "Specified booking is not scheduled for today or is not confirmed";
                 }
             } else {
-                // Deterministic choice: the earliest not-checked-in session that has not ended yet, so a missed
-                // morning session never absorbs the arrival for a later one. When every remaining session has
-                // ended, the earliest one is chosen and the arrival window below denies it as ended.
-                List<Booking> notCheckedIn = todayBookings.stream()
+                // If member has multiple bookings today, pick the first one that has not yet been checked in, in session
+                // start order so the choice does not depend on database row order. E2E-D6 (CODEOWNER decision
+                // 2026-11-05, Option A): same-day arrival is allowed, including after the session has ended.
+                targetBooking = todayBookings.stream()
                         .filter(b -> !checkInRepository.existsByBookingIdAndResult(b.getId(), CheckInResult.ALLOWED))
                         .sorted(BY_SESSION_START)
-                        .toList();
-                targetBooking = notCheckedIn.stream()
-                        .filter(b -> !hasEnded(b, now))
                         .findFirst()
-                        .orElse(notCheckedIn.isEmpty() ? null : notCheckedIn.getFirst());
+                        .orElse(null);
                 if (targetBooking == null) {
                     denialReason = "All confirmed bookings for today have already been checked in";
                 }
@@ -141,11 +117,6 @@ public class CheckInServiceImpl implements CheckInService {
                     denialReason = "Specified booking is not scheduled for today or is not confirmed";
                 } else if (alreadyCheckedIn) {
                     denialReason = "Already checked in for this session";
-                } else if (hasEnded(targetBooking, now)) {
-                    denialReason = SESSION_ENDED_REASON;
-                } else if (now.isBefore(opensAt(targetBooking))) {
-                    denialReason = "Check-in opens at " + opensAt(targetBooking).toLocalTime().format(HH_MM)
-                            + ", " + opensMinutesBefore + " minutes before the session starts";
                 } else {
                     // Check package coverage directly from booking
                     SportPackageRegistration pkg = targetBooking.getPackageRegistration();

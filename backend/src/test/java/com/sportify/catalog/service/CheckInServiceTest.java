@@ -83,7 +83,7 @@ public class CheckInServiceTest {
 
         sport = Sport.builder().id(10L).name("Badminton").build();
         classSession = ClassSession.builder().id(20L).sport(sport).sessionDate(LocalDate.of(2026, 10, 5))
-                .startTime(java.time.LocalTime.of(0, 30)).endTime(java.time.LocalTime.of(1, 30)).build(); // clock 00:00 is inside the 60-minute window
+                .startTime(java.time.LocalTime.of(8, 0)).endTime(java.time.LocalTime.of(9, 0)).build();
         todayBooking = Booking.builder()
                 .id(30L)
                 .member(memberProfile)
@@ -443,7 +443,8 @@ public class CheckInServiceTest {
         verify(sessionRepository).findForUpdate(20L);
     }
 
-    // Flow 2: arrival must target a session that has not ended, earliest first.
+    // Automatic choice is in session start order (not database row order). E2E-D6 Option A: same-day arrival is
+    // allowed, including after the session has ended.
     private CheckInServiceImpl serviceAt(String instant) {
         return new CheckInServiceImpl(checkInRepository, bookingRepository, memberProfileRepository, auditService,
                 Clock.fixed(Instant.parse(instant), ZoneId.of("UTC")), sessionRepository, entityManager, operationalMemberPolicy);
@@ -466,21 +467,7 @@ public class CheckInServiceTest {
     }
 
     @Test
-    void automaticArrivalSkipsAMissedEndedSessionAndPicksTheNextOne() {
-        Booking morning = bookingAt(31L, 21L, 7);
-        Booking afternoon = bookingAt(32L, 22L, 16);
-        stubToday(List.of(morning, afternoon));
-        var request = new CheckInRequest(); request.setIdentifier("MEM-123");
-
-        CheckInResponse res = serviceAt("2026-10-05T15:30:00Z").recordCheckIn(request, receptionist);
-
-        assertEquals("ALLOWED", res.getResult());
-        verify(sessionRepository).findForUpdate(22L);
-        verify(sessionRepository, org.mockito.Mockito.never()).findForUpdate(21L);
-    }
-
-    @Test
-    void automaticArrivalPicksTheEarliestOpenSessionRegardlessOfRowOrder() {
+    void automaticArrivalPicksTheEarliestSessionRegardlessOfRowOrder() {
         Booking late = bookingAt(32L, 22L, 18);
         Booking early = bookingAt(31L, 21L, 16);
         stubToday(List.of(late, early));
@@ -492,47 +479,10 @@ public class CheckInServiceTest {
     }
 
     @Test
-    void automaticArrivalIsDeniedAsEndedWhenEveryRemainingSessionHasEnded() {
-        Booking second = bookingAt(32L, 22L, 9);
-        Booking first = bookingAt(31L, 21L, 7);
-        stubToday(List.of(second, first));
-        var request = new CheckInRequest(); request.setIdentifier("MEM-123");
-
-        CheckInResponse res = serviceAt("2026-10-05T15:30:00Z").recordCheckIn(request, receptionist);
-
-        assertEquals("DENIED", res.getResult());
-        assertEquals("The booked session has already ended", res.getDenialReason());
-        verify(sessionRepository).findForUpdate(21L);
-    }
-
-    @Test
-    void selectedBookingIsDeniedOnceItsSessionEndTimeIsReached() {
+    void d6_sameDayArrivalAfterTheSessionEndIsStillAllowed() {
         stubToday(List.of(bookingAt(31L, 21L, 7)));
         var request = new CheckInRequest(); request.setIdentifier("MEM-123"); request.setBookingId(31L);
 
-        CheckInResponse res = serviceAt("2026-10-05T08:00:00Z").recordCheckIn(request, receptionist);
-
-        assertEquals("DENIED", res.getResult());
-        assertEquals("The booked session has already ended", res.getDenialReason());
-    }
-
-    @Test
-    void arrivalDuringTheSessionIsAllowedAsALateArrival() {
-        stubToday(List.of(bookingAt(31L, 21L, 7)));
-        var request = new CheckInRequest(); request.setIdentifier("MEM-123"); request.setBookingId(31L);
-
-        assertEquals("ALLOWED", serviceAt("2026-10-05T07:59:59Z").recordCheckIn(request, receptionist).getResult());
-    }
-
-    @Test
-    void arrivalOpensExactlySixtyMinutesBeforeTheStart() {
-        stubToday(List.of(bookingAt(31L, 21L, 16)));
-        var request = new CheckInRequest(); request.setIdentifier("MEM-123"); request.setBookingId(31L);
-
-        CheckInResponse early = serviceAt("2026-10-05T14:59:59Z").recordCheckIn(request, receptionist);
-        assertEquals("DENIED", early.getResult());
-        assertEquals("Check-in opens at 15:00, 60 minutes before the session starts", early.getDenialReason());
-
-        assertEquals("ALLOWED", serviceAt("2026-10-05T15:00:00Z").recordCheckIn(request, receptionist).getResult());
+        assertEquals("ALLOWED", serviceAt("2026-10-05T15:30:00Z").recordCheckIn(request, receptionist).getResult());
     }
 }
