@@ -114,6 +114,7 @@ class FinanceReportServiceImplTest {
         assertThat(o.averagePayment()).isEqualByComparingTo("666666.67");
         assertThat(o.pendingAmount()).isEqualByComparingTo("700000");
         assertThat(o.refundedAmount()).isEqualByComparingTo("200000");
+        assertThat(o.netRevenue()).as("gross collected minus refunds paid out in the month").isEqualByComparingTo("1800000");
         assertThat(o.previousMonth()).isEqualTo("2026-09");
         assertThat(o.previousPaidRevenue()).isEqualByComparingTo("1600000");
         assertThat(o.revenueChange()).isEqualByComparingTo("400000");

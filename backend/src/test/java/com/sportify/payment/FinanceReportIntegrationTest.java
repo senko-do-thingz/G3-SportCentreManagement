@@ -70,7 +70,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * BE-22 against a real SQL Server (Testcontainers) with known payments in March 2001, a month no other test uses:
  * every figure of the overview, the revenue breakdowns (shares add up to 100), the ledger filters and the CSV export
- * are checked. PENDING, FAILED and REFUNDED payments and a payment at 2001-04-01 00:00 must not count as March revenue.
+ * are checked. Revenue is gross collected money by payment_time: SUCCESS and later-REFUNDED payments both count in the
+ * month they were paid (P7 in March, P9 in February), so a closed month never changes; refunds are a separate deduction
+ * in the month they are paid out. PENDING and FAILED payments and a payment at 2001-04-01 00:00 are not March revenue.
  *
  * March 2001 data:
  * P1 SUCCESS 300000  BANK_TRANSFER package (sport A)   paid 2001-03-05 10:00, invoice
@@ -361,9 +363,9 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"P1,100000.00,1700000.00", "P2,500000.00,1500000.00"})
-    @DisplayName("Real BE-21 partial and full refunds preserve SUCCESS-only finance semantics")
-    void financeAfterRealRefundApprovalAndCompletion(String key, String approved, String remainingRevenue) throws Exception {
+    @CsvSource({"P1,100000.00", "P2,500000.00"})
+    @DisplayName("Real BE-21 partial and full refunds keep the collected month unchanged and deduct only the refund")
+    void financeAfterRealRefundApprovalAndCompletion(String key, String approved) throws Exception {
         Long paymentId = payments.get(key);
         Long registrationId = jdbc.queryForObject(
                 "SELECT id FROM sport_package_registration WHERE payment_id = ?", Long.class, paymentId);
@@ -377,7 +379,7 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT payment_status FROM payment WHERE id = ?", String.class, paymentId))
                 .isEqualTo("SUCCESS");
         assertThat(dec(getJson("/api/v1/manager/finance/overview?month=2001-03"), "paidRevenue"))
-                .isEqualByComparingTo("2000000.00");
+                .isEqualByComparingTo("2400000.00");
         assertThat(dec(getJson("/api/v1/manager/finance/overview?month=" + completionMonth), "refundedAmount"))
                 .isEqualByComparingTo(refundedBefore);
 
@@ -386,13 +388,15 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
         var refundBeforeRead = jdbc.queryForMap("SELECT * FROM refund_request WHERE id = ?", submitted.getId());
         assertThat(paymentBeforeRead.get("payment_status")).isEqualTo("REFUNDED");
         assertThat(refundBeforeRead.get("status")).isEqualTo("COMPLETED");
-        // Even a partial refund removes the whole original payment, not only the approved amount.
+        // The collected month (March 2001) does not change; only the approved amount is deducted, in the payout month.
         assertThat(dec(getJson("/api/v1/manager/finance/overview?month=2001-03"), "paidRevenue"))
-                .isEqualByComparingTo(remainingRevenue);
+                .isEqualByComparingTo("2400000.00");
         assertThat(dec(getJson("/api/v1/manager/finance/revenue?from=2001-03-01&to=2001-03-31&groupBy=METHOD"), "totalRevenue"))
-                .isEqualByComparingTo(remainingRevenue);
-        assertThat(dec(getJson("/api/v1/manager/finance/overview?month=" + completionMonth), "refundedAmount"))
-                .isEqualByComparingTo(refundedBefore.add(new BigDecimal(approved)));
+                .isEqualByComparingTo("2400000.00");
+        JsonNode payoutMonth = getJson("/api/v1/manager/finance/overview?month=" + completionMonth);
+        assertThat(dec(payoutMonth, "refundedAmount")).isEqualByComparingTo(refundedBefore.add(new BigDecimal(approved)));
+        assertThat(dec(payoutMonth, "netRevenue"))
+                .isEqualByComparingTo(dec(payoutMonth, "paidRevenue").subtract(dec(payoutMonth, "refundedAmount")));
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM activity_log WHERE entity_type = 'REFUND_REQUEST' "
                 + "AND entity_id = ? AND action = 'REFUND_COMPLETED'", Integer.class, submitted.getId())).isEqualTo(1);
         assertThat(jdbc.queryForMap("SELECT * FROM payment WHERE id = ?", paymentId)).isEqualTo(paymentBeforeRead);
@@ -404,24 +408,27 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("Overview of March 2001: every figure; PENDING, FAILED, REFUNDED and the April boundary payment are not revenue")
+    @DisplayName("Overview of March 2001: every figure; refunded P7 stays March revenue; PENDING, FAILED and the April payment are not")
     void overview() throws Exception {
         JsonNode o = getJson("/api/v1/manager/finance/overview?month=2001-03");
 
         assertThat(o.get("month").asText()).isEqualTo("2001-03");
-        assertThat(dec(o, "paidRevenue")).isEqualByComparingTo("2000000");
-        assertThat(o.get("paidTransactions").asLong()).isEqualTo(3);
-        assertThat(dec(o, "averagePayment")).isEqualByComparingTo("666666.67");
+        // P1 300000 + P2 500000 + P3 1200000 + refunded P7 400000 (collected 2001-03-12).
+        assertThat(dec(o, "paidRevenue")).isEqualByComparingTo("2400000");
+        assertThat(o.get("paidTransactions").asLong()).isEqualTo(4);
+        assertThat(dec(o, "averagePayment")).isEqualByComparingTo("600000");
         assertThat(dec(o, "pendingAmount")).isEqualByComparingTo("700000");
         assertThat(o.get("pendingTransactions").asLong()).isEqualTo(1);
         // P7 (log time 2001-03-25, updated_at later moved to April) and P9 (legacy, updated_at 2001-03-28).
         assertThat(dec(o, "refundedAmount")).isEqualByComparingTo("250000");
         assertThat(o.get("refundedTransactions").asLong()).isEqualTo(2);
+        assertThat(dec(o, "netRevenue")).isEqualByComparingTo("2150000");
         assertThat(o.get("previousMonth").asText()).isEqualTo("2001-02");
-        assertThat(dec(o, "previousPaidRevenue")).isEqualByComparingTo("100000");
-        assertThat(o.get("previousPaidTransactions").asLong()).isEqualTo(1);
-        assertThat(dec(o, "revenueChange")).isEqualByComparingTo("1900000");
-        assertThat(dec(o, "revenueChangePercent")).isEqualByComparingTo("1900.00");
+        // P6 100000 + refunded P9 150000 (collected 2001-02-20).
+        assertThat(dec(o, "previousPaidRevenue")).isEqualByComparingTo("250000");
+        assertThat(o.get("previousPaidTransactions").asLong()).isEqualTo(2);
+        assertThat(dec(o, "revenueChange")).isEqualByComparingTo("2150000");
+        assertThat(dec(o, "revenueChangePercent")).isEqualByComparingTo("860.00");
 
         JsonNode april = getJson("/api/v1/manager/finance/overview?month=2001-04");
         assertThat(dec(april, "paidRevenue")).isEqualByComparingTo("999000");
@@ -430,7 +437,7 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
         assertThat(april.get("refundedTransactions").asLong()).isZero();
 
         JsonNode february = getJson("/api/v1/manager/finance/overview?month=2001-02");
-        assertThat(dec(february, "paidRevenue")).isEqualByComparingTo("100000");
+        assertThat(dec(february, "paidRevenue")).isEqualByComparingTo("250000");
         assertThat(dec(february, "refundedAmount")).isEqualByComparingTo("0");
     }
 
@@ -439,24 +446,26 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
     void revenueBreakdowns() throws Exception {
         String range = "from=2001-03-01&to=2001-03-31";
 
+        // Refunded P7 (VNPAY, package of sport B, collected 2001-03-12) is part of March gross revenue.
         JsonNode byType = getJson("/api/v1/manager/finance/revenue?" + range + "&groupBy=ITEM_TYPE");
-        assertThat(dec(byType, "totalRevenue")).isEqualByComparingTo("2000000");
-        assertThat(byType.get("totalTransactions").asLong()).isEqualTo(3);
+        assertThat(dec(byType, "totalRevenue")).isEqualByComparingTo("2400000");
+        assertThat(byType.get("totalTransactions").asLong()).isEqualTo(4);
         assertRows(byType, new String[][]{
-                {"MEMBERSHIP_CARD", "1200000", "1", "60.00"},
-                {"SPORT_PACKAGE", "800000", "2", "40.00"}});
+                {"MEMBERSHIP_CARD", "1200000", "1", "50.00"},
+                {"SPORT_PACKAGE", "1200000", "3", "50.00"}});
 
         JsonNode byMethod = getJson("/api/v1/manager/finance/revenue?" + range + "&groupBy=METHOD");
         assertRows(byMethod, new String[][]{
-                {"MOMO", "1200000", "1", "60.00"},
-                {"CASH", "500000", "1", "25.00"},
-                {"BANK_TRANSFER", "300000", "1", "15.00"}});
+                {"MOMO", "1200000", "1", "50.00"},
+                {"CASH", "500000", "1", "20.83"},
+                {"VNPAY", "400000", "1", "16.67"},
+                {"BANK_TRANSFER", "300000", "1", "12.50"}});
 
         JsonNode bySport = getJson("/api/v1/manager/finance/revenue?" + range + "&groupBy=SPORT");
         assertRows(bySport, new String[][]{
-                {null, "1200000", "1", "60.00"},
-                {String.valueOf(sportBId), "500000", "1", "25.00"},
-                {String.valueOf(sportAId), "300000", "1", "15.00"}});
+                {null, "1200000", "1", "50.00"},
+                {String.valueOf(sportBId), "900000", "2", "37.50"},
+                {String.valueOf(sportAId), "300000", "1", "12.50"}});
         assertThat(bySport.get("rows").get(1).get("label").asText()).isEqualTo(sportBName);
         assertThat(bySport.get("rows").get(2).get("label").asText()).isEqualTo(sportAName);
 
@@ -536,15 +545,16 @@ class FinanceReportIntegrationTest extends AbstractIntegrationTest {
         String text = new String(body, 3, body.length - 3, StandardCharsets.UTF_8);
         List<String> lines = Arrays.asList(text.split("\r\n"));
         assertThat(lines.get(0)).isEqualTo("Payment code,Paid at,Invoice number,Member code,Member name,Item type,Item code,Item,Sport,Method,Amount");
-        // Rows of other tests (paid now) are outside March 2001; only the 3 paid March rows remain.
-        assertThat(lines).hasSize(4);
+        // Rows of other tests (paid now) are outside March 2001; only the 4 collected March rows remain, oldest first.
+        assertThat(lines).hasSize(5);
         assertThat(lines.get(1)).contains("2001-03-05 10:00:00").contains(invoiceNumber).contains("Nguy\u1ec5n V\u0103n \u00c1nh")
                 .contains(sportAName).contains("BANK_TRANSFER").endsWith(",300000");
         assertThat(lines.get(2)).contains("\"Tr\u1ea7n Th\u1ecb B\u00edch, \"\"VIP\"\"\"").endsWith(",500000");
-        assertThat(lines.get(3)).contains("MEMBERSHIP_CARD").contains("MOMO").endsWith(",1200000");
-        // The PENDING (P4), FAILED (P5) and REFUNDED (P7, P9) payments and the April payment (P8) are not exported.
+        assertThat(lines.get(3)).contains("2001-03-12 08:00:00").contains("VNPAY").endsWith(",400000");
+        assertThat(lines.get(4)).contains("MEMBERSHIP_CARD").contains("MOMO").endsWith(",1200000");
+        // The PENDING (P4), FAILED (P5), February (P9, refunded) and April (P8) payments are not March rows.
         assertThat(lines.stream().noneMatch(l -> l.endsWith(",700000") || l.endsWith(",250000")
-                || l.endsWith(",400000") || l.endsWith(",150000") || l.endsWith(",999000"))).isTrue();
+                || l.endsWith(",150000") || l.endsWith(",999000"))).isTrue();
     }
 
     @Test

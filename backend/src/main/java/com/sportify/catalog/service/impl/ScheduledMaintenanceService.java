@@ -1,5 +1,6 @@
 package com.sportify.catalog.service.impl;
 
+import com.sportify.catalog.repository.ClassSessionRepository;
 import com.sportify.catalog.repository.MemberCardRepository;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ public class ScheduledMaintenanceService {
 
     private final MemberCardRepository cards;
     private final SportPackageRegistrationRepository registrations;
+    private final ClassSessionRepository sessions;
     private final Clock clock;
 
     /**
@@ -37,6 +39,13 @@ public class ScheduledMaintenanceService {
         int expiredRegistrations = registrations.expireActive(today, now);
         return new MaintenanceResult(today, cancelledCards, expiredCards,
                 cancelledRegistrations, expiredRegistrations);
+    }
+
+    /** PUBLISHED -> COMPLETED once the session end time is reached (state machine "Daily Job (time passed)"). */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int completeEndedSessions() {
+        LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), BUSINESS_ZONE).withNano(0);
+        return sessions.completeEnded(now.toLocalDate(), now.toLocalTime(), now);
     }
 
     public record MaintenanceResult(LocalDate businessDate, int cancelledPendingCards, int expiredCards,

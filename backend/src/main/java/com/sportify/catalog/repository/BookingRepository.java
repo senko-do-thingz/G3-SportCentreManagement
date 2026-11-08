@@ -167,6 +167,22 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                                                               @Param("endTime") java.time.LocalTime endTime);
 
     /**
+     * Rescheduling counterpart of {@link #findOverlappingConfirmedSessionCodes}: member codes of this session's
+     * CONFIRMED bookings whose member holds another CONFIRMED booking in a non-cancelled session that would intersect
+     * the proposed date and time (strict intersection, so back-to-back sessions do not conflict).
+     */
+    @Query(value = "SELECT DISTINCT m.member_code FROM booking b JOIN member_profile m ON m.user_id = b.member_id "
+            + "JOIN booking ob ON ob.member_id = b.member_id AND ob.status = 'CONFIRMED' AND ob.session_id <> b.session_id "
+            + "JOIN class_session os ON os.id = ob.session_id "
+            + "WHERE b.session_id = :sessionId AND b.status = 'CONFIRMED' AND os.status <> 'CANCELLED' "
+            + "AND os.session_date = :sessionDate AND os.start_time < CAST(:endTime AS time) "
+            + "AND os.end_time > CAST(:startTime AS time) ORDER BY m.member_code", nativeQuery = true)
+    java.util.List<String> findMemberCodesOverlappingReschedule(@Param("sessionId") Long sessionId,
+                                                               @Param("sessionDate") LocalDate sessionDate,
+                                                               @Param("startTime") java.time.LocalTime startTime,
+                                                               @Param("endTime") java.time.LocalTime endTime);
+
+    /**
      * E2E-BUG-02: 1 when the member of this booking has PRESENT or LATE attendance for the booked session. Attendance
      * is unique per (session, member) and is written under the same session row lock as cancellation, so a caller that
      * holds the session lock sees the committed participation state.

@@ -79,6 +79,49 @@ describe('Member support requests (Flow 6)', () => {
     expect(body.category).toBe('GENERAL')
   })
 
+  it('lets the member reply to reopen a resolved request and shows their own message', async () => {
+    tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
+    let reopened = false
+    const resolved = { ...answered, status: 'RESOLVED', unreadReplies: 0 }
+    const { calls } = installFakeFetch(call => {
+      if (call.path === '/users/me') return json(200, MEMBER)
+      if (call.path === '/member/support-requests/5/replies' && call.method === 'POST') {
+        reopened = true
+        return json(200, { ...resolved, status: 'IN_PROGRESS' })
+      }
+      if (call.path === '/member/support-requests/5') return json(200, reopened
+        ? { ...resolved, status: 'IN_PROGRESS', replies: [...resolved.replies, { message: 'It still fails.', createdAt: '2026-11-07T09:00:00', fromMe: true }] }
+        : resolved)
+      if (call.path === '/member/support-requests') return json(200, [{ ...resolved, replies: [] }])
+      return backendError(404, 'Not found')
+    })
+    const user = userEvent.setup()
+    renderApp('/member/support')
+    await user.click(await screen.findByRole('button', { name: 'View SUP-1005' }))
+    expect(await screen.findByText(/Replying within 7 days of the resolution reopens this request/)).toBeInTheDocument()
+    await user.type(screen.getByLabelText(/Still need help\? Reply to reopen/), 'It still fails.')
+    await user.click(screen.getByRole('button', { name: 'Reply and reopen' }))
+    await waitFor(() => expect(calls.some(call => call.method === 'POST' && call.path === '/member/support-requests/5/replies')).toBe(true))
+    expect(await screen.findByText('It still fails.')).toBeInTheDocument()
+    expect(screen.getByText('You')).toBeInTheDocument()
+  })
+
+  it('does not offer a reply on a closed request', async () => {
+    tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
+    const closed = { ...answered, status: 'CLOSED', unreadReplies: 0 }
+    installFakeFetch(call => {
+      if (call.path === '/users/me') return json(200, MEMBER)
+      if (call.path === '/member/support-requests/5') return json(200, closed)
+      if (call.path === '/member/support-requests') return json(200, [{ ...closed, replies: [] }])
+      return backendError(404, 'Not found')
+    })
+    const user = userEvent.setup()
+    renderApp('/member/support')
+    await user.click(await screen.findByRole('button', { name: 'View SUP-1005' }))
+    expect(await screen.findByText(/This request is closed/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Send message|Reply and reopen/ })).not.toBeInTheDocument()
+  })
+
   it('shows reception replies and marks them as read', async () => {
     tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
     let read = false

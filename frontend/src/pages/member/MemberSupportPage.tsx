@@ -95,13 +95,37 @@ function RequestDetail({ id, onRead }: { id: number; onRead: () => void }) {
     }
     return ticket
   }, [id, onRead])
-  return <TrainingData load={load} refreshLabel="Refresh request">{ticket => <Card title={`Request ${ticket.code}`}>
+  return <TrainingData load={load} refreshLabel="Refresh request">{(ticket, refresh) => <Card title={`Request ${ticket.code}`}>
     <p><StatusBadge status={ticket.status} /> {topicLabel(ticket.category)}{ticket.sessionCode ? ` - session ${ticket.sessionCode}` : ''}</p>
     <h2>{ticket.subject}</h2>
     <p className="training-excerpt">{ticket.description}</p>
     <h3>Replies from reception</h3>
     {ticket.replies.length === 0 ? <p role="status">No reply yet. Reception will answer here.</p>
       : <ul className="training-list">{ticket.replies.map((reply, index) => <li key={index}>
-        <p><strong>Reception</strong> - {new Date(reply.createdAt).toLocaleString()}</p><p>{reply.message}</p></li>)}</ul>}
+        <p><strong>{reply.fromMe ? 'You' : 'Reception'}</strong> - {new Date(reply.createdAt).toLocaleString()}</p><p>{reply.message}</p></li>)}</ul>}
+    {ticket.status === 'CLOSED'
+      ? <p role="status">This request is closed. Send a new support request if you need more help.</p>
+      : <FollowUpForm id={ticket.id} resolved={ticket.status === 'RESOLVED'} onSent={refresh} />}
   </Card>}</TrainingData>
+}
+
+/** Helpdesk follow-up: a message on a resolved request reopens it within 7 days of the resolution. */
+function FollowUpForm({ id, resolved, onSent }: { id: number; resolved: boolean; onSent: () => void }) {
+  const [message, setMessage] = useState('')
+  const action = useTrainingAction()
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    void action.run(async () => {
+      if (!message.trim()) throw new Error('Write a message for reception.')
+      await memberSupportApi.reply(id, message.trim())
+      setMessage('')
+      onSent()
+    }, resolved ? 'Message sent. Your request is open again.' : 'Message sent to reception.')
+  }
+  return <form className="training-form" onSubmit={submit}>
+    <TextArea label={resolved ? 'Still need help? Reply to reopen' : 'Add a message'} required maxLength={2000} value={message} onChange={event => setMessage(event.target.value)} />
+    {resolved && <p>Replying within 7 days of the resolution reopens this request. After that, send a new request.</p>}
+    <ActionMessage {...action} />
+    <Button type="submit" variant="secondary" loading={action.pending}>{resolved ? 'Reply and reopen' : 'Send message'}</Button>
+  </form>
 }

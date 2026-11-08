@@ -707,7 +707,7 @@
     {
       "id": "S10",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/CheckInServiceImpl.java",
-      "line": 49,
+      "line": 54,
       "definition": "public CheckInResponse recordCheckIn"
     },
     {
@@ -725,13 +725,13 @@
     {
       "id": "S13",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java",
-      "line": 79,
+      "line": 81,
       "definition": "public BookingResponse createBooking"
     },
     {
       "id": "S14",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java",
-      "line": 354,
+      "line": 362,
       "definition": "recordSelfTrainingAttendance"
     },
     {
