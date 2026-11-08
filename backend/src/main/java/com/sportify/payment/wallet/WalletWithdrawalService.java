@@ -24,8 +24,8 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * MW-06 withdrawals. Creating a request reserves the amount in the ledger at once (available -> reserved), so the same
- * money can never be spent or requested twice. A Receptionist approves or rejects; APPROVED moves no money and is not
+ * MW-06 withdrawals. Creating a request reserves the amount in the ledger at once (available -> reserved) and holds the
+ * Member's single wallet-operation slot, so the same money can never be spent or requested twice. A Receptionist approves or rejects; APPROVED moves no money and is not
  * a transfer. A separate completion step records the payout reference (real money) and consumes the reservation; demo
  * funds can only end SIMULATED_COMPLETED. Reject and failure release the reservation exactly once. Full account numbers
  * are returned only to Receptionists processing a request; everyone else sees a masked number.
@@ -36,7 +36,6 @@ public class WalletWithdrawalService {
 
     public static final BigDecimal MIN_AMOUNT = new BigDecimal("10000");
     public static final BigDecimal MAX_AMOUNT = new BigDecimal("50000000");
-    static final int MAX_OPEN_PER_MEMBER = 3;
 
     public record PayoutAccountRequest(String bankBin, String accountNumber, String accountHolder) {}
     public record PayoutAccount(String bankBin, String bankName, String maskedAccountNumber, String accountHolder, LocalDateTime updatedAt) {}
@@ -54,6 +53,7 @@ public class WalletWithdrawalService {
     private final WalletLedgerService ledger;
     private final VietQrBankDirectory directory;
     private final OperationalMemberPolicy operational;
+    private final WalletPendingOperations pending;
 
     private static final String SELECT = "SELECT w.*, m.member_code, u.full_name AS member_name, r.full_name AS reviewer_name,"
             + " c.full_name AS completer_name FROM dbo.wallet_withdrawal w JOIN dbo.member_profile m ON m.user_id=w.member_id"
@@ -121,9 +121,9 @@ public class WalletWithdrawalService {
                     + " to " + MAX_AMOUNT.toPlainString(), "WITHDRAWAL_INVALID_AMOUNT");
         }
         String key = idempotencyKey == null || idempotencyKey.isBlank() ? null : idempotencyKey.trim();
-        long walletId = ledger.ensureWallet(memberId).walletId();
-        // Serialize this Member's withdrawal requests on the wallet row before any check.
-        jdbc.queryForObject("SELECT id FROM dbo.member_wallet WITH (UPDLOCK, ROWLOCK) WHERE id=?", Long.class, walletId);
+        ledger.ensureWallet(memberId);
+        // CODEOWNER lock order: the member_wallet row first; every check below runs under it.
+        pending.lockWallet(memberId);
         if (key != null) {
             var existing = jdbc.query(SELECT + " WHERE w.member_id=? AND w.idempotency_key=?", mapper(false), memberId, key);
             if (!existing.isEmpty()) {
@@ -134,11 +134,8 @@ public class WalletWithdrawalService {
                 return found;
             }
         }
-        Integer open = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.wallet_withdrawal WHERE member_id=? AND status IN ('PENDING','APPROVED')",
-                Integer.class, memberId);
-        if (open != null && open >= MAX_OPEN_PER_MEMBER) {
-            throw new BusinessRuleException("You already have " + MAX_OPEN_PER_MEMBER + " open withdrawals", "WITHDRAWAL_TOO_MANY_OPEN");
-        }
+        // CODEOWNER rule: at most one blocking wallet operation per Member (top-up, purchase or withdrawal).
+        pending.requireNone(memberId);
         String bin = null, bank = null, number = null, holder = null;
         if (pool == Pool.ACTUAL) {
             operational.requireRealMember(memberId);
@@ -164,6 +161,8 @@ public class WalletWithdrawalService {
         var reserve = ledger.apply(new Operation(memberId, EntryType.WITHDRAWAL_RESERVE, pool, amount, "WD-RES-" + id,
                 "WALLET_WITHDRAWAL", id, (pool == Pool.ACTUAL ? "Withdrawal " : "Demo withdrawal ") + code(id) + " requested", memberId));
         jdbc.update("UPDATE dbo.wallet_withdrawal SET reserve_entry_id=? WHERE id=?", reserve.entry().id(), id);
+        // The open request holds the Member's slot until it is completed, rejected or fails.
+        pending.claim(memberId, WalletPendingOperations.Type.WITHDRAWAL, id);
         return find(id, false);
     }
 
@@ -242,6 +241,7 @@ public class WalletWithdrawalService {
                     + " review_note=COALESCE(?, review_note), updated_at=?, version=version+1 WHERE id=?",
                     demo ? "SIMULATED_COMPLETED" : "COMPLETED", reference, payout.entry().id(), actorId, now,
                     trim(request == null ? null : request.note()), now, id);
+            pending.release(w.memberId(), WalletPendingOperations.Type.WITHDRAWAL, id);
         } catch (DuplicateKeyException duplicate) {
             throw new ConflictException("This payout reference was already used for another withdrawal", "WITHDRAWAL_DUPLICATE_REFERENCE");
         }
@@ -252,6 +252,7 @@ public class WalletWithdrawalService {
         var released = ledger.apply(new Operation(w.memberId(), EntryType.WITHDRAWAL_RELEASE, Pool.valueOf(w.pool()), w.amount(),
                 "WD-REL-" + w.id(), "WALLET_WITHDRAWAL", w.id(), "Withdrawal " + w.code() + " " + status.toLowerCase(Locale.ROOT)
                 + ", funds released", actorId));
+        pending.release(w.memberId(), WalletPendingOperations.Type.WITHDRAWAL, w.id());
         Timestamp now = Timestamp.valueOf(LocalDateTime.now(clock));
         if (review) {
             jdbc.update("UPDATE dbo.wallet_withdrawal SET status=?, release_entry_id=?, review_note=?, reviewed_by=?, reviewed_at=?,"
@@ -271,10 +272,14 @@ public class WalletWithdrawalService {
         return found.getFirst();
     }
 
+    /** CODEOWNER lock order: the Member's member_wallet row first, then the withdrawal row. */
     private Withdrawal lock(long id) {
-        if (jdbc.queryForList("SELECT id FROM dbo.wallet_withdrawal WITH (UPDLOCK, ROWLOCK) WHERE id=?", Long.class, id).isEmpty()) {
+        List<Long> owner = jdbc.queryForList("SELECT member_id FROM dbo.wallet_withdrawal WHERE id=?", Long.class, id);
+        if (owner.isEmpty()) {
             throw new ResourceNotFoundException("Withdrawal not found");
         }
+        pending.lockWallet(owner.getFirst());
+        jdbc.queryForList("SELECT id FROM dbo.wallet_withdrawal WITH (UPDLOCK, ROWLOCK) WHERE id=?", Long.class, id);
         return find(id, true);
     }
 

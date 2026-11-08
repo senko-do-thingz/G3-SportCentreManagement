@@ -96,24 +96,29 @@ class WalletWithdrawalIntegrationTest extends AbstractIntegrationTest {
         decide(receptionist, id, "complete", "{\"payoutReference\":\"PO2611081\"}").andExpect(status().isConflict());
         decide(receptionist, id, "reject", "{\"note\":\"late\"}").andExpect(status().isConflict());
         assertBalances(member, "300000", "0");
+        assertThat(count("SELECT COUNT(*) FROM wallet_pending_operation WHERE member_id=?", member)).isZero();
     }
 
     @Test
-    void rejectAndFailureReleaseTheReservationExactlyOnce() throws Exception {
+    void rejectAndFailureReleaseTheReservationAndTheSlotExactlyOnce() throws Exception {
         fund(member, Pool.ACTUAL, 300_000);
         saveAccount(member);
         long a = id(create(member, 100_000, "ACTUAL", "4567").andReturn().getResponse().getContentAsString());
-        long b = id(create(member, 100_000, "ACTUAL", "4567").andReturn().getResponse().getContentAsString());
-        assertBalances(member, "100000", "200000");
+        assertBalances(member, "200000", "100000");
+        // CODEOWNER rule: one blocking wallet operation per Member, so a second request waits for the first.
+        create(member, 100_000, "ACTUAL", "4567").andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WALLET_OPERATION_IN_FLIGHT"));
         decide(receptionist, a, "reject", "{}").andExpect(status().isBadRequest());
         decide(receptionist, a, "reject", "{\"note\":\"Account holder mismatch\"}").andExpect(status().isOk());
         decide(receptionist, a, "reject", "{\"note\":\"again\"}").andExpect(status().isConflict());
+        long b = id(create(member, 100_000, "ACTUAL", "4567").andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
         decide(receptionist, b, "approve", null).andExpect(status().isOk());
         decide(receptionist, b, "fail", "{\"note\":\"Bank returned the transfer\"}").andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("FAILED"));
         assertBalances(member, "300000", "0");
         assertThat(count("SELECT COUNT(*) FROM wallet_ledger_entry e JOIN member_wallet w ON w.id=e.wallet_id WHERE w.member_id=?"
                 + " AND e.entry_type='WITHDRAWAL_RELEASE'", member)).isEqualTo(2);
+        assertThat(count("SELECT COUNT(*) FROM wallet_pending_operation WHERE member_id=?", member)).isZero();
     }
 
     @Test
@@ -136,8 +141,8 @@ class WalletWithdrawalIntegrationTest extends AbstractIntegrationTest {
         int created = 0;
         for (Future<Integer> r : results) if (r.get() == 201) created++;
         pool.shutdown();
-        assertThat(created).isEqualTo(2);
-        assertBalances(member, "50000", "200000");
+        assertThat(created).isEqualTo(1);
+        assertBalances(member, "150000", "100000");
     }
 
     @Test
