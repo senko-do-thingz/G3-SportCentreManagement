@@ -11,7 +11,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import com.sportify.payment.service.VietQrBankDirectory;
+import java.util.Optional;
+import static org.mockito.Mockito.when;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -35,8 +40,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** MW-07 inbox on real SQL Server: one notice per task and Receptionist, read is not resolved, role scope. */
 @AutoConfigureMockMvc
+@TestPropertySource(properties = {"app.wallet.simulated-topups-enabled=true",
+        "app.payment.bank-transfer.live-instructions-enabled=true", "app.payment.bank-transfer.bank-bin=970436",
+        "app.payment.bank-transfer.account-number=0011009990001", "app.payment.bank-transfer.account-name=SPORTIFYDEMOCENTER"})
 class ReceptionInboxIntegrationTest extends AbstractIntegrationTest {
     static final SecureRandom RANDOM = new SecureRandom();
+
+    /** Synthetic receiving account (as in WalletTopUpIntegrationTest); the bank directory is mocked. */
+    static final VietQrBankDirectory.Bank BANK = new VietQrBankDirectory.Bank("970436", "VCB", "Vietcombank", true);
+    @MockitoBean VietQrBankDirectory directory;
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
@@ -51,6 +63,8 @@ class ReceptionInboxIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void fixture() {
+        when(directory.supported("970436")).thenReturn(Optional.of(BANK));
+        when(directory.banks()).thenReturn(List.of(BANK));
         member = member();
         receptionist = account("RECEPTIONIST");
         otherReceptionist = account("RECEPTIONIST");
