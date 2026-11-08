@@ -418,10 +418,11 @@
       "path": "backend/src/main/resources/db/migration/catalog/V51__wallet_topup.sql",
       "version": 51,
       "creates": [
-        "dbo.wallet_topup"
+        "dbo.wallet_topup",
+        "dbo.wallet_pending_operation"
       ],
       "drops": [],
-      "sha256_lf": "d17442917c41a490981bfc1dff5be2de0b38eefd668894f6638e8454c64180ca"
+      "sha256_lf": "bed906e66260c30d34e2e0e142166b356d1e28cf54c17182d5d8353bf4a118b6"
     },
     {
       "path": "backend/src/main/resources/db/migration/catalog/V52__wallet_payment_settlement.sql",
@@ -433,7 +434,7 @@
       "sha256_lf": "89e86c318735ae2c3e7175da07cc803a678098b9a91b26abc011fd17d6bc3996"
     }
   ],
-  "create_occurrences": 78,
+  "create_occurrences": 79,
   "create_names": [
     "[activity_log]",
     "[age_group]",
@@ -503,6 +504,7 @@
     "dbo.simulated_qr_session",
     "dbo.simulated_qr_transition",
     "dbo.wallet_ledger_entry",
+    "dbo.wallet_pending_operation",
     "dbo.wallet_topup",
     "member_check_in_pass",
     "member_sport_level",

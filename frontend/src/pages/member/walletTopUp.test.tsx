@@ -28,7 +28,7 @@ describe('Member wallet top-up (MW-04)', () => {
     let created = false
     const { calls, fetchMock } = signedIn('MEMBER', call => {
       if (call.path === '/member/wallet/topups' && call.method === 'POST') { created = true; return json(201, pending) }
-      if (call.path === '/member/wallet/topups') return json(200, { simulatedTopUpsEnabled: false, minAmount: 10000, maxAmount: 50000000, topUps: created ? [pending] : [] })
+      if (call.path === '/member/wallet/topups') return json(200, { simulatedTopUpsEnabled: false, realTopUpsAvailable: true, minAmount: 10000, maxAmount: 50000000, topUps: created ? [pending] : [] })
       return backendError(404, 'Not found')
     })
     const user = userEvent.setup()
@@ -46,13 +46,21 @@ describe('Member wallet top-up (MW-04)', () => {
   })
 
   it('refuses an amount below the minimum before calling the server', async () => {
-    const { calls } = signedIn('MEMBER', () => json(200, { simulatedTopUpsEnabled: true, minAmount: 10000, maxAmount: 50000000, topUps: [] }))
+    const { calls } = signedIn('MEMBER', () => json(200, { simulatedTopUpsEnabled: true, realTopUpsAvailable: true, minAmount: 10000, maxAmount: 50000000, topUps: [] }))
     const user = userEvent.setup()
     renderApp('/member/wallet/topup')
     expect(await screen.findByLabelText('Top-up type')).toBeInTheDocument()
     await user.type(screen.getByLabelText('Amount (VND)'), '5000')
     await user.click(screen.getByRole('button', { name: 'Create top-up request' }))
     expect(await screen.findByText(/Enter a whole amount from/)).toBeInTheDocument()
+    expect(calls.some(call => call.method === 'POST')).toBe(false)
+  })
+
+  it('does not offer a bank top-up when no verified receiving account is configured', async () => {
+    const { calls } = signedIn('MEMBER', () => json(200, { simulatedTopUpsEnabled: false, realTopUpsAvailable: false, minAmount: 10000, maxAmount: 50000000, topUps: [] }))
+    renderApp('/member/wallet/topup')
+    expect(await screen.findByText(/Bank top-ups are not available right now/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Create top-up request' })).toBeDisabled()
     expect(calls.some(call => call.method === 'POST')).toBe(false)
   })
 })
@@ -77,9 +85,10 @@ describe('Reception wallet top-up queue (MW-04)', () => {
     expect(calls.find(call => call.path.endsWith('/confirm'))?.body).toEqual({ receivedAmount: 200000, bankReference: 'FT26110899', note: '' })
   })
 
-  it('shows a duplicate confirmation conflict without claiming success', async () => {
-    signedIn('RECEPTIONIST', call => call.path.endsWith('/confirm')
-      ? backendError(409, 'Top-up TU-000007 is already CONFIRMED') : json(200, [pending]))
+  it('shows a duplicate confirmation by someone else as a conflict without claiming success', async () => {
+    const other = { ...pending, status: 'CONFIRMED', receivedAmount: 200000, bankReference: 'FT-OTHER', reviewedByName: 'Lan', instructions: null }
+    signedIn('RECEPTIONIST', call => call.path.endsWith('/confirm') ? backendError(409, 'Top-up TU-000007 is already CONFIRMED')
+      : call.path === '/reception/wallet/topups/7' ? json(200, other) : json(200, [pending]))
     const user = userEvent.setup()
     renderApp('/reception/wallet/topups')
     const row = (await screen.findByText('TU-000007')).closest('tr') as HTMLElement
@@ -87,7 +96,33 @@ describe('Reception wallet top-up queue (MW-04)', () => {
     await user.type(screen.getByLabelText(/Amount received/), '200000')
     await user.type(screen.getByLabelText(/Bank transaction reference/), 'FT26110899')
     await user.click(screen.getByRole('button', { name: 'Confirm and credit wallet' }))
-    expect(await screen.findByText('Top-up TU-000007 is already CONFIRMED')).toBeInTheDocument()
+    expect(await screen.findByText(/Top-up TU-000007 is already CONFIRMED Current status: CONFIRMED by Lan/)).toBeInTheDocument()
     expect(screen.queryByText(/TU-000007 confirmed/)).not.toBeInTheDocument()
+  })
+
+  it('re-reads the request after a lost confirmation response and shows the committed outcome once', async () => {
+    const committed = { ...pending, status: 'CONFIRMED', receivedAmount: 200000, bankReference: 'FT26110899', reviewedByName: 'Lan', instructions: null }
+    const { calls } = signedIn('RECEPTIONIST', call => call.path.endsWith('/confirm') ? backendError(502, 'Bad gateway')
+      : call.path === '/reception/wallet/topups/7' ? json(200, committed) : json(200, [pending]))
+    const user = userEvent.setup()
+    renderApp('/reception/wallet/topups')
+    const row = (await screen.findByText('TU-000007')).closest('tr') as HTMLElement
+    await user.click(within(row).getByRole('button', { name: 'Review' }))
+    await user.type(screen.getByLabelText(/Amount received/), '200000')
+    await user.type(screen.getByLabelText(/Bank transaction reference/), 'FT26110899')
+    await user.click(screen.getByRole('button', { name: 'Confirm and credit wallet' }))
+    expect(await screen.findByText(/TU-000007 is confirmed by Lan. The wallet was credited once/)).toBeInTheDocument()
+    expect(calls.filter(call => call.path.endsWith('/confirm'))).toHaveLength(1)
+  })
+
+  it('offers a late-payment review for a member-cancelled bank top-up and requires a note', async () => {
+    const cancelled = { ...pending, status: 'CANCELLED', instructions: null }
+    signedIn('RECEPTIONIST', call => json(200, call.path.startsWith('/reception/wallet/topups?') ? [cancelled] : cancelled))
+    const user = userEvent.setup()
+    renderApp('/reception/wallet/topups')
+    const row = (await screen.findByText('TU-000007')).closest('tr') as HTMLElement
+    await user.click(within(row).getByRole('button', { name: 'Review late payment' }))
+    expect(screen.getByLabelText('Note (required for a late payment)', { exact: false })).toBeRequired()
+    expect(screen.queryByRole('button', { name: 'Reject request' })).not.toBeInTheDocument()
   })
 })

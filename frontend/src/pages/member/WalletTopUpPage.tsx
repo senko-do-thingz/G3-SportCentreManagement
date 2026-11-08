@@ -29,7 +29,8 @@ export function WalletTopUpPage() {
 
 function TopUpWorkspace({ data, onChanged }: { data: MemberTopUps; onChanged: () => void }) {
   const [amount, setAmount] = useState('')
-  const [mode, setMode] = useState<WalletPool>('ACTUAL')
+  const [mode, setMode] = useState<WalletPool>(!data.realTopUpsAvailable && data.simulatedTopUpsEnabled ? 'SIMULATED' : 'ACTUAL')
+  const unavailable = mode === 'ACTUAL' && !data.realTopUpsAvailable
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [created, setCreated] = useState<WalletTopUp | null>(null)
@@ -73,8 +74,11 @@ function TopUpWorkspace({ data, onChanged }: { data: MemberTopUps; onChanged: ()
               <Select label="Top-up type" name="mode" value={mode} onChange={(e) => setMode(e.target.value as WalletPool)}
                 options={[{ value: 'ACTUAL', label: 'Bank transfer (real money)' }, { value: 'SIMULATED', label: 'Demo top-up (not real money)' }]} />
             )}
+            {unavailable && (
+              <Notice tone="warning">Bank top-ups are not available right now because the centre has no verified receiving account. Do not transfer money.</Notice>
+            )}
             {error && <Notice tone="danger" live="assertive">{error}</Notice>}
-            <div className="profile-form__actions"><Button type="submit" loading={busy}>Create top-up request</Button></div>
+            <div className="profile-form__actions"><Button type="submit" loading={busy} disabled={unavailable}>Create top-up request</Button></div>
           </form>
         </Card>
         <Card title="My top-up requests">
@@ -132,6 +136,8 @@ function TopUpTable({ topUps, onChanged }: { topUps: WalletTopUp[]; onChanged: (
   return (
     <>
       {error && <Notice tone="danger">{error}</Notice>}
+      <p className="health-meta">You can have one pending top-up at a time. Cancel only if you have not sent the money. If you already
+        transferred it, reception can still match your transfer note to the request and credit your wallet.</p>
       <div className="table-scroll">
         <table className="table">
           <caption>Top-up requests, newest first</caption>
