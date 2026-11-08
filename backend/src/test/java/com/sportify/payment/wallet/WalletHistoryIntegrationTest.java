@@ -12,12 +12,17 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import com.sportify.payment.service.VietQrBankDirectory;
+import java.util.Optional;
+import static org.mockito.Mockito.when;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.security.SecureRandom;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,9 +35,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** MW-08 wallet history on real SQL Server: complete own timeline, honest pending states, filters, reconciliation. */
 @AutoConfigureMockMvc
-@TestPropertySource(properties = "app.wallet.simulated-topups-enabled=true")
+@TestPropertySource(properties = {"app.wallet.simulated-topups-enabled=true",
+        "app.payment.bank-transfer.live-instructions-enabled=true", "app.payment.bank-transfer.bank-bin=970436",
+        "app.payment.bank-transfer.account-number=0011009990001", "app.payment.bank-transfer.account-name=SPORTIFYDEMOCENTER"})
 class WalletHistoryIntegrationTest extends AbstractIntegrationTest {
     static final SecureRandom RANDOM = new SecureRandom();
+
+    /** Synthetic receiving account (as in WalletTopUpIntegrationTest); the bank directory is mocked. */
+    static final VietQrBankDirectory.Bank BANK = new VietQrBankDirectory.Bank("970436", "VCB", "Vietcombank", true);
+    @MockitoBean VietQrBankDirectory directory;
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
@@ -46,6 +57,8 @@ class WalletHistoryIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void fixture() {
+        when(directory.supported("970436")).thenReturn(Optional.of(BANK));
+        when(directory.banks()).thenReturn(List.of(BANK));
         member = member();
         otherMember = member();
         receptionist = account("RECEPTIONIST");
@@ -56,7 +69,6 @@ class WalletHistoryIntegrationTest extends AbstractIntegrationTest {
         long confirmed = topUp(member, 400_000, "ACTUAL");
         confirm(confirmed, 400_000, "FTH" + confirmed);
         confirm(confirmed, 400_000, "FTH" + confirmed);
-        long pending = topUp(member, 50_000, "ACTUAL");
         long demo = topUp(member, 30_000, "SIMULATED");
         confirm(demo, 30_000, null);
         mvc.perform(put("/api/v1/member/wallet/payout-account").with(user(details(member))).contentType(MediaType.APPLICATION_JSON)
@@ -67,12 +79,10 @@ class WalletHistoryIntegrationTest extends AbstractIntegrationTest {
 
         mvc.perform(get("/api/v1/member/wallet/history").with(user(details(member))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.page.totalElements").value(4))
+                .andExpect(jsonPath("$.page.totalElements").value(3))
                 .andExpect(jsonPath("$.reconciled").value(true))
                 .andExpect(jsonPath("$.availableBalance").value(300000))
                 .andExpect(jsonPath("$.reservedBalance").value(100000))
-                .andExpect(jsonPath("$.page.content[?(@.id == " + pending + " && @.type == 'TOPUP')].direction").value("NONE"))
-                .andExpect(jsonPath("$.page.content[?(@.id == " + pending + " && @.type == 'TOPUP')].availableAfter").value(org.hamcrest.Matchers.contains((Object) null)))
                 .andExpect(jsonPath("$.page.content[?(@.id == " + held + " && @.type == 'WITHDRAWAL')].status").value("APPROVED"))
                 .andExpect(jsonPath("$.page.content[?(@.id == " + held + " && @.type == 'WITHDRAWAL')].detail").value("To Vietcombank ****4567"))
                 .andExpect(jsonPath("$.page.content[?(@.id == " + demo + " && @.type == 'TOPUP')].pool").value("SIMULATED"));
@@ -88,7 +98,10 @@ class WalletHistoryIntegrationTest extends AbstractIntegrationTest {
         topUp(otherMember, 99_000, "ACTUAL");
         mvc.perform(get("/api/v1/member/wallet/history?type=TOPUP&status=PENDING").with(user(details(member))))
                 .andExpect(jsonPath("$.page.totalElements").value(1))
-                .andExpect(jsonPath("$.page.content[0].amount").value(25000));
+                .andExpect(jsonPath("$.page.content[0].amount").value(25000))
+                // A pending top-up moved no money: no direction and no balance after.
+                .andExpect(jsonPath("$.page.content[0].direction").value("NONE"))
+                .andExpect(jsonPath("$.page.content[0].availableAfter").doesNotExist());
         mvc.perform(get("/api/v1/member/wallet/history?size=1&page=1").with(user(details(member))))
                 .andExpect(jsonPath("$.page.content.length()").value(1)).andExpect(jsonPath("$.page.totalPages").value(2));
         mvc.perform(get("/api/v1/member/wallet/history?from=2000-01-01&to=2000-01-02").with(user(details(member))))
