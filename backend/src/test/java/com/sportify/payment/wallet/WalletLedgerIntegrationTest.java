@@ -106,6 +106,30 @@ class WalletLedgerIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void compensationMustNameAnEarlierDebitOfTheSameWalletAndNeverExceedIt() {
+        ledger.apply(op(member, EntryType.TOPUP_CREDIT, Pool.ACTUAL, 300_000, key("topup")));
+        long debit = ledger.apply(op(member, EntryType.PURCHASE_DEBIT, Pool.ACTUAL, 200_000, key("buy"))).entry().id();
+        ledger.apply(op(otherMember, EntryType.TOPUP_CREDIT, Pool.ACTUAL, 100_000, key("other-topup")));
+        long otherDebit = ledger.apply(op(otherMember, EntryType.PURCHASE_DEBIT, Pool.ACTUAL, 100_000, key("other-buy"))).entry().id();
+        // Not tied to a debit, tied to a non-debit entry, or tied to another member's debit: refused.
+        assertThatThrownBy(() -> ledger.apply(op(member, EntryType.COMPENSATION_CREDIT, Pool.ACTUAL, 50_000, key("free"))))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("must name the wallet debit");
+        assertThatThrownBy(() -> ledger.apply(compensation(member, debit + 999_999, 50_000, key("missing"))))
+                .isInstanceOf(BusinessRuleException.class);
+        assertThatThrownBy(() -> ledger.apply(compensation(member, otherDebit, 50_000, key("cross"))))
+                .isInstanceOf(BusinessRuleException.class);
+        // Partial compensations up to the debit succeed; one more VND is refused; a replay moves nothing.
+        var first = ledger.apply(compensation(member, debit, 150_000, key("comp")));
+        ledger.apply(compensation(member, debit, 50_000, key("comp")));
+        assertThatThrownBy(() -> ledger.apply(compensation(member, debit, 1, key("over"))))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("exceed");
+        assertThat(ledger.apply(compensation(member, debit, 150_000, keyOf(first))).replay()).isTrue();
+        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo("300000");
+        assertThat(ledger.balance(otherMember).actualAvailable()).isEqualByComparingTo("0");
+        assertReconciles(member);
+    }
+
+    @Test
     void insufficientFundsLeavesBalanceAndLedgerUnchanged() {
         ledger.apply(op(member, EntryType.TOPUP_CREDIT, Pool.ACTUAL, 50_000, key("topup")));
         assertThatThrownBy(() -> ledger.apply(op(member, EntryType.PURCHASE_DEBIT, Pool.ACTUAL, 50_001, key("buy"))))
@@ -265,6 +289,11 @@ class WalletLedgerIntegrationTest extends AbstractIntegrationTest {
 
     private Operation op(long memberId, EntryType type, Pool pool, long amount, String key) {
         return new Operation(memberId, type, pool, BigDecimal.valueOf(amount), key, "TEST", 1, "Test " + type, null);
+    }
+
+    private Operation compensation(long memberId, long debitEntryId, long amount, String key) {
+        return new Operation(memberId, EntryType.COMPENSATION_CREDIT, Pool.ACTUAL, BigDecimal.valueOf(amount), key,
+                WalletLedgerService.COMPENSATION_SOURCE, debitEntryId, "Test compensation", null);
     }
 
     private String keyOf(WalletLedgerService.Applied applied) {
