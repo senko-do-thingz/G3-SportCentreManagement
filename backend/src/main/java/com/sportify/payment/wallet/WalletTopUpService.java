@@ -29,6 +29,17 @@ import java.util.List;
  * A Receptionist confirms after checking the bank evidence; the confirmation locks the request, checks amount and
  * reference, and credits the wallet once through the ledger (operation key TOPUP-{id}). SIMULATED requests exist only
  * when demo top-ups are enabled; they credit the separate demo pool and never carry a bank reference.
+ *
+ * <p>A real-money request can be created only while a verified receiving account is configured, and it stores that
+ * account; confirmation re-checks the stored account, so a request that was never payable can never be credited.</p>
+ *
+ * <p>A Member has at most one in-flight wallet operation ({@link WalletPendingOperations}). Every method locks in the
+ * same order: member_wallet row, then the wallet_topup row, then the pending-operation slot, then the ledger.</p>
+ *
+ * <p>Late payment: a Member may cancel a PENDING request, but money already sent is not lost. Reception can still
+ * confirm a Member-CANCELLED real-money request when the bank statement shows the exact amount with its transfer note;
+ * a review note is then required. Money that matches no request (wrong note or amount, or a REJECTED request) is never
+ * credited; it is returned to the sender as described in reports/MW-04-unmatched-payments.md.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -36,7 +47,6 @@ public class WalletTopUpService {
 
     public static final BigDecimal MIN_AMOUNT = new BigDecimal("10000");
     public static final BigDecimal MAX_AMOUNT = new BigDecimal("50000000");
-    static final int MAX_OPEN_PER_MEMBER = 3;
 
     public record CreateRequest(BigDecimal amount, Pool mode) {}
     public record ConfirmRequest(BigDecimal receivedAmount, String bankReference, String note) {}
@@ -51,7 +61,7 @@ public class WalletTopUpService {
                         String bankReference, String reviewNote, String reviewedByName, LocalDateTime reviewedAt,
                         Long ledgerEntryId, LocalDateTime createdAt, Instructions instructions) {}
 
-    public record MemberTopUps(boolean simulatedTopUpsEnabled, BigDecimal minAmount, BigDecimal maxAmount, List<TopUp> topUps) {}
+    public record MemberTopUps(boolean simulatedTopUpsEnabled, boolean realTopUpsAvailable, BigDecimal minAmount, BigDecimal maxAmount, List<TopUp> topUps) {}
 
     private final JdbcTemplate jdbc;
     private final Clock clock;
@@ -59,6 +69,7 @@ public class WalletTopUpService {
     private final BankTransferProperties beneficiary;
     private final VietQrBankDirectory directory;
     private final OperationalMemberPolicy operational;
+    private final WalletPendingOperations pending;
 
     @Value("${app.wallet.simulated-topups-enabled:false}")
     private boolean simulatedTopUpsEnabled;
@@ -92,14 +103,19 @@ public class WalletTopUpService {
         if (mode == Pool.ACTUAL) {
             // Synthetic demo identities never receive real money (existing quarantine rule).
             operational.requireRealMember(memberId);
+            if (!liveBeneficiary()) {
+                throw new ConflictException("Real-money top-ups are unavailable: no verified receiving account is configured.",
+                        "TOPUP_NOT_PAYABLE");
+            }
         }
         String key = idempotencyKey == null || idempotencyKey.isBlank() ? null : idempotencyKey.trim();
         if (key != null && key.length() > 80) {
             throw new BusinessRuleException("Idempotency-Key must be at most 80 characters");
         }
         ledger.ensureWallet(memberId);
-        // Serialize this Member's requests so the open-request limit and the idempotency key hold under retries.
-        jdbc.queryForObject("SELECT id FROM dbo.member_wallet WITH (UPDLOCK, ROWLOCK) WHERE member_id=?", Long.class, memberId);
+        // Wallet row first: serializes this Member's wallet operations so the one-in-flight rule and the idempotency key
+        // hold under retries and races.
+        pending.lockWallet(memberId);
         if (key != null) {
             List<TopUp> existing = jdbc.query(SELECT + " WHERE t.member_id=? AND t.idempotency_key=?", mapper, memberId, key);
             if (!existing.isEmpty()) {
@@ -110,19 +126,15 @@ public class WalletTopUpService {
                 return withInstructions(found);
             }
         }
-        Integer open = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.wallet_topup WHERE member_id=? AND status='PENDING'",
-                Integer.class, memberId);
-        if (open != null && open >= MAX_OPEN_PER_MEMBER) {
-            throw new BusinessRuleException("You already have " + MAX_OPEN_PER_MEMBER
-                    + " pending top-ups. Wait for reception to review them or cancel one.", "TOPUP_TOO_MANY_PENDING");
-        }
+        pending.requireNone(memberId);
         Timestamp now = Timestamp.valueOf(LocalDateTime.now(clock));
-        boolean live = mode == Pool.ACTUAL && liveBeneficiary();
+        boolean live = mode == Pool.ACTUAL;
         Long id = jdbc.queryForObject("INSERT INTO dbo.wallet_topup (member_id, mode, amount, status, idempotency_key,"
                 + " beneficiary_bin, beneficiary_account, beneficiary_name, created_at, updated_at)"
                 + " OUTPUT INSERTED.id VALUES (?,?,?,'PENDING',?,?,?,?,?,?)", Long.class,
                 memberId, mode.name(), amount, key, live ? beneficiary.getBankBin() : null,
                 live ? beneficiary.getAccountNumber().replace(" ", "") : null, live ? beneficiary.getAccountName() : null, now, now);
+        pending.claim(memberId, WalletPendingOperations.Type.TOPUP, id);
         return withInstructions(find(id));
     }
 
@@ -130,7 +142,7 @@ public class WalletTopUpService {
     public MemberTopUps mine(long memberId) {
         List<TopUp> topUps = jdbc.query(SELECT + " WHERE t.member_id=? ORDER BY t.id DESC OFFSET 0 ROWS FETCH NEXT 50 ROWS ONLY",
                 mapper, memberId).stream().map(this::withInstructions).toList();
-        return new MemberTopUps(simulatedTopUpsEnabled, MIN_AMOUNT, MAX_AMOUNT, topUps);
+        return new MemberTopUps(simulatedTopUpsEnabled, liveBeneficiary(), MIN_AMOUNT, MAX_AMOUNT, topUps);
     }
 
     @Transactional(readOnly = true)
@@ -151,6 +163,7 @@ public class WalletTopUpService {
         requirePending(topUp);
         jdbc.update("UPDATE dbo.wallet_topup SET status='CANCELLED', updated_at=?, version=version+1 WHERE id=?",
                 Timestamp.valueOf(LocalDateTime.now(clock)), id);
+        pending.release(topUp.memberId(), WalletPendingOperations.Type.TOPUP, id);
         return withInstructions(find(id));
     }
 
@@ -174,13 +187,17 @@ public class WalletTopUpService {
     }
 
     /**
-     * Lock order: the top-up row, then (inside the ledger) the wallet row. A second confirmation waits for the first
-     * and then sees CONFIRMED (409 TOPUP_NOT_PENDING). A wrong amount or a reused bank reference changes nothing.
+     * Lock order: the wallet row, then the top-up row, then (inside the ledger) the wallet row again, which is already
+     * held. A second confirmation waits for the first and then sees CONFIRMED (409 TOPUP_NOT_PENDING). A wrong amount,
+     * a reused bank reference or a request without a stored receiving account changes nothing.
      */
     @Transactional
     public TopUp confirm(long id, ConfirmRequest request, long actorId) {
         TopUp topUp = lock(id);
-        requirePending(topUp);
+        boolean late = "CANCELLED".equals(topUp.status()) && Pool.ACTUAL.name().equals(topUp.mode());
+        if (!late) {
+            requirePending(topUp);
+        }
         if (request == null || request.receivedAmount() == null || request.receivedAmount().compareTo(topUp.amount()) != 0) {
             throw new ConflictException("The received amount must equal the requested " + topUp.amount().toPlainString()
                     + " VND. Reject the request if the bank shows a different amount.", "TOPUP_AMOUNT_MISMATCH");
@@ -195,6 +212,9 @@ public class WalletTopUpService {
         } else if (reference == null || reference.length() < 4 || reference.length() > 60) {
             throw new BusinessRuleException("Enter the bank transaction reference (4 to 60 characters) from the bank statement",
                     "TOPUP_REFERENCE_REQUIRED");
+        } else if (!hasStoredBeneficiary(id)) {
+            throw new ConflictException("This request was never payable: it has no verified receiving account. Reject it and"
+                    + " return any money received to the sender.", "TOPUP_NOT_PAYABLE");
         }
         Integer active = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.user_account WHERE id=? AND status='ACTIVE'", Integer.class,
                 topUp.memberId());
@@ -202,17 +222,22 @@ public class WalletTopUpService {
             throw new ConflictException("The member account is not active. Reject the top-up instead.", "TOPUP_MEMBER_INACTIVE");
         }
         String note = trim(request.note(), 300);
+        if (late && note == null) {
+            throw new BusinessRuleException("This request was cancelled by the member. Add a note describing the late bank"
+                    + " transfer to confirm it.", "TOPUP_LATE_NOTE_REQUIRED");
+        }
         var applied = ledger.apply(new Operation(topUp.memberId(), EntryType.TOPUP_CREDIT,
                 simulated ? Pool.SIMULATED : Pool.ACTUAL, topUp.amount(), "TOPUP-" + id, "WALLET_TOPUP", id,
                 (simulated ? "Demo top-up " : "Top-up ") + topUp.code(), actorId));
         try {
             jdbc.update("UPDATE dbo.wallet_topup SET status='CONFIRMED', received_amount=?, bank_reference=?, review_note=?,"
-                    + " reviewed_by=?, reviewed_at=?, ledger_entry_id=?, updated_at=?, version=version+1 WHERE id=? AND status='PENDING'",
+                    + " reviewed_by=?, reviewed_at=?, ledger_entry_id=?, updated_at=?, version=version+1 WHERE id=? AND status=?",
                     request.receivedAmount(), reference, note, actorId, Timestamp.valueOf(LocalDateTime.now(clock)),
-                    applied.entry().id(), Timestamp.valueOf(LocalDateTime.now(clock)), id);
+                    applied.entry().id(), Timestamp.valueOf(LocalDateTime.now(clock)), id, topUp.status());
         } catch (DuplicateKeyException duplicate) {
             throw new ConflictException("This bank reference was already used for another top-up", "TOPUP_DUPLICATE_REFERENCE");
         }
+        pending.release(topUp.memberId(), WalletPendingOperations.Type.TOPUP, id);
         return find(id);
     }
 
@@ -227,6 +252,7 @@ public class WalletTopUpService {
         Timestamp now = Timestamp.valueOf(LocalDateTime.now(clock));
         jdbc.update("UPDATE dbo.wallet_topup SET status='REJECTED', review_note=?, reviewed_by=?, reviewed_at=?, updated_at=?,"
                 + " version=version+1 WHERE id=?", reason, actorId, now, now, id);
+        pending.release(topUp.memberId(), WalletPendingOperations.Type.TOPUP, id);
         return find(id);
     }
 
@@ -272,12 +298,21 @@ public class WalletTopUpService {
         return found.getFirst();
     }
 
+    /** Locks the owning wallet row first and then the top-up row, the same order create() uses. */
     private TopUp lock(long id) {
-        List<Long> locked = jdbc.queryForList("SELECT id FROM dbo.wallet_topup WITH (UPDLOCK, ROWLOCK) WHERE id=?", Long.class, id);
-        if (locked.isEmpty()) {
+        List<Long> owner = jdbc.queryForList("SELECT member_id FROM dbo.wallet_topup WHERE id=?", Long.class, id);
+        if (owner.isEmpty()) {
             throw new ResourceNotFoundException("Top-up not found");
         }
+        pending.lockWallet(owner.getFirst());
+        jdbc.queryForList("SELECT id FROM dbo.wallet_topup WITH (UPDLOCK, ROWLOCK) WHERE id=?", Long.class, id);
         return find(id);
+    }
+
+    private boolean hasStoredBeneficiary(long id) {
+        Integer stored = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.wallet_topup WHERE id=? AND beneficiary_bin IS NOT NULL"
+                + " AND beneficiary_account IS NOT NULL AND beneficiary_name IS NOT NULL", Integer.class, id);
+        return stored != null && stored > 0;
     }
 
     private static void requirePending(TopUp topUp) {
