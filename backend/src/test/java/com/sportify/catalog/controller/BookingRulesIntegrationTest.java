@@ -325,17 +325,19 @@ class BookingRulesIntegrationTest extends AbstractIntegrationTest {
         } finally { release.countDown(); stop(pool); }
     }
 
-    @ParameterizedTest @CsvSource({"MEMBER,121,200", "MEMBER,120,200", "MEMBER,119,400", "RECEPTIONIST,119,200", "MANAGER,119,200"})
-    void cutoffBoundaryAndStaffException_restoreOnlyOnSuccessfulCancellation(String role, int minutes, int expected) {
+    /** Member: 120 minutes or more before the start restores the credit; later is a late cancellation that forfeits it. */
+    @ParameterizedTest @CsvSource({"MEMBER,121,true", "MEMBER,120,true", "MEMBER,119,false", "RECEPTIONIST,119,true", "MANAGER,119,true"})
+    void cutoffBoundaryAndStaffException_lateMemberCancellationFreesSeatButForfeitsCredit(String role, int minutes, boolean restored) {
         long session = session(TODAY, NOW.toLocalTime().plusMinutes(minutes), 10, TrainingFormat.COACH_LED), reg = registration(memberA);
         long booking = service.createBooking(request(session, reg), memberA).getId();
         UserAccount caller = role.equals("MEMBER") ? memberA : role.equals("MANAGER") ? manager : receptionist;
         var result = http(delete("/api/v1/bookings/" + booking), caller);
-        assertThat(result.status()).isEqualTo(expected);
-        assertThat(seats(session)).isEqualTo(expected == 200 ? 0 : 1);
-        assertThat(balance(reg)).isEqualTo(expected == 200 ? 3 : 2);
-        if (expected == 400) assertThat(result.code()).isEqualTo("CANCELLATION_CUTOFF");
-        else assertThat(result.body().path("cancelledById").asLong()).isEqualTo(caller.getId());
+        assertThat(result.status()).isEqualTo(200);
+        assertThat(seats(session)).isZero();
+        assertThat(balance(reg)).isEqualTo(restored ? 3 : 2);
+        assertThat(result.body().path("cancelledById").asLong()).isEqualTo(caller.getId());
+        if (!restored) assertThat(result.body().path("cancelReason").asText())
+                .isEqualTo("Late cancellation by member: session credit not returned");
     }
 
     @ParameterizedTest @ValueSource(strings = {"ACTIVE", "CAPPED", "PENDING_PAYMENT", "EXPIRED", "CANCELLED", "REFUNDED"})
@@ -499,11 +501,13 @@ class BookingRulesIntegrationTest extends AbstractIntegrationTest {
 
     @ParameterizedTest @ValueSource(strings = {"CHECKIN_FIRST", "CANCEL_FIRST"}) @Timeout(100)
     void cancellationAndCheckInSerializeWithoutAllowedCheckInOnCancelledBooking(String order) throws Exception {
-        long session = session(TODAY, LocalTime.NOON, 10, TrainingFormat.COACH_LED), reg = registration(memberA);
+        // 10:30 start, now 10:00: inside the 60-minute check-in window. Reception cancels, so a cancellation that wins the
+        // race restores the credit (a Member's late cancellation here would forfeit it).
+        long session = session(TODAY, LocalTime.of(10, 30), 10, TrainingFormat.COACH_LED), reg = registration(memberA);
         long booking = service.createBooking(request(session, reg), memberA).getId();
         var held = new CountDownLatch(1); var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
         var firstSpid = new AtomicInteger(); var secondSpid = new AtomicInteger(); var pool = newWorkerPool();
-        java.util.function.Supplier<Outcome> cancel = () -> http(delete("/api/v1/bookings/" + booking), memberA);
+        java.util.function.Supplier<Outcome> cancel = () -> http(delete("/api/v1/bookings/" + booking), receptionist);
         java.util.function.Supplier<Outcome> checkIn = () -> http(post("/api/v1/check-ins").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"identifier\":\"" + memberA.getId() + "\",\"bookingId\":" + booking + "}"), receptionist);
         try {

@@ -43,6 +43,7 @@ public final class AuditAction {
     public static final String SESSION_CREATED = "SESSION_CREATED";
     public static final String SESSION_UPDATED = "SESSION_UPDATED";
     public static final String SESSION_CANCELLED = "SESSION_CANCELLED";
+    public static final String SESSION_PUBLISHED = "SESSION_PUBLISHED";
     public static final String BOOKING_CREATED = "BOOKING_CREATED";
     public static final String BOOKING_CANCELLED = "BOOKING_CANCELLED";
 

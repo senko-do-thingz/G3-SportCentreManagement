@@ -102,6 +102,7 @@ describe('FE-13 manager finance API - BE contract integration', () => {
       revenueChangePercent: -5.24,
       simulatedRevenue: 0,
       simulatedTransactions: 0,
+      netRevenue: 15960000,
     })
     expect(calls[0].path).toBe('/manager/finance/overview?month=2026-10')
   })

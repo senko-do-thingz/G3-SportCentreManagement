@@ -1,7 +1,7 @@
 import type { EligibilityReason, SessionDetail } from '../../api/memberSessionsApi'
 
 export type DetailState = EligibilityReason | 'ELIGIBLE' | 'UNKNOWN'
-const reasons: EligibilityReason[] = ['NO_PACKAGE', 'NO_SESSIONS_LEFT', 'PACKAGE_EXPIRED_BY_THEN', 'PACKAGE_NOT_STARTED_BY_THEN', 'FULL', 'ALREADY_BOOKED', 'CAPACITY_UNAVAILABLE', 'SYNTHETIC_OPERATION_DENIED']
+const reasons: EligibilityReason[] = ['NO_PACKAGE', 'NO_SESSIONS_LEFT', 'PACKAGE_EXPIRED_BY_THEN', 'PACKAGE_NOT_STARTED_BY_THEN', 'FULL', 'ALREADY_BOOKED', 'CAPACITY_UNAVAILABLE', 'SYNTHETIC_OPERATION_DENIED', 'AGE_RESTRICTED', 'TIME_CONFLICT']
 export function resolveSessionDetailState(detail: SessionDetail): DetailState {
   if (!detail?.session || detail.memberContext !== true) return 'UNKNOWN'
   if (detail.alreadyBooked === true || detail.reason === 'ALREADY_BOOKED') return 'ALREADY_BOOKED'
@@ -20,5 +20,7 @@ export const ELIGIBILITY_COPY: Record<DetailState, { title: string; message: str
   ALREADY_BOOKED: { title: 'Already Booked', message: 'You already have a confirmed booking for this session. No duplicate booking is needed.' },
   CAPACITY_UNAVAILABLE: { title: 'Availability Cannot Be Confirmed', message: 'The booking capacity is temporarily unavailable. Refresh availability or choose another session.' },
   SYNTHETIC_OPERATION_DENIED: { title: 'Demo Account Restricted', message: 'Synthetic members cannot use operational classes or training records. Simulated packages cannot be used to book live sessions.' },
+  AGE_RESTRICTED: { title: 'Outside Class Age Group', message: 'Your age on the session date is outside this class age group. Please choose a class for your age group.' },
+  TIME_CONFLICT: { title: 'Time Conflict', message: 'You already have a confirmed booking at an overlapping time on this date. Choose another session or cancel the other booking first.' },
   UNKNOWN: { title: 'Eligibility Cannot Be Confirmed', message: 'We cannot safely confirm eligibility for this session. Refresh availability and try again.' },
 }

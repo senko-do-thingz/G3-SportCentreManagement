@@ -51,7 +51,7 @@ public interface ClassSessionRepository extends JpaRepository<ClassSession, Long
             + "AND (:format IS NULL OR s.trainingType = :format) "
             + "AND (:level IS NULL OR c.level = :level) AND (:coachId IS NULL OR co.id = :coachId)";
 
-    @EntityGraph(attributePaths = {"sport", "sportClass", "facility", "coach", "coach.userAccount"})
+    @EntityGraph(attributePaths = {"sport", "sportClass", "sportClass.ageGroup", "facility", "coach", "coach.userAccount"})
     @Query(value = "SELECT s" + VISIBLE_FROM + VISIBLE_WHERE + SEARCH_FILTERS,
             countQuery = "SELECT COUNT(s)" + VISIBLE_FROM + VISIBLE_WHERE + SEARCH_FILTERS)
     Page<ClassSession> searchVisible(@Param("sportId") Long sportId,
@@ -60,7 +60,7 @@ public interface ClassSessionRepository extends JpaRepository<ClassSession, Long
             @Param("coachId") Long coachId, @Param("today") LocalDate today, @Param("now") LocalTime now,
             Pageable pageable);
 
-    @EntityGraph(attributePaths = {"sport", "sportClass", "facility", "coach", "coach.userAccount"})
+    @EntityGraph(attributePaths = {"sport", "sportClass", "sportClass.ageGroup", "facility", "coach", "coach.userAccount"})
     @Query("SELECT s" + VISIBLE_FROM + VISIBLE_WHERE + "AND s.id = :id")
     Optional<ClassSession> findVisibleById(@Param("id") Long id,
             @Param("today") LocalDate today, @Param("now") LocalTime now);
@@ -82,6 +82,16 @@ public interface ClassSessionRepository extends JpaRepository<ClassSession, Long
             + "WHERE id = :id AND status = 'PUBLISHED' AND booked_count >= 0 AND booked_count < capacity",
             nativeQuery = true)
     int reserveSeat(@Param("id") Long id, @Param("now") LocalDateTime now);
+
+    /**
+     * Lifecycle job: PUBLISHED sessions whose end time has been reached become COMPLETED. DRAFT and CANCELLED rows are
+     * untouched. Every booking/cancel/edit path already rejects ended sessions, so no session lock is needed here.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "UPDATE class_session SET status = 'COMPLETED', updated_at = :now WHERE status = 'PUBLISHED' "
+            + "AND (session_date < :today OR (session_date = :today AND end_time <= CAST(:time AS time)))",
+            nativeQuery = true)
+    int completeEnded(@Param("today") LocalDate today, @Param("time") LocalTime time, @Param("now") LocalDateTime now);
 
     /**
      * Releases seats in one atomic UPDATE (never below zero). The caller must hold the session row lock taken with
@@ -123,6 +133,14 @@ public interface ClassSessionRepository extends JpaRepository<ClassSession, Long
                                                     @Param("statuses") Collection<SessionStatus> statuses,
                                                     @Param("today") LocalDate today,
                                                     @Param("now") LocalTime now);
+
+    /** Largest capacity among the class's upcoming sessions (null when none), same "upcoming" rule as above. */
+    @Query("SELECT MAX(s.capacity) FROM ClassSession s WHERE s.sportClass.id = :classId AND s.status IN :statuses "
+            + "AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime > cast(:now as time)))")
+    Integer findMaxUpcomingCapacity(@Param("classId") Long classId,
+                                    @Param("statuses") Collection<SessionStatus> statuses,
+                                    @Param("today") LocalDate today,
+                                    @Param("now") LocalTime now);
 
     /** Projection row of {@link #countUpcomingByClassIds}. */
     interface ClassSessionCount {

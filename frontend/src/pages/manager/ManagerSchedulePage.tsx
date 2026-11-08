@@ -8,7 +8,7 @@ import { managerClassesApi } from '../../api/managerClassesApi'
 import { managerSessionsApi, type ManagerSession } from '../../api/managerSessionsApi'
 import { facilitiesApi } from '../../api/facilitiesApi'
 import { Button, Card, EmptyState, Input, PageHeader, PageLoader, Select, StatusBadge, useToast } from '../../components/ui'
-import { ManagerError, PreviewNotice } from './ManagerShared'
+import { ConfirmationModal, ManagerError, PreviewNotice } from './ManagerShared'
 import { useResource } from './useManagerTools'
 import { loadScheduleClasses } from './loadScheduleClasses'
 import { addDays, canManageSession, centerNow, compareScheduleSessions, displayDate, monday, WEEKDAYS } from './scheduleModel'
@@ -32,6 +32,7 @@ export function ManagerSchedulePage() {
   const [sessions, reload] = useResource(loader)
   const [editing, setEditing] = useState<ManagerSession | 'new' | null>(params.get('create') === '1' ? 'new' : null)
   const [cancelling, setCancelling] = useState<ManagerSession | null>(null)
+  const [publishing, setPublishing] = useState<ManagerSession | null>(null)
   const toast = useToast()
   function query(key: string, value: string) { setParams((previous) => { const next = new URLSearchParams(previous); if (value) next.set(key, value); else next.delete(key); next.delete('create'); return next }) }
   function closeEditor() { setEditing(null); if (params.has('create')) query('create', '') }
@@ -108,6 +109,7 @@ export function ManagerSchedulePage() {
                             editDisabled={!facilitiesUsable || classes.status !== 'ready'}
                             onEdit={() => setEditing(session)}
                             onCancel={() => setCancelling(session)}
+                            onPublish={() => setPublishing(session)}
                           />)}
                         </div> : <span className="f2-schedule-table__empty-cell" aria-label="No sessions">-</span>}
                       </td>
@@ -123,6 +125,7 @@ export function ManagerSchedulePage() {
     </Card>
     {editing && classes.status === 'ready' && facilitiesUsable && <SessionEditorModal item={editing === 'new' ? undefined : editing} classes={classes.data} facilities={facilities.status === 'ready' ? facilities.data : []} manualFacility={manualFacility} classId={classId} onClose={closeEditor} onSuccess={sessionSaved} />}
     {cancelling && <CancelSessionModal item={cancelling} onClose={() => setCancelling(null)} onSuccess={saved} />}
+    {publishing && <ConfirmationModal title="Publish session" description={`${publishing.class?.name ?? 'Session'} on ${displayDate(publishing.date)} at ${publishing.startTime.slice(0, 5)}: members will be able to find and book it.`} onClose={() => setPublishing(null)} save={() => managerSessionsApi.publish(publishing.id)} onSuccess={() => { setPublishing(null); reload(); toast.success(`Session ${sessionIdText(publishing.sessionId)} published`) }} confirmLabel="Publish session" />}
   </div>
 }
 
@@ -132,12 +135,14 @@ function ManagerScheduleEntry({
   editDisabled,
   onEdit,
   onCancel,
+  onPublish,
 }: {
   session: ManagerSession
   canManage: boolean
   editDisabled: boolean
   onEdit: () => void
   onCancel: () => void
+  onPublish: () => void
 }) {
   return <article className={`f2-session f2-session--${session.status.toLowerCase()}`}>
     <span className="session-identity">Session ID <code>{sessionIdText(session.sessionId)}</code></span>
@@ -152,6 +157,7 @@ function ManagerScheduleEntry({
     <p className="f2-session__meta">{session.bookedCount} / {session.capacity} booked - {session.trainingType === 'COACH_LED' ? 'Coach-led' : 'Self-training'}</p>
     {session.status === 'CANCELLED' && <p className="f2-session__meta f2-session__reason">Reason: {session.cancelReason || 'Not provided'}</p>}
     {canManage && <div className="f2-session__actions">
+      {session.status === 'DRAFT' && <Button size="sm" onClick={onPublish}>Publish</Button>}
       <Button size="sm" variant="secondary" disabled={editDisabled} onClick={onEdit}>Edit</Button>
       <Button size="sm" variant="danger" aria-label="Cancel session" title="Cancel session" onClick={onCancel}>Cancel</Button>
     </div>}

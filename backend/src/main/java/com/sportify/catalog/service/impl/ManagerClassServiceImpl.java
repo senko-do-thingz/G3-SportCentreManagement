@@ -61,6 +61,8 @@ import java.util.stream.Collectors;
  *   <li>The sport of a class cannot change while the class has upcoming sessions, because every session
  *       stores its own sport_id.</li>
  *   <li>Changing the coach does not touch existing sessions; new sessions copy the coach of the class (V20).</li>
+ *   <li>The maximum members cannot drop below the capacity of an upcoming session. A changed age group applies
+ *       to new bookings only.</li>
  *   <li>A class cannot be deactivated while it has confirmed bookings on upcoming sessions.</li>
  * </ul>
  * An upcoming session is a DRAFT or PUBLISHED session whose date is after today, or today with a start
@@ -183,6 +185,15 @@ public class ManagerClassServiceImpl implements ManagerClassService {
 
         if (sportChanged && upcoming > 0) {
             throw new BusinessRuleException("Cannot change the sport of a class that has upcoming sessions");
+        }
+        // Keep "session capacity <= class maximum" true for sessions already on the schedule. A new age group only
+        // applies to new bookings; members already booked keep their places.
+        if (upcoming > 0 && request.maxMembers() != null) {
+            Integer largest = classSessionRepository.findMaxUpcomingCapacity(id, UPCOMING_SESSION_STATUSES, today, timeNow);
+            if (largest != null && request.maxMembers() < largest) {
+                throw new BusinessRuleException("Maximum members cannot be below the capacity of an upcoming session ("
+                        + largest + "). Reduce those sessions first.", "CLASS_MAX_BELOW_SESSION_CAPACITY");
+            }
         }
 
         sportClass.setName(request.name().trim());

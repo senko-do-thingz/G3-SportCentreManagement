@@ -82,7 +82,8 @@ public class CheckInServiceTest {
         memberProfile = MemberProfile.builder().id(1L).userAccount(memberUser).memberCode("MEM-123").build();
 
         sport = Sport.builder().id(10L).name("Badminton").build();
-        classSession = ClassSession.builder().id(20L).sport(sport).sessionDate(LocalDate.of(2026, 10, 5)).build();
+        classSession = ClassSession.builder().id(20L).sport(sport).sessionDate(LocalDate.of(2026, 10, 5))
+                .startTime(java.time.LocalTime.of(0, 30)).endTime(java.time.LocalTime.of(1, 30)).build(); // clock 00:00 is inside the 60-minute window
         todayBooking = Booking.builder()
                 .id(30L)
                 .member(memberProfile)
@@ -440,5 +441,98 @@ public class CheckInServiceTest {
         when(checkInRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         assertEquals("Already checked in for this session", checkInService.recordCheckIn(request, receptionist).getDenialReason());
         verify(sessionRepository).findForUpdate(20L);
+    }
+
+    // Flow 2: arrival must target a session that has not ended, earliest first.
+    private CheckInServiceImpl serviceAt(String instant) {
+        return new CheckInServiceImpl(checkInRepository, bookingRepository, memberProfileRepository, auditService,
+                Clock.fixed(Instant.parse(instant), ZoneId.of("UTC")), sessionRepository, entityManager, operationalMemberPolicy);
+    }
+
+    private Booking bookingAt(long bookingId, long sessionId, int startHour) {
+        ClassSession session = ClassSession.builder().id(sessionId).sport(sport).sessionDate(LocalDate.of(2026, 10, 5))
+                .startTime(java.time.LocalTime.of(startHour, 0)).endTime(java.time.LocalTime.of(startHour + 1, 0)).build();
+        org.mockito.Mockito.lenient().when(sessionRepository.findForUpdate(sessionId)).thenReturn(Optional.of(session));
+        return Booking.builder().id(bookingId).member(memberProfile).session(session).status(BookingStatus.CONFIRMED)
+                .packageRegistration(SportPackageRegistration.builder().id(40L + bookingId).status(PackageRegistrationStatus.ACTIVE)
+                        .startDate(LocalDate.of(2026, 10, 1)).endDate(LocalDate.of(2026, 10, 31)).build()).build();
+    }
+
+    private void stubToday(List<Booking> bookings) {
+        when(memberProfileRepository.findByMemberCode("MEM-123")).thenReturn(Optional.of(memberProfile));
+        when(bookingRepository.findTodayBookingsForMember(eq(1L), eq(LocalDate.of(2026, 10, 5)), eq(BookingStatus.CONFIRMED)))
+                .thenReturn(bookings);
+        when(checkInRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+    }
+
+    @Test
+    void automaticArrivalSkipsAMissedEndedSessionAndPicksTheNextOne() {
+        Booking morning = bookingAt(31L, 21L, 7);
+        Booking afternoon = bookingAt(32L, 22L, 16);
+        stubToday(List.of(morning, afternoon));
+        var request = new CheckInRequest(); request.setIdentifier("MEM-123");
+
+        CheckInResponse res = serviceAt("2026-10-05T15:30:00Z").recordCheckIn(request, receptionist);
+
+        assertEquals("ALLOWED", res.getResult());
+        verify(sessionRepository).findForUpdate(22L);
+        verify(sessionRepository, org.mockito.Mockito.never()).findForUpdate(21L);
+    }
+
+    @Test
+    void automaticArrivalPicksTheEarliestOpenSessionRegardlessOfRowOrder() {
+        Booking late = bookingAt(32L, 22L, 18);
+        Booking early = bookingAt(31L, 21L, 16);
+        stubToday(List.of(late, early));
+        var request = new CheckInRequest(); request.setIdentifier("MEM-123");
+
+        assertEquals("ALLOWED", serviceAt("2026-10-05T15:30:00Z").recordCheckIn(request, receptionist).getResult());
+        verify(sessionRepository).findForUpdate(21L);
+        verify(sessionRepository, org.mockito.Mockito.never()).findForUpdate(22L);
+    }
+
+    @Test
+    void automaticArrivalIsDeniedAsEndedWhenEveryRemainingSessionHasEnded() {
+        Booking second = bookingAt(32L, 22L, 9);
+        Booking first = bookingAt(31L, 21L, 7);
+        stubToday(List.of(second, first));
+        var request = new CheckInRequest(); request.setIdentifier("MEM-123");
+
+        CheckInResponse res = serviceAt("2026-10-05T15:30:00Z").recordCheckIn(request, receptionist);
+
+        assertEquals("DENIED", res.getResult());
+        assertEquals("The booked session has already ended", res.getDenialReason());
+        verify(sessionRepository).findForUpdate(21L);
+    }
+
+    @Test
+    void selectedBookingIsDeniedOnceItsSessionEndTimeIsReached() {
+        stubToday(List.of(bookingAt(31L, 21L, 7)));
+        var request = new CheckInRequest(); request.setIdentifier("MEM-123"); request.setBookingId(31L);
+
+        CheckInResponse res = serviceAt("2026-10-05T08:00:00Z").recordCheckIn(request, receptionist);
+
+        assertEquals("DENIED", res.getResult());
+        assertEquals("The booked session has already ended", res.getDenialReason());
+    }
+
+    @Test
+    void arrivalDuringTheSessionIsAllowedAsALateArrival() {
+        stubToday(List.of(bookingAt(31L, 21L, 7)));
+        var request = new CheckInRequest(); request.setIdentifier("MEM-123"); request.setBookingId(31L);
+
+        assertEquals("ALLOWED", serviceAt("2026-10-05T07:59:59Z").recordCheckIn(request, receptionist).getResult());
+    }
+
+    @Test
+    void arrivalOpensExactlySixtyMinutesBeforeTheStart() {
+        stubToday(List.of(bookingAt(31L, 21L, 16)));
+        var request = new CheckInRequest(); request.setIdentifier("MEM-123"); request.setBookingId(31L);
+
+        CheckInResponse early = serviceAt("2026-10-05T14:59:59Z").recordCheckIn(request, receptionist);
+        assertEquals("DENIED", early.getResult());
+        assertEquals("Check-in opens at 15:00, 60 minutes before the session starts", early.getDenialReason());
+
+        assertEquals("ALLOWED", serviceAt("2026-10-05T15:00:00Z").recordCheckIn(request, receptionist).getResult());
     }
 }
