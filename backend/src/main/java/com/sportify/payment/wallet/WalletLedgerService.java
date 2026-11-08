@@ -28,6 +28,9 @@ public class WalletLedgerService {
     public static final BigDecimal MAX_OPERATION_AMOUNT = new BigDecimal("100000000");
     static final String CODE_INSUFFICIENT = "WALLET_INSUFFICIENT_FUNDS";
     static final String CODE_REPLAY_MISMATCH = "WALLET_OPERATION_REPLAY_MISMATCH";
+    static final String CODE_COMPENSATION_INVALID = "WALLET_COMPENSATION_INVALID";
+    /** sourceType of a COMPENSATION_CREDIT; its sourceId is the compensated PURCHASE_DEBIT ledger entry id. */
+    public static final String COMPENSATION_SOURCE = "WALLET_LEDGER_ENTRY";
 
     public enum Pool { ACTUAL, SIMULATED }
 
@@ -125,6 +128,10 @@ public class WalletLedgerService {
             return new Applied(entry, true);
         }
 
+        if (op.type() == EntryType.COMPENSATION_CREDIT) {
+            requireCompensable(walletId, op);
+        }
+
         BigDecimal available = current.available(op.pool());
         BigDecimal reserved = current.reserved(op.pool());
         BigDecimal amount = op.amount();
@@ -153,6 +160,31 @@ public class WalletLedgerService {
                 walletId, op.operationKey(), op.type().name(), op.pool().name(), amount, available, reserved,
                 op.sourceType(), op.sourceId(), op.description(), op.actorId(), now);
         return new Applied(jdbc.queryForObject("SELECT * FROM dbo.wallet_ledger_entry WHERE id=?", ENTRY, id), false);
+    }
+
+    /**
+     * A compensation credit returns money from one earlier PURCHASE_DEBIT of the same wallet and pool, named by
+     * sourceType {@value #COMPENSATION_SOURCE} and sourceId = that debit's ledger entry id. All compensations for the
+     * debit together can never exceed it. Runs under the wallet row lock, so concurrent compensations serialize.
+     */
+    private void requireCompensable(long walletId, Operation op) {
+        if (!COMPENSATION_SOURCE.equals(op.sourceType())) {
+            throw new BusinessRuleException("A compensation credit must name the wallet debit it compensates", CODE_COMPENSATION_INVALID);
+        }
+        List<java.util.Map<String, Object>> debit = jdbc.queryForList("SELECT amount FROM dbo.wallet_ledger_entry"
+                + " WHERE id=? AND wallet_id=? AND entry_type='PURCHASE_DEBIT' AND pool=?", op.sourceId(), walletId, op.pool().name());
+        if (debit.isEmpty()) {
+            throw new BusinessRuleException("A compensation credit must refer to an earlier wallet payment of this wallet",
+                    CODE_COMPENSATION_INVALID);
+        }
+        BigDecimal debited = (BigDecimal) debit.getFirst().get("amount");
+        BigDecimal compensated = jdbc.queryForObject("SELECT COALESCE(SUM(amount), 0) FROM dbo.wallet_ledger_entry"
+                + " WHERE wallet_id=? AND entry_type='COMPENSATION_CREDIT' AND source_type=? AND source_id=?",
+                BigDecimal.class, walletId, COMPENSATION_SOURCE, op.sourceId());
+        if (compensated.add(op.amount()).compareTo(debited) > 0) {
+            throw new BusinessRuleException("Compensation would exceed the original wallet payment of "
+                    + debited.toPlainString() + " VND", CODE_COMPENSATION_INVALID);
+        }
     }
 
     /** + for money that becomes spendable, - for money that leaves the available balance, 0 for release-to-payout moves. */
