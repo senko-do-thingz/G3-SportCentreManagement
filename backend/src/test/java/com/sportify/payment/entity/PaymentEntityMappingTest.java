@@ -277,7 +277,8 @@ class PaymentEntityMappingTest {
                 PaymentMethod.BANK_TRANSFER,
                 PaymentMethod.MOMO,
                 PaymentMethod.VNPAY,
-                PaymentMethod.ZALOPAY
+                PaymentMethod.ZALOPAY,
+                PaymentMethod.WALLET
         );
 
         assertThat(PaymentStatus.values()).containsExactly(

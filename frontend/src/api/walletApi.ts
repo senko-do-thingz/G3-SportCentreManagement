@@ -99,3 +99,21 @@ export const receptionTopUpApi = {
     api.post<WalletTopUp>(`/reception/wallet/topups/${id}/confirm`, { receivedAmount, bankReference, note }),
   reject: (id: number, reason: string) => api.post<WalletTopUp>(`/reception/wallet/topups/${id}/reject`, { reason }),
 }
+
+export interface WalletPaymentResult {
+  paymentId: number
+  paymentCode: string
+  status: string
+  method: string
+  amount: number
+  ledgerEntryId: number
+  availableAfter: number
+  invoiceId: number | null
+  invoiceNumber: string | null
+  replay: boolean
+}
+
+/** MW-05: settle one own pending purchase from the ACTUAL wallet balance (debit, activation and invoice together). */
+export const walletPaymentApi = {
+  pay: (paymentId: number) => api.post<WalletPaymentResult>(`/member/wallet/payments/${paymentId}`),
+}

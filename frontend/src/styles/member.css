@@ -698,3 +698,13 @@
   padding-top: var(--space-4);
   border-top: 1px solid var(--color-border);
 }
+
+/* MW-05 pay with wallet */
+.wallet-pay {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}

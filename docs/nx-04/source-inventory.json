@@ -394,9 +394,46 @@
       ],
       "drops": [],
       "sha256_lf": "aab2855d0af60805a8f0a75b056e26782888eca8819193074da5b1a19a854562"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V49__member_health_assessment.sql",
+      "version": 49,
+      "creates": [
+        "dbo.member_health_assessment"
+      ],
+      "drops": [],
+      "sha256_lf": "cfede0cfa4330c8d0d894043fbbb97cbddaadd648ccb4fac352c14030565f6c6"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V50__member_wallet_ledger.sql",
+      "version": 50,
+      "creates": [
+        "dbo.member_wallet",
+        "dbo.wallet_ledger_entry"
+      ],
+      "drops": [],
+      "sha256_lf": "a423f789ec8b88cc77e87403df4cc2a25c9186cbd0fc5dfe4a11325d1a3af33d"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V51__wallet_topup.sql",
+      "version": 51,
+      "creates": [
+        "dbo.wallet_topup"
+      ],
+      "drops": [],
+      "sha256_lf": "d17442917c41a490981bfc1dff5be2de0b38eefd668894f6638e8454c64180ca"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V52__wallet_payment_settlement.sql",
+      "version": 52,
+      "creates": [
+        "dbo.payment_wallet_settlement"
+      ],
+      "drops": [],
+      "sha256_lf": "89e86c318735ae2c3e7175da07cc803a678098b9a91b26abc011fd17d6bc3996"
     }
   ],
-  "create_occurrences": 73,
+  "create_occurrences": 78,
   "create_names": [
     "[activity_log]",
     "[age_group]",
@@ -458,10 +495,15 @@
     "dbo.cash_capture_ticket",
     "dbo.cash_coverage",
     "dbo.cash_event",
+    "dbo.member_health_assessment",
+    "dbo.member_wallet",
+    "dbo.payment_wallet_settlement",
     "dbo.simulated_payment_transaction",
     "dbo.simulated_qr_rate_limit",
     "dbo.simulated_qr_session",
     "dbo.simulated_qr_transition",
+    "dbo.wallet_ledger_entry",
+    "dbo.wallet_topup",
     "member_check_in_pass",
     "member_sport_level",
     "permission",

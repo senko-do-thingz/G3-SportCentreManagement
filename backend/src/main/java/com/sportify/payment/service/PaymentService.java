@@ -24,6 +24,17 @@ public interface PaymentService {
             PaymentMethod.BANK_TRANSFER
     );
 
+    /**
+     * Methods an item activation may record. WALLET only reaches activation through WalletPaymentService, which debits
+     * the wallet in the same transaction; staff confirmation, desk sales and method changes still use
+     * SUPPORTED_PAYMENT_METHODS, so they can never select WALLET.
+     */
+    Set<PaymentMethod> SETTLEMENT_PAYMENT_METHODS = Set.of(
+            PaymentMethod.CASH,
+            PaymentMethod.BANK_TRANSFER,
+            PaymentMethod.WALLET
+    );
+
     @Transactional(propagation = Propagation.MANDATORY)
     Payment createPendingPayment(MemberProfile member, BigDecimal amount, PaymentMethod method);
 
