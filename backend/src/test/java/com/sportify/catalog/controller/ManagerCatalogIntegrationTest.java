@@ -256,7 +256,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                         .header("Authorization", "Bearer " + receptionToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"memberId\":" + memberProfile.getId() + ",\"packageId\":" + packageId
-                                + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"CASH\",\"startDate\":\"" + LocalDate.now() + "\"}"))
+                                + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"CASH\",\"startDate\":\"" + centerToday() + "\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andReturn().getResponse().getContentAsString();
@@ -271,7 +271,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/packages/registrations")
                         .header("Authorization", "Bearer " + memberToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"packageId\":" + packageId + ",\"startDate\":\"" + LocalDate.now() + "\"}"))
+                        .content("{\"packageId\":" + packageId + ",\"startDate\":\"" + centerToday() + "\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", containsString("greater than zero")));
 
@@ -1784,5 +1784,14 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 throw new RuntimeException("Teardown cleanup failed", cleanFailure);
             }
         });
+    }
+
+    /**
+     * The date the server validates against: the application clock runs in Asia/Ho_Chi_Minh, while CI runners use UTC.
+     * Between 17:00 and 24:00 UTC LocalDate.now() is still yesterday for the server, and "Start date cannot be in the
+     * past" made this test fail depending on the time of day.
+     */
+    private static LocalDate centerToday() {
+        return LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
     }
 }
