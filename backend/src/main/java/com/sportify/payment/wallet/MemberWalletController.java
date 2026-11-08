@@ -7,12 +7,14 @@ import com.sportify.payment.wallet.WalletLedgerService.Entry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -24,6 +26,7 @@ import java.util.List;
 public class MemberWalletController {
 
     private final WalletLedgerService ledger;
+    private final WalletHistoryService history;
 
     public record Overview(BigDecimal availableBalance, BigDecimal reservedBalance, BigDecimal demoAvailableBalance,
                            BigDecimal demoReservedBalance, String currency, LocalDateTime updatedAt,
@@ -48,5 +51,17 @@ public class MemberWalletController {
         List<Entry> content = ledger.entries(memberId, page, size);
         long total = ledger.entryCount(memberId);
         return new PageResponse<>(content, page, size, total, (int) ((total + size - 1) / size));
+    }
+
+    /** MW-08 wallet activity of the signed-in Member only, with filters and a ledger reconciliation flag. */
+    @GetMapping("/history")
+    public WalletHistoryService.History history(@AuthenticationPrincipal CustomUserDetails user,
+                                                @RequestParam(required = false) String type,
+                                                @RequestParam(required = false) String status,
+                                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                                @RequestParam(defaultValue = "0") int page,
+                                                @RequestParam(defaultValue = "20") int size) {
+        return history.history(user.getUserAccount().getId(), type, status, from, to, page, size);
     }
 }

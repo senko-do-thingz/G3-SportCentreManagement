@@ -708,3 +708,19 @@
   padding-top: var(--space-4);
   border-top: 1px solid var(--color-border);
 }
+
+/* MW-08 wallet activity */
+.wallet-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.wallet-detail-row td {
+  background: var(--color-surface-muted);
+}
+
+.payment-wallet-link {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-muted);
+}

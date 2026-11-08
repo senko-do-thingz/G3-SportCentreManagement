@@ -133,6 +133,9 @@ export function MyPaymentsPage() {
         title="My Payments and Receipts"
         description="Track payments and open receipts for confirmed transactions."
       />
+      <p className="payment-wallet-link">
+        Wallet top-ups, wallet payments and withdrawals are listed in <Link to="/member/wallet/history">Wallet activity</Link>.
+      </p>
       <Card
         title="Payment history"
         aria-label="Payment history"
