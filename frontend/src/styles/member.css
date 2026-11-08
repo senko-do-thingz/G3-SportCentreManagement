@@ -587,3 +587,74 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* MW-02 Health & Training questionnaire */
+.health-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.health-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.health-question {
+  margin: 0 0 var(--space-4);
+  padding: 0 0 var(--space-4);
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.health-question legend {
+  margin-bottom: var(--space-2);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.health-question__choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.health-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.health-skip {
+  border: 0;
+  background: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.health-skip:disabled {
+  color: var(--color-text-muted);
+  cursor: default;
+  text-decoration: none;
+}
+
+.health-version,
+.health-meta {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.health-note {
+  color: var(--color-text);
+}
+
+.health-list {
+  margin: var(--space-3) 0 0;
+  padding-left: var(--space-5);
+  color: var(--color-text-muted);
+}
