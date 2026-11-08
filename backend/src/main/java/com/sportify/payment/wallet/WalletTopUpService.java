@@ -189,7 +189,8 @@ public class WalletTopUpService {
     /**
      * Lock order: the wallet row, then the top-up row, then (inside the ledger) the wallet row again, which is already
      * held. A second confirmation waits for the first and then sees CONFIRMED (409 TOPUP_NOT_PENDING). A wrong amount,
-     * a reused bank reference or a request without a stored receiving account changes nothing.
+     * a reused bank reference or a request without a stored receiving account changes nothing. A late confirmation of a
+     * Member-cancelled request is refused while any other wallet operation of that Member is in flight.
      */
     @Transactional
     public TopUp confirm(long id, ConfirmRequest request, long actorId) {
@@ -225,6 +226,16 @@ public class WalletTopUpService {
         if (late && note == null) {
             throw new BusinessRuleException("This request was cancelled by the member. Add a note describing the late bank"
                     + " transfer to confirm it.", "TOPUP_LATE_NOTE_REQUIRED");
+        }
+        if (late) {
+            // A cancelled request no longer holds the Member's slot. Late reconciliation is itself a financial operation,
+            // so it waits until no other wallet operation (a newer top-up, a withdrawal) is in flight. Checked under the
+            // wallet row lock taken by lock(id), the same lock every claim takes, so the slot cannot change meanwhile.
+            pending.current(topUp.memberId()).ifPresent(other -> {
+                throw new ConflictException("The member has another wallet request in progress (" + other.type().name()
+                        + " " + other.operationId() + "). Resolve it first, then confirm this late payment.",
+                        WalletPendingOperations.CODE_IN_FLIGHT);
+            });
         }
         var applied = ledger.apply(new Operation(topUp.memberId(), EntryType.TOPUP_CREDIT,
                 simulated ? Pool.SIMULATED : Pool.ACTUAL, topUp.amount(), "TOPUP-" + id, "WALLET_TOPUP", id,

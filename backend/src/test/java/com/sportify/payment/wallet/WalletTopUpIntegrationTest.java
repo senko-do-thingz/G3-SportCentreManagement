@@ -256,6 +256,75 @@ class WalletTopUpIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void aLatePaymentWaitsWhileAnotherWalletOperationIsInFlight() throws Exception {
+        long late = id(create(member, 70_000, "ACTUAL", key()).andReturn().getResponse().getContentAsString());
+        mvc.perform(post("/api/v1/member/wallet/topups/" + late + "/cancel").with(user(details(member)))).andExpect(status().isOk());
+        long newer = id(create(member, 20_000, "ACTUAL", key()).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
+        confirm(receptionist, late, 70_000, "FTLATEBUSY" + late, "Late transfer").andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(WalletPendingOperations.CODE_IN_FLIGHT));
+        assertThat(jdbc.queryForObject("SELECT status FROM wallet_topup WHERE id=?", String.class, late)).isEqualTo("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT operation_id FROM wallet_pending_operation WHERE member_id=?", Long.class, member)).isEqualTo(newer);
+        assertThat(ledger.entryCount(member)).isZero();
+
+        // A pending withdrawal (MW-06) blocks it the same way.
+        mvc.perform(post("/api/v1/member/wallet/topups/" + newer + "/cancel").with(user(details(member)))).andExpect(status().isOk());
+        jdbc.update("INSERT INTO wallet_pending_operation (member_id, operation_type, operation_id, created_at)"
+                + " VALUES (?, 'WITHDRAWAL', ?, SYSDATETIME())", member, -member);
+        try {
+            confirm(receptionist, late, 70_000, "FTLATEBUSY" + late, "Late transfer").andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("WITHDRAWAL")));
+        } finally {
+            jdbc.update("DELETE FROM wallet_pending_operation WHERE member_id=?", member);
+        }
+        assertThat(ledger.entryCount(member)).isZero();
+
+        // Once nothing else is in flight, the late payment is confirmed exactly once and takes no slot.
+        confirm(receptionist, late, 70_000, "FTLATEBUSY" + late, "Late transfer").andExpect(status().isOk());
+        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo("70000");
+        assertThat(ledger.entryCount(member)).isEqualTo(1);
+        assertThat(slotCount(member)).isZero();
+    }
+
+    @Test
+    void aLateConfirmationRacingANewTopUpNeverCreditsWhileTheNewOneIsPending() throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        List<String> outcomes = new ArrayList<>();
+        for (int round = 0; round < 6; round++) {
+            jdbc.queryForList("SELECT id FROM wallet_topup WHERE member_id=? AND status='PENDING'", Long.class, member)
+                    .forEach(open -> {
+                        try {
+                            mvc.perform(post("/api/v1/member/wallet/topups/" + open + "/cancel").with(user(details(member))));
+                        } catch (Exception e) {
+                            throw new IllegalStateException(e);
+                        }
+                    });
+            long late = id(create(member, 10_000, "ACTUAL", key()).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
+            mvc.perform(post("/api/v1/member/wallet/topups/" + late + "/cancel").with(user(details(member)))).andExpect(status().isOk());
+            CountDownLatch start = new CountDownLatch(1);
+            String nextKey = key();
+            Future<Integer> lateConfirm = pool.submit(() -> { start.await();
+                return confirm(receptionist, late, 10_000, "FTRACELATE" + late, "Late transfer").andReturn().getResponse().getStatus(); });
+            Future<Integer> newTopUp = pool.submit(() -> { start.await();
+                return create(member, 10_000, "ACTUAL", nextKey).andReturn().getResponse().getStatus(); });
+            start.countDown();
+            int confirmStatus = lateConfirm.get();
+            int createStatus = newTopUp.get();
+            outcomes.add(confirmStatus + "/" + createStatus);
+            // Either the late payment committed first (then the new request is created after it),
+            // or the new request took the slot first and the late payment was refused.
+            assertThat(List.of("200/201", "409/201")).contains(confirmStatus + "/" + createStatus);
+        }
+        pool.shutdown();
+        Integer confirmed = jdbc.queryForObject("SELECT COUNT(*) FROM wallet_topup WHERE member_id=? AND status='CONFIRMED'", Integer.class, member);
+        assertThat(ledger.entryCount(member)).isEqualTo(confirmed.longValue());
+        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo(BigDecimal.valueOf(10_000L * confirmed));
+        Integer pendingRows = jdbc.queryForObject("SELECT COUNT(*) FROM wallet_topup WHERE member_id=? AND status='PENDING'", Integer.class, member);
+        assertThat(pendingRows).isEqualTo(1);
+        assertThat(slotCount(member)).isEqualTo(1);
+        assertThat(outcomes).hasSize(6);
+    }
+
+    @Test
     void aMemberCancelledRealTopUpCanStillBeConfirmedAsALatePaymentWithANote() throws Exception {
         long id = id(create(member, 70_000, "ACTUAL", key()).andReturn().getResponse().getContentAsString());
         mvc.perform(post("/api/v1/member/wallet/topups/" + id + "/cancel").with(user(details(member))))
