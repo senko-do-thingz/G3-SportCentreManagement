@@ -143,6 +143,19 @@ class WalletPaymentIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void walletPaymentWaitsWhileAnotherWalletOperationIsInFlight() throws Exception {
+        fund(member, 500_000);
+        long payment = pendingPackagePayment(member);
+        // CODEOWNER rule: one blocking wallet operation per Member (here a pending top-up holds the slot).
+        jdbc.update("INSERT INTO wallet_pending_operation (member_id, operation_type, operation_id, created_at) VALUES (?, 'TOPUP', 1, SYSDATETIME())", member);
+        pay(member, payment).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("WALLET_OPERATION_IN_FLIGHT"));
+        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo("500000");
+        assertThat(jdbc.queryForObject("SELECT payment_status FROM payment WHERE id=?", String.class, payment)).isEqualTo("PENDING");
+        jdbc.update("DELETE FROM wallet_pending_operation WHERE member_id=?", member);
+        pay(member, payment).andExpect(status().isOk());
+    }
+
+    @Test
     void staffAndMembersCannotPickWalletThroughTheExistingChannels() throws Exception {
         long payment = pendingPackagePayment(member);
         mvc.perform(put("/api/v1/payments/" + payment + "/confirm").with(user(details(receptionist))).contentType(MediaType.APPLICATION_JSON)
