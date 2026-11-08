@@ -1,11 +1,11 @@
 # MW-07 evidence - Receptionist action inbox
 
 - Branch: `fix/flow-1-mw-07-reception-inbox` (stacked on `fix/flow-3-mw-06-withdrawal`)
-- Captured: 2026-11-08 23:45 Asia/Bangkok
+- Captured: 2026-11-09 01:11 Asia/Bangkok (recaptured after the CODEOWNER single in-flight wallet rule was merged into the stack)
 - Browser: Google Chrome via Playwright (channel `chrome`), viewport 1440x900, light theme
-- Backend: jar built from this branch, profiles `dev,demo`, port 18080, throwaway database `sportify_mw_evidence_1794156136` (fresh V1-V53 plus demo seeds). Not the shared `sportify` database. No new migration in this task.
+- Backend: jar built from this branch, profiles `dev,demo`, port 18080, throwaway database `sportify_mw_evidence_1794161446` (fresh V1-V53 plus demo seeds). Not the shared `sportify` database. No new migration in this task.
 - Frontend: local Vite dev server on port 3000
-- Fixture: Mai (synthetic) created top-up TU-000001 (500,000 VND, pending), a second confirmed top-up, a payout account and withdrawal WD-000001 (300,000 VND, pending) through the real APIs.
+- Fixture: Mai (synthetic) created top-up TU-000001 (500,000 VND, pending). An (synthetic) was funded with a confirmed top-up, saved a payout account and requested withdrawal WD-000001 (300,000 VND, pending). Two members are used because each member may have only one wallet operation in flight.
 - Capture script: `ev.py` + `mw07.py` (kept outside the repository)
 
 | File | Role and route | Steps | Expected | Observed |
