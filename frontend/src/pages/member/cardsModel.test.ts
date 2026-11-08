@@ -183,7 +183,7 @@ describe('FE-04 helpers', () => {
   it('TC-FE04-014 free tier, perks, validity and tier order', () => {
     expect(isFreeTier(STANDARD_TIER)).toBe(true)
     expect(isFreeTier(GOLD_TIER)).toBe(false)
-    expect(tierPerks(GOLD_TIER)[0]).toBe('5% off packages longer than a single visit')
+    expect(tierPerks(GOLD_TIER)[0]).toBe('5% off 30-day and 90-day packages')
     expect(tierPerks(STANDARD_TIER)[0]).toBe('0% off sport packages')
     expect(validityLabel(VIP_TIER)).toBe('12 months validity')
     expect(validityLabel(cardTier({ durationMonths: 1 }))).toBe('1 month validity')

@@ -55,14 +55,12 @@ export function registrationTitle(registration: Pick<PackageRegistration, 'sport
 }
 
 /**
- * "10% off packages longer than a single visit". Shared by the tier stat hint, the first-package
- * hero and the Sport Packages note, so every text states the rule the prices are computed with:
- * MembershipCardServiceImpl.getApplicableDiscountPercentage gives 0 only to packages of 1 day or
- * less (see isDiscountEligible in packagesModel.ts). docs/database/09 lines 149 to 153 say 30-day
- * and 90-day packages only; that difference is an open question for the backend team.
+ * "10% off 30-day and 90-day packages". Shared by the tier stat hint, the first-package
+ * hero and the Sport Packages note, so every text states the same eligibility rule
+ * used by MembershipCardServiceImpl and isDiscountEligible in packagesModel.ts.
  */
 export function cardDiscountText(discountPercentage: number): string {
-  return `${discountPercentage}% off packages longer than a single visit`
+  return `${discountPercentage}% off 30-day and 90-day packages`
 }
 
 /** True when the date range contains today. A missing start or end date is an open bound. */

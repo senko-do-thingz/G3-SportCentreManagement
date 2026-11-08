@@ -115,7 +115,7 @@ describe('FE-03 Sport Packages (F1-09)', () => {
     expect(finalPrice(/^Coach-led Football, 30 days/)).toBe('810.000 VND')
     expect(finalPrice(/^Coach-led Football, 90 days/)).toBe('2.160.000 VND')
     expect(finalPrice(/^Self-training Football, Single visit/)).toBe('80.000 VND')
-    expect(screen.getByText(/Your VIP card gives you 10% off packages longer than a single visit/)).toBeInTheDocument()
+    expect(screen.getByText(/Your VIP card gives you 10% off 30-day and 90-day packages/)).toBeInTheDocument()
   })
 
   it('TC-FE03-014 a pending or expired card gives no discount', async () => {
@@ -359,12 +359,12 @@ describe('FE-03 review round 1', () => {
     expect(screen.queryByText(/1 sessions/)).not.toBeInTheDocument()
   })
 
-  it('TC-FE03-043 a 60 day package is discounted for GOLD and the note states the same rule (B2)', async () => {
+  it('TC-FE03-043 a 60 day package keeps its full price for GOLD and the note states the eligible terms (B2)', async () => {
     const sixty = sportPackage({ id: 9, durationDays: 60, sessionCount: 16, priceAmount: 1000000 })
     await openList({ cards: [GOLD], packages: [...PACKAGES, sixty] })
-    expect(finalPrice(/^Coach-led Football, 60 days/)).toBe('950.000 VND')
+    expect(finalPrice(/^Coach-led Football, 60 days/)).toBe('1.000.000 VND')
     const note = screen.getByText(/Your Gold card gives you/)
-    expect(note).toHaveTextContent('Your Gold card gives you 5% off packages longer than a single visit.')
+    expect(note).toHaveTextContent('Your Gold card gives you 5% off 30-day and 90-day packages.')
     expect(note).not.toHaveTextContent('30 day and 90 day')
   })
 

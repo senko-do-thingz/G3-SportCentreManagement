@@ -218,7 +218,7 @@ Front desk check-in validates member arrival at the center:
 3. **Registration Activation Rules:**
    - Status transition: Strictly allowed only from `PENDING_PAYMENT` -> `ACTIVE`. Transition from any other status (`ACTIVE`, `CANCELLED`, `REFUNDED`, `EXPIRED`) throws a business rule error.
    - Channel and role enforcement: Registrations created by a `MEMBER` actor always force channel `ONLINE` and status `PENDING_PAYMENT`. Only `RECEPTIONIST` and `MANAGER` staff actors can create immediate `ACTIVE` registrations with channel `RECEPTION`.
-   - Date recomputation at activation: If `startDate` is in the past when activation occurs (`startDate < TODAY`), `startDate` is reset to `TODAY` and `endDate` is set to `startDate + durationDays`. If `startDate >= TODAY`, dates are preserved unchanged.
+   - Date recomputation at activation: If `startDate` is in the past when activation occurs (`startDate < TODAY`), `startDate` is reset to `TODAY` and `endDate` is moved by the same number of calendar days. The purchased duration is derived from the registration's stored start and end dates, so later catalog edits do not change it. If `startDate >= TODAY`, dates are preserved unchanged.
    - Refund terminal status: Approved refunds transition the associated package registration status to `REFUNDED`.
 4. **Booking Eligibility Checklist:**
    - Session State: `PUBLISHED` and not in the past (today allowed) (Implemented).

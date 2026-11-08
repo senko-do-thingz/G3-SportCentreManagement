@@ -105,11 +105,13 @@ describe('FE-03 packages model', () => {
     expect(packageSummary({ durationDays: 30 })).toBe('30 days - No session limit')
   })
 
-  it('TC-FE03-009 discount eligibility follows the backend: every package longer than 1 day', () => {
+  it('TC-FE03-009 discount eligibility is limited to 30-day and 90-day packages', () => {
     expect(isDiscountEligible(1)).toBe(false)
-    expect(isDiscountEligible(2)).toBe(true)
-    expect(isDiscountEligible(60)).toBe(true)
-    expect(priceBreakdown(sportPackage({ durationDays: 60, priceAmount: 1000000 }), GOLD).final).toBe(950000)
+    expect(isDiscountEligible(2)).toBe(false)
+    expect(isDiscountEligible(30)).toBe(true)
+    expect(isDiscountEligible(60)).toBe(false)
+    expect(isDiscountEligible(90)).toBe(true)
+    expect(priceBreakdown(sportPackage({ durationDays: 60, priceAmount: 1000000 }), GOLD).final).toBe(1000000)
   })
 
   it('TC-FE03-020 sanitizeFilters drops unknown sport, format and duration values', () => {

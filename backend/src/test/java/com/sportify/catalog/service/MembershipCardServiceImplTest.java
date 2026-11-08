@@ -346,6 +346,12 @@ public class MembershipCardServiceImplTest {
     }
 
     @Test
+    void getApplicableDiscountPercentage_OtherDurations_ReturnZero() {
+        assertEquals(0, membershipCardService.getApplicableDiscountPercentage(100L, 2));
+        assertEquals(0, membershipCardService.getApplicableDiscountPercentage(100L, 60));
+    }
+
+    @Test
     void getApplicableDiscountPercentage_MultiDayPackage_ReturnsCardDiscount() {
         MemberCard card = MemberCard.builder().id(1L).tier(goldTier).build();
         when(memberCardRepository.findActiveCardsForMember(eq(100L), eq(CardStatus.ACTIVE), any(LocalDate.class)))
@@ -353,6 +359,7 @@ public class MembershipCardServiceImplTest {
 
         int discount = membershipCardService.getApplicableDiscountPercentage(100L, 30);
         assertEquals(5, discount);
+        assertEquals(5, membershipCardService.getApplicableDiscountPercentage(100L, 90));
     }
 
     @Test
