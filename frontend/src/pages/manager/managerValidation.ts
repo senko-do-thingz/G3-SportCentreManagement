@@ -38,6 +38,16 @@ export function numericError(value: string, label: string, minimum: number, inte
   return undefined
 }
 
+/**
+ * Sport package price: 0 VND is allowed (a desk-only package, which a Member cannot order online); negative prices
+ * are rejected. Same rule as the backend create and update requests.
+ */
+export function nonNegativePriceError(value: string): string | undefined {
+  if (!value.trim() || !Number.isFinite(Number(value)) || Number(value) < 0) return 'Enter a price of 0 VND or more.'
+  if (!/^\d{1,12}(?:\.\d{1,2})?$/.test(value.trim())) return 'Price must have at most 12 integer digits and 2 decimal places.'
+  return undefined
+}
+
 export function positivePriceError(value: string): string | undefined {
   if (!value.trim() || !Number.isFinite(Number(value)) || Number(value) <= 0) return 'Enter a price greater than 0 VND.'
   if (!/^\d{1,12}(?:\.\d{1,2})?$/.test(value.trim()) || Number(value) < 0.01) return 'Price must have at most 12 integer digits and 2 decimal places.'

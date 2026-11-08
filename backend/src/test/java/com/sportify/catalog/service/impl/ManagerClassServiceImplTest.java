@@ -368,6 +368,35 @@ class ManagerClassServiceImplTest {
     }
 
     @Test
+    void updateClass_maxMembersBelowAnUpcomingSessionCapacity_shouldThrowWithoutSaving() {
+        SportClass sportClass = existingClass();
+        when(sportClassRepository.findWithDetailsById(CLASS_ID)).thenReturn(Optional.of(sportClass));
+        when(coachSportRepository.existsById(new CoachSportId(COACH_ID, FOOTBALL_ID))).thenReturn(true);
+        stubUpcomingSessions(CLASS_ID, 2);
+        when(classSessionRepository.findMaxUpcomingCapacity(eq(CLASS_ID), anyCollection(), eq(TODAY), eq(NOW))).thenReturn(14);
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> service.updateClass(CLASS_ID,
+                new SportClassRequest("Football Fundamentals", FOOTBALL_ID, AGE_16_ID, ClassLevel.BEGINNER, 12, COACH_ID), actor));
+
+        assertEquals("CLASS_MAX_BELOW_SESSION_CAPACITY", ex.getCode());
+        verify(sportClassRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    void updateClass_maxMembersEqualToTheLargestUpcomingCapacity_isAllowed() {
+        SportClass sportClass = existingClass();
+        when(sportClassRepository.findWithDetailsById(CLASS_ID)).thenReturn(Optional.of(sportClass));
+        when(coachSportRepository.existsById(new CoachSportId(COACH_ID, FOOTBALL_ID))).thenReturn(true);
+        when(sportClassRepository.saveAndFlush(sportClass)).thenReturn(sportClass);
+        stubUpcomingSessions(CLASS_ID, 2);
+        when(classSessionRepository.findMaxUpcomingCapacity(eq(CLASS_ID), anyCollection(), eq(TODAY), eq(NOW))).thenReturn(14);
+
+        assertEquals(14, service.updateClass(CLASS_ID, new SportClassRequest("Football Fundamentals", FOOTBALL_ID,
+                AGE_16_ID, ClassLevel.BEGINNER, 14, COACH_ID), actor).maxMembers());
+    }
+
+    @Test
     void updateClass_withoutAnyChange_shouldNotWriteAuditRow() {
         SportClass sportClass = existingClass();
         when(sportClassRepository.findWithDetailsById(CLASS_ID)).thenReturn(Optional.of(sportClass));

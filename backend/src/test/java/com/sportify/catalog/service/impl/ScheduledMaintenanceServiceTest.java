@@ -22,6 +22,20 @@ import static org.mockito.Mockito.*;
 class ScheduledMaintenanceServiceTest {
     private final MemberCardRepository cards = mock(MemberCardRepository.class);
     private final SportPackageRegistrationRepository registrations = mock(SportPackageRegistrationRepository.class);
+    private final com.sportify.catalog.repository.ClassSessionRepository sessions =
+            mock(com.sportify.catalog.repository.ClassSessionRepository.class);
+
+    @Test
+    void completesEndedSessionsUsingTheVietnamBusinessDateAndTime() throws Exception {
+        when(sessions.completeEnded(any(), any(), any())).thenReturn(3);
+        // 2026-10-15T10:30:00.250Z is 17:30:00 in Asia/Ho_Chi_Minh; sub-second precision is dropped.
+        assertThat(service("2026-10-15T10:30:00.250Z").completeEndedSessions()).isEqualTo(3);
+        verify(sessions).completeEnded(LocalDate.of(2026, 10, 15), java.time.LocalTime.of(17, 30),
+                LocalDateTime.parse("2026-10-15T17:30:00"));
+        verifyNoInteractions(cards, registrations);
+        var tx = ScheduledMaintenanceService.class.getMethod("completeEndedSessions").getAnnotation(Transactional.class);
+        assertThat(tx.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
+    }
 
     @ParameterizedTest
     @CsvSource({
@@ -33,7 +47,7 @@ class ScheduledMaintenanceServiceTest {
     })
     void usesExclusiveCalendarMidnightWithOneVietnamDate(String instant, LocalDate date,
                                                          LocalDateTime cutoff, LocalDateTime now) {
-        var service = new ScheduledMaintenanceService(cards, registrations,
+        var service = new ScheduledMaintenanceService(cards, registrations, sessions,
                 Clock.fixed(Instant.parse(instant), ZoneOffset.UTC));
         var result = service.runDailyMaintenance();
         assertThat(result.businessDate()).isEqualTo(date);
@@ -89,7 +103,7 @@ class ScheduledMaintenanceServiceTest {
                 return Instant.parse("2026-10-15T16:59:59Z").plusSeconds(reads.getAndIncrement());
             }
         };
-        var result = new ScheduledMaintenanceService(cards, registrations, ticking).runDailyMaintenance();
+        var result = new ScheduledMaintenanceService(cards, registrations, sessions, ticking).runDailyMaintenance();
         assertThat(reads).hasValue(1);
         assertThat(result.businessDate()).isEqualTo(LocalDate.of(2026, 10, 15));
         verify(registrations).expireActive(LocalDate.of(2026, 10, 15), LocalDateTime.parse("2026-10-15T23:59:59"));
@@ -114,6 +128,6 @@ class ScheduledMaintenanceServiceTest {
     }
 
     private ScheduledMaintenanceService service(String instant) {
-        return new ScheduledMaintenanceService(cards, registrations, Clock.fixed(Instant.parse(instant), ZoneOffset.UTC));
+        return new ScheduledMaintenanceService(cards, registrations, sessions, Clock.fixed(Instant.parse(instant), ZoneOffset.UTC));
     }
 }

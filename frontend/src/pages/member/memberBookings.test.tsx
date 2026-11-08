@@ -267,17 +267,32 @@ describe('FE-09 member booking screens', () => {
     expect(backend.calls.filter((call) => call.method === 'DELETE' && call.path === '/bookings/21')).toHaveLength(1)
   })
 
-  it('keeps booking confirmed when backend rejects cancellation after cutoff', async () => {
+  it('warns that a late cancellation frees the place but forfeits the session credit', async () => {
+    const soon = new Date(Date.now() + 60 * 60 * 1000 + 7 * 60 * 60 * 1000).toISOString()
+    const lateBooking = { ...booking, sessionDate: soon.slice(0, 10), startTime: `${soon.slice(11, 16)}:00` }
+    api((call) => {
+      if (call.path === '/bookings/my?when=UPCOMING') return json(200, [lateBooking])
+      if (call.path === '/bookings/my?when=PAST') return json(200, [])
+      return backendError(404, 'Unexpected request')
+    })
+    renderApp('/member/bookings/21/cancel')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Late cancellation')
+    expect(screen.getByRole('alert')).toHaveTextContent('this session credit is not returned')
+    expect(screen.getByRole('button', { name: 'Confirm cancellation' })).toBeEnabled()
+  })
+
+  it('keeps booking confirmed when backend rejects cancellation because the session has started', async () => {
     api((call) => {
       if (call.path === '/bookings/my?when=UPCOMING') return json(200, [booking])
       if (call.path === '/bookings/my?when=PAST') return json(200, [])
-      if (call.path === '/bookings/21' && call.method === 'DELETE') return json(400, { message: 'Too late', code: 'CANCELLATION_CUTOFF' })
+      if (call.path === '/bookings/21' && call.method === 'DELETE') return json(400, { message: 'Started', code: 'SESSION_STARTED' })
       return backendError(404, 'Unexpected request')
     })
     const user = userEvent.setup()
     renderApp('/member/bookings/21/cancel')
     await user.click(await screen.findByRole('button', { name: 'Confirm cancellation' }))
-    expect(await screen.findByText(/cancellation deadline has passed/)).toBeInTheDocument()
+    expect(await screen.findByText('Cancellation request rejected')).toBeInTheDocument()
+    expect(screen.getByText(/has already started/)).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Booking cancelled' })).not.toBeInTheDocument()
   })
 

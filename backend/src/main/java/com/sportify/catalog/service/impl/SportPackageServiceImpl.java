@@ -103,7 +103,7 @@ public class SportPackageServiceImpl implements SportPackageService {
     @Override
     @Transactional(readOnly = true)
     public List<SportPackageResponse> getManagerPackages(Long sportId, TrainingFormat format, Boolean active) {
-        return sportPackageRepository.findAll(SportPackageSpecifications.withFilters(sportId, format, active), Sort.by(Sort.Direction.ASC, "id"))
+        return sportPackageRepository.findAll(SportPackageSpecifications.withFilters(sportId, format, active), Sort.by(Sort.Direction.DESC, "id"))
                 .stream()
                 .map(this::mapToPackageResponse)
                 .collect(Collectors.toList());
@@ -399,8 +399,10 @@ public class SportPackageServiceImpl implements SportPackageService {
 
         LocalDate today = LocalDate.now(clock);
         if (registration.getStartDate().isBefore(today)) {
+            long purchasedDays = java.time.temporal.ChronoUnit.DAYS.between(
+                    registration.getStartDate(), registration.getEndDate()) + 1;
             registration.setStartDate(today);
-            registration.setEndDate(packageEnd(today, registration.getSportPackage().getDurationDays()));
+            registration.setEndDate(today.plusDays(purchasedDays - 1));
         }
 
         registration.setStatus(PackageRegistrationStatus.ACTIVE);

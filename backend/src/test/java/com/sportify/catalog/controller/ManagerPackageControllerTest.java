@@ -1,6 +1,7 @@
 package com.sportify.catalog.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sportify.catalog.dto.SportPackageCreateRequest;
 import com.sportify.catalog.dto.SportPackageResponse;
 import com.sportify.catalog.dto.SportPackageUpdateRequest;
 import com.sportify.catalog.entity.TrainingFormat;
@@ -32,9 +33,12 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -248,16 +252,25 @@ class ManagerPackageControllerTest {
                 .andExpect(jsonPath("$.message").value("Session minutes must be either 60 or 90"));
     }
 
+    /** E2E04-F01: a 0 VND package can be edited and deactivated, matching creation (Option A). */
     @Test
-    void updatePackage_zeroPrice_shouldReturn400() throws Exception {
+    void updatePackage_zeroPriceAndDeactivate_isAccepted() throws Exception {
         SportPackageUpdateRequest req = sampleUpdateRequest();
         req.setPrice(BigDecimal.ZERO);
+        req.setActive(false);
+        SportPackageResponse expected = samplePackage(10L, "PKG-YOGA", false);
+        expected.setPriceAmount(BigDecimal.ZERO);
+        when(sportPackageService.updatePackage(eq(10L), any(SportPackageUpdateRequest.class), any())).thenReturn(expected);
 
         mockMvc.perform(put(PACKAGES_URL + "/10")
                         .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priceAmount").value(0));
+        verify(sportPackageService).updatePackage(eq(10L),
+                org.mockito.ArgumentMatchers.argThat((SportPackageUpdateRequest r) -> r.getPrice().signum() == 0
+                        && Boolean.FALSE.equals(r.getActive())), any());
     }
 
     @Test
@@ -269,7 +282,23 @@ class ManagerPackageControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.price").value("Price must not be negative"));
+        verify(sportPackageService, never()).updatePackage(any(), any(), any());
+    }
+
+    @Test
+    void createPackage_negativePrice_shouldReturn400() throws Exception {
+        SportPackageCreateRequest req = SportPackageCreateRequest.builder().code("PKG-NEG").name("Negative").sportId(1L)
+                .trainingFormat(TrainingFormat.SELF_TRAINING).durationDays(30).sessionCount(4).sessionMinutes(60).build();
+        req.setPriceAmount(BigDecimal.valueOf(-1));
+
+        mockMvc.perform(post(PACKAGES_URL)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(MANAGER_TOKEN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest());
+        verify(sportPackageService, never()).createPackage(any(), any());
     }
 
     @Test
