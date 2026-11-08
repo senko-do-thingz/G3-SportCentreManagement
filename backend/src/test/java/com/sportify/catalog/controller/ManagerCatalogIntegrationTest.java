@@ -1354,8 +1354,8 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("Updating sport package price to 0 via HTTP returns 400 Bad Request")
-    void testUpdatePackage_priceZero_returns400() throws Exception {
+    @DisplayName("Updating sport package price to a negative value via HTTP returns 400 (0 VND is allowed, E2E04-F01)")
+    void testUpdatePackage_negativePrice_returns400() throws Exception {
         SportPackage pkg = sportPackageRepository.save(SportPackage.builder()
                 .code("PKG-ZERO-" + MARKER)
                 .name("Zero Price Pkg " + MARKER)
@@ -1370,7 +1370,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
 
         SportPackageUpdateRequest req = SportPackageUpdateRequest.builder()
                 .name("Zero Price Pkg " + MARKER)
-                .price(BigDecimal.ZERO)
+                .price(BigDecimal.valueOf(-1))
                 .sessionCount(10)
                 .durationDays(30)
                 .sessionMinutes(60)
