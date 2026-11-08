@@ -3,6 +3,7 @@ package com.sportify.catalog.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sportify.AbstractIntegrationTest;
+import com.sportify.catalog.dto.SportPackageCreateRequest;
 import com.sportify.catalog.dto.CardTierResponse;
 import com.sportify.catalog.dto.MemberCardPurchaseRequest;
 import com.sportify.catalog.dto.MemberCardResponse;
@@ -222,6 +223,96 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         jdbcTemplate.update("DELETE FROM membership_card_tier WHERE code LIKE '%" + MARKER + "%'");
         jdbcTemplate.update("DELETE FROM member_profile WHERE member_code LIKE '%" + MARKER + "%'");
         jdbcTemplate.update("DELETE FROM user_account WHERE email LIKE '%" + MARKER + "%'");
+    }
+
+    /**
+     * E2E04-F01 (Issue #252, Option A): a 0 VND sport package is supported end to end. The Manager can create, edit,
+     * deactivate and reactivate it (the original CLEAN-01 failure), negative prices are rejected on create and update,
+     * a desk sale activates it without a payment or invoice, a Member cannot order it online, and an existing
+     * registration keeps its price snapshot when the catalog package changes.
+     */
+    @Test
+    @DisplayName("E2E04-F01: 0 VND package create/edit/deactivate/reactivate, negative rejected, desk-only sale, snapshot kept")
+    void zeroPricePackage_isSupportedConsistently() throws Exception {
+        String code = "PKG-" + MARKER + "-ZERO";
+        String created = mockMvc.perform(post("/api/v1/packages")
+                        .header("Authorization", "Bearer " + managerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(SportPackageCreateRequest.builder()
+                                .code(code).name("Complimentary trial " + MARKER).sportId(activeSport1.getId())
+                                .trainingFormat(TrainingFormat.COACH_LED).durationDays(30).sessionCount(4)
+                                .sessionMinutes(60).priceAmount(BigDecimal.ZERO).build())))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long packageId = objectMapper.readTree(created).get("id").asLong();
+
+        // Desk sale by a Receptionist: ACTIVE at once, no payment and no invoice.
+        Role receptionRole = roleRepository.findByCode("RECEPTIONIST")
+                .orElseGet(() -> roleRepository.save(Role.builder().code("RECEPTIONIST").name("Receptionist").build()));
+        UserAccount reception = userRepository.save(UserAccount.builder().email("reception_" + MARKER + "@sportify.com")
+                .passwordHash("hashed").fullName("Reception BE03").status("ACTIVE").role(receptionRole).build());
+        String receptionToken = jwtService.generateToken(new CustomUserDetails(reception));
+        String sold = mockMvc.perform(post("/api/v1/packages/registrations")
+                        .header("Authorization", "Bearer " + receptionToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":" + memberProfile.getId() + ",\"packageId\":" + packageId
+                                + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"CASH\",\"startDate\":\"" + LocalDate.now() + "\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andReturn().getResponse().getContentAsString();
+        long registrationId = objectMapper.readTree(sold).get("id").asLong();
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sport_package_registration WHERE id = ? AND payment_id IS NOT NULL", Integer.class, registrationId));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM invoice WHERE member_id = ?", Integer.class, memberProfile.getId()));
+
+        // A Member cannot order a 0 VND package online.
+        String memberToken = jwtService.generateToken(new CustomUserDetails(memberUser));
+        mockMvc.perform(post("/api/v1/packages/registrations")
+                        .header("Authorization", "Bearer " + memberToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"packageId\":" + packageId + ",\"startDate\":\"" + LocalDate.now() + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("greater than zero")));
+
+        // Edit and deactivate at 0 VND (original CLEAN-01 failure), then reactivate.
+        for (boolean active : new boolean[]{false, true}) {
+            mockMvc.perform(put("/api/v1/packages/" + packageId)
+                            .header("Authorization", "Bearer " + managerToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(SportPackageUpdateRequest.builder()
+                                    .name("Complimentary trial edited " + MARKER).price(BigDecimal.ZERO).sessionCount(6)
+                                    .durationDays(30).sessionMinutes(60).active(active).build())))
+                    .andExpect(status().isOk());
+            SportPackage reloaded = sportPackageRepository.findById(packageId).orElseThrow();
+            assertEquals(active, reloaded.getIsActive());
+            assertEquals(0, BigDecimal.ZERO.compareTo(reloaded.getPriceAmount()));
+        }
+
+        // Negative price is rejected on update and on create; nothing changes.
+        mockMvc.perform(put("/api/v1/packages/" + packageId)
+                        .header("Authorization", "Bearer " + managerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(SportPackageUpdateRequest.builder()
+                                .name("Negative " + MARKER).price(BigDecimal.valueOf(-1)).sessionCount(6)
+                                .durationDays(30).sessionMinutes(60).active(true).build())))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/v1/packages")
+                        .header("Authorization", "Bearer " + managerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(SportPackageCreateRequest.builder()
+                                .code("PKG-" + MARKER + "-NEG").name("Negative " + MARKER).sportId(activeSport1.getId())
+                                .trainingFormat(TrainingFormat.COACH_LED).durationDays(30).sessionCount(4)
+                                .sessionMinutes(60).priceAmount(BigDecimal.valueOf(-1)).build())))
+                .andExpect(status().isBadRequest());
+        assertEquals("Complimentary trial edited " + MARKER, sportPackageRepository.findById(packageId).orElseThrow().getName());
+
+        // The existing registration keeps its original snapshot after the catalog edits.
+        var snapshot = jdbcTemplate.queryForMap(
+                "SELECT status, paid_amount, total_sessions FROM sport_package_registration WHERE id = ?", registrationId);
+        assertEquals("ACTIVE", snapshot.get("status"));
+        assertEquals(0, BigDecimal.ZERO.compareTo((BigDecimal) snapshot.get("paid_amount")));
+        assertEquals(4, ((Number) snapshot.get("total_sessions")).intValue());
     }
 
     @Test
@@ -1263,8 +1354,8 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("Updating sport package price to 0 via HTTP returns 400 Bad Request")
-    void testUpdatePackage_priceZero_returns400() throws Exception {
+    @DisplayName("Updating sport package price to a negative value via HTTP returns 400 (0 VND is allowed, E2E04-F01)")
+    void testUpdatePackage_negativePrice_returns400() throws Exception {
         SportPackage pkg = sportPackageRepository.save(SportPackage.builder()
                 .code("PKG-ZERO-" + MARKER)
                 .name("Zero Price Pkg " + MARKER)
@@ -1279,7 +1370,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
 
         SportPackageUpdateRequest req = SportPackageUpdateRequest.builder()
                 .name("Zero Price Pkg " + MARKER)
-                .price(BigDecimal.ZERO)
+                .price(BigDecimal.valueOf(-1))
                 .sessionCount(10)
                 .durationDays(30)
                 .sessionMinutes(60)
