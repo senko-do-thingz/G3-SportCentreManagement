@@ -17,6 +17,7 @@ import { WalletTopUpPage } from '../pages/member/WalletTopUpPage'
 import { WalletTopUpQueuePage } from '../pages/reception/WalletTopUpQueuePage'
 import { WalletWithdrawPage } from '../pages/member/WalletWithdrawPage'
 import { WalletWithdrawalQueuePage } from '../pages/reception/WalletWithdrawalQueuePage'
+import { ReceptionInboxPage } from '../pages/reception/ReceptionInboxPage'
 import { MyProfilePage } from '../pages/member/MyProfilePage'
 import { HealthAssessmentPage } from '../pages/member/HealthAssessmentPage'
 import { CheckInPassPage } from '../pages/member/CheckInPassPage'
@@ -120,6 +121,7 @@ const SCREENS: Record<string, ReactNode> = {
   '/reception/refunds': <RefundRequestsPage />,
   '/reception/wallet/topups': <WalletTopUpQueuePage />,
   '/reception/wallet/withdrawals': <WalletWithdrawalQueuePage />,
+  '/reception/inbox': <ReceptionInboxPage />,
   '/coach': <CoachTeachingSchedulePage />,
   '/coach/roster': <CoachRosterPage />,
 }
