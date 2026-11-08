@@ -658,3 +658,24 @@
   padding-left: var(--space-5);
   color: var(--color-text-muted);
 }
+
+/* MW-03 Sportify Wallet */
+.wallet-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.wallet-amount {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.wallet-amount--in {
+  color: var(--color-success);
+}
+
+.wallet-amount--out {
+  color: var(--color-text);
+}
