@@ -8,9 +8,21 @@ Migration: `backend/src/main/resources/db/demo/V28__seed_demo_accounts.sql`. At 
 
 Use a fresh isolated demo database when enabling the profile. Do not reuse one for production or remove its migration location. A later shared version can make an unapplied V28 incompatible with disabled out-of-order execution. Profile checks cannot identify the business purpose of a database connection. Operators must select the database correctly.
 
-## Account specification
+## Demo Accounts
 
-Credentials and exact display names are in the root README's `Demo Accounts` table. Tests parse the actual SQL account rows and read the documented password; a disconnected copy of the seed cannot make these tests pass.
+These accounts are for an isolated local demonstration database only. Activate the seed with `SPRING_PROFILES_ACTIVE=dev,demo` on a fresh isolated database. Tests parse the actual SQL account rows and compare them with this specification.
+
+Common demo password: `SportifyDemo2026!`
+
+| Display name | Email | Role | Demo password | Scenario |
+|---|---|---|---|---|
+| Nguyen Thi Lan | lan.reception@example.com | RECEPTIONIST | SportifyDemo2026! | Front desk |
+| Tran Minh Quan | quan.coach@example.com | COACH | SportifyDemo2026! | BADMINTON primary sport |
+| Le Hoang Nam | nam.coach@example.com | COACH | SportifyDemo2026! | SWIMMING primary sport |
+| Pham Thu Ha | ha.coach@example.com | COACH | SportifyDemo2026! | BASKETBALL primary sport |
+| Nguyen Van An | an.gold@example.com | MEMBER | SportifyDemo2026! | GOLD physical card, 5% discount on eligible 30-day and 90-day packages |
+| Tran Thi Mai | mai.standard@example.com | MEMBER | SportifyDemo2026! | STANDARD physical card, free and permanent, 0% discount |
+| Le Quoc Bao | bao.nocard@example.com | MEMBER | SportifyDemo2026! | Member profile with no physical card, 0% discount |
 
 | Account email | Role | Required relationship/scenario |
 |---|---|---|
@@ -32,14 +44,14 @@ GOLD: ACTIVE, start 2026-10-01, inclusive end 2027-09-30, price snapshot 300000 
 
 | Case | Verification |
 |---|---|
-| U01 | README password satisfies the real StrongPasswordValidator |
+| U01 | Documented password satisfies the real StrongPasswordValidator |
 | U02 | ApplicationConfig PasswordEncoder matches the SQL BCrypt hash; wrong password fails; plaintext absent from SQL |
 | U03 | Actual SQL has exactly seven unique example.com identities, ordered ordinals and 1/3/3 role mapping |
 | U04 | Actual coach sports are three distinct codes present in V6 |
 | U05 | GOLD, physical STANDARD and no-card specification; no payment fabrication/account overwrite |
 | U06 | Existing member sequence and formatter conventions, including values above 9999 |
-| U07 | Deterministic inclusive twelve-month GOLD dates, matching README |
-| U08 | Every README table name/email/role/password/sport matches SQL |
+| U07 | Deterministic inclusive twelve-month GOLD dates, matching this specification |
+| U08 | Every specification table name/email/role/password/sport matches SQL |
 | U09 | Resource presence, global migration version uniqueness and transactional/locking safeguards |
 
 `com.sportify.core.config.DemoProfileSafetyConfigurationTest` has nine parameterized executions:
@@ -63,7 +75,7 @@ The suite defines 60 test executions after Round 2: all original 59 plus one rea
 | Case group | Executions | Actual verification |
 |---|---:|---|
 | Fresh migration | 1 | Correct catalog, seven accounts, profiles, cards, manager, trusted FKs, V28 success and ordered history |
-| Successful authentication | 7 | AuthenticationService authenticates every account using README password; signed access/refresh tokens, subject, resolved authorities and current-user role |
+| Successful authentication | 7 | AuthenticationService authenticates every account using the documented password; signed access/refresh tokens, subject, resolved authorities and current-user role |
 | Stored password | 7 | Actual DB hash matches configured encoder and is not plaintext |
 | Wrong password | 7 | AuthenticationService rejects each account's incorrect credential |
 | Disabled account | 7 | INACTIVE status cannot authenticate; rollback restores ACTIVE |

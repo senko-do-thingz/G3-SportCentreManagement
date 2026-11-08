@@ -105,7 +105,7 @@ describe('FE-04 Membership Cards (F1-11)', () => {
     expect(within(tier('Standard')).getByRole('link', { name: 'Explore sport packages' })).toHaveAttribute('href', '/member/packages')
     expect(within(tier('Gold Member')).getByText('300.000 VND')).toBeInTheDocument()
     expect(within(tier('Gold Member')).getByText('12 months validity')).toBeInTheDocument()
-    expect(within(tier('Gold Member')).getByText('5% off packages longer than a single visit')).toBeInTheDocument()
+    expect(within(tier('Gold Member')).getByText('5% off 30-day and 90-day packages')).toBeInTheDocument()
     expect(within(tier('VIP Member')).getByText('600.000 VND')).toBeInTheDocument()
     expect(within(tier('VIP Member')).getByRole('button', { name: 'Get card' })).toBeInTheDocument()
     expect(calls.map((call) => call.path)).toEqual(expect.arrayContaining(['/membership-cards/tiers', '/membership-cards/my']))

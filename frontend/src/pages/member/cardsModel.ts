@@ -250,14 +250,14 @@ export const PLAN_ACTION_LABELS: Record<CardPlanKind, string> = {
 /**
  * Benefits shown under each tier. The backend has no perks field yet (CardTierResponse carries
  * price, duration, discount and description only), so the list is built from the discount rule
- * the backend applies: every package longer than a single visit.
+ * the backend applies: 30-day and 90-day packages.
  */
 export function tierPerks(tier: Pick<CardTier, 'durationMonths' | 'discountPercentage'>): string[] {
   if (isFreeTier(tier)) {
     return ['0% off sport packages', 'Standard sport package prices', 'Pay per sport or session']
   }
   return [
-    `${tier.discountPercentage ?? 0}% off packages longer than a single visit`,
+    `${tier.discountPercentage ?? 0}% off 30-day and 90-day packages`,
     'Self-training and coach-led packages',
     'Single visits excluded',
   ]
