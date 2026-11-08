@@ -1,0 +1,445 @@
+{
+  "RUN": "e2e04-mw7lj4fh",
+  "finishedVn": "2026-11-08T15:54",
+  "results": [
+    {
+      "id": "F1-01",
+      "flow": "Flow 1",
+      "scenario": "Manager login with documented credential (D1)",
+      "expected": "200 + token",
+      "result": "PASS",
+      "actual": "HTTP 200"
+    },
+    {
+      "id": "SETUP-01",
+      "flow": "Setup",
+      "scenario": "Read sports, facilities, age groups",
+      "expected": "active Badminton sport with a facility",
+      "result": "PASS",
+      "actual": "Badminton / Badminton Court 1 / Ages 16+"
+    },
+    {
+      "id": "F1-02",
+      "flow": "Flow 1",
+      "scenario": "Manager creates synthetic COACH qualified for the sport",
+      "expected": "201",
+      "result": "PASS",
+      "actual": "HTTP 201"
+    },
+    {
+      "id": "F1-03",
+      "flow": "Flow 1",
+      "scenario": "Manager creates synthetic RECEPTIONIST",
+      "expected": "201",
+      "result": "PASS",
+      "actual": "HTTP 201"
+    },
+    {
+      "id": "F1-04-coach",
+      "flow": "Flow 1",
+      "scenario": "Staff login (coach) with temporary password",
+      "expected": "200",
+      "result": "PASS",
+      "actual": "HTTP 200"
+    },
+    {
+      "id": "F1-04-reception",
+      "flow": "Flow 1",
+      "scenario": "Staff login (reception) with temporary password",
+      "expected": "200",
+      "result": "PASS",
+      "actual": "HTTP 200"
+    },
+    {
+      "id": "F1-05",
+      "flow": "Flow 1",
+      "scenario": "Member self-registration (two synthetic members)",
+      "expected": "201 x2",
+      "result": "PASS",
+      "actual": "HTTP 200/200"
+    },
+    {
+      "id": "F1-06",
+      "flow": "Flow 1",
+      "scenario": "Duplicate e-mail registration rejected",
+      "expected": "409",
+      "result": "PASS",
+      "actual": "HTTP 409  Email is already registered"
+    },
+    {
+      "id": "F1-07",
+      "flow": "Flow 1",
+      "scenario": "GET /users/me returns the member profile",
+      "expected": "200 MEMBER",
+      "result": "PASS",
+      "actual": "HTTP 200 id=25"
+    },
+    {
+      "id": "F1-08",
+      "flow": "Flow 1",
+      "scenario": "Refresh token rotation: new pair issued, old refresh token rejected",
+      "expected": "200 then 401",
+      "result": "PASS",
+      "actual": "first 200, reuse 401"
+    },
+    {
+      "id": "F1-09",
+      "flow": "Flow 1",
+      "scenario": "Member cannot call a Manager API",
+      "expected": "403",
+      "result": "PASS",
+      "actual": "HTTP 403  Access Denied"
+    },
+    {
+      "id": "SETUP-02",
+      "flow": "Setup",
+      "scenario": "Manager creates synthetic packages (free desk package, paid package)",
+      "expected": "201 x2",
+      "result": "PASS",
+      "actual": "HTTP 201/201  "
+    },
+    {
+      "id": "F1-10",
+      "flow": "Flow 1",
+      "scenario": "Member online order of a paid package waits for payment",
+      "expected": "201 PENDING_PAYMENT",
+      "result": "PASS",
+      "actual": "HTTP 201 PENDING_PAYMENT amount=400000"
+    },
+    {
+      "id": "F1-11",
+      "flow": "Flow 1",
+      "scenario": "Member cannot order the free package online (price must be > 0)",
+      "expected": "400",
+      "result": "PASS",
+      "actual": "HTTP 400  Payment amount must be greater than zero. Attempted package price: 0.00"
+    },
+    {
+      "id": "F1-12",
+      "flow": "Flow 1",
+      "scenario": "Reception desk sale of the free package activates it without a payment (m1, m2)",
+      "expected": "201 ACTIVE, no payment",
+      "result": "PASS",
+      "actual": "HTTP 201/201 ACTIVE paymentId=none "
+    },
+    {
+      "id": "F3-01",
+      "flow": "Flow 3",
+      "scenario": "Confirm with a wrong amount is refused and stays PENDING (non-settling)",
+      "expected": "409 PAYMENT_AMOUNT_MISMATCH",
+      "result": "PASS",
+      "actual": "HTTP 409 PAYMENT_AMOUNT_MISMATCH Amount received 1 does not match the payment amount 400000.00. The payment stays PENDING and needs review."
+    },
+    {
+      "id": "F3-02",
+      "flow": "Flow 3",
+      "scenario": "Member cannot confirm a payment",
+      "expected": "403",
+      "result": "PASS",
+      "actual": "HTTP 403  Access Denied"
+    },
+    {
+      "id": "F3-03",
+      "flow": "Flow 3",
+      "scenario": "Member cancels their own pending order",
+      "expected": "200 CANCELLED",
+      "result": "PASS",
+      "actual": "HTTP 200 CANCELLED"
+    },
+    {
+      "id": "F3-04",
+      "flow": "Flow 3",
+      "scenario": "Refund quote of a package with no payment is refused",
+      "expected": "409 PAYMENT_NOT_REFUNDABLE",
+      "result": "PASS",
+      "actual": "HTTP 409 PAYMENT_NOT_REFUNDABLE Package registration REG-PKG-1010 has no payment, so it cannot be refunded"
+    },
+    {
+      "id": "F3-05",
+      "flow": "Flow 3",
+      "scenario": "Manager finance overview and operations report load",
+      "expected": "200 x2",
+      "result": "PASS",
+      "actual": "HTTP 200/200"
+    },
+    {
+      "id": "SETUP-03",
+      "flow": "Setup",
+      "scenario": "Manager creates a class for the synthetic coach",
+      "expected": "201",
+      "result": "PASS",
+      "actual": "HTTP 201 CL-1002"
+    },
+    {
+      "id": "F2-01",
+      "flow": "Flow 2",
+      "scenario": "Manager schedules a session today and one tomorrow 09:00",
+      "expected": "201 x2",
+      "result": "PASS",
+      "actual": "HTTP 201/201  "
+    },
+    {
+      "id": "F2-02",
+      "flow": "Flow 2",
+      "scenario": "Same coach and facility at an overlapping time is a schedule conflict",
+      "expected": "409",
+      "result": "PASS",
+      "actual": "HTTP 409  The selected coach, facility or time conflicts with existing sessions. Choose another coach, facility or time."
+    },
+    {
+      "id": "F2-03",
+      "flow": "Flow 2",
+      "scenario": "Member sees the session as eligible with the free package",
+      "expected": "200 eligible",
+      "result": "PASS",
+      "actual": "HTTP 200 eligible=true reason=null"
+    },
+    {
+      "id": "F2-04",
+      "flow": "Flow 2",
+      "scenario": "Member books today and tomorrow (1 credit each)",
+      "expected": "201 x2",
+      "result": "PASS",
+      "actual": "HTTP 201/201"
+    },
+    {
+      "id": "F2-05",
+      "flow": "Flow 2",
+      "scenario": "Duplicate booking of the same session rejected",
+      "expected": "409 ALREADY_BOOKED",
+      "result": "PASS",
+      "actual": "HTTP 409 ALREADY_BOOKED Member already has a confirmed booking for this session"
+    },
+    {
+      "id": "F2-06",
+      "flow": "Flow 2",
+      "scenario": "Package balance after two bookings",
+      "expected": "remaining 2 of 4",
+      "result": "PASS",
+      "actual": "remaining=2"
+    },
+    {
+      "id": "F2-07",
+      "flow": "Flow 2",
+      "scenario": "Member cancels tomorrow (more than 120 minutes ahead): credit returned",
+      "expected": "200, remaining 3",
+      "result": "PASS",
+      "actual": "HTTP 200 remaining=3"
+    },
+    {
+      "id": "F2-08",
+      "flow": "Flow 2",
+      "scenario": "Member cannot cancel another member's booking",
+      "expected": "403",
+      "result": "PASS",
+      "actual": "HTTP 403  Access Denied"
+    },
+    {
+      "id": "F2-09",
+      "flow": "Flow 2",
+      "scenario": "My Schedule lists only the member's CONFIRMED upcoming booking",
+      "expected": "200, 1 booking",
+      "result": "PASS",
+      "actual": "HTTP 200 rows=1"
+    },
+    {
+      "id": "F2-10",
+      "flow": "Flow 2",
+      "scenario": "Manager reschedules the booked tomorrow-free session time (no conflict)",
+      "expected": "200",
+      "result": "PASS",
+      "actual": "HTTP 200"
+    },
+    {
+      "id": "F2-11",
+      "flow": "Flow 2",
+      "scenario": "Front-desk check-in for today's booking",
+      "expected": "201 ALLOWED",
+      "result": "PASS",
+      "actual": "HTTP 201 ALLOWED "
+    },
+    {
+      "id": "F2-12",
+      "flow": "Flow 2",
+      "scenario": "Second check-in for the same booking is denied",
+      "expected": "201 DENIED",
+      "result": "PASS",
+      "actual": "HTTP 201 DENIED Already checked in for this session"
+    },
+    {
+      "id": "F2-13",
+      "flow": "Flow 2",
+      "scenario": "Checked-in booking cannot be cancelled",
+      "expected": "400 ALREADY_CHECKED_IN",
+      "result": "PASS",
+      "actual": "HTTP 400 ALREADY_CHECKED_IN Cannot cancel booking that has already been checked in"
+    },
+    {
+      "id": "F2-14",
+      "flow": "Flow 2",
+      "scenario": "Coach sees the session and both members on the roster",
+      "expected": "200, 2 members",
+      "result": "PASS",
+      "actual": "HTTP 200/200 roster=2"
+    },
+    {
+      "id": "F4-01",
+      "flow": "Flow 4",
+      "scenario": "Coach marks PRESENT on the session date (before start allowed, E2E-D9)",
+      "expected": "201",
+      "result": "PASS",
+      "actual": "HTTP 201"
+    },
+    {
+      "id": "F4-02",
+      "flow": "Flow 4",
+      "scenario": "Second attendance for the same member/session needs the correction endpoint",
+      "expected": "409",
+      "result": "PASS",
+      "actual": "HTTP 409  Attendance already exists; use the correction endpoint with a reason"
+    },
+    {
+      "id": "F4-03",
+      "flow": "Flow 4",
+      "scenario": "Result before the session ends is refused",
+      "expected": "400",
+      "result": "PASS",
+      "actual": "HTTP 400  Results can only be recorded after the session ends"
+    },
+    {
+      "id": "F4-04",
+      "flow": "Flow 4",
+      "scenario": "Coach assigns a personal plan and feedback",
+      "expected": "201 x2",
+      "result": "PASS",
+      "actual": "HTTP 201/201"
+    },
+    {
+      "id": "F4-05",
+      "flow": "Flow 4",
+      "scenario": "Member reads own attendance, plans and progress",
+      "expected": "200 x3",
+      "result": "PASS",
+      "actual": "HTTP 200/200/200"
+    },
+    {
+      "id": "F4-06",
+      "flow": "Flow 4",
+      "scenario": "Reception cannot record coach-led attendance",
+      "expected": "403",
+      "result": "PASS",
+      "actual": "HTTP 403  Access Denied"
+    },
+    {
+      "id": "F5-01",
+      "flow": "Flow 5",
+      "scenario": "Member class recommendations for the sport",
+      "expected": "200 list",
+      "result": "PASS",
+      "actual": "HTTP 200 items=1"
+    },
+    {
+      "id": "F5-02",
+      "flow": "Flow 5",
+      "scenario": "Coach drill suggestions for an assigned booking",
+      "expected": "200 with mode",
+      "result": "PASS",
+      "actual": "HTTP 200 mode=AI_GENERATED drills=?"
+    },
+    {
+      "id": "F5-03",
+      "flow": "Flow 5",
+      "scenario": "Member saves a recommendation and lists it",
+      "expected": "200/201 then listed",
+      "result": "PASS",
+      "actual": "HTTP 201/200 "
+    },
+    {
+      "id": "F5-04",
+      "flow": "Flow 5",
+      "scenario": "Another coach cannot read drill suggestions for this booking",
+      "expected": "404/403",
+      "result": "PASS",
+      "actual": "HTTP 403  Access Denied"
+    },
+    {
+      "id": "F6-01",
+      "flow": "Flow 6",
+      "scenario": "Assistant answers \"my bookings\" from the member's own data",
+      "expected": "200",
+      "result": "PASS",
+      "actual": "HTTP 200 mode=KNOWLEDGE_BASED"
+    },
+    {
+      "id": "F6-02",
+      "flow": "Flow 6",
+      "scenario": "Assistant refuses a health question without data access",
+      "expected": "200 NO_ANSWER",
+      "result": "PASS",
+      "actual": "HTTP 200 {\"mode\":\"KNOWLEDGE_BASED\",\"status\":\"NO_ANSWER\",\"answer\":\"I cannot assess personal training or health concerns. Ask your "
+    },
+    {
+      "id": "F6-03",
+      "flow": "Flow 6",
+      "scenario": "Member submits a support request (idempotent retry)",
+      "expected": "201 then same id",
+      "result": "PASS",
+      "actual": "HTTP 201/201 same=true"
+    },
+    {
+      "id": "F6-04",
+      "flow": "Flow 6",
+      "scenario": "Reception replies; member sees the reply; resolve requires notes",
+      "expected": "200, reply visible",
+      "result": "PASS",
+      "actual": "reply 200, member replies=1, resolve 200"
+    },
+    {
+      "id": "F6-05",
+      "flow": "Flow 6",
+      "scenario": "Another member cannot read the request",
+      "expected": "404",
+      "result": "PASS",
+      "actual": "HTTP 404  Support request not found"
+    },
+    {
+      "id": "X-01",
+      "flow": "Cross-flow",
+      "scenario": "Manager activity log shows the booking created",
+      "expected": "200 with BOOKING_CREATED",
+      "result": "PASS",
+      "actual": "HTTP 200"
+    },
+    {
+      "id": "X-02",
+      "flow": "Cross-flow",
+      "scenario": "Member notifications inbox loads",
+      "expected": "200",
+      "result": "PASS",
+      "actual": "HTTP 200"
+    },
+    {
+      "id": "CLEAN-01",
+      "flow": "Setup",
+      "scenario": "Deactivate the synthetic packages so real members never see them",
+      "expected": "200",
+      "result": "FAIL",
+      "actual": "HTTP 400/200"
+    }
+  ],
+  "facts": {
+    "sport": "Badminton",
+    "facility": "Badminton Court 1",
+    "ageGroup": "Ages 16+",
+    "pendingReg": 10,
+    "pendingPayment": 13,
+    "financeOverview": {
+      "paidRevenue": 0,
+      "refundedAmount": 0
+    },
+    "sessionToday": "081126BM01 2026-11-08 16:30:00-17:30:00",
+    "sessionTomorrow": "091126BM01 2026-11-09 09:00-10:00",
+    "drillMode": "AI_GENERATED",
+    "assistantMode": "KNOWLEDGE_BASED"
+  }
+}
