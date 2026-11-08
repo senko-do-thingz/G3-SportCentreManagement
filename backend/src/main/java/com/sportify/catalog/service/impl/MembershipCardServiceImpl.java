@@ -729,8 +729,8 @@ public class MembershipCardServiceImpl implements MembershipCardService {
     @Override
     @Transactional(readOnly = true)
     public int getApplicableDiscountPercentage(Long memberId, int packageDurationDays) {
-        // Single visit packages (<= 1 day) are strictly excluded from discounts
-        if (packageDurationDays <= 1) {
+        // Card benefits apply only to the 30-day and 90-day package terms.
+        if (packageDurationDays != 30 && packageDurationDays != 90) {
             return 0;
         }
 

@@ -7,13 +7,13 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.regex.Pattern;
 
-/** Reads the actual migration and README so tests cannot silently exercise a separate seed fixture. */
+/** Reads the actual migration and demo specification so tests cannot silently exercise a separate seed fixture. */
 final class DemoSeedSource {
     static final String RESOURCE = "db/demo/V28__seed_demo_accounts.sql";
     static final Path ROOT = Files.isDirectory(Path.of("backend")) ? Path.of(".") : Path.of("..");
     static final String SQL = resource(RESOURCE);
-    static final String README = file(ROOT.resolve("README.md"));
-    static final String PASSWORD = capture(README, "Common demo password: `([^`]+)`");
+    static final String SPECIFICATION = file(ROOT.resolve("docs/tests/BE-07_test_cases.md"));
+    static final String PASSWORD = capture(SPECIFICATION, "Common demo password: `([^`]+)`");
     static final String HASH = capture(SQL, "DECLARE @PasswordHash NVARCHAR\\(100\\) = '([^']+)'");
     static final List<Account> ACCOUNTS = Pattern.compile(
             "\\((\\d+), '([^']+@example\\.com)', '([^']+)', '(RECEPTIONIST|COACH|MEMBER)', "

@@ -90,8 +90,10 @@ export const managerSessionsApi = {
   byCode: (id: SessionId, signal?: AbortSignal) => api.get<ManagerSession>(`/manager/sessions/by-code/${id}`, { signal }),
   updateByCode: (id: SessionId, body: SessionUpdate) => api.put<ManagerSession>(`/manager/sessions/by-code/${id}`, body),
   cancelByCode: (id: SessionId, reason: string) => api.put<ManagerSession>(`/manager/sessions/by-code/${id}/cancel`, { reason: reason.trim() }),
+  publishByCode: (id: SessionId) => api.put<ManagerSession>(`/manager/sessions/by-code/${id}/publish`, {}),
   list: (filters: SessionFilters, signal?: AbortSignal) => api.get<ManagerSession[]>('/manager/sessions', { query: { ...filters }, signal }),
   create: (classId: number, body: SessionCreate) => api.post<ManagerSession[]>(`/manager/classes/${classId}/sessions`, body),
   update: (id: number, body: SessionUpdate) => api.put<ManagerSession>(`/manager/sessions/${id}`, body),
   cancel: (id: number, reason: string) => api.put<ManagerSession>(`/manager/sessions/${id}/cancel`, { reason: reason.trim() }),
+  publish: (id: number) => api.put<ManagerSession>(`/manager/sessions/${id}/publish`, {}),
 }

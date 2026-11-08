@@ -394,9 +394,18 @@
       ],
       "drops": [],
       "sha256_lf": "aab2855d0af60805a8f0a75b056e26782888eca8819193074da5b1a19a854562"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V49__member_health_assessment.sql",
+      "version": 49,
+      "creates": [
+        "dbo.member_health_assessment"
+      ],
+      "drops": [],
+      "sha256_lf": "cfede0cfa4330c8d0d894043fbbb97cbddaadd648ccb4fac352c14030565f6c6"
     }
   ],
-  "create_occurrences": 73,
+  "create_occurrences": 74,
   "create_names": [
     "[activity_log]",
     "[age_group]",
@@ -458,6 +467,7 @@
     "dbo.cash_capture_ticket",
     "dbo.cash_coverage",
     "dbo.cash_event",
+    "dbo.member_health_assessment",
     "dbo.simulated_payment_transaction",
     "dbo.simulated_qr_rate_limit",
     "dbo.simulated_qr_session",
@@ -707,7 +717,7 @@
     {
       "id": "S10",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/CheckInServiceImpl.java",
-      "line": 49,
+      "line": 54,
       "definition": "public CheckInResponse recordCheckIn"
     },
     {
@@ -725,13 +735,13 @@
     {
       "id": "S13",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java",
-      "line": 79,
+      "line": 81,
       "definition": "public BookingResponse createBooking"
     },
     {
       "id": "S14",
       "path": "backend/src/main/java/com/sportify/catalog/service/impl/BookingServiceImpl.java",
-      "line": 354,
+      "line": 362,
       "definition": "recordSelfTrainingAttendance"
     },
     {

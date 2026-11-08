@@ -325,17 +325,19 @@ class BookingRulesIntegrationTest extends AbstractIntegrationTest {
         } finally { release.countDown(); stop(pool); }
     }
 
-    @ParameterizedTest @CsvSource({"MEMBER,121,200", "MEMBER,120,200", "MEMBER,119,400", "RECEPTIONIST,119,200", "MANAGER,119,200"})
-    void cutoffBoundaryAndStaffException_restoreOnlyOnSuccessfulCancellation(String role, int minutes, int expected) {
+    /** Member: 120 minutes or more before the start restores the credit; later is a late cancellation that forfeits it. */
+    @ParameterizedTest @CsvSource({"MEMBER,121,true", "MEMBER,120,true", "MEMBER,119,false", "RECEPTIONIST,119,true", "MANAGER,119,true"})
+    void cutoffBoundaryAndStaffException_lateMemberCancellationFreesSeatButForfeitsCredit(String role, int minutes, boolean restored) {
         long session = session(TODAY, NOW.toLocalTime().plusMinutes(minutes), 10, TrainingFormat.COACH_LED), reg = registration(memberA);
         long booking = service.createBooking(request(session, reg), memberA).getId();
         UserAccount caller = role.equals("MEMBER") ? memberA : role.equals("MANAGER") ? manager : receptionist;
         var result = http(delete("/api/v1/bookings/" + booking), caller);
-        assertThat(result.status()).isEqualTo(expected);
-        assertThat(seats(session)).isEqualTo(expected == 200 ? 0 : 1);
-        assertThat(balance(reg)).isEqualTo(expected == 200 ? 3 : 2);
-        if (expected == 400) assertThat(result.code()).isEqualTo("CANCELLATION_CUTOFF");
-        else assertThat(result.body().path("cancelledById").asLong()).isEqualTo(caller.getId());
+        assertThat(result.status()).isEqualTo(200);
+        assertThat(seats(session)).isZero();
+        assertThat(balance(reg)).isEqualTo(restored ? 3 : 2);
+        assertThat(result.body().path("cancelledById").asLong()).isEqualTo(caller.getId());
+        if (!restored) assertThat(result.body().path("cancelReason").asText())
+                .isEqualTo("Late cancellation by member: session credit not returned");
     }
 
     @ParameterizedTest @ValueSource(strings = {"ACTIVE", "CAPPED", "PENDING_PAYMENT", "EXPIRED", "CANCELLED", "REFUNDED"})

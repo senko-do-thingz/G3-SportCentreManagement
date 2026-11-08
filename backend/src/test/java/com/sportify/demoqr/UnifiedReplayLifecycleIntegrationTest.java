@@ -39,6 +39,7 @@ class UnifiedReplayLifecycleIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired MemberCardRepository cards;
     @Autowired SportPackageRegistrationRepository registrations;
+    @Autowired com.sportify.catalog.repository.ClassSessionRepository sessions;
     @Autowired PlatformTransactionManager transactions;
     private final ObjectMapper json=new ObjectMapper();
 
@@ -109,7 +110,7 @@ class UnifiedReplayLifecycleIntegrationTest {
         LocalDate end=jdbc.queryForObject("SELECT end_date FROM "+table+" WHERE payment_id=?",java.sql.Date.class,payment).toLocalDate();
         // Advance only this production service's injected business clock. Never change SQL Server/system time or paid dates.
         Clock afterTerm=Clock.fixed(end.plusDays(1).atTime(12,0).atZone(ScheduledMaintenanceService.BUSINESS_ZONE).toInstant(),ScheduledMaintenanceService.BUSINESS_ZONE);
-        var maintenance=new ScheduledMaintenanceService(cards,registrations,afterTerm);
+        var maintenance=new ScheduledMaintenanceService(cards,registrations,sessions,afterTerm);
         new TransactionTemplate(transactions).executeWithoutResult(ignored->maintenance.runDailyMaintenance());
         assertThat(jdbc.queryForObject("SELECT status FROM "+table+" WHERE payment_id=?",String.class,payment)).isEqualTo("EXPIRED");
         assertThat(history(payment)).isEqualTo(paidHistory);assertThat(finance()).isEqualTo(paidFinance);

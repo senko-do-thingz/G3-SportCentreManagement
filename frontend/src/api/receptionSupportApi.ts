@@ -4,7 +4,7 @@ export const supportStatuses = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] as 
 export type SupportStatus = typeof supportStatuses[number]
 export const supportCategories = ['GENERAL', 'FACILITY', 'BOOKING', 'MEMBERSHIP', 'PAYMENT'] as const
 export interface SupportIntake { memberId: number; category: string; subject: string; description: string }
-export interface SupportReply { id: number; message: string; staffName: string; createdAt: string }
+export interface SupportReply { id: number; message: string; staffName: string; createdAt: string; /** A follow-up written by the Member (staffName is then the Member's name). */ fromMember?: boolean }
 export interface SupportTicket extends SupportIntake {
   id: number; code: string; memberCode: string | null; memberName: string; status: SupportStatus
   /** Internal staff note; never shown to the Member. */

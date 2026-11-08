@@ -192,7 +192,7 @@ describe('FE-02 dashboard model', () => {
   // Review round 3
 
   it('TC-FE02-127 cardDiscountText states the rule the prices use', () => {
-    expect(cardDiscountText(10)).toBe('10% off packages longer than a single visit')
-    expect(cardDiscountText(5)).toBe('5% off packages longer than a single visit')
+    expect(cardDiscountText(10)).toBe('10% off 30-day and 90-day packages')
+    expect(cardDiscountText(5)).toBe('5% off 30-day and 90-day packages')
   })
 })

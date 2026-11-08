@@ -7,7 +7,7 @@ import type { PageResponse } from './types'
 
 export type RevenueGroup = 'ITEM_TYPE' | 'METHOD' | 'SPORT'
 
-/** Mirrors BE-22 FinanceOverviewResponse. Refunds are reported separately from paid revenue. */
+/** Mirrors BE-22 FinanceOverviewResponse. paidRevenue is gross money collected in the month (kept even if refunded later); refunds are deducted in the month they are paid out. */
 export interface ManagerFinanceOverview {
   month: string
   from: string
@@ -25,6 +25,8 @@ export interface ManagerFinanceOverview {
   revenueChangePercent: number | null
   simulatedRevenue: number
   simulatedTransactions: number
+  /** Gross collected revenue minus refunds paid out in the same month; may be negative. */
+  netRevenue: number
 }
 
 /** Mirrors BE-22 RevenueTrendPoint. The endpoint is anchored to the current month. */
@@ -157,6 +159,7 @@ function asOverview(value: unknown): ManagerFinanceOverview {
     revenueChangePercent: nullableSignedAmount(value.revenueChangePercent),
     simulatedRevenue: value.simulatedRevenue === null || value.simulatedRevenue === undefined ? 0 : amount(value.simulatedRevenue),
     simulatedTransactions: value.simulatedTransactions === null || value.simulatedTransactions === undefined ? 0 : count(value.simulatedTransactions),
+    netRevenue: value.netRevenue === null || value.netRevenue === undefined ? amount(value.paidRevenue) - amount(value.refundedAmount) : signedAmount(value.netRevenue),
   }
 }
 

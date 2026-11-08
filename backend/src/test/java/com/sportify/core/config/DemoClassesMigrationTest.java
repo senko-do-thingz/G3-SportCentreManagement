@@ -168,11 +168,11 @@ class DemoClassesMigrationTest {
     }
 
     @Test
-    void technicalSourceIsAsciiAndReadmeDocumentsActualLifecycleAndCounts() {
+    void technicalSourceIsAsciiAndSpecificationDocumentsActualLifecycleAndCounts() {
         assertThat(SQL.chars().allMatch(c -> c < 128)).isTrue();
-        var readme = DemoSeedSource.file(DemoSeedSource.ROOT.resolve("README.md"));
-        assertThat(readme).contains("V29__seed_demo_classes_and_sessions.sql", "48", "24", "DEMO-CL-BAD-BEG",
-                "DEMO-CL-BAD-INT", "fresh isolated", "not move", "complimentary");
-        CLASSES.forEach(spec -> assertThat(readme).contains(spec.code(), spec.name(), spec.coach(), spec.facility()));
+        var specification = DemoSeedSource.file(DemoSeedSource.ROOT.resolve("docs/tests/BE-15_test_cases.md"));
+        assertThat(specification).contains("V29__seed_demo_classes_and_sessions.sql", "48", "24", "DEMO-CL-BAD-BEG",
+                "DEMO-CL-BAD-INT", "fresh isolated", "Never repurpose", "complimentary");
+        CLASSES.forEach(spec -> assertThat(specification).contains(spec.code(), spec.name(), spec.coach(), spec.facility()));
     }
 }

@@ -10,6 +10,7 @@ import com.sportify.catalog.entity.SportPackageRegistration;
 import com.sportify.catalog.repository.BookingRepository;
 import com.sportify.catalog.repository.ClassSessionRepository;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
+import com.sportify.catalog.service.ClassAgeEligibility;
 import com.sportify.catalog.service.MemberScheduleService;
 import com.sportify.catalog.service.OperationalMemberPolicy;
 import com.sportify.catalog.service.PackageBookingEligibility;
@@ -84,7 +85,7 @@ public class MemberScheduleServiceImpl implements MemberScheduleService {
         var member = members.findById(actor.getId())
                 .orElseThrow(() -> new AccessDeniedException("A member profile is required"));
         if (!Objects.equals(member.getId(), actor.getId())) throw new AccessDeniedException("Invalid member context");
-        return eligibility(session, common, member.getId());
+        return eligibility(session, common, member.getId(), dateOfBirth(member));
     }
 
     @Override
@@ -104,20 +105,30 @@ public class MemberScheduleServiceImpl implements MemberScheduleService {
         LocalDateTime now = LocalDateTime.now(clock);
         ClassSession session = sessions.findVisibleById(id, now.toLocalDate(), now.toLocalTime())
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + id));
-        return eligibility(session, response(session, counts(List.of(session)).getOrDefault(id, 0L)), memberId);
+        return eligibility(session, response(session, counts(List.of(session)).getOrDefault(id, 0L)), memberId, dateOfBirth(member));
     }
 
-    private SessionDetailResponse eligibility(ClassSession session, SessionResponse common, Long memberId) {
+    private static LocalDate dateOfBirth(com.sportify.identity.entity.MemberProfile member) {
+        return member.getUserAccount() == null ? null : member.getUserAccount().getDateOfBirth();
+    }
+
+    private SessionDetailResponse eligibility(ClassSession session, SessionResponse common, Long memberId, LocalDate dateOfBirth) {
         if (isSyntheticMember(memberId)) {
             return rejected(common, false, SYNTHETIC_OPERATION_DENIED);
         }
         Long id = session.getId();
         boolean alreadyBooked = bookings.findBySessionIdAndMemberIdAndStatus(id, memberId, BookingStatus.CONFIRMED).isPresent();
         if (alreadyBooked) return rejected(common, true, ALREADY_BOOKED);
+        // Same order as booking creation: duplicate, then overlap with another confirmed booking, then capacity.
+        if (!bookings.findOverlappingConfirmedSessionCodes(memberId, id, session.getSessionDate(),
+                session.getStartTime(), session.getEndTime()).isEmpty()) {
+            return rejected(common, false, TIME_CONFLICT);
+        }
         if (common.full()) return rejected(common, false, FULL);
         // The existing write path checks the cache. Do not promise eligibility when it already blocks booking.
         // Real confirmed counts still determine full/freeSeats; a stale cache must not be mislabeled FULL.
         if (session.getBookedCount() >= session.getCapacity()) return rejected(common, false, CAPACITY_UNAVAILABLE);
+        if (!ClassAgeEligibility.fits(dateOfBirth, session)) return rejected(common, false, AGE_RESTRICTED);
 
         List<SportPackageRegistration> matching = PackageBookingEligibility.matching(
                 registrations.findForSessionEligibility(memberId, session.getSport().getId(), session.getTrainingType()),
@@ -166,7 +177,8 @@ public class MemberScheduleServiceImpl implements MemberScheduleService {
                 c == null ? null : c.getLevel(), coach == null ? null : coach.getId(),
                 coach == null ? null : coach.getUserAccount().getFullName(),
                 facility == null ? null : facility.getId(), facility == null ? null : facility.getName(),
-                s.getSessionDate(), s.getStartTime(), s.getEndTime(), capacity, booked, free, free == 0, s.getStatus(), s.getSessionCode());
+                s.getSessionDate(), s.getStartTime(), s.getEndTime(), capacity, booked, free, free == 0, s.getStatus(), s.getSessionCode(),
+                ClassAgeEligibility.label(s));
     }
 
     private static SessionDetailResponse.SuitableRegistration registrationResponse(SportPackageRegistration r) {

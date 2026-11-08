@@ -11,7 +11,7 @@ import { useAuth } from '../../auth/useAuth'
 import { BrowseError } from './BrowseError'
 import { MemberScheduleNav } from './MemberScheduleNav'
 import { useMemberResource } from './useMemberResource'
-import { bookingDate, bookingErrorMessage, bookingTime, cancellationDeadline } from './bookingPresentation'
+import { bookingDate, bookingErrorMessage, bookingTime, cancellationDeadline, isLateCancellation } from './bookingPresentation'
 
 function routeId(value: string | undefined): number | null {
   if (!value || !/^\d+$/.test(value)) return null
@@ -184,13 +184,15 @@ function BookingCancellationContent({ id, memberId }: { id: number; memberId: nu
 
   const booking = checkedBooking ?? resource.data
   const deadline = cancellationDeadline(booking)
+  const late = isLateCancellation(booking)
   if (booking.status !== 'CONFIRMED') return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Booking cannot be cancelled" /><Card><Badge>Cancelled</Badge><p>This booking has already been cancelled.</p><Link className={buttonClassName()} to="/member/bookings?when=PAST">View past bookings</Link></Card></div>
 
   return <div className="page browse-page booking-flow">
     <MemberScheduleNav />
     <PageHeader eyebrow="Member / My Bookings" title="Cancel booking" description="Please confirm before cancelling this session." />
     <Card className="booking-cancel-card">
-      <div className="booking-cancel-warning" role="note"><strong>Cancellation deadline</strong><p>{deadline ? `Cancel by ${deadline} Vietnam time. This is two hours before the session starts.` : 'The backend will verify whether this booking is within the cancellation period.'}</p><p>After the cutoff, the booking service will reject the request and the booking will remain confirmed.</p></div>
+      <div className="booking-cancel-warning" role="note"><strong>Cancellation deadline</strong><p>{deadline ? `Cancel by ${deadline} Vietnam time to get your session credit back. This is two hours before the session starts.` : 'The backend will verify whether this booking is within the free cancellation period.'}</p><p>After that you can still cancel to free your place for another member, but the session credit is not returned.</p></div>
+      {late && <div className="booking-error" role="alert"><strong>Late cancellation</strong><p>The free cancellation deadline has passed. If you cancel now, your place is released but this session credit is not returned to your package.</p></div>}
       <h2>{bookingTitle(booking)}</h2>
       <SessionContext {...booking} sessionId={booking.sessionCode} date={booking.sessionDate} />
       <dl className="browse-facts booking-confirmation__facts"><div><dt>Booking code</dt><dd>{booking.bookingCode}</dd></div><div><dt>Date</dt><dd>{bookingDate(booking.sessionDate)}</dd></div><div><dt>Time</dt><dd>{bookingTime(booking.startTime)} - {bookingTime(booking.endTime)}</dd></div><div><dt>Package</dt><dd>{booking.packageName || 'Sport package'}</dd></div>{booking.trainingType !== 'SELF_TRAINING' && <div><dt>Coach</dt><dd>{booking.coachName || 'Not provided'}</dd></div>}<div><dt>Facility</dt><dd>{booking.facilityName || 'Not provided'}</dd></div></dl>
@@ -249,6 +251,7 @@ function BookingCancelledContent({ id, memberId }: { id: number; memberId: numbe
       <SessionContext {...booking} sessionId={booking.sessionCode} date={booking.sessionDate} />
       <p className="booking-code">Booking code: <strong>{booking.bookingCode}</strong></p>
       <dl className="browse-facts booking-confirmation__facts"><div><dt>Date</dt><dd>{bookingDate(booking.sessionDate)}</dd></div><div><dt>Time</dt><dd>{bookingTime(booking.startTime)} - {bookingTime(booking.endTime)} (Vietnam time)</dd></div><div><dt>Cancelled by</dt><dd>{actorName(booking)}</dd></div>{booking.cancelledAt && <div><dt>Cancelled at</dt><dd>{formatDateTime(booking.cancelledAt)}</dd></div>}</dl>
+      {booking.cancelReason?.startsWith('Late cancellation') && <p className="notice notice--info">Late cancellation: your place was released for other members, but this session credit was not returned.</p>}
       {registration?.totalSessions === null ? <p>This package has no session limit. You can review its current status in My sport packages.</p> : registration && registration.remainingSessions !== null ? <p>Latest package balance: {registration.remainingSessions} sessions remaining.</p> : <p>The latest package balance is unavailable. Review My sport packages for the current count.</p>}
       <div className="browse-actions booking-actions"><Link className={buttonClassName()} to="/member/bookings?when=PAST">View past bookings</Link><Link className={buttonClassName('secondary')} to="/member/classes">Find Classes</Link><Link className={buttonClassName('secondary')} to="/member/membership">My sport packages</Link></div>
     </Card>
