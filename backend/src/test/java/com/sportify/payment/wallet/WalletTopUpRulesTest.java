@@ -18,14 +18,14 @@ class WalletTopUpRulesTest {
 
     @Test
     void demoTopUpsAreRefusedUnlessExplicitlyEnabled() {
-        var service = new WalletTopUpService(null, null, null, null, null, null);
+        var service = new WalletTopUpService(null, null, null, null, null, null, null);
         assertThatThrownBy(() -> service.create(1, new CreateRequest(new BigDecimal("50000"), Pool.SIMULATED), null))
                 .isInstanceOf(BusinessRuleException.class).hasMessageContaining("not enabled");
     }
 
     @Test
     void amountsOutsideTheLimitsOrWithFractionsAreRefusedBeforeAnyLookup() {
-        var service = new WalletTopUpService(null, null, null, null, null, null);
+        var service = new WalletTopUpService(null, null, null, null, null, null, null);
         for (String amount : new String[] {"9999", "50000001", "10000.5"}) {
             assertThatThrownBy(() -> service.create(1, new CreateRequest(new BigDecimal(amount), Pool.ACTUAL), null))
                     .isInstanceOf(BusinessRuleException.class).hasMessageContaining("Top-up amount");

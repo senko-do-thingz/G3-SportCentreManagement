@@ -175,13 +175,14 @@ public class WalletWithdrawalService {
     @Transactional(readOnly = true)
     public List<Withdrawal> staffList(String status) {
         String filter = status == null || status.isBlank() ? "OPEN" : status.trim().toUpperCase(Locale.ROOT);
-        String where = switch (filter) {
-            case "OPEN" -> " WHERE w.status IN ('PENDING','APPROVED') ORDER BY w.id ASC";
-            case "ALL" -> " ORDER BY w.id DESC";
-            case "PENDING", "APPROVED", "REJECTED", "COMPLETED", "FAILED", "SIMULATED_COMPLETED" -> " WHERE w.status='" + filter + "' ORDER BY w.id DESC";
+        String page = " OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY";
+        return switch (filter) {
+            case "OPEN" -> jdbc.query(SELECT + " WHERE w.status IN ('PENDING','APPROVED') ORDER BY w.id ASC" + page, mapper(false));
+            case "ALL" -> jdbc.query(SELECT + " ORDER BY w.id DESC" + page, mapper(false));
+            case "PENDING", "APPROVED", "REJECTED", "COMPLETED", "FAILED", "SIMULATED_COMPLETED" ->
+                    jdbc.query(SELECT + " WHERE w.status = ? ORDER BY w.id DESC" + page, mapper(false), filter);
             default -> throw new BusinessRuleException("Unknown withdrawal status " + status);
         };
-        return jdbc.query(SELECT + where + " OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY", mapper(false));
     }
 
     /** Receptionist processing view: the only place the full account number is returned. */

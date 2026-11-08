@@ -82,7 +82,7 @@ export interface WalletTopUp {
   instructions: TopUpInstructions | null
 }
 
-export interface MemberTopUps { simulatedTopUpsEnabled: boolean; minAmount: number; maxAmount: number; topUps: WalletTopUp[] }
+export interface MemberTopUps { simulatedTopUpsEnabled: boolean; realTopUpsAvailable: boolean; minAmount: number; maxAmount: number; topUps: WalletTopUp[] }
 
 /** MW-04: the Member's own top-up requests. Creating one only records PENDING. */
 export const topUpApi = {
@@ -95,6 +95,7 @@ export const topUpApi = {
 /** MW-04: Receptionist confirmation queue. */
 export const receptionTopUpApi = {
   list: (status: string, signal: AbortSignal) => api.get<WalletTopUp[]>('/reception/wallet/topups', { signal, query: { status } }),
+  detail: (id: number) => api.get<WalletTopUp>(`/reception/wallet/topups/${id}`),
   confirm: (id: number, receivedAmount: number, bankReference: string | null, note: string) =>
     api.post<WalletTopUp>(`/reception/wallet/topups/${id}/confirm`, { receivedAmount, bankReference, note }),
   reject: (id: number, reason: string) => api.post<WalletTopUp>(`/reception/wallet/topups/${id}/reject`, { reason }),

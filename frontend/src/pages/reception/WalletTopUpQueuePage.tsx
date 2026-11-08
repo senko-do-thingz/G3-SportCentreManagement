@@ -10,12 +10,14 @@ const FILTERS = [
   { value: 'PENDING', label: 'Pending review' },
   { value: 'CONFIRMED', label: 'Confirmed' },
   { value: 'REJECTED', label: 'Rejected' },
+  { value: 'CANCELLED', label: 'Cancelled by member' },
   { value: 'ALL', label: 'All recent' },
 ]
 
 /**
  * MW-04: Receptionists confirm a top-up only after checking the bank statement. The received amount is typed, never
- * prefilled, so a confirmation always reflects what staff actually saw.
+ * prefilled, so a confirmation always reflects what staff actually saw. A real-money request the member cancelled can
+ * still be confirmed as a late payment (with a note) when the transfer arrives afterwards.
  */
 export function WalletTopUpQueuePage() {
   const [status, setStatus] = useState('PENDING')
@@ -49,7 +51,7 @@ export function WalletTopUpQueuePage() {
                     <td>{formatDateTime(t.createdAt)}</td>
                     <td><Badge tone={t.status === 'PENDING' ? 'warning' : t.status === 'CONFIRMED' ? 'success' : 'neutral'}>{t.status}</Badge>
                       {t.reviewedByName && <div className="health-meta">by {t.reviewedByName}{t.bankReference ? `, ref ${t.bankReference}` : ''}</div>}</td>
-                    <td>{t.status === 'PENDING' ? <Button size="sm" variant="secondary" onClick={() => { setSelectedId(t.id); setMessage(null) }}>Review</Button> : '-'}</td>
+                    <td>{reviewable(t) ? <Button size="sm" variant="secondary" onClick={() => { setSelectedId(t.id); setMessage(null) }}>{t.status === 'PENDING' ? 'Review' : 'Review late payment'}</Button> : '-'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -57,15 +59,21 @@ export function WalletTopUpQueuePage() {
           </div>
         ))}
       </Card>
-      {selected && selected.status === 'PENDING' && (
+      {selected && reviewable(selected) && (
         <ReviewPanel key={selected.id} topUp={selected} onDone={(text) => { setMessage(text); setSelectedId(null); reload() }} />
       )}
     </div>
   )
 }
 
+/** PENDING requests, and real-money requests the member cancelled (a transfer may still arrive late). */
+function reviewable(t: WalletTopUp) {
+  return t.status === 'PENDING' || (t.status === 'CANCELLED' && t.mode === 'ACTUAL')
+}
+
 function ReviewPanel({ topUp, onDone }: { topUp: WalletTopUp; onDone: (message: string) => void }) {
   const demo = topUp.mode === 'SIMULATED'
+  const late = topUp.status === 'CANCELLED'
   const [received, setReceived] = useState('')
   const [reference, setReference] = useState('')
   const [note, setNote] = useState('')
@@ -77,11 +85,22 @@ function ReviewPanel({ topUp, onDone }: { topUp: WalletTopUp; onDone: (message: 
     event.preventDefault()
     setBusy(true)
     setError(null)
+    const sentReference = demo ? null : reference.trim()
     try {
-      const done = await receptionTopUpApi.confirm(topUp.id, Number(received), demo ? null : reference.trim(), note)
+      const done = await receptionTopUpApi.confirm(topUp.id, Number(received), sentReference, note)
       onDone(`${done.code} confirmed. ${formatMoney(done.amount)} ${demo ? 'demo funds were' : 'was'} added to the member's wallet.`)
     } catch (failure) {
-      setError(getErrorMessage(failure))
+      // The confirmation may have committed even though its response was lost or reported a conflict. Read the
+      // authoritative request instead of retrying, so the wallet is never credited twice.
+      const current = await receptionTopUpApi.detail(topUp.id).catch(() => null)
+      if (current && current.status === 'CONFIRMED' && current.receivedAmount === Number(received)
+          && (current.bankReference ?? null) === sentReference) {
+        onDone(`${current.code} is confirmed${current.reviewedByName ? ` by ${current.reviewedByName}` : ''}. The wallet was credited once; nothing more was added.`)
+      } else {
+        setError(current && current.status !== topUp.status
+          ? `${getErrorMessage(failure)} Current status: ${current.status}${current.reviewedByName ? ` by ${current.reviewedByName}` : ''}. The wallet was not credited again.`
+          : getErrorMessage(failure))
+      }
     } finally {
       setBusy(false)
     }
@@ -109,23 +128,24 @@ function ReviewPanel({ topUp, onDone }: { topUp: WalletTopUp; onDone: (message: 
       </dl>
       <Notice tone={demo ? 'warning' : 'info'}>
         {demo ? 'Demo top-up: no bank check is needed. It credits demo funds that cannot be spent on real services or withdrawn.'
-          : 'Confirm only after you see this exact amount with this transfer note on the bank statement.'}
+          : late ? 'The member cancelled this request. Confirm it only if the bank statement shows this exact amount with this transfer note, and describe the late transfer in the note.'
+            : 'Confirm only after you see this exact amount with this transfer note on the bank statement.'}
       </Notice>
       <form onSubmit={confirm} aria-label="Confirm top-up">
         <div className="profile-form__grid">
           <Input label="Amount received (VND)" name="receivedAmount" inputMode="numeric" value={received} onChange={(e) => setReceived(e.target.value.replace(/\D/g, ''))} required />
           {!demo && <Input label="Bank transaction reference" name="bankReference" value={reference} onChange={(e) => setReference(e.target.value)} required />}
         </div>
-        <TextArea label="Note (optional)" name="note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
+        <TextArea label={late ? 'Note (required for a late payment)' : 'Note (optional)'} name="note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} required={late} />
         {error && <Notice tone="danger" live="assertive">{error}</Notice>}
         <div className="profile-form__actions">
           <Button type="submit" loading={busy}>Confirm and credit wallet</Button>
         </div>
       </form>
-      <div className="topup-reject">
+      {!late && <div className="topup-reject">
         <Input label="Reason to reject" name="rejectReason" value={reason} onChange={(e) => setReason(e.target.value)} />
         <Button variant="secondary" disabled={busy || !reason.trim()} onClick={reject}>Reject request</Button>
-      </div>
+      </div>}
     </Card>
   )
 }
