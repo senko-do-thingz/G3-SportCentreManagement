@@ -77,23 +77,23 @@ class DemoAccountsMigrationTest {
         var start = LocalDate.parse(capture(SQL, "DECLARE @StartDate DATE = '(\\d+)'") , DateTimeFormatter.BASIC_ISO_DATE);
         var end = LocalDate.parse(capture(SQL, "DECLARE @GoldEndDate DATE = '(\\d+)'") , DateTimeFormatter.BASIC_ISO_DATE);
         assertThat(end).isEqualTo(start.plusMonths(12).minusDays(1));
-        assertThat(README).contains(start.toString(), end.toString());
+        assertThat(SPECIFICATION).contains(start.toString(), end.toString());
     }
 
     @Test
-    void everyReadmeTableRowMatchesTheActualMigrationAndCommonPassword() {
+    void everySpecificationTableRowMatchesTheActualMigrationAndCommonPassword() {
         for (Account account : ACCOUNTS) {
-            var rows = README.lines().filter(line -> line.startsWith("| " + account.name() + " | ")).toList();
+            var rows = SPECIFICATION.lines().filter(line -> line.startsWith("| " + account.name() + " | ")).toList();
             assertThat(rows).hasSize(1);
             var columns = rows.getFirst().split("\\|", -1);
             assertThat(columns[2].trim()).isEqualTo(account.email());
             assertThat(columns[3].trim()).isEqualTo(account.role());
-            assertTrue(columns[4].trim().equals(PASSWORD), "README demo credentials must be consistent");
+            assertTrue(columns[4].trim().equals(PASSWORD), "Demo specification credentials must be consistent");
             if (account.sport() != null) {
                 assertThat(columns[5]).contains(account.sport());
             }
         }
-        assertThat(README).contains("## Demo Accounts", "SPRING_PROFILES_ACTIVE", "dev,demo", "isolated");
+        assertThat(SPECIFICATION).contains("## Demo Accounts", "SPRING_PROFILES_ACTIVE", "dev,demo", "isolated");
     }
 
     @Test
