@@ -60,6 +60,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -110,6 +111,10 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    /** The center clock (Asia/Ho_Chi_Minh); "today" must match the service, not the CI runner's UTC date. */
+    @Autowired
+    private Clock clock;
 
     @Autowired
     private JwtService jwtService;
@@ -200,7 +205,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .build());
         memberUser = memberAccount;
         jdbcTemplate.update("INSERT INTO member_profile (user_id, member_code, current_level, joined_on) VALUES (?, ?, 'BEGINNER', ?)",
-                memberAccount.getId(), "MEM-" + MARKER, LocalDate.now());
+                memberAccount.getId(), "MEM-" + MARKER, LocalDate.now(clock));
         memberProfile = memberProfileRepository.findById(memberAccount.getId()).orElseThrow();
     }
 
@@ -256,7 +261,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                         .header("Authorization", "Bearer " + receptionToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"memberId\":" + memberProfile.getId() + ",\"packageId\":" + packageId
-                                + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"CASH\",\"startDate\":\"" + LocalDate.now() + "\"}"))
+                                + ",\"channel\":\"RECEPTION\",\"paymentMethod\":\"CASH\",\"startDate\":\"" + LocalDate.now(clock) + "\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andReturn().getResponse().getContentAsString();
@@ -271,7 +276,7 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/packages/registrations")
                         .header("Authorization", "Bearer " + memberToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"packageId\":" + packageId + ",\"startDate\":\"" + LocalDate.now() + "\"}"))
+                        .content("{\"packageId\":" + packageId + ",\"startDate\":\"" + LocalDate.now(clock) + "\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", containsString("greater than zero")));
 
@@ -523,8 +528,8 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .member(memberProfile)
                 .sportPackage(pkg)
                 .channel(RegistrationChannel.ONLINE)
-                .startDate(LocalDate.now())
-                .endDate(LocalDate.now().plusDays(30))
+                .startDate(LocalDate.now(clock))
+                .endDate(LocalDate.now(clock).plusDays(30))
                 .totalSessions(10)
                 .remainingSessions(10)
                 .originalPrice(BigDecimal.valueOf(500000.00))
@@ -551,8 +556,8 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .tier(testTier)
                 .pricePaid(BigDecimal.valueOf(800000.00))
                 .status(CardStatus.ACTIVE)
-                .startDate(LocalDate.now())
-                .endDate(LocalDate.now().plusMonths(12))
+                .startDate(LocalDate.now(clock))
+                .endDate(LocalDate.now(clock).plusMonths(12))
                 .build());
 
         // 3. Manager updates package price to 750,000
@@ -1158,8 +1163,8 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .cardCode("CARD-UNRES-" + MARKER)
                 .member(memberProfile)
                 .tier(goldTier)
-                .startDate(LocalDate.now().minusMonths(1))
-                .endDate(LocalDate.now().plusMonths(11))
+                .startDate(LocalDate.now(clock).minusMonths(1))
+                .endDate(LocalDate.now(clock).plusMonths(11))
                 .status(CardStatus.ACTIVE)
                 .pricePaid(BigDecimal.valueOf(150000.00))
                 .upgradeRequest(true)
@@ -1188,8 +1193,8 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .cardCode("CARD-BASE-" + MARKER)
                 .member(memberProfile)
                 .tier(goldTier)
-                .startDate(LocalDate.now())
-                .endDate(LocalDate.now().plusMonths(12))
+                .startDate(LocalDate.now(clock))
+                .endDate(LocalDate.now(clock).plusMonths(12))
                 .status(CardStatus.ACTIVE)
                 .pricePaid(goldTier.getPrice())
                 .build());
@@ -1199,8 +1204,8 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .cardCode("CARD-UPG1-" + MARKER)
                 .member(memberProfile)
                 .tier(vipTier)
-                .startDate(LocalDate.now())
-                .endDate(LocalDate.now().plusMonths(12))
+                .startDate(LocalDate.now(clock))
+                .endDate(LocalDate.now(clock).plusMonths(12))
                 .status(CardStatus.PENDING_PAYMENT)
                 .pricePaid(BigDecimal.valueOf(300000.00))
                 .upgradeRequest(true)
@@ -1212,8 +1217,8 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .cardCode("CARD-UPG2-" + MARKER)
                 .member(memberProfile)
                 .tier(vipTier)
-                .startDate(LocalDate.now())
-                .endDate(LocalDate.now().plusMonths(12))
+                .startDate(LocalDate.now(clock))
+                .endDate(LocalDate.now(clock).plusMonths(12))
                 .status(CardStatus.PENDING_PAYMENT)
                 .pricePaid(BigDecimal.valueOf(300000.00))
                 .upgradeRequest(true)
@@ -1242,8 +1247,8 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                     .cardCode("CARD-CONC-" + iter + "-" + MARKER)
                     .member(memberProfile)
                     .tier(goldTier)
-                    .startDate(LocalDate.now())
-                    .endDate(LocalDate.now().plusMonths(12))
+                    .startDate(LocalDate.now(clock))
+                    .endDate(LocalDate.now(clock).plusMonths(12))
                     .status(CardStatus.ACTIVE)
                     .pricePaid(goldTier.getPrice())
                     .build());
@@ -1428,8 +1433,8 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .cardCode("CARD-MOCK-UNRES-" + MARKER)
                 .member(memberProfile)
                 .tier(goldTier)
-                .startDate(LocalDate.now().minusMonths(1))
-                .endDate(LocalDate.now().plusMonths(11))
+                .startDate(LocalDate.now(clock).minusMonths(1))
+                .endDate(LocalDate.now(clock).plusMonths(11))
                 .status(CardStatus.ACTIVE)
                 .pricePaid(BigDecimal.valueOf(150000.00))
                 .upgradeRequest(true)
@@ -1598,8 +1603,8 @@ class ManagerCatalogIntegrationTest extends AbstractIntegrationTest {
                 .cardCode("CARD-ACT-UNRES-" + MARKER)
                 .member(memberProfile)
                 .tier(vipTier)
-                .startDate(LocalDate.now())
-                .endDate(LocalDate.now().plusMonths(12))
+                .startDate(LocalDate.now(clock))
+                .endDate(LocalDate.now(clock).plusMonths(12))
                 .status(CardStatus.PENDING_PAYMENT)
                 .pricePaid(BigDecimal.valueOf(300000.00))
                 .upgradeRequest(true)
