@@ -2,7 +2,8 @@ import { useCallback, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { staffTrainingApi, type BookingCandidate, type TrainingClass } from '../../api/staffTrainingApi'
 import { coachProgress } from '../../api/coachProgressApi'
-import { Card, PageHeader, Select } from '../../components/ui'
+import { HEALTH_OUTCOME_LABELS, memberHealthApi, type CoachHealthSummary } from '../../api/memberHealthApi'
+import { Badge, Card, PageHeader, Select } from '../../components/ui'
 import { formatCalendarDate } from '../../utils/date'
 import { formatDateTime } from '../../utils/format'
 import { TrainingData } from '../member/TrainingData'
@@ -42,6 +43,7 @@ function Members({ classId, candidates, initialMember }: { classId: number; cand
       <Card title={`${profile.memberName} - Profile and goals`}>
         <dl className="browse-facts"><div><dt>Member code</dt><dd>{profile.memberCode ?? '-'}</dd></div><div><dt>Current level</dt><dd>{profile.currentLevel ?? 'Not provided'}</dd></div><div><dt>Training goal</dt><dd>{profile.mainGoal ?? 'Not provided'}</dd></div></dl>
       </Card>
+      <HealthSummaryCard classId={classId} memberId={profile.memberId} />
       <Card title="Recorded progress">
         <p>{progress.interpretation}</p>
         <p>Attendance shown here belongs to recorded results. This is not the complete attendance ledger. Compare only the same metric ID and scale.</p>
@@ -54,4 +56,17 @@ function Members({ classId, candidates, initialMember }: { classId: number; cand
       </Card>
     </>}</TrainingData>}
   </>
+}
+
+/** MW-02: the Member's consented training note. Individual answers are never sent to Coaches. */
+function HealthSummaryCard({ classId, memberId }: { classId: number; memberId: number }) {
+  const load = useCallback((signal: AbortSignal) => memberHealthApi.coachSummary(classId, memberId, signal), [classId, memberId])
+  return <TrainingData load={load}>{(summary: CoachHealthSummary) => <Card title="Health and training note">
+    {summary.shared && summary.outcome ? <>
+      <p><Badge tone={summary.outcome === 'COACH_DISCUSSION_RECOMMENDED' ? 'warning' : summary.outcome === 'NO_REPORTED_CONCERNS' ? 'success' : 'neutral'}>{HEALTH_OUTCOME_LABELS[summary.outcome]}</Badge></p>
+      {summary.consultationRequested && <p>The member would like to talk with you before training.</p>}
+      {summary.updatedAt && <p>Shared by the member, last updated {formatDateTime(summary.updatedAt)}.</p>}
+    </> : <p role="status">The member has not shared a health and training note.</p>}
+    <p>{summary.disclaimer}</p>
+  </Card>}</TrainingData>
 }
