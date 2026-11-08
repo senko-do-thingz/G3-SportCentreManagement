@@ -171,7 +171,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
      * CONFIRMED bookings whose member holds another CONFIRMED booking in a non-cancelled session that would intersect
      * the proposed date and time (strict intersection, so back-to-back sessions do not conflict).
      */
-    @Query(value = "SELECT DISTINCT m.member_code FROM booking b JOIN member_profile m ON m.id = b.member_id "
+    @Query(value = "SELECT DISTINCT m.member_code FROM booking b JOIN member_profile m ON m.user_id = b.member_id "
             + "JOIN booking ob ON ob.member_id = b.member_id AND ob.status = 'CONFIRMED' AND ob.session_id <> b.session_id "
             + "JOIN class_session os ON os.id = ob.session_id "
             + "WHERE b.session_id = :sessionId AND b.status = 'CONFIRMED' AND os.status <> 'CANCELLED' "
