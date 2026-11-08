@@ -52,6 +52,19 @@ public class ManagerSessionController {
                 managerSessionService.getSessionByCode(sessionId).id(), request, actor(principal)));
     }
 
+    @PutMapping("/sessions/by-code/{sessionId}/publish")
+    public ResponseEntity<ManagerSessionResponse> publishByCode(@PathVariable String sessionId,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        return ResponseEntity.ok(managerSessionService.publishSession(
+                managerSessionService.getSessionByCode(sessionId).id(), actor(principal)));
+    }
+
+    @PutMapping("/sessions/{id}/publish")
+    public ResponseEntity<ManagerSessionResponse> publishSession(@PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        return ResponseEntity.ok(managerSessionService.publishSession(id, actor(principal)));
+    }
+
     @GetMapping("/sessions")
     public ResponseEntity<List<ManagerSessionResponse>> listSessions(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

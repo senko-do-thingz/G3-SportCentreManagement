@@ -35,9 +35,9 @@ export function isSingleVisit(pkg: Pick<SportPackage, 'durationDays'>): boolean 
   return pkg.durationDays <= SINGLE_VISIT_MAX_DAYS
 }
 
-/** Backend rule: a card discount applies to every package longer than a single visit. */
+/** Card benefits apply only to the 30-day and 90-day package terms. */
 export function isDiscountEligible(durationDays: number): boolean {
-  return durationDays > SINGLE_VISIT_MAX_DAYS
+  return durationDays === 30 || durationDays === 90
 }
 
 /** Discount percent the backend will apply to this package for a member holding this card. */

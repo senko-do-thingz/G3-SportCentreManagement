@@ -315,13 +315,14 @@ public class CenterConsultationService {
         LocalDate today=LocalDate.now(clock);
         LocalDate from=day.equals("TOMORROW")?today.plusDays(1):today;
         LocalDate to=day.equals("UPCOMING")?today.plusDays(14):from;
-        // Coach-led sessions are only listed while their Coach is active and still teaches the class.
+        // Same rule as Flow 2 booking: a coach-led session is listed while its Coach is active and qualified for the
+        // sport, even after the class default coach changes (substitute coach).
         String sql="""
             SELECT s.id,c.name,sp.name sport_name,s.session_date,s.start_time,s.end_time,s.capacity-s.booked_count free_seats
             FROM class_session s JOIN sport sp ON sp.id=s.sport_id LEFT JOIN sport_class c ON c.id=s.class_id
             LEFT JOIN user_account cu ON cu.id=s.coach_id
             WHERE s.status='PUBLISHED' AND sp.is_active=1 AND (c.id IS NULL OR c.is_active=1)
-                AND (s.training_type<>'COACH_LED' OR (cu.status='ACTIVE' AND (c.id IS NULL OR c.coach_id=s.coach_id)))
+                AND (s.training_type<>'COACH_LED' OR (cu.status='ACTIVE' AND EXISTS(SELECT 1 FROM coach_sport cs WHERE cs.coach_id=s.coach_id AND cs.sport_id=s.sport_id)))
                 AND s.booked_count<s.capacity AND s.session_date BETWEEN ? AND ?
                 AND (s.session_date>? OR s.start_time>CAST(? AS time))
             """;

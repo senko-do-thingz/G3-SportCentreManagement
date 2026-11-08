@@ -207,7 +207,7 @@ function HowCardWorks() {
       <dl className="summary-list">
         <div>
           <dt>Discount applies to</dt>
-          <dd>Packages longer than a single visit</dd>
+          <dd>30-day and 90-day packages</dd>
         </div>
         <div>
           <dt>Single-session visits</dt>

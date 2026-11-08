@@ -27,6 +27,8 @@ public class ReceptionSupportService {
     static final int MAX_OPEN_MEMBER_REQUESTS=5;
     static final int MAX_EXCERPT=1000;
     static final int MAX_DESCRIPTION=2000;
+    /** Days after resolution during which a Member reply reopens the request; later the request is closed. */
+    static final int REOPEN_DAYS=7;
     /** The excerpt is text the Member sent, so staff must not treat it as a verified record. */
     static final String EXCERPT_HEADER="\n\nAssistant answer shared by the member (not verified by staff):\n";
 
@@ -38,14 +40,15 @@ public class ReceptionSupportService {
                                @Size(max=MAX_EXCERPT) String assistantExcerpt) {}
     public record Update(@NotNull Status status,@Size(max=2000) String resolutionNotes) {}
     public record ReplyRequest(@NotBlank @Size(max=2000) String message) {}
-    public record Reply(long id,String message,String staffName,LocalDateTime createdAt) {}
+    /** staffName is the sender's name; fromMember marks a follow-up message written by the Member. */
+    public record Reply(long id,String message,String staffName,LocalDateTime createdAt,boolean fromMember) {}
     /** Staff view: includes the internal resolution notes and staff identifiers. */
     public record Ticket(long id,String code,long memberId,String memberCode,String memberName,String category,String subject,
                          String description,String status,String resolutionNotes,long createdBy,Long assignedStaffId,
                          Long bookingId,String sessionCode,LocalDateTime createdAt,LocalDateTime updatedAt,
                          boolean memberSubmitted,int replyCount,List<Reply> replies) {}
     /** Member view: never contains internal notes or staff account identifiers. */
-    public record MemberReply(String message,LocalDateTime createdAt) {}
+    public record MemberReply(String message,LocalDateTime createdAt,boolean fromMe) {}
     public record MemberTicket(long id,String code,String category,String subject,String description,String status,
                                String sessionCode,boolean submittedByMe,LocalDateTime createdAt,LocalDateTime updatedAt,
                                int unreadReplies,List<MemberReply> replies) {}
@@ -62,7 +65,7 @@ public class ReceptionSupportService {
     private final ObjectMapper json;
     private static final String SELECT="""
         SELECT q.*,m.member_code,u.full_name,s.session_code,
-            (SELECT COUNT(*) FROM support_request_message x WHERE x.request_id=q.id) reply_count
+            (SELECT COUNT(*) FROM support_request_message x WHERE x.request_id=q.id AND x.sender_id<>q.member_id) reply_count
         FROM support_request q
         JOIN member_profile m ON m.user_id=q.member_id JOIN user_account u ON u.id=q.member_id
         LEFT JOIN booking b ON b.id=q.intake_booking_id LEFT JOIN class_session s ON s.id=b.session_id
@@ -217,6 +220,50 @@ public class ReceptionSupportService {
         return withReplies(ticket(id));
     }
 
+    /**
+     * The Member follows up on their own request (helpdesk practice). OPEN and IN_PROGRESS requests keep their status.
+     * A RESOLVED request is reopened to IN_PROGRESS when the Member writes within {@value #REOPEN_DAYS} days of its last
+     * update; after that, or once CLOSED, the Member is asked to start a new request. Sending the same text as the
+     * Member's latest message again is a retry and changes nothing.
+     */
+    @Transactional public MemberTicket memberReply(long member,long id,ReplyRequest request) {
+        jdbc.queryForList("SELECT id FROM support_request WITH(UPDLOCK,HOLDLOCK) WHERE id=? AND member_id=?",Long.class,id,member);
+        var current=memberOwned(member,id);
+        operational.requireRealMember(member);
+        String message=request.message()==null?"":request.message().trim();
+        if(message.isEmpty())throw new BusinessRuleException("Enter a message for Reception");
+        var latest=jdbc.query("SELECT TOP (1) sender_id,message_body FROM support_request_message WHERE request_id=? ORDER BY created_at DESC,id DESC",
+            (rs,row)->new Object[]{rs.getLong("sender_id"),rs.getString("message_body")},id);
+        if(!latest.isEmpty() && ((Long)latest.getFirst()[0])==member && message.equals(latest.getFirst()[1]))return memberDetail(member,id);
+        Status from=Status.valueOf(current.status());
+        var now=LocalDateTime.now(clock);
+        if(from==Status.CLOSED)
+            throw new ConflictException("This request is closed. Send a new support request instead","SUPPORT_CLOSED");
+        if(from==Status.RESOLVED && current.updatedAt().plusDays(REOPEN_DAYS).isBefore(now))
+            throw new ConflictException("This request was resolved more than "+REOPEN_DAYS+" days ago. Send a new support request instead","SUPPORT_REOPEN_EXPIRED");
+        jdbc.update("INSERT support_request_message(request_id,sender_id,message_body,created_at) VALUES (?,?,?,?)",id,member,message,now);
+        Status to=from==Status.RESOLVED?Status.IN_PROGRESS:from;
+        jdbc.update("UPDATE support_request SET status=?,updated_at=? WHERE id=?",to.name(),now,id);
+        record(member,id,from==Status.RESOLVED?"MEMBER_SUPPORT_REOPENED":"MEMBER_SUPPORT_REPLIED",Map.of("from",from.name(),"to",to.name()));
+        return memberDetail(member,id);
+    }
+
+    /**
+     * Daily housekeeping: a request left RESOLVED for more than {@value #REOPEN_DAYS} days can no longer be reopened by
+     * the Member, so it becomes CLOSED. Resolution notes are kept. Returns the number of requests closed.
+     */
+    @Transactional public int closeStaleResolved() {
+        return jdbc.update("UPDATE support_request SET status='CLOSED',updated_at=? WHERE status='RESOLVED' AND updated_at<? "
+            + "AND intake_created_by IS NOT NULL AND category IN ('GENERAL','FACILITY','BOOKING','MEMBERSHIP','PAYMENT')",
+            LocalDateTime.now(clock),LocalDateTime.now(clock).minusDays(REOPEN_DAYS));
+    }
+
+    private Ticket memberOwned(long member,long id) {
+        var rows=jdbc.query(SELECT+" AND q.id=? AND q.member_id=?",this::map,id,member);
+        if(rows.isEmpty())throw new ResourceNotFoundException("Support request not found");
+        return rows.getFirst();
+    }
+
     @Transactional public Ticket update(long actor,long id,Update request) {
         staffAccount(actor,true);
         jdbc.queryForList("SELECT id FROM support_request WITH(UPDLOCK,HOLDLOCK) WHERE id=?",Long.class,id);
@@ -285,9 +332,11 @@ public class ReceptionSupportService {
     private Ticket ticket(long id) {var rows=jdbc.query(SELECT+" AND q.id=?",this::map,id);if(rows.isEmpty())throw new ResourceNotFoundException("General support request not found");return rows.getFirst();}
     private List<Reply> replies(long id) {
         return jdbc.query("""
-            SELECT x.id,x.message_body,x.created_at,u.full_name FROM support_request_message x JOIN user_account u ON u.id=x.sender_id
+            SELECT x.id,x.message_body,x.created_at,u.full_name,CASE WHEN x.sender_id=q.member_id THEN 1 ELSE 0 END from_member
+            FROM support_request_message x JOIN user_account u ON u.id=x.sender_id JOIN support_request q ON q.id=x.request_id
             WHERE x.request_id=? ORDER BY x.created_at,x.id
-            """,(rs,row)->new Reply(rs.getLong("id"),rs.getString("message_body"),rs.getString("full_name"),rs.getTimestamp("created_at").toLocalDateTime()),id);
+            """,(rs,row)->new Reply(rs.getLong("id"),rs.getString("message_body"),rs.getString("full_name"),rs.getTimestamp("created_at").toLocalDateTime(),
+                rs.getInt("from_member")==1),id);
     }
     private Ticket withReplies(Ticket t) {
         return new Ticket(t.id(),t.code(),t.memberId(),t.memberCode(),t.memberName(),t.category(),t.subject(),t.description(),t.status(),
@@ -297,7 +346,7 @@ public class ReceptionSupportService {
     private MemberTicket memberView(long member,Ticket t,boolean withReplies) {
         Integer unread=jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE user_id=? AND is_read=0 AND event_key LIKE ?",
             Integer.class,member,eventPrefix(t.id())+"REPLY:%");
-        var replies=withReplies?replies(t.id()).stream().map(r->new MemberReply(r.message(),r.createdAt())).toList():List.<MemberReply>of();
+        var replies=withReplies?replies(t.id()).stream().map(r->new MemberReply(r.message(),r.createdAt(),r.fromMember())).toList():List.<MemberReply>of();
         return new MemberTicket(t.id(),t.code(),t.category(),t.subject(),t.description(),t.status(),t.sessionCode(),t.memberSubmitted(),
             t.createdAt(),t.updatedAt(),unread==null?0:unread,replies);
     }

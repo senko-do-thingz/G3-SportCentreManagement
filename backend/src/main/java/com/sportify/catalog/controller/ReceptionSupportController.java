@@ -43,6 +43,8 @@ public class ReceptionSupportController {
     public ReceptionSupportService.MemberTicket memberDetail(@PathVariable long id,@AuthenticationPrincipal CustomUserDetails actor){return support.memberDetail(actor.getUserAccount().getId(),id);}
     @PostMapping("/member/support-requests") @ResponseStatus(HttpStatus.CREATED) @PreAuthorize(MEMBER)
     public ReceptionSupportService.MemberTicket memberCreate(@Valid @RequestBody ReceptionSupportService.MemberIntake request,@RequestHeader("Idempotency-Key") UUID operation,@AuthenticationPrincipal CustomUserDetails actor){return support.memberCreate(actor.getUserAccount().getId(),request,operation);}
+    @PostMapping("/member/support-requests/{id}/replies") @PreAuthorize(MEMBER)
+    public ReceptionSupportService.MemberTicket memberReply(@PathVariable long id,@Valid @RequestBody ReceptionSupportService.ReplyRequest request,@AuthenticationPrincipal CustomUserDetails actor){return support.memberReply(actor.getUserAccount().getId(),id,request);}
     @PutMapping("/member/support-requests/{id}/read") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize(MEMBER)
     public void memberRead(@PathVariable long id,@AuthenticationPrincipal CustomUserDetails actor){support.memberRead(actor.getUserAccount().getId(),id);}
 }

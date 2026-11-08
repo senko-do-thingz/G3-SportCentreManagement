@@ -52,6 +52,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -254,6 +255,24 @@ public class BookingServiceImplTest {
 
         verify(registrationRepository).consumeSession(eq(50L), eq("ACTIVE"), eq(session.getSessionDate()), any(LocalDateTime.class));
         verify(registrationRepository, never()).save(any());
+    }
+
+    @Test
+    void createBooking_MemberOutsideTheClassAgeGroupIsRejectedBeforePackageSelectionOrWrites() {
+        session.setSportClass(com.sportify.catalog.entity.SportClass.builder().id(7L)
+                .ageGroup(com.sportify.catalog.entity.AgeGroup.builder().id(3L).code("ADULT").label("Adult").minAge(16).build())
+                .build());
+        memberUser.setDateOfBirth(LocalDate.of(2010, 10, 7)); // still 15 on 2026-10-06
+        when(memberProfileRepository.findById(100L)).thenReturn(Optional.of(memberProfile));
+        when(sessionRepository.findForUpdate(20L)).thenReturn(Optional.of(session));
+
+        var error = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(explicitRequest(), memberUser));
+
+        assertEquals("AGE_RESTRICTED", error.getCode());
+        assertTrue(error.getMessage().contains("Ages 16+"));
+        verify(registrationRepository, never()).findById(any());
+        verify(sessionRepository, never()).reserveSeat(any(), any());
+        assertNoBookingWrites();
     }
 
     private BookingCreateRequest explicitRequest() {

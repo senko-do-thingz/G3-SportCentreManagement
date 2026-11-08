@@ -25,6 +25,7 @@ function backend(conflict = false, facilitiesMissing: boolean | number = false, 
     if (path === '/manager/sessions') return json(200, schedule)
     if (path === '/manager/classes/5/sessions' && call.method === 'POST') return conflict ? json(409, { status: 409, message: 'Schedule conflict', details: { conflicts: [{ sessionId: 7, requestedDate: date, date, startTime: '09:00:00', endTime: '10:00:00', class: session.class, coach: session.coach, facility: session.facility, conflictType: 'BOTH' }, { sessionId: 9, requestedDate: date, date, startTime: '09:15:00', endTime: '10:15:00', class: null, coach: null, facility: null, conflictType: 'FACILITY' }] } }) : json(201, [session])
     if (path === '/manager/sessions/7/cancel') return json(200, session)
+    if (path === '/manager/sessions/9/publish' && call.method === 'PUT') return json(200, { ...session, id: 9, status: 'PUBLISHED' })
     if (path === '/manager/sessions/7') return editResult instanceof Response ? editResult : json(200, editResult)
     return backendError(404, 'Unexpected test request')
   })
@@ -273,6 +274,17 @@ describe('FE-07 schedule', () => {
     await user.type(screen.getByLabelText(/^Cancellation reason/), '  Weather  ')
     await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
     await waitFor(() => expect(api.calls.some((call) => call.path === '/manager/sessions/7/cancel' && call.method === 'PUT')).toBe(true))
+  })
+  it('offers Publish only for a draft session and sends the publish request after confirmation', async () => {
+    const draft = { ...session, id: 9, startTime: '11:00:00', endTime: '12:00:00', status: 'DRAFT' }
+    const api = backend(false, false, [session, draft])
+    const user = userEvent.setup()
+    renderApp(`/manager/schedule?week=${monday(date)}`)
+    expect(await screen.findAllByRole('button', { name: 'Edit' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'Publish' })).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: 'Publish' }))
+    await user.click(screen.getByRole('button', { name: 'Publish session' }))
+    await waitFor(() => expect(api.calls.some((call) => call.path === '/manager/sessions/9/publish' && call.method === 'PUT')).toBe(true))
   })
   it('creates a weekly schedule using weekdays and range, without a date or draft status', async () => {
     const api = backend()

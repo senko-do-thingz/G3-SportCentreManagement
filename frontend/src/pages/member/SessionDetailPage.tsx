@@ -49,6 +49,7 @@ function SessionDetailContent({ id, returnTo }: { id: number | SessionId; return
       <Card title={session.className || `${session.sportName} ${self ? 'Self-training' : 'Session'}`}>
         <SessionContext {...session} date={session.sessionDate} trainingType={session.trainingFormat} />
         {session.level && <Badge tone="success">{session.level[0] + session.level.slice(1).toLowerCase()}</Badge>}
+        {session.ageGroupLabel && <Badge tone="info">{session.ageGroupLabel}</Badge>}
         <dl className="browse-facts"><div><dt>Sport</dt><dd>{session.sportName}</dd></div><div><dt>Format</dt><dd>{self ? 'Self-training' : 'Coach-led'}</dd></div><div><dt>Facility</dt><dd>{session.facilityName || 'Facility not assigned'}</dd></div><div><dt>Session length</dt><dd>{sessionMinutes(session.startTime, session.endTime)}</dd></div><div><dt>Capacity</dt><dd>{session.capacity} members</dd></div></dl>
         <h3>Upcoming session</h3><div className="browse-callout"><strong>{browseDate(session.sessionDate)} / {session.startTime.slice(0, 5)} - {session.endTime.slice(0, 5)}</strong><p>{session.bookedCount} / {session.capacity} booked - {session.freeSeats} spots remaining</p></div>
         <div className="browse-actions"><Link className={buttonClassName('secondary')} to={returnTo}>Back to results</Link><Button variant="ghost" onClick={reload}>Refresh availability</Button></div>

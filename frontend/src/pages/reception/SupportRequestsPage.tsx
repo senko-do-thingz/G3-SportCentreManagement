@@ -103,13 +103,13 @@ function TicketDetail({ ticket, onSaved }: { ticket: SupportTicket; onSaved: () 
       <p>Current status: {ticket.status}</p>
       <h3>Replies to the member</h3>
       {replies.length === 0 ? <p role="status">No reply has been sent yet.</p>
-        : <ul className="training-list">{replies.map(reply => <li key={reply.id}><p><strong>{reply.staffName}</strong> - {new Date(reply.createdAt).toLocaleString()}</p><p>{reply.message}</p></li>)}</ul>}
+        : <ul className="training-list">{replies.map(reply => <li key={reply.id}><p><strong>{reply.fromMember ? `Member: ${reply.staffName}` : reply.staffName}</strong> - {new Date(reply.createdAt).toLocaleString()}</p><p>{reply.message}</p></li>)}</ul>}
       {(ticket.status === 'OPEN' || ticket.status === 'IN_PROGRESS') && <ReplyForm ticket={ticket} onSaved={onSaved} />}
       {transitions.length > 0 ? <form onSubmit={event => {
         event.preventDefault()
         void action.run(async () => {
           if ((status === 'RESOLVED' || status === 'CLOSED') && notes.trim().length < 3) throw new Error('Provide an internal outcome note of at least 3 characters.')
-          if (status === 'RESOLVED' && ticket.memberSubmitted && replies.length === 0) throw new Error('Send a reply to the member before resolving a request they submitted.')
+          if (status === 'RESOLVED' && ticket.memberSubmitted && !replies.some(reply => !reply.fromMember)) throw new Error('Send a reply to the member before resolving a request they submitted.')
           const epoch = tokenStorage.getEpoch()
           await api.update(ticket.id, status, notes)
           if (epoch === tokenStorage.getEpoch()) onSaved()
