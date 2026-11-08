@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { WALLET_ENTRY_LABELS, walletApi, type WalletEntry, type WalletOverview } from '../../api/walletApi'
-import { Badge, Card, EmptyState, ErrorState, Notice, PageHeader, Spinner, StatCard } from '../../components/ui'
+import { Badge, Card, EmptyState, ErrorState, Notice, PageHeader, Spinner, StatCard, buttonClassName } from '../../components/ui'
 import { formatDateTime } from '../../utils/dateDisplay'
 import { formatMoney } from '../../utils/format'
 import { useMemberResource } from './useMemberResource'
@@ -15,6 +16,7 @@ export function MemberWalletPage() {
         eyebrow="Payments"
         title="My Wallet"
         description="Your internal Sportify Wallet balance and its activity."
+        actions={<Link className={buttonClassName()} to="/member/wallet/topup">Top up wallet</Link>}
       />
       {resource.status === 'loading' && <Spinner label="Loading your wallet" />}
       {resource.status === 'error' && <ErrorState title="We could not load your wallet" error={resource.error} onRetry={reload} />}
