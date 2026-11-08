@@ -1,9 +1,9 @@
 # MW-04 evidence - QR wallet top-up verification (re-captured after CODEOWNER review)
 
-- Code under test: `a797f5ae` (branch `fix/flow-3-mw-04-topup`, base `main` after #250 and #253 were merged). The jar was built from this commit.
-- Captured: 2026-11-09 00:15 Asia/Bangkok. Replaces the screenshots captured on 2026-11-08 before the review fixes.
+- Code under test: `6caa7006` (branch `fix/flow-3-mw-04-topup`, base `main` after #250 and #253 were merged). Backend jar built from `a797f5ae`; no backend file changed between `a797f5ae` and `6caa7006` (only the QR card text). Frontend served from `6caa7006`.
+- Captured: 2026-11-09 00:45 Asia/Bangkok. Replaces the screenshots captured on 2026-11-08 before the review fixes.
 - Browser: Google Chrome 157 driven by Playwright (`playwright-core`), headless, viewport 1440x900, light theme
-- Backend: jar on port 18080, profiles `dev,demo`, JDK 25, throwaway database `sportify_mw_evidence_1794157867` on local SQL Server (fresh V1-V51 plus demo seeds). Not the shared `sportify` database. Dropped after capture.
+- Backend: jar on port 18080, profiles `dev,demo`, JDK 25, throwaway database `sportify_mw_evidence_1794159909` on local SQL Server (fresh V1-V51 plus demo seeds). Not the shared `sportify` database. Dropped after capture.
 - Receiving account: SYNTHETIC. BIN 970436, account `0011009990001`, name `SPORTIFYDEMOCENTER`, passed as command-line properties for this run only, with a copy of the repository bank directory whose `capturedAt` was refreshed. No real account, no money moved. Demo (SIMULATED) top-ups left at the default (off).
 - Screenshot 08 comes from the same database after restarting the backend with `live-instructions-enabled=false` (no verified receiving account).
 - Frontend: Vite dev server on port 3000 from the same commit, `VITE_API_BASE_URL=http://localhost:18080/api/v1`
@@ -22,6 +22,9 @@
 | `screenshots/08-nonpayable-guard-bank-topup-disabled.png` | MEMBER `/member/wallet/topup` (no verified account) | Open the page | Warning shown, Create button disabled | As expected |
 
 ## API checks made in the same run (as the signed-in user)
+
+The QR in screenshot 01 was decoded from the image: NAPAS GUID, BIN 970436, account 0011009990001, `QRIBFTTA`, currency 704, amount 200000, country VN, note SPW1, and a valid CRC-16/CCITT-FALSE.
+
 
 | Check | Result |
 |---|---|
