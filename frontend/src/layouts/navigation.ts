@@ -84,6 +84,14 @@ export const MEMBER_AREA: RoleArea = {
           screens: ['F3-01', 'F3-02', 'F3-03'],
         },
         {
+          label: 'My Wallet',
+          path: 'wallet',
+          title: 'My Wallet',
+          description: 'Your internal Sportify Wallet balance and activity.',
+          task: 'MW-03',
+          screens: [],
+        },
+        {
           label: 'Training', path: 'training/plans', title: 'Training plans',
           description: 'Your assigned plans, coach feedback, attendance and results.',
           task: 'Member training', screens: ['F4-06', 'F4-07', 'F4-08'],

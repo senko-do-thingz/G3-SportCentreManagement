@@ -12,6 +12,7 @@ import { MemberDashboardPage } from '../pages/member/MemberDashboardPage'
 import { MembershipCardsPage } from '../pages/member/MembershipCardsPage'
 import { MyMembershipPage } from '../pages/member/MyMembershipPage'
 import { MyPaymentsPage } from '../pages/member/MyPaymentsPage'
+import { MemberWalletPage } from '../pages/member/MemberWalletPage'
 import { MyProfilePage } from '../pages/member/MyProfilePage'
 import { HealthAssessmentPage } from '../pages/member/HealthAssessmentPage'
 import { CheckInPassPage } from '../pages/member/CheckInPassPage'
@@ -104,6 +105,7 @@ const SCREENS: Record<string, ReactNode> = {
   '/member/packages': <SportPackagesPage />,
   '/member/membership': <MyMembershipPage />,
   '/member/payments': <MyPaymentsPage />,
+  '/member/wallet': <MemberWalletPage />,
   '/member/schedule': <MemberSchedulePage />,
   '/reception': <MemberSearchPage />,
   '/reception/support': <SupportRequestsPage />,
