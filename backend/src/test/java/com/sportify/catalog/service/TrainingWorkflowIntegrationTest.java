@@ -379,6 +379,41 @@ class TrainingWorkflowIntegrationTest {
         assertThat(support.staff(reception,null,null,code)).extracting(ReceptionSupportService.Ticket::code).containsExactly(code);
         assertThat(support.verification(reception,support.member(peer).getFirst().id()).memberStatus()).isEqualTo("ACTIVE");
     }
+    @Test void F6_memberFollowUpReopensWithinSevenDaysThenRequestsCloseAutomatically() throws Exception {
+        var ticket=support.memberCreate(member,new ReceptionSupportService.MemberIntake(ReceptionSupportService.Category.BOOKING,"Court change","Can I move my session?",null,null),UUID.randomUUID());
+        long id=ticket.id();
+        // A follow-up on an OPEN request keeps it OPEN and does not count as the Reception reply resolving needs.
+        var followUp=support.memberReply(member,id,new ReceptionSupportService.ReplyRequest("It is the Tuesday session."));
+        assertThat(followUp.status()).isEqualTo("OPEN");
+        assertThat(followUp.replies()).singleElement().satisfies(r->assertThat(r.fromMe()).isTrue());
+        assertThat(support.memberReply(member,id,new ReceptionSupportService.ReplyRequest("It is the Tuesday session.")).replies()).hasSize(1);
+        assertThat(support.detail(reception,id).replyCount()).isZero();
+        assertThatThrownBy(()->support.update(reception,id,new ReceptionSupportService.Update(ReceptionSupportService.Status.CLOSED,"No answer sent")))
+            .isInstanceOf(BusinessRuleException.class).hasMessageContaining("reply");
+        assertThatThrownBy(()->support.memberReply(peer,id,new ReceptionSupportService.ReplyRequest("Not mine"))).isInstanceOf(ResourceNotFoundException.class);
+
+        support.reply(reception,id,new ReceptionSupportService.ReplyRequest("Yes, ask at the desk to move it."));
+        support.update(reception,id,new ReceptionSupportService.Update(ReceptionSupportService.Status.RESOLVED,"Explained the rebooking rule"));
+        assertThat(support.detail(reception,id).replies()).extracting(ReceptionSupportService.Reply::fromMember).containsExactly(true,false);
+        // Within seven days a Member reply reopens the resolved request.
+        clock.value=clock.value.plus(Duration.ofDays(6));
+        var reopened=support.memberReply(member,id,new ReceptionSupportService.ReplyRequest("The desk said it needs a manager."));
+        assertThat(reopened.status()).isEqualTo("IN_PROGRESS");
+        assertThat(count("SELECT COUNT(*) FROM activity_log WHERE entity_id=? AND action='MEMBER_SUPPORT_REOPENED' AND actor_user_id=?",id,member)).isEqualTo(1);
+        // Resolved again; after more than seven days the Member must start a new request and the job closes it.
+        support.reply(reception,id,new ReceptionSupportService.ReplyRequest("A manager approved the move."));
+        support.update(reception,id,new ReceptionSupportService.Update(ReceptionSupportService.Status.RESOLVED,"Manager approved"));
+        clock.value=clock.value.plus(Duration.ofDays(8));
+        assertThatThrownBy(()->support.memberReply(member,id,new ReceptionSupportService.ReplyRequest("One more thing")))
+            .isInstanceOfSatisfying(ConflictException.class,e->assertThat(e.getCode()).isEqualTo("SUPPORT_REOPEN_EXPIRED"));
+        assertThat(support.closeStaleResolved()).isGreaterThanOrEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT status FROM support_request WHERE id=?",String.class,id)).isEqualTo("CLOSED");
+        assertThat(jdbc.queryForObject("SELECT resolution_notes FROM support_request WHERE id=?",String.class,id)).isEqualTo("Manager approved");
+        assertThatThrownBy(()->support.memberReply(member,id,new ReceptionSupportService.ReplyRequest("Still there?")))
+            .isInstanceOfSatisfying(ConflictException.class,e->assertThat(e.getCode()).isEqualTo("SUPPORT_CLOSED"));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/member/support-requests/"+id+"/replies").with(as(reception)).contentType("application/json").content("{\"message\":\"x\"}"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+    }
     @Test void F6_assistantAnswersFromTheMembersOwnBookingsAndHomeworkOnly() {
         long upcoming=insert("INSERT class_session(class_id,sport_id,session_date,start_time,end_time,coach_id,training_type,capacity,booked_count,status,session_code) VALUES (?,?,'2026-11-04','09:00','10:00',?,'COACH_LED',10,1,'PUBLISHED',?)",classId,sport,coach,SessionIdentityFixtures.reserve(jdbc,LocalDate.of(2026,11,4),sport));
         long upcomingBooking=insert("INSERT booking(booking_code,session_id,member_id,status) VALUES (?,?,?,'CONFIRMED')",code(),upcoming,member);

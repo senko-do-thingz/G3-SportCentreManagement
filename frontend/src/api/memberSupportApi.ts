@@ -12,7 +12,7 @@ export const memberSupportTopics = [
 export interface MemberSupportIntake {
   category: string; subject: string; description: string; bookingId?: number; assistantExcerpt?: string
 }
-export interface MemberSupportReply { message: string; createdAt: string }
+export interface MemberSupportReply { message: string; createdAt: string; /** True for a follow-up the Member wrote; absent or false for a Reception reply. */ fromMe?: boolean }
 export interface MemberSupportTicket {
   id: number; code: string; category: string; subject: string; description: string; status: SupportStatus
   sessionCode: string | null; submittedByMe: boolean; createdAt: string; updatedAt: string
@@ -25,4 +25,6 @@ export const memberSupportApi = {
   detail: (id: number, signal: AbortSignal) => api.get<MemberSupportTicket>(`/member/support-requests/${id}`, { signal }),
   create: (body: MemberSupportIntake, key: string) => api.post<MemberSupportTicket>('/member/support-requests', body, { headers: { 'Idempotency-Key': key } }),
   markRead: (id: number) => api.put<void>(`/member/support-requests/${id}/read`, {}),
+  /** Follow-up message. Reopens a request resolved within the last 7 days; closed or older requests are refused. */
+  reply: (id: number, message: string) => api.post<MemberSupportTicket>(`/member/support-requests/${id}/replies`, { message }),
 }

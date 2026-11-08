@@ -526,7 +526,7 @@ public class SportPackageServiceImplTest {
     @Test
     void activateRegistration_PastStartDate_RecomputesDates() {
         LocalDate pastStart = LocalDate.of(2026, 10, 1); // Clock is 2026-10-06
-        LocalDate pastEnd = pastStart.plusDays(30);
+        LocalDate pastEnd = pastStart.plusDays(29);
         SportPackageRegistration reg = SportPackageRegistration.builder()
                 .id(55L)
                 .member(memberProfile)
@@ -544,6 +544,27 @@ public class SportPackageServiceImplTest {
         assertEquals(PackageRegistrationStatus.ACTIVE, res.getStatus());
         assertEquals(LocalDate.of(2026, 10, 6), res.getStartDate()); // Recomputed to today
         assertEquals(LocalDate.of(2026, 11, 4), res.getEndDate()); // Recomputed: 30 days counting today, 06/10 to 04/11
+    }
+
+    @Test
+    void activateRegistration_PastStartDate_PreservesPurchasedDurationAfterCatalogEdit() {
+        LocalDate pastStart = LocalDate.of(2026, 10, 1);
+        sportPackage.setDurationDays(90);
+        SportPackageRegistration reg = SportPackageRegistration.builder()
+                .id(56L)
+                .member(memberProfile)
+                .sportPackage(sportPackage)
+                .startDate(pastStart)
+                .endDate(pastStart.plusDays(29))
+                .status(PackageRegistrationStatus.PENDING_PAYMENT)
+                .build();
+        when(registrationRepository.findById(56L)).thenReturn(Optional.of(reg));
+        when(registrationRepository.save(any(SportPackageRegistration.class))).thenAnswer(i -> i.getArgument(0));
+
+        PackageRegistrationResponse res = sportPackageService.activateRegistration(56L, receptionistUser);
+
+        assertEquals(LocalDate.of(2026, 10, 6), res.getStartDate());
+        assertEquals(LocalDate.of(2026, 11, 4), res.getEndDate());
     }
 
     @Test
@@ -1134,6 +1155,7 @@ public class SportPackageServiceImplTest {
         assertEquals(1, result.size());
         assertEquals("PKG-1", result.get(0).getCode());
         assertEquals(false, result.get(0).getIsActive());
+        verify(sportPackageRepository).findAll(any(Specification.class), eq(Sort.by(Sort.Direction.DESC, "id")));
     }
 
     private SportPackageRegistration pendingRegistrationWithPayment() {

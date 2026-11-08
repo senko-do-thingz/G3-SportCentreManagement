@@ -271,10 +271,20 @@ class BookingRulesServiceTest {
         verify(clock).instant();
     }
 
-    @Test void memberAfterCutoffGets400ReasonWithNoCounterChanges() {
+    @Test void memberLateCancellationAfterCutoffFreesTheSeatButForfeitsTheCredit() {
         session.setSessionDate(TODAY); session.setStartTime(LocalTime.of(11, 59, 59));
+        var response = service.cancelBooking(3L, actor);
+        String late = "Late cancellation by member: session credit not returned";
+        assertThat(response.getCancelReason()).isEqualTo(late);
+        verify(bookings).cancelConfirmedSessionBookings(List.of(3L), 1L, 30L, late, NOW);
+        verify(sessions).releaseSeats(1L, 1, NOW);
+        verify(registrations, never()).restoreSession(any(), any(), any());
+    }
+
+    @Test void memberCannotCancelOnceTheSessionHasStarted() {
+        session.setSessionDate(TODAY); session.setStartTime(NOW.toLocalTime().minusSeconds(1));
         assertThatThrownBy(() -> service.cancelBooking(3L, actor)).isInstanceOfSatisfying(BusinessRuleException.class,
-                e -> assertThat(e.getCode()).isEqualTo("CANCELLATION_CUTOFF"));
+                e -> assertThat(e.getCode()).isEqualTo("SESSION_STARTED"));
         verify(sessions, never()).releaseSeats(any(), anyInt(), any());
         verify(registrations, never()).restoreSession(any(), any(), any());
     }

@@ -339,7 +339,7 @@ function CardItem({
         <div>
           <p className="package-item__code">{card.cardCode}</p>
           <h3 className="package-item__title">{card.tierName}</h3>
-          <p className="package-item__meta">{card.discountPercentage ?? 0}% off packages longer than a single visit</p>
+          <p className="package-item__meta">{card.discountPercentage ?? 0}% off 30-day and 90-day packages</p>
         </div>
         <div className="membership-item__badges">
           <StatusBadge status={status} />

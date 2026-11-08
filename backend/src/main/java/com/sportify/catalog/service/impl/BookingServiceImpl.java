@@ -18,6 +18,7 @@ import com.sportify.catalog.repository.CheckInRepository;
 import com.sportify.catalog.repository.ClassSessionRepository;
 import com.sportify.catalog.repository.SportPackageRegistrationRepository;
 import com.sportify.catalog.service.BookingService;
+import com.sportify.catalog.service.ClassAgeEligibility;
 import com.sportify.catalog.service.TrainingWriteService;
 import com.sportify.catalog.service.PackageBookingEligibility;
 import com.sportify.catalog.service.MemberBookingLock;
@@ -73,6 +74,7 @@ public class BookingServiceImpl implements BookingService {
     private final MemberBookingLock memberBookingLock;
 
     public static final int MEMBER_CANCELLATION_CUTOFF_MINUTES = 120;
+    public static final String LATE_CANCELLATION_REASON = "Late cancellation by member: session credit not returned";
 
     @Override
     @Transactional
@@ -136,6 +138,10 @@ public class BookingServiceImpl implements BookingService {
         if (session.getBookedCount() >= session.getCapacity()) {
             // Same distinction as BE-11: do not repair or mislabel an inconsistent cached counter.
             throw rule("Session is fully booked", "CAPACITY_UNAVAILABLE");
+        }
+        // Same precedence as the BE-11 eligibility read: after capacity, before package selection. Staff booking too.
+        if (!ClassAgeEligibility.fits(member.getUserAccount() == null ? null : member.getUserAccount().getDateOfBirth(), session)) {
+            throw rule("Member age is outside the class age group (" + ClassAgeEligibility.label(session) + ")", "AGE_RESTRICTED");
         }
 
         SportPackageRegistration packageReg;
@@ -222,15 +228,17 @@ public class BookingServiceImpl implements BookingService {
             throw rule("Cannot cancel a booking in a cancelled or completed session", "SESSION_UNAVAILABLE");
         }
         LocalDateTime start = LocalDateTime.of(session.getSessionDate(), session.getStartTime());
+        // Late cancellation: a Member may still cancel inside the last 120 minutes before the start, which frees the
+        // seat for someone else, but the session credit is forfeited (like a no-show). Staff cancellations keep the
+        // credit at their discretion until the session ends.
+        boolean lateMemberCancellation = false;
         if (SecurityUtils.isMember(actor)) {
             if (!now.isBefore(start)) throw rule("Cannot cancel a session that has already started", "SESSION_STARTED");
-            if (now.isAfter(start.minusMinutes(MEMBER_CANCELLATION_CUTOFF_MINUTES))) {
-                throw rule("Member cancellation requires at least 120 minutes before session start", "CANCELLATION_CUTOFF");
-            }
+            lateMemberCancellation = now.isAfter(start.minusMinutes(MEMBER_CANCELLATION_CUTOFF_MINUTES));
         } else if (!now.isBefore(LocalDateTime.of(session.getSessionDate(), session.getEndTime()))) {
             throw rule("Cannot cancel a session that has already ended", "SESSION_ENDED");
         }
-        String reason = "Cancelled by user";
+        String reason = lateMemberCancellation ? LATE_CANCELLATION_REASON : "Cancelled by user";
         int changed = bookingRepository.cancelConfirmedSessionBookings(List.of(bookingId), sessionId, actor.getId(), reason, now);
         if (changed != 1) {
             if (checkInRepository.existsByBookingIdAndResult(bookingId, CheckInResult.ALLOWED)) {
@@ -250,7 +258,7 @@ public class BookingServiceImpl implements BookingService {
             throw new ConflictException("Booking changed while cancelling; reload and retry", "BOOKING_CHANGED");
         }
         entityManager.refresh(session);
-        if (booking.getPackageRegistration() != null) {
+        if (booking.getPackageRegistration() != null && !lateMemberCancellation) {
             registrationRepository.restoreSession(booking.getPackageRegistration().getId(), PackageRegistrationStatus.ACTIVE.name(), now);
         }
         booking = bookingRepository.save(booking);

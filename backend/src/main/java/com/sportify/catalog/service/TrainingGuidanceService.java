@@ -67,7 +67,7 @@ public class TrainingGuidanceService {
             LEFT JOIN member_sport_level msl ON msl.member_id=? AND msl.sport_id=sp.id
             LEFT JOIN age_group ag ON ag.id=c.age_group_id AND ag.is_active=1
             WHERE c.is_active=1 AND sp.is_active=1 AND s.status='PUBLISHED' AND s.booked_count<s.capacity
-                AND (s.training_type='SELF_TRAINING' OR (u.status='ACTIVE' AND s.coach_id=c.coach_id))
+                AND (s.training_type='SELF_TRAINING' OR (u.status='ACTIVE' AND EXISTS(SELECT 1 FROM coach_sport cs WHERE cs.coach_id=s.coach_id AND cs.sport_id=s.sport_id)))
                 AND s.session_date BETWEEN ? AND ? AND (s.session_date>? OR s.start_time>CAST(? AS time))
                 AND NOT EXISTS(SELECT 1 FROM booking b WHERE b.session_id=s.id AND b.member_id=? AND b.status='CONFIRMED')
                 AND NOT EXISTS(SELECT 1 FROM booking ob JOIN class_session os ON os.id=ob.session_id

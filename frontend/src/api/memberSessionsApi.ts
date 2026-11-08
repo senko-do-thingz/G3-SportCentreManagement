@@ -20,6 +20,8 @@ export interface BrowseSession {
   className: string | null
   trainingFormat: BrowseFormat
   level: string | null
+  /** Class age group such as "Ages 16+"; null when the class has no age restriction. */
+  ageGroupLabel?: string | null
   coachId: number | null
   coachName: string | null
   facilityId: number | null
@@ -33,7 +35,7 @@ export interface BrowseSession {
   full: boolean
   status: string
 }
-export type EligibilityReason = 'NO_PACKAGE' | 'NO_SESSIONS_LEFT' | 'PACKAGE_EXPIRED_BY_THEN' | 'PACKAGE_NOT_STARTED_BY_THEN' | 'FULL' | 'ALREADY_BOOKED' | 'CAPACITY_UNAVAILABLE' | 'SYNTHETIC_OPERATION_DENIED'
+export type EligibilityReason = 'NO_PACKAGE' | 'NO_SESSIONS_LEFT' | 'PACKAGE_EXPIRED_BY_THEN' | 'PACKAGE_NOT_STARTED_BY_THEN' | 'FULL' | 'ALREADY_BOOKED' | 'CAPACITY_UNAVAILABLE' | 'SYNTHETIC_OPERATION_DENIED' | 'AGE_RESTRICTED' | 'TIME_CONFLICT'
 export interface SuitableRegistration {
   registrationId: number
   registrationCode: string
@@ -82,14 +84,14 @@ function asBrowseSession(value: unknown): BrowseSession {
     || typeof value.trainingFormat !== 'string' || !['SELF_TRAINING', 'COACH_LED'].includes(value.trainingFormat)
     || typeof value.status !== 'string' || !['DRAFT', 'PUBLISHED', 'CANCELLED', 'COMPLETED'].includes(value.status)
     || !['classId', 'coachId', 'facilityId'].every((key) => value[key] == null || isPositiveId(value[key]))
-    || !['className', 'coachName', 'facilityName', 'level'].every((key) => isOptionalText(value[key]))
+    || !['className', 'coachName', 'facilityName', 'level', 'ageGroupLabel'].every((key) => isOptionalText(value[key]))
     || !isCalendarDate(value.sessionDate) || !validTime(value.startTime) || !validTime(value.endTime)
     || seconds(value.startTime) >= seconds(value.endTime)
     || !isNonnegativeInteger(value.capacity) || !isNonnegativeInteger(value.bookedCount) || !isNonnegativeInteger(value.freeSeats)
     || value.freeSeats !== Math.max(0, value.capacity - value.bookedCount) || value.full !== (value.freeSeats === 0)) {
     throw new ApiError(0, 'Session details could not be read. Refresh availability and try again.')
   }
-  return { ...value, sessionId: optionalSessionId(value.sessionId), classId: value.classId ?? null, className: value.className ?? null, coachId: value.coachId ?? null, coachName: value.coachName ?? null, facilityId: value.facilityId ?? null, facilityName: value.facilityName ?? null, level: value.level ?? null } as unknown as BrowseSession
+  return { ...value, sessionId: optionalSessionId(value.sessionId), classId: value.classId ?? null, className: value.className ?? null, coachId: value.coachId ?? null, coachName: value.coachName ?? null, facilityId: value.facilityId ?? null, facilityName: value.facilityName ?? null, level: value.level ?? null, ageGroupLabel: value.ageGroupLabel ?? null } as unknown as BrowseSession
 }
 
 /** Complete a bounded calendar/lookup query. Failure never returns a misleading partial list. */

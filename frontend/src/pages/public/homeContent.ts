@@ -74,15 +74,15 @@ export const HOME_NOTICES = {
   },
   recommendations: {
     title: 'Find your starting point',
-    text: 'Personalised recommendations are not available yet. You can compare sports, choose a level in the class finder, or ask the front desk about your goals.',
+    text: 'Sign in as a member and open Recommendations for classes that match your sport, level and goal. Recommendations never book a place.',
   },
   reception: {
     title: 'Contact reception',
-    text: 'Please speak to the front desk at Sportify Center for help with age groups, packages and training goals. Online reception messaging is not available yet.',
+    text: 'Sign in as a member and open Contact reception to send a question; reception replies in My support requests. You can also speak to the front desk at Sportify Center.',
   },
   assistant: {
     title: 'AI Assistant',
-    text: 'The AI Assistant is not available yet. Please speak to reception for help with sports, packages or bookings.',
+    text: "Sign in as a member to use the center assistant. It answers from the center's current packages and schedule and your own bookings; it does not book or pay for you.",
   },
   member: {
     title: 'Member booking and purchases',
@@ -94,6 +94,6 @@ export const HOME_NOTICES = {
 export const HOME_FAQ = [
   { question: 'How do I join a class?', answer: 'Create an account, pick a sport and a package, then book your sessions in the Member area.' },
   { question: 'Self-training or coach-led?', answer: 'Self-training is on your own at your pace. Coach-led classes are taught by a qualified coach. Each has its own price for each sport.' },
-  { question: 'What does a membership card give me?', answer: 'A discount on eligible sport packages, plus extra perks on higher tiers. Card validity is separate from package validity.' },
+  { question: 'What does a membership card give me?', answer: 'A percentage discount, set for each card tier, on 30-day and 90-day sport packages. Card validity is separate from package validity.' },
   { question: 'Can I come for a single visit?', answer: 'Yes. A single visit has its own price, and membership card discounts do not apply to it.' },
 ]

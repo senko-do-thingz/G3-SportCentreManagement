@@ -450,6 +450,78 @@ class ManagerSessionServiceImplTest {
     }
 
     @Test
+    void publish_draftRevalidatesAssignmentThenBecomesPublishedWithAudit() {
+        ClassSession session = existing(100L);
+        session.setStatus(SessionStatus.DRAFT);
+        when(sessions.findForUpdate(100L)).thenReturn(Optional.of(session));
+        validAssignment();
+        when(sessions.saveAndFlush(session)).thenReturn(session);
+
+        var result = service.publishSession(100L, manager);
+
+        assertEquals(SessionStatus.PUBLISHED, result.status());
+        verify(qualifications).existsById(new CoachSportId(20L, 1L));
+        var event = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(audit).record(event.capture());
+        assertEquals(AuditAction.SESSION_PUBLISHED, event.getValue().getAction());
+    }
+
+    @Test
+    void publish_rejectsNonDraftSessionsWithoutWrites() {
+        when(sessions.findForUpdate(100L)).thenReturn(Optional.of(existing(100L)));
+
+        var error = assertThrows(BusinessRuleException.class, () -> service.publishSession(100L, manager));
+
+        assertEquals("SESSION_NOT_DRAFT", error.getCode());
+        verify(sessions, never()).saveAndFlush(any());
+        verifyNoInteractions(audit, coaches, facilities);
+    }
+
+    @Test
+    void publish_draftWhoseCoachNoLongerTeachesTheSportStaysDraft() {
+        ClassSession session = existing(100L);
+        session.setStatus(SessionStatus.DRAFT);
+        when(sessions.findForUpdate(100L)).thenReturn(Optional.of(session));
+        when(coaches.findForScheduleUpdate(20L)).thenReturn(Optional.of(coach));
+        when(qualifications.existsById(new CoachSportId(20L, 1L))).thenReturn(false);
+
+        assertThrows(BusinessRuleException.class, () -> service.publishSession(100L, manager));
+
+        assertEquals(SessionStatus.DRAFT, session.getStatus());
+        verify(sessions, never()).saveAndFlush(any());
+        verifyNoInteractions(audit);
+    }
+
+    @Test
+    void update_rescheduleOverlappingAnotherBookingOfABookedMemberIsRejectedWithoutWrites() {
+        ClassSession session = existing(100L);
+        when(sessions.findForUpdate(100L)).thenReturn(Optional.of(session));
+        confirmed(100L, 2);
+        LocalDate target = DATE.plusDays(1);
+        when(bookings.findMemberCodesOverlappingReschedule(100L, target, START, END)).thenReturn(List.of("MEM-0007"));
+
+        var error = assertThrows(ConflictException.class, () -> service.updateSession(100L,
+                new SessionUpdateRequest(target, START, END, 30L, 20L, 16, 0L, "Weather"), manager));
+
+        assertTrue(error.getMessage().contains("MEM-0007"));
+        verify(sessions, never()).saveAndFlush(any());
+        verifyNoInteractions(allocator, audit, notifications);
+    }
+
+    @Test
+    void update_withoutTimingChangeSkipsTheMemberOverlapQuery() {
+        ClassSession session = existing(100L);
+        when(sessions.findForUpdate(100L)).thenReturn(Optional.of(session));
+        confirmed(100L, 2);
+        validAssignment();
+        when(sessions.saveAndFlush(session)).thenReturn(session);
+
+        service.updateSession(100L, update(18), manager);
+
+        verify(bookings, never()).findMemberCodesOverlappingReschedule(anyLong(), any(), any(), any());
+    }
+
+    @Test
     void update_reschedulingRequiresAnAuthenticatedManagerAtTheServiceBoundary() {
         when(sessions.findForUpdate(100L)).thenReturn(Optional.of(existing(100L)));
         var request = new SessionUpdateRequest(DATE.plusDays(1), START, END, 30L, 20L, 16, 0L, null);

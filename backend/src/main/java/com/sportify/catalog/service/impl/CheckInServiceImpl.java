@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,6 +44,10 @@ public class CheckInServiceImpl implements CheckInService {
     private final ClassSessionRepository sessionRepository;
     private final EntityManager entityManager;
     private final com.sportify.catalog.service.OperationalMemberPolicy operationalMemberPolicy;
+
+    private static final Comparator<Booking> BY_SESSION_START = Comparator
+            .comparing((Booking b) -> b.getSession().getStartTime())
+            .thenComparing(Booking::getId);
 
     @Override
     @Transactional
@@ -86,9 +91,12 @@ public class CheckInServiceImpl implements CheckInService {
                     denialReason = "Specified booking is not scheduled for today or is not confirmed";
                 }
             } else {
-                // If member has multiple bookings today, pick the first one that has not yet been checked in
+                // If member has multiple bookings today, pick the first one that has not yet been checked in, in session
+                // start order so the choice does not depend on database row order. E2E-D6 (CODEOWNER decision
+                // 2026-11-05, Option A): same-day arrival is allowed, including after the session has ended.
                 targetBooking = todayBookings.stream()
                         .filter(b -> !checkInRepository.existsByBookingIdAndResult(b.getId(), CheckInResult.ALLOWED))
+                        .sorted(BY_SESSION_START)
                         .findFirst()
                         .orElse(null);
                 if (targetBooking == null) {

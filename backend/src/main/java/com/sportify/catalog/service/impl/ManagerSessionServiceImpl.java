@@ -174,6 +174,16 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
                 throw new BusinessRuleException(
                         "The new date is outside the validity period of packages used by confirmed bookings of this session");
             }
+            // Booking forbids two overlapping CONFIRMED bookings of one member; rescheduling must not create one.
+            if (booked > 0 && timingChanged) {
+                List<String> overlapping = bookingRepository.findMemberCodesOverlappingReschedule(id, date,
+                        request.startTime(), request.endTime());
+                if (!overlapping.isEmpty()) {
+                    throw new ConflictException("The new time overlaps another confirmed booking of member(s) "
+                            + String.join(", ", overlapping) + "; choose another time or ask them to cancel first",
+                            "MEMBER_TIME_CONFLICT");
+                }
+            }
             Assignment assignment = lockAndValidateAssignment(sportClass, request.coachId(),
                     request.facilityId(), session.getTrainingType());
             validateFacilityCapacityAndSport(sportClass, assignment.facility(), request.capacity());
@@ -239,6 +249,39 @@ public class ManagerSessionServiceImpl implements ManagerSessionService {
                     "registrations", cancellation.registrations().stream().map(row -> Map.of(
                             "registrationId", row.registrationId(), "packageBookings", row.packageBookings())).toList()));
             return toResponse(saved, 0);
+        });
+    }
+
+    /**
+     * DRAFT -> PUBLISHED. A draft already occupies its coach and facility, so no new overlap can appear; the class,
+     * coach qualification and facility are revalidated because they may have changed since the draft was saved.
+     */
+    @Override
+    @Transactional
+    public ManagerSessionResponse publishSession(Long id, UserAccount actor) {
+        return withLockHandling(() -> {
+            if (actor == null || actor.getId() == null) {
+                throw new BusinessRuleException("An authenticated manager is required to publish a session");
+            }
+            ClassSession session = findForUpdate(id);
+            ensureCanChange(session);
+            if (session.getStatus() != SessionStatus.DRAFT) {
+                throw new BusinessRuleException("Only draft sessions can be published", "SESSION_NOT_DRAFT");
+            }
+            SportClass sportClass = session.getSportClass();
+            if (sportClass == null) {
+                throw new BusinessRuleException("Only sessions linked to a class can be published here");
+            }
+            ensureActiveClass(sportClass);
+            Assignment assignment = lockAndValidateAssignment(sportClass,
+                    session.getCoach() == null ? null : session.getCoach().getId(),
+                    session.getFacility() == null ? null : session.getFacility().getId(), session.getTrainingType());
+            validateFacilityCapacityAndSport(sportClass, assignment.facility(), session.getCapacity());
+            Map<String, Object> before = snapshot(session);
+            session.setStatus(SessionStatus.PUBLISHED);
+            ClassSession saved = sessionRepository.saveAndFlush(session);
+            audit(saved, actor, AuditAction.SESSION_PUBLISHED, Map.of("before", before, "after", snapshot(saved)));
+            return toResponse(saved, bookingCounts(List.of(id)).getOrDefault(id, 0L));
         });
     }
 
