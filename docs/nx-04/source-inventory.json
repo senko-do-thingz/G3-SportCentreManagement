@@ -403,9 +403,19 @@
       ],
       "drops": [],
       "sha256_lf": "cfede0cfa4330c8d0d894043fbbb97cbddaadd648ccb4fac352c14030565f6c6"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V50__member_wallet_ledger.sql",
+      "version": 50,
+      "creates": [
+        "dbo.member_wallet",
+        "dbo.wallet_ledger_entry"
+      ],
+      "drops": [],
+      "sha256_lf": "a423f789ec8b88cc77e87403df4cc2a25c9186cbd0fc5dfe4a11325d1a3af33d"
     }
   ],
-  "create_occurrences": 74,
+  "create_occurrences": 76,
   "create_names": [
     "[activity_log]",
     "[age_group]",
@@ -468,10 +478,12 @@
     "dbo.cash_coverage",
     "dbo.cash_event",
     "dbo.member_health_assessment",
+    "dbo.member_wallet",
     "dbo.simulated_payment_transaction",
     "dbo.simulated_qr_rate_limit",
     "dbo.simulated_qr_session",
     "dbo.simulated_qr_transition",
+    "dbo.wallet_ledger_entry",
     "member_check_in_pass",
     "member_sport_level",
     "permission",
