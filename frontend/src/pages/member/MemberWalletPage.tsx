@@ -16,7 +16,10 @@ export function MemberWalletPage() {
         eyebrow="Payments"
         title="My Wallet"
         description="Your internal Sportify Wallet balance and its activity."
-        actions={<Link className={buttonClassName()} to="/member/wallet/topup">Top up wallet</Link>}
+        actions={<>
+          <Link className={buttonClassName()} to="/member/wallet/topup">Top up wallet</Link>
+          <Link className={buttonClassName('secondary')} to="/member/wallet/withdraw">Withdraw</Link>
+        </>}
       />
       {resource.status === 'loading' && <Spinner label="Loading your wallet" />}
       {resource.status === 'error' && <ErrorState title="We could not load your wallet" error={resource.error} onRetry={reload} />}

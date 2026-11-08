@@ -20,7 +20,7 @@ class ReleaseMigrationIntegrationTest {
         var accounts=jdbc.queryForList("SELECT id,email,status,role_id,version,avatar_url FROM user_account ORDER BY id");
         var packages=jdbc.queryForList("SELECT * FROM sport_package ORDER BY id");
         var latest=Flyway.configure().dataSource(fixture.source()).locations(locations).cleanDisabled(true).outOfOrder(false).validateOnMigrate(true).load();
-        assertThat(latest.migrate().migrationsExecuted).isEqualTo(11);
+        assertThat(latest.migrate().migrationsExecuted).isEqualTo(12);
         latest.validate();assertThat(latest.migrate().migrationsExecuted).isZero();
         assertThat(jdbc.queryForList("SELECT version,checksum,description FROM flyway_schema_history ORDER BY installed_rank").subList(0,history.size())).isEqualTo(history);
         assertThat(jdbc.queryForList("SELECT id,email,status,role_id,version,avatar_url FROM user_account ORDER BY id")).isEqualTo(accounts);
