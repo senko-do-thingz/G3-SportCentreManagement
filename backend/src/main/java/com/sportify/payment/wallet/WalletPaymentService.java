@@ -50,15 +50,20 @@ public class WalletPaymentService {
     private final InvoiceRepository invoices;
     private final WalletLedgerService ledger;
     private final OperationalMemberPolicy operational;
+    private final WalletPendingOperations pending;
     private final JdbcTemplate jdbc;
     private final Clock clock;
 
     /**
-     * Lock order: payment row (the same first lock as staff confirmation, so the two cannot both settle it), then the
-     * item and account inside activation, then the wallet row inside the ledger.
+     * Lock order follows the CODEOWNER wallet rule: the member_wallet row first, then the payment row (the same row
+     * staff confirmation locks, so the two cannot both settle it), then the item and account inside activation. A wallet
+     * purchase completes in one transaction, so it claims no slot but refuses while another wallet operation (a pending
+     * top-up or withdrawal) is in flight.
      */
     @Transactional
     public Result pay(UserAccount member, long paymentId) {
+        ledger.ensureWallet(member.getId());
+        pending.lockWallet(member.getId());
         Payment payment = payments.findByIdForUpdate(paymentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found"));
         if (payment.getMember() == null || !member.getId().equals(payment.getMember().getId())) {
@@ -76,6 +81,7 @@ public class WalletPaymentService {
         if ("SIMULATED".equals(payment.getSettlementType()) || payment.getSimulatedTransactionId() != null) {
             throw new BusinessRuleException("A simulated payment cannot be settled from the wallet", "WALLET_PAYMENT_NOT_ELIGIBLE");
         }
+        pending.requireNone(member.getId());
         operational.requireRealMember(member.getId());
         var item = items.findItem(payment).orElseThrow(() -> new BusinessRuleException("Payment " + payment.getPaymentCode()
                 + " is not linked to a membership card or a package registration", "WALLET_PAYMENT_NOT_ELIGIBLE"));
