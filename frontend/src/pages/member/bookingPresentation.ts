@@ -29,13 +29,23 @@ export function bookingTime(value: string | null): string {
   return formatClockTime(value)
 }
 
-/** The backend allows member cancellation until two hours before the local session start. */
-export function cancellationDeadline(booking: Pick<MemberBookingRecord, 'sessionDate' | 'startTime'>): string | null {
+/** Free cancellation (credit returned) ends two hours before the local session start; later member cancellations forfeit the credit. */
+function cancellationDeadlineDate(booking: Pick<MemberBookingRecord, 'sessionDate' | 'startTime'>): Date | null {
   if (!booking.startTime || !isCalendarDate(booking.sessionDate) || !/^([01]\d|2[0-3]):[0-5]\d/.test(booking.startTime)) return null
   const [year, month, day] = booking.sessionDate.split('-').map(Number)
   const [hour, minute] = booking.startTime.split(':').map(Number)
-  const deadline = new Date(Date.UTC(year, month - 1, day, hour - 2, minute) - 7 * 60 * 60 * 1000)
-  return formatDateTime(deadline)
+  return new Date(Date.UTC(year, month - 1, day, hour - 2, minute) - 7 * 60 * 60 * 1000)
+}
+
+export function cancellationDeadline(booking: Pick<MemberBookingRecord, 'sessionDate' | 'startTime'>): string | null {
+  const deadline = cancellationDeadlineDate(booking)
+  return deadline ? formatDateTime(deadline) : null
+}
+
+/** True once the free cancellation deadline has passed: cancelling still frees the place but forfeits the credit. */
+export function isLateCancellation(booking: Pick<MemberBookingRecord, 'sessionDate' | 'startTime'>, now: number = Date.now()): boolean {
+  const deadline = cancellationDeadlineDate(booking)
+  return deadline !== null && now > deadline.getTime()
 }
 
 export function bookingErrorMessage(error: unknown): string {
@@ -54,6 +64,8 @@ export function bookingErrorMessage(error: unknown): string {
     case 'CANCELLATION_CUTOFF': return 'The cancellation deadline has passed. This booking was not cancelled.'
     case 'CANNOT_CANCEL': return 'This booking can no longer be cancelled.'
     case 'SYNTHETIC_OPERATION_DENIED': return 'Synthetic members cannot use operational classes or training records.'
+    case 'TIME_CONFLICT': return 'This booking overlaps another confirmed booking at the same time. Choose another session.'
+    case 'AGE_RESTRICTED': return 'The member age on the session date is outside this class age group. Choose a class for their age group.'
     default: return error.message || 'The request could not be completed. Please try again.'
   }
 }

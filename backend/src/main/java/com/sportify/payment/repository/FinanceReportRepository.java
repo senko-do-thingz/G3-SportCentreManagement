@@ -19,13 +19,30 @@ import java.util.Locale;
 import java.util.function.Consumer;
 
 /**
- * Read-only SQL for the manager finance reports (BE-22). Every revenue figure comes from the view vw_paid_payment
- * (SUCCESS payments only, filtered by payment_time); the ledger reads vw_payment_ledger (every status). Both views are
- * created by V30. Native SQL is used because the reports are aggregations over views, which JPQL cannot express.
+ * Read-only SQL for the manager finance reports (BE-22). Every revenue figure is gross collected revenue
+ * ({@link #COLLECTED}): money actually received, by payment_time, whether or not it was later refunded. Refunds are a
+ * separate deduction in the month the refund was paid out ({@link #refundedTotals}), so a closed month never changes
+ * and a partial refund deducts only the refunded amount. The ledger reads vw_payment_ledger (every status). Both views
+ * are created by V30. Native SQL is used because the reports are aggregations over views, which JPQL cannot express.
  * Time ranges are half open: start inclusive, end exclusive.
  */
 @Repository
 public class FinanceReportRepository {
+
+    /**
+     * Gross collected payments: vw_paid_payment (SUCCESS, actual settlement, payment_time set) plus REFUNDED payments,
+     * which were collected first. A SIMULATED settlement can never be refunded, so REFUNDED rows are always actual
+     * money. payment_time is not changed by a refund, so a refunded payment stays in the month it was collected.
+     */
+    static final String COLLECTED = """
+            (SELECT payment_id, payment_code, payment_time, amount, payment_method, member_id, member_code, member_name,
+                    invoice_number, item_type, item_code, item_name, sport_id, sport_name
+             FROM dbo.vw_paid_payment
+             UNION ALL
+             SELECT payment_id, payment_code, payment_time, amount, payment_method, member_id, member_code, member_name,
+                    invoice_number, item_type, item_code, item_name, sport_id, sport_name
+             FROM dbo.vw_payment_ledger
+             WHERE payment_status = 'REFUNDED' AND payment_time IS NOT NULL) collected""";
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -59,9 +76,9 @@ public class FinanceReportRepository {
     public Totals paidTotals(LocalDateTime from, LocalDateTime toExclusive) {
         return totals("""
                 SELECT COALESCE(SUM(amount), 0) AS total, COUNT_BIG(*) AS cnt
-                FROM dbo.vw_paid_payment
+                FROM %s
                 WHERE payment_time >= :from AND payment_time < :to
-                """, from, toExclusive);
+                """.formatted(COLLECTED), from, toExclusive);
     }
 
     /** PENDING payments requested (created_at) in the range. */
@@ -124,11 +141,11 @@ public class FinanceReportRepository {
         return jdbc.query("""
                 SELECT YEAR(payment_time) AS y, MONTH(payment_time) AS m,
                        COALESCE(SUM(amount), 0) AS total, COUNT_BIG(*) AS cnt
-                FROM dbo.vw_paid_payment
+                FROM %s
                 WHERE payment_time >= :from AND payment_time < :to
                 GROUP BY YEAR(payment_time), MONTH(payment_time)
                 ORDER BY y, m
-                """, range(from, toExclusive),
+                """.formatted(COLLECTED), range(from, toExclusive),
                 (rs, i) -> new MonthTotal(rs.getInt("y"), rs.getInt("m"), rs.getBigDecimal("total"), rs.getLong("cnt")));
     }
 
@@ -153,7 +170,7 @@ public class FinanceReportRepository {
         }
         String sql = "SELECT " + key + " AS group_key, MAX(" + label + ") AS group_label,"
                 + " COALESCE(SUM(amount), 0) AS total, COUNT_BIG(*) AS cnt"
-                + " FROM dbo.vw_paid_payment"
+                + " FROM " + COLLECTED
                 + " WHERE payment_time >= :from AND payment_time < :to"
                 + " GROUP BY " + key
                 + " ORDER BY total DESC, group_key";
@@ -188,10 +205,10 @@ public class FinanceReportRepository {
         jdbc.query("""
                 SELECT TOP (:limit) payment_code, payment_time, invoice_number, member_code, member_name,
                        item_type, item_code, item_name, sport_name, payment_method, amount
-                FROM dbo.vw_paid_payment
+                FROM %s
                 WHERE payment_time >= :from AND payment_time < :to
                 ORDER BY payment_time, payment_id
-                """, range(from, toExclusive).addValue("limit", limit), (RowCallbackHandler) rs -> consumer.accept(new ExportRow(
+                """.formatted(COLLECTED), range(from, toExclusive).addValue("limit", limit), (RowCallbackHandler) rs -> consumer.accept(new ExportRow(
                 rs.getString("payment_code"), toLocalDateTime(rs.getTimestamp("payment_time")),
                 rs.getString("invoice_number"), rs.getString("member_code"), rs.getString("member_name"),
                 rs.getString("item_type"), rs.getString("item_code"), rs.getString("item_name"),

@@ -15,4 +15,5 @@ public interface ManagerSessionService {
     List<ManagerSessionResponse> createSessions(Long classId, SessionCreateRequest request, UserAccount actor);
     ManagerSessionResponse updateSession(Long id, SessionUpdateRequest request, UserAccount actor);
     ManagerSessionResponse cancelSession(Long id, SessionCancelRequest request, UserAccount actor);
+    ManagerSessionResponse publishSession(Long id, UserAccount actor);
 }

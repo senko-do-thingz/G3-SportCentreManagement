@@ -202,6 +202,10 @@
                     <argLine>@{argLine}</argLine>
                     <skipTests>${skipUnitTests}</skipTests>
                     <excludedGroups>${unitExcludedGroups}</excludedGroups>
+                    <systemPropertyVariables>
+                        <app.sessions.auto-complete.enabled>false</app.sessions.auto-complete.enabled>
+                        <app.support.auto-close.enabled>false</app.support.auto-close.enabled>
+                    </systemPropertyVariables>
                     <!-- Surefire 3.6.1 auto-detects transitive JUnit 4 and switches groups to Vintage categories.
                          Disable Vintage auto-addition so integration is interpreted as a Jupiter tag. -->
                     <properties>
@@ -224,6 +228,10 @@
                         <include>**/*Test.java</include>
                         <include>**/*IT.java</include>
                     </includes>
+                    <systemPropertyVariables>
+                        <app.sessions.auto-complete.enabled>false</app.sessions.auto-complete.enabled>
+                        <app.support.auto-close.enabled>false</app.support.auto-close.enabled>
+                    </systemPropertyVariables>
                     <!-- Keep the same Jupiter tag semantics as Surefire; do not auto-add Vintage. -->
                     <properties>
                         <property>
