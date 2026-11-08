@@ -23,7 +23,7 @@ public class SportPackageUpdateRequest {
     private String name;
 
     @NotNull(message = "Price is required")
-    @DecimalMin(value = "0.01", message = "Price must be greater than zero")
+    @DecimalMin(value = "0.0", inclusive = true, message = "Price must not be negative")
     @Digits(integer = 12, fraction = 2, message = "Price format is invalid")
     private BigDecimal price;
 
