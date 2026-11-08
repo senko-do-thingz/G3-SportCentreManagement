@@ -120,7 +120,117 @@ There are two different kinds of demo setup. Do not confuse them.
 
 Before starting a newer backend on an existing shared `sportify` database in either normal or unified-demo mode, back up the database and check `flyway_schema_history` for unexpected entries. For committee rehearsal, use the unified-demo runtime above; do not run demo scripts that create new databases.
 
-Demo account passwords are documented only in the linked test case files and apply only to those disposable databases.
+Demo account details are in [Demo Accounts](#demo-accounts) below and apply only to those disposable databases.
+
+## Demo Accounts
+
+Reference for the **disposable `dev,demo` seed databases only** (section A above). These accounts and classes never exist in the shared `sportify` database. Backend tests read this section to check that it matches the V28 and V29 seed migrations, so keep it in sync with them.
+
+These seven accounts are for isolated local demonstrations only. Never enable the `demo` profile against a production or shared database. The profile guard rejects simultaneous `prod` and `demo` activation before Flyway initializes; it cannot determine whether a connection points to a production database.
+
+Common demo password: `SportifyDemo2026!`
+
+| Display name | Email | Role | Demo password | Scenario |
+|---|---|---|---|---|
+| Nguyen Thi Lan | lan.reception@example.com | RECEPTIONIST | SportifyDemo2026! | Front desk |
+| Tran Minh Quan | quan.coach@example.com | COACH | SportifyDemo2026! | BADMINTON primary sport |
+| Le Hoang Nam | nam.coach@example.com | COACH | SportifyDemo2026! | SWIMMING primary sport |
+| Pham Thu Ha | ha.coach@example.com | COACH | SportifyDemo2026! | BASKETBALL primary sport |
+| Nguyen Van An | an.gold@example.com | MEMBER | SportifyDemo2026! | GOLD physical card, 5% multi-day package discount |
+| Tran Thi Mai | mai.standard@example.com | MEMBER | SportifyDemo2026! | STANDARD physical card, free and permanent, 0% discount |
+| Le Quoc Bao | bao.nocard@example.com | MEMBER | SportifyDemo2026! | Member profile with no physical card, 0% discount |
+
+To enable the seed, create a fresh isolated SQL Server demonstration database and point the backend's existing database environment settings to it. In PowerShell, from `backend/`:
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE = 'dev,demo'
+mvn spring-boot:run
+```
+
+The explicit `demo` profile adds `classpath:db/demo` after the ordinary identity/catalog locations. `V28__seed_demo_accounts.sql` creates the accounts and profiles. Ordinary startup, including `dev` and `prod`, does not discover this migration. Keep demonstration databases on the demo configuration and never repurpose them as production databases. Removing a previously used migration location can fail Flyway validation. Use a fresh demo database when enabling the seed after newer shared migrations: `out-of-order=false` is preserved, and V28 cannot be retroactively inserted into a later migration history. Existing applied migrations and the production profile configuration are unchanged.
+
+The GOLD term is fixed at **2026-10-01 through 2027-09-30**, inclusive. After that window it no longer grants benefits even if its stored status remains ACTIVE. STANDARD starts on 2026-10-01 and has no end date. Before these start dates, neither card grants benefits. The two cards are imported demo entitlement snapshots (`DEMO-CARD-GOLD`, `DEMO-CARD-STANDARD`) with prices 300000 VND and 0 VND, respectively, and nullable `payment_id`; they are not sales and have no payment, receipt, or invoice. Purchase/confirmation behavior is unchanged. Single-visit packages never receive card discounts.
+
+Member codes use the existing `seq_member_code` and `MEM-%04d` convention (MEM-0001, MEM-0002, MEM-0003 on a completely fresh database); existing profiles keep their codes. Card codes use a separate namespace and do not consume or reset `seq_card_code`. SQL replay inserts only missing records and rejects conflicting demo identities, disabled accounts, primary sports, tier terms or card scenarios. It preserves existing hashes, personal/profile fields, certifications, payments and unrelated cards. If a demo account's password was previously changed, the existing password remains in effect. Flyway applies V28 once; independent SQL replay joins a caller transaction or opens its own transaction and is covered by the CI integration suite. SQL Server sequence allocations are not rolled back, so failed attempts can leave harmless code gaps.
+
+See [BE-07 test cases](docs/tests/BE-07_test_cases.md) for verification and lifecycle limits.
+
+### Demo Classes and Sessions (BE-15)
+
+The same explicit `dev,demo` opt-in also applies
+`db/demo/V29__seed_demo_classes_and_sessions.sql`, after BE-07 V28. Use a fresh
+isolated demonstration database with all migrations in order. Ordinary `dev`
+and `prod` startup excludes both demo migrations. Never point the demo profile at
+a production/shared database; the existing prod/demo guard remains enabled.
+
+V29 creates six adult classes across three sports, three levels and all three
+BE-07 demo coaches. Each class has four weekly coach-led sessions (90 minutes)
+and four weekly self-training sessions (60 minutes, null session coach):
+
+| Class identity | Class name | Sport/level | Class and coach-led coach | Facility | First day offset | Coach-led / self-training times |
+| --- | --- | --- | --- | --- | --- | --- |
+| DEMO-CL-BAD-BEG | Badminton Foundations - Small Group | BADMINTON / BEGINNER | quan.coach@example.com | DEMO-BADMINTON | 2 | 09:00-10:30 / 11:00-12:00 |
+| DEMO-CL-BAD-INT | Badminton Rally and Footwork | BADMINTON / INTERMEDIATE | quan.coach@example.com | DEMO-BADMINTON | 4 | 18:00-19:30 / 20:00-21:00 |
+| DEMO-CL-SWIM-BEG | Swimming Water Confidence | SWIMMING / BEGINNER | nam.coach@example.com | INDOOR_POOL | 3 | 07:00-08:30 / 10:00-11:00 |
+| DEMO-CL-SWIM-ADV | Swimming Endurance and Technique | SWIMMING / ADVANCED | nam.coach@example.com | INDOOR_POOL | 6 | 09:00-10:30 / 11:00-12:00 |
+| DEMO-CL-BB-INT | Basketball Passing and Team Play | BASKETBALL / INTERMEDIATE | ha.coach@example.com | BB_COURT_A | 1 | 17:00-18:30 / 19:00-20:00 |
+| DEMO-CL-BB-ADV | Basketball Advanced Game Skills | BASKETBALL / ADVANCED | ha.coach@example.com | BB_COURT_B | 7 | 09:00-10:30 / 11:00-12:00 |
+
+There are **48 PUBLISHED sessions: 24 coach-led and 24 self-training**, spread over
+days 1-28 from the SQL Server date at first application. Each listed offset repeats
+at +7, +14 and +21 days. The seed reuses the three existing pool/basketball facilities
+and creates one sport-specific `DEMO-BADMINTON` court. BE-10 has no additional
+operating-hour or coach-availability calendar; this plan uses 07:00-21:00 slots and
+checks strict overlaps against DRAFT/PUBLISHED sessions. Conflicts fail the entire
+seed with a BE-15 error; dates are never silently shifted.
+
+The first coach-led `DEMO-CL-BAD-BEG` session is full (capacity 3, three confirmed
+bookings, zero free seats). The first coach-led `DEMO-CL-BAD-INT` session is nearly
+full (capacity 3, two confirmed bookings, one free seat). The other 46 sessions
+initially have no bookings. An, Mai and Bao occupy the full session; An and Mai
+occupy the nearly full session, so Bao can demonstrate booking its last seat.
+
+Two clearly named, demo-only complimentary packages (`DEMO-PKG-BAD-COACH` and
+`DEMO-PKG-BAD-SELF`) provide eight credits over 30 inclusive days. Four ACTIVE
+RECEPTION registrations are created by the BE-07 receptionist: coached packages
+for all three members and a self-training package for Bao. Initial coached
+balances are An 6, Mai 6 and Bao 7; Bao's self-training balance is 8. This follows
+the existing supported free staff-registration path: all prices are zero and
+there are no fake payments, invoices, receipts or payment audit records. Existing
+paid catalog packages, demo membership cards and account credentials are preserved.
+
+Flyway applies V29 once. Restarting the app does **not move** dates forward or
+recreate the full badges after teacher interactions. Logical SQL replay preserves
+the original anchor and consistent existing bookings/credits. It repairs only
+unambiguous missing fixtures and rejects conflicting metadata, unexplained credit
+or counter changes, and missing past/today sessions. Regenerating a future window
+requires a **fresh isolated demonstration database**; do not delete migration
+history, enable out-of-order migration or replay the SQL as a recurring startup job.
+
+Start from `backend/` using the BE-07 environment setup above:
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE = 'dev,demo'
+mvn spring-boot:run
+```
+
+Sign in using an existing BE-07 demo member/receptionist account. In the frontend,
+open Find Classes (`/member/classes`), filter by sport, level, format, coach and date, and inspect
+the two small-group badminton sessions. For direct API verification with an access
+token already stored in a task-specific environment variable:
+
+```powershell
+$demoHeaders = @{ Authorization = "Bearer $env:DEMO_ACCESS_TOKEN" }
+$demoSessions = Invoke-RestMethod 'http://localhost:8080/api/v1/sessions?size=100' -Headers $demoHeaders
+$demoSessions.content | Select-Object className, sessionDate, trainingFormat, coachName, capacity, bookedCount, freeSeats, full
+```
+
+`GET /api/v1/sessions` requires MEMBER, RECEPTIONIST or MANAGER, not COACH. Standard
+BE-11 filters and zero-based pagination are unchanged. Read-only SQL inspection and
+the complete test/CI plan are in [BE-15 test cases](docs/tests/BE-15_test_cases.md).
+The original V28-only account replay suite remains targeted to V28; the new full-demo
+suite validates V28 + V29 together, including all seven account logins. SQL Server
+integration execution is required in GitHub CI and is not claimed from local compilation.
 
 ## Documentation
 
