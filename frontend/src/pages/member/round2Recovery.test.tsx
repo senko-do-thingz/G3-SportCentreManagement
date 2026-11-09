@@ -26,11 +26,11 @@ describe('DEF-001 DEF-002 resource errors retain routes and recover', () => {
     const user = userEvent.setup()
     renderApp('/member/packages')
     expect(await screen.findByRole('alert')).toHaveTextContent('unexpected response')
-    expect(screen.getByRole('heading', { name: 'Sport Packages' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Choose your sport. Find your pace.' })).toBeInTheDocument()
     expect(screen.queryByText(/No session limit/)).not.toBeInTheDocument()
     broken = false
     await user.click(screen.getByRole('button', { name: 'Try again' }))
-    expect(await screen.findByRole('list', { name: 'Sport packages' })).toBeInTheDocument()
+    expect(await screen.findByRole('group', { name: 'Sport packages' })).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
   it.each(['packages', 'sports', 'sessions'])('%s null row retains an alert, keyboard Retry and successful recovery', async (resource) => {
@@ -46,14 +46,14 @@ describe('DEF-001 DEF-002 resource errors retain routes and recover', () => {
     const user = userEvent.setup()
     renderApp(resource === 'sessions' ? '/member/classes' : '/member/packages')
     await screen.findAllByRole('alert')
-    expect(screen.getByRole('heading', { name: resource === 'sessions' ? 'Find Classes' : 'Sport Packages' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: resource === 'sessions' ? 'Find Classes' : 'Choose your sport. Find your pace.' })).toBeInTheDocument()
     const retry = screen.getAllByRole('button', { name: 'Try again' }).at(-1)!
     retry.focus()
     expect(retry).toHaveFocus()
     broken = false
     await user.keyboard('{Enter}')
     if (resource === 'sessions') expect(await screen.findByText('1 matching sessions')).toBeInTheDocument()
-    else expect(await screen.findByRole('list', { name: 'Sport packages' })).toBeInTheDocument()
+    else expect(await screen.findByRole('group', { name: 'Sport packages' })).toBeInTheDocument()
   })
 })
 
