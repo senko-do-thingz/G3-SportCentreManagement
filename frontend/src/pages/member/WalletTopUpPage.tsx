@@ -118,9 +118,8 @@ function PendingInstructions({ topUp }: { topUp: WalletTopUp }) {
           <div><dt>Account</dt><dd>{instructions.accountNumber}</dd></div>
           <div><dt>Account name</dt><dd>{instructions.accountName}</dd></div>
         </>}
-        <div><dt>Type</dt><dd>{topUp.mode === 'SIMULATED' ? 'Demo (not real money)' : 'Bank transfer'}</dd></div>
+        {topUp.mode === 'SIMULATED' && <div><dt>Type</dt><dd>Demo (not real money)</dd></div>}
       </dl>
-      <p className="health-meta">Showing this code does not credit your wallet. Reception confirms the transfer first.</p>
     </Card>
   )
 }

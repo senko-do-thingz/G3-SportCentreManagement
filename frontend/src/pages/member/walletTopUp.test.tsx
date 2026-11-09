@@ -38,7 +38,7 @@ describe('Member wallet top-up (MW-04)', () => {
     await user.click(screen.getByRole('button', { name: 'Create top-up request' }))
     expect(await screen.findByAltText('VietQR code for top-up TU-000007')).toBeInTheDocument()
     expect(screen.getAllByText('SPW7').length).toBeGreaterThan(0)
-    expect(screen.getByText('Showing this code does not credit your wallet. Reception confirms the transfer first.')).toBeInTheDocument()
+    expect(screen.getByText(/Your wallet is credited after reception checks the money arrived/)).toBeInTheDocument()
     const post = calls.find(call => call.method === 'POST')
     expect(post?.body).toEqual({ amount: 200000, mode: 'ACTUAL' })
     const init = fetchMock.mock.calls.find(([, options]) => options?.method === 'POST')?.[1]
