@@ -13,6 +13,8 @@ import { MembershipCardsPage } from '../pages/member/MembershipCardsPage'
 import { MyMembershipPage } from '../pages/member/MyMembershipPage'
 import { MyPaymentsPage } from '../pages/member/MyPaymentsPage'
 import { MemberWalletPage } from '../pages/member/MemberWalletPage'
+import { WalletTopUpPage } from '../pages/member/WalletTopUpPage'
+import { WalletTopUpQueuePage } from '../pages/reception/WalletTopUpQueuePage'
 import { MyProfilePage } from '../pages/member/MyProfilePage'
 import { HealthAssessmentPage } from '../pages/member/HealthAssessmentPage'
 import { CheckInPassPage } from '../pages/member/CheckInPassPage'
@@ -114,6 +116,7 @@ const SCREENS: Record<string, ReactNode> = {
   '/reception/check-in': <CheckInPage />,
   '/reception/payments': <PaymentRequestsPage />,
   '/reception/refunds': <RefundRequestsPage />,
+  '/reception/wallet/topups': <WalletTopUpQueuePage />,
   '/coach': <CoachTeachingSchedulePage />,
   '/coach/roster': <CoachRosterPage />,
 }
@@ -144,6 +147,7 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
   '/member': [
     { path: 'check-in-pass', element: <CheckInPassPage /> },
     { path: 'profile/health', element: <HealthAssessmentPage /> },
+    { path: 'wallet/topup', element: <WalletTopUpPage /> },
     { path: 'training/classes', element: <MemberClassesPage /> },
     { path: 'training/classes/:id', element: <MemberClassDetailPage /> },
     { path: 'training/questions', element: <ClassQuestionsPage /> },
