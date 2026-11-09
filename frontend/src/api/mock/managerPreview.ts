@@ -1,4 +1,5 @@
 import type { RequestOptions } from '../client'
+import { financePreviewResponse } from './managerFinancePreview'
 import { schedulePreviewResponse } from './managerSchedulePreview'
 import { memberBrowsePreview } from './memberBrowsePreview'
 import type { Sport } from '../packagesApi'
@@ -94,6 +95,8 @@ export async function previewResponse(path: string, options: RequestOptions, tok
   if (browse) return browse
   const schedule = schedulePreviewResponse(path, options, sports, empty)
   if (schedule) return schedule
+  const finance = financePreviewResponse(path, options, empty)
+  if (finance) return finance
   if (path === '/sports') return json(200, sports)
   if (path === '/manager/users' && method === 'GET') {
     const query = options.query ?? {}

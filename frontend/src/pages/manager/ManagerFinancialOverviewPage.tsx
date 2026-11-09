@@ -2,7 +2,7 @@ import { businessDate } from '../../utils/date'
 import { useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { managerFinanceApi, type FinanceTransaction } from '../../api/managerFinanceApi'
-import { Card, Input, PageHeader, PageLoader, StatCard, StatusBadge, Table, type TableColumn } from '../../components/ui'
+import { Card, Input, PageLoader, StatCard, StatusBadge, Table, type TableColumn } from '../../components/ui'
 import { useResource } from './useManagerTools'
 import { ManagerError, PreviewNotice } from './ManagerShared'
 import { FinanceTrendChart } from './FinanceShared'
@@ -58,8 +58,24 @@ export function ManagerFinancialOverviewPage() {
     })
   }
 
-  return <div className="page manager-page manager-finance-page">
-    <PageHeader eyebrow="Manager / Payments & Reports" title="Financial Overview" description="Monitor paid revenue, pending payments and refunds." />
+  return <div className="page manager-page manager-finance-page manager-concept-page">
+    <div className="concept-header">
+      <div className="concept-header__main">
+        <div className="concept-eyebrow">MANAGER WORKSPACE</div>
+        <h1 className="concept-title">Financial Overview</h1>
+        <p className="concept-sub">Monitor paid revenue, pending payments, refunds and monthly trends.</p>
+      </div>
+      <span className="concept-tag">DESIGN CONCEPT - SAMPLE DATA</span>
+    </div>
+
+    <div className="concept-hero">
+      <div>
+        <small>FINANCIAL DASHBOARD</small>
+        <h2>REVENUE DISCIPLINE. <span className="concept-goldtext">AUDITED METRICS.</span></h2>
+        <p>Real-time performance indicators and service revenue breakdowns across all sports.</p>
+      </div>
+    </div>
+
     <PreviewNotice />
     <div className="finance-period-row">
       <Input label="Reporting period" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
@@ -67,6 +83,37 @@ export function ManagerFinancialOverviewPage() {
     </div>
 
     {resource.status === 'loading' ? <PageLoader label="Loading financial overview" /> : resource.status === 'error' ? <ManagerError error={resource.error} onRetry={reload} /> : <>
+      <div className="concept-stats">
+        <div className="concept-stat">
+          <span className="concept-stat__icon" aria-hidden="true">R</span>
+          <div>
+            <strong>{formatMoney(resource.data.overview.paidRevenue)}</strong>
+            <small>Paid Revenue ({resource.data.overview.paidTransactions} txns)</small>
+          </div>
+        </div>
+        <div className="concept-stat">
+          <span className="concept-stat__icon" aria-hidden="true">P</span>
+          <div>
+            <strong>{formatMoney(resource.data.overview.pendingAmount)}</strong>
+            <small>Pending Payments ({resource.data.overview.pendingTransactions} txns)</small>
+          </div>
+        </div>
+        <div className="concept-stat">
+          <span className="concept-stat__icon" aria-hidden="true">F</span>
+          <div>
+            <strong>{formatMoney(resource.data.overview.refundedAmount)}</strong>
+            <small>Refunded Amount ({resource.data.overview.refundedTransactions} completed)</small>
+          </div>
+        </div>
+        <div className="concept-stat">
+          <span className="concept-stat__icon" aria-hidden="true">N</span>
+          <div>
+            <strong>{formatMoney(resource.data.overview.netRevenue)}</strong>
+            <small>Net Revenue (After refunds)</small>
+          </div>
+        </div>
+      </div>
+
       <section className="finance-kpis" aria-label="Financial key performance indicators">
         <StatCard label="Paid revenue" value={formatMoney(resource.data.overview.paidRevenue)} hint={`${resource.data.overview.paidTransactions} successful transactions`} />
         <StatCard label="Pending payments" value={formatMoney(resource.data.overview.pendingAmount)} hint={`${resource.data.overview.pendingTransactions} pending transactions`} />
