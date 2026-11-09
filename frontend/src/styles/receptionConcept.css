@@ -387,3 +387,9 @@
 .page.rcp.rcp-register .page-header__title { font-family: var(--font-display); text-transform: uppercase; letter-spacing: -0.03em; }
 .page.rcp.rcp-register .reception-tabs__tab--active { border-bottom-color: var(--color-primary); color: var(--color-primary); }
 .page.rcp.rcp-register .card { border-radius: var(--radius-md); }
+
+/* RUI-05 check-in */
+.page.rcp.rcp-checkin .page-header { padding: 0 0 var(--space-4); }
+.page.rcp.rcp-checkin .page-header__title { font-family: var(--font-display); text-transform: uppercase; letter-spacing: -0.03em; }
+.page.rcp.rcp-checkin .card { border-radius: var(--radius-md); }
+.page.rcp.rcp-checkin .checkin-result { border-left-width: 4px; border-radius: var(--radius-sm); }
