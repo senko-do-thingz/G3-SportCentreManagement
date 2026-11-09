@@ -1,3 +1,4 @@
+import { ReceptionCallout } from './ReceptionConcept'
 import { useCallback, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { receptionPaymentsApi, type StaffPayment } from '../../api/receptionPaymentsApi'
@@ -139,7 +140,7 @@ export function PaymentRequestsPage() {
           </Link>
         }
       />
-      <div className="payment-stats">
+      <div className="payment-stats rcp-payment-stats">
         <StatCard
           label={status === 'PENDING' ? 'Pending requests' : 'Requests found'}
           value={total === null ? '-' : total}
@@ -151,7 +152,7 @@ export function PaymentRequestsPage() {
           hint="Pending payments with a recorded amount mismatch. Confirm only when the full amount is verified."
         />
       </div>
-      <Card title="Registrations awaiting payment">
+      <Card title="Registrations awaiting payment" className="rcp-payment-queue">
         <form className="payment-filters" role="search" aria-label="Filter payment requests" onSubmit={onSearch}>
           <Input
             label="Search member or reference"
@@ -191,9 +192,12 @@ export function PaymentRequestsPage() {
               : undefined
           }
         />
-        <p className="notice notice--info payment-note">
-          Open the existing registration from Flow 1 or Flow 2. Do not create it again.
-        </p>
+        <div className="payment-note">
+          <ReceptionCallout>
+            Open the existing registration from Flow 1 or Flow 2. Do not create it again. Opening a payment does not
+            mark it as paid; only the confirmation on its own screen does.
+          </ReceptionCallout>
+        </div>
       </Card>
     </PaymentWorkspace>
   )
