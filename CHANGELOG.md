@@ -1,3 +1,7 @@
+## 2026-11-09 - TODO rebuilt from the merge history
+
+- Replace the 2026-10-08 planning snapshot in TODO.md with merged work by flow (with PR numbers), open PRs in review and remaining work checked against the code. Documentation only.
+
 ## 2026-11-07 - Root README aligned with current main
 
 - Replace the Release 1.1 candidate header with a main-branch project overview and per-flow status, including My Schedule and the Registration Successful screen.
