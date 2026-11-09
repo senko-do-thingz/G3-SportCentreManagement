@@ -393,3 +393,8 @@
 .page.rcp.rcp-checkin .page-header__title { font-family: var(--font-display); text-transform: uppercase; letter-spacing: -0.03em; }
 .page.rcp.rcp-checkin .card { border-radius: var(--radius-md); }
 .page.rcp.rcp-checkin .checkin-result { border-left-width: 4px; border-radius: var(--radius-sm); }
+
+/* RUI-06 assisted booking */
+.page.rcp.reception-bookings-page .page-header { padding: 0 0 var(--space-4); }
+.page.rcp.reception-bookings-page .page-header__title { font-family: var(--font-display); text-transform: uppercase; letter-spacing: -0.03em; }
+.page.rcp.reception-bookings-page .card { border-radius: var(--radius-md); }
