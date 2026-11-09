@@ -375,3 +375,4 @@
   .rcp-hero,
   .rcp-stats { display: none; }
 }
+.rcp-inbox .card > .rcp-callout { margin-top: var(--space-4); }
