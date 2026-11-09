@@ -430,3 +430,15 @@
   .page.rcp-pay .summary-list dd { font-variant-numeric: tabular-nums; }
   .page.rcp-pay > .rcp-callout { margin: 0; }
 }
+
+/* RUI-09 refund requests and detail (inside the shared PaymentWorkspace; scoped by refund-only markers) */
+@media screen {
+  .payment-workspace:has(.rcp-refund-scope, .refund-steps) .card {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+  }
+  .payment-workspace:has(.rcp-refund-scope) .card[aria-label='Eligibility check'] { border-left: 4px solid var(--color-primary); }
+  .payment-workspace:has(.rcp-refund-scope) .card[aria-label='Refund request'] { border-left: 4px solid var(--color-highlight); }
+  .payment-workspace .refund-steps__step[data-state='current'] { font-weight: var(--weight-bold); }
+}

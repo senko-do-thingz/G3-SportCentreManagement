@@ -1,3 +1,4 @@
+import '../../styles/receptionConcept.css'
 import { useCallback, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { getErrorMessage } from '../../api/errors'
