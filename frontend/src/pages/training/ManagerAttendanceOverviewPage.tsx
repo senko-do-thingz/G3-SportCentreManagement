@@ -2,8 +2,9 @@ import { useCallback, useState } from 'react'
 import { managerAttendanceApi as api } from '../../api/managerAttendanceApi'
 import { managerClassesApi } from '../../api/managerClassesApi'
 import { businessDate, formatCalendarDate } from '../../utils/date'
-import { Button, Card, Input, PageHeader, Select } from '../../components/ui'
+import { Button, Card, Input, Select } from '../../components/ui'
 import { TrainingData } from '../member/TrainingData'
+import { PreviewNotice } from '../manager/ManagerShared'
 import '../member/training.css'
 
 const loadCoaches = (signal: AbortSignal) => managerClassesApi.coaches(undefined, signal)
@@ -17,8 +18,56 @@ export function ManagerAttendanceOverviewPage() {
   const load = useCallback((signal: AbortSignal) => api.overview(from, to, classId, coachId, signal), [from, to, classId, coachId])
   const detail = useCallback((signal: AbortSignal) => api.detail(selected, signal), [selected])
   const loadClasses = useCallback((signal: AbortSignal) => managerClassesApi.list({ size: 100, search: classSearch || undefined }, signal), [classSearch])
-  return <div className="training-page">
-    <PageHeader title="Attendance overview" description="Read session attendance across the center. Cancelled sessions and bookings are excluded from summary counts." />
+  return <div className="page manager-page training-page manager-concept-page">
+    <div className="concept-header">
+      <div className="concept-header__main">
+        <div className="concept-eyebrow">MANAGER WORKSPACE</div>
+        <h1 className="concept-title">Attendance Overview</h1>
+        <p className="concept-sub">Read session attendance across the center. Cancelled sessions and bookings are excluded from summary counts.</p>
+      </div>
+      <span className="concept-tag">DESIGN CONCEPT - SAMPLE DATA</span>
+    </div>
+
+    <div className="concept-hero">
+      <div>
+        <small>ATTENDANCE MONITOR</small>
+        <h2>SESSION PARTICIPATION. <span className="concept-goldtext">AUDIT COMPLIANCE.</span></h2>
+        <p>Review confirmed attendance rates, late arrivals and unmarked records across scheduled sessions.</p>
+      </div>
+    </div>
+
+    <div className="concept-stats">
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">R</span>
+        <div>
+          <strong>31 Days</strong>
+          <small>Max filter range</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">F</span>
+        <div>
+          <strong>Present+Late</strong>
+          <small>Rate formula</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">C</span>
+        <div>
+          <strong>Excluded</strong>
+          <small>Cancelled bookings</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">A</span>
+        <div>
+          <strong>Read-only</strong>
+          <small>Audit state</small>
+        </div>
+      </div>
+    </div>
+
+    <PreviewNotice />
     <Card title="Attendance filters">
       <div className="training-form-grid">
         <Input label="From date" type="date" value={from} onChange={event => { select(''); setFrom(event.target.value) }} />
