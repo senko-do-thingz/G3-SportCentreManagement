@@ -78,7 +78,7 @@ export function MemberDashboardPage() {
 
   if (purchases.status === 'loading') {
     return (
-      <div className="page">
+      <div className="page member-ui member-ui--dashboard">
         {header}
         <div className="dashboard-loading">
           <Spinner label="Loading your dashboard" />
@@ -89,7 +89,7 @@ export function MemberDashboardPage() {
 
   if (purchases.status === 'error') {
     return (
-      <div className="page">
+      <div className="page member-ui member-ui--dashboard">
         {header}
         <ErrorState
           title="We could not load your dashboard"
@@ -116,7 +116,7 @@ export function MemberDashboardPage() {
   const upcoming = bookings.status === 'ready' ? upcomingBookings(bookings.data, now) : []
 
   return (
-    <div className="page dashboard" data-state={state}>
+    <div className="page dashboard member-ui member-ui--dashboard" data-state={state}>
       {header}
 
       <DashboardHero
