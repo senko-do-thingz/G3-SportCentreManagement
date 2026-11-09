@@ -410,6 +410,11 @@
   max-width: 1500px;
 }
 
+.member-main:has(.member-ui--packages) {
+  max-width: none;
+  padding-inline: clamp(18px, 3.6vw, 64px);
+}
+
 @media (max-width: 640px) {
   .member-layout__header .member-header__bar {
     min-height: 0;
