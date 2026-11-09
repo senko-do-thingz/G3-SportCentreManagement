@@ -8,9 +8,10 @@ import { formatCalendarDate } from '../../utils/date'
 import { formatDateTime } from '../../utils/format'
 import { TrainingData } from '../member/TrainingData'
 import '../member/training.css'
+import '../../styles/coachUi.css'
 
 export function CoachProgressPage() {
-  return <div className="training-page">
+  return <div className="training-page coach-ui">
     <PageHeader title="Member progress" description="Review the goals and recorded outcomes of members in your assigned classes." />
     <TrainingData load={staffTrainingApi.coachClasses}>{classes => <ProgressWorkspace classes={classes} />}</TrainingData>
   </div>

@@ -1,4 +1,5 @@
 import { formatDateTime } from '../../utils/format'
+import '../../styles/coachUi.css'
 import { parseSessionReference, sessionRouteReference } from '../../api/sessionIdentity'
 import { SessionContext } from '../../components/SessionContext'
 import { sessionIdText } from '../../api/sessionIdentity'
@@ -56,7 +57,7 @@ export function CoachTeachingSchedulePage() {
   const classCount = new Set(sessions.flatMap((session) => session.classId ? [session.classId] : [])).size
   const dates = Array.from({ length: 7 }, (_, index) => browseAddDays(week, index))
 
-  return <div className="page coach-schedule-page">
+  return <div className="page coach-schedule-page coach-ui">
     <PageHeader eyebrow="Coach" title="My Teaching Schedule" description="Review your assigned sessions and open a roster for class preparation." />
     {resource.status === 'loading' ? <PageLoader label="Loading your teaching schedule" /> : resource.status === 'error' ? <ErrorState title="We could not load your teaching schedule" error={resource.error} onRetry={reload} /> : <>
       <div className="coach-stats">
@@ -124,7 +125,7 @@ export function CoachRosterPage() {
     })
   }
 
-  return <div className="page coach-schedule-page">
+  return <div className="page coach-schedule-page coach-ui">
     <PageHeader eyebrow="Coach" title="Class Roster" description="Review confirmed members for a session assigned to you. Personal contact details are restricted." actions={<Button variant="secondary" disabled={!selectedSession || roster.status !== 'ready'} onClick={() => window.print()}>Print roster</Button>} />
     <Card title="Select a session">
       <div className="browse-actions coach-week-nav"><Button variant="secondary" onClick={() => setParams(changeWeekParams(params, browseAddDays(week, -7)))}>Previous week</Button><Button variant="secondary" onClick={() => setParams(changeWeekParams(params, browseMonday(browseToday())))}>This week</Button><Button variant="secondary" onClick={() => setParams(changeWeekParams(params, browseAddDays(week, 7)))}>Next week</Button><strong>{browseDate(week)} - {browseDate(weekEnd)}</strong></div>

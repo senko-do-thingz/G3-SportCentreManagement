@@ -6,6 +6,7 @@ import { Button, Card, EmptyState, Input, PageHeader, Select } from '../../compo
 import { TrainingData } from '../member/TrainingData'
 import { TrainingTextarea, ActionMessage } from './TrainingFormFields'
 import { attendanceLabel, useTrainingAction } from './trainingFormState'
+import '../../styles/coachUi.css'
 
 export function MemberClassesPage() {
   return <div className="training-page"><PageHeader title="My classes" description="Class information, your participation and conversations with your coach." />
@@ -63,7 +64,7 @@ export function ClassQuestionsPage({ coach = false }: { coach?: boolean }) {
     setReplyBody('')
     action.reset()
   }
-  return <div className="training-page"><PageHeader title={coach ? 'Member practice questions' : 'Ask your coach'} description="Discuss class exercises and supplementary practice with the assigned coach." />
+  return <div className={coach ? 'training-page coach-ui' : 'training-page'}><PageHeader title={coach ? 'Member practice questions' : 'Ask your coach'} description="Discuss class exercises and supplementary practice with the assigned coach." />
     {!coach && <TrainingData load={learning.classes}>{classes => <AskForm classes={classes} disabled={action.pending} onSaved={id => { selectQuestion(String(id)); refresh(value => value + 1) }} />}</TrainingData>}
     <div className="training-actions"><Button variant="secondary" disabled={action.pending} onClick={() => { action.reset(); refresh(value => value + 1) }}>Refresh conversations</Button></div>
     <TrainingData key={revision} load={load}>{questions => questions.length ? <Card title="Conversations"><Select label="Class question" placeholder="Select a conversation" value={selected} disabled={action.pending} onChange={event => selectQuestion(event.target.value)} options={questions.map(q => ({ value: String(q.id), label: `${q.className} - ${q.memberName} - ${q.subject}` }))} /></Card> : <EmptyState title="No class questions yet" />}</TrainingData>
