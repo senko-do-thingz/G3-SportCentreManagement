@@ -229,6 +229,23 @@ export function financePreviewResponse(path: string, options: RequestOptions, em
     return json(200, report)
   }
 
+  if (path === '/manager/reports/operations' && method === 'GET') {
+    return json(200, {
+      from: String(query.from ?? '2026-10-01'),
+      to: String(query.to ?? '2026-10-31'),
+      timeZone: 'Asia/Ho_Chi_Minh',
+      registeredMembers: empty ? 0 : 24,
+      currentlyEnabledMembersRegistered: empty ? 0 : 22,
+      classBookings: {
+        total: empty ? 0 : 48,
+        confirmed: empty ? 0 : 42,
+        cancelled: empty ? 0 : 6,
+        upcoming: empty ? 0 : 14,
+        completed: empty ? 0 : 28,
+      },
+    })
+  }
+
   if (path === '/refunds/pending' && method === 'GET') {
     return json(200, empty ? [] : pendingRefundsData)
   }
