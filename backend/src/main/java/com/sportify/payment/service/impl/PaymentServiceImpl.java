@@ -149,9 +149,9 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         PaymentMethod effectiveMethod = actualMethod != null ? actualMethod : payment.getPaymentMethod();
-        if (effectiveMethod == null || !SUPPORTED_PAYMENT_METHODS.contains(effectiveMethod)) {
+        if (effectiveMethod == null || !SETTLEMENT_PAYMENT_METHODS.contains(effectiveMethod)) {
             throw new BusinessRuleException("Payment method " + effectiveMethod
-                    + " is not supported. Supported methods: " + SUPPORTED_PAYMENT_METHODS);
+                    + " is not supported. Supported methods: " + SETTLEMENT_PAYMENT_METHODS);
         }
         payment.setPaymentMethod(effectiveMethod);
 

@@ -416,14 +416,14 @@ public class MembershipCardServiceImpl implements MembershipCardService {
         if (actualMethod != null && card.getPayment() == null) {
             throw new BusinessRuleException("Cannot specify payment method for a card with no linked payment");
         }
-        if (actualMethod != null && !PaymentService.SUPPORTED_PAYMENT_METHODS.contains(actualMethod)) {
+        if (actualMethod != null && !PaymentService.SETTLEMENT_PAYMENT_METHODS.contains(actualMethod)) {
             throw new BusinessRuleException("Payment method " + actualMethod
-                    + " is not supported. Supported methods: " + PaymentService.SUPPORTED_PAYMENT_METHODS);
+                    + " is not supported. Supported methods: " + PaymentService.SETTLEMENT_PAYMENT_METHODS);
         }
         if (actualMethod == null && card.getPayment() != null && card.getPayment().getPaymentMethod() != null
-                && !PaymentService.SUPPORTED_PAYMENT_METHODS.contains(card.getPayment().getPaymentMethod())) {
+                && !PaymentService.SETTLEMENT_PAYMENT_METHODS.contains(card.getPayment().getPaymentMethod())) {
             throw new BusinessRuleException("Payment method " + card.getPayment().getPaymentMethod()
-                    + " is not supported. Supported methods: " + PaymentService.SUPPORTED_PAYMENT_METHODS);
+                    + " is not supported. Supported methods: " + PaymentService.SETTLEMENT_PAYMENT_METHODS);
         }
 
         // Honor a previously requested card after tier deactivation, retaining its requested price.
