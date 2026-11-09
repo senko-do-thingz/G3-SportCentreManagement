@@ -177,3 +177,26 @@ export const receptionWithdrawalApi = {
     api.post<WalletWithdrawal>(`/reception/wallet/withdrawals/${id}/complete`, { payoutReference, note }),
   fail: (id: number, note: string) => api.post<WalletWithdrawal>(`/reception/wallet/withdrawals/${id}/fail`, { note }),
 }
+
+export interface InboxItem {
+  id: number
+  title: string
+  content: string
+  createdAt: string
+  /** Presentation state only. */
+  read: boolean
+  sourceType: 'WALLET_TOPUP' | 'WALLET_WITHDRAWAL' | 'PAYMENT_EXCEPTION' | 'SUPPORT_REQUEST' | 'UNKNOWN'
+  sourceId: number
+  /** Live status of the task itself, read from its source record. */
+  sourceStatus: string
+  open: boolean
+  link: string
+}
+
+export interface ReceptionInbox { items: InboxItem[]; unreadOpen: number; open: number }
+
+/** MW-07: the Receptionist's own action inbox. */
+export const receptionInboxApi = {
+  get: (openOnly: boolean, signal?: AbortSignal) => api.get<ReceptionInbox>('/reception/inbox', { signal, query: { openOnly } }),
+  markRead: (id: number) => api.put<InboxItem>(`/reception/inbox/${id}/read`),
+}

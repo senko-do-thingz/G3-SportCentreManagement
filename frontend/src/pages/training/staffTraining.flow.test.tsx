@@ -345,7 +345,8 @@ describe('Coach session attendance writes and role boundaries', () => {
     const { calls } = signedIn(role, unexpected)
     renderApp(path)
     expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
-    expect(calls.map(call => call.path)).toEqual(['/users/me'])
+    // MW-07: the receptionist inbox badge polls its own inbox; no attendance data may be fetched.
+    expect(calls.map(call => call.path).filter(path => !path.startsWith('/reception/inbox'))).toEqual(['/users/me'])
   })
 
   it('shows canonical identity and context, supports keyboard selection and searches by facility', async () => {
