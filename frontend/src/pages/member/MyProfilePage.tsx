@@ -85,7 +85,7 @@ export function MyProfilePage() {
   const [profile, reload] = useMemberResource(loadProfile)
 
   return (
-    <div className="page">
+    <div className="page member-ui member-ui--profile">
       <PageHeader
         eyebrow="Your sport, your way"
         title="My Profile"

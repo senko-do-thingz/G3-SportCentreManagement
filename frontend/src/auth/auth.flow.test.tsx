@@ -116,7 +116,7 @@ describe('auth flow', () => {
     expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
     await logIn('member@sportify.demo', 'Demo123!')
 
-    expect(await screen.findByRole('heading', { name: 'Sport Packages' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Choose your sport. Find your pace.' })).toBeInTheDocument()
   })
 
   it('ignores a requested page that belongs to another role', async () => {
