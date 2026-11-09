@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
@@ -55,11 +55,24 @@ function signIn() {
   tokenStorage.startSession({ accessToken: 'member-access', refreshToken: 'member-refresh' })
 }
 
-async function openList(options: Options = {}, path = '/member/packages') {
+async function openList(options: Options = {}, path = '/member/packages', selectFootball = true) {
   const fake = packagesBackend(options)
   signIn()
   renderApp(path)
-  await screen.findByRole('list', { name: 'Sport packages' })
+  const requestedSportId = new URL(path, 'http://localhost').searchParams.get('sport')
+  if (requestedSportId) {
+    const selectedSport = SPORTS.find((item) => String(item.id) === requestedSportId)
+    if (selectedSport) {
+      await screen.findByRole('region', { name: `${selectedSport.name} packages` })
+    }
+  } else if (options.packages?.length === 0) {
+    await screen.findByText('No active sport packages are available')
+  } else if (selectFootball) {
+    const packageGroup = await screen.findByRole('group', { name: 'Sport packages' })
+    fireEvent.click(within(packageGroup).getByRole('button', { name: 'Choose Football packages' }))
+  } else {
+    await screen.findByRole('group', { name: 'Sport packages' })
+  }
   return fake
 }
 
@@ -82,15 +95,48 @@ afterEach(() => {
 })
 
 describe('FE-03 Sport Packages (F1-09)', () => {
+  it('TC-FE03-009 shows both training plans together and lets members switch or close sports', async () => {
+    const user = userEvent.setup()
+    await openList({}, '/member/packages', false)
+
+    const packageGroup = screen.getByRole('group', { name: 'Sport packages' })
+    const footballButton = within(packageGroup).getByRole('button', { name: 'Choose Football packages' })
+    const swimmingButton = within(packageGroup).getByRole('button', { name: 'Choose Swimming packages' })
+    const footballPhoto = within(footballButton).getByTestId('package-sport-photo')
+    const swimmingPhoto = within(swimmingButton).getByTestId('package-sport-photo')
+    expect(footballPhoto).toHaveAttribute('src', expect.stringContaining('photo-1574629810360-7efbbe195018'))
+    expect(swimmingPhoto).toHaveAttribute('src', expect.stringContaining('photo-1530549387789-4c1017266635'))
+    expect(footballPhoto).toHaveAttribute('alt', '')
+    expect(footballPhoto).toHaveAttribute('aria-hidden', 'true')
+
+    expect(screen.queryByRole('region', { name: 'Football packages' })).not.toBeInTheDocument()
+    await user.click(footballButton)
+    const football = screen.getByRole('region', { name: 'Football packages' })
+    const coachLedPlans = within(football).getByRole('region', { name: 'Coach-led' })
+    const selfTrainingPlans = within(football).getByRole('region', { name: 'Self-training' })
+    expect(within(coachLedPlans).getAllByRole('listitem')).toHaveLength(2)
+    expect(within(selfTrainingPlans).getAllByRole('listitem')).toHaveLength(2)
+    expect(within(football).getAllByText('8 sessions')).toHaveLength(2)
+
+    await user.click(screen.getByRole('button', { name: 'Close Football packages' }))
+    expect(screen.queryByRole('region', { name: 'Football packages' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose Swimming packages' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
   it('TC-FE03-010 lists the packages from GET /packages with duration, sessions, minutes and price', async () => {
+    const user = userEvent.setup()
     const { calls } = await openList()
-    expect(screen.getByRole('heading', { name: 'Sport Packages' })).toBeInTheDocument()
-    expect(screen.getAllByRole('listitem')).toHaveLength(5)
+    expect(screen.getByRole('heading', { name: 'Choose your sport. Find your pace.' })).toBeInTheDocument()
+    expect(screen.getAllByRole('listitem')).toHaveLength(4)
     const coach30 = cardFor(/^Coach-led Football, 30 days - 8 sessions$/)
     expect(within(coach30).getByText('900.000 VND')).toBeInTheDocument()
     expect(within(coach30).getByText(/Original price - 90 min \/ session/)).toBeInTheDocument()
-    expect(within(coach30).getByRole('link', { name: /View package/ })).toHaveAttribute('href', '/member/packages/4')
+    expect(within(coach30).getByRole('link', { name: /View package/ })).toHaveAttribute('href', '/member/packages/4?sport=1')
     expect(calls.map((call) => call.path)).toEqual(expect.arrayContaining(['/sports', '/packages', '/membership-cards/my']))
+
+    await user.click(screen.getByRole('button', { name: 'All sports' }))
+    await user.click(screen.getByRole('button', { name: 'Choose Swimming packages' }))
+    expect(screen.getAllByRole('listitem')).toHaveLength(1)
   })
 
   it('TC-FE03-011 STANDARD member (no card): every price is the original price', async () => {
@@ -123,47 +169,42 @@ describe('FE-03 Sport Packages (F1-09)', () => {
     expect(finalPrice(/^Coach-led Football, 30 days/)).toBe('900.000 VND')
   })
 
-  it('TC-FE03-015 filters by sport, training type and duration, and Reset filters clears them', async () => {
-    const user = userEvent.setup()
-    await openList()
-    await user.selectOptions(screen.getByLabelText('Sport'), '1')
+  it('TC-FE03-015 keeps all formats and durations visible when returning from a package', async () => {
+    await openList({}, '/member/packages?sport=1&format=COACH_LED&duration=90')
     expect(screen.getAllByRole('listitem')).toHaveLength(4)
-    await user.selectOptions(screen.getByLabelText('Training type'), 'COACH_LED')
-    expect(screen.getAllByRole('listitem')).toHaveLength(2)
-    await user.selectOptions(screen.getByLabelText('Duration'), '90')
-    expect(screen.getAllByRole('listitem')).toHaveLength(1)
     expect(cardFor(/^Coach-led Football, 90 days/)).toBeInTheDocument()
-    // The detail link keeps the filters for "Back to packages".
+    expect(cardFor(/^Self-training Football, Single visit/)).toBeInTheDocument()
     expect(within(cardFor(/^Coach-led Football, 90 days/)).getByRole('link', { name: /View package/ })).toHaveAttribute(
       'href',
-      '/member/packages/6?sport=1&format=COACH_LED&duration=90',
+      '/member/packages/6?sport=1',
     )
-
-    await user.click(screen.getAllByRole('button', { name: 'Reset filters' })[0])
-    expect(screen.getAllByRole('listitem')).toHaveLength(5)
-    expect(screen.getByLabelText('Sport')).toHaveValue('')
+    expect(screen.queryByLabelText('Sport')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Training type')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Duration')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reset filters' })).not.toBeInTheDocument()
   })
 
-  it('TC-FE03-016 no match shows an empty state with Reset filters', async () => {
-    const user = userEvent.setup()
-    await openList()
-    await user.selectOptions(screen.getByLabelText('Sport'), '2')
-    await user.selectOptions(screen.getByLabelText('Training type'), 'COACH_LED')
-    expect(screen.getByText('No packages match these filters')).toBeInTheDocument()
+  it('TC-FE03-016 shows a clear empty state when no active plans are available', async () => {
+    await openList({ packages: [] }, '/member/packages', false)
+    expect(screen.getByText('No active sport packages are available')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Browse all sports' })).toBeInTheDocument()
   })
 
-  it('TC-FE03-017 filters are read from the URL', async () => {
+  it('TC-FE03-017 sport focus is read from the URL', async () => {
     packagesBackend()
     signIn()
     renderApp('/member/packages?sport=2')
-    expect(await screen.findAllByRole('listitem')).toHaveLength(1)
-    expect(screen.getByLabelText('Sport')).toHaveValue('2')
+    await screen.findByRole('region', { name: 'Swimming packages' })
+    const swimming = screen.getByRole('button', { name: 'Close Swimming packages' })
+    expect(swimming).toHaveAttribute('aria-pressed', 'true')
+    expect(within(screen.getByRole('region', { name: 'Swimming packages' })).getAllByRole('listitem')).toHaveLength(1)
+    expect(screen.getByRole('region', { name: 'Self-training' })).toBeInTheDocument()
   })
 
   it('TC-FE03-018 when the cards cannot be loaded, prices are original and a warning explains it', async () => {
     await openList({ cards: backendError(500, 'Internal server error') })
     expect(finalPrice(/^Coach-led Football, 30 days/)).toBe('900.000 VND')
-    expect(screen.getByRole('alert')).toHaveTextContent('We could not load your membership card')
+    expect(screen.getByRole('alert')).toHaveTextContent('Membership discount could not be loaded')
   })
 
   it('TC-FE03-019 a failure of the catalog shows an error with Retry', async () => {
@@ -182,7 +223,7 @@ describe('FE-03 Sport Packages (F1-09)', () => {
     expect(alert).toHaveTextContent('We could not load the sport packages')
     failing = false
     await user.click(within(alert).getByRole('button', { name: 'Try again' }))
-    expect(await screen.findByRole('list', { name: 'Sport packages' })).toBeInTheDocument()
+    expect(await screen.findByRole('group', { name: 'Sport packages' })).toBeInTheDocument()
   })
 })
 
@@ -364,7 +405,7 @@ describe('FE-03 review round 1', () => {
     await openList({ cards: [GOLD], packages: [...PACKAGES, sixty] })
     expect(finalPrice(/^Coach-led Football, 60 days/)).toBe('1.000.000 VND')
     const note = screen.getByText(/Your Gold card gives you/)
-    expect(note).toHaveTextContent('Your Gold card gives you 5% off 30-day and 90-day packages.')
+    expect(note).toHaveTextContent('Your Gold card gives you 5% off 30-day and 90-day packages. Prices below include it.')
     expect(note).not.toHaveTextContent('30 day and 90 day')
   })
 
@@ -425,7 +466,8 @@ describe('FE-03 review round 1', () => {
     })
     signIn()
     renderApp('/member/packages')
-    await screen.findByRole('list', { name: 'Sport packages' })
+    const packageGroup = await screen.findByRole('group', { name: 'Sport packages' })
+    fireEvent.click(within(packageGroup).getByRole('button', { name: 'Choose Football packages' }))
     expect(within(cardFor(/^Coach-led Football, 30 days/)).getByText(/Checking your card discount/)).toBeInTheDocument()
     expect(within(cardFor(/^Coach-led Football, 30 days/)).queryByText(/Original price/)).not.toBeInTheDocument()
     // Round 2 (N1): the big price waits for the card; a single visit keeps its price.
@@ -438,17 +480,19 @@ describe('FE-03 review round 1', () => {
     expect(within(cardFor(/^Coach-led Football, 30 days/)).queryByText(/Checking your card discount/)).not.toBeInTheDocument()
   })
 
-  it('TC-FE03-049 unknown URL filters are ignored: selects and list agree (M3)', async () => {
+  it('TC-FE03-049 legacy hidden filter parameters do not hide package choices', async () => {
     packagesBackend()
     signIn()
     renderApp('/member/packages?sport=999&format=abc&duration=7')
-    expect(await screen.findAllByRole('listitem')).toHaveLength(5)
-    expect(screen.getByLabelText('Sport')).toHaveValue('')
-    expect(screen.getByLabelText('Training type')).toHaveValue('')
-    expect(screen.getByLabelText('Duration')).toHaveValue('')
+    const packageGroup = await screen.findByRole('group', { name: 'Sport packages' })
+    expect(screen.queryByLabelText('Sport')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Training type')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Duration')).not.toBeInTheDocument()
+    fireEvent.click(within(packageGroup).getByRole('button', { name: 'Choose Football packages' }))
+    expect(await screen.findAllByRole('listitem')).toHaveLength(4)
     expect(within(cardFor(/^Coach-led Football, 30 days/)).getByRole('link', { name: /View package/ })).toHaveAttribute(
       'href',
-      '/member/packages/4',
+      '/member/packages/4?sport=1',
     )
   })
 })
