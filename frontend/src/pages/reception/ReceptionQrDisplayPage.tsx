@@ -1,3 +1,4 @@
+import '../../styles/receptionConcept.css'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import QRCode from 'qrcode'
@@ -39,7 +40,7 @@ export function ReceptionQrDisplayPage() {
 
   if (!qrPaymentDemoEnabled()) {
     return (
-      <div className="page reception-qr-display-page">
+      <div className="page rcp-pay reception-qr-display-page">
         <PaymentHero eyebrow={EYEBROW} title="Simulated QR Payment Display" />
         <EmptyState
           title="QR Simulator Disabled"
@@ -56,7 +57,7 @@ export function ReceptionQrDisplayPage() {
 
   if (id === null) {
     return (
-      <div className="page reception-qr-display-page">
+      <div className="page rcp-pay reception-qr-display-page">
         <PaymentHero eyebrow={EYEBROW} title="Simulated QR Payment Display" />
         <EmptyState
           title="Payment not found"
@@ -184,7 +185,7 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
 
   if (resource.status === 'loading') {
     return (
-      <div className="page reception-qr-display-page">
+      <div className="page rcp-pay reception-qr-display-page">
         <PaymentHero eyebrow={EYEBROW} title="Simulated QR Payment Display" aside={actions} />
         <Spinner label="Loading the desk QR presentation" />
       </div>
@@ -193,7 +194,7 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
 
   if (resource.status === 'error' || !projection) {
     return (
-      <div className="page reception-qr-display-page">
+      <div className="page rcp-pay reception-qr-display-page">
         <PaymentHero eyebrow={EYEBROW} title="Simulated QR Payment Display" aside={actions} />
         <ErrorState
           title="Could not load desk projection"
@@ -205,7 +206,7 @@ function ReceptionQrDisplayContent({ paymentId }: { paymentId: number }) {
   }
 
   return (
-    <div className="page reception-qr-display-page">
+    <div className="page rcp-pay reception-qr-display-page">
       <PaymentHero
         eyebrow={EYEBROW}
         title="Simulated QR Payment Display"

@@ -416,3 +416,17 @@
   text-transform: uppercase;
 }
 .rcp-payment-queue .payment-filters { margin-bottom: var(--space-4); }
+
+/* RUI-08 payment verification, QR display and receipt (screen only; print output is unchanged) */
+@media screen {
+  .page.rcp-pay .card {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+  }
+  .page.rcp-pay .card[aria-label='Amount verification'],
+  .page.rcp-pay .card[aria-label='Amount mismatch'] { border-left: 4px solid var(--color-highlight); }
+  .page.rcp-pay .card[aria-label='Failed payment'] { border-left: 4px solid var(--color-danger); }
+  .page.rcp-pay .summary-list dd { font-variant-numeric: tabular-nums; }
+  .page.rcp-pay > .rcp-callout { margin: 0; }
+}
