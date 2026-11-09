@@ -432,9 +432,19 @@
       ],
       "drops": [],
       "sha256_lf": "89e86c318735ae2c3e7175da07cc803a678098b9a91b26abc011fd17d6bc3996"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V53__wallet_withdrawal.sql",
+      "version": 53,
+      "creates": [
+        "dbo.member_payout_account",
+        "dbo.wallet_withdrawal"
+      ],
+      "drops": [],
+      "sha256_lf": "0369562e55eeddb040aa3e8ac2e0e08ae8e8b75d9afc1fea2dc6c90deab873a7"
     }
   ],
-  "create_occurrences": 79,
+  "create_occurrences": 81,
   "create_names": [
     "[activity_log]",
     "[age_group]",
@@ -497,6 +507,7 @@
     "dbo.cash_coverage",
     "dbo.cash_event",
     "dbo.member_health_assessment",
+    "dbo.member_payout_account",
     "dbo.member_wallet",
     "dbo.payment_wallet_settlement",
     "dbo.simulated_payment_transaction",
@@ -506,6 +517,7 @@
     "dbo.wallet_ledger_entry",
     "dbo.wallet_pending_operation",
     "dbo.wallet_topup",
+    "dbo.wallet_withdrawal",
     "member_check_in_pass",
     "member_sport_level",
     "permission",

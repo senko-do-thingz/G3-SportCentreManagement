@@ -118,3 +118,62 @@ export interface WalletPaymentResult {
 export const walletPaymentApi = {
   pay: (paymentId: number) => api.post<WalletPaymentResult>(`/member/wallet/payments/${paymentId}`),
 }
+
+export type WithdrawalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | 'FAILED' | 'SIMULATED_COMPLETED'
+
+export interface PayoutAccount { bankBin: string; bankName: string; maskedAccountNumber: string; accountHolder: string; updatedAt: string }
+
+export interface WalletWithdrawal {
+  id: number
+  code: string
+  memberId: number
+  memberCode: string
+  memberName: string
+  pool: WalletPool
+  amount: number
+  status: WithdrawalStatus
+  bankName: string | null
+  /** Masked for Members and lists; full only in the Receptionist processing detail. */
+  accountNumber: string | null
+  accountHolder: string | null
+  reviewNote: string | null
+  reviewedByName: string | null
+  reviewedAt: string | null
+  payoutReference: string | null
+  completedByName: string | null
+  completedAt: string | null
+  createdAt: string
+}
+
+export interface BankOption { bin: string; code: string; name: string; transferSupported: boolean }
+
+export const WITHDRAWAL_STATUS_LABELS: Record<WithdrawalStatus, string> = {
+  PENDING: 'Waiting for review',
+  APPROVED: 'Approved, not yet paid',
+  REJECTED: 'Rejected, funds released',
+  COMPLETED: 'Paid out',
+  FAILED: 'Payout failed, funds released',
+  SIMULATED_COMPLETED: 'Demo completed (no real transfer)',
+}
+
+/** MW-06: the Member's payout account and withdrawal requests. */
+export const withdrawalApi = {
+  account: async (signal: AbortSignal) => (await api.get<PayoutAccount | undefined>('/member/wallet/payout-account', { signal })) ?? null,
+  saveAccount: (bankBin: string, accountNumber: string, accountHolder: string) =>
+    api.put<PayoutAccount>('/member/wallet/payout-account', { bankBin, accountNumber, accountHolder }),
+  banks: async (signal: AbortSignal) => (await api.get<{ banks: BankOption[] }>('/payments/vietqr-banks', { signal })).banks,
+  mine: (signal: AbortSignal) => api.get<WalletWithdrawal[]>('/member/wallet/withdrawals', { signal }),
+  create: (amount: number, pool: WalletPool, confirmAccountLast4: string | null, key: string) =>
+    api.post<WalletWithdrawal>('/member/wallet/withdrawals', { amount, pool, confirmAccountLast4 }, { headers: { 'Idempotency-Key': key } }),
+}
+
+/** MW-06: Receptionist review. Approve is not a payout; complete records the transfer separately. */
+export const receptionWithdrawalApi = {
+  list: (status: string, signal: AbortSignal) => api.get<WalletWithdrawal[]>('/reception/wallet/withdrawals', { signal, query: { status } }),
+  detail: (id: number, signal: AbortSignal) => api.get<WalletWithdrawal>(`/reception/wallet/withdrawals/${id}`, { signal }),
+  approve: (id: number, note: string) => api.post<WalletWithdrawal>(`/reception/wallet/withdrawals/${id}/approve`, { note }),
+  reject: (id: number, note: string) => api.post<WalletWithdrawal>(`/reception/wallet/withdrawals/${id}/reject`, { note }),
+  complete: (id: number, payoutReference: string | null, note: string) =>
+    api.post<WalletWithdrawal>(`/reception/wallet/withdrawals/${id}/complete`, { payoutReference, note }),
+  fail: (id: number, note: string) => api.post<WalletWithdrawal>(`/reception/wallet/withdrawals/${id}/fail`, { note }),
+}
