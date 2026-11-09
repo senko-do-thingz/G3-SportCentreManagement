@@ -19,6 +19,7 @@ export function MemberWalletPage() {
         actions={<>
           <Link className={buttonClassName()} to="/member/wallet/topup">Top up wallet</Link>
           <Link className={buttonClassName('secondary')} to="/member/wallet/withdraw">Withdraw</Link>
+          <Link className={buttonClassName('secondary')} to="/member/wallet/history">All activity</Link>
         </>}
       />
       {resource.status === 'loading' && <Spinner label="Loading your wallet" />}

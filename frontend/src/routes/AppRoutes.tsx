@@ -18,6 +18,7 @@ import { WalletTopUpQueuePage } from '../pages/reception/WalletTopUpQueuePage'
 import { WalletWithdrawPage } from '../pages/member/WalletWithdrawPage'
 import { WalletWithdrawalQueuePage } from '../pages/reception/WalletWithdrawalQueuePage'
 import { ReceptionInboxPage } from '../pages/reception/ReceptionInboxPage'
+import { WalletHistoryPage } from '../pages/member/WalletHistoryPage'
 import { MyProfilePage } from '../pages/member/MyProfilePage'
 import { HealthAssessmentPage } from '../pages/member/HealthAssessmentPage'
 import { CheckInPassPage } from '../pages/member/CheckInPassPage'
@@ -154,6 +155,7 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
     { path: 'profile/health', element: <HealthAssessmentPage /> },
     { path: 'wallet/topup', element: <WalletTopUpPage /> },
     { path: 'wallet/withdraw', element: <WalletWithdrawPage /> },
+    { path: 'wallet/history', element: <WalletHistoryPage /> },
     { path: 'training/classes', element: <MemberClassesPage /> },
     { path: 'training/classes/:id', element: <MemberClassDetailPage /> },
     { path: 'training/questions', element: <ClassQuestionsPage /> },

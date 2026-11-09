@@ -200,3 +200,35 @@ export const receptionInboxApi = {
   get: (openOnly: boolean, signal?: AbortSignal) => api.get<ReceptionInbox>('/reception/inbox', { signal, query: { openOnly } }),
   markRead: (id: number) => api.put<InboxItem>(`/reception/inbox/${id}/read`),
 }
+
+export interface WalletActivityRow {
+  type: 'TOPUP' | 'WALLET_PAYMENT' | 'WITHDRAWAL' | 'COMPENSATION'
+  id: number
+  reference: string
+  createdAt: string
+  amount: number
+  /** NONE for a pending top-up or a released withdrawal: no money moved for the member. */
+  direction: 'CREDIT' | 'DEBIT' | 'NONE'
+  status: string
+  pool: WalletPool
+  availableAfter: number | null
+  detail: string
+  paymentId: number | null
+  bankReference: string | null
+  settledAt: string | null
+}
+
+export interface WalletHistory {
+  page: { content: WalletActivityRow[]; page: number; size: number; totalElements: number; totalPages: number }
+  availableBalance: number
+  reservedBalance: number
+  ledgerAvailable: number
+  ledgerReserved: number
+  reconciled: boolean
+}
+
+/** MW-08: the Member's own wallet activity. */
+export const walletHistoryApi = {
+  history: (filters: { type: string; status: string; from: string; to: string; page: number; size: number }, signal: AbortSignal) =>
+    api.get<WalletHistory>('/member/wallet/history', { signal, query: filters }),
+}
