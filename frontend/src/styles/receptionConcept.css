@@ -1,0 +1,377 @@
+/*
+ * Receptionist Concept A page content styles (RUI-00).
+ * Every selector is scoped under .rcp, the class set by ReceptionScreen on Receptionist pages only.
+ * The shared staff header, Brand logo, sidebar and other roles are not touched. Colors come from tokens.css only.
+ */
+
+.page.rcp {
+  gap: var(--space-5);
+}
+
+/* Title block: eyebrow, display heading, short description. Replaces the gradient header on converted pages. */
+.page.rcp .page-header {
+  align-items: flex-end;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.page.rcp .page-header .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-primary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.page.rcp .page-header .eyebrow::before {
+  content: '';
+  display: block;
+  width: 24px;
+  height: 2px;
+  background: var(--color-primary);
+}
+
+.page.rcp .page-header__title {
+  margin-top: var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+.page.rcp .page-header__description {
+  margin-top: var(--space-1);
+  font-size: var(--text-md);
+  color: var(--color-text-muted);
+}
+
+.page.rcp .page-header__actions .btn {
+  height: auto;
+  box-shadow: none;
+}
+
+/* Navy hero banner with one optional action. Static copy only, never data. */
+.rcp-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  min-height: 120px;
+  padding: var(--space-6) var(--space-8);
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: linear-gradient(109deg, var(--color-hero) 0%, var(--color-hero-deep) 35%, var(--color-primary) 100%);
+  color: var(--color-on-hero);
+}
+
+.rcp-hero__kicker {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-on-hero-muted);
+}
+
+.rcp-hero__title {
+  margin: var(--space-2) 0;
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.13;
+  text-transform: uppercase;
+  color: var(--color-on-hero);
+}
+
+.rcp-hero__highlight {
+  display: block;
+  color: var(--color-hero-highlight);
+}
+
+.rcp-hero__text {
+  margin: 0;
+  max-width: 62ch;
+  font-size: var(--text-sm);
+  color: var(--color-on-hero-muted);
+}
+
+.rcp-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.rcp-hero__actions .btn--primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.rcp-hero__actions .btn--primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+/* Summary metrics. Values must come from API data the page already loaded. */
+.rcp-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rcp-stat {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 84px;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.rcp-stat__mark {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+
+.rcp-stat__value {
+  display: block;
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  line-height: 1.1;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.rcp-stat__label {
+  display: block;
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.rcp-stat--warning .rcp-stat__mark { background: var(--color-warning-soft); color: var(--color-warning); }
+.rcp-stat--success .rcp-stat__mark { background: var(--color-success-soft); color: var(--color-success); }
+.rcp-stat--danger .rcp-stat__mark { background: var(--color-danger-soft); color: var(--color-danger); }
+
+/* Panels: flat white blocks with a thin border, used through the shared Card component. */
+.page.rcp .card {
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.page.rcp .card__title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+.page.rcp .card__header {
+  margin-bottom: var(--space-4);
+}
+
+/* Two and three column content grids that collapse on narrow screens. */
+.rcp-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.rcp-grid--wide-left { grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.85fr); }
+.rcp-grid--wide-right { grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr); }
+.rcp-grid > * { min-width: 0; }
+
+/* Tables inside converted pages. */
+.page.rcp .table-scroll {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.page.rcp .table th {
+  background: var(--color-surface-muted);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.page.rcp .table tbody tr:hover td {
+  background: var(--color-table-hover);
+}
+
+/* Key and value list for record details. */
+.rcp-kv {
+  display: grid;
+  grid-template-columns: minmax(120px, 160px) minmax(0, 1fr);
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.rcp-kv dt { color: var(--color-text-muted); }
+.rcp-kv dd { margin: 0; font-weight: var(--weight-semibold); color: var(--color-text); overflow-wrap: anywhere; }
+
+/* Small uppercase caption above a group. */
+.rcp-caption {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+/* Callouts with a colored left rule. Used for safety notes, not for live status. */
+.rcp-callout {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-primary-soft-hover);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: var(--color-info-soft);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+.rcp-callout--warning {
+  border-color: var(--color-warning-border);
+  border-left-color: var(--color-highlight);
+  background: var(--color-warning-soft);
+}
+
+.rcp-callout--danger {
+  border-color: var(--color-danger-border);
+  border-left-color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+/* Row card used by queues (inbox items, requests). */
+.rcp-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-5);
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.rcp-row--attention { border-left-color: var(--color-highlight); background: var(--color-surface-muted); }
+.rcp-row--muted { border-left-color: var(--color-border-strong); }
+
+.rcp-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.rcp-row__meta strong { color: var(--color-text); }
+
+.rcp-row__title {
+  margin: var(--space-1) 0;
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.rcp-row__body {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.rcp-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.rcp-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Toolbar row above a list or table. */
+.rcp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.rcp-toolbar > .field { min-width: 220px; margin: 0; }
+
+/* Keyboard focus stays visible on every interactive element inside converted pages. */
+.page.rcp :is(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+@media (max-width: 960px) {
+  .rcp-grid,
+  .rcp-grid--wide-left,
+  .rcp-grid--wide-right { grid-template-columns: minmax(0, 1fr); }
+  .rcp-hero { flex-direction: column; align-items: flex-start; padding: var(--space-5); }
+}
+
+@media (max-width: 640px) {
+  .page.rcp .page-header__title { font-size: var(--text-2xl); }
+  .page.rcp .card { padding: var(--space-4); }
+  .rcp-row { grid-template-columns: minmax(0, 1fr); }
+  .rcp-row__actions { justify-content: flex-start; }
+  .rcp-kv { grid-template-columns: minmax(0, 1fr); gap: 0 var(--space-4); }
+  .rcp-kv dd { margin-bottom: var(--space-2); }
+}
+
+@media print {
+  .rcp-hero,
+  .rcp-stats { display: none; }
+}
