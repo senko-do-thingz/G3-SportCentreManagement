@@ -891,7 +891,7 @@ describe('FE-01 review fixes (round 3)', () => {
       tokenStorage.startSession({ accessToken: 'x-access', refreshToken: 'x-refresh' }, { persistent: false })
       profilesByToken({ 'x-access': MEMBER, 'y-access': MEMBER_Y })
       renderApp('/member/packages')
-      await screen.findByRole('heading', { name: 'Sport Packages' })
+      await screen.findByRole('heading', { name: 'Choose your sport. Find your pace.' })
       expect(screen.getAllByText('Taylor Nguyen').length).toBeGreaterThan(0)
 
       otherTabLogsIn('y-access')
@@ -899,7 +899,7 @@ describe('FE-01 review fixes (round 3)', () => {
       expect(await screen.findByRole('heading', { name: 'Member Dashboard' })).toBeInTheDocument()
       expect(screen.getByRole('status', { name: 'Account switched' })).toHaveTextContent(switchNotice('Jordan Pham'))
       expect(screen.queryByText('Taylor Nguyen')).not.toBeInTheDocument()
-      expect(screen.queryByRole('heading', { name: 'Sport Packages' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Choose your sport. Find your pace.' })).not.toBeInTheDocument()
     })
 
     it('remembered tab of member X lands on the manager home when a manager logs in elsewhere', async () => {
@@ -919,13 +919,13 @@ describe('FE-01 review fixes (round 3)', () => {
       tokenStorage.startSession({ accessToken: 'x-access', refreshToken: 'x-refresh' })
       const { calls } = profilesByToken({ 'x-access': MEMBER, 'x-access-2': MEMBER })
       renderApp('/member/packages')
-      await screen.findByRole('heading', { name: 'Sport Packages' })
+      await screen.findByRole('heading', { name: 'Choose your sport. Find your pace.' })
 
       otherTabLogsIn('x-access-2')
       await waitFor(() => expect(calls.filter((call) => call.path === '/users/me')).toHaveLength(2))
       await new Promise((resolve) => setTimeout(resolve, 20))
 
-      expect(screen.getByRole('heading', { name: 'Sport Packages' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Choose your sport. Find your pace.' })).toBeInTheDocument()
       expect(screen.queryByText(/You are now signed in as/)).not.toBeInTheDocument()
     })
 

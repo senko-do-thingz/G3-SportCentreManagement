@@ -73,7 +73,7 @@ export function MyMembershipPage() {
   }
 
   return (
-    <div className="page">
+    <div className="page member-ui member-ui--membership">
       <PageHeader
         eyebrow="Your sport, your way"
         title="My Membership and Sport Packages"
