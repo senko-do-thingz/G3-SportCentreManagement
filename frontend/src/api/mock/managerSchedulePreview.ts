@@ -78,5 +78,45 @@ export function schedulePreviewResponse(path: string, options: RequestOptions, s
     sessions = [...sessions.filter((entry) => entry.id !== old?.id), ...result]
     return json(old ? 200 : 201, old ? result[0] : result)
   }
+  if (path === '/manager/training/attendance/backfill' && method === 'GET') {
+    return json(200, {
+      enabled: true,
+      window: '2026-10-01 to 2026-10-31',
+      message: 'Administrative recovery window is active.',
+      bookings: [
+        {
+          bookingId: 101,
+          sessionId: 1,
+          sessionCode: 'SES-001',
+          memberName: 'Taylor Nguyen',
+          className: 'Basketball Foundations',
+          coachName: 'Daniel Smith',
+          facilityName: 'Training Court A',
+          date: '2026-10-10',
+          startTime: '09:00:00',
+          endTime: '10:00:00',
+        },
+        {
+          bookingId: 102,
+          sessionId: 2,
+          sessionCode: 'SES-002',
+          memberName: 'Sample Member 1',
+          className: 'Swimming Technique',
+          coachName: 'Chris Nguyen',
+          facilityName: 'Indoor Pool',
+          date: '2026-10-11',
+          startTime: '10:00:00',
+          endTime: '11:00:00',
+        },
+      ],
+    })
+  }
+  if (path === '/manager/training/attendance/backfill' && method === 'POST') {
+    const body = options.body as { bookingId: number; status: string; reason: string; notes?: string }
+    if (!body?.reason || body.reason.trim().length < 3) {
+      return failure(400, 'A meaningful administrative reason (3-500 chars) is required.')
+    }
+    return json(200, { id: body.bookingId })
+  }
   return undefined
 }
