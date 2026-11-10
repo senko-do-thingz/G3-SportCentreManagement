@@ -326,18 +326,42 @@ function PlanDraftSummary({ title, steps, audience, shareLabel }: { title: strin
 function OwnPlans({ plans }: { plans: StaffPlan[] }) {
   const [planId, setPlanId] = useState('')
   const load = useCallback((signal: AbortSignal) => training.plan(planId, signal), [planId])
-  if (!plans.length) return <EmptyState title="You have not assigned any plans yet" />
+  if (!plans.length) return <div className="coach-plan-no-saved"><EmptyState title="No assigned plans yet" description="Plans appear here after you assign one to a confirmed booking or class." /></div>
   return (
-    <div className="training-form">
-      <Select label="Assigned plans" value={planId} onChange={event => setPlanId(event.target.value)} placeholder="Select a plan to view and review"
-        options={plans.map(plan => ({ value: String(plan.id), label: `${plan.title} - ${plan.memberName} - ${plan.className}` }))} />
+    <div className="training-form coach-own-plans">
+      <div className="coach-own-plans__selector">
+        <Select label="Assigned plans" value={planId} onChange={event => setPlanId(event.target.value)} placeholder="Select a plan to view and review"
+          options={plans.map(plan => ({ value: String(plan.id), label: `${plan.title} - ${plan.memberName} - ${plan.className}` }))} />
+        <p>Review the saved plan and share feedback with its member.</p>
+      </div>
+      {!planId && <div className="coach-plan-review-empty" role="status">
+        <strong>Choose a saved plan</strong>
+        <span>Select a plan above to inspect its exercises and provide feedback.</span>
+      </div>}
       {planId && <TrainingData load={load}>{({ plan, steps }) => (
-        <div className="training-form">
-          <h3>{plan.title} - {plan.memberName}</h3>
-          {plan.description && <p className="training-copy">{plan.description}</p>}
-          <ol className="training-steps">{steps.map(step => <li key={step.id}><strong>{step.title} - {step.durationMinutes} minutes</strong><p className="training-copy">{step.instructions}</p></li>)}</ol>
+        <section className="training-form coach-plan-review" aria-label="Selected saved plan">
+          <header className="coach-plan-review__heading">
+            <p>Saved plan</p>
+            <h3 id="coach-selected-plan-title">{plan.title}</h3>
+          </header>
+          <dl className="coach-plan-review__facts">
+            <div><dt>Member</dt><dd>{plan.memberName}</dd></div>
+            <div><dt>Class</dt><dd>{plan.className}</dd></div>
+          </dl>
+          {plan.description && <p className="training-copy coach-plan-review__description">{plan.description}</p>}
+          <section className="coach-plan-exercise-list" aria-labelledby="coach-plan-exercises-heading">
+            <h4 id="coach-plan-exercises-heading">Plan exercises <span>{steps.length} {steps.length === 1 ? 'exercise' : 'exercises'}</span></h4>
+            {steps.length === 0
+              ? <p className="coach-plan-review-empty" role="status">This saved plan has no exercises.</p>
+              : <ol className="training-steps">{steps.map(step => (
+                <li key={step.id} className="coach-plan-exercise">
+                  <div className="coach-plan-exercise__heading"><strong>{step.title}</strong><span>{step.durationMinutes} min</span></div>
+                  <p className="training-copy">{step.instructions || 'No instructions provided.'}</p>
+                </li>
+              ))}</ol>}
+          </section>
           <PublishFeedbackForm key={plan.id} planId={plan.id} />
-        </div>
+        </section>
       )}</TrainingData>}
     </div>
   )
@@ -361,14 +385,25 @@ function PublishFeedbackForm({ planId }: { planId: number }) {
     }, 'Plan feedback saved. The member can view it immediately.')
   }
   return (
-    <form className="training-form" onSubmit={submit}>
-      <h3>Plan feedback</h3>
-      <fieldset className="training-fieldset" disabled={action.pending}>
-        <Select label="Progress rating" name="rating" required defaultValue="4" options={[1, 2, 3, 4, 5].map(value => ({ value: String(value), label: `${value}/5` }))} />
-        <TrainingTextarea label="Feedback" name="comments" required maxLength={1000} />
-        <TrainingTextarea label="Strengths" name="strengths" maxLength={500} />
-        <TrainingTextarea label="Areas for improvement" name="areasForImprovement" maxLength={500} />
-        <Button type="submit" loading={action.pending}>Save feedback</Button>
+    <form className="training-form coach-publish-feedback" onSubmit={submit}>
+      <header className="coach-publish-feedback__heading">
+        <div><p>Coach note</p><h3>Plan feedback</h3></div>
+        <span>Saved feedback is visible to the member.</span>
+      </header>
+      <fieldset className="training-fieldset coach-publish-feedback__fields" disabled={action.pending}>
+        <div className="coach-publish-feedback__rating">
+          <Select label="Progress rating" name="rating" required defaultValue="4" options={[1, 2, 3, 4, 5].map(value => ({ value: String(value), label: `${value}/5` }))} />
+        </div>
+        <div className="coach-publish-feedback__comments">
+          <TrainingTextarea label="Feedback" name="comments" required maxLength={1000} />
+        </div>
+        <div className="coach-publish-feedback__details">
+          <TrainingTextarea label="Strengths" name="strengths" maxLength={500} />
+          <TrainingTextarea label="Areas for improvement" name="areasForImprovement" maxLength={500} />
+        </div>
+        <div className="coach-publish-feedback__actions">
+          <Button type="submit" loading={action.pending}>Save feedback</Button>
+        </div>
       </fieldset>
       <ActionMessage {...action} />
     </form>

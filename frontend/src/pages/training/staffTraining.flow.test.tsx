@@ -209,6 +209,10 @@ describe('Coach training writes', () => {
       bookingId: 11, classId: 1, memberId: 42, title: 'Personal plan', steps: [{ title: 'Warm-up', durationMinutes: 10 }],
     })
     await user.selectOptions(screen.getByLabelText('Assigned plans'), '7')
+    const selectedPlan = await screen.findByRole('region', { name: 'Selected saved plan' })
+    expect(within(selectedPlan).getByRole('heading', { name: 'Personal plan' })).toBeInTheDocument()
+    expect(within(selectedPlan).getByText('Beginner swimming')).toBeInTheDocument()
+    expect(within(selectedPlan).getByRole('heading', { name: 'Plan exercises 1 exercise' })).toBeInTheDocument()
     await user.type(await screen.findByLabelText('Feedback'), 'Good progress')
     await user.click(screen.getByRole('button', { name: 'Save feedback' }))
     expect(await screen.findByText('Plan feedback saved. The member can view it immediately.')).toBeInTheDocument()
