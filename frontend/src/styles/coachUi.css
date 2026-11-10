@@ -14,7 +14,7 @@
   --coach-on-feature-muted: var(--color-on-feature-muted);
   --coach-display: var(--font-display);
   --coach-body: var(--font-sans);
-  --coach-radius: 4px;
+  --coach-radius: 0;
   --coach-gap: var(--space-4);
   display: grid;
   align-content: start;
@@ -41,8 +41,35 @@
   text-transform: uppercase;
 }
 
-.coach-ui .card {
+.coach-ui .card,
+.coach-ui .btn,
+.coach-ui .input,
+.coach-ui .select,
+.coach-ui select,
+.coach-ui textarea,
+.coach-ui .badge,
+.coach-ui .alert,
+.coach-ui .coach-day,
+.coach-ui .coach-session,
+.coach-ui .coach-schedule-session,
+.coach-ui .coach-question-item,
+.coach-ui .coach-schedule-hero,
+.coach-ui .coach-hero,
+.coach-ui .coach-metric-card,
+.coach-ui .coach-panel,
+.coach-ui .coach-empty-state,
+.coach-ui .coach-ui__panel,
+.coach-ui .coach-ui__hero,
+.coach-ui .coach-ui__empty,
+.coach-ui .coach-ui__metrics {
   border-radius: var(--coach-radius);
+}
+
+.coach-ui .card {
+  box-shadow: none;
+}
+
+.coach-ui .btn {
   box-shadow: none;
 }
 
@@ -268,6 +295,7 @@
   gap: var(--space-4);
 }
 
+.coach-ui.coach-schedule-page .page-header__title,
 .coach-ui .coach-schedule-page .page-header__title {
   text-transform: uppercase;
 }
@@ -371,6 +399,18 @@
   height: 2.5rem;
   border: 3px solid var(--coach-blue);
   background: var(--coach-blue-soft);
+}
+
+/* Contextual icons for summary metrics scoped to Teaching Schedule, Class Roster, and Member Questions */
+.coach-ui.coach-schedule-page .coach-schedule-metric__icon,
+.coach-ui.coach-roster-page .coach-schedule-metric__icon,
+.coach-ui.coach-questions-page .coach-schedule-metric__icon,
+.coach-ui .coach-roster-page .coach-schedule-metric__icon,
+.coach-ui .coach-questions-page .coach-schedule-metric__icon {
+  flex: 0 0 2rem;
+  width: 2rem;
+  height: 2rem;
+  color: var(--coach-blue);
 }
 
 .coach-ui .coach-schedule-metric > div {
@@ -760,10 +800,12 @@
   }
 }
 
+.coach-ui.coach-roster-page,
 .coach-ui .coach-roster-page {
   gap: var(--space-4);
 }
 
+.coach-ui.coach-roster-page .page-header__title,
 .coach-ui .coach-roster-page .page-header__title {
   text-transform: uppercase;
 }
@@ -950,7 +992,9 @@
   gap: var(--space-2);
 }
 
+.coach-ui.coach-roster-page .coach-roster-content > .empty-state,
 .coach-ui .coach-roster-page .coach-roster-content > .empty-state,
+.coach-ui.coach-roster-page .coach-roster-content > .error-state,
 .coach-ui .coach-roster-page .coach-roster-content > .error-state {
   margin: var(--space-4);
 }
@@ -971,23 +1015,36 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .coach-ui.coach-roster-page .coach-schedule-metric__icon,
+  .coach-ui .coach-roster-page .coach-schedule-metric__icon {
+    flex-basis: 1.75rem;
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
   .coach-ui .coach-roster-content .coach-roster-facts {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .coach-ui.coach-roster-page .page-header__actions,
   .coach-ui .coach-roster-page .page-header__actions {
     width: 100%;
   }
 }
 
 @media print {
+  .coach-ui.coach-roster-page > .page-header,
   .coach-ui .coach-roster-page > .page-header,
-.coach-ui .coach-roster-page > .coach-schedule-hero,
-.coach-ui .coach-roster-page > .coach-roster-metrics,
-.coach-ui .coach-roster-page > .coach-roster-layout > .coach-roster-picker {
+  .coach-ui.coach-roster-page > .coach-schedule-hero,
+  .coach-ui .coach-roster-page > .coach-schedule-hero,
+  .coach-ui.coach-roster-page > .coach-roster-metrics,
+  .coach-ui .coach-roster-page > .coach-roster-metrics,
+  .coach-ui.coach-roster-page > .coach-roster-layout > .coach-roster-picker,
+  .coach-ui .coach-roster-page > .coach-roster-layout > .coach-roster-picker {
     display: none !important;
   }
 
+  .coach-ui.coach-roster-page > .coach-roster-layout,
   .coach-ui .coach-roster-page > .coach-roster-layout {
     display: block;
   }
@@ -1011,10 +1068,12 @@
   }
 }
 
+.coach-ui.coach-questions-page,
 .coach-ui .coach-questions-page {
   gap: var(--space-4);
 }
 
+.coach-ui.coach-questions-page .page-header__title,
 .coach-ui .coach-questions-page .page-header__title {
   text-transform: uppercase;
 }
@@ -1321,15 +1380,24 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .coach-ui.coach-questions-page .coach-schedule-metric__icon,
+  .coach-ui .coach-questions-page .coach-schedule-metric__icon {
+    flex-basis: 1.75rem;
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
   .coach-ui .coach-question-discussion-header dl {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
+.coach-ui.coach-progress-page,
 .coach-ui .coach-progress-page {
   gap: var(--space-4);
 }
 
+.coach-ui.coach-progress-page .page-header__title,
 .coach-ui .coach-progress-page .page-header__title {
   text-transform: uppercase;
 }
@@ -1679,10 +1747,12 @@
   }
 }
 
+.coach-ui.coach-plans-page,
 .coach-ui .coach-plans-page {
   gap: var(--space-4);
 }
 
+.coach-ui.coach-plans-page .page-header__title,
 .coach-ui .coach-plans-page .page-header__title {
   text-transform: uppercase;
 }
@@ -1720,10 +1790,9 @@
 }
 
 .coach-ui .coach-plans-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.85fr);
-  align-items: start;
-  gap: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
   min-width: 0;
 }
 
@@ -1929,10 +1998,6 @@
 }
 
 @media (max-width: 1200px) {
-  .coach-ui .coach-plans-layout {
-    grid-template-columns: minmax(0, 1.15fr) minmax(16rem, 0.85fr);
-  }
-
   .coach-ui .coach-plan-form > .training-fieldset {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1952,10 +2017,6 @@
   .coach-ui .coach-plans-summary > div + div {
     border-top: 1px solid var(--coach-rule);
     border-left: 0;
-  }
-
-  .coach-ui .coach-plans-layout {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1981,9 +2042,13 @@
   display: grid;
   gap: var(--space-2);
   min-width: 0;
-  padding: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--coach-rule);
   background: var(--coach-surface-muted);
+}
+
+.coach-ui .coach-own-plans__selector > .field {
+  max-width: 36rem;
 }
 
 .coach-ui .coach-own-plans__selector > p {
@@ -2013,6 +2078,8 @@
 }
 
 .coach-ui .coach-plan-review {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
   min-width: 0;
   padding-top: var(--space-4);
@@ -2058,7 +2125,7 @@
   display: grid;
   gap: var(--space-1);
   min-width: 0;
-  padding: var(--space-3);
+  padding: var(--space-3) var(--space-4);
 }
 
 .coach-ui .coach-plan-review__facts > div + div {
@@ -2080,7 +2147,7 @@
 
 .coach-ui .coach-plan-review__description {
   margin: 0;
-  padding: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border-left: 3px solid var(--coach-blue);
   background: var(--coach-blue-soft);
   color: var(--coach-ink);
@@ -2118,15 +2185,18 @@
 
 .coach-ui .coach-plan-exercise-list > .training-steps {
   display: grid;
-  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: var(--space-3);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .coach-ui .coach-plan-exercise {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  padding: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--coach-rule);
   background: var(--coach-surface-muted);
 }
@@ -2137,6 +2207,8 @@
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--coach-rule);
 }
 
 .coach-ui .coach-plan-exercise__heading > strong {
@@ -2161,10 +2233,14 @@
 }
 
 .coach-ui .coach-publish-feedback {
-  gap: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
   min-width: 0;
-  padding-top: var(--space-4);
-  border-top: 2px solid var(--coach-rule);
+  margin-top: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--coach-rule);
+  background: var(--coach-surface-muted);
 }
 
 .coach-ui .coach-publish-feedback__heading {
@@ -2173,6 +2249,8 @@
   align-items: end;
   justify-content: space-between;
   gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--coach-rule);
 }
 
 .coach-ui .coach-publish-feedback__heading > div {
@@ -2188,7 +2266,7 @@
 .coach-ui .coach-publish-feedback__fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-3);
+  gap: var(--space-4);
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -2205,10 +2283,18 @@
   min-width: 0;
 }
 
+.coach-ui .coach-publish-feedback__comments textarea {
+  min-height: 6rem;
+}
+
 .coach-ui .coach-publish-feedback__details {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
+  gap: var(--space-4);
+}
+
+.coach-ui .coach-publish-feedback__details textarea {
+  min-height: 5rem;
 }
 
 .coach-ui .coach-publish-feedback__actions {
@@ -2240,10 +2326,12 @@
   }
 }
 
+.coach-ui.coach-results-page,
 .coach-ui .coach-results-page {
   gap: var(--space-4);
 }
 
+.coach-ui.coach-results-page .page-header__title,
 .coach-ui .coach-results-page .page-header__title {
   text-transform: uppercase;
 }

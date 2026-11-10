@@ -23,7 +23,9 @@ This document describes the shared presentation foundation for Coach pages. It d
 ## Design and implementation rules
 
 - Use existing design tokens. Primary, navy, and gold values are defined in `src/styles/tokens.css` and must not be copied or changed here.
+- Surfaces and controls within `.coach-ui` use `--coach-radius: 0` for crisp, rectangular presentation aligned with the Sportify Home design language (`.home-page .btn { border-radius: 0 }`). All cards, panels, buttons, inputs, selects, textareas, badges, and metric blocks are square. The only permitted circular elements are decorative background watermark rings (`.coach-schedule-hero::after`) and functional spinning indicators.
 - Body content uses `--font-sans`; display headings use `--font-display`. The Be Vietnam Pro 700 stylesheet is already installed and imported locally.
 - Keep new selectors under `.coach-ui`. Do not style `body`, the shared header, the sidebar, or unscoped component selectors from this file.
+- Support both compound root selectors (`.coach-ui.coach-*-page`) and descendant selectors so styling applies reliably when `coach-ui` is attached to the page container.
 - Preserve live loading, error, empty, validation, permission, and action states when applying these patterns in later Coach page work.
 - Test light and dark themes, keyboard focus, long content, and narrow widths when applying the patterns to each page.

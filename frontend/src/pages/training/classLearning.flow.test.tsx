@@ -216,4 +216,15 @@ describe('Class learning Round 02', () => {
     expect(calls.some(call => call.path === '/member/training/consultation')).toBe(true)
     expect(calls.some(call => /openai|gemini|chat\/completions/.test(call.path))).toBe(false)
   })
+  it('renders contextual SVG icons for Member Questions queue metrics and omits decorative square markers', async () => {
+    const question = { id: 7, classId: 1, className: 'Class skills', memberName: 'Member', subject: 'Footwork', description: 'How to practise?', status: 'OPEN', createdAt: '2026-11-02T10:00:00' }
+    login('COACH', () => json(200, [question]))
+    renderApp('/coach/training/questions')
+
+    expect(await screen.findByRole('heading', { name: 'Member Questions' })).toBeInTheDocument()
+    expect(await screen.findByText('Questions in queue')).toBeInTheDocument()
+    const questionSummary = screen.getByRole('region', { name: 'Question queue summary' })
+    expect(questionSummary.querySelectorAll('svg.coach-schedule-metric__icon')).toHaveLength(2)
+    expect(questionSummary.querySelectorAll('.coach-schedule-metric__mark')).toHaveLength(0)
+  })
 })

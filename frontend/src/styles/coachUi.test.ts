@@ -25,4 +25,28 @@ describe('coach presentation foundation', () => {
     expect(stylesheet).toContain('.coach-ui__focus:focus-visible')
     expect(stylesheet).not.toMatch(/#[\da-f]{3,8}\b/i)
   })
+
+  it('enforces flat 0px rectangular surfaces on Coach content matching Sportify Home DNA', () => {
+    expect(stylesheet).toMatch(/--coach-radius:\s*0\s*;/)
+    expect(stylesheet).toContain('.coach-ui .card')
+    expect(stylesheet).toContain('.coach-ui .btn')
+    expect(stylesheet).toContain('.coach-ui .input')
+    expect(stylesheet).toContain('.coach-ui select')
+    expect(stylesheet).toContain('.coach-ui textarea')
+  })
+
+  it('supports compound root selectors where coach-ui is on the page container', () => {
+    expect(stylesheet).toContain('.coach-ui.coach-schedule-page')
+    expect(stylesheet).toContain('.coach-ui.coach-roster-page')
+    expect(stylesheet).toContain('.coach-ui.coach-questions-page')
+    expect(stylesheet).toContain('.coach-ui.coach-progress-page')
+    expect(stylesheet).toContain('.coach-ui.coach-plans-page')
+    expect(stylesheet).toContain('.coach-ui.coach-results-page')
+  })
+
+  it('provides scoped metric icon styling for Coach summary metrics', () => {
+    expect(stylesheet).toContain('.coach-ui.coach-schedule-page .coach-schedule-metric__icon')
+    expect(stylesheet).toContain('.coach-ui.coach-roster-page .coach-schedule-metric__icon')
+    expect(stylesheet).toContain('.coach-ui.coach-questions-page .coach-schedule-metric__icon')
+  })
 })

@@ -41,6 +41,9 @@ describe('FE-10 coach schedule and roster screens', () => {
     expect(await screen.findByRole('heading', { name: 'Basketball Foundations' })).toBeInTheDocument()
     expect(screen.getByText('Sessions this week').parentElement).toHaveTextContent('1')
     expect(screen.getByText('Classes assigned').parentElement).toHaveTextContent('1')
+    const scheduleSummary = screen.getByRole('region', { name: 'Schedule summary' })
+    expect(scheduleSummary.querySelectorAll('svg.coach-schedule-metric__icon')).toHaveLength(4)
+    expect(scheduleSummary.querySelectorAll('.coach-schedule-metric__mark')).toHaveLength(0)
     expect(screen.getByRole('link', { name: 'View roster' })).toHaveAttribute('href', '/coach/roster?sessionId=5&week=2026-10-19')
     expect(screen.getByRole('link', { name: 'View class roster' })).toHaveAttribute('href', '/coach/roster?sessionId=5&week=2026-10-19')
     expect(screen.getByText('Session status').parentElement).toHaveTextContent('Published')
@@ -157,6 +160,16 @@ describe('FE-10 coach schedule and roster screens', () => {
     setup(RECEPTIONIST)
     renderApp('/coach')
     expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
+  })
+
+  it('renders contextual SVG icons for Class Roster summary metrics and omits decorative square markers', async () => {
+    setup()
+    renderApp('/coach/roster?sessionId=5&week=2026-10-19')
+
+    expect(await screen.findByRole('heading', { name: 'Class Roster' })).toBeInTheDocument()
+    const rosterMetrics = screen.getByRole('region', { name: 'Roster summary' })
+    expect(rosterMetrics.querySelectorAll('svg.coach-schedule-metric__icon')).toHaveLength(4)
+    expect(rosterMetrics.querySelectorAll('.coach-schedule-metric__mark')).toHaveLength(0)
   })
 })
 
