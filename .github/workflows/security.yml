@@ -39,7 +39,7 @@ jobs:
         working-directory: backend
         run: mvn -B -ntp test-compile
       # Match main's existing category even when CI is the workflow caller.
-      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
         with:
           category: .github/workflows/security.yml:codeql
 
@@ -57,7 +57,7 @@ jobs:
         with:
           languages: javascript-typescript
           build-mode: none
-      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
         with:
           category: .github/workflows/ci.yml:frontend-codeql
 
