@@ -28,6 +28,7 @@ export function ManagerClassesPage() {
   function filter(set: (value: string) => void, value: string) { set(value); setPage(0) }
 
   const totalClasses = classes.status === 'ready' ? String(classes.data.totalElements).padStart(2, '0') : '--'
+  const activeOnPage = classes.status === 'ready' ? String(classes.data.content.filter((c) => c.active).length).padStart(2, '0') : '--'
   const sportsCount = sports.status === 'ready' ? String(sports.data.length).padStart(2, '0') : '--'
   const coachesCount = coaches.status === 'ready' ? String(coaches.data.length).padStart(2, '0') : '--'
 
@@ -46,7 +47,6 @@ export function ManagerClassesPage() {
         <h1 className="concept-title">Class Management</h1>
         <p className="concept-sub">Manage classes, coach assignments and weekly schedules across all sports.</p>
       </div>
-      <span className="concept-tag">DESIGN CONCEPT - SAMPLE DATA</span>
     </div>
 
     <div className="concept-hero">
@@ -63,7 +63,14 @@ export function ManagerClassesPage() {
         <span className="concept-stat__icon" aria-hidden="true">C</span>
         <div>
           <strong>{totalClasses}</strong>
-          <small>Active classes</small>
+          <small>Matching classes</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">A</span>
+        <div>
+          <strong>{activeOnPage}</strong>
+          <small>Active on this page</small>
         </div>
       </div>
       <div className="concept-stat">
@@ -80,17 +87,10 @@ export function ManagerClassesPage() {
           <small>Qualified coaches</small>
         </div>
       </div>
-      <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">G</span>
-        <div>
-          <strong>Enabled</strong>
-          <small>Conflict guard</small>
-        </div>
-      </div>
     </div>
 
     <PreviewNotice />
-    <Card title="Classes" actions={<div className="concept-row"><span className="manager-catalog__count">{classes.status === 'ready' ? classes.data.totalElements + (classes.data.totalElements === 1 ? ' class' : ' classes') : 'Loading'}</span><Button size="sm" onClick={() => navigate('/manager/classes/new')}>+ Create class</Button></div>}>
+    <Card title="Classes" actions={<span className="manager-catalog__count">{classes.status === 'ready' ? classes.data.totalElements + (classes.data.totalElements === 1 ? ' class' : ' classes') : 'Loading'}</span>}>
       <div className="manager-filters">
         <Input label="Search classes" value={search} onChange={(event) => filter(setSearch, event.target.value)} placeholder="Class name or code" />
         <Select label="Sport" placeholder="All sports" value={sportId} options={sports.status === 'ready' ? sports.data.map((item) => ({ value: String(item.id), label: item.name })) : []} onChange={(event) => filter(setSportId, event.target.value)} />

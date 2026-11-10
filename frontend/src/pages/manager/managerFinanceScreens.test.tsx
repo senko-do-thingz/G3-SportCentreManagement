@@ -617,4 +617,31 @@ describe('FE-13 Round 2 action safety', () => {
     expect(within(table).getByText('Credit card (Legacy unverified)')).toBeVisible()
     expect(within(table).getByText('Bank transfer (Legacy unverified)')).toBeVisible()
   })
+
+  it('does not render duplicate KPI blocks on Financial Overview or false zero counts while Transactions and Reports load', async () => {
+    financeApi()
+    const overviewView = renderApp('/manager/finance?month=2026-10')
+    const kpis = await screen.findByRole('region', { name: 'Financial key performance indicators' })
+    expect(within(kpis).getByText('16.110.000 VND')).toBeInTheDocument()
+    expect(document.querySelectorAll('.concept-stats')).toHaveLength(0)
+    expect(screen.queryByText(/Paid Revenue \(12 txns\)/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/DESIGN CONCEPT/i)).not.toBeInTheDocument()
+    overviewView.unmount()
+
+    let resolveTx!: (res: Response) => void
+    tokenStorage.startSession({ accessToken: 'finance-manager-token', refreshToken: 'finance-refresh-token' })
+    installFakeFetch((call) => {
+      if (call.path === '/users/me') return json(200, MANAGER)
+      if (call.path.startsWith('/manager/finance/transactions') || call.path === '/refunds/pending') {
+        return new Promise<Response>((resolve) => { resolveTx = resolve })
+      }
+      return backendError(404, 'Unexpected')
+    })
+    const txView = renderApp('/manager/transactions?month=2026-10')
+    expect(await screen.findByRole('heading', { name: 'Transactions & Refunds' })).toBeInTheDocument()
+    expect(screen.queryByText('0 Total')).not.toBeInTheDocument()
+    expect(screen.queryByText('0 Pending')).not.toBeInTheDocument()
+    txView.unmount()
+    void resolveTx
+  })
 })

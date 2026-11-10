@@ -24,9 +24,10 @@ export function MembershipCardsManagementPage() {
   const [selected, setSelected] = useState<ManagerCardTier | null>(null)
 
   const tiers = resource.status === 'ready' ? resource.data : []
-  const publishedTiers = tiers.length ? String(tiers.length).padStart(2, '0') : '--'
-  const activeCount = tiers.length ? String(tiers.filter((t) => t.isActive).length).padStart(2, '0') : '--'
-  const maxDiscount = tiers.length ? Math.max(...tiers.map((t) => t.discountPercentage ?? 0)) + '%' : '--'
+  const publishedTiers = resource.status === 'ready' ? String(tiers.length).padStart(2, '0') : '--'
+  const activeCount = resource.status === 'ready' ? String(tiers.filter((t) => t.isActive).length).padStart(2, '0') : '--'
+  const maxDiscount = resource.status === 'ready' && tiers.length ? Math.max(...tiers.map((t) => t.discountPercentage ?? 0)) + '%' : '--'
+  const defaultTierLabel = resource.status === 'ready' ? (tiers.find((t) => t.code === 'STANDARD')?.name ?? 'None') : '--'
 
   const columns: TableColumn<ManagerCardTier>[] = [
     {
@@ -84,7 +85,6 @@ export function MembershipCardsManagementPage() {
         <h1 className="concept-title">Membership Cards</h1>
         <p className="concept-sub">Review tier fees, validity and package discounts while protecting standard tiers.</p>
       </div>
-      <span className="concept-tag">DESIGN CONCEPT - SAMPLE DATA</span>
     </div>
 
     <div className="concept-hero">
@@ -120,7 +120,7 @@ export function MembershipCardsManagementPage() {
       <div className="concept-stat">
         <span className="concept-stat__icon" aria-hidden="true">S</span>
         <div>
-          <strong>Protected</strong>
+          <strong>{defaultTierLabel}</strong>
           <small>Standard tier</small>
         </div>
       </div>

@@ -24,7 +24,6 @@ export function ManagerAttendanceBackfillPage() {
         <h1 className="concept-title">Missed Attendance</h1>
         <p className="concept-sub">Manager-only administrative recovery for a completed past session with a confirmed booking and no saved attendance. A reason and permanent audit are required.</p>
       </div>
-      <span className="concept-tag">DESIGN CONCEPT - SAMPLE DATA</span>
     </div>
 
     <div className="concept-hero">
@@ -35,40 +34,41 @@ export function ManagerAttendanceBackfillPage() {
       </div>
     </div>
 
-    <div className="concept-stats">
-      <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">R</span>
-        <div>
-          <strong>Manager Only</strong>
-          <small>Authorized role</small>
-        </div>
-      </div>
-      <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">E</span>
-        <div>
-          <strong>Confirmed</strong>
-          <small>Eligible bookings</small>
-        </div>
-      </div>
-      <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">M</span>
-        <div>
-          <strong>Mandatory</strong>
-          <small>Audit reason</small>
-        </div>
-      </div>
-      <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">P</span>
-        <div>
-          <strong>Permanent</strong>
-          <small>Log record</small>
-        </div>
-      </div>
-    </div>
-
     <PreviewNotice />
     {saved && <p role="status">Attendance backfilled and audited. The member can view the saved status.</p>}
-    <TrainingData key={revision} load={api.workspace}>{workspace => <BackfillForm workspace={workspace} onSaved={() => { setSaved(true); refresh(n => n + 1) }} />}</TrainingData>
+    <TrainingData key={revision} load={api.workspace}>{workspace => <>
+      <div className="concept-stats">
+        <div className="concept-stat">
+          <span className="concept-stat__icon" aria-hidden="true">R</span>
+          <div>
+            <strong>{workspace.enabled ? 'Enabled' : 'Disabled'}</strong>
+            <small>Recovery status</small>
+          </div>
+        </div>
+        <div className="concept-stat">
+          <span className="concept-stat__icon" aria-hidden="true">E</span>
+          <div>
+            <strong>{String(workspace.bookings.length).padStart(2, '0')}</strong>
+            <small>Eligible bookings</small>
+          </div>
+        </div>
+        <div className="concept-stat">
+          <span className="concept-stat__icon" aria-hidden="true">W</span>
+          <div>
+            <strong>{workspace.window || 'Not set'}</strong>
+            <small>Cutoff window</small>
+          </div>
+        </div>
+        <div className="concept-stat">
+          <span className="concept-stat__icon" aria-hidden="true">M</span>
+          <div>
+            <strong>3-500 chars</strong>
+            <small>Required reason</small>
+          </div>
+        </div>
+      </div>
+      <BackfillForm workspace={workspace} onSaved={() => { setSaved(true); refresh(n => n + 1) }} />
+    </>}</TrainingData>
   </div>
 }
 

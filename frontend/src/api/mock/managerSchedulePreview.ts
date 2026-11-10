@@ -2,7 +2,26 @@ import type { RequestOptions } from '../client'
 import type { ClassRequest, ManagerClass } from '../managerClassesApi'
 import type { ManagerSession, SessionCreate, SessionUpdate } from '../managerSessionsApi'
 import type { Sport } from '../packagesApi'
+import { parseSessionId, type SessionId } from '../sessionIdentity'
 import { addDays, centerNow, monday, repeatDates } from '../../pages/manager/scheduleModel'
+
+const SPORT_CODES: Record<string, string> = {
+  Football: 'FB',
+  Swimming: 'SW',
+  Badminton: 'BM',
+  Volleyball: 'VB',
+  Basketball: 'BK',
+  Tennis: 'TE',
+}
+
+function buildSessionCode(date: string, sportName: string | undefined, seq: number): SessionId {
+  const dd = date.slice(8, 10)
+  const mm = date.slice(5, 7)
+  const yy = date.slice(2, 4)
+  const code = (sportName && SPORT_CODES[sportName]) || 'BK'
+  const nn = String(Math.max(1, Math.min(99, seq))).padStart(2, '0')
+  return parseSessionId(`${dd}${mm}${yy}${code}${nn}`)
+}
 
 const coaches = [
   { id: 3, fullName: 'Daniel Smith', headline: 'Certified sports coach', specialties: 'Foundation skills and safe technique', yearsExperience: 8, sportIds: [1, 2, 4] },
@@ -15,10 +34,55 @@ let classes: ManagerClass[] = [
   { id: 2, code: 'CL-002', name: 'Swimming Technique', sportId: 3, sportName: 'Swimming', ageGroupId: 2, ageGroupLabel: ages[1].label, level: 'INTERMEDIATE', coachId: 4, coachName: coaches[1].fullName, maxMembers: 12, upcomingSessions: 1, active: true, createdAt: '2026-10-01T09:00:00', updatedAt: '2026-10-01T09:00:00' },
 ]
 const week = monday(centerNow().date)
-let sessions: ManagerSession[] = [0, 2, 4, 6].map((offset, index) => ({
-  id: index + 1, date: addDays(week, offset), startTime: '09:00:00', endTime: '10:00:00', class: { id: 1, code: 'CL-001', name: classes[0].name }, coach: { id: 3, name: coaches[0].fullName }, facility: { id: 1, name: facilities[0].name }, capacity: 20, bookedCount: index === 3 ? 0 : 4,
-  trainingType: 'COACH_LED', status: index === 2 ? 'CANCELLED' : 'PUBLISHED', cancelReason: index === 2 ? 'Facility maintenance' : null, cancelledAt: index === 2 ? `${week}T08:00:00` : null, cancelledByUserId: index === 2 ? 1 : null,
-}))
+let sessions: ManagerSession[] = [0, 2, 4, 6].map((offset, index) => {
+  const date = addDays(week, offset)
+  return {
+    id: index + 1,
+    sessionId: buildSessionCode(date, classes[0].sportName, index + 1),
+    sportName: classes[0].sportName,
+    date,
+    startTime: '09:00:00',
+    endTime: '10:00:00',
+    class: { id: 1, code: 'CL-001', name: classes[0].name },
+    coach: { id: 3, name: coaches[0].fullName },
+    facility: { id: 1, name: facilities[0].name },
+    capacity: 20,
+    bookedCount: index === 3 ? 0 : 4,
+    trainingType: 'COACH_LED',
+    status: index === 2 ? 'CANCELLED' : 'PUBLISHED',
+    cancelReason: index === 2 ? 'Facility maintenance' : null,
+    cancelledAt: index === 2 ? `${week}T08:00:00` : null,
+    cancelledByUserId: index === 2 ? 1 : null,
+  }
+})
+
+let backfillBookings = [
+  {
+    bookingId: 101,
+    sessionId: 1,
+    sessionCode: buildSessionCode(addDays(centerNow().date, -2), 'Basketball', 1),
+    memberName: 'Taylor Nguyen',
+    className: 'Basketball Foundations',
+    coachName: 'Daniel Smith',
+    facilityName: 'Training Court A',
+    date: addDays(centerNow().date, -2),
+    startTime: '09:00:00',
+    endTime: '10:00:00',
+  },
+  {
+    bookingId: 102,
+    sessionId: 2,
+    sessionCode: buildSessionCode(addDays(centerNow().date, -1), 'Swimming', 1),
+    memberName: 'Sample Member 1',
+    className: 'Swimming Technique',
+    coachName: 'Chris Nguyen',
+    facilityName: 'Indoor Pool',
+    date: addDays(centerNow().date, -1),
+    startTime: '10:00:00',
+    endTime: '11:00:00',
+  },
+]
+
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 const failure = (status: number, message: string) => json(status, { status, message })
 
@@ -60,55 +124,120 @@ export function schedulePreviewResponse(path: string, options: RequestOptions, s
   }
   if (path === '/manager/sessions' && method === 'GET') return json(200, empty ? [] : sessions.filter((entry) => entry.date >= String(query.from) && entry.date <= String(query.to) && (!query.classId || entry.class?.id === Number(query.classId)) && (!query.coachId || entry.coach?.id === Number(query.coachId)) && (!query.facilityId || entry.facility?.id === Number(query.facilityId))))
   const create = /^\/manager\/classes\/(\d+)\/sessions$/.exec(path)
-  const update = /^\/manager\/sessions\/(\d+)(\/cancel)?$/.exec(path)
+  const update = /^\/manager\/sessions\/(\d+)(\/cancel|\/publish)?$/.exec(path)
   if (create || update) {
     const old = update ? sessions.find((entry) => entry.id === Number(update[1])) : undefined
     if (update && !old) return failure(404, 'Session not found.')
-    if (update?.[2] && old) { old.status = 'CANCELLED'; old.cancelReason = (options.body as { reason: string }).reason; old.cancelledByUserId = 1; old.cancelledAt = `${centerNow().date}T${centerNow().time}`; return json(200, old) }
+    if (update?.[2] === '/cancel' && old) { old.status = 'CANCELLED'; old.cancelReason = (options.body as { reason: string }).reason; old.cancelledByUserId = 1; old.cancelledAt = `${centerNow().date}T${centerNow().time}`; return json(200, old) }
+    if (update?.[2] === '/publish' && old) { old.status = 'PUBLISHED'; return json(200, old) }
     const body = options.body as SessionCreate | SessionUpdate
     const sessionClass = classes.find((entry) => entry.id === (old?.class?.id ?? Number(create?.[1])))
     const facility = facilities.find((entry) => entry.id === body.facilityId), coach = coaches.find((entry) => entry.id === body.coachId)
     if (!sessionClass || !facility) return failure(400, 'Class and facility are required.')
     const dates = body.date ? [body.date] : 'fromDate' in body && body.fromDate ? repeatDates(body.fromDate, body.toDate, body.daysOfWeek) : []
     if (!dates.length || dates.length > 100) return failure(400, 'Choose between 1 and 100 sessions.')
-    const conflicts = dates.flatMap((date) => sessions.filter((entry) => entry.id !== old?.id && entry.status !== 'CANCELLED' && entry.date === date && entry.startTime < body.endTime && entry.endTime > body.startTime && (entry.facility?.id === body.facilityId || (body.coachId && entry.coach?.id === body.coachId))).map((entry) => ({ sessionId: entry.id, requestedDate: date, date: entry.date, startTime: entry.startTime, endTime: entry.endTime, class: entry.class, coach: entry.coach, facility: entry.facility, conflictType: entry.facility?.id === body.facilityId ? body.coachId && entry.coach?.id === body.coachId ? 'BOTH' : 'FACILITY' : 'COACH' })))
+    const conflicts = dates.flatMap((date) => sessions.filter((entry) => entry.id !== old?.id && entry.status !== 'CANCELLED' && entry.date === date && entry.startTime < body.endTime && entry.endTime > body.startTime && (entry.facility?.id === body.facilityId || (body.coachId && entry.coach?.id === body.coachId))).map((entry) => ({ sessionId: entry.id, sessionCode: entry.sessionId, requestedDate: date, date: entry.date, startTime: entry.startTime, endTime: entry.endTime, class: entry.class, coach: entry.coach, facility: entry.facility, conflictType: entry.facility?.id === body.facilityId ? body.coachId && entry.coach?.id === body.coachId ? 'BOTH' : 'FACILITY' : 'COACH' })))
     if (conflicts.length) return json(409, { status: 409, message: 'The schedule overlaps existing sessions.', details: { conflicts } })
     let nextId = Math.max(0, ...sessions.map((entry) => entry.id)) + 1
-    const result: ManagerSession[] = dates.map((date) => ({ id: old?.id ?? nextId++, date, startTime: body.startTime, endTime: body.endTime, class: { id: sessionClass.id, name: sessionClass.name, code: sessionClass.code }, coach: coach ? { id: coach.id, name: coach.fullName } : null, facility, capacity: body.capacity, bookedCount: old?.bookedCount ?? 0, trainingType: old?.trainingType ?? ('trainingType' in body ? body.trainingType : 'COACH_LED'), status: old?.status ?? 'PUBLISHED', cancelReason: null, cancelledAt: null, cancelledByUserId: null }))
+    const result: ManagerSession[] = dates.map((date) => {
+      const id = old?.id ?? nextId++
+      return {
+        id,
+        sessionId: buildSessionCode(date, sessionClass.sportName, id),
+        sportName: sessionClass.sportName,
+        date,
+        startTime: body.startTime,
+        endTime: body.endTime,
+        class: { id: sessionClass.id, name: sessionClass.name, code: sessionClass.code },
+        coach: coach ? { id: coach.id, name: coach.fullName } : null,
+        facility,
+        capacity: body.capacity,
+        bookedCount: old?.bookedCount ?? 0,
+        trainingType: old?.trainingType ?? ('trainingType' in body ? body.trainingType : 'COACH_LED'),
+        status: old?.status ?? 'PUBLISHED',
+        cancelReason: null,
+        cancelledAt: null,
+        cancelledByUserId: null,
+      }
+    })
     sessions = [...sessions.filter((entry) => entry.id !== old?.id), ...result]
     return json(old ? 200 : 201, old ? result[0] : result)
   }
+  if (path === '/manager/training/attendance/overview' && method === 'GET') {
+    const todayDate = centerNow().date
+    const overviewSessions = empty ? [] : [
+      {
+        id: 1,
+        sessionCode: buildSessionCode(todayDate, 'Basketball', 1),
+        date: todayDate,
+        startTime: '09:00:00',
+        classId: 1,
+        className: 'Basketball Foundations',
+        coachId: 3,
+        coachName: 'Daniel Smith',
+        confirmed: 4,
+        present: 3,
+        late: 0,
+        absent: 0,
+        excused: 0,
+        unmarked: 1,
+        attendanceRate: 75,
+      },
+      {
+        id: 2,
+        sessionCode: buildSessionCode(todayDate, 'Swimming', 2),
+        date: todayDate,
+        startTime: '10:30:00',
+        classId: 2,
+        className: 'Swimming Technique',
+        coachId: 4,
+        coachName: 'Chris Nguyen',
+        confirmed: 3,
+        present: 2,
+        late: 1,
+        absent: 0,
+        excused: 0,
+        unmarked: 0,
+        attendanceRate: 100,
+      },
+    ].filter((s) => (!query.classId || s.classId === Number(query.classId)) && (!query.coachId || s.coachId === Number(query.coachId)))
+    return json(200, { sessions: overviewSessions, truncated: false })
+  }
+  const attendanceDetail = /^\/manager\/training\/attendance\/sessions\/([A-Z0-9]+)$/.exec(path)
+  if (attendanceDetail && method === 'GET') {
+    const sessionCode = attendanceDetail[1]
+    const todayDate = centerNow().date
+    return json(200, {
+      session: {
+        id: 1,
+        sessionCode,
+        date: todayDate,
+        startTime: '09:00:00',
+        className: sessionCode.includes('SW') ? 'Swimming Technique' : 'Basketball Foundations',
+        coachName: sessionCode.includes('SW') ? 'Chris Nguyen' : 'Daniel Smith',
+        confirmed: 4,
+        present: 3,
+        late: 0,
+        absent: 0,
+        excused: 0,
+        unmarked: 1,
+        attendanceRate: 75,
+      },
+      members: [
+        { bookingId: 201, memberCode: 'MB-0248', memberName: 'Taylor Nguyen', bookingStatus: 'CONFIRMED', attendanceStatus: 'PRESENT', markedBy: 'Daniel Smith', markedAt: `${todayDate} 09:05`, notes: 'On time' },
+        { bookingId: 202, memberCode: 'MB-0253', memberName: 'Sample Member 1', bookingStatus: 'CONFIRMED', attendanceStatus: 'PRESENT', markedBy: 'Daniel Smith', markedAt: `${todayDate} 09:06`, notes: null },
+        { bookingId: 203, memberCode: 'MB-0254', memberName: 'Sample Member 2', bookingStatus: 'CONFIRMED', attendanceStatus: 'PRESENT', markedBy: 'Daniel Smith', markedAt: `${todayDate} 09:07`, notes: null },
+        { bookingId: 204, memberCode: 'MB-0255', memberName: 'Sample Member 3', bookingStatus: 'CONFIRMED', attendanceStatus: null, markedBy: null, markedAt: null, notes: null },
+      ],
+    })
+  }
   if (path === '/manager/training/attendance/backfill' && method === 'GET') {
+    const todayDate = centerNow().date
     return json(200, {
       enabled: true,
-      window: '2026-10-01 to 2026-10-31',
+      window: `${addDays(todayDate, -7)} to ${todayDate}`,
       message: 'Administrative recovery window is active.',
-      bookings: [
-        {
-          bookingId: 101,
-          sessionId: 1,
-          sessionCode: 'SES-001',
-          memberName: 'Taylor Nguyen',
-          className: 'Basketball Foundations',
-          coachName: 'Daniel Smith',
-          facilityName: 'Training Court A',
-          date: '2026-10-10',
-          startTime: '09:00:00',
-          endTime: '10:00:00',
-        },
-        {
-          bookingId: 102,
-          sessionId: 2,
-          sessionCode: 'SES-002',
-          memberName: 'Sample Member 1',
-          className: 'Swimming Technique',
-          coachName: 'Chris Nguyen',
-          facilityName: 'Indoor Pool',
-          date: '2026-10-11',
-          startTime: '10:00:00',
-          endTime: '11:00:00',
-        },
-      ],
+      bookings: empty ? [] : backfillBookings,
     })
   }
   if (path === '/manager/training/attendance/backfill' && method === 'POST') {
@@ -116,7 +245,8 @@ export function schedulePreviewResponse(path: string, options: RequestOptions, s
     if (!body?.reason || body.reason.trim().length < 3) {
       return failure(400, 'A meaningful administrative reason (3-500 chars) is required.')
     }
-    return json(200, { id: body.bookingId })
+    backfillBookings = backfillBookings.filter((b) => b.bookingId !== body.bookingId)
+    return json(201, { id: body.bookingId })
   }
   return undefined
 }

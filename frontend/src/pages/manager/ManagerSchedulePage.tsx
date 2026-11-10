@@ -62,6 +62,7 @@ export function ManagerSchedulePage() {
   const available = classes.status === 'ready' && facilitiesUsable && classes.data.some((item) => item.active)
 
   const weekSessionsCount = sessions.status === 'ready' ? String(sessions.data.length).padStart(2, '0') : '--'
+  const publishedCount = sessions.status === 'ready' ? String(sessions.data.filter((s) => s.status === 'PUBLISHED').length).padStart(2, '0') : '--'
   const coachesCount = coaches.status === 'ready' ? String(coaches.data.length).padStart(2, '0') : '--'
   const facilitiesCount = facilities.status === 'ready' ? String(facilities.data.length).padStart(2, '0') : '--'
 
@@ -72,7 +73,6 @@ export function ManagerSchedulePage() {
         <h1 className="concept-title">Schedule &amp; Coach Assignment</h1>
         <p className="concept-sub">Plan single sessions or a weekly schedule. Times use Vietnam time (UTC+7).</p>
       </div>
-      <span className="concept-tag">DESIGN CONCEPT - SAMPLE DATA</span>
     </div>
 
     <div className="concept-hero">
@@ -93,6 +93,13 @@ export function ManagerSchedulePage() {
         </div>
       </div>
       <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">P</span>
+        <div>
+          <strong>{publishedCount}</strong>
+          <small>Published in week</small>
+        </div>
+      </div>
+      <div className="concept-stat">
         <span className="concept-stat__icon" aria-hidden="true">C</span>
         <div>
           <strong>{coachesCount}</strong>
@@ -104,13 +111,6 @@ export function ManagerSchedulePage() {
         <div>
           <strong>{facilitiesCount}</strong>
           <small>Venues / Courts</small>
-        </div>
-      </div>
-      <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">T</span>
-        <div>
-          <strong>UTC+7</strong>
-          <small>Timezone</small>
         </div>
       </div>
     </div>

@@ -30,6 +30,7 @@ export function UserManagementPage() {
   const totalCount = ready ? resource.data.totalElements : 0
   const activeCount = ready ? resource.data.content.filter((u) => u.status === 'ACTIVE').length : 0
   const currentRoleLabel = role ? (ROLE_LABELS[role as keyof typeof ROLE_LABELS] ?? role) : 'All roles'
+  const currentStatusLabel = status === 'ACTIVE' ? 'Active' : status === 'INACTIVE' ? 'Inactive' : 'All statuses'
 
   const columns: TableColumn<ManagerUser>[] = [
     { key: 'fullName', header: 'Name / email', render: (row) => <div className="manager-cell"><strong>{row.fullName}</strong><span>{row.email}</span></div> },
@@ -50,7 +51,6 @@ export function UserManagementPage() {
         <h1 className="concept-title">User Management</h1>
         <p className="concept-sub">Manage member, coach and receptionist accounts with clear role and status controls.</p>
       </div>
-      <span className="concept-tag">DESIGN CONCEPT - SAMPLE DATA</span>
     </div>
 
     <div className="concept-hero">
@@ -67,28 +67,28 @@ export function UserManagementPage() {
         <span className="concept-stat__icon" aria-hidden="true">U</span>
         <div>
           <strong>{ready ? String(totalCount).padStart(2, '0') : '--'}</strong>
-          <small>Accounts shown</small>
+          <small>Matching accounts</small>
         </div>
       </div>
       <div className="concept-stat">
         <span className="concept-stat__icon" aria-hidden="true">A</span>
         <div>
           <strong>{ready ? String(activeCount).padStart(2, '0') : '--'}</strong>
-          <small>Active accounts</small>
+          <small>Active on this page</small>
         </div>
       </div>
       <div className="concept-stat">
         <span className="concept-stat__icon" aria-hidden="true">R</span>
         <div>
           <strong>{currentRoleLabel}</strong>
-          <small>Current filter</small>
+          <small>Role filter</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">P</span>
+        <span className="concept-stat__icon" aria-hidden="true">S</span>
         <div>
-          <strong>02</strong>
-          <small>Staff roles</small>
+          <strong>{currentStatusLabel}</strong>
+          <small>Status filter</small>
         </div>
       </div>
     </div>

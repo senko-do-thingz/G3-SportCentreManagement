@@ -122,6 +122,55 @@ export async function previewResponse(path: string, options: RequestOptions, tok
     record('USER_STATUS_CHANGED', 'USER_ACCOUNT', user.id, `Changed ${user.fullName}'s account status to ${user.status.toLowerCase()}.`)
     return json(200, user)
   }
+  const coachProfile = /^\/manager\/users\/(\d+)\/coach-profile(\/photo)?$/.exec(path)
+  if (coachProfile) {
+    const user = users.find((item) => item.id === Number(coachProfile[1]) && item.role === 'COACH')
+    if (!user) return failure(404, 'Coach account not found.')
+    if (method === 'GET' && !coachProfile[2]) {
+      return json(200, {
+        userId: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        avatarUrl: null,
+        headline: user.id === 3 ? 'Certified sports coach' : 'Performance coach',
+        bio: 'Experienced center coach focused on safe technique and measurable progress.',
+        yearsExperience: user.id === 3 ? 8 : 5,
+        specialties: 'Foundation skills, conditioning',
+        isPublic: true,
+        displayOrder: user.id === 3 ? 1 : 2,
+      })
+    }
+    if (method === 'PUT' && !coachProfile[2]) {
+      const req = options.body as Record<string, unknown>
+      record('USER_UPDATED', 'USER_ACCOUNT', user.id, `Updated ${user.fullName}'s coach profile.`)
+      return json(200, {
+        userId: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        avatarUrl: (req.avatarUrl as string) || null,
+        headline: (req.headline as string) || null,
+        bio: (req.bio as string) || null,
+        yearsExperience: (req.yearsExperience as number | null) ?? null,
+        specialties: (req.specialties as string) || null,
+        isPublic: Boolean(req.isPublic),
+        displayOrder: Number(req.displayOrder ?? 0),
+      })
+    }
+    if (method === 'POST' && coachProfile[2]) {
+      return json(200, {
+        userId: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        avatarUrl: `/api/v1/coaches/${user.id}/photo`,
+        headline: 'Certified sports coach',
+        bio: 'Experienced center coach.',
+        yearsExperience: 8,
+        specialties: 'Foundation skills',
+        isPublic: true,
+        displayOrder: 1,
+      })
+    }
+  }
   if (path === '/manager/packages' && method === 'GET') {
     const query = options.query ?? {}
     return json(200, empty ? [] : packages.filter((item) => (!query.sportId || item.sportId === Number(query.sportId)) && (!query.format || item.trainingFormat === query.format) && (query.active === undefined || query.active === '' || item.isActive === (String(query.active) === 'true'))))

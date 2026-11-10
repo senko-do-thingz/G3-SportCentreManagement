@@ -4,7 +4,7 @@ import { api } from '../../api/client'
 import { managerClassesApi, type ClassLevel, type ManagerClass } from '../../api/managerClassesApi'
 import { packagesApi } from '../../api/packagesApi'
 import { Button, Card, Input, PageLoader, Select, useToast } from '../../components/ui'
-import { ManagerError } from './ManagerShared'
+import { ManagerError, PreviewNotice } from './ManagerShared'
 import { useManagerForm, useResource } from './useManagerTools'
 
 const loadLookups = async (signal: AbortSignal) => {
@@ -57,8 +57,8 @@ function ClassForm({ item, lookups }: { item: ManagerClass | null; lookups: Awai
         <h1 className="concept-title">{item ? 'Edit Class' : 'Create Class'}</h1>
         <p className="concept-sub">Define the class and assign a qualified coach before scheduling sessions.</p>
       </div>
-      <span className="concept-tag">DESIGN CONCEPT - SAMPLE DATA</span>
     </div>
+    <PreviewNotice />
     <div className="f2-editor-layout">
       <Card title="Class details">
         <form ref={ref} onSubmit={form.submit} noValidate className="manager-form">

@@ -46,10 +46,12 @@ export function ActivityLogPage() {
   if (pageOutOfRange) setPage(lastValidPage)
   const ready = resource.status === 'ready' && search === debounced && !invalidRange && !pageOutOfRange
 
-  const totalEvents = resource.status === 'ready' ? String(resource.data.totalElements).padStart(2, '0') : '--'
-  const activeActors = resource.status === 'ready' ? String(new Set(resource.data.content.map((c) => c.actorName)).size).padStart(2, '0') : '--'
+  const totalEvents = ready ? String(resource.data.totalElements).padStart(2, '0') : '--'
+  const pageEvents = ready ? String(resource.data.content.length).padStart(2, '0') : '--'
+  const activeActors = ready ? String(new Set(resource.data.content.map((c) => c.actorName)).size).padStart(2, '0') : '--'
 
   const activeFilterCount = [search.trim(), action, actor, from, to].filter(Boolean).length
+  const filterScopeLabel = activeFilterCount > 0 ? `${activeFilterCount} Active` : 'All activity'
   const filtered = activeFilterCount > 0
   const clearFilters = () => { setSearch(''); setAction(''); setActor(null); setFrom(''); setTo(''); setPage(0) }
   const columns: TableColumn<ActivityLog>[] = [
@@ -65,7 +67,6 @@ export function ActivityLogPage() {
         <h1 className="concept-title">Activity Log</h1>
         <p className="concept-sub">See who changed what and when across your center with complete audit integrity.</p>
       </div>
-      <span className="concept-tag">DESIGN CONCEPT - SAMPLE DATA</span>
     </div>
 
     <div className="concept-hero">
@@ -82,28 +83,28 @@ export function ActivityLogPage() {
         <span className="concept-stat__icon" aria-hidden="true">E</span>
         <div>
           <strong>{totalEvents}</strong>
-          <small>Total events</small>
+          <small>Matching events</small>
         </div>
       </div>
       <div className="concept-stat">
         <span className="concept-stat__icon" aria-hidden="true">A</span>
         <div>
           <strong>{activeActors}</strong>
-          <small>Active actors</small>
+          <small>Actors on this page</small>
         </div>
       </div>
       <div className="concept-stat">
         <span className="concept-stat__icon" aria-hidden="true">S</span>
         <div>
-          <strong>Real-time</strong>
-          <small>Audit stream</small>
+          <strong>{pageEvents}</strong>
+          <small>Events on this page</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">P</span>
+        <span className="concept-stat__icon" aria-hidden="true">F</span>
         <div>
-          <strong>Protected</strong>
-          <small>Tamper proof</small>
+          <strong>{filterScopeLabel}</strong>
+          <small>Filter scope</small>
         </div>
       </div>
     </div>

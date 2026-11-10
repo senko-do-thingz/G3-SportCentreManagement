@@ -146,7 +146,6 @@ export function ManagerRevenueReportsPage() {
         <h1 className="concept-title">Revenue & Operations Reports</h1>
         <p className="concept-sub">Analyze business metrics, revenue distributions and operations reports across configurable date ranges.</p>
       </div>
-      <span className="concept-tag">DESIGN CONCEPT - SAMPLE DATA</span>
     </div>
 
     <div className="concept-hero">
@@ -154,37 +153,6 @@ export function ManagerRevenueReportsPage() {
         <small>ANALYTICS & REPORTING</small>
         <h2>COMPREHENSIVE AUDIT. <span className="concept-goldtext">STRATEGIC VISIBILITY.</span></h2>
         <p>Operational statistics, booking volumes, payment share analysis and exportable reporting ledgers.</p>
-      </div>
-    </div>
-
-    <div className="concept-stats">
-      <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">R</span>
-        <div>
-          <strong>{report.status === 'ready' ? formatMoney(report.data.totalRevenue) : 'Revenue'}</strong>
-          <small>Total collected in range</small>
-        </div>
-      </div>
-      <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">T</span>
-        <div>
-          <strong>{report.status === 'ready' ? report.data.totalTransactions.toLocaleString('en-US') : '0'} Txns</strong>
-          <small>Transaction volume</small>
-        </div>
-      </div>
-      <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">G</span>
-        <div>
-          <strong>{GROUPS.find((option) => option.value === groupBy)?.label ?? groupBy}</strong>
-          <small>Grouping category</small>
-        </div>
-      </div>
-      <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">C</span>
-        <div>
-          <strong>CSV Export</strong>
-          <small>Direct ledger download</small>
-        </div>
       </div>
     </div>
 

@@ -65,7 +65,6 @@ export function ManagerFinancialOverviewPage() {
         <h1 className="concept-title">Financial Overview</h1>
         <p className="concept-sub">Monitor paid revenue, pending payments, refunds and monthly trends.</p>
       </div>
-      <span className="concept-tag">DESIGN CONCEPT - SAMPLE DATA</span>
     </div>
 
     <div className="concept-hero">
@@ -83,37 +82,6 @@ export function ManagerFinancialOverviewPage() {
     </div>
 
     {resource.status === 'loading' ? <PageLoader label="Loading financial overview" /> : resource.status === 'error' ? <ManagerError error={resource.error} onRetry={reload} /> : <>
-      <div className="concept-stats">
-        <div className="concept-stat">
-          <span className="concept-stat__icon" aria-hidden="true">R</span>
-          <div>
-            <strong>{formatMoney(resource.data.overview.paidRevenue)}</strong>
-            <small>Paid Revenue ({resource.data.overview.paidTransactions} txns)</small>
-          </div>
-        </div>
-        <div className="concept-stat">
-          <span className="concept-stat__icon" aria-hidden="true">P</span>
-          <div>
-            <strong>{formatMoney(resource.data.overview.pendingAmount)}</strong>
-            <small>Pending Payments ({resource.data.overview.pendingTransactions} txns)</small>
-          </div>
-        </div>
-        <div className="concept-stat">
-          <span className="concept-stat__icon" aria-hidden="true">F</span>
-          <div>
-            <strong>{formatMoney(resource.data.overview.refundedAmount)}</strong>
-            <small>Refunded Amount ({resource.data.overview.refundedTransactions} completed)</small>
-          </div>
-        </div>
-        <div className="concept-stat">
-          <span className="concept-stat__icon" aria-hidden="true">N</span>
-          <div>
-            <strong>{formatMoney(resource.data.overview.netRevenue)}</strong>
-            <small>Net Revenue (After refunds)</small>
-          </div>
-        </div>
-      </div>
-
       <section className="finance-kpis" aria-label="Financial key performance indicators">
         <StatCard label="Paid revenue" value={formatMoney(resource.data.overview.paidRevenue)} hint={`${resource.data.overview.paidTransactions} successful transactions`} />
         <StatCard label="Pending payments" value={formatMoney(resource.data.overview.pendingAmount)} hint={`${resource.data.overview.pendingTransactions} pending transactions`} />

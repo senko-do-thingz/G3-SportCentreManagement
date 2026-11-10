@@ -48,8 +48,10 @@ export function ManagerPackagesPage() {
     return resource.data.filter((item) => [item.name, item.code, item.sportName].some((value) => value.toLocaleLowerCase().includes(term)))
   }, [resource, search])
 
+  const totalPackages = resource.status === 'ready' ? String(rows.length).padStart(2, '0') : '--'
   const sportsCount = sports.status === 'ready' ? String(sports.data.length).padStart(2, '0') : '--'
-  const activeCount = resource.status === 'ready' ? String(resource.data.filter((p) => p.isActive).length).padStart(2, '0') : '--'
+  const activeCount = resource.status === 'ready' ? String(rows.filter((p) => p.isActive).length).padStart(2, '0') : '--'
+  const currentFormatLabel = format === 'COACH_LED' ? 'Coach-led' : format === 'SELF_TRAINING' ? 'Self-training' : 'All formats'
 
   const columns: TableColumn<ManagerPackage>[] = [
     {
@@ -113,7 +115,6 @@ export function ManagerPackagesPage() {
         <h1 className="concept-title">Sport Packages</h1>
         <p className="concept-sub">Review sport packages, training formats and pricing while keeping existing policies.</p>
       </div>
-      <span className="concept-tag">DESIGN CONCEPT - SAMPLE DATA</span>
     </div>
 
     <div className="concept-hero">
@@ -129,8 +130,8 @@ export function ManagerPackagesPage() {
       <div className="concept-stat">
         <span className="concept-stat__icon" aria-hidden="true">P</span>
         <div>
-          <strong>02</strong>
-          <small>Training formats</small>
+          <strong>{totalPackages}</strong>
+          <small>Matching packages</small>
         </div>
       </div>
       <div className="concept-stat">
@@ -144,14 +145,14 @@ export function ManagerPackagesPage() {
         <span className="concept-stat__icon" aria-hidden="true">A</span>
         <div>
           <strong>{activeCount}</strong>
-          <small>Active packages</small>
+          <small>Active in view</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">V</span>
+        <span className="concept-stat__icon" aria-hidden="true">F</span>
         <div>
-          <strong>Enabled</strong>
-          <small>Price validation</small>
+          <strong>{currentFormatLabel}</strong>
+          <small>Format filter</small>
         </div>
       </div>
     </div>

@@ -188,7 +188,6 @@ export function ManagerTransactionsPage() {
         <h1 className="concept-title">Transactions & Refunds</h1>
         <p className="concept-sub">Review collected payments, audit settlement methods and decide pending refund requests.</p>
       </div>
-      <span className="concept-tag">DESIGN CONCEPT - SAMPLE DATA</span>
     </div>
 
     <div className="concept-hero">
@@ -203,29 +202,29 @@ export function ManagerTransactionsPage() {
       <div className="concept-stat">
         <span className="concept-stat__icon" aria-hidden="true">T</span>
         <div>
-          <strong>{transactions.status === 'ready' ? transactions.data.totalElements : 0} Total</strong>
-          <small>Transactions recorded</small>
+          <strong>{transactions.status === 'ready' ? `${transactions.data.totalElements} Total` : '--'}</strong>
+          <small>Matching transactions</small>
         </div>
       </div>
       <div className="concept-stat">
         <span className="concept-stat__icon" aria-hidden="true">S</span>
         <div>
-          <strong>Settled</strong>
-          <small>Verified payments</small>
+          <strong>{transactions.status === 'ready' ? `${transactions.data.content.length} Shown` : '--'}</strong>
+          <small>Rows on this page</small>
         </div>
       </div>
       <div className="concept-stat">
         <span className="concept-stat__icon" aria-hidden="true">R</span>
         <div>
-          <strong>{refunds.status === 'ready' ? refunds.data.length : 0} Pending</strong>
+          <strong>{refunds.status === 'ready' ? `${refunds.data.length} Pending` : '--'}</strong>
           <small>Refund requests queue</small>
         </div>
       </div>
       <div className="concept-stat">
-        <span className="concept-stat__icon" aria-hidden="true">A</span>
+        <span className="concept-stat__icon" aria-hidden="true">M</span>
         <div>
-          <strong>Audited</strong>
-          <small>Permanent decision log</small>
+          <strong>{month}</strong>
+          <small>Reporting month</small>
         </div>
       </div>
     </div>
