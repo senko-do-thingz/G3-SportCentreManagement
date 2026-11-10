@@ -1790,10 +1790,9 @@
 }
 
 .coach-ui .coach-plans-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.85fr);
-  align-items: start;
-  gap: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
   min-width: 0;
 }
 
@@ -1999,10 +1998,6 @@
 }
 
 @media (max-width: 1200px) {
-  .coach-ui .coach-plans-layout {
-    grid-template-columns: minmax(0, 1.15fr) minmax(16rem, 0.85fr);
-  }
-
   .coach-ui .coach-plan-form > .training-fieldset {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -2022,10 +2017,6 @@
   .coach-ui .coach-plans-summary > div + div {
     border-top: 1px solid var(--coach-rule);
     border-left: 0;
-  }
-
-  .coach-ui .coach-plans-layout {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -2051,9 +2042,13 @@
   display: grid;
   gap: var(--space-2);
   min-width: 0;
-  padding: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--coach-rule);
   background: var(--coach-surface-muted);
+}
+
+.coach-ui .coach-own-plans__selector > .field {
+  max-width: 36rem;
 }
 
 .coach-ui .coach-own-plans__selector > p {
@@ -2083,6 +2078,8 @@
 }
 
 .coach-ui .coach-plan-review {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
   min-width: 0;
   padding-top: var(--space-4);
@@ -2128,7 +2125,7 @@
   display: grid;
   gap: var(--space-1);
   min-width: 0;
-  padding: var(--space-3);
+  padding: var(--space-3) var(--space-4);
 }
 
 .coach-ui .coach-plan-review__facts > div + div {
@@ -2150,7 +2147,7 @@
 
 .coach-ui .coach-plan-review__description {
   margin: 0;
-  padding: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border-left: 3px solid var(--coach-blue);
   background: var(--coach-blue-soft);
   color: var(--coach-ink);
@@ -2188,15 +2185,18 @@
 
 .coach-ui .coach-plan-exercise-list > .training-steps {
   display: grid;
-  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: var(--space-3);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .coach-ui .coach-plan-exercise {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  padding: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--coach-rule);
   background: var(--coach-surface-muted);
 }
@@ -2207,6 +2207,8 @@
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--coach-rule);
 }
 
 .coach-ui .coach-plan-exercise__heading > strong {
@@ -2231,10 +2233,14 @@
 }
 
 .coach-ui .coach-publish-feedback {
-  gap: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
   min-width: 0;
-  padding-top: var(--space-4);
-  border-top: 2px solid var(--coach-rule);
+  margin-top: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--coach-rule);
+  background: var(--coach-surface-muted);
 }
 
 .coach-ui .coach-publish-feedback__heading {
@@ -2243,6 +2249,8 @@
   align-items: end;
   justify-content: space-between;
   gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--coach-rule);
 }
 
 .coach-ui .coach-publish-feedback__heading > div {
@@ -2258,7 +2266,7 @@
 .coach-ui .coach-publish-feedback__fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-3);
+  gap: var(--space-4);
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -2275,10 +2283,18 @@
   min-width: 0;
 }
 
+.coach-ui .coach-publish-feedback__comments textarea {
+  min-height: 6rem;
+}
+
 .coach-ui .coach-publish-feedback__details {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
+  gap: var(--space-4);
+}
+
+.coach-ui .coach-publish-feedback__details textarea {
+  min-height: 5rem;
 }
 
 .coach-ui .coach-publish-feedback__actions {

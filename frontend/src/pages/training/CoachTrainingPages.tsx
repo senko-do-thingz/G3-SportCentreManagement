@@ -385,7 +385,7 @@ function PublishFeedbackForm({ planId }: { planId: number }) {
     }, 'Plan feedback saved. The member can view it immediately.')
   }
   return (
-    <form className="training-form coach-publish-feedback" onSubmit={submit}>
+    <form className="training-form coach-publish-feedback" aria-label="Plan feedback" onSubmit={submit}>
       <header className="coach-publish-feedback__heading">
         <div><p>Coach note</p><h3>Plan feedback</h3></div>
         <span>Saved feedback is visible to the member.</span>
