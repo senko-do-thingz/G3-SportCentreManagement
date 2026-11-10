@@ -16,10 +16,11 @@ import { attendanceLabel, useTrainingAction } from './trainingFormState'
 import { coachProgress } from '../../api/coachProgressApi'
 import { GOAL_OPTIONS, LEVEL_OPTIONS } from '../member/profileValidation'
 import '../member/training.css'
+import '../../styles/coachUi.css'
 
 export function CoachTrainingPlansPage() {
   return (
-    <div className="training-page">
+    <div className="training-page coach-ui coach-plans-page">
       <PageHeader title="Assign plans and feedback" description="Assign a personal plan using a confirmed booking in a class you coach, or a plan for the whole class. Members can view plans and feedback as soon as you save them." />
       <TrainingData load={training.coachClasses}>{classes => <CoachPlansWorkspace classes={classes} />}</TrainingData>
     </div>
@@ -32,20 +33,42 @@ function CoachPlansWorkspace({ classes }: { classes: TrainingClass[] }) {
   const [scope, setScope] = useState<PlanScope>('INDIVIDUAL')
   const [revision, refresh] = useState(0)
   const loadMembers = useCallback((signal: AbortSignal) => training.bookingCandidates(classId, signal), [classId])
+  const selectedClass = classes.find(item => String(item.id) === classId)
   return (
     <>
-      <Card title={scope === 'CLASS' ? 'Create a class plan' : 'Create a personal plan'}>
-        <Select label="Plan scope" value={scope} onChange={event => setScope(event.target.value as PlanScope)}
-          options={[{ value: 'INDIVIDUAL', label: 'Individual member' }, { value: 'CLASS', label: 'Whole class' }]} />
-        <Select label="Assigned class" value={classId} onChange={event => setClassId(event.target.value)} placeholder="Select a class"
-          options={classes.map(item => ({ value: String(item.id), label: item.name }))} />
-        {!classes.length && <p>You have no assigned classes.</p>}
-        {classId && scope === 'INDIVIDUAL' && <TrainingData load={loadMembers}>{members => <CreatePlanForm key={classId} classId={Number(classId)} members={members} onSaved={() => refresh(value => value + 1)} />}</TrainingData>}
-        {classId && scope === 'CLASS' && <CreateClassPlanForm key={classId} classId={Number(classId)} />}
-      </Card>
-      <Card title="Assigned plans">
-        <TrainingData key={revision} load={training.plans}>{plans => <OwnPlans plans={plans} />}</TrainingData>
-      </Card>
+      <section className="coach-schedule-hero" aria-label="Plan assignment introduction">
+        <div className="coach-schedule-hero__copy">
+          <p className="coach-schedule-hero__eyebrow">Sportify coach experience</p>
+          <h2>Plan the work.<br /><span>Build better habits.</span></h2>
+          <p>Prepare a plan, review every exercise, then decide what to share.</p>
+        </div>
+        <Button variant="accent" size="sm" className="coach-schedule-hero__action" disabled={!classes.length} onClick={() => document.getElementById('coach-plan-scope')?.focus()}>Create a plan</Button>
+      </section>
+      <section className="coach-plans-summary" aria-label="Plan setup summary">
+        <div><span>Assigned classes</span><strong>{classes.length}</strong></div>
+        <div><span>Class in focus</span><strong>{selectedClass?.name ?? 'Choose a class'}</strong></div>
+        <div><span>Plan scope</span><strong>{scope === 'CLASS' ? 'Whole class' : 'Individual member'}</strong></div>
+      </section>
+      <div className="coach-plans-layout">
+        <Card className="coach-plan-builder" title={scope === 'CLASS' ? 'Create a class plan' : 'Create a personal plan'}>
+          <div className="coach-plan-setup">
+            <Select id="coach-plan-scope" label="Plan scope" value={scope} onChange={event => setScope(event.target.value as PlanScope)}
+              options={[{ value: 'INDIVIDUAL', label: 'Individual member' }, { value: 'CLASS', label: 'Whole class' }]} />
+            <Select id="coach-plan-class" label="Assigned class" value={classId} onChange={event => setClassId(event.target.value)} placeholder="Select a class"
+              options={classes.map(item => ({ value: String(item.id), label: item.name }))} />
+          </div>
+          {!classes.length && <p className="coach-plan-empty-note" role="status">You have no assigned classes.</p>}
+          {classes.length > 0 && !classId && <div className="coach-plan-empty-note"><EmptyState title="Choose an assigned class" description="Select the class before choosing a confirmed booking or preparing a class plan." /></div>}
+          {classId && scope === 'INDIVIDUAL' && <TrainingData load={loadMembers}>{members => <CreatePlanForm key={classId} classId={Number(classId)} members={members} onSaved={() => refresh(value => value + 1)} />}</TrainingData>}
+          {classId && scope === 'CLASS' && <CreateClassPlanForm key={classId} classId={Number(classId)} />}
+        </Card>
+        <Card className="coach-assigned-plans" title="Assigned plans">
+          <TrainingData key={revision} load={training.plans}>{plans => <>
+            <p className="coach-assigned-plans__count">{plans.length} {plans.length === 1 ? 'saved plan' : 'saved plans'}</p>
+            <OwnPlans plans={plans} />
+          </>}</TrainingData>
+        </Card>
+      </div>
     </>
   )
 }
@@ -106,26 +129,33 @@ function CreatePlanForm({ classId, members, onSaved }: { classId: number; member
 
   const selectedMemberId = members.find(item => item.bookingId === Number(bookingId))?.memberId
   return (
-    <form className="training-form" onSubmit={submit}>
+    <form className="training-form coach-plan-form" onSubmit={submit}>
       <fieldset disabled={action.pending} className="training-fieldset">
-        <Select label="Member booking" name="bookingId" required placeholder="Select a confirmed booking" value={bookingId} onChange={event => chooseBooking(event.target.value)}
-          options={members.map(member => ({ value: String(member.bookingId), label: `${member.memberName} - Booking #${member.bookingId} - ${formatCalendarDate(member.sessionDate)}` }))} />
-        {bookingId && <Link className="btn btn--secondary" to={`/coach/training/progress?classId=${classId}&memberId=${selectedMemberId ?? ''}`}>View selected member progress</Link>}
-        {bookingId && selectedMemberId !== undefined && <CoachDrillDrafts key={bookingId}
-          intro="Drafts use this member's training goal, level, recorded results and your latest feedback. When AI drafting is unavailable, RULE_BASED drafts from the curated catalog are shown. Nothing is assigned until you review the plan and select Assign plan."
-          context={<MemberTrainingContext classId={classId} memberId={selectedMemberId} />}
-          load={options => training.drillSuggestions(Number(bookingId), options)}
-          onUse={(drafts, adjustments) => { setSteps(draftSteps(drafts)); setDescription(current => withAdjustments(current, adjustments)) }} />}
-        <Input label="Plan title" name="title" required maxLength={150} value={title} onChange={event => setTitle(event.target.value)} />
-        <TrainingTextarea label="Plan description" name="description" maxLength={1000} value={description} onChange={event => setDescription(event.target.value)} />
-        <StepFields steps={steps} setSteps={setSteps} />
-        {bookingId && <PlanDraftSummary title={title} steps={steps}
-          audience={(() => { const member = members.find(item => item.bookingId === Number(bookingId)); return member ? `${member.memberName} / Individual draft (booking #${member.bookingId}, ${formatCalendarDate(member.sessionDate)})` : 'Individual draft' })()}
-          shareLabel="Assign plan" />}
-        <div className="training-actions">
-          <Button variant="secondary" disabled={steps.length >= 100} onClick={() => setSteps(current => [...current, blankStep()])}>Add exercise</Button>
-          <Button type="submit" loading={action.pending}>Assign plan</Button>
-        </div>
+        <section className="coach-plan-form__details" aria-labelledby="coach-personal-plan-details">
+          <h3 id="coach-personal-plan-details">Plan details</h3>
+          <Select label="Member booking" name="bookingId" required placeholder="Select a confirmed booking" value={bookingId} onChange={event => chooseBooking(event.target.value)}
+            options={members.map(member => ({ value: String(member.bookingId), label: `${member.memberName} - Booking #${member.bookingId} - ${formatCalendarDate(member.sessionDate)}` }))} />
+          {bookingId && <Link className="btn btn--secondary" to={`/coach/training/progress?classId=${classId}&memberId=${selectedMemberId ?? ''}`}>View selected member progress</Link>}
+          <Input label="Plan title" name="title" required maxLength={150} value={title} onChange={event => setTitle(event.target.value)} />
+          <TrainingTextarea label="Plan description" name="description" maxLength={1000} value={description} onChange={event => setDescription(event.target.value)} />
+        </section>
+        <section className="coach-plan-form__exercises" aria-labelledby="coach-personal-plan-exercises">
+          <h3 id="coach-personal-plan-exercises">Exercises and review</h3>
+          {bookingId && selectedMemberId !== undefined && <CoachDrillDrafts key={bookingId}
+            intro="Drafts use this member's training goal, level, recorded results and your latest feedback. When AI drafting is unavailable, RULE_BASED drafts from the curated catalog are shown. Nothing is assigned until you review the plan and select Assign plan."
+            context={<MemberTrainingContext classId={classId} memberId={selectedMemberId} />}
+            load={options => training.drillSuggestions(Number(bookingId), options)}
+            onUse={(drafts, adjustments) => { setSteps(draftSteps(drafts)); setDescription(current => withAdjustments(current, adjustments)) }} />}
+          {!bookingId && <p className="coach-plan-inline-note">Choose a confirmed member booking to load optional drill suggestions and build exercises.</p>}
+          <StepFields steps={steps} setSteps={setSteps} />
+          {bookingId && <PlanDraftSummary title={title} steps={steps}
+            audience={(() => { const member = members.find(item => item.bookingId === Number(bookingId)); return member ? `${member.memberName} / Individual draft (booking #${member.bookingId}, ${formatCalendarDate(member.sessionDate)})` : 'Individual draft' })()}
+            shareLabel="Assign plan" />}
+          <div className="training-actions">
+            <Button variant="secondary" disabled={steps.length >= 100} onClick={() => setSteps(current => [...current, blankStep()])}>Add exercise</Button>
+            <Button type="submit" loading={action.pending}>Assign plan</Button>
+          </div>
+        </section>
       </fieldset>
       <ActionMessage {...action} />
     </form>
@@ -154,20 +184,27 @@ function CreateClassPlanForm({ classId }: { classId: number }) {
   }
 
   return (
-    <form className="training-form" onSubmit={submit}>
+    <form className="training-form coach-plan-form" onSubmit={submit}>
       <fieldset disabled={action.pending} className="training-fieldset">
-        <CoachDrillDrafts
-          intro="Class drafts use the number of members at each level and with each goal, and the class averages of recorded skills. No individual member data is used. Nothing is assigned until you review the plan and select Assign class plan."
-          load={options => training.classDrillSuggestions(classId, options)}
-          onUse={(drafts, adjustments) => { setSteps(draftSteps(drafts)); setDescription(current => withAdjustments(current, adjustments)) }} />
-        <Input label="Plan title" name="title" required maxLength={150} value={title} onChange={event => setTitle(event.target.value)} />
-        <TrainingTextarea label="Plan description" name="description" maxLength={1000} value={description} onChange={event => setDescription(event.target.value)} />
-        <StepFields steps={steps} setSteps={setSteps} />
-        <PlanDraftSummary title={title} steps={steps} audience="Whole class / Class draft" shareLabel="Assign class plan" />
-        <div className="training-actions">
-          <Button variant="secondary" disabled={steps.length >= 100} onClick={() => setSteps(current => [...current, blankStep()])}>Add exercise</Button>
-          <Button type="submit" loading={action.pending}>Assign class plan</Button>
-        </div>
+        <section className="coach-plan-form__details" aria-labelledby="coach-class-plan-details">
+          <h3 id="coach-class-plan-details">Plan details</h3>
+          <p className="coach-plan-inline-note">This plan targets the selected class. It becomes visible to eligible members only after you assign it.</p>
+          <Input label="Plan title" name="title" required maxLength={150} value={title} onChange={event => setTitle(event.target.value)} />
+          <TrainingTextarea label="Plan description" name="description" maxLength={1000} value={description} onChange={event => setDescription(event.target.value)} />
+        </section>
+        <section className="coach-plan-form__exercises" aria-labelledby="coach-class-plan-exercises">
+          <h3 id="coach-class-plan-exercises">Exercises and review</h3>
+          <CoachDrillDrafts
+            intro="Class drafts use the number of members at each level and with each goal, and the class averages of recorded skills. No individual member data is used. Nothing is assigned until you review the plan and select Assign class plan."
+            load={options => training.classDrillSuggestions(classId, options)}
+            onUse={(drafts, adjustments) => { setSteps(draftSteps(drafts)); setDescription(current => withAdjustments(current, adjustments)) }} />
+          <StepFields steps={steps} setSteps={setSteps} />
+          <PlanDraftSummary title={title} steps={steps} audience="Whole class / Class draft" shareLabel="Assign class plan" />
+          <div className="training-actions">
+            <Button variant="secondary" disabled={steps.length >= 100} onClick={() => setSteps(current => [...current, blankStep()])}>Add exercise</Button>
+            <Button type="submit" loading={action.pending}>Assign class plan</Button>
+          </div>
+        </section>
       </fieldset>
       <ActionMessage {...action} />
     </form>
@@ -223,7 +260,7 @@ function CoachDrillDrafts({ intro, context, load, onUse }: { intro: string; cont
       setCopied(0)
     }, 'Drafts loaded for Coach review. Nothing assigned.')
   }
-  return <div className="training-form"><h3>Supplementary drill drafts</h3>
+  return <div className="training-form coach-drill-drafts"><h3>Supplementary drill drafts</h3>
     <p>{intro}</p>
     {context}
     <div ref={focusBox}><Input label="Current focus (optional)" maxLength={200} value={focus} onChange={event => setFocus(event.target.value)} /></div>
@@ -235,7 +272,7 @@ function CoachDrillDrafts({ intro, context, load, onUse }: { intro: string; cont
       : <p>Mode: {suggestions.mode}, rule version {suggestions.ruleVersion}. Drafts are not saved.</p>)}
     {suggestions?.memberCount !== undefined && <p>Based on {suggestions.memberCount === 1 ? '1 member' : `${suggestions.memberCount} members`} with a confirmed booking in this class.</p>}
     {suggestions && (suggestions.drafts.length ? <>
-      <table className="table"><caption>Suggested exercises for review</caption>
+      <div className="coach-drill-table-scroll"><table className="table"><caption>Suggested exercises for review</caption>
         <thead><tr><th>Select</th><th>Exercise</th><th>Time</th><th>Target</th><th>Why suggested</th></tr></thead>
         <tbody>{suggestions.drafts.map((draft, index) => <tr key={draft.title}>
           <td><label><input type="checkbox" checked={selected.includes(index)} onChange={event => setSelected(current => event.target.checked ? [...current, index] : current.filter(value => value !== index))} /> Select draft: {draft.title}</label></td>
@@ -244,7 +281,7 @@ function CoachDrillDrafts({ intro, context, load, onUse }: { intro: string; cont
           <td>{`${draft.goal} - ${draft.level} - ${draft.durationMinutes} minutes`}</td>
           <td>{draft.reason}</td>
         </tr>)}</tbody>
-      </table>
+      </table></div>
       <p>Selected: {selected.length === 1 ? '1 exercise' : `${selected.length} exercises`}, {chosenMinutes} minutes{sessionMinutes.trim() ? ` of a ${sessionMinutes.trim()}-minute session` : ''}.</p>
       <TrainingTextarea label="Coach adjustments (optional)" maxLength={500} value={adjustments} onChange={event => setAdjustments(event.target.value)} />
       <p>AI and the curated catalog only provide suggestions. You approve content, duration and intensity before sharing.</p>
@@ -271,7 +308,7 @@ function PlanDraftSummary({ title, steps, audience, shareLabel }: { title: strin
   const filled = steps.filter(step => step.title.trim())
   if (!title.trim() && !filled.length) return null
   const total = filled.reduce((sum, step) => sum + (Number.isInteger(Number(step.durationMinutes)) ? Number(step.durationMinutes) : 0), 0)
-  return <section className="training-context" aria-label="Training plan draft">
+  return <section className="training-context coach-plan-draft-summary" aria-label="Training plan draft">
     <h4>Training plan draft</h4>
     <p><span className="badge badge--warning">Draft / Not shared</span></p>
     <dl className="browse-facts">
@@ -289,18 +326,42 @@ function PlanDraftSummary({ title, steps, audience, shareLabel }: { title: strin
 function OwnPlans({ plans }: { plans: StaffPlan[] }) {
   const [planId, setPlanId] = useState('')
   const load = useCallback((signal: AbortSignal) => training.plan(planId, signal), [planId])
-  if (!plans.length) return <EmptyState title="You have not assigned any plans yet" />
+  if (!plans.length) return <div className="coach-plan-no-saved"><EmptyState title="No assigned plans yet" description="Plans appear here after you assign one to a confirmed booking or class." /></div>
   return (
-    <div className="training-form">
-      <Select label="Assigned plans" value={planId} onChange={event => setPlanId(event.target.value)} placeholder="Select a plan to view and review"
-        options={plans.map(plan => ({ value: String(plan.id), label: `${plan.title} - ${plan.memberName} - ${plan.className}` }))} />
+    <div className="training-form coach-own-plans">
+      <div className="coach-own-plans__selector">
+        <Select label="Assigned plans" value={planId} onChange={event => setPlanId(event.target.value)} placeholder="Select a plan to view and review"
+          options={plans.map(plan => ({ value: String(plan.id), label: `${plan.title} - ${plan.memberName} - ${plan.className}` }))} />
+        <p>Review the saved plan and share feedback with its member.</p>
+      </div>
+      {!planId && <div className="coach-plan-review-empty" role="status">
+        <strong>Choose a saved plan</strong>
+        <span>Select a plan above to inspect its exercises and provide feedback.</span>
+      </div>}
       {planId && <TrainingData load={load}>{({ plan, steps }) => (
-        <div className="training-form">
-          <h3>{plan.title} - {plan.memberName}</h3>
-          {plan.description && <p className="training-copy">{plan.description}</p>}
-          <ol className="training-steps">{steps.map(step => <li key={step.id}><strong>{step.title} - {step.durationMinutes} minutes</strong><p className="training-copy">{step.instructions}</p></li>)}</ol>
+        <section className="training-form coach-plan-review" aria-label="Selected saved plan">
+          <header className="coach-plan-review__heading">
+            <p>Saved plan</p>
+            <h3 id="coach-selected-plan-title">{plan.title}</h3>
+          </header>
+          <dl className="coach-plan-review__facts">
+            <div><dt>Member</dt><dd>{plan.memberName}</dd></div>
+            <div><dt>Class</dt><dd>{plan.className}</dd></div>
+          </dl>
+          {plan.description && <p className="training-copy coach-plan-review__description">{plan.description}</p>}
+          <section className="coach-plan-exercise-list" aria-labelledby="coach-plan-exercises-heading">
+            <h4 id="coach-plan-exercises-heading">Plan exercises <span>{steps.length} {steps.length === 1 ? 'exercise' : 'exercises'}</span></h4>
+            {steps.length === 0
+              ? <p className="coach-plan-review-empty" role="status">This saved plan has no exercises.</p>
+              : <ol className="training-steps">{steps.map(step => (
+                <li key={step.id} className="coach-plan-exercise">
+                  <div className="coach-plan-exercise__heading"><strong>{step.title}</strong><span>{step.durationMinutes} min</span></div>
+                  <p className="training-copy">{step.instructions || 'No instructions provided.'}</p>
+                </li>
+              ))}</ol>}
+          </section>
           <PublishFeedbackForm key={plan.id} planId={plan.id} />
-        </div>
+        </section>
       )}</TrainingData>}
     </div>
   )
@@ -324,14 +385,25 @@ function PublishFeedbackForm({ planId }: { planId: number }) {
     }, 'Plan feedback saved. The member can view it immediately.')
   }
   return (
-    <form className="training-form" onSubmit={submit}>
-      <h3>Plan feedback</h3>
-      <fieldset className="training-fieldset" disabled={action.pending}>
-        <Select label="Progress rating" name="rating" required defaultValue="4" options={[1, 2, 3, 4, 5].map(value => ({ value: String(value), label: `${value}/5` }))} />
-        <TrainingTextarea label="Feedback" name="comments" required maxLength={1000} />
-        <TrainingTextarea label="Strengths" name="strengths" maxLength={500} />
-        <TrainingTextarea label="Areas for improvement" name="areasForImprovement" maxLength={500} />
-        <Button type="submit" loading={action.pending}>Save feedback</Button>
+    <form className="training-form coach-publish-feedback" aria-label="Plan feedback" onSubmit={submit}>
+      <header className="coach-publish-feedback__heading">
+        <div><p>Coach note</p><h3>Plan feedback</h3></div>
+        <span>Saved feedback is visible to the member.</span>
+      </header>
+      <fieldset className="training-fieldset coach-publish-feedback__fields" disabled={action.pending}>
+        <div className="coach-publish-feedback__rating">
+          <Select label="Progress rating" name="rating" required defaultValue="4" options={[1, 2, 3, 4, 5].map(value => ({ value: String(value), label: `${value}/5` }))} />
+        </div>
+        <div className="coach-publish-feedback__comments">
+          <TrainingTextarea label="Feedback" name="comments" required maxLength={1000} />
+        </div>
+        <div className="coach-publish-feedback__details">
+          <TrainingTextarea label="Strengths" name="strengths" maxLength={500} />
+          <TrainingTextarea label="Areas for improvement" name="areasForImprovement" maxLength={500} />
+        </div>
+        <div className="coach-publish-feedback__actions">
+          <Button type="submit" loading={action.pending}>Save feedback</Button>
+        </div>
       </fieldset>
       <ActionMessage {...action} />
     </form>
@@ -340,7 +412,7 @@ function PublishFeedbackForm({ planId }: { planId: number }) {
 
 export function CoachTrainingResultsPage() {
   return (
-    <div className="training-page">
+    <div className="training-page coach-ui coach-results-page">
       <PageHeader title="Record training results" description="Record results for members marked Present or Late in sessions you coach. Results are visible as soon as you save them." />
       <TrainingData load={training.coachSessions}>{sessions => <CoachResultsWorkspace sessions={sessions} />}</TrainingData>
     </div>
@@ -354,13 +426,43 @@ function CoachResultsWorkspace({ sessions }: { sessions: StaffSession[] }) {
     const [members, metrics] = await Promise.all([training.coachRoster(sessionId, signal), training.metrics(session!.sportId, signal)])
     return { members, metrics }
   }, [sessionId, session])
+  const selectedSessionLabel = session ? `${session.className} / ${formatCalendarDate(session.date)}` : 'None selected'
   return (
-    <Card title="Select a session">
-      <Select label="Assigned session" value={sessionId} onChange={event => setSessionId(event.target.value)} placeholder="Select a session"
-        options={sessions.map(item => ({ value: sessionRouteReference(item), label: `${sessionIdText(item.sessionId)} - ${item.className} - ${formatCalendarDate(item.date)} - ${item.startTime.slice(0, 5)}` }))} />
-      {!sessions.length && <p>You have no assigned sessions.</p>}
-      {session && <><SessionContext {...session} /><TrainingData load={load}>{data => <ResultForm key={session.id} session={session} {...data} />}</TrainingData></>}
-    </Card>
+    <>
+      <section className="coach-schedule-hero coach-results-hero" aria-label="Training results introduction">
+        <div className="coach-schedule-hero__copy">
+          <p className="coach-schedule-hero__eyebrow">Sportify coach experience</p>
+          <h2>Measure progress.<br /><span>Make it count.</span></h2>
+          <p>Record skill scores or notes for members eligible in the selected session.</p>
+        </div>
+        <Button variant="accent" size="sm" className="coach-schedule-hero__action" disabled={!sessions.length} onClick={() => document.getElementById('coach-results-session')?.focus()}>Select session</Button>
+      </section>
+      <section className="coach-results-overview" aria-label="Training results overview">
+        <div><span>Assigned sessions</span><strong>{sessions.length}</strong></div>
+        <div><span>Selected session</span><strong>{selectedSessionLabel}</strong></div>
+      </section>
+      <div className="coach-results-layout">
+        <Card className="coach-results-session" title="Session selection">
+          <Select id="coach-results-session" label="Assigned session" value={sessionId} onChange={event => setSessionId(event.target.value)} placeholder="Select an assigned session"
+            options={sessions.map(item => ({ value: sessionRouteReference(item), label: `${sessionIdText(item.sessionId)} - ${item.className} - ${formatCalendarDate(item.date)} - ${item.startTime.slice(0, 5)}` }))} />
+          {!sessions.length
+            ? <p className="coach-results-eligibility" role="status">You have no assigned sessions.</p>
+            : <aside className="coach-results-eligibility">
+              <span>Coach only</span>
+              <h3>Result eligibility</h3>
+              <p>Attendance must be marked before a result can be saved.</p>
+            </aside>}
+        </Card>
+        <Card className="coach-results-editor" title="Result editor">
+          {!session
+            ? <div className="coach-results-empty"><EmptyState title="Select a session to begin" description="After you select an assigned session, eligible members and evaluation fields will appear here. Results are not saved by viewing this page." /></div>
+            : <div className="coach-results-selected">
+              <SessionContext {...session} />
+              <TrainingData load={load}>{data => <ResultForm key={session.id} session={session} {...data} />}</TrainingData>
+            </div>}
+        </Card>
+      </div>
+    </>
   )
 }
 
@@ -369,7 +471,7 @@ function ResultForm({ session, members, metrics }: { session: StaffSession; memb
   const [savedMemberIds, setSavedMemberIds] = useState<number[]>([])
   const saved = members.filter(member => member.resultId || savedMemberIds.includes(member.memberId))
   const eligible = members.filter(member => !member.resultId && !savedMemberIds.includes(member.memberId) && (member.status === 'PRESENT' || member.status === 'LATE'))
-  if (!eligible.length) return <><ActionMessage {...action} /><EmptyState title={saved.length ? "Results already saved" : "No members eligible for results"} description={saved.length ? "All eligible members already have a result. Duplicate submissions are disabled." : "Record Present or Late attendance before saving results."} /></>
+  if (!eligible.length) return <div className="coach-results-state"><ActionMessage {...action} /><EmptyState title={saved.length ? "Results already saved" : "No members eligible for results"} description={saved.length ? "All eligible members already have a result. Duplicate submissions are disabled." : "Record Present or Late attendance before saving results."} /></div>
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = event.currentTarget
@@ -392,18 +494,35 @@ function ResultForm({ session, members, metrics }: { session: StaffSession; memb
     }, 'Training results saved. The member can view them immediately.')
   }
   return (
-    <form className="training-form" onSubmit={submit}>
-      {saved.length > 0 && <p role="status">Results already saved for: {saved.map(member => member.memberName).join(', ')}</p>}
-      <fieldset className="training-fieldset training-result-fields" disabled={action.pending}>
-        <Select label="Member receiving results" name="memberId" required placeholder="Select a member"
-          options={eligible.map(member => ({ value: String(member.memberId), label: `${member.memberName} - ${attendanceLabel(member.status)}` }))} />
-        <TrainingTextarea label="Result notes" name="notes" maxLength={1000} required={!metrics.length} />
-        {metrics.length ? metrics.map(metric => (
-          <Input key={metric.id} label={`${metric.name} (0-${metric.maxScore})`} name={`metric-${metric.id}`} type="number" min={0} max={metric.maxScore} step="0.01" />
-        )) : <p>No skill metrics are configured for this sport. You can still save result notes.</p>}
-        <Button type="submit" loading={action.pending}>Save results</Button>
-      </fieldset>
-      <ActionMessage {...action} />
-    </form>
+    <section className="coach-results-data" aria-label="Training results for selected session">
+      <div className="coach-results-data__summary" aria-label="Session result counts">
+        <div><span>Eligible members</span><strong>{eligible.length}</strong></div>
+        <div><span>Recorded results</span><strong>{saved.length}</strong></div>
+      </div>
+      <form className="training-form coach-result-form" onSubmit={submit}>
+        {saved.length > 0 && <p className="coach-results-saved" role="status">Results already saved for: {saved.map(member => member.memberName).join(', ')}</p>}
+        <fieldset className="training-fieldset training-result-fields coach-result-fields" disabled={action.pending}>
+          <div className="coach-result-member">
+            <Select label="Member receiving results" name="memberId" required placeholder="Select a member"
+              options={eligible.map(member => ({ value: String(member.memberId), label: `${member.memberName} - ${attendanceLabel(member.status)}` }))} />
+            <p>Only members marked Present or Late are listed.</p>
+          </div>
+          <section className="coach-result-scores" aria-labelledby="coach-result-scores-title">
+            <header><h3 id="coach-result-scores-title">Skill scores</h3><span>{metrics.length ? `${metrics.length} configured ${metrics.length === 1 ? 'metric' : 'metrics'}` : 'No metrics configured'}</span></header>
+            {metrics.length
+              ? <div className="coach-result-metric-grid">{metrics.map(metric => (
+                <Input key={metric.id} label={`${metric.name} (0-${metric.maxScore})`} name={`metric-${metric.id}`} type="number" min={0} max={metric.maxScore} step="0.01" />
+              ))}</div>
+              : <p>No skill metrics are configured for this sport. You can still save result notes.</p>}
+          </section>
+          <div className="coach-result-notes">
+            <TrainingTextarea label="Result notes" name="notes" maxLength={1000} required={!metrics.length} />
+            {metrics.length > 0 && <p>Enter notes, one or more scores, or both.</p>}
+          </div>
+          <div className="coach-result-actions"><Button type="submit" loading={action.pending}>Save results</Button></div>
+        </fieldset>
+        <ActionMessage {...action} />
+      </form>
+    </section>
   )
 }

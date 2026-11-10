@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { tokenStorage } from '../../api/tokenStorage'
 import { backendError, installFakeFetch, json, type RecordedCall } from '../../test/fakeBackend'
@@ -37,13 +37,45 @@ describe('FE-10 coach schedule and roster screens', () => {
     const { calls } = setup()
     renderApp('/coach?week=2026-10-19')
 
-    expect(await screen.findByRole('heading', { name: 'My Teaching Schedule' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Teaching Schedule' })).toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: 'Basketball Foundations' })).toBeInTheDocument()
     expect(screen.getByText('Sessions this week').parentElement).toHaveTextContent('1')
     expect(screen.getByText('Classes assigned').parentElement).toHaveTextContent('1')
+    const scheduleSummary = screen.getByRole('region', { name: 'Schedule summary' })
+    expect(scheduleSummary.querySelectorAll('svg.coach-schedule-metric__icon')).toHaveLength(4)
+    expect(scheduleSummary.querySelectorAll('.coach-schedule-metric__mark')).toHaveLength(0)
     expect(screen.getByRole('link', { name: 'View roster' })).toHaveAttribute('href', '/coach/roster?sessionId=5&week=2026-10-19')
+    expect(screen.getByRole('link', { name: 'View class roster' })).toHaveAttribute('href', '/coach/roster?sessionId=5&week=2026-10-19')
+    expect(screen.getByText('Session status').parentElement).toHaveTextContent('Published')
     expect(calls.some((call) => call.path === '/coach/sessions?from=2026-10-19&to=2026-10-25')).toBe(true)
     expect(calls.some((call) => call.path.includes('coachId='))).toBe(false)
+  })
+
+  it('updates the session overview when a different real session is selected', async () => {
+    const otherSession = {
+      ...session, id: 6, className: 'Swimming Technique', sportName: 'Swimming', sessionDate: '2026-10-21',
+      startTime: '09:00:00', endTime: '10:00:00', facilityName: 'Indoor Pool', capacity: 12, bookedCount: 4,
+    }
+    setup(COACH, (call) => call.path.startsWith('/coach/sessions?') ? json(200, [session, otherSession]) : undefined)
+    const user = userEvent.setup()
+    renderApp('/coach?week=2026-10-19')
+
+    await user.click(await screen.findByRole('button', { name: /Swimming Technique/ }))
+
+    expect(screen.getByRole('heading', { name: 'Swimming Technique' })).toBeInTheDocument()
+    expect(screen.getByText('Members booked').parentElement).toHaveTextContent('4 / 12')
+    expect(screen.getByRole('link', { name: 'View roster' })).toHaveAttribute('href', '/coach/roster?sessionId=6&week=2026-10-19')
+  })
+
+  it('navigates to another week while keeping the week query and loading that date range', async () => {
+    const { calls } = setup()
+    const user = userEvent.setup()
+    renderApp('/coach?week=2026-10-19')
+
+    await user.click(await screen.findByRole('button', { name: 'Next week' }))
+
+    await waitFor(() => expect(calls.some((call) => call.path === '/coach/sessions?from=2026-10-26&to=2026-11-01')).toBe(true))
+    expect(screen.getByText('26/10/2026 - 01/11/2026')).toBeInTheDocument()
   })
 
   it('loads only the selected owned session roster, hides phone numbers and prints the roster', async () => {
@@ -61,6 +93,24 @@ describe('FE-10 coach schedule and roster screens', () => {
 
     await user.click(screen.getByRole('button', { name: 'Print roster' }))
     expect(print).toHaveBeenCalledTimes(1)
+  })
+
+  it('selects an assigned session from the roster workspace and shows only confirmed booking fields', async () => {
+    const { calls } = setup()
+    const user = userEvent.setup()
+    renderApp('/coach/roster?week=2026-10-19')
+
+    expect(await screen.findByRole('heading', { name: 'Class Roster' })).toBeInTheDocument()
+    expect(await screen.findByText('Choose a session to view its roster')).toBeInTheDocument()
+    const sessionSelect = await screen.findByRole('combobox', { name: 'Session' })
+
+    await user.selectOptions(sessionSelect, '5')
+
+    expect(await screen.findByText('Taylor Nguyen')).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Confirmed member bookings' })).toBeInTheDocument()
+    expect(screen.getByText('Roster capacity').parentElement).toHaveTextContent('20')
+    expect(screen.queryByText('0901234567')).not.toBeInTheDocument()
+    expect(calls.some((call) => call.path === '/coach/sessions/5/roster')).toBe(true)
   })
 
   it('shows the roster empty state for a session with no confirmed bookings', async () => {
@@ -110,6 +160,16 @@ describe('FE-10 coach schedule and roster screens', () => {
     setup(RECEPTIONIST)
     renderApp('/coach')
     expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
+  })
+
+  it('renders contextual SVG icons for Class Roster summary metrics and omits decorative square markers', async () => {
+    setup()
+    renderApp('/coach/roster?sessionId=5&week=2026-10-19')
+
+    expect(await screen.findByRole('heading', { name: 'Class Roster' })).toBeInTheDocument()
+    const rosterMetrics = screen.getByRole('region', { name: 'Roster summary' })
+    expect(rosterMetrics.querySelectorAll('svg.coach-schedule-metric__icon')).toHaveLength(4)
+    expect(rosterMetrics.querySelectorAll('.coach-schedule-metric__mark')).toHaveLength(0)
   })
 })
 

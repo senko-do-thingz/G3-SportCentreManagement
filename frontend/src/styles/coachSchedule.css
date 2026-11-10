@@ -27,7 +27,7 @@
   body:has(.coach-print) .staff-topbar,
   body:has(.coach-print) .toast-region,
   body:has(.coach-print) .staff-content > :not(:has(.coach-print)),
-  .coach-print > :not(.card__header):not(.browse-facts):not(.coach-privacy-note):not(.coach-roster-table-wrap) {
+  .coach-print > :not(.card__header):not(.browse-facts):not(.coach-privacy-note):not(.coach-roster-table-wrap):not(.session-context) {
     display: none !important;
   }
   body:has(.coach-print) .staff-layout,

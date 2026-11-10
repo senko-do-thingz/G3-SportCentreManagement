@@ -36,11 +36,12 @@ describe('FE-00 login integration', () => {
     ['MEMBER', 'Member Dashboard'],
     ['RECEPTIONIST', 'Member Search and Profile'],
     ['MANAGER', 'User Management'],
-    ['COACH', 'My Teaching Schedule'],
+    ['COACH', 'Teaching Schedule'],
   ])('loads a Bearer-authenticated profile and the %s layout', async (role, heading) => {
     const { calls } = installFakeFetch((call) => {
       if (call.path === '/auth/login') return json(200, PAIR)
       if (call.path === '/users/me') return json(200, { ...MANAGER, role })
+      if (role === 'COACH' && call.path.startsWith('/coach/sessions?')) return json(200, [])
       return backendError(404, 'Not found')
     })
     renderApp('/login')
