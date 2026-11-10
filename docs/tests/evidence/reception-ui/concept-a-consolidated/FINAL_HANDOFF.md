@@ -29,7 +29,7 @@ Source matrix: SOURCE_PRESERVATION_MATRIX.md. Tree at the preservation commit eq
 All 12 old branches remain on origin. Reviews and comments on the old PRs are kept.
 
 ## Changed files
-17 source and test files under `frontend/src` (15 reception pages, `ReceptionConcept.tsx`, `receptionConcept.css`, `receptionConcept.test.ts`; `receptionInbox.test.tsx` assertion), plus this report folder. No backend, API, DB, auth, token, Brand, header, sidebar or workflow file.
+18 files under `frontend/src`: 14 Receptionist pages, `ReceptionConcept.tsx` (new), `receptionConcept.css` (new), `receptionConcept.test.ts` (new) and `receptionInbox.test.tsx` (one added assertion), plus this report folder. No backend, API, DB, auth, token, Brand, header, sidebar or workflow file.
 
 ## Reports
 CONSOLIDATED_REVIEW.md, HOME_UI_ALIGNMENT.md, SCREENSHOT_MANIFEST.md, CI_TEST_EVIDENCE.md, SOURCE_PRESERVATION_MATRIX.md.
