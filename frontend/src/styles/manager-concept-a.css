@@ -1,0 +1,868 @@
+/* Sportify Manager UI - Concept A Foundation Styles */
+/* Strict adherence to design tokens: no raw color literals. */
+
+.staff-content:has(> .manager-concept-page) {
+  max-width: 1722px;
+  padding: var(--space-6) var(--space-8);
+}
+
+.manager-concept-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
+
+/* Header and Typography */
+.concept-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin-bottom: var(--space-2);
+}
+
+.concept-header__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.concept-eyebrow {
+  color: var(--color-primary);
+  letter-spacing: var(--tracking-eyebrow);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+  text-transform: uppercase;
+}
+
+.concept-eyebrow::before {
+  content: '';
+  display: block;
+  width: 24px;
+  height: 3px;
+  background: var(--color-primary);
+}
+
+.concept-title {
+  font-family: var(--font-display);
+  color: var(--color-navy);
+  font-size: var(--text-3xl);
+  letter-spacing: -0.028em;
+  font-weight: 900;
+  line-height: 1.15;
+  margin: 0 0 var(--space-1);
+  text-transform: uppercase;
+}
+
+.concept-sub {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+  max-width: 900px;
+  line-height: 1.5;
+}
+
+.concept-tag {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  border: 1px solid var(--color-warning-border);
+  border-radius: 0;
+  font-weight: var(--weight-bold);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  padding: var(--space-2) var(--space-3);
+  letter-spacing: 0.01em;
+}
+
+/* Hero Banner */
+.concept-hero {
+  background: linear-gradient(105deg, var(--color-hero), var(--color-navy) 62%, var(--color-primary));
+  padding: var(--space-5) var(--space-6);
+  min-height: 104px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  color: var(--color-on-hero);
+  margin-bottom: var(--space-4);
+  position: relative;
+  overflow: hidden;
+  border-radius: 0;
+}
+
+.concept-hero::after {
+  content: '';
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  border: 40px solid var(--color-primary-soft);
+  opacity: 0.08;
+  border-radius: 0;
+  right: 110px;
+  top: -110px;
+  pointer-events: none;
+}
+
+.concept-hero small {
+  color: var(--color-on-hero-muted);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  font-weight: var(--weight-bold);
+  text-transform: uppercase;
+}
+
+.concept-hero h2 {
+  font-family: var(--font-display);
+  margin: var(--space-1) 0;
+  font-size: var(--text-2xl);
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+  font-weight: 900;
+  color: var(--color-on-hero);
+}
+
+.concept-hero p {
+  margin: 0;
+  color: var(--color-on-hero-muted);
+  font-size: var(--text-xs);
+}
+
+.concept-goldtext {
+  color: var(--color-hero-highlight);
+}
+
+/* Concept Buttons */
+.concept-btn {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-decoration: none;
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms;
+}
+
+.concept-btn:hover:not(:disabled) {
+  background: var(--color-surface-muted);
+}
+
+.concept-btn--primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.concept-btn--primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+.concept-btn--gold {
+  background: var(--color-highlight);
+  border-color: var(--color-highlight);
+  color: var(--color-on-accent);
+  font-weight: var(--weight-bold);
+}
+
+.concept-btn--gold:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.concept-btn--danger {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  border-color: var(--color-danger-border);
+}
+
+.concept-btn--danger:hover:not(:disabled) {
+  background: var(--color-danger-fill);
+  color: var(--color-text-inverse);
+}
+
+.concept-btn--ghost {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  border-color: var(--color-primary-soft-hover);
+}
+
+.concept-btn--ghost:hover:not(:disabled) {
+  background: var(--color-primary-soft-hover);
+}
+
+.concept-btn--sm {
+  height: 28px;
+  font-size: 11px;
+  padding: 0 var(--space-2);
+}
+
+.concept-btn:disabled,
+.concept-btn--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Stat Cards */
+.concept-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.concept-stat {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  min-height: 81px;
+  padding: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  box-shadow: var(--shadow-sm);
+  border-radius: 0;
+}
+
+.concept-stat__icon {
+  width: 40px;
+  height: 40px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: var(--text-md);
+  flex: none;
+}
+
+.concept-stat strong {
+  font-size: var(--text-2xl);
+  line-height: 1.1;
+  font-weight: 900;
+  color: var(--color-navy);
+  display: block;
+}
+
+.concept-stat small {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+/* Grids and Panels */
+.concept-grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: 1fr 1fr;
+}
+
+.concept-grid--largeright {
+  grid-template-columns: 0.68fr 1.32fr;
+}
+
+.concept-grid--largeleft {
+  grid-template-columns: 1.25fr 0.75fr;
+}
+
+.concept-grid--single {
+  grid-template-columns: 1fr;
+}
+
+.concept-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: var(--space-4) var(--space-5);
+  box-shadow: var(--shadow-sm);
+  border-radius: 0;
+  min-width: 0;
+}
+
+.concept-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.concept-panel-header h3 {
+  font-size: var(--text-lg);
+  margin: 0;
+  color: var(--color-navy);
+  font-weight: 800;
+}
+
+.concept-panel-header p {
+  font-size: 11px;
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+}
+
+/* Filters */
+.concept-filters {
+  background: var(--color-primary-soft);
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  flex-wrap: wrap;
+}
+
+.concept-field {
+  flex: 1;
+  min-width: 140px;
+}
+
+.concept-field--sm {
+  flex: 0.5;
+  min-width: 100px;
+}
+
+.concept-field--wide {
+  flex: 1.6;
+  min-width: 220px;
+}
+
+.concept-field label {
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  color: var(--color-text-muted);
+  display: block;
+  margin-bottom: var(--space-1);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.concept-control {
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  height: 38px;
+  border-radius: 0;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  width: 100%;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.concept-control--hint {
+  color: var(--color-text-subtle);
+}
+
+.concept-control--error {
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.concept-control--area {
+  height: 80px;
+  align-items: flex-start;
+  white-space: normal;
+  resize: vertical;
+}
+
+/* Concept Tables */
+.concept-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+}
+
+.concept-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.concept-table thead {
+  background: var(--color-primary-soft);
+}
+
+.concept-table th {
+  text-align: left;
+  padding: var(--space-3);
+  color: var(--color-text-muted);
+  font-weight: var(--weight-bold);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.concept-table td {
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-3);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  vertical-align: middle;
+}
+
+.concept-table tbody tr:nth-child(even) {
+  background: var(--color-table-hover);
+}
+
+.concept-table tbody tr:hover {
+  background: var(--color-surface-muted);
+}
+
+.concept-table .name {
+  font-weight: var(--weight-bold);
+  color: var(--color-navy);
+}
+
+.concept-table .meta {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.concept-table .actioncell {
+  white-space: nowrap;
+}
+
+.concept-table .actioncell .concept-btn {
+  margin-right: var(--space-1);
+}
+
+/* Pills / Badges */
+.concept-pill {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  padding: 4px var(--space-2);
+  border-radius: 0;
+  background: var(--color-success-soft);
+  border: 1px solid var(--color-success-border);
+  color: var(--color-success);
+  white-space: nowrap;
+}
+
+.concept-pill--warn {
+  background: var(--color-warning-soft);
+  border-color: var(--color-warning-border);
+  color: var(--color-warning);
+}
+
+.concept-pill--bad,
+.concept-pill--danger {
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger-border);
+  color: var(--color-danger);
+}
+
+.concept-pill--blue,
+.concept-pill--info {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary-soft-hover);
+  color: var(--color-primary);
+}
+
+.concept-pill--neutral {
+  background: var(--color-neutral-soft);
+  color: var(--color-neutral);
+  border-color: var(--color-border);
+}
+
+/* Callout Banners */
+.concept-info-banner {
+  margin: var(--space-3) 0;
+  background: var(--color-primary-soft);
+  border-left: 3px solid var(--color-primary);
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  border-radius: 0;
+}
+
+.concept-warn-banner {
+  margin: var(--space-3) 0;
+  background: var(--color-warning-soft);
+  border-left: 4px solid var(--color-highlight);
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-warning);
+  font-size: var(--text-xs);
+  border-radius: 0;
+}
+
+.concept-danger-banner {
+  margin: var(--space-3) 0;
+  background: var(--color-danger-soft);
+  border-left: 4px solid var(--color-danger);
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-danger);
+  font-size: var(--text-xs);
+  border-radius: 0;
+}
+
+/* Rows and Tabs */
+.concept-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.concept-spread {
+  justify-content: space-between;
+}
+
+.concept-tabs {
+  display: flex;
+  gap: var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-4);
+}
+
+.concept-tab {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  padding: 0 0 var(--space-2);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-bottom: 3px solid transparent;
+}
+
+.concept-tab.active,
+.concept-tab--active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+/* Card Grid for Tiers */
+.concept-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+
+.concept-tier {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: var(--space-5);
+  min-height: 190px;
+  position: relative;
+  border-radius: 0;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+}
+
+.concept-tier--popular {
+  border-top: 4px solid var(--color-primary);
+}
+
+.concept-tier h3 {
+  font-size: var(--text-lg);
+  margin: var(--space-1) 0 var(--space-2);
+  color: var(--color-navy);
+}
+
+.concept-tier strong {
+  font-size: var(--text-2xl);
+  color: var(--color-primary);
+  display: block;
+  margin-bottom: var(--space-2);
+}
+
+.concept-tier p {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin: var(--space-1) 0;
+}
+
+/* Chart Bars */
+.concept-chart {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: var(--space-4);
+  border-radius: 0;
+  box-shadow: var(--shadow-sm);
+}
+
+.concept-chart__title {
+  font-size: var(--text-md);
+  color: var(--color-navy);
+  font-weight: var(--weight-bold);
+  margin-bottom: var(--space-4);
+}
+
+.concept-chart__bars {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-4);
+  height: 190px;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 var(--space-2);
+}
+
+.concept-chart__bar {
+  flex: 1;
+  max-width: 65px;
+  background: linear-gradient(0deg, var(--color-primary-active), var(--color-primary));
+  border-radius: 0;
+  position: relative;
+}
+
+.concept-chart__bar small {
+  position: absolute;
+  bottom: -20px;
+  font-size: 10px;
+  color: var(--color-text-muted);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+/* Timetable */
+.concept-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--space-2);
+}
+
+.concept-day {
+  min-height: 330px;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  padding: var(--space-3) var(--space-2);
+  border-radius: 0;
+}
+
+.concept-day > strong {
+  font-size: var(--text-xs);
+  color: var(--color-navy);
+}
+
+.concept-day > small {
+  display: block;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-4);
+}
+
+.concept-session {
+  background: var(--color-primary-soft);
+  border-left: 3px solid var(--color-primary);
+  padding: var(--space-2);
+  font-size: 11px;
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
+  margin: var(--space-2) 0;
+  border-radius: 0;
+}
+
+.concept-session--gold {
+  background: var(--color-warning-soft);
+  border-color: var(--color-highlight);
+  color: var(--color-warning);
+}
+
+.concept-session--gray {
+  background: var(--color-neutral-soft);
+  border-color: var(--color-neutral);
+  color: var(--color-neutral);
+}
+
+/* Modals and Scrim */
+.concept-modal-scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--color-backdrop);
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.concept-dialog {
+  width: 650px;
+  max-width: 90vw;
+  max-height: 860px;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-6);
+  position: relative;
+  border-radius: 0;
+}
+
+.concept-dialog--wide {
+  width: 790px;
+}
+
+.concept-dialog--narrow {
+  width: 580px;
+}
+
+.concept-dialog__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.concept-dialog h2 {
+  font-size: var(--text-xl);
+  color: var(--color-navy);
+  margin: 0;
+  font-weight: 850;
+}
+
+.concept-dialog p {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin: var(--space-1) 0 0;
+}
+
+.concept-dialog__close {
+  background: transparent;
+  border: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  line-height: 1;
+  padding: var(--space-1);
+}
+
+.concept-dialog__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+/* Utilities */
+.concept-no-data {
+  border: 1px dashed var(--color-border-strong);
+  background: var(--color-surface-muted);
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--color-text-muted);
+  border-radius: 0;
+}
+
+.concept-no-data strong {
+  color: var(--color-text);
+  font-size: var(--text-lg);
+  display: block;
+  margin-bottom: var(--space-1);
+}
+
+.concept-sectionline {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  font-weight: var(--weight-bold);
+  color: var(--color-primary);
+  text-transform: uppercase;
+}
+
+/* Responsive Overrides */
+@media (max-width: 1100px) {
+  .concept-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .concept-grid {
+    grid-template-columns: 1fr;
+  }
+  .concept-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .concept-week {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .concept-stats {
+    grid-template-columns: 1fr;
+  }
+  .concept-header {
+    flex-direction: column;
+  }
+  .concept-card-grid {
+    grid-template-columns: 1fr;
+  }
+  .concept-week {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Dark Mode High-Contrast Overrides for Headings and Labels */
+:root[data-theme='dark'] .concept-title,
+:root[data-theme='dark'] .concept-stat strong,
+:root[data-theme='dark'] .concept-panel-header h3,
+:root[data-theme='dark'] .concept-table .name,
+:root[data-theme='dark'] .concept-tier h3,
+:root[data-theme='dark'] .concept-chart__title,
+:root[data-theme='dark'] .concept-day > strong,
+:root[data-theme='dark'] .concept-dialog h2,
+:root[data-theme='dark'] .manager-page .card__title,
+:root[data-theme='dark'] .manager-page .manager-cell strong {
+  color: var(--color-text);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .concept-title,
+  :root:not([data-theme='light']) .concept-stat strong,
+  :root:not([data-theme='light']) .concept-panel-header h3,
+  :root:not([data-theme='light']) .concept-table .name,
+  :root:not([data-theme='light']) .concept-tier h3,
+  :root:not([data-theme='light']) .concept-chart__title,
+  :root:not([data-theme='light']) .concept-day > strong,
+  :root:not([data-theme='light']) .concept-dialog h2,
+  :root:not([data-theme='light']) .manager-page .card__title,
+  :root:not([data-theme='light']) .manager-page .manager-cell strong {
+    color: var(--color-text);
+  }
+}
+
+/* Strict Rectangular Corners: All Manager Surfaces, Cards, Dialogs, and Controls */
+.manager-page,
+.manager-page *,
+.manager-concept-page,
+.manager-concept-page *,
+.concept-dialog,
+.concept-dialog *,
+.concept-modal-scrim,
+.concept-modal-scrim *,
+.modal-backdrop:has(.manager-form) .modal,
+.modal-backdrop:has(.manager-form) .modal *,
+.modal-backdrop:has([class*="manager-"]) .modal,
+.modal-backdrop:has([class*="manager-"]) .modal *,
+.modal-backdrop:has(.concept-dialog) .modal,
+.modal-backdrop:has(.concept-dialog) .modal * {
+  border-radius: 0 !important;
+}
