@@ -1,3 +1,4 @@
+import '../../styles/receptionConcept.css'
 import { useCallback, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { getErrorMessage } from '../../api/errors'
@@ -171,7 +172,7 @@ function RefundProgress({ stage }: { stage: RefundStage }) {
   const steps = refundSteps(stage)
   if (steps.length === 0) return null
   return (
-    <ol className="refund-steps" aria-label="Refund progress">
+    <ol className="refund-steps rcp-refund-steps" aria-label="Refund progress">
       {steps.map((step) => (
         <li key={step.label} className="refund-steps__step" data-state={step.state} aria-current={step.state === 'current' ? 'step' : undefined}>
           {step.label}

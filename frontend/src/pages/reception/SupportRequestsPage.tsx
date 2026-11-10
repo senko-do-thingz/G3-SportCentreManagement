@@ -2,7 +2,8 @@ import { useCallback, useRef, useState, type FormEvent } from 'react'
 import { receptionSupportApi as api, supportCategories, supportStatuses, supportTransitions, type SupportIntake, type SupportStatus, type SupportTicket } from '../../api/receptionSupportApi'
 import { receptionApi } from '../../api/receptionApi'
 import { tokenStorage } from '../../api/tokenStorage'
-import { Button, Card, Input, PageHeader, Select, StatCard, TextArea } from '../../components/ui'
+import { Badge, Button, Card, Input, PageHeader, Select, TextArea } from '../../components/ui'
+import { ReceptionCallout, ReceptionHero, ReceptionScreen, ReceptionStat, ReceptionStats } from './ReceptionConcept'
 import { TrainingData } from '../member/TrainingData'
 import { useTrainingAction } from '../training/trainingFormState'
 import { ActionMessage } from '../training/TrainingFormFields'
@@ -21,14 +22,15 @@ export function SupportRequestsPage() {
   const load = useCallback((signal: AbortSignal) => api.list(memberId, status, signal, query), [memberId, status, query])
   const summary = useCallback((signal: AbortSignal) => api.summary(signal), [])
   const detail = useCallback((signal: AbortSignal) => api.detail(selected!, signal), [selected])
-  return <div className="training-page">
-    <PageHeader title="Support requests" description="Review member questions and follow up on unresolved requests. Requests do not change payments or packages automatically." />
-    <TrainingData key={`summary-${revision}`} load={summary}>{counts => <div className="support-counts" aria-label="Support request counts">
-      <StatCard label="Open" value={counts.open} /><StatCard label="In progress" value={counts.inProgress} />
-      <StatCard label="Resolved" value={counts.resolved} /><StatCard label="Closed" value={counts.closed} />
-    </div>}</TrainingData>
+  return <ReceptionScreen className="training-page rcp-support">
+    <PageHeader eyebrow="Receptionist workspace" title="Support requests" description="Review member questions and follow up on unresolved requests. Requests do not change payments or packages automatically." />
+    <ReceptionHero kicker="Member care" title="Support requests." highlight="Reply, then resolve." description="Answer the member first. Record an internal outcome note before resolving or closing a request." />
+    <TrainingData key={`summary-${revision}`} load={summary}>{counts => <ReceptionStats label="Support request counts">
+      <ReceptionStat mark="O" label="Open" value={counts.open} tone="warning" /><ReceptionStat mark="P" label="In progress" value={counts.inProgress} />
+      <ReceptionStat mark="R" label="Resolved" value={counts.resolved} tone="success" /><ReceptionStat mark="C" label="Closed" value={counts.closed} />
+    </ReceptionStats>}</TrainingData>
     <Card title="Support inbox">
-      <form className="training-actions" onSubmit={event => { event.preventDefault(); setQuery(search); select(null) }}>
+      <form className="training-actions rcp-toolbar" onSubmit={event => { event.preventDefault(); setQuery(search); select(null) }}>
         <Input label="Find request code, member or subject" maxLength={100} value={search} onChange={event => setSearch(event.target.value)} />
         <Button type="submit" variant="secondary">Search requests</Button>
       </form>
@@ -38,12 +40,12 @@ export function SupportRequestsPage() {
       </div>
       <TrainingData key={revision} load={load}>{tickets => <>
         <p>Showing up to 100 newest matching requests. Opening a request does not resolve it; record a reply and the outcome before closing.</p>
-        {tickets.length === 0 ? <p role="status">No support requests match these filters.</p> : <table className="table"><caption>Member support requests</caption><thead><tr><th>Request</th><th>Member</th><th>Category</th><th>Source</th><th>Status</th><th>Action</th></tr></thead><tbody>{tickets.map(ticket => <tr key={ticket.id}><td>{ticket.code}: {ticket.subject}</td><td>{ticket.memberName}</td><td>{ticket.category}</td><td>{ticket.memberSubmitted ? 'Sent by member' : 'Recorded at desk'}</td><td>{ticket.status}</td><td><Button variant="secondary" onClick={() => select(ticket.id)}>View {ticket.code}</Button></td></tr>)}</tbody></table>}
+        {tickets.length === 0 ? <p role="status">No support requests match these filters.</p> : <div className="table-scroll"><table className="table"><caption>Member support requests</caption><thead><tr><th>Request</th><th>Member</th><th>Category</th><th>Source</th><th>Status</th><th>Action</th></tr></thead><tbody>{tickets.map(ticket => <tr key={ticket.id}><td>{ticket.code}: {ticket.subject}</td><td>{ticket.memberName}</td><td>{ticket.category}</td><td>{ticket.memberSubmitted ? 'Sent by member' : 'Recorded at desk'}</td><td><Badge tone={ticket.status === 'OPEN' ? 'warning' : ticket.status === 'IN_PROGRESS' ? 'info' : ticket.status === 'RESOLVED' ? 'success' : 'neutral'}>{ticket.status}</Badge></td><td><Button variant="secondary" onClick={() => select(ticket.id)}>View {ticket.code}</Button></td></tr>)}</tbody></table></div>}
       </>}</TrainingData>
     </Card>
     {selected !== null && <TrainingData key={`${selected}-${revision}`} load={detail} refreshLabel="Refresh request details">{ticket => <TicketDetail ticket={ticket} onSaved={() => refresh(value => value + 1)} />}</TrainingData>}
     <CreateTicket onSaved={ticket => { select(ticket.id); refresh(value => value + 1) }} />
-  </div>
+  </ReceptionScreen>
 }
 
 function CreateTicket({ onSaved }: { onSaved: (ticket: SupportTicket) => void }) {
@@ -95,13 +97,13 @@ function TicketDetail({ ticket, onSaved }: { ticket: SupportTicket; onSaved: () 
   const action = useTrainingAction()
   const replies = ticket.replies ?? []
   const verification = useCallback((signal: AbortSignal) => api.verification(ticket.id, signal), [ticket.id])
-  return <>
+  return <div className="rcp-grid rcp-grid--wide-left">
     <Card title={`Request ${ticket.code}`}>
       <p>{ticket.memberName}{ticket.memberCode ? ` (${ticket.memberCode})` : ''} - {ticket.subject}</p>
       <p>{ticket.memberSubmitted ? 'Sent by the member' : 'Recorded at the desk'}{ticket.sessionCode ? ` - session ${ticket.sessionCode}` : ''}</p>
       <p className="training-excerpt">{ticket.description}</p>
       <p>Current status: {ticket.status}</p>
-      <h3>Replies to the member</h3>
+      <h3 className="rcp-caption">Replies to the member</h3>
       {replies.length === 0 ? <p role="status">No reply has been sent yet.</p>
         : <ul className="training-list">{replies.map(reply => <li key={reply.id}><p><strong>{reply.fromMember ? `Member: ${reply.staffName}` : reply.staffName}</strong> - {new Date(reply.createdAt).toLocaleString()}</p><p>{reply.message}</p></li>)}</ul>}
       {(ticket.status === 'OPEN' || ticket.status === 'IN_PROGRESS') && <ReplyForm ticket={ticket} onSaved={onSaved} />}
@@ -116,6 +118,7 @@ function TicketDetail({ ticket, onSaved }: { ticket: SupportTicket; onSaved: () 
         }, 'Request status saved.')
       }}>
         <Select label="Next status" options={options(transitions)} value={status} onChange={event => setStatus(event.target.value as SupportStatus)} />
+        <ReceptionCallout tone="warning">Internal outcome notes are staff only. Member-visible text goes in the reply above.</ReceptionCallout>
         <TextArea label="Internal outcome note (staff only, never shown to the member)" maxLength={2000} value={notes} onChange={event => setNotes(event.target.value)} />
         <ActionMessage {...action} /><Button type="submit" loading={action.pending}>Update status</Button>
       </form> : <><p>Internal outcome note: {ticket.resolutionNotes}</p><p role="status">This request is closed.</p></>}
@@ -125,9 +128,9 @@ function TicketDetail({ ticket, onSaved }: { ticket: SupportTicket; onSaved: () 
       <p>Membership card: {facts.cardTier ? `${facts.cardTier}, ${facts.cardDiscount ?? 0}% discount${facts.cardEndDate ? `, valid until ${facts.cardEndDate}` : ''}` : 'No active card'}</p>
       {facts.activePackages.length === 0 ? <p>No active sport package.</p>
         : <ul className="training-list">{facts.activePackages.map((item, index) => <li key={index}>{item.sportName} - {item.name}: {item.remainingSessions} of {item.totalSessions} sessions, valid until {item.endDate}</li>)}</ul>}
-      <p>This panel is for checking only. It does not record a payment or activate a package.</p>
+      <ReceptionCallout>This panel is for checking only. It does not record a payment or activate a package.</ReceptionCallout>
     </Card>}</TrainingData>
-  </>
+  </div>
 }
 
 function ReplyForm({ ticket, onSaved }: { ticket: SupportTicket; onSaved: () => void }) {

@@ -1,3 +1,4 @@
+import { ReceptionCallout } from './ReceptionConcept'
 import { useCallback, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiError, getErrorMessage } from '../../api/errors'
@@ -75,6 +76,12 @@ export function RefundRequestsPage() {
           </Link>
         }
       />
+      <div className="rcp-refund-scope">
+        <ReceptionCallout>
+          Three separate steps: you submit the request, a manager approves or rejects it, then the payout is recorded.
+          Submitting here never approves or pays a refund.
+        </ReceptionCallout>
+      </div>
       {memberId !== null ? <MemberRefundQueues memberId={memberId} /> : (
         <Card title="Approved - waiting to be refunded">
           <p role="status">Select a member below to view their approved and pending refunds.</p>

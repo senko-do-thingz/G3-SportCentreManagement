@@ -1,3 +1,4 @@
+import { ReceptionCallout } from './ReceptionConcept'
 import { useCallback, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ApiError, getErrorMessage, splitFieldErrors } from '../../api/errors'
@@ -109,7 +110,7 @@ export function ReceptionPaymentPage() {
 
   if (id === null) {
     return (
-      <div className="page">
+      <div className="page rcp-pay">
         <PaymentHero eyebrow={EYEBROW} title="Verify and Record Payment" aside={actions} />
         <EmptyState title="Payment not found" description="The payment link is not valid." />
       </div>
@@ -117,7 +118,7 @@ export function ReceptionPaymentPage() {
   }
   if (payment.status === 'loading') {
     return (
-      <div className="page">
+      <div className="page rcp-pay">
         <PaymentHero eyebrow={EYEBROW} title="Verify and Record Payment" aside={actions} />
         <Spinner label="Loading the payment" />
       </div>
@@ -125,7 +126,7 @@ export function ReceptionPaymentPage() {
   }
   if (payment.status === 'error') {
     return (
-      <div className="page">
+      <div className="page rcp-pay">
         <PaymentHero eyebrow={EYEBROW} title="Verify and Record Payment" aside={actions} />
         <ErrorState title="We could not load the payment" error={payment.error} onRetry={reload} />
       </div>
@@ -253,7 +254,7 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
 
   if (mismatch) {
     return (
-      <div className="page">
+      <div className="page rcp-pay">
         <PaymentHero
           eyebrow={EYEBROW}
           title="Payment Needs Review"
@@ -288,13 +289,17 @@ function VerifyPayment({ payment, actions, onDone }: { payment: StaffPayment; ac
   }
 
   return (
-    <div className="page">
+    <div className="page rcp-pay">
       <PaymentHero
         eyebrow={EYEBROW}
         title="Verify and Record Payment"
         description="Confirm only after the full amount has been received."
         aside={actions}
       />
+      <ReceptionCallout tone="warning">
+        Opening this page does not settle the payment. It is recorded only when you confirm it below after checking
+        the amount actually received.
+      </ReceptionCallout>
       <div className="reception-grid">
         <Card title="Payment information">
           <form className="reception-form" aria-label="Verify and record payment" noValidate onSubmit={submit}>
@@ -563,7 +568,7 @@ function PaymentConfirmed({ payment, actions, memberId }: { payment: StaffPaymen
   const canPrint = invoice.status === 'ready' && problem === null && presentation.canPrintReceipt
 
   return (
-    <div className="page">
+    <div className="page rcp-pay">
       <PaymentHero
         eyebrow={EYEBROW}
         title={refunded ? 'Payment Refunded' : problem ? 'Payment Needs Review' : 'Payment Confirmed and Receipt'}
@@ -775,7 +780,7 @@ function ServiceUpdated({ paymentId, memberId }: { paymentId: number; memberId: 
 
 function PaymentFailed({ payment, actions }: { payment: StaffPayment; actions: ReactNode }) {
   return (
-    <div className="page">
+    <div className="page rcp-pay">
       <PaymentHero eyebrow={EYEBROW} title="Payment Failed" description="This payment was closed without being received." aside={actions} />
       <Card title={`Payment ${payment.code}`} aria-label="Failed payment">
         <StatusBadge status={paymentStatusTone(payment.status)} label={paymentStatusLabel(payment.status)} />

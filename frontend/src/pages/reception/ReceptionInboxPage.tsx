@@ -6,6 +6,7 @@ import { INBOX_CHANGED_EVENT, INBOX_POLL_MS } from '../../components/InboxBadge'
 import { useResource } from '../../hooks/useResource'
 import { Badge, Button, Card, EmptyState, ErrorState, Notice, PageHeader, Select, Spinner, buttonClassName } from '../../components/ui'
 import { formatDateTime } from '../../utils/dateDisplay'
+import { ReceptionCallout, ReceptionHero, ReceptionScreen, ReceptionStat, ReceptionStats } from './ReceptionConcept'
 
 const SOURCE_LABELS: Record<InboxItem['sourceType'], string> = {
   WALLET_TOPUP: 'Wallet top-up',
@@ -38,33 +39,52 @@ export function ReceptionInboxPage() {
     try { await receptionInboxApi.markRead(id); reload() } catch (failure) { setError(getErrorMessage(failure)) }
   }
 
+  const data = resource.status === 'ready' ? resource.data : null
   return (
-    <div className="page">
-      <PageHeader eyebrow="Front desk" title="Inbox" description="Tasks that need reception. Reading a notice does not complete the task." />
+    <ReceptionScreen className="rcp-inbox">
+      <PageHeader eyebrow="Receptionist workspace" title="Action inbox" description="Tasks that need reception. Reading a notice does not complete the task." />
+      <ReceptionHero
+        kicker="Front desk operations"
+        title="Action inbox."
+        highlight="Open the right workflow."
+        description="Top-ups, withdrawals, payment exceptions and support requests that need reception. Each task is completed on its own screen."
+      />
+      {data && (
+        <ReceptionStats label="Inbox summary">
+          <ReceptionStat mark="O" label="Open tasks (newest 100 notices)" value={data.open} tone={data.open > 0 ? 'warning' : 'success'} />
+          <ReceptionStat mark="U" label="Unread open (newest 100 notices)" value={data.unreadOpen} />
+          <ReceptionStat mark="L" label="Items shown" value={data.items.length} />
+          <ReceptionStat mark="R" label="Checks for new tasks" value={`${Math.round(INBOX_POLL_MS / 1000)}s`} />
+        </ReceptionStats>
+      )}
       <Card
-        title={resource.status === 'ready' ? `${resource.data.open} open tasks, ${resource.data.unreadOpen} unread` : 'Tasks'}
+        title={data ? `${data.open} open tasks, ${data.unreadOpen} unread` : 'Tasks'}
         actions={<Button variant="secondary" size="sm" onClick={reload}>Refresh</Button>}
       >
-        <Select label="Show" value={filter} onChange={(e) => setFilter(e.target.value)}
-          options={[{ value: 'open', label: 'Open tasks' }, { value: 'all', label: 'All notices (including resolved)' }]} />
+        <div className="rcp-toolbar">
+          <Select label="Show" value={filter} onChange={(e) => setFilter(e.target.value)}
+            options={[{ value: 'open', label: 'Open tasks' }, { value: 'all', label: 'All notices (including resolved)' }]} />
+        </div>
         {error && <Notice tone="danger">{error}</Notice>}
         {resource.status === 'loading' && <Spinner label="Loading inbox" />}
         {resource.status === 'error' && <ErrorState title="We could not load the inbox" error={resource.error} onRetry={reload} />}
-        {resource.status === 'ready' && (resource.data.items.length === 0
+        {data && (data.items.length === 0
           ? <EmptyState title="Nothing to do" description="New top-ups, withdrawals, payment exceptions and support requests appear here." />
           : (
-            <ul className="inbox-list">
-              {resource.data.items.map((item) => (
-                <li key={item.id} className={'inbox-item' + (item.read ? '' : ' inbox-item--unread')}>
-                  <div className="inbox-item__head">
-                    <Badge tone="info">{SOURCE_LABELS[item.sourceType]}</Badge>
-                    <strong>{item.title}</strong>
-                    {!item.read && <Badge tone="warning">Unread</Badge>}
-                    <Badge tone={item.open ? 'warning' : 'success'}>{item.open ? `Open - ${item.sourceStatus}` : `Resolved - ${item.sourceStatus}`}</Badge>
+            <ul className="rcp-list">
+              {data.items.map((item) => (
+                <li key={item.id} className={'rcp-row' + (!item.open ? ' rcp-row--muted' : item.read ? '' : ' rcp-row--attention')}>
+                  <div>
+                    <div className="rcp-row__meta">
+                      <strong>{SOURCE_LABELS[item.sourceType]}</strong>
+                      <span>{formatDateTime(item.createdAt)}</span>
+                      {!item.read && <Badge tone="warning">Unread</Badge>}
+                      <Badge tone={item.open ? 'warning' : 'success'}>{item.open ? `Open - ${item.sourceStatus}` : `Resolved - ${item.sourceStatus}`}</Badge>
+                    </div>
+                    <p className="rcp-row__title">{item.title}</p>
+                    <p className="rcp-row__body">{item.content}</p>
                   </div>
-                  <p className="health-note">{item.content}</p>
-                  <p className="health-meta">{formatDateTime(item.createdAt)}</p>
-                  <div className="profile-form__actions">
+                  <div className="rcp-row__actions">
                     <Link className={buttonClassName('primary', 'sm')} to={item.link}>Open task</Link>
                     {!item.read && <Button variant="secondary" size="sm" onClick={() => markRead(item.id)}>Mark as read</Button>}
                   </div>
@@ -72,7 +92,10 @@ export function ReceptionInboxPage() {
               ))}
             </ul>
           ))}
+        <ReceptionCallout>
+          <strong>Important:</strong> Mark as read only updates the notice. A payment, wallet transaction or support request stays open until it is handled in its own workflow.
+        </ReceptionCallout>
       </Card>
-    </div>
+    </ReceptionScreen>
   )
 }
