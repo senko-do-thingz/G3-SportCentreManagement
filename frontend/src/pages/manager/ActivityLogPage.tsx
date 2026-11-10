@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '../../api/errors'
 import { ACTIVITY_ACTIONS, managerActivityLogsApi } from '../../api/managerActivityLogsApi'
-import { Button, Card, Input, Modal, PageHeader, Select, Table, type TableColumn } from '../../components/ui'
+import { Button, Card, Input, Modal, Select, Table, type TableColumn } from '../../components/ui'
 import { humanizeCode } from '../../utils/format'
 import type { ActivityLog, ManagerUser } from '../../types/manager'
 import { ActorPickerModal } from './ActorPickerModal'
@@ -46,7 +46,12 @@ export function ActivityLogPage() {
   if (pageOutOfRange) setPage(lastValidPage)
   const ready = resource.status === 'ready' && search === debounced && !invalidRange && !pageOutOfRange
 
+  const totalEvents = ready ? String(resource.data.totalElements).padStart(2, '0') : '--'
+  const pageEvents = ready ? String(resource.data.content.length).padStart(2, '0') : '--'
+  const activeActors = ready ? String(new Set(resource.data.content.map((c) => c.actorName)).size).padStart(2, '0') : '--'
+
   const activeFilterCount = [search.trim(), action, actor, from, to].filter(Boolean).length
+  const filterScopeLabel = activeFilterCount > 0 ? `${activeFilterCount} Active` : 'All activity'
   const filtered = activeFilterCount > 0
   const clearFilters = () => { setSearch(''); setAction(''); setActor(null); setFrom(''); setTo(''); setPage(0) }
   const columns: TableColumn<ActivityLog>[] = [
@@ -55,8 +60,55 @@ export function ActivityLogPage() {
     { key: 'entityId', header: 'Target', width: '33%', render: (log) => <div className="manager-activity__cell"><span className="manager-activity__primary">{log.entityType ? humanizeCode(log.entityType) : 'Record'}{log.entityId !== null ? ' #' + log.entityId : ''}</span><span className="manager-activity__secondary">{log.shortDetail || '-'}</span></div> },
     { key: 'details', header: 'Details', width: '21%', render: (log) => <Button size="sm" variant="secondary" aria-label={'View details for ' + humanizeCode(log.action) + ' by ' + (log.actorName || 'system')} onClick={() => setSelected(log)}>View details</Button> },
   ]
-  return <div className="page manager-page manager-activity">
-    <PageHeader title="Activity log" description="See who changed what and when across your center." actions={<Button variant="secondary" onClick={reload}>Refresh</Button>} />
+  return <div className="page manager-page manager-activity manager-concept-page">
+    <div className="concept-header">
+      <div className="concept-header__main">
+        <div className="concept-eyebrow">MANAGER WORKSPACE</div>
+        <h1 className="concept-title">Activity Log</h1>
+        <p className="concept-sub">See who changed what and when across your center with complete audit integrity.</p>
+      </div>
+    </div>
+
+    <div className="concept-hero">
+      <div>
+        <small>AUDIT TRAIL</small>
+        <h2>TRACEABLE ACTIONS. <span className="concept-goldtext">TOTAL ACCOUNTABILITY.</span></h2>
+        <p>Monitor changes across users, packages, classes, and schedules.</p>
+      </div>
+      <Button variant="secondary" className="concept-btn concept-btn--gold" onClick={reload}>Refresh</Button>
+    </div>
+
+    <div className="concept-stats">
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">E</span>
+        <div>
+          <strong>{totalEvents}</strong>
+          <small>Matching events</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">A</span>
+        <div>
+          <strong>{activeActors}</strong>
+          <small>Actors on this page</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">S</span>
+        <div>
+          <strong>{pageEvents}</strong>
+          <small>Events on this page</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">F</span>
+        <div>
+          <strong>{filterScopeLabel}</strong>
+          <small>Filter scope</small>
+        </div>
+      </div>
+    </div>
+
     <PreviewNotice />
     <Card className="manager-activity__card" title="Activity history" actions={ready ? <span className="manager-activity__count">{resource.data.totalElements.toLocaleString()} {resource.data.totalElements === 1 ? 'event' : 'events'}</span> : undefined}>
       <div className="manager-activity__toolbar">

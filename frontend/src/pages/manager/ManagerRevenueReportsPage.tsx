@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getErrorMessage } from '../../api/errors'
 import { managerFinanceApi, type FinanceRevenueRow, type RevenueGroup } from '../../api/managerFinanceApi'
-import { Button, Card, Input, PageHeader, PageLoader, Select, StatCard, Table, type TableColumn } from '../../components/ui'
+import { Button, Card, Input, PageLoader, Select, StatCard, Table, type TableColumn } from '../../components/ui'
 import { useResource } from './useManagerTools'
 import { ManagerError, PreviewNotice } from './ManagerShared'
 import { FinanceRevenueChart } from './FinanceRevenueChart'
@@ -139,8 +139,23 @@ export function ManagerRevenueReportsPage() {
     }
   }
 
-  return <div className="page manager-page manager-finance-page">
-    <PageHeader eyebrow="Manager / Payments & Reports" title="Revenue Reports" description="Review revenue, transaction counts and shares by service, payment method or sport." />
+  return <div className="page manager-page manager-finance-page manager-concept-page">
+    <div className="concept-header">
+      <div className="concept-header__main">
+        <div className="concept-eyebrow">MANAGER WORKSPACE</div>
+        <h1 className="concept-title">Revenue & Operations Reports</h1>
+        <p className="concept-sub">Analyze business metrics, revenue distributions and operations reports across configurable date ranges.</p>
+      </div>
+    </div>
+
+    <div className="concept-hero">
+      <div>
+        <small>ANALYTICS & REPORTING</small>
+        <h2>COMPREHENSIVE AUDIT. <span className="concept-goldtext">STRATEGIC VISIBILITY.</span></h2>
+        <p>Operational statistics, booking volumes, payment share analysis and exportable reporting ledgers.</p>
+      </div>
+    </div>
+
     <PreviewNotice />
 
     <Card title="Report filters">

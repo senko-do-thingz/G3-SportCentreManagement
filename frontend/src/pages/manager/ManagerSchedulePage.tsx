@@ -7,7 +7,7 @@ import { ApiError } from '../../api/errors'
 import { managerClassesApi } from '../../api/managerClassesApi'
 import { managerSessionsApi, type ManagerSession } from '../../api/managerSessionsApi'
 import { facilitiesApi } from '../../api/facilitiesApi'
-import { Button, Card, EmptyState, Input, PageHeader, PageLoader, Select, StatusBadge, useToast } from '../../components/ui'
+import { Button, Card, EmptyState, Input, PageLoader, Select, StatusBadge, useToast } from '../../components/ui'
 import { ConfirmationModal, ManagerError, PreviewNotice } from './ManagerShared'
 import { useResource } from './useManagerTools'
 import { loadScheduleClasses } from './loadScheduleClasses'
@@ -60,8 +60,61 @@ export function ManagerSchedulePage() {
   const manualFacility = facilities.status === 'error' && facilities.error instanceof ApiError && facilities.error.status === 404
   const facilitiesUsable = manualFacility || (facilities.status === 'ready' && facilities.data.some((item) => item.active !== false))
   const available = classes.status === 'ready' && facilitiesUsable && classes.data.some((item) => item.active)
-  return <div className="page manager-page">
-    <PageHeader title="Schedule & Coach Assignment" description="Plan single sessions or a weekly schedule. Times use Vietnam time (UTC+7)." actions={<Button disabled={!available} onClick={() => setEditing('new')}>+ Create session</Button>} />
+
+  const weekSessionsCount = sessions.status === 'ready' ? String(sessions.data.length).padStart(2, '0') : '--'
+  const publishedCount = sessions.status === 'ready' ? String(sessions.data.filter((s) => s.status === 'PUBLISHED').length).padStart(2, '0') : '--'
+  const coachesCount = coaches.status === 'ready' ? String(coaches.data.length).padStart(2, '0') : '--'
+  const facilitiesCount = facilities.status === 'ready' ? String(facilities.data.length).padStart(2, '0') : '--'
+
+  return <div className="page manager-page manager-concept-page">
+    <div className="concept-header">
+      <div className="concept-header__main">
+        <div className="concept-eyebrow">MANAGER WORKSPACE</div>
+        <h1 className="concept-title">Schedule &amp; Coach Assignment</h1>
+        <p className="concept-sub">Plan single sessions or a weekly schedule. Times use Vietnam time (UTC+7).</p>
+      </div>
+    </div>
+
+    <div className="concept-hero">
+      <div>
+        <small>FACILITY TIMETABLE</small>
+        <h2>TIMELY COORDINATION. <span className="concept-goldtext">SEAMLESS OPERATIONS.</span></h2>
+        <p>Manage venue availability, coach shifts, and member bookings.</p>
+      </div>
+      <Button variant="secondary" className="concept-btn concept-btn--gold" disabled={!available} onClick={() => setEditing('new')}>+ Create session</Button>
+    </div>
+
+    <div className="concept-stats">
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">W</span>
+        <div>
+          <strong>{weekSessionsCount}</strong>
+          <small>Week sessions</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">P</span>
+        <div>
+          <strong>{publishedCount}</strong>
+          <small>Published in week</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">C</span>
+        <div>
+          <strong>{coachesCount}</strong>
+          <small>Active coaches</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">V</span>
+        <div>
+          <strong>{facilitiesCount}</strong>
+          <small>Venues / Courts</small>
+        </div>
+      </div>
+    </div>
+
     <PreviewNotice />
     <Card title="Weekly schedule">
       <SessionIdGuide />

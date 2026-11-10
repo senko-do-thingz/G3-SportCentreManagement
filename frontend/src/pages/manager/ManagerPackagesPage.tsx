@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { managerPackagesApi } from '../../api/managerPackagesApi'
 import { packagesApi } from '../../api/packagesApi'
-import { Button, Card, Input, PageHeader, Select, StatusBadge, Table, useToast, type TableColumn } from '../../components/ui'
+import { Button, Card, Input, Select, StatusBadge, Table, useToast, type TableColumn } from '../../components/ui'
 import { formatMoney } from '../../utils/format'
 import type { ManagerPackage } from '../../types/manager'
 import { ConfirmationModal, ManagerError, PreviewNotice } from './ManagerShared'
@@ -47,6 +47,11 @@ export function ManagerPackagesPage() {
     if (!term) return resource.data
     return resource.data.filter((item) => [item.name, item.code, item.sportName].some((value) => value.toLocaleLowerCase().includes(term)))
   }, [resource, search])
+
+  const totalPackages = resource.status === 'ready' ? String(rows.length).padStart(2, '0') : '--'
+  const sportsCount = sports.status === 'ready' ? String(sports.data.length).padStart(2, '0') : '--'
+  const activeCount = resource.status === 'ready' ? String(rows.filter((p) => p.isActive).length).padStart(2, '0') : '--'
+  const currentFormatLabel = format === 'COACH_LED' ? 'Coach-led' : format === 'SELF_TRAINING' ? 'Self-training' : 'All formats'
 
   const columns: TableColumn<ManagerPackage>[] = [
     {
@@ -103,14 +108,58 @@ export function ManagerPackagesPage() {
     },
   ]
 
-  return <div className="page manager-page manager-catalog manager-catalog--packages">
-    <PageHeader
-      title="Sport packages"
-      description="Manage package prices and training terms for each sport."
-      actions={<Button disabled={sports.status !== 'ready' || !sports.data.length} onClick={() => setEditing('create')}>+ Create package</Button>}
-    />
+  return <div className="page manager-page manager-catalog manager-catalog--packages manager-concept-page">
+    <div className="concept-header">
+      <div className="concept-header__main">
+        <div className="concept-eyebrow">MANAGER WORKSPACE</div>
+        <h1 className="concept-title">Sport Packages</h1>
+        <p className="concept-sub">Review sport packages, training formats and pricing while keeping existing policies.</p>
+      </div>
+    </div>
+
+    <div className="concept-hero">
+      <div>
+        <small>PACKAGES AND PRICING</small>
+        <h2>FLEXIBLE TRAINING. <span className="concept-goldtext">CLEAR OPTIONS.</span></h2>
+        <p>Compare package types, eligibility and current prices.</p>
+      </div>
+      <Button variant="secondary" className="concept-btn concept-btn--gold" disabled={sports.status !== 'ready' || !sports.data.length} onClick={() => setEditing('create')}>+ Create package</Button>
+    </div>
+
+    <div className="concept-stats">
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">P</span>
+        <div>
+          <strong>{totalPackages}</strong>
+          <small>Matching packages</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">S</span>
+        <div>
+          <strong>{sportsCount}</strong>
+          <small>Available sports</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">A</span>
+        <div>
+          <strong>{activeCount}</strong>
+          <small>Active in view</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">F</span>
+        <div>
+          <strong>{currentFormatLabel}</strong>
+          <small>Format filter</small>
+        </div>
+      </div>
+    </div>
+
     <PreviewNotice />
-    <Card className="manager-catalog__panel" title="Package catalog" actions={<span className="manager-catalog__count">{resource.status === 'ready' ? rows.length + (rows.length === 1 ? ' package' : ' packages') : 'Loading catalog'}</span>}>
+
+    <Card className="manager-catalog__panel" title="Sport package catalog" actions={<span className="manager-catalog__count">{resource.status === 'ready' ? rows.length + (rows.length === 1 ? ' package' : ' packages') : 'Loading catalog'}</span>}>
       <div className="manager-catalog__filters manager-filters">
         <Input label="Search packages" type="search" value={search} placeholder="Name, code or sport" hint="Search the loaded catalog." onChange={(event) => { setSearch(event.target.value); setPage(0) }} />
         <Select label="Sport" placeholder="All sports" options={sports.status === 'ready' ? sports.data.map((sport) => ({ value: String(sport.id), label: sport.name })) : []} disabled={sports.status !== 'ready'} value={sportId} onChange={(event) => filter(setSportId, event.target.value)} />
@@ -143,6 +192,7 @@ export function ManagerPackagesPage() {
         <p>Package price updates apply to new registrations. Existing registrations keep their stored price and discount. Active membership cards use their tier's current discount for future eligible registrations.</p>
       </div>
     </Card>
+
     {editing !== null && sports.status === 'ready' && <PackageEditorModal item={editing === 'create' ? undefined : editing} sports={sports.data} onClose={() => setEditing(null)} onSuccess={saved} />}
     {changing && <ConfirmationModal
       title={changing.isActive ? 'Deactivate package' : 'Activate package'}
