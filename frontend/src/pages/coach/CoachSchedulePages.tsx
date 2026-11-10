@@ -61,6 +61,38 @@ function rosterHref(session: CoachSessionRecord, week: string): string {
   return `/coach/roster?sessionId=${encodeURIComponent(sessionRouteReference(session))}&week=${encodeURIComponent(week)}`
 }
 
+type ScheduleMetricIconName = 'sessions' | 'classes' | 'members' | 'week'
+
+/** Decorative icons for the Teaching Schedule summary only. */
+function ScheduleMetricIcon({ name }: { name: ScheduleMetricIconName }) {
+  return <svg
+    className="coach-schedule-metric__icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    focusable="false"
+  >
+    {name === 'sessions' ? <>
+      <rect x="3" y="5" width="18" height="16" />
+      <path d="M8 3v4M16 3v4M3 10h18M7 14h2M12 14h2M7 18h2M12 18h2" />
+    </> : name === 'classes' ? <>
+      <path d="M12 7c-2.4-1.9-5.4-2.4-9-2v14c3.6-.4 6.6.1 9 2V7Z" />
+      <path d="M12 7c2.4-1.9 5.4-2.4 9-2v14c-3.6-.4-6.6.1-9 2V7Z" />
+    </> : name === 'members' ? <>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 20v-1.2c0-3.2 2.2-5 5.5-5s5.5 1.8 5.5 5V20" />
+      <path d="M16 5.2a3 3 0 0 1 0 5.6M17.5 14c2 .6 3 2.2 3 4.8V20" />
+    </> : <>
+      <rect x="3" y="5" width="18" height="16" />
+      <path d="M8 3v4M16 3v4M3 10h18M7 14h10M7 18h6" />
+    </>}
+  </svg>
+}
+
 export function CoachTeachingSchedulePage() {
   const [params, setParams] = useSearchParams()
   const [selection, setSelection] = useState<{ week: string; sessionId: string } | null>(null)
@@ -94,10 +126,10 @@ export function CoachTeachingSchedulePage() {
     </section>
     {resource.status === 'loading' ? <PageLoader label="Loading your teaching schedule" /> : resource.status === 'error' ? <ErrorState title="We could not load your teaching schedule" error={resource.error} onRetry={reload} /> : <>
       <section className="coach-schedule-metrics" aria-label="Schedule summary">
-        <div className="coach-schedule-metric"><span className="coach-schedule-metric__mark" aria-hidden="true" /><div><p>{sessions.length}</p><span>Sessions this week</span></div></div>
-        <div className="coach-schedule-metric"><span className="coach-schedule-metric__mark" aria-hidden="true" /><div><p>{classCount}</p><span>Classes assigned</span></div></div>
-        <div className="coach-schedule-metric"><span className="coach-schedule-metric__mark" aria-hidden="true" /><div><p>{nextSession?.bookedCount ?? 0}</p><span>Members in next session</span></div></div>
-        <div className="coach-schedule-metric"><span className="coach-schedule-metric__mark" aria-hidden="true" /><div><p>{weekMetricLabel(week, weekEnd)}</p><span>Week in view</span></div></div>
+        <div className="coach-schedule-metric"><ScheduleMetricIcon name="sessions" /><div><p>{sessions.length}</p><span>Sessions this week</span></div></div>
+        <div className="coach-schedule-metric"><ScheduleMetricIcon name="classes" /><div><p>{classCount}</p><span>Classes assigned</span></div></div>
+        <div className="coach-schedule-metric"><ScheduleMetricIcon name="members" /><div><p>{nextSession?.bookedCount ?? 0}</p><span>Members in next session</span></div></div>
+        <div className="coach-schedule-metric"><ScheduleMetricIcon name="week" /><div><p>{weekMetricLabel(week, weekEnd)}</p><span>Week in view</span></div></div>
       </section>
       <div className="coach-schedule-layout">
         <Card className="coach-schedule-weekly" title="Weekly schedule" actions={<Button variant="secondary" size="sm" onClick={() => setParams((current) => changeWeekParams(current, browseMonday(browseToday())))}>This week</Button>}>
