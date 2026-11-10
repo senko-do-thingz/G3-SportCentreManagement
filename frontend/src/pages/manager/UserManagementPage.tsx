@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { managerUsersApi } from '../../api/managerUsersApi'
 import { useAuth } from '../../auth/useAuth'
 import { ROLE_LABELS } from '../../auth/roles'
-import { Button, Card, Input, Modal, PageHeader, Select, StatusBadge, Table, useToast, type TableColumn } from '../../components/ui'
+import { Button, Card, Input, Modal, Select, StatusBadge, Table, useToast, type TableColumn } from '../../components/ui'
 import type { ManagerUser } from '../../types/manager'
 import { formatManagerDateTime } from './managerFormat'
 import { AddStaffAccountModal } from './AddStaffAccountModal'
@@ -26,6 +26,11 @@ export function UserManagementPage() {
   const [resource, reload] = useResource(load)
   const ready = resource.status === 'ready' && search === debounced
   const changed = () => { setChanging(null); toast.success('Account status updated'); reload() }
+
+  const totalCount = ready ? resource.data.totalElements : 0
+  const activeCount = ready ? resource.data.content.filter((u) => u.status === 'ACTIVE').length : 0
+  const currentRoleLabel = role ? (ROLE_LABELS[role as keyof typeof ROLE_LABELS] ?? role) : 'All roles'
+
   const columns: TableColumn<ManagerUser>[] = [
     { key: 'fullName', header: 'Name / email', render: (row) => <div className="manager-cell"><strong>{row.fullName}</strong><span>{row.email}</span></div> },
     { key: 'role', header: 'Role', render: (row) => ROLE_LABELS[row.role as keyof typeof ROLE_LABELS] ?? row.role },
@@ -37,9 +42,59 @@ export function UserManagementPage() {
       <Button variant={row.status === 'ACTIVE' ? 'danger' : 'secondary'} size="sm" disabled={row.id === user?.id && row.status === 'ACTIVE'} title={row.id === user?.id ? 'You cannot deactivate your own account.' : undefined} onClick={() => setChanging(row)}>{row.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}</Button>
     </div> },
   ]
-  return <div className="page manager-page manager-page--users">
-    <PageHeader eyebrow="Center management" title="User Management" description="Manage member, coach and receptionist accounts." actions={<Button onClick={() => setAdding(true)}>+ Add staff</Button>} />
+
+  return <div className="page manager-page manager-page--users manager-concept-page">
+    <div className="concept-header">
+      <div className="concept-header__main">
+        <div className="concept-eyebrow">MANAGER WORKSPACE</div>
+        <h1 className="concept-title">User Management</h1>
+        <p className="concept-sub">Manage member, coach and receptionist accounts with clear role and status controls.</p>
+      </div>
+      <span className="concept-tag">DESIGN CONCEPT - SAMPLE DATA</span>
+    </div>
+
+    <div className="concept-hero">
+      <div>
+        <small>CENTER MANAGEMENT</small>
+        <h2>ONE CENTER. <span className="concept-goldtext">ONE TEAM.</span></h2>
+        <p>Clear roles and account states for safer daily operations.</p>
+      </div>
+      <Button variant="secondary" className="concept-btn concept-btn--gold" onClick={() => setAdding(true)}>+ Add staff</Button>
+    </div>
+
+    <div className="concept-stats">
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">U</span>
+        <div>
+          <strong>{ready ? String(totalCount).padStart(2, '0') : '--'}</strong>
+          <small>Accounts shown</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">A</span>
+        <div>
+          <strong>{ready ? String(activeCount).padStart(2, '0') : '--'}</strong>
+          <small>Active accounts</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">R</span>
+        <div>
+          <strong>{currentRoleLabel}</strong>
+          <small>Current filter</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">P</span>
+        <div>
+          <strong>02</strong>
+          <small>Staff roles</small>
+        </div>
+      </div>
+    </div>
+
     <PreviewNotice />
+
     <Card title="Center accounts">
       <div className="manager-filters">
         <Input label="Search accounts" type="search" placeholder="Search name, email or phone" value={search} onChange={(event) => { setSearch(event.target.value); setPage(0) }} />
@@ -50,6 +105,7 @@ export function UserManagementPage() {
       {resource.status === 'error' ? <ManagerError error={resource.error} onRetry={reload} /> : <Table columns={columns} rows={ready ? resource.data.content : []} rowKey={(row) => row.id} loading={!ready} caption="Center accounts" emptyTitle={search || role || status ? 'No matching accounts' : 'No accounts yet'} emptyDescription="Try a different search or add a staff account." pagination={ready ? { page, pageSize: 20, totalItems: resource.data.totalElements, onPageChange: setPage } : undefined} />}
       <p className="manager-footnote">Account status controls login. It is separate from membership and payment status. You cannot deactivate your own account.</p>
     </Card>
+
     {adding && <AddStaffAccountModal onClose={() => setAdding(false)} onSuccess={() => { setAdding(false); toast.success('Staff account created', 'The account is active. Your current filters have been preserved.'); reload() }} />}
     {changing && <ConfirmationModal title={changing.status === 'ACTIVE' ? 'Deactivate account' : 'Activate account'} description={`${changing.status === 'ACTIVE' ? 'Deactivate' : 'Activate'} ${changing.fullName}'s account? ${changing.status === 'ACTIVE' ? 'They will no longer be able to log in.' : 'They will be able to log in again.'}`} onClose={() => setChanging(null)} save={() => managerUsersApi.changeStatus(changing.id, changing.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE')} onSuccess={changed} confirmLabel={changing.status === 'ACTIVE' ? 'Deactivate account' : 'Activate account'} danger={changing.status === 'ACTIVE'} />}
     {editingCoach && <EditCoachProfileModal userId={editingCoach.id} name={editingCoach.fullName} onClose={() => setEditingCoach(null)} onSuccess={() => { setEditingCoach(null); toast.success('Coach profile updated', 'The Home page shows the new photo and details.') }} />}

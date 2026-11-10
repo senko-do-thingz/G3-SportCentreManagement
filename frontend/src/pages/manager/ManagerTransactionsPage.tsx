@@ -5,7 +5,7 @@ import { ApiError, getErrorMessage } from '../../api/errors'
 import { managerFinanceApi, type FinanceTransaction, type ReviewRefundRequest } from '../../api/managerFinanceApi'
 import type { Refund } from '../../api/receptionPaymentsApi'
 import { tokenStorage } from '../../api/tokenStorage'
-import { Button, Card, Input, Modal, PageHeader, Select, StatusBadge, Table, TextArea, type TableColumn } from '../../components/ui'
+import { Button, Card, Input, Modal, Select, StatusBadge, Table, TextArea, type TableColumn } from '../../components/ui'
 import { useResource, useDebounced } from './useManagerTools'
 import { ManagerError, PreviewNotice } from './ManagerShared'
 import { formatDateTime, formatMoney, humanizeCode } from '../../utils/format'
@@ -181,8 +181,55 @@ export function ManagerTransactionsPage() {
     }
   }
 
-  return <div className="page manager-page manager-finance-page">
-    <PageHeader eyebrow="Manager / Payments & Reports" title="Transactions and Refunds" description="Review collected payments and decide pending refund requests." />
+  return <div className="page manager-page manager-finance-page manager-concept-page">
+    <div className="concept-header">
+      <div className="concept-header__main">
+        <div className="concept-eyebrow">MANAGER WORKSPACE</div>
+        <h1 className="concept-title">Transactions & Refunds</h1>
+        <p className="concept-sub">Review collected payments, audit settlement methods and decide pending refund requests.</p>
+      </div>
+      <span className="concept-tag">DESIGN CONCEPT - SAMPLE DATA</span>
+    </div>
+
+    <div className="concept-hero">
+      <div>
+        <small>AUDITED LEDGER</small>
+        <h2>FINANCIAL SETTLEMENTS. <span className="concept-goldtext">DISCIPLINED RECOVERY.</span></h2>
+        <p>Complete traceability of revenue receipts, payment methods and refund authorizations.</p>
+      </div>
+    </div>
+
+    <div className="concept-stats">
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">T</span>
+        <div>
+          <strong>{transactions.status === 'ready' ? transactions.data.totalElements : 0} Total</strong>
+          <small>Transactions recorded</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">S</span>
+        <div>
+          <strong>Settled</strong>
+          <small>Verified payments</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">R</span>
+        <div>
+          <strong>{refunds.status === 'ready' ? refunds.data.length : 0} Pending</strong>
+          <small>Refund requests queue</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">A</span>
+        <div>
+          <strong>Audited</strong>
+          <small>Permanent decision log</small>
+        </div>
+      </div>
+    </div>
+
     <PreviewNotice />
 
     <Card title="Transaction ledger">

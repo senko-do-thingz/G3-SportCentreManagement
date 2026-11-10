@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { managerCardTiersApi } from '../../api/managerCardTiersApi'
-import { Badge, Button, Card, EmptyState, PageHeader, Spinner, StatusBadge, Table, useToast, type TableColumn } from '../../components/ui'
+import { Badge, Button, Card, EmptyState, Spinner, StatusBadge, Table, useToast, type TableColumn } from '../../components/ui'
 import { formatMoney } from '../../utils/format'
 import type { ManagerCardTier } from '../../types/manager'
 import { EditMembershipCardModal } from './EditMembershipCardModal'
@@ -22,6 +22,11 @@ export function MembershipCardsManagementPage() {
   const toast = useToast()
   const [resource, reload] = useResource(load)
   const [selected, setSelected] = useState<ManagerCardTier | null>(null)
+
+  const tiers = resource.status === 'ready' ? resource.data : []
+  const publishedTiers = tiers.length ? String(tiers.length).padStart(2, '0') : '--'
+  const activeCount = tiers.length ? String(tiers.filter((t) => t.isActive).length).padStart(2, '0') : '--'
+  const maxDiscount = tiers.length ? Math.max(...tiers.map((t) => t.discountPercentage ?? 0)) + '%' : '--'
 
   const columns: TableColumn<ManagerCardTier>[] = [
     {
@@ -72,8 +77,55 @@ export function MembershipCardsManagementPage() {
     },
   ]
 
-  return <div className="page manager-page manager-catalog manager-catalog--tiers">
-    <PageHeader title="Membership cards" description="Review tier fees, validity and package discounts." />
+  return <div className="page manager-page manager-catalog manager-catalog--tiers manager-concept-page">
+    <div className="concept-header">
+      <div className="concept-header__main">
+        <div className="concept-eyebrow">MANAGER WORKSPACE</div>
+        <h1 className="concept-title">Membership Cards</h1>
+        <p className="concept-sub">Review tier fees, validity and package discounts while protecting standard tiers.</p>
+      </div>
+      <span className="concept-tag">DESIGN CONCEPT - SAMPLE DATA</span>
+    </div>
+
+    <div className="concept-hero">
+      <div>
+        <small>TIER BENEFITS</small>
+        <h2>TIERED PRIVILEGES. <span className="concept-goldtext">PREDICTABLE VALUE.</span></h2>
+        <p>Review discounts and duration rules across published tiers.</p>
+      </div>
+    </div>
+
+    <div className="concept-stats">
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">T</span>
+        <div>
+          <strong>{publishedTiers}</strong>
+          <small>Published tiers</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">A</span>
+        <div>
+          <strong>{activeCount}</strong>
+          <small>Active tiers</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">D</span>
+        <div>
+          <strong>{maxDiscount}</strong>
+          <small>Max package discount</small>
+        </div>
+      </div>
+      <div className="concept-stat">
+        <span className="concept-stat__icon" aria-hidden="true">S</span>
+        <div>
+          <strong>Protected</strong>
+          <small>Standard tier</small>
+        </div>
+      </div>
+    </div>
+
     <PreviewNotice />
     {resource.status === 'loading' && <Card className="manager-catalog__state"><Spinner label="Loading membership cards" /></Card>}
     {resource.status === 'error' && <Card className="manager-catalog__state"><ManagerError error={resource.error} onRetry={reload} /></Card>}
