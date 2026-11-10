@@ -464,3 +464,8 @@
   font-weight: var(--weight-bold);
   letter-spacing: 0.02em;
 }
+
+/* DEF-RUI-002: in dark mode --color-primary is a pale blue, which washed out the hero. Keep it deep navy. */
+:root[data-theme='dark'] .rcp-hero {
+  background: linear-gradient(109deg, var(--color-hero-deep) 0%, var(--color-hero) 40%, var(--color-feature-surface) 75%, var(--color-primary-soft-hover) 100%);
+}
