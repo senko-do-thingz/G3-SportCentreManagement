@@ -92,6 +92,24 @@ describe('FE-10 coach schedule and roster screens', () => {
     expect(print).toHaveBeenCalledTimes(1)
   })
 
+  it('selects an assigned session from the roster workspace and shows only confirmed booking fields', async () => {
+    const { calls } = setup()
+    const user = userEvent.setup()
+    renderApp('/coach/roster?week=2026-10-19')
+
+    expect(await screen.findByRole('heading', { name: 'Class Roster' })).toBeInTheDocument()
+    expect(await screen.findByText('Choose a session to view its roster')).toBeInTheDocument()
+    const sessionSelect = await screen.findByRole('combobox', { name: 'Session' })
+
+    await user.selectOptions(sessionSelect, '5')
+
+    expect(await screen.findByText('Taylor Nguyen')).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Confirmed member bookings' })).toBeInTheDocument()
+    expect(screen.getByText('Roster capacity').parentElement).toHaveTextContent('20')
+    expect(screen.queryByText('0901234567')).not.toBeInTheDocument()
+    expect(calls.some((call) => call.path === '/coach/sessions/5/roster')).toBe(true)
+  })
+
   it('shows the roster empty state for a session with no confirmed bookings', async () => {
     setup(COACH, (call) => call.path === '/coach/sessions/5/roster' ? json(200, []) : undefined)
     renderApp('/coach/roster?sessionId=5&week=2026-10-19')

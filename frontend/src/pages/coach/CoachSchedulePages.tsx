@@ -159,7 +159,7 @@ function rosterBookedAt(value: string | null): string {
 
 function RosterTable({ rows }: { rows: CoachRosterRecord[] }) {
   return <div className="coach-roster-table-wrap">
-    <table className="coach-roster-table">
+    <table className="coach-roster-table" aria-label="Confirmed member bookings">
       <thead><tr><th scope="col">Member code</th><th scope="col">Member name</th><th scope="col">Package</th><th scope="col">Booked at</th><th scope="col">Status</th></tr></thead>
       <tbody>{rows.map((row) => <tr key={row.bookingId}><td>{row.memberCode || 'Not provided'}</td><td>{row.memberName || 'Not provided'}</td><td>{row.packageName || 'Not provided'}</td><td>{rosterBookedAt(row.bookedAt)}</td><td><Badge tone="success">Confirmed</Badge></td></tr>)}</tbody>
     </table>
@@ -191,20 +191,47 @@ export function CoachRosterPage() {
     })
   }
 
-  return <div className="page coach-schedule-page coach-ui">
-    <PageHeader eyebrow="Coach" title="Class Roster" description="Review confirmed members for a session assigned to you. Personal contact details are restricted." actions={<Button variant="secondary" disabled={!selectedSession || roster.status !== 'ready'} onClick={() => window.print()}>Print roster</Button>} />
-    <Card title="Select a session">
-      <div className="browse-actions coach-week-nav"><Button variant="secondary" onClick={() => setParams(changeWeekParams(params, browseAddDays(week, -7)))}>Previous week</Button><Button variant="secondary" onClick={() => setParams(changeWeekParams(params, browseMonday(browseToday())))}>This week</Button><Button variant="secondary" onClick={() => setParams(changeWeekParams(params, browseAddDays(week, 7)))}>Next week</Button><strong>{browseDate(week)} - {browseDate(weekEnd)}</strong></div>
-      {sessionsResource.status === 'error' ? <ErrorState title="We could not load your sessions" error={sessionsResource.error} onRetry={reloadSessions} /> : sessionsResource.status === 'loading' ? <PageLoader label="Loading your sessions" /> : sessions.length === 0 ? <EmptyState title="No assigned sessions this week" description="Change the week to find one of your sessions." /> : <Select label="Session" placeholder="Choose a session" value={selectedSession ? sessionRouteReference(selectedSession) : ''} options={options} onChange={(event) => selectSession(event.target.value)} />}
-    </Card>
-    {selectedSession && <Card className="coach-print" title={sessionTitle(selectedSession)} actions={<StatusBadge status={selectedSession.status} />}>
-      <SessionContext {...selectedSession} date={selectedSession.sessionDate} />
-      <dl className="browse-facts coach-roster-facts"><div><dt>Date</dt><dd>{browseDate(selectedSession.sessionDate)}</dd></div><div><dt>Time</dt><dd>{displayTime(selectedSession.startTime)} - {displayTime(selectedSession.endTime)} Vietnam time</dd></div><div><dt>Sport</dt><dd>{selectedSession.sportName}</dd></div><div><dt>Facility</dt><dd>{selectedSession.facilityName || 'Not provided'}</dd></div><div><dt>Capacity</dt><dd>{selectedSession.capacity ?? 'Not provided'}</dd></div><div><dt>Confirmed bookings</dt><dd>{selectedSession.bookedCount}</dd></div></dl>
-      <p className="notice notice--info coach-privacy-note">Personal contact details are restricted. This roster shows member names and package details only.</p>
-      {roster.status === 'loading' ? <PageLoader label="Loading confirmed roster" /> : roster.status === 'error' ? <ErrorState title="We could not load this class roster" error={roster.error} onRetry={reloadRoster} /> : roster.data.length === 0 ? <EmptyState title="No confirmed bookings" description="There are no confirmed members on this session roster." /> : <RosterTable rows={roster.data} />}
-    </Card>}
-    {sessionsResource.status === 'ready' && selectedSessionId && !selectedSession && <Card><ErrorState title="Session is not in this week's schedule" message="Choose a session from your schedule, or change the week and select it again." /></Card>}
-    {sessionsResource.status === 'ready' && !selectedSessionId && sessions.length > 0 && <EmptyState title="Choose a session to view its roster" description="Only your assigned sessions are available in this coach workspace." />}
-    {sessionsResource.status === 'ready' && selectedSession && roster.status === 'ready' && roster.data.length > 0 && <div className="coach-print-hidden"><Link className="btn btn--secondary" to={`/coach?week=${week}`}>Back to teaching schedule</Link>{selectedSession.classId && <Link className="btn btn--secondary" to={`/coach/training/progress?classId=${selectedSession.classId}`}>View class member progress</Link>}</div>}
+  const rosterCount = selectedSession && roster.status === 'ready' ? roster.data.length : '--'
+
+  return <div className="page coach-schedule-page coach-roster-page coach-ui">
+    <PageHeader eyebrow="Your workspace" title="Class Roster" description="Select an assigned session to review its confirmed bookings." actions={<Button variant="secondary" disabled={!selectedSession || roster.status !== 'ready'} onClick={() => window.print()}>Print roster</Button>} />
+    <section className="coach-schedule-hero" aria-label="Class roster introduction">
+      <div className="coach-schedule-hero__copy">
+        <p className="coach-schedule-hero__eyebrow">Sportify coach experience</p>
+        <h2>Know your class.<br /><span>Prepare to coach.</span></h2>
+        <p>Review confirmed bookings and session details in one place.</p>
+      </div>
+      <a className="btn btn--accent coach-schedule-hero__action" href="#coach-roster-picker">Choose session</a>
+    </section>
+    <section className="coach-roster-metrics" aria-label="Roster summary">
+      <div className="coach-schedule-metric"><span className="coach-schedule-metric__mark" aria-hidden="true" /><div><p>{selectedSession ? '1' : '--'}</p><span>Selected session</span></div></div>
+      <div className="coach-schedule-metric"><span className="coach-schedule-metric__mark" aria-hidden="true" /><div><p>{selectedSession?.bookedCount ?? '--'}</p><span>Confirmed bookings</span></div></div>
+      <div className="coach-schedule-metric"><span className="coach-schedule-metric__mark" aria-hidden="true" /><div><p>{rosterCount}</p><span>Members displayed</span></div></div>
+      <div className="coach-schedule-metric"><span className="coach-schedule-metric__mark" aria-hidden="true" /><div><p>{selectedSession?.capacity ?? '--'}</p><span>Roster capacity</span></div></div>
+    </section>
+    <div className="coach-roster-layout">
+      <Card className="coach-roster-picker" title="Choose a session" id="coach-roster-picker">
+        <div className="coach-roster-picker__body">
+          <p className="coach-roster-field-label">Schedule week</p>
+          <div className="coach-roster-week-nav" aria-label="Roster week navigation">
+            <strong>{browseDate(week)} - {browseDate(weekEnd)}</strong>
+            <Button variant="secondary" size="sm" onClick={() => setParams(changeWeekParams(params, browseAddDays(week, -7)))}>Previous</Button>
+            <Button variant="secondary" size="sm" onClick={() => setParams(changeWeekParams(params, browseMonday(browseToday())))}>This week</Button>
+            <Button variant="secondary" size="sm" onClick={() => setParams(changeWeekParams(params, browseAddDays(week, 7)))}>Next</Button>
+          </div>
+          {sessionsResource.status === 'error' ? <ErrorState title="We could not load your sessions" error={sessionsResource.error} onRetry={reloadSessions} /> : sessionsResource.status === 'loading' ? <PageLoader label="Loading your sessions" /> : sessions.length === 0 ? <EmptyState title="No assigned sessions this week" description="Change the week to find one of your sessions." /> : <Select label="Session" placeholder="Choose an assigned session" value={selectedSession ? sessionRouteReference(selectedSession) : ''} options={options} onChange={(event) => selectSession(event.target.value)} />}
+          <p className="coach-roster-picker__note">Only sessions assigned to your coach account are available. The roster contains confirmed bookings only.</p>
+        </div>
+      </Card>
+      <Card className={`coach-print coach-roster-content${selectedSession ? ' has-session' : ''}`} title={selectedSession ? sessionTitle(selectedSession) : 'Member roster'} actions={selectedSession ? <StatusBadge status={selectedSession.status} /> : undefined}>
+        {selectedSession ? <>
+          <SessionContext {...selectedSession} date={selectedSession.sessionDate} />
+          <dl className="browse-facts coach-roster-facts"><div><dt>Capacity</dt><dd>{selectedSession.capacity ?? 'Not provided'}</dd></div><div><dt>Confirmed bookings</dt><dd>{selectedSession.bookedCount}</dd></div></dl>
+          <p className="notice notice--info coach-privacy-note">Personal contact details are restricted. This roster shows member names and package details only.</p>
+          {roster.status === 'loading' ? <PageLoader label="Loading confirmed roster" /> : roster.status === 'error' ? <ErrorState title="We could not load this class roster" error={roster.error} onRetry={reloadRoster} /> : roster.data.length === 0 ? <EmptyState title="No confirmed bookings" description="There are no confirmed members on this session roster." /> : <RosterTable rows={roster.data} />}
+        </> : sessionsResource.status === 'error' ? <EmptyState title="Roster unavailable" description="Retry loading your sessions to choose a class roster." /> : sessionsResource.status === 'loading' ? <PageLoader label="Loading roster options" /> : selectedSessionId ? <ErrorState title="Session is not in this week's schedule" message="Choose a session from your schedule, or change the week and select it again." /> : sessions.length === 0 ? <EmptyState title="No session to review" description="Assigned sessions with confirmed bookings will appear here." /> : <EmptyState title="Choose a session to view its roster" description="Select one of your assigned sessions. Confirmed bookings will appear here." />}
+      </Card>
+    </div>
+    {sessionsResource.status === 'ready' && selectedSession && roster.status === 'ready' && roster.data.length > 0 && <div className="coach-print-hidden coach-roster-links"><Link className="btn btn--secondary" to={`/coach?week=${week}`}>Back to teaching schedule</Link>{selectedSession.classId && <Link className="btn btn--secondary" to={`/coach/training/progress?classId=${selectedSession.classId}`}>View class member progress</Link>}</div>}
   </div>
 }
