@@ -4,7 +4,7 @@
 
 - Feature branch: fix/flow-4-6-member-workspace-training-assistant-concept-b
 - Main baseline fetched from GitHub on 2026-11-11: f6774c7d08f9f11801a5071e338575cf196fb088
-- Source commit: pending commit creation; update this field after the source commit is created.
+- Source commit: 35b69908f1c05a7ce894317cc60b303ff38c57c7
 - Scope owner: Hung
 - Scope: Member workspace shell and navigation, dashboard presentation, Training Hub landing and navigation, the existing consent-gated assistant entry, and Member support presentation.
 - Coach workflow redesign was dropped after the user confirmed it had been completed by others. No Coach application files were changed.

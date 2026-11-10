@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "pending",
+  "sourceCommit": "35b69908f1c05a7ce894317cc60b303ff38c57c7",
   "mainBaseline": "f6774c7d08f9f11801a5071e338575cf196fb088",
   "captureBoundary": "All captures use local synthetic API responses and are not live backend evidence.",
   "productionBackendWrites": false,
