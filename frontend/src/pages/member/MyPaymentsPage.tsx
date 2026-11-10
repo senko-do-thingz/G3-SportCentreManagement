@@ -127,7 +127,7 @@ export function MyPaymentsPage() {
   const filtered = status !== ''
 
   return (
-    <div className="page">
+    <div className="page member-commerce">
       <PaymentHero
         eyebrow="Member / Payments"
         title="My Payments and Receipts"

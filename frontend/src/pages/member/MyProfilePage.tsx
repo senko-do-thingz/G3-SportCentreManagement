@@ -6,12 +6,13 @@ import type { UserProfile } from '../../api/types'
 import { ROLE_LABELS, roleOf } from '../../auth/roles'
 import { useAuth } from '../../auth/useAuth'
 import { PasswordRules } from '../../components/PasswordRules'
-import { Button, Card, ErrorState, Input, PageHeader, PasswordInput, Select, useToast } from '../../components/ui'
+import { Button, Card, ErrorState, Input, PasswordInput, Select, useToast } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { initials } from '../../utils/format'
 import { useFocusFirstInvalid } from '../../utils/useFocusFirstInvalid'
 import { MEMBER_PATHS, toIsoDate } from './dashboardModel'
+import { MemberCommerceHeader, MemberCommerceHero } from './MemberCommerceComponents'
 import {
   ADDRESS_MAX_LENGTH,
   CURRENT_PASSWORD_REJECTED_MESSAGE,
@@ -85,8 +86,8 @@ export function MyProfilePage() {
   const [profile, reload] = useMemberResource(loadProfile)
 
   return (
-    <div className="page member-ui member-ui--profile">
-      <PageHeader
+    <div className="page member-ui member-ui--profile member-commerce">
+      <MemberCommerceHeader
         eyebrow="Your sport, your way"
         title="My Profile"
         description="Update your personal details, training preferences and password."
@@ -94,6 +95,11 @@ export function MyProfilePage() {
           <Link className={buttonClassName('secondary')} to="/member/profile/health">Health &amp; Training</Link>
           <Link className={buttonClassName('secondary')} to="/member/check-in-pass">Open check-in pass</Link>
         </> : undefined}
+      />
+      <MemberCommerceHero
+        kicker="Account & Security"
+        title="YOUR PROFILE. YOUR HEALTH. A BETTER TRAINING JOURNEY."
+        description="Keep your contact details up to date, manage your security credentials, and review your training goals."
       />
       {profile.status === 'loading' && <Spinner label="Loading your profile" />}
       {profile.status === 'error' && (

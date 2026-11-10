@@ -38,16 +38,18 @@ export function PaymentStatusPage() {
   if (id === null) {
     return (
       <PaymentWorkspace>
-        <PaymentHero eyebrow="Member / Payments" title="Payment Instructions and Status" />
-        <EmptyState
-          title="Payment not found"
-          description="The payment link is not valid."
-          action={
-            <Link className={buttonClassName('secondary', 'md')} to={PAYMENT_PATHS.list}>
-              My payments
-            </Link>
-          }
-        />
+        <div className="member-commerce">
+          <PaymentHero eyebrow="Member / Payments" title="Payment Instructions and Status" />
+          <EmptyState
+            title="Payment not found"
+            description="The payment link is not valid."
+            action={
+              <Link className={buttonClassName('secondary', 'md')} to={PAYMENT_PATHS.list}>
+                My payments
+              </Link>
+            }
+          />
+        </div>
       </PaymentWorkspace>
     )
   }
@@ -83,24 +85,28 @@ function PaymentStatusView({ paymentId }: { paymentId: number }) {
   if (!payment) {
     return (
       <PaymentWorkspace>
-        <PaymentNav paymentId={paymentId} />
-        {header}
-        {loadError ? (
-          <ErrorState title="We could not load the payment" error={loadError} onRetry={refresh} />
-        ) : (
-          <Spinner label="Loading the payment" />
-        )}
+        <div className="member-commerce">
+          <PaymentNav paymentId={paymentId} />
+          {header}
+          {loadError ? (
+            <ErrorState title="We could not load the payment" error={loadError} onRetry={refresh} />
+          ) : (
+            <Spinner label="Loading the payment" />
+          )}
+        </div>
       </PaymentWorkspace>
     )
   }
 
   return (
     <PaymentWorkspace>
-      <PaymentNav paymentId={paymentId} />
-      {header}
-      <div className="payment-summary">
-        <Instructions payment={payment} />
-        <StatusPanel polling={polling} payment={payment} />
+      <div className="member-commerce">
+        <PaymentNav paymentId={paymentId} />
+        {header}
+        <div className="payment-summary">
+          <Instructions payment={payment} />
+          <StatusPanel polling={polling} payment={payment} />
+        </div>
       </div>
     </PaymentWorkspace>
   )
