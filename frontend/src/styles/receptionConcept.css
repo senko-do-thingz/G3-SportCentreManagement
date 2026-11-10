@@ -469,3 +469,13 @@
 :root[data-theme='dark'] .rcp-hero {
   background: linear-gradient(109deg, var(--color-hero-deep) 0%, var(--color-hero) 40%, var(--color-feature-surface) 75%, var(--color-primary-soft-hover) 100%);
 }
+
+/* DEF-RUI-003: spacing for the arrival pass reader card (CheckInPassReader markup is left unchanged). */
+.page.rcp.rcp-checkin form[aria-label='Member QR check-in'] {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+.page.rcp.rcp-checkin form[aria-label='Member QR check-in'] > .field { width: 100%; }
+.page.rcp.rcp-checkin .card > p { margin: 0 0 var(--space-2); font-size: var(--text-sm); color: var(--color-text-muted); }
