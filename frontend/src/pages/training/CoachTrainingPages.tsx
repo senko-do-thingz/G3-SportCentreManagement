@@ -412,7 +412,7 @@ function PublishFeedbackForm({ planId }: { planId: number }) {
 
 export function CoachTrainingResultsPage() {
   return (
-    <div className="training-page coach-ui">
+    <div className="training-page coach-ui coach-results-page">
       <PageHeader title="Record training results" description="Record results for members marked Present or Late in sessions you coach. Results are visible as soon as you save them." />
       <TrainingData load={training.coachSessions}>{sessions => <CoachResultsWorkspace sessions={sessions} />}</TrainingData>
     </div>
@@ -426,13 +426,43 @@ function CoachResultsWorkspace({ sessions }: { sessions: StaffSession[] }) {
     const [members, metrics] = await Promise.all([training.coachRoster(sessionId, signal), training.metrics(session!.sportId, signal)])
     return { members, metrics }
   }, [sessionId, session])
+  const selectedSessionLabel = session ? `${session.className} / ${formatCalendarDate(session.date)}` : 'None selected'
   return (
-    <Card title="Select a session">
-      <Select label="Assigned session" value={sessionId} onChange={event => setSessionId(event.target.value)} placeholder="Select a session"
-        options={sessions.map(item => ({ value: sessionRouteReference(item), label: `${sessionIdText(item.sessionId)} - ${item.className} - ${formatCalendarDate(item.date)} - ${item.startTime.slice(0, 5)}` }))} />
-      {!sessions.length && <p>You have no assigned sessions.</p>}
-      {session && <><SessionContext {...session} /><TrainingData load={load}>{data => <ResultForm key={session.id} session={session} {...data} />}</TrainingData></>}
-    </Card>
+    <>
+      <section className="coach-schedule-hero coach-results-hero" aria-label="Training results introduction">
+        <div className="coach-schedule-hero__copy">
+          <p className="coach-schedule-hero__eyebrow">Sportify coach experience</p>
+          <h2>Measure progress.<br /><span>Make it count.</span></h2>
+          <p>Record skill scores or notes for members eligible in the selected session.</p>
+        </div>
+        <Button variant="accent" size="sm" className="coach-schedule-hero__action" disabled={!sessions.length} onClick={() => document.getElementById('coach-results-session')?.focus()}>Select session</Button>
+      </section>
+      <section className="coach-results-overview" aria-label="Training results overview">
+        <div><span>Assigned sessions</span><strong>{sessions.length}</strong></div>
+        <div><span>Selected session</span><strong>{selectedSessionLabel}</strong></div>
+      </section>
+      <div className="coach-results-layout">
+        <Card className="coach-results-session" title="Session selection">
+          <Select id="coach-results-session" label="Assigned session" value={sessionId} onChange={event => setSessionId(event.target.value)} placeholder="Select an assigned session"
+            options={sessions.map(item => ({ value: sessionRouteReference(item), label: `${sessionIdText(item.sessionId)} - ${item.className} - ${formatCalendarDate(item.date)} - ${item.startTime.slice(0, 5)}` }))} />
+          {!sessions.length
+            ? <p className="coach-results-eligibility" role="status">You have no assigned sessions.</p>
+            : <aside className="coach-results-eligibility">
+              <span>Coach only</span>
+              <h3>Result eligibility</h3>
+              <p>Attendance must be marked before a result can be saved.</p>
+            </aside>}
+        </Card>
+        <Card className="coach-results-editor" title="Result editor">
+          {!session
+            ? <div className="coach-results-empty"><EmptyState title="Select a session to begin" description="After you select an assigned session, eligible members and evaluation fields will appear here. Results are not saved by viewing this page." /></div>
+            : <div className="coach-results-selected">
+              <SessionContext {...session} />
+              <TrainingData load={load}>{data => <ResultForm key={session.id} session={session} {...data} />}</TrainingData>
+            </div>}
+        </Card>
+      </div>
+    </>
   )
 }
 
@@ -441,7 +471,7 @@ function ResultForm({ session, members, metrics }: { session: StaffSession; memb
   const [savedMemberIds, setSavedMemberIds] = useState<number[]>([])
   const saved = members.filter(member => member.resultId || savedMemberIds.includes(member.memberId))
   const eligible = members.filter(member => !member.resultId && !savedMemberIds.includes(member.memberId) && (member.status === 'PRESENT' || member.status === 'LATE'))
-  if (!eligible.length) return <><ActionMessage {...action} /><EmptyState title={saved.length ? "Results already saved" : "No members eligible for results"} description={saved.length ? "All eligible members already have a result. Duplicate submissions are disabled." : "Record Present or Late attendance before saving results."} /></>
+  if (!eligible.length) return <div className="coach-results-state"><ActionMessage {...action} /><EmptyState title={saved.length ? "Results already saved" : "No members eligible for results"} description={saved.length ? "All eligible members already have a result. Duplicate submissions are disabled." : "Record Present or Late attendance before saving results."} /></div>
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = event.currentTarget
@@ -464,18 +494,35 @@ function ResultForm({ session, members, metrics }: { session: StaffSession; memb
     }, 'Training results saved. The member can view them immediately.')
   }
   return (
-    <form className="training-form" onSubmit={submit}>
-      {saved.length > 0 && <p role="status">Results already saved for: {saved.map(member => member.memberName).join(', ')}</p>}
-      <fieldset className="training-fieldset training-result-fields" disabled={action.pending}>
-        <Select label="Member receiving results" name="memberId" required placeholder="Select a member"
-          options={eligible.map(member => ({ value: String(member.memberId), label: `${member.memberName} - ${attendanceLabel(member.status)}` }))} />
-        <TrainingTextarea label="Result notes" name="notes" maxLength={1000} required={!metrics.length} />
-        {metrics.length ? metrics.map(metric => (
-          <Input key={metric.id} label={`${metric.name} (0-${metric.maxScore})`} name={`metric-${metric.id}`} type="number" min={0} max={metric.maxScore} step="0.01" />
-        )) : <p>No skill metrics are configured for this sport. You can still save result notes.</p>}
-        <Button type="submit" loading={action.pending}>Save results</Button>
-      </fieldset>
-      <ActionMessage {...action} />
-    </form>
+    <section className="coach-results-data" aria-label="Training results for selected session">
+      <div className="coach-results-data__summary" aria-label="Session result counts">
+        <div><span>Eligible members</span><strong>{eligible.length}</strong></div>
+        <div><span>Recorded results</span><strong>{saved.length}</strong></div>
+      </div>
+      <form className="training-form coach-result-form" onSubmit={submit}>
+        {saved.length > 0 && <p className="coach-results-saved" role="status">Results already saved for: {saved.map(member => member.memberName).join(', ')}</p>}
+        <fieldset className="training-fieldset training-result-fields coach-result-fields" disabled={action.pending}>
+          <div className="coach-result-member">
+            <Select label="Member receiving results" name="memberId" required placeholder="Select a member"
+              options={eligible.map(member => ({ value: String(member.memberId), label: `${member.memberName} - ${attendanceLabel(member.status)}` }))} />
+            <p>Only members marked Present or Late are listed.</p>
+          </div>
+          <section className="coach-result-scores" aria-labelledby="coach-result-scores-title">
+            <header><h3 id="coach-result-scores-title">Skill scores</h3><span>{metrics.length ? `${metrics.length} configured ${metrics.length === 1 ? 'metric' : 'metrics'}` : 'No metrics configured'}</span></header>
+            {metrics.length
+              ? <div className="coach-result-metric-grid">{metrics.map(metric => (
+                <Input key={metric.id} label={`${metric.name} (0-${metric.maxScore})`} name={`metric-${metric.id}`} type="number" min={0} max={metric.maxScore} step="0.01" />
+              ))}</div>
+              : <p>No skill metrics are configured for this sport. You can still save result notes.</p>}
+          </section>
+          <div className="coach-result-notes">
+            <TrainingTextarea label="Result notes" name="notes" maxLength={1000} required={!metrics.length} />
+            {metrics.length > 0 && <p>Enter notes, one or more scores, or both.</p>}
+          </div>
+          <div className="coach-result-actions"><Button type="submit" loading={action.pending}>Save results</Button></div>
+        </fieldset>
+        <ActionMessage {...action} />
+      </form>
+    </section>
   )
 }
