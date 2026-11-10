@@ -43,4 +43,10 @@ describe('coach presentation foundation', () => {
     expect(stylesheet).toContain('.coach-ui.coach-plans-page')
     expect(stylesheet).toContain('.coach-ui.coach-results-page')
   })
+
+  it('provides scoped metric icon styling for Coach summary metrics', () => {
+    expect(stylesheet).toContain('.coach-ui.coach-schedule-page .coach-schedule-metric__icon')
+    expect(stylesheet).toContain('.coach-ui.coach-roster-page .coach-schedule-metric__icon')
+    expect(stylesheet).toContain('.coach-ui.coach-questions-page .coach-schedule-metric__icon')
+  })
 })

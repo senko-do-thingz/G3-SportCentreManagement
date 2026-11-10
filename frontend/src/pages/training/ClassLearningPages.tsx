@@ -77,6 +77,32 @@ function MemberQuestionsPage() {
   </div>
 }
 
+type QuestionMetricIconName = 'queue' | 'conversation'
+
+/** Decorative icons for the Member Questions summary only. */
+function QuestionMetricIcon({ name }: { name: QuestionMetricIconName }) {
+  return <svg
+    className="coach-schedule-metric__icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    focusable="false"
+  >
+    {name === 'queue' ? <>
+      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+      <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    </> : <>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      <line x1="8" y1="9" x2="16" y2="9" />
+      <line x1="8" y1="13" x2="13" y2="13" />
+    </>}
+  </svg>
+}
+
 function CoachMemberQuestionsPage() {
   const [revision, refresh] = useState(0)
   const [selected, setSelected] = useState('')
@@ -118,8 +144,8 @@ function CoachMemberQuestionsPage() {
       const selectedQuestion = questions.find(question => String(question.id) === selected)
       return <>
         <section className="coach-question-metrics" aria-label="Question queue summary">
-          <div className="coach-schedule-metric"><span className="coach-schedule-metric__mark" aria-hidden="true" /><div><p>{questions.length}</p><span>Questions in queue</span></div></div>
-          <div className="coach-schedule-metric"><span className="coach-schedule-metric__mark" aria-hidden="true" /><div><p>{selected ? '1' : '0'}</p><span>Conversation selected</span></div></div>
+          <div className="coach-schedule-metric"><QuestionMetricIcon name="queue" /><div><p>{questions.length}</p><span>Questions in queue</span></div></div>
+          <div className="coach-schedule-metric"><QuestionMetricIcon name="conversation" /><div><p>{selected ? '1' : '0'}</p><span>Conversation selected</span></div></div>
         </section>
         <div className="coach-question-layout">
           <Card className="coach-question-inbox" title="Question inbox" actions={<span className="coach-question-count">{questions.length} {questions.length === 1 ? 'question' : 'questions'}</span>}>

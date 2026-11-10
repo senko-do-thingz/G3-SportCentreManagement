@@ -161,6 +161,16 @@ describe('FE-10 coach schedule and roster screens', () => {
     renderApp('/coach')
     expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
   })
+
+  it('renders contextual SVG icons for Class Roster summary metrics and omits decorative square markers', async () => {
+    setup()
+    renderApp('/coach/roster?sessionId=5&week=2026-10-19')
+
+    expect(await screen.findByRole('heading', { name: 'Class Roster' })).toBeInTheDocument()
+    const rosterMetrics = screen.getByRole('region', { name: 'Roster summary' })
+    expect(rosterMetrics.querySelectorAll('svg.coach-schedule-metric__icon')).toHaveLength(4)
+    expect(rosterMetrics.querySelectorAll('.coach-schedule-metric__mark')).toHaveLength(0)
+  })
 })
 
  it('ID-04 shows public codes and resolves only an owned public-code roster', async () => {

@@ -198,6 +198,44 @@ function RosterTable({ rows }: { rows: CoachRosterRecord[] }) {
   </div>
 }
 
+type RosterMetricIconName = 'session' | 'bookings' | 'members' | 'capacity'
+
+/** Decorative icons for the Class Roster summary only. */
+function RosterMetricIcon({ name }: { name: RosterMetricIconName }) {
+  return <svg
+    className="coach-schedule-metric__icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    focusable="false"
+  >
+    {name === 'session' ? <>
+      <rect x="3" y="5" width="18" height="16" />
+      <path d="M8 3v4M16 3v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
+    </> : name === 'bookings' ? <>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="8.5" cy="7" r="4" />
+      <polyline points="17 11 19 13 23 9" />
+    </> : name === 'members' ? <>
+      <line x1="8" y1="6" x2="21" y2="6" />
+      <line x1="8" y1="12" x2="21" y2="12" />
+      <line x1="8" y1="18" x2="21" y2="18" />
+      <line x1="3" y1="6" x2="3.01" y2="6" />
+      <line x1="3" y1="12" x2="3.01" y2="12" />
+      <line x1="3" y1="18" x2="3.01" y2="18" />
+    </> : <>
+      <rect x="3" y="3" width="7" height="7" />
+      <rect x="14" y="3" width="7" height="7" />
+      <rect x="3" y="14" width="7" height="7" />
+      <rect x="14" y="14" width="7" height="7" />
+    </>}
+  </svg>
+}
+
 export function CoachRosterPage() {
   const [params, setParams] = useSearchParams()
   const week = sessionWeek(params)
@@ -236,10 +274,10 @@ export function CoachRosterPage() {
       <a className="btn btn--accent coach-schedule-hero__action" href="#coach-roster-picker">Choose session</a>
     </section>
     <section className="coach-roster-metrics" aria-label="Roster summary">
-      <div className="coach-schedule-metric"><span className="coach-schedule-metric__mark" aria-hidden="true" /><div><p>{selectedSession ? '1' : '--'}</p><span>Selected session</span></div></div>
-      <div className="coach-schedule-metric"><span className="coach-schedule-metric__mark" aria-hidden="true" /><div><p>{selectedSession?.bookedCount ?? '--'}</p><span>Confirmed bookings</span></div></div>
-      <div className="coach-schedule-metric"><span className="coach-schedule-metric__mark" aria-hidden="true" /><div><p>{rosterCount}</p><span>Members displayed</span></div></div>
-      <div className="coach-schedule-metric"><span className="coach-schedule-metric__mark" aria-hidden="true" /><div><p>{selectedSession?.capacity ?? '--'}</p><span>Roster capacity</span></div></div>
+      <div className="coach-schedule-metric"><RosterMetricIcon name="session" /><div><p>{selectedSession ? '1' : '--'}</p><span>Selected session</span></div></div>
+      <div className="coach-schedule-metric"><RosterMetricIcon name="bookings" /><div><p>{selectedSession?.bookedCount ?? '--'}</p><span>Confirmed bookings</span></div></div>
+      <div className="coach-schedule-metric"><RosterMetricIcon name="members" /><div><p>{rosterCount}</p><span>Members displayed</span></div></div>
+      <div className="coach-schedule-metric"><RosterMetricIcon name="capacity" /><div><p>{selectedSession?.capacity ?? '--'}</p><span>Roster capacity</span></div></div>
     </section>
     <div className="coach-roster-layout">
       <Card className="coach-roster-picker" title="Choose a session" id="coach-roster-picker">
