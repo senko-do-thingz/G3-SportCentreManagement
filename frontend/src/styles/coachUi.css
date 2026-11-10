@@ -401,6 +401,14 @@
   background: var(--coach-blue-soft);
 }
 
+/* This icon treatment is exclusive to Teaching Schedule; Class Roster keeps its existing metrics. */
+.coach-ui.coach-schedule-page .coach-schedule-metric__icon {
+  flex: 0 0 2rem;
+  width: 2rem;
+  height: 2rem;
+  color: var(--coach-blue);
+}
+
 .coach-ui .coach-schedule-metric > div {
   min-width: 0;
 }
