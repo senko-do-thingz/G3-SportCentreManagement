@@ -70,8 +70,11 @@ export function MemberDashboardPage() {
 
   const header = (
     <PageHeader
-      eyebrow="Your sport, your way"
-      title="Member Dashboard"
+      eyebrow="Member workspace"
+      title={<>
+        <span className="member-concept__dashboard-heading" aria-hidden="true">My sport. <span>My progress.</span></span>
+        <span className="member-concept__sr-only">Member Dashboard</span>
+      </>}
       description="Your membership, sport packages and upcoming training in one place."
     />
   )
@@ -477,6 +480,7 @@ function ProfileCard() {
 }
 
 const QUICK_LINKS = [
+  { to: '/member/training', label: 'Training progress', hint: 'Plans, attendance and coach feedback' },
   { to: MEMBER_PATHS.membershipCard, label: 'My membership card', hint: 'Tier, benefits and renewal' },
   { to: MEMBER_PATHS.packages, label: 'Sport packages', hint: 'Prices by sport and training style' },
   { to: MEMBER_PATHS.schedule, label: 'My schedule', hint: 'Your booked sessions' },

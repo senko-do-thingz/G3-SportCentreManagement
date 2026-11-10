@@ -1,0 +1,65 @@
+{
+  "sourceCommit": "pending",
+  "mainBaseline": "f6774c7d08f9f11801a5071e338575cf196fb088",
+  "captureBoundary": "All captures use local synthetic API responses and are not live backend evidence.",
+  "productionBackendWrites": false,
+  "screenReaderPass": false,
+  "captures": [
+    {
+      "file": "screenshots/dashboard-1440x900-light-synthetic.png",
+      "route": "/member",
+      "theme": "light",
+      "viewport": { "width": 1440, "height": 900 },
+      "image": { "width": 1440, "height": 1241, "mode": "full-page" },
+      "fixture": "Synthetic Taylor Nguyen profile; empty package and session lists.",
+      "sha256": "BB7152F28B590A8BB306C9C832BADEF78D37A59E2E2F64A206CE0353FCACAB7F"
+    },
+    {
+      "file": "screenshots/dashboard-1440x900-dark-synthetic.png",
+      "route": "/member",
+      "theme": "dark",
+      "viewport": { "width": 1440, "height": 900 },
+      "image": { "width": 1440, "height": 1241, "mode": "full-page" },
+      "fixture": "Synthetic Taylor Nguyen profile; empty package and session lists.",
+      "sha256": "E4FC381229926215C4C495D4ED8776C2B12FF5E5B802FFE56C02589B689D142C"
+    },
+    {
+      "file": "screenshots/dashboard-390x844-dark-synthetic.png",
+      "route": "/member",
+      "theme": "dark",
+      "viewport": { "width": 390, "height": 844 },
+      "image": { "width": 390, "height": 844, "mode": "viewport" },
+      "fixture": "Synthetic Taylor Nguyen profile; empty package and session lists.",
+      "measurements": { "documentScrollWidth": 375, "headerContext": "hidden", "headerHeightPx": 111, "menuExpanded": false },
+      "sha256": "ED572676CE8746DF02FECE60782DFB058C9ABA746D8DF54825EF6B79E1D169BC"
+    },
+    {
+      "file": "screenshots/member-navigation-390x844-dark-synthetic.png",
+      "route": "/member/training",
+      "theme": "dark",
+      "viewport": { "width": 390, "height": 844 },
+      "image": { "width": 390, "height": 2280, "mode": "full-page" },
+      "fixture": "Synthetic Member training responses; drawer open for layout review.",
+      "measurements": { "documentScrollWidth": 375, "headerContext": "hidden", "drawerExpanded": true },
+      "sha256": "099A7EC8763274EAEA77FAC0A4117FC89698135BB444A5798339393287C685F6"
+    },
+    {
+      "file": "screenshots/support-1440x900-light-synthetic.png",
+      "route": "/member/support",
+      "theme": "light",
+      "viewport": { "width": 1440, "height": 900 },
+      "image": { "width": 1440, "height": 1041, "mode": "full-page" },
+      "fixture": "Synthetic empty support request response.",
+      "sha256": "8831ADDC9FA19B593107EE7AD99767F291B5EF68B9DBBBAA0577BC82A26A2581"
+    },
+    {
+      "file": "screenshots/training-hub-1440x900-light-synthetic.png",
+      "route": "/member/training",
+      "theme": "light",
+      "viewport": { "width": 1440, "height": 900 },
+      "image": { "width": 1440, "height": 1475, "mode": "full-page" },
+      "fixture": "Synthetic empty training responses and explicit empty states.",
+      "sha256": "67CB94AECBAED792436BF07DD42BF0D364EA0E0567D7C21B009EBA6A477D307B"
+    }
+  ]
+}

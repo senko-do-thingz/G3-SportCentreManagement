@@ -9,19 +9,23 @@ import { safeMemberReturnTo } from './assistantNavigation'
 import { useTrainingAction } from '../training/trainingFormState'
 import { ActionMessage } from '../training/TrainingFormFields'
 
-export function MemberAssistantLink({ onNavigate }: { onNavigate?: () => void }) {
+export function MemberAssistantLink({ onNavigate, className, label = 'Open center assistant' }: {
+  onNavigate?: () => void
+  className?: string
+  label?: string
+}) {
   const location = useLocation()
   const active = location.pathname === '/member/assistant'
   const returnTo = `${location.pathname}${location.search}${location.hash}`
   const href = active ? `${location.pathname}${location.search}` : `/member/assistant?returnTo=${encodeURIComponent(returnTo)}`
   return (
     <Link
-      className={'workspace-header__nav-link' + (active ? ' workspace-header__nav-link--active' : '')}
+      className={className ?? ('workspace-header__nav-link' + (active ? ' workspace-header__nav-link--active' : ''))}
       aria-current={active ? 'page' : undefined}
       onClick={onNavigate}
       to={href}
     >
-      Open center assistant
+      {label}
     </Link>
   )
 }
@@ -92,7 +96,7 @@ function CenterConsultationWorkspace() {
   const returnTo = safeMemberReturnTo(params.get('returnTo'))
   const [optIn, setOptIn] = useState(false)
   const [result, setResult] = useState<Consultation | null>(null)
-  const [question, setQuestion] = useState('')
+  const [question, setQuestion] = useState(() => params.get('question')?.slice(0, 500) ?? '')
   const [asked, setAsked] = useState('')
   const action = useTrainingAction()
   const resultRef = useRef<HTMLDivElement>(null)
