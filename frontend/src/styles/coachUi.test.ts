@@ -8,6 +8,7 @@ describe('coach presentation foundation', () => {
     const selectorBlocks = stylesheet
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/@import[^;]+;/g, '')
+      .replace(/@media[^{}]+\{/g, '')
       .match(/[^{}]+(?=\{)/g) ?? []
     const selectors = selectorBlocks.flatMap(block => block.split(',').map(selector => selector.trim()))
 
