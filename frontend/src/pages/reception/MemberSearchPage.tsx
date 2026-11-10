@@ -3,6 +3,7 @@ import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { ApiError, splitFieldErrors } from '../../api/errors'
 import type { MemberCard, PackageRegistration } from '../../api/memberApi'
 import { isMemberNotFound, receptionApi, type CreatedMember, type MemberOverview, type MemberSummary } from '../../api/receptionApi'
+import { ReceptionCallout, ReceptionHero, ReceptionScreen } from './ReceptionConcept'
 import { Button, Card, EmptyState, ErrorState, Input, Modal, PageHeader, StatusBadge } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
@@ -66,12 +67,18 @@ export function MemberSearchPage() {
   )
 
   return (
-    <div className="page reception-page reception-member-search-page">
+    <ReceptionScreen className="reception-page reception-member-search-page">
       <PageHeader
-        eyebrow="Front desk"
+        eyebrow="Receptionist workspace"
         title="Member Search and Profile"
         description="Find a member and use their existing profile."
         actions={createButton}
+      />
+      <ReceptionHero
+        kicker="Front desk"
+        title="Find the member."
+        highlight="Use the existing profile."
+        description="Search by member code, name, phone or email. Payments continue from the member's existing requests."
       />
       <Card title="Find member">
         {/* Keyed by the query so Back to an older search restores that search. */}
@@ -99,7 +106,7 @@ export function MemberSearchPage() {
           }}
         />
       )}
-    </div>
+    </ReceptionScreen>
   )
 }
 
@@ -173,9 +180,11 @@ function OverviewBody({
             </Link>
           </div>
         </div>
-        <p className="notice notice--info reception-side-note">
-          Use an existing online request for payment. Do not create a second registration for the same request.
-        </p>
+        <div className="reception-side-note">
+          <ReceptionCallout>
+            Use an existing online request for payment. Do not create a second registration for the same request.
+          </ReceptionCallout>
+        </div>
       </div>
 
       {waitingCards.length > 0 && (

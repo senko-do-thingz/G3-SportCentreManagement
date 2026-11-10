@@ -15,6 +15,7 @@ import {
   registerPath,
   validateIdentifier,
 } from './receptionModel'
+import { ReceptionScreen, ReceptionStat, ReceptionStats } from './ReceptionConcept'
 
 /**
  * Check-in (Figma F1-15 with the Recorded and Rejected states): the desk types a member code or scans
@@ -115,12 +116,21 @@ export function CheckInPage() {
   ]
 
   return (
-    <div className="page reception-page reception-ui18-page home-page">
+    <ReceptionScreen className="reception-page reception-ui18-page home-page rcp-checkin">
       <PageHeader
-        eyebrow="Front desk"
+        eyebrow="Receptionist workspace"
         title="Check-in"
         description="Record member arrivals and review today's check-ins."
       />
+      {todayList.status === 'ready' && (
+        <ReceptionStats label="Today's check-in summary">
+          <ReceptionStat mark="T" label="Arrivals logged today" value={todayList.data.length} />
+          <ReceptionStat mark="OK" tone="success" label="Recorded today"
+            value={todayList.data.filter((row) => checkInVerdict(row) === 'recorded').length} />
+          <ReceptionStat mark="X" tone="danger" label="Rejected today"
+            value={todayList.data.filter((row) => checkInVerdict(row) !== 'recorded').length} />
+        </ReceptionStats>
+      )}
       <CheckInPassReader onRecorded={(record) => {
         setLast({ record, identifier: record.memberCode ?? String(record.memberId ?? '') })
         reloadToday()
@@ -187,7 +197,7 @@ export function CheckInPage() {
           />
         </Card>
       </div>
-    </div>
+    </ReceptionScreen>
   )
 }
 
