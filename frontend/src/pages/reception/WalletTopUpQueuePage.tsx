@@ -40,7 +40,7 @@ export function WalletTopUpQueuePage() {
       />
       {resource.status === 'ready' && (
         <ReceptionStats label="Top-up summary">
-          <ReceptionStat mark="L" label="Requests shown" value={rows.length} />
+          <ReceptionStat mark="L" label="Requests shown (newest 100)" value={rows.length} />
           <ReceptionStat mark="P" tone="warning" label="Pending review in this list" value={rows.filter((t) => t.status === 'PENDING').length} />
           <ReceptionStat mark="D" label="Demo requests in this list" value={rows.filter((t) => t.mode === 'SIMULATED').length} />
         </ReceptionStats>

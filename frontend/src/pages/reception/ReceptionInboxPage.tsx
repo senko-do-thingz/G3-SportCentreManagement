@@ -51,8 +51,8 @@ export function ReceptionInboxPage() {
       />
       {data && (
         <ReceptionStats label="Inbox summary">
-          <ReceptionStat mark="O" label="Open tasks" value={data.open} tone={data.open > 0 ? 'warning' : 'success'} />
-          <ReceptionStat mark="U" label="Unread open" value={data.unreadOpen} />
+          <ReceptionStat mark="O" label="Open tasks (newest 100 notices)" value={data.open} tone={data.open > 0 ? 'warning' : 'success'} />
+          <ReceptionStat mark="U" label="Unread open (newest 100 notices)" value={data.unreadOpen} />
           <ReceptionStat mark="L" label="Items shown" value={data.items.length} />
           <ReceptionStat mark="R" label="Checks for new tasks" value={`${Math.round(INBOX_POLL_MS / 1000)}s`} />
         </ReceptionStats>

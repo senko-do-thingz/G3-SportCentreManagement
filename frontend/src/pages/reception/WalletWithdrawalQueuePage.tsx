@@ -33,7 +33,7 @@ export function WalletWithdrawalQueuePage() {
       />
       {resource.status === 'ready' && (
         <ReceptionStats label="Withdrawal summary">
-          <ReceptionStat mark="L" label="Requests shown" value={rows.length} />
+          <ReceptionStat mark="L" label="Requests shown (newest 100)" value={rows.length} />
           <ReceptionStat mark="1" tone="warning" label="Waiting for approval in this list" value={rows.filter((w) => w.status === 'PENDING').length} />
           <ReceptionStat mark="2" tone="warning" label="Approved, not paid out yet" value={rows.filter((w) => w.status === 'APPROVED').length} />
         </ReceptionStats>
