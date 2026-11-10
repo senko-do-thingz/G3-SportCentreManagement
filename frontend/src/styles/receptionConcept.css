@@ -69,7 +69,7 @@
   min-height: 120px;
   padding: var(--space-6) var(--space-8);
   overflow: hidden;
-  border-radius: var(--radius-md);
+  border-radius: 0;
   background: linear-gradient(109deg, var(--color-hero) 0%, var(--color-hero-deep) 35%, var(--color-primary) 100%);
   color: var(--color-on-hero);
 }
@@ -140,7 +140,7 @@
   min-height: 84px;
   padding: var(--space-4) var(--space-5);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: 0;
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
 }
@@ -152,7 +152,7 @@
   justify-content: center;
   width: 44px;
   height: 44px;
-  border-radius: var(--radius-md);
+  border-radius: 0;
   background: var(--color-primary-soft);
   color: var(--color-primary);
   font-size: var(--text-sm);
@@ -185,7 +185,7 @@
   padding: var(--space-5) var(--space-6);
   border: 1px solid var(--color-border);
   border-top: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: 0;
   box-shadow: var(--shadow-sm);
 }
 
@@ -215,7 +215,7 @@
 /* Tables inside converted pages. */
 .page.rcp .table-scroll {
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: 0;
 }
 
 .page.rcp .table th {
@@ -261,7 +261,7 @@
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-primary-soft-hover);
   border-left: 3px solid var(--color-primary);
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   background: var(--color-info-soft);
   color: var(--color-text);
   font-size: var(--text-sm);
@@ -289,7 +289,7 @@
   padding: var(--space-4) var(--space-5);
   border: 1px solid var(--color-border);
   border-left: 4px solid var(--color-primary);
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   background: var(--color-surface);
 }
 
@@ -380,30 +380,30 @@
 /* RUI-03 member search and profile */
 .rcp.reception-member-search-page .member-overview { margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--color-border); }
 .rcp.reception-member-search-page .reception-subtitle { margin-top: var(--space-5); font-size: var(--text-xs); font-weight: var(--weight-bold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-primary); }
-.rcp.reception-member-search-page .package-item { border: 1px solid var(--color-border); border-left: 4px solid var(--color-primary); border-radius: var(--radius-sm); }
+.rcp.reception-member-search-page .package-item { border: 1px solid var(--color-border); border-left: 4px solid var(--color-primary); border-radius: 0; }
 
 /* RUI-04 register and renew: Concept A title and tab accents on top of the UI-18 form layout */
 .page.rcp.rcp-register .page-header { padding: 0 0 var(--space-4); }
 .page.rcp.rcp-register .page-header__title { font-family: var(--font-display); text-transform: uppercase; letter-spacing: -0.03em; }
 .page.rcp.rcp-register .reception-tabs__tab--active { border-bottom-color: var(--color-primary); color: var(--color-primary); }
-.page.rcp.rcp-register .card { border-radius: var(--radius-md); }
+.page.rcp.rcp-register .card { border-radius: 0; }
 
 /* RUI-05 check-in */
 .page.rcp.rcp-checkin .page-header { padding: 0 0 var(--space-4); }
 .page.rcp.rcp-checkin .page-header__title { font-family: var(--font-display); text-transform: uppercase; letter-spacing: -0.03em; }
-.page.rcp.rcp-checkin .card { border-radius: var(--radius-md); }
-.page.rcp.rcp-checkin .checkin-result { border-left-width: 4px; border-radius: var(--radius-sm); }
+.page.rcp.rcp-checkin .card { border-radius: 0; }
+.page.rcp.rcp-checkin .checkin-result { border-left-width: 4px; border-radius: 0; }
 
 /* RUI-06 assisted booking */
 .page.rcp.reception-bookings-page .page-header { padding: 0 0 var(--space-4); }
 .page.rcp.reception-bookings-page .page-header__title { font-family: var(--font-display); text-transform: uppercase; letter-spacing: -0.03em; }
-.page.rcp.reception-bookings-page .card { border-radius: var(--radius-md); }
+.page.rcp.reception-bookings-page .card { border-radius: 0; }
 
 /* RUI-07 payment request queue (inside the shared PaymentWorkspace; scoped by page classes only) */
 .rcp-payment-stats .stat-card {
   border: 1px solid var(--color-border);
   border-left: 4px solid var(--color-primary);
-  border-radius: var(--radius-md);
+  border-radius: 0;
   box-shadow: var(--shadow-sm);
 }
 .rcp-payment-stats .stat-card:last-child { border-left-color: var(--color-highlight); }
@@ -421,7 +421,7 @@
 @media screen {
   .page.rcp-pay .card {
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: 0;
     box-shadow: var(--shadow-sm);
   }
   .page.rcp-pay .card[aria-label='Amount verification'],
@@ -435,7 +435,7 @@
 @media screen {
   .payment-workspace:has(.rcp-refund-scope, .rcp-refund-steps) .card {
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: 0;
     box-shadow: var(--shadow-sm);
   }
   .payment-workspace:has(.rcp-refund-scope) .card[aria-label='Eligibility check'] { border-left: 4px solid var(--color-primary); }
@@ -446,3 +446,21 @@
 /* RUI-10 and RUI-11 wallet review panels */
 .page.rcp .rcp-review-card { border-left: 4px solid var(--color-highlight); }
 .page.rcp.rcp-wallet .browse-facts { margin-bottom: var(--space-4); }
+
+/*
+ * Home alignment: square corners. The real Home renders every rectangular surface square (buttons, selects, brand mark).
+ * Receptionist screens follow it inside their own scopes only; global tokens and other roles are not touched.
+ * Exceptions kept on purpose, matching Home: loading spinners and avatar circles stay round (functional shape).
+ */
+:is(.page.rcp, .page.rcp-pay, .payment-workspace:has(.rcp-payment-queue, .rcp-refund-scope, .rcp-refund-steps)),
+:is(.page.rcp, .page.rcp-pay, .payment-workspace:has(.rcp-payment-queue, .rcp-refund-scope, .rcp-refund-steps))
+  :not(.spinner, .avatar, [class*='spinner'], [class*='avatar']) {
+  border-radius: 0;
+}
+
+/* Home button weight and height on Receptionist screens. */
+.page.rcp .btn,
+.page.rcp-pay .btn {
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.02em;
+}
