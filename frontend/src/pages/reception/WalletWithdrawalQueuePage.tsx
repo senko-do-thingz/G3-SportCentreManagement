@@ -5,6 +5,7 @@ import { useResource } from '../../hooks/useResource'
 import { Badge, Button, Card, EmptyState, ErrorState, Input, Notice, PageHeader, Select, Spinner } from '../../components/ui'
 import { formatDateTime } from '../../utils/dateDisplay'
 import { formatMoney } from '../../utils/format'
+import { ReceptionHero, ReceptionScreen, ReceptionStat, ReceptionStats } from './ReceptionConcept'
 
 const FILTERS = [
   { value: 'OPEN', label: 'Open (pending and approved)' },
@@ -22,10 +23,26 @@ export function WalletWithdrawalQueuePage() {
   const [message, setMessage] = useState<string | null>(null)
   const rows = resource.status === 'ready' ? resource.data : []
   return (
-    <div className="page">
-      <PageHeader eyebrow="Payments" title="Wallet withdrawals" description="Approve or reject member withdrawals. Record the transfer only after you have made it." />
+    <ReceptionScreen className="rcp-wallet">
+      <PageHeader eyebrow="Receptionist workspace" title="Wallet withdrawals" description="Approve or reject member withdrawals. Record the transfer only after you have made it." />
+      <ReceptionHero
+        kicker="Wallet payouts"
+        title="Approve, transfer, record."
+        highlight="Two separate steps."
+        description="Approval does not move money. Record the payout only after the bank shows the transfer as sent."
+      />
+      {resource.status === 'ready' && (
+        <ReceptionStats label="Withdrawal summary">
+          <ReceptionStat mark="L" label="Requests shown (newest 100)" value={rows.length} />
+          <ReceptionStat mark="1" tone="warning" label="Waiting for approval in this list" value={rows.filter((w) => w.status === 'PENDING').length} />
+          <ReceptionStat mark="2" tone="warning" label="Approved, not paid out yet" value={rows.filter((w) => w.status === 'APPROVED').length} />
+        </ReceptionStats>
+      )}
+      <div className={selected ? 'rcp-grid rcp-grid--wide-left' : undefined}>
       <Card title="Requests" actions={<Button variant="secondary" size="sm" onClick={reload}>Refresh</Button>}>
-        <Select label="Show" value={status} options={FILTERS} onChange={(e) => { setStatus(e.target.value); setSelected(null) }} />
+        <div className="rcp-toolbar">
+          <Select label="Show" value={status} options={FILTERS} onChange={(e) => { setStatus(e.target.value); setSelected(null) }} />
+        </div>
         {message && <Notice tone="success" live="polite">{message}</Notice>}
         {resource.status === 'loading' && <Spinner label="Loading withdrawals" />}
         {resource.status === 'error' && <ErrorState title="We could not load withdrawals" error={resource.error} onRetry={reload} />}
@@ -52,7 +69,8 @@ export function WalletWithdrawalQueuePage() {
         ))}
       </Card>
       {selected && <ProcessPanel key={selected} id={selected} onDone={(text) => { setMessage(text); setSelected(null); reload() }} />}
-    </div>
+      </div>
+    </ReceptionScreen>
   )
 }
 
@@ -74,7 +92,8 @@ function ProcessPanel({ id, onDone }: { id: number; onDone: (message: string) =>
   }
 
   return (
-    <Card title={`Process ${w.code} - ${w.memberName}`} actions={<Badge tone="warning">{WITHDRAWAL_STATUS_LABELS[w.status]}</Badge>}>
+    <Card title={`Process ${w.code} - ${w.memberName}`} className="rcp-review-card" actions={<Badge tone="warning">{WITHDRAWAL_STATUS_LABELS[w.status]}</Badge>}>
+      <p className="rcp-caption">{w.status === 'PENDING' ? 'Step 1 of 2: approve or reject' : 'Step 2 of 2: record the transfer'}</p>
       <dl className="browse-facts">
         <div><dt>Amount</dt><dd>{formatMoney(w.amount)}</dd></div>
         <div><dt>Bank</dt><dd>{w.bankName ?? 'Demo funds, no bank'}</dd></div>

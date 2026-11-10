@@ -5,6 +5,7 @@ import { useResource } from '../../hooks/useResource'
 import { Badge, Button, Card, EmptyState, ErrorState, Input, Notice, PageHeader, Select, Spinner, TextArea } from '../../components/ui'
 import { formatDateTime } from '../../utils/dateDisplay'
 import { formatMoney } from '../../utils/format'
+import { ReceptionHero, ReceptionScreen, ReceptionStat, ReceptionStats } from './ReceptionConcept'
 
 const FILTERS = [
   { value: 'PENDING', label: 'Pending review' },
@@ -29,10 +30,26 @@ export function WalletTopUpQueuePage() {
   const selected = rows.find((t) => t.id === selectedId) ?? null
 
   return (
-    <div className="page">
-      <PageHeader eyebrow="Payments" title="Wallet top-ups" description="Check each transfer against the bank statement, then confirm or reject it." />
+    <ReceptionScreen className="rcp-wallet">
+      <PageHeader eyebrow="Receptionist workspace" title="Wallet top-ups" description="Check each transfer against the bank statement, then confirm or reject it." />
+      <ReceptionHero
+        kicker="Wallet reconciliation"
+        title="Check the bank first."
+        highlight="Then credit the wallet."
+        description="Type the amount you actually see on the bank statement. Nothing is credited until you confirm."
+      />
+      {resource.status === 'ready' && (
+        <ReceptionStats label="Top-up summary">
+          <ReceptionStat mark="L" label="Requests shown (newest 100)" value={rows.length} />
+          <ReceptionStat mark="P" tone="warning" label="Pending review in this list" value={rows.filter((t) => t.status === 'PENDING').length} />
+          <ReceptionStat mark="D" label="Demo requests in this list" value={rows.filter((t) => t.mode === 'SIMULATED').length} />
+        </ReceptionStats>
+      )}
+      <div className={selected && reviewable(selected) ? 'rcp-grid rcp-grid--wide-left' : undefined}>
       <Card title="Requests" actions={<Button variant="secondary" size="sm" onClick={reload}>Refresh</Button>}>
+        <div className="rcp-toolbar">
         <Select label="Show" value={status} options={FILTERS} onChange={(e) => { setStatus(e.target.value); setSelectedId(null) }} />
+        </div>
         {message && <Notice tone="success" live="polite">{message}</Notice>}
         {resource.status === 'loading' && <Spinner label="Loading top-ups" />}
         {resource.status === 'error' && <ErrorState title="We could not load top-ups" error={resource.error} onRetry={reload} />}
@@ -62,7 +79,8 @@ export function WalletTopUpQueuePage() {
       {selected && reviewable(selected) && (
         <ReviewPanel key={selected.id} topUp={selected} onDone={(text) => { setMessage(text); setSelectedId(null); reload() }} />
       )}
-    </div>
+      </div>
+    </ReceptionScreen>
   )
 }
 
@@ -120,7 +138,7 @@ function ReviewPanel({ topUp, onDone }: { topUp: WalletTopUp; onDone: (message: 
   }
 
   return (
-    <Card title={`Review ${topUp.code} - ${topUp.memberName}`}>
+    <Card title={`Review ${topUp.code} - ${topUp.memberName}`} className="rcp-review-card">
       <dl className="browse-facts">
         <div><dt>Requested amount</dt><dd>{formatMoney(topUp.amount)}</dd></div>
         <div><dt>Expected transfer note</dt><dd><code>{topUp.transferReference}</code></dd></div>

@@ -1,3 +1,4 @@
+import '../../styles/receptionConcept.css'
 import { useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { receptionPaymentsApi } from '../../api/receptionPaymentsApi'
@@ -43,7 +44,7 @@ function ReceptionReceiptRoute() {
 
   if (id === null) {
     return (
-      <div className="page">
+      <div className="page rcp-pay">
         <PaymentHero eyebrow={EYEBROW} title="Receipt" />
         <EmptyState title="Receipt not found" description="The receipt link is not valid." />
       </div>
@@ -51,7 +52,7 @@ function ReceptionReceiptRoute() {
   }
   if (invoice.status === 'loading') {
     return (
-      <div className="page">
+      <div className="page rcp-pay">
         <PaymentHero eyebrow={EYEBROW} title="Receipt" />
         <Spinner label="Loading the receipt" />
       </div>
@@ -59,7 +60,7 @@ function ReceptionReceiptRoute() {
   }
   if (invoice.status === 'error') {
     return (
-      <div className="page">
+      <div className="page rcp-pay">
         <PaymentHero eyebrow={EYEBROW} title="Receipt" aside={back} />
         <ErrorState title="We could not load the receipt" error={invoice.error} onRetry={reload} />
       </div>
@@ -69,7 +70,7 @@ function ReceptionReceiptRoute() {
   const data = invoice.data
   if (data.paymentId !== id) {
     return (
-      <div className="page">
+      <div className="page rcp-pay">
         <PaymentHero eyebrow={EYEBROW} title="Receipt" aside={back} />
         <EmptyState title="Receipt not found" description="The invoice returned belongs to another payment. Open the receipt from the payment again." />
       </div>
@@ -82,7 +83,7 @@ function ReceptionReceiptRoute() {
   const presentation = classifyProvenance(data)
   const printable = (data.status === 'PAID' || data.status === 'REFUNDED') && presentation.canPrintReceipt
   return (
-    <div className="page">
+    <div className="page rcp-pay">
       <PaymentHero eyebrow={EYEBROW} title={`Receipt ${data.invoiceNumber}`} description={presentation.receiptHeroDescription} />
       <Card title="Sportify / Payment receipt" aria-label="Receipt" className={printable ? 'payment-receipt payment-print-receipt' : 'payment-receipt'}>
         {presentation.receiptWarningMessage && (

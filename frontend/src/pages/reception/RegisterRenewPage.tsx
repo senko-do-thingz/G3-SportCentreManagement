@@ -15,6 +15,7 @@ import { addDays } from '../member/cardsModel'
 import { currentCard } from '../member/dashboardModel'
 import { packageEndDate, packageSummary, packageTitle, priceBreakdown, validateStartDate } from '../member/packagesModel'
 import { MemberHeader, MemberPicker } from './ReceptionMember'
+import { ReceptionHero, ReceptionScreen } from './ReceptionConcept'
 import {
   CARD_PLAN_LABELS,
   changeDue,
@@ -67,11 +68,17 @@ export function RegisterRenewPage() {
   }
 
   return (
-    <div className="page reception-page reception-ui18-page home-page">
+    <ReceptionScreen className="reception-page reception-ui18-page home-page rcp-register">
       <PageHeader
-        eyebrow="Front desk"
+        eyebrow="Receptionist workspace"
         title="Register and Renew"
         description="Register or renew a sport package or a membership card, and take the payment at the desk."
+      />
+      <ReceptionHero
+        kicker="Packages and cards"
+        title="Register and renew."
+        highlight="One request, one payment."
+        description="A sale stays pending until its payment is confirmed. If a submission result is unclear, check the member profile before trying again."
       />
       <div className="reception-tabs" role="tablist" aria-label="Request type">
         {(Object.keys(TAB_LABELS) as RegisterTab[]).map((value) => (
@@ -118,7 +125,7 @@ export function RegisterRenewPage() {
           <SaleWorkspace key={`${tab}-${memberId}`} tab={tab} memberId={memberId} packageId={packageId} />
         )}
       </div>
-    </div>
+    </ReceptionScreen>
   )
 }
 

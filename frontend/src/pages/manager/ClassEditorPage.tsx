@@ -3,8 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../../api/client'
 import { managerClassesApi, type ClassLevel, type ManagerClass } from '../../api/managerClassesApi'
 import { packagesApi } from '../../api/packagesApi'
-import { Button, Card, Input, PageHeader, PageLoader, Select, useToast } from '../../components/ui'
-import { ManagerError } from './ManagerShared'
+import { Button, Card, Input, PageLoader, Select, useToast } from '../../components/ui'
+import { ManagerError, PreviewNotice } from './ManagerShared'
 import { useManagerForm, useResource } from './useManagerTools'
 
 const loadLookups = async (signal: AbortSignal) => {
@@ -50,8 +50,15 @@ function ClassForm({ item, lookups }: { item: ManagerClass | null; lookups: Awai
     savedId.current = saved.id
   }, () => { toast.success('Class saved'); navigate(item ? '/manager/classes' : `/manager/schedule?classId=${savedId.current}&create=1`) })
   function change(key: keyof typeof draft, value: string) { setDraft((current) => ({ ...current, [key]: value, ...(key === 'sportId' ? { coachId: '' } : {}) })); form.clear(key) }
-  return <div className="page manager-page">
-    <PageHeader eyebrow="Class management" title={item ? 'Edit Class' : 'Create Class'} description="Define the class and assign a qualified coach before scheduling sessions." />
+  return <div className="page manager-page manager-concept-page">
+    <div className="concept-header">
+      <div className="concept-header__main">
+        <div className="concept-eyebrow">MANAGER WORKSPACE</div>
+        <h1 className="concept-title">{item ? 'Edit Class' : 'Create Class'}</h1>
+        <p className="concept-sub">Define the class and assign a qualified coach before scheduling sessions.</p>
+      </div>
+    </div>
+    <PreviewNotice />
     <div className="f2-editor-layout">
       <Card title="Class details">
         <form ref={ref} onSubmit={form.submit} noValidate className="manager-form">

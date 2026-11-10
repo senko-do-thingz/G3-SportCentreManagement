@@ -42,11 +42,15 @@ describe('FE-07 class management', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: /^Sport/ }), '1')
     await waitFor(() => expect(api.calls.some((call) => call.path === '/coaches?sportId=1')).toBe(true))
   })
-  it('loads classes and sends combined server filters', async () => {
+  it('loads classes and sends combined server filters with a single + Create class CTA', async () => {
     const api = backend()
     const user = userEvent.setup()
     renderApp('/manager/classes')
     await screen.findByText(item.name)
+    expect(screen.getAllByRole('button', { name: '+ Create class' })).toHaveLength(1)
+    expect(screen.queryByText(/DESIGN CONCEPT/i)).not.toBeInTheDocument()
+    expect(screen.getByText('Matching classes')).toBeInTheDocument()
+    expect(screen.getByText('Active on this page')).toBeInTheDocument()
     await user.selectOptions(screen.getByRole('combobox', { name: /^Sport/ }), '1')
     await user.selectOptions(screen.getByLabelText('Status'), 'true')
     await user.type(screen.getByLabelText('Search classes'), 'foundations')

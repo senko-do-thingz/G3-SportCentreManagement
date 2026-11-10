@@ -726,4 +726,23 @@ describe('FE-06 read-only activity', () => {
     expect(formatManagerDateTime('2026-10-13T17:15:00Z')).toBe('14/10/2026 00:15')
     expect(formatManagerDateTime(null)).toBe('-')
   })
+  it('never renders DESIGN CONCEPT - SAMPLE DATA and labels paginated KPIs honestly', async () => {
+    authOnly()
+    vi.spyOn(managerUsersApi, 'list').mockResolvedValue({
+      content: [staff, { ...staff, id: 4, fullName: 'Inactive Coach', status: 'INACTIVE' }],
+      page: 0,
+      size: 20,
+      totalElements: 45,
+      totalPages: 3,
+    })
+    renderApp('/manager')
+    expect(await screen.findByText('Daniel Smith')).toBeInTheDocument()
+    expect(screen.queryByText(/DESIGN CONCEPT/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/SAMPLE DATA/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Frontend preview/i)).not.toBeInTheDocument()
+    expect(screen.getByText('Matching accounts')).toBeInTheDocument()
+    expect(screen.getByText('45')).toBeInTheDocument()
+    expect(screen.getByText('Active on this page')).toBeInTheDocument()
+    expect(screen.getByText('01')).toBeInTheDocument()
+  })
 })

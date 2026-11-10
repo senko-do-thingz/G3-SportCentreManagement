@@ -27,6 +27,9 @@ describe('Reception inbox (MW-07)', () => {
     expect(await screen.findByLabelText('Inbox, 1 unread open tasks')).toBeInTheDocument()
     const item = (await screen.findByText('Verify wallet top-up TU-000004')).closest('li') as HTMLElement
     expect(within(item).getByText('Open - PENDING')).toBeInTheDocument()
+    const stats = screen.getByRole('list', { name: 'Inbox summary' })
+    expect(within(stats).getByText('Open tasks (newest 100 notices)').previousElementSibling).toHaveTextContent('1')
+    expect(within(stats).getByText('Unread open (newest 100 notices)').previousElementSibling).toHaveTextContent('1')
     expect(within(item).getByRole('link', { name: 'Open task' })).toHaveAttribute('href', '/reception/wallet/topups')
     await user.click(within(item).getByRole('button', { name: 'Mark as read' }))
     const after = (await screen.findByText('Verify wallet top-up TU-000004')).closest('li') as HTMLElement

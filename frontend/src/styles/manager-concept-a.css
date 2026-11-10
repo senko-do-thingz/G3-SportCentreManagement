@@ -183,6 +183,27 @@
   border-color: var(--color-accent-hover);
 }
 
+/* Hero actions sit on a dark surface: keep the gold action legible in every state and on every page stylesheet order. */
+.manager-concept-page .concept-hero .concept-btn--gold,
+.manager-concept-page .concept-hero .btn--secondary.concept-btn--gold {
+  background: var(--color-highlight);
+  border-color: var(--color-highlight);
+  color: var(--color-on-accent);
+  box-shadow: none;
+}
+
+.manager-concept-page .concept-hero .concept-btn--gold:hover:not(:disabled),
+.manager-concept-page .concept-hero .btn--secondary.concept-btn--gold:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  color: var(--color-on-accent);
+}
+
+.manager-concept-page .concept-hero .concept-btn--gold:focus-visible {
+  outline: 3px solid var(--color-on-hero);
+  outline-offset: 2px;
+}
+
 .concept-btn--danger {
   background: var(--color-danger-soft);
   color: var(--color-danger);
@@ -858,6 +879,11 @@
 .concept-dialog *,
 .concept-modal-scrim,
 .concept-modal-scrim *,
+.staff-layout:has(.manager-concept-page) .sidebar__link,
+body:has(.manager-concept-page) .modal,
+body:has(.manager-concept-page) .modal *,
+body:has(.manager-concept-page) .toast,
+body:has(.manager-concept-page) .toast *,
 .modal-backdrop:has(.manager-form) .modal,
 .modal-backdrop:has(.manager-form) .modal *,
 .modal-backdrop:has([class*="manager-"]) .modal,
@@ -865,4 +891,6 @@
 .modal-backdrop:has(.concept-dialog) .modal,
 .modal-backdrop:has(.concept-dialog) .modal * {
   border-radius: 0 !important;
+  rx: 0 !important;
+  ry: 0 !important;
 }
