@@ -33,6 +33,35 @@ function signedIn(handler: (call: RecordedCall) => Response) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Member Training Hub', () => {
+  it('keeps the primary training areas visible and the remaining routes keyboard reachable in More tools', async () => {
+    signedIn(call => call.path.startsWith('/member/training/') ? json(200, []) : backendError(404, 'Not found'))
+    const user = userEvent.setup()
+    renderApp('/member/training')
+
+    expect(await screen.findByRole('heading', { name: 'Training Hub' })).toBeInTheDocument()
+    const navigation = screen.getByRole('navigation', { name: 'Training navigation' })
+    for (const [label, href] of [
+      ['Overview', '/member/training'],
+      ['My classes', '/member/training/classes'],
+      ['Training plan', '/member/training/plans'],
+      ['Progress', '/member/training/results'],
+      ['Coach feedback', '/member/training/feedback'],
+    ]) {
+      expect(within(navigation).getByRole('link', { name: label })).toHaveAttribute('href', href)
+    }
+
+    await user.click(within(navigation).getByText('More tools'))
+    const tools = within(navigation).getByRole('group', { name: 'Additional training tools' })
+    for (const [label, href] of [
+      ['Ask your coach', '/member/training/questions'],
+      ['Attendance history', '/member/training/attendance'],
+      ['Class recommendations', '/member/training/recommendations'],
+      ['Training preferences', '/member/training/goals'],
+    ]) {
+      expect(within(tools).getByRole('link', { name: label })).toHaveAttribute('href', href)
+    }
+  })
+
   it('summarizes real training records and keeps every training destination reachable', async () => {
     const { calls } = signedIn(call => {
       if (call.path === '/member/training/plans') return json(200, trainingRecords.plans)

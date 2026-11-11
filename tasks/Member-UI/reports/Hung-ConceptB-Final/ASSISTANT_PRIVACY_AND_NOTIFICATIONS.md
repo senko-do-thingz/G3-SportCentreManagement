@@ -1,21 +1,23 @@
-# Assistant Privacy and Notifications
+# Spori AI Privacy and Notification API Notes
 
-## Spori AI entry
+## Spori AI desktop experience
 
-The floating Member-only Spori AI entry offers three suggested questions and a link to the full assistant. A selected question is passed as a URL query prefill to /member/assistant. It is not submitted automatically, and the automated consultation opt-in remains unchecked.
+The desktop Member shell presents the Spori robot identity, suggested questions, and a typed question composer. Submitting the composer routes to the existing assistant page with the question held in transient React Router state. It does not call the consultation API, enable consent, or place the question in the URL. The existing assistant page still requires the member to review the question and explicitly opt in before any consultation request.
 
-The existing full assistant page is still the source of assistant behavior. Its disclosure states that no conversation history is stored, the question and answer remain on the page until leaving or turning consultation off, and personal, medical, and private questions are not answered. External AI is off unless the center approves it; the disclosure states that question text is never sent to an outside company.
+The existing narrow-screen assistant entry and suggested-question route are preserved. Narrow-screen suggested links retain the previous query-based prefill; this desktop task does not redesign that UI. The assistant page accepts either route state for the desktop flow or the existing query prefill.
 
-Automated coverage is in frontend/src/layouts/MemberLayout.test.tsx and frontend/src/pages/member/training.flow.test.tsx. The tests verify the suggested question prefill, the unchecked consent state, no consultation request during the handoff, Member authorization, and safe return paths.
+The assistant disclosure states that no conversation history is stored, the question and answer remain on the page until leaving or turning consultation off, external AI is disabled unless the center approves it, and private or health questions are not answered. This work does not change those business or consent rules.
 
-## Notifications
+Automated coverage is in `frontend/src/layouts/MemberLayout.test.tsx` and `frontend/src/pages/member/MemberAssistantPage.test.tsx`. It covers desktop handoff without URL question text, narrow-screen handoff compatibility, no automatic consultation request, and unchecked consent.
 
-A scoped source search returned no notification implementation matches in frontend/src/api, frontend/src/pages/member, or frontend/src/layouts/navigation.ts. Therefore:
+## Notification API dependency
 
-- No notification list, badge, or sample notification payload was introduced.
-- Notification-center integration is BLOCKED_API_UNAVAILABLE until an API contract and client are available.
-- Existing API data only is displayed by the Member pages.
+A scoped search found no Member notification-list API or client in `frontend/src/api` or Member pages. The only inbox API found is `receptionInboxApi` in `frontend/src/api/walletApi.ts`, which calls `/reception/inbox` and is explicitly for Receptionist actions. It cannot supply Member notifications.
 
-## Privacy and evidence boundary
+- No Member notification list, badge count, or sample notification payload was added.
+- Member notification-center integration remains `BLOCKED_API_UNAVAILABLE` until a Member API contract and client are provided.
+- Existing wallet, training, booking, membership, and support data are not repurposed as notifications.
 
-Browser screenshots use controlled local synthetic responses. They are not live backend evidence and do not represent a production account. No production backend writes were performed. This task did not create or publish a private AI Audit Log document.
+## Evidence boundary
+
+Desktop screenshots use local synthetic API responses. They are not evidence of live backend integration. No production backend writes were performed. No manual screen-reader pass is claimed.

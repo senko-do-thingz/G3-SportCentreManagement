@@ -19,7 +19,7 @@ export function MemberSupportPage() {
   const [selected, select] = useState<number | null>(null)
   const [submitted, setSubmitted] = useState<MemberSupportTicket | null>(null)
   const load = useCallback((signal: AbortSignal) => memberSupportApi.list(signal), [])
-  return <div className="training-page">
+  return <div className="training-page member-support-page">
     <Link to="/member/assistant">Back to the center assistant</Link>
     <PageHeader title="Contact reception" description="Send a question that needs a staff member's help. Reception replies here; replies are not instant." />
     {submitted ? <Card title="Support request submitted">
