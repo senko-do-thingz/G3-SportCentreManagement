@@ -49,7 +49,7 @@ export function TrainingPlansPage() {
   return (
     <div className="training-page">
       <PageHeader title="Training plans" description="View the personal plans and exercise instructions assigned by your coach." />
-      <TrainingData load={training.plans} refreshLabel="Refresh training plans">
+      <TrainingData load={training.plans}>
         {plans => plans.length ? (
           <Card>
             <ul className="training-list">
@@ -59,7 +59,7 @@ export function TrainingPlansPage() {
                   <p>{plan.className} - Coach {plan.coachName}</p>
                   {plan.description && <p className="training-copy">{plan.description}</p>}
                   <Link to={`/member/training/plans/${plan.id}`} aria-label={`View plan details: ${plan.title}`}>
-                    View plan details
+                    View plan details &gt;
                   </Link>
                 </li>
               ))}

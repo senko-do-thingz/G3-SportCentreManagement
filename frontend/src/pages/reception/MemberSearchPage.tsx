@@ -63,7 +63,10 @@ export function MemberSearchPage() {
   )
 
   const createButton = (
-    <Button onClick={() => setCreating(true)}>Create member</Button>
+    <Button onClick={() => setCreating(true)}>
+      <span aria-hidden="true" style={{ fontSize: '1.35rem', fontWeight: 800, marginRight: '4px', lineHeight: 1 }}>+</span>
+      Create member
+    </Button>
   )
 
   return (
@@ -388,6 +391,8 @@ function CreateMemberModal({
   const inFlight = useRef(false)
   const [created, setCreated] = useState<CreatedMember | null>(null)
   const [revealed, setRevealed] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [copiedCode, setCopiedCode] = useState(false)
   const [uncertain, setUncertain] = useState(false)
 
   const close = () => {
@@ -396,6 +401,8 @@ function CreateMemberModal({
       const member = created.member
       setCreated(null)
       setRevealed(false)
+      setCopied(false)
+      setCopiedCode(false)
       onCreated(member)
       return
     }
@@ -451,14 +458,212 @@ function CreateMemberModal({
 
   if (created) {
     return (
-      <Modal key="created-member" open onClose={close} title="Member created" description="Give the temporary sign-in details to the member securely." className="reception-member-search__modal">
-        <p>Member code: {created.member.memberCode ?? '-'}</p>
-        <p>The temporary password is available only in this dialog. Ask the member to change it after signing in.</p>
-        <Input label="Temporary password" type={revealed ? 'text' : 'password'} value={created.temporaryPassword} readOnly autoComplete="off" />
-        <Button variant="secondary" onClick={() => setRevealed((value) => !value)}>
-          {revealed ? 'Hide temporary password' : 'Reveal temporary password'}
-        </Button>
-        <Button onClick={close}>Continue to member profile</Button>
+      <Modal
+        key="created-member"
+        open
+        onClose={close}
+        title="Member created"
+        description="Give the temporary sign-in details to the member securely."
+        className="reception-member-search__modal"
+        footer={
+          <Button
+            variant="primary"
+            onClick={close}
+            style={{
+              minHeight: '42px',
+              padding: '0 24px',
+              fontSize: '0.95rem',
+              fontWeight: 700,
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #1f4fd8 0%, #163bb0 100%)',
+              color: '#ffffff',
+              border: 'none',
+              boxShadow: '0 4px 14px rgba(31, 79, 216, 0.25)',
+              cursor: 'pointer',
+            }}
+          >
+            Continue to member profile
+          </Button>
+        }
+      >
+        {/* High-visibility Check-in ID Card */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #0b1736 0%, #152e69 100%)',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            marginBottom: '16px',
+            color: '#ffffff',
+            boxShadow: '0 6px 18px rgba(11, 23, 54, 0.18)',
+            border: '1px solid #1f3a7a',
+            position: 'relative',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+            <div>
+              <span
+                style={{
+                  display: 'inline-block',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.12em',
+                  color: '#ffc83d',
+                  textTransform: 'uppercase',
+                  marginBottom: '2px',
+                }}
+              >
+                CHECK-IN ID (MÃ HỘI VIÊN)
+              </span>
+              <div
+                style={{
+                  fontSize: '1.75rem',
+                  fontWeight: 850,
+                  fontFamily: 'Consolas, Monaco, monospace',
+                  letterSpacing: '2px',
+                  color: '#ffffff',
+                  textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                }}
+              >
+                {created.member.memberCode ?? `MEM-#${created.member.userId}`}
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={async () => {
+                const codeToCopy = created.member.memberCode ?? String(created.member.userId)
+                try {
+                  await navigator.clipboard.writeText(codeToCopy)
+                  setCopiedCode(true)
+                  setTimeout(() => setCopiedCode(false), 2000)
+                } catch {
+                  /* clipboard fallback */
+                }
+              }}
+              style={{
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                padding: '5px 12px',
+                height: '32px',
+                borderRadius: '8px',
+                background: copiedCode ? '#10b981' : 'rgba(255, 255, 255, 0.16)',
+                color: '#ffffff',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                cursor: 'pointer',
+              }}
+            >
+              {copiedCode ? 'Copied ID!' : 'Copy ID'}
+            </Button>
+          </div>
+
+          <div
+            style={{
+              paddingTop: '8px',
+              borderTop: '1px solid rgba(255, 255, 255, 0.15)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: '0.86rem',
+            }}
+          >
+            <div>
+              <span style={{ color: '#94a3b8', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Hội viên:{' '}
+              </span>
+              <strong style={{ color: '#f8fafc', fontWeight: 600 }}>{created.member.fullName}</strong>
+            </div>
+            {(created.member.phone || created.member.email) && (
+              <span style={{ color: '#cbd5e1', fontSize: '0.82rem' }}>
+                {created.member.phone || created.member.email}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '16px' }}>
+          <Input
+            label="Temporary password"
+            type={revealed ? 'text' : 'password'}
+            value={created.temporaryPassword}
+            readOnly
+            autoComplete="off"
+            style={{
+              fontFamily: 'Consolas, Monaco, monospace',
+              fontSize: '1rem',
+              letterSpacing: revealed ? '0.5px' : '3px',
+              fontWeight: 600,
+              background: '#f8fafc',
+              border: '1px solid #cbd5e1',
+              borderRadius: '8px',
+              padding: '10px 14px',
+              color: '#0f172a',
+              width: '100%',
+              boxSizing: 'border-box',
+            }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setRevealed((value) => !value)}
+              style={{
+                fontSize: '0.82rem',
+                padding: '4px 10px',
+                height: '30px',
+                color: '#1f4fd8',
+                fontWeight: 600,
+                borderRadius: '6px',
+              }}
+            >
+              {revealed ? 'Hide temporary password' : 'Reveal temporary password'}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(created.temporaryPassword)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 2000)
+                } catch {
+                  /* clipboard fallback */
+                }
+              }}
+              style={{
+                fontSize: '0.82rem',
+                padding: '4px 14px',
+                height: '30px',
+                fontWeight: 600,
+                borderRadius: '6px',
+                borderColor: copied ? '#86efac' : undefined,
+                background: copied ? '#f0fdf4' : undefined,
+                color: copied ? '#15803d' : undefined,
+              }}
+            >
+              {copied ? 'Copied!' : 'Copy password'}
+            </Button>
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: '#fffbeb',
+            border: '1px solid #fef08a',
+            borderRadius: '10px',
+            padding: '12px 14px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '10px',
+          }}
+        >
+          <p style={{ fontSize: '0.84rem', color: '#854d0e', lineHeight: 1.5, margin: 0 }}>
+            The temporary password is available only in this dialog. Ask the member to change it after signing in.
+          </p>
+        </div>
       </Modal>
     )
   }

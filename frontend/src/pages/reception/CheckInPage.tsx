@@ -142,7 +142,8 @@ export function CheckInPage() {
               <Input
                 id={IDENTIFIER_ID}
                 label="Member code or card scan"
-                hint="Scan the member card, or type the member code (for example MB-0248)."
+                hint="Scan the member card, or type the member code (for example MEM-0016)."
+                placeholder="e.g. MEM-0016"
                 required
                 autoFocus
                 autoComplete="off"

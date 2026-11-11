@@ -8,16 +8,22 @@ import { EMPTY_VALUE, initials } from '../../utils/format'
 
 export function MemberHeader({ member, children }: { member: MemberSummary; children?: ReactNode }) {
   const contact = [member.email, member.phone].filter(Boolean).join(' - ') || EMPTY_VALUE
+  const code = member.memberCode ?? `Member #${member.userId}`
   return (
     <div className="member-header">
       <span className="avatar member-header__avatar" aria-hidden="true">
         {initials(member.fullName)}
       </span>
       <div className="member-header__text">
-        <p className="member-header__code">{member.memberCode ?? `Member #${member.userId}`}</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+          <p className="member-header__code" title="Member Check-in ID">
+            <span className="member-header__code-tag">CHECK-IN ID</span>
+            <span className="member-header__code-val">{code}</span>
+          </p>
+          {member.status && <StatusBadge status={member.status} />}
+        </div>
         <p className="member-header__name">
           <span>{member.fullName}</span>
-          {member.status && <StatusBadge status={member.status} />}
         </p>
         <p className="member-header__contact">{contact}</p>
       </div>
