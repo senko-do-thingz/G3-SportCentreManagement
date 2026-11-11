@@ -2,32 +2,44 @@ import { useCallback, useMemo, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { memberSessionsApi, type BrowseFormat, type BrowseSession } from '../../api/memberSessionsApi'
 import { packagesApi } from '../../api/packagesApi'
-import { Button, CalendarDateField, Card, EmptyState, PageHeader, PageLoader, Select } from '../../components/ui'
+import trainingGroundImage from '../../assets/home/hero.jpg'
+import { Button, CalendarDateField, Card, EmptyState, PageLoader, Select } from '../../components/ui'
 import { BrowseError } from './BrowseError'
 import { FindClassesPage } from './FindClassesPage'
 import { MemberBookingsPage } from './MemberBookingsPages'
 import { MemberScheduleNav, type MemberScheduleTab } from './MemberScheduleNav'
 import { MemberSchedulePage } from './MemberSchedulePage'
+import { ScheduleWorkspaceHero } from './ScheduleWorkspaceHero'
 import { SessionCard } from './SessionCard'
 import { browseAddDays, browseDate, browseMonday, browseToday, validBrowseDate } from './memberScheduleDates'
+import { sportImageFor } from './sportImages'
 import { useMemberResource } from './useMemberResource'
 
-const TAB_DETAILS: Record<MemberScheduleTab, { title: string; description: string }> = {
+const TAB_DETAILS: Record<MemberScheduleTab, { title: string; description: string; imageSrc: string; imageAlt: string; fadeImage?: boolean }> = {
   center: {
     title: 'Center Schedule',
     description: 'Explore the center-wide timetable, compare availability, and open a session before booking.',
+    imageSrc: sportImageFor('football'),
+    imageAlt: 'Football training on the center field',
   },
   'my-schedule': {
     title: 'My Schedule',
     description: 'Your confirmed bookings only, organized week by week in Vietnam time (UTC+7).',
+    imageSrc: sportImageFor('tennis'),
+    imageAlt: 'Tennis practice on a clay court',
   },
   'find-classes': {
     title: 'Find Classes',
     description: 'Filter live Sportify sessions by sport, level, format, coach, and date.',
+    imageSrc: trainingGroundImage,
+    imageAlt: 'Badminton practice on an indoor training court',
+    fadeImage: true,
   },
   bookings: {
     title: 'My Bookings',
     description: 'Review your upcoming reservations and booking history using the existing cancellation rules.',
+    imageSrc: sportImageFor('basketball'),
+    imageAlt: 'Basketball training at the sports center',
   },
 }
 
@@ -47,10 +59,12 @@ export function MemberSchedulesWorkspacePage({ tab: forcedTab }: { tab?: MemberS
   return (
     <div className="page browse-page member-schedule-theme schedule-workspace">
       <MemberScheduleNav activeTab={activeTab} />
-      <PageHeader
-        eyebrow="Member / Schedules & bookings"
+      <ScheduleWorkspaceHero
         title={details.title}
         description={details.description}
+        imageSrc={details.imageSrc}
+        imageAlt={details.imageAlt}
+        fadeImage={details.fadeImage}
         actions={activeTab === 'center' ? <Link className="btn btn--primary" to="/member/schedules?tab=find-classes">Find a class</Link> : undefined}
       />
       <div className="schedule-workspace__content">

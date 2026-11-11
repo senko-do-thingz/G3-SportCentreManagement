@@ -5,10 +5,10 @@ import { managerPreviewEnabled } from '../../config/env'
 export type MemberScheduleTab = 'center' | 'my-schedule' | 'find-classes' | 'bookings'
 
 const TABS: { value: MemberScheduleTab; label: string }[] = [
-  { value: 'center', label: 'Center Schedule' },
   { value: 'my-schedule', label: 'My Schedule' },
+  { value: 'center', label: 'Center Schedule' },
   { value: 'find-classes', label: 'Find Classes' },
-  { value: 'bookings', label: 'My Bookings' },
+  { value: 'bookings', label: 'My bookings' },
 ]
 
 export function MemberScheduleNav({ activeTab }: { activeTab?: MemberScheduleTab }) {

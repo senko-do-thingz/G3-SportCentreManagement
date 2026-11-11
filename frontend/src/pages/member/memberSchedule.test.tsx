@@ -32,7 +32,16 @@ describe('My Schedule shows only the member own CONFIRMED bookings', () => {
   it('renders confirmed coach-led and self-training sessions with date, time, sport, coach, facility and Session ID', async () => {
     const api = backend()
     renderApp('/member/schedule?date=2026-10-16')
-    expect(await screen.findByRole('heading', { name: 'My Schedule' })).toBeInTheDocument()
+    const heading = await screen.findByRole('heading', { name: 'My Schedule' })
+    expect(heading.closest('.schedule-workspace__hero')).toHaveClass('schedule-workspace__hero')
+    expect(within(heading.closest('.schedule-workspace__hero') as HTMLElement).getByRole('img', { name: 'Tennis practice on a clay court' })).toBeInTheDocument()
+    const workspaceNavigation = screen.getByRole('navigation', { name: 'Schedules and bookings' })
+    expect(within(workspaceNavigation).getAllByRole('link').map((link) => link.textContent)).toEqual([
+      'My Schedule',
+      'Center Schedule',
+      'Find Classes',
+      'My bookings',
+    ])
     const table = await screen.findByRole('table', { name: 'Weekly schedule' })
     expect(within(table).getByText('Basketball Foundations')).toBeInTheDocument()
     expect(within(table).getByText('16:00 - 17:00')).toBeInTheDocument()
