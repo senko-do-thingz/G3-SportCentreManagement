@@ -190,7 +190,7 @@ describe('FE-04 Membership Cards (F1-11)', () => {
     const queued = card({ id: 6, tierId: 2, tierName: 'Gold Member', startDate: '2027-07-05', endDate: '2028-07-04' })
     await openCards({ cards: [GOLD_CARD, queued] })
     expect(within(tier('Gold Member')).getByText('Starts 05/07/2027')).toBeInTheDocument()
-    expect(within(tier('VIP Member')).getByText(/already renewed from 2027-07-05/)).toBeInTheDocument()
+    expect(within(tier('VIP Member')).getByText(/already renewed from 05\/07\/2027/)).toBeInTheDocument()
     expect(within(tier('VIP Member')).queryByRole('button')).not.toBeInTheDocument()
   })
 

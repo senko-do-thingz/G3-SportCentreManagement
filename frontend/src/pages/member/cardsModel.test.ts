@@ -67,7 +67,7 @@ describe('FE-04 planCard', () => {
     const queued = card({ id: 6, cardCode: 'CARD-0006', tierId: 2, tierName: 'Gold', startDate: '2027-07-05', endDate: '2028-07-04' })
     const plan = planCard(VIP_TIER, [GOLD_CARD, queued], CARD_TIERS, TODAY)
     expect(plan.kind).toBe('blocked')
-    expect(plan.reason).toMatch(/already renewed from 2027-07-05/)
+    expect(plan.reason).toMatch(/already renewed from 05\/07\/2027/)
   })
 
   it('TC-FE04-008 renewal compares with the last card: VIP in force and Gold queued, VIP starts after Gold', () => {

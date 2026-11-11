@@ -1,4 +1,4 @@
-import { formatCalendarDate, formatMonthRange } from '../../utils/dateDisplay'
+import { formatMonth, formatMonthRange } from '../../utils/dateDisplay'
 import type { FinanceTrendPoint } from '../../api/managerFinanceApi'
 
 function shortMoney(value: number): string {
@@ -43,7 +43,7 @@ export function FinanceTrendChart({ points }: { points: FinanceTrendPoint[] }) {
         <circle className="finance-chart__point" cx={point.x} cy={point.y} r="5">
           <title>{`${formatMonthRange(point.month)}: ${new Intl.NumberFormat('vi-VN').format(point.revenue)} VND`}</title>
         </circle>
-        <text className="finance-chart__month" x={point.x} y={height - 16} textAnchor="middle">{formatCalendarDate(`${point.month}-01`)}</text>
+        <text className="finance-chart__month" x={point.x} y={height - 16} textAnchor="middle">{formatMonth(point.month)}</text>
       </g>)}
     </svg>
     <ul className="finance-trend-values" aria-label="Monthly collected revenue values">

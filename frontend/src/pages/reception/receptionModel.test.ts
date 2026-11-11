@@ -155,7 +155,7 @@ describe('FE-05 receptionModel - membership card at the desk (FE-04 planCard)', 
     const desk = deskCardPlan(VIP, [gold, queued], TIERS, TODAY)
     expect(desk.sellable).toBe(false)
     expect(desk.plan.kind).toBe('blocked')
-    expect(desk.message).toBe("The member's card is already renewed from 2027-07-05. It can be upgraded once that term has started.")
+    expect(desk.message).toBe("The member's card is already renewed from 05/07/2027. It can be upgraded once that term has started.")
   })
 
   it('TC-FE05-012 only active paid tiers are sold', () => {

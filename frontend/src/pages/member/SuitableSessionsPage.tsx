@@ -37,7 +37,7 @@ export function SuitableSessionsPage() {
               : AVAILABILITY[session.availability]}</td>
           </tr>)}</tbody></table>}
       {data.packages.length > 0
-        ? <ul className="training-list">{data.packages.map((item, index) => <li key={index}>{item.packageName} ({item.trainingFormat === 'COACH_LED' ? 'Coach-led' : 'Self-training'}): {item.remainingSessions} of {item.totalSessions} sessions available, valid until {item.endDate}</li>)}</ul>
+        ? <ul className="training-list">{data.packages.map((item, index) => <li key={index}>{item.packageName} ({item.trainingFormat === 'COACH_LED' ? 'Coach-led' : 'Self-training'}): {item.remainingSessions} of {item.totalSessions} sessions available, valid until {formatCalendarDate(item.endDate)}</li>)}</ul>
         : <p>You have no active {data.sportName} package.</p>}
       <p>A compatible package is required to book. Saving a suggestion does not hold a seat, and viewing this list books nothing.</p>
       <Link className={buttonClassName('secondary')} to="/member/packages">Check other package options</Link>

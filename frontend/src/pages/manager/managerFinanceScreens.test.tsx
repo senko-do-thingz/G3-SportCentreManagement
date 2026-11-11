@@ -205,7 +205,9 @@ describe('FE-13 financial overview', () => {
     expect(within(serviceCard!).getByText('Sport packages')).toBeInTheDocument()
     expect(within(serviceCard!).getByText('12.360.000 VND')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '1 requests' })).toHaveAttribute('href', '/manager/transactions#refund-queue')
-    expect(screen.getByRole('img', { name: 'Six-month collected revenue through current month' })).toBeInTheDocument()
+    const trend = screen.getByRole('img', { name: 'Six-month collected revenue through current month' })
+    expect(trend).toBeInTheDocument()
+    expect(trend.querySelector('.finance-chart__month')).toHaveTextContent(/^05\/2026$/)
     expect(await screen.findByText('INV-1041')).toBeInTheDocument()
     expect(calls.some((call) => call.path === '/manager/finance/overview?month=2026-10')).toBe(true)
     expect(calls.some((call) => call.path === '/manager/finance/trend?months=6')).toBe(true)
@@ -367,6 +369,7 @@ describe('FE-13 revenue reports and backend CSV export', () => {
     expect(screen.getByRole('img', { name: /revenue by category/i })).toBeInTheDocument()
     expect(screen.getByRole('table', { name: 'Revenue report by category' })).toBeInTheDocument()
     expect(screen.getByText('44.69%')).toBeInTheDocument()
+    expect(screen.getByText(/Registrations and class bookings in 01\/10\/2026 - 31\/10\/2026/)).toBeInTheDocument()
     expect(screen.queryByLabelText('Sport')).not.toBeInTheDocument()
     expect(calls.some((call) => call.path === '/manager/finance/revenue?from=2026-10-01&to=2026-10-31&groupBy=SPORT')).toBe(true)
     expect(calls.some((call) => call.path.includes('sportId=3'))).toBe(false)
@@ -416,6 +419,17 @@ describe('FE-13 revenue reports and backend CSV export', () => {
       authorization: 'Bearer finance-manager-token',
     })
   })
+
+  it('DEF-311-01 does not export a stale range while a visible report date is invalid', async () => {
+    const { calls } = revenueApi()
+    renderApp('/manager/reports?from=2026-10-01&to=2026-10-31&groupBy=SPORT')
+    await screen.findByRole('table', { name: 'Revenue report by category' })
+    const from = screen.getByLabelText(/^From date/)
+    fireEvent.change(from, { target: { value: '11/11/' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }))
+    expect(await screen.findByText('Enter a valid date in dd/MM/yyyy format.')).toBeInTheDocument()
+    expect(calls.some((call) => call.path.startsWith('/manager/finance/revenue/export'))).toBe(false)
+  })
 })
 
 describe('FE-13 Round 2 action safety', () => {
@@ -442,7 +456,9 @@ describe('FE-13 Round 2 action safety', () => {
     renderApp('/manager/reports?from=2026-10-01&to=2026-10-31')
     await screen.findByRole('table', { name: 'Revenue report by category' })
     fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }))
-    fireEvent.change(screen.getByLabelText('From date'), { target: { value: '2026-10-02' } })
+    const from = screen.getByLabelText(/From date/)
+    fireEvent.change(from, { target: { value: '02/10/2026' } })
+    fireEvent.blur(from)
     await screen.findByRole('table', { name: 'Revenue report by category' })
     expect(screen.getByRole('button', { name: 'Export CSV' })).toBeEnabled()
     const result = { blob: new Blob(['Payment code,Amount\r\n']), contentDisposition: null, contentType: 'text/csv' }

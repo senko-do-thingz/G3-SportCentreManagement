@@ -1,12 +1,13 @@
 import { useCallback } from 'react'
 import { operationsReport } from '../../api/operationsReportApi'
 import { Card, StatCard } from '../../components/ui'
+import { formatCalendarDate } from '../../utils/dateDisplay'
 import { TrainingData } from '../member/TrainingData'
 
 export function OperationsSummary({ from, to }: { from: string; to: string }) {
   const load = useCallback((signal: AbortSignal) => operationsReport(from, to, signal), [from, to])
   return <Card title="Operations" >
-    <p>Registrations and class bookings in {from} to {to}. Revenue and CSV export use the same date controls below.</p>
+    <p>Registrations and class bookings in {formatCalendarDate(from)} - {formatCalendarDate(to)}. Revenue and CSV export use the same date controls below.</p>
     <TrainingData load={load}>{report => <>
       <section className="finance-kpis" aria-label="Member registrations">
         <StatCard label="Members registered in range" value={report.registeredMembers.toLocaleString('en-US')} />

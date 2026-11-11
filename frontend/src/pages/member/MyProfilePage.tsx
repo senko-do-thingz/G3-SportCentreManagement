@@ -6,7 +6,7 @@ import type { UserProfile } from '../../api/types'
 import { ROLE_LABELS, roleOf } from '../../auth/roles'
 import { useAuth } from '../../auth/useAuth'
 import { PasswordRules } from '../../components/PasswordRules'
-import { Button, Card, ErrorState, Input, PasswordInput, Select, useToast } from '../../components/ui'
+import { Button, CalendarDateField, Card, ErrorState, Input, PasswordInput, Select, useToast } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { initials } from '../../utils/format'
@@ -231,15 +231,14 @@ function PersonalInfoCard({ initial, onSaved }: { initial: UserProfile; onSaved:
               error={fieldErrors.fullName}
               required
             />
-            <Input
+            <CalendarDateField
               label="Date of birth"
-              type="date"
               name="dateOfBirth"
               autoComplete="bday"
               min={MIN_DATE_OF_BIRTH}
               max={latestDateOfBirth(today)}
               value={form.dateOfBirth}
-              onChange={(event) => update('dateOfBirth', event.target.value)}
+              onChange={(value) => update('dateOfBirth', value)}
               error={fieldErrors.dateOfBirth}
             />
             <Input

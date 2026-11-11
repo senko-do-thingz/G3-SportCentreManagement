@@ -1,9 +1,25 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { formatCalendarDate, formatDate, formatDateTime, formatTime, formatMonthRange, formatWeekRange, parseDate } from './dateDisplay'
+import { formatCalendarDate, formatDate, formatDateTime, formatDisplayCalendarDate, formatTime, formatMonth, formatMonthRange, formatWeekRange, parseDate, parseDisplayCalendarDate } from './dateDisplay'
 
 afterEach(() => vi.unstubAllEnvs())
 
 describe('ID-05 center calendar display', () => {
+  it.each([
+    ['2026-11-11', '11/11/2026'],
+    ['2026-01-02', '02/01/2026'],
+    ['2028-02-29', '29/02/2028'],
+  ])('round trips calendar date %s', (iso, display) => {
+    expect(formatDisplayCalendarDate(iso)).toBe(display)
+    expect(parseDisplayCalendarDate(display)).toBe(iso)
+  })
+  it.each(['29/02/2027', '31/04/2026', '01/01/0000', '1/01/2026', '01/1/2026', '11/11/26', '11/11/', '', ' 11/11/2026 '])('rejects invalid or partial display date %j', value => {
+    expect(parseDisplayCalendarDate(value)).toBeNull()
+  })
+  it('keeps invalid and blank editable values empty instead of inventing an epoch date', () => {
+    expect(formatDisplayCalendarDate('')).toBe('')
+    expect(formatDisplayCalendarDate('not-a-date')).toBe('')
+    expect(formatDisplayCalendarDate('1970-01-01')).toBe('01/01/1970')
+  })
   it.each(['UTC', 'Asia/Tokyo', 'America/Los_Angeles'])('keeps calendar and timestamp semantics in client zone %s', zone => {
     vi.stubEnv('TZ', zone)
     expect(formatDate('2026-01-05')).toBe('05/01/2026')
@@ -37,6 +53,8 @@ describe('ID-05 center calendar display', () => {
     expect(formatTime('24:00')).toBe('-')
   })
   it('describes full monthly and ISO weekly periods without changing native values', () => {
+    expect(formatMonth('2028-02')).toBe('02/2028')
+    expect(formatMonth('2026-13')).toBe('-')
     expect(formatMonthRange('2028-02')).toBe('01/02/2028 - 29/02/2028')
     expect(formatMonthRange('2026-13')).toBe('-')
     expect(formatWeekRange('2020-W53')).toBe('28/12/2020 - 03/01/2021')

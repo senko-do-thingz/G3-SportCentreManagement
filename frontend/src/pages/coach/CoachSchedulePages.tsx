@@ -42,19 +42,7 @@ function changeWeekParams(params: URLSearchParams, week: string): URLSearchParam
 }
 
 function weekMetricLabel(start: string, end: string): string {
-  const dateParts = (value: string) => {
-    const [year, month, day] = value.split('-').map(Number)
-    const date = new Date(Date.UTC(year, month - 1, day, 12))
-    return {
-      day: String(day).padStart(2, '0'),
-      month: new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' }).format(date).toUpperCase(),
-    }
-  }
-  const first = dateParts(start)
-  const last = dateParts(end)
-  return first.month === last.month
-    ? `${first.day} - ${last.day} ${last.month}`
-    : `${first.day} ${first.month} - ${last.day} ${last.month}`
+  return `${browseDate(start)} - ${browseDate(end)}`
 }
 
 function rosterHref(session: CoachSessionRecord, week: string): string {

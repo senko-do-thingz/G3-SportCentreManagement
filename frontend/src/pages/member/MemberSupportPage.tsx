@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { memberSupportApi, memberSupportTopics, type MemberSupportIntake, type MemberSupportTicket } from '../../api/memberSupportApi'
 import { tokenStorage } from '../../api/tokenStorage'
 import { Button, Card, Input, PageHeader, Select, StatusBadge, TextArea } from '../../components/ui'
+import { formatDateTime } from '../../utils/dateDisplay'
 import { TrainingData } from './TrainingData'
 import { useTrainingAction } from '../training/trainingFormState'
 import { ActionMessage } from '../training/TrainingFormFields'
@@ -102,7 +103,7 @@ function RequestDetail({ id, onRead }: { id: number; onRead: () => void }) {
     <h3>Replies from reception</h3>
     {ticket.replies.length === 0 ? <p role="status">No reply yet. Reception will answer here.</p>
       : <ul className="training-list">{ticket.replies.map((reply, index) => <li key={index}>
-        <p><strong>{reply.fromMe ? 'You' : 'Reception'}</strong> - {new Date(reply.createdAt).toLocaleString()}</p><p>{reply.message}</p></li>)}</ul>}
+        <p><strong>{reply.fromMe ? 'You' : 'Reception'}</strong> - {formatDateTime(reply.createdAt)}</p><p>{reply.message}</p></li>)}</ul>}
     {ticket.status === 'CLOSED'
       ? <p role="status">This request is closed. Send a new support request if you need more help.</p>
       : <FollowUpForm id={ticket.id} resolved={ticket.status === 'RESOLVED'} onSent={refresh} />}
