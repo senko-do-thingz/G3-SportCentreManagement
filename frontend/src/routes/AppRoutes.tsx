@@ -54,11 +54,10 @@ import { ActivityLogPage } from '../pages/manager/ActivityLogPage'
 import { ManagerClassesPage } from '../pages/manager/ManagerClassesPage'
 import { ClassEditorPage } from '../pages/manager/ClassEditorPage'
 import { ManagerSchedulePage } from '../pages/manager/ManagerSchedulePage'
-import { MemberSchedulePage } from '../pages/member/MemberSchedulePage'
-import { FindClassesPage } from '../pages/member/FindClassesPage'
+import { MemberSchedulesWorkspacePage } from '../pages/member/MemberSchedulesWorkspacePage'
 import { SessionDetailPage } from '../pages/member/SessionDetailPage'
 import { BookingConfirmedPage, BookingOptionsPage, BookingReviewPage } from '../pages/member/BookingCreationPages'
-import { BookingCancelledPage, BookingCancellationPage, MemberBookingsPage } from '../pages/member/MemberBookingsPages'
+import { BookingCancelledPage, BookingCancellationPage } from '../pages/member/MemberBookingsPages'
 import { ReceptionBookingConfirmedPage, ReceptionBookingsPage, ReceptionAssistedBookingPage } from '../pages/reception/ReceptionBookingsPage'
 import { CoachRosterPage, CoachTeachingSchedulePage } from '../pages/coach/CoachSchedulePages'
 import { ManagerFinancialOverviewPage } from '../pages/manager/ManagerFinancialOverviewPage'
@@ -110,13 +109,13 @@ const SCREENS: Record<string, ReactNode> = {
   '/member': <MemberDashboardPage />,
   '/member/training': <MemberTrainingHubPage />,
   '/member/support': <MemberSupportPage />,
-  '/member/bookings': <MemberBookingsPage />,
+  '/member/bookings': <MemberSchedulesWorkspacePage tab="bookings" />,
   '/member/profile': <MyProfilePage />,
   '/member/packages': <SportPackagesPage />,
   '/member/membership': <MyMembershipPage />,
   '/member/payments': <MyPaymentsPage />,
   '/member/wallet': <MemberWalletPage />,
-  '/member/schedule': <MemberSchedulePage />,
+  '/member/schedules': <MemberSchedulesWorkspacePage />,
   '/reception': <MemberSearchPage />,
   '/reception/support': <SupportRequestsPage />,
   '/reception/bookings': <ReceptionBookingsPage />,
@@ -173,7 +172,8 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
     { path: 'training/recommendations/classes/:classId', element: <SuitableSessionsPage /> },
     { path: 'training/goals', element: <MemberTrainingGoalsPage /> },
     { path: 'assistant', element: <MemberAssistantPage /> },
-    { path: 'classes', element: <FindClassesPage /> },
+    { path: 'schedule', element: <MemberSchedulesWorkspacePage tab="my-schedule" /> },
+    { path: 'classes', element: <MemberSchedulesWorkspacePage tab="find-classes" /> },
     { path: 'sessions/:sessionId', element: <SessionDetailPage /> },
     { path: 'bookings/new', element: <BookingOptionsPage /> },
     { path: 'bookings/review', element: <BookingReviewPage /> },

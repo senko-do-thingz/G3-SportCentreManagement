@@ -82,6 +82,23 @@ class CenterConsultationAssistantTest {
         assertThat(CenterConsultationService.day("classes this week", "classes this week")).isEqualTo("UPCOMING");
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"Hello", "Hi Spori!", "Xin ch\u00E0o", "Thank you", "C\u1EA3m \u01A1n"})
+    void greetingsAndThanksReceiveANaturalBoundedReply(String question) {
+        var jdbc = mock(JdbcTemplate.class);
+        var classifier = mock(AssistantIntentClassifier.class);
+        var answer = service(jdbc, classifier).answer(7L, question, true);
+        assertThat(answer.status()).isEqualTo("ANSWERED");
+        assertThat(answer.answer()).isNotBlank();
+        assertThat(answer.sources()).isEmpty();
+        verifyNoInteractions(jdbc, classifier);
+    }
+
+    @Test void courtesyMatchingDoesNotSwallowARealOrUnrelatedQuestion() {
+        assertThat(CenterConsultationService.courtesy("hello, what classes are available?")).isNull();
+        assertThat(CenterConsultationService.courtesy("write a poem about the moon")).isNull();
+    }
+
     @Test void personalQuestionsWithoutASignedInMemberReadNothing() {
         var jdbc = mock(JdbcTemplate.class);
         var answer = service(jdbc, null).answer("how many sessions do i have left", true);

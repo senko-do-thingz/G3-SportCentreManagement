@@ -42,7 +42,7 @@ function LevelPicker({ selected, disabled, onChange }: { selected?: string; disa
   </fieldset>
 }
 
-export function FindClassesPage() {
+export function FindClassesPage({ embedded = false }: { embedded?: boolean }) {
   const [params, setParams] = useSearchParams()
   const location = useLocation()
   const [today] = useState(browseToday)
@@ -68,9 +68,9 @@ export function FindClassesPage() {
   useEffect(() => {
     if (!rangeError && resource.status === 'ready' && page > 0 && page >= resource.data.totalPages) setParams((previous) => updateBrowseParams(previous, 'page', String(Math.max(0, resource.data.totalPages - 1))), { replace: true })
   }, [rangeError, resource, page, setParams])
-  return <div className="page browse-page class-discovery">
-    <MemberScheduleNav />
-    <section className="class-discovery__hero" aria-labelledby="class-discovery-title">
+  return <div className={`page browse-page class-discovery${embedded ? ' schedule-workspace__embedded' : ''}`}>
+    {!embedded && <MemberScheduleNav />}
+    {!embedded && <section className="class-discovery__hero" aria-labelledby="class-discovery-title">
       <div className="class-discovery__hero-copy">
         <p className="class-discovery__eyebrow">Member / Classes &amp; schedule</p>
         <h1 id="class-discovery-title">Find Classes</h1>
@@ -79,7 +79,7 @@ export function FindClassesPage() {
       <div className="class-discovery__hero-art" aria-hidden="true">
         {sportRows.slice(0, 3).map((sport) => <Photo {...sportPhotoFor(sport.name, 480)} alt="" key={sport.id} sizes="170px" width="480" height="320" />)}
       </div>
-    </section>
+    </section>}
     <Card className="class-discovery__filter-card" title="Find your next session">
       <div className="class-discovery__filters">
         <SportPicker sports={sportRows} selected={sportId} disabled={!datesValid} onChange={(value) => change('sportId', value)} />

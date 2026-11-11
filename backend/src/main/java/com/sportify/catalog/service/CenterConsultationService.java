@@ -79,6 +79,17 @@ public class CenterConsultationService {
         boolean vi=vietnamese(raw,plain);
         String guard=guard(raw,plain);
         if(guard!=null)return guard.equals("COACH")?coach(vi,RULES_MODE):unknown(vi,RULES_MODE);
+        String courtesy=courtesy(plain);
+        if(courtesy!=null) {
+            boolean courtesyVi=vi || plain.startsWith("xin chao") || plain.startsWith("chao") || plain.startsWith("cam on");
+            return courtesy.equals("THANKS")
+                ?response(courtesyVi,RULES_MODE,"ANSWERED",t(courtesyVi,
+                    "You're welcome! Ask me whenever you need help with Sportify sessions, packages, bookings, or your own training records.",
+                    "Kh\u00F4ng c\u00F3 g\u00EC! H\u00E3y h\u1ECFi t\u00F4i khi b\u1EA1n c\u1EA7n h\u1ED7 tr\u1EE3 v\u1EC1 l\u1ECBch Sportify, g\u00F3i t\u1EADp, \u0111\u1EB7t ch\u1ED7 ho\u1EB7c h\u1ED3 s\u01A1 t\u1EADp luy\u1EC7n c\u1EE7a b\u1EA1n."),List.of())
+                :response(courtesyVi,RULES_MODE,"ANSWERED",t(courtesyVi,
+                    "Hello! I'm Spori. I can help with center schedules, package prices, booking guidance, and your own Sportify training records. What would you like to know?",
+                    "Xin ch\u00E0o! T\u00F4i l\u00E0 Spori. T\u00F4i c\u00F3 th\u1EC3 gi\u00FAp v\u1EC1 l\u1ECBch c\u1EE7a trung t\u00E2m, gi\u00E1 g\u00F3i t\u1EADp, h\u01B0\u1EDBng d\u1EABn \u0111\u1EB7t ch\u1ED7 v\u00E0 h\u1ED3 s\u01A1 t\u1EADp luy\u1EC7n Sportify c\u1EE7a b\u1EA1n. B\u1EA1n mu\u1ED1n bi\u1EBFt g\u00EC?"),List.of());
+        }
 
         String mode=RULES_MODE;
         String intent=rules(raw,plain);
@@ -162,6 +173,14 @@ public class CenterConsultationService {
         String plain=plain(text);
         String guard=guard(text,plain);
         return guard!=null?guard:rules(text,plain);
+    }
+
+    /** Pure greetings and thanks are normal conversation, not off-topic requests. */
+    static String courtesy(String plain) {
+        String normalized=plain.trim().replaceAll("[.!?,]+$", "").trim();
+        if(normalized.matches("^(thank you|thanks|thanks a lot|many thanks|cam on|cam on ban|cam on spori)$"))return "THANKS";
+        if(normalized.matches("^(hello|hi|hey|hello there|hi there|hello spori|hi spori|good morning|good afternoon|good evening|xin chao|xin chao spori|chao ban|chao spori)$"))return "GREETING";
+        return null;
     }
 
     /** Lower-cased text without Vietnamese diacritics, so "b\u00F3ng \u0111\u00E1" and "bong da" match the same keyword. */
