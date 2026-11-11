@@ -1,0 +1,26 @@
+{
+  "viewport": "1440x900",
+  "timestamp": "2026-11-12 01:00:12",
+  "checks": [
+    {
+      "check": "Member Navigation & Dashboard Wallet Removal",
+      "status": "PASS",
+      "details": "Sidebar has no 'My wallet' link, and Dashboard contains no 'Wallet balance' stat card."
+    },
+    {
+      "check": "Retired Member Wallet Routes 404",
+      "status": "PASS",
+      "details": "All member wallet routes (/member/wallet, topup, withdraw, history) fall through to Page not found."
+    },
+    {
+      "check": "Receptionist Wallet Workflows Removal",
+      "status": "PASS",
+      "details": "Receptionist sidebar has no wallet queue links, inbox contains no wallet tasks, and queue routes render Page not found."
+    },
+    {
+      "check": "Payment Summary Wallet Pay Card Removal",
+      "status": "PASS",
+      "details": "My Payments has no wallet link, payment summary has no WalletPayCard, and Bank Transfer remains available."
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 package com.sportify.payment.wallet;
 
+import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.identity.security.CustomUserDetails;
 import com.sportify.payment.wallet.WalletTopUpService.ConfirmRequest;
 import com.sportify.payment.wallet.WalletTopUpService.CreateRequest;
@@ -42,7 +43,7 @@ public class WalletTopUpController {
     public TopUp create(@RequestBody CreateRequest request,
                         @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
                         @AuthenticationPrincipal CustomUserDetails user) {
-        return service.create(user.getUserAccount().getId(), request, idempotencyKey);
+        throw new BusinessRuleException("Wallet top-up is no longer supported as the Wallet feature has been retired.", "WALLET_FEATURE_RETIRED");
     }
 
     @GetMapping("/member/wallet/topups/{id}")

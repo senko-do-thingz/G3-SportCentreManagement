@@ -47,7 +47,7 @@ export function ReceptionInboxPage() {
         kicker="Front desk operations"
         title="Action inbox."
         highlight="Open the right workflow."
-        description="Top-ups, withdrawals, payment exceptions and support requests that need reception. Each task is completed on its own screen."
+        description="Payment exceptions and support requests that need reception. Each task is completed on its own screen."
       />
       {data && (
         <ReceptionStats label="Inbox summary">
@@ -69,7 +69,7 @@ export function ReceptionInboxPage() {
         {resource.status === 'loading' && <Spinner label="Loading inbox" />}
         {resource.status === 'error' && <ErrorState title="We could not load the inbox" error={resource.error} onRetry={reload} />}
         {data && (data.items.length === 0
-          ? <EmptyState title="Nothing to do" description="New top-ups, withdrawals, payment exceptions and support requests appear here." />
+          ? <EmptyState title="Nothing to do" description="New payment exceptions and support requests appear here." />
           : (
             <ul className="rcp-list">
               {data.items.map((item) => (
@@ -93,7 +93,7 @@ export function ReceptionInboxPage() {
             </ul>
           ))}
         <ReceptionCallout>
-          <strong>Important:</strong> Mark as read only updates the notice. A payment, wallet transaction or support request stays open until it is handled in its own workflow.
+          <strong>Important:</strong> Mark as read only updates the notice. A payment or support request stays open until it is handled in its own workflow.
         </ReceptionCallout>
       </Card>
     </ReceptionScreen>

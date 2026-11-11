@@ -95,14 +95,6 @@ export const MEMBER_AREA: RoleArea = {
       heading: 'Account',
       items: [
         {
-          label: 'My wallet',
-          path: 'wallet',
-          title: 'My Wallet',
-          description: 'Your internal Sportify Wallet balance and activity.',
-          task: 'MW-03',
-          screens: [],
-        },
-        {
           label: 'My payments',
           path: 'payments',
           title: 'My Payments and Receipts',
@@ -198,22 +190,6 @@ export const RECEPTIONIST_AREA: RoleArea = {
           description: 'Check eligibility, submit refunds for approval and record completed refunds.',
           task: 'FE-12',
           screens: ['F3-07'],
-        },
-        {
-          label: 'Wallet top-ups',
-          path: 'wallet/topups',
-          title: 'Wallet top-ups',
-          description: 'Confirm or reject member wallet top-ups after checking the bank.',
-          task: 'MW-04',
-          screens: [],
-        },
-        {
-          label: 'Wallet withdrawals',
-          path: 'wallet/withdrawals',
-          title: 'Wallet withdrawals',
-          description: 'Approve, reject and record member wallet withdrawals.',
-          task: 'MW-06',
-          screens: [],
         },
       ],
     },

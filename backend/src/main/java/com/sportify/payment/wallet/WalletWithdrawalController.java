@@ -1,5 +1,6 @@
 package com.sportify.payment.wallet;
 
+import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.identity.security.CustomUserDetails;
 import com.sportify.payment.wallet.WalletWithdrawalService.CompleteRequest;
 import com.sportify.payment.wallet.WalletWithdrawalService.CreateRequest;
@@ -58,7 +59,7 @@ public class WalletWithdrawalController {
     public Withdrawal create(@RequestBody CreateRequest request,
                              @RequestHeader(value = "Idempotency-Key", required = false) String key,
                              @AuthenticationPrincipal CustomUserDetails user) {
-        return service.create(user.getUserAccount().getId(), request, key);
+        throw new BusinessRuleException("Wallet withdrawal is no longer supported as the Wallet feature has been retired.", "WALLET_FEATURE_RETIRED");
     }
 
     @GetMapping("/reception/wallet/withdrawals")
