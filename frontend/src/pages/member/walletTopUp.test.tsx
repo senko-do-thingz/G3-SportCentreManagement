@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
@@ -24,6 +24,49 @@ function signedIn(role: string, handler: (call: RecordedCall) => Response | Prom
 }
 
 describe('Member wallet top-up (MW-04)', () => {
+  it('allows only one same-tick create request', async () => {
+    let resolveCreate!: (response: Response) => void
+    const create = new Promise<Response>((resolve) => { resolveCreate = resolve })
+    let submitted = false
+    const { calls } = signedIn('MEMBER', call => {
+      if (call.path === '/member/wallet/topups' && call.method === 'POST') { submitted = true; return create }
+      if (call.path === '/member/wallet/topups') return json(200, { simulatedTopUpsEnabled: false, realTopUpsAvailable: true, minAmount: 10000, maxAmount: 50000000, topUps: submitted ? [pending] : [] })
+      return backendError(404, 'Not found')
+    })
+    renderApp('/member/wallet/topup')
+    fireEvent.change(await screen.findByLabelText('Amount (VND)'), { target: { value: '200000' } })
+    const form = screen.getByRole('form', { name: 'New top-up' })
+    fireEvent.submit(form)
+    fireEvent.submit(form)
+    await waitFor(() => expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1))
+    await act(async () => { resolveCreate(json(201, pending)) })
+    expect(await screen.findByAltText('VietQR code for top-up TU-000007')).toBeInTheDocument()
+  })
+
+  it('retains the create idempotency key after an uncertain response', async () => {
+    let attempts = 0
+    const { fetchMock } = signedIn('MEMBER', call => {
+      if (call.path === '/member/wallet/topups' && call.method === 'POST') {
+        attempts += 1
+        return attempts === 1 ? backendError(500, 'Response unavailable') : json(200, pending)
+      }
+      if (call.path === '/member/wallet/topups') return json(200, { simulatedTopUpsEnabled: false, realTopUpsAvailable: true, minAmount: 10000, maxAmount: 50000000, topUps: attempts > 1 ? [pending] : [] })
+      return backendError(404, 'Not found')
+    })
+    const user = userEvent.setup()
+    renderApp('/member/wallet/topup')
+    await user.type(await screen.findByLabelText('Amount (VND)'), '200000')
+    await user.click(screen.getByRole('button', { name: 'Create top-up request' }))
+    expect(await screen.findByText(/outcome was not confirmed/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Create top-up request' }))
+    expect(await screen.findByAltText('VietQR code for top-up TU-000007')).toBeInTheDocument()
+    const keys = fetchMock.mock.calls
+      .filter(([, options]) => options?.method === 'POST')
+      .map(([, options]) => new Headers(options?.headers).get('Idempotency-Key'))
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).toBe(keys[1])
+  })
+
   it('creates a PENDING request with one idempotency key and shows the QR and transfer note', async () => {
     let created = false
     const { calls, fetchMock } = signedIn('MEMBER', call => {
@@ -62,6 +105,22 @@ describe('Member wallet top-up (MW-04)', () => {
     expect(await screen.findByText(/Bank top-ups are not available right now/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create top-up request' })).toBeDisabled()
     expect(calls.some(call => call.method === 'POST')).toBe(false)
+  })
+
+  it('allows only one same-tick cancellation request', async () => {
+    let resolveCancel!: (response: Response) => void
+    const cancellation = new Promise<Response>((resolve) => { resolveCancel = resolve })
+    const { calls } = signedIn('MEMBER', call => {
+      if (call.path === '/member/wallet/topups/7/cancel') return cancellation
+      if (call.path === '/member/wallet/topups') return json(200, { simulatedTopUpsEnabled: false, realTopUpsAvailable: true, minAmount: 10000, maxAmount: 50000000, topUps: [pending] })
+      return backendError(404, 'Not found')
+    })
+    renderApp('/member/wallet/topup')
+    const cancel = await screen.findByRole('button', { name: 'Cancel' })
+    fireEvent.click(cancel)
+    fireEvent.click(cancel)
+    await waitFor(() => expect(calls.filter((call) => call.path.endsWith('/cancel'))).toHaveLength(1))
+    await act(async () => { resolveCancel(json(200, { ...pending, status: 'CANCELLED' })) })
   })
 })
 

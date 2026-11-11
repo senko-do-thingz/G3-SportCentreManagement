@@ -3,9 +3,25 @@ import QRCode from 'qrcode'
 import { Link } from 'react-router-dom'
 import { getErrorMessage } from '../../api/errors'
 import { topUpApi, type MemberTopUps, type WalletPool, type WalletTopUp } from '../../api/walletApi'
-import { Badge, Button, Card, EmptyState, ErrorState, Input, Notice, PageHeader, Select, Spinner, buttonClassName } from '../../components/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  Input,
+  Notice,
+  Select,
+  Spinner,
+  buttonClassName,
+} from '../../components/ui'
 import { formatDateTime } from '../../utils/dateDisplay'
 import { formatMoney } from '../../utils/format'
+import {
+  MemberCommerceCard,
+  MemberCommerceHeader,
+  MemberCommerceHero,
+} from './MemberCommerceComponents'
 import { useMemberResource } from './useMemberResource'
 
 /** MW-04: request a wallet top-up. The request stays PENDING until reception confirms the money arrived. */
@@ -13,31 +29,50 @@ export function WalletTopUpPage() {
   const load = useCallback((signal: AbortSignal) => topUpApi.mine(signal), [])
   const [resource, reload] = useMemberResource(load)
   return (
-    <div className="page">
-      <PageHeader
-        eyebrow="My Wallet"
-        title="Top up wallet"
+    <div className="page member-commerce">
+      <MemberCommerceHeader
+        eyebrow="Member Workspace"
+        title="Top Up"
+        highlight="Wallet"
         description="Transfer money with the QR code. Your wallet is credited only after reception checks the transfer."
-        actions={<Link className={buttonClassName('secondary')} to="/member/wallet">Back to My Wallet</Link>}
+        actions={
+          <Link className={buttonClassName('secondary')} to="/member/wallet">
+            Back to My Wallet
+          </Link>
+        }
+      />
+      <MemberCommerceHero
+        kicker="SPORTIFY MEMBER WALLET"
+        title="TOP UP YOUR WALLET."
+        highlight="FAST, VERIFIED, READY."
+        description="Request an official top-up, transfer via VietQR, and check approval status in real time."
       />
       {resource.status === 'loading' && <Spinner label="Loading your top-ups" />}
-      {resource.status === 'error' && <ErrorState title="We could not load your top-ups" error={resource.error} onRetry={reload} />}
+      {resource.status === 'error' && (
+        <ErrorState title="We could not load your top-ups" error={resource.error} onRetry={reload} />
+      )}
       {resource.status === 'ready' && <TopUpWorkspace data={resource.data} onChanged={reload} />}
     </div>
   )
 }
 
+const PRESET_AMOUNTS = [100000, 200000, 500000, 1000000]
+
 function TopUpWorkspace({ data, onChanged }: { data: MemberTopUps; onChanged: () => void }) {
   const [amount, setAmount] = useState('')
-  const [mode, setMode] = useState<WalletPool>(!data.realTopUpsAvailable && data.simulatedTopUpsEnabled ? 'SIMULATED' : 'ACTUAL')
+  const [mode, setMode] = useState<WalletPool>(
+    !data.realTopUpsAvailable && data.simulatedTopUpsEnabled ? 'SIMULATED' : 'ACTUAL'
+  )
   const unavailable = mode === 'ACTUAL' && !data.realTopUpsAvailable
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [created, setCreated] = useState<WalletTopUp | null>(null)
   const intent = useRef<{ serialized: string; key: string } | null>(null)
+  const inFlight = useRef(false)
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
+    if (inFlight.current) return
     const value = Number(amount)
     if (!Number.isInteger(value) || value < data.minAmount || value > data.maxAmount) {
       setError(`Enter a whole amount from ${formatMoney(data.minAmount)} to ${formatMoney(data.maxAmount)}.`)
@@ -46,6 +81,7 @@ function TopUpWorkspace({ data, onChanged }: { data: MemberTopUps; onChanged: ()
     // One key per intended request, so a retry after a network error never creates a second top-up.
     const serialized = `${value}|${mode}`
     if (intent.current?.serialized !== serialized) intent.current = { serialized, key: crypto.randomUUID() }
+    inFlight.current = true
     setBusy(true)
     setError(null)
     try {
@@ -55,40 +91,101 @@ function TopUpWorkspace({ data, onChanged }: { data: MemberTopUps; onChanged: ()
       setAmount('')
       onChanged()
     } catch (failure) {
-      setError(getErrorMessage(failure))
+      setError(
+        `${getErrorMessage(failure)} The outcome was not confirmed. Check My Top-Up Requests before retrying; retrying this unchanged request reuses the same safety key.`
+      )
     } finally {
+      inFlight.current = false
       setBusy(false)
     }
   }
 
-  const pending = created && created.status === 'PENDING' ? created : data.topUps.find((t) => t.status === 'PENDING') ?? null
+  const pending =
+    created && created.status === 'PENDING'
+      ? created
+      : data.topUps.find((t) => t.status === 'PENDING') ?? null
 
   return (
-    <div className="health-layout">
-      <div className="health-side">
-        <Card title="New top-up">
+    <div className="member-commerce-grid">
+      <div className="member-commerce-column">
+        <MemberCommerceCard title="New Top-Up Request">
           <form onSubmit={submit} aria-label="New top-up" noValidate>
-            <Input label="Amount (VND)" name="amount" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))}
-              hint={`From ${formatMoney(data.minAmount)} to ${formatMoney(data.maxAmount)}`} />
+            <p className="health-meta" style={{ marginTop: 0, marginBottom: 'var(--space-2)' }}>
+              Select a quick amount or type an exact whole amount:
+            </p>
+            <div className="member-commerce-chips" role="group" aria-label="Preset top-up amounts">
+              {PRESET_AMOUNTS.map((val) => (
+                <button
+                  type="button"
+                  key={val}
+                  className={`member-commerce-chip${Number(amount) === val ? ' member-commerce-chip--active' : ''}`}
+                  onClick={() => setAmount(String(val))}
+                >
+                  {formatMoney(val)}
+                </button>
+              ))}
+            </div>
+
+            <Input
+              label="Amount (VND)"
+              name="amount"
+              inputMode="numeric"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))}
+              hint={`From ${formatMoney(data.minAmount)} to ${formatMoney(data.maxAmount)}`}
+            />
             {data.simulatedTopUpsEnabled && (
-              <Select label="Top-up type" name="mode" value={mode} onChange={(e) => setMode(e.target.value as WalletPool)}
-                options={[{ value: 'ACTUAL', label: 'Bank transfer (real money)' }, { value: 'SIMULATED', label: 'Demo top-up (not real money)' }]} />
+              <Select
+                label="Top-up type"
+                name="mode"
+                value={mode}
+                onChange={(e) => setMode(e.target.value as WalletPool)}
+                options={[
+                  { value: 'ACTUAL', label: 'Bank transfer (real money)' },
+                  { value: 'SIMULATED', label: 'Demo top-up (not real money)' },
+                ]}
+              />
             )}
             {unavailable && (
-              <Notice tone="warning">Bank top-ups are not available right now because the centre has no verified receiving account. Do not transfer money.</Notice>
+              <Notice tone="warning">
+                Bank top-ups are not available right now because the centre has no verified receiving account. Do not
+                transfer money.
+              </Notice>
             )}
-            {error && <Notice tone="danger" live="assertive">{error}</Notice>}
-            <div className="profile-form__actions"><Button type="submit" loading={busy} disabled={unavailable}>Create top-up request</Button></div>
+            {error && (
+              <Notice tone="danger" live="assertive">
+                {error}
+              </Notice>
+            )}
+            <div className="profile-form__actions" style={{ marginTop: 'var(--space-4)' }}>
+              <Button type="submit" loading={busy} disabled={unavailable}>
+                Create top-up request
+              </Button>
+            </div>
           </form>
-        </Card>
-        <Card title="My top-up requests">
-          {data.topUps.length === 0 ? <EmptyState title="No top-up requests yet" description="Your requests and their review status appear here." />
-            : <TopUpTable topUps={data.topUps} onChanged={onChanged} />}
-        </Card>
+        </MemberCommerceCard>
+
+        <MemberCommerceCard title="My Top-Up Requests">
+          {data.topUps.length === 0 ? (
+            <EmptyState
+              title="No top-up requests yet"
+              description="Your requests and their review status appear here."
+            />
+          ) : (
+            <TopUpTable topUps={data.topUps} onChanged={onChanged} />
+          )}
+        </MemberCommerceCard>
       </div>
-      <div className="health-side">
-        {pending ? <PendingInstructions topUp={pending} /> : (
-          <Card title="Transfer instructions"><p className="health-note">Create a top-up request to see its transfer details.</p></Card>
+
+      <div className="member-commerce-column">
+        {pending ? (
+          <PendingInstructions topUp={pending} />
+        ) : (
+          <MemberCommerceCard title="Transfer Instructions">
+            <p className="health-note" style={{ margin: 0 }}>
+              Create a top-up request on the left to see official VietQR payment instructions and transfer details.
+            </p>
+          </MemberCommerceCard>
         )}
       </div>
     </div>
@@ -101,24 +198,58 @@ function PendingInstructions({ topUp }: { topUp: WalletTopUp }) {
   useEffect(() => {
     let active = true
     if (instructions?.qrPayload) {
-      QRCode.toDataURL(instructions.qrPayload, { width: 280, margin: 4, errorCorrectionLevel: 'M' }).then((url) => { if (active) setImage(url) })
+      QRCode.toDataURL(instructions.qrPayload, { width: 280, margin: 4, errorCorrectionLevel: 'M' }).then((url) => {
+        if (active) setImage(url)
+      })
     }
-    return () => { active = false }
+    return () => {
+      active = false
+    }
   }, [instructions?.qrPayload])
   if (!instructions) return null
   return (
     <Card title={`Top-up ${topUp.code}`} actions={<Badge tone="warning">Pending review</Badge>}>
       <Notice tone={instructions.payable ? 'info' : 'warning'}>{instructions.notice}</Notice>
-      {instructions.payable && image && <img className="topup-qr" src={image} alt={`VietQR code for top-up ${topUp.code}`} />}
+      {instructions.payable && image && (
+        <div style={{ display: 'flex', justifyContent: 'center', margin: 'var(--space-4) 0' }}>
+          <div className="member-commerce-qr-box__frame">
+            <img src={image} width={280} height={280} alt={`VietQR code for top-up ${topUp.code}`} />
+          </div>
+        </div>
+      )}
       <dl className="browse-facts">
-        <div><dt>Amount</dt><dd>{formatMoney(instructions.amount)}</dd></div>
-        <div><dt>Transfer note</dt><dd><code>{instructions.transferReference}</code></dd></div>
-        {instructions.payable && <>
-          <div><dt>Bank</dt><dd>{instructions.bankName}</dd></div>
-          <div><dt>Account</dt><dd>{instructions.accountNumber}</dd></div>
-          <div><dt>Account name</dt><dd>{instructions.accountName}</dd></div>
-        </>}
-        {topUp.mode === 'SIMULATED' && <div><dt>Type</dt><dd>Demo (not real money)</dd></div>}
+        <div>
+          <dt>Amount</dt>
+          <dd>{formatMoney(instructions.amount)}</dd>
+        </div>
+        <div>
+          <dt>Transfer note</dt>
+          <dd>
+            <code>{instructions.transferReference}</code>
+          </dd>
+        </div>
+        {instructions.payable && (
+          <>
+            <div>
+              <dt>Bank</dt>
+              <dd>{instructions.bankName}</dd>
+            </div>
+            <div>
+              <dt>Account</dt>
+              <dd>{instructions.accountNumber}</dd>
+            </div>
+            <div>
+              <dt>Account name</dt>
+              <dd>{instructions.accountName}</dd>
+            </div>
+          </>
+        )}
+        {topUp.mode === 'SIMULATED' && (
+          <div>
+            <dt>Type</dt>
+            <dd>Demo (not real money)</dd>
+          </div>
+        )}
       </dl>
     </Card>
   )
@@ -128,28 +259,67 @@ const STATUS_TONE = { PENDING: 'warning', CONFIRMED: 'success', REJECTED: 'dange
 
 function TopUpTable({ topUps, onChanged }: { topUps: WalletTopUp[]; onChanged: () => void }) {
   const [error, setError] = useState<string | null>(null)
+  const [cancelling, setCancelling] = useState<number | null>(null)
+  const cancellingIds = useRef(new Set<number>())
   const cancel = async (id: number) => {
+    if (cancellingIds.current.has(id)) return
+    cancellingIds.current.add(id)
+    setCancelling(id)
     setError(null)
-    try { await topUpApi.cancel(id); onChanged() } catch (failure) { setError(getErrorMessage(failure)) }
+    try {
+      await topUpApi.cancel(id)
+      onChanged()
+    } catch (failure) {
+      setError(`${getErrorMessage(failure)} The cancellation outcome was not confirmed. Refresh the request status before trying again.`)
+    } finally {
+      cancellingIds.current.delete(id)
+      setCancelling((current) => current === id ? null : current)
+    }
   }
   return (
     <>
       {error && <Notice tone="danger">{error}</Notice>}
-      <p className="health-meta">You can have one pending top-up at a time. Cancel only if you have not sent the money. If you already
-        transferred it, reception can still match your transfer note to the request and credit your wallet.</p>
+      <p className="health-meta" style={{ marginTop: 0, marginBottom: 'var(--space-3)' }}>
+        You can have one pending top-up at a time. Cancel only if you have not sent the money. If you already
+        transferred it, reception can still match your transfer note to the request and credit your wallet.
+      </p>
       <div className="table-scroll">
         <table className="table">
           <caption>Top-up requests, newest first</caption>
-          <thead><tr><th>Request</th><th>Created</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Request</th>
+              <th>Created</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
           <tbody>
             {topUps.map((t) => (
               <tr key={t.id}>
-                <td>{t.code} {t.mode === 'SIMULATED' && <Badge tone="warning">Demo</Badge>}</td>
+                <td>
+                  {t.code} {t.mode === 'SIMULATED' && <Badge tone="warning">Demo</Badge>}
+                </td>
                 <td>{formatDateTime(t.createdAt)}</td>
                 <td>{formatMoney(t.amount)}</td>
-                <td><Badge tone={STATUS_TONE[t.status]}>{t.status === 'PENDING' ? 'Pending review' : t.status.charAt(0) + t.status.slice(1).toLowerCase()}</Badge>
-                  {t.reviewNote && t.status === 'REJECTED' && <div className="health-meta">{t.reviewNote}</div>}</td>
-                <td>{t.status === 'PENDING' ? <Button variant="secondary" size="sm" onClick={() => cancel(t.id)}>Cancel</Button> : '-'}</td>
+                <td>
+                  <Badge tone={STATUS_TONE[t.status]}>
+                    {t.status === 'PENDING'
+                      ? 'Pending review'
+                      : t.status.charAt(0) + t.status.slice(1).toLowerCase()}
+                  </Badge>
+                  {t.reviewNote && t.status === 'REJECTED' && <div className="health-meta">{t.reviewNote}</div>}
+                </td>
+                <td>
+                  {t.status === 'PENDING' ? (
+                    <Button variant="secondary" size="sm" loading={cancelling === t.id} onClick={() => cancel(t.id)}>
+                      Cancel
+                    </Button>
+                  ) : (
+                    '-'
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

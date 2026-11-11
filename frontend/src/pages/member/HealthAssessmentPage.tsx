@@ -7,8 +7,9 @@ import {
   type HealthAnswer,
   type HealthAssessment,
 } from '../../api/memberHealthApi'
-import { Badge, Button, Card, Checkbox, ErrorState, Notice, PageHeader, Spinner, buttonClassName } from '../../components/ui'
+import { Badge, Button, Card, Checkbox, ErrorState, Notice, Spinner, buttonClassName } from '../../components/ui'
 import { formatDateTime } from '../../utils/dateDisplay'
+import { MemberCommerceHeader, MemberCommerceHero } from './MemberCommerceComponents'
 import { useMemberResource } from './useMemberResource'
 
 const CHOICES: { value: HealthAnswer; label: string }[] = [
@@ -22,12 +23,17 @@ export function HealthAssessmentPage() {
   const load = useCallback((signal: AbortSignal) => memberHealthApi.get(signal), [])
   const [resource, reload] = useMemberResource(load)
   return (
-    <div className="page">
-      <PageHeader
+    <div className="page member-commerce">
+      <MemberCommerceHeader
         eyebrow="My Profile"
         title="Health & Training"
         description="An optional questionnaire that helps your Coach plan safe training. You can skip any question."
         actions={<Link className={buttonClassName('secondary')} to="/member/profile">Back to My Profile</Link>}
+      />
+      <MemberCommerceHero
+        kicker="Coach Advisory"
+        title="TRAIN SAFELY. SHARE ADVISORY NOTES WITH YOUR COACH."
+        description="An optional, advisory-only questionnaire. Your Coach receives only a summary note if you consent to sharing."
       />
       {resource.status === 'loading' && <Spinner label="Loading your questionnaire" />}
       {resource.status === 'error' && <ErrorState title="We could not load your questionnaire" error={resource.error} onRetry={reload} />}

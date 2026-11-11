@@ -1,0 +1,447 @@
+{
+  "captureDate": "2026-11-11",
+  "captureTool": "Google Chrome local browser at deviceScaleFactor 1 using the Vite application and a temporary local synthetic API shim.",
+  "captureBoundary": "Captures show the local UI with synthetic responses, not a live service or production account.",
+  "productionBackendWrites": false,
+  "liveApiValidation": false,
+  "screenReaderPass": false,
+  "desktopAcceptanceViewports": [
+    {
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "width": 1920,
+      "height": 1080
+    }
+  ],
+  "desktopCaptures": [
+    {
+      "file": "screenshots/assistant-1440x900-dark-synthetic.png",
+      "page": "Spori AI assistant",
+      "route": "/member/assistant",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1440,
+        "height": 900,
+        "mode": "viewport"
+      },
+      "state": "Initial assistant consent and privacy view",
+      "fixture": "Local synthetic member profile; assistant consultation is not enabled or submitted.",
+      "sha256": "E43F4798A4652E9CB428A0B80CAC89F1D2C69BD74FA7733BE6E3789053AA836F"
+    },
+    {
+      "file": "screenshots/assistant-1440x900-light-synthetic.png",
+      "page": "Spori AI assistant",
+      "route": "/member/assistant",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1440,
+        "height": 900,
+        "mode": "viewport"
+      },
+      "state": "Initial assistant consent and privacy view",
+      "fixture": "Local synthetic member profile; assistant consultation is not enabled or submitted.",
+      "sha256": "1D5BE7AC40B01B1FB706E8A8AC8A9B743C90D5653FDC7F376D4262A6C29C4023"
+    },
+    {
+      "file": "screenshots/assistant-1920x1080-dark-synthetic.png",
+      "page": "Spori AI assistant",
+      "route": "/member/assistant",
+      "theme": "dark",
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1920,
+        "height": 1080,
+        "mode": "viewport"
+      },
+      "state": "Initial assistant consent and privacy view",
+      "fixture": "Local synthetic member profile; assistant consultation is not enabled or submitted.",
+      "sha256": "89754D627C6F7C3C1263ABD27967DEE0C40587B30E09BB481B4FA42DAC525AAA"
+    },
+    {
+      "file": "screenshots/assistant-1920x1080-light-synthetic.png",
+      "page": "Spori AI assistant",
+      "route": "/member/assistant",
+      "theme": "light",
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1920,
+        "height": 1080,
+        "mode": "viewport"
+      },
+      "state": "Initial assistant consent and privacy view",
+      "fixture": "Local synthetic member profile; assistant consultation is not enabled or submitted.",
+      "sha256": "90F388619A8E2D79B1A56AFDB15AB9AD73714D0EED7A914A55CB97AC0CDDDB11"
+    },
+    {
+      "file": "screenshots/dashboard-1440x900-dark-synthetic.png",
+      "page": "Member Dashboard",
+      "route": "/member",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1440,
+        "height": 900,
+        "mode": "viewport"
+      },
+      "state": "Initial dashboard view",
+      "fixture": "Synthetic member profile, wallet and training records from the temporary local preview API shim.",
+      "sha256": "65276877CEB0FF0BFE20F7DB8DC72DA0B7DE038AAAE7C12C159572590959C7A9"
+    },
+    {
+      "file": "screenshots/dashboard-1440x900-light-synthetic.png",
+      "page": "Member Dashboard",
+      "route": "/member",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1440,
+        "height": 900,
+        "mode": "viewport"
+      },
+      "state": "Initial dashboard view",
+      "fixture": "Synthetic member profile, wallet and training records from the temporary local preview API shim.",
+      "sha256": "EE9433A60935C73B1AF052B260C1180BBC8EAAA0E53C51568FB6876F3DF8EA5B"
+    },
+    {
+      "file": "screenshots/dashboard-1920x1080-dark-synthetic.png",
+      "page": "Member Dashboard",
+      "route": "/member",
+      "theme": "dark",
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1920,
+        "height": 1080,
+        "mode": "viewport"
+      },
+      "state": "Initial dashboard view",
+      "fixture": "Synthetic member profile, wallet and training records from the temporary local preview API shim.",
+      "sha256": "AE0C66CA6A9E4FA379EB095115C686C574FF07B769C490B007961F2790385826"
+    },
+    {
+      "file": "screenshots/dashboard-1920x1080-light-synthetic.png",
+      "page": "Member Dashboard",
+      "route": "/member",
+      "theme": "light",
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1920,
+        "height": 1080,
+        "mode": "viewport"
+      },
+      "state": "Initial dashboard view",
+      "fixture": "Synthetic member profile, wallet and training records from the temporary local preview API shim.",
+      "sha256": "832F350D0FE82AB52142AD8B19474B66C9275D37927914BA9FC9FFCC953E60C9"
+    },
+    {
+      "file": "screenshots/spori-drawer-1440x900-dark-synthetic.png",
+      "page": "Spori AI drawer",
+      "route": "/member",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1440,
+        "height": 900,
+        "mode": "viewport"
+      },
+      "state": "Spori AI dialog open with suggested questions and desktop composer",
+      "fixture": "Synthetic Member shell; composer is not submitted and consultation consent remains off.",
+      "sha256": "8EBBDEEBB89E6D66F30C381395E21073144874182F3BD4B1E436BCB63C64303E"
+    },
+    {
+      "file": "screenshots/spori-drawer-1440x900-light-synthetic.png",
+      "page": "Spori AI drawer",
+      "route": "/member",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1440,
+        "height": 900,
+        "mode": "viewport"
+      },
+      "state": "Spori AI dialog open with suggested questions and desktop composer",
+      "fixture": "Synthetic Member shell; composer is not submitted and consultation consent remains off.",
+      "sha256": "521F42A5218E0C3556B070005D8F452DD05D0406BF224EA33AF22EC945F76BF8"
+    },
+    {
+      "file": "screenshots/spori-drawer-1920x1080-dark-synthetic.png",
+      "page": "Spori AI drawer",
+      "route": "/member",
+      "theme": "dark",
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1920,
+        "height": 1080,
+        "mode": "viewport"
+      },
+      "state": "Spori AI dialog open with suggested questions and desktop composer",
+      "fixture": "Synthetic Member shell; composer is not submitted and consultation consent remains off.",
+      "sha256": "F89C3025B80969D2DFF0FE28EDEB552346D33ECF01D07235A29038A42A47E73B"
+    },
+    {
+      "file": "screenshots/spori-drawer-1920x1080-light-synthetic.png",
+      "page": "Spori AI drawer",
+      "route": "/member",
+      "theme": "light",
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1920,
+        "height": 1080,
+        "mode": "viewport"
+      },
+      "state": "Spori AI dialog open with suggested questions and desktop composer",
+      "fixture": "Synthetic Member shell; composer is not submitted and consultation consent remains off.",
+      "sha256": "B57D2B581E0D9739A251C079DA05429C7C26A62A015460F7236B76C85C7E2B70"
+    },
+    {
+      "file": "screenshots/support-1440x900-dark-synthetic.png",
+      "page": "Member Support",
+      "route": "/member/support",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1440,
+        "height": 900,
+        "mode": "viewport"
+      },
+      "state": "Initial support page",
+      "fixture": "Synthetic support request record from the temporary local preview API shim.",
+      "sha256": "874A40BEF48489C1D007DC7EB1124FB1F6311B9BB4145F7BC3BB163BC4065B78"
+    },
+    {
+      "file": "screenshots/support-1440x900-light-synthetic.png",
+      "page": "Member Support",
+      "route": "/member/support",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1440,
+        "height": 900,
+        "mode": "viewport"
+      },
+      "state": "Initial support page",
+      "fixture": "Synthetic support request record from the temporary local preview API shim.",
+      "sha256": "B7EE7063650ADD77A81F4E0E7BEE3F2F012DFB5FD0C9AF85BA4C3096E05C43A3"
+    },
+    {
+      "file": "screenshots/support-1920x1080-dark-synthetic.png",
+      "page": "Member Support",
+      "route": "/member/support",
+      "theme": "dark",
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1920,
+        "height": 1080,
+        "mode": "viewport"
+      },
+      "state": "Initial support page",
+      "fixture": "Synthetic support request record from the temporary local preview API shim.",
+      "sha256": "EB78E04FC7309A16D2A2E552CEAEEF88D6CDDD68AA48CE4BA9373F85DEAD6510"
+    },
+    {
+      "file": "screenshots/support-1920x1080-light-synthetic.png",
+      "page": "Member Support",
+      "route": "/member/support",
+      "theme": "light",
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1920,
+        "height": 1080,
+        "mode": "viewport"
+      },
+      "state": "Initial support page",
+      "fixture": "Synthetic support request record from the temporary local preview API shim.",
+      "sha256": "835B82EE12AC51FEBA98B382F940F836476DD9497EA5CD56757BE057E89677C6"
+    },
+    {
+      "file": "screenshots/training-1440x900-dark-synthetic.png",
+      "page": "Training Hub",
+      "route": "/member/training",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1440,
+        "height": 900,
+        "mode": "viewport"
+      },
+      "state": "Initial hub view with primary navigation and More tools",
+      "fixture": "Synthetic training records from the temporary local preview API shim.",
+      "sha256": "753DF90BD59CBBEFB3CF3CB697A74A9DB1AD1769BB3560C19960B046167610BC"
+    },
+    {
+      "file": "screenshots/training-1440x900-light-synthetic.png",
+      "page": "Training Hub",
+      "route": "/member/training",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1440,
+        "height": 900,
+        "mode": "viewport"
+      },
+      "state": "Initial hub view with primary navigation and More tools",
+      "fixture": "Synthetic training records from the temporary local preview API shim.",
+      "sha256": "093A3194DEA3F866CABFCFB584E989E29614458283F7A88E014AD06843D1B410"
+    },
+    {
+      "file": "screenshots/training-1920x1080-dark-synthetic.png",
+      "page": "Training Hub",
+      "route": "/member/training",
+      "theme": "dark",
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1920,
+        "height": 1080,
+        "mode": "viewport"
+      },
+      "state": "Initial hub view with primary navigation and More tools",
+      "fixture": "Synthetic training records from the temporary local preview API shim.",
+      "sha256": "7A482FDB8D10816E8B969D6F6109C1D8B8CA11A6F44D1584B62A74F21A88E602"
+    },
+    {
+      "file": "screenshots/training-1920x1080-light-synthetic.png",
+      "page": "Training Hub",
+      "route": "/member/training",
+      "theme": "light",
+      "viewport": {
+        "width": 1920,
+        "height": 1080,
+        "deviceScaleFactor": 1
+      },
+      "image": {
+        "width": 1920,
+        "height": 1080,
+        "mode": "viewport"
+      },
+      "state": "Initial hub view with primary navigation and More tools",
+      "fixture": "Synthetic training records from the temporary local preview API shim.",
+      "sha256": "CFE0F19E86204D13CF913448B604295E39B01B949A120E22328BC2E957823471"
+    }
+  ],
+  "retainedHistoricalCaptures": [
+    {
+      "route": "/member",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "image": {
+        "width": 390,
+        "height": 844,
+        "mode": "viewport"
+      },
+      "file": "screenshots/dashboard-390x844-dark-synthetic.png",
+      "retention": "Pre-existing historical capture; not regenerated or used as desktop acceptance evidence.",
+      "sha256": "ED572676CE8746DF02FECE60782DFB058C9ABA746D8DF54825EF6B79E1D169BC"
+    },
+    {
+      "route": "/member/training",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "image": {
+        "width": 390,
+        "height": 2280,
+        "mode": "full-page"
+      },
+      "file": "screenshots/member-navigation-390x844-dark-synthetic.png",
+      "retention": "Pre-existing historical capture; not regenerated or used as desktop acceptance evidence.",
+      "sha256": "099A7EC8763274EAEA77FAC0A4117FC89698135BB444A5798339393287C685F6"
+    },
+    {
+      "route": "/member/training",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "image": {
+        "width": 1440,
+        "height": 1475,
+        "mode": "full-page"
+      },
+      "file": "screenshots/training-hub-1440x900-light-synthetic.png",
+      "retention": "Pre-existing historical capture; not regenerated or used as desktop acceptance evidence.",
+      "sha256": "67CB94AECBAED792436BF07DD42BF0D364EA0E0567D7C21B009EBA6A477D307B"
+    }
+  ]
+}

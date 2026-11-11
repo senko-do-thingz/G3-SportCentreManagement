@@ -3,10 +3,11 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { cardsApi } from '../../api/cardsApi'
 import { ApiError, getErrorMessage } from '../../api/errors'
 import { memberApi, type MemberCard, type PackageRegistration } from '../../api/memberApi'
-import { Badge, Button, Card, EmptyState, ErrorState, Modal, PageHeader, StatusBadge, useToast } from '../../components/ui'
+import { Badge, Button, Card, EmptyState, ErrorState, Modal, StatusBadge, useToast } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatDate, formatMoney } from '../../utils/format'
+import { MemberCommerceHeader, MemberCommerceHero } from './MemberCommerceComponents'
 import {
   canCancelCard,
   displayStatus,
@@ -73,8 +74,8 @@ export function MyMembershipPage() {
   }
 
   return (
-    <div className="page member-ui member-ui--membership">
-      <PageHeader
+    <div className="page member-ui member-ui--membership member-commerce">
+      <MemberCommerceHeader
         eyebrow="Your sport, your way"
         title="My Membership and Sport Packages"
         description="Track card validity and each sport package separately."
@@ -83,6 +84,11 @@ export function MyMembershipPage() {
             Explore packages
           </Link>
         }
+      />
+      <MemberCommerceHero
+        kicker="Entitlements & Cards"
+        title="MANAGE YOUR ACTIVE SPORT PACKAGES AND CARDS"
+        description="Review remaining sessions, validity dates, renewal options, and active membership card tiers."
       />
       <div className="tabs" role="tablist" aria-label="My membership">
         {TABS.map((item) => (
