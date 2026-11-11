@@ -8,7 +8,8 @@ This change standardizes calendar dates as `dd/MM/yyyy` and datetimes as `dd/MM/
 
 - Base: `bf5a12407117b6ed9f354f13f5c48511f9e2a11c`
 - Implementation: `ecf8ec046918ecab2f287424cb14d8779d752f5c`
-- Final evidence head: inserted after the reports and CI links are committed.
+- Evidence and screenshot commit: `802d9411a2e0e9cc7e985e9e87e0d5aa895ac25b`
+- Publication metadata head: see the live PR checks link below.
 
 ## Verification summary
 
@@ -27,6 +28,14 @@ Full evidence is in:
 - [`04_CROSS_PR_INTEGRATION.md`](04_CROSS_PR_INTEGRATION.md)
 - [`SCREENSHOT_MANIFEST.json`](SCREENSHOT_MANIFEST.json)
 
+Representative final-base browser proof:
+
+![Manager valid date](https://raw.githubusercontent.com/senko-do-thingz/G3-SportCentreManagement/fix/ui-global-date-format-ddmmyyyy/tasks/Global-Date-Format/reports/screenshots/manager-focused-valid-date-light-1440x900.png)
+
+![Manager invalid date](https://raw.githubusercontent.com/senko-do-thingz/G3-SportCentreManagement/fix/ui-global-date-format-ddmmyyyy/tasks/Global-Date-Format/reports/screenshots/manager-invalid-date-dark-1440x900.png)
+
+![Member date range](https://raw.githubusercontent.com/senko-do-thingz/G3-SportCentreManagement/fix/ui-global-date-format-ddmmyyyy/tasks/Global-Date-Format/reports/screenshots/member-date-range-light-1440x900.png)
+
 ## Remaining risks
 
 - Future `main` changes can still create conflicts after this handoff; the current base already contains #308, #309, and #310 and is cleanly integrated.
@@ -39,4 +48,6 @@ Ready for the requested single CODEOWNER review. PRs #308, #309, and #310 are al
 
 ## GitHub CI
 
-PR and final-head workflow links will be inserted after publication.
+- PR: [#311](https://github.com/senko-do-thingz/G3-SportCentreManagement/pull/311)
+- Live final-head checks: [PR #311 checks](https://github.com/senko-do-thingz/G3-SportCentreManagement/pull/311/checks)
+- Evidence-head workflow: [GitHub Actions run 42999286336](https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/42999286336)

@@ -45,4 +45,8 @@ The preferred interactive browser-control pipe and its in-app browser host were 
 
 ## CI
 
-PR URL and final-head GitHub Actions links will be inserted after the single PR is opened and its final evidence commit is pushed.
+- PR: [#311](https://github.com/senko-do-thingz/G3-SportCentreManagement/pull/311)
+- Live final-head checks: [PR #311 checks](https://github.com/senko-do-thingz/G3-SportCentreManagement/pull/311/checks)
+- Evidence-head workflow: [GitHub Actions run 42999286336](https://github.com/senko-do-thingz/G3-SportCentreManagement/actions/runs/42999286336)
+
+The PR checks link is intentionally head-relative: it always resolves to the final pushed commit even when a documentation-only publication commit starts a successor workflow.
