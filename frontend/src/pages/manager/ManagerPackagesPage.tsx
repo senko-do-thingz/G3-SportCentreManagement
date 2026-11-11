@@ -161,7 +161,7 @@ export function ManagerPackagesPage() {
 
     <Card className="manager-catalog__panel" title="Sport package catalog" actions={<span className="manager-catalog__count">{resource.status === 'ready' ? rows.length + (rows.length === 1 ? ' package' : ' packages') : 'Loading catalog'}</span>}>
       <div className="manager-catalog__filters manager-filters">
-        <Input label="Search packages" type="search" value={search} placeholder="Name, code or sport" hint="Search the loaded catalog." onChange={(event) => { setSearch(event.target.value); setPage(0) }} />
+        <Input label="Search packages" type="search" value={search} placeholder="Name, code or sport" onChange={(event) => { setSearch(event.target.value); setPage(0) }} />
         <Select label="Sport" placeholder="All sports" options={sports.status === 'ready' ? sports.data.map((sport) => ({ value: String(sport.id), label: sport.name })) : []} disabled={sports.status !== 'ready'} value={sportId} onChange={(event) => filter(setSportId, event.target.value)} />
         <Select label="Training type" placeholder="All training types" options={[{ value: 'SELF_TRAINING', label: 'Self-training' }, { value: 'COACH_LED', label: 'Coach-led' }]} value={format} onChange={(event) => filter(setFormat, event.target.value)} />
         <Select label="Status" placeholder="All statuses" options={[{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }]} value={active} onChange={(event) => filter(setActive, event.target.value)} />
