@@ -14,15 +14,15 @@ import { useMemberResource } from './useMemberResource'
 
 const loadSports = (signal: AbortSignal) => packagesApi.sports({ signal })
 
-function SportPicker({ sports, selected, onChange }: { sports: Sport[]; selected?: number; onChange: (value: string) => void }) {
+function SportPicker({ sports, selected, disabled, onChange }: { sports: Sport[]; selected?: number; disabled?: boolean; onChange: (value: string) => void }) {
   return <fieldset className="class-discovery__picker">
     <legend>Sport</legend>
     <div className="class-discovery__sport-grid">
-      <button type="button" className={`class-discovery__sport-choice class-discovery__sport-choice--all${selected === undefined ? ' is-selected' : ''}`} aria-pressed={selected === undefined} onClick={() => onChange('')}>
+      <button type="button" disabled={disabled} className={`class-discovery__sport-choice class-discovery__sport-choice--all${selected === undefined ? ' is-selected' : ''}`} aria-pressed={selected === undefined} onClick={() => onChange('')}>
         <span className="class-discovery__all-mark" aria-hidden="true">ALL</span>
         <span>All sports</span>
       </button>
-      {sports.map((sport) => <button type="button" className={`class-discovery__sport-choice${selected === sport.id ? ' is-selected' : ''}`} aria-pressed={selected === sport.id} key={sport.id} onClick={() => onChange(String(sport.id))}>
+      {sports.map((sport) => <button type="button" disabled={disabled} className={`class-discovery__sport-choice${selected === sport.id ? ' is-selected' : ''}`} aria-pressed={selected === sport.id} key={sport.id} onClick={() => onChange(String(sport.id))}>
         <Photo {...sportPhotoFor(sport.name, 480)} alt="" sizes="160px" width="480" height="320" loading="lazy" />
         <span>{sport.name}</span>
       </button>)}
@@ -30,11 +30,11 @@ function SportPicker({ sports, selected, onChange }: { sports: Sport[]; selected
   </fieldset>
 }
 
-function LevelPicker({ selected, onChange }: { selected?: string; onChange: (value: string) => void }) {
+function LevelPicker({ selected, disabled, onChange }: { selected?: string; disabled?: boolean; onChange: (value: string) => void }) {
   return <fieldset className="class-discovery__picker class-discovery__level-picker">
     <legend>Level</legend>
     <div className="class-discovery__level-grid">
-      {[{ value: '', label: 'All levels' }, ...BROWSE_LEVELS].map((option, index) => <button type="button" className={`class-discovery__level-choice${(selected ?? '') === option.value ? ' is-selected' : ''}`} aria-pressed={(selected ?? '') === option.value} key={option.value || 'all'} onClick={() => onChange(option.value)}>
+      {[{ value: '', label: 'All levels' }, ...BROWSE_LEVELS].map((option, index) => <button type="button" disabled={disabled} className={`class-discovery__level-choice${(selected ?? '') === option.value ? ' is-selected' : ''}`} aria-pressed={(selected ?? '') === option.value} key={option.value || 'all'} onClick={() => onChange(option.value)}>
         <span className="class-discovery__level-mark" aria-hidden="true">{index === 0 ? <span>ALL</span> : <>{[0, 1, 2].map((bar) => <i className={bar < index ? 'is-active' : ''} key={bar} />)}</>}</span>
         <span>{option.label}</span>
       </button>)}
@@ -47,6 +47,9 @@ export function FindClassesPage() {
   const location = useLocation()
   const [today] = useState(browseToday)
   const { sportId, format, level, coachId, from = today, to = today, page = 0 } = browseFilters(params, today)
+  const [fromValid, setFromValid] = useState(true)
+  const [toValid, setToValid] = useState(true)
+  const datesValid = fromValid && toValid
   const rangeError = browseRangeError(from, to)
   const [sports, retrySports] = useMemberResource(loadSports)
   const sportRows = sports.status === 'ready' ? sports.data : []
@@ -79,19 +82,19 @@ export function FindClassesPage() {
     </section>
     <Card className="class-discovery__filter-card" title="Find your next session">
       <div className="class-discovery__filters">
-        <SportPicker sports={sportRows} selected={sportId} onChange={(value) => change('sportId', value)} />
-        <LevelPicker selected={level} onChange={(value) => change('level', value)} />
+        <SportPicker sports={sportRows} selected={sportId} disabled={!datesValid} onChange={(value) => change('sportId', value)} />
+        <LevelPicker selected={level} disabled={!datesValid} onChange={(value) => change('level', value)} />
         <div className="browse-filters class-discovery__fields">
-          <CalendarDateField label="From date" value={from} max={to || undefined} onChange={(value) => change('from', value)} error={rangeError ?? undefined} />
-          <CalendarDateField label="To date" value={to} min={from || undefined} onChange={(value) => change('to', value)} />
-          <Select label="Training format" placeholder="All formats" value={format ?? ''} options={BROWSE_FORMATS} onChange={(event) => change('format', event.target.value)} />
-          <Select label="Coach" placeholder={coaches.status === 'loading' ? 'Loading coaches...' : 'All coaches'} value={coachId ? String(coachId) : ''} options={options} disabled={format === 'SELF_TRAINING'} hint="Coaches with sessions in the selected date range and filters." onChange={(event) => change('coachId', event.target.value)} />
+          <CalendarDateField label="From date" value={from} max={to || undefined} onValidityChange={setFromValid} onChange={(value, valid) => { if (valid !== false) change('from', value) }} error={rangeError ?? undefined} />
+          <CalendarDateField label="To date" value={to} min={from || undefined} onValidityChange={setToValid} onChange={(value, valid) => { if (valid !== false) change('to', value) }} />
+          <Select label="Training format" placeholder="All formats" value={format ?? ''} options={BROWSE_FORMATS} disabled={!datesValid} onChange={(event) => change('format', event.target.value)} />
+          <Select label="Coach" placeholder={coaches.status === 'loading' ? 'Loading coaches...' : 'All coaches'} value={coachId ? String(coachId) : ''} options={options} disabled={!datesValid || format === 'SELF_TRAINING'} hint="Coaches with sessions in the selected date range and filters." onChange={(event) => change('coachId', event.target.value)} />
         </div>
       </div>
-      <div className="browse-actions"><Button variant="secondary" onClick={() => { const next = new URLSearchParams(params); for (const key of ['sportId', 'from', 'to', 'format', 'level', 'coachId', 'page']) next.delete(key); setParams(next) }}>Clear filters</Button><Button variant="ghost" onClick={reload}>Refresh results</Button></div>
+      <div className="browse-actions"><Button variant="secondary" onClick={() => { const next = new URLSearchParams(params); for (const key of ['sportId', 'from', 'to', 'format', 'level', 'coachId', 'page']) next.delete(key); setParams(next) }}>Clear filters</Button><Button variant="ghost" disabled={!datesValid} onClick={reload}>Refresh results</Button></div>
       {sports.status === 'error' && <BrowseError error={sports.error} onRetry={retrySports} />}
       {coaches.status === 'error' && <div><p className="browse-muted">Coach filter options are unavailable. Session results are still shown.</p><BrowseError error={coaches.error} onRetry={retryCoaches} /></div>}
-      {!rangeError && (resource.status === 'loading' ? <PageLoader label="Finding sessions" /> : resource.status === 'error' ? <BrowseError error={resource.error} onRetry={reload} /> : <>
+      {datesValid && !rangeError && (resource.status === 'loading' ? <PageLoader label="Finding sessions" /> : resource.status === 'error' ? <BrowseError error={resource.error} onRetry={reload} /> : <>
         <div className="class-discovery__results-heading"><div><p className="class-discovery__eyebrow">Your next session</p><h2>Explore the lineup</h2></div><p className="browse-muted" role="status">{resource.data.totalElements} matching sessions</p></div>
         {!resource.data.content.length ? <EmptyState title="No matching sessions" description="Try different dates or clear your filters." /> : <div className="browse-grid">{resource.data.content.map((session) => <SessionCard session={session} returnTo={returnTo} key={session.id} />)}</div>}
         <Pagination page={resource.data.page} pageSize={resource.data.size} totalItems={resource.data.totalElements} onPageChange={(value) => change('page', String(value))} />

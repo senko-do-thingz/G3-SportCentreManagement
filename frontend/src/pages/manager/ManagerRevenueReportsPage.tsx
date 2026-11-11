@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getErrorMessage } from '../../api/errors'
 import { managerFinanceApi, type FinanceRevenueRow, type RevenueGroup } from '../../api/managerFinanceApi'
-import { Button, CalendarDateField, Card, PageLoader, Select, StatCard, Table, type TableColumn } from '../../components/ui'
+import { Button, CalendarDateField, Card, PageLoader, Select, StatCard, Table, validateCalendarDateFields, type TableColumn } from '../../components/ui'
 import { useResource } from './useManagerTools'
 import { ManagerError, PreviewNotice } from './ManagerShared'
 import { FinanceRevenueChart } from './FinanceRevenueChart'
@@ -84,6 +84,10 @@ export function ManagerRevenueReportsPage() {
   const groupBy = selectedGroup(searchParams.get('groupBy'))
   const [exportMessage, setExportMessage] = useState('')
   const [exportFailed, setExportFailed] = useState(false)
+  const [fromValid, setFromValid] = useState(true)
+  const [toValid, setToValid] = useState(true)
+  const filtersRef = useRef<HTMLDivElement>(null)
+  const datesValid = fromValid && toValid
   const [activeExport, setActiveExport] = useState<{ controller: AbortController; from: string; to: string } | null>(null)
   const exporting = activeExport !== null && activeExport.from === from && activeExport.to === to && !activeExport.controller.signal.aborted
   const exportRequest = useRef<AbortController | null>(null)
@@ -102,17 +106,18 @@ export function ManagerRevenueReportsPage() {
     return next
   }, { replace: true })
 
-  const updateFrom = (value: string) => {
-    if (!validDate(value)) return
+  const updateFrom = (value: string, valid = true) => {
+    if (!valid || !validDate(value)) return
     updateParams({ from: value, ...(value > to ? { to: value } : {}) })
   }
 
-  const updateTo = (value: string) => {
-    if (!validDate(value)) return
+  const updateTo = (value: string, valid = true) => {
+    if (!valid || !validDate(value)) return
     updateParams({ to: value, ...(value < from ? { from: value } : {}) })
   }
 
   const exportCsv = async () => {
+    if (!filtersRef.current || !validateCalendarDateFields(filtersRef.current)) return
     if (report.status !== 'ready' || (exportRequest.current && !exportRequest.current.signal.aborted)) return
     const controller = new AbortController()
     exportRequest.current = controller
@@ -159,10 +164,10 @@ export function ManagerRevenueReportsPage() {
     <PreviewNotice />
 
     <Card title="Report filters">
-      <div className="manager-filters manager-filters--revenue">
-        <CalendarDateField label="From date" value={from} max={to} onChange={updateFrom} required />
-        <CalendarDateField label="To date" value={to} min={from} onChange={(value) => updateTo(value)} required />
-        <Select label="Group by" value={groupBy} options={GROUPS} onChange={(event) => updateParams({ groupBy: event.target.value })} />
+      <div ref={filtersRef} className="manager-filters manager-filters--revenue">
+        <CalendarDateField label="From date" value={from} max={to} onChange={updateFrom} onValidityChange={setFromValid} required />
+        <CalendarDateField label="To date" value={to} min={from} onChange={updateTo} onValidityChange={setToValid} required />
+        <Select label="Group by" value={groupBy} options={GROUPS} disabled={!datesValid} onChange={(event) => updateParams({ groupBy: event.target.value })} />
         <div className="finance-filter-hint">All report values use the selected date range.</div>
       </div>
     </Card>

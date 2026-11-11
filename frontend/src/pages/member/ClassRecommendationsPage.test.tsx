@@ -22,6 +22,23 @@ it('submits supported preferences, explains provenance and links to real session
   expect(calls.every(call => call.method === 'GET')).toBe(true)
 })
 
+it('DEF-311-01 keeps an incomplete date from applying the previous recommendation range', async () => {
+  tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
+  const { calls } = installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER)
+    : call.path.startsWith('/member/training/recommendations') ? json(200, {
+      mode: 'RULE_BASED', ruleVersion: 'class-rules-v1', bookingEligibilityChecked: false, message: 'Preference matches only.', page: 0, size: 10, totalMatches: 0, items: [],
+    }) : json(200, []))
+  renderApp('/member/training/recommendations')
+  await screen.findByText('No matching available classes')
+  const initialRequests = calls.filter(call => call.path.startsWith('/member/training/recommendations')).length
+  const from = screen.getByLabelText('Available from date')
+  await userEvent.clear(from)
+  await userEvent.type(from, '11/11/')
+  await userEvent.click(screen.getByRole('button', { name: 'Find recommendations' }))
+  expect(await screen.findByText('Enter a valid date in dd/MM/yyyy format.')).toBeInTheDocument()
+  expect(calls.filter(call => call.path.startsWith('/member/training/recommendations'))).toHaveLength(initialRequests)
+})
+
 const recommendation = { classId: 2, sessionId: 7, sessionCode: '031126BM01', className: 'Coached skills', sportName: 'Badminton', level: 'ADVANCED', coachName: 'Quan', date: '2026-11-03', startTime: '09:00', endTime: '10:00', freeSeats: 4, score: 40,
   reasons: ['Published upcoming session with 4 available places', 'Matches your saved Badminton level: ADVANCED', 'Fits the 16+ age group'] }
 const recommendationsResponse = { mode: 'RULE_BASED', ruleVersion: 'class-rules-v1', bookingEligibilityChecked: false, message: 'Preference matches only.', page: 0, size: 10, totalMatches: 1, items: [recommendation] }

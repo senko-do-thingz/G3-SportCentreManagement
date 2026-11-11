@@ -709,7 +709,8 @@ describe('FE-06 read-only activity', () => {
     const callsBefore = list.mock.calls.length
     fireEvent.change(screen.getByLabelText('To date'), { target: { value: '13/10/2026' } })
     fireEvent.blur(screen.getByLabelText('To date'))
-    expect(await screen.findByText('End date must be on or after the start date.')).toBeInTheDocument()
+    expect(await screen.findByText('Date must be on or after 14/10/2026.')).toBeInTheDocument()
+    expect(screen.getByLabelText('To date')).toHaveAttribute('aria-invalid', 'true')
     expect(list).toHaveBeenCalledTimes(callsBefore)
   })
   it('opens row details without another request and safely displays absent values', async () => {

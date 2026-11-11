@@ -419,6 +419,17 @@ describe('FE-13 revenue reports and backend CSV export', () => {
       authorization: 'Bearer finance-manager-token',
     })
   })
+
+  it('DEF-311-01 does not export a stale range while a visible report date is invalid', async () => {
+    const { calls } = revenueApi()
+    renderApp('/manager/reports?from=2026-10-01&to=2026-10-31&groupBy=SPORT')
+    await screen.findByRole('table', { name: 'Revenue report by category' })
+    const from = screen.getByLabelText(/^From date/)
+    fireEvent.change(from, { target: { value: '11/11/' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }))
+    expect(await screen.findByText('Enter a valid date in dd/MM/yyyy format.')).toBeInTheDocument()
+    expect(calls.some((call) => call.path.startsWith('/manager/finance/revenue/export'))).toBe(false)
+  })
 })
 
 describe('FE-13 Round 2 action safety', () => {

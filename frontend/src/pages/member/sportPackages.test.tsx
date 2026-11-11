@@ -305,6 +305,30 @@ describe('FE-03 Package Detail and Registration (F1-10)', () => {
     expect(post?.authorization).toBe('Bearer member-access')
   })
 
+  it('DEF-311-01 blocks an invalid visible start date instead of registering the stale date', async () => {
+    const user = userEvent.setup()
+    const { calls } = await openDetail()
+    const input = screen.getByLabelText(/Start date/)
+    await user.clear(input)
+    await user.type(input, '31/11/2026')
+    await user.click(screen.getByRole('button', { name: 'Confirm registration' }))
+    expect(await screen.findByText('Enter a valid date in dd/MM/yyyy format.')).toBeInTheDocument()
+    expect(calls.some((call) => call.method === 'POST' && call.path === '/packages/registrations')).toBe(false)
+    expect(screen.queryByRole('dialog', { name: 'Payment summary' })).not.toBeInTheDocument()
+  })
+
+  it('DEF-311-01 submits a newly typed valid start date on an immediate click', async () => {
+    const user = userEvent.setup()
+    const { calls } = await openDetail()
+    const input = screen.getByLabelText(/Start date/)
+    await user.clear(input)
+    await user.type(input, '01/11/2026')
+    await user.click(screen.getByRole('button', { name: 'Confirm registration' }))
+    await screen.findByRole('dialog', { name: 'Payment summary' })
+    const post = calls.find((call) => call.method === 'POST' && call.path === '/packages/registrations')
+    expect(post?.body).toMatchObject({ startDate: '2026-11-01' })
+  })
+
   it('TC-FE03-036 register -> Payment Handoff overlay -> Continue to payment lands on the new payment summary', async () => {
     const user = userEvent.setup()
     await openDetail({ cards: [VIP] })

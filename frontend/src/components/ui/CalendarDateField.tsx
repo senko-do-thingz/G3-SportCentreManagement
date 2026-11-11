@@ -1,9 +1,11 @@
 import { useEffect, useId, useRef, useState, type FocusEventHandler } from 'react'
 import { formatDisplayCalendarDate, parseDisplayCalendarDate } from '../../utils/dateDisplay'
+import { CALENDAR_DATE_VALIDATE_EVENT } from './calendarDateValidation'
 
 export interface CalendarDateFieldProps {
   value: string
-  onChange: (iso: string) => void
+  onChange: (iso: string, valid?: boolean) => void
+  onValidityChange?: (valid: boolean) => void
   id?: string
   name?: string
   label: string
@@ -34,6 +36,7 @@ function validationMessage(display: string, required: boolean, min?: string, max
 export function CalendarDateField({
   value,
   onChange,
+  onValidityChange,
   id,
   name,
   label,
@@ -53,34 +56,86 @@ export function CalendarDateField({
   const generatedId = useId()
   const inputId = id ?? generatedId
   const textRef = useRef<HTMLInputElement>(null)
+  const committedValueRef = useRef(value)
   const [display, setDisplay] = useState(() => formatDisplayCalendarDate(value))
   const [localError, setLocalError] = useState<string | null>(null)
+  const syncKey = `${value}\u0000${min ?? ''}\u0000${max ?? ''}\u0000${required}`
+  const [previousSyncKey, setPreviousSyncKey] = useState(syncKey)
+
+  if (previousSyncKey !== syncKey) {
+    setPreviousSyncKey(syncKey)
+    setDisplay(formatDisplayCalendarDate(value))
+    setLocalError(null)
+  }
 
   useEffect(() => {
-    if (document.activeElement !== textRef.current) setDisplay(formatDisplayCalendarDate(value))
-  }, [value])
+    const nextDisplay = formatDisplayCalendarDate(value)
+    const nextError = validationMessage(nextDisplay, required, min, max)
+    textRef.current?.setCustomValidity(nextError ?? '')
+    onValidityChange?.(nextError === null)
+    if (nextError === null) committedValueRef.current = value
+  }, [value, required, min, max, onValidityChange])
+
+  const validate = (nextDisplay: string, announce: boolean) => {
+    const nextError = validationMessage(nextDisplay, required, min, max)
+    textRef.current?.setCustomValidity(nextError ?? '')
+    onValidityChange?.(nextError === null)
+    if (announce) setLocalError(nextError)
+    return nextError
+  }
+
+  const emitChange = (iso: string, valid: boolean) => {
+    if (valid) onChange(iso)
+    else onChange(iso, false)
+  }
+
+  const commit = (nextDisplay: string) => {
+    const iso = nextDisplay ? parseDisplayCalendarDate(nextDisplay) : ''
+    const nextError = validate(nextDisplay, true)
+    if (iso === null) return false
+
+    if (iso !== value) emitChange(iso, nextError === null)
+    if (nextError === null) committedValueRef.current = iso
+    return nextError === null
+  }
+
+  useEffect(() => {
+    const input = textRef.current
+    if (!input) return
+    const validateNow = (event: Event) => {
+      if (commit(input.value)) return
+      event.preventDefault()
+      input.focus()
+    }
+    input.addEventListener(CALENDAR_DATE_VALIDATE_EVENT, validateNow)
+    return () => input.removeEventListener(CALENDAR_DATE_VALIDATE_EVENT, validateNow)
+  })
+
+  useEffect(() => {
+    const input = textRef.current
+    const form = input?.form
+    if (!input || !form) return
+    const blockUncommittedDate = (event: SubmitEvent) => {
+      const firstUncommitted = Array.from(form.querySelectorAll<HTMLInputElement>('.calendar-date-field__text'))
+        .find((field) => {
+          const fieldRequired = field.required
+          return field.value ? parseDisplayCalendarDate(field.value) === null : fieldRequired
+        })
+      if (firstUncommitted !== input) return
+      event.preventDefault()
+      event.stopPropagation()
+      commit(input.value)
+      input.focus()
+    }
+    form.addEventListener('submit', blockUncommittedDate, true)
+    return () => form.removeEventListener('submit', blockUncommittedDate, true)
+  })
 
   const message = error ?? localError
   const hintText = hint ? `${hint} Date format: dd/MM/yyyy.` : 'Date format: dd/MM/yyyy.'
   const hintId = `${inputId}-hint`
   const errorId = message ? `${inputId}-error` : undefined
   const describedBy = [hintId, errorId].filter(Boolean).join(' ')
-
-  const commit = (nextDisplay: string) => {
-    const iso = nextDisplay ? parseDisplayCalendarDate(nextDisplay) : ''
-    if (iso === null) {
-      setLocalError(validationMessage(nextDisplay, required, min, max))
-      return false
-    }
-
-    // Empty and well-formed values are canonical application state. Range rules remain
-    // visible here, while the owning form receives the ISO value and can apply its
-    // domain-specific message before any request is submitted.
-    if (iso !== value) onChange(iso)
-    const nextError = validationMessage(nextDisplay, required, min, max)
-    setLocalError(nextError)
-    return nextError === null
-  }
 
   return (
     <div className={['field', 'calendar-date-field', className ?? ''].filter(Boolean).join(' ')}>
@@ -109,8 +164,13 @@ export function CalendarDateField({
           aria-describedby={describedBy}
           onFocus={onFocus}
           onChange={(event) => {
-            setDisplay(event.target.value)
+            const nextDisplay = event.target.value
+            const iso = nextDisplay ? parseDisplayCalendarDate(nextDisplay) : ''
+            const nextError = validate(nextDisplay, false)
+            setDisplay(nextDisplay)
             if (localError) setLocalError(null)
+            if (iso !== null && iso !== value) emitChange(iso, nextError === null)
+            if (iso && nextError === null) committedValueRef.current = iso
           }}
           onBlur={() => {
             if (!commit(display) && !display && !required && value) onChange('')
@@ -118,8 +178,13 @@ export function CalendarDateField({
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !commit(display)) event.preventDefault()
             if (event.key === 'Escape') {
-              setDisplay(formatDisplayCalendarDate(value))
+              const restored = committedValueRef.current
+              const restoredDisplay = formatDisplayCalendarDate(restored)
+              setDisplay(restoredDisplay)
               setLocalError(null)
+              textRef.current?.setCustomValidity('')
+              onValidityChange?.(true)
+              if (restored !== value) emitChange(restored, true)
             }
           }}
         />
@@ -136,9 +201,11 @@ export function CalendarDateField({
             disabled={disabled}
             onChange={(event) => {
               const iso = event.target.value
-              setDisplay(formatDisplayCalendarDate(iso))
-              setLocalError(null)
-              onChange(iso)
+              const nextDisplay = formatDisplayCalendarDate(iso)
+              const nextError = validate(nextDisplay, true)
+              setDisplay(nextDisplay)
+              if (nextError === null) committedValueRef.current = iso
+              emitChange(iso, nextError === null)
               queueMicrotask(() => textRef.current?.focus())
             }}
           />

@@ -208,6 +208,19 @@ describe('FE-02 My Profile (F1-08) - personal information', () => {
     await waitFor(() => expect(within(form).getByLabelText(/Full name/)).toHaveFocus())
   })
 
+  it('DEF-311-01 does not update the profile with a stale birth date when the visible date is invalid', async () => {
+    const user = userEvent.setup()
+    const { calls } = await openProfile()
+    const form = personalForm()
+    const dob = within(form).getByLabelText('Date of birth')
+    await user.clear(dob)
+    await user.type(dob, '31/02/2026')
+    await user.click(within(form).getByRole('button', { name: 'Save changes' }))
+    expect(await within(form).findByText('Enter a valid date in dd/MM/yyyy format.')).toBeInTheDocument()
+    expect(calls.some((call) => call.method === 'PUT' && call.path === '/users/me')).toBe(false)
+    expect(dob).toHaveFocus()
+  })
+
   it('TC-FE02-044 editing a field clears its error', async () => {
     const user = userEvent.setup()
     await openProfile()

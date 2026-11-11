@@ -55,6 +55,18 @@ describe('Wallet activity history (MW-08)', () => {
     expect(calls.some(c => c.path.startsWith('/member/wallet/history') && c.path.includes('type=TOPUP') && c.path.includes('page=0'))).toBe(true)
   })
 
+  it('DEF-311-01 does not apply another wallet filter while a visible date is incomplete', async () => {
+    const { calls } = backend()
+    const user = userEvent.setup()
+    renderApp('/member/wallet/history')
+    await screen.findByText('Pending - not credited')
+    const initialRequests = calls.filter(call => call.path.startsWith('/member/wallet/history')).length
+    const from = screen.getByLabelText('From')
+    await user.type(from, '11/11/')
+    expect(screen.getByLabelText('Type')).toBeDisabled()
+    expect(calls.filter(call => call.path.startsWith('/member/wallet/history'))).toHaveLength(initialRequests)
+  })
+
   it('links wallet activity from My Payments', async () => {
     tokenStorage.startSession({ accessToken: 'token', refreshToken: 'refresh' })
     installFakeFetch(call => call.path === '/users/me' ? json(200, MEMBER)

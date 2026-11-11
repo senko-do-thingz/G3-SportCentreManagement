@@ -11,6 +11,9 @@ const loadCoaches = (signal: AbortSignal) => managerClassesApi.coaches(undefined
 export function ManagerAttendanceOverviewPage() {
   const [from, setFrom] = useState(businessDate())
   const [to, setTo] = useState(businessDate())
+  const [fromValid, setFromValid] = useState(true)
+  const [toValid, setToValid] = useState(true)
+  const datesValid = fromValid && toValid
   const [classId, setClassId] = useState('')
   const [classSearch, setClassSearch] = useState('')
   const [coachId, setCoachId] = useState('')
@@ -38,15 +41,15 @@ export function ManagerAttendanceOverviewPage() {
     <PreviewNotice />
     <Card title="Attendance filters">
       <div className="training-form-grid">
-        <CalendarDateField label="From date" value={from} max={to} onChange={value => { select(''); setFrom(value) }} required />
-        <CalendarDateField label="To date" value={to} min={from} onChange={value => { select(''); setTo(value) }} required />
-        <Input label="Search classes" value={classSearch} onChange={event => { setClassSearch(event.target.value); setClassId(''); select('') }} />
-        <TrainingData load={loadClasses}>{page => <Select label="Class" placeholder="All classes" value={classId} options={page.content.map(item => ({ value: String(item.id), label: item.name }))} onChange={event => { select(''); setClassId(event.target.value) }} hint={page.totalElements > page.content.length ? 'Showing the first 100 matches. Refine the class search to find another class.' : undefined} />}</TrainingData>
-        <TrainingData load={loadCoaches}>{coaches => <Select label="Coach" placeholder="All coaches" value={coachId} options={coaches.map(item => ({ value: String(item.id), label: item.fullName }))} onChange={event => { select(''); setCoachId(event.target.value) }} />}</TrainingData>
+        <CalendarDateField label="From date" value={from} max={to} onValidityChange={setFromValid} onChange={(value, valid) => { if (valid === false) return; select(''); setFrom(value) }} required />
+        <CalendarDateField label="To date" value={to} min={from} onValidityChange={setToValid} onChange={(value, valid) => { if (valid === false) return; select(''); setTo(value) }} required />
+        <Input label="Search classes" value={classSearch} disabled={!datesValid} onChange={event => { setClassSearch(event.target.value); setClassId(''); select('') }} />
+        <TrainingData load={loadClasses}>{page => <Select label="Class" placeholder="All classes" value={classId} disabled={!datesValid} options={page.content.map(item => ({ value: String(item.id), label: item.name }))} onChange={event => { select(''); setClassId(event.target.value) }} hint={page.totalElements > page.content.length ? 'Showing the first 100 matches. Refine the class search to find another class.' : undefined} />}</TrainingData>
+        <TrainingData load={loadCoaches}>{coaches => <Select label="Coach" placeholder="All coaches" value={coachId} disabled={!datesValid} options={coaches.map(item => ({ value: String(item.id), label: item.fullName }))} onChange={event => { select(''); setCoachId(event.target.value) }} />}</TrainingData>
       </div>
       <p>Choose up to 31 days. Attendance rate = (Present + Late) / confirmed bookings for completed sessions. Unmarked and excused bookings remain in that denominator. Unmarked is not ABSENT. A dash means the rate is not applicable or has a zero denominator.</p>
     </Card>
-    <TrainingData load={load}>{overview => <>
+    {datesValid && <TrainingData load={load}>{overview => <>
       <div className="concept-stats">
         <div className="concept-stat">
           <span className="concept-stat__icon" aria-hidden="true">S</span>
@@ -81,7 +84,7 @@ export function ManagerAttendanceOverviewPage() {
         {overview.truncated && <p role="status">Only the newest 200 sessions are shown. Narrow the date, class or Coach filters.</p>}
         {overview.sessions.length === 0 ? <p role="status">No sessions match these filters.</p> : <table className="table"><caption>Attendance by session</caption><thead><tr><th>Session</th><th>Class / Coach</th><th>Confirmed</th><th>Present</th><th>Late</th><th>Absent</th><th>Excused</th><th>Unmarked</th><th>Rate</th><th>Action</th></tr></thead><tbody>{overview.sessions.map(item => <tr key={item.id}><td>{item.sessionCode}<br />{formatCalendarDate(item.date)} {item.startTime.slice(0,5)}</td><td>{item.className}<br />{item.coachName ?? 'No Coach'}</td><td>{item.confirmed}</td><td>{item.present}</td><td>{item.late}</td><td>{item.absent}</td><td>{item.excused}</td><td>{item.unmarked}</td><td>{item.attendanceRate == null ? '-' : `${item.attendanceRate}%`}</td><td><Button variant="secondary" onClick={() => select(item.sessionCode)}>View {item.sessionCode}</Button></td></tr>)}</tbody></table>}
       </Card>
-    </>}</TrainingData>
+    </>}</TrainingData>}
     {selected && <TrainingData load={detail}>{data => <Card title={`Attendance details - ${data.session.sessionCode}`}>
       <p>Cancelled bookings are shown as history and are excluded from summary counts.</p>
       {data.members.length === 0 ? <p>No bookings for this session.</p> : <table className="table"><caption>Session attendance details</caption><thead><tr><th>Member</th><th>Booking</th><th>Attendance</th><th>Marked by / at</th><th>Notes</th></tr></thead><tbody>{data.members.map(item => <tr key={item.bookingId}><td>{item.memberCode} - {item.memberName}</td><td>{item.bookingStatus}</td><td>{item.attendanceStatus ?? 'Unmarked'}</td><td>{item.markedBy ?? '-'}<br />{item.markedAt ?? '-'}</td><td>{item.notes ?? '-'}</td></tr>)}</tbody></table>}

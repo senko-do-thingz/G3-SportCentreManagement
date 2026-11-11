@@ -19,6 +19,8 @@ export function ActivityLogPage() {
   const [actor, setActor] = useState<ManagerUser | null>(null)
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
+  const [fromValid, setFromValid] = useState(true)
+  const [toValid, setToValid] = useState(true)
   const [page, setPage] = useState(0)
   const [picking, setPicking] = useState(false)
   const [selected, setSelected] = useState<ActivityLog | null>(null)
@@ -26,6 +28,7 @@ export function ActivityLogPage() {
     ? true
     : window.matchMedia('(min-width: 901px)').matches)
   const invalidRange = Boolean(from && to && from > to)
+  const invalidDateFilter = !fromValid || !toValid
   useEffect(() => {
     const media = window.matchMedia?.('(min-width: 901px)')
     if (!media) return
@@ -44,7 +47,7 @@ export function ActivityLogPage() {
     : page
   const pageOutOfRange = resource.status === 'ready' && page > lastValidPage
   if (pageOutOfRange) setPage(lastValidPage)
-  const ready = resource.status === 'ready' && search === debounced && !invalidRange && !pageOutOfRange
+  const ready = resource.status === 'ready' && search === debounced && !invalidRange && !invalidDateFilter && !pageOutOfRange
 
   const totalEvents = ready ? String(resource.data.totalElements).padStart(2, '0') : '--'
   const pageEvents = ready ? String(resource.data.content.length).padStart(2, '0') : '--'
@@ -75,7 +78,7 @@ export function ActivityLogPage() {
         <h2>TRACEABLE ACTIONS. <span className="concept-goldtext">TOTAL ACCOUNTABILITY.</span></h2>
         <p>Monitor changes across users, packages, classes, and schedules.</p>
       </div>
-      <Button variant="secondary" className="concept-btn concept-btn--gold" onClick={reload}>Refresh</Button>
+      <Button variant="secondary" className="concept-btn concept-btn--gold" disabled={invalidDateFilter} onClick={reload}>Refresh</Button>
     </div>
 
     <div className="concept-stats">
@@ -112,7 +115,7 @@ export function ActivityLogPage() {
     <PreviewNotice />
     <Card className="manager-activity__card" title="Activity history" actions={ready ? <span className="manager-activity__count">{resource.data.totalElements.toLocaleString()} {resource.data.totalElements === 1 ? 'event' : 'events'}</span> : undefined}>
       <div className="manager-activity__toolbar">
-        <Input className="manager-activity__search" label="Search activity" type="search" maxLength={200} placeholder="Actor, action or target" value={search} onChange={(event) => { setSearch(event.target.value); setPage(0) }} />
+        <Input className="manager-activity__search" label="Search activity" type="search" maxLength={200} placeholder="Actor, action or target" value={search} disabled={invalidDateFilter} onChange={(event) => { setSearch(event.target.value); setPage(0) }} />
         <div className="manager-activity__filter-actions">
           <Button variant="secondary" aria-controls="manager-activity-filters" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((open) => !open)}>
             Filters{activeFilterCount > 0 && <span className="manager-activity__filter-count">{activeFilterCount}</span>}
@@ -126,16 +129,16 @@ export function ActivityLogPage() {
             <div className="field__label-row">
               <span className="field__label" id="actor-label">Performed by</span>
             </div>
-            <Button variant="secondary" aria-labelledby="actor-label actor-value" onClick={() => setPicking(true)}>
+            <Button variant="secondary" aria-labelledby="actor-label actor-value" disabled={invalidDateFilter} onClick={() => setPicking(true)}>
               <span id="actor-value">{actor?.fullName ?? 'All actors'}</span>
             </Button>
           </div>
-          <Select label="Action" placeholder="All actions" value={action} options={ACTIVITY_ACTIONS.map((code) => ({ value: code, label: humanizeCode(code) }))} onChange={(event) => { setAction(event.target.value); setPage(0) }} />
-          <CalendarDateField label="From date" value={from} max={to || undefined} onChange={(value) => { setFrom(value); setPage(0) }} />
-          <CalendarDateField label="To date" value={to} min={from || undefined} error={invalidRange ? 'End date must be on or after the start date.' : undefined} onChange={(value) => { setTo(value); setPage(0) }} />
+          <Select label="Action" placeholder="All actions" value={action} options={ACTIVITY_ACTIONS.map((code) => ({ value: code, label: humanizeCode(code) }))} disabled={invalidDateFilter} onChange={(event) => { setAction(event.target.value); setPage(0) }} />
+          <CalendarDateField label="From date" value={from} max={to || undefined} onValidityChange={setFromValid} onChange={(value, valid) => { if (valid === false) return; setFrom(value); setPage(0) }} />
+          <CalendarDateField label="To date" value={to} min={from || undefined} error={invalidRange ? 'End date must be on or after the start date.' : undefined} onValidityChange={setToValid} onChange={(value, valid) => { if (valid === false) return; setTo(value); setPage(0) }} />
         </div>
       </div>
-      {resource.status === 'error' && search === debounced && !invalidRange ? <ManagerError error={resource.error} onRetry={reload} /> : !invalidRange && <div className="manager-activity__table"><Table columns={columns} rows={ready ? resource.data.content : []} rowKey={(log) => log.id} loading={!ready} caption="Activity history" scrollLabel="Activity history table. Scroll horizontally to view all columns." emptyTitle={filtered ? 'No matching activity' : 'No activity yet'} emptyDescription={filtered ? 'Clear filters or choose a different date range.' : 'Recorded center activity will appear here.'} pagination={ready ? { page, pageSize: ACTIVITY_PAGE_SIZE, totalItems: resource.data.totalElements, onPageChange: setPage } : undefined} /></div>}
+      {!invalidDateFilter && (resource.status === 'error' && search === debounced && !invalidRange ? <ManagerError error={resource.error} onRetry={reload} /> : !invalidRange && <div className="manager-activity__table"><Table columns={columns} rows={ready ? resource.data.content : []} rowKey={(log) => log.id} loading={!ready} caption="Activity history" scrollLabel="Activity history table. Scroll horizontally to view all columns." emptyTitle={filtered ? 'No matching activity' : 'No activity yet'} emptyDescription={filtered ? 'Clear filters or choose a different date range.' : 'Recorded center activity will appear here.'} pagination={ready ? { page, pageSize: ACTIVITY_PAGE_SIZE, totalItems: resource.data.totalElements, onPageChange: setPage } : undefined} /></div>)}
       <p className="manager-activity__footnote">Activity records are read-only. Times use the center timezone (Asia/Ho_Chi_Minh). Only the safe fields returned by the activity service are shown.</p>
     </Card>
     {picking && <ActorPickerModal onClose={() => setPicking(false)} onSelect={(selectedActor) => { setActor(selectedActor); setPicking(false); setPage(0) }} />}

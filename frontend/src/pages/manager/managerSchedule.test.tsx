@@ -241,7 +241,7 @@ describe('FE-07 schedule', () => {
     expect(await screen.findByText(/The facility dropdown API is not available/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '+ Create session' }))
     const dialog = screen.getByRole('dialog', { name: 'Create session' })
-    fireEvent.change(within(dialog).getByLabelText(/^Date/), { target: { value: date } })
+    fireEvent.change(within(dialog).getByLabelText(/^Date/), { target: { value: displayDate(date) } })
     await waitFor(() => expect(within(dialog).getByLabelText(/^Coach/)).toBeEnabled())
     await user.click(within(dialog).getByRole('button', { name: 'Create schedule' }))
     expect(await within(dialog).findByText('Enter a valid existing facility ID.')).toBeInTheDocument()
@@ -257,7 +257,7 @@ describe('FE-07 schedule', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '+ Create session' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: '+ Create session' }))
     const dialog = screen.getByRole('dialog', { name: 'Create session' })
-    fireEvent.change(within(dialog).getByLabelText(/^Date/), { target: { value: date } })
+    fireEvent.change(within(dialog).getByLabelText(/^Date/), { target: { value: displayDate(date) } })
     await user.selectOptions(within(dialog).getByLabelText(/^Facility/), '1')
     await waitFor(() => expect(within(dialog).getByLabelText(/^Coach/)).toBeEnabled())
     await user.click(within(dialog).getByRole('button', { name: 'Create schedule' }))
@@ -265,7 +265,7 @@ describe('FE-07 schedule', () => {
     expect(within(conflict).getByText('2 conflicting sessions')).toBeInTheDocument()
     expect(within(conflict).getByText('Session ID Session ID unavailable: Unassigned class')).toBeInTheDocument()
     await user.click(within(conflict).getByRole('button', { name: 'Edit session' }))
-    expect(within(dialog).getByLabelText(/^Date/)).toHaveValue(date)
+    expect(within(dialog).getByLabelText(/^Date/)).toHaveValue(displayDate(date))
     expect(api.calls.filter((call) => call.method === 'POST')).toHaveLength(1)
   })
   it('requires a reason before sending cancellation', async () => {
@@ -348,6 +348,39 @@ describe('FE-07 schedule', () => {
       date: addDays(date, 2), expectedRevision: 2, rescheduleReason: 'Facility maintenance', capacity: 20,
     }))
     expect(api.calls.find((call) => call.method === 'PUT')?.path).toBe('/manager/sessions/7')
+  })
+
+  it('DEF-311-01 blocks an invalid visible date from updating the stale session date', async () => {
+    const reviewedSession = { ...session, date: '2026-11-15' }
+    const api = backend(false, false, [reviewedSession], reviewedSession)
+    const user = userEvent.setup()
+    renderApp(`/manager/schedule?week=${monday(reviewedSession.date)}`)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit session' })
+    const input = within(dialog).getByLabelText(/^Date/)
+    expect(input).toHaveValue('15/11/2026')
+    await user.clear(input)
+    await user.type(input, '31/11/2026')
+    await user.click(within(dialog).getByRole('button', { name: 'Save session' }))
+    expect(await within(dialog).findByText('Enter a valid date in dd/MM/yyyy format.')).toBeInTheDocument()
+    expect(api.calls.some((call) => call.path === '/manager/sessions/7' && call.method === 'PUT')).toBe(false)
+    expect(input).toHaveFocus()
+  })
+
+  it('DEF-311-01 blocks keyboard submission when the visible session date is invalid', async () => {
+    const reviewedSession = { ...session, date: '2026-11-15' }
+    const api = backend(false, false, [reviewedSession], reviewedSession)
+    const user = userEvent.setup()
+    renderApp(`/manager/schedule?week=${monday(reviewedSession.date)}`)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit session' })
+    const input = within(dialog).getByLabelText(/^Date/)
+    await user.clear(input)
+    await user.type(input, '31/11/2026{Enter}')
+    expect(await within(dialog).findByText('Enter a valid date in dd/MM/yyyy format.')).toBeInTheDocument()
+    expect(api.calls.some((call) => call.path === '/manager/sessions/7' && call.method === 'PUT')).toBe(false)
   })
 
   it('shows the regenerated code and follows a move outside the displayed week', async () => {
