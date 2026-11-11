@@ -232,7 +232,7 @@ export function ManagerTransactionsPage() {
     <PreviewNotice />
 
     <Card title="Transaction ledger">
-      <div className="manager-filters">
+      <div className="manager-filters manager-filters--transactions">
         <Input label="Search transactions" placeholder="Invoice, member or payment code" value={search} onChange={(event) => updateFilter('query', event.target.value)} />
         <Input label="Reporting month" type="month" value={month} onChange={(event) => updateFilter('month', event.target.value)} />
         <Select label="Payment status" placeholder="All statuses" value={status} options={TRANSACTION_STATUSES} onChange={(event) => updateFilter('status', event.target.value)} />

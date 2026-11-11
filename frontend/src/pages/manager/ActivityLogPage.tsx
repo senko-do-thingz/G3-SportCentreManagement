@@ -122,7 +122,14 @@ export function ActivityLogPage() {
       </div>
       <div id="manager-activity-filters" className="manager-activity__filters" hidden={!filtersOpen}>
         <div className="manager-activity__filters-grid">
-          <div className="field"><span className="field__label" id="actor-label">Performed by</span><Button variant="secondary" aria-labelledby="actor-label actor-value" onClick={() => setPicking(true)}><span id="actor-value">{actor?.fullName ?? 'All actors'}</span></Button></div>
+          <div className="field">
+            <div className="field__label-row">
+              <span className="field__label" id="actor-label">Performed by</span>
+            </div>
+            <Button variant="secondary" aria-labelledby="actor-label actor-value" onClick={() => setPicking(true)}>
+              <span id="actor-value">{actor?.fullName ?? 'All actors'}</span>
+            </Button>
+          </div>
           <Select label="Action" placeholder="All actions" value={action} options={ACTIVITY_ACTIONS.map((code) => ({ value: code, label: humanizeCode(code) }))} onChange={(event) => { setAction(event.target.value); setPage(0) }} />
           <Input label="From date" type="date" value={from} onChange={(event) => { setFrom(event.target.value); setPage(0) }} />
           <Input label="To date" type="date" value={to} aria-invalid={invalidRange || undefined} aria-describedby={invalidRange ? 'manager-activity-range-error' : undefined} onChange={(event) => { setTo(event.target.value); setPage(0) }} />
