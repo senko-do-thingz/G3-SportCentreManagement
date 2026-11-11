@@ -36,6 +36,9 @@ describe('FE-08 find classes', () => {
     const user = userEvent.setup()
     renderApp('/member/classes?from=2026-10-16&to=2026-11-15&sportId=3&level=BEGINNER')
     await screen.findByText('Basketball Foundations')
+    const hero = screen.getByRole('heading', { name: 'Find Classes' }).closest('.schedule-workspace__hero') as HTMLElement
+    expect(hero).toHaveClass('schedule-workspace__hero--fade-image')
+    expect(hero.querySelector('img')).toHaveAttribute('alt', 'Badminton practice on an indoor training court')
     expect(screen.getByRole('button', { name: 'Beginner' })).toHaveAttribute('aria-pressed', 'true')
     const photo = screen.getByRole('img', { name: 'Basketball training session' })
     expect(photo).toBeInTheDocument()

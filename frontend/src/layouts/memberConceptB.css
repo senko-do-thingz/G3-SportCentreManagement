@@ -11,10 +11,10 @@
 }
 
 /* Floating Spori conversation: compact, scrollable, and never navigates on send. */
-.member-concept__assistant-mark { flex: 0 0 36px; }
-.member-concept__assistant-launcher-copy { min-width: 0; max-width: 180px; overflow: hidden; }
+.member-concept__assistant-mark { flex: 0 0 38px; }
+.member-concept__assistant-launcher-copy { min-width: 0; max-width: 180px; margin-left: 12px; overflow: hidden; }
 .member-concept__assistant-launcher-copy strong,
-.member-concept__assistant-launcher-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.member-concept__assistant-launcher-copy small { display: block; overflow: hidden; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .member-concept__assistant-dialog { max-height: calc(100vh - 120px); overflow: hidden; }
 .member-concept__assistant-messages { display: grid; gap: 10px; min-height: 120px; max-height: min(390px, 48vh); padding-right: 3px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .member-concept__assistant-prompts button { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; min-height: 40px; padding: 8px 0; border: 0; border-bottom: 1px solid var(--color-border); background: transparent; color: var(--color-text); font: inherit; font-size: 0.76rem; line-height: 1.35; text-align: left; cursor: pointer; }
