@@ -12,6 +12,7 @@ import { BrowseError } from './BrowseError'
 import { MemberScheduleNav } from './MemberScheduleNav'
 import { useMemberResource } from './useMemberResource'
 import { bookingDate, bookingErrorMessage, bookingTime, cancellationDeadline, isLateCancellation } from './bookingPresentation'
+import { MemberCommerceHeader, MemberCommerceHero } from './MemberCommerceComponents'
 
 function routeId(value: string | undefined): number | null {
   if (!value || !/^\d+$/.test(value)) return null
@@ -42,33 +43,162 @@ export function MemberBookingsPage() {
   }, [memberId, when])
   const [resource, reload] = useMemberResource(loader)
 
-  return <div className="page browse-page booking-flow">
-    <MemberScheduleNav />
-    <PageHeader eyebrow="Member / Classes & schedule" title="My Bookings" description="Review your upcoming sessions and booking history." />
-    <Card>
-      <div className="booking-tabs" role="tablist" aria-label="Booking history">
-        <button type="button" role="tab" aria-selected={when === 'UPCOMING'} className={`booking-tab${when === 'UPCOMING' ? ' booking-tab--active' : ''}`} onClick={() => setParams({ when: 'UPCOMING' })}>Upcoming</button>
-        <button type="button" role="tab" aria-selected={when === 'PAST'} className={`booking-tab${when === 'PAST' ? ' booking-tab--active' : ''}`} onClick={() => setParams({ when: 'PAST' })}>Past</button>
-      </div>
-      {resource.status === 'loading' ? <PageLoader label={`Loading ${when.toLowerCase()} bookings`} /> : resource.status === 'error' ? <BrowseError error={resource.error} onRetry={reload} /> : resource.data.length === 0 ? <EmptyState title={when === 'UPCOMING' ? 'No upcoming bookings' : 'No past bookings'} description={when === 'UPCOMING' ? 'Find a class and reserve a place in a session.' : 'Completed and cancelled bookings will appear here.'} action={when === 'UPCOMING' ? <Link className={buttonClassName()} to="/member/classes">Find Classes</Link> : undefined} /> : <div className="booking-list">
-        {resource.data.map((booking) => <BookingHistoryCard booking={booking} when={when} key={booking.id} />)}
-      </div>}
-      <div className="browse-actions booking-actions"><Button variant="ghost" onClick={reload}>Refresh bookings</Button>{when === 'UPCOMING' && <Link className={buttonClassName('secondary')} to="/member/classes">Find Classes</Link>}</div>
-    </Card>
-  </div>
+  return (
+    <div className="page browse-page booking-flow member-commerce">
+      <MemberScheduleNav />
+      <MemberCommerceHeader
+        eyebrow="Member / Classes & schedule"
+        title="My Bookings"
+        description="Review your upcoming sessions and booking history."
+        actions={
+          <>
+            <Link className={buttonClassName('secondary')} to="/member/check-in-pass">
+              Check-in pass
+            </Link>
+            <Link className={buttonClassName()} to="/member/classes">
+              Find Classes
+            </Link>
+          </>
+        }
+      />
+      <MemberCommerceHero
+        kicker="SPORTIFY SESSIONS"
+        title="YOUR RESERVED SESSIONS."
+        highlight="TRAIN ON TIME."
+        description="Track your confirmed class and court reservations, view booking codes, or manage schedule changes."
+        actionLabel="Browse classes"
+        actionHref="/member/classes"
+      />
+      <Card>
+        <div className="booking-tabs" role="tablist" aria-label="Booking history">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={when === 'UPCOMING'}
+            className={`booking-tab${when === 'UPCOMING' ? ' booking-tab--active' : ''}`}
+            onClick={() => setParams({ when: 'UPCOMING' })}
+          >
+            Upcoming
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={when === 'PAST'}
+            className={`booking-tab${when === 'PAST' ? ' booking-tab--active' : ''}`}
+            onClick={() => setParams({ when: 'PAST' })}
+          >
+            Past
+          </button>
+        </div>
+        {resource.status === 'loading' ? (
+          <PageLoader label={`Loading ${when.toLowerCase()} bookings`} />
+        ) : resource.status === 'error' ? (
+          <BrowseError error={resource.error} onRetry={reload} />
+        ) : resource.data.length === 0 ? (
+          <EmptyState
+            title={when === 'UPCOMING' ? 'No upcoming bookings' : 'No past bookings'}
+            description={
+              when === 'UPCOMING'
+                ? 'Find a class and reserve a place in a session.'
+                : 'Completed and cancelled bookings will appear here.'
+            }
+            action={
+              when === 'UPCOMING' ? (
+                <Link className={buttonClassName()} to="/member/classes">
+                  Find Classes
+                </Link>
+              ) : undefined
+            }
+          />
+        ) : (
+          <div className="booking-list">
+            {resource.data.map((booking) => (
+              <BookingHistoryCard booking={booking} when={when} key={booking.id} />
+            ))}
+          </div>
+        )}
+        <div className="browse-actions booking-actions">
+          <Button variant="ghost" onClick={reload}>
+            Refresh bookings
+          </Button>
+          {when === 'UPCOMING' && (
+            <Link className={buttonClassName('secondary')} to="/member/classes">
+              Find Classes
+            </Link>
+          )}
+        </div>
+      </Card>
+    </div>
+  )
 }
 
 function BookingHistoryCard({ booking, when }: { booking: MemberBookingRecord; when: BookingWhen }) {
   const self = booking.trainingType === 'SELF_TRAINING'
   const cancelHref = `/member/bookings/${booking.id}/cancel`
-  return <article className="booking-history-card">
-    <div className="booking-history-card__heading"><div><p className="booking-history-card__date">{bookingDate(booking.sessionDate)} / {bookingTime(booking.startTime)} - {bookingTime(booking.endTime)}</p><h2>{bookingTitle(booking)}</h2></div><Badge tone={booking.status === 'CONFIRMED' ? 'success' : 'neutral'}>{booking.status === 'CONFIRMED' ? 'Confirmed' : 'Cancelled'}</Badge></div>
-    <SessionContext {...booking} sessionId={booking.sessionCode} date={booking.sessionDate} />
-    <p className="browse-muted">{booking.sportName || 'Sport not provided'}{!self && ` - ${booking.coachName || 'Coach not provided'}`} - {booking.facilityName || 'Facility not provided'}</p>
-    {booking.status === 'CANCELLED' && <div className="booking-cancelled-meta"><span>Cancelled by {actorName(booking)}</span>{booking.cancelledAt && <span>On {formatDateTime(booking.cancelledAt)}</span>}{booking.cancelReason && <span>Reason: {booking.cancelReason}</span>}</div>}
-    <details className="booking-details"><summary>Booking details</summary><dl className="browse-facts"><div><dt>Booking code</dt><dd>{booking.bookingCode}</dd></div><div><dt>Training</dt><dd>{self ? 'Self-training' : 'Coach-led'}</dd></div><div><dt>Package</dt><dd>{booking.packageName || 'Not provided'}</dd></div>{!self && <div><dt>Coach</dt><dd>{booking.coachName || 'Not provided'}</dd></div>}<div><dt>Facility</dt><dd>{booking.facilityName || 'Not provided'}</dd></div></dl></details>
-    <div className="browse-actions booking-actions">{when === 'UPCOMING' && booking.status === 'CONFIRMED' && <Link className={buttonClassName('secondary')} to={cancelHref}>Cancel booking</Link>}{when === 'PAST' && booking.status === 'CONFIRMED' && <span className="browse-muted">Session completed</span>}</div>
-  </article>
+  return (
+    <article className="booking-history-card">
+      <div className="booking-history-card__heading">
+        <div>
+          <p className="booking-history-card__date">
+            {bookingDate(booking.sessionDate)} / {bookingTime(booking.startTime)} - {bookingTime(booking.endTime)}
+          </p>
+          <h2>{bookingTitle(booking)}</h2>
+        </div>
+        <Badge tone={booking.status === 'CONFIRMED' ? 'success' : 'neutral'}>
+          {booking.status === 'CONFIRMED' ? 'Confirmed' : 'Cancelled'}
+        </Badge>
+      </div>
+      <SessionContext {...booking} sessionId={booking.sessionCode} date={booking.sessionDate} />
+      <p className="browse-muted">
+        {booking.sportName || 'Sport not provided'}
+        {!self && ` - ${booking.coachName || 'Coach not provided'}`} - {booking.facilityName || 'Facility not provided'}
+      </p>
+      {booking.status === 'CANCELLED' && (
+        <div className="booking-cancelled-meta">
+          <span>Cancelled by {actorName(booking)}</span>
+          {booking.cancelledAt && <span>On {formatDateTime(booking.cancelledAt)}</span>}
+          {booking.cancelReason && <span>Reason: {booking.cancelReason}</span>}
+        </div>
+      )}
+      <details className="booking-details">
+        <summary>Booking details</summary>
+        <dl className="browse-facts">
+          <div>
+            <dt>Booking code</dt>
+            <dd>{booking.bookingCode}</dd>
+          </div>
+          <div>
+            <dt>Training</dt>
+            <dd>{self ? 'Self-training' : 'Coach-led'}</dd>
+          </div>
+          <div>
+            <dt>Package</dt>
+            <dd>{booking.packageName || 'Not provided'}</dd>
+          </div>
+          {!self && (
+            <div>
+              <dt>Coach</dt>
+              <dd>{booking.coachName || 'Not provided'}</dd>
+            </div>
+          )}
+          <div>
+            <dt>Facility</dt>
+            <dd>{booking.facilityName || 'Not provided'}</dd>
+          </div>
+        </dl>
+      </details>
+      <div className="browse-actions booking-actions">
+        {when === 'UPCOMING' && booking.status === 'CONFIRMED' && (
+          <Link className={buttonClassName('secondary')} to={cancelHref}>
+            Cancel booking
+          </Link>
+        )}
+        {when === 'PAST' && booking.status === 'CONFIRMED' && (
+          <span className="browse-muted">Session completed</span>
+        )}
+      </div>
+    </article>
+  )
 }
 
 export function BookingCancellationPage() {
@@ -76,7 +206,19 @@ export function BookingCancellationPage() {
   const memberId = user?.id ?? null
   const { bookingId: rawId } = useParams()
   const id = routeId(rawId)
-  if (!id) return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Booking unavailable" /><Card><p role="alert">Choose a valid booking to cancel.</p><Link className={buttonClassName()} to="/member/bookings">Back to My Bookings</Link></Card></div>
+  if (!id)
+    return (
+      <div className="page browse-page member-commerce">
+        <MemberScheduleNav />
+        <PageHeader title="Booking unavailable" />
+        <Card>
+          <p role="alert">Choose a valid booking to cancel.</p>
+          <Link className={buttonClassName()} to="/member/bookings">
+            Back to My Bookings
+          </Link>
+        </Card>
+      </div>
+    )
   return <BookingCancellationContent key={`${id}-${memberId ?? 'unknown'}`} id={id} memberId={memberId} />
 }
 
@@ -84,10 +226,13 @@ type CancellationState = 'ready' | 'submitting' | 'checking' | 'unknown' | 'conf
 
 function BookingCancellationContent({ id, memberId }: { id: number; memberId: number | null }) {
   const navigate = useNavigate()
-  const loader = useCallback(async (signal: AbortSignal) => {
-    if (memberId === null) return null
-    return memberBookingsApi.findMine(id, memberId, signal)
-  }, [id, memberId])
+  const loader = useCallback(
+    async (signal: AbortSignal) => {
+      if (memberId === null) return null
+      return memberBookingsApi.findMine(id, memberId, signal)
+    },
+    [id, memberId]
+  )
   const [resource, reload] = useMemberResource(loader)
   const [state, setState] = useState<CancellationState>('ready')
   const [checkedBooking, setCheckedBooking] = useState<MemberBookingRecord | null>(null)
@@ -150,15 +295,28 @@ function BookingCancellationContent({ id, memberId }: { id: number; memberId: nu
 
   async function confirmCancel() {
     const booking = checkedBooking ?? (resource.status === 'ready' ? resource.data : null)
-    if (submitted.current || !isCurrent() || (state !== 'ready' && state !== 'confirmed')
-      || memberId === null || !booking || booking.id !== id || booking.memberId !== memberId || booking.status !== 'CONFIRMED') return
+    if (
+      submitted.current ||
+      !isCurrent() ||
+      (state !== 'ready' && state !== 'confirmed') ||
+      memberId === null ||
+      !booking ||
+      booking.id !== id ||
+      booking.memberId !== memberId ||
+      booking.status !== 'CONFIRMED'
+    )
+      return
     submitted.current = true
     setState('submitting')
     setError(null)
     try {
       const cancelled = await memberBookingsApi.cancel(id)
       if (!isCurrent()) return
-      if (cancelled.id !== id || (cancelled.memberId != null && cancelled.memberId !== memberId) || cancelled.status !== 'CANCELLED') {
+      if (
+        cancelled.id !== id ||
+        (cancelled.memberId != null && cancelled.memberId !== memberId) ||
+        cancelled.status !== 'CANCELLED'
+      ) {
         throw new ApiError(0, 'The server did not confirm this booking cancellation.')
       }
       setState('complete')
@@ -178,32 +336,173 @@ function BookingCancellationContent({ id, memberId }: { id: number; memberId: nu
     }
   }
 
-  if (resource.status === 'loading') return <div className="page browse-page"><MemberScheduleNav /><PageLoader label="Loading booking details" /></div>
-  if (resource.status === 'error') return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Cancel booking" /><BrowseError error={resource.error} onRetry={reload} /></div>
-  if (!resource.data) return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Booking not found" /><Card><p>This booking could not be found in your upcoming or past bookings.</p><Link className={buttonClassName()} to="/member/bookings">My Bookings</Link></Card></div>
+  if (resource.status === 'loading')
+    return (
+      <div className="page browse-page member-commerce">
+        <MemberScheduleNav />
+        <PageLoader label="Loading booking details" />
+      </div>
+    )
+  if (resource.status === 'error')
+    return (
+      <div className="page browse-page member-commerce">
+        <MemberScheduleNav />
+        <PageHeader title="Cancel booking" />
+        <BrowseError error={resource.error} onRetry={reload} />
+      </div>
+    )
+  if (!resource.data)
+    return (
+      <div className="page browse-page member-commerce">
+        <MemberScheduleNav />
+        <PageHeader title="Booking not found" />
+        <Card>
+          <p>This booking could not be found in your upcoming or past bookings.</p>
+          <Link className={buttonClassName()} to="/member/bookings">
+            My Bookings
+          </Link>
+        </Card>
+      </div>
+    )
 
   const booking = checkedBooking ?? resource.data
   const deadline = cancellationDeadline(booking)
   const late = isLateCancellation(booking)
-  if (booking.status !== 'CONFIRMED') return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Booking cannot be cancelled" /><Card><Badge>Cancelled</Badge><p>This booking has already been cancelled.</p><Link className={buttonClassName()} to="/member/bookings?when=PAST">View past bookings</Link></Card></div>
+  if (booking.status !== 'CONFIRMED')
+    return (
+      <div className="page browse-page member-commerce">
+        <MemberScheduleNav />
+        <PageHeader title="Booking cannot be cancelled" />
+        <Card>
+          <Badge>Cancelled</Badge>
+          <p>This booking has already been cancelled.</p>
+          <Link className={buttonClassName()} to="/member/bookings?when=PAST">
+            View past bookings
+          </Link>
+        </Card>
+      </div>
+    )
 
-  return <div className="page browse-page booking-flow">
-    <MemberScheduleNav />
-    <PageHeader eyebrow="Member / My Bookings" title="Cancel booking" description="Please confirm before cancelling this session." />
-    <Card className="booking-cancel-card">
-      <div className="booking-cancel-warning" role="note"><strong>Cancellation deadline</strong><p>{deadline ? `Cancel by ${deadline} Vietnam time to get your session credit back. This is two hours before the session starts.` : 'The backend will verify whether this booking is within the free cancellation period.'}</p><p>After that you can still cancel to free your place for another member, but the session credit is not returned.</p></div>
-      {late && <div className="booking-error" role="alert"><strong>Late cancellation</strong><p>The free cancellation deadline has passed. If you cancel now, your place is released but this session credit is not returned to your package.</p></div>}
-      <h2>{bookingTitle(booking)}</h2>
-      <SessionContext {...booking} sessionId={booking.sessionCode} date={booking.sessionDate} />
-      <dl className="browse-facts booking-confirmation__facts"><div><dt>Booking code</dt><dd>{booking.bookingCode}</dd></div><div><dt>Date</dt><dd>{bookingDate(booking.sessionDate)}</dd></div><div><dt>Time</dt><dd>{bookingTime(booking.startTime)} - {bookingTime(booking.endTime)}</dd></div><div><dt>Package</dt><dd>{booking.packageName || 'Sport package'}</dd></div>{booking.trainingType !== 'SELF_TRAINING' && <div><dt>Coach</dt><dd>{booking.coachName || 'Not provided'}</dd></div>}<div><dt>Facility</dt><dd>{booking.facilityName || 'Not provided'}</dd></div></dl>
-      <p>After an accepted cancellation, the booking service updates the package balance. The cancellation result will show the latest balance available from your package record.</p>
-      {state === 'checking' && <p role="status">Checking cancellation status. Do not submit another cancellation.</p>}
-      {state === 'unknown' && <div className="booking-error" role="alert"><strong>Cancellation outcome unknown</strong><p>The cancellation may have been accepted. Check its status or return to My Bookings before taking further action.</p>{error && <p>{error}</p>}</div>}
-      {state === 'confirmed' && <div role="status"><strong>Booking currently confirmed</strong><p>A fresh booking history check shows this booking as confirmed. Review the details before choosing to try cancellation again.</p></div>}
-      {state === 'rejected' && <div className="booking-error" role="alert"><strong>Cancellation request rejected</strong><p>{error}</p><p>Review My Bookings for the current status before taking further action.</p></div>}
-      <div className="browse-actions booking-actions"><Link className={buttonClassName('secondary')} to="/member/bookings?when=UPCOMING">Keep booking</Link>{(state === 'unknown' || state === 'checking') && <Button variant="secondary" disabled={state === 'checking'} onClick={() => void checkCancellationStatus()}>Check cancellation status</Button>}<Button variant="danger" loading={state === 'submitting'} disabled={state !== 'ready' && state !== 'confirmed'} onClick={() => void confirmCancel()}>{state === 'confirmed' ? 'Try cancellation again' : 'Confirm cancellation'}</Button></div>
-    </Card>
-  </div>
+  return (
+    <div className="page browse-page booking-flow member-commerce">
+      <MemberScheduleNav />
+      <MemberCommerceHeader
+        eyebrow="Member / My Bookings"
+        title="Cancel booking"
+        description="Please confirm before cancelling this session."
+      />
+      <Card className="booking-cancel-card">
+        <div className="booking-cancel-warning" role="note">
+          <strong>Cancellation deadline</strong>
+          <p>
+            {deadline
+              ? `Cancel by ${deadline} Vietnam time to get your session credit back. This is two hours before the session starts.`
+              : 'The backend will verify whether this booking is within the free cancellation period.'}
+          </p>
+          <p>
+            After that you can still cancel to free your place for another member, but the session credit is not
+            returned.
+          </p>
+        </div>
+        {late && (
+          <div className="booking-error" role="alert">
+            <strong>Late cancellation</strong>
+            <p>
+              The free cancellation deadline has passed. If you cancel now, your place is released but this session
+              credit is not returned to your package.
+            </p>
+          </div>
+        )}
+        <h2>{bookingTitle(booking)}</h2>
+        <SessionContext {...booking} sessionId={booking.sessionCode} date={booking.sessionDate} />
+        <dl className="browse-facts booking-confirmation__facts">
+          <div>
+            <dt>Booking code</dt>
+            <dd>{booking.bookingCode}</dd>
+          </div>
+          <div>
+            <dt>Date</dt>
+            <dd>{bookingDate(booking.sessionDate)}</dd>
+          </div>
+          <div>
+            <dt>Time</dt>
+            <dd>
+              {bookingTime(booking.startTime)} - {bookingTime(booking.endTime)}
+            </dd>
+          </div>
+          <div>
+            <dt>Package</dt>
+            <dd>{booking.packageName || 'Sport package'}</dd>
+          </div>
+          {booking.trainingType !== 'SELF_TRAINING' && (
+            <div>
+              <dt>Coach</dt>
+              <dd>{booking.coachName || 'Not provided'}</dd>
+            </div>
+          )}
+          <div>
+            <dt>Facility</dt>
+            <dd>{booking.facilityName || 'Not provided'}</dd>
+          </div>
+        </dl>
+        <p>
+          After an accepted cancellation, the booking service updates the package balance. The cancellation result will
+          show the latest balance available from your package record.
+        </p>
+        {state === 'checking' && (
+          <p role="status">Checking cancellation status. Do not submit another cancellation.</p>
+        )}
+        {state === 'unknown' && (
+          <div className="booking-error" role="alert">
+            <strong>Cancellation outcome unknown</strong>
+            <p>
+              The cancellation may have been accepted. Check its status or return to My Bookings before taking further
+              action.
+            </p>
+            {error && <p>{error}</p>}
+          </div>
+        )}
+        {state === 'confirmed' && (
+          <div role="status">
+            <strong>Booking currently confirmed</strong>
+            <p>
+              A fresh booking history check shows this booking as confirmed. Review the details before choosing to try
+              cancellation again.
+            </p>
+          </div>
+        )}
+        {state === 'rejected' && (
+          <div className="booking-error" role="alert">
+            <strong>Cancellation request rejected</strong>
+            <p>{error}</p>
+            <p>Review My Bookings for the current status before taking further action.</p>
+          </div>
+        )}
+        <div className="browse-actions booking-actions">
+          <Link className={buttonClassName('secondary')} to="/member/bookings?when=UPCOMING">
+            Keep booking
+          </Link>
+          {(state === 'unknown' || state === 'checking') && (
+            <Button
+              variant="secondary"
+              disabled={state === 'checking'}
+              onClick={() => void checkCancellationStatus()}
+            >
+              Check cancellation status
+            </Button>
+          )}
+          <Button
+            variant="danger"
+            loading={state === 'submitting'}
+            disabled={state !== 'ready' && state !== 'confirmed'}
+            onClick={() => void confirmCancel()}
+          >
+            {state === 'confirmed' ? 'Try cancellation again' : 'Confirm cancellation'}
+          </Button>
+        </div>
+      </Card>
+    </div>
+  )
 }
 
 export function BookingCancelledPage() {
@@ -211,7 +510,19 @@ export function BookingCancelledPage() {
   const memberId = user?.id ?? null
   const { bookingId: rawId } = useParams()
   const id = routeId(rawId)
-  if (!id) return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Cancellation unavailable" /><Card><p role="alert">Choose a valid booking.</p><Link className={buttonClassName()} to="/member/bookings">My Bookings</Link></Card></div>
+  if (!id)
+    return (
+      <div className="page browse-page member-commerce">
+        <MemberScheduleNav />
+        <PageHeader title="Cancellation unavailable" />
+        <Card>
+          <p role="alert">Choose a valid booking.</p>
+          <Link className={buttonClassName()} to="/member/bookings">
+            My Bookings
+          </Link>
+        </Card>
+      </div>
+    )
   return <BookingCancelledContent key={`${id}-${memberId ?? 'unknown'}`} id={id} memberId={memberId} />
 }
 
@@ -221,39 +532,119 @@ interface VerifiedCancellation {
 }
 
 function BookingCancelledContent({ id, memberId }: { id: number; memberId: number | null }) {
-  const loader = useCallback(async (signal: AbortSignal) => {
-    if (memberId === null) return null
-    const booking = await memberBookingsApi.findMine(id, memberId, signal)
-    if (!booking || booking.status !== 'CANCELLED') return null
-    if (booking.packageRegistrationId === null) return { booking, registration: null } satisfies VerifiedCancellation
-    try {
-      const registrations = await memberApi.myRegistrations({ signal })
-      const registration = registrations.find((row) => row.id === booking.packageRegistrationId && row.memberId === memberId) ?? null
-      return { booking, registration } satisfies VerifiedCancellation
-    } catch (error) {
-      if (signal.aborted) throw error
-      return { booking, registration: null } satisfies VerifiedCancellation
-    }
-  }, [id, memberId])
+  const loader = useCallback(
+    async (signal: AbortSignal) => {
+      if (memberId === null) return null
+      const booking = await memberBookingsApi.findMine(id, memberId, signal)
+      if (!booking || booking.status !== 'CANCELLED') return null
+      if (booking.packageRegistrationId === null) return { booking, registration: null } satisfies VerifiedCancellation
+      try {
+        const registrations = await memberApi.myRegistrations({ signal })
+        const registration =
+          registrations.find((row) => row.id === booking.packageRegistrationId && row.memberId === memberId) ?? null
+        return { booking, registration } satisfies VerifiedCancellation
+      } catch (error) {
+        if (signal.aborted) throw error
+        return { booking, registration: null } satisfies VerifiedCancellation
+      }
+    },
+    [id, memberId]
+  )
   const [resource, reload] = useMemberResource(loader)
-  if (resource.status === 'loading') return <div className="page browse-page"><MemberScheduleNav /><PageLoader label="Loading cancellation result" /></div>
-  if (resource.status === 'error') return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Cancellation result" /><BrowseError error={resource.error} onRetry={reload} /></div>
-  if (!resource.data) return <div className="page browse-page"><MemberScheduleNav /><PageHeader title="Cancellation not confirmed" /><Card><div className="booking-error" role="alert"><p>This booking is not listed as cancelled. Refresh My Bookings to confirm its current status.</p></div><Link className={buttonClassName()} to="/member/bookings">My Bookings</Link></Card></div>
+  if (resource.status === 'loading')
+    return (
+      <div className="page browse-page member-commerce">
+        <MemberScheduleNav />
+        <PageLoader label="Loading cancellation result" />
+      </div>
+    )
+  if (resource.status === 'error')
+    return (
+      <div className="page browse-page member-commerce">
+        <MemberScheduleNav />
+        <PageHeader title="Cancellation result" />
+        <BrowseError error={resource.error} onRetry={reload} />
+      </div>
+    )
+  if (!resource.data)
+    return (
+      <div className="page browse-page member-commerce">
+        <MemberScheduleNav />
+        <PageHeader title="Cancellation not confirmed" />
+        <Card>
+          <div className="booking-error" role="alert">
+            <p>This booking is not listed as cancelled. Refresh My Bookings to confirm its current status.</p>
+          </div>
+          <Link className={buttonClassName()} to="/member/bookings">
+            My Bookings
+          </Link>
+        </Card>
+      </div>
+    )
 
   const { booking, registration } = resource.data
-  return <div className="page browse-page booking-flow">
-    <MemberScheduleNav />
-    <PageHeader eyebrow="Member / My Bookings" title="Booking cancelled" description="The booking service confirmed your cancellation." />
-    <Card className="booking-confirmation">
-      <div className="booking-confirmation__mark booking-confirmation__mark--cancelled" aria-hidden="true" />
-      <Badge>Cancelled</Badge>
-      <h2>{bookingTitle(booking)}</h2>
-      <SessionContext {...booking} sessionId={booking.sessionCode} date={booking.sessionDate} />
-      <p className="booking-code">Booking code: <strong>{booking.bookingCode}</strong></p>
-      <dl className="browse-facts booking-confirmation__facts"><div><dt>Date</dt><dd>{bookingDate(booking.sessionDate)}</dd></div><div><dt>Time</dt><dd>{bookingTime(booking.startTime)} - {bookingTime(booking.endTime)} (Vietnam time)</dd></div><div><dt>Cancelled by</dt><dd>{actorName(booking)}</dd></div>{booking.cancelledAt && <div><dt>Cancelled at</dt><dd>{formatDateTime(booking.cancelledAt)}</dd></div>}</dl>
-      {booking.cancelReason?.startsWith('Late cancellation') && <p className="notice notice--info">Late cancellation: your place was released for other members, but this session credit was not returned.</p>}
-      {registration?.totalSessions === null ? <p>This package has no session limit. You can review its current status in My sport packages.</p> : registration && registration.remainingSessions !== null ? <p>Latest package balance: {registration.remainingSessions} sessions remaining.</p> : <p>The latest package balance is unavailable. Review My sport packages for the current count.</p>}
-      <div className="browse-actions booking-actions"><Link className={buttonClassName()} to="/member/bookings?when=PAST">View past bookings</Link><Link className={buttonClassName('secondary')} to="/member/classes">Find Classes</Link><Link className={buttonClassName('secondary')} to="/member/membership">My sport packages</Link></div>
-    </Card>
-  </div>
+  return (
+    <div className="page browse-page booking-flow member-commerce">
+      <MemberScheduleNav />
+      <MemberCommerceHeader
+        eyebrow="Member / My Bookings"
+        title="Booking cancelled"
+        description="The booking service confirmed your cancellation."
+      />
+      <Card className="booking-confirmation">
+        <div className="booking-confirmation__mark booking-confirmation__mark--cancelled" aria-hidden="true" />
+        <Badge>Cancelled</Badge>
+        <h2>{bookingTitle(booking)}</h2>
+        <SessionContext {...booking} sessionId={booking.sessionCode} date={booking.sessionDate} />
+        <p className="booking-code">
+          Booking code: <strong>{booking.bookingCode}</strong>
+        </p>
+        <dl className="browse-facts booking-confirmation__facts">
+          <div>
+            <dt>Date</dt>
+            <dd>{bookingDate(booking.sessionDate)}</dd>
+          </div>
+          <div>
+            <dt>Time</dt>
+            <dd>
+              {bookingTime(booking.startTime)} - {bookingTime(booking.endTime)} (Vietnam time)
+            </dd>
+          </div>
+          <div>
+            <dt>Cancelled by</dt>
+            <dd>{actorName(booking)}</dd>
+          </div>
+          {booking.cancelledAt && (
+            <div>
+              <dt>Cancelled at</dt>
+              <dd>{formatDateTime(booking.cancelledAt)}</dd>
+            </div>
+          )}
+        </dl>
+        {booking.cancelReason?.startsWith('Late cancellation') && (
+          <p className="notice notice--info">
+            Late cancellation: your place was released for other members, but this session credit was not returned.
+          </p>
+        )}
+        {registration?.totalSessions === null ? (
+          <p>This package has no session limit. You can review its current status in My sport packages.</p>
+        ) : registration && registration.remainingSessions !== null ? (
+          <p>Latest package balance: {registration.remainingSessions} sessions remaining.</p>
+        ) : (
+          <p>The latest package balance is unavailable. Review My sport packages for the current count.</p>
+        )}
+        <div className="browse-actions booking-actions">
+          <Link className={buttonClassName()} to="/member/bookings?when=PAST">
+            View past bookings
+          </Link>
+          <Link className={buttonClassName('secondary')} to="/member/classes">
+            Find Classes
+          </Link>
+          <Link className={buttonClassName('secondary')} to="/member/membership">
+            My sport packages
+          </Link>
+        </div>
+      </Card>
+    </div>
+  )
 }

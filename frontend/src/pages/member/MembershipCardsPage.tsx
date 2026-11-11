@@ -3,10 +3,11 @@ import { Link, useNavigate } from 'react-router-dom'
 import { cardsApi, type CardTier } from '../../api/cardsApi'
 import { ApiError, getErrorMessage } from '../../api/errors'
 import { memberApi, type MemberCard } from '../../api/memberApi'
-import { Badge, Button, Card, EmptyState, ErrorState, Modal, PageHeader, useToast } from '../../components/ui'
+import { Badge, Button, Card, EmptyState, ErrorState, Modal, useToast } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatDate, formatMoney } from '../../utils/format'
+import { MemberCommerceHeader, MemberCommerceHero } from './MemberCommerceComponents'
 import {
   cardInForce,
   isFreeTier,
@@ -56,7 +57,7 @@ export function MembershipCardsPage() {
   const [selected, setSelected] = useState<Selection | null>(null)
 
   const header = (
-    <PageHeader
+    <MemberCommerceHeader
       eyebrow="Your sport, your way"
       title="Membership Cards"
       description="Enjoy discounts on sport packages with an eligible membership card."
@@ -80,8 +81,13 @@ export function MembershipCardsPage() {
   // The overlay keeps the same position in the tree whatever the page state, so a reload after a
   // failed purchase does not unmount it and its error message stays visible.
   return (
-    <div className="page">
+    <div className="page member-commerce">
       {header}
+      <MemberCommerceHero
+        kicker="Tiers & Benefits"
+        title="UPGRADE YOUR MEMBERSHIP. UNLOCK DISCOUNTS."
+        description="Choose the membership card tier that fits your training routine and save on every sport package."
+      />
       <div className="cards-page__content">{content}</div>
       {selected && (
         <ConfirmCardModal tier={selected.tier} plan={selected.plan} onClose={() => setSelected(null)} onStale={reload} />

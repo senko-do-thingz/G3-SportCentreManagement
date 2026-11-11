@@ -25,7 +25,13 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
  * buttons and wraps receipt content at a readable print size on A4.
  */
 export function ReceiptPage() {
-  return <PaymentWorkspace><ReceiptRoute /></PaymentWorkspace>
+  return (
+    <PaymentWorkspace>
+      <div className="member-commerce">
+        <ReceiptRoute />
+      </div>
+    </PaymentWorkspace>
+  )
 }
 
 function ReceiptRoute() {

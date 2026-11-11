@@ -93,13 +93,22 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
   if (payment.status !== 'ready') {
     return (
       <PaymentWorkspace>
-        <PaymentNav paymentId={paymentId} />
-        <PaymentHero eyebrow={EYEBROW} title="Payment Summary" />
-        {payment.status === 'loading' ? (
-          <Spinner label="Loading the payment" />
-        ) : (
-          <ErrorState title="We could not load the payment" error={payment.error} onRetry={reload} />
-        )}
+        <div className="member-commerce">
+          <PaymentNav paymentId={paymentId} />
+          <PaymentHero eyebrow={EYEBROW} title="Payment Summary" />
+          {payment.status === 'loading' ? (
+            <Spinner label="Loading the payment" />
+          ) : (
+            <div>
+              <ErrorState title="We could not load the payment" error={payment.error} onRetry={reload} />
+              <div style={{ marginTop: 'var(--space-4)' }}>
+                <Link className={buttonClassName('secondary')} to={PAYMENT_PATHS.list}>
+                  Back to My payments
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
       </PaymentWorkspace>
     )
   }
@@ -109,17 +118,19 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
   if (data.id !== paymentId) {
     return (
       <PaymentWorkspace>
-        <PaymentNav paymentId={paymentId} />
-        <PaymentHero eyebrow={EYEBROW} title="Payment Summary" />
-        <EmptyState
-          title="Payment not found"
-          description={MISMATCH_MESSAGE}
-          action={
-            <Link className={buttonClassName('secondary', 'md')} to={PAYMENT_PATHS.list}>
-              My payments
-            </Link>
-          }
-        />
+        <div className="member-commerce">
+          <PaymentNav paymentId={paymentId} />
+          <PaymentHero eyebrow={EYEBROW} title="Payment Summary" />
+          <EmptyState
+            title="Payment not found"
+            description={MISMATCH_MESSAGE}
+            action={
+              <Link className={buttonClassName('secondary', 'md')} to={PAYMENT_PATHS.list}>
+                My payments
+              </Link>
+            }
+          />
+        </div>
       </PaymentWorkspace>
     )
   }
@@ -133,17 +144,18 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
 
   return (
     <PaymentWorkspace>
-      <PaymentNav paymentId={paymentId} />
-      <PaymentHero
-        eyebrow={EYEBROW}
-        title={singleVisit ? 'Single Visit Payment Summary' : 'Payment Summary'}
-        description={
-          singleVisit
-            ? 'Single visits use a separate price and do not receive a card discount.'
-            : 'Review your request and card benefits before paying.'
-        }
-      />
-      <div className="payment-summary">
+      <div className="member-commerce">
+        <PaymentNav paymentId={paymentId} />
+        <PaymentHero
+          eyebrow={EYEBROW}
+          title={singleVisit ? 'Single Visit Payment Summary' : 'Payment Summary'}
+          description={
+            singleVisit
+              ? 'Single visits use a separate price and do not receive a card discount.'
+              : 'Review your request and card benefits before paying.'
+          }
+        />
+        <div className="payment-summary">
         <Card title={data.itemDescription ?? `Payment ${data.code}`} aria-label="Payment details">
           {registration?.totalSessions !== null && registration?.totalSessions !== undefined && (
             <p className="payment-summary__chip">{sessionsLabel(registration.totalSessions)}</p>
@@ -190,6 +202,7 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
           )}
         </Card>
         <OrderSummary payment={data} singleVisit={singleVisit} onStale={reload} />
+      </div>
       </div>
     </PaymentWorkspace>
   )
