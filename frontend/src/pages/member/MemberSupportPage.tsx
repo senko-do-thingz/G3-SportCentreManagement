@@ -19,7 +19,7 @@ export function MemberSupportPage() {
   const [selected, select] = useState<number | null>(null)
   const [submitted, setSubmitted] = useState<MemberSupportTicket | null>(null)
   const load = useCallback((signal: AbortSignal) => memberSupportApi.list(signal), [])
-  return <div className="training-page">
+  return <div className="training-page member-support-page">
     <Link to="/member/assistant">Back to the center assistant</Link>
     <PageHeader title="Contact reception" description="Send a question that needs a staff member's help. Reception replies here; replies are not instant." />
     {submitted ? <Card title="Support request submitted">
@@ -31,14 +31,14 @@ export function MemberSupportPage() {
       <div id="my-requests" />
       <TrainingData key={revision} load={load} refreshLabel="Refresh my support requests">{tickets => tickets.length === 0
         ? <p role="status">You have not sent any support requests.</p>
-        : <table className="table"><caption>My support requests</caption>
-          <thead><tr><th>Request</th><th>Topic</th><th>Status</th><th>Replies</th><th>Action</th></tr></thead>
+        : <div className="member-support-table" role="region" aria-label="Support requests table" tabIndex={0}><table className="table"><caption>My support requests</caption>
+          <thead><tr><th scope="col">Request</th><th scope="col">Topic</th><th scope="col">Status</th><th scope="col">Replies</th><th scope="col">Action</th></tr></thead>
           <tbody>{tickets.map(ticket => <tr key={ticket.id}>
             <td>{ticket.code}: {ticket.subject}</td><td>{topicLabel(ticket.category)}</td>
             <td><StatusBadge status={ticket.status} /></td>
             <td>{ticket.unreadReplies === 0 ? '-' : ticket.unreadReplies === 1 ? '1 new reply' : `${ticket.unreadReplies} new replies`}</td>
             <td><Button variant="secondary" onClick={() => select(ticket.id)}>View {ticket.code}</Button></td>
-          </tr>)}</tbody></table>}</TrainingData>
+          </tr>)}</tbody></table></div>}</TrainingData>
     </Card>
     {selected !== null && <RequestDetail key={selected} id={selected} onRead={() => refresh(value => value + 1)} />}
   </div>

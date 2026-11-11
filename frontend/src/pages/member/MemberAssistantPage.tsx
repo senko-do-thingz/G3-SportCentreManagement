@@ -5,23 +5,28 @@ import { Button, Input, Card } from '../../components/ui'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { SporiRobotMark } from './SporiRobotMark'
 import { safeMemberReturnTo } from './assistantNavigation'
 import { useTrainingAction } from '../training/trainingFormState'
 import { ActionMessage } from '../training/TrainingFormFields'
 
-export function MemberAssistantLink({ onNavigate }: { onNavigate?: () => void }) {
+export function MemberAssistantLink({ onNavigate, className, label = 'Open center assistant' }: {
+  onNavigate?: () => void
+  className?: string
+  label?: string
+}) {
   const location = useLocation()
   const active = location.pathname === '/member/assistant'
   const returnTo = `${location.pathname}${location.search}${location.hash}`
   const href = active ? `${location.pathname}${location.search}` : `/member/assistant?returnTo=${encodeURIComponent(returnTo)}`
   return (
     <Link
-      className={'workspace-header__nav-link' + (active ? ' workspace-header__nav-link--active' : '')}
+      className={className ?? ('workspace-header__nav-link' + (active ? ' workspace-header__nav-link--active' : ''))}
       aria-current={active ? 'page' : undefined}
       onClick={onNavigate}
       to={href}
     >
-      Open center assistant
+      {label}
     </Link>
   )
 }
@@ -89,10 +94,14 @@ export function MemberAssistantPage() {
 
 function CenterConsultationWorkspace() {
   const [params] = useSearchParams()
+  const location = useLocation()
   const returnTo = safeMemberReturnTo(params.get('returnTo'))
   const [optIn, setOptIn] = useState(false)
   const [result, setResult] = useState<Consultation | null>(null)
-  const [question, setQuestion] = useState('')
+  const [question, setQuestion] = useState(() => {
+    const routeQuestion = (location.state as { assistantQuestion?: unknown } | null)?.assistantQuestion
+    return typeof routeQuestion === 'string' ? routeQuestion.slice(0, 500) : params.get('question')?.slice(0, 500) ?? ''
+  })
   const [asked, setAsked] = useState('')
   const action = useTrainingAction()
   const resultRef = useRef<HTMLDivElement>(null)
@@ -106,11 +115,16 @@ function CenterConsultationWorkspace() {
     void action.run(async () => { setResult(await trainingGuidanceApi.consult(text)); setAsked(text) }, 'Center information loaded.')
   }
   return (
-    <div className="training-page">
-      <Link to={returnTo}>Back to previous page</Link>
-      <PageHeader title="Center assistant" description="Ask in English or Vietnamese about schedules, package prices, general exercise, or your own packages, bookings and coach feedback. Answers come only from center data and your own records." />
-      <p>Automated center consultation answers from Sportify's own records on the center server. No conversation history is stored: your question and answer stay on this page until you leave or turn consultation off. General exercise answers are fixed curated text, not personal or medical advice.</p>
-      <p aria-label="External AI disclosure"><strong>External AI:</strong> turning on consultation does not share your question with any outside company. External AI is off unless the center approves it. Even then your question text is never sent: only fixed service words found in it (for example &quot;price&quot;, &quot;tomorrow&quot; or a sport name) and the list of sports. Names, contact details, numbers and health details are never sent, private and health questions are answered without AI, and the AI never writes the answer.</p>
+    <div className="training-page assistant-workspace">
+      <Link className="assistant-workspace__back" to={returnTo}>Back to previous page</Link>
+      <div className="assistant-workspace__heading">
+        <span className="assistant-workspace__mark"><SporiRobotMark /></span>
+        <PageHeader eyebrow={<span className="assistant-workspace__desktop-eyebrow">Spori AI / Sportify training guide</span>} title="Center assistant" description="Ask in English or Vietnamese about schedules, package prices, general exercise, or your own packages, bookings and coach feedback. Answers come only from center data and your own records." />
+      </div>
+      <div className="assistant-workspace__privacy">
+        <p>Answers use Sportify's own center records. No conversation history is stored: your question and answer stay on this page until you leave or turn consultation off. General exercise answers are fixed curated text, not personal or medical advice.</p>
+        <p aria-label="External AI disclosure"><strong>External AI:</strong> turning on consultation does not share your question with any outside company. External AI is off unless the center approves it. Even then your question text is never sent: only fixed service words found in it (for example &quot;price&quot;, &quot;tomorrow&quot; or a sport name) and the list of sports. Names, contact details, numbers and health details are never sent, private and health questions are answered without AI, and the AI never writes the answer.</p>
+      </div>
       {!enabled ? <EmptyState title="Automated consultation is disabled" /> : <Card title="Ask about the center">
         <label><input type="checkbox" checked={optIn} disabled={action.pending} onChange={event => { setOptIn(event.target.checked); setResult(null); setQuestion('') }} /> Enable automated center consultation</label>
         <div role="group" aria-label="Example questions"><p>Example questions (select one to fill the question field):</p>

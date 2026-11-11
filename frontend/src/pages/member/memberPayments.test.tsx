@@ -779,7 +779,7 @@ describe('FE-11 My Payments and Receipts (F3-03, S3-PaidHistory)', () => {
     renderApp('/member/payments')
     expect(await screen.findByRole('heading', { level: 1, name: 'My Payments and Receipts' })).toBeInTheDocument()
     const nav = screen.getByRole('navigation', { name: 'Member navigation' })
-    expect(within(nav).getByRole('link', { name: 'My Payments' })).toHaveAttribute('aria-current', 'page')
+    expect(within(nav).getByRole('link', { name: 'My payments' })).toHaveAttribute('aria-current', 'page')
   })
 })
 

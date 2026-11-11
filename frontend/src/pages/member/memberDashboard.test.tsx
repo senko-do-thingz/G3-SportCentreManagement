@@ -15,6 +15,11 @@ interface DashboardData {
   cards?: Response | unknown[]
   registrations?: Response | unknown[]
   bookings?: Response | unknown[]
+  wallet?: Response | Record<string, unknown>
+  plans?: Response | unknown[]
+  attendance?: Response | unknown[]
+  results?: Response | unknown[]
+  feedback?: Response | unknown[]
 }
 
 function answer(value: Response | unknown[] | undefined): Response {
@@ -38,6 +43,23 @@ function dashboardBackend(data: DashboardData = {}) {
     if (call.path.startsWith('/bookings/my')) {
       return answer(data.bookings)
     }
+    if (call.path === '/member/wallet') {
+      return data.wallet instanceof Response ? data.wallet : json(200, data.wallet ?? {
+        availableBalance: 350000,
+        reservedBalance: 0,
+        demoAvailableBalance: 0,
+        demoReservedBalance: 0,
+        currency: 'VND',
+        updatedAt: '2026-10-13T09:30:00',
+        recentActivity: [],
+        activityCount: 0,
+        notice: 'Synthetic dashboard test balance',
+      })
+    }
+    if (call.path === '/member/training/plans') return answer(data.plans)
+    if (call.path === '/member/training/attendance') return answer(data.attendance)
+    if (call.path === '/member/training/results') return answer(data.results)
+    if (call.path === '/member/training/feedback') return answer(data.feedback)
     return backendError(404, 'Resource not found')
   }
 }
@@ -174,7 +196,7 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
     expect(within(item).queryByRole('progressbar')).not.toBeInTheDocument()
   })
 
-  it('TC-FE02-028 the dashboard calls the three member endpoints with the access token', async () => {
+  it('TC-FE02-028 the dashboard reads member, wallet and training summaries with the access token', async () => {
     const { calls } = await openDashboard()
     await waitFor(() => expect(calls.some((call) => call.path.startsWith('/bookings/my'))).toBe(true))
     const paths = calls.map((call) => `${call.method} ${call.path}`)
@@ -184,11 +206,34 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
         'GET /membership-cards/my',
         'GET /packages/registrations/my',
         'GET /bookings/my?when=UPCOMING',
+        'GET /member/wallet',
+        'GET /member/training/plans',
+        'GET /member/training/attendance',
+        'GET /member/training/results',
+        'GET /member/training/feedback',
       ]),
     )
     for (const call of calls) {
       expect(call.authorization).toBe('Bearer member-access')
     }
+  })
+
+  it('TC-FE02-143 dashboard wallet and training snapshot show values returned by their member APIs', async () => {
+    await openDashboard({
+      wallet: { availableBalance: 735000, currency: 'VND' },
+      plans: [{ id: 1 }, { id: 2 }],
+      attendance: [{ id: 3 }],
+      results: [{ id: 4 }, { id: 5 }, { id: 6 }],
+      feedback: [{ id: 7 }],
+    })
+
+    expect(statValue('Wallet balance')).toBe('735.000 VND')
+    const snapshot = screen.getByRole('region', { name: 'Training snapshot' })
+    expect(snapshot).toHaveTextContent('Assigned plans2')
+    expect(snapshot).toHaveTextContent('Attendance records1')
+    expect(snapshot).toHaveTextContent('Session results3')
+    expect(snapshot).toHaveTextContent('Coach feedback1')
+    expect(within(snapshot).getByRole('link', { name: 'Training Hub' })).toHaveAttribute('href', '/member/training')
   })
 
   it('TC-FE02-029 past, cancelled and later bookings are filtered and only three are listed', async () => {

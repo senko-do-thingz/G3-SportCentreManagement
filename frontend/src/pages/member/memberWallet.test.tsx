@@ -53,6 +53,6 @@ describe('My Wallet overview (MW-03)', () => {
   it('is listed in the member menu and not available to staff', async () => {
     signedIn('MEMBER', call => call.path === '/member/wallet' ? json(200, empty) : json(200, []))
     renderApp('/member')
-    expect((await screen.findAllByRole('link', { name: /My Wallet/ }))[0]).toHaveAttribute('href', '/member/wallet')
+    expect((await screen.findAllByRole('link', { name: /My wallet/ }))[0]).toHaveAttribute('href', '/member/wallet')
   })
 })

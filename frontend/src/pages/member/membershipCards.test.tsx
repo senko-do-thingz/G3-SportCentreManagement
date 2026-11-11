@@ -353,7 +353,7 @@ describe('FE-04 My Membership and Sport Packages (F1-12)', () => {
 
   it('TC-FE04-059 My Membership is the active menu item on both screens', async () => {
     await openCards()
-    expect(screen.getByRole('link', { name: 'My Membership' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'My membership' })).toHaveAttribute('aria-current', 'page')
   })
 })
 
