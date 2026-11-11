@@ -1,4 +1,4 @@
-# Sportify Member Concept B — PR #308 Final Remediation Report
+# Sportify Member Concept B - PR #308 Final Remediation Report
 
 ## Executive summary
 
