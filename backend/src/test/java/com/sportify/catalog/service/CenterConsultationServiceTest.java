@@ -100,6 +100,9 @@ class CenterConsultationServiceTest {
         assertThat(CenterConsultationService.intent("what classes are available tomorrow")).isEqualTo("SESSIONS");
         assertThat(CenterConsultationService.intent("what are the package prices")).isEqualTo("PACKAGES");
         assertThat(CenterConsultationService.intent("how do i book a session")).isEqualTo("BOOKING");
+        assertThat(CenterConsultationService.intent("how many sports are available")).isEqualTo("SPORTS_CATALOG");
+        assertThat(CenterConsultationService.intent("what sports are offered")).isEqualTo("SPORTS_CATALOG");
+        assertThat(CenterConsultationService.intent("bao nhieu mon the thao")).isEqualTo("SPORTS_CATALOG");
     }
 
     @Test void faqCatalogStaysSmallWithUniqueIdsAndAsciiText() {

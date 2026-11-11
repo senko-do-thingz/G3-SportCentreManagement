@@ -14,7 +14,7 @@ export function ScheduleWorkspaceHero({
   description,
   imageSrc,
   imageAlt,
-  fadeImage = false,
+  fadeImage = true,
   actions,
 }: ScheduleWorkspaceHeroProps) {
   const titleId = `schedule-workspace-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-title`
