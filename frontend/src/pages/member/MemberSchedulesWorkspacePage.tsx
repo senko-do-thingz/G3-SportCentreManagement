@@ -21,12 +21,14 @@ const TAB_DETAILS: Record<MemberScheduleTab, { title: string; description: strin
     description: 'Explore the center-wide timetable, compare availability, and open a session before booking.',
     imageSrc: sportImageFor('football'),
     imageAlt: 'Football training on the center field',
+    fadeImage: true,
   },
   'my-schedule': {
     title: 'My Schedule',
     description: 'Your confirmed bookings only, organized week by week in Vietnam time (UTC+7).',
     imageSrc: sportImageFor('tennis'),
     imageAlt: 'Tennis practice on a clay court',
+    fadeImage: true,
   },
   'find-classes': {
     title: 'Find Classes',
@@ -40,6 +42,7 @@ const TAB_DETAILS: Record<MemberScheduleTab, { title: string; description: strin
     description: 'Review your upcoming reservations and booking history using the existing cancellation rules.',
     imageSrc: sportImageFor('basketball'),
     imageAlt: 'Basketball training at the sports center',
+    fadeImage: true,
   },
 }
 
@@ -65,7 +68,6 @@ export function MemberSchedulesWorkspacePage({ tab: forcedTab }: { tab?: MemberS
         imageSrc={details.imageSrc}
         imageAlt={details.imageAlt}
         fadeImage={details.fadeImage}
-        actions={activeTab === 'center' ? <Link className="btn btn--primary" to="/member/schedules?tab=find-classes">Find a class</Link> : undefined}
       />
       <div className="schedule-workspace__content">
         {activeTab === 'center' && <CenterSchedule />}
@@ -125,12 +127,17 @@ function CenterSchedule() {
   return (
     <Card className="center-schedule" title={`${browseDate(from)} - ${browseDate(to)}`}>
       <div className="center-schedule__toolbar">
-        <div className="schedule-week-nav" role="group" aria-label="Center schedule week navigation">
-          <Button variant="secondary" onClick={() => moveWeek(-7)}>Previous week</Button>
-          <Button variant={from === browseMonday(today) ? 'primary' : 'secondary'} onClick={() => change('date', today)}>This week</Button>
-          <Button variant="secondary" onClick={() => moveWeek(7)}>Next week</Button>
+        <div className="center-schedule__week-group">
+          <div className="schedule-week-nav" role="group" aria-label="Center schedule week navigation">
+            <Button variant="secondary" onClick={() => moveWeek(-7)}>Previous week</Button>
+            <Button variant={from === browseMonday(today) ? 'primary' : 'secondary'} onClick={() => change('date', today)}>This week</Button>
+            <Button variant="secondary" onClick={() => moveWeek(7)}>Next week</Button>
+          </div>
+          <CalendarDateField label="Week containing" value={from} onChange={(value, valid) => { if (valid !== false) change('date', value) }} />
         </div>
-        <CalendarDateField label="Week containing" value={from} onChange={(value, valid) => { if (valid !== false) change('date', value) }} />
+        <div className="center-schedule__toolbar-actions">
+          <Link className="btn btn--primary" to="/member/schedules?tab=find-classes">Find a class</Link>
+        </div>
       </div>
       <div className="center-schedule__filters" aria-label="Center schedule filters">
         <Select label="Sport" placeholder="All sports" value={sportId ? String(sportId) : ''} options={sports.status === 'ready' ? sports.data.map((sport) => ({ value: String(sport.id), label: sport.name })) : []} onChange={(event) => change('sportId', event.target.value)} />

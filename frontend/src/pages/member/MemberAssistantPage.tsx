@@ -63,12 +63,16 @@ const ANSWER_TEXT = {
   en: {
     answered: 'Grounded center answer', unavailable: 'Answer unavailable', found: 'How this answer was found',
     noAnswer: 'This assistant does not answer personal, medical or private questions. Ask your human coach or reception.',
+    noAnswerSteps: 'Open Contact Reception, choose a topic, enter the question and submit; replies appear in My support requests.',
+    contactReceptionist: 'Contact Receptionist',
     sourceType: 'Source type', open: 'Open source', contact: 'Contact reception about this answer',
     modes: MODE_LABELS, kinds: SOURCE_KIND_LABELS, otherKind: 'Center information',
   },
   vi: {
     answered: 'Câu trả lời từ dữ liệu trung tâm', unavailable: 'Chưa có câu trả lời', found: 'Cách tìm ra câu trả lời',
     noAnswer: 'Trợ lý không trả lời câu hỏi cá nhân, y tế hay riêng tư. Hãy hỏi Coach hoặc lễ tân.',
+    noAnswerSteps: 'Mở mục Liên hệ Lễ tân, chọn chủ đề, nhập câu hỏi và gửi; phản hồi sẽ hiển thị trong Yêu cầu hỗ trợ của tôi.',
+    contactReceptionist: 'Liên hệ Lễ tân',
     sourceType: 'Loại nguồn', open: 'Mở nguồn', contact: 'Liên hệ lễ tân về câu trả lời này',
     modes: { KNOWLEDGE_BASED: 'Quy tắc từ khoá', AI_ASSISTED: 'AI đã hiểu câu hỏi của bạn' } as Record<Consultation['mode'], string>,
     kinds: {
@@ -135,11 +139,28 @@ function CenterConsultationWorkspace() {
       </Card>}
       {result && (() => {
         const text = ANSWER_TEXT[result.language === 'vi' ? 'vi' : 'en']
-        return <div ref={resultRef}><Card title={result.status === 'ANSWERED' ? text.answered : text.unavailable}><div role="status"><p>{result.mode} - {result.answer}</p></div>
+        return <div ref={resultRef}><Card title={result.status === 'ANSWERED' ? text.answered : text.unavailable}>
+          <div role="status" className="assistant-workspace__answer">
+            <p>{result.mode} - {result.answer}</p>
+            {result.status === 'NO_ANSWER' && (
+              <div className="assistant-workspace__no-answer">
+                <p>{text.noAnswer}</p>
+                <p className="assistant-workspace__steps">{text.noAnswerSteps}</p>
+                <div className="training-actions" style={{ marginTop: '12px', marginBottom: '12px' }}>
+                  <Link
+                    to="/member/support"
+                    state={{ question: asked, excerpt: assistantExcerpt(asked, result) }}
+                    className="btn btn--secondary"
+                  >
+                    {text.contactReceptionist}
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
           <p>{text.found}: {text.modes[result.mode] ?? result.mode}.</p>
-          {result.status === 'NO_ANSWER' && <p>{text.noAnswer}</p>}
           {result.sources.length > 0 && <ul className="training-list">{result.sources.map(source => <li key={`${source.kind}-${source.id}`}><h2>{source.title}</h2><p>{text.sourceType}: {text.kinds[source.kind] ?? text.otherKind}</p><p>{source.detail}</p><Link to={source.path}>{text.open}: {source.title}</Link></li>)}</ul>}
-          <Link to="/member/support" state={{ excerpt: assistantExcerpt(asked, result) }}>{text.contact}</Link>
+          {result.status !== 'NO_ANSWER' && <Link to="/member/support" state={{ excerpt: assistantExcerpt(asked, result) }}>{text.contact}</Link>}
         </Card></div>
       })()}
       <div role="group" aria-label="Need help from a person?" className="training-actions">

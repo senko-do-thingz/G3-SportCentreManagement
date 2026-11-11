@@ -1,0 +1,41 @@
+{
+  "viewport": "1440x900",
+  "timestamp": "2026-11-12 00:21:03",
+  "checks": [
+    {
+      "check": "Home coach carousel portraits",
+      "status": "PASS",
+      "details": "Loaded 3 coach portraits with naturalWidth > 0, zero initials fallbacks."
+    },
+    {
+      "check": "Four schedule tabs order and height",
+      "status": "PASS",
+      "details": "Tab order: ['My Schedule', 'Center Schedule', 'Find Classes', 'My bookings']. Hero heights: 272px, 272px, 272px, 272px."
+    },
+    {
+      "check": "Center Schedule Find a class button",
+      "status": "PASS",
+      "details": "Button relocated from hero to center-schedule__toolbar, clicks successfully to find-classes tab."
+    },
+    {
+      "check": "Find Classes scale normalization",
+      "status": "PASS",
+      "details": "Container aligned: workspace=1110.625px, discovery=1110.625px."
+    },
+    {
+      "check": "Spori sports catalog dynamic answer",
+      "status": "PASS",
+      "details": "Dynamic response: sports: Football, Badminton, Basketball, Volleyball, Swimming, Tennis. You can explore classes, sche"
+    },
+    {
+      "check": "Spori NO_ANSWER receptionist handoff",
+      "status": "PASS",
+      "details": "Receptionist guidance shown, navigated to /member/support with prefilled question: 'Can I pet an alien from Mars at midnight?...'"
+    },
+    {
+      "check": "CalendarDateField picker & formatting",
+      "status": "PASS",
+      "details": "Picker button accessible (aria-label='Open calendar picker'), dd/MM/yyyy direct typing verified."
+    }
+  ]
+}

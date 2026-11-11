@@ -56,6 +56,7 @@ export function CalendarDateField({
   const generatedId = useId()
   const inputId = id ?? generatedId
   const textRef = useRef<HTMLInputElement>(null)
+  const pickerRef = useRef<HTMLInputElement>(null)
   const committedValueRef = useRef(value)
   const [display, setDisplay] = useState(() => formatDisplayCalendarDate(value))
   const [localError, setLocalError] = useState<string | null>(null)
@@ -188,28 +189,53 @@ export function CalendarDateField({
             }
           }}
         />
-        {!readOnly && <>
-          <span className="calendar-date-field__icon" aria-hidden="true">&#128197;</span>
-          <input
-            className="calendar-date-field__picker"
-            type="date"
-            tabIndex={-1}
-            aria-label="Open calendar picker"
-            value={value}
-            min={min}
-            max={max}
-            disabled={disabled}
-            onChange={(event) => {
-              const iso = event.target.value
-              const nextDisplay = formatDisplayCalendarDate(iso)
-              const nextError = validate(nextDisplay, true)
-              setDisplay(nextDisplay)
-              if (nextError === null) committedValueRef.current = iso
-              emitChange(iso, nextError === null)
-              queueMicrotask(() => textRef.current?.focus())
-            }}
-          />
-        </>}
+        {!readOnly && (
+          <>
+            <button
+              type="button"
+              className="calendar-date-field__trigger"
+              aria-label="Open calendar picker"
+              disabled={disabled}
+              tabIndex={disabled ? -1 : 0}
+              onClick={() => {
+                if (disabled || readOnly) return
+                const picker = pickerRef.current
+                if (!picker) return
+                try {
+                  if (typeof picker.showPicker === 'function') {
+                    picker.showPicker()
+                  } else {
+                    picker.focus()
+                  }
+                } catch {
+                  picker.focus()
+                }
+              }}
+            >
+              <span className="calendar-date-field__icon" aria-hidden="true">&#128197;</span>
+            </button>
+            <input
+              ref={pickerRef}
+              className="calendar-date-field__picker"
+              type="date"
+              tabIndex={-1}
+              aria-label="Calendar date picker"
+              value={value}
+              min={min}
+              max={max}
+              disabled={disabled}
+              onChange={(event) => {
+                const iso = event.target.value
+                const nextDisplay = formatDisplayCalendarDate(iso)
+                const nextError = validate(nextDisplay, true)
+                setDisplay(nextDisplay)
+                if (nextError === null) committedValueRef.current = iso
+                emitChange(iso, nextError === null)
+                queueMicrotask(() => textRef.current?.focus())
+              }}
+            />
+          </>
+        )}
       </div>
       {name && <input type="hidden" name={name} value={value} />}
       <div className={reserveErrorSpace ? 'field__feedback field__feedback--reserved' : 'field__feedback'}>
