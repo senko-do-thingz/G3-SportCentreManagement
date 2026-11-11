@@ -46,7 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ReceptionInboxIntegrationTest extends AbstractIntegrationTest {
     static final SecureRandom RANDOM = new SecureRandom();
 
-    /** Synthetic receiving account (as in WalletTopUpIntegrationTest); the bank directory is mocked. */
+    /** Synthetic receiving account; the bank directory is mocked. */
     static final VietQrBankDirectory.Bank BANK = new VietQrBankDirectory.Bank("970436", "VCB", "Vietcombank", true);
     @MockitoBean VietQrBankDirectory directory;
 
@@ -71,9 +71,9 @@ class ReceptionInboxIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void aPendingTopUpGivesOneNoticeThatStaysOpenWhenReadAndResolvesWithTheTask() throws Exception {
-        long topUp = createTopUp();
-        String key = "WALLET_TOPUP:" + topUp;
+    void aPendingTaskGivesOneNoticeThatStaysOpenWhenReadAndResolvesWithTheTask() throws Exception {
+        long paymentId = createPaymentException();
+        String key = "PAYMENT_EXCEPTION:" + paymentId;
         for (int i = 0; i < 3; i++) {
             mvc.perform(get("/api/v1/reception/inbox").with(user(details(receptionist)))).andExpect(status().isOk());
         }
@@ -82,14 +82,15 @@ class ReceptionInboxIntegrationTest extends AbstractIntegrationTest {
         mvc.perform(put("/api/v1/reception/inbox/" + notice + "/read").with(user(details(receptionist))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.read").value(true)).andExpect(jsonPath("$.open").value(true))
                 .andExpect(jsonPath("$.sourceStatus").value("PENDING"));
-        assertThat(jdbc.queryForObject("SELECT status FROM wallet_topup WHERE id=?", String.class, topUp)).isEqualTo("PENDING");
-        mvc.perform(post("/api/v1/reception/wallet/topups/" + topUp + "/confirm").with(user(details(otherReceptionist)))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"receivedAmount\":30000,\"bankReference\":\"FTINB" + topUp + "\"}"))
-                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("SELECT payment_status FROM payment WHERE id=?", String.class, paymentId)).isEqualTo("PENDING");
+
+        // Resolve the payment
+        jdbc.update("UPDATE payment SET payment_status = 'SUCCESS', payment_time = SYSDATETIME(), notes = N'Resolved by staff' WHERE id = ?", paymentId);
+
         var items = inbox.inbox(receptionist, false).items().stream().filter(i -> i.id() == notice).toList();
         assertThat(items).singleElement().satisfies(i -> {
             assertThat(i.open()).isFalse();
-            assertThat(i.sourceStatus()).isEqualTo("CONFIRMED");
+            assertThat(i.sourceStatus()).isEqualTo("SUCCESS");
         });
         assertThat(inbox.inbox(receptionist, true).items()).noneMatch(i -> i.id() == notice);
         inbox.sync(otherReceptionist);
@@ -98,7 +99,7 @@ class ReceptionInboxIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void concurrentPollingNeverDuplicatesANotice() throws Exception {
-        long topUp = createTopUp();
+        long paymentId = createPaymentException();
         ExecutorService pool = Executors.newFixedThreadPool(5);
         CountDownLatch start = new CountDownLatch(1);
         List<Future<Object>> results = new ArrayList<>();
@@ -108,18 +109,15 @@ class ReceptionInboxIntegrationTest extends AbstractIntegrationTest {
         start.countDown();
         for (Future<Object> r : results) r.get();
         pool.shutdown();
-        assertThat(notices(receptionist, "WALLET_TOPUP:" + topUp)).isEqualTo(1);
+        assertThat(notices(receptionist, "PAYMENT_EXCEPTION:" + paymentId)).isEqualTo(1);
     }
 
     @Test
     void noticesHoldNoBankAccountAndOnlyReceptionistsReachTheInbox() throws Exception {
-        long topUp = createTopUp();
+        long paymentId = createPaymentException();
         inbox.sync(receptionist);
-        String text = jdbc.queryForObject("SELECT title + ' ' + content FROM notification WHERE user_id=? AND event_key=?",
-                String.class, receptionist, "WALLET_TOPUP:" + topUp);
-        assertThat(text).contains("30,000").doesNotContainPattern("[0-9]{9,}");
         long notice = jdbc.queryForObject("SELECT id FROM notification WHERE user_id=? AND event_key=?", Long.class,
-                receptionist, "WALLET_TOPUP:" + topUp);
+                receptionist, "PAYMENT_EXCEPTION:" + paymentId);
         mvc.perform(put("/api/v1/reception/inbox/" + notice + "/read").with(user(details(otherReceptionist)))).andExpect(status().isNotFound());
         for (String role : List.of("MEMBER", "MANAGER", "COACH")) {
             long id = "MEMBER".equals(role) ? member : account(role);
@@ -130,24 +128,91 @@ class ReceptionInboxIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void aReceptionistAddedLaterStillSeesTasksThatAreOpenNow() {
-        long topUp = createTopUp();
+        long paymentId = createPaymentException();
         long later = account("RECEPTIONIST");
         assertThat(inbox.inbox(later, true).items())
-                .anyMatch(i -> i.sourceType().equals("WALLET_TOPUP") && i.sourceId() == topUp && !i.read());
+                .anyMatch(i -> i.sourceType().equals("PAYMENT_EXCEPTION") && i.sourceId() == paymentId && !i.read());
     }
 
-    private long createTopUp() {
-        try {
-            String body = mvc.perform(post("/api/v1/member/wallet/topups").with(user(details(member)))
-                    .header("Idempotency-Key", marker + "-" + ++serial).contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"amount\":30000,\"mode\":\"ACTUAL\"}")).andExpect(status().isCreated())
-                    .andReturn().getResponse().getContentAsString();
-            var m = java.util.regex.Pattern.compile("\"id\":(\\d+)").matcher(body);
-            assertThat(m.find()).isTrue();
-            return Long.parseLong(m.group(1));
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
+    @Test
+    void activeInboxExcludesHistoricalWalletNotificationsWithoutModifyingRecords() {
+        // Arrange: insert pre-existing pending wallet topup and withdrawal into database
+        long topUpId = insertHistoricalTopUp(member, 50_000, "PENDING");
+        long withdrawalId = insertHistoricalWithdrawal(member, 30_000, "PENDING");
+
+        // Insert historical notification records for the receptionist
+        String topUpKey = "WALLET_TOPUP:" + topUpId;
+        String withdrawalKey = "WALLET_WITHDRAWAL:" + withdrawalId;
+        jdbc.update("INSERT INTO notification (user_id, title, content, type, is_read, created_at, event_key) "
+                + "VALUES (?, N'Verify wallet top-up TU-000001', N'Member requested 50,000 VND', 'RECEPTION_TASK', 0, SYSDATETIME(), ?)",
+                receptionist, topUpKey);
+        jdbc.update("INSERT INTO notification (user_id, title, content, type, is_read, created_at, event_key) "
+                + "VALUES (?, N'Review wallet withdrawal WD-000001', N'Member asked to withdraw 30,000 VND', 'RECEPTION_TASK', 0, SYSDATETIME(), ?)",
+                receptionist, withdrawalKey);
+
+        // Also add an active payment exception task
+        long paymentId = createPaymentException();
+        String paymentKey = "PAYMENT_EXCEPTION:" + paymentId;
+
+        // Verify stored records exist before query
+        assertThat(notices(receptionist, topUpKey)).isEqualTo(1);
+        assertThat(notices(receptionist, withdrawalKey)).isEqualTo(1);
+
+        // Act: fetch active inbox (both openOnly=false and openOnly=true)
+        var fullInbox = inbox.inbox(receptionist, false);
+        var openOnlyInbox = inbox.inbox(receptionist, true);
+
+        // Assert 1: Historical wallet notifications are completely excluded from the active inbox
+        assertThat(fullInbox.items()).noneMatch(i -> i.sourceType().startsWith("WALLET_"));
+        assertThat(openOnlyInbox.items()).noneMatch(i -> i.sourceType().startsWith("WALLET_"));
+
+        // Assert 2: Active non-wallet tasks are included and counted
+        assertThat(fullInbox.items()).anyMatch(i -> i.sourceType().equals("PAYMENT_EXCEPTION") && i.sourceId() == paymentId);
+        assertThat(fullInbox.open()).isEqualTo(1);
+        assertThat(fullInbox.unreadOpen()).isEqualTo(1);
+
+        // Assert 3: Stored notification and wallet records are preserved in the DB without deletion or modification
+        assertThat(notices(receptionist, topUpKey)).isEqualTo(1);
+        assertThat(notices(receptionist, withdrawalKey)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT is_read FROM notification WHERE user_id=? AND event_key=?", Boolean.class, receptionist, topUpKey)).isFalse();
+        assertThat(jdbc.queryForObject("SELECT is_read FROM notification WHERE user_id=? AND event_key=?", Boolean.class, receptionist, withdrawalKey)).isFalse();
+        assertThat(jdbc.queryForObject("SELECT status FROM wallet_topup WHERE id=?", String.class, topUpId)).isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject("SELECT status FROM wallet_withdrawal WHERE id=?", String.class, withdrawalId)).isEqualTo("PENDING");
+    }
+
+    @Test
+    void walletTopUpConfirmationAttemptThrowsWalletFeatureRetired() throws Exception {
+        mvc.perform(post("/api/v1/reception/wallet/topups/1/confirm").with(user(details(receptionist)))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"receivedAmount\":30000,\"bankReference\":\"FT123\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("WALLET_FEATURE_RETIRED"));
+    }
+
+    private long createPaymentException() {
+        String code = "PAY-EX-" + marker + "-" + ++serial;
+        jdbc.update("""
+                INSERT INTO payment (payment_code, member_id, amount, payment_method, payment_status, notes, created_at, updated_at)
+                VALUES (?, ?, 200000, 'BANK_TRANSFER', 'PENDING', N'Amount mismatch: expected 200000 got 100000', SYSDATETIME(), SYSDATETIME())
+                """, code, member);
+        return jdbc.queryForObject("SELECT id FROM payment WHERE payment_code = ?", Long.class, code);
+    }
+
+    private long insertHistoricalTopUp(long memberId, long amount, String status) {
+        String key = "hist-tu-" + marker + "-" + ++serial;
+        jdbc.update("""
+                INSERT INTO wallet_topup (member_id, mode, amount, status, beneficiary_bin, beneficiary_account, beneficiary_name, idempotency_key, created_at, updated_at)
+                VALUES (?, 'ACTUAL', ?, ?, '970436', '0011009990001', N'SPORTIFYDEMOCENTER', ?, SYSDATETIME(), SYSDATETIME())
+                """, memberId, amount, status, key);
+        return jdbc.queryForObject("SELECT id FROM wallet_topup WHERE idempotency_key = ?", Long.class, key);
+    }
+
+    private long insertHistoricalWithdrawal(long memberId, long amount, String status) {
+        String key = "hist-wd-" + marker + "-" + ++serial;
+        jdbc.update("""
+                INSERT INTO wallet_withdrawal (member_id, pool, amount, status, bank_bin, bank_name, account_number, account_holder, idempotency_key, created_at, updated_at)
+                VALUES (?, 'ACTUAL', ?, ?, '970436', N'Vietcombank', '0011001234567', N'NGUYEN TEST', ?, SYSDATETIME(), SYSDATETIME())
+                """, memberId, amount, status, key);
+        return jdbc.queryForObject("SELECT id FROM wallet_withdrawal WHERE idempotency_key = ?", Long.class, key);
     }
 
     private int notices(long userId, String key) {

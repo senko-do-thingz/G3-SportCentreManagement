@@ -28,13 +28,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -44,8 +38,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * MW-05 wallet settlement of an existing pending package purchase on real SQL Server: atomic debit + activation +
- * invoice, no partial purchase, exactly-once under replay and concurrency, staff channels unchanged.
+ * MW-05: Wallet payment integration test reflecting the retired wallet feature.
+ * Verifies that wallet payment mutations are rejected with WALLET_FEATURE_RETIRED,
+ * role authorization is enforced, financial records remain un-mutated, and
+ * standard payment methods (Bank Transfer, Cash) remain fully operational.
  */
 @AutoConfigureMockMvc
 class WalletPaymentIntegrationTest extends AbstractIntegrationTest {
@@ -76,92 +72,88 @@ class WalletPaymentIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void walletPaysAPendingPackageOnceActivatesItAndIssuesAnInvoice() throws Exception {
+    void payingWithWalletIsRejectedWithWalletFeatureRetiredAndLeavesPaymentPending() throws Exception {
         fund(member, 500_000);
         long payment = pendingPackagePayment(member);
-        pay(member, payment).andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("SUCCESS"))
-                .andExpect(jsonPath("$.method").value("WALLET"))
-                .andExpect(jsonPath("$.availableAfter").value(200000))
-                .andExpect(jsonPath("$.invoiceNumber").exists())
-                .andExpect(jsonPath("$.replay").value(false));
-        pay(member, payment).andExpect(status().isOk()).andExpect(jsonPath("$.replay").value(true));
-        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo("200000");
-        assertThat(count("SELECT COUNT(*) FROM wallet_ledger_entry e JOIN member_wallet w ON w.id=e.wallet_id"
-                + " WHERE w.member_id=? AND e.entry_type='PURCHASE_DEBIT'", member)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT r.status FROM sport_package_registration r WHERE r.payment_id=?", String.class, payment))
-                .isEqualTo("ACTIVE");
-        assertThat(count("SELECT COUNT(*) FROM invoice WHERE payment_id=?", payment)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT payment_method + ':' + payment_status FROM payment WHERE id=?", String.class, payment)).isEqualTo("WALLET:SUCCESS");
-        assertThat(count("SELECT COUNT(*) FROM payment_wallet_settlement WHERE payment_id=?", payment)).isEqualTo(1);
-    }
 
-    @Test
-    void insufficientBalanceLeavesNoDebitNoEntitlementAndThePaymentPending() throws Exception {
-        fund(member, 299_999);
-        long payment = pendingPackagePayment(member);
-        pay(member, payment).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("WALLET_INSUFFICIENT_FUNDS"));
-        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo("299999");
-        assertThat(jdbc.queryForObject("SELECT payment_status FROM payment WHERE id=?", String.class, payment)).isEqualTo("PENDING");
+        // Attempting to pay with wallet must fail with WALLET_FEATURE_RETIRED
+        pay(member, payment)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("WALLET_FEATURE_RETIRED"))
+                .andExpect(jsonPath("$.message").value("Sportify Wallet has been retired. Please pay using Bank Transfer, Cash, or QR Code."));
+
+        // Verify no financial mutation occurred
+        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo("500000");
+        assertThat(count("SELECT COUNT(*) FROM wallet_ledger_entry e JOIN member_wallet w ON w.id=e.wallet_id"
+                + " WHERE w.member_id=? AND e.entry_type='PURCHASE_DEBIT'", member)).isZero();
+        assertThat(jdbc.queryForObject("SELECT payment_status FROM payment WHERE id=?", String.class, payment))
+                .isEqualTo("PENDING");
         assertThat(jdbc.queryForObject("SELECT status FROM sport_package_registration WHERE payment_id=?", String.class, payment))
                 .isEqualTo("PENDING_PAYMENT");
         assertThat(count("SELECT COUNT(*) FROM invoice WHERE payment_id=?", payment)).isZero();
-        // The existing bank-transfer path still works for the same purchase.
+        assertThat(count("SELECT COUNT(*) FROM payment_wallet_settlement WHERE payment_id=?", payment)).isZero();
+    }
+
+    @Test
+    void roleAuthorizationIsEnforcedOnWalletPaymentEndpoint() throws Exception {
+        long payment = pendingPackagePayment(member);
+
+        // Unauthenticated -> 401
+        mvc.perform(post("/api/v1/member/wallet/payments/" + payment))
+                .andExpect(status().isUnauthorized());
+
+        // Receptionist -> 403 (requires MEMBER role)
+        mvc.perform(post("/api/v1/member/wallet/payments/" + payment).with(user(details(receptionist))))
+                .andExpect(status().isForbidden());
+
+        // Coach -> 403
+        long coach = account("COACH");
+        mvc.perform(post("/api/v1/member/wallet/payments/" + payment).with(user(details(coach))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void unchangedBankTransferAndCashPaymentBehavior() throws Exception {
+        // Pending purchase can be paid via Bank Transfer
+        long payment = pendingPackagePayment(member);
         mvc.perform(put("/api/v1/payments/" + payment + "/confirm").with(user(details(receptionist))).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"method\":\"BANK_TRANSFER\",\"amountReceived\":300000,\"referenceCode\":\"FT" + payment + "\"}"))
                 .andExpect(status().isOk());
-        pay(member, payment).andExpect(status().isConflict());
-        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo("299999");
-    }
 
-    @Test
-    void demoFundsCannotPayAndAnotherMembersPaymentIsNotReachable() throws Exception {
-        ledger.apply(new Operation(member, EntryType.TOPUP_CREDIT, Pool.SIMULATED, new BigDecimal("900000"), key(), "TEST", 1, "demo", null));
-        long payment = pendingPackagePayment(member);
-        pay(member, payment).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("WALLET_INSUFFICIENT_FUNDS"));
-        fund(otherMember, 900_000);
-        pay(otherMember, payment).andExpect(status().isNotFound());
-        assertThat(ledger.balance(otherMember).actualAvailable()).isEqualByComparingTo("900000");
-        mvc.perform(post("/api/v1/member/wallet/payments/" + payment).with(user(details(receptionist)))).andExpect(status().isForbidden());
-    }
-
-    @Test
-    void concurrentWalletPaymentsOfOnePurchaseDebitOnce() throws Exception {
-        fund(member, 1_000_000);
-        long payment = pendingPackagePayment(member);
-        ExecutorService pool = Executors.newFixedThreadPool(4);
-        CountDownLatch start = new CountDownLatch(1);
-        List<Future<Integer>> results = new ArrayList<>();
-        for (int i = 0; i < 4; i++) {
-            results.add(pool.submit(() -> { start.await(); return pay(member, payment).andReturn().getResponse().getStatus(); }));
-        }
-        start.countDown();
-        for (Future<Integer> result : results) assertThat(result.get()).isEqualTo(200);
-        pool.shutdown();
-        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo("700000");
+        assertThat(jdbc.queryForObject("SELECT payment_status FROM payment WHERE id=?", String.class, payment))
+                .isEqualTo("SUCCESS");
+        assertThat(jdbc.queryForObject("SELECT status FROM sport_package_registration WHERE payment_id=?", String.class, payment))
+                .isEqualTo("ACTIVE");
         assertThat(count("SELECT COUNT(*) FROM invoice WHERE payment_id=?", payment)).isEqualTo(1);
-    }
 
-    @Test
-    void walletPaymentWaitsWhileAnotherWalletOperationIsInFlight() throws Exception {
-        fund(member, 500_000);
-        long payment = pendingPackagePayment(member);
-        // CODEOWNER rule: one blocking wallet operation per Member (here a pending top-up holds the slot).
-        jdbc.update("INSERT INTO wallet_pending_operation (member_id, operation_type, operation_id, created_at) VALUES (?, 'TOPUP', ?, SYSDATETIME())", member, -member);
-        pay(member, payment).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("WALLET_OPERATION_IN_FLIGHT"));
-        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo("500000");
-        assertThat(jdbc.queryForObject("SELECT payment_status FROM payment WHERE id=?", String.class, payment)).isEqualTo("PENDING");
-        jdbc.update("DELETE FROM wallet_pending_operation WHERE member_id=?", member);
-        pay(member, payment).andExpect(status().isOk());
+        // Another purchase can be paid via Cash
+        long paymentCash = pendingPackagePayment(otherMember);
+        mvc.perform(put("/api/v1/payments/" + paymentCash + "/confirm").with(user(details(receptionist))).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"method\":\"CASH\",\"amountReceived\":300000}"))
+                .andExpect(status().isOk());
+
+        assertThat(jdbc.queryForObject("SELECT payment_status FROM payment WHERE id=?", String.class, paymentCash))
+                .isEqualTo("SUCCESS");
+        assertThat(jdbc.queryForObject("SELECT status FROM sport_package_registration WHERE payment_id=?", String.class, paymentCash))
+                .isEqualTo("ACTIVE");
+        assertThat(count("SELECT COUNT(*) FROM invoice WHERE payment_id=?", paymentCash)).isEqualTo(1);
     }
 
     @Test
     void staffAndMembersCannotPickWalletThroughTheExistingChannels() throws Exception {
         long payment = pendingPackagePayment(member);
+        // Staff cannot confirm with WALLET method
         mvc.perform(put("/api/v1/payments/" + payment + "/confirm").with(user(details(receptionist))).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"method\":\"WALLET\",\"amountReceived\":300000,\"referenceCode\":\"X1\"}")).andExpect(status().isBadRequest());
+
+        // Member cannot switch method to WALLET
         mvc.perform(put("/api/v1/payments/" + payment + "/method").with(user(details(member))).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"paymentMethod\":\"WALLET\"}")).andExpect(status().isBadRequest());
+
+        // But member can switch method to supported methods (e.g. BANK_TRANSFER)
+        mvc.perform(put("/api/v1/payments/" + payment + "/method").with(user(details(member))).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"paymentMethod\":\"BANK_TRANSFER\"}")).andExpect(status().isOk());
+
         assertThat(jdbc.queryForObject("SELECT payment_status FROM payment WHERE id=?", String.class, payment)).isEqualTo("PENDING");
     }
 

@@ -15,20 +15,13 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -38,11 +31,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** MW-06 withdrawals on real SQL Server: atomic reserve, approval is not payout, single release or payout, masking. */
+/**
+ * MW-06: Wallet withdrawal integration test reflecting the retired wallet feature.
+ * Verifies that all withdrawal mutations are rejected with WALLET_FEATURE_RETIRED,
+ * role authorization is strictly enforced, historical withdrawal records and payout
+ * accounts remain queryable in read-only mode, and financial balances remain unaltered.
+ */
 @AutoConfigureMockMvc
 class WalletWithdrawalIntegrationTest extends AbstractIntegrationTest {
     static final SecureRandom RANDOM = new SecureRandom();
-    static final String ACCOUNT = "{\"bankBin\":\"970436\",\"accountNumber\":\"0011001234567\",\"accountHolder\":\"nguyen test\"}";
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
@@ -64,145 +61,144 @@ class WalletWithdrawalIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void payoutAccountIsValidatedStoredAndMaskedForTheMember() throws Exception {
+    void allWithdrawalMutationsAreRejectedWithWalletFeatureRetired() throws Exception {
+        fund(member, Pool.ACTUAL, 500_000);
+
+        // 1. Save payout account is rejected
         mvc.perform(put("/api/v1/member/wallet/payout-account").with(user(details(member))).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"bankBin\":\"123456\",\"accountNumber\":\"0011001234567\",\"accountHolder\":\"NGUYEN TEST\"}"))
-                .andExpect(status().isBadRequest());
-        mvc.perform(put("/api/v1/member/wallet/payout-account").with(user(details(member))).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"bankBin\":\"970436\",\"accountNumber\":\"12ab\",\"accountHolder\":\"NGUYEN TEST\"}"))
-                .andExpect(status().isBadRequest());
-        saveAccount(member).andExpect(status().isOk())
+                .content("{\"bankBin\":\"970436\",\"accountNumber\":\"0011001234567\",\"accountHolder\":\"NGUYEN TEST\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("WALLET_FEATURE_RETIRED"))
+                .andExpect(jsonPath("$.message").value("Wallet payout account management is no longer supported as the Wallet feature has been retired."));
+
+        // 2. Create withdrawal is rejected
+        mvc.perform(post("/api/v1/member/wallet/withdrawals").with(user(details(member))).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":200000,\"pool\":\"ACTUAL\",\"confirmAccountLast4\":\"4567\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("WALLET_FEATURE_RETIRED"))
+                .andExpect(jsonPath("$.message").value("Wallet withdrawal is no longer supported as the Wallet feature has been retired."));
+
+        assertThat(count("SELECT COUNT(*) FROM wallet_withdrawal WHERE member_id=?", member)).isZero();
+
+        // Insert historical withdrawal directly for staff mutation tests
+        long id = insertHistoricalWithdrawal(member, 200_000, "PENDING");
+
+        // 3. Approve withdrawal is rejected
+        mvc.perform(post("/api/v1/reception/wallet/withdrawals/" + id + "/approve").with(user(details(receptionist)))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"Approval\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("WALLET_FEATURE_RETIRED"))
+                .andExpect(jsonPath("$.message").value("Wallet withdrawal approval is no longer supported as the Wallet feature has been retired."));
+
+        // 4. Reject withdrawal is rejected
+        mvc.perform(post("/api/v1/reception/wallet/withdrawals/" + id + "/reject").with(user(details(receptionist)))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"Rejection\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("WALLET_FEATURE_RETIRED"))
+                .andExpect(jsonPath("$.message").value("Wallet withdrawal rejection is no longer supported as the Wallet feature has been retired."));
+
+        // 5. Complete withdrawal is rejected
+        mvc.perform(post("/api/v1/reception/wallet/withdrawals/" + id + "/complete").with(user(details(receptionist)))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"payoutReference\":\"PO123456\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("WALLET_FEATURE_RETIRED"))
+                .andExpect(jsonPath("$.message").value("Wallet withdrawal completion is no longer supported as the Wallet feature has been retired."));
+
+        // 6. Fail withdrawal is rejected
+        mvc.perform(post("/api/v1/reception/wallet/withdrawals/" + id + "/fail").with(user(details(receptionist)))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"Failed transfer\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("WALLET_FEATURE_RETIRED"))
+                .andExpect(jsonPath("$.message").value("Wallet withdrawal processing is no longer supported as the Wallet feature has been retired."));
+
+        // Balance remains intact
+        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo("500000");
+        assertThat(jdbc.queryForObject("SELECT status FROM wallet_withdrawal WHERE id=?", String.class, id)).isEqualTo("PENDING");
+    }
+
+    @Test
+    void roleAuthorizationIsEnforcedOnAllWithdrawalEndpoints() throws Exception {
+        long id = insertHistoricalWithdrawal(member, 100_000, "PENDING");
+
+        // Unauthenticated -> 401
+        mvc.perform(put("/api/v1/member/wallet/payout-account").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"bankBin\":\"970436\",\"accountNumber\":\"0011001234567\",\"accountHolder\":\"NGUYEN TEST\"}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/member/wallet/withdrawals").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":50000,\"pool\":\"ACTUAL\"}")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/reception/wallet/withdrawals/" + id + "/approve")).andExpect(status().isUnauthorized());
+
+        // Receptionist cannot access member endpoints -> 403
+        mvc.perform(put("/api/v1/member/wallet/payout-account").with(user(details(receptionist))).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"bankBin\":\"970436\",\"accountNumber\":\"0011001234567\",\"accountHolder\":\"NGUYEN TEST\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/member/wallet/withdrawals").with(user(details(receptionist))).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":50000,\"pool\":\"ACTUAL\"}")).andExpect(status().isForbidden());
+
+        // Member cannot access receptionist endpoints -> 403
+        mvc.perform(post("/api/v1/reception/wallet/withdrawals/" + id + "/approve").with(user(details(member))))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/reception/wallet/withdrawals").with(user(details(member))))
+                .andExpect(status().isForbidden());
+
+        // Manager cannot approve receptionist withdrawals -> 403
+        mvc.perform(post("/api/v1/reception/wallet/withdrawals/" + id + "/approve").with(user(details(manager))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void readOnlyPayoutAccountAndWithdrawalsRemainAccessibleWithMasking() throws Exception {
+        // Direct insert of historical payout account
+        jdbc.update("""
+                INSERT INTO member_payout_account (member_id, bank_bin, bank_name, account_number, account_holder, updated_at)
+                VALUES (?, '970436', N'Vietcombank', '0011001234567', N'NGUYEN TEST', SYSDATETIME())
+                """, member);
+
+        // Member reads own payout account (masked)
+        mvc.perform(get("/api/v1/member/wallet/payout-account").with(user(details(member))))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.maskedAccountNumber").value("****4567"))
                 .andExpect(jsonPath("$.accountHolder").value("NGUYEN TEST"))
                 .andExpect(jsonPath("$.accountNumber").doesNotExist());
-        mvc.perform(get("/api/v1/member/wallet/payout-account").with(user(details(otherMember)))).andExpect(status().isNoContent());
-    }
 
-    @Test
-    void requestReservesAtOnceApprovalMovesNothingAndCompletionPaysOutOnce() throws Exception {
-        fund(member, Pool.ACTUAL, 500_000);
-        saveAccount(member);
-        long id = id(create(member, 200_000, "ACTUAL", "4567").andExpect(status().isCreated())
-                .andExpect(jsonPath("$.status").value("PENDING"))
-                .andExpect(jsonPath("$.accountNumber").value("****4567")).andReturn().getResponse().getContentAsString());
-        assertBalances(member, "300000", "200000");
-        decide(receptionist, id, "approve", "{\"note\":\"Checked\"}").andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"));
-        assertBalances(member, "300000", "200000");
-        mvc.perform(get("/api/v1/reception/wallet/withdrawals/" + id).with(user(details(receptionist))))
-                .andExpect(jsonPath("$.accountNumber").value("0011001234567"));
-        decide(receptionist, id, "complete", "{}").andExpect(status().isBadRequest());
-        decide(receptionist, id, "complete", "{\"payoutReference\":\"PO2611081\"}").andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("COMPLETED"));
-        decide(receptionist, id, "complete", "{\"payoutReference\":\"PO2611081\"}").andExpect(status().isConflict());
-        decide(receptionist, id, "reject", "{\"note\":\"late\"}").andExpect(status().isConflict());
-        assertBalances(member, "300000", "0");
-        assertThat(count("SELECT COUNT(*) FROM wallet_pending_operation WHERE member_id=?", member)).isZero();
-    }
+        // Other member without payout account gets 204
+        mvc.perform(get("/api/v1/member/wallet/payout-account").with(user(details(otherMember))))
+                .andExpect(status().isNoContent());
 
-    @Test
-    void rejectAndFailureReleaseTheReservationAndTheSlotExactlyOnce() throws Exception {
-        fund(member, Pool.ACTUAL, 300_000);
-        saveAccount(member);
-        long a = id(create(member, 100_000, "ACTUAL", "4567").andReturn().getResponse().getContentAsString());
-        assertBalances(member, "200000", "100000");
-        // CODEOWNER rule: one blocking wallet operation per Member, so a second request waits for the first.
-        create(member, 100_000, "ACTUAL", "4567").andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("WALLET_OPERATION_IN_FLIGHT"));
-        decide(receptionist, a, "reject", "{}").andExpect(status().isBadRequest());
-        decide(receptionist, a, "reject", "{\"note\":\"Account holder mismatch\"}").andExpect(status().isOk());
-        decide(receptionist, a, "reject", "{\"note\":\"again\"}").andExpect(status().isConflict());
-        long b = id(create(member, 100_000, "ACTUAL", "4567").andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
-        decide(receptionist, b, "approve", null).andExpect(status().isOk());
-        decide(receptionist, b, "fail", "{\"note\":\"Bank returned the transfer\"}").andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("FAILED"));
-        assertBalances(member, "300000", "0");
-        assertThat(count("SELECT COUNT(*) FROM wallet_ledger_entry e JOIN member_wallet w ON w.id=e.wallet_id WHERE w.member_id=?"
-                + " AND e.entry_type='WITHDRAWAL_RELEASE'", member)).isEqualTo(2);
-        assertThat(count("SELECT COUNT(*) FROM wallet_pending_operation WHERE member_id=?", member)).isZero();
-    }
+        // Insert historical withdrawals
+        long id = insertHistoricalWithdrawal(member, 100_000, "PENDING");
 
-    @Test
-    void excessMissingAccountWrongConfirmationAndConcurrentRequestsAreRefused() throws Exception {
-        fund(member, Pool.ACTUAL, 250_000);
-        create(member, 100_000, "ACTUAL", "4567").andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("WITHDRAWAL_ACCOUNT_REQUIRED"));
-        saveAccount(member);
-        create(member, 100_000, "ACTUAL", "9999").andExpect(status().isBadRequest());
-        create(member, 300_000, "ACTUAL", "4567").andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("WALLET_INSUFFICIENT_FUNDS"));
-        assertThat(count("SELECT COUNT(*) FROM wallet_withdrawal WHERE member_id=?", member)).isZero();
-        ExecutorService pool = Executors.newFixedThreadPool(3);
-        CountDownLatch start = new CountDownLatch(1);
-        List<Future<Integer>> results = new ArrayList<>();
-        for (int i = 0; i < 3; i++) {
-            results.add(pool.submit(() -> { start.await(); return create(member, 100_000, "ACTUAL", "4567").andReturn().getResponse().getStatus(); }));
-        }
-        start.countDown();
-        int created = 0;
-        for (Future<Integer> r : results) if (r.get() == 201) created++;
-        pool.shutdown();
-        assertThat(created).isEqualTo(1);
-        assertBalances(member, "150000", "100000");
-    }
+        // Member reads own withdrawals
+        mvc.perform(get("/api/v1/member/wallet/withdrawals").with(user(details(member))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == " + id + ")].amount").value(100000.0));
 
-    @Test
-    void demoFundsNeverBecomeARealBankPayout() throws Exception {
-        fund(member, Pool.SIMULATED, 120_000);
-        create(member, 50_000, "ACTUAL", "4567").andExpect(status().isBadRequest());
-        long id = id(create(member, 50_000, "SIMULATED", null).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
-        decide(receptionist, id, "approve", null).andExpect(status().isOk());
-        decide(receptionist, id, "complete", "{\"payoutReference\":\"PO-FAKE\"}").andExpect(status().isBadRequest());
-        decide(receptionist, id, "complete", "{}").andExpect(status().isOk()).andExpect(jsonPath("$.status").value("SIMULATED_COMPLETED"))
-                .andExpect(jsonPath("$.payoutReference").doesNotExist());
-        var balance = ledger.balance(member);
-        assertThat(balance.simulatedAvailable()).isEqualByComparingTo("70000");
-        assertThat(balance.actualAvailable()).isEqualByComparingTo("0");
-    }
+        // Other member sees empty list
+        mvc.perform(get("/api/v1/member/wallet/withdrawals").with(user(details(otherMember))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
 
-    @Test
-    void onlyReceptionistsDecideAndMembersSeeOnlyTheirOwnRequests() throws Exception {
-        fund(member, Pool.ACTUAL, 100_000);
-        saveAccount(member);
-        long id = id(create(member, 50_000, "ACTUAL", "4567").andReturn().getResponse().getContentAsString());
-        decide(member, id, "approve", null).andExpect(status().isForbidden());
-        decide(manager, id, "approve", null).andExpect(status().isForbidden());
-        mvc.perform(get("/api/v1/member/wallet/withdrawals").with(user(details(otherMember)))).andExpect(jsonPath("$.length()").value(0));
+        // Receptionist reads queue and detail
         mvc.perform(get("/api/v1/reception/wallet/withdrawals").with(user(details(receptionist))))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.id == " + id + ")].accountNumber").value("****4567"));
-        assertThat(count("SELECT COUNT(*) FROM refund_request WHERE member_id=?", member)).isZero();
+
+        mvc.perform(get("/api/v1/reception/wallet/withdrawals/" + id).with(user(details(receptionist))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accountNumber").value("0011001234567"));
     }
 
-    private void assertBalances(long memberId, String available, String reserved) {
-        var b = ledger.balance(memberId);
-        assertThat(b.actualAvailable()).isEqualByComparingTo(available);
-        assertThat(b.actualReserved()).isEqualByComparingTo(reserved);
-    }
-
-    private ResultActions saveAccount(long memberId) throws Exception {
-        return mvc.perform(put("/api/v1/member/wallet/payout-account").with(user(details(memberId)))
-                .contentType(MediaType.APPLICATION_JSON).content(ACCOUNT));
-    }
-
-    private ResultActions create(long memberId, long amount, String pool, String last4) throws Exception {
-        String confirm = last4 == null ? "null" : "\"" + last4 + "\"";
-        return mvc.perform(post("/api/v1/member/wallet/withdrawals").with(user(details(memberId))).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"amount\":" + amount + ",\"pool\":\"" + pool + "\",\"confirmAccountLast4\":" + confirm + "}"));
-    }
-
-    private ResultActions decide(long staff, long id, String action, String body) throws Exception {
-        var request = post("/api/v1/reception/wallet/withdrawals/" + id + "/" + action).with(user(details(staff)));
-        if (body != null) request = request.contentType(MediaType.APPLICATION_JSON).content(body);
-        return mvc.perform(request);
+    private long insertHistoricalWithdrawal(long memberId, long amount, String status) {
+        String key = "hist-wd-" + marker + "-" + ++serial;
+        jdbc.update("""
+                INSERT INTO wallet_withdrawal (member_id, pool, amount, status, bank_bin, bank_name, account_number, account_holder, idempotency_key, created_at, updated_at)
+                VALUES (?, 'ACTUAL', ?, ?, '970436', N'Vietcombank', '0011001234567', N'NGUYEN TEST', ?, SYSDATETIME(), SYSDATETIME())
+                """, memberId, amount, status, key);
+        return jdbc.queryForObject("SELECT id FROM wallet_withdrawal WHERE idempotency_key = ?", Long.class, key);
     }
 
     private void fund(long memberId, Pool pool, long amount) {
         ledger.apply(new Operation(memberId, EntryType.TOPUP_CREDIT, pool, BigDecimal.valueOf(amount), marker + "-f" + ++serial, "TEST", 1, "fixture", null));
-    }
-
-    private long id(String json) {
-        var m = java.util.regex.Pattern.compile("\"id\":(\\d+)").matcher(json);
-        assertThat(m.find()).isTrue();
-        return Long.parseLong(m.group(1));
     }
 
     private String code() { return marker + ++serial; }

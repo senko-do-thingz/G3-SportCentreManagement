@@ -66,7 +66,9 @@ public class ReceptionInboxService {
         sync(receptionistId);
         List<Item> items = jdbc.query("""
                 SELECT TOP 100 n.id, n.title, n.content, n.created_at, n.is_read, n.event_key FROM dbo.notification n
-                WHERE n.user_id = ? AND n.type = ? ORDER BY n.created_at DESC, n.id DESC""",
+                WHERE n.user_id = ? AND n.type = ?
+                  AND (n.event_key IS NULL OR n.event_key NOT LIKE 'WALLET_%')
+                ORDER BY n.created_at DESC, n.id DESC""",
                 (rs, row) -> item(rs.getLong("id"), rs.getString("title"), rs.getString("content"),
                         rs.getTimestamp("created_at").toLocalDateTime(), rs.getBoolean("is_read"), rs.getString("event_key")),
                 receptionistId, TYPE);
@@ -101,8 +103,7 @@ public class ReceptionInboxService {
             default -> "UNKNOWN";
         };
         boolean open = switch (type) {
-            case "WALLET_TOPUP", "PAYMENT_EXCEPTION" -> "PENDING".equals(status);
-            case "WALLET_WITHDRAWAL" -> "PENDING".equals(status) || "APPROVED".equals(status);
+            case "PAYMENT_EXCEPTION" -> "PENDING".equals(status);
             case "SUPPORT_REQUEST" -> "OPEN".equals(status) || "IN_PROGRESS".equals(status);
             default -> false;
         };
