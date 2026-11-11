@@ -74,8 +74,8 @@ describe('auth flow', () => {
 
     expect(await screen.findByRole('heading', { name: 'Member Dashboard' })).toBeInTheDocument()
     const nav = screen.getByRole('navigation', { name: /member navigation/i })
-    expect(within(nav).getByRole('link', { name: 'Sport Packages' })).toBeInTheDocument()
-    expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
+    expect(within(nav).getByRole('link', { name: 'My packages' })).toBeInTheDocument()
+    expect(screen.getByRole('complementary', { name: 'Member workspace navigation' })).toBeInTheDocument()
   })
 
   it('shows the backend message when the password is wrong', async () => {

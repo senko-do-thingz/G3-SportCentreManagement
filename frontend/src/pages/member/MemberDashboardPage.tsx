@@ -2,11 +2,13 @@ import { SessionContext } from '../../components/SessionContext'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { memberApi, type MemberBooking, type MemberCard, type PackageRegistration } from '../../api/memberApi'
+import { memberTrainingApi } from '../../api/memberTrainingApi'
+import { walletApi, type WalletOverview } from '../../api/walletApi'
 import { useAuth } from '../../auth/useAuth'
 import { Badge, Card, EmptyState, ErrorState, PageHeader, StatCard, StatusBadge } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
-import { formatDate, formatDateTime } from '../../utils/format'
+import { formatDate, formatDateTime, formatMoney } from '../../utils/format'
 import {
   activeRegistrations,
   canBook,
@@ -43,6 +45,13 @@ interface Purchases {
   registrations: PackageRegistration[]
 }
 
+interface TrainingSnapshot {
+  plans: number | null
+  attendance: number | null
+  results: number | null
+  feedback: number | null
+}
+
 /** Cards and packages decide the state of the page, so they load together. */
 function loadPurchases(signal: AbortSignal): Promise<Purchases> {
   return Promise.all([memberApi.myCards({ signal }), memberApi.myRegistrations({ signal })]).then(
@@ -55,6 +64,27 @@ function loadBookings(signal: AbortSignal): Promise<MemberBooking[]> {
   return memberApi.myUpcomingBookings({ signal })
 }
 
+function loadWallet(signal: AbortSignal): Promise<WalletOverview> {
+  return walletApi.overview(signal)
+}
+
+async function recordCount<T>(request: Promise<T[]>): Promise<number | null> {
+  try {
+    return (await request).length
+  } catch {
+    return null
+  }
+}
+
+function loadTrainingSnapshot(signal: AbortSignal): Promise<TrainingSnapshot> {
+  return Promise.all([
+    recordCount(memberTrainingApi.plans(signal)),
+    recordCount(memberTrainingApi.attendance(signal)),
+    recordCount(memberTrainingApi.results(signal)),
+    recordCount(memberTrainingApi.feedback(signal)),
+  ]).then(([plans, attendance, results, feedback]) => ({ plans, attendance, results, feedback }))
+}
+
 /**
  * Member Dashboard (Figma F1-07, states "New Standard Member" and "After Purchase").
  * Data: the signed in profile from the auth context (GET /users/me), GET /membership-cards/my,
@@ -64,15 +94,24 @@ export function MemberDashboardPage() {
   const { user } = useAuth()
   const [purchases, reloadPurchases] = useMemberResource(loadPurchases)
   const [bookings, reloadBookings] = useMemberResource(loadBookings)
+  const [wallet] = useMemberResource(loadWallet)
+  const [trainingSnapshot, reloadTrainingSnapshot] = useMemberResource(loadTrainingSnapshot)
   // Fixed for the life of the page, so the lists do not change while the member reads them.
   const [now] = useState(() => new Date())
   const today = toIsoDate(now)
 
   const header = (
     <PageHeader
-      eyebrow="Your sport, your way"
-      title="Member Dashboard"
-      description="Your membership, sport packages and upcoming training in one place."
+      eyebrow="Member workspace"
+      title={<>
+        <span className="member-concept__dashboard-heading member-concept__dashboard-heading--desktop" aria-hidden="true">Good to see you, <span>{user?.fullName?.split(/\s+/)[0] || 'member'}.</span></span>
+        <span className="member-concept__dashboard-heading member-concept__dashboard-heading--mobile" aria-hidden="true">My sport. <span>My progress.</span></span>
+        <span className="member-concept__sr-only">Member Dashboard</span>
+      </>}
+      description={<>
+        <span className="member-concept__dashboard-description--desktop">Your Sportify training at a glance. Pick up where you left off.</span>
+        <span className="member-concept__dashboard-description--mobile">Your membership, sport packages and upcoming training in one place.</span>
+      </>}
     />
   )
 
@@ -137,6 +176,13 @@ export function MemberDashboardPage() {
           value={card ? card.tierName : STANDARD_TIER_NAME}
           hint={card ? cardHint(card) : 'Explore cards for package discounts'}
         />
+        <div className="dashboard-wallet-stat">
+          <StatCard
+            label="Wallet balance"
+            value={wallet.status === 'ready' ? formatMoney(wallet.data.availableBalance, wallet.data.currency) : wallet.status === 'loading' ? 'Loading' : 'Unavailable'}
+            hint={wallet.status === 'ready' ? 'Available balance' : wallet.status === 'error' ? 'Wallet data could not load' : 'Your available balance'}
+          />
+        </div>
         <StatCard label="Active packages" value={active.length} hint={activePackagesHint(active.length, bookableCount)} />
         <StatCard
           label="Upcoming sessions"
@@ -151,7 +197,8 @@ export function MemberDashboardPage() {
           <PackagesCard registrations={active} today={today} />
           <UpcomingSessionsCard bookings={bookings} upcoming={upcoming} hasBookablePackage={bookable} onRetry={reloadBookings} />
         </div>
-        <aside className="dashboard__side" aria-label="Profile and quick links">
+        <aside className="dashboard__side" aria-label="Training and account links">
+          <TrainingSnapshotCard className="dashboard-training-card" snapshot={trainingSnapshot} onRetry={reloadTrainingSnapshot} />
           <ProfileCard />
           <QuickLinksCard />
         </aside>
@@ -465,6 +512,34 @@ function UpcomingSessionsCard({
   )
 }
 
+function TrainingSnapshotCard({ snapshot, onRetry, className }: { snapshot: Resource<TrainingSnapshot>; onRetry: () => void; className?: string }) {
+  return (
+    <Card
+      className={className}
+      title="Training snapshot"
+      aria-label="Training snapshot"
+      actions={<Link to="/member/training">Training Hub</Link>}
+    >
+      {snapshot.status === 'loading' ? <Spinner label="Loading your training records" /> : null}
+      {snapshot.status === 'error' ? <ErrorState title="We could not load your training records" error={snapshot.error} onRetry={onRetry} /> : null}
+      {snapshot.status === 'ready' && (
+        <>
+          <p className="dashboard-training__caption">Counts from your saved coach and attendance records.</p>
+          <dl className="dashboard-training__counts">
+            <div><dt>Assigned plans</dt><dd>{snapshot.data.plans ?? 'Unavailable'}</dd></div>
+            <div><dt>Attendance records</dt><dd>{snapshot.data.attendance ?? 'Unavailable'}</dd></div>
+            <div><dt>Session results</dt><dd>{snapshot.data.results ?? 'Unavailable'}</dd></div>
+            <div><dt>Coach feedback</dt><dd>{snapshot.data.feedback ?? 'Unavailable'}</dd></div>
+          </dl>
+          {(snapshot.data.plans === null || snapshot.data.attendance === null || snapshot.data.results === null || snapshot.data.feedback === null) && (
+            <p className="dashboard-training__note" role="status">Some training data is currently unavailable.</p>
+          )}
+        </>
+      )}
+    </Card>
+  )
+}
+
 function ProfileCard() {
   return (
     <Card title="Your profile" aria-label="Your profile">
@@ -477,6 +552,7 @@ function ProfileCard() {
 }
 
 const QUICK_LINKS = [
+  { to: '/member/training', label: 'Training progress', hint: 'Plans, attendance and coach feedback' },
   { to: MEMBER_PATHS.membershipCard, label: 'My membership card', hint: 'Tier, benefits and renewal' },
   { to: MEMBER_PATHS.packages, label: 'Sport packages', hint: 'Prices by sport and training style' },
   { to: MEMBER_PATHS.schedule, label: 'My schedule', hint: 'Your booked sessions' },

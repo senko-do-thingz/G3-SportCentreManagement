@@ -76,6 +76,7 @@ import { MemberAssistantPage } from '../pages/member/MemberAssistantPage'
 import { MemberSupportPage } from '../pages/member/MemberSupportPage'
 import { ClassRecommendationsPage } from '../pages/member/ClassRecommendationsPage'
 import { MemberTrainingGoalsPage } from '../pages/member/MemberTrainingGoalsPage'
+import { MemberTrainingHubPage } from '../pages/member/MemberTrainingHubPage'
 import { SuitableSessionsPage } from '../pages/member/SuitableSessionsPage'
 import { CoachTrainingPlansPage, CoachTrainingResultsPage } from '../pages/training/CoachTrainingPages'
 import { ClassQuestionsPage, MemberClassesPage, MemberClassDetailPage } from '../pages/training/ClassLearningPages'
@@ -107,6 +108,9 @@ const SCREENS: Record<string, ReactNode> = {
   '/manager/transactions': <ManagerTransactionsPage />,
   '/manager/reports': <ManagerRevenueReportsPage />,
   '/member': <MemberDashboardPage />,
+  '/member/training': <MemberTrainingHubPage />,
+  '/member/support': <MemberSupportPage />,
+  '/member/bookings': <MemberBookingsPage />,
   '/member/profile': <MyProfilePage />,
   '/member/packages': <SportPackagesPage />,
   '/member/membership': <MyMembershipPage />,
@@ -151,6 +155,7 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
     { path: 'classes/:classId/edit', element: <ClassEditorPage /> },
   ],
   '/member': [
+    { path: 'training/plans', element: <TrainingPlansPage /> },
     { path: 'check-in-pass', element: <CheckInPassPage /> },
     { path: 'profile/health', element: <HealthAssessmentPage /> },
     { path: 'wallet/topup', element: <WalletTopUpPage /> },
@@ -168,10 +173,8 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
     { path: 'training/recommendations/classes/:classId', element: <SuitableSessionsPage /> },
     { path: 'training/goals', element: <MemberTrainingGoalsPage /> },
     { path: 'assistant', element: <MemberAssistantPage /> },
-    { path: 'support', element: <MemberSupportPage /> },
     { path: 'classes', element: <FindClassesPage /> },
     { path: 'sessions/:sessionId', element: <SessionDetailPage /> },
-    { path: 'bookings', element: <MemberBookingsPage /> },
     { path: 'bookings/new', element: <BookingOptionsPage /> },
     { path: 'bookings/review', element: <BookingReviewPage /> },
     { path: 'bookings/confirmed/:bookingId', element: <BookingConfirmedPage /> },
