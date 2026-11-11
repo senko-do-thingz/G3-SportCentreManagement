@@ -4,10 +4,10 @@ import { walletHistoryApi, type WalletActivityRow } from '../../api/walletApi'
 import {
   Badge,
   Button,
+  CalendarDateField,
   Card,
   EmptyState,
   ErrorState,
-  Input,
   Notice,
   Select,
   Spinner,
@@ -122,17 +122,17 @@ export function WalletHistoryPage() {
             options={STATUSES}
             onChange={(e) => reset(() => setStatus(e.target.value))}
           />
-          <Input
+          <CalendarDateField
             label="From"
-            type="date"
             value={from}
-            onChange={(e) => reset(() => setFrom(e.target.value))}
+            max={to || undefined}
+            onChange={(value) => reset(() => setFrom(value))}
           />
-          <Input
+          <CalendarDateField
             label="To"
-            type="date"
             value={to}
-            onChange={(e) => reset(() => setTo(e.target.value))}
+            min={from || undefined}
+            onChange={(value) => reset(() => setTo(value))}
           />
         </div>
       </MemberCommerceCard>

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getErrorMessage } from '../../api/errors'
 import { managerFinanceApi, type FinanceRevenueRow, type RevenueGroup } from '../../api/managerFinanceApi'
-import { Button, Card, Input, PageLoader, Select, StatCard, Table, type TableColumn } from '../../components/ui'
+import { Button, CalendarDateField, Card, PageLoader, Select, StatCard, Table, type TableColumn } from '../../components/ui'
 import { useResource } from './useManagerTools'
 import { ManagerError, PreviewNotice } from './ManagerShared'
 import { FinanceRevenueChart } from './FinanceRevenueChart'
@@ -160,8 +160,8 @@ export function ManagerRevenueReportsPage() {
 
     <Card title="Report filters">
       <div className="manager-filters manager-filters--revenue">
-        <Input label="From date" type="date" value={from} max={to} onChange={(event) => updateFrom(event.target.value)} />
-        <Input label="To date" type="date" value={to} min={from} onChange={(event) => updateTo(event.target.value)} />
+        <CalendarDateField label="From date" value={from} max={to} onChange={updateFrom} required />
+        <CalendarDateField label="To date" value={to} min={from} onChange={(value) => updateTo(value)} required />
         <Select label="Group by" value={groupBy} options={GROUPS} onChange={(event) => updateParams({ groupBy: event.target.value })} />
         <div className="finance-filter-hint">All report values use the selected date range.</div>
       </div>

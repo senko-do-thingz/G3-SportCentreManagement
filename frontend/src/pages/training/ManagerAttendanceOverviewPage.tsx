@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { managerAttendanceApi as api } from '../../api/managerAttendanceApi'
 import { managerClassesApi } from '../../api/managerClassesApi'
 import { businessDate, formatCalendarDate } from '../../utils/date'
-import { Button, Card, Input, Select } from '../../components/ui'
+import { Button, CalendarDateField, Card, Input, Select } from '../../components/ui'
 import { TrainingData } from '../member/TrainingData'
 import { PreviewNotice } from '../manager/ManagerShared'
 import '../member/training.css'
@@ -38,8 +38,8 @@ export function ManagerAttendanceOverviewPage() {
     <PreviewNotice />
     <Card title="Attendance filters">
       <div className="training-form-grid">
-        <Input label="From date" type="date" value={from} onChange={event => { select(''); setFrom(event.target.value) }} />
-        <Input label="To date" type="date" value={to} onChange={event => { select(''); setTo(event.target.value) }} />
+        <CalendarDateField label="From date" value={from} max={to} onChange={value => { select(''); setFrom(value) }} required />
+        <CalendarDateField label="To date" value={to} min={from} onChange={value => { select(''); setTo(value) }} required />
         <Input label="Search classes" value={classSearch} onChange={event => { setClassSearch(event.target.value); setClassId(''); select('') }} />
         <TrainingData load={loadClasses}>{page => <Select label="Class" placeholder="All classes" value={classId} options={page.content.map(item => ({ value: String(item.id), label: item.name }))} onChange={event => { select(''); setClassId(event.target.value) }} hint={page.totalElements > page.content.length ? 'Showing the first 100 matches. Refine the class search to find another class.' : undefined} />}</TrainingData>
         <TrainingData load={loadCoaches}>{coaches => <Select label="Coach" placeholder="All coaches" value={coachId} options={coaches.map(item => ({ value: String(item.id), label: item.fullName }))} onChange={event => { select(''); setCoachId(event.target.value) }} />}</TrainingData>

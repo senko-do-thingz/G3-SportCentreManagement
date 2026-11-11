@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '../../api/errors'
 import { ACTIVITY_ACTIONS, managerActivityLogsApi } from '../../api/managerActivityLogsApi'
-import { Button, Card, Input, Modal, Select, Table, type TableColumn } from '../../components/ui'
+import { Button, CalendarDateField, Card, Input, Modal, Select, Table, type TableColumn } from '../../components/ui'
 import { humanizeCode } from '../../utils/format'
 import type { ActivityLog, ManagerUser } from '../../types/manager'
 import { ActorPickerModal } from './ActorPickerModal'
@@ -131,11 +131,10 @@ export function ActivityLogPage() {
             </Button>
           </div>
           <Select label="Action" placeholder="All actions" value={action} options={ACTIVITY_ACTIONS.map((code) => ({ value: code, label: humanizeCode(code) }))} onChange={(event) => { setAction(event.target.value); setPage(0) }} />
-          <Input label="From date" type="date" value={from} onChange={(event) => { setFrom(event.target.value); setPage(0) }} />
-          <Input label="To date" type="date" value={to} aria-invalid={invalidRange || undefined} aria-describedby={invalidRange ? 'manager-activity-range-error' : undefined} onChange={(event) => { setTo(event.target.value); setPage(0) }} />
+          <CalendarDateField label="From date" value={from} max={to || undefined} onChange={(value) => { setFrom(value); setPage(0) }} />
+          <CalendarDateField label="To date" value={to} min={from || undefined} error={invalidRange ? 'End date must be on or after the start date.' : undefined} onChange={(value) => { setTo(value); setPage(0) }} />
         </div>
       </div>
-      {invalidRange && <p id="manager-activity-range-error" className="manager-activity__range-error" role="alert">End date must be on or after the start date.</p>}
       {resource.status === 'error' && search === debounced && !invalidRange ? <ManagerError error={resource.error} onRetry={reload} /> : !invalidRange && <div className="manager-activity__table"><Table columns={columns} rows={ready ? resource.data.content : []} rowKey={(log) => log.id} loading={!ready} caption="Activity history" scrollLabel="Activity history table. Scroll horizontally to view all columns." emptyTitle={filtered ? 'No matching activity' : 'No activity yet'} emptyDescription={filtered ? 'Clear filters or choose a different date range.' : 'Recorded center activity will appear here.'} pagination={ready ? { page, pageSize: ACTIVITY_PAGE_SIZE, totalItems: resource.data.totalElements, onPageChange: setPage } : undefined} /></div>}
       <p className="manager-activity__footnote">Activity records are read-only. Times use the center timezone (Asia/Ho_Chi_Minh). Only the safe fields returned by the activity service are shown.</p>
     </Card>

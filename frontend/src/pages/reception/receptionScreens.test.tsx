@@ -497,7 +497,7 @@ describe('FE-05 Register and Renew (F1-14)', () => {
     const user = userEvent.setup()
     const form = await screen.findByRole('form', { name: 'Sell a sport package' })
     await user.selectOptions(within(form).getByLabelText(/^Package/), '4')
-    expect(within(form).getByLabelText(/Start date/)).toHaveValue('2026-10-13')
+    expect(within(form).getByLabelText(/Start date/)).toHaveValue('13/10/2026')
     const summary = screen.getByRole('region', { name: 'Fee summary' })
     expect(within(summary).getByText('New registration')).toBeInTheDocument()
     expect(within(summary).getByText('10% - 90.000 VND')).toBeInTheDocument()
@@ -542,7 +542,7 @@ describe('FE-05 Register and Renew (F1-14)', () => {
     await open('/reception/register?memberId=2&packageId=2')
     const form = await screen.findByRole('form', { name: 'Sell a sport package' })
     expect(within(form).getByLabelText(/^Package/)).toHaveValue('2')
-    expect(within(form).getByLabelText(/Start date/)).toHaveValue('2026-10-25')
+    expect(within(form).getByLabelText(/Start date/)).toHaveValue('25/10/2026')
     expect(within(screen.getByRole('region', { name: 'Fee summary' })).getByText('Renewal')).toBeInTheDocument()
   })
 

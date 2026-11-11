@@ -15,6 +15,11 @@ const tokensCss = readFileSync('src/styles/tokens.css', 'utf8')
 const scheduleCss = readFileSync('src/styles/managerSchedule.css', 'utf8')
 let injectedStyles: HTMLStyleElement
 
+function setCalendarDate(input: HTMLElement, iso: string) {
+  fireEvent.change(input, { target: { value: displayDate(iso) } })
+  fireEvent.blur(input)
+}
+
 function backend(conflict = false, facilitiesMissing: boolean | number = false, schedule: unknown[] = [session, cancelledSession], editResult: unknown = session) {
   return installFakeFetch((call) => {
     const path = call.path.split('?')[0]
@@ -294,8 +299,8 @@ describe('FE-07 schedule', () => {
     await user.click(screen.getByRole('button', { name: '+ Create session' }))
     const dialog = screen.getByRole('dialog', { name: 'Create session' })
     await user.click(within(dialog).getByLabelText('Repeat weekly'))
-    fireEvent.change(within(dialog).getByLabelText(/^From date/), { target: { value: monday(addDays(date, 7)) } })
-    fireEvent.change(within(dialog).getByLabelText(/^To date/), { target: { value: addDays(monday(addDays(date, 7)), 21) } })
+    setCalendarDate(within(dialog).getByLabelText(/^From date/), monday(addDays(date, 7)))
+    setCalendarDate(within(dialog).getByLabelText(/^To date/), addDays(monday(addDays(date, 7)), 21))
     await user.click(within(dialog).getByLabelText('MON'))
     expect(within(dialog).getByText('4 sessions will be created.')).toBeInTheDocument()
     await user.selectOptions(within(dialog).getByLabelText(/^Facility/), '1')
@@ -335,7 +340,7 @@ describe('FE-07 schedule', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: 'Edit' }))
     const dialog = screen.getByRole('dialog', { name: 'Edit session' })
-    fireEvent.change(within(dialog).getByLabelText(/^Date/), { target: { value: addDays(date, 2) } })
+    setCalendarDate(within(dialog).getByLabelText(/^Date/), addDays(date, 2))
     await user.type(within(dialog).getByLabelText('Rescheduling reason (optional)'), 'Facility maintenance')
     await waitFor(() => expect(within(dialog).getByLabelText(/^Coach/)).toBeEnabled())
     await user.click(within(dialog).getByRole('button', { name: 'Save session' }))
@@ -354,7 +359,7 @@ describe('FE-07 schedule', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: 'Edit' }))
     const dialog = screen.getByRole('dialog', { name: 'Edit session' })
-    fireEvent.change(within(dialog).getByLabelText(/^Date/), { target: { value: target } })
+    setCalendarDate(within(dialog).getByLabelText(/^Date/), target)
     await waitFor(() => expect(within(dialog).getByLabelText(/^Coach/)).toBeEnabled())
     await user.click(within(dialog).getByRole('button', { name: 'Save session' }))
     expect(await screen.findByText(`Session ${code} saved for ${displayDate(target)}`)).toBeInTheDocument()
@@ -368,12 +373,12 @@ describe('FE-07 schedule', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: 'Edit' }))
     const dialog = screen.getByRole('dialog', { name: 'Edit session' })
-    fireEvent.change(within(dialog).getByLabelText(/^Date/), { target: { value: addDays(date, 1) } })
+    setCalendarDate(within(dialog).getByLabelText(/^Date/), addDays(date, 1))
     await user.type(within(dialog).getByLabelText('Rescheduling reason (optional)'), 'Member availability')
     await waitFor(() => expect(within(dialog).getByLabelText(/^Coach/)).toBeEnabled())
     await user.click(within(dialog).getByRole('button', { name: 'Save session' }))
     expect(await within(dialog).findByText(/The session has changed/)).toBeInTheDocument()
-    expect(within(dialog).getByLabelText(/^Date/)).toHaveValue(addDays(date, 1))
+    expect(within(dialog).getByLabelText(/^Date/)).toHaveValue(displayDate(addDays(date, 1)))
     expect(within(dialog).getByLabelText('Rescheduling reason (optional)')).toHaveValue('Member availability')
     expect(screen.queryByText('Schedule updated')).not.toBeInTheDocument()
   })

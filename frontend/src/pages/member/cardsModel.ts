@@ -1,5 +1,6 @@
 import type { CardTier } from '../../api/cardsApi'
 import type { MemberCard, PackageRegistration } from '../../api/memberApi'
+import { formatCalendarDate } from '../../utils/dateDisplay'
 
 /**
  * Pure rules of Membership Cards (F1-11) and My Membership and Sport Packages (F1-12).
@@ -159,9 +160,10 @@ function termBaseCents(active: MemberCard, cards: MemberCard[]): number | null {
 }
 
 function blockedReason(audience: PlanAudience, from: string): string {
+  const displayFrom = formatCalendarDate(from)
   return audience === 'desk'
-    ? `The member's card is already renewed from ${from}. It can be upgraded once that term has started.`
-    : `Your card is already renewed from ${from}. You can upgrade once that term has started.`
+    ? `The member's card is already renewed from ${displayFrom}. It can be upgraded once that term has started.`
+    : `Your card is already renewed from ${displayFrom}. You can upgrade once that term has started.`
 }
 
 /** What buying tier means today for this member. See the file comment for the rules. */

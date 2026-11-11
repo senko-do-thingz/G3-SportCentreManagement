@@ -5,6 +5,7 @@ import { tokenStorage } from '../../api/tokenStorage'
 import { backendError, installFakeFetch, json, MEMBER, type RecordedCall } from '../../test/fakeBackend'
 import { card, payment, registration, sport, sportPackage } from '../../test/memberFixtures'
 import { renderApp } from '../../test/renderApp'
+import { formatCalendarDate } from '../../utils/dateDisplay'
 
 /**
  * FE-03: Sport Packages (F1-09), Package Detail and Registration (F1-10), Payment Handoff overlay
@@ -277,10 +278,12 @@ describe('FE-03 Package Detail and Registration (F1-10)', () => {
     const user = userEvent.setup()
     const { calls } = await openDetail()
     const input = screen.getByLabelText(/Start date/)
-    expect(input).toHaveAttribute('min', '2026-10-13')
-    expect(input).toHaveValue('2026-10-13')
+    const picker = input.closest('.calendar-date-field')!.querySelector('input[type="date"]')
+    expect(picker).toHaveAttribute('min', '2026-10-13')
+    expect(input).toHaveValue('13/10/2026')
     await user.clear(input)
-    await user.type(input, '2026-10-12')
+    await user.type(input, '12/10/2026')
+    await user.tab()
     await user.click(screen.getByRole('button', { name: 'Confirm registration' }))
     expect(await screen.findByText('Start date cannot be in the past')).toBeInTheDocument()
     expect(calls.some((call) => call.method === 'POST')).toBe(false)
@@ -292,7 +295,8 @@ describe('FE-03 Package Detail and Registration (F1-10)', () => {
     const { calls } = await openDetail()
     const input = screen.getByLabelText(/Start date/)
     await user.clear(input)
-    await user.type(input, '2026-11-01')
+    await user.type(input, '01/11/2026')
+    await user.tab()
     expect(summaryValue('Expiry date')).toBe('30/11/2026')
     await user.click(screen.getByRole('button', { name: 'Confirm registration' }))
     await screen.findByRole('dialog', { name: 'Payment summary' })
@@ -439,15 +443,16 @@ describe('FE-03 review round 1', () => {
     vi.setSystemTime(new Date('2026-10-13T16:59:00Z')) // 23:59 in Asia/Ho_Chi_Minh.
     const { calls } = await openDetail()
     const input = screen.getByLabelText(/Start date/)
-    expect(input).toHaveValue('2026-10-13')
-    expect(input).toHaveAttribute('min', '2026-10-13')
+    const picker = input.closest('.calendar-date-field')!.querySelector('input[type="date"]')
+    expect(input).toHaveValue('13/10/2026')
+    expect(picker).toHaveAttribute('min', '2026-10-13')
 
     vi.setSystemTime(new Date('2026-10-13T17:01:00Z')) // 00:01 on October 14 in Asia/Ho_Chi_Minh.
     await user.click(screen.getByRole('button', { name: 'Confirm registration' }))
     expect(await screen.findByText('Start date cannot be in the past', { selector: '.field__error' })).toBeInTheDocument()
     expect(calls.some((call) => call.method === 'POST')).toBe(false)
-    expect(input).toHaveValue('2026-10-13')
-    expect(input).toHaveAttribute('min', '2026-10-14')
+    expect(input).toHaveValue(formatCalendarDate('2026-10-13'))
+    expect(picker).toHaveAttribute('min', '2026-10-14')
   })
 
   it('TC-FE03-048 while the cards load, eligible prices show "-" and "Checking your card discount" (M2, N1)', async () => {

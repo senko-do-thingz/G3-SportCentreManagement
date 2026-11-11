@@ -258,6 +258,41 @@
   box-shadow: var(--focus-ring-danger);
 }
 
+.calendar-date-field__control {
+  position: relative;
+}
+
+.calendar-date-field__text {
+  padding-right: 48px;
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-date-field__icon {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.calendar-date-field__picker {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 44px;
+  height: 44px;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.calendar-date-field__picker:disabled {
+  cursor: not-allowed;
+}
+
+.calendar-date-field__control:focus-within .calendar-date-field__icon {
+  color: var(--color-primary);
+}
+
 /* Input with an element inside on the right, for example the password Show or Hide button */
 .input-wrap {
   position: relative;

@@ -6,7 +6,7 @@ import { RecommendationTabs } from './RecommendationTabs'
 import { FORMAT_OPTIONS, WEEKDAYS } from './trainingAvailability'
 import { trainingGuidanceApi, type ClassRecommendation, type RecommendationPreferences, type SavedRecommendation, type SportLevel } from '../../api/trainingGuidanceApi'
 import { packagesApi } from '../../api/packagesApi'
-import { Button, Card, EmptyState, Input, PageHeader, Select } from '../../components/ui'
+import { Button, CalendarDateField, Card, EmptyState, Input, PageHeader, Select } from '../../components/ui'
 import { ActionMessage } from '../training/TrainingFormFields'
 import { useTrainingAction } from '../training/trainingFormState'
 import { TrainingData } from './TrainingData'
@@ -30,6 +30,8 @@ export function ClassRecommendationsPage() {
   const [params] = useSearchParams()
   const [initial] = useState(() => initialPreferences(params))
   const [preferences, setPreferences] = useState<RecommendationPreferences>(initial)
+  const [from, setFrom] = useState(initial.from ?? '')
+  const [to, setTo] = useState(initial.to ?? '')
   const [savedRevision, refreshSaved] = useState(0)
   const load = useCallback((signal: AbortSignal) => trainingGuidanceApi.recommendations(preferences, signal), [preferences])
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -38,7 +40,7 @@ export function ClassRecommendationsPage() {
     const text = (key: string) => String(values.get(key) ?? '').trim() || undefined
     const days = values.getAll('days').map(String)
     setPreferences({ sportId: text('sportId') ? Number(text('sportId')) : undefined, level: text('level'), goal: text('goal'),
-      from: text('from'), to: text('to'), earliest: text('earliest'), latest: text('latest'), page: 0, size: 10,
+      from: from || undefined, to: to || undefined, earliest: text('earliest'), latest: text('latest'), page: 0, size: 10,
       ...(text('format') ? { format: text('format') } : {}), ...(days.length ? { days: days.join(',') } : {}) })
   }
   const initialDays = initial.days?.split(',') ?? []
@@ -51,7 +53,7 @@ export function ClassRecommendationsPage() {
       <fieldset><legend>Available days (leave all unticked for any day)</legend><div className="training-actions">
         {WEEKDAYS.map(day => <label key={day.value}><input type="checkbox" name="days" value={day.value} defaultChecked={initialDays.includes(day.value)} /> {day.label}</label>)}
       </div></fieldset>
-      <Input label="Available from date" name="from" type="date" /><Input label="Available to date" name="to" type="date" />
+      <CalendarDateField label="Available from date" name="from" value={from} max={to || undefined} onChange={setFrom} /><CalendarDateField label="Available to date" name="to" value={to} min={from || undefined} onChange={setTo} />
       <Input label="Earliest start time" name="earliest" type="time" defaultValue={initial.earliest} /><Input label="Latest end time" name="latest" type="time" defaultValue={initial.latest} />
       <p>Use a future range of up to 30 days. Times use Vietnam time (UTC+7). Set your goals, preferred sports and usual availability in <Link to="/member/training/goals">My goals</Link>.</p><Button type="submit">Find recommendations</Button>
     </form></Card>

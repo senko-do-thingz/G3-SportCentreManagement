@@ -41,6 +41,28 @@ export function formatCalendarDate(value: string | null | undefined): string {
   return isCalendarDate(value) ? `${value.slice(8, 10)}/${value.slice(5, 7)}/${value.slice(0, 4)}` : EMPTY
 }
 
+/** Strict calendar conversion for editable controls. Empty or invalid ISO values stay empty. */
+export function formatDisplayCalendarDate(value: string | null | undefined): string {
+  return isCalendarDate(value) ? `${value.slice(8, 10)}/${value.slice(5, 7)}/${value.slice(0, 4)}` : ''
+}
+
+/** Month-only values remain month-only in the UI; no synthetic day is introduced. */
+export function formatMonth(value: string | null | undefined): string {
+  if (!value || !/^\d{4}-(0[1-9]|1[0-2])$/.test(value) || value.slice(0, 4) === '0000') return EMPTY
+  return `${value.slice(5, 7)}/${value.slice(0, 4)}`
+}
+
+/**
+ * Parses an exact dd/MM/yyyy calendar value without constructing a browser-local Date.
+ * Partial values, unpadded values, year zero and impossible Gregorian dates are rejected.
+ */
+export function parseDisplayCalendarDate(value: string): string | null {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value)
+  if (!match || match[3] === '0000') return null
+  const iso = `${match[3]}-${match[2]}-${match[1]}`
+  return isCalendarDate(iso) ? iso : null
+}
+
 /** A session LocalTime already belongs to the center calendar. */
 export function formatClockTime(value: string | null | undefined): string {
   return value && LOCAL_TIME.test(value) ? value.slice(0, 5) : EMPTY

@@ -41,6 +41,7 @@ describe('FE-10 coach schedule and roster screens', () => {
     expect(await screen.findByRole('heading', { name: 'Basketball Foundations' })).toBeInTheDocument()
     expect(screen.getByText('Sessions this week').parentElement).toHaveTextContent('1')
     expect(screen.getByText('Classes assigned').parentElement).toHaveTextContent('1')
+    expect(screen.getByText('Week in view').parentElement).toHaveTextContent('19/10/2026 - 25/10/2026')
     const scheduleSummary = screen.getByRole('region', { name: 'Schedule summary' })
     expect(scheduleSummary.querySelectorAll('svg.coach-schedule-metric__icon')).toHaveLength(4)
     expect(scheduleSummary.querySelectorAll('.coach-schedule-metric__mark')).toHaveLength(0)
@@ -75,7 +76,7 @@ describe('FE-10 coach schedule and roster screens', () => {
     await user.click(await screen.findByRole('button', { name: 'Next week' }))
 
     await waitFor(() => expect(calls.some((call) => call.path === '/coach/sessions?from=2026-10-26&to=2026-11-01')).toBe(true))
-    expect(screen.getByText('26/10/2026 - 01/11/2026')).toBeInTheDocument()
+    expect(screen.getAllByText('26/10/2026 - 01/11/2026')).toHaveLength(2)
   })
 
   it('loads only the selected owned session roster, hides phone numbers and prints the roster', async () => {

@@ -3,7 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom'
 import { ApiError, getErrorMessage } from '../../api/errors'
 import { memberApi, type MemberCard, type PackageRegistration } from '../../api/memberApi'
 import { packagesApi, type SportPackage } from '../../api/packagesApi'
-import { Badge, Button, Card, EmptyState, ErrorState, Input, Modal, PageHeader } from '../../components/ui'
+import { Badge, Button, CalendarDateField, Card, EmptyState, ErrorState, Modal, PageHeader } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { formatDate, formatMoney } from '../../utils/format'
@@ -235,15 +235,14 @@ function RegistrationForm({
             </div>
           </dl>
           <fieldset className="profile-form" disabled={submitting || registration !== null || blocked}>
-            <Input
+            <CalendarDateField
               label="Start date"
-              type="date"
               name="startDate"
               min={minDate}
               value={startDate}
               onFocus={refreshMinDate}
-              onChange={(event) => {
-                setStartDate(event.target.value)
+              onChange={(value) => {
+                setStartDate(value)
                 setFieldError(null)
                 refreshMinDate()
               }}

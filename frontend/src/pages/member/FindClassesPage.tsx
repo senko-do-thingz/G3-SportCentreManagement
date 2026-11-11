@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import { memberSessionsApi } from '../../api/memberSessionsApi'
 import { packagesApi, type Sport } from '../../api/packagesApi'
-import { Button, Card, EmptyState, Input, PageLoader, Pagination, Select } from '../../components/ui'
+import { Button, CalendarDateField, Card, EmptyState, PageLoader, Pagination, Select } from '../../components/ui'
 import { BrowseError } from './BrowseError'
 import { MemberScheduleNav } from './MemberScheduleNav'
 import { SessionCard } from './SessionCard'
@@ -82,8 +82,8 @@ export function FindClassesPage() {
         <SportPicker sports={sportRows} selected={sportId} onChange={(value) => change('sportId', value)} />
         <LevelPicker selected={level} onChange={(value) => change('level', value)} />
         <div className="browse-filters class-discovery__fields">
-          <Input label="From date" type="date" value={from} onChange={(event) => change('from', event.target.value)} error={rangeError ?? undefined} />
-          <Input label="To date" type="date" value={to} onChange={(event) => change('to', event.target.value)} />
+          <CalendarDateField label="From date" value={from} max={to || undefined} onChange={(value) => change('from', value)} error={rangeError ?? undefined} />
+          <CalendarDateField label="To date" value={to} min={from || undefined} onChange={(value) => change('to', value)} />
           <Select label="Training format" placeholder="All formats" value={format ?? ''} options={BROWSE_FORMATS} onChange={(event) => change('format', event.target.value)} />
           <Select label="Coach" placeholder={coaches.status === 'loading' ? 'Loading coaches...' : 'All coaches'} value={coachId ? String(coachId) : ''} options={options} disabled={format === 'SELF_TRAINING'} hint="Coaches with sessions in the selected date range and filters." onChange={(event) => change('coachId', event.target.value)} />
         </div>
