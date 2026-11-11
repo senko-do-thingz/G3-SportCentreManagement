@@ -10,6 +10,40 @@
   color: var(--color-text);
 }
 
+/* Floating Spori conversation: compact, scrollable, and never navigates on send. */
+.member-concept__assistant-mark { flex: 0 0 36px; }
+.member-concept__assistant-launcher-copy { min-width: 0; max-width: 180px; overflow: hidden; }
+.member-concept__assistant-launcher-copy strong,
+.member-concept__assistant-launcher-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.member-concept__assistant-dialog { max-height: calc(100vh - 120px); overflow: hidden; }
+.member-concept__assistant-messages { display: grid; gap: 10px; min-height: 120px; max-height: min(390px, 48vh); padding-right: 3px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.member-concept__assistant-prompts button { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; min-height: 40px; padding: 8px 0; border: 0; border-bottom: 1px solid var(--color-border); background: transparent; color: var(--color-text); font: inherit; font-size: 0.76rem; line-height: 1.35; text-align: left; cursor: pointer; }
+.member-concept__assistant-prompts button:hover,
+.member-concept__assistant-prompts button:focus-visible,
+.member-concept__assistant-prompts button span { color: var(--color-primary); }
+.member-concept__assistant-message { display: grid; gap: 5px; width: min(88%, 330px); padding: 10px 12px; border: 1px solid var(--color-border); background: var(--color-surface-muted); }
+.member-concept__assistant-message--user { justify-self: end; border-color: var(--color-primary); background: var(--color-primary); color: var(--color-on-primary); }
+.member-concept__assistant-message--assistant { justify-self: start; }
+.member-concept__assistant-message.is-error { border-color: var(--color-danger, #b42318); }
+.member-concept__assistant-message strong { font-size: 0.68rem; }
+.member-concept__assistant-message p { margin: 0; font-size: 0.76rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.member-concept__assistant-message ul { display: grid; gap: 7px; margin: 4px 0 0; padding: 8px 0 0; border-top: 1px solid var(--color-border); list-style: none; }
+.member-concept__assistant-message li { display: grid; gap: 2px; }
+.member-concept__assistant-message li a { font-size: 0.72rem; font-weight: 700; }
+.member-concept__assistant-message li span { color: var(--color-text-muted); font-size: 0.68rem; line-height: 1.4; }
+.member-concept__assistant-typing { display: flex; align-items: center; gap: 8px; color: var(--color-text-muted); font-size: 0.72rem; }
+.member-concept__assistant-typing span { width: 8px; height: 8px; border-radius: 50%; background: var(--color-primary); animation: spori-pulse 900ms ease-in-out infinite alternate; }
+.member-concept__assistant-composer { display: grid; grid-template-columns: minmax(0, 1fr) !important; gap: 7px; padding-top: 9px; border-top: 1px solid var(--color-border); }
+.member-concept__assistant-consent { display: flex; align-items: center; gap: 7px; color: var(--color-text-muted); font-size: 0.68rem; line-height: 1.35; }
+.member-concept__assistant-consent input { flex: none; width: 15px; height: 15px; }
+.member-concept__assistant-compose-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
+.member-concept__assistant-compose-row textarea { min-width: 0; min-height: 44px; max-height: 100px; resize: vertical; padding: 9px 10px; border: 1px solid var(--color-border-strong); background: var(--color-bg); color: var(--color-text); font: inherit; font-size: 0.75rem; line-height: 1.4; }
+.member-concept__assistant-compose-row button { min-height: 44px; padding-inline: 13px; border: 1px solid var(--color-primary); background: var(--color-primary); color: var(--color-on-primary); font: inherit; font-size: 0.74rem; font-weight: 700; cursor: pointer; }
+.member-concept__assistant-compose-row button:disabled { border-color: var(--color-border); background: var(--color-surface-muted); color: var(--color-text-muted); cursor: not-allowed; }
+.member-concept__assistant-composer small { color: var(--color-text-muted); font-size: 0.64rem; line-height: 1.4; }
+@keyframes spori-pulse { to { opacity: 0.3; transform: scale(0.7); } }
+@media (prefers-reduced-motion: reduce) { .member-concept__assistant-typing span { animation: none; } }
+
 .member-concept .workspace-header__breadcrumb > * + *::before {
   content: '/';
   margin-right: 10px;

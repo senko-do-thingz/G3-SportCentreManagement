@@ -32,7 +32,7 @@ function actorName(booking: MemberBookingRecord): string {
   return 'Not provided'
 }
 
-export function MemberBookingsPage() {
+export function MemberBookingsPage({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth()
   const memberId = user?.id ?? null
   const [params, setParams] = useSearchParams()
@@ -44,9 +44,9 @@ export function MemberBookingsPage() {
   const [resource, reload] = useMemberResource(loader)
 
   return (
-    <div className="page browse-page booking-flow member-commerce">
-      <MemberScheduleNav />
-      <MemberCommerceHeader
+    <div className={`page browse-page booking-flow member-commerce${embedded ? ' schedule-workspace__embedded' : ''}`}>
+      {!embedded && <MemberScheduleNav />}
+      {!embedded && <MemberCommerceHeader
         eyebrow="Member / Classes & schedule"
         title="My Bookings"
         description="Review your upcoming sessions and booking history."
@@ -60,15 +60,15 @@ export function MemberBookingsPage() {
             </Link>
           </>
         }
-      />
-      <MemberCommerceHero
+      />}
+      {!embedded && <MemberCommerceHero
         kicker="SPORTIFY SESSIONS"
         title="YOUR RESERVED SESSIONS."
         highlight="TRAIN ON TIME."
         description="Track your confirmed class and court reservations, view booking codes, or manage schedule changes."
         actionLabel="Browse classes"
         actionHref="/member/classes"
-      />
+      />}
       <Card>
         <div className="booking-tabs" role="tablist" aria-label="Booking history">
           <button
@@ -76,7 +76,7 @@ export function MemberBookingsPage() {
             role="tab"
             aria-selected={when === 'UPCOMING'}
             className={`booking-tab${when === 'UPCOMING' ? ' booking-tab--active' : ''}`}
-            onClick={() => setParams({ when: 'UPCOMING' })}
+            onClick={() => setParams((previous) => { const next = new URLSearchParams(previous); next.set('when', 'UPCOMING'); return next })}
           >
             Upcoming
           </button>
@@ -85,7 +85,7 @@ export function MemberBookingsPage() {
             role="tab"
             aria-selected={when === 'PAST'}
             className={`booking-tab${when === 'PAST' ? ' booking-tab--active' : ''}`}
-            onClick={() => setParams({ when: 'PAST' })}
+            onClick={() => setParams((previous) => { const next = new URLSearchParams(previous); next.set('when', 'PAST'); return next })}
           >
             Past
           </button>
