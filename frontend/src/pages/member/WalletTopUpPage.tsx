@@ -68,9 +68,11 @@ function TopUpWorkspace({ data, onChanged }: { data: MemberTopUps; onChanged: ()
   const [error, setError] = useState<string | null>(null)
   const [created, setCreated] = useState<WalletTopUp | null>(null)
   const intent = useRef<{ serialized: string; key: string } | null>(null)
+  const inFlight = useRef(false)
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
+    if (inFlight.current) return
     const value = Number(amount)
     if (!Number.isInteger(value) || value < data.minAmount || value > data.maxAmount) {
       setError(`Enter a whole amount from ${formatMoney(data.minAmount)} to ${formatMoney(data.maxAmount)}.`)
@@ -79,6 +81,7 @@ function TopUpWorkspace({ data, onChanged }: { data: MemberTopUps; onChanged: ()
     // One key per intended request, so a retry after a network error never creates a second top-up.
     const serialized = `${value}|${mode}`
     if (intent.current?.serialized !== serialized) intent.current = { serialized, key: crypto.randomUUID() }
+    inFlight.current = true
     setBusy(true)
     setError(null)
     try {
@@ -88,8 +91,11 @@ function TopUpWorkspace({ data, onChanged }: { data: MemberTopUps; onChanged: ()
       setAmount('')
       onChanged()
     } catch (failure) {
-      setError(getErrorMessage(failure))
+      setError(
+        `${getErrorMessage(failure)} The outcome was not confirmed. Check My Top-Up Requests before retrying; retrying this unchanged request reuses the same safety key.`
+      )
     } finally {
+      inFlight.current = false
       setBusy(false)
     }
   }
@@ -253,13 +259,21 @@ const STATUS_TONE = { PENDING: 'warning', CONFIRMED: 'success', REJECTED: 'dange
 
 function TopUpTable({ topUps, onChanged }: { topUps: WalletTopUp[]; onChanged: () => void }) {
   const [error, setError] = useState<string | null>(null)
+  const [cancelling, setCancelling] = useState<number | null>(null)
+  const cancellingIds = useRef(new Set<number>())
   const cancel = async (id: number) => {
+    if (cancellingIds.current.has(id)) return
+    cancellingIds.current.add(id)
+    setCancelling(id)
     setError(null)
     try {
       await topUpApi.cancel(id)
       onChanged()
     } catch (failure) {
-      setError(getErrorMessage(failure))
+      setError(`${getErrorMessage(failure)} The cancellation outcome was not confirmed. Refresh the request status before trying again.`)
+    } finally {
+      cancellingIds.current.delete(id)
+      setCancelling((current) => current === id ? null : current)
     }
   }
   return (
@@ -299,7 +313,7 @@ function TopUpTable({ topUps, onChanged }: { topUps: WalletTopUp[]; onChanged: (
                 </td>
                 <td>
                   {t.status === 'PENDING' ? (
-                    <Button variant="secondary" size="sm" onClick={() => cancel(t.id)}>
+                    <Button variant="secondary" size="sm" loading={cancelling === t.id} onClick={() => cancel(t.id)}>
                       Cancel
                     </Button>
                   ) : (

@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
@@ -21,6 +21,58 @@ function signedIn(role: string, handler: (call: RecordedCall) => Response | Prom
 }
 
 describe('Member withdrawal (MW-06)', () => {
+  it('allows only one same-tick request and sends an idempotency key', async () => {
+    let resolveCreate!: (response: Response) => void
+    const create = new Promise<Response>((resolve) => { resolveCreate = resolve })
+    const { calls, fetchMock } = signedIn('MEMBER', call => {
+      if (call.path === '/member/wallet') return json(200, wallet)
+      if (call.path === '/member/wallet/payout-account') return json(200, account)
+      if (call.path === '/payments/vietqr-banks') return json(200, banks)
+      if (call.path === '/member/wallet/withdrawals' && call.method === 'POST') return create
+      if (call.path === '/member/wallet/withdrawals') return json(200, [])
+      return backendError(404, 'Not found')
+    })
+    renderApp('/member/wallet/withdraw')
+    fireEvent.change(await screen.findByLabelText('Amount (VND)'), { target: { value: '200000' } })
+    fireEvent.change(screen.getByLabelText(/Confirm last 4 digits/), { target: { value: '4567' } })
+    const form = screen.getByRole('form', { name: 'New withdrawal' })
+    fireEvent.submit(form)
+    fireEvent.submit(form)
+    await waitFor(() => expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1))
+    const request = fetchMock.mock.calls.find(([, options]) => options?.method === 'POST')?.[1]
+    expect(new Headers(request?.headers).get('Idempotency-Key')).toMatch(/.{8,}/)
+    await act(async () => { resolveCreate(json(201, pending)) })
+    expect(await screen.findByText(/WD-000003 requested/)).toBeInTheDocument()
+  })
+
+  it('retains the idempotency key when an uncertain request is retried unchanged', async () => {
+    let attempts = 0
+    const { fetchMock } = signedIn('MEMBER', call => {
+      if (call.path === '/member/wallet') return json(200, wallet)
+      if (call.path === '/member/wallet/payout-account') return json(200, account)
+      if (call.path === '/payments/vietqr-banks') return json(200, banks)
+      if (call.path === '/member/wallet/withdrawals' && call.method === 'POST') {
+        attempts += 1
+        return attempts === 1 ? backendError(502, 'Gateway response was lost') : json(200, pending)
+      }
+      if (call.path === '/member/wallet/withdrawals') return json(200, attempts > 1 ? [pending] : [])
+      return backendError(404, 'Not found')
+    })
+    const user = userEvent.setup()
+    renderApp('/member/wallet/withdraw')
+    await user.type(await screen.findByLabelText('Amount (VND)'), '200000')
+    await user.type(screen.getByLabelText(/Confirm last 4 digits/), '4567')
+    await user.click(screen.getByRole('button', { name: 'Request withdrawal' }))
+    expect(await screen.findByText(/outcome was not confirmed/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Request withdrawal' }))
+    expect(await screen.findByText(/WD-000003 requested/)).toBeInTheDocument()
+    const keys = fetchMock.mock.calls
+      .filter(([, options]) => options?.method === 'POST')
+      .map(([, options]) => new Headers(options?.headers).get('Idempotency-Key'))
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).toBe(keys[1])
+  })
+
   it('requests a withdrawal with the confirmed last 4 digits and shows only a masked account', async () => {
     let created = false
     const { calls } = signedIn('MEMBER', call => {
@@ -58,6 +110,28 @@ describe('Member withdrawal (MW-06)', () => {
     await user.click(screen.getByRole('button', { name: 'Request withdrawal' }))
     expect(await screen.findByText(/more than your available balance/)).toBeInTheDocument()
     expect(calls.some(c => c.method === 'POST')).toBe(false)
+  })
+
+  it('saves a payout account only once for same-tick submits', async () => {
+    let resolveSave!: (response: Response) => void
+    const save = new Promise<Response>((resolve) => { resolveSave = resolve })
+    const { calls } = signedIn('MEMBER', call => {
+      if (call.path === '/member/wallet') return json(200, wallet)
+      if (call.path === '/member/wallet/payout-account' && call.method === 'PUT') return save
+      if (call.path === '/member/wallet/payout-account') return json(200, null)
+      if (call.path === '/payments/vietqr-banks') return json(200, banks)
+      if (call.path === '/member/wallet/withdrawals') return json(200, [])
+      return backendError(404, 'Not found')
+    })
+    renderApp('/member/wallet/withdraw')
+    fireEvent.change(await screen.findByLabelText('Bank'), { target: { value: '970436' } })
+    fireEvent.change(screen.getByLabelText('Account number'), { target: { value: '0011001234567' } })
+    fireEvent.change(screen.getByLabelText(/Account holder/), { target: { value: 'NGUYEN TEST' } })
+    const form = screen.getByRole('form', { name: 'Payout bank account' })
+    fireEvent.submit(form)
+    fireEvent.submit(form)
+    await waitFor(() => expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(1))
+    await act(async () => { resolveSave(json(200, account)) })
   })
 })
 

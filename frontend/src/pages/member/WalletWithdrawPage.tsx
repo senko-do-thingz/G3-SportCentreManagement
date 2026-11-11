@@ -175,12 +175,12 @@ function RequestForm({
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null)
   const intent = useRef<{ serialized: string; key: string } | null>(null)
+  const inFlight = useRef(false)
   const available = pool === 'ACTUAL' ? data.wallet.availableBalance : data.wallet.demoAvailableBalance
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    // Synchronous guard against double clicks in the same event tick
-    if (busy) return
+    if (inFlight.current) return
     const value = Number(amount)
     if (!Number.isInteger(value) || value < 10000) {
       setMessage({ tone: 'danger', text: 'Enter a whole amount of at least 10.000 VND.' })
@@ -195,6 +195,7 @@ function RequestForm({
     }
     const serialized = `${value}|${pool}|${last4}`
     if (intent.current?.serialized !== serialized) intent.current = { serialized, key: crypto.randomUUID() }
+    inFlight.current = true
     setBusy(true)
     setMessage(null)
     onNotice(null)
@@ -211,8 +212,12 @@ function RequestForm({
       onNotice(`${created.code} requested. ${formatMoney(created.amount)} is held until reception reviews it.`)
       onChanged()
     } catch (failure) {
-      setMessage({ tone: 'danger', text: getErrorMessage(failure) })
+      setMessage({
+        tone: 'danger',
+        text: `${getErrorMessage(failure)} The outcome was not confirmed. Check My Withdrawals before retrying; retrying this unchanged request reuses the same safety key.`,
+      })
     } finally {
+      inFlight.current = false
       setBusy(false)
     }
   }
@@ -292,9 +297,12 @@ function PayoutAccountCard({
   const [holder, setHolder] = useState(account?.accountHolder ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const inFlight = useRef(false)
 
   const save = async (event: FormEvent) => {
     event.preventDefault()
+    if (inFlight.current) return
+    inFlight.current = true
     setBusy(true)
     setError(null)
     try {
@@ -305,6 +313,7 @@ function PayoutAccountCard({
     } catch (failure) {
       setError(getErrorMessage(failure))
     } finally {
+      inFlight.current = false
       setBusy(false)
     }
   }

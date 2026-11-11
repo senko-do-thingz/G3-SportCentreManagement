@@ -802,8 +802,8 @@
   .member-commerce__actions,
   .member-commerce-card__action,
   .member-commerce-quick-action,
-  button,
-  .btn {
+  .member-commerce button,
+  .member-commerce .btn {
     display: none !important;
   }
   .member-commerce {
