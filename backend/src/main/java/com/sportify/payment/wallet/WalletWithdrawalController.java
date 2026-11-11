@@ -44,7 +44,7 @@ public class WalletWithdrawalController {
     @PutMapping("/member/wallet/payout-account")
     @PreAuthorize("hasRole('MEMBER') and principal.enabled")
     public PayoutAccount savePayoutAccount(@RequestBody PayoutAccountRequest request, @AuthenticationPrincipal CustomUserDetails user) {
-        return service.savePayoutAccount(user.getUserAccount().getId(), request);
+        throw new BusinessRuleException("Wallet payout account management is no longer supported as the Wallet feature has been retired.", "WALLET_FEATURE_RETIRED");
     }
 
     @GetMapping("/member/wallet/withdrawals")
@@ -78,25 +78,25 @@ public class WalletWithdrawalController {
     @PreAuthorize("hasRole('RECEPTIONIST') and principal.enabled")
     public Withdrawal approve(@PathVariable long id, @RequestBody(required = false) DecisionRequest request,
                               @AuthenticationPrincipal CustomUserDetails user) {
-        return service.approve(id, request, user.getUserAccount().getId());
+        throw new BusinessRuleException("Wallet withdrawal approval is no longer supported as the Wallet feature has been retired.", "WALLET_FEATURE_RETIRED");
     }
 
     @PostMapping("/reception/wallet/withdrawals/{id}/reject")
     @PreAuthorize("hasRole('RECEPTIONIST') and principal.enabled")
     public Withdrawal reject(@PathVariable long id, @RequestBody DecisionRequest request, @AuthenticationPrincipal CustomUserDetails user) {
-        return service.reject(id, request, user.getUserAccount().getId());
+        throw new BusinessRuleException("Wallet withdrawal rejection is no longer supported as the Wallet feature has been retired.", "WALLET_FEATURE_RETIRED");
     }
 
     @PostMapping("/reception/wallet/withdrawals/{id}/complete")
     @PreAuthorize("hasRole('RECEPTIONIST') and principal.enabled")
     public Withdrawal complete(@PathVariable long id, @RequestBody(required = false) CompleteRequest request,
                                @AuthenticationPrincipal CustomUserDetails user) {
-        return service.complete(id, request, user.getUserAccount().getId());
+        throw new BusinessRuleException("Wallet withdrawal completion is no longer supported as the Wallet feature has been retired.", "WALLET_FEATURE_RETIRED");
     }
 
     @PostMapping("/reception/wallet/withdrawals/{id}/fail")
     @PreAuthorize("hasRole('RECEPTIONIST') and principal.enabled")
     public Withdrawal fail(@PathVariable long id, @RequestBody DecisionRequest request, @AuthenticationPrincipal CustomUserDetails user) {
-        return service.fail(id, request, user.getUserAccount().getId());
+        throw new BusinessRuleException("Wallet withdrawal processing is no longer supported as the Wallet feature has been retired.", "WALLET_FEATURE_RETIRED");
     }
 }

@@ -45,6 +45,54 @@ class WalletRetirementTest {
     }
 
     @Test
+    void cancellingTopUpThrowsWalletFeatureRetired() {
+        var service = mock(WalletTopUpService.class);
+        var controller = new WalletTopUpController(service);
+
+        assertThatThrownBy(() -> controller.cancel(10L, user))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Wallet top-up cancellation is no longer supported")
+                .extracting(e -> ((BusinessRuleException) e).getCode())
+                .isEqualTo("WALLET_FEATURE_RETIRED");
+    }
+
+    @Test
+    void confirmingTopUpThrowsWalletFeatureRetired() {
+        var service = mock(WalletTopUpService.class);
+        var controller = new WalletTopUpController(service);
+
+        assertThatThrownBy(() -> controller.confirm(10L, new WalletTopUpService.ConfirmRequest(BigDecimal.valueOf(100000), "REF1234", "note"), user))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Wallet top-up confirmation is no longer supported")
+                .extracting(e -> ((BusinessRuleException) e).getCode())
+                .isEqualTo("WALLET_FEATURE_RETIRED");
+    }
+
+    @Test
+    void rejectingTopUpThrowsWalletFeatureRetired() {
+        var service = mock(WalletTopUpService.class);
+        var controller = new WalletTopUpController(service);
+
+        assertThatThrownBy(() -> controller.reject(10L, new WalletTopUpService.RejectRequest("reason"), user))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Wallet top-up rejection is no longer supported")
+                .extracting(e -> ((BusinessRuleException) e).getCode())
+                .isEqualTo("WALLET_FEATURE_RETIRED");
+    }
+
+    @Test
+    void savingPayoutAccountThrowsWalletFeatureRetired() {
+        var service = mock(WalletWithdrawalService.class);
+        var controller = new WalletWithdrawalController(service);
+
+        assertThatThrownBy(() -> controller.savePayoutAccount(new WalletWithdrawalService.PayoutAccountRequest("970436", "0011001234567", "NGUYEN VAN A"), user))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Wallet payout account management is no longer supported")
+                .extracting(e -> ((BusinessRuleException) e).getCode())
+                .isEqualTo("WALLET_FEATURE_RETIRED");
+    }
+
+    @Test
     void creatingWithdrawalThrowsWalletFeatureRetired() {
         var service = mock(WalletWithdrawalService.class);
         var controller = new WalletWithdrawalController(service);
@@ -52,6 +100,54 @@ class WalletRetirementTest {
         assertThatThrownBy(() -> controller.create(new WalletWithdrawalService.CreateRequest(BigDecimal.valueOf(50000), WalletLedgerService.Pool.ACTUAL, "1234"), "key-2", user))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Wallet withdrawal is no longer supported")
+                .extracting(e -> ((BusinessRuleException) e).getCode())
+                .isEqualTo("WALLET_FEATURE_RETIRED");
+    }
+
+    @Test
+    void approvingWithdrawalThrowsWalletFeatureRetired() {
+        var service = mock(WalletWithdrawalService.class);
+        var controller = new WalletWithdrawalController(service);
+
+        assertThatThrownBy(() -> controller.approve(20L, new WalletWithdrawalService.DecisionRequest("note"), user))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Wallet withdrawal approval is no longer supported")
+                .extracting(e -> ((BusinessRuleException) e).getCode())
+                .isEqualTo("WALLET_FEATURE_RETIRED");
+    }
+
+    @Test
+    void rejectingWithdrawalThrowsWalletFeatureRetired() {
+        var service = mock(WalletWithdrawalService.class);
+        var controller = new WalletWithdrawalController(service);
+
+        assertThatThrownBy(() -> controller.reject(20L, new WalletWithdrawalService.DecisionRequest("note"), user))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Wallet withdrawal rejection is no longer supported")
+                .extracting(e -> ((BusinessRuleException) e).getCode())
+                .isEqualTo("WALLET_FEATURE_RETIRED");
+    }
+
+    @Test
+    void completingWithdrawalThrowsWalletFeatureRetired() {
+        var service = mock(WalletWithdrawalService.class);
+        var controller = new WalletWithdrawalController(service);
+
+        assertThatThrownBy(() -> controller.complete(20L, new WalletWithdrawalService.CompleteRequest("PO123456", "note"), user))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Wallet withdrawal completion is no longer supported")
+                .extracting(e -> ((BusinessRuleException) e).getCode())
+                .isEqualTo("WALLET_FEATURE_RETIRED");
+    }
+
+    @Test
+    void failingWithdrawalThrowsWalletFeatureRetired() {
+        var service = mock(WalletWithdrawalService.class);
+        var controller = new WalletWithdrawalController(service);
+
+        assertThatThrownBy(() -> controller.fail(20L, new WalletWithdrawalService.DecisionRequest("note"), user))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Wallet withdrawal processing is no longer supported")
                 .extracting(e -> ((BusinessRuleException) e).getCode())
                 .isEqualTo("WALLET_FEATURE_RETIRED");
     }
