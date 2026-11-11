@@ -15,6 +15,7 @@ type ChatMessage = {
   text: string
   result?: Consultation
   error?: boolean
+  questionText?: string
 }
 
 export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
@@ -79,7 +80,7 @@ export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
     setPending(true)
     try {
       const result = await trainingGuidanceApi.consult(question)
-      setMessages((current) => [...current, { id: nextMessageId.current++, role: 'assistant', text: result.answer, result }])
+      setMessages((current) => [...current, { id: nextMessageId.current++, role: 'assistant', text: result.answer, result, questionText: question }])
     } catch (error) {
       const text = error instanceof Error && error.message ? error.message : 'Spori could not load a grounded answer. Please try again or open the full assistant.'
       setMessages((current) => [...current, { id: nextMessageId.current++, role: 'assistant', text, error: true }])
@@ -126,11 +127,38 @@ export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
             <p className="member-concept__assistant-copy">Hello! I can help with center sessions, packages, booking guidance, and your own Sportify records. I cannot change bookings or payments.</p>
             <div className="member-concept__assistant-prompts" aria-label="Suggested questions">{PROMPTS.map((question) => <button type="button" key={question} onClick={() => setDraft(question)}>{question}<span aria-hidden="true">&gt;</span></button>)}</div>
           </div>}
-          {messages.map((message) => <article className={`member-concept__assistant-message member-concept__assistant-message--${message.role}${message.error ? ' is-error' : ''}`} key={message.id}>
-            <strong>{message.role === 'user' ? 'You' : 'Spori'}</strong>
-            <p>{message.text}</p>
-            {message.result?.sources.length ? <ul>{message.result.sources.map((source) => <li key={`${message.id}-${source.kind}-${source.id}`}><Link to={source.path} onClick={close}>{source.title}</Link><span>{source.detail}</span></li>)}</ul> : null}
-          </article>)}
+          {messages.map((message) => (
+            <article className={`member-concept__assistant-message member-concept__assistant-message--${message.role}${message.error ? ' is-error' : ''}`} key={message.id}>
+              <strong>{message.role === 'user' ? 'You' : 'Spori'}</strong>
+              {message.result?.status === 'NO_ANSWER' ? (
+                <div className="member-concept__assistant-no-answer">
+                  <p>
+                    {message.result.language === 'vi'
+                      ? 'Tôi không tìm thấy câu trả lời chắc chắn cho câu hỏi của bạn. Bạn có thể liên hệ Lễ tân Sportify để được hỗ trợ thêm.'
+                      : "I couldn't find a reliable answer to your question. You can contact Sportify Reception for further assistance."}
+                  </p>
+                  <p className="member-concept__assistant-steps">
+                    {message.result.language === 'vi'
+                      ? 'Mở mục Liên hệ Lễ tân, chọn chủ đề, nhập câu hỏi và gửi; phản hồi sẽ hiển thị trong Yêu cầu hỗ trợ của tôi.'
+                      : 'Open Contact Reception, choose a topic, enter the question and submit; replies appear in My support requests.'}
+                  </p>
+                  <div className="member-concept__assistant-actions" style={{ marginTop: '8px' }}>
+                    <Link
+                      to="/member/support"
+                      state={{ question: message.questionText, excerpt: `Question: ${message.questionText}\nSpori AI: ${message.result.answer}` }}
+                      onClick={close}
+                      className="btn btn--secondary btn--sm"
+                    >
+                      {message.result.language === 'vi' ? 'Liên hệ Lễ tân' : 'Contact Receptionist'}
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <p>{message.text}</p>
+              )}
+              {message.result?.sources.length ? <ul>{message.result.sources.map((source) => <li key={`${message.id}-${source.kind}-${source.id}`}><Link to={source.path} onClick={close}>{source.title}</Link><span>{source.detail}</span></li>)}</ul> : null}
+            </article>
+          ))}
           {pending && <div className="member-concept__assistant-typing" role="status"><span aria-hidden="true" />Spori is checking Sportify data...</div>}
         </div>
 
