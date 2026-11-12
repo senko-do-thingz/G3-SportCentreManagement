@@ -29,7 +29,7 @@ export function AddStaffAccountModal({ onClose, onSuccess }: { onClose: () => vo
         <Input label="Full name" name="fullName" value={draft.fullName} onChange={(event) => change('fullName', event.target.value)} error={form.errors.fullName} maxLength={100} required autoComplete="name" />
         <Input label="Email address" name="email" type="email" value={draft.email} onChange={(event) => change('email', event.target.value)} error={form.errors.email} maxLength={255} required autoComplete="email" />
         <Input label="Phone number" name="phone" type="tel" value={draft.phone} onChange={(event) => change('phone', event.target.value)} error={form.errors.phone} maxLength={20} required autoComplete="tel" />
-        <Select label="Role" name="role" value={draft.role} onChange={(event) => { change('role', event.target.value as StaffRole); change('sportIds', []) }} error={form.errors.role} options={[{ value: 'RECEPTIONIST', label: 'Receptionist' }, { value: 'COACH', label: 'Coach' }, { value: 'MANAGER', label: 'Manager' }]} required />
+        <Select label="Role" name="role" value={draft.role} onChange={(event) => { change('role', event.target.value as StaffRole); change('sportIds', []) }} error={form.errors.role} options={[{ value: 'RECEPTIONIST', label: 'Receptionist' }, { value: 'COACH', label: 'Coach' }]} required />
         <div className="manager-form-full">
           <PasswordInput label="Temporary password" name="temporaryPassword" autoComplete="new-password" value={draft.temporaryPassword} onChange={(event) => change('temporaryPassword', event.target.value)} error={form.errors.temporaryPassword} maxLength={64} required />
           <PasswordRules id="staff-password-rules" password={draft.temporaryPassword} />

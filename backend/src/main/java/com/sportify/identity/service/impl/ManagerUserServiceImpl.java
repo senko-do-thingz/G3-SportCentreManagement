@@ -48,7 +48,8 @@ public class ManagerUserServiceImpl implements ManagerUserService {
 
     private static final String ROLE_COACH = "COACH";
     private static final Set<String> ALL_ROLES = Set.of("MEMBER", "COACH", "RECEPTIONIST", "MANAGER");
-    private static final Set<String> STAFF_ROLES = Set.of("RECEPTIONIST", "COACH", "MANAGER");
+    private static final Set<String> STAFF_ROLES = Set.of("RECEPTIONIST", "COACH");
+    private static final String MEMBER_RESET_PASSWORD = "SportifyDemo2026!";
 
     private static final String ENTITY_TYPE = "USER_ACCOUNT";
 
@@ -77,7 +78,7 @@ public class ManagerUserServiceImpl implements ManagerUserService {
     public ManagerUserResponse createStaffAccount(StaffAccountCreateRequest request, UserAccount actor) {
         String roleCode = request.role().trim().toUpperCase(Locale.ROOT);
         if (!STAFF_ROLES.contains(roleCode)) {
-            throw new BusinessRuleException("Role must be one of RECEPTIONIST, COACH, MANAGER");
+            throw new BusinessRuleException("Role must be one of RECEPTIONIST, COACH");
         }
 
         List<Long> sportIds = request.sportIds() == null ? List.of() : request.sportIds().stream().distinct().toList();
@@ -165,6 +166,25 @@ public class ManagerUserServiceImpl implements ManagerUserService {
                 .build());
 
         return userMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public void resetMemberPassword(Long userId, UserAccount actor) {
+        UserAccount user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        if (!"MEMBER".equals(user.getRole().getCode())) {
+            throw new BusinessRuleException("Only Member passwords can be reset");
+        }
+        user.setPasswordHash(passwordEncoder.encode(MEMBER_RESET_PASSWORD));
+        userRepository.save(user);
+        auditService.record(AuditEvent.builder()
+                .actor(actor)
+                .action(AuditAction.PASSWORD_RESET_COMPLETED)
+                .entityType(ENTITY_TYPE)
+                .entityId(user.getId())
+                .summary("Manager reset Member password")
+                .build());
     }
 
     private String normalizeRoleFilter(String role) {

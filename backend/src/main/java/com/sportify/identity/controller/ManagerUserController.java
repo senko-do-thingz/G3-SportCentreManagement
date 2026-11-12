@@ -60,6 +60,14 @@ public class ManagerUserController {
         return ResponseEntity.ok(managerUserService.changeStatus(id, request.status(), actor(principal)));
     }
 
+    @PostMapping("/{id}/reset-password")
+    public ResponseEntity<Void> resetMemberPassword(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        managerUserService.resetMemberPassword(id, actor(principal));
+        return ResponseEntity.noContent().build();
+    }
+
     private static UserAccount actor(CustomUserDetails principal) {
         return principal == null ? null : principal.getUserAccount();
     }

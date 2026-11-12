@@ -17,6 +17,9 @@ export const managerUsersApi = {
   changeStatus(id: number, status: AccountStatus): Promise<ManagerUser> {
     return api.patch(`/manager/users/${id}/status`, { status })
   },
+  resetMemberPassword(id: number): Promise<void> {
+    return api.post(`/manager/users/${id}/reset-password`)
+  },
   async coachProfile(id: number, signal?: AbortSignal): Promise<ManagerCoachProfile> {
     const response = await api.get<ManagerCoachProfile>(`/manager/users/${id}/coach-profile`, { signal })
     if (!response || response.userId !== id || typeof response.isPublic !== 'boolean') throw new Error('The coach profile service returned an unexpected response.')
