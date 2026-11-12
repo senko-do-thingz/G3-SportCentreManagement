@@ -87,6 +87,10 @@ export function ReceptionPaymentPage() {
   const [params] = useSearchParams()
   const id = positiveId(paymentId)
   const memberId = positiveId(params.get('memberId'))
+  const requestedReturn = params.get('returnTo')
+  const bookingReturn = memberId !== null && requestedReturn?.startsWith('/reception/bookings/new?')
+    && positiveId(new URLSearchParams(requestedReturn.split('?')[1]).get('memberId')) === memberId
+    ? requestedReturn : null
 
   const load = useCallback(
     (signal: AbortSignal) =>
@@ -105,6 +109,7 @@ export function ReceptionPaymentPage() {
           Member profile
         </Link>
       )}
+      {bookingReturn && <Link className={buttonClassName('secondary', 'md')} to={bookingReturn}>Return to selected session</Link>}
     </div>
   )
 
@@ -148,6 +153,7 @@ export function ReceptionPaymentPage() {
             Member profile
           </Link>
         )}
+        {bookingReturn && <Link className={buttonClassName('secondary', 'md')} to={bookingReturn}>Return to selected session</Link>}
       </div>
     )
     return <VerifyPayment key={data.id} payment={data} actions={pendingActions} onDone={reload} />

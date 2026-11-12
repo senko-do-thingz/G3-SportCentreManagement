@@ -1,0 +1,49 @@
+[
+  {
+    "name": "reception recommendations",
+    "passed": true,
+    "detail": [
+      "Basketball - 30-day package (Coach-led)",
+      "Basketball - Single session (Coach-led)",
+      "Basketball - 90-day package (Coach-led)"
+    ]
+  },
+  {
+    "name": "no mismatched recommendations",
+    "passed": true,
+    "detail": [
+      "Basketball - 30-day package (Coach-led)",
+      "Basketball - Single session (Coach-led)",
+      "Basketball - 90-day package (Coach-led)"
+    ]
+  },
+  {
+    "name": "registration handoff",
+    "passed": true,
+    "detail": {
+      "memberId": "28",
+      "sessionId": "131126BK01",
+      "packageId": "7",
+      "selected": "7"
+    }
+  },
+  {
+    "name": "reception return",
+    "passed": true,
+    "detail": "http://localhost:15173/reception/bookings/new?memberId=28&sessionId=131126BK01&week=2026-11-13"
+  },
+  {
+    "name": "member recommendations",
+    "passed": true,
+    "detail": [
+      "Basketball - 30-day package (Coach-led)",
+      "Basketball - Single session (Coach-led)",
+      "Basketball - 90-day package (Coach-led)"
+    ]
+  },
+  {
+    "name": "member package handoff",
+    "passed": true,
+    "detail": "http://localhost:15173/member/packages/7?sport=3&format=COACH_LED&sessionId=131126BK01&sessionDate=2026-11-13&returnTo=%2Fmember%2Fclasses"
+  }
+]

@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
+import { parseSessionReference } from '../../api/sessionIdentity'
 import { PAYMENT_PATHS } from './paymentsModel'
 
 export interface PaymentNavProps {
@@ -11,13 +12,16 @@ export interface PaymentNavProps {
  * status and My payments. Hidden when printing.
  */
 export function PaymentNav({ paymentId }: PaymentNavProps) {
+  const location = useLocation()
+  const selectedSession = parseSessionReference(new URLSearchParams(location.search).get('sessionId'))
+  const sessionQuery = selectedSession ? `?${new URLSearchParams({ sessionId: String(selectedSession) })}` : ''
   const linkClass = ({ isActive }: { isActive: boolean }) => `payment-nav__link${isActive ? ' payment-nav__link--active' : ''}`
   return (
     <nav className="payment-nav no-print" aria-label="Payment pages">
-      <NavLink to={PAYMENT_PATHS.summary(paymentId)} end className={linkClass}>
+      <NavLink to={`${PAYMENT_PATHS.summary(paymentId)}${sessionQuery}`} end className={linkClass}>
         Payment summary
       </NavLink>
-      <NavLink to={PAYMENT_PATHS.status(paymentId)} end className={linkClass}>
+      <NavLink to={`${PAYMENT_PATHS.status(paymentId)}${sessionQuery}`} end className={linkClass}>
         Payment status
       </NavLink>
       <NavLink to={PAYMENT_PATHS.list} end className={linkClass}>
