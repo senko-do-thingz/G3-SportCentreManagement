@@ -497,7 +497,7 @@ describe('FE-05 Register and Renew (F1-14)', () => {
     const user = userEvent.setup()
     const form = await screen.findByRole('form', { name: 'Sell a sport package' })
     await user.selectOptions(within(form).getByLabelText(/^Package/), '4')
-    expect(within(form).getByLabelText(/Start date/)).toHaveValue('2026-10-13')
+    expect(within(form).getByLabelText(/Start date/)).toHaveValue('13/10/2026')
     const summary = screen.getByRole('region', { name: 'Fee summary' })
     expect(within(summary).getByText('New registration')).toBeInTheDocument()
     expect(within(summary).getByText('10% - 90.000 VND')).toBeInTheDocument()
@@ -525,6 +525,21 @@ describe('FE-05 Register and Renew (F1-14)', () => {
     expect(within(receipt).getByRole('link', { name: 'View receipt' })).toHaveAttribute('href', '/reception/payments/60')
   })
 
+  it('DEF-311-01 does not register or collect payment when the visible start date is invalid', async () => {
+    const { calls } = await open('/reception/register?memberId=2')
+    const user = userEvent.setup()
+    const form = await screen.findByRole('form', { name: 'Sell a sport package' })
+    await user.selectOptions(within(form).getByLabelText(/^Package/), '4')
+    await user.click(within(form).getByRole('button', { name: 'Use exact amount' }))
+    const startDate = within(form).getByLabelText(/Start date/)
+    await user.clear(startDate)
+    await user.type(startDate, '31/11/2026')
+    await user.click(within(form).getByRole('button', { name: 'Record payment and register' }))
+    expect(await within(form).findByText('Enter a valid date in dd/MM/yyyy format.')).toBeInTheDocument()
+    expect(calls.some((call) => call.path === '/packages/registrations' && call.method === 'POST')).toBe(false)
+    expect(screen.queryByRole('region', { name: 'Sale recorded' })).not.toBeInTheDocument()
+  })
+
   it('TC-FE05-042 a transfer needs its reference and the exact amount before anything is sent', async () => {
     const { calls } = await open('/reception/register?memberId=2')
     const user = userEvent.setup()
@@ -542,7 +557,7 @@ describe('FE-05 Register and Renew (F1-14)', () => {
     await open('/reception/register?memberId=2&packageId=2')
     const form = await screen.findByRole('form', { name: 'Sell a sport package' })
     expect(within(form).getByLabelText(/^Package/)).toHaveValue('2')
-    expect(within(form).getByLabelText(/Start date/)).toHaveValue('2026-10-25')
+    expect(within(form).getByLabelText(/Start date/)).toHaveValue('25/10/2026')
     expect(within(screen.getByRole('region', { name: 'Fee summary' })).getByText('Renewal')).toBeInTheDocument()
   })
 

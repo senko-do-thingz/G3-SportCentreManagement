@@ -6,6 +6,7 @@ import { packagesApi } from '../../api/packagesApi'
 import { trainingGuidanceApi, type SportLevel, type TrainingContext } from '../../api/trainingGuidanceApi'
 import type { UserProfile } from '../../api/types'
 import { Button, Card, Input, PageHeader, Select } from '../../components/ui'
+import { formatCalendarDate } from '../../utils/dateDisplay'
 import { ActionMessage } from '../training/TrainingFormFields'
 import { useTrainingAction } from '../training/trainingFormState'
 import { GOAL_OPTIONS, LEVEL_OPTIONS } from './profileValidation'
@@ -39,7 +40,7 @@ export function MemberTrainingGoalsPage() {
           <div><dt>General level</dt><dd>{label(LEVEL_OPTIONS, data.context.currentLevel)}</dd></div>
           <div><dt>Age group check</dt><dd>{data.context.dateOfBirthKnown ? 'Date of birth on file' : 'Add your date of birth in My profile'}</dd></div>
           {data.context.activePackages.map((item, index) => <div key={index}><dt>{item.sportName}</dt>
-            <dd>{item.trainingFormat === 'COACH_LED' ? 'Coach-led' : 'Self-training'} / {item.remainingSessions} of {item.totalSessions} sessions until {item.endDate}</dd></div>)}
+            <dd>{item.trainingFormat === 'COACH_LED' ? 'Coach-led' : 'Self-training'} / {item.remainingSessions} of {item.totalSessions} sessions until {formatCalendarDate(item.endDate)}</dd></div>)}
           {data.context.activePackages.length === 0 && <div><dt>Packages</dt><dd>No active sport package</dd></div>}
         </dl>
         <p>Suggestions use your goals and availability. You choose what to book; a recommendation never books or uses a session.</p>

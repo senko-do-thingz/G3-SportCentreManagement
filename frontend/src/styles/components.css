@@ -258,6 +258,75 @@
   box-shadow: var(--focus-ring-danger);
 }
 
+.calendar-date-field__control {
+  position: relative;
+}
+
+.calendar-date-field__text {
+  padding-right: 48px;
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-date-field__trigger {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.calendar-date-field__trigger:hover:not(:disabled) {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.calendar-date-field__trigger:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.calendar-date-field__trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.calendar-date-field__icon {
+  display: inline-block;
+  font-size: 1.15rem;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.calendar-date-field__picker {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.calendar-date-field__picker:disabled {
+  cursor: not-allowed;
+}
+
+.calendar-date-field__control:focus-within .calendar-date-field__trigger {
+  color: var(--color-primary);
+}
+
 /* Input with an element inside on the right, for example the password Show or Hide button */
 .input-wrap {
   position: relative;

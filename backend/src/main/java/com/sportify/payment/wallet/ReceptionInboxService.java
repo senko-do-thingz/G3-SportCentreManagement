@@ -32,24 +32,10 @@ public class ReceptionInboxService {
 
     /** Source queries for currently open tasks: (event key, title, content, created_at). */
     private static final String OPEN_TASKS = """
-            SELECT 'WALLET_TOPUP:' + CAST(t.id AS VARCHAR(20)) AS event_key,
-                   N'Verify wallet top-up ' + t.topup_code AS title,
-                   CONCAT(N'Member ', m.member_code, N' requested ', FORMAT(t.amount, 'N0'), N' VND',
-                          CASE WHEN t.mode = 'SIMULATED' THEN N' (demo funds)' ELSE N'. Check the bank statement.' END) AS content,
-                   t.created_at
-            FROM dbo.wallet_topup t JOIN dbo.member_profile m ON m.user_id = t.member_id WHERE t.status = 'PENDING'
-            UNION ALL
-            SELECT 'WALLET_WITHDRAWAL:' + CAST(w.id AS VARCHAR(20)),
-                   N'Review wallet withdrawal ' + w.withdrawal_code,
-                   CONCAT(N'Member ', m.member_code, N' asked to withdraw ', FORMAT(w.amount, 'N0'), N' VND',
-                          CASE WHEN w.pool = 'SIMULATED' THEN N' (demo funds)' ELSE N'.' END),
-                   w.created_at
-            FROM dbo.wallet_withdrawal w JOIN dbo.member_profile m ON m.user_id = w.member_id WHERE w.status IN ('PENDING', 'APPROVED')
-            UNION ALL
-            SELECT 'PAYMENT_EXCEPTION:' + CAST(p.id AS VARCHAR(20)),
-                   N'Payment needs review ' + p.payment_code,
-                   N'An amount mismatch was recorded. The payment is still pending.',
-                   p.updated_at
+            SELECT 'PAYMENT_EXCEPTION:' + CAST(p.id AS VARCHAR(20)) AS event_key,
+                   N'Payment needs review ' + p.payment_code AS title,
+                   N'An amount mismatch was recorded. The payment is still pending.' AS content,
+                   p.updated_at AS created_at
             FROM dbo.payment p WHERE p.payment_status = 'PENDING' AND p.notes LIKE N'%Amount mismatch:%'
             UNION ALL
             SELECT 'SUPPORT_REQUEST:' + CAST(s.id AS VARCHAR(20)),
@@ -80,7 +66,9 @@ public class ReceptionInboxService {
         sync(receptionistId);
         List<Item> items = jdbc.query("""
                 SELECT TOP 100 n.id, n.title, n.content, n.created_at, n.is_read, n.event_key FROM dbo.notification n
-                WHERE n.user_id = ? AND n.type = ? ORDER BY n.created_at DESC, n.id DESC""",
+                WHERE n.user_id = ? AND n.type = ?
+                  AND (n.event_key IS NULL OR n.event_key NOT LIKE 'WALLET_%')
+                ORDER BY n.created_at DESC, n.id DESC""",
                 (rs, row) -> item(rs.getLong("id"), rs.getString("title"), rs.getString("content"),
                         rs.getTimestamp("created_at").toLocalDateTime(), rs.getBoolean("is_read"), rs.getString("event_key")),
                 receptionistId, TYPE);
@@ -115,8 +103,7 @@ public class ReceptionInboxService {
             default -> "UNKNOWN";
         };
         boolean open = switch (type) {
-            case "WALLET_TOPUP", "PAYMENT_EXCEPTION" -> "PENDING".equals(status);
-            case "WALLET_WITHDRAWAL" -> "PENDING".equals(status) || "APPROVED".equals(status);
+            case "PAYMENT_EXCEPTION" -> "PENDING".equals(status);
             case "SUPPORT_REQUEST" -> "OPEN".equals(status) || "IN_PROGRESS".equals(status);
             default -> false;
         };

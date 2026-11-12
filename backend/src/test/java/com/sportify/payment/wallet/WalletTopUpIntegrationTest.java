@@ -23,14 +23,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -41,14 +36,18 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** MW-04 top-ups on real SQL Server: PENDING never credits, staff confirmation credits once, and every refusal is clean. */
+/**
+ * MW-04: Wallet top-up integration test reflecting the retired wallet feature.
+ * Verifies that all wallet top-up mutations are rejected with WALLET_FEATURE_RETIRED,
+ * role authorization is enforced, historical read-only lists and details remain accessible,
+ * member data isolation is preserved, and financial balances remain unaltered.
+ */
 @AutoConfigureMockMvc
 @TestPropertySource(properties = {"app.wallet.simulated-topups-enabled=true",
         "app.payment.bank-transfer.live-instructions-enabled=true", "app.payment.bank-transfer.bank-bin=" + WalletTopUpIntegrationTest.BIN,
         "app.payment.bank-transfer.account-number=0011009990001", "app.payment.bank-transfer.account-name=SPORTIFYDEMOCENTER"})
 class WalletTopUpIntegrationTest extends AbstractIntegrationTest {
     static final SecureRandom RANDOM = new SecureRandom();
-    /** Synthetic receiving account; the bank directory is mocked so no real bank or directory freshness is involved. */
     static final String BIN = "970436";
     static final VietQrBankDirectory.Bank BANK = new VietQrBankDirectory.Bank(BIN, "VCB", "Vietcombank", true);
 
@@ -77,30 +76,107 @@ class WalletTopUpIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void pendingTopUpLeavesTheWalletUnchangedAndCarriesTheVerifiedReceivingAccount() throws Exception {
-        long id = create(member, 200_000, "ACTUAL", key()).andExpect(status().isCreated())
-                .andExpect(jsonPath("$.status").value("PENDING"))
-                .andExpect(jsonPath("$.code").value(org.hamcrest.Matchers.startsWith("TU-")))
-                .andExpect(jsonPath("$.instructions.payable").value(true))
-                .andExpect(jsonPath("$.instructions.bankBin").value(BIN))
-                .andExpect(jsonPath("$.instructions.qrPayload").exists())
-                .andReturn().getResponse().getContentAsString().transform(this::id);
+    void allTopUpMutationsAreRejectedWithWalletFeatureRetired() throws Exception {
+        // 1. Member create top-up is rejected
+        create(member, 200_000, "ACTUAL", key())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("WALLET_FEATURE_RETIRED"))
+                .andExpect(jsonPath("$.message").value("Wallet top-up is no longer supported as the Wallet feature has been retired."));
+
         assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo("0");
         assertThat(ledger.entryCount(member)).isZero();
-        mvc.perform(get("/api/v1/member/wallet/topups").with(user(details(member))))
-                .andExpect(jsonPath("$.topUps[0].id").value(id))
-                .andExpect(jsonPath("$.topUps[0].status").value("PENDING"));
+        assertThat(count("SELECT COUNT(*) FROM wallet_topup WHERE member_id=?", member)).isZero();
+
+        // Insert historical topup directly for remaining mutation tests
+        long topUpId = insertHistoricalTopUp(member, 150_000, "PENDING");
+
+        // 2. Member cancel top-up is rejected
+        mvc.perform(post("/api/v1/member/wallet/topups/" + topUpId + "/cancel").with(user(details(member))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("WALLET_FEATURE_RETIRED"))
+                .andExpect(jsonPath("$.message").value("Wallet top-up cancellation is no longer supported as the Wallet feature has been retired."));
+
+        // 3. Receptionist confirm top-up is rejected
+        confirm(receptionist, topUpId, 150_000, "FT123456")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("WALLET_FEATURE_RETIRED"))
+                .andExpect(jsonPath("$.message").value("Wallet top-up confirmation is no longer supported as the Wallet feature has been retired."));
+
+        // 4. Receptionist reject top-up is rejected
+        mvc.perform(post("/api/v1/reception/wallet/topups/" + topUpId + "/reject").with(user(details(receptionist)))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"No longer valid\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("WALLET_FEATURE_RETIRED"))
+                .andExpect(jsonPath("$.message").value("Wallet top-up rejection is no longer supported as the Wallet feature has been retired."));
+
+        // Verify status and balance remained unchanged
+        assertThat(jdbc.queryForObject("SELECT status FROM wallet_topup WHERE id=?", String.class, topUpId)).isEqualTo("PENDING");
+        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo("0");
+        assertThat(ledger.entryCount(member)).isZero();
     }
 
     @Test
-    void withoutAVerifiedReceivingAccountNoRealTopUpCanBeCreatedOrCredited() throws Exception {
-        when(directory.supported(BIN)).thenReturn(Optional.empty());
-        create(member, 200_000, "ACTUAL", key()).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("TOPUP_NOT_PAYABLE"));
+    void roleAuthorizationIsStrictlyEnforcedOnAllTopUpEndpoints() throws Exception {
+        long topUpId = insertHistoricalTopUp(member, 100_000, "PENDING");
+
+        // Unauthenticated mutations return 401
+        mvc.perform(post("/api/v1/member/wallet/topups").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":100000,\"mode\":\"ACTUAL\"}")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/member/wallet/topups/" + topUpId + "/cancel")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/reception/wallet/topups/" + topUpId + "/confirm").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"receivedAmount\":100000,\"bankReference\":\"FT1\"}")).andExpect(status().isUnauthorized());
+
+        // Receptionist cannot invoke member mutation endpoints
+        mvc.perform(post("/api/v1/member/wallet/topups").with(user(details(receptionist))).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":100000,\"mode\":\"ACTUAL\"}")).andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/member/wallet/topups/" + topUpId + "/cancel").with(user(details(receptionist))))
+                .andExpect(status().isForbidden());
+
+        // Member cannot invoke receptionist endpoints
+        confirm(member, topUpId, 100_000, "FT1").andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/reception/wallet/topups/" + topUpId + "/reject").with(user(details(member)))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"No\"}")).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/reception/wallet/topups").with(user(details(member)))).andExpect(status().isForbidden());
+
+        // Manager cannot confirm receptionist topup (requires RECEPTIONIST)
+        confirm(manager, topUpId, 100_000, "FTMGR").andExpect(status().isForbidden());
+    }
+
+    @Test
+    void readOnlyHistoryAndDetailsRemainAccessibleWithMemberIsolation() throws Exception {
+        long ownTopUp = insertHistoricalTopUp(member, 200_000, "PENDING");
+        long otherTopUp = insertHistoricalTopUp(otherMember, 300_000, "PENDING");
+
+        // Member reads own topups list
         mvc.perform(get("/api/v1/member/wallet/topups").with(user(details(member))))
-                .andExpect(jsonPath("$.realTopUpsAvailable").value(false));
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wallet_topup WHERE member_id=?", Integer.class, member)).isZero();
-        // Even a row written around the service cannot exist without the receiving account it was issued for.
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.topUps[?(@.id == " + ownTopUp + ")].amount").value(200000.0))
+                .andExpect(jsonPath("$.topUps[?(@.id == " + otherTopUp + ")]").doesNotExist());
+
+        // Member reads own topup detail
+        mvc.perform(get("/api/v1/member/wallet/topups/" + ownTopUp).with(user(details(member))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(ownTopUp))
+                .andExpect(jsonPath("$.amount").value(200000.0));
+
+        // Member cannot read another member's topup detail (404)
+        mvc.perform(get("/api/v1/member/wallet/topups/" + otherTopUp).with(user(details(member))))
+                .andExpect(status().isNotFound());
+
+        // Receptionist reads staff topup queue
+        mvc.perform(get("/api/v1/reception/wallet/topups").with(user(details(receptionist))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == " + ownTopUp + ")].status").value("PENDING"));
+
+        // Receptionist reads staff topup detail
+        mvc.perform(get("/api/v1/reception/wallet/topups/" + ownTopUp).with(user(details(receptionist))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(ownTopUp))
+                .andExpect(jsonPath("$.amount").value(200000.0));
+    }
+
+    @Test
+    void databaseConstraintsProtectBeneficiaryIntegrity() {
         ledger.ensureWallet(member);
         assertThatThrownBy(() -> jdbc.update("INSERT INTO wallet_topup (member_id, mode, amount, status, created_at, updated_at)"
                 + " VALUES (?, 'ACTUAL', 200000, 'PENDING', SYSDATETIME(), SYSDATETIME())", member))
@@ -109,285 +185,24 @@ class WalletTopUpIntegrationTest extends AbstractIntegrationTest {
         assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo("0");
     }
 
-    @Test
-    void receptionistConfirmationCreditsExactlyOnceAndRecordsActorTimeAndReference() throws Exception {
-        long id = id(create(member, 150_000, "ACTUAL", key()).andReturn().getResponse().getContentAsString());
-        confirm(receptionist, id, 150_000, "FT26110812345").andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("CONFIRMED"))
-                .andExpect(jsonPath("$.bankReference").value("FT26110812345"))
-                .andExpect(jsonPath("$.reviewedAt").exists());
-        confirm(otherReceptionist, id, 150_000, "FT26110812345").andExpect(status().isConflict());
-        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo("150000");
-        assertThat(ledger.entryCount(member)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT reviewed_by FROM wallet_topup WHERE id=?", Long.class, id)).isEqualTo(receptionist);
-    }
-
-    @Test
-    void concurrentConfirmationsOfOneTopUpCreditOnce() throws Exception {
-        long id = id(create(member, 90_000, "ACTUAL", key()).andReturn().getResponse().getContentAsString());
-        ExecutorService pool = Executors.newFixedThreadPool(4);
-        CountDownLatch start = new CountDownLatch(1);
-        List<Future<Integer>> results = new ArrayList<>();
-        for (int i = 0; i < 4; i++) {
-            long staff = i % 2 == 0 ? receptionist : otherReceptionist;
-            results.add(pool.submit(() -> { start.await(); return confirm(staff, id, 90_000, "FTRACE" + id).andReturn().getResponse().getStatus(); }));
-        }
-        start.countDown();
-        List<Integer> statuses = new ArrayList<>();
-        for (Future<Integer> result : results) statuses.add(result.get());
-        pool.shutdown();
-        assertThat(statuses).containsOnlyOnce(200);
-        assertThat(statuses.stream().filter(s -> s == 409).count()).isEqualTo(3);
-        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo("90000");
-        assertThat(ledger.entryCount(member)).isEqualTo(1);
-    }
-
-    @Test
-    void wrongAmountMissingOrReusedReferenceAndRejectedRequestsChangeNoBalance() throws Exception {
-        long first = id(create(member, 100_000, "ACTUAL", key()).andReturn().getResponse().getContentAsString());
-        confirm(receptionist, first, 99_000, "FTWRONGAMT").andExpect(status().isConflict());
-        confirm(receptionist, first, 100_000, null).andExpect(status().isBadRequest());
-        confirm(receptionist, first, 100_000, "FTSAME" + first).andExpect(status().isOk());
-        long second = id(create(member, 100_000, "ACTUAL", key()).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
-        confirm(receptionist, second, 100_000, "FTSAME" + first).andExpect(status().isConflict());
-        assertThat(jdbc.queryForObject("SELECT status FROM wallet_topup WHERE id=?", String.class, second)).isEqualTo("PENDING");
-        mvc.perform(post("/api/v1/reception/wallet/topups/" + second + "/reject").with(user(details(receptionist)))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"No matching bank transfer\"}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REJECTED"));
-        confirm(receptionist, second, 100_000, "FTLATE" + second).andExpect(status().isConflict());
-        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo("100000");
-        assertThat(ledger.entryCount(member)).isEqualTo(1);
-    }
-
-    @Test
-    void demoTopUpCreditsOnlyTheDemoPoolAndNeverTakesABankReference() throws Exception {
-        long id = id(create(member, 50_000, "SIMULATED", key()).andExpect(status().isCreated())
-                .andExpect(jsonPath("$.instructions.notice").value(org.hamcrest.Matchers.startsWith("DEMO TOP-UP")))
-                .andReturn().getResponse().getContentAsString());
-        confirm(receptionist, id, 50_000, "FTDEMO").andExpect(status().isBadRequest());
-        confirm(receptionist, id, 50_000, null).andExpect(status().isOk());
-        var balance = ledger.balance(member);
-        assertThat(balance.simulatedAvailable()).isEqualByComparingTo("50000");
-        assertThat(balance.actualAvailable()).isEqualByComparingTo("0");
-    }
-
-    @Test
-    void invalidAmountsIdempotentRetriesAndOnlyOnePendingTopUp() throws Exception {
-        create(member, 9_999, "ACTUAL", key()).andExpect(status().isBadRequest());
-        create(member, 50_000_001, "ACTUAL", key()).andExpect(status().isBadRequest());
-        String retry = key();
-        long a = id(create(member, 20_000, "ACTUAL", retry).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
-        long b = id(create(member, 20_000, "ACTUAL", retry).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
-        assertThat(b).isEqualTo(a);
-        create(member, 30_000, "ACTUAL", retry).andExpect(status().isConflict());
-        create(member, 20_000, "ACTUAL", key()).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value(WalletPendingOperations.CODE_IN_FLIGHT));
-        create(member, 20_000, "SIMULATED", key()).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value(WalletPendingOperations.CODE_IN_FLIGHT));
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wallet_topup WHERE member_id=?", Integer.class, member)).isEqualTo(1);
-        mvc.perform(post("/api/v1/member/wallet/topups/" + a + "/cancel").with(user(details(member)))).andExpect(status().isOk());
-        create(member, 20_000, "ACTUAL", key()).andExpect(status().isCreated());
-        assertThat(slotCount(member)).isEqualTo(1);
-    }
-
-    @Test
-    void parallelCreatesLeaveExactlyOnePendingTopUp() throws Exception {
-        ExecutorService pool = Executors.newFixedThreadPool(6);
-        CountDownLatch start = new CountDownLatch(1);
-        List<Future<Integer>> results = new ArrayList<>();
-        for (int i = 0; i < 6; i++) {
-            String requestKey = key();
-            results.add(pool.submit(() -> { start.await(); return create(member, 30_000, "ACTUAL", requestKey).andReturn().getResponse().getStatus(); }));
-        }
-        start.countDown();
-        List<Integer> statuses = new ArrayList<>();
-        for (Future<Integer> result : results) statuses.add(result.get());
-        pool.shutdown();
-        assertThat(statuses).containsOnlyOnce(201);
-        assertThat(statuses.stream().filter(s -> s == 409).count()).isEqualTo(5);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wallet_topup WHERE member_id=? AND status='PENDING'", Integer.class, member)).isEqualTo(1);
-        assertThat(slotCount(member)).isEqualTo(1);
-    }
-
-    @Test
-    void anotherInFlightWalletOperationBlocksATopUpAndTheDatabaseRefusesASecondSlot() throws Exception {
-        ledger.ensureWallet(member);
-        jdbc.update("INSERT INTO wallet_pending_operation (member_id, operation_type, operation_id, created_at)"
-                + " VALUES (?, 'WITHDRAWAL', ?, SYSDATETIME())", member, -member);
-        try {
-            create(member, 20_000, "ACTUAL", key()).andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.code").value(WalletPendingOperations.CODE_IN_FLIGHT))
-                    .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("pending withdrawal")));
-            assertThatThrownBy(() -> jdbc.update("INSERT INTO wallet_pending_operation (member_id, operation_type, operation_id, created_at)"
-                    + " VALUES (?, 'PURCHASE', ?, SYSDATETIME())", member, -member)).isInstanceOf(DataIntegrityViolationException.class);
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wallet_topup WHERE member_id=?", Integer.class, member)).isZero();
-        } finally {
-            jdbc.update("DELETE FROM wallet_pending_operation WHERE member_id=?", member);
-        }
-    }
-
-    @Test
-    void concurrentCreateConfirmAndCancelNeverDeadlockAndKeepTheLedgerConsistent() throws Exception {
-        ExecutorService pool = Executors.newFixedThreadPool(3);
-        List<Integer> statuses = new ArrayList<>();
-        for (int round = 0; round < 6; round++) {
-            List<Long> open = jdbc.queryForList("SELECT id FROM wallet_topup WHERE member_id=? AND status='PENDING'", Long.class, member);
-            long id = open.isEmpty() ? id(create(member, 10_000, "ACTUAL", key()).andExpect(status().isCreated())
-                    .andReturn().getResponse().getContentAsString()) : open.getFirst();
-            CountDownLatch start = new CountDownLatch(1);
-            String nextKey = key();
-            List<Future<Integer>> results = List.of(
-                    pool.submit(() -> { start.await(); return confirm(receptionist, id, 10_000, "FTMIX" + id).andReturn().getResponse().getStatus(); }),
-                    pool.submit(() -> { start.await(); return mvc.perform(post("/api/v1/member/wallet/topups/" + id + "/cancel")
-                            .with(user(details(member)))).andReturn().getResponse().getStatus(); }),
-                    pool.submit(() -> { start.await(); return create(member, 10_000, "ACTUAL", nextKey).andReturn().getResponse().getStatus(); }));
-            start.countDown();
-            for (Future<Integer> result : results) statuses.add(result.get());
-        }
-        pool.shutdown();
-        // 400 is a confirmation that lost to the member's cancel (a late payment needs a note); never a 5xx deadlock victim.
-        assertThat(statuses).allMatch(s -> s == 200 || s == 201 || s == 400 || s == 409);
-        Integer confirmed = jdbc.queryForObject("SELECT COUNT(*) FROM wallet_topup WHERE member_id=? AND status='CONFIRMED'", Integer.class, member);
-        assertThat(ledger.entryCount(member)).isEqualTo(confirmed.longValue());
-        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo(BigDecimal.valueOf(10_000L * confirmed));
-        Integer pendingRows = jdbc.queryForObject("SELECT COUNT(*) FROM wallet_topup WHERE member_id=? AND status='PENDING'", Integer.class, member);
-        assertThat(pendingRows).isLessThanOrEqualTo(1);
-        assertThat(slotCount(member)).isEqualTo(pendingRows);
-    }
-
-    @Test
-    void aLatePaymentWaitsWhileAnotherWalletOperationIsInFlight() throws Exception {
-        long late = id(create(member, 70_000, "ACTUAL", key()).andReturn().getResponse().getContentAsString());
-        mvc.perform(post("/api/v1/member/wallet/topups/" + late + "/cancel").with(user(details(member)))).andExpect(status().isOk());
-        long newer = id(create(member, 20_000, "ACTUAL", key()).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
-        confirm(receptionist, late, 70_000, "FTLATEBUSY" + late, "Late transfer").andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value(WalletPendingOperations.CODE_IN_FLIGHT));
-        assertThat(jdbc.queryForObject("SELECT status FROM wallet_topup WHERE id=?", String.class, late)).isEqualTo("CANCELLED");
-        assertThat(jdbc.queryForObject("SELECT operation_id FROM wallet_pending_operation WHERE member_id=?", Long.class, member)).isEqualTo(newer);
-        assertThat(ledger.entryCount(member)).isZero();
-
-        // A pending withdrawal (MW-06) blocks it the same way.
-        mvc.perform(post("/api/v1/member/wallet/topups/" + newer + "/cancel").with(user(details(member)))).andExpect(status().isOk());
-        jdbc.update("INSERT INTO wallet_pending_operation (member_id, operation_type, operation_id, created_at)"
-                + " VALUES (?, 'WITHDRAWAL', ?, SYSDATETIME())", member, -member);
-        try {
-            confirm(receptionist, late, 70_000, "FTLATEBUSY" + late, "Late transfer").andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("WITHDRAWAL")));
-        } finally {
-            jdbc.update("DELETE FROM wallet_pending_operation WHERE member_id=?", member);
-        }
-        assertThat(ledger.entryCount(member)).isZero();
-
-        // Once nothing else is in flight, the late payment is confirmed exactly once and takes no slot.
-        confirm(receptionist, late, 70_000, "FTLATEBUSY" + late, "Late transfer").andExpect(status().isOk());
-        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo("70000");
-        assertThat(ledger.entryCount(member)).isEqualTo(1);
-        assertThat(slotCount(member)).isZero();
-    }
-
-    @Test
-    void aLateConfirmationRacingANewTopUpNeverCreditsWhileTheNewOneIsPending() throws Exception {
-        ExecutorService pool = Executors.newFixedThreadPool(2);
-        List<String> outcomes = new ArrayList<>();
-        for (int round = 0; round < 6; round++) {
-            jdbc.queryForList("SELECT id FROM wallet_topup WHERE member_id=? AND status='PENDING'", Long.class, member)
-                    .forEach(open -> {
-                        try {
-                            mvc.perform(post("/api/v1/member/wallet/topups/" + open + "/cancel").with(user(details(member))));
-                        } catch (Exception e) {
-                            throw new IllegalStateException(e);
-                        }
-                    });
-            long late = id(create(member, 10_000, "ACTUAL", key()).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
-            mvc.perform(post("/api/v1/member/wallet/topups/" + late + "/cancel").with(user(details(member)))).andExpect(status().isOk());
-            CountDownLatch start = new CountDownLatch(1);
-            String nextKey = key();
-            Future<Integer> lateConfirm = pool.submit(() -> { start.await();
-                return confirm(receptionist, late, 10_000, "FTRACELATE" + late, "Late transfer").andReturn().getResponse().getStatus(); });
-            Future<Integer> newTopUp = pool.submit(() -> { start.await();
-                return create(member, 10_000, "ACTUAL", nextKey).andReturn().getResponse().getStatus(); });
-            start.countDown();
-            int confirmStatus = lateConfirm.get();
-            int createStatus = newTopUp.get();
-            outcomes.add(confirmStatus + "/" + createStatus);
-            // Either the late payment committed first (then the new request is created after it),
-            // or the new request took the slot first and the late payment was refused.
-            assertThat(List.of("200/201", "409/201")).contains(confirmStatus + "/" + createStatus);
-        }
-        pool.shutdown();
-        Integer confirmed = jdbc.queryForObject("SELECT COUNT(*) FROM wallet_topup WHERE member_id=? AND status='CONFIRMED'", Integer.class, member);
-        assertThat(ledger.entryCount(member)).isEqualTo(confirmed.longValue());
-        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo(BigDecimal.valueOf(10_000L * confirmed));
-        Integer pendingRows = jdbc.queryForObject("SELECT COUNT(*) FROM wallet_topup WHERE member_id=? AND status='PENDING'", Integer.class, member);
-        assertThat(pendingRows).isEqualTo(1);
-        assertThat(slotCount(member)).isEqualTo(1);
-        assertThat(outcomes).hasSize(6);
-    }
-
-    @Test
-    void aMemberCancelledRealTopUpCanStillBeConfirmedAsALatePaymentWithANote() throws Exception {
-        long id = id(create(member, 70_000, "ACTUAL", key()).andReturn().getResponse().getContentAsString());
-        mvc.perform(post("/api/v1/member/wallet/topups/" + id + "/cancel").with(user(details(member))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
-        confirm(receptionist, id, 70_000, "FTLATEPAY" + id).andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("TOPUP_LATE_NOTE_REQUIRED"));
-        confirm(receptionist, id, 70_000, "FTLATEPAY" + id, "Transfer arrived after the member cancelled").andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("CONFIRMED"));
-        confirm(otherReceptionist, id, 70_000, "FTLATEPAY" + id, "Second attempt").andExpect(status().isConflict());
-        assertThat(ledger.balance(member).actualAvailable()).isEqualByComparingTo("70000");
-        assertThat(ledger.entryCount(member)).isEqualTo(1);
-        assertThat(slotCount(member)).isZero();
-    }
-
-    @Test
-    void ownershipAndRolesAreEnforced() throws Exception {
-        long id = id(create(member, 40_000, "ACTUAL", key()).andReturn().getResponse().getContentAsString());
-        mvc.perform(get("/api/v1/member/wallet/topups/" + id).with(user(details(otherMember)))).andExpect(status().isNotFound());
-        mvc.perform(post("/api/v1/member/wallet/topups/" + id + "/cancel").with(user(details(otherMember)))).andExpect(status().isNotFound());
-        confirm(member, id, 40_000, "FTSELF" + id).andExpect(status().isForbidden());
-        confirm(manager, id, 40_000, "FTMGR" + id).andExpect(status().isForbidden());
-        mvc.perform(get("/api/v1/reception/wallet/topups").with(user(details(member)))).andExpect(status().isForbidden());
-        mvc.perform(get("/api/v1/reception/wallet/topups").with(user(details(receptionist))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$[?(@.id == " + id + ")].status").value("PENDING"));
-        mvc.perform(post("/api/v1/member/wallet/topups/" + id + "/cancel").with(user(details(member))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
-        // A cancelled real-money request is only confirmable as a documented late payment (note required).
-        confirm(receptionist, id, 40_000, "FTCANCEL" + id).andExpect(status().isBadRequest());
-        assertThat(ledger.entryCount(member)).isZero();
-    }
-
-    @Test
-    void syntheticDemoIdentitiesCannotRequestRealMoneyTopUps() throws Exception {
-        long synthetic = member("@unified-demo.invalid");
-        create(synthetic, 20_000, "ACTUAL", key()).andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("SYNTHETIC_OPERATION_DENIED"));
-    }
-
     private ResultActions create(long id, long amount, String mode, String key) throws Exception {
         return mvc.perform(post("/api/v1/member/wallet/topups").with(user(details(id))).header("Idempotency-Key", key)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"amount\":" + amount + ",\"mode\":\"" + mode + "\"}"));
     }
 
     private ResultActions confirm(long staff, long id, long amount, String reference) throws Exception {
-        return confirm(staff, id, amount, reference, null);
-    }
-
-    private ResultActions confirm(long staff, long id, long amount, String reference, String note) throws Exception {
         String ref = reference == null ? "null" : "\"" + reference + "\"";
-        String text = note == null ? "null" : "\"" + note + "\"";
         return mvc.perform(post("/api/v1/reception/wallet/topups/" + id + "/confirm").with(user(details(staff)))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"receivedAmount\":" + amount + ",\"bankReference\":" + ref
-                        + ",\"note\":" + text + "}"));
+                .contentType(MediaType.APPLICATION_JSON).content("{\"receivedAmount\":" + amount + ",\"bankReference\":" + ref + "}"));
     }
 
-    private int slotCount(long memberId) {
-        return jdbc.queryForObject("SELECT COUNT(*) FROM wallet_pending_operation WHERE member_id=?", Integer.class, memberId);
-    }
-
-    private long id(String json) {
-        var matcher = java.util.regex.Pattern.compile("\"id\":(\\d+)").matcher(json);
-        assertThat(matcher.find()).isTrue();
-        return Long.parseLong(matcher.group(1));
+    private long insertHistoricalTopUp(long memberId, long amount, String status) {
+        String key = "hist-tu-" + marker + "-" + ++serial;
+        jdbc.update("""
+                INSERT INTO wallet_topup (member_id, mode, amount, status, beneficiary_bin, beneficiary_account, beneficiary_name, idempotency_key, created_at, updated_at)
+                VALUES (?, 'ACTUAL', ?, ?, '970436', '0011009990001', N'SPORTIFYDEMOCENTER', ?, SYSDATETIME(), SYSDATETIME())
+                """, memberId, amount, status, key);
+        return jdbc.queryForObject("SELECT id FROM wallet_topup WHERE idempotency_key = ?", Long.class, key);
     }
 
     private String key() { return marker + "-k" + ++serial; }
@@ -413,6 +228,5 @@ class WalletTopUpIntegrationTest extends AbstractIntegrationTest {
         }));
     }
 
-    @SuppressWarnings("unused")
-    private static BigDecimal vnd(long value) { return BigDecimal.valueOf(value); }
+    private int count(String sql, Object... args) { return jdbc.queryForObject(sql, Integer.class, args); }
 }

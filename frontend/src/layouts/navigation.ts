@@ -53,10 +53,10 @@ export const MEMBER_AREA: RoleArea = {
           screens: ['F2-07', 'F2-08'],
         },
         {
-          label: 'My schedule',
-          path: 'schedule',
-          title: 'My Schedule',
-          description: 'The sessions you have booked, week by week.',
+          label: 'Schedules & classes',
+          path: 'schedules',
+          title: 'Schedules & Bookings',
+          description: 'Center sessions, your schedule, class discovery and bookings in one workspace.',
           task: 'FE-08',
           screens: ['F2-04', 'F2-05', 'F2-06'],
         },
@@ -94,14 +94,6 @@ export const MEMBER_AREA: RoleArea = {
     {
       heading: 'Account',
       items: [
-        {
-          label: 'My wallet',
-          path: 'wallet',
-          title: 'My Wallet',
-          description: 'Your internal Sportify Wallet balance and activity.',
-          task: 'MW-03',
-          screens: [],
-        },
         {
           label: 'My payments',
           path: 'payments',
@@ -198,22 +190,6 @@ export const RECEPTIONIST_AREA: RoleArea = {
           description: 'Check eligibility, submit refunds for approval and record completed refunds.',
           task: 'FE-12',
           screens: ['F3-07'],
-        },
-        {
-          label: 'Wallet top-ups',
-          path: 'wallet/topups',
-          title: 'Wallet top-ups',
-          description: 'Confirm or reject member wallet top-ups after checking the bank.',
-          task: 'MW-04',
-          screens: [],
-        },
-        {
-          label: 'Wallet withdrawals',
-          path: 'wallet/withdrawals',
-          title: 'Wallet withdrawals',
-          description: 'Approve, reject and record member wallet withdrawals.',
-          task: 'MW-06',
-          screens: [],
         },
       ],
     },

@@ -196,7 +196,7 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
     expect(within(item).queryByRole('progressbar')).not.toBeInTheDocument()
   })
 
-  it('TC-FE02-028 the dashboard reads member, wallet and training summaries with the access token', async () => {
+  it('TC-FE02-028 the dashboard reads member and training summaries with the access token', async () => {
     const { calls } = await openDashboard()
     await waitFor(() => expect(calls.some((call) => call.path.startsWith('/bookings/my'))).toBe(true))
     const paths = calls.map((call) => `${call.method} ${call.path}`)
@@ -206,28 +206,27 @@ describe('FE-02 Member Dashboard (F1-07)', () => {
         'GET /membership-cards/my',
         'GET /packages/registrations/my',
         'GET /bookings/my?when=UPCOMING',
-        'GET /member/wallet',
         'GET /member/training/plans',
         'GET /member/training/attendance',
         'GET /member/training/results',
         'GET /member/training/feedback',
       ]),
     )
+    expect(paths).not.toContain('GET /member/wallet')
     for (const call of calls) {
       expect(call.authorization).toBe('Bearer member-access')
     }
   })
 
-  it('TC-FE02-143 dashboard wallet and training snapshot show values returned by their member APIs', async () => {
+  it('TC-FE02-143 dashboard training snapshot shows values returned by member APIs and wallet is retired', async () => {
     await openDashboard({
-      wallet: { availableBalance: 735000, currency: 'VND' },
       plans: [{ id: 1 }, { id: 2 }],
       attendance: [{ id: 3 }],
       results: [{ id: 4 }, { id: 5 }, { id: 6 }],
       feedback: [{ id: 7 }],
     })
 
-    expect(statValue('Wallet balance')).toBe('735.000 VND')
+    expect(screen.queryByText('Wallet balance')).not.toBeInTheDocument()
     const snapshot = screen.getByRole('region', { name: 'Training snapshot' })
     expect(snapshot).toHaveTextContent('Assigned plans2')
     expect(snapshot).toHaveTextContent('Attendance records1')

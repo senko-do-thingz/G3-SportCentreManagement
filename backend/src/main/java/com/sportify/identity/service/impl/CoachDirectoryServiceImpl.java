@@ -39,6 +39,18 @@ public class CoachDirectoryServiceImpl implements CoachDirectoryService {
                 .toList();
     }
 
+    private static final Map<String, String> DEMO_COACH_AVATARS = Map.of(
+            "nam.coach@example.com", "/images/coaches/long-pham.jpg",
+            "ha.coach@example.com", "/images/coaches/tram-vo.jpg",
+            "quan.coach@example.com", "/images/coaches/bao-le.jpg",
+            "khoa.nguyen@sportifycenter.vn", "/images/coaches/khoa-nguyen.jpg",
+            "ha.tran@sportifycenter.vn", "/images/coaches/ha-tran.jpg",
+            "bao.le@sportifycenter.vn", "/images/coaches/bao-le.jpg",
+            "long.pham@sportifycenter.vn", "/images/coaches/long-pham.jpg",
+            "tram.vo@sportifycenter.vn", "/images/coaches/tram-vo.jpg",
+            "huy.dang@sportifycenter.vn", "/images/coaches/huy-dang.jpg"
+    );
+
     @Override
     @Transactional(readOnly = true)
     public List<PublicCoachResponse> getPublicCoaches(Long sportId) {
@@ -56,9 +68,26 @@ public class CoachDirectoryServiceImpl implements CoachDirectoryService {
                         coach.getSpecialties(),
                         coach.getYearsExperience(),
                         coach.getBio(),
-                        coach.getUserAccount().getAvatarUrl(),
+                        resolveAvatarUrl(coach.getUserAccount()),
                         sportsByCoach.getOrDefault(coach.getId(), List.of())))
                 .toList();
+    }
+
+    private String resolveAvatarUrl(com.sportify.identity.entity.UserAccount account) {
+        if (account == null) {
+            return null;
+        }
+        String avatarUrl = account.getAvatarUrl();
+        if (avatarUrl != null && !avatarUrl.isBlank()) {
+            return avatarUrl;
+        }
+        if (account.getEmail() != null) {
+            String demo = DEMO_COACH_AVATARS.get(account.getEmail().toLowerCase());
+            if (demo != null) {
+                return demo;
+            }
+        }
+        return null;
     }
 
     private List<CoachProfile> findCoaches(Long sportId) {

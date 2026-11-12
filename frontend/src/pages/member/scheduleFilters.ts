@@ -33,7 +33,7 @@ export function safeBrowseReturn(value: string | null): string {
   if (!value || value.includes('\\') || [...value].some((char) => char.charCodeAt(0) < 32)) return '/member/classes'
   try {
     const url = new URL(value, 'https://sportify.invalid')
-    if (!value.startsWith('/') || url.origin !== 'https://sportify.invalid' || !['/member/classes', '/member/schedule'].includes(url.pathname)) return '/member/classes'
+    if (!value.startsWith('/') || url.origin !== 'https://sportify.invalid' || !['/member/classes', '/member/schedule', '/member/schedules'].includes(url.pathname)) return '/member/classes'
     return url.pathname + url.search
   } catch { return '/member/classes' }
 }

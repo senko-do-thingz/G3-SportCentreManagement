@@ -1,4 +1,3 @@
-import { WalletPayCard } from './WalletPayCard'
 import { useCallback, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getErrorMessage } from '../../api/errors'
@@ -376,7 +375,6 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
           <Button type="submit" fullWidth loading={saving}>
             Continue to payment
           </Button>
-          <WalletPayCard paymentId={payment.id} amount={Number(payment.amount)} onStale={onStale} />
         </form>
       ) : (
         <div className="payment-summary__actions">

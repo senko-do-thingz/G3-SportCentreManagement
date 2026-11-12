@@ -27,7 +27,7 @@ it('F5-01 saves preferred sports and hands format and available days to the reco
   })
   const user = userEvent.setup()
   renderApp('/member/training/goals')
-  expect(await screen.findByText('Coach-led / 7 of 8 sessions until 2026-11-30')).toBeInTheDocument()
+  expect(await screen.findByText('Coach-led / 7 of 8 sessions until 30/11/2026')).toBeInTheDocument()
   expect(screen.getByRole('checkbox', { name: 'Football' })).toBeChecked()
   await user.click(screen.getByRole('checkbox', { name: 'Badminton' }))
   await user.selectOptions(screen.getByLabelText('Training format'), 'COACH_LED')

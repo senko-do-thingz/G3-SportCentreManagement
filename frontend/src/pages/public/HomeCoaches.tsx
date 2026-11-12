@@ -48,7 +48,7 @@ export function HomeCoaches({ coaches, sports, onOpen }: HomeCoachesProps) {
             <li key={coach.id} className="home-coach-card">
               <article className="home-coach-card__inner" aria-labelledby={`coach-${coach.id}`}>
                 <div className="home-coach-card__media">
-                  <CoachAvatar name={coach.fullName} url={safeAvatar(coach.avatarUrl)} />
+                  <CoachAvatar name={coach.fullName} url={safeAvatar(coach.avatarUrl, coach.fullName)} />
                   <span className="home-coach-card__sport">{sportSummary(names)}</span>
                   {coach.yearsExperience ? <span className="home-coach-card__years">{coach.yearsExperience} {coach.yearsExperience === 1 ? 'year' : 'years'}</span> : null}
                 </div>

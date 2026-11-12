@@ -3,6 +3,7 @@ import { receptionSupportApi as api, supportCategories, supportStatuses, support
 import { receptionApi } from '../../api/receptionApi'
 import { tokenStorage } from '../../api/tokenStorage'
 import { Badge, Button, Card, Input, PageHeader, Select, TextArea } from '../../components/ui'
+import { formatCalendarDate, formatDateTime } from '../../utils/dateDisplay'
 import { ReceptionCallout, ReceptionHero, ReceptionScreen, ReceptionStat, ReceptionStats } from './ReceptionConcept'
 import { TrainingData } from '../member/TrainingData'
 import { useTrainingAction } from '../training/trainingFormState'
@@ -105,7 +106,7 @@ function TicketDetail({ ticket, onSaved }: { ticket: SupportTicket; onSaved: () 
       <p>Current status: {ticket.status}</p>
       <h3 className="rcp-caption">Replies to the member</h3>
       {replies.length === 0 ? <p role="status">No reply has been sent yet.</p>
-        : <ul className="training-list">{replies.map(reply => <li key={reply.id}><p><strong>{reply.fromMember ? `Member: ${reply.staffName}` : reply.staffName}</strong> - {new Date(reply.createdAt).toLocaleString()}</p><p>{reply.message}</p></li>)}</ul>}
+        : <ul className="training-list">{replies.map(reply => <li key={reply.id}><p><strong>{reply.fromMember ? `Member: ${reply.staffName}` : reply.staffName}</strong> - {formatDateTime(reply.createdAt)}</p><p>{reply.message}</p></li>)}</ul>}
       {(ticket.status === 'OPEN' || ticket.status === 'IN_PROGRESS') && <ReplyForm ticket={ticket} onSaved={onSaved} />}
       {transitions.length > 0 ? <form onSubmit={event => {
         event.preventDefault()
@@ -125,9 +126,9 @@ function TicketDetail({ ticket, onSaved }: { ticket: SupportTicket; onSaved: () 
     </Card>
     <TrainingData load={verification}>{facts => <Card title="Verification">
       <p>Member: {facts.memberName}{facts.memberCode ? ` / ${facts.memberCode}` : ''} - account {facts.memberStatus}</p>
-      <p>Membership card: {facts.cardTier ? `${facts.cardTier}, ${facts.cardDiscount ?? 0}% discount${facts.cardEndDate ? `, valid until ${facts.cardEndDate}` : ''}` : 'No active card'}</p>
+      <p>Membership card: {facts.cardTier ? `${facts.cardTier}, ${facts.cardDiscount ?? 0}% discount${facts.cardEndDate ? `, valid until ${formatCalendarDate(facts.cardEndDate)}` : ''}` : 'No active card'}</p>
       {facts.activePackages.length === 0 ? <p>No active sport package.</p>
-        : <ul className="training-list">{facts.activePackages.map((item, index) => <li key={index}>{item.sportName} - {item.name}: {item.remainingSessions} of {item.totalSessions} sessions, valid until {item.endDate}</li>)}</ul>}
+        : <ul className="training-list">{facts.activePackages.map((item, index) => <li key={index}>{item.sportName} - {item.name}: {item.remainingSessions} of {item.totalSessions} sessions, valid until {formatCalendarDate(item.endDate)}</li>)}</ul>}
       <ReceptionCallout>This panel is for checking only. It does not record a payment or activate a package.</ReceptionCallout>
     </Card>}</TrainingData>
   </div>

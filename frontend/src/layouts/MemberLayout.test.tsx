@@ -49,7 +49,7 @@ describe('Member Concept B shell', () => {
     expect(within(navigation).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page')
     expect(within(navigation).queryByRole('heading', { name: 'Member workspace' })).not.toBeInTheDocument()
     expect(within(navigation).getByRole('link', { name: 'My profile' })).toHaveAttribute('href', '/member/profile')
-    expect(within(navigation).getByRole('link', { name: 'My schedule' })).toHaveAttribute('href', '/member/schedule')
+    expect(within(navigation).getByRole('link', { name: 'Schedules & classes' })).toHaveAttribute('href', '/member/schedules')
     expect(within(navigation).getByRole('link', { name: 'Training progress' })).toHaveAttribute('href', '/member/training')
     expect(screen.getByText(MEMBER.fullName)).toBeInTheDocument()
     expect(screen.getByText('Member')).toBeInTheDocument()
@@ -90,9 +90,11 @@ describe('Member Concept B shell', () => {
     expect(toggle).toHaveFocus()
   })
 
-  it('opens the Member-only Spori AI drawer and routes a suggested question to the consent screen', async () => {
+  it('keeps a consented Spori conversation in the floating panel', async () => {
     tokenStorage.startSession({ accessToken: 'test-assistant-access', refreshToken: 'test-assistant-refresh' })
-    const { calls } = installFakeFetch(call => json(200, call.path === '/users/me' ? MEMBER : []))
+    const { calls } = installFakeFetch(call => json(200, call.path === '/users/me' ? MEMBER : call.path.includes('/consultation') ? {
+      mode: 'KNOWLEDGE_BASED', status: 'ANSWERED', answer: "Hello! I'm Spori.", historyStored: false, sources: [], language: 'en',
+    } : []))
     const user = userEvent.setup()
     renderApp('/member')
 
@@ -103,21 +105,17 @@ describe('Member Concept B shell', () => {
     const dialog = screen.getByRole('dialog', { name: 'Spori AI' })
     expect(dialog).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Close Spori AI' })).toHaveFocus()
-    await user.keyboard('{Shift>}{Tab}{/Shift}')
-    expect(within(dialog).getByRole('link', { name: 'Open full assistant' })).toHaveFocus()
-    await user.keyboard('{Tab}')
-    expect(within(dialog).getByRole('button', { name: 'Close Spori AI' })).toHaveFocus()
-    await user.click(within(dialog).getByRole('link', { name: /How should I warm up/ }))
+    await user.click(within(dialog).getByLabelText('Enable automated center consultation'))
+    await user.type(within(dialog).getByRole('textbox', { name: 'Ask Spori a question' }), 'Hello')
+    await user.click(within(dialog).getByRole('button', { name: 'Send' }))
 
-    expect(await screen.findByRole('heading', { name: 'Center assistant' })).toBeInTheDocument()
-    expect(screen.getByLabelText(/Center question/)).toHaveValue('How should I warm up before practice?')
-    expect(window.location.search).not.toContain('question=')
-    expect(screen.getByLabelText('Enable automated center consultation')).not.toBeChecked()
-    expect(calls.some(call => call.path.includes('/consultation'))).toBe(false)
-    expect(screen.queryByRole('button', { name: 'Ask Spori AI' })).not.toBeInTheDocument()
+    expect(await within(dialog).findByText("Hello! I'm Spori.")).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Center assistant' })).not.toBeInTheDocument()
+    expect(calls.find(call => call.path.includes('/consultation'))?.body).toEqual({ question: 'Hello', optIn: true })
+    expect(within(dialog).getByRole('link', { name: 'Expand to full assistant' })).toBeInTheDocument()
   })
 
-  it('preserves the existing narrow-screen suggested-question route', async () => {
+  it('fills a suggested question in place on a narrow screen and expands only explicitly', async () => {
     previousWidth = window.innerWidth
     previousMatchMedia = window.matchMedia
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
@@ -133,16 +131,17 @@ describe('Member Concept B shell', () => {
     renderApp('/member')
 
     await user.click(await screen.findByRole('button', { name: 'Ask Spori AI' }))
-    const prompt = within(screen.getByRole('dialog', { name: 'Spori AI' })).getByRole('link', { name: /How should I warm up/ })
-    expect(prompt).toHaveAttribute('href', expect.stringContaining('question=How%20should%20I%20warm%20up%20before%20practice'))
+    const dialog = screen.getByRole('dialog', { name: 'Spori AI' })
+    const prompt = within(dialog).getByRole('button', { name: /How should I warm up/ })
     await user.click(prompt)
-
+    expect(within(dialog).getByRole('textbox', { name: 'Ask Spori a question' })).toHaveValue('How should I warm up before practice?')
+    expect(screen.queryByRole('heading', { name: 'Center assistant' })).not.toBeInTheDocument()
+    await user.click(within(dialog).getByRole('link', { name: 'Expand to full assistant' }))
     expect(await screen.findByRole('heading', { name: 'Center assistant' })).toBeInTheDocument()
-    expect(screen.getByLabelText(/Center question/)).toHaveValue('How should I warm up before practice?')
     expect(screen.getByLabelText('Enable automated center consultation')).not.toBeChecked()
   })
 
-  it('routes a typed Spori question privately to the consent screen without submitting it', async () => {
+  it('does not send a typed floating question until consultation consent is enabled', async () => {
     tokenStorage.startSession({ accessToken: 'test-assistant-access', refreshToken: 'test-assistant-refresh' })
     const { calls } = installFakeFetch(call => json(200, call.path === '/users/me' ? MEMBER : []))
     const user = userEvent.setup()
@@ -155,11 +154,7 @@ describe('Member Concept B shell', () => {
     const dialog = screen.getByRole('dialog', { name: 'Spori AI' })
     const prompt = 'How can I prepare for my next training session?'
     await user.type(within(dialog).getByRole('textbox', { name: 'Ask Spori a question' }), prompt)
-    await user.click(within(dialog).getByRole('button', { name: 'Continue' }))
-
-    expect(await screen.findByRole('heading', { name: 'Center assistant' })).toBeInTheDocument()
-    expect(screen.getByLabelText(/Center question/)).toHaveValue(prompt)
-    expect(screen.getByLabelText('Enable automated center consultation')).not.toBeChecked()
+    expect(within(dialog).getByRole('button', { name: 'Send' })).toBeDisabled()
     expect(calls.some(call => call.path.includes('/consultation'))).toBe(false)
   })
 

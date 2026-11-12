@@ -1,5 +1,4 @@
 import { screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tokenStorage } from '../../api/tokenStorage'
 import { backendError, installFakeFetch, json, MEMBER } from '../../test/fakeBackend'
@@ -26,37 +25,14 @@ function backend(available: number, onPay: () => Response) {
   })
 }
 
-describe('Pay a pending purchase with Sportify Wallet (MW-05)', () => {
-  it('pays from the wallet once and opens the receipt', async () => {
+describe('Pay a pending purchase with Sportify Wallet (retired)', () => {
+  it('does not offer wallet payment option on payment summary', async () => {
     const pending = payment()
-    const { calls } = backend(Number(pending.amount) + 1000, () => json(200, { paymentId: pending.id, paymentCode: pending.code, status: 'SUCCESS',
-      method: 'WALLET', amount: pending.amount, ledgerEntryId: 3, availableAfter: 1000, invoiceId: 7, invoiceNumber: 'INV-7', replay: false }))
-    const user = userEvent.setup()
+    backend(Number(pending.amount) + 1000, () => json(200, {}))
     renderApp(`/member/payments/${pending.id}`)
-    const button = await screen.findByRole('button', { name: /from wallet/ })
-    expect(screen.getByText(/Demo funds cannot be used/)).toBeInTheDocument()
-    await user.click(button)
-    expect((await screen.findAllByText(/Receipt/i)).length).toBeGreaterThan(0)
-    expect(calls.filter((call) => call.path === `/member/wallet/payments/${pending.id}` && call.method === 'POST')).toHaveLength(1)
-  })
-
-  it('disables wallet payment when the real balance is too low, even with demo funds', async () => {
-    const pending = payment()
-    const { calls } = backend(Number(pending.amount) - 1, () => json(200, {}))
-    renderApp(`/member/payments/${pending.id}`)
-    const button = await screen.findByRole('button', { name: /from wallet/ })
-    expect(button).toBeDisabled()
-    expect(screen.getByText(/not enough for this payment. Nothing will be charged/)).toBeInTheDocument()
-    expect(calls.some((call) => call.path.startsWith('/member/wallet/payments'))).toBe(false)
-  })
-
-  it('shows the server refusal and does not leave the summary', async () => {
-    const pending = payment()
-    backend(Number(pending.amount), () => backendError(400, 'Not enough wallet balance for this operation'))
-    const user = userEvent.setup()
-    renderApp(`/member/payments/${pending.id}`)
-    await user.click(await screen.findByRole('button', { name: /from wallet/ }))
-    expect(await screen.findByText('Not enough wallet balance for this operation')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /from wallet/ })).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: 'Order summary' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /bank transfer/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /from wallet/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Demo funds cannot be used/i)).not.toBeInTheDocument()
   })
 })

@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Flow 6 Member assistant. A bounded knowledge service: it answers only from read-only center queries and fixed text,
@@ -79,6 +80,17 @@ public class CenterConsultationService {
         boolean vi=vietnamese(raw,plain);
         String guard=guard(raw,plain);
         if(guard!=null)return guard.equals("COACH")?coach(vi,RULES_MODE):unknown(vi,RULES_MODE);
+        String courtesy=courtesy(plain);
+        if(courtesy!=null) {
+            boolean courtesyVi=vi || plain.startsWith("xin chao") || plain.startsWith("chao") || plain.startsWith("cam on");
+            return courtesy.equals("THANKS")
+                ?response(courtesyVi,RULES_MODE,"ANSWERED",t(courtesyVi,
+                    "You're welcome! Ask me whenever you need help with Sportify sessions, packages, bookings, or your own training records.",
+                    "Kh\u00F4ng c\u00F3 g\u00EC! H\u00E3y h\u1ECFi t\u00F4i khi b\u1EA1n c\u1EA7n h\u1ED7 tr\u1EE3 v\u1EC1 l\u1ECBch Sportify, g\u00F3i t\u1EADp, \u0111\u1EB7t ch\u1ED7 ho\u1EB7c h\u1ED3 s\u01A1 t\u1EADp luy\u1EC7n c\u1EE7a b\u1EA1n."),List.of())
+                :response(courtesyVi,RULES_MODE,"ANSWERED",t(courtesyVi,
+                    "Hello! I'm Spori. I can help with center schedules, package prices, booking guidance, and your own Sportify training records. What would you like to know?",
+                    "Xin ch\u00E0o! T\u00F4i l\u00E0 Spori. T\u00F4i c\u00F3 th\u1EC3 gi\u00FAp v\u1EC1 l\u1ECBch c\u1EE7a trung t\u00E2m, gi\u00E1 g\u00F3i t\u1EADp, h\u01B0\u1EDBng d\u1EABn \u0111\u1EB7t ch\u1ED7 v\u00E0 h\u1ED3 s\u01A1 t\u1EADp luy\u1EC7n Sportify c\u1EE7a b\u1EA1n. B\u1EA1n mu\u1ED1n bi\u1EBFt g\u00EC?"),List.of());
+        }
 
         String mode=RULES_MODE;
         String intent=rules(raw,plain);
@@ -112,6 +124,7 @@ public class CenterConsultationService {
                     "L\u1EC5 t\u00E2n c\u00F3 th\u1EC3 gi\u00FAp nh\u1EEFng c\u00E2u tr\u1EE3 l\u00FD kh\u00F4ng tr\u1EA3 l\u1EDDi \u0111\u01B0\u1EE3c, nh\u01B0 t\u00E0i kho\u1EA3n, thanh to\u00E1n hay ki\u1EC3m tra gi\u1EA3m gi\u00E1. H\u00E3y g\u1EEDi y\u00EAu c\u1EA7u h\u1ED7 tr\u1EE3, l\u1EC5 t\u00E2n s\u1EBD tr\u1EA3 l\u1EDDi b\u1EA1n trong m\u1EE5c My support requests."),
                 List.of(new ConsultationSource("SUPPORT",0,t(vi,"Contact reception","Li\u00EAn h\u1EC7 l\u1EC5 t\u00E2n"),
                     t(vi,"Opens the support request form. Nothing is sent until you submit it.","M\u1EDF form y\u00EAu c\u1EA7u h\u1ED7 tr\u1EE3. Ch\u01B0a c\u00F3 g\u00EC \u0111\u01B0\u1EE3c g\u1EEDi cho \u0111\u1EBFn khi b\u1EA1n b\u1EA5m g\u1EEDi."),"/member/support")));
+            case "SPORTS_CATALOG" -> sportsCatalog(vi,mode);
             case "MY_PACKAGES" -> memberId==null?signIn(vi,mode):myPackages(vi,mode,memberId);
             case "MY_BOOKINGS" -> memberId==null?signIn(vi,mode):myBookings(vi,mode,memberId);
             case "MY_TRAINING" -> memberId==null?signIn(vi,mode):myTraining(vi,mode,memberId);
@@ -164,6 +177,14 @@ public class CenterConsultationService {
         return guard!=null?guard:rules(text,plain);
     }
 
+    /** Pure greetings and thanks are normal conversation, not off-topic requests. */
+    static String courtesy(String plain) {
+        String normalized=plain.trim().replaceAll("[.!?,]+$", "").trim();
+        if(normalized.matches("^(thank you|thanks|thanks a lot|many thanks|cam on|cam on ban|cam on spori)$"))return "THANKS";
+        if(normalized.matches("^(hello|hi|hey|hello there|hi there|hello spori|hi spori|good morning|good afternoon|good evening|xin chao|xin chao spori|chao ban|chao spori)$"))return "GREETING";
+        return null;
+    }
+
     /** Lower-cased text without Vietnamese diacritics, so "b\u00F3ng \u0111\u00E1" and "bong da" match the same keyword. */
     static String plain(String text) {
         String stripped=Normalizer.normalize(text.replace('\u0111','d').replace('\u0110','d'),Normalizer.Form.NFD).replaceAll("\\p{M}+","");
@@ -208,6 +229,8 @@ public class CenterConsultationService {
         if(contains(raw,"contact reception","talk to reception","talk to staff","speak to staff","human support","support request","complain",
             "li\u00EAn h\u1EC7","l\u1EC5 t\u00E2n","g\u1EB7p nh\u00E2n vi\u00EAn","khi\u1EBFu n\u1EA1i","h\u1ED7 tr\u1EE3")
             || matchesWord(plain,CONTACT_PLAIN))return "CONTACT";
+        if(contains(raw,"how many sports","what sports","which sports","sports are available","sports offered","sports do you have","sports do you offer","available sports","sports catalog","list of sports")
+            || matchesWord(plain,SPORTS_CATALOG_PLAIN))return "SPORTS_CATALOG";
         if(contains(raw,"package","price","cost","gi\u00E1","g\u00F3i","h\u1ECDc ph\u00ED","chi ph\u00ED","bao nhi\u00EAu ti\u1EC1n")
             || matchesWord(plain,PACKAGES_PLAIN))return "PACKAGES";
         if(contains(raw,"how to book","how do i book","booking rules","cancel","refund","payment",
@@ -237,6 +260,7 @@ public class CenterConsultationService {
     private static final Pattern MY_BOOKINGS_PLAIN=words("lich cua toi","buoi da dat","lich da dat","lop da dat");
     private static final Pattern COACH_PLAIN=words("bai tap","giao an","ke hoach tap");
     private static final Pattern CONTACT_PLAIN=words("lien he","le tan","gap nhan vien","khieu nai","ho tro");
+    private static final Pattern SPORTS_CATALOG_PLAIN=words("bao nhieu mon the thao","may mon the thao","cac mon the thao","nhung mon the thao","mon the thao nao","co nhung mon nao","danh muc mon the thao","cac mon the thao dang co","bao nhieu mon");
     private static final Pattern PACKAGES_PLAIN=words("bang gia","goi tap","hoc phi","chi phi","bao nhieu tien");
     private static final Pattern BOOKING_PLAIN=words("cach dat","dat cho","dat lich","huy lich","hoan tien","thanh toan");
     private static final Pattern SESSIONS_PLAIN=words("lich tap","lich hoc","con cho","khung gio","buoi tap","lop hoc");
@@ -444,6 +468,21 @@ public class CenterConsultationService {
         return response(vi,mode,"NO_ANSWER",t(vi,"I cannot assess personal training or health concerns. Ask your assigned human coach about your practice plan.",
                 "Tr\u1EE3 l\u00FD kh\u00F4ng \u0111\u00E1nh gi\u00E1 \u0111\u01B0\u1EE3c v\u1EA5n \u0111\u1EC1 t\u1EADp luy\u1EC7n c\u00E1 nh\u00E2n hay s\u1EE9c kh\u1ECFe. H\u00E3y h\u1ECFi Coach ph\u1EE5 tr\u00E1ch c\u1EE7a b\u1EA1n v\u1EC1 k\u1EBF ho\u1EA1ch t\u1EADp."),
             List.of(askCoach(vi)));
+    }
+    private Consultation sportsCatalog(boolean vi,String mode) {
+        var rows=jdbc.query("SELECT id,code,name FROM sport WHERE is_active=1 ORDER BY id",
+            (rs,row)->new Object[]{rs.getLong("id"),rs.getString("code"),rs.getString("name")});
+        int count=rows.size();
+        String sportList=rows.stream().map(r->(String)r[2]).collect(Collectors.joining(", "));
+        List<ConsultationSource> sources=rows.stream()
+            .map(r->new ConsultationSource("SPORT_CATALOG",(Long)r[0],(String)r[2],
+                vi?"M\u00F4n th\u1EC3 thao \u0111ang ho\u1EA1t \u0111\u1ED9ng t\u1EA1i trung t\u00E2m":"Active sport offered at the center",
+                "/#sports"))
+            .toList();
+        String answer=vi
+            ?String.format("Trung t\u00E2m Sportify hi\u1EC7n cung c\u1EA5p %d m\u00F4n th\u1EC3 thao: %s. B\u1EA1n c\u00F3 th\u1EC3 xem l\u1ECBch t\u1EADp v\u00E0 c\u00E1c g\u00F3i t\u1EADp cho t\u1EEBng m\u00F4n.",count,sportList)
+            :String.format("Sportify Center currently offers %d sports: %s. You can explore classes, schedules, and packages for each sport.",count,sportList);
+        return response(vi,mode,"ANSWERED",answer,sources);
     }
     private static Consultation unknown(boolean vi,String mode) {
         return response(vi,mode,"NO_ANSWER",t(vi,"I do not have a grounded answer to that question. I can show published sessions, active package prices, your own packages, bookings and coach feedback, explain how to check booking eligibility, or answer a few general exercise questions such as warming up. Contact reception for other center information.",

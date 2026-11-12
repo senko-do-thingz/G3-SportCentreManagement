@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { memberSupportApi, memberSupportTopics, type MemberSupportIntake, type MemberSupportTicket } from '../../api/memberSupportApi'
 import { tokenStorage } from '../../api/tokenStorage'
 import { Button, Card, Input, PageHeader, Select, StatusBadge, TextArea } from '../../components/ui'
+import { formatDateTime } from '../../utils/dateDisplay'
 import { TrainingData } from './TrainingData'
 import { useTrainingAction } from '../training/trainingFormState'
 import { ActionMessage } from '../training/TrainingFormFields'
@@ -13,8 +14,9 @@ const topicLabel = (value: string) => memberSupportTopics.find(topic => topic.va
 /** Flow 6 F6-05 Contact Reception, S6-Submitted and S6-MemberReply: the Member's own support requests. */
 export function MemberSupportPage() {
   const location = useLocation()
-  const excerpt = typeof (location.state as { excerpt?: unknown } | null)?.excerpt === 'string'
-    ? (location.state as { excerpt: string }).excerpt : ''
+  const routeState = location.state as { excerpt?: unknown; question?: unknown } | null
+  const excerpt = typeof routeState?.excerpt === 'string' ? routeState.excerpt : ''
+  const initialQuestion = typeof routeState?.question === 'string' ? routeState.question : ''
   const [revision, refresh] = useState(0)
   const [selected, select] = useState<number | null>(null)
   const [submitted, setSubmitted] = useState<MemberSupportTicket | null>(null)
@@ -26,7 +28,7 @@ export function MemberSupportPage() {
       <p role="status">Your request {submitted.code} was sent to reception. Status: {submitted.status.replaceAll('_', ' ')}.</p>
       <p>Reception will reply in My support requests below. Sending a request does not book, cancel, pay or change any package.</p>
       <Button variant="secondary" onClick={() => setSubmitted(null)}>Send another request</Button>
-    </Card> : <SupportForm excerpt={excerpt} onSubmitted={ticket => { setSubmitted(ticket); refresh(value => value + 1) }} />}
+    </Card> : <SupportForm excerpt={excerpt} initialQuestion={initialQuestion} onSubmitted={ticket => { setSubmitted(ticket); refresh(value => value + 1) }} />}
     <Card title="My support requests">
       <div id="my-requests" />
       <TrainingData key={revision} load={load} refreshLabel="Refresh my support requests">{tickets => tickets.length === 0
@@ -44,10 +46,10 @@ export function MemberSupportPage() {
   </div>
 }
 
-function SupportForm({ excerpt, onSubmitted }: { excerpt: string; onSubmitted: (ticket: MemberSupportTicket) => void }) {
+function SupportForm({ excerpt, initialQuestion = '', onSubmitted }: { excerpt: string; initialQuestion?: string; onSubmitted: (ticket: MemberSupportTicket) => void }) {
   const [category, setCategory] = useState<string>(excerpt ? 'MEMBERSHIP' : 'GENERAL')
   const [subject, setSubject] = useState('')
-  const [description, setDescription] = useState('')
+  const [description, setDescription] = useState(() => initialQuestion ? initialQuestion.slice(0, 1000) : '')
   const [includeExcerpt, setIncludeExcerpt] = useState(excerpt.length > 0)
   const intent = useRef<{ serialized: string; key: string } | null>(null)
   const action = useTrainingAction()
@@ -102,7 +104,7 @@ function RequestDetail({ id, onRead }: { id: number; onRead: () => void }) {
     <h3>Replies from reception</h3>
     {ticket.replies.length === 0 ? <p role="status">No reply yet. Reception will answer here.</p>
       : <ul className="training-list">{ticket.replies.map((reply, index) => <li key={index}>
-        <p><strong>{reply.fromMe ? 'You' : 'Reception'}</strong> - {new Date(reply.createdAt).toLocaleString()}</p><p>{reply.message}</p></li>)}</ul>}
+        <p><strong>{reply.fromMe ? 'You' : 'Reception'}</strong> - {formatDateTime(reply.createdAt)}</p><p>{reply.message}</p></li>)}</ul>}
     {ticket.status === 'CLOSED'
       ? <p role="status">This request is closed. Send a new support request if you need more help.</p>
       : <FollowUpForm id={ticket.id} resolved={ticket.status === 'RESOLVED'} onSent={refresh} />}

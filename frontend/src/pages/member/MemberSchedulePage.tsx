@@ -15,7 +15,7 @@ const FIND_CLASSES = '/member/classes'
 const ASSISTANT = '/member/assistant'
 
 /** My Schedule shows only the sessions the signed-in member holds a CONFIRMED booking for. */
-export function MemberSchedulePage() {
+export function MemberSchedulePage({ embedded = false }: { embedded?: boolean }) {
   const [params, setParams] = useSearchParams()
   const [today] = useState(browseToday)
   const selectedDate = params.get('date') ?? today
@@ -31,18 +31,22 @@ export function MemberSchedulePage() {
   const returnTo = `/member/schedule?${new URLSearchParams({ date: from })}`
 
   function changeWeek(monday: string) {
-    setParams({ date: monday }, { replace: true })
+    setParams((previous) => {
+      const next = new URLSearchParams(previous)
+      next.set('date', monday)
+      return next
+    }, { replace: true })
   }
 
   return (
-    <div className="page browse-page member-schedule-theme">
-      <MemberScheduleNav />
-      <PageHeader
+    <div className={`page browse-page member-schedule-theme${embedded ? ' schedule-workspace__embedded' : ''}`}>
+      {!embedded && <MemberScheduleNav />}
+      {!embedded && <PageHeader
         eyebrow="Member / Classes & schedule"
         title="My Schedule"
         description="The sessions you have booked, week by week. All times use Vietnam time (UTC+7)."
         actions={<Link className={buttonClassName()} to={FIND_CLASSES}>Find Classes</Link>}
-      />
+      />}
 
       <Card title={`${browseDate(from)} - ${browseDate(to)}`}>
         <div className="schedule-controls">

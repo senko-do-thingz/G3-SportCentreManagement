@@ -4,10 +4,10 @@ import { walletHistoryApi, type WalletActivityRow } from '../../api/walletApi'
 import {
   Badge,
   Button,
+  CalendarDateField,
   Card,
   EmptyState,
   ErrorState,
-  Input,
   Notice,
   Select,
   Spinner,
@@ -70,6 +70,9 @@ export function WalletHistoryPage() {
   const [status, setStatus] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
+  const [fromValid, setFromValid] = useState(true)
+  const [toValid, setToValid] = useState(true)
+  const datesValid = fromValid && toValid
   const [page, setPage] = useState(0)
   const [open, setOpen] = useState<string | null>(null)
   const load = useCallback(
@@ -114,37 +117,41 @@ export function WalletHistoryPage() {
             label="Type"
             value={type}
             options={TYPES}
+            disabled={!datesValid}
             onChange={(e) => reset(() => setType(e.target.value))}
           />
           <Select
             label="Status"
             value={status}
             options={STATUSES}
+            disabled={!datesValid}
             onChange={(e) => reset(() => setStatus(e.target.value))}
           />
-          <Input
+          <CalendarDateField
             label="From"
-            type="date"
             value={from}
-            onChange={(e) => reset(() => setFrom(e.target.value))}
+            max={to || undefined}
+            onValidityChange={setFromValid}
+            onChange={(value, valid) => { if (valid !== false) reset(() => setFrom(value)) }}
           />
-          <Input
+          <CalendarDateField
             label="To"
-            type="date"
             value={to}
-            onChange={(e) => reset(() => setTo(e.target.value))}
+            min={from || undefined}
+            onValidityChange={setToValid}
+            onChange={(value, valid) => { if (valid !== false) reset(() => setTo(value)) }}
           />
         </div>
       </MemberCommerceCard>
-      {resource.status === 'loading' && <Spinner label="Loading wallet activity" />}
-      {resource.status === 'error' && (
+      {datesValid && resource.status === 'loading' && <Spinner label="Loading wallet activity" />}
+      {datesValid && resource.status === 'error' && (
         <ErrorState
           title="We could not load your wallet activity"
           error={resource.error}
           onRetry={reload}
         />
       )}
-      {resource.status === 'ready' && (
+      {datesValid && resource.status === 'ready' && (
         <Card title={`Activity (${resource.data.page.totalElements})`}>
           <p className="health-meta" style={{ marginTop: 0, marginBottom: 'var(--space-3)' }}>
             Available {formatMoney(resource.data.availableBalance)}, held for withdrawal{' '}

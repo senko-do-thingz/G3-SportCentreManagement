@@ -6,7 +6,7 @@ import type { PackageRegistration } from '../../api/memberApi'
 import { packagesApi, type SportPackage } from '../../api/packagesApi'
 import { receptionApi, type DeskSale, type MemberOverview, type PaymentMethod } from '../../api/receptionApi'
 import { receptionPaymentsApi } from '../../api/receptionPaymentsApi'
-import { Button, Card, EmptyState, ErrorState, Input, PageHeader, Select, Table, type TableColumn } from '../../components/ui'
+import { Button, CalendarDateField, Card, EmptyState, ErrorState, Input, PageHeader, Select, Table, type TableColumn } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
 import { useResource } from '../../hooks/useResource'
@@ -530,15 +530,14 @@ function PackageSale({
                 }}
                 error={errors.packageId}
               />
-              <Input
+              <CalendarDateField
                 label="Start date"
-                type="date"
                 required
                 min={today}
                 value={startDate}
                 disabled={saving || uncertain}
-                onChange={(event) => {
-                  setStartDate(event.target.value)
+                onChange={(value) => {
+                  setStartDate(value)
                   setErrors((current) => ({ ...current, startDate: undefined }))
                 }}
                 error={errors.startDate}

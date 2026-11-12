@@ -1,4 +1,6 @@
 import { avatarSrc } from '../../api/avatarUrl'
+import { COACH_DEMO_PHOTOS } from './creditsContent'
+
 /** Public coach record from GET /coaches/public (no contact data). */
 export interface PublicCoach {
   id: number
@@ -42,7 +44,18 @@ export function coachStory(coach: PublicCoach, sportNames: string[]): string | n
   return sportNames.length ? `${firstName} coaches ${sportNames.join(', ')} at Sportify Center.` : `${firstName} coaches at Sportify Center.`
 }
 
-/** Absolute http(s) links and photos uploaded by a manager are shown; anything else falls back to initials. */
-export function safeAvatar(url: string | null | undefined): string | null {
-  return avatarSrc(url)
+function normalizeCoachName(name: string): string {
+  return name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+/** Absolute http(s) links, demo assets, and photos uploaded by a manager are shown; eligible demo portraits match by name if url is missing; anything else falls back to initials. */
+export function safeAvatar(url: string | null | undefined, fullName?: string): string | null {
+  const resolved = avatarSrc(url)
+  if (resolved) return resolved
+  if (fullName) {
+    const target = normalizeCoachName(fullName)
+    const demo = COACH_DEMO_PHOTOS.find((item) => normalizeCoachName(item.name) === target)
+    if (demo) return `/images/coaches/${demo.file}`
+  }
+  return null
 }
