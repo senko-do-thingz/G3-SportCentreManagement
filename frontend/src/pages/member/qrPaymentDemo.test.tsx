@@ -10,7 +10,7 @@ function backend(options: { role?: string; status?: number; data?: ReturnType<ty
   return installFakeFetch((call) => {
     if (call.path === '/users/me') return json(200, { ...MEMBER, role: options.role ?? 'MEMBER' })
     if (call.path === '/payments/52') return options.status ? backendError(options.status, 'Access to this payment is unavailable') : json(200, options.data ?? payment())
-    if (call.path === '/payments/local-demo/capability') return json(200, { contractVersion: 1, mode: 'LOCAL_DEMO', enabled: true })
+    if (call.path === '/payments/simulated-qr/capability') return json(200, { contractVersion: 1, settlementEnabled: true, enabled: true })
     return json(200, [])
   })
 }
@@ -22,13 +22,12 @@ describe('QR-01 guarded demo route and payment integration', () => {
   })
   afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals() })
 
-  it('renders single QR demo card and server amount on the authorized route', async () => {
+  it('offers token generation with the server amount on the authorized route', async () => {
     const { calls } = backend({ data: payment({ method: 'BANK_TRANSFER' }) })
     renderApp('/member/payments/52/qr-demo')
-    expect(await screen.findByRole('img', { name: /Non-payable demo QR for payment 52/ }, { timeout: 5000 })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Simulate Payment Confirmation' })).toBeVisible()
+    expect(await screen.findByRole('button', { name: 'Generate QR token' }, { timeout: 5000 })).toBeVisible()
     expect(screen.getByText('810.000 VND')).toBeVisible()
-    expect(screen.getByText(/Simulated QR Payment - Demo only - No real money transferred/)).toBeVisible()
+    expect(screen.getByText(/No real money is transferred/)).toBeVisible()
     expect(calls.every((call) => call.method === 'GET')).toBe(true)
   })
 
@@ -40,11 +39,11 @@ describe('QR-01 guarded demo route and payment integration', () => {
     expect(screen.getByRole('button', { name: 'Continue to payment' })).toBeEnabled()
     expect(screen.getByRole('radio', { name: 'Bank transfer' })).toBeChecked()
     await user.click(demo)
-    expect(await screen.findByRole('img', { name: /Non-payable demo QR for payment 52/ })).toBeVisible()
+    expect(await screen.findByRole('button', { name: 'Generate QR token' })).toBeVisible()
     expect(screen.getByText(/Owner confirmation finalizes this payment as Paid - Simulated and activates the purchased entitlement\./)).toBeVisible()
     expect(screen.queryByText(/Your actual payment is not changed/i)).not.toBeInTheDocument()
     expect(screen.getByText('810.000 VND')).toBeVisible()
-    expect(screen.getByText('Simulated QR Payment - Demo only - No real money transferred.')).toBeVisible()
+    expect(screen.getByText(/No real money is transferred/)).toBeVisible()
     expect(document.querySelector('.payment-workspace-header .home-theme')).toBeInTheDocument()
     expect(document.querySelector('.payment-workspace-header select')).not.toBeInTheDocument()
     await user.click(screen.getByRole('link', { name: 'Back to Payment Summary' }))
@@ -158,6 +157,41 @@ describe('QR-01 guarded demo route and payment integration', () => {
     vi.stubEnv('VITE_QR_PAYMENT_DEMO', ''); vi.stubEnv('DEV', false); vi.stubEnv('MODE', 'production')
     backend()
     renderApp('/member/payments/52/qr-demo')
-    expect(await screen.findByRole('img', { name: /Non-payable/ })).toBeVisible()
+    expect(await screen.findByRole('button', { name: 'Generate QR token' })).toBeVisible()
+  })
+
+  it('requires the scanned token and shows the simulated receipt after confirmation', async () => {
+    const token = 'a'.repeat(43)
+    let settled = false
+    const base = {
+      id: '123e4567-e89b-12d3-a456-426614174000', paymentId: 52, reference: 'DEMO-52',
+      amount: 810000, currency: 'VND', bankCode: 'VIETCOMBANK_DEMO', bankLabel: 'Vietcombank (demo)',
+      createdAt: '2099-01-01T00:00:00Z', expiresAt: '2099-01-01T00:05:00Z', serverTime: '2099-01-01T00:00:00Z',
+      mode: 'NON_PAYABLE', state: 'PENDING',
+    }
+    const { calls } = installFakeFetch((call) => {
+      if (call.path === '/users/me') return json(200, MEMBER)
+      if (call.path === '/payments/52') return json(200, payment(settled ? {
+        status: 'SUCCESS', settlementType: 'SIMULATED', settlementProvider: 'SPORTIFY_SIMULATOR', invoiceId: 301,
+      } : {}))
+      if (call.path === '/payments/simulated-qr/capability') return json(200, { contractVersion: 1, settlementEnabled: true, enabled: true })
+      if (call.path === '/payments/simulated-qr/sessions' && call.method === 'POST')
+        return json(200, { session: base, confirmationUrl: `https://demo.example.test/demo/qr/confirm#token=${token}` })
+      if (call.path === '/payments/simulated-qr/sessions/confirm') {
+        settled = true
+        return json(200, { ...base, state: 'SETTLED', settlementType: 'SIMULATED', settlementProvider: 'SPORTIFY_SIMULATOR', invoiceId: 301, invoiceNumber: 'INV-301' })
+      }
+      return json(200, [])
+    })
+    const user = userEvent.setup()
+    renderApp('/member/payments/52/qr-demo')
+    await user.click(await screen.findByRole('button', { name: 'Generate QR token' }))
+    expect(await screen.findByRole('img', { name: 'Scannable payment verification token' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Verify and Confirm Payment' })).toBeDisabled()
+    await user.type(screen.getByLabelText('Verification token'), token)
+    await user.click(screen.getByRole('button', { name: 'Verify and Confirm Payment' }))
+    await waitFor(() => expect(calls.find((call) => call.path.endsWith('/confirm'))?.body).toEqual({ token }))
+    expect(await screen.findByText(/Payment Successful - Demo/)).toBeVisible()
+    expect(screen.getByRole('link', { name: 'View payment receipt' })).toHaveAttribute('href', '/member/payments/receipts/301')
   })
 })

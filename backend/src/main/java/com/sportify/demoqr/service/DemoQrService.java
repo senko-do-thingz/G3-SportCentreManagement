@@ -136,6 +136,7 @@ public class DemoQrService {
                     || settlement.invoiceNumber() == null || settlement.invoiceNumber().isBlank()) {
                 throw new IllegalStateException("Simulated settlement requires a persisted PAID invoice and audit record");
             }
+            store.markOperationalSettlement(session.paymentId(), tx.id());
             session = store.settle(session);
             return session.state() == State.SETTLED
                     ? new Outcome<>(view(session), null) : new Outcome<>(null, stateError(session));
