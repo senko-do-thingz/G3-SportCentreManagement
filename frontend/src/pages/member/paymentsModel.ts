@@ -21,9 +21,9 @@ export const PAYMENT_PATHS = {
 } as const
 
 /**
- * Methods a member can pay with online today. Only BANK_TRANSFER is supported online.
+ * Methods a member can choose at checkout. Bank transfer uses the VietQR code; cash is paid at reception.
  */
-export const AVAILABLE_ONLINE_METHODS: readonly string[] = ['BANK_TRANSFER']
+export const AVAILABLE_ONLINE_METHODS: readonly string[] = ['BANK_TRANSFER', 'CASH']
 
 /** Method preselected on the summary; Continue switches any other method to it. */
 export const DEFAULT_PAYMENT_METHOD = 'BANK_TRANSFER'
@@ -64,13 +64,10 @@ export function isSimulatedSettlement(item: { settlementType?: string | null } |
   return item?.settlementType === 'SIMULATED'
 }
 
-/** "Paid" for SUCCESS, as in Figma F3-03; "Paid - Simulated" when settled via Sportify QR simulator. */
-export function paymentStatusLabel(status: string | null | undefined, settlementType?: string | null): string {
+/** Use the same member-facing status label regardless of internal settlement provenance. */
+export function paymentStatusLabel(status: string | null | undefined, _settlementType?: string | null): string {
   if (!status) {
     return 'Unknown'
-  }
-  if (status === 'SUCCESS' && settlementType === 'SIMULATED') {
-    return 'Paid - Simulated'
   }
   return STATUS_LABELS[status] ?? status
 }

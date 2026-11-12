@@ -140,26 +140,22 @@ describe('FE-11 Payment Summary (F3-01, S3-Single)', () => {
     expect(calls.some((call) => call.method === 'PUT')).toBe(false)
   })
 
-  it('TC-FE11-005 only bank transfer is offered online; a non-bank-transfer payment is switched to bank transfer by Continue', async () => {
+  it('TC-FE11-005 Cash stays selected at checkout and directs the member to reception', async () => {
     const user = userEvent.setup()
-    const { calls } = paymentsBackend({
-      payments: [payment({ method: 'CASH', bankTransferInstructions: null }), payment()],
-    })
+    const { calls } = paymentsBackend({ payments: [payment({ method: 'CASH', bankTransferInstructions: null })] })
     renderApp('/member/payments/52')
     const order = await screen.findByRole('region', { name: 'Order summary' })
-    expect(within(order).getByRole('radio', { name: 'Bank transfer' })).toBeChecked()
-    expect(within(order).getAllByRole('radio')).toHaveLength(1)
+    expect(within(order).getByRole('radio', { name: 'Cash' })).toBeChecked()
+    expect(within(order).getAllByRole('radio')).toHaveLength(2)
     for (const unsupported of ['MoMo', 'VNPay', 'ZaloPay', 'Credit card']) {
       expect(within(order).queryByRole('radio', { name: unsupported })).not.toBeInTheDocument()
     }
 
     await user.click(within(order).getByRole('button', { name: 'Continue to payment' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Payment Instructions and Status' })).toBeInTheDocument()
-    const put = calls.filter((call) => call.method === 'PUT')
-    expect(put).toHaveLength(1)
-    expect(put[0].path).toBe('/payments/52/method')
-    expect(put[0].body).toEqual({ paymentMethod: 'BANK_TRANSFER' })
-    expect(await screen.findByRole('region', { name: 'Bank transfer' })).toHaveTextContent('0123456789')
+    expect(calls.some((call) => call.method === 'PUT')).toBe(false)
+    expect(await screen.findByRole('region', { name: 'Payment instructions' }))
+      .toHaveTextContent('Pay at reception with this payment reference')
   })
 
   it('TC-FE11-006 a rejected method change shows the backend message and stays on the summary', async () => {
@@ -912,7 +908,7 @@ describe('FE-11 Receipts (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt)', 
     expect(screen.queryByRole('button', { name: 'Print receipt' })).not.toBeInTheDocument()
   })
 
-  it('QR-05 displays Paid - Simulated and explicit simulation provenance across summary, history and receipt', async () => {
+  it('shows the ordinary Paid and Bank transfer labels in member payment pages', async () => {
     const simulatedPayment = payment({
       status: 'SUCCESS',
       settlementType: 'SIMULATED',
@@ -935,21 +931,20 @@ describe('FE-11 Receipts (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt)', 
     })
 
     const summary = renderApp('/member/payments/52')
-    expect(await screen.findByText('Paid - Simulated')).toBeInTheDocument()
-    expect(screen.getByText('SIMULATED (SPORTIFY_SIMULATOR)')).toBeInTheDocument()
-    expect(screen.getByText('SIM-QR-52-00000052')).toBeInTheDocument()
-    expect(screen.getByText('Paid (Simulated) with: Bank transfer')).toBeInTheDocument()
+    expect(await screen.findByText('Paid')).toBeInTheDocument()
+    expect(screen.getByText('Paid with: Bank transfer')).toBeInTheDocument()
+    expect(screen.queryByText(/simulated/i)).not.toBeInTheDocument()
     summary.unmount()
 
     const history = renderApp('/member/payments')
-    expect(await screen.findByText('Paid - Simulated')).toBeInTheDocument()
-    expect(screen.getByText('Bank transfer (Simulated)')).toBeInTheDocument()
+    expect(await screen.findByText('Paid')).toBeInTheDocument()
+    expect(screen.getByText('Bank transfer')).toBeInTheDocument()
+    expect(screen.queryByText(/simulated/i)).not.toBeInTheDocument()
     history.unmount()
 
     renderApp('/member/payments/receipts/7')
     const receipt = await screen.findByRole('region', { name: 'Receipt INV-0007' })
-    expect(within(receipt).getByText(/SIMULATED SETTLEMENT - Completed via Sportify QR Simulator/)).toBeInTheDocument()
-    expect(within(receipt).getByText('SIMULATED (SPORTIFY_SIMULATOR)')).toBeInTheDocument()
-    expect(within(receipt).getByText('Paid - Simulated')).toBeInTheDocument()
+    expect(within(receipt).getByText('Paid')).toBeInTheDocument()
+    expect(within(receipt).queryByText(/simulated/i)).not.toBeInTheDocument()
   })
 })

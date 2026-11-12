@@ -15,8 +15,9 @@ import java.util.Set;
 
 public interface PaymentService {
 
-    Set<PaymentMethod> ONLINE_ALLOWED_PAYMENT_METHODS = Set.of(
-            PaymentMethod.BANK_TRANSFER
+    Set<PaymentMethod> MEMBER_ALLOWED_PAYMENT_METHODS = Set.of(
+            PaymentMethod.BANK_TRANSFER,
+            PaymentMethod.CASH
     );
 
     Set<PaymentMethod> SUPPORTED_PAYMENT_METHODS = Set.of(

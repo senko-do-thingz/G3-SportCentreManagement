@@ -5,6 +5,7 @@ import { getErrorMessage } from '../../api/errors'
 import type { Payment } from '../../api/paymentsApi'
 import { PaymentHero } from '../../components/PaymentHero'
 import { PaymentWorkspace } from '../../components/PaymentWorkspace'
+import { VietQrPaymentCard } from '../../components/qr/VietQrPaymentCard'
 import { Button, Card, EmptyState, ErrorState, StatusBadge, useToast } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
@@ -16,7 +17,6 @@ import {
   accountNumberToCopy,
   amountToCopy,
   formatPaymentMoney as formatMoney,
-  isSimulatedSettlement,
   methodLabel,
   parseIdParam,
   PAYMENT_PATHS,
@@ -71,7 +71,7 @@ function PaymentStatusView({ paymentId }: { paymentId: number }) {
     const before = previousStatus.current
     previousStatus.current = status
     if (before === 'PENDING' && status === 'SUCCESS') {
-      toast.success('Payment confirmed', 'Reception confirmed your payment.')
+      toast.success('Payment confirmed')
     } else if (before === 'PENDING' && status && status !== 'PENDING') {
       toast.info(`Payment ${paymentStatusLabel(status).toLowerCase()}`)
     }
@@ -81,7 +81,9 @@ function PaymentStatusView({ paymentId }: { paymentId: number }) {
     <PaymentHero
       eyebrow="Member / Payments"
       title="Payment Instructions and Status"
-      description="Pay at reception or use the bank transfer details below."
+      description={payment?.method === 'BANK_TRANSFER'
+        ? 'Review your VietQR transfer instructions below. Reception confirms payment after verifying the received funds.'
+        : 'Check your payment status or give reception your payment reference.'}
     />
   )
 
@@ -108,7 +110,9 @@ function PaymentStatusView({ paymentId }: { paymentId: number }) {
         {header}
         {selectedSession && <Link className={buttonClassName('secondary')} to={`/member/sessions/${selectedSession}`}>Return to selected session</Link>}
         <div className="payment-summary">
-          <Instructions payment={payment} />
+          {payment.status === 'PENDING' && payment.method === 'BANK_TRANSFER' ? (
+            <VietQrPaymentCard payment={payment} onRefresh={refresh} fallback={<Instructions payment={payment} />} />
+          ) : <Instructions payment={payment} />}
           <StatusPanel polling={polling} payment={payment} />
         </div>
       </div>
@@ -138,23 +142,33 @@ function Instructions({ payment }: { payment: Payment }) {
             <dt>Method</dt>
             <dd>{methodLabel(payment.method)}</dd>
           </div>
-          {isSimulatedSettlement(payment) && (
-            <div>
-              <dt>Settlement provenance</dt>
-              <dd>SIMULATED ({payment.settlementProvider ?? 'SPORTIFY_SIMULATOR'})</dd>
-            </div>
-          )}
-          {isSimulatedSettlement(payment) && payment.referenceCode && (
-            <div>
-              <dt>Simulated transaction</dt>
-              <dd>{payment.referenceCode}</dd>
-            </div>
-          )}
         </dl>
       </Card>
     )
   }
   if (!instructions) {
+    if (payment.method === 'CASH') {
+      return (
+        <Card title="Cash" aria-label="Payment instructions">
+          <dl className="summary-list">
+            <div>
+              <dt>Payment reference</dt>
+              <dd><CopyValue label="payment reference" value={payment.code} copy={payment.code} /></dd>
+            </div>
+            <div>
+              <dt>Amount to pay</dt>
+              <dd>{formatMoney(payment.amount)}</dd>
+            </div>
+          </dl>
+          <div className="notice notice--info payment-summary__note">
+            <p>Cash has no online checkout yet. Pay at reception with this payment reference; a receptionist confirms once the cash is received.</p>
+          </div>
+          <Link className={buttonClassName('secondary', 'md', true)} to={PAYMENT_PATHS.summary(payment.id)}>
+            Switch to bank transfer
+          </Link>
+        </Card>
+      )
+    }
     return (
       <Card title={methodLabel(payment.method)} aria-label="Payment instructions">
         <dl className="summary-list">
@@ -280,17 +294,14 @@ function StatusPanel({ polling, payment }: { polling: ReturnType<typeof usePayme
         <StatusBadge status={paymentStatusToneCode(payment.status)} label={paymentStatusLabel(payment.status, payment.settlementType)} />
         <h3 className="payment-status__title">{content.title}</h3>
         <p className="payment-status__text">{content.text}</p>
-        {isSimulatedSettlement(payment) && (
-          <p className="notice notice--warning" role="status">
-            Settled in simulation only via Sportify QR Simulator. No real bank transfer or cash collection occurred.
-          </p>
-        )}
       </div>
 
       {payment.status === 'PENDING' && (
         <>
           <div className="notice notice--info payment-summary__note">
-            <p>Reception confirms the funds received. Do not submit a second request.</p>
+            <p>{payment.method === 'BANK_TRANSFER'
+              ? 'This QR does not notify the center when money arrives. If you transferred the amount, ask reception to verify your payment reference.'
+              : 'Bring the cash and payment reference to reception. Your payment stays pending until staff record the cash received.'}</p>
           </div>
           <p className="payment-status__check">
             {polling.polling

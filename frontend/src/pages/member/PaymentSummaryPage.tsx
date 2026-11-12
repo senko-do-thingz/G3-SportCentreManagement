@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { parseSessionReference } from '../../api/sessionIdentity'
 import { getErrorMessage } from '../../api/errors'
 import { memberApi, type MemberCard, type PackageRegistration } from '../../api/memberApi'
-import { ONLINE_PAYMENT_METHODS, paymentsApi, type Payment } from '../../api/paymentsApi'
+import { MEMBER_PAYMENT_METHODS, paymentsApi, type Payment } from '../../api/paymentsApi'
 import { PaymentHero } from '../../components/PaymentHero'
 import { PaymentWorkspace } from '../../components/PaymentWorkspace'
 import { Button, Card, EmptyState, ErrorState, StatusBadge } from '../../components/ui'
@@ -19,7 +19,6 @@ import {
   isPending,
   DEFAULT_PAYMENT_METHOD,
   isMethodAvailable,
-  isSimulatedSettlement,
   isSingleVisitRegistration,
   methodLabel,
   parseIdParam,
@@ -34,9 +33,6 @@ import {
 } from './paymentsModel'
 import { sessionsLabel } from './packagesModel'
 import { useMemberResource } from './useMemberResource'
-import { qrPaymentDemoEnabled } from '../../config/env'
-import { demoQrPath } from '../../components/qr/demoQr'
-import '../../components/qr/demoQr.css'
 
 const INVALID_LINK_MESSAGE = 'The payment link is not valid.'
 const MISMATCH_MESSAGE = 'The payment returned does not match this link. Open it again from My payments.'
@@ -174,18 +170,6 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
                 <StatusBadge status={paymentStatusToneCode(data.status)} label={paymentStatusLabel(data.status, data.settlementType)} />
               </dd>
             </div>
-            {isSimulatedSettlement(data) && (
-              <div>
-                <dt>Settlement provenance</dt>
-                <dd>SIMULATED ({data.settlementProvider ?? 'SPORTIFY_SIMULATOR'})</dd>
-              </div>
-            )}
-            {isSimulatedSettlement(data) && data.referenceCode && (
-              <div>
-                <dt>Simulated transaction</dt>
-                <dd>{data.referenceCode}</dd>
-              </div>
-            )}
             {registration && <RegistrationRows registration={registration} singleVisit={singleVisit} />}
             {card && <CardRows card={card} />}
             <div>
@@ -275,9 +259,8 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const pending = isPending(payment)
-  // Only bank transfer can be paid online today. A payment created with a wallet method starts on
-  // bank transfer here, so Continue switches it (PUT) and the next screen shows the bank details.
-  const [method, setMethod] = useState<string>(DEFAULT_PAYMENT_METHOD)
+  // Bank transfer opens the VietQR instructions; Cash leaves the payment pending for reception.
+  const [method, setMethod] = useState<string>(payment.method ?? DEFAULT_PAYMENT_METHOD)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -338,7 +321,7 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
         <form className="payment-method-form" onSubmit={handleSubmit} noValidate>
           <fieldset className="payment-methods" disabled={saving}>
             <legend className="payment-methods__legend">Payment method</legend>
-            {ONLINE_PAYMENT_METHODS.map((option) => {
+            {MEMBER_PAYMENT_METHODS.map((option) => {
               const available = isMethodAvailable(option)
               return (
                 <label
@@ -366,8 +349,9 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
             })}
           </fieldset>
           <p className="payment-methods__hint">
-            You will see the bank account and the transfer content on the next screen. You can also pay at
-            reception with your payment reference.
+            {method === 'CASH'
+              ? 'Pay at reception and provide your payment reference. The receptionist confirms after receiving the cash.'
+              : 'The next screen shows your VietQR transfer QR. Reception confirms real transfers after checking the received funds.'}
           </p>
           {error && (
             <div className="notice notice--danger" role="alert">
@@ -384,7 +368,7 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
       ) : (
         <div className="payment-summary__actions">
           <p className="payment-methods__hint">
-            {payment.status === 'SUCCESS' ? (isSimulatedSettlement(payment) ? 'Paid (Simulated) with' : 'Paid with') : 'Method'}: {methodLabel(payment.method)}
+            {payment.status === 'SUCCESS' ? 'Paid with' : 'Method'}: {methodLabel(payment.method)}
           </p>
           {payment.invoiceId ? (
             <Link className={buttonClassName('primary', 'md', true)} to={PAYMENT_PATHS.receipt(payment.invoiceId)}>
@@ -394,14 +378,6 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
           <Link className={buttonClassName('secondary', 'md', true)} to={PAYMENT_PATHS.status(payment.id)}>
             View payment status
           </Link>
-        </div>
-      )}
-      {pending && qrPaymentDemoEnabled() && (
-        <div className="qr-demo-entry">
-          <Link className={buttonClassName('secondary', 'md', true)} to={demoQrPath(payment.id)} aria-describedby="qr-demo-entry-description">
-            Pay with QR (Simulation)
-          </Link>
-          <p id="qr-demo-entry-description" className="payment-methods__hint">Simulated QR confirmation. Completes payment in simulation only with no real bank transfer.</p>
         </div>
       )}
       <Link className={buttonClassName('ghost', 'md', true, 'no-print')} to={MEMBER_PATHS.membership}>

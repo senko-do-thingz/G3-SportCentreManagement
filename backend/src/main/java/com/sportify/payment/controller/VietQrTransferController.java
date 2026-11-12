@@ -15,6 +15,7 @@ import java.util.*;
 public class VietQrTransferController {
     private final VietQrTransferService transfers;
     private final VietQrBankDirectory directory;
+    private final VietQrCheckoutService checkout;
     @GetMapping("/{id}/vietqr-instructions")
     public VietQrTransferService.Instructions instructions(@PathVariable long id,@AuthenticationPrincipal CustomUserDetails actor) {
         return transfers.instructions(id,actor.getUserAccount());
@@ -23,5 +24,19 @@ public class VietQrTransferController {
     public Map<String,Object> banks() {
         return Map.of("source","https://api.vietqr.io/v2/banks","capturedAt",directory.capturedAt(),
                 "fresh",directory.fresh(),"banks",directory.banks());
+    }
+
+    @PostMapping("/{id}/vietqr-checkout")
+    @PreAuthorize("hasRole('MEMBER') and principal.enabled")
+    public VietQrCheckoutService.Checkout checkout(@PathVariable long id,
+            @AuthenticationPrincipal CustomUserDetails actor) {
+        return checkout.checkout(id, actor.getUserAccount());
+    }
+
+    @PostMapping("/{id}/vietqr-sandbox-callback")
+    @PreAuthorize("hasRole('MEMBER') and principal.enabled")
+    public VietQrCheckoutService.SandboxCallbackSubmission testCallback(@PathVariable long id,
+            @AuthenticationPrincipal CustomUserDetails actor) {
+        return checkout.submitSandboxCallback(id, actor.getUserAccount());
     }
 }

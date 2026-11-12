@@ -8,6 +8,7 @@ import com.sportify.demoqr.dto.LocalDemoSettlementResponse;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.payment.entity.Invoice;
 import com.sportify.payment.entity.Payment;
+import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.entity.PaymentStatus;
 import com.sportify.payment.repository.InvoiceRepository;
 import com.sportify.payment.repository.PaymentRepository;
@@ -51,7 +52,7 @@ public class LocalDemoPaymentService {
             if (environment.matchesProfiles("prod") || environment.matchesProfiles("production")) {
                 return false;
             }
-            boolean profileActive = environment.matchesProfiles("local-demo");
+            boolean profileActive = environment.matchesProfiles("local-demo") || environment.matchesProfiles("dev");
             String flag = environment.getProperty("app.payment.local-demo.enabled");
             if (flag == null || flag.isBlank()) {
                 flag = environment.getProperty("PAYMENT_LOCAL_DEMO_ENABLED");
@@ -94,6 +95,12 @@ public class LocalDemoPaymentService {
                     .orElseThrow(DemoQrException::unavailable);
 
             if (payment.getMember() == null || !actor.getId().equals(payment.getMember().getId())) {
+                throw DemoQrException.unavailable();
+            }
+
+            // The member-facing local completion action represents a bank-transfer QR only.
+            // Cash stays pending until reception confirms that cash was actually received.
+            if (payment.getPaymentMethod() != PaymentMethod.BANK_TRANSFER) {
                 throw DemoQrException.unavailable();
             }
 

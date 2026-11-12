@@ -1,6 +1,5 @@
 package com.sportify.payment.service;
 
-import com.sportify.catalog.service.OperationalMemberPolicy;
 import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.payment.config.BankTransferProperties;
@@ -16,22 +15,21 @@ public class VietQrTransferService {
     private final PaymentService payments;
     private final BankTransferProperties beneficiary;
     private final VietQrBankDirectory directory;
-    private final OperationalMemberPolicy operational;
     public record Instructions(long paymentId,String paymentCode,boolean payable,String notice,String bankBin,
             String bankName,String accountNumber,String accountName,BigDecimal amount,String currency,
             String transferReference,String qrPayload,boolean requiresStaffConfirmation) {}
 
     @Transactional(readOnly=true)
     public Instructions instructions(long id,UserAccount actor) {
+        // getPayment enforces ownership. Reading transfer instructions does not grant class or training access.
         var payment=payments.getPayment(id,actor);
-        operational.requireRealMember(payment.getMemberId());
         if(payment.getStatus()!=PaymentStatus.PENDING || payment.getMethod()!=PaymentMethod.BANK_TRANSFER
                 || "SIMULATED".equals(payment.getSettlementType()) || payment.getSimulatedTransactionId()!=null
                 || "SPORTIFY_SIMULATOR".equals(payment.getSettlementProvider()))
             throw new BusinessRuleException("Only pending real bank-transfer payments support these instructions","TRANSFER_NOT_AVAILABLE");
         var bank=directory.supported(beneficiary.getBankBin());
         if(!beneficiary.isLiveInstructionsEnabled() || !beneficiary.isLiveBeneficiaryValid() || bank.isEmpty())
-            return new Instructions(id,payment.getCode(),false,"DEMO NON-PAYABLE. A verified beneficiary and fresh supported bank directory are required.",
+            return new Instructions(id,payment.getCode(),false,"DEMO NON-PAYABLE. Configure a verified beneficiary and refresh the supported VietQR bank directory.",
                     null,null,null,null,payment.getAmount(),"VND",null,null,true);
         String reference="SP"+id;
         String account=beneficiary.getAccountNumber().replace(" ","");

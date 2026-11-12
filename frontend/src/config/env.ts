@@ -33,9 +33,9 @@ export function managerPreviewEnabled(): boolean {
   return import.meta.env.DEV && import.meta.env.VITE_MANAGER_PREVIEW === 'true'
 }
 
-/** Enabled by default for the QR-05 simulation flow unless explicitly disabled via VITE_QR_PAYMENT_DEMO=false. Backend capability gating remains mandatory. */
+/** The legacy Sportify QR simulator is opt-in; member bank-transfer checkout uses VietQR format codes. */
 export function qrPaymentDemoEnabled(): boolean {
-  return import.meta.env.VITE_QR_PAYMENT_DEMO !== 'false'
+  return import.meta.env.VITE_QR_PAYMENT_DEMO === 'true'
 }
 
 export interface SampleAccount {

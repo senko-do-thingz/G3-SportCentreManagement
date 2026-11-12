@@ -55,9 +55,9 @@ public class PaymentServiceImpl implements PaymentService {
         validateNewPayment(member, amount);
 
         PaymentMethod chosenMethod = (method != null) ? method : PaymentMethod.BANK_TRANSFER;
-        if (!ONLINE_ALLOWED_PAYMENT_METHODS.contains(chosenMethod)) {
+        if (!MEMBER_ALLOWED_PAYMENT_METHODS.contains(chosenMethod)) {
             throw new BusinessRuleException("Payment method " + chosenMethod
-                    + " is not allowed for online requests. Allowed methods: " + ONLINE_ALLOWED_PAYMENT_METHODS);
+                    + " is not allowed for member checkout. Allowed methods: " + MEMBER_ALLOWED_PAYMENT_METHODS);
         }
 
         Long seq = paymentRepository.getNextPaymentCodeSequence();
@@ -276,9 +276,9 @@ public class PaymentServiceImpl implements PaymentService {
         if (newMethod == null) {
             throw new BusinessRuleException("Payment method cannot be null");
         }
-        if (!isStaffUser && !ONLINE_ALLOWED_PAYMENT_METHODS.contains(newMethod)) {
+        if (!isStaffUser && !MEMBER_ALLOWED_PAYMENT_METHODS.contains(newMethod)) {
             throw new BusinessRuleException("Payment method " + newMethod
-                    + " is not allowed for online payment. Allowed methods: " + ONLINE_ALLOWED_PAYMENT_METHODS);
+                    + " is not allowed for member checkout. Allowed methods: " + MEMBER_ALLOWED_PAYMENT_METHODS);
         }
         if (isStaffUser && !SUPPORTED_PAYMENT_METHODS.contains(newMethod)) {
             throw new BusinessRuleException("Payment method " + newMethod
@@ -332,6 +332,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .referenceCode(payment.getReferenceCode())
                 .settlementType(payment.getSettlementType())
                 .settlementProvider(payment.getSettlementProvider())
+                .settlementEnvironment(payment.getVietQrEnvironment())
                 .simulatedTransactionId(payment.getSimulatedTransactionId())
                 .invoiceId(invoiceId)
                 .invoiceNumber(invoiceNumber)
