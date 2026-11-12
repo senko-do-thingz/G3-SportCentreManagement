@@ -9,10 +9,19 @@
   background: transparent;
   color: var(--h-ink);
 }
-.home-page.workflow-surface h1, .home-page.workflow-surface h2, .home-page.workflow-surface h3 {
+.home-page.workflow-surface h2, .home-page.workflow-surface h3 {
   text-transform: none;
   letter-spacing: -0.02em;
   line-height: 1.3;
+}
+/* The page title follows the shared workspace title (styles/workspaceUi.css), like every other role page. */
+.home-page.workflow-surface h1 {
+  font-family: var(--ui-font-display);
+  font-size: var(--ui-title-size);
+  font-weight: var(--ui-title-weight);
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
 }
 .workflow-surface .page-header {
   padding-bottom: var(--space-6);

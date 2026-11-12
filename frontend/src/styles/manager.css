@@ -72,7 +72,7 @@
 .manager-page--users .manager-filters .field > .btn, .manager-page--users .manager-filters > .btn { height: 48px; padding: 0 var(--space-5); font-size: var(--text-md); }
 .manager-page--users .table-scroll { border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
 .manager-page--users .table { font-size: var(--text-base); }
-.manager-page--users .table th { padding: var(--space-4) var(--space-5); font-size: var(--text-sm); }
+.manager-page--users .table th { padding: var(--space-4) var(--space-5); font-size: var(--text-xs); }
 .manager-page--users .table td { padding: var(--space-5); }
 .manager-page--users .table tbody tr:nth-child(even) td { background: var(--color-surface-muted); }
 .manager-page--users .table tbody tr:hover td { background: var(--color-table-hover); }
@@ -102,7 +102,7 @@
 .manager-page--users .manager-filters > .btn--ghost { background: var(--color-surface); border-color: var(--color-border-strong); color: var(--color-primary); }
 .manager-page--users .manager-filters > .btn--ghost:hover:not(:disabled) { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
 .manager-page--users .table-scroll { border-color: var(--color-primary-soft-hover); }
-.manager-page--users .table th { background: var(--color-primary-soft); color: var(--color-primary); border-bottom: 2px solid var(--color-primary); }
+.manager-page--users .table th { background: var(--ui-band); color: var(--ui-muted); border-bottom: 2px solid var(--color-primary); }
 .manager-page--users .table tbody tr:nth-child(even) td { background: var(--color-surface-muted); }
 .manager-page--users .table tbody tr:hover td { background: var(--color-primary-soft); }
 .manager-page--users .manager-cell strong { color: var(--color-navy); }

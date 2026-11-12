@@ -24,7 +24,8 @@
 .manager-catalog__scroll-hint { display: none; margin: var(--space-3) var(--space-5) 0; color: var(--color-text-muted); font-size: var(--text-xs); }
 .manager-catalog__table .table { min-width: 0; table-layout: fixed; }
 .manager-catalog__table .table-scroll:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.manager-catalog__table .table th { padding: var(--space-3); background: transparent; color: var(--color-text-muted); font-size: var(--text-xs); font-weight: var(--weight-medium); letter-spacing: 0; text-transform: none; border-bottom: 1px solid var(--color-border); }
+/* Column labels use the shared workspace table header (Home band, small uppercase; styles/workspaceUi.css). */
+.manager-catalog__table .table th { padding: var(--space-3); background: var(--ui-band); color: var(--ui-muted); font-size: var(--text-xs); font-weight: var(--weight-bold); letter-spacing: 0.06em; text-transform: uppercase; border-bottom: 1px solid var(--ui-border); }
 .manager-catalog__table .table td { padding: var(--space-3); font-size: var(--text-sm); }
 .manager-catalog__table .table tbody tr:hover td { background: transparent; }
 .manager-catalog__table .table tbody tr:hover td:not([colspan]) { background: var(--color-table-hover); }
