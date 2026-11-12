@@ -148,7 +148,6 @@ function CreatePlanForm({ classId, members, onSaved }: { classId: number; member
             onUse={(drafts, adjustments) => {
               setSteps(draftSteps(drafts))
               setDescription(current => withAdjustments(current, adjustments))
-              setTimeout(() => { document.querySelector<HTMLInputElement>('input[name="title"]')?.focus() }, 50)
             }} />}
           {!bookingId && <p className="coach-plan-inline-note">Choose a confirmed member booking to load optional drill suggestions and build exercises.</p>}
           <StepFields steps={steps} setSteps={setSteps} />
@@ -204,7 +203,6 @@ function CreateClassPlanForm({ classId }: { classId: number }) {
             onUse={(drafts, adjustments) => {
               setSteps(draftSteps(drafts))
               setDescription(current => withAdjustments(current, adjustments))
-              setTimeout(() => { document.querySelector<HTMLInputElement>('input[name="title"]')?.focus() }, 50)
             }} />
           <StepFields steps={steps} setSteps={setSteps} />
           <PlanDraftSummary title={title} steps={steps} audience="Whole class / Class draft" shareLabel="Assign class plan" />

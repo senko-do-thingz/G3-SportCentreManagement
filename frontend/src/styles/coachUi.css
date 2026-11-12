@@ -1860,8 +1860,8 @@
   min-width: 0;
   position: sticky;
   top: 1.5rem;
-  background: var(--coach-surface, #ffffff);
-  border: 1px solid var(--coach-rule, #e2e8f0);
+  background: var(--coach-surface);
+  border: 1px solid var(--coach-rule);
   border-radius: 0;
   padding: var(--space-4);
   box-shadow: 0 4px 12px rgba(11, 23, 54, 0.04);
@@ -1929,9 +1929,9 @@
   gap: var(--space-4);
   min-width: 0;
   padding: 22px 24px;
-  border: 1px solid var(--coach-rule, #e2e8f0);
+  border: 1px solid var(--coach-rule);
   border-radius: 0;
-  background: var(--coach-surface, #ffffff);
+  background: var(--coach-surface);
   box-shadow: 0 4px 16px rgba(11, 23, 54, 0.04);
 }
 
@@ -1954,15 +1954,15 @@
 .coach-ui .coach-drill-drafts .training-context {
   margin: 0;
   padding: 18px 22px;
-  border: 1px solid #e0e7f1;
+  border: 1px solid var(--coach-rule);
   border-radius: 0;
-  background: linear-gradient(135deg, #f8fafc 0%, #f0f4ff 100%);
+  background: var(--coach-surface-muted);
   box-shadow: 0 2px 8px rgba(11, 23, 54, 0.03);
 }
 
 .coach-ui .coach-drill-drafts .training-context h4 {
   margin: 0 0 10px;
-  color: #0b1736;
+  color: var(--coach-ink);
   font-size: 0.9rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -1971,24 +1971,24 @@
 
 .coach-ui .coach-drill-drafts .training-context .browse-facts > div {
   padding: 8px 0;
-  border-bottom: 1px solid rgba(203, 213, 225, 0.6);
+  border-bottom: 1px solid var(--coach-rule);
 }
 
 .coach-ui .coach-drill-drafts .training-context dt {
-  color: #64748b;
+  color: var(--coach-muted);
   font-size: 0.82rem;
   font-weight: 600;
 }
 
 .coach-ui .coach-drill-drafts .training-context dd {
-  color: #0b1736;
+  color: var(--coach-ink);
   font-size: 0.88rem;
   font-weight: 700;
 }
 
 .coach-ui .coach-btn-suggest-drills {
-  background: linear-gradient(135deg, #1f4fd8 0%, #102454 100%) !important;
-  color: #ffffff !important;
+  background: var(--coach-blue) !important;
+  color: var(--coach-surface) !important;
   font-weight: 700 !important;
   padding: 10px 24px !important;
   border-radius: 0 !important;
@@ -2006,9 +2006,9 @@
 .coach-ui .coach-drill-table-scroll {
   max-width: 100%;
   overflow-x: auto;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--coach-rule);
   border-radius: 0;
-  background: #ffffff;
+  background: var(--coach-surface);
 }
 
 .coach-ui .coach-drill-table-scroll .table {
@@ -2024,16 +2024,16 @@
 .coach-ui .coach-plan-draft-summary {
   margin: 0;
   padding: 18px 22px;
-  border: 1px solid #dde6ef;
-  border-top: 4px solid #f5b301;
+  border: 1px solid var(--coach-rule);
+  border-top: 4px solid var(--color-accent);
   border-radius: 0;
-  background: #ffffff;
+  background: var(--coach-surface);
   box-shadow: 0 4px 14px rgba(11, 23, 54, 0.05);
 }
 
 .coach-ui .coach-plan-draft-summary > h4 {
   margin: 0 0 var(--space-2);
-  color: #0b1736;
+  color: var(--coach-ink);
   font-family: var(--coach-display);
   font-size: 1.05rem;
   font-weight: 800;
