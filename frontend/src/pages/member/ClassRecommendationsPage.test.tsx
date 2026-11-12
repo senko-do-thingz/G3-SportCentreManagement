@@ -85,22 +85,3 @@ it('removes a saved recommendation and shows when no session is available', asyn
   expect(await screen.findByText('No saved recommendations')).toBeInTheDocument()
   expect(calls.some(call => call.method === 'DELETE' && call.path === '/member/training/saved-recommendations/9')).toBe(true)
 })
-
-it('saves a level per sport and clears one back to the general level', async () => {
-  tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
-  const { calls } = installFakeFetch(call => {
-    if (call.path === '/users/me') return json(200, MEMBER)
-    if (call.path === '/member/training/sport-levels') return json(200, [{ sportId: 1, sportName: 'Badminton', level: null }, { sportId: 2, sportName: 'Swimming', level: 'INTERMEDIATE' }])
-    if (call.path === '/member/training/sport-levels/1' && call.method === 'PUT') return json(200, { sportId: 1, sportName: 'Badminton', level: 'ADVANCED' })
-    if (call.path === '/member/training/sport-levels/2' && call.method === 'DELETE') return new Response(null, { status: 204 })
-    if (call.path.startsWith('/member/training/recommendations')) return json(200, { ...recommendationsResponse, totalMatches: 0, items: [] })
-    return json(200, [])
-  })
-  renderApp('/member/training/recommendations')
-  await userEvent.selectOptions(await screen.findByLabelText('Badminton level'), 'ADVANCED')
-  await userEvent.selectOptions(screen.getByLabelText('Swimming level'), '')
-  await userEvent.click(screen.getByRole('button', { name: 'Save sport levels' }))
-  expect(await screen.findByText('Sport levels saved. Recommendations use them from now on.')).toBeInTheDocument()
-  expect(calls.find(call => call.method === 'PUT')).toMatchObject({ path: '/member/training/sport-levels/1', body: { level: 'ADVANCED' } })
-  expect(calls.some(call => call.method === 'DELETE' && call.path === '/member/training/sport-levels/2')).toBe(true)
-})

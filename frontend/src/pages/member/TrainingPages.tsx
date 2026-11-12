@@ -59,7 +59,7 @@ export function TrainingPlansPage() {
                   <p>{plan.className} - Coach {plan.coachName}</p>
                   {plan.description && <p className="training-copy">{plan.description}</p>}
                   <Link to={`/member/training/plans/${plan.id}`} aria-label={`View plan details: ${plan.title}`}>
-                    View plan details
+                    View plan details &gt;
                   </Link>
                 </li>
               ))}

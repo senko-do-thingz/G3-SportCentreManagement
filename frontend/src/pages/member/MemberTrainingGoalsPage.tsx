@@ -22,7 +22,6 @@ const label = (options: { value: string; label: string }[], value: string | null
 export function MemberTrainingGoalsPage() {
   const auth = useContext(AuthContext)
   const memberId = auth?.user?.id
-  const [revision, refresh] = useState(0)
   const load = useCallback(async (signal: AbortSignal): Promise<GoalsData> => {
     const [profile, context, levels, sports] = await Promise.all([memberApi.me({ signal }), trainingGuidanceApi.context(signal),
       trainingGuidanceApi.sportLevels(signal), packagesApi.sports({ signal })])
@@ -31,8 +30,8 @@ export function MemberTrainingGoalsPage() {
   return <div className="training-page">
     <RecommendationTabs />
     <PageHeader title="My training goals" description="Tell us what you want to achieve and when you can train. Recommendations use these preferences; you always choose what to book." />
-    <TrainingData key={`${memberId}-${revision}`} load={load}>{data => <div className="training-form-grid">
-      <GoalsForm data={data} memberId={memberId} onSaved={() => refresh(value => value + 1)} />
+    <TrainingData key={memberId} load={load}>{data => <div className="training-form-grid">
+      <GoalsForm data={data} memberId={memberId} />
       <Card title="Your training context">
         <dl className="browse-facts">
           <div><dt>Member</dt><dd>{data.context.memberName}</dd></div>
@@ -49,7 +48,7 @@ export function MemberTrainingGoalsPage() {
   </div>
 }
 
-function GoalsForm({ data, memberId, onSaved }: { data: GoalsData; memberId: number | undefined; onSaved: () => void }) {
+function GoalsForm({ data, memberId }: { data: GoalsData; memberId: number | undefined }) {
   const navigate = useNavigate()
   const action = useTrainingAction()
   const [goal, setGoal] = useState(data.profile.mainGoal ?? '')
@@ -78,33 +77,49 @@ function GoalsForm({ data, memberId, onSaved }: { data: GoalsData; memberId: num
   }
   function submit(event: FormEvent) {
     event.preventDefault()
-    void action.run(async () => { await save(); onSaved() }, 'Training preferences saved.')
+    void action.run(save, 'Training preferences saved.')
   }
   return <Card title="Training preferences"><form className="training-form" onSubmit={submit}>
     <Select label="Main goal" placeholder="Not set" options={GOAL_OPTIONS} value={goal} onChange={event => setGoal(event.target.value)} />
     <Select label="General level" placeholder="Not set" options={LEVEL_OPTIONS} value={level} onChange={event => setLevel(event.target.value)} />
     <fieldset><legend>Preferred sports and level per sport</legend>
-      {data.sports.map(sport => <div key={sport.id} className="training-actions">
-        <label><input type="checkbox" checked={preferred.includes(sport.id)} onChange={event => setPreferred(list => toggle(list, sport.id, event.target.checked))} /> {sport.name}</label>
-        {data.levels.some(item => item.sportId === sport.id) && <Select label={`${sport.name} level`} placeholder="Use general level" options={LEVEL_OPTIONS}
-          value={levels[sport.id] ?? ''} onChange={event => setLevels(current => ({ ...current, [sport.id]: event.target.value }))} />}
-      </div>)}
+      <div className="training-sport-list">
+        {data.sports.map(sport => <div key={sport.id} className="training-sport-row">
+          <label className="training-sport-checkbox">
+            <input type="checkbox" checked={preferred.includes(sport.id)} onChange={event => setPreferred(list => toggle(list, sport.id, event.target.checked))} />
+            <span>{sport.name}</span>
+          </label>
+          {data.levels.some(item => item.sportId === sport.id) && (
+            <div className="training-sport-select">
+              <Select aria-label={`${sport.name} level`} placeholder="Use general level" options={LEVEL_OPTIONS}
+                value={levels[sport.id] ?? ''} onChange={event => setLevels(current => ({ ...current, [sport.id]: event.target.value }))} />
+            </div>
+          )}
+        </div>)}
+      </div>
     </fieldset>
-    <Select label="Training format" placeholder="Coach-led or self-training" options={FORMAT_OPTIONS} value={availability.format}
+    <Select label="Training format" options={FORMAT_OPTIONS} value={availability.format}
       onChange={event => setAvailability(current => ({ ...current, format: event.target.value as TrainingAvailability['format'] }))} />
-    <fieldset><legend>Available days</legend><div className="training-actions">
-      {WEEKDAYS.map(day => <label key={day.value}><input type="checkbox" checked={availability.days.includes(day.value)}
-        onChange={event => setAvailability(current => ({ ...current, days: toggle(current.days, day.value, event.target.checked) }))} /> {day.label}</label>)}
+    <fieldset><legend>Available days</legend><div className="training-days-grid">
+      {WEEKDAYS.map(day => <label key={day.value} className="training-day-chip"><input type="checkbox" checked={availability.days.includes(day.value)}
+        onChange={event => setAvailability(current => ({ ...current, days: toggle(current.days, day.value, event.target.checked) }))} /> <span>{day.label}</span></label>)}
     </div></fieldset>
-    <Input label="Earliest start time" type="time" value={availability.earliest} onChange={event => setAvailability(current => ({ ...current, earliest: event.target.value }))} />
-    <Input label="Latest end time" type="time" value={availability.latest} onChange={event => setAvailability(current => ({ ...current, latest: event.target.value }))} />
+    <div className="training-time-range">
+      <Input label="Earliest start time" type="time" value={availability.earliest} onChange={event => setAvailability(current => ({ ...current, earliest: event.target.value }))} />
+      <Input label="Latest end time" type="time" value={availability.latest} onChange={event => setAvailability(current => ({ ...current, latest: event.target.value }))} />
+    </div>
     <p>Goal and levels are saved to your profile. Levels are recorded per sport rather than one level for all sports. Training format and available times are kept on this device.</p>
     <ActionMessage {...action} />
     <div className="training-actions">
       <Button type="submit" variant="secondary" loading={action.pending}>Save preferences</Button>
       <Button type="button" disabled={action.pending} onClick={() => { void action.run(async () => {
         await save()
-        const query = availabilityQuery(availability)
+        const firstSport = preferred[0]
+        const query = availabilityQuery(availability, {
+          sportId: firstSport,
+          level: (firstSport && levels[firstSport]) || level || undefined,
+          goal: goal || undefined,
+        })
         navigate(`/member/training/recommendations${query ? `?${query}` : ''}`)
       }, 'Training preferences saved.') }}>Get recommendations</Button>
     </div>

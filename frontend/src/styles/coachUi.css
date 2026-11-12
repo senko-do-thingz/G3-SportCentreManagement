@@ -1853,7 +1853,20 @@
   border: 0;
 }
 
-.coach-ui .coach-plan-form__details,
+.coach-ui .coach-plan-form__details {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-width: 0;
+  position: sticky;
+  top: 1.5rem;
+  background: var(--coach-surface);
+  border: 1px solid var(--coach-rule);
+  border-radius: 0;
+  padding: var(--space-4);
+  box-shadow: 0 4px 12px rgba(11, 23, 54, 0.04);
+}
+
 .coach-ui .coach-plan-form__exercises {
   display: grid;
   align-content: start;
@@ -1913,37 +1926,89 @@
 }
 
 .coach-ui .coach-drill-drafts {
-  gap: var(--space-3);
+  gap: var(--space-4);
   min-width: 0;
-  padding: var(--space-3);
+  padding: 22px 24px;
   border: 1px solid var(--coach-rule);
-  background: var(--coach-surface-muted);
+  border-radius: 0;
+  background: var(--coach-surface);
+  box-shadow: 0 4px 16px rgba(11, 23, 54, 0.04);
 }
 
 .coach-ui .coach-drill-drafts > h3 {
   margin: 0;
   color: var(--coach-ink);
   font-family: var(--coach-display);
-  font-size: var(--text-sm);
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
 }
 
 .coach-ui .coach-drill-drafts > p {
   margin: 0;
   color: var(--coach-muted);
-  font-size: var(--text-xs);
+  font-size: 0.85rem;
   line-height: 1.55;
 }
 
 .coach-ui .coach-drill-drafts .training-context {
   margin: 0;
-  padding: var(--space-3);
+  padding: 18px 22px;
   border: 1px solid var(--coach-rule);
-  background: var(--coach-surface);
+  border-radius: 0;
+  background: var(--coach-surface-muted);
+  box-shadow: 0 2px 8px rgba(11, 23, 54, 0.03);
+}
+
+.coach-ui .coach-drill-drafts .training-context h4 {
+  margin: 0 0 10px;
+  color: var(--coach-ink);
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.coach-ui .coach-drill-drafts .training-context .browse-facts > div {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--coach-rule);
+}
+
+.coach-ui .coach-drill-drafts .training-context dt {
+  color: var(--coach-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.coach-ui .coach-drill-drafts .training-context dd {
+  color: var(--coach-ink);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.coach-ui .coach-btn-suggest-drills {
+  background: var(--coach-blue) !important;
+  color: var(--coach-surface) !important;
+  font-weight: 700 !important;
+  padding: 10px 24px !important;
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: 0 4px 14px rgba(31, 79, 216, 0.25) !important;
+  transition: all 0.2s ease !important;
+  cursor: pointer;
+}
+
+.coach-ui .coach-btn-suggest-drills:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(31, 79, 216, 0.35) !important;
 }
 
 .coach-ui .coach-drill-table-scroll {
   max-width: 100%;
   overflow-x: auto;
+  border: 1px solid var(--coach-rule);
+  border-radius: 0;
+  background: var(--coach-surface);
 }
 
 .coach-ui .coach-drill-table-scroll .table {
@@ -1958,16 +2023,20 @@
 
 .coach-ui .coach-plan-draft-summary {
   margin: 0;
-  padding: var(--space-3);
+  padding: 18px 22px;
   border: 1px solid var(--coach-rule);
-  border-left: 3px solid var(--color-accent);
-  background: var(--coach-surface-muted);
+  border-top: 4px solid var(--color-accent);
+  border-radius: 0;
+  background: var(--coach-surface);
+  box-shadow: 0 4px 14px rgba(11, 23, 54, 0.05);
 }
 
 .coach-ui .coach-plan-draft-summary > h4 {
   margin: 0 0 var(--space-2);
   color: var(--coach-ink);
   font-family: var(--coach-display);
+  font-size: 1.05rem;
+  font-weight: 800;
 }
 
 .coach-ui .coach-assigned-plans__count {

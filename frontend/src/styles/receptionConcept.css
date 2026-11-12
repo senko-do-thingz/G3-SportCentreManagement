@@ -66,12 +66,14 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-6);
-  min-height: 120px;
-  padding: var(--space-6) var(--space-8);
+  min-height: 124px;
+  padding: 24px 28px;
   overflow: hidden;
   border-radius: 0;
-  background: linear-gradient(109deg, var(--color-hero) 0%, var(--color-hero-deep) 35%, var(--color-primary) 100%);
-  color: var(--color-on-hero);
+  border: 1px solid rgba(245, 179, 1, 0.4);
+  background: linear-gradient(135deg, #0b1736 0%, #102454 55%, #1f4fd8 120%);
+  box-shadow: 0 8px 24px rgba(11, 23, 54, 0.12);
+  color: #ffffff;
 }
 
 .rcp-hero__kicker {
@@ -380,31 +382,31 @@
 /* RUI-03 member search and profile */
 .rcp.reception-member-search-page .member-overview { margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--color-border); }
 .rcp.reception-member-search-page .reception-subtitle { margin-top: var(--space-5); font-size: var(--text-xs); font-weight: var(--weight-bold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-primary); }
-.rcp.reception-member-search-page .package-item { border: 1px solid var(--color-border); border-left: 4px solid var(--color-primary); border-radius: 0; }
+.rcp.reception-member-search-page .package-item { border: 1px solid var(--color-border); border-left: 4px solid var(--color-primary); border-radius: 0; box-shadow: 0 2px 8px rgba(11, 23, 54, 0.04); }
 
 /* RUI-04 register and renew: Concept A title and tab accents on top of the UI-18 form layout */
 .page.rcp.rcp-register .page-header { padding: 0 0 var(--space-4); }
 .page.rcp.rcp-register .page-header__title { font-family: var(--font-display); text-transform: uppercase; letter-spacing: -0.03em; }
 .page.rcp.rcp-register .reception-tabs__tab--active { border-bottom-color: var(--color-primary); color: var(--color-primary); }
-.page.rcp.rcp-register .card { border-radius: 0; }
+.page.rcp.rcp-register .card { border-radius: 0; box-shadow: 0 4px 16px rgba(11, 23, 54, 0.05); }
 
 /* RUI-05 check-in */
 .page.rcp.rcp-checkin .page-header { padding: 0 0 var(--space-4); }
 .page.rcp.rcp-checkin .page-header__title { font-family: var(--font-display); text-transform: uppercase; letter-spacing: -0.03em; }
-.page.rcp.rcp-checkin .card { border-radius: 0; }
-.page.rcp.rcp-checkin .checkin-result { border-left-width: 4px; border-radius: 0; }
+.page.rcp.rcp-checkin .card { border-radius: 0; box-shadow: 0 4px 16px rgba(11, 23, 54, 0.05); }
+.page.rcp.rcp-checkin .checkin-result { border-left-width: 4px; border-radius: 0; box-shadow: 0 2px 8px rgba(11, 23, 54, 0.04); }
 
 /* RUI-06 assisted booking */
 .page.rcp.reception-bookings-page .page-header { padding: 0 0 var(--space-4); }
 .page.rcp.reception-bookings-page .page-header__title { font-family: var(--font-display); text-transform: uppercase; letter-spacing: -0.03em; }
-.page.rcp.reception-bookings-page .card { border-radius: 0; }
+.page.rcp.reception-bookings-page .card { border-radius: 0; box-shadow: 0 4px 16px rgba(11, 23, 54, 0.05); }
 
 /* RUI-07 payment request queue (inside the shared PaymentWorkspace; scoped by page classes only) */
 .rcp-payment-stats .stat-card {
   border: 1px solid var(--color-border);
   border-left: 4px solid var(--color-primary);
   border-radius: 0;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 2px 8px rgba(11, 23, 54, 0.04);
 }
 .rcp-payment-stats .stat-card:last-child { border-left-color: var(--color-highlight); }
 .rcp-payment-stats .stat-card__value { font-variant-numeric: tabular-nums; }
