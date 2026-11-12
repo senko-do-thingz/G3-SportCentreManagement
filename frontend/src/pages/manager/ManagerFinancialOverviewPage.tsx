@@ -87,9 +87,7 @@ export function ManagerFinancialOverviewPage() {
         <StatCard label="Pending payments" value={formatMoney(resource.data.overview.pendingAmount)} hint={`${resource.data.overview.pendingTransactions} pending transactions`} />
         <StatCard label="Refunded amount" value={formatMoney(resource.data.overview.refundedAmount)} hint={`${resource.data.overview.refundedTransactions} completed refunds`} />
         <StatCard label="Net revenue" value={formatMoney(resource.data.overview.netRevenue)} hint="Paid revenue minus refunds paid out this month" />
-        {(resource.data.overview.simulatedTransactions > 0 || resource.data.overview.simulatedRevenue > 0) && (
-          <StatCard label="Simulated QR volume (non-cash)" value={formatMoney(resource.data.overview.simulatedRevenue)} hint={`${resource.data.overview.simulatedTransactions} simulated transactions (excluded from paid revenue)`} />
-        )}
+        <StatCard label="Demo Revenue (non-cash)" value={formatMoney(resource.data.overview.simulatedRevenue)} hint={`${resource.data.overview.simulatedTransactions} simulated transactions (excluded from actual paid revenue)`} />
       </section>
 
       <div className="finance-overview-grid">

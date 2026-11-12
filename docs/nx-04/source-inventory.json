@@ -442,9 +442,18 @@
       ],
       "drops": [],
       "sha256_lf": "0369562e55eeddb040aa3e8ac2e0e08ae8e8b75d9afc1fea2dc6c90deab873a7"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V54__mark_operational_qr_settlements.sql",
+      "version": 54,
+      "creates": [
+        "dbo.operational_qr_settlement"
+      ],
+      "drops": [],
+      "sha256_lf": "bcb4730b3508786a35cc3fdaa7941be61f37403b9020b39868b9a661e44bbeb0"
     }
   ],
-  "create_occurrences": 81,
+  "create_occurrences": 82,
   "create_names": [
     "[activity_log]",
     "[age_group]",
@@ -509,6 +518,7 @@
     "dbo.member_health_assessment",
     "dbo.member_payout_account",
     "dbo.member_wallet",
+    "dbo.operational_qr_settlement",
     "dbo.payment_wallet_settlement",
     "dbo.simulated_payment_transaction",
     "dbo.simulated_qr_rate_limit",

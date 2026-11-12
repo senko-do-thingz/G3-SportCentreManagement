@@ -270,8 +270,8 @@ describe('FE-13 financial overview', () => {
     const view = renderApp('/manager/finance?month=2026-10')
     const kpis = await screen.findByRole('region', { name: 'Financial key performance indicators' })
     expect(within(kpis).getByText('16.110.000 VND')).toBeInTheDocument()
-    expect(within(kpis).getByText('Simulated QR volume (non-cash)')).toBeInTheDocument()
-    expect(within(kpis).getByText('1 simulated transactions (excluded from paid revenue)')).toBeInTheDocument()
+    expect(within(kpis).getByText('Demo Revenue (non-cash)')).toBeInTheDocument()
+    expect(within(kpis).getByText('1 simulated transactions (excluded from actual paid revenue)')).toBeInTheDocument()
     expect(await screen.findByText('Paid - Simulated')).toBeInTheDocument()
     view.unmount()
 

@@ -22,10 +22,14 @@ public class OperationalMemberPolicy {
         Integer synthetic = jdbc.queryForObject("""
                 SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.user_account WHERE id=?
                     AND LOWER(email) LIKE '%@unified-demo.invalid')
-                  OR EXISTS (SELECT 1 FROM dbo.payment WHERE member_id=? AND
-                    (settlement_type='SIMULATED' OR settlement_provider='SPORTIFY_SIMULATOR'
-                     OR simulated_transaction_id IS NOT NULL))
-                  OR EXISTS (SELECT 1 FROM dbo.simulated_payment_transaction WHERE member_id=?)
+                  OR EXISTS (SELECT 1 FROM dbo.payment p WHERE p.member_id=? AND
+                    (p.settlement_type='SIMULATED' OR p.settlement_provider='SPORTIFY_SIMULATOR'
+                     OR p.simulated_transaction_id IS NOT NULL)
+                    AND NOT EXISTS (SELECT 1 FROM dbo.operational_qr_settlement oq
+                        WHERE oq.payment_id=p.id AND oq.simulated_transaction_id=p.simulated_transaction_id))
+                  OR EXISTS (SELECT 1 FROM dbo.simulated_payment_transaction tx WHERE tx.member_id=?
+                    AND NOT EXISTS (SELECT 1 FROM dbo.operational_qr_settlement oq
+                        WHERE oq.payment_id=tx.payment_id AND oq.simulated_transaction_id=tx.id))
                 THEN 1 ELSE 0 END
                 """, Integer.class, memberId, memberId, memberId);
         if (configured || Integer.valueOf(1).equals(synthetic)) {
