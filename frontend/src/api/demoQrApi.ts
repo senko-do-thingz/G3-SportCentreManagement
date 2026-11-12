@@ -71,7 +71,8 @@ function created(value: unknown): CreatedDemoSession {
   const item = value as CreatedDemoSession
   const snapshot = session(item?.session)
   const url = new URL(item.confirmationUrl)
-  if (url.protocol !== 'https:' || url.username || url.password || url.search
+  const localHttp = url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname)
+  if ((url.protocol !== 'https:' && !localHttp) || url.username || url.password || url.search
     || !url.pathname.endsWith('/demo/qr/confirm') || !DEMO_TOKEN.test(url.hash.slice(7)) || !url.hash.startsWith('#token=')) {
     throw new Error('Invalid demo confirmation link')
   }

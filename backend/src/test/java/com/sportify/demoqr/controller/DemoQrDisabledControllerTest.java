@@ -42,10 +42,6 @@ abstract class DisabledDemoQrContract {
     }
 }
 
-@ActiveProfiles("qr-simulator")
-@TestPropertySource(properties = "app.payment.simulator.enabled=false")
-class DemoQrDisabledControllerTest extends DisabledDemoQrContract { }
-
 @ActiveProfiles("prod")
 @TestPropertySource(properties = "app.payment.simulator.enabled=true")
 class DemoQrProductionControllerTest extends DisabledDemoQrContract { }

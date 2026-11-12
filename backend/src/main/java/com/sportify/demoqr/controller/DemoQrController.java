@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/payments/simulated-qr/sessions")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('MEMBER')")
-@Profile("(qr-simulator | unified-demo) & !prod & !production")
+@Profile("!prod & !production")
 @Conditional(TokenQrEnabledCondition.class)
 public class DemoQrController {
     private final DemoQrService service;
