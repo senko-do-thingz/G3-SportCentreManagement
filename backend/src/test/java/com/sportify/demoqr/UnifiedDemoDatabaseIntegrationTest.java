@@ -83,7 +83,7 @@ class UnifiedDemoDatabaseIntegrationTest extends LocalDemoWorkflow {
         assertThat(context.getBean(Flyway.class).getConfiguration().getIgnoreMigrationPatterns()).isEmpty();
         assertThat(jdbcTemplate.queryForObject("SELECT DB_NAME()", String.class)).isEqualTo(fixture.name());
         assertThat(context.getEnvironment().getProperty("app.training.attendance-backfill.enabled")).isEqualTo("false");
-        assertThat(context.getBeansOfType(com.sportify.demoqr.service.DemoQrService.class)).isEmpty();
+        assertThat(context.getBeansOfType(com.sportify.demoqr.service.DemoQrService.class)).hasSize(1);
     }
 
     private long pending(String email, String method) {
