@@ -58,6 +58,10 @@ export function RegisterRenewPage() {
   const tab: RegisterTab = isRegisterTab(tabParam) ? tabParam : 'package'
   const memberId = positiveId(params.get('memberId'))
   const packageId = positiveId(params.get('packageId'))
+  const sessionId = params.get('sessionId')
+  const week = params.get('week')
+  const bookingReturn = memberId && sessionId && /^\d{1,10}$|^[A-Za-z0-9_-]{4,32}$/.test(sessionId)
+    ? `/reception/bookings/new?${new URLSearchParams({ memberId: String(memberId), sessionId, ...(week ? { week } : {}) })}` : null
 
   const setTab = (next: RegisterTab) => {
     setParams((current) => {
@@ -122,7 +126,7 @@ export function RegisterRenewPage() {
             />
           </Card>
         ) : (
-          <SaleWorkspace key={`${tab}-${memberId}`} tab={tab} memberId={memberId} packageId={packageId} />
+          <SaleWorkspace key={`${tab}-${memberId}-${packageId}-${bookingReturn}`} tab={tab} memberId={memberId} packageId={packageId} bookingReturn={bookingReturn} />
         )}
       </div>
     </ReceptionScreen>
@@ -135,7 +139,7 @@ interface SaleData {
   tiers: CardTier[]
 }
 
-function SaleWorkspace({ tab, memberId, packageId }: { tab: 'package' | 'card'; memberId: number; packageId: number | null }) {
+function SaleWorkspace({ tab, memberId, packageId, bookingReturn }: { tab: 'package' | 'card'; memberId: number; packageId: number | null; bookingReturn: string | null }) {
   const load = useCallback(
     async (signal: AbortSignal): Promise<SaleData> => {
       const [overview, packages, tiers] = await Promise.all([
@@ -164,6 +168,7 @@ function SaleWorkspace({ tab, memberId, packageId }: { tab: 'package' | 'card'; 
       <SaleReceipt
         result={result}
         memberId={memberId}
+        bookingReturn={bookingReturn}
         onNewSale={() => {
           setResult(null)
           setSaleCount((count) => count + 1)
@@ -183,10 +188,11 @@ function SaleWorkspace({ tab, memberId, packageId }: { tab: 'package' | 'card'; 
       <Link className={buttonClassName('ghost', 'sm')} to={registerPath({ tab })}>
         Change member
       </Link>
+      {bookingReturn && <Link className={buttonClassName('secondary', 'sm')} to={bookingReturn}>Return to selected session</Link>}
     </MemberHeader>
   )
   return tab === 'package' ? (
-    <PackageSale key={saleCount} data={data.data} memberBlock={memberBlock} initialPackageId={packageId} onSold={onSold} onRefresh={reload} />
+    <PackageSale key={saleCount} data={data.data} memberBlock={memberBlock} initialPackageId={packageId} bookingReturn={bookingReturn} onSold={onSold} onRefresh={reload} />
   ) : (
     <CardSale key={saleCount} data={data.data} memberBlock={memberBlock} onSold={onSold} onRefresh={reload} />
   )
@@ -317,7 +323,7 @@ interface SaleResult {
   itemId: number
 }
 
-function SaleReceipt({ result, memberId, onNewSale }: { result: SaleResult; memberId: number; onNewSale: () => void }) {
+function SaleReceipt({ result, memberId, bookingReturn, onNewSale }: { result: SaleResult; memberId: number; bookingReturn: string | null; onNewSale: () => void }) {
   const outcome = saleOutcome({ status: result.status, paymentId: result.paymentId, amount: result.amount })
   const notice: Record<typeof outcome, { tone: string; text: string }> = {
     paid: { tone: 'success', text: `${result.title} is active. Payment ${result.paymentCode ?? result.paymentId} is recorded.` },
@@ -372,7 +378,7 @@ function SaleReceipt({ result, memberId, onNewSale }: { result: SaleResult; memb
         {outcome === 'pending' && result.paymentId !== null && (
           <Link
             className={buttonClassName('primary', 'md')}
-            to={receptionPaymentPath(result.paymentId, memberId)}
+            to={`${receptionPaymentPath(result.paymentId, memberId)}${bookingReturn ? `&returnTo=${encodeURIComponent(bookingReturn)}` : ''}`}
           >
             Confirm payment
           </Link>
@@ -380,6 +386,7 @@ function SaleReceipt({ result, memberId, onNewSale }: { result: SaleResult; memb
         <Link className={buttonClassName('secondary', 'md')} to={memberSearchPath(memberId)}>
           Back to member profile
         </Link>
+        {bookingReturn && <Link className={buttonClassName('secondary', 'md')} to={bookingReturn}>Return to selected session</Link>}
         <Button variant="ghost" onClick={onNewSale}>
           New sale
         </Button>
@@ -405,12 +412,14 @@ function PackageSale({
   data,
   memberBlock,
   initialPackageId,
+  bookingReturn,
   onSold,
   onRefresh,
 }: {
   data: SaleData
   memberBlock: ReactNode
   initialPackageId: number | null
+  bookingReturn: string | null
   onSold: (result: SaleResult) => void
   onRefresh: () => void
 }) {
@@ -419,7 +428,8 @@ function PackageSale({
   const known = initialPackageId !== null && packages.some((item) => item.id === initialPackageId)
   const [selectedId, setSelectedId] = useState<string>(known ? String(initialPackageId) : '')
   const [startDate, setStartDate] = useState(() =>
-    defaultStartDate(overview.registrations, known ? initialPackageId : null, today),
+    bookingReturn ? new URLSearchParams(bookingReturn.split('?')[1]).get('week') ?? today
+      : defaultStartDate(overview.registrations, known ? initialPackageId : null, today),
   )
   const [payment, setPayment] = useState<DeskPaymentForm>(EMPTY_DESK_PAYMENT)
   const [errors, setErrors] = useState<{ packageId?: string; startDate?: string; payment: DeskPaymentErrors }>({
@@ -432,6 +442,7 @@ function PackageSale({
   const [priceChanged, setPriceChanged] = useState(false)
 
   const selected = packages.find((item) => String(item.id) === selectedId) ?? null
+  const pending = selected ? overview.registrations.find((item) => item.packageId === selected.id && item.status === 'PENDING_PAYMENT') : null
   const card = currentCard(overview.cards, today)
   const price = selected ? priceBreakdown(selected, card) : null
   const amountDue = price?.final ?? 0
@@ -449,10 +460,12 @@ function PackageSale({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    if (inFlight.current || uncertain) return
+    if (inFlight.current || uncertain || pending) return
     const checkToday = receptionDate(new Date())
     const packageError = selected ? undefined : 'Choose a package'
-    const dateError = validateStartDate(startDate, checkToday) ?? undefined
+    const sessionDate = bookingReturn ? new URLSearchParams(bookingReturn.split('?')[1]).get('week') : null
+    const dateError = validateStartDate(startDate, checkToday) ?? (selected && sessionDate && (startDate > sessionDate || packageEndDate(startDate, selected.durationDays) < sessionDate)
+      ? 'Choose a start date that covers the selected session.' : undefined)
     const paymentErrors = price ? validateDeskPayment(payment, price.final) : {}
     setErrors({ packageId: packageError, startDate: dateError, payment: paymentErrors })
     setFormError(null)
@@ -509,6 +522,7 @@ function PackageSale({
               {formError}
             </p>
           )}
+          {pending && <p className="notice notice--warning" role="status">Payment pending for registration {pending.registrationCode}. Confirm its existing payment before creating another registration. {pending.paymentId && <Link to={`${receptionPaymentPath(pending.paymentId, overview.member.userId)}${bookingReturn ? `&returnTo=${encodeURIComponent(bookingReturn)}` : ''}`}>Confirm payment</Link>}</p>}
           {packages.length === 0 ? (
             <EmptyState title="No package on sale" description="The manager has not published any sport package yet." />
           ) : (
@@ -525,7 +539,8 @@ function PackageSale({
                   const id = positiveId(event.target.value)
                   const nextPackage = packages.find((item) => item.id === id)
                   if (nextPackage && (amountDue === 0) !== (priceBreakdown(nextPackage, card).final === 0)) setPayment(EMPTY_DESK_PAYMENT)
-                  setStartDate(defaultStartDate(overview.registrations, id, receptionDate(new Date())))
+                  setStartDate(bookingReturn ? new URLSearchParams(bookingReturn.split('?')[1]).get('week') ?? receptionDate(new Date())
+                    : defaultStartDate(overview.registrations, id, receptionDate(new Date())))
                   setErrors((current) => ({ ...current, packageId: undefined }))
                 }}
                 error={errors.packageId}
@@ -557,7 +572,7 @@ function PackageSale({
             />
           )}
           <div className="reception-form__actions">
-            <Button type="submit" loading={saving} disabled={uncertain || packages.length === 0}>
+            <Button type="submit" loading={saving} disabled={uncertain || Boolean(pending) || packages.length === 0}>
               Record payment and register
             </Button>
             {priceChanged && <Button variant="secondary" onClick={onRefresh}>Refresh prices</Button>}

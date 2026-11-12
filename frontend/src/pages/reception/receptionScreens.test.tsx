@@ -40,6 +40,7 @@ const ACTIVE_BADMINTON = registration({
 })
 const PENDING_FOOTBALL = registration({
   id: 11,
+  packageId: 5,
   registrationCode: 'REG-ONLINE-001',
   status: 'PENDING_PAYMENT',
   paymentId: 41,

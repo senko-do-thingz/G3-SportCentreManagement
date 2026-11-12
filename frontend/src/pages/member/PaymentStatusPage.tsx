@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { parseSessionReference } from '../../api/sessionIdentity'
 import { getErrorMessage } from '../../api/errors'
 import type { Payment } from '../../api/paymentsApi'
 import { PaymentHero } from '../../components/PaymentHero'
@@ -57,6 +58,8 @@ export function PaymentStatusPage() {
 }
 
 function PaymentStatusView({ paymentId }: { paymentId: number }) {
+  const [params] = useSearchParams()
+  const selectedSession = parseSessionReference(params.get('sessionId'))
   const polling = usePaymentPolling(paymentId)
   const { payment, loadError, refresh } = polling
   const toast = useToast()
@@ -103,6 +106,7 @@ function PaymentStatusView({ paymentId }: { paymentId: number }) {
       <div className="member-commerce">
         <PaymentNav paymentId={paymentId} />
         {header}
+        {selectedSession && <Link className={buttonClassName('secondary')} to={`/member/sessions/${selectedSession}`}>Return to selected session</Link>}
         <div className="payment-summary">
           <Instructions payment={payment} />
           <StatusPanel polling={polling} payment={payment} />
