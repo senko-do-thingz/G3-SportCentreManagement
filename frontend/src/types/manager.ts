@@ -2,7 +2,7 @@ import type { CardTier } from '../api/cardsApi'
 import type { SportPackage } from '../api/packagesApi'
 import type { Role } from '../api/types'
 
-export type StaffRole = Exclude<Role, 'MEMBER'>
+export type StaffRole = Exclude<Role, 'MEMBER' | 'MANAGER'>
 export type AccountStatus = 'ACTIVE' | 'INACTIVE'
 export type TrainingFormat = 'SELF_TRAINING' | 'COACH_LED'
 

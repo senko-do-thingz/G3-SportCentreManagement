@@ -135,6 +135,33 @@ class ManagerUserServiceImplTest {
         when(passwordEncoder.encode("Temp1234")).thenReturn("encoded-hash");
     }
 
+    @Test
+    void createStaffAccount_managerRole_isRejectedBeforeAnyWrite() {
+        assertThrows(BusinessRuleException.class, () -> service.createStaffAccount(request("MANAGER", null), actor));
+        verifyNoInteractions(userRepository, roleRepository);
+    }
+
+    @Test
+    void resetMemberPassword_hashesFixedPassword() {
+        UserAccount member = user(9L, "member@sportify.test", "MEMBER", "ACTIVE");
+        when(userRepository.findById(9L)).thenReturn(Optional.of(member));
+        when(passwordEncoder.encode("SportifyDemo2026!")).thenReturn("encoded-reset");
+        service.resetMemberPassword(9L, actor);
+        assertEquals("encoded-reset", member.getPasswordHash());
+        verify(userRepository).save(member);
+        verify(auditService).record(any(AuditEvent.class));
+    }
+
+    @Test
+    void resetMemberPassword_rejectsNonMember() {
+        for (String roleCode : List.of("MANAGER", "COACH", "RECEPTIONIST")) {
+            when(userRepository.findById(9L)).thenReturn(Optional.of(user(9L, "other@sportify.test", roleCode, "ACTIVE")));
+            assertThrows(BusinessRuleException.class, () -> service.resetMemberPassword(9L, actor));
+        }
+        verifyNoInteractions(passwordEncoder);
+        verify(userRepository, never()).save(any(UserAccount.class));
+    }
+
     // ---------------------------------------------------------------------
     // listUsers
     // ---------------------------------------------------------------------
@@ -245,17 +272,6 @@ class ManagerUserServiceImplTest {
         assertEquals(20L, event.getEntityId());
         assertEquals(actor, event.getActor());
         assertEquals("RECEPTIONIST", event.getDetails().get("role"));
-    }
-
-    @Test
-    void createStaffAccount_manager_shouldBeAllowed() {
-        stubCreateDependencies("MANAGER");
-        stubSaveAssignsId(21L);
-
-        ManagerUserResponse response = service.createStaffAccount(request("manager", List.of()), actor);
-
-        assertEquals("MANAGER", response.role());
-        verify(coachProfileRepository, never()).save(any());
     }
 
     @Test

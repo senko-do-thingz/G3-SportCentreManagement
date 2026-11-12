@@ -9,7 +9,7 @@ export function validateStaff(request: StaffAccountRequest): Record<string, stri
   else if (request.email.length > 255 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(request.email)) errors.email = 'Enter a valid email address.'
   if (!/^\+?\d{8,15}$/.test(request.phone)) errors.phone = 'Phone must be 8-15 digits with optional leading +.'
   if (!isStrongPassword(request.temporaryPassword)) errors.temporaryPassword = STRONG_PASSWORD_MESSAGE
-  if (!['COACH', 'RECEPTIONIST', 'MANAGER'].includes(request.role)) errors.role = 'Choose a staff role.'
+  if (!['COACH', 'RECEPTIONIST'].includes(request.role)) errors.role = 'Choose a staff role.'
   if (request.role === 'COACH' && (!request.sportIds.length || request.sportIds.length > 20)) errors.sportIds = 'Choose 1-20 sports for this coach.'
   return errors
 }

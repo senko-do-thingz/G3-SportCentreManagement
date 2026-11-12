@@ -10,7 +10,7 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 
 /**
- * Create a staff account (RECEPTIONIST, COACH or MANAGER). MEMBER accounts are not created here.
+ * Create a staff account (RECEPTIONIST or COACH). MEMBER accounts are not created here.
  * {@code sportIds} is required for a COACH (the first id becomes the primary sport) and must be empty otherwise.
  */
 public record StaffAccountCreateRequest(
