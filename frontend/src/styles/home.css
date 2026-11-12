@@ -394,7 +394,20 @@
   .home-hero__actions, .home-hero__actions .home-btn { width: 100%; }
   .home-strip__sports { grid-template-columns: 1fr; gap: 20px; padding: 28px 24px; }
   .home-strip__side { grid-template-columns: 1fr; grid-template-rows: 72px 72px; }
-  .home-finder form, .home-features__list, .home-sports, .home-plans, .home-footer__grid { grid-template-columns: 1fr; }
+  .home-finder form, .home-plans, .home-footer__grid { grid-template-columns: 1fr; }
+  /* Features and sports stay two-up on phones so the page does not turn into a long single column of tall cards. */
+  .home-features__list { gap: 12px; margin-top: 32px; }
+  .home-features__list li { gap: 10px; padding: 24px 12px; }
+  .home-features__icon { width: 56px; height: 56px; }
+  .home-features__icon .home-icon { width: 26px; height: 26px; }
+  .home-features__list h3 { font-size: 18px; }
+  .home-features__list p { font-size: 13px; }
+  .home-sports { gap: 12px; }
+  .home-sport { aspect-ratio: 1 / 1; }
+  .home-sport__label { padding: 12px; }
+  /* Scales with the viewport so the longest names (Basketball, Volleyball) fit one line on 320px screens. */
+  .home-sport h3 { font-size: clamp(12px, 4.2vw, 20px); letter-spacing: 0; white-space: nowrap; }
+  .home-sport__go { display: none; }
   .home-rail { grid-template-columns: 1fr; }
   .home-rail__arrow { display: none; }
   .home-coach-card { flex-basis: 78%; }
