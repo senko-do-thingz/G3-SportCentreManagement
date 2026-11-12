@@ -2,7 +2,7 @@ package com.sportify.demoqr.controller;
 
 import com.sportify.demoqr.service.DemoQrException;
 import com.sportify.demoqr.service.DemoQrService;
-import com.sportify.demoqr.config.SimulatedSettlementEnabledCondition;
+import com.sportify.demoqr.config.TokenQrEnabledCondition;
 import com.sportify.identity.security.CustomUserDetails;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('MEMBER')")
 @Profile("(qr-simulator | unified-demo) & !prod & !production")
-@Conditional(SimulatedSettlementEnabledCondition.class)
+@Conditional(TokenQrEnabledCondition.class)
 public class DemoQrController {
     private final DemoQrService service;
 

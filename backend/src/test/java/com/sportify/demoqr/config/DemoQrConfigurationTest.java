@@ -26,12 +26,18 @@ class DemoQrConfigurationTest {
     @Test
     void unifiedDemoEnablesTokenFlowOnlyUnderCanonicalGuard() {
         var condition = new SimulatedSettlementEnabledCondition();
+        var tokenCondition = new TokenQrEnabledCondition();
         var context = mock(ConditionContext.class);
         MockEnvironment env = UnifiedDemoSafetyGuardTest.canonical();
         when(context.getEnvironment()).thenReturn(env);
         assertThat(condition.matches(context, null)).isTrue();
+        assertThat(tokenCondition.matches(context, null)).isFalse();
+        env.setProperty("app.payment.simulator.public-base-url", "https://demo.example.test/");
+        env.setProperty("app.payment.simulator.allowed-origins", "https://demo.example.test");
+        assertThat(tokenCondition.matches(context, null)).isTrue();
         env.setActiveProfiles("dev", "unified-demo", "qr-simulator");
         assertThat(condition.matches(context, null)).isFalse();
+        assertThat(tokenCondition.matches(context, null)).isFalse();
         env.setActiveProfiles("dev", "unified-demo");
         env.setProperty(UnifiedDemoSafetyGuard.ENABLED, "false");
         assertThat(condition.matches(context, null)).isFalse();

@@ -2,7 +2,7 @@ package com.sportify.demoqr.service;
 
 import com.sportify.core.common.SecurityUtils;
 import com.sportify.demoqr.config.DemoQrSettings;
-import com.sportify.demoqr.config.SimulatedSettlementEnabledCondition;
+import com.sportify.demoqr.config.TokenQrEnabledCondition;
 import com.sportify.identity.entity.UserAccount;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Profile;
@@ -23,7 +23,7 @@ import java.util.function.Supplier;
 /** SQL-backed QR payment simulation service with atomic simulated settlement. */
 @Service
 @Profile("(qr-simulator | unified-demo) & !prod & !production")
-@Conditional(SimulatedSettlementEnabledCondition.class)
+@Conditional(TokenQrEnabledCondition.class)
 public class DemoQrService {
     public enum State { PENDING, AUTHORIZED_PENDING_SETTLEMENT, CANCELED, EXPIRED, SETTLED }
     public enum Bank {
