@@ -195,6 +195,40 @@ describe('QR-01 guarded demo route and payment integration', () => {
     expect(screen.getByRole('link', { name: 'View payment receipt' })).toHaveAttribute('href', '/member/payments/receipts/301')
   })
 
+  it('accepts a local http confirmation link and fills the token without scanning', async () => {
+    const token = 'c'.repeat(43)
+    let settled = false
+    const base = {
+      id: '123e4567-e89b-12d3-a456-426614174000', paymentId: 52, reference: 'DEMO-52',
+      amount: 810000, currency: 'VND', bankCode: 'VIETCOMBANK_DEMO', bankLabel: 'Vietcombank (demo)',
+      createdAt: '2099-01-01T00:00:00Z', expiresAt: '2099-01-01T00:05:00Z', serverTime: '2099-01-01T00:00:00Z',
+      mode: 'NON_PAYABLE', state: 'PENDING',
+    }
+    const { calls } = installFakeFetch((call) => {
+      if (call.path === '/users/me') return json(200, MEMBER)
+      if (call.path === '/payments/52') return json(200, payment(settled ? {
+        status: 'SUCCESS', settlementType: 'SIMULATED', settlementProvider: 'SPORTIFY_SIMULATOR', invoiceId: 301,
+      } : {}))
+      if (call.path === '/payments/simulated-qr/capability') return json(200, { contractVersion: 1, settlementEnabled: true, enabled: true })
+      if (call.path === '/payments/simulated-qr/sessions' && call.method === 'POST')
+        return json(200, { session: base, confirmationUrl: `http://localhost:5173/demo/qr/confirm#token=${token}` })
+      if (call.path === '/payments/simulated-qr/sessions/confirm') {
+        settled = true
+        return json(200,{ ...base, state: 'SETTLED', settlementType: 'SIMULATED', settlementProvider: 'SPORTIFY_SIMULATOR', invoiceId: 301, invoiceNumber: 'INV-301' })
+      }
+      return json(200, [])
+    })
+    const user = userEvent.setup()
+    renderApp('/member/payments/52/qr-demo')
+    await user.click(await screen.findByRole('button', { name: 'Generate QR token' }))
+    expect(await screen.findByRole('img', { name: 'Scannable payment verification token' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Fill token automatically' }))
+    expect(screen.getByLabelText('Verification token')).toHaveValue(token)
+    await user.click(screen.getByRole('button', { name: 'Verify and Confirm Payment' }))
+    await waitFor(() => expect(calls.find((call) => call.path.endsWith('/confirm'))?.body).toEqual({ token }))
+    expect(await screen.findByText(/Payment Successful - Demo/)).toBeVisible()
+  })
+
   it('removes the canceled QR while issuing a replacement and confirms the new token', async () => {
     let issues = 0
     let releaseReplacement!: () => void
