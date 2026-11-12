@@ -159,7 +159,7 @@ try:
             decoded = zxingcpp.read_barcodes(Image.open(BytesIO(desktop.locator('.qr-demo-card svg').first.screenshot())))
             check('Replacement QR reveals one token: ' + theme, len(decoded) == 1 and len(decoded[0].text) == 43)
             tokens.append(decoded[0].text)
-            desktop.get_by_label('Verification token').fill(decoded[0].text)
+            desktop.get_by_role('textbox', name='Verification token').fill(decoded[0].text)
             desktop.get_by_role('button', name='Verify and Confirm Payment').click()
             expect(desktop.get_by_text('Payment Successful - Demo')).to_be_visible()
             mobile.goto(args.base + '/demo/qr/confirm#token=' + decoded[0].text)
