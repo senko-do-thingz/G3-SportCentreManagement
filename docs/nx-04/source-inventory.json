@@ -465,6 +465,13 @@
       "creates": [],
       "drops": [],
       "sha256_lf": "815b889b1e3479fb9b578cc2c2639e996786fe251d2af63943892c50317288a2"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V57__allow_local_vietqr_demo_provenance.sql",
+      "version": 57,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "999482b873cbc9435b6cb49a20128e74c1e26479a3de13dd8d0de9fe3d3c4d60"
     }
   ],
   "create_occurrences": 82,
