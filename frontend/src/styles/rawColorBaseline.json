@@ -564,6 +564,11 @@
     ":root { --shadow-lg|rgba(16,46,80,0.18)": 1,
     ":root { --shadow-md|rgba(16,46,80,0.08)": 1,
     ":root { --shadow-sm|rgba(16,46,80,0.06)": 1,
+    ":root { --ui-band|#f5f7fb": 1,
+    ":root { --ui-border|#e4e8f0": 1,
+    ":root { --ui-ink|#0e1a33": 1,
+    ":root { --ui-muted|#5a6782": 1,
+    ":root { --ui-shadow|rgba(14,26,51,0.08)": 1,
     "@media screen { :root[data-theme='dark'] { --color-backdrop|rgba(0,6,15,0.74)": 1,
     "@media screen { :root[data-theme='dark'] { --color-bg|#0d1724": 1,
     "@media screen { :root[data-theme='dark'] { --color-border-strong|#6f89a6": 1,
@@ -604,7 +609,12 @@
     "@media screen { :root[data-theme='dark'] { --color-warning|#f1ce86": 1,
     "@media screen { :root[data-theme='dark'] { --shadow-lg|rgba(0,0,0,0.5)": 1,
     "@media screen { :root[data-theme='dark'] { --shadow-md|rgba(0,0,0,0.28)": 1,
-    "@media screen { :root[data-theme='dark'] { --shadow-sm|rgba(0,0,0,0.24)": 1
+    "@media screen { :root[data-theme='dark'] { --shadow-sm|rgba(0,0,0,0.24)": 1,
+    "@media screen { :root[data-theme='dark'] { --ui-band|#0e1526": 1,
+    "@media screen { :root[data-theme='dark'] { --ui-border|#232d47": 1,
+    "@media screen { :root[data-theme='dark'] { --ui-ink|#e8ecf6": 1,
+    "@media screen { :root[data-theme='dark'] { --ui-muted|#96a0b8": 1,
+    "@media screen { :root[data-theme='dark'] { --ui-shadow|rgba(0,0,0,0.4)": 1
   },
   "src/theme/theme.ts": {
     "#0d1724": 2,
