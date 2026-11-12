@@ -103,7 +103,7 @@ export function CoachTeachingSchedulePage() {
   const dates = Array.from({ length: 7 }, (_, index) => browseAddDays(week, index))
 
   return <div className="page coach-schedule-page coach-ui">
-    <PageHeader eyebrow="Your workspace" title="Teaching Schedule" description="Review assigned sessions across the teaching week." />
+    <PageHeader eyebrow="Coach workspace" title="Teaching Schedule" description="Review assigned sessions across the teaching week." />
     <section className="coach-schedule-hero" aria-label="Coach schedule introduction">
       <div className="coach-schedule-hero__copy">
         <p className="coach-schedule-hero__eyebrow">Sportify coach experience</p>
@@ -252,7 +252,7 @@ export function CoachRosterPage() {
   const rosterCount = selectedSession && roster.status === 'ready' ? roster.data.length : '--'
 
   return <div className="page coach-schedule-page coach-roster-page coach-ui">
-    <PageHeader eyebrow="Your workspace" title="Class Roster" description="Select an assigned session to review its confirmed bookings." actions={<Button variant="secondary" disabled={!selectedSession || roster.status !== 'ready'} onClick={() => window.print()}>Print roster</Button>} />
+    <PageHeader eyebrow="Coach workspace" title="Class Roster" description="Select an assigned session to review its confirmed bookings." actions={<Button variant="secondary" disabled={!selectedSession || roster.status !== 'ready'} onClick={() => window.print()}>Print roster</Button>} />
     <section className="coach-schedule-hero" aria-label="Class roster introduction">
       <div className="coach-schedule-hero__copy">
         <p className="coach-schedule-hero__eyebrow">Sportify coach experience</p>

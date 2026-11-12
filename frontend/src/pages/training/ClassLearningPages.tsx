@@ -131,7 +131,7 @@ function CoachMemberQuestionsPage() {
   }
 
   return <div className="training-page coach-ui coach-questions-page">
-    <PageHeader eyebrow="Your workspace" title="Member Questions" description="Review member questions and share clear practice guidance." />
+    <PageHeader eyebrow="Coach workspace" title="Member Questions" description="Review member questions and share clear practice guidance." />
     <section className="coach-schedule-hero" aria-label="Member questions introduction">
       <div className="coach-schedule-hero__copy">
         <p className="coach-schedule-hero__eyebrow">Sportify coach experience</p>

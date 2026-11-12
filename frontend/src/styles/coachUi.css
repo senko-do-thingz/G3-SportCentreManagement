@@ -27,7 +27,7 @@
 .coach-ui .page-header__title {
   color: var(--coach-ink);
   font-family: var(--coach-display);
-  font-size: clamp(1.75rem, 2.6vw, 2.5rem);
+  font-size: var(--ui-title-size);
   letter-spacing: -0.035em;
   line-height: 1.1;
   overflow-wrap: anywhere;
