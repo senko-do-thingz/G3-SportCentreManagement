@@ -12,13 +12,7 @@ import { MemberDashboardPage } from '../pages/member/MemberDashboardPage'
 import { MembershipCardsPage } from '../pages/member/MembershipCardsPage'
 import { MyMembershipPage } from '../pages/member/MyMembershipPage'
 import { MyPaymentsPage } from '../pages/member/MyPaymentsPage'
-import { MemberWalletPage } from '../pages/member/MemberWalletPage'
-import { WalletTopUpPage } from '../pages/member/WalletTopUpPage'
-import { WalletTopUpQueuePage } from '../pages/reception/WalletTopUpQueuePage'
-import { WalletWithdrawPage } from '../pages/member/WalletWithdrawPage'
-import { WalletWithdrawalQueuePage } from '../pages/reception/WalletWithdrawalQueuePage'
 import { ReceptionInboxPage } from '../pages/reception/ReceptionInboxPage'
-import { WalletHistoryPage } from '../pages/member/WalletHistoryPage'
 import { MyProfilePage } from '../pages/member/MyProfilePage'
 import { HealthAssessmentPage } from '../pages/member/HealthAssessmentPage'
 import { CheckInPassPage } from '../pages/member/CheckInPassPage'
@@ -114,7 +108,6 @@ const SCREENS: Record<string, ReactNode> = {
   '/member/packages': <SportPackagesPage />,
   '/member/membership': <MyMembershipPage />,
   '/member/payments': <MyPaymentsPage />,
-  '/member/wallet': <MemberWalletPage />,
   '/member/schedules': <MemberSchedulesWorkspacePage />,
   '/reception': <MemberSearchPage />,
   '/reception/support': <SupportRequestsPage />,
@@ -123,8 +116,6 @@ const SCREENS: Record<string, ReactNode> = {
   '/reception/check-in': <CheckInPage />,
   '/reception/payments': <PaymentRequestsPage />,
   '/reception/refunds': <RefundRequestsPage />,
-  '/reception/wallet/topups': <WalletTopUpQueuePage />,
-  '/reception/wallet/withdrawals': <WalletWithdrawalQueuePage />,
   '/reception/inbox': <ReceptionInboxPage />,
   '/coach': <CoachTeachingSchedulePage />,
   '/coach/roster': <CoachRosterPage />,
@@ -157,9 +148,6 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
     { path: 'training/plans', element: <TrainingPlansPage /> },
     { path: 'check-in-pass', element: <CheckInPassPage /> },
     { path: 'profile/health', element: <HealthAssessmentPage /> },
-    { path: 'wallet/topup', element: <WalletTopUpPage /> },
-    { path: 'wallet/withdraw', element: <WalletWithdrawPage /> },
-    { path: 'wallet/history', element: <WalletHistoryPage /> },
     { path: 'training/classes', element: <MemberClassesPage /> },
     { path: 'training/classes/:id', element: <MemberClassDetailPage /> },
     { path: 'training/questions', element: <ClassQuestionsPage /> },

@@ -3,12 +3,11 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { memberApi, type MemberBooking, type MemberCard, type PackageRegistration } from '../../api/memberApi'
 import { memberTrainingApi } from '../../api/memberTrainingApi'
-import { walletApi, type WalletOverview } from '../../api/walletApi'
 import { useAuth } from '../../auth/useAuth'
 import { Badge, Card, EmptyState, ErrorState, PageHeader, StatCard, StatusBadge } from '../../components/ui'
 import { buttonClassName } from '../../components/ui/buttonClassName'
 import { Spinner } from '../../components/ui/Spinner'
-import { formatDate, formatDateTime, formatMoney } from '../../utils/format'
+import { formatDate, formatDateTime } from '../../utils/format'
 import {
   activeRegistrations,
   canBook,
@@ -64,10 +63,6 @@ function loadBookings(signal: AbortSignal): Promise<MemberBooking[]> {
   return memberApi.myUpcomingBookings({ signal })
 }
 
-function loadWallet(signal: AbortSignal): Promise<WalletOverview> {
-  return walletApi.overview(signal)
-}
-
 async function recordCount<T>(request: Promise<T[]>): Promise<number | null> {
   try {
     return (await request).length
@@ -94,7 +89,6 @@ export function MemberDashboardPage() {
   const { user } = useAuth()
   const [purchases, reloadPurchases] = useMemberResource(loadPurchases)
   const [bookings, reloadBookings] = useMemberResource(loadBookings)
-  const [wallet] = useMemberResource(loadWallet)
   const [trainingSnapshot, reloadTrainingSnapshot] = useMemberResource(loadTrainingSnapshot)
   // Fixed for the life of the page, so the lists do not change while the member reads them.
   const [now] = useState(() => new Date())
@@ -176,13 +170,6 @@ export function MemberDashboardPage() {
           value={card ? card.tierName : STANDARD_TIER_NAME}
           hint={card ? cardHint(card) : 'Explore cards for package discounts'}
         />
-        <div className="dashboard-wallet-stat">
-          <StatCard
-            label="Wallet balance"
-            value={wallet.status === 'ready' ? formatMoney(wallet.data.availableBalance, wallet.data.currency) : wallet.status === 'loading' ? 'Loading' : 'Unavailable'}
-            hint={wallet.status === 'ready' ? 'Available balance' : wallet.status === 'error' ? 'Wallet data could not load' : 'Your available balance'}
-          />
-        </div>
         <StatCard label="Active packages" value={active.length} hint={activePackagesHint(active.length, bookableCount)} />
         <StatCard
           label="Upcoming sessions"

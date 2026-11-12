@@ -1,5 +1,6 @@
 package com.sportify.payment.wallet;
 
+import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.identity.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,6 +21,6 @@ public class MemberWalletPaymentController {
 
     @PostMapping("/{paymentId}")
     public WalletPaymentService.Result pay(@PathVariable long paymentId, @AuthenticationPrincipal CustomUserDetails user) {
-        return service.pay(user.getUserAccount(), paymentId);
+        throw new BusinessRuleException("Sportify Wallet has been retired. Please pay using Bank Transfer, Cash, or QR Code.", "WALLET_FEATURE_RETIRED");
     }
 }

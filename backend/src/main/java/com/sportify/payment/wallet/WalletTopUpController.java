@@ -1,5 +1,6 @@
 package com.sportify.payment.wallet;
 
+import com.sportify.core.exception.BusinessRuleException;
 import com.sportify.identity.security.CustomUserDetails;
 import com.sportify.payment.wallet.WalletTopUpService.ConfirmRequest;
 import com.sportify.payment.wallet.WalletTopUpService.CreateRequest;
@@ -42,7 +43,7 @@ public class WalletTopUpController {
     public TopUp create(@RequestBody CreateRequest request,
                         @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
                         @AuthenticationPrincipal CustomUserDetails user) {
-        return service.create(user.getUserAccount().getId(), request, idempotencyKey);
+        throw new BusinessRuleException("Wallet top-up is no longer supported as the Wallet feature has been retired.", "WALLET_FEATURE_RETIRED");
     }
 
     @GetMapping("/member/wallet/topups/{id}")
@@ -54,7 +55,7 @@ public class WalletTopUpController {
     @PostMapping("/member/wallet/topups/{id}/cancel")
     @PreAuthorize("hasRole('MEMBER') and principal.enabled")
     public TopUp cancel(@PathVariable long id, @AuthenticationPrincipal CustomUserDetails user) {
-        return service.cancel(user.getUserAccount().getId(), id);
+        throw new BusinessRuleException("Wallet top-up cancellation is no longer supported as the Wallet feature has been retired.", "WALLET_FEATURE_RETIRED");
     }
 
     @GetMapping("/reception/wallet/topups")
@@ -72,12 +73,12 @@ public class WalletTopUpController {
     @PostMapping("/reception/wallet/topups/{id}/confirm")
     @PreAuthorize("hasRole('RECEPTIONIST') and principal.enabled")
     public TopUp confirm(@PathVariable long id, @RequestBody ConfirmRequest request, @AuthenticationPrincipal CustomUserDetails user) {
-        return service.confirm(id, request, user.getUserAccount().getId());
+        throw new BusinessRuleException("Wallet top-up confirmation is no longer supported as the Wallet feature has been retired.", "WALLET_FEATURE_RETIRED");
     }
 
     @PostMapping("/reception/wallet/topups/{id}/reject")
     @PreAuthorize("hasRole('RECEPTIONIST') and principal.enabled")
     public TopUp reject(@PathVariable long id, @RequestBody RejectRequest request, @AuthenticationPrincipal CustomUserDetails user) {
-        return service.reject(id, request, user.getUserAccount().getId());
+        throw new BusinessRuleException("Wallet top-up rejection is no longer supported as the Wallet feature has been retired.", "WALLET_FEATURE_RETIRED");
     }
 }
