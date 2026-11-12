@@ -17,7 +17,7 @@ public record DemoQrSettings(String publicBaseUrl, long lifetimeSeconds) {
     }
 
     private static long validateLifetime(long seconds) {
-        if (seconds < 30 || seconds > 600) throw new IllegalArgumentException("Demo lifetime must be 30 to 600 seconds");
+        if (seconds != 300) throw new IllegalArgumentException("Demo token lifetime must be 300 seconds");
         return seconds;
     }
 
