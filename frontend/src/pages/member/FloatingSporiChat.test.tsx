@@ -31,11 +31,8 @@ describe('FloatingSporiChat', () => {
     // Open chat
     fireEvent.click(screen.getByRole('button', { name: /Ask Spori AI/i }))
 
-    // Enable consent
-    fireEvent.click(screen.getByLabelText(/Enable automated center consultation/i))
-
     // Type question and send
-    const input = screen.getByPlaceholderText(/Ask about training, classes, or your records/i)
+    const input = screen.getByRole('textbox', { name: 'Ask Spori a question' })
     fireEvent.change(input, { target: { value: 'Can I bring my pet kangaroo to swimming?' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 

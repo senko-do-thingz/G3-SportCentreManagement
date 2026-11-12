@@ -100,7 +100,6 @@ function CenterConsultationWorkspace() {
   const [params] = useSearchParams()
   const location = useLocation()
   const returnTo = safeMemberReturnTo(params.get('returnTo'))
-  const [optIn, setOptIn] = useState(false)
   const [result, setResult] = useState<Consultation | null>(null)
   const [question, setQuestion] = useState(() => {
     const routeQuestion = (location.state as { assistantQuestion?: unknown } | null)?.assistantQuestion
@@ -114,7 +113,7 @@ function CenterConsultationWorkspace() {
   useEffect(() => { if (result) resultRef.current?.scrollIntoView?.({ block: 'start' }) }, [result])
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!optIn || !enabled) return
+    if (!enabled) return
     const text = question.trim()
     void action.run(async () => { setResult(await trainingGuidanceApi.consult(text)); setAsked(text) }, 'Center information loaded.')
   }
@@ -123,19 +122,15 @@ function CenterConsultationWorkspace() {
       <Link className="assistant-workspace__back" to={returnTo}>Back to previous page</Link>
       <div className="assistant-workspace__heading">
         <span className="assistant-workspace__mark"><SporiRobotMark /></span>
-        <PageHeader eyebrow={<span className="assistant-workspace__desktop-eyebrow">Spori AI / Sportify training guide</span>} title="Center assistant" description="Ask in English or Vietnamese about schedules, package prices, general exercise, or your own packages, bookings and coach feedback. Answers come only from center data and your own records." />
+        <PageHeader eyebrow={<span className="assistant-workspace__desktop-eyebrow">Spori AI / Sportify training guide</span>} title="Center assistant" description="Ask about classes, prices, or your own records — in English or Vietnamese." />
       </div>
-      <div className="assistant-workspace__privacy">
-        <p>Answers use Sportify's own center records. No conversation history is stored: your question and answer stay on this page until you leave or turn consultation off. General exercise answers are fixed curated text, not personal or medical advice.</p>
-        <p aria-label="External AI disclosure"><strong>External AI:</strong> turning on consultation does not share your question with any outside company. External AI is off unless the center approves it. Even then your question text is never sent: only fixed service words found in it (for example &quot;price&quot;, &quot;tomorrow&quot; or a sport name) and the list of sports. Names, contact details, numbers and health details are never sent, private and health questions are answered without AI, and the AI never writes the answer.</p>
-      </div>
+      <div className="assistant-workspace__privacy"><p aria-label="Privacy note">Answers come from Sportify data only. Personal details are never sent to AI.</p></div>
       {!enabled ? <EmptyState title="Automated consultation is disabled" /> : <Card title="Ask about the center">
-        <label><input type="checkbox" checked={optIn} disabled={action.pending} onChange={event => { setOptIn(event.target.checked); setResult(null); setQuestion('') }} /> Enable automated center consultation</label>
-        <div role="group" aria-label="Example questions"><p>Example questions (select one to fill the question field):</p>
-          <div className="training-actions">{ASSISTANT_EXAMPLES.map(example => <Button key={example} type="button" variant="secondary" disabled={!optIn || action.pending} onClick={() => setQuestion(example)}>{example}</Button>)}</div>
+        <div role="group" aria-label="Example questions">
+          <div className="training-actions">{ASSISTANT_EXAMPLES.map(example => <Button key={example} type="button" variant="secondary" disabled={action.pending} onClick={() => setQuestion(example)}>{example}</Button>)}</div>
         </div>
-        <form className="training-form" onSubmit={submit}><Input label="Center question" name="question" value={question} onChange={event => setQuestion(event.target.value)} maxLength={500} required disabled={!optIn || action.pending} />
-          <Button type="submit" disabled={!optIn} loading={action.pending}>Ask center assistant</Button></form><ActionMessage {...action} />
+        <form className="training-form" onSubmit={submit}><Input label="Your question" name="question" value={question} onChange={event => setQuestion(event.target.value)} maxLength={500} required disabled={action.pending} />
+          <Button type="submit" loading={action.pending}>Ask</Button></form><ActionMessage {...action} />
       </Card>}
       {result && (() => {
         const text = ANSWER_TEXT[result.language === 'vi' ? 'vi' : 'en']

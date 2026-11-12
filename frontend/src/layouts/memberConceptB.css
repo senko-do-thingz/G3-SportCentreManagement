@@ -1797,7 +1797,7 @@
 
   .assistant-workspace__privacy {
     display: grid;
-    grid-template-columns: 0.8fr 1.2fr;
+    grid-template-columns: 1fr;
     gap: 14px;
     padding: 11px 14px;
     border: 1px solid var(--color-border);
