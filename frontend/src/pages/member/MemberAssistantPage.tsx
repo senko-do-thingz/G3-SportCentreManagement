@@ -122,7 +122,7 @@ function CenterConsultationWorkspace() {
       <Link className="assistant-workspace__back" to={returnTo}>Back to previous page</Link>
       <div className="assistant-workspace__heading">
         <span className="assistant-workspace__mark"><SporiRobotMark /></span>
-        <PageHeader eyebrow={<span className="assistant-workspace__desktop-eyebrow">Spori AI / Sportify training guide</span>} title="Center assistant" description="Ask about classes, prices, or your own records — in English or Vietnamese." />
+        <PageHeader eyebrow={<span className="assistant-workspace__desktop-eyebrow">Spori AI / Sportify training guide</span>} title="Center assistant" description="Ask about classes, prices, or your own records in English or Vietnamese." />
       </div>
       <div className="assistant-workspace__privacy"><p aria-label="Privacy note">Answers come from Sportify data only. Personal details are never sent to AI.</p></div>
       {!enabled ? <EmptyState title="Automated consultation is disabled" /> : <Card title="Ask about the center">
