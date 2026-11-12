@@ -195,8 +195,9 @@ public class PaymentVerificationServiceImpl implements PaymentVerificationServic
 
         payment.setReferenceCode(referenceNumber);
         payment.setPaymentTime(transactionTime);
+        boolean localDemo = sandbox && transactionId.startsWith("LOCAL-SANDBOX-");
         payment.setSettlementType(sandbox ? "SIMULATED" : "ACTUAL");
-        payment.setSettlementProvider("GATEWAY");
+        payment.setSettlementProvider(localDemo ? "LOCAL_DEMO" : "GATEWAY");
         payment.setVietQrTransactionId(transactionId);
         payment.setVietQrEnvironment(environment);
         Invoice invoice = recordPaymentConfirmed(payment.getId(), null,

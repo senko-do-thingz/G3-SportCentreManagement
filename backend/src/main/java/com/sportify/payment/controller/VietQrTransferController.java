@@ -33,10 +33,4 @@ public class VietQrTransferController {
         return checkout.checkout(id, actor.getUserAccount());
     }
 
-    @PostMapping("/{id}/vietqr-sandbox-callback")
-    @PreAuthorize("hasRole('MEMBER') and principal.enabled")
-    public VietQrCheckoutService.SandboxCallbackSubmission testCallback(@PathVariable long id,
-            @AuthenticationPrincipal CustomUserDetails actor) {
-        return checkout.submitSandboxCallback(id, actor.getUserAccount());
-    }
 }

@@ -56,6 +56,13 @@ public class VietQrTransactionSyncService {
         if (!Objects.equals(callback.orderId(), payment.getVietQrOrderId())) {
             throw invalid("PAYMENT_NOT_FOUND", "The VietQR order ID was not created for this payment.");
         }
+        String environment = gateway.isSandbox() ? "SANDBOX" : "PRODUCTION";
+        if (!environment.equals(payment.getVietQrEnvironment())) {
+            throw invalid("ENVIRONMENT_MISMATCH", "The order belongs to a different settlement environment.");
+        }
+        if (!gateway.isSandbox() && callback.transactionId().startsWith("LOCAL-SANDBOX-")) {
+            throw invalid("INVALID_TRANSACTION_ID", "A local demo transaction cannot settle a production payment.");
+        }
 
         String expectedAccount = VietQrCheckoutService.digitsOnly(beneficiary.getAccountNumber());
         if (!expectedAccount.equals(VietQrCheckoutService.digitsOnly(callback.bankAccount()))) {
@@ -68,11 +75,13 @@ public class VietQrTransactionSyncService {
             throw invalid("AMOUNT_MISMATCH", "The callback amount does not match this order.");
         }
 
-        if (callback.transactionId().equals(payment.getVietQrTransactionId())
-                || payment.getPaymentStatus() == PaymentStatus.SUCCESS
-                    && "GATEWAY".equals(payment.getSettlementProvider())
-                    && "SANDBOX".equals(payment.getVietQrEnvironment())) {
-            return payment.getPaymentCode(); // Retries and local-demo/provider callback races are idempotent.
+        if (payment.getPaymentStatus() == PaymentStatus.SUCCESS
+                && (callback.transactionId().startsWith("LOCAL-SANDBOX-")
+                    ? "LOCAL_DEMO" : "GATEWAY").equals(payment.getSettlementProvider())
+                && environment.equals(payment.getVietQrEnvironment())
+                && callback.transactionId().equals(payment.getVietQrTransactionId())
+                && callback.referenceNumber().equals(payment.getReferenceCode())) {
+            return payment.getPaymentCode();
         }
         if (payments.findByVietQrTransactionId(callback.transactionId()).isPresent()) {
             throw invalid("DUPLICATE_TRANSACTION", "This VietQR transaction was already used for another payment.");
@@ -84,7 +93,7 @@ public class VietQrTransactionSyncService {
         LocalDateTime transactionTime = LocalDateTime.ofInstant(
                 Instant.ofEpochMilli(callback.transactionTime()), clock.getZone());
         verification.confirmVietQrPayment(paymentId, callback.referenceNumber(), callback.transactionId(), transactionTime,
-                gateway.isSandbox() ? "SANDBOX" : "PRODUCTION");
+                environment);
         return payment.getPaymentCode();
     }
 

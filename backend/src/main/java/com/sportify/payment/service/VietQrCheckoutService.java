@@ -14,6 +14,8 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.core.env.Environment;
+import com.sportify.demoqr.config.LocalDemoSafetyGuard;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -36,6 +38,7 @@ public class VietQrCheckoutService {
     private final OperationalMemberPolicy operational;
     private final VietQrTransactionSyncService transactionSync;
     private final EntityManager entityManager;
+    private final Environment environment;
 
     public record Checkout(long paymentId, String paymentCode, boolean enabled, boolean sandbox,
                            boolean localSandboxCompletion,
@@ -81,6 +84,7 @@ public class VietQrCheckoutService {
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "VietQR returned an oversized payment code.");
             }
             payment.setVietQrOrderId(orderId);
+            payment.setVietQrEnvironment(gateway.isSandbox() ? "SANDBOX" : "PRODUCTION");
             payment.setVietQrContent(content);
             payment.setVietQrQrCode(remote.qrCode());
             payment.setVietQrQrLink(safeQrLink(remote.qrLink()));
@@ -98,11 +102,13 @@ public class VietQrCheckoutService {
 
     @Transactional
     public SandboxCallbackSubmission submitSandboxCallback(long paymentId, UserAccount actor) {
+        requireLocalSandbox();
         payments.getPayment(paymentId, actor);
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found for id: " + paymentId));
         if (payment.getPaymentStatus() == PaymentStatus.SUCCESS
-                && "GATEWAY".equals(payment.getSettlementProvider())
+                && ("GATEWAY".equals(payment.getSettlementProvider())
+                    || "LOCAL_DEMO".equals(payment.getSettlementProvider()))
                 && "SANDBOX".equals(payment.getVietQrEnvironment())) {
             return new SandboxCallbackSubmission("ALREADY_COMPLETED",
                     "This VietQR Sandbox demo payment is already complete. No real money moved.");
@@ -135,7 +141,8 @@ public class VietQrCheckoutService {
                         "VietQR accepted the sandbox test request. This local demo is marked paid without moving real money.");
             }
             if (current.getPaymentStatus() == PaymentStatus.SUCCESS
-                    && "GATEWAY".equals(current.getSettlementProvider())
+                    && ("GATEWAY".equals(current.getSettlementProvider())
+                        || "LOCAL_DEMO".equals(current.getSettlementProvider()))
                     && "SANDBOX".equals(current.getVietQrEnvironment())) {
                 return new SandboxCallbackSubmission("ALREADY_COMPLETED",
                         "VietQR accepted the sandbox test request and its callback already completed this demo payment.");
@@ -145,6 +152,16 @@ public class VietQrCheckoutService {
         }
         return new SandboxCallbackSubmission("SUBMITTED",
                 "VietQR accepted the sandbox callback request. The payment updates after VietQR reaches the configured callback URL.");
+    }
+
+    private void requireLocalSandbox() {
+        boolean enabled = environment.matchesProfiles("dev")
+                && "true".equalsIgnoreCase(environment.getProperty("app.payment.local-demo.enabled",
+                        environment.getProperty("PAYMENT_LOCAL_DEMO_ENABLED", "false")));
+        if (!gateway.isSandbox() || !enabled) {
+            throw new BusinessRuleException("Local sandbox settlement is disabled.", "VIETQR_SANDBOX_CALLBACK_DISABLED");
+        }
+        LocalDemoSafetyGuard.validateLocalDemoSafety(environment);
     }
 
     private static void requireEligiblePayment(Payment payment) {
