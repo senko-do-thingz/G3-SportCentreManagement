@@ -24,15 +24,15 @@ describe('Reception inbox (MW-07)', () => {
     })()
     const user = userEvent.setup()
     renderApp('/reception/inbox')
-    expect(await screen.findByLabelText('Inbox, 1 unread open tasks')).toBeInTheDocument()
-    const item = (await screen.findByText('Verify wallet top-up TU-000004')).closest('li') as HTMLElement
+    expect(await screen.findByRole('button', { name: 'Inbox, 1 unread' })).toBeInTheDocument()
+    const item = (await within(screen.getByRole('main')).findByText('Verify wallet top-up TU-000004')).closest('li') as HTMLElement
     expect(within(item).getByText('Open - PENDING')).toBeInTheDocument()
     const stats = screen.getByRole('list', { name: 'Inbox summary' })
     expect(within(stats).getByText('Open tasks (newest 100 notices)').previousElementSibling).toHaveTextContent('1')
     expect(within(stats).getByText('Unread open (newest 100 notices)').previousElementSibling).toHaveTextContent('1')
     expect(within(item).getByRole('link', { name: 'Open task' })).toHaveAttribute('href', '/reception/wallet/topups')
     await user.click(within(item).getByRole('button', { name: 'Mark as read' }))
-    const after = (await screen.findByText('Verify wallet top-up TU-000004')).closest('li') as HTMLElement
+    const after = (await within(screen.getByRole('main')).findByText('Verify wallet top-up TU-000004')).closest('li') as HTMLElement
     expect(await within(after).findByText('Open - PENDING')).toBeInTheDocument()
     expect(within(after).queryByRole('button', { name: 'Mark as read' })).not.toBeInTheDocument()
     expect(calls.some(c => c.method === 'PUT' && c.path === '/reception/inbox/11/read')).toBe(true)
@@ -45,6 +45,7 @@ describe('Reception inbox (MW-07)', () => {
       : json(200, { items: [], unreadOpen: 0, open: 0 }))
     renderApp('/reception/inbox')
     expect(await screen.findByText('Nothing to do')).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: 'Inbox' }).length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByRole('button', { name: 'Inbox' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Inbox' })).not.toBeInTheDocument()
   })
 })
