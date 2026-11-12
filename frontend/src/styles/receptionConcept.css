@@ -481,3 +481,34 @@
 }
 .page.rcp.rcp-checkin form[aria-label='Member QR check-in'] > .field { width: 100%; }
 .page.rcp.rcp-checkin .card > p { margin: 0 0 var(--space-2); font-size: var(--text-sm); color: var(--color-text-muted); }
+
+/* Flow 6 support requests: compact list, conversation and one reply box. */
+.rcp-support__toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 16px; }
+.rcp-support__toolbar > :first-child { flex: 1 1 240px; }
+.rcp-support__list, .rcp-support__thread { margin: 0; padding: 0; list-style: none; }
+.rcp-support__row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; width: 100%;
+  padding: 12px 4px; border: 0; border-bottom: 1px solid var(--color-border); background: transparent;
+  color: var(--color-text); font: inherit; text-align: left; cursor: pointer;
+}
+.rcp-support__row:hover { background: var(--color-surface-muted); }
+.rcp-support__row:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.rcp-support__row .badge { grid-row: 1 / span 2; grid-column: 2; }
+.rcp-support__row-main { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rcp-support__row-meta, .rcp-support__message-meta, .rcp-support__hint { color: var(--color-text-muted); font-size: 0.85rem; }
+.rcp-support__panel, .rcp-support__detail { display: grid; gap: 12px; margin-bottom: 20px; }
+.rcp-support__panel { padding: 16px; border: 1px solid var(--color-border); background: var(--color-surface); }
+.rcp-support__heading { margin: 0; font-size: 1.25rem; }
+.rcp-support__detail-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.rcp-support__subject { margin: 0; }
+.rcp-support__thread { display: grid; gap: 10px; }
+.rcp-support__message { padding: 10px 14px; border-left: 3px solid var(--color-primary); background: var(--color-surface-muted); }
+.rcp-support__message--member { border-left-color: var(--color-border-strong); }
+.rcp-support__message p { margin: 0; }
+.rcp-support__message p + p { margin-top: 4px; white-space: pre-wrap; }
+.rcp-support__reply, .rcp-support__status { display: grid; gap: 10px; }
+.rcp-support__reply > .btn { justify-self: start; }
+.rcp-support__actions { display: flex; gap: 8px; }
+.rcp-support__section { border-top: 1px solid var(--color-border); padding-top: 10px; }
+.rcp-support__section > summary { cursor: pointer; font-weight: 600; }
+.rcp-support__section[open] > summary { margin-bottom: 10px; }
