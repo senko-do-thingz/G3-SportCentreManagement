@@ -13,13 +13,29 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.mock.env.MockEnvironment;
+import org.springframework.context.annotation.ConditionContext;
 
 import java.time.Clock;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class DemoQrConfigurationTest {
+    @Test
+    void unifiedDemoEnablesTokenFlowOnlyUnderCanonicalGuard() {
+        var condition = new SimulatedSettlementEnabledCondition();
+        var context = mock(ConditionContext.class);
+        MockEnvironment env = UnifiedDemoSafetyGuardTest.canonical();
+        when(context.getEnvironment()).thenReturn(env);
+        assertThat(condition.matches(context, null)).isTrue();
+        env.setActiveProfiles("dev", "unified-demo", "qr-simulator");
+        assertThat(condition.matches(context, null)).isFalse();
+        env.setActiveProfiles("dev", "unified-demo");
+        env.setProperty(UnifiedDemoSafetyGuard.ENABLED, "false");
+        assertThat(condition.matches(context, null)).isFalse();
+    }
     @ParameterizedTest
     @CsvSource({"qr-simulator,true,true", "qr-demo,true,false", "dev,true,false", "dev,false,false", "prod,true,false", "production,true,false", "default,true,false", "'dev,prod',true,false", "'qr-demo,production',true,false"})
     void independentProfileAndExplicitOptInAreBothRequired(String profiles, String enabled, boolean present) {
