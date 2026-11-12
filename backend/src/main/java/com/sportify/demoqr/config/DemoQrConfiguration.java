@@ -7,7 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
 @Configuration(proxyBeanMethods = false)
-@Profile("(qr-simulator | unified-demo) & !prod & !production")
+@Profile("!prod & !production")
 @Conditional(TokenQrEnabledCondition.class)
 public class DemoQrConfiguration {
     @Bean
@@ -16,6 +16,6 @@ public class DemoQrConfiguration {
             @Value("${app.payment.simulator.allowed-origins:}") String origins,
 
             @Value("${app.payment.simulator.lifetime-seconds:300}") long lifetimeSeconds) {
-        return new DemoQrSettings(base, origins, false, lifetimeSeconds);
+        return DemoQrSettings.lenient(base, origins, lifetimeSeconds);
     }
 }
