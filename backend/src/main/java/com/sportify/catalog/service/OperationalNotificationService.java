@@ -68,6 +68,12 @@ public class OperationalNotificationService {
             """,(rs,row)->new Reminder("CARD:"+rs.getLong("id"),"CARD_EXPIRY","Membership card ends soon",rs.getString("name")+" ends on "+rs.getDate("end_date")+".",rs.getDate("end_date").toLocalDate(),null),member,today,today,today.plusDays(expiryDays)));
         return new Inbox(notices,List.copyOf(reminders),expiryDays);
     }
+    /** Manager/Coach header inbox: only the signed-in staff member's own notification rows, never another user's. */
+    public List<Notice> own(long user) {
+        return jdbc.query("SELECT TOP (20) id,title,content,type,is_read,created_at,event_key,origin_revision FROM notification WHERE user_id=? ORDER BY created_at DESC,id DESC",
+            (rs,row)->new Notice(rs.getLong("id"),rs.getString("title"),rs.getString("content"),rs.getString("type"),rs.getBoolean("is_read"),
+                rs.getTimestamp("created_at").toLocalDateTime(),rs.getString("event_key"),rs.getObject("origin_revision",Long.class),null),user);
+    }
     @Transactional public void read(long member,long id) {
         if(jdbc.update("UPDATE notification SET is_read=1 WHERE id=? AND user_id=?",id,member)!=1)
             throw new ResourceNotFoundException("Notification not found");
