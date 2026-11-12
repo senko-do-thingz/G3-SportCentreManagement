@@ -214,7 +214,7 @@
   margin: 0;
   color: var(--color-navy);
   font-family: var(--font-display);
-  font-size: clamp(2rem, 3.2vw, 3.1rem);
+  font-size: var(--ui-title-size);
   font-weight: 800;
   letter-spacing: -0.055em;
   line-height: 1.08;
@@ -341,7 +341,7 @@
 }
 
 .member-concept .member-ui--dashboard .page-header__title {
-  font-size: clamp(2.25rem, 4.3vw, 3.5rem);
+  font-size: var(--ui-title-size);
 }
 
 .member-concept__dashboard-heading {
@@ -1191,7 +1191,7 @@
   }
 
   .member-concept .member-ui--dashboard .page-header__title {
-    font-size: clamp(2rem, 3.2vw, 2.8rem);
+    font-size: var(--ui-title-size);
     line-height: 1.08;
   }
 
@@ -1200,8 +1200,9 @@
     font-family: var(--font-display);
     font-size: inherit;
     font-weight: 800;
-    letter-spacing: -0.045em;
-    text-transform: none;
+    /* Uppercase like every other workspace page title (Home section headings). */
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
   }
 
   .member-concept__dashboard-heading--desktop,
@@ -1786,7 +1787,7 @@
   }
 
   .assistant-workspace__heading .page-header__title {
-    font-size: 1.8rem;
+    font-size: var(--ui-title-size);
     letter-spacing: -0.03em;
   }
 
@@ -1829,7 +1830,7 @@
   }
 
   .member-concept .member-support-page .page-header__title {
-    font-size: 1.9rem;
+    font-size: var(--ui-title-size);
     letter-spacing: -0.03em;
   }
 

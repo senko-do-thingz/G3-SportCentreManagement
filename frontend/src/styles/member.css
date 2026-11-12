@@ -756,7 +756,7 @@
 .member-ui .page-header__title {
   color: var(--color-text);
   font-family: var(--font-display);
-  font-size: clamp(24px, 2vw, 30px);
+  font-size: var(--ui-title-size);
   font-weight: 800;
   line-height: 1.2;
   letter-spacing: -0.03em;
@@ -976,7 +976,7 @@
 
 .member-ui--packages .page-header__title {
   max-width: 18ch;
-  font-size: clamp(32px, 4.2vw, 58px);
+  font-size: var(--ui-title-size);
   line-height: 1.04;
   letter-spacing: -0.055em;
   text-transform: uppercase;
@@ -1472,7 +1472,7 @@
 
 .member-ui--packages .page-header__title {
   max-width: 18ch;
-  font-size: clamp(32px, 4.2vw, 58px);
+  font-size: var(--ui-title-size);
   line-height: 1.04;
   letter-spacing: -0.055em;
   text-transform: uppercase;
@@ -1558,8 +1558,10 @@
   position: relative;
   z-index: 1;
   color: var(--color-on-hero);
+  max-width: 100%;
   font-family: var(--font-display);
-  font-size: clamp(17px, 1.65vw, 24px);
+  /* Six tiles share the row at 1280-1440px; this size keeps "Basketball" and "Volleyball" inside the tile. */
+  font-size: clamp(16px, 1.25vw, 22px);
   font-weight: var(--weight-bold);
   line-height: 1.08;
   text-transform: uppercase;

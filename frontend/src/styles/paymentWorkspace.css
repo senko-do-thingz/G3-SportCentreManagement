@@ -45,7 +45,7 @@
 
 .payment-workspace .payment-hero__title {
   color: var(--h-ink);
-  font-size: clamp(1.75rem, 3.2vw, 2.625rem);
+  font-size: var(--ui-title-size);
   line-height: 1.1;
   text-wrap: balance;
 }

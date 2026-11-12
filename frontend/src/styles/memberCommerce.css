@@ -53,7 +53,7 @@
 .member-commerce__title {
   margin: 0 0 var(--space-1);
   font-family: var(--font-display);
-  font-size: var(--text-3xl);
+  font-size: var(--ui-title-size);
   font-weight: 800;
   letter-spacing: -0.025em;
   line-height: 1.15;
@@ -705,7 +705,7 @@
 
 .member-commerce .payment-hero__title {
   font-family: var(--font-display);
-  font-size: var(--text-2xl);
+  font-size: var(--ui-title-size);
   font-weight: 800;
   color: var(--color-on-hero);
   text-transform: uppercase;
