@@ -10,6 +10,7 @@ import { findActiveItem, itemHref, MEMBER_AREA } from './navigation'
 import { PaymentWorkspaceHeader } from './PaymentWorkspaceHeader'
 import { WorkspaceHeader } from './WorkspaceHeader'
 import './memberConceptB.css'
+import '../styles/workspaceUi.css'
 
 /** Member-only Concept B shell. Shared staff headers and their styles remain untouched. */
 export function MemberLayout() {

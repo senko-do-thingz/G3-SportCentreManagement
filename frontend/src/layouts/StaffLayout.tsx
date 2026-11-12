@@ -1,3 +1,5 @@
+import '@fontsource/be-vietnam-pro/700.css'
+import '@fontsource/be-vietnam-pro/800.css'
 import { useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useMatch } from 'react-router-dom'
 import { AccountSwitchNotice } from '../components/AccountSwitchNotice'
@@ -6,6 +8,7 @@ import { findActiveItem, itemHref, STAFF_AREAS } from './navigation'
 import { PaymentWorkspaceHeader } from './PaymentWorkspaceHeader'
 import { WorkspaceHeader } from './WorkspaceHeader'
 import { WorkflowSurface } from '../components/WorkflowSurface'
+import '../styles/workspaceUi.css'
 
 /** Coach, reception and manager workspaces share a Home-branded header and role-aware sidebar. */
 export function StaffLayout() {
