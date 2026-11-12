@@ -116,7 +116,7 @@ def start_backend():
                         'JWT_SECRET': 'cXJvNC1pc29sYXRlZC10ZXN0LWtleS1uby1yZWFsLWNyZWRlbnRpYWxz',
                         'SPORTIFY_PAYMENT_ACCOUNT_NAME': 'CI synthetic center',
                         'SPORTIFY_PAYMENT_ACCOUNT_NUMBER': 'NOT_AVAILABLE', 'SPORTIFY_PAYMENT_BANK': 'Simulation only',
-                        'PAYMENT_SIMULATOR_ENABLED': 'true', 'PAYMENT_SIMULATOR_LIFETIME_SECONDS': '600',
+                        'PAYMENT_SIMULATOR_ENABLED': 'true', 'PAYMENT_SIMULATOR_LIFETIME_SECONDS': '300',
                         'PAYMENT_SIMULATOR_PUBLIC_BASE_URL': 'https://demo.example.test:55443/',
                         'PAYMENT_SIMULATOR_ALLOWED_ORIGINS': 'https://demo.example.test:55443',
                         'CORS_ALLOWED_ORIGINS': 'https://demo.example.test:55443',
