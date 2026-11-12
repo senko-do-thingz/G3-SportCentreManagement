@@ -97,6 +97,7 @@ export function TokenQrPaymentCard({ payment, onSettled }: { payment: Payment; o
       {created && !expired && <div className="qr-demo-entry">
         <label htmlFor="demo-qr-token">Verification token</label>
         <input id="demo-qr-token" value={tokenInput} onChange={(event) => setTokenInput(event.target.value)} autoComplete="off" spellCheck={false} maxLength={43} />
+        <Button variant="secondary" disabled={busy} onClick={() => setTokenInput(token)}>Fill token automatically</Button>
         <Button disabled={busy || !DEMO_TOKEN.test(tokenInput.trim())} onClick={() => void confirm()}>
           {busy ? 'Verifying...' : 'Verify and Confirm Payment'}
         </Button>

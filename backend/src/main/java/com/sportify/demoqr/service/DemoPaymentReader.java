@@ -15,7 +15,7 @@ import com.sportify.payment.entity.PaymentStatus;
 import com.sportify.payment.repository.PaymentRepository;
 import com.sportify.payment.service.PaymentVerificationService;
 import com.sportify.payment.service.impl.PaymentNotes;
-import com.sportify.demoqr.config.SimulatedSettlementEnabledCondition;
+import com.sportify.demoqr.config.TokenQrEnabledCondition;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import org.springframework.beans.factory.ObjectProvider;
@@ -37,7 +37,7 @@ import java.util.Objects;
  * and PAYMENT_CONFIRMED activity log) without creating actual cash collection tickets or cash_event rows.
  */
 @Service
-@Conditional(SimulatedSettlementEnabledCondition.class)
+@Conditional(TokenQrEnabledCondition.class)
 public class DemoPaymentReader {
     private final PaymentRepository payments;
     private final MemberCardRepository cards;

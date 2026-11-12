@@ -22,7 +22,7 @@ import java.util.function.Supplier;
 
 /** SQL-backed QR payment simulation service with atomic simulated settlement. */
 @Service
-@Profile("(qr-simulator | unified-demo) & !prod & !production")
+@Profile("!prod & !production")
 @Conditional(TokenQrEnabledCondition.class)
 public class DemoQrService {
     public enum State { PENDING, AUTHORIZED_PENDING_SETTLEMENT, CANCELED, EXPIRED, SETTLED }

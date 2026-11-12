@@ -1,6 +1,6 @@
 package com.sportify.demoqr.service;
 
-import com.sportify.demoqr.config.SimulatedSettlementEnabledCondition;
+import com.sportify.demoqr.config.TokenQrEnabledCondition;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -19,7 +19,7 @@ import java.util.function.Supplier;
 
 /** SQL Server owns time, uniqueness and serialization; there is no process-local session state. */
 @Repository
-@Conditional(SimulatedSettlementEnabledCondition.class)
+@Conditional(TokenQrEnabledCondition.class)
 public class SqlQrStore {
     public record Session(UUID id, long paymentId, long ownerId, BigDecimal amount, String currency,
                           DemoQrService.Bank bank, Instant createdAt, Instant expiresAt,

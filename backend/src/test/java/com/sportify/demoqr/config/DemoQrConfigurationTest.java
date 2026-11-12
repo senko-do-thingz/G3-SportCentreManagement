@@ -24,27 +24,27 @@ import static org.mockito.Mockito.when;
 
 class DemoQrConfigurationTest {
     @Test
-    void unifiedDemoEnablesTokenFlowOnlyUnderCanonicalGuard() {
+    void tokenFlowIsEnabledEverywhereExceptProduction() {
         var condition = new SimulatedSettlementEnabledCondition();
         var tokenCondition = new TokenQrEnabledCondition();
         var context = mock(ConditionContext.class);
         MockEnvironment env = UnifiedDemoSafetyGuardTest.canonical();
         when(context.getEnvironment()).thenReturn(env);
         assertThat(condition.matches(context, null)).isTrue();
-        assertThat(tokenCondition.matches(context, null)).isFalse();
-        env.setProperty("app.payment.simulator.public-base-url", "https://demo.example.test/");
-        env.setProperty("app.payment.simulator.allowed-origins", "https://demo.example.test");
         assertThat(tokenCondition.matches(context, null)).isTrue();
-        env.setActiveProfiles("dev", "unified-demo", "qr-simulator");
-        assertThat(condition.matches(context, null)).isFalse();
+        env.setActiveProfiles("dev");
+        assertThat(tokenCondition.matches(context, null)).isTrue();
+        env.setActiveProfiles("prod");
+        assertThat(tokenCondition.matches(context, null)).isFalse();
+        env.setActiveProfiles("production");
         assertThat(tokenCondition.matches(context, null)).isFalse();
         env.setActiveProfiles("dev", "unified-demo");
         env.setProperty(UnifiedDemoSafetyGuard.ENABLED, "false");
         assertThat(condition.matches(context, null)).isFalse();
     }
     @ParameterizedTest
-    @CsvSource({"qr-simulator,true,true", "qr-demo,true,false", "dev,true,false", "dev,false,false", "prod,true,false", "production,true,false", "default,true,false", "'dev,prod',true,false", "'qr-demo,production',true,false"})
-    void independentProfileAndExplicitOptInAreBothRequired(String profiles, String enabled, boolean present) {
+    @CsvSource({"qr-simulator,true,true", "qr-demo,true,true", "dev,true,true", "dev,false,true", "prod,true,false", "production,true,false", "default,true,true", "'dev,prod',true,false", "'qr-demo,production',true,false"})
+    void tokenFlowIsPresentOutsideProduction(String profiles, String enabled, boolean present) {
         new ApplicationContextRunner().withUserConfiguration(DemoQrConfiguration.class, DemoQrService.class, DemoQrController.class, DemoPaymentReader.class)
                 .withBean(Clock.class, Clock::systemUTC)
                 .withBean(SqlQrStore.class, () -> mock(SqlQrStore.class))
