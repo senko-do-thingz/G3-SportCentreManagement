@@ -21,6 +21,7 @@ import {
   validateStartDate,
 } from './packagesModel'
 import { useMemberResource } from './useMemberResource'
+import { parseSessionReference } from '../../api/sessionIdentity'
 
 function loadPackages(signal: AbortSignal): Promise<SportPackage[]> {
   return packagesApi.packages({ signal })
@@ -50,6 +51,11 @@ export function PackageDetailPage() {
   const [registrations] = useMemberResource(loadMyRegistrations)
   const [today] = useState(() => businessDate())
   const backTo = `${MEMBER_PATHS.packages}${location.search}`
+  const selectedSession = parseSessionReference(new URLSearchParams(location.search).get('sessionId'))
+  const requestedDate = new URLSearchParams(location.search).get('sessionDate')
+  const selectedSessionDate = selectedSession && requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) && requestedDate >= today ? requestedDate : null
+  const sessionReturn = selectedSession ? `/member/sessions/${selectedSession}` : null
+  const paymentSuffix = selectedSession ? `?${new URLSearchParams({ sessionId: String(selectedSession) })}` : ''
 
   const header = (
     <PageHeader
@@ -118,6 +124,9 @@ export function PackageDetailPage() {
               ) ?? null)
             : null
         }
+        sessionReturn={sessionReturn}
+        paymentSuffix={paymentSuffix}
+        selectedSessionDate={selectedSessionDate}
       />
     </div>
   )
@@ -130,6 +139,9 @@ function RegistrationForm({
   cardsLoading,
   registrationsLoading,
   pendingRegistration,
+  sessionReturn,
+  paymentSuffix,
+  selectedSessionDate,
 }: {
   pkg: SportPackage
   card: MemberCard | null
@@ -137,12 +149,15 @@ function RegistrationForm({
   cardsLoading: boolean
   registrationsLoading: boolean
   pendingRegistration: PackageRegistration | null
+  sessionReturn: string | null
+  paymentSuffix: string
+  selectedSessionDate: string | null
 }) {
   // "Today" is read again on focus, on change and at submit, so a page left open past midnight
   // never accepts yesterday and the picker minimum follows the date.
   const [minDate, setMinDate] = useState(() => businessDate())
   const refreshMinDate = () => setMinDate(businessDate())
-  const [startDate, setStartDate] = useState(minDate)
+  const [startDate, setStartDate] = useState(selectedSessionDate ?? minDate)
   const [fieldError, setFieldError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -166,7 +181,8 @@ function RegistrationForm({
     setFormError(null)
     const now = businessDate()
     setMinDate(now)
-    const error = validateStartDate(startDate, now)
+    const error = validateStartDate(startDate, now) ?? (selectedSessionDate && (startDate > selectedSessionDate || packageEndDate(startDate, pkg.durationDays) < selectedSessionDate)
+      ? 'Choose a start date that covers the selected session.' : null)
     setFieldError(error)
     if (error) {
       focusFirstInvalid()
@@ -267,12 +283,13 @@ function RegistrationForm({
             <div className="notice notice--warning" role="status">
               <p>You already have a registration waiting for payment for this package ({pendingRegistration.registrationCode}).</p>
               {pendingRegistration.paymentId !== null ? (
-                <Link to={paymentSummaryPath(pendingRegistration.paymentId)}>Continue to payment</Link>
+                <Link to={`${paymentSummaryPath(pendingRegistration.paymentId)}${paymentSuffix}`}>Continue to payment</Link>
               ) : (
                 <p>Please pay at the front desk.</p>
               )}
             </div>
           )}
+          {sessionReturn && <Link className={buttonClassName('secondary', 'md')} to={sessionReturn}>Return to selected session</Link>}
           <dl className="summary-list">
             <div>
               <dt>Sport</dt>
@@ -335,10 +352,11 @@ function RegistrationForm({
                 View my registration
               </Link>
               {registration.paymentId !== null && (
-                <Link className={buttonClassName('primary', 'md')} to={paymentSummaryPath(registration.paymentId)}>
+                <Link className={buttonClassName('primary', 'md')} to={`${paymentSummaryPath(registration.paymentId)}${paymentSuffix}`}>
                   Continue to payment
                 </Link>
               )}
+              {sessionReturn && <Link className={buttonClassName('secondary', 'md')} to={sessionReturn}>Return to selected session</Link>}
             </>
           )
         }

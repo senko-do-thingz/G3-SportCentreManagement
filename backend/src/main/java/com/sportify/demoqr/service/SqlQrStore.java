@@ -162,6 +162,12 @@ public class SqlQrStore {
                 session.amount(), session.bank().name());
     }
 
+    /** Marks this new owner-verified flow without reclassifying historical simulation rows. */
+    public void markOperationalSettlement(long paymentId, long simulatedTransactionId) {
+        jdbc.update("INSERT dbo.operational_qr_settlement(payment_id, simulated_transaction_id) VALUES (?, ?)",
+                paymentId, simulatedTransactionId);
+    }
+
     public Session settle(Session session) {
         int updated = jdbc.update("""
                 UPDATE dbo.simulated_qr_session
