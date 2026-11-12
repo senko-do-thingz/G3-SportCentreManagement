@@ -7,7 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
 @Configuration(proxyBeanMethods = false)
-@Profile("!prod & !production")
+@Profile("(qr-simulator | unified-demo) & !prod & !production")
 @Conditional(SimulatedSettlementEnabledCondition.class)
 public class DemoQrConfiguration {
     @Bean
