@@ -45,13 +45,10 @@
   font-weight: var(--ui-button-weight);
   letter-spacing: 0.02em;
 }
-/* Disabled buttons read as unavailable without dimming gold or navy fills into a muddy colour. */
-:is(.staff-layout, .member-layout) main .btn:disabled {
-  opacity: 1;
-  background: var(--color-neutral-soft);
-  border-color: var(--ui-border);
-  box-shadow: none;
-  color: var(--color-text-muted);
+/* Disabled buttons turn grey instead of a dimmed gold or navy. A filter works whatever fill a page gives the
+   button, and the shared opacity from .btn:disabled is kept, so a disabled button never looks clickable. */
+:is(.staff-layout, .member-layout) main :is(.btn, button):disabled {
+  filter: grayscale(1);
 }
 
 /* Inputs, selects and text areas: one control height, the Home border and square corners. */
