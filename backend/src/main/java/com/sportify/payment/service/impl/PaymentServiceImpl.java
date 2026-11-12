@@ -107,7 +107,20 @@ public class PaymentServiceImpl implements PaymentService {
                 .confirmedByUser(confirmedBy)
                 .notes("Paid at the desk, confirmed by user id " + confirmedBy.getId())
                 .build();
+        markActualSettlement(payment, method);
         return paymentRepository.save(payment);
+    }
+
+    /**
+     * Staff-confirmed money is a real (non-simulated) settlement. Recording it as ACTUAL lets
+     * Reception and Manager screens show a verified receipt instead of "Legacy unverified".
+     */
+    private static void markActualSettlement(Payment payment, PaymentMethod method) {
+        if (payment.getSettlementType() != null) {
+            return;
+        }
+        payment.setSettlementType("ACTUAL");
+        payment.setSettlementProvider(method == PaymentMethod.CASH ? "DESK_CASH" : "MANUAL_TRANSFER");
     }
 
     private static void validateNewPayment(MemberProfile member, BigDecimal amount) {
@@ -159,6 +172,7 @@ public class PaymentServiceImpl implements PaymentService {
         LocalDateTime now = capturedAt == null ? LocalDateTime.now(clock) : LocalDateTime.ofInstant(capturedAt, clock.getZone());
         payment.setPaymentStatus(PaymentStatus.SUCCESS);
         payment.setPaymentTime(now);
+        markActualSettlement(payment, effectiveMethod);
 
         if (confirmedBy != null) {
             payment.setConfirmedByUser(confirmedBy);
