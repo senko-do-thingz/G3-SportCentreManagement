@@ -11,7 +11,8 @@ import { Badge, Button, Card, PageHeader, PageLoader, buttonClassName } from '..
 import { BrowseError } from './BrowseError'
 import { MemberScheduleNav } from './MemberScheduleNav'
 import { safeBrowseReturn } from './scheduleFilters'
-import { ELIGIBILITY_COPY, resolveSessionDetailState } from './sessionEligibility'
+import { ELIGIBILITY_COPY, PACKAGE_RECOVERY_REASONS, resolveSessionDetailState } from './sessionEligibility'
+import { SessionPackageRecommendations } from './SessionPackageRecommendations'
 import { useMemberResource } from './useMemberResource'
 import { bookingCalendarHref, bookingDate, bookingErrorMessage, bookingTime, eligibleRegistrations } from './bookingPresentation'
 
@@ -161,17 +162,9 @@ function BookingOptionsContent({ sessionId, returnTo }: { sessionId: number | Se
                   ? 'Operational booking is unavailable for synthetic or demo member accounts.'
                   : 'No eligible package registration is available for this session.'}
               </p>
-              {status !== 'SYNTHETIC_OPERATION_DENIED' && (
-                <Link
-                  className={buttonClassName()}
-                  to={`/member/packages?${new URLSearchParams({
-                    sport: String(detail.session.sportId),
-                    format: detail.session.trainingFormat,
-                  })}`}
-                >
-                  View other packages
-                </Link>
-              )}
+              {PACKAGE_RECOVERY_REASONS.some((reason) => reason === status) && <SessionPackageRecommendations session={detail.session} returnTo={returnTo} />}
+              {status === 'ALREADY_BOOKED' && <Link className={buttonClassName('secondary')} to="/member/bookings">View my booking</Link>}
+              {status === 'CAPACITY_UNAVAILABLE' && <Button variant="secondary" onClick={reload}>Refresh availability</Button>}
             </div>
           ) : (
             <fieldset className="booking-package-options">

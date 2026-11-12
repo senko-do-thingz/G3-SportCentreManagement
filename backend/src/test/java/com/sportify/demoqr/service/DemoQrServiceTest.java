@@ -115,6 +115,7 @@ class DemoQrServiceTest {
         assertThat(view.invoiceNumber()).isEqualTo("INV-1077");
         verify(store).insertSettlement(pending);
         verify(reader).settle(52L, owner, "BIDV_DEMO", 901L, "SIM-QR-52-ABCDEF123456");
+        verify(store).markOperationalSettlement(52L, 901L);
         verify(store).settle(pending);
     }
 

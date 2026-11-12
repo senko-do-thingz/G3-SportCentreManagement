@@ -1,6 +1,7 @@
 import type { EligibilityReason, SessionDetail } from '../../api/memberSessionsApi'
 
 export type DetailState = EligibilityReason | 'ELIGIBLE' | 'UNKNOWN'
+export const PACKAGE_RECOVERY_REASONS: EligibilityReason[] = ['NO_PACKAGE', 'NO_SESSIONS_LEFT', 'PACKAGE_EXPIRED_BY_THEN', 'PACKAGE_NOT_STARTED_BY_THEN']
 const reasons: EligibilityReason[] = ['NO_PACKAGE', 'NO_SESSIONS_LEFT', 'PACKAGE_EXPIRED_BY_THEN', 'PACKAGE_NOT_STARTED_BY_THEN', 'FULL', 'ALREADY_BOOKED', 'CAPACITY_UNAVAILABLE', 'SYNTHETIC_OPERATION_DENIED', 'AGE_RESTRICTED', 'TIME_CONFLICT']
 export function resolveSessionDetailState(detail: SessionDetail): DetailState {
   if (!detail?.session || detail.memberContext !== true) return 'UNKNOWN'

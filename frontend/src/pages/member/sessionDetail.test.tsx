@@ -8,6 +8,7 @@ import { ApiError } from '../../api/errors'
 import { tokenStorage } from '../../api/tokenStorage'
 import { renderApp } from '../../test/renderApp'
 import { backendError, installFakeFetch, json, MEMBER, MANAGER } from '../../test/fakeBackend'
+import { sportPackage } from '../../test/memberFixtures'
 
 const session: BrowseSession = { id: 5, sportId: 3, sportName: 'Basketball', classId: 1, className: 'Basketball Foundations', trainingFormat: 'COACH_LED', level: 'BEGINNER', coachId: 3, coachName: 'Quan Coach', facilityId: 1, facilityName: 'Court A', sessionDate: '2026-10-16', startTime: '16:00:00', endTime: '17:00:00', capacity: 20, bookedCount: 2, freeSeats: 18, full: false, status: 'PUBLISHED' }
 const detail: SessionDetail = { session, memberContext: true, alreadyBooked: false, bookingStatus: null, eligible: true, reason: null, suitableRegistrations: [{ registrationId: 1, registrationCode: 'REG-001', packageId: 2, packageName: 'Basketball package', sportId: 3, trainingFormat: 'COACH_LED', startDate: '2026-10-01', endDate: '2026-12-01', remainingSessions: 5 }] }
@@ -16,6 +17,7 @@ function backend(value: SessionDetail | number = detail, profile = MEMBER) {
     if (call.path === '/users/me') return json(200, profile)
     if (call.path === '/sessions/5' || call.path === '/sessions/by-code/161026BK01') return typeof value === 'number' ? backendError(value, 'Session not found') : json(200, value)
     if (call.path === '/coaches/3') return json(200, { id: 3, name: 'Quan Coach', headline: null, bio: null, yearsExperience: null, specialties: null, sports: [{ id: 3, name: 'Basketball' }], certifications: [{ id: 1, name: 'Sports Coach Certificate', issuer: 'Federation', verified: false, issuedOn: '2024-01-01', expiresOn: '2025-01-01' }], upcomingSessions: { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }, email: 'private@example.com' })
+    if (call.path === '/packages') return json(200, [sportPackage({ id: 4, sportId: 3, sportName: 'Basketball', trainingFormat: 'COACH_LED', isActive: true })])
     return backendError(404, 'Unexpected test request')
   })
 }
@@ -28,7 +30,7 @@ describe('FE-08 session detail', () => {
     expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Book session' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to results' })).toHaveAttribute('href', '/member/classes?level=BEGINNER')
-    if (reason === 'NO_PACKAGE' || reason === 'NO_SESSIONS_LEFT') expect(screen.getByRole('link', { name: 'View suitable sport packages' })).toHaveAttribute('href', '/member/packages?sport=3&format=COACH_LED')
+    if (reason === 'NO_PACKAGE' || reason === 'NO_SESSIONS_LEFT') expect(await screen.findByRole('link', { name: 'View matching package' })).toHaveAttribute('href', '/member/packages/4?sport=3&format=COACH_LED&sessionId=5&sessionDate=2026-10-16&returnTo=%2Fmember%2Fclasses%3Flevel%3DBEGINNER')
     expect(api.calls.every((call) => call.method === 'GET')).toBe(true)
   })
   it('routes eligible members to FE-09 with session and return context without creating a booking', async () => {

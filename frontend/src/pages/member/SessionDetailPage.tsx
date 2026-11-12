@@ -11,6 +11,7 @@ import { MemberScheduleNav } from './MemberScheduleNav'
 import { browseDate, sessionMinutes } from './memberScheduleDates'
 import { safeBrowseReturn } from './scheduleFilters'
 import { ELIGIBILITY_COPY, resolveSessionDetailState } from './sessionEligibility'
+import { SessionPackageRecommendations } from './SessionPackageRecommendations'
 import { useMemberResource } from './useMemberResource'
 
 export function SessionDetailPage() {
@@ -40,7 +41,6 @@ function SessionDetailContent({ id, returnTo }: { id: number | SessionId; return
   const state = resolveSessionDetailState(detail), copy = ELIGIBILITY_COPY[state]
   const self = session.trainingFormat === 'SELF_TRAINING'
   const packageState = ['NO_PACKAGE', 'NO_SESSIONS_LEFT', 'PACKAGE_EXPIRED_BY_THEN', 'PACKAGE_NOT_STARTED_BY_THEN'].includes(state)
-  const packageLink = `/member/packages?${new URLSearchParams({ sport: String(session.sportId), format: session.trainingFormat })}`
   const bookingLink = `/member/bookings/new?${new URLSearchParams({ sessionId: sessionRouteReference(session), returnTo })}`
   return <div className="page browse-page">
     <MemberScheduleNav />
@@ -57,7 +57,8 @@ function SessionDetailContent({ id, returnTo }: { id: number | SessionId; return
       <Card title={self ? 'Self-training access' : 'Your coach'}>
         {self ? <><dl className="browse-facts"><div><dt>Sport</dt><dd>{session.sportName}</dd></div><div><dt>Format</dt><dd>Self-training</dd></div><div><dt>Facility</dt><dd>{session.facilityName || 'Facility not assigned'}</dd></div></dl><p className="browse-callout">Practice independently using a self-training sport package. Coach-led sessions need a separate matching package.</p></> : <><div className="browse-avatar" aria-hidden="true">{(session.coachName || '?').split(' ').filter(Boolean).slice(0, 2).map((name) => name[0]).join('')}</div><h3>{session.coachName || 'Coach not provided'}</h3>{session.coachId && <Button variant="secondary" onClick={() => setProfileOpen(true)}>View coach profile</Button>}</>}
         <div className="browse-eligibility" role="status"><Badge tone={state === 'ELIGIBLE' ? 'success' : state === 'FULL' ? 'warning' : 'info'}>{state === 'ELIGIBLE' ? 'Eligible' : state === 'FULL' ? 'Fully booked' : copy.title}</Badge><p>{copy.message}</p>
-          {packageState && <Link className={buttonClassName()} to={packageLink}>View suitable sport packages</Link>}
+          {packageState && <SessionPackageRecommendations session={session} returnTo={returnTo} />}
+          {state === 'ALREADY_BOOKED' && <Link className={buttonClassName('secondary')} to="/member/bookings">View my booking</Link>}
           {state === 'ELIGIBLE' && <><p className="notice notice--info">Continue to choose an eligible package and review this booking. No booking has been created yet.</p><Link className={buttonClassName()} to={bookingLink}>Book session</Link></>}
           <Link className={buttonClassName('secondary')} to={returnTo}>Find another class</Link>
         </div>

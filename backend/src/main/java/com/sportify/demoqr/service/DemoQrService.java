@@ -2,8 +2,9 @@ package com.sportify.demoqr.service;
 
 import com.sportify.core.common.SecurityUtils;
 import com.sportify.demoqr.config.DemoQrSettings;
+import com.sportify.demoqr.config.TokenQrEnabledCondition;
 import com.sportify.identity.entity.UserAccount;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -21,8 +22,8 @@ import java.util.function.Supplier;
 
 /** SQL-backed QR payment simulation service with atomic simulated settlement. */
 @Service
-@Profile("qr-simulator & !prod & !production")
-@ConditionalOnProperty(name = "app.payment.simulator.enabled", havingValue = "true")
+@Profile("(qr-simulator | unified-demo) & !prod & !production")
+@Conditional(TokenQrEnabledCondition.class)
 public class DemoQrService {
     public enum State { PENDING, AUTHORIZED_PENDING_SETTLEMENT, CANCELED, EXPIRED, SETTLED }
     public enum Bank {
@@ -136,6 +137,7 @@ public class DemoQrService {
                     || settlement.invoiceNumber() == null || settlement.invoiceNumber().isBlank()) {
                 throw new IllegalStateException("Simulated settlement requires a persisted PAID invoice and audit record");
             }
+            store.markOperationalSettlement(session.paymentId(), tx.id());
             session = store.settle(session);
             return session.state() == State.SETTLED
                     ? new Outcome<>(view(session), null) : new Outcome<>(null, stateError(session));

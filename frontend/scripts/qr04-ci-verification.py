@@ -116,7 +116,7 @@ def start_backend():
                         'JWT_SECRET': 'cXJvNC1pc29sYXRlZC10ZXN0LWtleS1uby1yZWFsLWNyZWRlbnRpYWxz',
                         'SPORTIFY_PAYMENT_ACCOUNT_NAME': 'CI synthetic center',
                         'SPORTIFY_PAYMENT_ACCOUNT_NUMBER': 'NOT_AVAILABLE', 'SPORTIFY_PAYMENT_BANK': 'Simulation only',
-                        'PAYMENT_SIMULATOR_ENABLED': 'true', 'PAYMENT_SIMULATOR_LIFETIME_SECONDS': '600',
+                        'PAYMENT_SIMULATOR_ENABLED': 'true', 'PAYMENT_SIMULATOR_LIFETIME_SECONDS': '300',
                         'PAYMENT_SIMULATOR_PUBLIC_BASE_URL': 'https://demo.example.test:55443/',
                         'PAYMENT_SIMULATOR_ALLOWED_ORIGINS': 'https://demo.example.test:55443',
                         'CORS_ALLOWED_ORIGINS': 'https://demo.example.test:55443',
@@ -183,7 +183,7 @@ try:
                                         serialization.PublicFormat.SubjectPublicKeyInfo)).digest()).decode()
     tls = ssl.create_default_context(cafile=str(args.private / 'tls-cert.pem'))
     first_pid = start_backend()
-    check('Fresh isolated SQL migrated through release V53', sql('SELECT MAX(TRY_CONVERT(int,version)) FROM flyway_schema_history WHERE success=1;') == '53')
+    check('Fresh isolated SQL migrated through release V54', sql('SELECT MAX(TRY_CONVERT(int,version)) FROM flyway_schema_history WHERE success=1;') == '54')
     check('All five additive release migrations applied', sql('SELECT COUNT(*) FROM flyway_schema_history WHERE TRY_CONVERT(int,version) BETWEEN 42 AND 46 AND success=1;') == '5')
     check('Canonical session identity migration applied once',
           sql("SELECT COUNT(*) FROM flyway_schema_history WHERE version='39' AND success=1;") == '1')

@@ -102,7 +102,8 @@ public class DemoPaymentReader {
         var payment = requireOwner(paymentId, actor);
         if (payment.getMember() == null || !actor.getId().equals(payment.getMember().getId())
                 || payment.getPaymentStatus() != PaymentStatus.PENDING || payment.getAmount() == null
-                || payment.getAmount().signum() <= 0) throw DemoQrException.unavailable();
+                || payment.getAmount().signum() <= 0 || payment.getSettlementType() != null
+                || payment.getSettlementProvider() != null || payment.getSimulatedTransactionId() != null) throw DemoQrException.unavailable();
         var card = cards.findByPaymentId(paymentId);
         var registration = registrations.findByPaymentId(paymentId);
         if (card.isPresent() == registration.isPresent()) throw DemoQrException.unavailable();

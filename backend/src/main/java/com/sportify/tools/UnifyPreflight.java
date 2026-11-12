@@ -38,8 +38,8 @@ public final class UnifyPreflight {
                 .outOfOrder(false).baselineOnMigrate(false).ignoreMigrationPatterns(new String[0]).load();
         // validate and info only: never migrate, baseline, repair or clean.
         require(flyway.validateWithResult().validationSuccessful, "FLYWAY_HISTORY_MISMATCH");
-        require(flyway.info().current() != null && "53".equals(flyway.info().current().getVersion().toString())
-                && flyway.info().pending().length == 0, "V53_REQUIRED");
+        require(flyway.info().current() != null && "54".equals(flyway.info().current().getVersion().toString())
+                && flyway.info().pending().length == 0, "V54_REQUIRED");
         require(zero(jdbc, "SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0 AND schema_id<>SCHEMA_ID('dbo')"), "UNDECLARED_SCHEMA");
         require(zero(jdbc, "SELECT COUNT(*) FROM sys.foreign_keys WHERE is_disabled=1 OR is_not_trusted=1"), "FOREIGN_KEY_DRIFT");
         require(zero(jdbc, "SELECT COUNT(*) FROM sys.check_constraints WHERE is_disabled=1 OR is_not_trusted=1"), "CHECK_CONSTRAINT_DRIFT");
@@ -56,8 +56,12 @@ public final class UnifyPreflight {
                 WHERE b.status='CONFIRMED' AND (LOWER(u.email) LIKE '%@unified-demo.invalid'
                   OR EXISTS (SELECT 1 FROM dbo.payment p WHERE p.member_id=b.member_id AND
                     (p.settlement_type='SIMULATED' OR p.settlement_provider='SPORTIFY_SIMULATOR'
-                     OR p.simulated_transaction_id IS NOT NULL))
-                  OR EXISTS (SELECT 1 FROM dbo.simulated_payment_transaction t WHERE t.member_id=b.member_id))
+                     OR p.simulated_transaction_id IS NOT NULL)
+                    AND NOT EXISTS (SELECT 1 FROM dbo.operational_qr_settlement oq
+                        WHERE oq.payment_id=p.id AND oq.simulated_transaction_id=p.simulated_transaction_id))
+                  OR EXISTS (SELECT 1 FROM dbo.simulated_payment_transaction t WHERE t.member_id=b.member_id
+                    AND NOT EXISTS (SELECT 1 FROM dbo.operational_qr_settlement oq
+                        WHERE oq.payment_id=t.payment_id AND oq.simulated_transaction_id=t.id)))
                 """), "SYNTHETIC_BOOKING_REQUIRES_OWNER_DISPOSITION");
         require(zero(jdbc, "SELECT COUNT(*) FROM dbo.class_session s LEFT JOIN dbo.session_code_history h ON h.session_code=s.session_code WHERE h.session_id IS NULL OR h.session_id<>s.id OR h.original_session_id<>s.id OR h.retired_at_utc IS NOT NULL"), "SESSION_IDENTITY_MISMATCH");
         Map<String, Count> counts = new LinkedHashMap<>();

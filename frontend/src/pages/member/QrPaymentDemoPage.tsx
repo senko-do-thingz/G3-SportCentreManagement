@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { paymentsApi } from '../../api/paymentsApi'
 import { PaymentHero } from '../../components/PaymentHero'
 import { PaymentWorkspace } from '../../components/PaymentWorkspace'
-import { DemoQrCard } from '../../components/qr/DemoQrCard'
+import { TokenQrPaymentCard } from '../../components/qr/TokenQrPaymentCard'
 import { demoPaymentAmountAvailable } from '../../components/qr/demoDetails'
 import { Card, EmptyState, ErrorState, StatusBadge } from '../../components/ui'
 import { Spinner } from '../../components/ui/Spinner'
@@ -48,7 +48,7 @@ function QrPaymentDemoView({ paymentId }: { paymentId: number }) {
           : payment.data.status === 'SUCCESS' && isSimulatedSettlement(payment.data) ? (
             <Card title="Simulated QR Payment Completed" aria-label="Simulated QR settlement result">
               <StatusBadge status={paymentStatusToneCode(payment.data.status)} label={paymentStatusLabel(payment.data.status, payment.data.settlementType)} />
-              <p className="notice notice--success" role="status">Paid - Simulated. Your payment was settled via Sportify QR Simulator; no real bank transfer occurred.</p>
+              <p className="notice notice--success" role="status">Payment Successful - Demo. Paid - Simulated; no real bank transfer occurred.</p>
               <dl className="summary-list">
                 <div><dt>Payment reference</dt><dd>{payment.data.code}</dd></div>
                 <div><dt>Amount</dt><dd>{formatPaymentMoney(payment.data.amount)}</dd></div>
@@ -68,7 +68,7 @@ function QrPaymentDemoView({ paymentId }: { paymentId: number }) {
             </Card>
           )
           : payment.data.status !== 'PENDING' ? <EmptyState title="Demo unavailable for this payment" description="Open a pending payment to start a simulated QR payment session." />
-          : <DemoQrCard payment={payment.data} onSettled={reload} />}
+          : <TokenQrPaymentCard payment={payment.data} onSettled={reload} />}
         <div style={{ marginTop: 'var(--space-4)' }}>{back}</div>
       </div>
     </PaymentWorkspace>

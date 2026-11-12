@@ -108,13 +108,20 @@ export function SportPackagesPage() {
     .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0) || a.name.localeCompare(b.name))
   const selectedSport = sportColumns.find((sport) => String(sport.id) === requestedSportId)
   const filters = { sport: selectedSport ? requestedSportId : '', format: '', duration: '' }
+  const withSessionContext = (params: URLSearchParams) => {
+    for (const key of ['sessionId', 'sessionDate', 'returnTo']) {
+      const value = searchParams.get(key)
+      if (value) params.set(key, value)
+    }
+    return params
+  }
   const toggleSport = (sportId: string) => {
     const nextSport = filters.sport === sportId ? '' : sportId
-    transitionPackageView(() => setSearchParams(filtersToParams({ ...filters, sport: nextSport }), { replace: true }))
+    transitionPackageView(() => setSearchParams(withSessionContext(filtersToParams({ ...filters, sport: nextSport })), { replace: true }))
   }
   const card = cards.status === 'ready' ? currentCard(cards.data, today) : null
   const shown = filterPackages(packages, filters)
-  const query = filtersToParams(filters).toString()
+  const query = withSessionContext(filtersToParams(filters)).toString()
   const search = query ? `?${query}` : ''
   const selectedSportPackages = selectedSport ? shown.filter((pkg) => pkg.sportId === selectedSport.id) : []
   const detailId = selectedSport ? `package-detail-${selectedSport.id}` : undefined

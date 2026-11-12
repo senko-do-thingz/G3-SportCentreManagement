@@ -1,5 +1,6 @@
 import { useCallback, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { parseSessionReference } from '../../api/sessionIdentity'
 import { getErrorMessage } from '../../api/errors'
 import { memberApi, type MemberCard, type PackageRegistration } from '../../api/memberApi'
 import { ONLINE_PAYMENT_METHODS, paymentsApi, type Payment } from '../../api/paymentsApi'
@@ -84,6 +85,8 @@ export function PaymentSummaryPage() {
 }
 
 function PaymentSummaryView({ paymentId }: { paymentId: number }) {
+  const location = useLocation()
+  const selectedSession = parseSessionReference(new URLSearchParams(location.search).get('sessionId'))
   // Stable per payment id, as useMemberResource requires.
   const loadPayment = useCallback((signal: AbortSignal) => paymentsApi.payment(paymentId, { signal }), [paymentId])
   const [payment, reload] = useMemberResource(loadPayment)
@@ -154,6 +157,7 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
               : 'Review your request and card benefits before paying.'
           }
         />
+        {selectedSession && <Link className={buttonClassName('secondary')} to={`/member/sessions/${selectedSession}`}>Return to selected session</Link>}
         <div className="payment-summary">
         <Card title={data.itemDescription ?? `Payment ${data.code}`} aria-label="Payment details">
           {registration?.totalSessions !== null && registration?.totalSessions !== undefined && (
@@ -269,6 +273,7 @@ interface OrderSummaryProps {
 
 function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const pending = isPending(payment)
   // Only bank transfer can be paid online today. A payment created with a wallet method starts on
   // bank transfer here, so Continue switches it (PUT) and the next screen shows the bank details.
@@ -287,13 +292,13 @@ function OrderSummary({ payment, singleVisit, onStale }: OrderSummaryProps) {
     }
     setError(null)
     if (method === payment.method) {
-      navigate(PAYMENT_PATHS.status(payment.id))
+      navigate(`${PAYMENT_PATHS.status(payment.id)}${location.search}`)
       return
     }
     setSaving(true)
     try {
       await paymentsApi.updateMethod(payment.id, method)
-      navigate(PAYMENT_PATHS.status(payment.id))
+      navigate(`${PAYMENT_PATHS.status(payment.id)}${location.search}`)
     } catch (caught) {
       setSaving(false)
       setError(getErrorMessage(caught))
