@@ -1,5 +1,7 @@
 import { useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { demoQrApi } from '../../api/demoQrApi'
 import { paymentsApi } from '../../api/paymentsApi'
 import { PaymentHero } from '../../components/PaymentHero'
 import { PaymentWorkspace } from '../../components/PaymentWorkspace'
@@ -8,7 +10,7 @@ import { demoPaymentAmountAvailable } from '../../components/qr/demoDetails'
 import { Card, EmptyState, ErrorState, StatusBadge } from '../../components/ui'
 import { Spinner } from '../../components/ui/Spinner'
 import { buttonClassName } from '../../components/ui/buttonClassName'
-import { qrPaymentDemoEnabled } from '../../config/env'
+import { qrPaymentDemoFlag } from '../../config/env'
 import { formatPaymentMoney, isSimulatedSettlement, parseIdParam, PAYMENT_PATHS, paymentStatusLabel, paymentStatusToneCode } from './paymentsModel'
 import { useMemberResource } from './useMemberResource'
 
@@ -16,7 +18,8 @@ import { useMemberResource } from './useMemberResource'
 export function QrPaymentDemoPage() {
   const { paymentId } = useParams()
   const id = parseIdParam(paymentId)
-  if (!qrPaymentDemoEnabled()) return (
+  const demoFlag = qrPaymentDemoFlag()
+  if (demoFlag === false) return (
     <PaymentWorkspace>
       <h1>Page not found</h1>
       <p>The page you are looking for does not exist or has been moved.</p>
@@ -30,7 +33,31 @@ export function QrPaymentDemoPage() {
         action={<Link className={buttonClassName('secondary', 'md')} to={PAYMENT_PATHS.list}>My payments</Link>} />
     </PaymentWorkspace>
   )
+  if (demoFlag === null) return <QrPaymentDemoCapabilityGate paymentId={id} />
   return <QrPaymentDemoView key={id} paymentId={id} />
+}
+
+function QrPaymentDemoCapabilityGate({ paymentId }: { paymentId: number }) {
+  const [enabled, setEnabled] = useState<boolean | null>(null)
+  useEffect(() => {
+    let active = true
+    void demoQrApi.capability().then((available) => {
+      if (active) setEnabled(available)
+    }).catch(() => {
+      if (active) setEnabled(false)
+    })
+    return () => { active = false }
+  }, [])
+
+  if (enabled === null) return <PaymentWorkspace><Spinner label="Checking QR demo availability" /></PaymentWorkspace>
+  if (!enabled) return (
+    <PaymentWorkspace>
+      <h1>Page not found</h1>
+      <p>The page you are looking for does not exist or has been moved.</p>
+      <Link to={PAYMENT_PATHS.list}>My payments</Link>
+    </PaymentWorkspace>
+  )
+  return <QrPaymentDemoView key={paymentId} paymentId={paymentId} />
 }
 
 function QrPaymentDemoView({ paymentId }: { paymentId: number }) {
@@ -47,8 +74,8 @@ function QrPaymentDemoView({ paymentId }: { paymentId: number }) {
           : !valid ? <EmptyState title="Payment details unavailable" description="Open the correct payment again from My payments." />
           : payment.data.status === 'SUCCESS' && isSimulatedSettlement(payment.data) ? (
             <Card title="Simulated QR Payment Completed" aria-label="Simulated QR settlement result">
-              <StatusBadge status={paymentStatusToneCode(payment.data.status)} label={paymentStatusLabel(payment.data.status, payment.data.settlementType)} />
-              <p className="notice notice--success" role="status">Payment Successful - Demo. Paid - Simulated; no real bank transfer occurred.</p>
+              <StatusBadge status={paymentStatusToneCode(payment.data.status)} label={paymentStatusLabel(payment.data.status)} />
+              <p className="notice notice--success" role="status">Payment Successful - Demo. <strong>Paid - Simulated</strong>; no real bank transfer occurred.</p>
               <dl className="summary-list">
                 <div><dt>Payment reference</dt><dd>{payment.data.code}</dd></div>
                 <div><dt>Amount</dt><dd>{formatPaymentMoney(payment.data.amount)}</dd></div>

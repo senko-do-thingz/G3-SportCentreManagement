@@ -41,7 +41,7 @@ const COLUMNS: TableColumn<Payment>[] = [
     key: 'status',
     header: 'Status',
     render: (payment) => (
-      <StatusBadge status={paymentStatusToneCode(payment.status)} label={paymentStatusLabel(payment.status, payment.settlementType)} />
+      <StatusBadge status={paymentStatusToneCode(payment.status)} label={paymentStatusLabel(payment.status)} />
     ),
   },
   { key: 'action', header: 'Action', render: (payment) => <PaymentAction payment={payment} /> },

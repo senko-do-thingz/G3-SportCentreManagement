@@ -31,23 +31,16 @@ describe('QR-01 guarded demo route and payment integration', () => {
     expect(calls.every((call) => call.method === 'GET')).toBe(true)
   })
 
-  it('opens the isolated demo without submitting a method or changing the real Continue action', async () => {
+  it('continues to the VietQR status screen without exposing the retired standalone simulator link', async () => {
     const { calls } = backend({ data: payment({ method: 'BANK_TRANSFER' }) })
     const user = userEvent.setup()
     renderApp('/member/payments/52')
-    const demo = await screen.findByRole('link', { name: 'Pay with QR (Simulation)' })
+    await screen.findByRole('heading', { name: 'Order summary' })
+    expect(screen.queryByRole('link', { name: 'Pay with QR (Simulation)' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue to payment' })).toBeEnabled()
     expect(screen.getByRole('radio', { name: 'Bank transfer' })).toBeChecked()
-    await user.click(demo)
-    expect(await screen.findByRole('button', { name: 'Generate QR token' })).toBeVisible()
-    expect(screen.getByText(/Owner confirmation finalizes this payment as Paid - Simulated and activates the purchased entitlement\./)).toBeVisible()
-    expect(screen.queryByText(/Your actual payment is not changed/i)).not.toBeInTheDocument()
-    expect(screen.getByText('810.000 VND')).toBeVisible()
-    expect(screen.getByText(/No real money is transferred/)).toBeVisible()
-    expect(document.querySelector('.payment-workspace-header .home-theme')).toBeInTheDocument()
-    expect(document.querySelector('.payment-workspace-header select')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('link', { name: 'Back to Payment Summary' }))
-    expect(await screen.findByRole('button', { name: 'Continue to payment' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: 'Continue to payment' }))
+    expect(await screen.findByRole('heading', { name: 'Payment Instructions and Status' })).toBeVisible()
     expect(calls.every((call) => call.method === 'GET')).toBe(true)
   })
 

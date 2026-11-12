@@ -33,9 +33,20 @@ export function managerPreviewEnabled(): boolean {
   return import.meta.env.DEV && import.meta.env.VITE_MANAGER_PREVIEW === 'true'
 }
 
-/** The legacy Sportify QR simulator is opt-in; member bank-transfer checkout uses VietQR format codes. */
+/**
+ * Explicit true/false values override the QR demo rollout. An empty value delegates the decision
+ * to the authenticated backend capability so production can enable it without a frontend rebuild.
+ */
+export function qrPaymentDemoFlag(): boolean | null {
+  const configured = import.meta.env.VITE_QR_PAYMENT_DEMO?.trim().toLowerCase()
+  if (configured === 'true') return true
+  if (configured === 'false') return false
+  return null
+}
+
+/** Components that must remain strictly opt-in can use this explicit frontend flag check. */
 export function qrPaymentDemoEnabled(): boolean {
-  return import.meta.env.VITE_QR_PAYMENT_DEMO === 'true'
+  return qrPaymentDemoFlag() === true
 }
 
 export interface SampleAccount {

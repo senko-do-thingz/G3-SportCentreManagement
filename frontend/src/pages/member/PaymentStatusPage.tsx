@@ -291,7 +291,7 @@ function StatusPanel({ polling, payment }: { polling: ReturnType<typeof usePayme
   return (
     <Card title="Payment status" aria-label="Payment status">
       <div className="payment-status" aria-live="polite" data-status={payment.status}>
-        <StatusBadge status={paymentStatusToneCode(payment.status)} label={paymentStatusLabel(payment.status, payment.settlementType)} />
+        <StatusBadge status={paymentStatusToneCode(payment.status)} label={paymentStatusLabel(payment.status)} />
         <h3 className="payment-status__title">{content.title}</h3>
         <p className="payment-status__text">{content.text}</p>
       </div>

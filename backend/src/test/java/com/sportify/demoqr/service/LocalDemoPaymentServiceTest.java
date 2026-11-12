@@ -6,6 +6,7 @@ import com.sportify.identity.entity.Role;
 import com.sportify.identity.entity.UserAccount;
 import com.sportify.payment.entity.Invoice;
 import com.sportify.payment.entity.Payment;
+import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.entity.PaymentStatus;
 import com.sportify.payment.repository.InvoiceRepository;
 import com.sportify.payment.repository.PaymentRepository;
@@ -150,6 +151,7 @@ class LocalDemoPaymentServiceTest {
         Payment actualPaid = Payment.builder()
                 .id(52L)
                 .member(memberProfile)
+                .paymentMethod(PaymentMethod.CASH)
                 .paymentStatus(PaymentStatus.SUCCESS)
                 .settlementType("ACTUAL")
                 .settlementProvider("DESK_CASH")
@@ -171,6 +173,7 @@ class LocalDemoPaymentServiceTest {
         Payment alreadySimulated = Payment.builder()
                 .id(52L)
                 .member(memberProfile)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .paymentStatus(PaymentStatus.SUCCESS)
                 .settlementType("SIMULATED")
                 .settlementProvider("SPORTIFY_SIMULATOR")
@@ -207,6 +210,7 @@ class LocalDemoPaymentServiceTest {
         Payment pending = Payment.builder()
                 .id(52L)
                 .member(memberProfile)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                 .paymentStatus(PaymentStatus.PENDING)
                 .amount(new BigDecimal("810000.00"))
                 .build();

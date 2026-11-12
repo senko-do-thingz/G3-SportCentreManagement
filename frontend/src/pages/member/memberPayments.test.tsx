@@ -47,6 +47,26 @@ function paymentsBackend(options: Options = {}) {
       index += 1
       return answer instanceof Response ? answer.clone() : json(200, answer)
     }
+    if (call.path === '/payments/52/vietqr-instructions') {
+      const answer = answers[Math.max(0, Math.min(index - 1, answers.length - 1))]
+      if (answer instanceof Response) return backendError(404, 'Payment not found')
+      const transfer = answer.bankTransferInstructions
+      return json(200, {
+        paymentId: answer.id,
+        paymentCode: answer.code,
+        payable: true,
+        notice: 'Transfer instructions only. Staff must verify actual receipt before confirming payment.',
+        bankBin: '970416',
+        bankName: transfer?.bank ?? 'Demo Bank',
+        accountNumber: transfer?.accountNumber ?? '0123456789',
+        accountName: transfer?.accountName ?? 'SPORTIFY CENTER',
+        amount: answer.amount,
+        currency: 'VND',
+        transferReference: transfer?.transferContent ?? answer.code,
+        qrPayload: '000201010212',
+        requiresStaffConfirmation: true,
+      })
+    }
     if (call.path === '/payments/52/method' && call.method === 'PUT') {
       return options.onMethod
         ? options.onMethod(call)
@@ -166,6 +186,7 @@ describe('FE-11 Payment Summary (F3-01, S3-Single)', () => {
     })
     renderApp('/member/payments/52')
     const order = await screen.findByRole('region', { name: 'Order summary' })
+    await user.click(within(order).getByRole('radio', { name: 'Bank transfer' }))
     await user.click(within(order).getByRole('button', { name: 'Continue to payment' }))
     const alert = await within(order).findByRole('alert')
     expect(alert).toHaveTextContent('Only pending payments can have their payment method updated')
@@ -938,7 +959,8 @@ describe('FE-11 Receipts (S3-CardReceipt, S3-MemberReceipt, S3-SingleReceipt)', 
 
     const history = renderApp('/member/payments')
     expect(await screen.findByText('Paid')).toBeInTheDocument()
-    expect(screen.getByText('Bank transfer')).toBeInTheDocument()
+    const historyTable = await screen.findByRole('table', { name: 'Payment history' })
+    expect(historyTable.querySelector('tbody tr td:nth-child(4)')).toHaveTextContent('Bank transfer')
     expect(screen.queryByText(/simulated/i)).not.toBeInTheDocument()
     history.unmount()
 

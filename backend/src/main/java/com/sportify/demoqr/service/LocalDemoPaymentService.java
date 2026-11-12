@@ -98,12 +98,6 @@ public class LocalDemoPaymentService {
                 throw DemoQrException.unavailable();
             }
 
-            // The member-facing local completion action represents a bank-transfer QR only.
-            // Cash stays pending until reception confirms that cash was actually received.
-            if (payment.getPaymentMethod() != PaymentMethod.BANK_TRANSFER) {
-                throw DemoQrException.unavailable();
-            }
-
             // SUCCESS describes the persisted payment, not current benefit availability. Replay never activates an item.
             if (payment.getPaymentStatus() == PaymentStatus.SUCCESS) {
                 if ("SIMULATED".equals(payment.getSettlementType())
@@ -129,6 +123,12 @@ public class LocalDemoPaymentService {
                     throw new DemoQrException(HttpStatus.CONFLICT, "SIMULATOR_ALREADY_SETTLED",
                             "Payment is already settled.");
                 }
+            }
+
+            // The member-facing local completion action represents a bank-transfer QR only.
+            // Cash stays pending until reception confirms that cash was actually received.
+            if (payment.getPaymentMethod() != PaymentMethod.BANK_TRANSFER) {
+                throw DemoQrException.unavailable();
             }
 
             if (payment.getPaymentStatus() != PaymentStatus.PENDING) {

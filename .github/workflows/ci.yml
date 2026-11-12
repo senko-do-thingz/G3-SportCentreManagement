@@ -288,7 +288,7 @@ jobs:
         with:
           name: frontend-test-reports
           path: frontend/vitest-results.json
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
 
   security:

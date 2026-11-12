@@ -65,7 +65,7 @@ export function isSimulatedSettlement(item: { settlementType?: string | null } |
 }
 
 /** Use the same member-facing status label regardless of internal settlement provenance. */
-export function paymentStatusLabel(status: string | null | undefined, _settlementType?: string | null): string {
+export function paymentStatusLabel(status: string | null | undefined): string {
   if (!status) {
     return 'Unknown'
   }

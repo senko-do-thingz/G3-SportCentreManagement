@@ -451,6 +451,20 @@
       ],
       "drops": [],
       "sha256_lf": "bcb4730b3508786a35cc3fdaa7941be61f37403b9020b39868b9a661e44bbeb0"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V55__add_vietqr_payment_gateway_fields.sql",
+      "version": 55,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "ad55971b2a5e74ccf58a04013d89efcdbb2e74e1f65dc5210ce6f26b59d7825d"
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/catalog/V56__allow_vietqr_sandbox_provenance.sql",
+      "version": 56,
+      "creates": [],
+      "drops": [],
+      "sha256_lf": "815b889b1e3479fb9b578cc2c2639e996786fe251d2af63943892c50317288a2"
     }
   ],
   "create_occurrences": 82,

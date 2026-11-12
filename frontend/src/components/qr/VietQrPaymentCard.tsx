@@ -4,7 +4,7 @@ import { getErrorMessage } from '../../api/errors'
 import { paymentsApi, type Payment, type VietQrInstructions } from '../../api/paymentsApi'
 import { localDemoPaymentApi } from '../../api/localDemoPaymentApi'
 import { copyText } from '../../utils/clipboard'
-import { formatPaymentMoney } from '../../pages/member/paymentsModel'
+import { accountNumberToCopy, amountToCopy, formatPaymentMoney } from '../../pages/member/paymentsModel'
 import { Button, Card, useToast } from '../ui'
 import { Spinner } from '../ui/Spinner'
 
@@ -22,58 +22,78 @@ export function VietQrPaymentCard({
   onRefresh: () => void
   fallback: ReactNode
 }) {
-  const [state, setState] = useState<InstructionsState>({ status: 'loading' })
+  const [requestState, setRequestState] = useState<{ key: string; state: InstructionsState } | null>(null)
   const [attempt, setAttempt] = useState(0)
-  const [qrImage, setQrImage] = useState<string | null>(null)
-  const [brandedImageFailed, setBrandedImageFailed] = useState(false)
-  const [demoAvailable, setDemoAvailable] = useState(false)
+  const [qrImageState, setQrImageState] = useState<{ payload: string; url: string | null } | null>(null)
+  const [failedBrandedImageKey, setFailedBrandedImageKey] = useState<string | null>(null)
+  const [demoCapability, setDemoCapability] = useState<{ paymentId: number; enabled: boolean } | null>(null)
   const [submittingDemo, setSubmittingDemo] = useState(false)
   const [demoMessage, setDemoMessage] = useState<string | null>(null)
   const [demoError, setDemoError] = useState<string | null>(null)
   const toast = useToast()
+  const requestKey = `${payment.id}:${attempt}`
+  const state: InstructionsState = requestState?.key === requestKey
+    ? requestState.state
+    : { status: 'loading' }
+  const demoAvailable = demoCapability?.paymentId === payment.id && demoCapability.enabled
 
   useEffect(() => {
     const controller = new AbortController()
     let active = true
-    setState({ status: 'loading' })
     paymentsApi.vietQrInstructions(payment.id, { signal: controller.signal }).then(
       (instructions) => {
-        if (active) setState({ status: 'ready', instructions })
+        if (active) setRequestState({ key: requestKey, state: { status: 'ready', instructions } })
       },
     ).catch((error: unknown) => {
-      if (active && !controller.signal.aborted) setState({ status: 'error', error: getErrorMessage(error) })
+      if (active && !controller.signal.aborted) {
+        setRequestState({ key: requestKey, state: { status: 'error', error: getErrorMessage(error) } })
+      }
     })
     void localDemoPaymentApi.capability(controller.signal).then((enabled) => {
-      if (active) setDemoAvailable(enabled)
+      if (active) setDemoCapability({ paymentId: payment.id, enabled })
+    }).catch(() => {
+      if (active && !controller.signal.aborted) setDemoCapability({ paymentId: payment.id, enabled: false })
     })
     return () => {
       active = false
       controller.abort()
     }
-  }, [payment.id, attempt])
+  }, [payment.id, requestKey])
 
   const instructions = state.status === 'ready' ? state.instructions : null
   const brandedImage = instructions?.payable ? quickLinkImage(instructions) : null
+  const qrPayload = instructions?.payable ? instructions.qrPayload : null
+  const transferReference = instructions?.transferReference?.trim() || null
+  const qrImage = qrPayload && qrImageState?.payload === qrPayload ? qrImageState.url : null
+  const brandedImageKey = brandedImage ? `${requestKey}:${brandedImage}` : null
+  const brandedImageFailed = brandedImageKey !== null && failedBrandedImageKey === brandedImageKey
   useEffect(() => {
     let active = true
-    setQrImage(null)
-    setBrandedImageFailed(false)
-    if (!instructions?.payable || !instructions.qrPayload) return () => { active = false }
-    QRCode.toDataURL(instructions.qrPayload, { width: 300, margin: 2, errorCorrectionLevel: 'M' }).then((url) => {
-      if (active) setQrImage(url)
+    if (!qrPayload) return () => { active = false }
+    QRCode.toDataURL(qrPayload, { width: 300, margin: 2, errorCorrectionLevel: 'M' }).then((url) => {
+      if (active) setQrImageState({ payload: qrPayload, url })
     }).catch(() => {
-      if (active) setQrImage(null)
+      if (active) setQrImageState({ payload: qrPayload, url: null })
     })
     return () => { active = false }
-  }, [instructions?.payable, instructions?.qrPayload])
+  }, [qrPayload])
 
   async function copyReference() {
-    if (!instructions?.transferReference) return
+    if (!transferReference) return
     try {
-      await copyText(instructions.transferReference)
-      toast.success('Copied transfer content', instructions.transferReference)
+      await copyText(transferReference)
+      toast.success('Copied transfer content', transferReference)
     } catch {
-      toast.error('Could not copy transfer content', 'Select the text and copy it by hand.')
+      toast.error('Could not copy the transfer content', 'Select the text and copy it by hand.')
+    }
+  }
+
+  async function copyDetail(label: string, value: string) {
+    try {
+      await copyText(value)
+      toast.success(`Copied ${label}`, value)
+    } catch {
+      toast.error(`Could not copy the ${label}`, 'Select the text and copy it by hand.')
     }
   }
 
@@ -124,7 +144,7 @@ export function VietQrPaymentCard({
   }
 
   return (
-    <Card title="VietQR bank transfer" aria-label="VietQR bank transfer">
+    <Card title="VietQR bank transfer" aria-label="Bank transfer">
       <p>{instructions.notice}</p>
       <div className="vietqr-payment-card__qr-wrap">
         {(brandedImage && !brandedImageFailed) || qrImage ? (
@@ -132,7 +152,7 @@ export function VietQrPaymentCard({
             <img
               src={brandedImage && !brandedImageFailed ? brandedImage : qrImage ?? undefined}
               alt={`VietQR transfer code for ${payment.code}`}
-              onError={() => { if (brandedImage && !brandedImageFailed) setBrandedImageFailed(true) }}
+              onError={() => { if (brandedImageKey && !brandedImageFailed) setFailedBrandedImageKey(brandedImageKey) }}
             />
           </div>
         ) : <Spinner label="Rendering your VietQR code" />}
@@ -152,13 +172,26 @@ export function VietQrPaymentCard({
       <dl className="summary-list">
         <div><dt>Amount</dt><dd>{formatPaymentMoney(instructions.amount)}</dd></div>
         <div><dt>Bank</dt><dd>{instructions.bankName ?? instructions.bankBin}</dd></div>
-        <div><dt>Account number</dt><dd>{instructions.accountNumber}</dd></div>
-        <div><dt>Account name</dt><dd>{instructions.accountName}</dd></div>
+        <div>
+          <dt>Account number</dt>
+          <dd className="copy-value">
+            <span className="copy-value__text">{instructions.accountNumber ?? '-'}</span>
+            {instructions.accountNumber && <button type="button" className="copy-value__button no-print" aria-label="Copy account number" onClick={() => void copyDetail('account number', accountNumberToCopy(instructions.accountNumber))}>Copy</button>}
+          </dd>
+        </div>
+        <div><dt>Account name</dt><dd>{instructions.accountName ?? '-'}</dd></div>
         <div>
           <dt>Transfer content</dt>
           <dd className="copy-value">
-            <code className="copy-value__text">{instructions.transferReference}</code>
-            <button type="button" className="copy-value__button no-print" onClick={() => void copyReference()}>Copy</button>
+            <code className="copy-value__text">{transferReference ?? '-'}</code>
+            {transferReference && <button type="button" className="copy-value__button no-print" aria-label="Copy transfer content" onClick={() => void copyReference()}>Copy</button>}
+          </dd>
+        </div>
+        <div>
+          <dt>Amount to transfer</dt>
+          <dd className="copy-value">
+            <span className="copy-value__text">{formatPaymentMoney(instructions.amount)}</span>
+            <button type="button" className="copy-value__button no-print" aria-label="Copy amount" onClick={() => void copyDetail('amount', amountToCopy(instructions.amount))}>Copy</button>
           </dd>
         </div>
       </dl>
@@ -178,7 +211,7 @@ function quickLinkImage(instructions: VietQrInstructions): string | null {
   const account = encodeURIComponent(instructions.accountNumber)
   const imageUrl = new URL(`https://img.vietqr.io/image/${bank}-${account}-compact2.svg`)
   imageUrl.searchParams.set('amount', String(amount))
-  imageUrl.searchParams.set('addInfo', instructions.transferReference)
+  imageUrl.searchParams.set('addInfo', instructions.transferReference.trim())
   imageUrl.searchParams.set('accountName', instructions.accountName)
   return imageUrl.toString()
 }

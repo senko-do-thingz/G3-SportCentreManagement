@@ -167,7 +167,7 @@ function PaymentSummaryView({ paymentId }: { paymentId: number }) {
             <div>
               <dt>Status</dt>
               <dd>
-                <StatusBadge status={paymentStatusToneCode(data.status)} label={paymentStatusLabel(data.status, data.settlementType)} />
+                <StatusBadge status={paymentStatusToneCode(data.status)} label={paymentStatusLabel(data.status)} />
               </dd>
             </div>
             {registration && <RegistrationRows registration={registration} singleVisit={singleVisit} />}
