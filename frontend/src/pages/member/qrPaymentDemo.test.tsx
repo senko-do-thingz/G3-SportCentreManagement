@@ -195,7 +195,7 @@ describe('QR-01 guarded demo route and payment integration', () => {
     expect(screen.getByRole('link', { name: 'View payment receipt' })).toHaveAttribute('href', '/member/payments/receipts/301')
   })
 
-  it('accepts a local http confirmation link and fills the token without scanning', async () => {
+  it('accepts a local http confirmation link and requires the scanned token to be entered', async () => {
     const token = 'c'.repeat(43)
     let settled = false
     const base = {
@@ -222,8 +222,10 @@ describe('QR-01 guarded demo route and payment integration', () => {
     renderApp('/member/payments/52/qr-demo')
     await user.click(await screen.findByRole('button', { name: 'Generate QR token' }))
     expect(await screen.findByRole('img', { name: 'Scannable payment verification token' })).toBeVisible()
-    await user.click(screen.getByRole('button', { name: 'Fill token automatically' }))
-    expect(screen.getByLabelText('Verification token')).toHaveValue(token)
+    expect(screen.queryByRole('button', { name: 'Fill token automatically' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Verification token')).toHaveValue('')
+    expect(screen.getByRole('button', { name: 'Verify and Confirm Payment' })).toBeDisabled()
+    await user.type(screen.getByLabelText('Verification token'), token)
     await user.click(screen.getByRole('button', { name: 'Verify and Confirm Payment' }))
     await waitFor(() => expect(calls.find((call) => call.path.endsWith('/confirm'))?.body).toEqual({ token }))
     expect(await screen.findByText(/Payment Successful - Demo/)).toBeVisible()
