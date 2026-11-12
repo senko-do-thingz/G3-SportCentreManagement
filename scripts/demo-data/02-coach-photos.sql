@@ -1,12 +1,14 @@
 /*
  * Sportify Center - profile photos for the six demo coaches.
- * The image files live in the repository: frontend/public/images/coaches/*.jpg (Unsplash License stock portraits,
+ * The image files live in the repository: the .jpg files in frontend/public/images/coaches/ (Unsplash License stock portraits,
  * demo only; download them once with download-coach-photos.ps1). The web app serves them, so no internet is needed.
  * Isolated sportify_demo only, after 01-staff-accounts.sql and explicit session approval. Existing photos are preserved.
  * Replace with real staff photos (with their consent) before any real use.
  */
 SET NOCOUNT OFF;
 SET XACT_ABORT ON;
+-- sqlcmd defaults QUOTED_IDENTIFIER to OFF; filtered indexes on these tables need it ON (SSMS already sets it).
+SET QUOTED_IDENTIFIER ON;
 
 -- Fail closed: an explicit session opt-in is required even in the dedicated isolated demo database.
 IF DB_NAME() <> N'sportify_demo'

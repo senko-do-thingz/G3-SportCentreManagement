@@ -16,6 +16,8 @@
 
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
+-- sqlcmd defaults QUOTED_IDENTIFIER to OFF; filtered indexes on these tables need it ON (SSMS already sets it).
+SET QUOTED_IDENTIFIER ON;
 
 -- Opt-in guard: requires explicit authorization context
 IF ISNULL(TRY_CAST(SESSION_CONTEXT(N'sportify_demo_seed_approved') AS INT), 0) <> 1

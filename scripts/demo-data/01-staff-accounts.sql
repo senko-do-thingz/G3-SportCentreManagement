@@ -8,6 +8,8 @@
  */
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
+-- sqlcmd defaults QUOTED_IDENTIFIER to OFF; filtered indexes on these tables need it ON (SSMS already sets it).
+SET QUOTED_IDENTIFIER ON;
 -- Fail closed: an explicit session opt-in is required even in the dedicated isolated demo database.
 IF DB_NAME() <> N'sportify_demo'
    OR ISNULL(TRY_CAST(SESSION_CONTEXT(N'sportify_demo_seed_approved') AS INT), 0) <> 1

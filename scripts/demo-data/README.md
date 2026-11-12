@@ -36,6 +36,16 @@ The historical catalog V32 migration is still part of ordinary Flyway locations.
 that history or prove its physical inventory is approved. Owner/DBA review is required before deploying V32 to a
 new real/shared environment. Do not edit an applied migration, run Flyway repair, delete rows, or invent inventory.
 
+Without SSMS, the same steps work with `sqlcmd` (the scripts set `QUOTED_IDENTIFIER ON` themselves; `-f 65001`
+keeps Vietnamese names intact). Each `sqlcmd` call is its own session, so pass the opt-in and the script as two
+input files of one call. Write the opt-in to a local file outside the repository; do not commit it:
+
+```powershell
+Set-Content "$env:TEMP\optin.sql" "EXEC sys.sp_set_session_context @key=N'sportify_demo_seed_approved', @value=1;`r`nGO" -Encoding ascii
+sqlcmd -S localhost -U sa -P <password> -C -b -f 65001 -d sportify_demo -i "$env:TEMP\optin.sql,scripts\demo-data\01-staff-accounts.sql"
+sqlcmd -S localhost -U sa -P <password> -C -b -f 65001 -d sportify_demo -i "$env:TEMP\optin.sql,scripts\demo-data\02-coach-photos.sql"
+```
+
 ## If something fails
 
 - "A phone number in this script already belongs to another account": change that phone number in the `@Staff`
