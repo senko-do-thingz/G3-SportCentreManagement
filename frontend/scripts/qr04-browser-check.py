@@ -4,7 +4,6 @@ import hashlib
 import json
 import mimetypes
 import ssl
-import uuid
 from io import BytesIO
 from pathlib import Path
 from urllib.error import HTTPError
@@ -122,21 +121,17 @@ try:
             context.route('https://api.qrserver.com/**', lambda route: route.abort())
             desktop.goto(args.base + f'/member/payments/{current_payment_id}/qr-demo')
             expect(desktop.get_by_text('Owner confirmation finalizes this payment as Paid - Simulated and activates the purchased entitlement.')).to_be_visible()
-            expect(desktop.get_by_role('button', name='Simulate Payment Confirmation')).to_be_disabled()
-            check('Legacy profile cannot enable the local demo action: ' + theme,
-                  desktop.get_by_role('button', name='Start simulation session').count() == 0)
-            status, created = request('/payments/simulated-qr/sessions',
-                                      {'paymentId': current_payment_id, 'bankCode': 'BIDV_DEMO', 'requestId': str(uuid.uuid4())},
-                                      bearer=auth['accessToken'])
-            check('Legacy API still creates an isolated confirmation session: ' + theme, status == 200)
+            desktop.get_by_role('button', name='Generate QR token').click()
+            expect(desktop.get_by_role('img', name='Scannable payment verification token')).to_be_visible()
             check('Desktop simulation consent notice and no old intent-only wording: ' + theme,
                   'Record confirmation intent' not in desktop.content()
                   and 'Review confirmation intent' not in desktop.content()
                   and 'Your actual payment is not changed' not in desktop.content())
-            first_url = created['confirmationUrl']
-            tokens.append(first_url.split('#token=')[1])
-            legacy = zxingcpp.read_barcodes(Image.open(BytesIO(desktop.locator('.qr-demo-card svg').first.screenshot())))
-            check('Member NON_PAYABLE decoder: ' + theme, len(legacy) == 1 and 'NON_PAYABLE=1' in legacy[0].text)
+            decoded = zxingcpp.read_barcodes(Image.open(BytesIO(desktop.locator('.qr-demo-card svg').first.screenshot())))
+            check('Member token QR decoder: ' + theme, len(decoded) == 1 and len(decoded[0].text) == 43)
+            first_token = decoded[0].text
+            tokens.append(first_token)
+            first_url = args.base + '/demo/qr/confirm#token=' + first_token
             for width in [390, 768, 1440]:
                 desktop.set_viewport_size({'width': width, 'height': 900})
                 inspect(desktop, f'desktop-pending-{width}-{theme}')
@@ -159,19 +154,18 @@ try:
             mobile.get_by_role('button', name='Cancel Simulation Session').click()
             expect(mobile.get_by_text('CANCELED', exact=True)).to_be_visible()
             inspect(mobile, 'mobile-canceled-' + theme)
-            status, created = request('/payments/simulated-qr/sessions',
-                                      {'paymentId': current_payment_id, 'bankCode': 'BIDV_DEMO', 'requestId': str(uuid.uuid4())},
-                                      bearer=auth['accessToken'])
-            check('Legacy API can replace a canceled session: ' + theme, status == 200)
-            url = created['confirmationUrl']
-            tokens.append(url.split('#token=')[1])
-            mobile.goto(url)
-            expect(mobile.get_by_role('button', name='Confirm simulated payment')).to_be_visible()
-            mobile.get_by_role('button', name='Confirm simulated payment').focus()
-            mobile.keyboard.press('Enter')
+            desktop.get_by_role('button', name='Generate a new QR token').click()
+            expect(desktop.get_by_role('img', name='Scannable payment verification token')).to_be_visible()
+            decoded = zxingcpp.read_barcodes(Image.open(BytesIO(desktop.locator('.qr-demo-card svg').first.screenshot())))
+            check('Replacement QR reveals one token: ' + theme, len(decoded) == 1 and len(decoded[0].text) == 43)
+            tokens.append(decoded[0].text)
+            desktop.get_by_label('Verification token').fill(decoded[0].text)
+            desktop.get_by_role('button', name='Verify and Confirm Payment').click()
+            expect(desktop.get_by_text('Payment Successful - Demo')).to_be_visible()
+            mobile.goto(args.base + '/demo/qr/confirm#token=' + decoded[0].text)
             expect(mobile.get_by_text('Paid - Simulated. Your payment was settled in simulation only; no real bank transfer occurred.')).to_be_visible()
             inspect(mobile, 'mobile-intent-' + theme)
-            check('Keyboard confirmation moves focus to result: ' + theme, mobile.evaluate("document.activeElement?.getAttribute('aria-label')") == 'Demo session result')
+            check('Member receipt available: ' + theme, desktop.get_by_role('link', name='View payment receipt').count() == 1)
             desktop.reload()
             expect(desktop.get_by_text('Paid - Simulated', exact=True)).to_be_visible()
             inspect(desktop, 'desktop-settled-1440-' + theme)

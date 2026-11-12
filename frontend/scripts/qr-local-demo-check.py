@@ -99,7 +99,7 @@ try:
         time.sleep(1)
     else:
         raise TimeoutError('Loopback backend did not become ready')
-    check('Fresh schema includes release V53', sql('SELECT MAX(TRY_CONVERT(int,version)) FROM flyway_schema_history WHERE success=1;') == '53')
+    check('Fresh schema includes release V54', sql('SELECT MAX(TRY_CONVERT(int,version)) FROM flyway_schema_history WHERE success=1;') == '54')
     check('All five additive release migrations applied', sql('SELECT COUNT(*) FROM flyway_schema_history WHERE TRY_CONVERT(int,version) BETWEEN 42 AND 46 AND success=1;') == '5')
     status, auth = request('/auth/login', {'email': 'an.gold@example.com', 'password': 'SportifyDemo2026!'})
     check('Demo Member authenticates', status == 200)

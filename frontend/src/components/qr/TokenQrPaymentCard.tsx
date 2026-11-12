@@ -14,7 +14,7 @@ export function TokenQrPaymentCard({ payment, onSettled }: { payment: Payment; o
   const [result, setResult] = useState<DemoSession | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [now, setNow] = useState(Date.now())
+  const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
     let active = true
