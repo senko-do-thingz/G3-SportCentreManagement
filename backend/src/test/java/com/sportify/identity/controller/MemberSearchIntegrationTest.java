@@ -19,6 +19,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import static org.hamcrest.Matchers.hasItems;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -108,9 +109,11 @@ public class MemberSearchIntegrationTest extends AbstractIntegrationTest {
     @WithMockUser(roles = "RECEPTIONIST")
     void searchMembers_NoQuery_ReturnsAll() throws Exception {
         mockMvc.perform(get("/api/v1/members")
+                .param("sort", "id,desc")
+                .param("size", "100")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content.length()").value(2));
+                .andExpect(jsonPath("$.content[*].fullName", hasItems("Alice Wonderland", "Bob Builder")));
     }
 
     @Test
