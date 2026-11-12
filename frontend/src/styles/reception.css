@@ -540,7 +540,7 @@
 .reception-page { gap: var(--space-6); }
 .reception-page .page-header { align-items: center; padding: var(--space-8); border: 0; border-radius: var(--radius-xl); background: linear-gradient(120deg, var(--color-hero-deep) 0%, var(--color-navy) 45%, var(--color-primary) 100%); box-shadow: var(--shadow-md); }
 .reception-page .page-header .eyebrow { color: var(--color-hero-highlight); }
-.reception-page .page-header__title { font-family: var(--font-display); font-size: var(--text-3xl); letter-spacing: -0.03em; color: var(--color-on-hero); }
+.reception-page .page-header__title { font-family: var(--font-display); font-size: var(--ui-title-size); letter-spacing: -0.03em; color: var(--color-on-hero); }
 .reception-page .page-header__description { font-size: var(--text-base); line-height: 1.6; color: var(--color-on-hero-muted); }
 .reception-page .page-header__actions .btn { height: 48px; padding: 0 var(--space-6); font-size: var(--text-base); box-shadow: var(--shadow-sm); }
 .reception-page .page-header__actions .btn--primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-on-accent); }
@@ -657,7 +657,7 @@
 .reception-page.reception-ui18-page .page-header__title {
   margin: 0;
   color: var(--h-ink);
-  font-size: clamp(1.75rem, 3.2vw, 2.625rem);
+  font-size: var(--ui-title-size);
   line-height: 1.1;
   letter-spacing: 0;
   text-wrap: balance;
@@ -810,8 +810,9 @@
 
 .reception-page.reception-ui18-page .input,
 .reception-page.reception-ui18-page .select {
-  min-height: 42px;
-  height: 42px;
+  /* Shared workspace control height (styles/workspaceUi.css). */
+  min-height: var(--ui-control-height);
+  height: var(--ui-control-height);
   border-radius: 0;
   font-size: var(--text-sm);
 }

@@ -60,7 +60,7 @@
   margin: 0;
   color: var(--h-ink);
   font-family: var(--h-display);
-  font-size: clamp(1.8rem, 3.1vw, 2.5rem);
+  font-size: var(--ui-title-size);
   font-weight: 800;
   line-height: 1.12;
   letter-spacing: 0;
@@ -110,10 +110,11 @@
 }
 .reception-page.reception-ui25-page .input,
 .reception-page.reception-ui25-page .select {
-  min-height: 42px;
-  height: 42px;
+  /* Shared workspace control height and border (styles/workspaceUi.css). */
+  min-height: var(--ui-control-height);
+  height: var(--ui-control-height);
   border-radius: 0;
-  border-color: var(--h-border);
+  border-color: var(--color-control-border);
   background-color: var(--h-surface);
   color: var(--h-ink);
   font-family: var(--h-body);
