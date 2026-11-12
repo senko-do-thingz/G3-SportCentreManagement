@@ -474,7 +474,7 @@ function CreateMemberModal({
               padding: '0 24px',
               fontSize: '0.95rem',
               fontWeight: 700,
-              borderRadius: '10px',
+              borderRadius: 0,
               background: 'linear-gradient(135deg, #1f4fd8 0%, #163bb0 100%)',
               color: '#ffffff',
               border: 'none',
@@ -486,11 +486,11 @@ function CreateMemberModal({
           </Button>
         }
       >
-        {/* High-visibility Check-in ID Card */}
+        {/* High-visibility Member Code Card */}
         <div
           style={{
             background: 'linear-gradient(135deg, #0b1736 0%, #152e69 100%)',
-            borderRadius: '12px',
+            borderRadius: 0,
             padding: '16px 20px',
             marginBottom: '16px',
             color: '#ffffff',
@@ -512,7 +512,7 @@ function CreateMemberModal({
                   marginBottom: '2px',
                 }}
               >
-                CHECK-IN ID (MÃ HỘI VIÊN)
+                MEMBER CODE
               </span>
               <div
                 style={{
@@ -547,14 +547,14 @@ function CreateMemberModal({
                 fontWeight: 700,
                 padding: '5px 12px',
                 height: '32px',
-                borderRadius: '8px',
+                borderRadius: 0,
                 background: copiedCode ? '#10b981' : 'rgba(255, 255, 255, 0.16)',
                 color: '#ffffff',
                 border: '1px solid rgba(255, 255, 255, 0.3)',
                 cursor: 'pointer',
               }}
             >
-              {copiedCode ? 'Copied ID!' : 'Copy ID'}
+              {copiedCode ? 'Copied code!' : 'Copy code'}
             </Button>
           </div>
 
@@ -570,7 +570,7 @@ function CreateMemberModal({
           >
             <div>
               <span style={{ color: '#94a3b8', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Hội viên:{' '}
+                Member:{' '}
               </span>
               <strong style={{ color: '#f8fafc', fontWeight: 600 }}>{created.member.fullName}</strong>
             </div>
@@ -596,7 +596,7 @@ function CreateMemberModal({
               fontWeight: 600,
               background: '#f8fafc',
               border: '1px solid #cbd5e1',
-              borderRadius: '8px',
+              borderRadius: 0,
               padding: '10px 14px',
               color: '#0f172a',
               width: '100%',
@@ -615,7 +615,7 @@ function CreateMemberModal({
                 height: '30px',
                 color: '#1f4fd8',
                 fontWeight: 600,
-                borderRadius: '6px',
+                borderRadius: 0,
               }}
             >
               {revealed ? 'Hide temporary password' : 'Reveal temporary password'}
@@ -638,7 +638,7 @@ function CreateMemberModal({
                 padding: '4px 14px',
                 height: '30px',
                 fontWeight: 600,
-                borderRadius: '6px',
+                borderRadius: 0,
                 borderColor: copied ? '#86efac' : undefined,
                 background: copied ? '#f0fdf4' : undefined,
                 color: copied ? '#15803d' : undefined,
@@ -653,7 +653,7 @@ function CreateMemberModal({
           style={{
             background: '#fffbeb',
             border: '1px solid #fef08a',
-            borderRadius: '10px',
+            borderRadius: 0,
             padding: '12px 14px',
             display: 'flex',
             alignItems: 'flex-start',

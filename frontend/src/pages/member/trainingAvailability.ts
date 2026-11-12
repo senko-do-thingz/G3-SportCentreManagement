@@ -23,7 +23,7 @@ export const TIME_OPTIONS = Array.from({ length: 37 }, (_, i) => {
   return { value, label }
 })
 
-export const EMPTY_AVAILABILITY: TrainingAvailability = { format: '', days: [], earliest: '', latest: '' }
+export const EMPTY_AVAILABILITY: TrainingAvailability = { format: 'COACH_LED', days: [], earliest: '', latest: '' }
 const key = (memberId: number | string) => `sportify.training-availability.${memberId}`
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/
 
@@ -35,7 +35,7 @@ export function loadAvailability(memberId: number | string | undefined): Trainin
     if (!raw || typeof raw !== 'object') return EMPTY_AVAILABILITY
     const days = Array.isArray(raw.days) ? raw.days.filter(day => WEEKDAYS.some(item => item.value === day)) : []
     return {
-      format: raw.format === 'COACH_LED' || raw.format === 'SELF_TRAINING' ? raw.format : '',
+      format: raw.format === 'SELF_TRAINING' ? 'SELF_TRAINING' : 'COACH_LED',
       days,
       earliest: typeof raw.earliest === 'string' && TIME.test(raw.earliest) ? raw.earliest : '',
       latest: typeof raw.latest === 'string' && TIME.test(raw.latest) ? raw.latest : '',

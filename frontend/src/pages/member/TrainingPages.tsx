@@ -49,7 +49,7 @@ export function TrainingPlansPage() {
   return (
     <div className="training-page">
       <PageHeader title="Training plans" description="View the personal plans and exercise instructions assigned by your coach." />
-      <TrainingData load={training.plans}>
+      <TrainingData load={training.plans} refreshLabel="Refresh training plans">
         {plans => plans.length ? (
           <Card>
             <ul className="training-list">

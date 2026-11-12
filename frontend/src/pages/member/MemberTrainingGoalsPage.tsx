@@ -22,7 +22,6 @@ const label = (options: { value: string; label: string }[], value: string | null
 export function MemberTrainingGoalsPage() {
   const auth = useContext(AuthContext)
   const memberId = auth?.user?.id
-  const [revision, refresh] = useState(0)
   const load = useCallback(async (signal: AbortSignal): Promise<GoalsData> => {
     const [profile, context, levels, sports] = await Promise.all([memberApi.me({ signal }), trainingGuidanceApi.context(signal),
       trainingGuidanceApi.sportLevels(signal), packagesApi.sports({ signal })])
@@ -31,8 +30,8 @@ export function MemberTrainingGoalsPage() {
   return <div className="training-page">
     <RecommendationTabs />
     <PageHeader title="My training goals" description="Tell us what you want to achieve and when you can train. Recommendations use these preferences; you always choose what to book." />
-    <TrainingData key={`${memberId}-${revision}`} load={load}>{data => <div className="training-form-grid">
-      <GoalsForm data={data} memberId={memberId} onSaved={() => refresh(value => value + 1)} />
+    <TrainingData key={memberId} load={load}>{data => <div className="training-form-grid">
+      <GoalsForm data={data} memberId={memberId} />
       <Card title="Your training context">
         <dl className="browse-facts">
           <div><dt>Member</dt><dd>{data.context.memberName}</dd></div>
@@ -49,7 +48,7 @@ export function MemberTrainingGoalsPage() {
   </div>
 }
 
-function GoalsForm({ data, memberId, onSaved }: { data: GoalsData; memberId: number | undefined; onSaved: () => void }) {
+function GoalsForm({ data, memberId }: { data: GoalsData; memberId: number | undefined }) {
   const navigate = useNavigate()
   const action = useTrainingAction()
   const [goal, setGoal] = useState(data.profile.mainGoal ?? '')
@@ -78,7 +77,7 @@ function GoalsForm({ data, memberId, onSaved }: { data: GoalsData; memberId: num
   }
   function submit(event: FormEvent) {
     event.preventDefault()
-    void action.run(async () => { await save(); onSaved() }, 'Training preferences saved.')
+    void action.run(save, 'Training preferences saved.')
   }
   return <Card title="Training preferences"><form className="training-form" onSubmit={submit}>
     <Select label="Main goal" placeholder="Not set" options={GOAL_OPTIONS} value={goal} onChange={event => setGoal(event.target.value)} />
@@ -99,7 +98,7 @@ function GoalsForm({ data, memberId, onSaved }: { data: GoalsData; memberId: num
         </div>)}
       </div>
     </fieldset>
-    <Select label="Training format" options={FORMAT_OPTIONS} value={availability.format || 'COACH_LED'}
+    <Select label="Training format" options={FORMAT_OPTIONS} value={availability.format}
       onChange={event => setAvailability(current => ({ ...current, format: event.target.value as TrainingAvailability['format'] }))} />
     <fieldset><legend>Available days</legend><div className="training-days-grid">
       {WEEKDAYS.map(day => <label key={day.value} className="training-day-chip"><input type="checkbox" checked={availability.days.includes(day.value)}

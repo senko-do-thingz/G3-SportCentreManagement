@@ -542,7 +542,7 @@
 .member-concept .member-training-hub .training-actions .btn {
   font-size: 0.78rem;
   padding: 6px 14px;
-  border-radius: 8px;
+  border-radius: 0;
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   color: var(--color-text-muted);
@@ -564,7 +564,7 @@
   gap: 22px;
   overflow: hidden;
   padding: clamp(20px, 3vw, 28px);
-  border-radius: var(--radius-lg, 14px);
+  border-radius: 0;
   border: 1px solid rgba(245, 179, 1, 0.4);
   background: linear-gradient(135deg, #0b1736 0%, #102454 55%, #1f4fd8 120%);
   color: #ffffff;
@@ -650,7 +650,7 @@
   min-width: 0;
   padding: 16px 18px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg, 12px);
+  border-radius: 0;
   background: var(--color-surface);
   box-shadow: 0 2px 8px rgba(11, 23, 54, 0.04);
   transition: all 0.2s ease;
@@ -712,7 +712,7 @@
   min-width: 0;
   padding: 12px 16px;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--color-surface);
   transition: all 0.2s ease;
 }
@@ -748,7 +748,7 @@
   font-size: 0.8rem;
   font-weight: 700;
   padding: 6px 14px;
-  border-radius: 6px;
+  border-radius: 0;
   background: var(--color-primary-soft);
   color: var(--color-primary);
   text-decoration: none;
@@ -781,7 +781,7 @@
   min-width: 0;
   padding: 10px 14px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 0;
   color: var(--color-text);
   text-decoration: none;
   transition: all 0.15s ease;
@@ -1484,7 +1484,7 @@
   .member-concept .training-hub__hero {
     min-height: 124px;
     padding: 24px 28px;
-    border-radius: var(--radius-lg, 14px);
+    border-radius: 0;
     border: 1px solid rgba(245, 179, 1, 0.4);
     background: linear-gradient(135deg, #0b1736 0%, #102454 55%, #1f4fd8 120%);
     color: #ffffff;
@@ -1524,7 +1524,7 @@
     gap: 8px;
     min-height: 42px;
     padding: 0 20px;
-    border-radius: 8px;
+    border-radius: 0;
     border: 1px solid var(--color-accent, #f5b301);
     background: var(--color-accent, #f5b301);
     color: #0b1736;
@@ -1550,7 +1550,7 @@
     min-height: 84px;
     padding: 16px 18px;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg, 12px);
+    border-radius: 0;
     background: var(--color-surface);
     box-shadow: 0 2px 8px rgba(11, 23, 54, 0.04);
   }

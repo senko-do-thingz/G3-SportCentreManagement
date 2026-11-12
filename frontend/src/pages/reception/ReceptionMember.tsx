@@ -16,8 +16,8 @@ export function MemberHeader({ member, children }: { member: MemberSummary; chil
       </span>
       <div className="member-header__text">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-          <p className="member-header__code" title="Member Check-in ID">
-            <span className="member-header__code-tag">CHECK-IN ID</span>
+          <p className="member-header__code" title="Member Code">
+            <span className="member-header__code-tag">MEMBER CODE</span>
             <span className="member-header__code-val">{code}</span>
           </p>
           {member.status && <StatusBadge status={member.status} />}

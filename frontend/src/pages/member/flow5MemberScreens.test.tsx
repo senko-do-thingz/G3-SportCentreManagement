@@ -42,6 +42,43 @@ it('F5-01 saves preferred sports and hands format and available days to the reco
   expect(screen.getByRole('checkbox', { name: 'Monday' })).toBeChecked()
 })
 
+it('F5-01 edits sport levels in My Goals and persists them accurately with coach-led default', async () => {
+  tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
+  const { calls } = installFakeFetch(call => {
+    if (call.path === '/users/me') return json(200, profile)
+    if (call.path === '/sports') return json(200, sports)
+    if (call.path === '/member/training/context') return json(200, context)
+    if (call.path === '/member/training/preferred-sports') return json(200, { ...context, preferredSportIds: (call.body as { sportIds: number[] }).sportIds })
+    if (call.path === '/member/training/sport-levels') return json(200, [
+      { sportId: 1, sportName: 'Football', level: 'INTERMEDIATE' },
+      { sportId: 2, sportName: 'Badminton', level: null },
+    ])
+    if (call.path === '/member/training/sport-levels/2' && call.method === 'PUT') return json(200, { sportId: 2, sportName: 'Badminton', level: 'ADVANCED' })
+    if (call.path === '/member/training/sport-levels/1' && call.method === 'DELETE') return new Response(null, { status: 204 })
+    return backendError(404, 'Not found')
+  })
+  const user = userEvent.setup()
+  renderApp('/member/training/goals')
+
+  // Verify default format is displayed as COACH_LED
+  expect(await screen.findByLabelText('Training format')).toHaveValue('COACH_LED')
+
+  // Change Badminton level to ADVANCED and clear Football level to use general level
+  await user.selectOptions(screen.getByLabelText('Badminton level'), 'ADVANCED')
+  await user.selectOptions(screen.getByLabelText('Football level'), '')
+
+  // Save preferences
+  await user.click(screen.getByRole('button', { name: 'Save preferences' }))
+
+  expect(await screen.findByText('Training preferences saved.')).toBeInTheDocument()
+  expect(calls.find(call => call.method === 'PUT' && call.path === '/member/training/sport-levels/2')?.body).toEqual({ level: 'ADVANCED' })
+  expect(calls.some(call => call.method === 'DELETE' && call.path === '/member/training/sport-levels/1')).toBe(true)
+
+  // Verify saved availability in localStorage matches displayed COACH_LED
+  const saved = JSON.parse(localStorage.getItem('sportify.training-availability.2') ?? '{}')
+  expect(saved.format).toBe('COACH_LED')
+})
+
 it('F5-04 lists suitable sessions with booking state and package check, and links only bookable ones', async () => {
   tokenStorage.startSession({ accessToken: 'test', refreshToken: 'refresh' })
   const { calls } = installFakeFetch(call => {

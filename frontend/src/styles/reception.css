@@ -25,7 +25,7 @@
   padding: 3px 8px 3px 5px;
   background: #eff6ff;
   border: 1px solid #bfdbfe;
-  border-radius: 8px;
+  border-radius: 0;
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   box-shadow: 0 1px 3px rgba(31, 79, 216, 0.08);
   width: fit-content;
@@ -38,7 +38,7 @@
   padding: 2px 6px;
   background: #1f4fd8;
   color: #ffffff;
-  border-radius: 4px;
+  border-radius: 0;
   text-transform: uppercase;
 }
 
@@ -561,17 +561,17 @@
   .member-results__item,
   .package-item
 ) {
-  border-radius: var(--radius-lg, 12px);
+  border-radius: 0;
   border: 1px solid var(--color-border, #dde6ef);
   box-shadow: 0 4px 16px rgba(11, 23, 54, 0.04);
 }
 
 .reception-member-search-page :is(.input, .select) {
-  border-radius: 8px;
+  border-radius: 0;
 }
 
 .reception-member-search__modal {
-  border-radius: 14px;
+  border-radius: 0;
   overflow: hidden;
   max-width: 540px;
 }
@@ -596,7 +596,7 @@
   font-size: 1rem;
   font-weight: 750;
   letter-spacing: -0.01em;
-  border-radius: 12px !important;
+  border-radius: 0 !important;
   background: linear-gradient(135deg, #f5b301 0%, #ffc83d 100%) !important;
   border: 1px solid #e5a500 !important;
   color: #0b1736 !important;
