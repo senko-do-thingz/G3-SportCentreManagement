@@ -2,54 +2,60 @@ import { useCallback, useRef, useState, type FormEvent } from 'react'
 import { receptionSupportApi as api, supportCategories, supportStatuses, supportTransitions, type SupportIntake, type SupportStatus, type SupportTicket } from '../../api/receptionSupportApi'
 import { receptionApi } from '../../api/receptionApi'
 import { tokenStorage } from '../../api/tokenStorage'
-import { Badge, Button, Card, Input, PageHeader, Select, TextArea } from '../../components/ui'
+import { Badge, Button, Input, PageHeader, Select, TextArea } from '../../components/ui'
 import { formatCalendarDate, formatDateTime } from '../../utils/dateDisplay'
-import { ReceptionCallout, ReceptionHero, ReceptionScreen, ReceptionStat, ReceptionStats } from './ReceptionConcept'
+import { ReceptionScreen } from './ReceptionConcept'
 import { TrainingData } from '../member/TrainingData'
 import { useTrainingAction } from '../training/trainingFormState'
 import { ActionMessage } from '../training/TrainingFormFields'
 import '../member/training.css'
 
 const options = (values: readonly string[]) => values.map(value => ({ value, label: value.replaceAll('_', ' ') }))
+const statusTone = (status: SupportStatus) => status === 'OPEN' ? 'warning' : status === 'IN_PROGRESS' ? 'info' : status === 'RESOLVED' ? 'success' : 'neutral'
+const label = (value: string) => value.replaceAll('_', ' ')
 
 /** Flow 6 F6-06 Support Request Inbox and F6-07 Detail & Reply. */
 export function SupportRequestsPage() {
-  const [memberId, setMemberId] = useState('')
   const [status, setStatus] = useState('')
   const [search, setSearch] = useState('')
   const [query, setQuery] = useState('')
   const [selected, select] = useState<number | null>(null)
+  const [creating, setCreating] = useState(false)
   const [revision, refresh] = useState(0)
-  const load = useCallback((signal: AbortSignal) => api.list(memberId, status, signal, query), [memberId, status, query])
-  const summary = useCallback((signal: AbortSignal) => api.summary(signal), [])
+  const load = useCallback((signal: AbortSignal) => api.list('', status, signal, query), [status, query])
   const detail = useCallback((signal: AbortSignal) => api.detail(selected!, signal), [selected])
+
+  if (selected !== null) {
+    return <ReceptionScreen className="training-page rcp-support">
+      <Button variant="ghost" size="sm" onClick={() => select(null)}>Back to requests</Button>
+      <TrainingData key={`${selected}-${revision}`} load={detail} refreshLabel="Refresh request details">
+        {ticket => <TicketDetail ticket={ticket} onSaved={() => refresh(value => value + 1)} />}
+      </TrainingData>
+    </ReceptionScreen>
+  }
+
   return <ReceptionScreen className="training-page rcp-support">
-    <PageHeader eyebrow="Receptionist workspace" title="Support requests" description="Review member questions and follow up on unresolved requests. Requests do not change payments or packages automatically." />
-    <ReceptionHero kicker="Member care" title="Support requests." highlight="Reply, then resolve." description="Answer the member first. Record an internal outcome note before resolving or closing a request." />
-    <TrainingData key={`summary-${revision}`} load={summary}>{counts => <ReceptionStats label="Support request counts">
-      <ReceptionStat mark="O" label="Open" value={counts.open} tone="warning" /><ReceptionStat mark="P" label="In progress" value={counts.inProgress} />
-      <ReceptionStat mark="R" label="Resolved" value={counts.resolved} tone="success" /><ReceptionStat mark="C" label="Closed" value={counts.closed} />
-    </ReceptionStats>}</TrainingData>
-    <Card title="Support inbox">
-      <form className="training-actions rcp-toolbar" onSubmit={event => { event.preventDefault(); setQuery(search); select(null) }}>
-        <Input label="Find request code, member or subject" maxLength={100} value={search} onChange={event => setSearch(event.target.value)} />
-        <Button type="submit" variant="secondary">Search requests</Button>
-      </form>
-      <div className="training-form-grid">
-        <Input label="Filter member ID" type="number" min="1" value={memberId} onChange={event => { setMemberId(event.target.value); select(null) }} />
-        <Select label="Status filter" placeholder="All statuses" options={options(supportStatuses)} value={status} onChange={event => { setStatus(event.target.value); select(null) }} />
-      </div>
-      <TrainingData key={revision} load={load}>{tickets => <>
-        <p>Showing up to 100 newest matching requests. Opening a request does not resolve it; record a reply and the outcome before closing.</p>
-        {tickets.length === 0 ? <p role="status">No support requests match these filters.</p> : <div className="table-scroll"><table className="table"><caption>Member support requests</caption><thead><tr><th>Request</th><th>Member</th><th>Category</th><th>Source</th><th>Status</th><th>Action</th></tr></thead><tbody>{tickets.map(ticket => <tr key={ticket.id}><td>{ticket.code}: {ticket.subject}</td><td>{ticket.memberName}</td><td>{ticket.category}</td><td>{ticket.memberSubmitted ? 'Sent by member' : 'Recorded at desk'}</td><td><Badge tone={ticket.status === 'OPEN' ? 'warning' : ticket.status === 'IN_PROGRESS' ? 'info' : ticket.status === 'RESOLVED' ? 'success' : 'neutral'}>{ticket.status}</Badge></td><td><Button variant="secondary" onClick={() => select(ticket.id)}>View {ticket.code}</Button></td></tr>)}</tbody></table></div>}
-      </>}</TrainingData>
-    </Card>
-    {selected !== null && <TrainingData key={`${selected}-${revision}`} load={detail} refreshLabel="Refresh request details">{ticket => <TicketDetail ticket={ticket} onSaved={() => refresh(value => value + 1)} />}</TrainingData>}
-    <CreateTicket onSaved={ticket => { select(ticket.id); refresh(value => value + 1) }} />
+    <PageHeader title="Support requests" actions={!creating && <Button onClick={() => setCreating(true)}>+ New request</Button>} />
+    {creating && <CreateTicket onCancel={() => setCreating(false)} onSaved={ticket => { setCreating(false); select(ticket.id); refresh(value => value + 1) }} />}
+    <form className="rcp-support__toolbar" onSubmit={event => { event.preventDefault(); setQuery(search) }}>
+      <Input label="Find request code, member or subject" maxLength={100} value={search} onChange={event => setSearch(event.target.value)} />
+      <Select label="Status filter" placeholder="All statuses" options={options(supportStatuses)} value={status} onChange={event => setStatus(event.target.value)} />
+      <Button type="submit" variant="secondary">Search requests</Button>
+    </form>
+    <TrainingData key={revision} load={load}>{tickets => tickets.length === 0
+      ? <p role="status">No support requests match these filters.</p>
+      : <ul className="rcp-support__list" aria-label="Member support requests">{tickets.map(ticket => <li key={ticket.id}>
+        <button type="button" className="rcp-support__row" aria-label={`View ${ticket.code}`} onClick={() => select(ticket.id)}>
+          <span className="rcp-support__row-main"><strong>{ticket.code}</strong> {ticket.subject}</span>
+          <span className="rcp-support__row-meta">{ticket.memberName}{ticket.createdAt ? ` · ${formatDateTime(ticket.createdAt)}` : ''}</span>
+          <Badge tone={statusTone(ticket.status)}>{label(ticket.status)}</Badge>
+        </button>
+      </li>)}</ul>}
+    </TrainingData>
   </ReceptionScreen>
 }
 
-function CreateTicket({ onSaved }: { onSaved: (ticket: SupportTicket) => void }) {
+function CreateTicket({ onSaved, onCancel }: { onSaved: (ticket: SupportTicket) => void; onCancel: () => void }) {
   const [search, setSearch] = useState('')
   const [query, setQuery] = useState('')
   const [member, setMember] = useState('')
@@ -74,70 +80,55 @@ function CreateTicket({ onSaved }: { onSaved: (ticket: SupportTicket) => void })
       onSaved(ticket)
     }, 'Support request saved.')
   }
-  return <Card title="New support request">
-    <form onSubmit={event => { event.preventDefault(); setMember(''); setQuery(search.trim()) }}>
+  return <section className="rcp-support__panel" aria-labelledby="new-support-request">
+    <h2 id="new-support-request" className="rcp-support__heading">New request</h2>
+    <form className="rcp-support__toolbar" onSubmit={event => { event.preventDefault(); setMember(''); setQuery(search.trim()) }}>
       <Input label="Search existing member" value={search} onChange={event => setSearch(event.target.value)} />
       <Button type="submit" variant="secondary">Search members</Button>
     </form>
     <form onSubmit={submit} className="training-form">
       <TrainingData load={members}>{page => <Select label="Member" required placeholder="Select a member" options={page.content.map(item => ({ value: String(item.userId), label: `${item.memberCode ?? item.userId} - ${item.fullName}` }))} value={member} onChange={event => setMember(event.target.value)} />}</TrainingData>
-      <p>Search by name, phone or email. Refine the search if the first page does not contain the member.</p>
       <Select label="Category" options={options(supportCategories)} value={category} onChange={event => setCategory(event.target.value)} />
       <Input label="Subject" required maxLength={200} value={subject} onChange={event => setSubject(event.target.value)} />
       <TextArea label="Issue details" required maxLength={2000} value={description} onChange={event => setDescription(event.target.value)} />
       <ActionMessage {...action} />
-      <Button type="submit" loading={action.pending}>Create request</Button>
+      <div className="rcp-support__actions">
+        <Button type="submit" loading={action.pending}>Create request</Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
+      </div>
     </form>
-  </Card>
+  </section>
 }
 
 function TicketDetail({ ticket, onSaved }: { ticket: SupportTicket; onSaved: () => void }) {
-  const transitions = supportTransitions[ticket.status]
-  const [status, setStatus] = useState<SupportStatus>(transitions[0] ?? ticket.status)
-  const [notes, setNotes] = useState(ticket.resolutionNotes ?? '')
-  const action = useTrainingAction()
   const replies = ticket.replies ?? []
-  const verification = useCallback((signal: AbortSignal) => api.verification(ticket.id, signal), [ticket.id])
-  return <div className="rcp-grid rcp-grid--wide-left">
-    <Card title={`Request ${ticket.code}`}>
-      <p>{ticket.memberName}{ticket.memberCode ? ` (${ticket.memberCode})` : ''} - {ticket.subject}</p>
-      <p>{ticket.memberSubmitted ? 'Sent by the member' : 'Recorded at the desk'}{ticket.sessionCode ? ` - session ${ticket.sessionCode}` : ''}</p>
-      <p className="training-excerpt">{ticket.description}</p>
-      <p>Current status: {ticket.status}</p>
-      <h3 className="rcp-caption">Replies to the member</h3>
-      {replies.length === 0 ? <p role="status">No reply has been sent yet.</p>
-        : <ul className="training-list">{replies.map(reply => <li key={reply.id}><p><strong>{reply.fromMember ? `Member: ${reply.staffName}` : reply.staffName}</strong> - {formatDateTime(reply.createdAt)}</p><p>{reply.message}</p></li>)}</ul>}
-      {(ticket.status === 'OPEN' || ticket.status === 'IN_PROGRESS') && <ReplyForm ticket={ticket} onSaved={onSaved} />}
-      {transitions.length > 0 ? <form onSubmit={event => {
-        event.preventDefault()
-        void action.run(async () => {
-          if ((status === 'RESOLVED' || status === 'CLOSED') && notes.trim().length < 3) throw new Error('Provide an internal outcome note of at least 3 characters.')
-          if (status === 'RESOLVED' && ticket.memberSubmitted && !replies.some(reply => !reply.fromMember)) throw new Error('Send a reply to the member before resolving a request they submitted.')
-          const epoch = tokenStorage.getEpoch()
-          await api.update(ticket.id, status, notes)
-          if (epoch === tokenStorage.getEpoch()) onSaved()
-        }, 'Request status saved.')
-      }}>
-        <Select label="Next status" options={options(transitions)} value={status} onChange={event => setStatus(event.target.value as SupportStatus)} />
-        <ReceptionCallout tone="warning">Internal outcome notes are staff only. Member-visible text goes in the reply above.</ReceptionCallout>
-        <TextArea label="Internal outcome note (staff only, never shown to the member)" maxLength={2000} value={notes} onChange={event => setNotes(event.target.value)} />
-        <ActionMessage {...action} /><Button type="submit" loading={action.pending}>Update status</Button>
-      </form> : <><p>Internal outcome note: {ticket.resolutionNotes}</p><p role="status">This request is closed.</p></>}
-    </Card>
-    <TrainingData load={verification}>{facts => <Card title="Verification">
-      <p>Member: {facts.memberName}{facts.memberCode ? ` / ${facts.memberCode}` : ''} - account {facts.memberStatus}</p>
-      <p>Membership card: {facts.cardTier ? `${facts.cardTier}, ${facts.cardDiscount ?? 0}% discount${facts.cardEndDate ? `, valid until ${formatCalendarDate(facts.cardEndDate)}` : ''}` : 'No active card'}</p>
-      {facts.activePackages.length === 0 ? <p>No active sport package.</p>
-        : <ul className="training-list">{facts.activePackages.map((item, index) => <li key={index}>{item.sportName} - {item.name}: {item.remainingSessions} of {item.totalSessions} sessions, valid until {formatCalendarDate(item.endDate)}</li>)}</ul>}
-      <ReceptionCallout>This panel is for checking only. It does not record a payment or activate a package.</ReceptionCallout>
-    </Card>}</TrainingData>
-  </div>
+  const active = ticket.status === 'OPEN' || ticket.status === 'IN_PROGRESS'
+  return <section className="rcp-support__detail" aria-labelledby="support-request-title">
+    <header className="rcp-support__detail-head">
+      <h2 id="support-request-title" className="rcp-support__heading">Request {ticket.code}</h2>
+      <Badge tone={statusTone(ticket.status)}>{label(ticket.status)}</Badge>
+    </header>
+    <p className="rcp-support__subject"><strong>{ticket.subject}</strong> · {ticket.memberName}{ticket.memberCode ? ` (${ticket.memberCode})` : ''}{ticket.sessionCode ? ` · session ${ticket.sessionCode}` : ''}</p>
+    <ol className="rcp-support__thread" aria-label="Conversation">
+      <li className="rcp-support__message rcp-support__message--member">
+        <p className="rcp-support__message-meta">{ticket.memberSubmitted ? ticket.memberName : 'Recorded at the desk'}{ticket.createdAt ? ` · ${formatDateTime(ticket.createdAt)}` : ''}</p>
+        <p>{ticket.description}</p>
+      </li>
+      {replies.map(reply => <li key={reply.id} className={'rcp-support__message' + (reply.fromMember ? ' rcp-support__message--member' : '')}>
+        <p className="rcp-support__message-meta">{reply.fromMember ? `Member: ${reply.staffName}` : reply.staffName} · {formatDateTime(reply.createdAt)}</p>
+        <p>{reply.message}</p>
+      </li>)}
+    </ol>
+    {active && <ReplyForm ticket={ticket} onSaved={onSaved} />}
+    <StatusForm ticket={ticket} onSaved={onSaved} />
+    <VerificationPanel ticketId={ticket.id} />
+  </section>
 }
 
 function ReplyForm({ ticket, onSaved }: { ticket: SupportTicket; onSaved: () => void }) {
   const [message, setMessage] = useState('')
   const action = useTrainingAction()
-  return <form className="training-form" onSubmit={event => {
+  return <form className="rcp-support__reply" onSubmit={event => {
     event.preventDefault()
     void action.run(async () => {
       if (!message.trim()) throw new Error('Enter a reply for the member.')
@@ -149,7 +140,61 @@ function ReplyForm({ ticket, onSaved }: { ticket: SupportTicket; onSaved: () => 
     }, 'Reply sent. The member is notified.')
   }}>
     <TextArea label="Reply to member" required maxLength={2000} value={message} onChange={event => setMessage(event.target.value)} />
-    <p>The member sees this reply in My support requests and receives a notification. An open request moves to in progress.</p>
-    <ActionMessage {...action} /><Button type="submit" loading={action.pending}>Send reply</Button>
+    <ActionMessage {...action} />
+    <Button type="submit" loading={action.pending}>Send reply</Button>
   </form>
+}
+
+function StatusForm({ ticket, onSaved }: { ticket: SupportTicket; onSaved: () => void }) {
+  const transitions = supportTransitions[ticket.status]
+  const [status, setStatus] = useState<SupportStatus>(transitions[0] ?? ticket.status)
+  const [notes, setNotes] = useState(ticket.resolutionNotes ?? '')
+  const [notesOpen, setNotesOpen] = useState(false)
+  const action = useTrainingAction()
+  const replies = ticket.replies ?? []
+  if (transitions.length === 0) {
+    return <details className="rcp-support__section">
+      <summary>Internal outcome note</summary>
+      <p>{ticket.resolutionNotes || 'No internal note recorded.'}</p>
+    </details>
+  }
+  return <form className="rcp-support__status" onSubmit={event => {
+    event.preventDefault()
+    void action.run(async () => {
+      if ((status === 'RESOLVED' || status === 'CLOSED') && notes.trim().length < 3) { setNotesOpen(true); throw new Error('Provide an internal outcome note of at least 3 characters.') }
+      if (status === 'RESOLVED' && ticket.memberSubmitted && !replies.some(reply => !reply.fromMember)) throw new Error('Send a reply to the member before resolving a request they submitted.')
+      const epoch = tokenStorage.getEpoch()
+      await api.update(ticket.id, status, notes)
+      if (epoch === tokenStorage.getEpoch()) onSaved()
+    }, 'Request status saved.')
+  }}>
+    <div className="rcp-support__toolbar">
+      <Select label="Next status" options={options(transitions)} value={status} onChange={event => {
+        const next = event.target.value as SupportStatus
+        setStatus(next)
+        if (next === 'RESOLVED' || next === 'CLOSED') setNotesOpen(true)
+      }} />
+      <Button type="submit" variant="secondary" loading={action.pending}>Update status</Button>
+    </div>
+    <details className="rcp-support__section" open={notesOpen} onToggle={event => setNotesOpen(event.currentTarget.open)}>
+      <summary>Internal outcome note (staff only)</summary>
+      <TextArea label="Internal outcome note (staff only, never shown to the member)" maxLength={2000} value={notes} onChange={event => setNotes(event.target.value)} />
+    </details>
+    <ActionMessage {...action} />
+  </form>
+}
+
+function VerificationPanel({ ticketId }: { ticketId: number }) {
+  const [open, setOpen] = useState(false)
+  const verification = useCallback((signal: AbortSignal) => api.verification(ticketId, signal), [ticketId])
+  return <details className="rcp-support__section" open={open} onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary>Member verification</summary>
+    {open && <TrainingData load={verification}>{facts => <div>
+      <p>Member: {facts.memberName}{facts.memberCode ? ` / ${facts.memberCode}` : ''} - account {facts.memberStatus}</p>
+      <p>Membership card: {facts.cardTier ? `${facts.cardTier}, ${facts.cardDiscount ?? 0}% discount${facts.cardEndDate ? `, valid until ${formatCalendarDate(facts.cardEndDate)}` : ''}` : 'No active card'}</p>
+      {facts.activePackages.length === 0 ? <p>No active sport package.</p>
+        : <ul className="training-list">{facts.activePackages.map((item, index) => <li key={index}>{item.sportName} - {item.name}: {item.remainingSessions} of {item.totalSessions} sessions, valid until {formatCalendarDate(item.endDate)}</li>)}</ul>}
+      <p className="rcp-support__hint">For checking only. This does not record a payment or activate a package.</p>
+    </div>}</TrainingData>}
+  </details>
 }

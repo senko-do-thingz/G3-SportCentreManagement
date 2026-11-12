@@ -136,7 +136,6 @@ export const RECEPTIONIST_AREA: RoleArea = {
     {
       heading: 'Front desk',
       items: [
-        { label: 'Inbox', path: 'inbox', title: 'Inbox', description: 'Open tasks that need reception.', task: 'MW-07', screens: [] },
         { label: 'Support requests', path: 'support', title: 'Support requests', description: 'Record and resolve member support requests.', task: 'R11-01', screens: ['F1-16'] },
         {
           label: 'Member search',

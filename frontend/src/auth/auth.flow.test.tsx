@@ -146,8 +146,9 @@ describe('auth flow', () => {
     renderApp('/manager')
 
     expect(await screen.findByRole('heading', { name: 'User Management' })).toBeInTheDocument()
-    await waitFor(() => expect(calls.map((call) => call.path)).toEqual(['/users/me', '/auth/refresh', '/users/me', '/manager/users?page=0&size=20']))
-    expect(calls.at(-1)?.authorization).toBe('Bearer fresh')
+    const pageCalls = () => calls.filter((call) => call.path !== '/staff/notifications')
+    await waitFor(() => expect(pageCalls().map((call) => call.path)).toEqual(['/users/me', '/auth/refresh', '/users/me', '/manager/users?page=0&size=20']))
+    expect(pageCalls().at(-1)?.authorization).toBe('Bearer fresh')
     expect(tokenStorage.getRefreshToken()).toBe('refresh-new')
   })
 

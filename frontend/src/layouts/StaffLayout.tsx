@@ -6,7 +6,6 @@ import { findActiveItem, itemHref, STAFF_AREAS } from './navigation'
 import { PaymentWorkspaceHeader } from './PaymentWorkspaceHeader'
 import { WorkspaceHeader } from './WorkspaceHeader'
 import { WorkflowSurface } from '../components/WorkflowSurface'
-import { InboxBadge } from '../components/InboxBadge'
 
 /** Coach, reception and manager workspaces share a Home-branded header and role-aware sidebar. */
 export function StaffLayout() {
@@ -30,7 +29,6 @@ export function StaffLayout() {
         <li><Link to="/">Sportify Center</Link></li>
         <li><span aria-current="page">{activeItem?.title ?? 'Workspace'}</span></li>
       </ol>
-      {role === 'RECEPTIONIST' && <InboxBadge />}
     </nav>
   )
 

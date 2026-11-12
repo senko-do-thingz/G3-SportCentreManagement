@@ -13,6 +13,7 @@ import { MembershipCardsPage } from '../pages/member/MembershipCardsPage'
 import { MyMembershipPage } from '../pages/member/MyMembershipPage'
 import { MyPaymentsPage } from '../pages/member/MyPaymentsPage'
 import { ReceptionInboxPage } from '../pages/reception/ReceptionInboxPage'
+import { NotificationsPage } from '../pages/NotificationsPage'
 import { MyProfilePage } from '../pages/member/MyProfilePage'
 import { HealthAssessmentPage } from '../pages/member/HealthAssessmentPage'
 import { CheckInPassPage } from '../pages/member/CheckInPassPage'
@@ -116,7 +117,6 @@ const SCREENS: Record<string, ReactNode> = {
   '/reception/check-in': <CheckInPage />,
   '/reception/payments': <PaymentRequestsPage />,
   '/reception/refunds': <RefundRequestsPage />,
-  '/reception/inbox': <ReceptionInboxPage />,
   '/coach': <CoachTeachingSchedulePage />,
   '/coach/roster': <CoachRosterPage />,
 }
@@ -140,11 +140,16 @@ const SCREENS: Record<string, ReactNode> = {
  *   (F3-07, FE-12).
  */
 const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
+  '/coach': [
+    { path: 'notifications', element: <NotificationsPage /> },
+  ],
   '/manager': [
+    { path: 'notifications', element: <NotificationsPage /> },
     { path: 'classes/new', element: <ClassEditorPage /> },
     { path: 'classes/:classId/edit', element: <ClassEditorPage /> },
   ],
   '/member': [
+    { path: 'notifications', element: <NotificationsPage /> },
     { path: 'training/plans', element: <TrainingPlansPage /> },
     { path: 'check-in-pass', element: <CheckInPassPage /> },
     { path: 'profile/health', element: <HealthAssessmentPage /> },
@@ -176,6 +181,7 @@ const SUB_SCREENS: Record<string, { path: string; element: ReactNode }[]> = {
     { path: 'payments/receipts/:invoiceId', element: <ReceiptPage /> },
   ],
   '/reception': [
+    { path: 'inbox', element: <ReceptionInboxPage /> },
     { path: 'training/attendance', element: <ForbiddenPage /> },
     { path: 'bookings/new', element: <ReceptionAssistedBookingPage /> },
     { path: 'bookings/confirmed/:bookingId', element: <ReceptionBookingConfirmedPage /> },

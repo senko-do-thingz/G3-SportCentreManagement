@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { Brand } from '../components/Brand'
 import { ThemeToggle } from '../theme/ThemeToggle'
 import { UserMenu } from './UserMenu'
+import { HeaderInbox } from '../components/HeaderInbox'
 
 export type WorkspaceHeaderVariant = 'member' | 'staff'
 
@@ -115,6 +116,7 @@ export function WorkspaceHeader({
         </button>
         <div className="home-account workspace-header__account">
           <ThemeToggle className="home-theme" />
+          <HeaderInbox />
           <UserMenu />
         </div>
       </div>
