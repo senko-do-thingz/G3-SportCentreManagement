@@ -105,14 +105,13 @@ describe('Member Concept B shell', () => {
     const dialog = screen.getByRole('dialog', { name: 'Spori AI' })
     expect(dialog).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Close Spori AI' })).toHaveFocus()
-    await user.click(within(dialog).getByLabelText('Enable automated center consultation'))
     await user.type(within(dialog).getByRole('textbox', { name: 'Ask Spori a question' }), 'Hello')
     await user.click(within(dialog).getByRole('button', { name: 'Send' }))
 
     expect(await within(dialog).findByText("Hello! I'm Spori.")).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Center assistant' })).not.toBeInTheDocument()
     expect(calls.find(call => call.path.includes('/consultation'))?.body).toEqual({ question: 'Hello', optIn: true })
-    expect(within(dialog).getByRole('link', { name: 'Expand to full assistant' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('link', { name: 'Open full assistant' })).toBeInTheDocument()
   })
 
   it('fills a suggested question in place on a narrow screen and expands only explicitly', async () => {
@@ -136,12 +135,12 @@ describe('Member Concept B shell', () => {
     await user.click(prompt)
     expect(within(dialog).getByRole('textbox', { name: 'Ask Spori a question' })).toHaveValue('How should I warm up before practice?')
     expect(screen.queryByRole('heading', { name: 'Center assistant' })).not.toBeInTheDocument()
-    await user.click(within(dialog).getByRole('link', { name: 'Expand to full assistant' }))
+    await user.click(within(dialog).getByRole('link', { name: 'Open full assistant' }))
     expect(await screen.findByRole('heading', { name: 'Center assistant' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Enable automated center consultation')).not.toBeChecked()
+    expect(screen.getByRole('textbox', { name: /Your question/ })).toHaveValue('')
   })
 
-  it('does not send a typed floating question until consultation consent is enabled', async () => {
+  it('does not send an empty floating question', async () => {
     tokenStorage.startSession({ accessToken: 'test-assistant-access', refreshToken: 'test-assistant-refresh' })
     const { calls } = installFakeFetch(call => json(200, call.path === '/users/me' ? MEMBER : []))
     const user = userEvent.setup()
@@ -152,8 +151,7 @@ describe('Member Concept B shell', () => {
     expect(launcher.querySelector('.member-concept__assistant-mark svg')).toBeInTheDocument()
     await user.click(launcher)
     const dialog = screen.getByRole('dialog', { name: 'Spori AI' })
-    const prompt = 'How can I prepare for my next training session?'
-    await user.type(within(dialog).getByRole('textbox', { name: 'Ask Spori a question' }), prompt)
+    await user.type(within(dialog).getByRole('textbox', { name: 'Ask Spori a question' }), '   ')
     expect(within(dialog).getByRole('button', { name: 'Send' })).toBeDisabled()
     expect(calls.some(call => call.path.includes('/consultation'))).toBe(false)
   })

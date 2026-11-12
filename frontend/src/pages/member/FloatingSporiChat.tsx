@@ -22,7 +22,6 @@ export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
   const location = useLocation()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
-  const [consented, setConsented] = useState(false)
   const [pending, setPending] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const nextMessageId = useRef(1)
@@ -73,7 +72,7 @@ export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const question = draft.trim()
-    if (!question || !consented || pending || !enabled) return
+    if (!question || pending || !enabled) return
     const userMessage: ChatMessage = { id: nextMessageId.current++, role: 'user', text: question }
     setMessages((current) => [...current, userMessage])
     setDraft('')
@@ -124,7 +123,7 @@ export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
 
         <div ref={messageLog} className="member-concept__assistant-messages" role="log" aria-live="polite" aria-relevant="additions">
           {messages.length === 0 && <div className="member-concept__assistant-welcome">
-            <p className="member-concept__assistant-copy">Hello! I can help with center sessions, packages, booking guidance, and your own Sportify records. I cannot change bookings or payments.</p>
+            <p className="member-concept__assistant-copy">Hi! Ask me about classes, packages, or your records.</p>
             <div className="member-concept__assistant-prompts" aria-label="Suggested questions">{PROMPTS.map((question) => <button type="button" key={question} onClick={() => setDraft(question)}>{question}<span aria-hidden="true">&gt;</span></button>)}</div>
           </div>}
           {messages.map((message) => (
@@ -163,15 +162,13 @@ export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
         </div>
 
         {!enabled ? <p className="notice notice--warning" role="status">Automated consultation is currently disabled. The full assistant explains other support options.</p> : <form className="member-concept__assistant-composer" onSubmit={send}>
-          <label className="member-concept__assistant-consent"><input type="checkbox" checked={consented} disabled={pending} onChange={(event) => setConsented(event.target.checked)} /> Enable automated center consultation</label>
           <label className="member-concept__sr-only" htmlFor="spori-question">Ask Spori a question</label>
           <div className="member-concept__assistant-compose-row">
-            <textarea id="spori-question" value={draft} maxLength={500} rows={2} placeholder="Ask about training, classes, or your records" disabled={pending} onKeyDown={handleComposerKeyDown} onChange={(event) => setDraft(event.target.value)} />
-            <button type="submit" disabled={!draft.trim() || !consented || pending}>Send</button>
+            <textarea id="spori-question" value={draft} maxLength={500} rows={2} placeholder="Ask a question..." disabled={pending} onKeyDown={handleComposerKeyDown} onChange={(event) => setDraft(event.target.value)} />
+            <button type="submit" disabled={!draft.trim() || pending}>Send</button>
           </div>
-          <small>Enter sends; Shift+Enter adds a new line. No conversation history is stored.</small>
         </form>}
-        <Link className="member-concept__assistant-full-link" to={assistantHref} onClick={close}>Expand to full assistant</Link>
+        <Link className="member-concept__assistant-full-link" to={assistantHref} onClick={close}>Open full assistant</Link>
       </section>
     </>}
   </>
