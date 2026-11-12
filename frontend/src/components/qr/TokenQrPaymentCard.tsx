@@ -41,11 +41,17 @@ export function TokenQrPaymentCard({ payment, onSettled }: { payment: Payment; o
   const expired = !!created && now >= Date.parse(created.session.expiresAt)
 
   async function start() {
+    const previousToken = token
+    setCreated(null)
     setBusy(true); setError(''); setTokenInput(''); setResult(null)
     try {
       const next = await demoQrApi.create(payment.id, DEMO_BANKS.vietcombank.code)
       if (next.session.paymentId !== payment.id || Number(next.session.amount) !== Number(payment.amount)) {
         throw new Error('Payment details changed. Refresh the page and try again.')
+      }
+      const replacementToken = new URL(next.confirmationUrl).hash.slice('#token='.length)
+      if (!DEMO_TOKEN.test(replacementToken) || replacementToken === previousToken) {
+        throw new Error('A new verification token was not issued. Generate another QR token.')
       }
       setCreated(next)
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not create a QR token.') }
