@@ -21,6 +21,7 @@ import com.sportify.payment.entity.Payment;
 import com.sportify.payment.entity.PaymentMethod;
 import com.sportify.payment.entity.PaymentStatus;
 import com.sportify.payment.repository.PaymentRepository;
+import com.sportify.payment.service.PaymentCancellationGuard;
 import com.sportify.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -60,10 +61,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     public PaymentResponse cancelPayment(Long id, UserAccount actor) {
         Payment payment = ownedPendingPayment(id, actor);
-        if (payment.getSubmittedForVerificationAt() != null || payment.getPaymentTime() != null
-                || payment.getReferenceCode() != null || payment.getSettlementType() != null) {
-            throw new ConflictException("This payment has been submitted or settlement has begun and can no longer be cancelled");
-        }
+        requireCancellable(payment, "This payment has been submitted or settlement has begun and can no longer be cancelled");
         var registration = sportPackageRegistrationRepository.findByPaymentId(id);
         var card = memberCardRepository.findByPaymentId(id);
         if (registration.isPresent() == card.isPresent()) {
@@ -87,6 +85,7 @@ public class PaymentServiceImpl implements PaymentService {
             memberCardRepository.save(item);
         }
         payment.setPaymentStatus(PaymentStatus.CANCELLED);
+        closeOpenCheckouts(payment);
         payment.setNotes(PaymentNotes.append(payment.getNotes(), "Payment cancelled by member user id " + actor.getId()));
         paymentRepository.saveAndFlush(payment);
         auditPayment(com.sportify.core.audit.AuditAction.PAYMENT_CANCELLED, payment, actor);
@@ -100,6 +99,33 @@ public class PaymentServiceImpl implements PaymentService {
      * card/package is read, the same order the Receptionist, wallet and QR settlement paths use. A cancellation and a
      * concurrent confirmation therefore run one after the other, and the second sees the first one's result.
      */
+    /**
+     * One cancellation rule for every path, checked with the payment row locked: no Receptionist handoff, no
+     * settlement marker on the payment, and no channel (demo QR, later VietQR) with a checkout or settlement under way.
+     */
+    private void requireCancellable(Payment payment, String settledMessage) {
+        if (payment.getSubmittedForVerificationAt() != null || payment.getPaymentTime() != null
+                || payment.getReferenceCode() != null || payment.getSettlementType() != null
+                || payment.getSettlementProvider() != null || payment.getSimulatedTransactionId() != null) {
+            throw new ConflictException(settledMessage);
+        }
+        for (PaymentCancellationGuard guard : cancellationGuards) {
+            String reason = guard.blockedReason(payment);
+            if (reason != null) throw new ConflictException(reason);
+        }
+    }
+
+    private void closeOpenCheckouts(Payment payment) {
+        for (PaymentCancellationGuard guard : cancellationGuards) guard.onCancelled(payment);
+    }
+
+    private java.util.List<PaymentCancellationGuard> cancellationGuards = java.util.List.of();
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setCancellationGuards(java.util.List<PaymentCancellationGuard> guards) {
+        this.cancellationGuards = java.util.List.copyOf(guards);
+    }
+
     private Payment ownedPendingPayment(Long id, UserAccount actor) {
         Payment payment = lockPayment(id);
         if (actor == null || payment.getMember() == null || !payment.getMember().getId().equals(actor.getId())) {
@@ -289,12 +315,12 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional(propagation = Propagation.MANDATORY)
     public Payment markPaymentCancelled(Long paymentId, String reason) {
         Payment payment = lockPayment(paymentId);
-        if (payment.getPaymentStatus() != PaymentStatus.PENDING || payment.getSubmittedForVerificationAt() != null
-                || payment.getPaymentTime() != null || payment.getReferenceCode() != null
-                || payment.getSettlementType() != null) {
+        if (payment.getPaymentStatus() != PaymentStatus.PENDING) {
             throw new ConflictException("This payment can no longer be cancelled");
         }
+        requireCancellable(payment, "This payment can no longer be cancelled");
         payment.setPaymentStatus(PaymentStatus.CANCELLED);
+        closeOpenCheckouts(payment);
         payment.setNotes(PaymentNotes.append(payment.getNotes(), reason));
         return paymentRepository.save(payment);
     }

@@ -182,6 +182,62 @@ class PaymentServiceImplTest {
     }
 
     @Test
+    void aChannelWithCheckoutUnderWayVetoesBothCancellationPaths() {
+        var channel = new RecordingGuard("A QR payment for this order is already being settled");
+        paymentService.setCancellationGuards(java.util.List.of(channel));
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingPayment));
+
+        assertThatThrownBy(() -> paymentService.cancelPayment(10L, ownerUser))
+                .isInstanceOf(com.sportify.core.exception.ConflictException.class)
+                .hasMessageContaining("already being settled");
+        assertThatThrownBy(() -> paymentService.markPaymentCancelled(10L, "Member cancelled the card"))
+                .isInstanceOf(com.sportify.core.exception.ConflictException.class);
+
+        assertThat(pendingPayment.getPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
+        assertThat(channel.closed).isZero();
+        verify(memberCardRepository, never()).save(any());
+        verify(paymentRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void cancellingClosesTheOpenChannelCheckoutSoItCannotBePaidLater() {
+        var channel = new RecordingGuard(null);
+        paymentService.setCancellationGuards(java.util.List.of(channel));
+        var card = com.sportify.catalog.entity.MemberCard.builder().id(5L).cardCode("CARD-5")
+                .member(ownerProfile).payment(pendingPayment).status(com.sportify.catalog.entity.CardStatus.PENDING_PAYMENT)
+                .pricePaid(pendingPayment.getAmount()).build();
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingPayment));
+        when(memberCardRepository.findByPaymentId(10L)).thenReturn(Optional.of(card));
+        when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(call -> call.getArgument(0));
+
+        paymentService.cancelPayment(10L, ownerUser);
+
+        assertThat(channel.closed).isEqualTo(1);
+        assertThat(pendingPayment.getPaymentStatus()).isEqualTo(PaymentStatus.CANCELLED);
+    }
+
+    @Test
+    void aSimulatedQrSettlementMarkerAloneBlocksCancellation() {
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pendingPayment));
+        pendingPayment.setSimulatedTransactionId(77L);
+        assertThatThrownBy(() -> paymentService.cancelPayment(10L, ownerUser))
+                .isInstanceOf(com.sportify.core.exception.ConflictException.class);
+        pendingPayment.setSimulatedTransactionId(null);
+        pendingPayment.setSettlementProvider("SPORTIFY_SIMULATOR");
+        assertThatThrownBy(() -> paymentService.markPaymentCancelled(10L, "Member cancelled the card"))
+                .isInstanceOf(com.sportify.core.exception.ConflictException.class);
+        verify(paymentRepository, never()).saveAndFlush(any());
+    }
+
+    private static final class RecordingGuard implements com.sportify.payment.service.PaymentCancellationGuard {
+        private final String reason;
+        private int closed;
+        RecordingGuard(String reason) { this.reason = reason; }
+        @Override public String blockedReason(Payment payment) { return reason; }
+        @Override public void onCancelled(Payment payment) { closed++; }
+    }
+
+    @Test
     @DisplayName("Create pending payment with valid online method succeeds and initializes pending status")
     void createPendingPayment_ValidOnlineMethod_Succeeds() {
         when(paymentRepository.getNextPaymentCodeSequence()).thenReturn(1001L);
