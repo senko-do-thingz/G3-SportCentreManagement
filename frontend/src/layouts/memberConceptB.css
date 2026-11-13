@@ -1985,3 +1985,97 @@
   .spori-row, .spori-panel { animation: none; }
   .spori-typing > span { animation: none; }
 }
+
+/* ------------------------------------------------------------------------------------------------------------------
+   Spori chat polish: round launcher, messenger-style header and welcome, compact sources, message actions.
+   Two-class selectors win over the older single-class launcher rules, including those inside media queries.
+   ------------------------------------------------------------------------------------------------------------------ */
+.member-concept__assistant-launcher.spori-fab { right: 24px; bottom: 24px; display: grid; place-items: center; width: 60px; height: 60px; min-height: 60px; padding: 0; border: 0; border-radius: 50%; background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-active) 100%); color: var(--color-on-primary); box-shadow: 0 10px 28px -6px color-mix(in srgb, var(--color-primary) 60%, transparent), 0 2px 6px rgba(15, 23, 42, 0.18); transition: transform 180ms cubic-bezier(.2, .8, .2, 1), box-shadow 180ms ease; }
+.member-concept__assistant-launcher.spori-fab:hover { transform: translateY(-2px) scale(1.04); background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-active) 100%); color: var(--color-on-primary); box-shadow: 0 14px 32px -6px color-mix(in srgb, var(--color-primary) 70%, transparent), 0 2px 6px rgba(15, 23, 42, 0.2); }
+.member-concept__assistant-launcher.spori-fab:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-primary) 45%, transparent); outline-offset: 3px; }
+.member-concept__assistant-launcher.spori-fab > .spori-fab__icon { grid-area: 1 / 1; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; background: transparent; color: inherit; transition: opacity 180ms ease, transform 220ms cubic-bezier(.2, .8, .2, 1); }
+.member-concept__assistant-launcher.spori-fab > .spori-fab__icon svg { display: block; width: 100%; height: 100%; }
+.member-concept__assistant-launcher.spori-fab > .spori-fab__icon--close { opacity: 0; transform: rotate(-90deg) scale(0.6); }
+.member-concept__assistant-launcher.spori-fab.is-open > .spori-fab__icon--bot { opacity: 0; transform: rotate(90deg) scale(0.6); }
+.member-concept__assistant-launcher.spori-fab.is-open > .spori-fab__icon--close { opacity: 1; transform: none; }
+.member-concept__assistant-launcher.spori-fab:not(.is-open)::before { position: absolute; inset: 0; border-radius: 50%; content: ""; animation: spori-ring 2.6s ease-out 1s 3; pointer-events: none; }
+.member-concept__assistant-launcher.spori-fab::after { right: calc(100% + 12px); padding: 7px 12px; border: 0; border-radius: 10px; background: var(--color-text); color: var(--color-surface); box-shadow: var(--shadow-md); font-size: 0.74rem; }
+.member-concept__assistant-launcher.spori-fab.is-open::after { display: none; }
+
+.spori-panel { right: 24px; bottom: 96px; width: min(392px, calc(100vw - 32px)); height: min(680px, calc(100vh - 128px)); border: 0; border-radius: 20px; background: var(--color-surface); box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-border) 80%, transparent), 0 28px 64px -16px rgba(15, 23, 42, 0.42), 0 8px 20px -8px rgba(15, 23, 42, 0.2); }
+.spori-panel__head { position: relative; gap: 12px; padding: 16px 14px 16px 18px; overflow: hidden; background: radial-gradient(circle at 92% -30%, color-mix(in srgb, var(--color-on-primary) 22%, transparent) 0 90px, transparent 91px), radial-gradient(circle at 70% 160%, color-mix(in srgb, var(--color-on-primary) 12%, transparent) 0 70px, transparent 71px), linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary-active) 100%); }
+.spori-panel__head .spori-icon-button { position: relative; }
+.spori-panel__identity h2 { font-size: 1.05rem; letter-spacing: -0.01em; }
+.spori-panel__identity p { font-size: 0.72rem; opacity: 0.85; }
+.spori-presence { position: relative; display: inline-grid; flex: none; }
+.spori-presence__dot { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border: 2px solid var(--color-primary-active); border-radius: 50%; background: var(--color-success); }
+
+.spori-log { position: relative; background: color-mix(in srgb, var(--color-surface-muted) 55%, var(--color-surface)); }
+.spori-panel .spori-log { gap: 12px; padding: 0 14px 16px; }
+
+/* Welcome: the header colour flows into a greeting, with a card of popular questions overlapping it. */
+.spori-panel .spori-welcome { justify-items: start; gap: 6px; margin: 0 -14px; padding: 18px 22px 44px; background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary-active) 100%); color: var(--color-on-primary); text-align: left; }
+.spori-panel .spori-welcome__title { color: inherit; font-size: 1.45rem; letter-spacing: -0.02em; line-height: 1.15; }
+.spori-panel .spori-welcome__copy { color: inherit; font-size: 0.84rem; opacity: 0.88; }
+.spori-panel .spori-welcome.is-compact { justify-items: center; margin: 0; padding: 14px 8px 2px; background: none; color: var(--color-text-muted); text-align: center; }
+.spori-panel .spori-welcome.is-compact .spori-welcome__title { display: none; }
+.spori-panel .spori-welcome.is-compact .spori-welcome__copy { max-width: 280px; font-size: 0.7rem; }
+.spori-suggest { display: grid; margin-top: -42px; overflow: hidden; border-radius: 16px; background: var(--color-surface); box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-border) 70%, transparent), 0 10px 26px -12px rgba(15, 23, 42, 0.3); }
+.spori-suggest__label { margin: 0; padding: 14px 16px 6px; color: var(--color-text-muted); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.spori-suggest button { display: flex; align-items: center; gap: 12px; padding: 12px 14px 12px 16px; border: 0; border-top: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent); background: transparent; color: var(--color-text); font: inherit; font-size: 0.84rem; font-weight: 600; line-height: 1.35; text-align: left; cursor: pointer; transition: background-color 140ms ease, color 140ms ease; }
+.spori-suggest__label + button { border-top: 0; }
+.spori-suggest button:hover, .spori-suggest button:focus-visible { background: var(--color-primary-soft); color: var(--color-primary); }
+.spori-suggest button > svg { flex: none; color: var(--color-text-muted); transition: transform 140ms ease; }
+.spori-suggest button:hover > svg { color: var(--color-primary); transform: translateX(2px); }
+.spori-suggest__icon { display: grid; flex: none; width: 34px; height: 34px; place-items: center; border-radius: 10px; background: var(--color-primary-soft); font-size: 1rem; }
+.spori-suggest__text { flex: 1; min-width: 0; }
+
+/* Messages */
+.spori-row--bot .spori-bubble { border: 0; border-radius: 18px 18px 18px 6px; background: var(--color-surface); box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-border) 75%, transparent), 0 1px 2px rgba(15, 23, 42, 0.06); }
+.spori-row--user .spori-bubble { box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--color-primary) 55%, transparent); }
+.spori-row--bot .spori-bubble.is-warning { box-shadow: 0 0 0 1px var(--color-warning), 0 1px 2px rgba(15, 23, 42, 0.06); }
+.spori-row--bot .spori-bubble.is-error { box-shadow: 0 0 0 1px var(--color-danger); }
+.spori-text p, .spori-bubble > p, .spori-text ul { font-size: 0.875rem; line-height: 1.58; }
+.spori-text ul { gap: 4px; padding-left: 4px; list-style: none; }
+.spori-text li { position: relative; padding-left: 14px; }
+.spori-text li::before { position: absolute; top: 0.62em; left: 2px; width: 5px; height: 5px; border-radius: 50%; background: var(--color-primary); content: ""; }
+.spori-row--user .spori-text li::before { background: var(--color-on-primary); }
+.spori-row--bot > .spori-meta-row { grid-column: 2; }
+.spori-meta-row { display: flex; align-items: center; gap: 6px; min-height: 24px; padding-inline: 4px; }
+.spori-meta-row .spori-time { padding: 0; }
+.spori-ai-badge { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px 1px 6px; border-radius: var(--radius-pill); background: var(--color-primary-soft); color: var(--color-primary); font-size: 0.62rem; font-weight: 700; }
+.spori-action { display: grid; width: 26px; height: 26px; place-items: center; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--color-text-muted); cursor: pointer; opacity: 0; transition: opacity 140ms ease, background-color 140ms ease, color 140ms ease; }
+.spori-row:hover .spori-action, .spori-action:focus-visible, .spori-action.is-done { opacity: 1; }
+.spori-action:hover { background: var(--color-surface-muted); color: var(--color-text); }
+.spori-action.is-done { color: var(--color-success); }
+@media (hover: none) { .spori-action { opacity: 1; } }
+
+/* Sources: compact rows; more than two fold behind a pill. */
+.spori-sources { gap: 6px; }
+.spori-sources li { gap: 2px; padding: 8px 10px; border: 0; border-radius: 12px; background: var(--color-surface-muted); }
+.spori-sources a { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.8rem; }
+.spori-sources a > svg { flex: none; opacity: 0.7; }
+.spori-sources small { display: -webkit-box; overflow: hidden; color: var(--color-text-muted); -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.spori-sources-fold { display: grid; gap: 8px; }
+.spori-sources-fold > summary { display: inline-flex; align-items: center; gap: 6px; width: fit-content; padding: 5px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-pill); background: var(--color-surface); color: var(--color-text-muted); font-size: 0.74rem; font-weight: 700; list-style: none; cursor: pointer; transition: border-color 140ms ease, color 140ms ease; }
+.spori-sources-fold > summary::-webkit-details-marker { display: none; }
+.spori-sources-fold > summary::after { width: 6px; height: 6px; margin-left: 2px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; content: ""; transform: rotate(45deg) translateY(-2px); transition: transform 160ms ease; }
+.spori-sources-fold[open] > summary::after { transform: rotate(225deg) translate(-2px, 0); }
+.spori-sources-fold > summary:hover, .spori-sources-fold > summary:focus-visible { border-color: var(--color-primary); color: var(--color-primary); }
+
+.spori-typing { padding: 13px 16px; }
+.spori-panel .spori-composer { margin: 10px 12px 0; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
+.spori-panel__foot { padding: 7px 12px 11px; }
+
+@keyframes spori-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 45%, transparent); } 80%, 100% { box-shadow: 0 0 0 16px transparent; } }
+
+@media (max-width: 680px) {
+  .member-concept__assistant-launcher.spori-fab { right: 16px; bottom: 16px; width: 54px; height: 54px; min-height: 54px; }
+  .spori-panel, .spori-panel--sheet { inset: 0; width: 100%; height: 100%; border-radius: 0; box-shadow: none; }
+  .spori-panel__head { padding-top: max(16px, env(safe-area-inset-top)); }
+  .spori-panel__foot { padding-bottom: max(11px, env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .member-concept__assistant-launcher.spori-fab, .member-concept__assistant-launcher.spori-fab > .spori-fab__icon { transition: none; }
+  .member-concept__assistant-launcher.spori-fab::before { animation: none; }
+}

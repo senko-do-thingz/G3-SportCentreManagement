@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { SporiRobotMark } from './SporiRobotMark'
-import { SporiAvatar, SporiComposer, SporiSources, SporiText, SporiTyping } from './sporiChat'
-import { formatTime, useSporiChat, type SporiMessage } from './useSporiChat'
+import { SporiAiBadge, SporiAvatar, SporiComposer, SporiCopyButton, SporiSources, SporiText, SporiTyping } from './sporiChat'
+import { formatTime, useSporiChat, useSporiScroll, type SporiMessage } from './useSporiChat'
 
 const PROMPTS = [
-  'Which classes are available soon?',
-  'How should I warm up before practice?',
-  'How many sessions do I have left?',
+  { icon: '📅', text: 'Which classes are available soon?' },
+  { icon: '🔥', text: 'How should I warm up before practice?' },
+  { icon: '🎟️', text: 'How many sessions do I have left?' },
 ] as const
 
 export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
@@ -50,13 +50,7 @@ export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
     }
   }, [open])
 
-  useEffect(() => {
-    if (!open) return
-    const log = messageLog.current
-    if (!log) return
-    if (typeof log.scrollTo === 'function') log.scrollTo({ top: log.scrollHeight, behavior: 'smooth' })
-    else log.scrollTop = log.scrollHeight
-  }, [chat.messages, open, chat.pending])
+  useSporiScroll(messageLog, { count: chat.messages.length, pending: chat.pending, lastIsAnswer: chat.messages.at(-1)?.role !== 'user', open })
 
   function close() { setOpen(false); launcher.current?.focus() }
 
@@ -71,7 +65,7 @@ export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
     <button
       ref={launcher}
       type="button"
-      className="member-concept__assistant-launcher"
+      className={'member-concept__assistant-launcher spori-fab' + (open ? ' is-open' : '')}
       aria-haspopup="dialog"
       aria-expanded={open}
       aria-controls="member-assistant-dialog"
@@ -79,20 +73,23 @@ export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
       title={open ? 'Close Spori AI' : 'Ask Spori AI'}
       onClick={() => setOpen((value) => !value)}
     >
-      <span className="member-concept__assistant-mark" aria-hidden="true">{isDesktop ? <SporiRobotMark /> : 'S'}</span>
-      <span className="member-concept__assistant-launcher-copy"><strong>Spori AI</strong><small>Ask about your training</small></span>
+      <span className="member-concept__sr-only">Spori AI</span>
+      <span className="member-concept__assistant-mark spori-fab__icon spori-fab__icon--bot" aria-hidden="true"><SporiRobotMark /></span>
+      <span className="spori-fab__icon spori-fab__icon--close" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="24" height="24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </span>
     </button>
     {open && <>
       <button className="member-concept__assistant-scrim spori-scrim" type="button" aria-label="Close Spori AI panel" onClick={close} />
-      <section ref={dialog} id="member-assistant-dialog" className="spori-panel" role="dialog" aria-modal="true" aria-labelledby="member-assistant-title" tabIndex={-1}>
+      <section ref={dialog} id="member-assistant-dialog" className={'spori-panel' + (isDesktop ? '' : ' spori-panel--sheet')} role="dialog" aria-modal="true" aria-labelledby="member-assistant-title" tabIndex={-1}>
         <header className="spori-panel__head">
           <button type="button" className="spori-icon-button spori-panel__close" aria-label="Close Spori AI" title="Close" onClick={close}>
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>
           </button>
-          <SporiAvatar size="md" />
+          <span className="spori-presence"><SporiAvatar size="md" /><span className="spori-presence__dot" aria-hidden="true" /></span>
           <div className="spori-panel__identity">
             <h2 id="member-assistant-title">Spori AI</h2>
-            <p><span className="spori-online" aria-hidden="true" />Online · Sportify assistant</p>
+            <p>Sportify assistant · replies in seconds</p>
           </div>
           <Link className="spori-icon-button" to={assistantHref} onClick={close} aria-label="Open full assistant" title="Open full assistant">
             <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M14 4h6v6M20 4l-8 8M10 5H5v14h14v-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -100,14 +97,18 @@ export function FloatingSporiChat({ isDesktop }: { isDesktop: boolean }) {
         </header>
 
         <div ref={messageLog} className="spori-log" role="log" aria-live="polite" aria-relevant="additions">
-          <div className="spori-welcome">
-            <SporiAvatar size="lg" />
-            <p className="spori-welcome__title">Hi, I'm Spori 👋</p>
-            <p className="spori-welcome__copy">Ask me about classes, packages, or your records — in English or Vietnamese.</p>
+          <div className={'spori-welcome' + (chat.messages.length ? ' is-compact' : '')}>
+            <p className="spori-welcome__title">Hi there 👋</p>
+            <p className="spori-welcome__copy">I'm Spori. Ask me about classes, packages, or your own records — in English or Vietnamese.</p>
           </div>
           {chat.messages.length === 0 && enabled && (
-            <div className="spori-chips" aria-label="Suggested questions">
-              {PROMPTS.map((question) => <button type="button" key={question} onClick={() => { setDraft(question); input.current?.focus() }}>{question}</button>)}
+            <div className="spori-suggest" aria-label="Suggested questions">
+              <p className="spori-suggest__label">Popular questions</p>
+              {PROMPTS.map((prompt) => <button type="button" key={prompt.text} onClick={() => { setDraft(prompt.text); input.current?.focus() }}>
+                <span className="spori-suggest__icon" aria-hidden="true">{prompt.icon}</span>
+                <span className="spori-suggest__text">{prompt.text}</span>
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>)}
             </div>
           )}
           {chat.messages.map((message) => <FloatingMessage key={message.id} message={message} onNavigate={close} />)}
@@ -155,9 +156,13 @@ function FloatingMessage({ message, onNavigate }: { message: SporiMessage; onNav
             {vi ? 'Liên hệ Lễ tân' : 'Contact Receptionist'}
           </Link>
         </div>}
-        <SporiSources sources={result.sources} onNavigate={onNavigate} />
+        <SporiSources sources={result.sources} onNavigate={onNavigate} vi={vi} />
       </div>
-      <time className="spori-time">{formatTime(message.at)}{result.mode === 'AI_GENERATED' ? ' · Gemini' : ''}</time>
+      <div className="spori-meta-row">
+        <time className="spori-time">{formatTime(message.at)}</time>
+        {result.mode === 'AI_GENERATED' && <SporiAiBadge />}
+        <SporiCopyButton text={result.answer} vi={vi} />
+      </div>
     </div>
   )
 }

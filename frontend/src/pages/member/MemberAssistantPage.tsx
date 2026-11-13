@@ -1,11 +1,11 @@
-import { useContext, useEffect, useRef, useState } from 'react'
+import { useContext, useRef, useState } from 'react'
 import { AuthContext } from '../../auth/authContext'
 import { type Consultation } from '../../api/trainingGuidanceApi'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { safeMemberReturnTo } from './assistantNavigation'
-import { SporiAvatar, SporiComposer, SporiSources, SporiText, SporiTyping } from './sporiChat'
-import { formatTime, useSporiChat } from './useSporiChat'
+import { SporiAiBadge, SporiAvatar, SporiComposer, SporiCopyButton, SporiSources, SporiText, SporiTyping } from './sporiChat'
+import { formatTime, useSporiChat, useSporiScroll } from './useSporiChat'
 
 export function MemberAssistantLink({ onNavigate, className, label = 'Open center assistant' }: {
   onNavigate?: () => void
@@ -108,13 +108,7 @@ function CenterConsultationWorkspace() {
   const enabled = import.meta.env.VITE_TRAINING_CONSULTATION_ENABLED !== 'false'
   const started = chat.messages.length > 0 || chat.pending
 
-  // Keep the newest message in view, like any chat.
-  useEffect(() => {
-    const log = logRef.current
-    if (!log) return
-    if (typeof log.scrollTo === 'function') log.scrollTo({ top: log.scrollHeight, behavior: 'smooth' })
-    else log.scrollTop = log.scrollHeight
-  }, [chat.messages, chat.pending])
+  useSporiScroll(logRef, { count: chat.messages.length, pending: chat.pending, lastIsAnswer: chat.messages.at(-1)?.role !== 'user' })
 
   function submit() {
     const text = question.trim()
@@ -189,7 +183,8 @@ function CenterConsultationWorkspace() {
 }
 
 function AnswerBubble({ question, result, at }: { question: string; result: Consultation; at: Date }) {
-  const text = ANSWER_TEXT[result.language === 'vi' ? 'vi' : 'en']
+  const vi = result.language === 'vi'
+  const text = ANSWER_TEXT[vi ? 'vi' : 'en']
   const noAnswer = result.status === 'NO_ANSWER'
   return (
     <div className="spori-row spori-row--bot">
@@ -201,11 +196,15 @@ function AnswerBubble({ question, result, at }: { question: string; result: Cons
           {result.mode !== 'AI_GENERATED' && <><p>{text.noAnswer}</p><p>{text.noAnswerSteps}</p></>}
           <Link className="spori-handoff__button" to="/member/support" state={{ question, excerpt: assistantExcerpt(question, result) }}>{text.contactReceptionist}</Link>
         </div>}
-        <SporiSources sources={result.sources} kindLabel={kind => text.kinds[kind] ?? text.otherKind} />
+        <SporiSources sources={result.sources} kindLabel={kind => text.kinds[kind] ?? text.otherKind} vi={vi} />
         <p className="spori-meta">{text.found}: {text.modes[result.mode] ?? result.mode}.</p>
         {!noAnswer && <Link className="spori-meta-link" to="/member/support" state={{ excerpt: assistantExcerpt(question, result) }}>{text.contact}</Link>}
       </div>
-      <time className="spori-time">{formatTime(at)}</time>
+      <div className="spori-meta-row">
+        <time className="spori-time">{formatTime(at)}</time>
+        {result.mode === 'AI_GENERATED' && <SporiAiBadge />}
+        <SporiCopyButton text={result.answer} vi={vi} />
+      </div>
     </div>
   )
 }

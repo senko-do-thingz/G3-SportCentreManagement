@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { trainingGuidanceApi, type ChatTurn, type Consultation } from '../../api/trainingGuidanceApi'
 
 /** Shared Spori conversation state: messages, the pending flag, and the history sent back with each question. */
@@ -36,6 +36,22 @@ export function useSporiChat(fallbackError: string) {
   }
 
   return { messages, pending, send, reset: () => setMessages([]) }
+}
+
+/**
+ * Chat scrolling as in most messengers: the Member's own message and the typing dots scroll to the bottom, while a new
+ * answer scrolls to its first line so a long reply is read from the top.
+ */
+export function useSporiScroll(log: RefObject<HTMLDivElement | null>, deps: { count: number; pending: boolean; lastIsAnswer: boolean; open?: boolean }) {
+  const { count, pending, lastIsAnswer, open = true } = deps
+  useEffect(() => {
+    const element = log.current
+    if (!open || !element || typeof element.scrollTo !== 'function') return
+    const rows = element.querySelectorAll<HTMLElement>('.spori-row')
+    const last = rows[rows.length - 1]
+    const top = !pending && lastIsAnswer && last ? Math.max(0, last.offsetTop - 12) : element.scrollHeight
+    element.scrollTo({ top, behavior: 'smooth' })
+  }, [log, count, pending, lastIsAnswer, open])
 }
 
 export function formatTime(at: Date) {
